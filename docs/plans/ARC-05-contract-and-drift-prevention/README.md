@@ -46,6 +46,8 @@ ARC-04-S01/S02/S03/S04/S05/S06/S07/S08/S11/S13 (vitest scoping and the retained 
 
 ## Risks
 
+> **Amendment 2026-09-06 (from `03` §F S-19 note).** The `claude plugin validate --strict` step keys on the **exit code only** — the command prints no per-target line for a skills directory — and every manifest the repo ships carries `author` (a missing author is a warning that `--strict` turns into exit 1).
+
 > **Amendment 2026-09-06 (from `03` §F S-19).** `claude plugin validate --strict` is proven to run headless on GitHub runners without login; the engine lint may call it in CI on the skills directory. The `03` fallback (skip when the CLI is absent) is retired — the CLI is installed from npm in the CI job.
 
 - Middle-wildcard permission globs may be unsupported (S-12). Mitigation: generator emits explicit names (default); style recorded in `engine.config.json.mcp.permissions.allowStyle`.
