@@ -162,6 +162,8 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 
 ### ARC-01-S03 — Import the server into `packages/snowarch` with history; leaf-level D-03 cut; package rename
 
+> **Amendment 2026-09-06 (from ARC-00-S02 finding e).** The leaf cut of this story MUST also `git rm` the server's `LICENSE` (the "Source Available License — All rights reserved" text), `TERMS.md`, `smithery.yaml` and `server.json` before the import is committed, and `packages/snowarch/package.json` `license` must read `Apache-2.0` (the `SEE LICENSE IN LICENSE` value and its copies in the deleted `desktop/` and lock files go with the cut). Rationale: without this, `packages/snowarch/LICENSE` arrives in a public Apache-2.0 tree carrying a contradictory proprietary licence until ARC-01-S08 runs. ARC-01-S08 then writes the single root `LICENSE`/`NOTICE` from `spikes/licence/`.
+
 **As** a maintainer **I want** the server's working tree imported under `packages/snowarch` with history, the D-03 surfaces that nothing under `src/` imports removed, and the package renamed to `@farstic/snowarch` **so that** ARC-04 hardens a server that already lives in its final directory under its final name, and the test suite is green from the first CI run.
 
 **Context.** D-01 (d) amended: package `@farstic/snowarch`, directory `packages/snowarch`, bin `snowarch`; the npm record `@farstic/snow-mcp@1.0.0` is never touched. D-03 (cut list). P-18 (bins and package name belong to third parties; dead URLs), P-15. `00` §4.9: `npx vitest run` today → 12 failed files, **all** `desktop/tests/**`; 272 tests pass. README deliverable "import of snow-mcp … with `desktop/`, `clients/`, … removed"; README acceptance criteria 4 (history) and 6 (cut list, footprint).
