@@ -46,6 +46,8 @@ ARC-04-S01/S02/S03/S04/S05/S06/S07/S08/S11/S13 (vitest scoping and the retained 
 
 ## Risks
 
+> **Amendment 2026-09-06 (from `03` §F S-23).** The generated `permissions.ask` block (and the generated §2.1 rule text) is derived **only** from `contract.json`'s `mutates` flag — never from tool-name suffixes. Regression test: the 14 tools listed in `03` S-23 appear in the generated `ask` block. The `allow` list is either 269 explicit read entries (no-glob fallback) or the three globs `snow_*_read` / `snow_*_index` / `snow_*_query` (205) plus the explicit non-mutating remainder — S-12's observation decides which; both are generated, neither is hand-maintained.
+
 > **Amendment 2026-09-06 (from `03` §F S-19 note).** The `claude plugin validate --strict` step keys on the **exit code only** — the command prints no per-target line for a skills directory — and every manifest the repo ships carries `author` (a missing author is a warning that `--strict` turns into exit 1).
 
 > **Amendment 2026-09-06 (from `03` §F S-19).** `claude plugin validate --strict` is proven to run headless on GitHub runners without login; the engine lint may call it in CI on the skills directory. The `03` fallback (skip when the CLI is absent) is retired — the CLI is installed from npm in the CI job.

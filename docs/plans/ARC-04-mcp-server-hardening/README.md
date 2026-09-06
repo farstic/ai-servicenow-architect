@@ -57,6 +57,8 @@ ARC-01. D-02 (relicensing) is a hard gate; D-03 fixes the cut list; D-05 fixes t
 
 ## Risks
 
+> **Amendment 2026-09-06 (from `03` §F S-23).** The per-tool `mutates` (and `gate`) values in the contract are **authored from each tool's behaviour**, tool by tool, during the import review — never derived from the name. The §2.1 suffix list is at most a lint *hint* ("suffix says write, flag says read → review"). Tests: every one of the 394 (later 398) tools carries an explicit boolean; the 14 tools named in `03` S-23 are `mutates: true`; a new tool without the field fails the build.
+
 - The gate split changes behaviour for existing snow-mcp 1.0.0 users (R-03). Mitigation: CHANGELOG migration note; the product ships as 2.0.0 under a new npm record (`@farstic/snowarch`); the old record is untouched.
 - Per-instance flag evaluation touches every dispatcher. Mitigation: an `AsyncLocalStorage` carrier (`runWithInstance`) keeps every `require*()` call site unchanged; the contract test asserts every tool's gate.
 - `list_changed` may not surface in Claude Code (S-02). Mitigation: documented `/mcp` reconnect fallback.
