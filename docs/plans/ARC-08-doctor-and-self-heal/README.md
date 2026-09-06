@@ -47,6 +47,8 @@ ARC-04-S02/S04/S11/S12 (store module, `snow_core_capabilities_read`, network cla
 
 ## Risks
 
+> **Amendment 2026-09-06 (from `03` §F S-07).** The docs-corpus check reads the **superproject's** `git submodule status` and requires the initialised form (no leading `-`) at the pinned SHA; a populated `vendor/ServiceNowDocs` tree with an uninitialised gitlink is a FAIL with the remedy `git submodule init` (folded into `./snowarch docs sync`).
+
 > **Amendment 2026-09-06 (from `03` §F S-21).** No doctor check, banner, or `--fix` action may shell out to `claude mcp get|list|add` for a *read-only* purpose: those commands rewrite `migrationVersion` in `~/.claude.json` when Claude Code versions alternate. Registration state is read from `.mcp.json`, `.claude/settings.json` and `.claude/settings.local.json` directly. The one legitimate `claude mcp` call (E-23's printed remedy for stale registrations) is printed for the user, never executed by the doctor.
 
 - Doctor drift from the checks in other ARCs. Mitigation: each ARC's acceptance criteria name the doctor check that proves them; CI runs the doctor after the bootstrap (S11 snapshot test).
