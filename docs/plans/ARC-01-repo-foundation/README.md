@@ -64,6 +64,8 @@ ARC-00 for names, licence and scope-cut confirmation (all closed 2026-09-04) and
 
 ## Risks
 
+> **Amendment 2026-09-06 (from `03` §F S-19).** Any plugin/marketplace manifest scaffolded in this ARC carries `name`, `version`, `description` **and `author`** — `claude plugin validate --strict` (ARC-05 CI) turns the missing-author warning into exit 1.
+
 - History import size: **retired** — measured on 2026-09-04 the two histories total < 4 MB; the repository stays far below the 30 MB target without `git filter-repo`. Residual risk: `git log --follow` across the subtree merge; fallback `git filter-repo --to-subdirectory-filter` is written into S03.
 - Renaming the server package before ARC-04 rebuilds `dist/` leaves no stale `dist/` in the tree because `dist/` is never imported (gitignored in the source) and stays ignored until ARC-04-S13 commits it; CI proves the server compiles with `tsc --noEmit` and runs its vitest suite (green once `desktop/tests/**` is removed — the only failing files today, `00` §4.9).
 - The README's "no file from the cut list" wording could tempt an implementer to delete `src/prompts` & co. and break the build; the Scope section and S03 make the split explicit and the ratchet test pins the leaf paths.

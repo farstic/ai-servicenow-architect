@@ -41,6 +41,8 @@ ARC-01, ARC-02, ARC-03, ARC-04, ARC-05, ARC-06, ARC-07, ARC-08 (per-story detail
 
 ## Risks
 
+> **Amendment 2026-09-06 (from `03` §F S-14f).** `scripts/release.mjs` checks the working tree is clean **before** testing whether the tag exists — the CLI's own plugin-tag command does it the other way round and a stale tag then masks a dirty tree until the version moves. Every product manifest carries `author` (S-19: `--strict` fails on that warning).
+
 - Windows CI runners differ from consultant laptops (policies, AV). Mitigation: S-08 on a real locked-down VM; the install page states the tested configurations.
 - Conventional-commit discipline slips. Mitigation: commitlint in CI; the release script falls back to a manually edited changelog section.
 
