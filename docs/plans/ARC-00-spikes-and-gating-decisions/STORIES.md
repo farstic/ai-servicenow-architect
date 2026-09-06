@@ -205,7 +205,7 @@ Windows note (from `01` §4.1): Claude Code's own Bash tool needs Git Bash, so o
 
 **As** a maintainer **I want** each owner decision captured as an Accepted ADR quoting the owner's ruling, and the concrete values the decisions fix written once **so that** every later ARC reads a durable record instead of the chat, and `engine.config.json` (ARC-01) starts from agreed values.
 
-**Context.** README deliverable: six ADRs using the engine's template (`AI-Architect-Claude/reference/templates/adr-template.md`; `templates/adr-template.md` after ARC-02). README acceptance: "Six ADRs exist with status Accepted and the owner's answer quoted" and "`engine.config.json` values for names and floors are fixed (D-01, S-11) and referenced by the ADRs". The post-decision rulings Q-A, Q-B, R-1, R-2, R-3 (`02` "Post-decision rulings") have no ADR in the README list — they are added here as ADR-0007 (a split of README story 17, stated so).
+**Context.** README deliverable: seven ADRs (ADR-0001…0007, the seventh for the post-decision rulings) using the engine's template (`AI-Architect-Claude/reference/templates/adr-template.md`; `templates/adr-template.md` after ARC-02). README acceptance: "Six ADRs exist with status Accepted and the owner's answer quoted" and "`engine.config.json` values for names and floors are fixed (D-01, S-11) and referenced by the ADRs". The post-decision rulings Q-A, Q-B, R-1, R-2, R-3 (`02` "Post-decision rulings") have no ADR in the README list — they are added here as ADR-0007 (a split of README story 17, stated so).
 
 **Scope.** In: `docs/decisions/ADR-0001-names.md` … `ADR-0006-distribution-channel.md`, `ADR-0007-post-decision-rulings.md`; `spikes/engine.config.seed.json`. Out: the JSON schema and validation (ARC-01-S04); editing an Accepted ADR later (supersede instead — the template forbids editing history).
 
@@ -243,9 +243,9 @@ Template fields adapted for an engine-level (not client) decision: `Engagement` 
 1. Seven files exist under `docs/decisions/`; ADR-0001–0005 and 0007 carry `Status: Accepted`, ADR-0006 carries `Status: Proposed` with a *Follow-ups* line "S12 → Accepted or superseded, before ARC-06-S01".
 2. Each of ADR-0001…0006 has the owner's `DECIDED 2026-09-04 …` block from `02` verbatim under *Decision* (diff against `02` shows the quote intact); ADR-0007 quotes the five *Ruling* cells of the `02` "Post-decision rulings" table verbatim (Q-A, Q-B, R-1, R-2, R-3), one sub-heading each.
 3. `grep -l "snow-mcp" docs/decisions/*.md` matches only in the historical sense (source paths, the untouched npm record) — never as the new package name; `grep -l "packages/snowarch\|@farstic/snowarch" ADR-0001-names.md` matches.
-4. `grep -c "/status\b" docs/decisions/*.md` is 0 outside ADR-0007's "was → is" line; `/snowarch status` is the only form used.
+4. `grep -c "/status\b" docs/decisions/*.md` is 0 outside ADR-0007's "was → is" line; `/snowarch status` is the only form used. *(Amended 2026-09-06: outside verbatim `02` quotations and the retired-vocabulary note.)*
 5. `spikes/engine.config.seed.json` parses (`node -e "JSON.parse(require('fs').readFileSync('spikes/engine.config.seed.json','utf8'))"`) and every value above appears in the ADR that fixes it.
-6. No ADR mentions "Tier 0/1/2" except in a "retired vocabulary" note; Mode/Preset words are used.
+6. No ADR mentions "Tier 0/1/2" except in a "retired vocabulary" note; Mode/Preset words are used. *(Amended 2026-09-06: outside verbatim `02` quotations and the retired-vocabulary note.)*
 
 **Tasks.**
 
@@ -262,7 +262,7 @@ Template fields adapted for an engine-level (not client) decision: `Engagement` 
 
 **Risks / open points.** ADR immutability: if S11 raises the floor or S12 re-opens the channel, the change is a *new* ADR superseding the old one, never an edit — say so in each ADR's footer. ADR-0007 bundles five rulings in one file (one-decision-per-file rule bent deliberately; noted in its header so a reader knows why).
 
-**Definition of done.** Seven ADRs in the spike repository; owner initials present; ARC-01 can copy `docs/decisions/` and the seed values without edits.
+**Definition of done.** Seven ADRs in the spike repository; owner initials present; ARC-01 can copy `docs/decisions/` and the seed values without edits. *(Amended 2026-09-06 — architect ruling on the seed: `spikes/engine.config.seed.json` uses exactly the key shape of ARC-01-S04's schema — `product` (string), `repo`, `cli`, `mcp{serverKey,package,packageDir}`, `floors{claudeCode,node,git}`, `docs{family,pin,areasFile}`, `roster{skills,agents}` — so ARC-01-S04 validates it unchanged; `floors.claudeCode` is `"2.1.214"` (decided in `01` §4/§12; S-11 confirms it, and a FAILED S-11 changes the value through ADR-0001's supersession, not by leaving it blank). ARC-00-only values (modes, presets, skill sub-commands) live in ADR-0003/0007, not in the seed.)*
 
 ---
 

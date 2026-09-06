@@ -27,6 +27,8 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 
 ### ARC-01-S01 — Found the repository: root commit with `LICENSE`/`NOTICE`, default branch, protection, skeleton
 
+> **Amendment 2026-09-06 (from ARC-00-S03 finding a).** The root commit ALSO carries the ARC-00 artefacts, copied verbatim from `farstic/snowarch-spikes` at its final tag: `spikes/licence/LICENSE` → `/LICENSE`, `spikes/licence/NOTICE` → `/NOTICE`, `spikes/licence/RELICENSING.md` → `docs/RELICENSING.md`, `spikes/licence/header-sweep.txt` → `docs/spikes/licence/header-sweep.txt`, `docs/decisions/` → `docs/decisions/`, `spikes/` (records, TEMPLATE, stub server, recipes, hooks) → `docs/spikes/`, `spikes/engine.config.seed.json` → `engine.config.json` (validated by S04). No ARC-01 story imported these before; this is the story that does. Acceptance: `diff -rq <snowarch-spikes>/docs/decisions docs/decisions` and `diff -rq <snowarch-spikes>/spikes docs/spikes` are empty at the root commit.
+
 **As** a maintainer **I want** `farstic/ai-servicenow-architect` to exist with an Apache-2.0 root commit, a protected `main` branch and the agreed directory skeleton **so that** every later story lands files in their final place and the relicensing statement is the first line of the repository's history.
 
 **Context.** D-01 (repository name), D-02 (licence, relicensing sentence "in the first commit"; `00` P-32), P-15 (three-way name mismatch). README acceptance criterion "`LICENSE` and `NOTICE` present". `00` §2 records that the engine has 0 tags and the server 0 tags — this story starts the tag discipline of `01` §12.
@@ -92,6 +94,8 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 ---
 
 ### ARC-01-S02 — Import the engine working tree with history (submodule dropped, legacy scripts parked)
+
+> **Amendment 2026-09-06 (from ARC-00-S03 finding a).** Criterion 3's `diff -rq` against `~/work/AI-Architect-Claude/` additionally excludes the paths the root commit (S01) brought from `snowarch-spikes` and that do not exist in the engine: `--exclude=LICENSE --exclude=NOTICE --exclude=RELICENSING.md --exclude=decisions --exclude=spikes --exclude=engine.config.json`. The engine import is still byte-identical for every engine-originated file.
 
 **As** a maintainer **I want** the engine's current *working tree* (not `origin/main`) imported at the root of the new repo with its full history **so that** the 28 skills, 9 agents, governance texts and scripts land in the location ARC-02 edits, and `git log` on any engine file still reaches the 2026 history.
 
