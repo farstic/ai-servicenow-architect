@@ -47,6 +47,8 @@ ARC-04-S02/S04/S11/S12 (store module, `snow_core_capabilities_read`, network cla
 
 ## Risks
 
+> **Amendment 2026-09-06 (from `03` §F S-21).** No doctor check, banner, or `--fix` action may shell out to `claude mcp get|list|add` for a *read-only* purpose: those commands rewrite `migrationVersion` in `~/.claude.json` when Claude Code versions alternate. Registration state is read from `.mcp.json`, `.claude/settings.json` and `.claude/settings.local.json` directly. The one legitimate `claude mcp` call (E-23's printed remedy for stale registrations) is printed for the user, never executed by the doctor.
+
 - Doctor drift from the checks in other ARCs. Mitigation: each ARC's acceptance criteria name the doctor check that proves them; CI runs the doctor after the bootstrap (S11 snapshot test).
 - Banner cost on slow disks. Mitigation: cached JSON; `--quick` subset bounded; hook `timeout` 10 s; in-hook watchdog 5 s (S08).
 - Whether the environment the doctor sees equals the environment Claude Code's spawned server sees (proxy/CA variables) — spike S-20, raised by ARC-04-S11 and run in ARC-00-S06 (ARC-00-S14 adds its row to `03` §A, which does not list it yet); until answered E-26 reports "as seen by this shell".

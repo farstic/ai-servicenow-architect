@@ -43,6 +43,8 @@ ARC-03 (B02 recipe and areas file), ARC-04 (server that starts unconfigured; com
 
 ## Risks
 
+> **Amendment 2026-09-06 (from `03` §F S-01 partial).** `enabledMcpjsonServers` pre-seeding is NOT honoured before the workspace is trusted (verified on 2.1.214 and 2.1.258); `disabledMcpjsonServers` is. Consequences: the design-only path stays dialog-free beyond the trust dialog; the live path must budget the trust dialog **plus** one MCP approval unless the owner's post-trust run (ARC-00-S04) shows otherwise. The bootstrap's B09 "Next:" line and INSTALL.md state the count the spike recorded — never fewer.
+
 - S-01 fails → one approval click remains; the summary line already tells the user to expect it.
 - S-03 fails on Windows → per-machine resolved paths written to `settings.local.json` and a generated local `.mcp.json` override (fallback in `03`).
 - Users run the launcher from a subfolder → B00 detects "not at repo root" and prints `cd`.

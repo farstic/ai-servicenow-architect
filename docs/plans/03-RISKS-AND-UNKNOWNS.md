@@ -86,3 +86,13 @@ Every spike is run by exactly one ARC-00 story (or, for the two that need produc
 - The published `@farstic/snow-mcp@1.0.0` tarball's provenance (built from an untracked working state) — relevant only to roadmap item 2, which republishes from CI with `--provenance`.
 - `hasTrustDialogAccepted` in `~/.claude.json` as a way to skip the trust dialog — deliberately not used (it would edit `~/.claude.json`).
 - Whether Claude Code's Bash tool exposes `CLAUDE_PROJECT_DIR` to the Claude-first clone step — the recipe uses `.` (the cwd) and does not need it.
+
+
+---
+
+## F. Rows added during ARC-00 execution (2026-09-06)
+
+| ID | Assumption / finding | Status | Evidence | Consumed by |
+|---|---|---|---|---|
+| S-01 (partial) | Pre-seeded `enabledMcpjsonServers` removes the MCP approval dialog on first `claude` | **PARTIALLY REFUTED — pre-trust.** `claude mcp get servicenow` reports `⏸ Pending approval` with `enabledMcpjsonServers` pre-seeded, identical to no toggle at all, on 2.1.214 and 2.1.258; `disabledMcpjsonServers` IS honoured pre-trust (`✘ Rejected`, absent from `claude mcp list`). Reproduced independently by the architect on 2.1.258. The dialog count itself (post-trust) is still pending the owner's interactive run. | `docs/spikes/S-01-preseeded-approval/README.md` | ARC-06-S01/S05/S09/S13: design-only mode is dialog-free beyond trust (rejection applies early); live mode must budget trust + one MCP approval unless the post-trust run shows the pre-seed is applied at that moment — do not promise fewer dialogs than the owner's run records. D-06 interruption (2) is therefore expected, not exceptional. |
+| S-21 (new) | `claude mcp get` / `claude mcp list` are inert on `~/.claude.json` | **REFUTED.** Each probe rewrites exactly one top-level key, `migrationVersion` (2.1.214 writes `13`, 2.1.258 writes `14`); alternating binaries flips it on every switch; a repeat on the same binary writes nothing; `projects` is untouched. Measured by whole-file diff (developer session); same-binary "no write" confirmed by the architect. | `docs/spikes/S-01-preseeded-approval/README.md` §finding (a) | ARC-08 (doctor must not shell out to `claude mcp …` for a read-only check — read `.mcp.json` and the settings files directly; if it ever must, document the `migrationVersion` write and never call it from the SessionStart banner); ARC-06/ARC-09 (a pinned 2.1.214 beside a newer global `claude` will churn this key — record, do not fight). |
