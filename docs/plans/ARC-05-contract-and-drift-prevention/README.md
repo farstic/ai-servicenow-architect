@@ -46,6 +46,8 @@ ARC-04-S01/S02/S03/S04/S05/S06/S07/S08/S11/S13 (vitest scoping and the retained 
 
 ## Risks
 
+> **Amendment 2026-09-07 (from `03` §F S-06 correction).** The generated rule file's MCP-failure instruction reads: "quote the typed notice (`CONNECT_TIMEOUT` / `CONNECTION_CLOSED` / `ENOENT` …) verbatim and the doctor's output; add nothing" — not "never explain". Rationale recorded: an invitation to explain produces embellishment on top of accurate data.
+
 > **Amendment 2026-09-07 (from `03` §F S-12 / S-16).** (1) `allow` is generated as the three globs `mcp__servicenow__snow_*_read` / `snow_*_index` / `snow_*_query` plus the explicit non-mutating remainder — middle-wildcard globs are confirmed on 2.1.258; the 269-entry fallback story is retired. (2) Bash allow rules are tested against the compound form Claude executes (`<cmd> 2>&1; echo "EXIT: $?"`): the generated list carries the wrapper `echo` entry, and the gate test runs the doctor through `claude -p --settings` (S-24) and asserts it runs without approval.
 
 > **Amendment 2026-09-07 (from the owner sitting).** Claude Code executes Bash tool calls in a compound form (`<cmd> 2>&1; echo "EXIT: $?"` was observed). Every generated `permissions.allow` Bash rule is written and tested against the form actually executed, not the bare command; the S-16 record states whether `Bash(./snowarch doctor*)` matched the compound form.
