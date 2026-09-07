@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# .githooks/pre-commit
+#
+# Auto-syncs agents/ and skills/ mirrors with .claude/agents/ and .claude/skills/.
+# If any files are updated, they are staged automatically before the commit proceeds.
+#
+# Install once per machine:
+#   git config core.hooksPath .githooks
+#
+# To bypass in an emergency (not recommended):
+#   git commit --no-verify
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# 1. Auto-sync agents/ + skills/ mirrors with the .claude/ source of truth.
+if ! bash "$REPO_ROOT/scripts/sync-agents-skills.sh" --check > /dev/null 2>&1; then
+  echo "Auto-syncing agents/ and skills/ mirrors..."
+  bash "$REPO_ROOT/scripts/sync-agents-skills.sh"
+  git -C "$REPO_ROOT" add agents/ skills/
+  echo "Mirrors synced and staged automatically."
+fi
+
+# 2. Structural integrity gate (parity, frontmatter, name-match, path refs).
+if ! bash "$REPO_ROOT/scripts/verify-structure.sh"; then
+  echo "Commit blocked: structure audit failed (see above). Fix, or bypass with: git commit --no-verify"
+  exit 1
+fi
+
+# 3. ServiceNowDocs citation gate (every cited doc path must resolve).
+if ! bash "$REPO_ROOT/scripts/verify-citations.sh"; then
+  echo "Commit blocked: dead ServiceNowDocs citation(s) (see above). Remap, or bypass with: git commit --no-verify"
+  exit 1
+fi
+
+exit 0
