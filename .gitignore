@@ -23,3 +23,12 @@ nowaikit-example.ts
 
 # Local rendered diagram previews (SVGs/HTML) — scratch viewing only, regenerable from .mmd.
 diagram-preview/
+
+# Added by ARC-01-S02b, ahead of ARC-01-S07's replacement of this file.
+# .local/ holds the per-checkout state ADR-0004 (D-04) puts instances.json in at mode 0600, so it
+# must never be unprotected -- not even between stories. node_modules/ goes live when ARC-01-S11
+# adds package.json. The other two are OS residue.
+.local/
+node_modules/
+.DS_Store
+Thumbs.db
