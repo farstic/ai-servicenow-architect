@@ -1,11 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/farstic/ai-servicenow-architect/engine.config.schema.json",
-  "title": "engine.config.json — the product's constants, in one place",
+  "title": "engine.config.json \u2014 the product's constants, in one place",
   "description": "Every value the engine, the server, the doctor and the release tooling would otherwise hand-write twice. Consumers read it; ARC-01 only defines it.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["product", "repo", "cli", "mcp", "floors", "docs", "roster"],
+  "required": [
+    "product",
+    "repo",
+    "cli",
+    "mcp",
+    "floors",
+    "docs",
+    "roster"
+  ],
   "properties": {
     "$schema": {
       "type": "string",
@@ -28,25 +36,45 @@
     "mcp": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["serverKey", "package", "packageDir"],
+      "required": [
+        "serverKey",
+        "package",
+        "packageDir"
+      ],
       "properties": {
         "serverKey": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]+$",
           "description": "The key in .mcp.json. Letters, digits, - and _ only (D-01); it becomes part of every generated permission rule, mcp__<serverKey>__<tool>."
         },
-        "package": { "type": "string", "pattern": "^@[a-z0-9-]+/[a-z0-9-]+$" },
-        "packageDir": { "type": "string", "pattern": "^packages/[a-z0-9-]+$" }
+        "package": {
+          "type": "string",
+          "pattern": "^@[a-z0-9-]+/[a-z0-9-]+$"
+        },
+        "packageDir": {
+          "type": "string",
+          "pattern": "^packages/[a-z0-9-]+$"
+        }
       }
     },
     "floors": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["claudeCode", "node", "git"],
+      "required": [
+        "claudeCode",
+        "node",
+        "git"
+      ],
       "description": "Minimum supported versions. The doctor reads these (01 section 8, section 12).",
       "properties": {
-        "claudeCode": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
-        "node": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "claudeCode": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
+        "node": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$"
+        },
         "git": {
           "type": "string",
           "pattern": "^\\d+\\.\\d+\\.\\d+$",
@@ -57,29 +85,56 @@
     "docs": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["family", "pin", "areasFile"],
+      "required": [
+        "family",
+        "pin",
+        "areasFile",
+        "upstream"
+      ],
       "properties": {
         "family": {
           "type": "string",
-          "enum": ["australia", "xanadu", "yokohama", "zurich"],
+          "enum": [
+            "australia",
+            "xanadu",
+            "yokohama",
+            "zurich"
+          ],
           "description": "Upstream release-family branches (00 section 3.10). main/mobile/nofamily/other/store are not release families. ARC-03's `snowarch docs family <name>` must extend this enum when ServiceNow adds one."
         },
         "pin": {
           "type": "string",
           "pattern": "^[0-9a-f]{40}$",
-          "description": "Full SHA. Must equal the vendor/ServiceNowDocs gitlink once ARC-03 creates it — enforced by tests/engine-config.test.mjs, which reports the check as skipped until then."
+          "description": "Full SHA. Must equal the vendor/ServiceNowDocs gitlink once ARC-03 creates it \u2014 enforced by tests/engine-config.test.mjs, which reports the check as skipped until then."
         },
-        "areasFile": { "type": "string", "pattern": "^vendor/[a-z0-9.-]+$" }
+        "areasFile": {
+          "type": "string",
+          "pattern": "^vendor/[a-z0-9.-]+$"
+        },
+        "upstream": {
+          "type": "string",
+          "description": "The submodule URL. Must equal .gitmodules submodule.vendor/ServiceNowDocs.url \u2014 asserted by tests/docs-pin.test.mjs, because a config naming a different upstream than the one git will clone is worse than no config. Constrained by PATTERN, not `format: \"uri\"`: plain Ajv ships no format validators, and in strict mode an unknown format is a hard error (\"unknown format \\\"uri\\\" ignored\"), so the story's `format: uri` would have made every run of tests/engine-config.test.mjs throw. The pattern is also tighter than `uri` \u2014 it accepts only an https git URL, which is the only shape a submodule clone here may take.",
+          "pattern": "^https://[A-Za-z0-9.-]+/[A-Za-z0-9._/-]+\\.git$"
+        }
       }
     },
     "roster": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["skills", "agents"],
-      "description": "Expected counts, cross-checked against the files on disk by the test — 00 section 3.8 records that these drift when they live in prose.",
+      "required": [
+        "skills",
+        "agents"
+      ],
+      "description": "Expected counts, cross-checked against the files on disk by the test \u2014 00 section 3.8 records that these drift when they live in prose.",
       "properties": {
-        "skills": { "type": "integer", "minimum": 1 },
-        "agents": { "type": "integer", "minimum": 1 }
+        "skills": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "agents": {
+          "type": "integer",
+          "minimum": 1
+        }
       }
     }
   }

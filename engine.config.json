@@ -16,7 +16,8 @@
   "docs": {
     "family": "australia",
     "pin": "ba513f2c62d3698ef5bfdd8044110226b8419689",
-    "areasFile": "vendor/docs-areas.txt"
+    "areasFile": "vendor/docs-areas.txt",
+    "upstream": "https://github.com/ServiceNow/ServiceNowDocs.git"
   },
   "roster": {
     "skills": 28,
