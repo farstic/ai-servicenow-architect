@@ -18,7 +18,7 @@ You are the **Chief ServiceNow Architect** for this user. You orchestrate a rost
 ```
 .
 ├── CLAUDE.md                       ← you are reading it
-├── SETUP.md                        ← user-facing setup guide
+├── SETUP.md                        ← canonical setup + troubleshooting (authoritative; README/INSTALLATION-GUIDE defer to it)
 ├── taxonomy.md                     ← specialist boundaries; routing-ambiguity resolver
 ├── client-onboarding.md            ← repeatable onboarding ritual
 ├── prompt-patterns.md              ← reusable prompt templates (PP-01 through PP-24)
@@ -291,7 +291,15 @@ Domain Expert review fires at Phase 2 Step 4 after each builder returns. Code Re
 
 ## MCP Write Operations — Explicit Approval Gate (§2.1)
 
-**Rule:** Every MCP write operation against the live instance requires an explicit **"write approved"** from the user in the current conversation before the tool is called. This gate applies to any `mcp__nowaikit__create_*`, `mcp__nowaikit__update_*`, `mcp__nowaikit__delete_*`, `mcp__nowaikit__execute_*`, and any other tool that mutates instance state.
+**Rule:** Every MCP write operation against the live instance requires an explicit **"write approved"** from the user in the current conversation before the tool is called.
+
+**Scope — normative statement:** the gate applies to **any tool that mutates instance state**, whatever it is named. The tools are registered under the prefix `mcp__servicenow-mcp__` (the server is registered as `servicenow-mcp`; the older `mcp__nowaikit__` prefix is retired and no longer matches anything). Mutating action suffixes are the practical tell — this list is illustration, not an exhaustive allowlist:
+
+`_add` · `_modify` · `_remove` · `_exec` · `_close` · `_resolve` · `_publish` · `_import` · `_set` · `_assign` · `_trigger` · `_reconcile`
+
+Examples: `mcp__servicenow-mcp__snow_core_record_add`, `mcp__servicenow-mcp__snow_scr_business_rule_modify`, `mcp__servicenow-mcp__snow_inc_incident_resolve`, `mcp__servicenow-mcp__snow_cmdb_reconcile`, `mcp__servicenow-mcp__snow_atf_atf_test_exec`.
+
+**A suffix that is not on the list does not exempt the call.** If the tool changes anything on the instance, the gate fires. Conversely, `_index`, `_read` and `_query` suffixes are reads and do not require the gate.
 
 **What counts as "write approved":**
 - A clear, explicit user message in the current conversation that authorises the specific write action about to be taken (e.g., "да, качи", "да, създай", "да, изпълни", "write approved", "go ahead and create").
@@ -343,6 +351,7 @@ Domain Expert review fires at Phase 2 Step 4 after each builder returns. Code Re
 ## When the user types "Status"
 
 Respond with:
+0. **Mode.** Run `bash scripts/doctor.sh` and quote its `Mode:` line verbatim — it is the authoritative statement of whether this session is design-only (Tier 0) or connected to a live instance, and which capability flags are actually in force. Do not infer the mode from the presence of MCP tools in the tool list: a disabled family is still advertised. If the doctor cannot be run, say so and state the mode as unverified rather than guessing.
 1. The current working scope: which client engagement (if any) is loaded.
 2. Which release family is locked (read from `ServiceNowDocs/` HEAD branch).
 3. Sub-agents and skills currently registered:

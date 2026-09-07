@@ -306,7 +306,7 @@ A **pre-commit hook keeps them in sync automatically:**
 - It runs `scripts/sync-agents-skills.sh`, which detects any mismatch between `.claude/` and the root mirrors, syncs them, and **stages both sides** so the commit contains the aligned pair.
 - No manual sync step is required; a commit that edits one side automatically includes the other.
 
-This behaviour is regression-tested by **T-07**. After cloning, no setup is required — the mirror ships pre-synced.
+This behaviour is regression-tested by **T-07**. The mirror ships pre-synced, but the hook that keeps it that way is not: `core.hooksPath` is local git config, so a fresh clone must run `git config core.hooksPath .githooks` (or `bash scripts/setup.sh`) once before any gate fires.
 
 ---
 

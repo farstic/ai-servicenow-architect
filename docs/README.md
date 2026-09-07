@@ -138,7 +138,7 @@ claude-servicenow-live/
 └── docs/                     ← This documentation suite
 ```
 
-The `.claude/` mirror ships pre-synced and is kept aligned automatically by the pre-commit hook — after `git clone`, no setup is required.
+The `.claude/` mirror ships pre-synced and is kept aligned automatically by the pre-commit hook. Note that the hook itself is **not** live on a fresh clone: `core.hooksPath` is local git config that `git clone` does not carry, so run `git config core.hooksPath .githooks` (or `bash scripts/setup.sh`) once after cloning, or the sync and verification gates stay silently inert.
 
 ---
 

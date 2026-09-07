@@ -1,4 +1,0 @@
-[submodule "ServiceNowDocs"]
-	path = ServiceNowDocs
-	url = https://github.com/ServiceNow/ServiceNowDocs.git
-	branch = australia

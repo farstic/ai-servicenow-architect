@@ -137,8 +137,16 @@ Read tools are safe to call freely and are the engine's primary means of validat
 
 - `get_table_schema`, `discover_table`, `check_table_completeness` — confirm a field or table exists *on this instance*.
 - `query_records`, `get_record`, `run_aggregate_query` — inspect data and volumes.
+
+### Reads gated by `SCRIPTING_ENABLED`
+
+These are reads — they require no §2.1 approval and mutate nothing — but the server refuses them outright unless `SCRIPTING_ENABLED=true` **and** `WRITE_ENABLED=true` are both set. The scripting guard wraps the entire `snow_scr_*` dispatcher, not just its write branch, so an audit-only call fails exactly like a write would:
+
 - `list_business_rules`, `list_script_includes`, `get_script_include` — audit existing config before proposing new.
-- `get_current_update_set`, `list_update_sets` — confirm capture context.
+- The rest of the script domain: client scripts, ACLs, UI actions and UI policies.
+- `get_current_update_set`, `list_update_sets` — confirm capture context (update-set tools sit behind the same guard).
+
+Symptom when the flag is absent: `(Code: SCRIPTING_NOT_ENABLED)`, raised mid-task rather than at startup, because the tools stay advertised to the model either way. **Workaround at Tier 0 / read-only:** query the underlying tables directly through the generic records-query tool — `sys_script_include`, `sys_script`, `sys_script_client`, `sys_security_acl` — which is not behind the scripting guard. Configuration and remedy: [`../SETUP.md`](../SETUP.md) §Capability flags.
 
 ### Writes (both gates required)
 
