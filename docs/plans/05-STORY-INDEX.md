@@ -24,18 +24,18 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-00-S12 | ARC-00 | S-14a–g plugin channel spikes (D-06 hedge, one-week time-box) and S-19 `claude plugin validate` on headless CI | L | S01, S03 | M0 | Not started |
 | ARC-00-S13 | ARC-00 | Windows test recipe for ARC-06 / ARC-09 CI | S | S06, S07 | M0 | Not started |
 | ARC-00-S14 | ARC-00 | Close-out: `03` §A/§B Status column, deferred spikes S-10 / S-13, gate sign-off for ARC-01 and ARC-06 | M | S02, S13 | M0 | Not started |
-| ARC-01-S01 | ARC-01 | Found the repository: root commit with `LICENSE`/`NOTICE`, default branch, protection, skeleton | M | ARC-00-S02 | M1 | Not started |
-| ARC-01-S02 | ARC-01 | Import the engine working tree with history (submodule dropped, legacy scripts parked) | M | S01; ARC-00-S02 | M1 | Not started |
-| ARC-01-S03 | ARC-01 | Import the server into `packages/snowarch` with history; leaf-level D-03 cut; package rename | L | S01; ARC-00-S02/S03 | M1 | Not started |
-| ARC-01-S04 | ARC-01 | `engine.config.json` + JSON schema + validation test | M | S02, S03 | M1 | Not started |
-| ARC-01-S05 | ARC-01 | Root `package.json`, workspaces, lockfile; `npm ci` proven on three OSes | M | S03, S04 | M1 | Not started |
-| ARC-01-S06 | ARC-01 | Single version of record and `tests/version-consistency.test.mjs` | S | S05 | M1 | Not started |
-| ARC-01-S07 | ARC-01 | `.gitignore` / `.gitattributes` / `.editorconfig` and the never-commit test | S | S05 | M1 | Not started |
-| ARC-01-S08 | ARC-01 | Licence sweep: replace every old licence claim, remove contradictions | S | S02, S03 | M1 | Not started |
-| ARC-01-S09 | ARC-01 | Merge `reference/templates/` and `templates/` into `templates/`; update every reference | S | S02 | M1 | Not started |
-| ARC-01-S10 | ARC-01 | Purge engagement residue; legacy-name ratchet test | M | S02, S03, S05, S09 | M1 | Not started |
-| ARC-01-S11 | ARC-01 | CI skeleton: three OSes × Node 20/22/24; footprint gate; `claude plugin validate` job | M | S05, S06, S07, S10 | M1 | Not started |
-| ARC-01-S12 | ARC-01 | `docs/ARCHITECTURE.md` and `docs/CONTRIBUTING.md` first versions | M | S01, S11 | M1 | Not started |
+| ARC-01-S01 | ARC-01 | Found the repository: root commit with `LICENSE`/`NOTICE`, default branch, protection, skeleton | M | ARC-00-S02 | M1 | Done (2026-09-08) |
+| ARC-01-S02 | ARC-01 | Import the engine working tree with history (submodule dropped, legacy scripts parked) | M | S01; ARC-00-S02 | M1 | Done (2026-09-08) |
+| ARC-01-S03 | ARC-01 | Import the server into `packages/snowarch` with history; leaf-level D-03 cut; package rename | L | S01; ARC-00-S02/S03 | M1 | Done (2026-09-08) |
+| ARC-01-S04 | ARC-01 | `engine.config.json` + JSON schema + validation test | M | S02, S03 | M1 | Done (2026-09-08) |
+| ARC-01-S05 | ARC-01 | Root `package.json`, workspaces, lockfile; `npm ci` proven on three OSes | M | S03, S04 | M1 | Done (2026-09-08) |
+| ARC-01-S06 | ARC-01 | Single version of record and `tests/version-consistency.test.mjs` | S | S05 | M1 | Done (2026-09-08) |
+| ARC-01-S07 | ARC-01 | `.gitignore` / `.gitattributes` / `.editorconfig` and the never-commit test | S | S05 | M1 | Done (2026-09-08) |
+| ARC-01-S08 | ARC-01 | Licence sweep: replace every old licence claim, remove contradictions | S | S02, S03 | M1 | Done (2026-09-08) |
+| ARC-01-S09 | ARC-01 | Merge `reference/templates/` and `templates/` into `templates/`; update every reference | S | S02 | M1 | Done (2026-09-08) |
+| ARC-01-S10 | ARC-01 | Purge engagement residue; legacy-name ratchet test | M | S02, S03, S05, S09 | M1 | Done (2026-09-08) |
+| ARC-01-S11 | ARC-01 | CI skeleton: three OSes × Node 20/22/24; footprint gate; `claude plugin validate` job | M | S05, S06, S07, S10 | M1 | Done (2026-09-08) |
+| ARC-01-S12 | ARC-01 | `docs/ARCHITECTURE.md` and `docs/CONTRIBUTING.md` first versions | M | S01, S11 | M1 | Done (2026-09-08) |
 | ARC-02-S01 | ARC-02 | Make `.claude/` canonical: delete root mirrors, sync script, structure gate and pre-commit chain; rewrite every path reference | M | ARC-01-S02/S09 | M1 | Not started |
 | ARC-02-S02 | ARC-02 | Skills lint and agents lint (`tests/skills-lint.test.mjs`), wired into CI | M | S01; ARC-00-S12; ARC-01-S05/S11; verdicts S-19 | M1 | Not started |
 | ARC-02-S03 | ARC-02 | Rewrite every skill description to ≤ 500 chars; triggers into bodies; `version:` → `metadata.version`; S-13 verification | L | S02 | M1 | Not started |
