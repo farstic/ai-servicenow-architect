@@ -46,6 +46,18 @@ ARC-04-S01/S02/S03/S04/S05/S06/S07/S08/S11/S13 (vitest scoping and the retained 
 
 ## Risks
 
+> **Amendment 2026-09-07 (from `03` §F S-06 correction).** The generated rule file's MCP-failure instruction reads: "quote the typed notice (`CONNECT_TIMEOUT` / `CONNECTION_CLOSED` / `ENOENT` …) verbatim and the doctor's output; add nothing" — not "never explain". Rationale recorded: an invitation to explain produces embellishment on top of accurate data.
+
+> **Amendment 2026-09-07 (from `03` §F S-12 / S-16).** (1) `allow` is generated as the three globs `mcp__servicenow__snow_*_read` / `snow_*_index` / `snow_*_query` plus the explicit non-mutating remainder — middle-wildcard globs are confirmed on 2.1.258; the 269-entry fallback story is retired. (2) Bash allow rules are tested against the compound form Claude executes (`<cmd> 2>&1; echo "EXIT: $?"`): the generated list carries the wrapper `echo` entry, and the gate test runs the doctor through `claude -p --settings` (S-24) and asserts it runs without approval.
+
+> **Amendment 2026-09-07 (from the owner sitting).** Claude Code executes Bash tool calls in a compound form (`<cmd> 2>&1; echo "EXIT: $?"` was observed). Every generated `permissions.allow` Bash rule is written and tested against the form actually executed, not the bare command; the S-16 record states whether `Bash(./snowarch doctor*)` matched the compound form.
+
+> **Amendment 2026-09-06 (from `03` §F S-23).** The generated `permissions.ask` block (and the generated §2.1 rule text) is derived **only** from `contract.json`'s `mutates` flag — never from tool-name suffixes. Regression test: the 14 tools listed in `03` S-23 appear in the generated `ask` block. The `allow` list is either 269 explicit read entries (no-glob fallback) or the three globs `snow_*_read` / `snow_*_index` / `snow_*_query` (205) plus the explicit non-mutating remainder — S-12's observation decides which; both are generated, neither is hand-maintained.
+
+> **Amendment 2026-09-06 (from `03` §F S-19 note).** The `claude plugin validate --strict` step keys on the **exit code only** — the command prints no per-target line for a skills directory — and every manifest the repo ships carries `author` (a missing author is a warning that `--strict` turns into exit 1).
+
+> **Amendment 2026-09-06 (from `03` §F S-19).** `claude plugin validate --strict` is proven to run headless on GitHub runners without login; the engine lint may call it in CI on the skills directory. The `03` fallback (skip when the CLI is absent) is retired — the CLI is installed from npm in the CI job.
+
 - Middle-wildcard permission globs may be unsupported (S-12). Mitigation: generator emits explicit names (default); style recorded in `engine.config.json.mcp.permissions.allowStyle`.
 - `ask` rules may not prompt in auto mode (S-18). Mitigation designed: `askStyle: deny-with-hook` (generated `deny` + PreToolUse exec-form `node` hook) — a new ARC-06 story if the spike fails; never assumed here.
 - The rule file adds ≤ 45 always-loaded lines to every session. Mitigation: it replaces the much longer §2.1/§2.2 prose that `CLAUDE.md` carries today; measured in ARC-02's `wc -l` criterion.

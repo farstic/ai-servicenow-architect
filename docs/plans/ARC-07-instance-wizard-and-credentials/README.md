@@ -48,6 +48,8 @@ ARC-04-S01 (prompt/colour libraries removed; `commander` kept), S02 (store modul
 
 ## Risks
 
+> **Amendment 2026-09-06 (from `03` §F S-14a).** On every channel, the instance URL and the user name are treated as confidential engagement data, not merely the password: nothing the wizard or the skill writes may land in user-scope files (`~/.claude/settings.json`, `~/.claude.json`); the per-checkout store is the only home for all three. This is a test, not a guideline.
+
 - Corporate laptops with shared/recorded terminals (R-04) — roadmap localhost form; `--password-stdin` from a password manager CLI is documented meanwhile.
 - OAuth ROPC disabled by instance hardening → the probe fails with a clear `OAUTH_ROPC_DISABLED` hint (detect the instance's error text).
 

@@ -27,6 +27,8 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 
 ### ARC-01-S01 — Found the repository: root commit with `LICENSE`/`NOTICE`, default branch, protection, skeleton
 
+> **Amendment 2026-09-06 (from ARC-00-S03 finding a).** The root commit ALSO carries the ARC-00 artefacts, copied verbatim from `farstic/snowarch-spikes` at its final tag: `spikes/licence/LICENSE` → `/LICENSE`, `spikes/licence/NOTICE` → `/NOTICE`, `spikes/licence/RELICENSING.md` → `docs/RELICENSING.md`, `spikes/licence/header-sweep.txt` → `docs/spikes/licence/header-sweep.txt`, `docs/decisions/` → `docs/decisions/`, `spikes/` (records, TEMPLATE, stub server, recipes, hooks) → `docs/spikes/`, `spikes/engine.config.seed.json` → `engine.config.json` (validated by S04). No ARC-01 story imported these before; this is the story that does. **Gate:** `docs/spikes/` contains pre-relicensing server build output as fixtures (`S-15-npm-ci/fixture/`, from snow-mcp `bb09bde`); it must not be committed to the public repository before ADR-0002 is Accepted (D-02 owner confirmation + the RobertBH17 resolution). Acceptance: `diff -rq <snowarch-spikes>/docs/decisions docs/decisions` and `diff -rq <snowarch-spikes>/spikes docs/spikes` are empty at the root commit.
+
 **As** a maintainer **I want** `farstic/ai-servicenow-architect` to exist with an Apache-2.0 root commit, a protected `main` branch and the agreed directory skeleton **so that** every later story lands files in their final place and the relicensing statement is the first line of the repository's history.
 
 **Context.** D-01 (repository name), D-02 (licence, relicensing sentence "in the first commit"; `00` P-32), P-15 (three-way name mismatch). README acceptance criterion "`LICENSE` and `NOTICE` present". `00` §2 records that the engine has 0 tags and the server 0 tags — this story starts the tag discipline of `01` §12.
@@ -92,6 +94,8 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 ---
 
 ### ARC-01-S02 — Import the engine working tree with history (submodule dropped, legacy scripts parked)
+
+> **Amendment 2026-09-06 (from ARC-00-S03 finding a).** Criterion 3's `diff -rq` against `~/work/AI-Architect-Claude/` additionally excludes the paths the root commit (S01) brought from `snowarch-spikes` and that do not exist in the engine: `--exclude=LICENSE --exclude=NOTICE --exclude=RELICENSING.md --exclude=decisions --exclude=spikes --exclude=engine.config.json`. The engine import is still byte-identical for every engine-originated file.
 
 **As** a maintainer **I want** the engine's current *working tree* (not `origin/main`) imported at the root of the new repo with its full history **so that** the 28 skills, 9 agents, governance texts and scripts land in the location ARC-02 edits, and `git log` on any engine file still reaches the 2026 history.
 
@@ -161,6 +165,8 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 ---
 
 ### ARC-01-S03 — Import the server into `packages/snowarch` with history; leaf-level D-03 cut; package rename
+
+> **Amendment 2026-09-06 (from ARC-00-S02 finding e).** The leaf cut of this story MUST also `git rm` the server's `LICENSE` (the "Source Available License — All rights reserved" text), `TERMS.md`, `smithery.yaml` and `server.json` before the import is committed, and `packages/snowarch/package.json` `license` must read `Apache-2.0` (the `SEE LICENSE IN LICENSE` value and its copies in the deleted `desktop/` and lock files go with the cut). Rationale: without this, `packages/snowarch/LICENSE` arrives in a public Apache-2.0 tree carrying a contradictory proprietary licence until ARC-01-S08 runs. ARC-01-S08 then writes the single root `LICENSE`/`NOTICE` from `spikes/licence/`.
 
 **As** a maintainer **I want** the server's working tree imported under `packages/snowarch` with history, the D-03 surfaces that nothing under `src/` imports removed, and the package renamed to `@farstic/snowarch` **so that** ARC-04 hardens a server that already lives in its final directory under its final name, and the test suite is green from the first CI run.
 
@@ -275,7 +281,7 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 
 **As** CI and the bootstrap (ARC-06 step B04) **I want** a root `package.json` with npm workspaces, a single root lockfile and the agreed scripts **so that** `npm ci --ignore-scripts` (dev) and `npm ci --omit=dev --ignore-scripts` (runtime) install the server's dependencies from one lockfile on macOS, Linux and native Windows.
 
-**Context.** README deliverable (root `package.json`, scripts, lockfile); `01` §3 root line (`workspaces ["packages/*", "tools/snowarch"]`), §4.2 B04 (`npm ci --omit=dev --ignore-scripts` at the root, ~72 MB), §13 (Node-only tooling); `03` S-15 (root `npm ci --omit=dev` footprint and module resolution — ARC-00 spike); README acceptance criteria 1 (clean `npm ci` on three OSes) and 6 (≤ 80 MB); R-1 (version `2.0.0` at release → `2.0.0-dev` now).
+**Context.** README deliverable (root `package.json`, scripts, lockfile); `01` §3 root line (`workspaces ["packages/*", "tools/snowarch"]`), §4.2 B04 (`npm ci --omit=dev --ignore-scripts` at the root, ~72 MB pre-cut / ~27 MB post-cut per ARC-00-S08), §13 (Node-only tooling); `03` S-15 (root `npm ci --omit=dev` footprint and module resolution — ARC-00 spike); README acceptance criteria 1 (clean `npm ci` on three OSes) and 6 (≤ 80 MB); R-1 (version `2.0.0` at release → `2.0.0-dev` now).
 
 **Scope.** In: root `package.json`, `package-lock.json` (lockfileVersion 3), a private placeholder `tools/snowarch/package.json` so the second workspace is real from day one, `tests/run.mjs` (a 15-line test launcher), the root `overrides` block moved from the server. Out: any content of `tools/snowarch/bin` or `lib` (ARC-06); `scripts/build-dist.mjs` (ARC-04), `scripts/release.mjs` (ARC-09) — the root scripts point at their final paths and fail with `MODULE_NOT_FOUND` until those ARCs land; nothing in ARC-01 CI calls them.
 
@@ -308,7 +314,7 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 - `tools/snowarch/package.json`: `{ "name": "@farstic/snowarch-tools", "version": "2.0.0-dev", "private": true, "type": "module", "description": "Zero-dependency bootstrap/doctor CLI; populated by ARC-06" }`. Measured on npm 11.13.0: a `packages/*` match without `package.json` is skipped and a literal workspace path without one is tolerated, so the placeholder is for determinism across npm 10 (Node 20) rather than a hard requirement. ARC-05's `packages/contract` therefore needs no `package.json`; `docs/ARCHITECTURE.md` says so.
 - `tests/run.mjs`: reads `tests/*.test.mjs` with `readdirSync`, then `spawnSync(process.execPath, ['--test', ...files], { stdio: 'inherit' })` and exits with the child's status. Reason: on Windows npm runs scripts through `cmd.exe`, which performs no glob expansion, and whether `node --test` expands a glob argument itself varies by Node line — so a file list computed by Node is the one form that behaves identically on all nine CI cells (`01` §13: all shipped tooling is Node; nothing assumes a POSIX shell). S11 criterion 1 is the proof.
 - Lockfile: `npm install --package-lock-only --ignore-scripts` at the root produces `package-lock.json` (`lockfileVersion: 3`) with `packages/snowarch` and `tools/snowarch` as workspace links; commit it. Delete nothing else — the server's own lockfile was removed in S03.
-- Footprint: `npm ci --omit=dev --ignore-scripts` then measure `node_modules` — today's server production tree is 72 MB (`00` §2) and the server package has no install scripts (`01` §4.2 B04), so the README's ≤ 80 MB gate holds before ARC-04-S01 prunes `pdfmake`/`pptxgenjs` (~20 MB of the 72 MB, `02` D-03). Measure with `node -e` (recursive `statSync` sum) so the number is comparable across OSes (`du` semantics differ).
+- Footprint: `npm ci --omit=dev --ignore-scripts` then measure `node_modules` — today's server production tree is 72 MB (`00` §2) and the server package has no install scripts (`01` §4.2 B04), so the README's ≤ 80 MB gate holds before ARC-04-S01 prunes `pdfmake`/`pptxgenjs` (72 → 27 MB `du`, 176 → 135 packages, `02` D-03 as re-measured by ARC-00-S08). **State the metric in the gate** — `du -sk` (block-rounded) and summed file content differ by ~15 MB on this tree; the gate uses the summed-content figure the CI job computes, and the `≤ 80 MB` pre-cut ceiling reads `≤ 60 MB` content / `≤ 80 MB du`. Measure with `node -e` (recursive `statSync` sum) so the number is comparable across OSes (`du` semantics differ).
 - Module resolution: hoisting puts `@modelcontextprotocol/sdk` etc. in root `node_modules`; `packages/snowarch/dist/server.js` resolves them by walking up — the S-15 spike's fallback (`--workspace packages/snowarch`) is recorded in `docs/CONTRIBUTING.md` in case a later dependency breaks hoisting.
 
 **Acceptance criteria.**

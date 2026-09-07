@@ -40,6 +40,12 @@ ARC-01 (layout, `engine.config.json` + schema, `LICENSE`/`NOTICE` files, CI skel
 
 ## Risks
 
+> **Amendment 2026-09-07 (ADR-0008 option A).** Recipe C is five steps **plus an idempotent repair step** that materialises any root-level path git left `skip-worktree` after `sparse-checkout set --cone` (git 2.34.1 stores the flag as a pattern; no-op on ≥ 2.39). `floors.git` stays 2.34.1 — stock Ubuntu 22.04 LTS remains supported. The completeness check (five root files + every cone area) is the safety net.
+
+> **Amendment 2026-09-07 (from `03` §F S-07 Ubuntu).** The git floor is raised by ADR-0008 (bracket: 2.34.1 silently omits the corpus root files incl. `LICENSE`; 2.39.5 correct); `snowarch docs verify` and the doctor assert the presence of the five root files and every cone area — a pin match alone is not completeness. Recipe B is gone from every list (no `--filter` on stock Ubuntu LTS git).
+
+> **Amendment 2026-09-06 (from `03` §F S-07, superseded row).** Recipe C is documented as **five** steps — the fifth is `git submodule init`, without which the superproject reports the populated corpus as uninitialised (`-` in `git submodule status`). Reconcile the cited-areas list before any number travels: the STORIES text says 19 in five places and 20 in one; `markdown/release-notes` is cited only by `README.md`, not by any skill or agent — decide in S02 whether it is in scope (architect recommendation: exclude) and regenerate the areas file from that rule. Size sentence for INSTALL.md: "about 300 MB on disk, ~315 MB on Windows". The Windows `core.longpaths` question is open until the VM run at a realistic path.
+
 - Submodule depth-1 without a blob filter may cost ~350 MB instead of ~300 (S-07). Mitigation: acceptable; record the measured number in the install page (S10/S11 copy it from the CI summary).
 - Upstream force-pushes or branch renames (`australia` → next family). Mitigation: `docs family` command; `docs sync --upstream` and the bump workflow fail loudly with a named remedy, never auto-merge.
 - Windows long paths with 35k files (longest corpus path is 197 characters; with a typical checkout prefix it exceeds `MAX_PATH`). Mitigation: the recipe passes `-c core.longpaths=true` and persists it in the submodule config on win32 (S-07 verifies; S11 proves weekly). Per Q-B the Windows path is native first-class; if S-03/S-04/S-08 fail their time-box the product falls back to "Git Bash required", which does not change this ARC's recipe (it never depends on bash).

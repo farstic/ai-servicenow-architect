@@ -47,6 +47,16 @@ ARC-04-S02/S04/S11/S12 (store module, `snow_core_capabilities_read`, network cla
 
 ## Risks
 
+> **Amendment 2026-09-07 (from `03` §F "Pattern 4/4").** Design rationale of record: four independent Claude Code surfaces reported success or said nothing while the underlying work had failed (dead MCP server → exit 0; unspawnable hook → silence; plugin `npm ci` SIGTERM → "✔ Successfully installed"; scaffolded plugins → nothing). The doctor therefore performs its own handshake, its own hook probe, its own dependency-tree completeness check and its own registration read, and never treats a Claude Code message or exit code as evidence.
+
+> **Amendment 2026-09-07 (from `03` §F S-06 / S-16).** (1) MCP startup failure is signalled by the doctor's own `initialize`/`tools/list` handshake, never by Claude Code's exit code (0 on failure, no stderr). (2) `/snowarch status` and the in-session doctor summary are **MCP tool calls** (`snow_core_status_read`, `snow_core_doctor_read` — ARC-04 adds the latter), because MCP allow rules match exactly and Bash allow rules do not survive Claude's non-deterministic command wrapper. (3) The generated rule file states: on any MCP failure the engine quotes the doctor's output and never diagnoses (regression: a fabricated "PDI hibernating" diagnosis naming an unrelated real hostname).
+
+> **Amendment 2026-09-07 (from `03` §F S-24 / S-20).** The `--live` handshake and the CI end-to-end checks may use `claude -p --mcp-config <file> --settings <rules> --strict-mcp-config`, which reaches a project stdio server with no trust dialog and no approval (proven on macOS). E-26 (proxy/CA) reports the launching shell's variables as inherited on macOS; the Windows row stays hedged.
+
+> **Amendment 2026-09-06 (from `03` §F S-07).** The docs-corpus check reads the **superproject's** `git submodule status` and requires the initialised form (no leading `-`) at the pinned SHA; a populated `vendor/ServiceNowDocs` tree with an uninitialised gitlink is a FAIL with the remedy `git submodule init` (folded into `./snowarch docs sync`).
+
+> **Amendment 2026-09-06 (from `03` §F S-21).** No doctor check, banner, or `--fix` action may shell out to `claude mcp get|list|add` for a *read-only* purpose: those commands rewrite `migrationVersion` in `~/.claude.json` when Claude Code versions alternate. Registration state is read from `.mcp.json`, `.claude/settings.json` and `.claude/settings.local.json` directly. The one legitimate `claude mcp` call (E-23's printed remedy for stale registrations) is printed for the user, never executed by the doctor.
+
 - Doctor drift from the checks in other ARCs. Mitigation: each ARC's acceptance criteria name the doctor check that proves them; CI runs the doctor after the bootstrap (S11 snapshot test).
 - Banner cost on slow disks. Mitigation: cached JSON; `--quick` subset bounded; hook `timeout` 10 s; in-hook watchdog 5 s (S08).
 - Whether the environment the doctor sees equals the environment Claude Code's spawned server sees (proxy/CA variables) — spike S-20, raised by ARC-04-S11 and run in ARC-00-S06 (ARC-00-S14 adds its row to `03` §A, which does not list it yet); until answered E-26 reports "as seen by this shell".
