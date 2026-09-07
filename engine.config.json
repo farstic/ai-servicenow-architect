@@ -1,4 +1,5 @@
 {
+  "$schema": "./engine.config.schema.json",
   "product": "snowarch",
   "repo": "farstic/ai-servicenow-architect",
   "cli": "snowarch",
