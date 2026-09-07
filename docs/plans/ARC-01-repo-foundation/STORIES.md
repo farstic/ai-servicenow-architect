@@ -526,12 +526,14 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 **Design notes.**
 - `git mv reference/templates/adr-template.md templates/adr-template.md` (and `nfr-checklist-template.md`, `raid-log-template.md`, `traceability-matrix-template.md`); `rmdir reference/templates reference`.
 - `sed -i '' 's#reference/templates/#templates/#g'` on the five files (macOS `sed`); verify with `git grep -n "reference/templates"` → nothing.
-- Add `reference/templates` to S10's forbidden patterns (no allow-list).
+- Add `reference/templates` to S10's forbidden patterns (no allow-list) — *amended 2026-09-08: scanned with `':!docs/plans' ':!docs/decisions' ':!docs/spikes' ':!docs/RELICENSING.md'`, for the reason in criterion 2.*
 - Resulting `templates/`: `adr-template.md`, `gherkin-feature-template.md`, `hld-template.md`, `nfr-checklist-template.md`, `raid-log-template.md`, `traceability-matrix-template.md`.
 
 **Acceptance criteria.**
 1. `ls templates | sort` prints exactly the six file names above; `test ! -d reference`.
-2. `git grep -n "reference/templates"` prints nothing.
+2. `git grep -n "reference/templates" -- . ':!docs/plans' ':!docs/decisions' ':!docs/spikes' ':!docs/RELICENSING.md'` prints nothing.
+
+   *(Amended 2026-09-08, measured before the move. The design note's "17 occurrences in the five root files" is **exactly right for the engine's live texts** and was reproduced (CLAUDE.md 5, governance-rules.md 6, prompt-patterns.md 4, README.md 1, taxonomy.md 1 = 17). But the tree now also holds **42 further occurrences in 19 files that did not exist on 2026-09-04** — the ADRs, the ARC plan documents, `docs/RELICENSING.md` and the `docs/spikes/` archive, all of which ARC-01 itself added. Those are **not** live path references: **ADRs are immutable once Accepted** and each names `reference/templates/adr-template.md` as the template that existed when it was written; the plan documents describe this very move in the future tense; `docs/spikes/` is frozen at `snowarch-spikes@arc-00-final-1`. Rewriting them would edit immutable decision records to fix a path they are not asserting. Same shape as S08's criterion 1 — and, as there, **S10's `reference/templates` forbidden pattern must carry the same four exclusions**, or it demands 19 allow-list rows on day one.)*
 3. `git log --follow --oneline templates/adr-template.md | wc -l` ≥ 1 and the oldest entry predates the import merge (history preserved through the rename).
 4. Every path of the form `templates/<name>.md` mentioned in `CLAUDE.md`, `governance-rules.md`, `prompt-patterns.md`, `taxonomy.md`, `README.md` exists (`git grep -oh "templates/[a-z-]*\.md" -- CLAUDE.md governance-rules.md prompt-patterns.md taxonomy.md README.md | sort -u | while read p; do test -f "$p" || echo "MISSING $p"; done` prints nothing).
 
