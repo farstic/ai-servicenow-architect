@@ -1,0 +1,10 @@
+{
+  "comment": "SK-09 exemptions. Each entry names a file and a substring that must appear on the matching line, so an exemption cannot silently widen to a different line. Measured 2026-09-08 during ARC-02-S02.",
+  "allow": [
+    {
+      "file": ".claude/skills/itom-discovery-specialist/EXAMPLES.md",
+      "context": "compliance baseline tier",
+      "reason": "A customer's CI classification in a worked example — 'Tier 1 Strict / Tier 2 Standard / Tier 3 Relaxed' is the client's own vocabulary, not the engine's retired Tier 0/1/2 permission model. Sweeping it would corrupt the example."
+    }
+  ]
+}

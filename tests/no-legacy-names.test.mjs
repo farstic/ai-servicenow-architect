@@ -44,6 +44,8 @@ const EXEMPT_FILES = new Set([
   'docs/ARCHITECTURE.md', 'docs/RELICENSING.md', 'docs/MIGRATION.md', 'NOTICE',
   'tests/no-legacy-names.test.mjs', 'tests/legacy-names.allowlist.json',
   'tests/version-consistency.test.mjs',   // detects the stale imported changelog by its old repo URL
+  'tests/fixtures/retired-vocabulary.json', // SK-09's token list — a detector's data, deliberately its
+                                            // own file so this exemption stays one file wide
 ]);
 const isExempt = (f) => EXEMPT_FILES.has(f) || EXEMPT_PREFIXES.some((p) => f.startsWith(p));
 
