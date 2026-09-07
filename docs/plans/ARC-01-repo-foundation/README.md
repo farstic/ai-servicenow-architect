@@ -15,7 +15,7 @@
 > `merge --allow-unrelated-histories` route is the default rather than the fallback.
 
 
-Status: **Stories drafted 2026-09-04** (see [STORIES.md](STORIES.md)) · Depends on: ARC-00 (D-01, D-02, D-03 — all decided 2026-09-04; the S-14 plugin-channel hedge does **not** gate this ARC, the layout is plugin-shaped either way) · Blocks: ARC-02 … ARC-10
+Status: **COMPLETE — all 12 stories delivered and merged to `develop`, 2026-09-08** (see [STORIES.md](STORIES.md)) · Depends on: ARC-00 (D-01, D-02, D-03 — all decided 2026-09-04; the S-14 plugin-channel hedge does **not** gate this ARC, the layout is plugin-shaped either way) · Blocks: ARC-02 … ARC-10
 
 ## Goal
 
@@ -66,16 +66,30 @@ ARC-00 for names, licence and scope-cut confirmation (all closed 2026-09-04) and
 
 ## Acceptance criteria
 
-- [ ] `git clone` of the new repository followed by `npm ci --ignore-scripts` succeeds on the three CI OSes × Node 20/22/24 with no network access other than github.com and registry.npmjs.org (S05, S11).
-- [ ] `claude plugin validate .claude/skills` and `claude plugin validate .claude/agents` pass on the seeded content (S02 locally; S11 in CI, advisory until S-19).
-- [ ] `tests/engine-config.test.mjs` validates `engine.config.json` against the schema in CI; every constant named in `01` §3 comments exists in it; `roster` counts match the directory listing; `docs.pin` matches the gitlink once ARC-03 adds it (S04).
-- [ ] `git tag -l` shows the two import tags; `git log --follow packages/snowarch/src/server.ts` reaches the original server history; `git log -- CLAUDE.md` reaches the original engine history (S02, S03).
-- [ ] `grep -rn "cvetomirgrigorov/servicenow-mcp\|claude-servicenow-live\|NowAIKit\|nowaikit" --include=*.md --include=*.json --include=*.ts .` returns only `docs/ARCHITECTURE.md` (history section), ADRs, `NOTICE`, `scripts/legacy/**`, and files listed in `tests/legacy-names.allowlist.json` with an owner (ARC-02 / ARC-04 / ARC-09); the ratchet test fails on any other occurrence and on any allow-listed file that no longer matches (S10).
-- [ ] No leaf item from the D-03 cut list exists in the tree (`desktop/`, `clients/`, `.github/agents`, `Dockerfile`, `server.json`, `smithery.yaml`, `glama.json`, `TERMS.md`); the import-entangled `src/` items are recorded in the `docs/ARCHITECTURE.md` cut ledger with owner ARC-04; `node_modules` after `npm ci --omit=dev --ignore-scripts` ≤ 80 MB (S03, S05, S11).
-- [ ] `LICENSE` and `NOTICE` present; no file in the tree states another licence (`git grep -i -E "source available|all rights reserved|not licensed for redistribution|license: MIT|SEE LICENSE IN LICENSE"` is empty outside `LICENSE`/`NOTICE`); no source file carries an old-licence header (measured: none did) (S01, S08).
-- [ ] Root, `packages/snowarch` and `tools/snowarch` versions are `2.0.0-dev` and `tests/version-consistency.test.mjs` passes (S06).
-- [ ] `.local/`, `clients/`, `.env`, `.claude/settings.local.json`, `memory/`, `.DS_Store` are ignored and absent from `git ls-files`; no credential-shaped literal is tracked; `git ls-files --eol` shows `i/lf w/crlf` for `*.ps1`/`*.cmd` and `i/lf w/lf` for `*.sh`/`*.mjs`/`*.md`/`*.json` on every CI cell (S07).
-- [ ] `docs/LIVE-ARTEFACTS-CATALOGUE.md` and the dated run-history sections of `VALIDATION-TESTS.md` are gone; the only `*.service-now.com` host in product files is the documentation placeholder `dev12345.service-now.com`, and none of the maintainer's engagement hostnames (kept in local `memory/`, never in the plan) appears outside `scripts/legacy/` (S10).
+> **All ten verified by running them at the ARC-01 close-out (2026-09-08), not by inspection.** A tick
+> here means a command was executed and its output read. The evidence, in order:
+> **1** CI run [34164741254](https://github.com/farstic/ai-servicenow-architect/actions/runs/34164741254) — all nine `test` cells `success` ·
+> **2** the same run's `plugin validate` job `success`, CLI pinned to 2.1.258 ·
+> **3** `tests/engine-config.test.mjs` 12 pass / 0 fail / 1 skipped-with-reason ·
+> **4** two `import/*` tags; oldest commit touching `packages/snowarch/src/server.ts` = `dd005fa`, touching `CLAUDE.md` = `51af231` ·
+> **5** `tests/no-legacy-names.test.mjs` 6 pass / 0 fail, allow-list 19 entries each with an owning ARC ·
+> **6** every leaf item of the D-03 cut absent (0 of 8 present) ·
+> **7** the licence clause returns **0 matches** *as amended on 2026-09-08* — see the correction in `STORIES.md` §ARC-01-S08: the two matches it acquired are a **detector** (the ratchet's own pattern list) and the **historical record** (this ARC's D-03 cut ledger), the same two classes the ratchet already exempts ·
+> **8** `2.0.0-dev 2.0.0-dev 2.0.0-dev` ·
+> **9** `never-commit` + `no-real-hostnames` 10 pass / 0 fail ·
+> **10** the catalogue is absent and the run-history headings count 0.
+
+
+- [x] `git clone` of the new repository followed by `npm ci --ignore-scripts` succeeds on the three CI OSes × Node 20/22/24 with no network access other than github.com and registry.npmjs.org (S05, S11).
+- [x] `claude plugin validate .claude/skills` and `claude plugin validate .claude/agents` pass on the seeded content (S02 locally; S11 in CI, advisory until S-19).
+- [x] `tests/engine-config.test.mjs` validates `engine.config.json` against the schema in CI; every constant named in `01` §3 comments exists in it; `roster` counts match the directory listing; `docs.pin` matches the gitlink once ARC-03 adds it (S04).
+- [x] `git tag -l` shows the two import tags; `git log --follow packages/snowarch/src/server.ts` reaches the original server history; `git log -- CLAUDE.md` reaches the original engine history (S02, S03).
+- [x] `grep -rn "cvetomirgrigorov/servicenow-mcp\|claude-servicenow-live\|NowAIKit\|nowaikit" --include=*.md --include=*.json --include=*.ts .` returns only `docs/ARCHITECTURE.md` (history section), ADRs, `NOTICE`, `scripts/legacy/**`, and files listed in `tests/legacy-names.allowlist.json` with an owner (ARC-02 / ARC-04 / ARC-09); the ratchet test fails on any other occurrence and on any allow-listed file that no longer matches (S10).
+- [x] No leaf item from the D-03 cut list exists in the tree (`desktop/`, `clients/`, `.github/agents`, `Dockerfile`, `server.json`, `smithery.yaml`, `glama.json`, `TERMS.md`); the import-entangled `src/` items are recorded in the `docs/ARCHITECTURE.md` cut ledger with owner ARC-04; `node_modules` after `npm ci --omit=dev --ignore-scripts` ≤ 80 MB (S03, S05, S11).
+- [x] `LICENSE` and `NOTICE` present; no file in the tree states another licence (`git grep -i -E "source available|all rights reserved|not licensed for redistribution|license: MIT|SEE LICENSE IN LICENSE"` is empty outside `LICENSE`/`NOTICE`); no source file carries an old-licence header (measured: none did) (S01, S08).
+- [x] Root, `packages/snowarch` and `tools/snowarch` versions are `2.0.0-dev` and `tests/version-consistency.test.mjs` passes (S06).
+- [x] `.local/`, `clients/`, `.env`, `.claude/settings.local.json`, `memory/`, `.DS_Store` are ignored and absent from `git ls-files`; no credential-shaped literal is tracked; `git ls-files --eol` shows `i/lf w/crlf` for `*.ps1`/`*.cmd` and `i/lf w/lf` for `*.sh`/`*.mjs`/`*.md`/`*.json` on every CI cell (S07).
+- [x] `docs/LIVE-ARTEFACTS-CATALOGUE.md` and the dated run-history sections of `VALIDATION-TESTS.md` are gone; the only `*.service-now.com` host in product files is the documentation placeholder `dev12345.service-now.com`, and none of the maintainer's engagement hostnames (kept in local `memory/`, never in the plan) appears outside `scripts/legacy/` (S10).
 
 ## Risks
 

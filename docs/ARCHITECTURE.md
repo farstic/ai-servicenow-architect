@@ -90,12 +90,64 @@ no empty directories, so a path appears in the repository only when its owner pu
 
 ## History
 
-| Commit | What |
+| Commit / tag | What |
 |---|---|
 | `811163f` (2026-09-06) | the repository's first commit — the programme plans, on `develop` |
-| *this commit* | the **foundation commit** on `arc-01/foundation`: LICENSE, NOTICE, `docs/RELICENSING.md`, `docs/decisions/`, `docs/spikes/`, `docs/ARCHITECTURE.md`, `engine.config.json` |
+| **`58f0b8c`** (2026-09-07) | **ARC-01-S01, the foundation commit**: `LICENSE`, `NOTICE`, `docs/RELICENSING.md`, `docs/decisions/`, `docs/spikes/`, `docs/ARCHITECTURE.md`, `engine.config.json`. Its message carries the D-02 relicensing sentence verbatim. |
+| **`eddb237`** (2026-09-07) | **ARC-01-S02**, engine import — an unrelated-histories merge of `import/engine-v2.8.0-worktree` (`7f99a3a`) at the repository root, so `git log <file>` reaches the 2026 history with no `--follow`. |
+| **`4dcb751`** (2026-09-07) | **ARC-01-S03**, server import — an unrelated-histories merge of `import/snow-mcp-1.0.0` (`58a66e0`) into `packages/snowarch`. |
+| `import/engine-v2.8.0-worktree` → `7f99a3a` | the engine working tree at import: source HEAD `21bdf69` plus its 13 uncommitted changes. |
+| `import/snow-mcp-1.0.0` → `58a66e0` | the server at import: source HEAD `bb09bde` plus its one uncommitted change. |
 
-**Why the foundation commit's own SHA is not printed here.** ARC-01-S01 task 5 asks for it, but a commit
-cannot contain its own hash. It is recorded by the architect at the milestone merge that creates `main`,
-together with the `main` default-branch switch and branch protection — the three acceptance criteria the
-2026-09-07 branch-model reconciliation defers to that point.
+**Two things about the import SHAs that a reader chasing history will need.**
+
+**Neither imported history kept its original commit ids.** The server's were rewritten twice — once by
+`git filter-repo --replace-text` at the R-4 secret gate, and again by `--to-subdirectory-filter
+packages/snowarch`. The oldest commit touching `src/server.ts` maps **`ebcdd71` → `dd005fa`**, with its
+subject and author-date unchanged and the same commit count on both sides. **A SHA quoted from the old
+`snow-mcp` repository will not resolve here**; match on subject and date instead.
+
+**`git subtree add` was tried first for the server and rejected on evidence.** It grafts the tree at a
+prefix without recording a rename, so `git log --follow -- packages/snowarch/src/server.ts` returned
+**0 commits** while the history was fully present and reachable by other queries. The
+`filter-repo --to-subdirectory-filter` + `merge --allow-unrelated-histories` route — the same shape as
+the engine import — makes the ordinary query work.
+
+---
+
+## The D-03 cut ledger
+
+D-03 named nine surfaces that do not enter the product. **ARC-01-S03 removed only the leaves** — items no
+surviving source file imports — because removing the rest requires source edits, which is ARC-04-S01's.
+The split is not a matter of taste: it was measured, and re-measured after the cut.
+
+### Removed in ARC-01-S03 (leaf cut, 106 files)
+
+| Item | Why it was a leaf |
+|---|---|
+| `desktop/` (66 files) | nothing under `src/` or `tests/` imports it. Removing it also removed the **12 failing vitest files** recorded in `00` §4.9 — every failure in the suite was there. |
+| `clients/` (18) · `.github/` (12) | no import; the ten Copilot personas and two old workflows are replaced by ARC-01-S11's `ci.yml`. |
+| `Dockerfile` · `server.json` · `smithery.yaml` · `glama.json` · `docs/index.html` · `docs/CLIENT_SETUP.md` | registry and marketing assets for the retired distribution channels. |
+| `package-lock.json` | the root lockfile governs from ARC-01-S05. |
+| `.gitignore` | the root `.gitignore` governs from ARC-01-S07. |
+| **`LICENSE`** · **`TERMS.md`** | the legally material half. The server's `LICENSE` was a *"Source Available License — All rights reserved"* text; leaving it in a public Apache-2.0 tree would have shipped a file contradicting the repository's own licence. **ARC-01-S08 restored `LICENSE` as a byte-identical copy of the root Apache-2.0 text** (`cmp` exits 0), because npm packs `LICENSE*` and consumers expect one in the tarball. |
+
+### Deferred to ARC-04-S01 (imported, not leaves)
+
+Each is imported by surviving source — **14 import statements in total**, so deleting any of them without
+editing the importers breaks the build.
+
+| Item | Imported by |
+|---|---|
+| `src/prompts/` (32 files) | `src/server.ts:15`, `src/direct/executor.ts:13`, `src/api/index.ts:17`, `src/sdk/index.ts` |
+| `src/a2a/` (4) · `src/dashboard/` (1) | dynamically imported by `src/server.ts` (lines 167, 170) |
+| `src/direct/` (2) | `src/cli/config-store.ts:8`, `src/cli/setup.ts:28`, `src/sdk/index.ts` |
+| `src/reports/` (8) | `src/sdk/index.ts` |
+| `src/transport/` (3) | the HTTP transport of D-03 item 6 |
+| `src/cli/writers` · `src/cli/detect-clients` | `src/cli/setup.ts:25-28`; `tests/cli/writers.test.ts` still tests `writers` |
+| `src/api/` (1) | **contested**: D-03 lists it as a survivor, ARC-04's README item 1 cuts it as the REST API of D-03 item 6. **ARC-04-S01 rules**; ARC-01 carried it unchanged and did not pre-empt the decision. |
+
+Also deferred and named here so they are not lost: the dependency prune (`pdfmake`, `pptxgenjs`,
+`@inquirer/prompts`, `ora`, `chalk` — ARC-04-S01, taking the production tree from ~57 MB to ~27 MB), and
+the `registry.npmjs.org/servicenow-mcp` update check in `src/cli/index.ts`, which is code and is on
+ARC-01-S10's ratchet allow-list under ARC-04.
