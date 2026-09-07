@@ -465,7 +465,7 @@ Conventions:
 **When to use:** A significant decision was made — a §1.1 custom-object approval/rejection, a baseline-vs-custom call, a routing override, or a choice between two viable ServiceNow patterns — and you want it recorded durably (governance §4.1).
 
 **Template:**
-> Capture an ADR for the decision below using `reference/templates/adr-template.md`.
+> Capture an ADR for the decision below using `templates/adr-template.md`.
 >
 > Decision: {{ONE-SENTENCE DECISION}}
 > Context: {{FORCES / REQUIREMENT / CONSTRAINTS / VOLUMES}}
@@ -482,7 +482,7 @@ Conventions:
 **When to use:** After a builder returns an artefact, or before a release sign-off, to keep the golden thread current and surface coverage gaps (governance §4.2).
 
 **Template:**
-> Update the requirements traceability matrix at clients/{{client-short-name}}/traceability.md (template: `reference/templates/traceability-matrix-template.md`).
+> Update the requirements traceability matrix at clients/{{client-short-name}}/traceability.md (template: `templates/traceability-matrix-template.md`).
 >
 > Requirement(s): {{REQ_ID(S)}}
 > New link to record: {{story / design / build artefact / ATF test / update set}}
@@ -494,7 +494,7 @@ Conventions:
 **When to use:** At discovery/design time, to capture risks, assumptions, issues, dependencies, and the non-functional targets the design must hit (governance §4.3).
 
 **Template:**
-> Capture {{RAID / NFR / BOTH}} for {{CAPABILITY_OR_PROGRAMME}} using `reference/templates/raid-log-template.md` and `reference/templates/nfr-checklist-template.md`.
+> Capture {{RAID / NFR / BOTH}} for {{CAPABILITY_OR_PROGRAMME}} using `templates/raid-log-template.md` and `templates/nfr-checklist-template.md`.
 >
 > Context: {{WHAT WE'RE DESIGNING}}
 > Known risks/assumptions/dependencies: {{LIST_IF_ANY}}

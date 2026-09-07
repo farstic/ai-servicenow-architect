@@ -82,4 +82,4 @@ npm run lint
 
 ## License
 
-See [LICENSE](./LICENSE). © 2026 Cvetomir Grigorov.
+Apache-2.0 — see [LICENSE](./LICENSE) and the repository [NOTICE](../../NOTICE). © 2026 Cvetomir Grigorov.

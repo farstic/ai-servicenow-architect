@@ -617,7 +617,7 @@ To invoke manually:
 
 **v1.1** (shipped): Developer, Code Reviewer, Flow Designer Specialist, Integration Specialist sub-agents and skills. NowAIKit MCP integration live — §2.1 Write Approval Gate and §2.2 Update Set Capture Protocol operational. Validation suite live (`VALIDATION-TESTS.md`). Three artefacts deployed to live PDI.
 
-**v1.2** (shipped): ATF Author and Diagramming Specialist — skill + batch sub-agent each, taking the roster to 27 specialists and 9 sub-agents. Every specialist now has a `SKILL.md`, including Performance & Scale, Security & GRC, and the CMDB & CSDM Specialist (promoted to the fifth Domain Expert gateway). §4 Delivery Artefact Governance — ADR, traceability matrix, RAID log, NFR checklist — with engine-level templates under `reference/templates/`.
+**v1.2** (shipped): ATF Author and Diagramming Specialist — skill + batch sub-agent each, taking the roster to 27 specialists and 9 sub-agents. Every specialist now has a `SKILL.md`, including Performance & Scale, Security & GRC, and the CMDB & CSDM Specialist (promoted to the fifth Domain Expert gateway). §4 Delivery Artefact Governance — ADR, traceability matrix, RAID log, NFR checklist — with engine-level templates under `templates/`.
 
 **v1.3** (next):
 - `claude-ai-projects/` Tier 1 instruction templates (still not shipped — see §5b).
