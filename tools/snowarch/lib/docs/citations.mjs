@@ -35,6 +35,42 @@ function expandBraces(path, file, line) {
   return m[2].split(',').map((alt) => `${m[1]}${alt.trim()}${m[3]}`);
 }
 
+// Citation-shaped tokens that carry NO `markdown/` prefix. The scanner cannot resolve them — they
+// name a filename with no area — so `verify` reported `dead: 0` on a skill that still pointed a
+// reader at files which do not exist anywhere in the corpus (found in review of ARC-03-S04; the
+// licensing skill had ten, of which two named real pages that merely lacked their path and two named
+// pages that exist nowhere). They are WARNED, never failed: the fix is a prose edit that ARC-02 owns
+// for the rest of the tree, and a warning that blocked CI would block that work.
+const BARE_CITATION = /\(citation:\s*`([^`]+)`\)/gi;
+const BARE_IN_CELL = /`([A-Za-z0-9][A-Za-z0-9._-]*\.md)`/g;
+// Repository files, not corpus pages — naming these in a table cell is not a citation.
+const REPO_FILES = new Set(['SKILL.md', 'EXAMPLES.md', 'CLAUDE.md', 'README.md', 'STORIES.md',
+  'NOTICE.md', 'CONTRIBUTING.md', 'ARCHITECTURE.md', 'VALIDATION-TESTS.md']);
+
+export function findBareCitations(text, file = '<inline>') {
+  const out = [];
+  text.split('\n').forEach((line, i) => {
+    for (const m of line.matchAll(BARE_CITATION)) {
+      if (!m[1].includes('markdown/')) {
+        out.push({ file, line: i + 1, raw: m[1],
+          reason: `citation without a markdown/ path — the gate cannot check "${m[1]}"` });
+      }
+    }
+    // A table row cell that is only a backticked *.md with no path: the "Citation" column form.
+    if (line.startsWith('|') && !line.startsWith('|---')) {
+      for (const cell of line.split('|')) {
+        const t = cell.trim();
+        const m = t.match(/^`([A-Za-z0-9][A-Za-z0-9._-]*\.md)`$/);
+        if (m && !REPO_FILES.has(m[1])) {
+          out.push({ file, line: i + 1, raw: m[1],
+            reason: `table citation without a markdown/ path — the gate cannot check "${m[1]}"` });
+        }
+      }
+    }
+  });
+  return out;
+}
+
 export function extract(text, file = '<inline>') {
   const out = [];
   const warnings = [];
@@ -81,8 +117,9 @@ export function scanRepo({ root = process.cwd(), roots = DEFAULT_ROOTS, legacy =
     for (const f of files) {
       const rel = relative(root, f).split(sep).join('/');
       scanned.push(rel);
-      const { citations: c, warnings: w } = extract(readFileSync(f, 'utf8'), rel);
-      citations.push(...c); warnings.push(...w);
+      const text = readFileSync(f, 'utf8');
+      const { citations: c, warnings: w } = extract(text, rel);
+      citations.push(...c); warnings.push(...w, ...findBareCitations(text, rel));
     }
   }
   return { citations, warnings, skipped, scanned };
