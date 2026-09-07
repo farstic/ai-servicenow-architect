@@ -25,8 +25,8 @@ This skill exists because a design can be technically sound, baseline-clean, and
 
 ## Ground Truth — `ServiceNowDocs/` (Australia branch)
 The platform's own entitlement engine is **Subscription Management**; third-party software entitlement is **Software Asset Management** / **SaaS License Management**. Cite the path; flag every plan/SKU-sensitive claim as "verify against the engagement's actual subscription."
-- **Platform subscription / entitlement model:** `markdown/platform-administration/exploring-subscription-management-v2.md`, `subscription-management-reference-v2.md`, `allocate-subscriptions-v2.md`, `managing-user-subscriptions-v2.md`, `configuring-subscription-management-v2.md`, `addressing-issues-subscription-management-v2.md`, `monitoring-capacity-subscriptions.md`
-- **Software & SaaS entitlement (third-party):** `markdown/it-asset-management/software-asset-management/`, `markdown/it-asset-management/saas-license-management/`, `markdown/it-asset-management/itam-subscrip-summary.md`, `markdown/it-asset-management/subscription-itam-licensing.md`
+- **Platform subscription / entitlement model:** `markdown/platform-administration/exploring-subscription-management-v2.md`, `markdown/platform-administration/subscription-management-reference-v2.md`, `allocate-subscriptions-v2.md`, `markdown/platform-administration/managing-user-subscriptions-v2.md`, `configuring-subscription-management-v2.md`, `addressing-issues-subscription-management-v2.md`, `monitoring-capacity-subscriptions.md`
+- **Software & SaaS entitlement (third-party):** `markdown/it-asset-management/software-asset-management/`, `markdown/it-asset-management/saas-license-management/`, `markdown/it-asset-management/software-asset-management/c_SAMOverview.md`, `markdown/it-asset-management/index.md`
 
 ## §1.1 — the licensing-specific reading
 - **Advisory only (NOT a §1.1 trigger):** reading subscription allocation, mapping roles to fulfiller vs requester, naming the SKU a capability needs, estimating Now Assist Assists consumption, flagging App Engine units. None of this creates an object.
@@ -34,10 +34,10 @@ The platform's own entitlement engine is **Subscription Management**; third-part
 - **Your own §1.1 trip-wire:** never propose a custom **license/subscription/entitlement tracking table** — baseline **Subscription Management** (platform users) and **SAM / SaaS License Management** (third-party software) already model this. Proposing one is itself a §1.1 violation. Return the four-part `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` if a requirement seems to demand it.
 
 ## The five licensing checklists
-**1 — Subscription / fulfiller impact.** Does the design create or widen a role that grants *write/fulfil* access? Fulfiller-type access generally requires a paid subscription; requester/approver/read paths usually do not. Count the affected user population and call out the delta. *(citation: `exploring-subscription-management-v2.md`, `managing-user-subscriptions-v2.md`)*
-**2 — SKU / plan coverage.** Is every capability the design uses inside the client's purchased product *and tier* (Standard / Pro / Enterprise)? Flag Pro/Enterprise-only features assumed on a lower tier. Treat all tier claims as "verify against the engagement's subscription," never asserted from memory. *(citation: `subscription-management-reference-v2.md`)*
-**3 — App Engine footprint (custom tables / scoped apps).** Every custom table / scoped app has an App Engine licensing footprint (subscription units, app tier). Quantify it and pair it with the §1.1 verdict — this is where "small custom table" becomes a recurring line item. *(citation: `subscription-itam-licensing.md`)*
-**4 — Now Assist / AI consumption.** AI capabilities draw on a separate AI entitlement and consume **Assists** per invocation. Estimate volume × Assists-per-call and flag whether the AI SKU is owned. *(citation: `itam-subscrip-summary.md`)*
+**1 — Subscription / fulfiller impact.** Does the design create or widen a role that grants *write/fulfil* access? Fulfiller-type access generally requires a paid subscription; requester/approver/read paths usually do not. Count the affected user population and call out the delta. *(citation: `exploring-subscription-management-v2.md`, `markdown/platform-administration/managing-user-subscriptions-v2.md`)*
+**2 — SKU / plan coverage.** Is every capability the design uses inside the client's purchased product *and tier* (Standard / Pro / Enterprise)? Flag Pro/Enterprise-only features assumed on a lower tier. Treat all tier claims as "verify against the engagement's subscription," never asserted from memory. *(citation: `markdown/platform-administration/subscription-management-reference-v2.md`)*
+**3 — App Engine footprint (custom tables / scoped apps).** Every custom table / scoped app has an App Engine licensing footprint (subscription units, app tier). Quantify it and pair it with the §1.1 verdict — this is where "small custom table" becomes a recurring line item. *(citation: `markdown/it-asset-management/index.md`)*
+**4 — Now Assist / AI consumption.** AI capabilities draw on a separate AI entitlement and consume **Assists** per invocation. Estimate volume × Assists-per-call and flag whether the AI SKU is owned. *(citation: `markdown/it-asset-management/software-asset-management/c_SAMOverview.md`)*
 **5 — Third-party software / SaaS entitlement.** Does an integration or workflow consume a third-party SaaS seat/API entitlement that SAM or SaaS License Management should govern (and that the design could exhaust)? *(citation: `markdown/it-asset-management/saas-license-management/`, `markdown/it-asset-management/software-asset-management/`)*
 
 ## Output — Licensing Constraint Note (routing-time)
@@ -60,10 +60,10 @@ Severity `block` / `fix-before-prod` / `consider`; tags `[LIC-SUB] [LIC-SKU] [LI
 ## Domain anti-patterns to block
 | Anti-pattern | Better | Citation |
 |---|---|---|
-| Granting a fulfiller-type (write) role to a large requester population | Requester/approver path; reserve fulfiller roles for true agents | `managing-user-subscriptions-v2.md` |
-| Assuming a Pro/Enterprise feature on a Standard SKU | Confirm tier; design to the owned tier or flag the upgrade cost | `subscription-management-reference-v2.md` |
-| Treating a custom table as "free" | Price the App Engine units; re-test the baseline alternative (§1.1) | `subscription-itam-licensing.md` |
-| Unbounded Now Assist calls in a high-volume flow | Estimate Assists × volume; cap/confidence-gate; confirm AI SKU | `itam-subscrip-summary.md` |
+| Granting a fulfiller-type (write) role to a large requester population | Requester/approver path; reserve fulfiller roles for true agents | `markdown/platform-administration/managing-user-subscriptions-v2.md` |
+| Assuming a Pro/Enterprise feature on a Standard SKU | Confirm tier; design to the owned tier or flag the upgrade cost | `markdown/platform-administration/subscription-management-reference-v2.md` |
+| Treating a custom table as "free" | Price the App Engine units; re-test the baseline alternative (§1.1) | `markdown/it-asset-management/index.md` |
+| Unbounded Now Assist calls in a high-volume flow | Estimate Assists × volume; cap/confidence-gate; confirm AI SKU | `markdown/it-asset-management/software-asset-management/c_SAMOverview.md` |
 | A custom "license tracking" table | Baseline Subscription Management / SAM / SaaS License Management | `markdown/it-asset-management/software-asset-management/` |
 | Ignoring third-party SaaS seat/API limits an integration will hit | Model the entitlement in SaaS License Management; design within quota | `markdown/it-asset-management/saas-license-management/` |
 

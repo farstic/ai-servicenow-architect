@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { extract, scanRepo, areasOf, CitationSyntaxError }
+import { extract, scanRepo, areasOf, findBareCitations, CitationSyntaxError }
   from '../tools/snowarch/lib/docs/citations.mjs';
 
 const paths = (t) => extract(t).citations.map((c) => c.path);
@@ -77,4 +77,47 @@ test('the real tree: every emitted area is a plausible directory name', () => {
   for (const a of areasOf(scanRepo({ root: process.cwd() }).citations)) {
     assert.match(a, /^[a-z0-9][a-z0-9-]*$/, `"${a}" would be checked out as a sparse-checkout area`);
   }
+});
+
+// ---- ARC-03-S04b: the blind spot. A citation with no `markdown/` prefix cannot be resolved, so
+// `verify` reported dead: 0 on a skill that still pointed a reader at files existing nowhere.
+test('a bare (citation: `x.md`) is warned; the same citation with a full path is not', () => {
+  const bare = findBareCitations('see the rule *(citation: `subscription-itam-licensing.md`)*', 'skills/x/SKILL.md');
+  assert.equal(bare.length, 1);
+  assert.equal(bare[0].file, 'skills/x/SKILL.md');
+  assert.equal(bare[0].line, 1);
+  assert.match(bare[0].reason, /citation without a markdown\/ path/);
+
+  const full = findBareCitations('see the rule *(citation: `markdown/it-asset-management/index.md`)*', 'skills/x/SKILL.md');
+  assert.deepEqual(full, [], 'a full-path citation must NOT warn');
+});
+
+test('a table cell that is only a bare *.md is warned; a full path is not; a repo file is not', () => {
+  const rows = [
+    '| Anti-pattern | Better | Citation |',
+    '|---|---|---|',
+    '| a | b | `itam-subscrip-summary.md` |',
+    '| c | d | `markdown/it-asset-management/index.md` |',
+    '| e | f | `SKILL.md` |',
+  ].join('\n');
+  const w = findBareCitations(rows, 'skills/x/SKILL.md');
+  assert.equal(w.length, 1, 'only the bare corpus filename should warn');
+  assert.equal(w[0].line, 3);
+  assert.match(w[0].reason, /table citation without a markdown\/ path/);
+});
+
+test('the warning never becomes a failure — verify still exits 0 with warnings present', async () => {
+  const { verifyCitations, formatResult, EXIT } = await import('../tools/snowarch/lib/docs/verify.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'bare-'));
+  try {
+    mkdirSync(join(dir, '.claude/skills/x'), { recursive: true });
+    mkdirSync(join(dir, 'vendor/ServiceNowDocs/markdown/alpha'), { recursive: true });
+    writeFileSync(join(dir, 'vendor/ServiceNowDocs/markdown/alpha/a.md'), 'x');
+    writeFileSync(join(dir, '.claude/skills/x/SKILL.md'),
+      'ok markdown/alpha/a.md and blind *(citation: `nowhere.md`)*\n');
+    const r = verifyCitations({ root: dir });
+    assert.equal(r.status, 'ok');
+    assert.equal(formatResult(r).code, EXIT.ok, 'a bare citation must warn, never fail');
+    assert.ok(r.warnings.some((w) => /citation without a markdown/.test(w.reason)));
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
