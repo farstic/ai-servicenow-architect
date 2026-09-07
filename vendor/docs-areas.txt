@@ -11,7 +11,6 @@ markdown/it-asset-management
 markdown/it-business-management
 markdown/it-operations-management
 markdown/it-service-management
-markdown/now-assist
 markdown/now-intelligence
 markdown/now-platform
 markdown/platform-administration

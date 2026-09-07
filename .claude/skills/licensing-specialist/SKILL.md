@@ -26,7 +26,7 @@ This skill exists because a design can be technically sound, baseline-clean, and
 ## Ground Truth — `ServiceNowDocs/` (Australia branch)
 The platform's own entitlement engine is **Subscription Management**; third-party software entitlement is **Software Asset Management** / **SaaS License Management**. Cite the path; flag every plan/SKU-sensitive claim as "verify against the engagement's actual subscription."
 - **Platform subscription / entitlement model:** `markdown/platform-administration/exploring-subscription-management-v2.md`, `subscription-management-reference-v2.md`, `allocate-subscriptions-v2.md`, `managing-user-subscriptions-v2.md`, `configuring-subscription-management-v2.md`, `addressing-issues-subscription-management-v2.md`, `monitoring-capacity-subscriptions.md`
-- **Software & SaaS entitlement (third-party):** `markdown/it-asset-management/software-asset-management/`, `markdown/it-asset-management/saas-license-management/`, `markdown/it-asset-management/itam-subscrip-summary.md`, `markdown/it-asset-management/subscription-itam-licensing.md`
+- **Software & SaaS entitlement (third-party):** `markdown/it-asset-management/software-asset-management/`, `markdown/it-asset-management/saas-license-management/`, `markdown/it-asset-management/software-asset-management/c_SAMOverview.md`, `markdown/it-asset-management/index.md`
 
 ## §1.1 — the licensing-specific reading
 - **Advisory only (NOT a §1.1 trigger):** reading subscription allocation, mapping roles to fulfiller vs requester, naming the SKU a capability needs, estimating Now Assist Assists consumption, flagging App Engine units. None of this creates an object.

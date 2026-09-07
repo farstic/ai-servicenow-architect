@@ -236,6 +236,8 @@ README titles → stories: README 1 → S01 · README 2 → S02 · README 3 → 
 
 ### ARC-03-S05 — `snowarch docs sync` — the checkout/reconcile recipe (sparse · full · skip), pinned-SHA fetch, Windows long paths; the Node-free launcher recipe text
 
+> **Amendment 2026-09-08 — `sync` was delivered early, in ARC-03-S03.** The architect folded the corpus checkout into S03 so `sync` and `verify` could be reviewed together, and it is done: recipe C's five steps plus ADR-0008's repair step live in `tools/snowarch/lib/docs/sync.mjs`, invoked by `node scripts/docs.mjs sync`, measured at 2.1 s / 5-of-5 root files / HEAD at the pin / submodule initialised / 296 MB. **What remains for this story is therefore the rest of its scope, not the checkout** — the `--upstream` path, the pin bump and whatever else its text below assigns. Recorded here so a later reader does not see "S05" and assume the checkout is undone.
+
 **As** an individual practitioner **I want** one idempotent command that makes `vendor/ServiceNowDocs` match the committed pin and the generated areas — from nothing, from a stale checkout, or from a wrong sparse set — in about a minute and about 300 MB **so that** bootstrap B02, the doctor's `--fix` and I all use the same, tested path.
 
 **Context.** The dominant install cost in P-11 (616 MB / 48,991 files → measured 299 MB / 35,185 files / ~55 s, `00` §3.10). Implements `01` §4.2 B02 and §10 bullets 1 and 4; ARC acceptance criteria "fresh user … ≤ 350 MB containing every file cited", "`--docs full` yields the full checkout"; ARC risk "Windows long paths". Blocks ARC-06-S06 and the ARC-08-S06 `--fix` action "missing/unsparse docs → B02".

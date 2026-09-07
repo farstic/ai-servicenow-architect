@@ -68,7 +68,7 @@ If items 1, 2, 3, or 4 are missing, **stop and return a clarification request** 
    - Baseline AI Control Tower attestation templates.
    - Baseline summarisation, classification, and translation Actions.
    If a baseline construct serves the requirement, design with baseline only and proceed. If a custom architectural object is required, halt per §1.1.
-5. **Verify Now Assist platform behaviour** against `ServiceNowDocs/markdown/now-assist/` (Australia branch) using `WebFetch` for any non-trivial Now Assist or AI Control Tower behaviour you depend on.
+5. **Verify Now Assist platform behaviour** against `ServiceNowDocs/markdown/intelligent-experiences/` (Australia branch) using `WebFetch` for any non-trivial Now Assist or AI Control Tower behaviour you depend on.
 6. **Walk the capability specification structure** per the SKILL: capability statement, trigger, inputs, prompt design, tools list, confidence routing, human-in-loop gates, multilanguage handling, AI Control Tower attestations, evaluation criteria, governance plan.
 7. **Identify downstream handoffs**: Developer (custom Action server scripts, only if approved per §1.1), Flow Designer Specialist (orchestration that invokes the AI capability), Integration Specialist (non-baseline LLM provider plumbing, only if approved per §1.1), Security & GRC Specialist (AI Control Tower attestation review).
 8. **Write the specification** following all SKILL output rules.
