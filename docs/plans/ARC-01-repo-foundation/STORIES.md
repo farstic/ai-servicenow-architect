@@ -246,7 +246,7 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
     "repo": "farstic/ai-servicenow-architect",
     "cli": "snowarch",
     "mcp": { "serverKey": "servicenow", "package": "@farstic/snowarch", "packageDir": "packages/snowarch" },
-    "floors": { "claudeCode": "2.1.214", "node": "20.0.0", "git": "2.25.0" },
+    "floors": { "claudeCode": "2.1.214", "node": "20.0.0", "git": "2.34.1" },
     "docs": { "family": "australia", "pin": "ba513f2c62d3698ef5bfdd8044110226b8419689", "areasFile": "vendor/docs-areas.txt" },
     "roster": { "skills": 28, "agents": 9 }
   }
@@ -255,6 +255,10 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 - `engine.config.schema.json`: `$schema: https://json-schema.org/draft/2020-12/schema`, `additionalProperties: false` at every level, `required` = every key shown. Constraints: `repo` `^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`; `mcp.serverKey` `^[A-Za-z0-9_-]+$` (D-01); `mcp.package` `^@[a-z0-9-]+/[a-z0-9-]+$`; `mcp.packageDir` `^packages/[a-z0-9-]+$`; each floor `^\d+\.\d+\.\d+$`; `docs.family` enum `["australia","xanadu","yokohama","zurich"]` (the upstream release-family branches listed in `00` §3.10; `main`/`mobile`/`nofamily`/`other`/`store` are not release families); `docs.pin` `^[0-9a-f]{40}$`; `docs.areasFile` `^vendor/[a-z0-9.-]+$`; `roster.skills`/`roster.agents` integer ≥ 1.
 - `tests/engine-config.test.mjs` (`node:test`): (1) the file parses; (2) Ajv 2020 (`ajv/dist/2020.js`, `strict: true`) validates it against the schema; (3) cross-checks against reality: `mcp.packageDir` exists and its `package.json.name` equals `mcp.package`; `roster.skills` equals the number of `.claude/skills/*/SKILL.md`; `roster.agents` equals the number of `.claude/agents/*.md`; (4) `git ls-files -s vendor/ServiceNowDocs` — when a gitlink exists (after ARC-03), its SHA equals `docs.pin`; before ARC-03 the check is reported as skipped with the reason "no gitlink yet (ARC-03)". Check (4) is what turns the `01` §10 "pin == gitlink (lint)" rule into a test without waiting for ARC-03.
 - Root `devDependencies`: `"ajv": "^8.17.1"` (dev only; `npm ci --omit=dev` never installs it, so the runtime footprint criterion is unaffected).
+
+> **Amendment 2026-09-08.** Two corrections to the design note above, both from decisions taken after it was written. **(a) `floors.git` is `2.34.1`, not `2.25.0`** — **ADR-0008** (Accepted 2026-09-07) supersedes ADR-0001's value: nothing below 2.34.1 has been measured, and below it the corpus recipe silently omits five root files including `LICENSE` (spike S-07). The literal JSON above is corrected in place. **(b)** the schema declares `$schema` as an allowed property, because `additionalProperties: false` at the top level would otherwise reject the editor hint the design note itself puts in the file.
+>
+> **A finding for ARC-01-S07, from running this story's test:** `.gitignore`'s `node_modules/` does **not** ignore a **symlink** named `node_modules` — a trailing slash matches directories only, and git reported `?? node_modules`. Setups that symlink their store (pnpm, some yarn layouts) would leave it untracked-but-visible. S07 should carry `node_modules` without the slash, or both forms.
 
 **Acceptance criteria.**
 1. `node -e "JSON.parse(require('fs').readFileSync('engine.config.json','utf8'))"` exits 0.
