@@ -3,13 +3,18 @@
 useDefault = true
 
 [allowlist]
-description = """
-vendor/ServiceNowDocs is ServiceNow's own documentation corpus, vendored as a submodule by ARC-03
-and attributed in NOTICE. Measured in ARC-01-S02: it trips 592 default rules, of which 526 are
-`curl-auth-user` — the `curl -u user:password` examples in the REST API reference pages — plus
-generic-api-key x44, curl-auth-header x8, private-key x8 and jwt x4. None is a credential; they are
-published examples. For contrast the same scan over the engine's history (59 commits) and over the
-server import artefact (57 commits) each returned NO leaks, so this corpus is the entire source of
-the noise. The path is listed before it exists so that ARC-03's merge cannot turn CI permanently red.
-"""
+description = "ARC-01: one path exclusion for a corpus that does not exist yet, and four fingerprints for documented benign findings."
+
+# vendor/ServiceNowDocs is ServiceNow's own documentation corpus, vendored as a submodule by ARC-03
+# and attributed in NOTICE. Measured in ARC-01-S02: it trips 592 default rules, of which 526 are
+# `curl-auth-user` — the `curl -u user:password` examples in the REST API reference pages — plus
+# generic-api-key x44, curl-auth-header x8, private-key x8 and jwt x4. None is a credential; they
+# are published examples. For contrast the same scan over the engine's history (59 commits) and over
+# the server import artefact (57 commits) each returned NO leaks, so this corpus is the entire
+# source of the noise. The path is listed BEFORE it exists so ARC-03's merge cannot turn CI red.
 paths = ['''^vendor/ServiceNowDocs/''']
+
+# The four remaining findings in the imported server documentation are allow-listed ONE BY ONE BY
+# FINGERPRINT in .gitleaksignore, not here: gitleaks takes fingerprints from that file
+# (`-i/--gitleaks-ignore-path`), and a `fingerprints` key in this TOML is not part of the schema —
+# it is silently ignored, which is how the first attempt at this "passed" review and still failed CI.
