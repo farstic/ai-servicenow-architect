@@ -1,0 +1,11 @@
+AI ServiceNow Architect
+Copyright 2026 Cvetomir Grigorov
+
+This product includes documentation from the ServiceNowDocs corpus
+(https://github.com/ServiceNow/ServiceNowDocs), licensed under the Apache License, Version 2.0,
+checked out as a git submodule at vendor/ServiceNowDocs. ServiceNow and Now Platform are
+trademarks of ServiceNow, Inc.; this project is not affiliated with or endorsed by ServiceNow, Inc.
+
+Portions derive from the author's earlier projects "claude-servicenow-live" (ServiceNow Architecture
+Engine v2.8.0) and "snow-mcp" (ServiceNow MCP Toolkit 1.0.0), relicensed by their author under the
+Apache License, Version 2.0, on 2026-09-04.

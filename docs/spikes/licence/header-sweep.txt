@@ -1,0 +1,217 @@
+ARC-00-S02 — header sweep: every file in the two source trees that asserts a pre-Apache licence
+================================================================================================
+Produced 2026-09-06; corrected 2026-09-06 after an adversarial review (see §7).
+Read-only: nothing in either source tree was modified.
+Source trees at:  AI-Architect-Claude HEAD 21bdf69   ·   snow-mcp HEAD bb09bde
+
+Each line carries the action ARC-01 takes and the story that owns it.  Story ownership in ARC-01:
+
+    ARC-01-S01   founds the repository; adds the root LICENSE and NOTICE
+    ARC-01-S02   imports the ENGINE working tree
+    ARC-01-S03   imports the SERVER into packages/snowarch, applies the leaf-level D-03 cut,
+                 renames the package and sets its `license` field
+    ARC-01-S05   regenerates the root lockfile
+    ARC-01-S08   the licence sweep itself — the consumer of this file
+
+ARC-01-S08's own scope names exactly four items to edit (`packages/snowarch/LICENSE`,
+`packages/snowarch/README.md:83-85`, `packages/snowarch/package.json.license` — done in S03,
+verified in S08 — and engine `docs/README.md:157-159`) and three already deleted by S03.  This
+sweep must, and does, cover all seven.  ARC-01-S08's acceptance criterion 1 is the test:
+
+    git grep -n -i -E "source available|all rights reserved|not licensed for redistribution|license: MIT|SEE LICENSE IN LICENSE" \
+        -- . ':!LICENSE' ':!packages/snowarch/LICENSE' ':!NOTICE'      # must print nothing
+
+
+1. METHOD
+---------
+Pass 1 — the story's grep, over both trees:
+
+    grep -rniE "proprietary|all rights reserved|source.available|license: MIT|not licensed for redistribution" \
+         ~/work/AI-Architect-Claude ~/work/snow-mcp \
+         --include=*.md --include=*.ts --include=*.mjs --include=*.yaml --include=*.json -l
+
+Exclusions applied to pass 1, with the reason and the suppressed count:
+
+    --exclude-dir=ServiceNowDocs   57 files in the engine.  Third-party vendored corpus (Apache-2.0,
+                                   attributed in NOTICE), not a licence assertion by either source
+                                   tree.  It is a submodule; ARC-03 owns it.
+    --exclude-dir=node_modules    119 files in snow-mcp.  Dependency licences, never imported.
+    --exclude-dir=.git             not source.
+    --exclude-dir=dist            build output; ARC-04-S13 regenerates it.
+    --exclude-dir=desktop         cut by D-03 item (1) and by ARC-01-S03's leaf cut; nothing imported.
+                                  Its hits are still listed in §4 so no reader has to wonder.
+
+Pass 1 is not sufficient — it provably cannot see three of the seven items (an extensionless file,
+a licence section with no matched phrase, and an HTML licence badge).  Three further passes were run:
+
+    Pass 2   `git grep` over ALL tracked files with no --include filter, both trees.
+    Pass 3   a filename pass for LICENCE / LICENSE / COPYING / NOTICE / TERMS files.
+    Pass 4   a semantic pass for licence statements the five patterns cannot match:
+             `## License` headings, `©` / `(c)` copyright lines, and bare "MIT" in markup.
+
+
+2. HITS OF THE STORY'S GREP (pass 1)
+------------------------------------
+engine:docs/README.md:157-159
+    ## License
+    **Proprietary — Enterprise Architecture Team. All rights reserved.** Internal use only; not
+    licensed for redistribution.
+    ACTION: rewrite the section — replace with the Apache-2.0 statement pointing at the root LICENSE.
+    The matched text is line 159, which alone matches three of the five patterns; the section runs
+    157-159 and ARC-01-S08's scope names that whole range.
+    OWNER: ARC-01-S08.
+
+mcp:smithery.yaml:15
+    license: MIT
+    ACTION: delete file — D-03 / ARC-01-S03's leaf `git rm -r` list.  The MIT claim contradicts both
+    the old source-available LICENSE and the new Apache-2.0 licence, so it must not survive the
+    import in any form.
+    OWNER: ARC-01-S03 (leaf-level cut).  Verified again by ARC-01-S08.
+
+mcp:TERMS.md:5,7,8
+    ## 1. Source Available Software
+    ServiceNow MCP Toolkit ("the Software") is source available software distributed under the
+    [ServiceNow MCP Toolkit Source Available License](./LICENSE). You may use the Software free of
+    ACTION: delete file — D-03 / ARC-01-S03's leaf `git rm -r` list.
+    OWNER: ARC-01-S03.  Verified again by ARC-01-S08.
+
+
+3. HITS THE STORY'S GREP CANNOT REACH
+--------------------------------------
+mcp:LICENSE:1,3
+    ServiceNow MCP Toolkit — Source Available License
+    Copyright (c) 2026 Cvetomir Grigorov. All rights reserved.
+    ACTION: replace the text with the verbatim Apache-2.0 text (spikes/licence/LICENSE).  The old
+    text prohibits copying, modifying, merging and derivative works (`00` P-32), which is exactly
+    what the merge requires, so this replacement is the legal precondition for ARC-04.
+    OWNER: ARC-01-S01 (the root LICENSE) + ARC-01-S08 (the server copy).
+    IMPORTANT — the server copy IS imported.  `LICENSE` is not on ARC-01-S03's leaf `git rm -r`
+    list, so the source-available text arrives in the tree as `packages/snowarch/LICENSE` with the
+    subtree import.  ARC-01-S08 replaces its content and keeps the file (npm packs `LICENSE*` and
+    consumers of `npx @farstic/snowarch` expect one in the tarball); its acceptance criterion 2 is
+    `cmp LICENSE packages/snowarch/LICENSE` exiting 0.
+    WHY PASS 1 MISSES IT: `snow-mcp/LICENSE` has no file extension and the story's command filters
+    with --include=*.md/*.ts/*.mjs/*.yaml/*.json.  The story's own design note names
+    `snow-mcp/LICENSE` as one of the four known hits, so the command and its stated expected result
+    contradict each other.  Flagged to the architect; the file is listed here regardless.
+
+mcp:README.md:83-85
+    ## License
+    See [LICENSE](./LICENSE). © 2026 Cvetomir Grigorov.
+    ACTION: rewrite the licence section to state Apache-2.0 and point at the root LICENSE.
+    OWNER: ARC-01-S08 — its scope names `packages/snowarch/README.md:83-85` explicitly.
+    WHY PASS 1 MISSES IT: the section contains none of the five patterns; it points at a file whose
+    text is the problem rather than restating it.  Found by pass 4 (`## License` heading + `©`).
+    This is the item most likely to survive an import unnoticed: after `LICENSE` is replaced the
+    sentence "See LICENSE" becomes correct again, but the `© 2026 Cvetomir Grigorov` line with no
+    licence grant is the wrong shape for an Apache-2.0 package README.
+
+mcp:docs/index.html:279-280
+    <div class="stat-number">MIT</div>
+    <div class="stat-label">License</div>
+    ACTION: none — the file is deleted by ARC-01-S03's leaf cut (`docs/index.html` is on the list).
+    OWNER: ARC-01-S03.
+    WHY IT IS LISTED: it is a fourth, published MIT claim, in the one artefact a user actually sees
+    (the project's docs landing page), and no pattern in either grep can match a value split across
+    HTML elements.  Recorded so it is visibly dismissed rather than missed.
+    WHY PASS 1 MISSES IT: `--include` has no `*.html`, and the text is `MIT` not `license: MIT`.
+
+
+4. `SEE LICENSE IN LICENSE` — four occurrences, not one
+--------------------------------------------------------
+ARC-01's acceptance criterion (README line 60) and ARC-01-S08's criterion 1 grep for a FIFTH
+pattern the story's S02 command does not carry: `SEE LICENSE IN LICENSE`.  It occurs in four
+tracked files, all in snow-mcp; the engine has none.  Only the first needs an edit.
+
+mcp:package.json:97
+    "license": "SEE LICENSE IN LICENSE",
+    ACTION: set to "Apache-2.0".
+    OWNER: ARC-01-S03 (it already renames the package to `@farstic/snowarch` and sets `license`
+    `Apache-2.0` — ARC-01 README line 42); ARC-01-S08 verifies it (its criterion 3).
+    NOTE: `package.json` `license` fields are explicitly OUT of ARC-00-S02's scope; the line is
+    recorded here only so ARC-01's criterion has no unlisted hit.
+
+mcp:package-lock.json:10
+    "license": "SEE LICENSE IN LICENSE",     (the root package's own `packages[""]` entry)
+    ACTION: none in place — ARC-01-S03's leaf cut deletes `packages/snowarch/package-lock.json`
+    ("the root lockfile governs"), and ARC-01-S05 generates a fresh root lockfile from the renamed,
+    Apache-2.0 `package.json`.
+    OWNER: ARC-01-S03 (delete) + ARC-01-S05 (regenerate).
+
+mcp:desktop/package.json:10   ·   mcp:desktop/package-lock.json:10
+    "license": "SEE LICENSE IN LICENSE",
+    ACTION: none — inside `desktop/`, which is excluded from pass 1 (§1) and removed by ARC-01-S03's
+    leaf cut.  `desktop/package-lock.json` additionally carries hundreds of dependency `"license":
+    "MIT"` lines; all go with the directory.
+    OWNER: ARC-01-S03.
+
+
+5. ITEMS WITH NO LICENCE CLAIM, RECORDED FOR THE CROSS-CHECK
+-------------------------------------------------------------
+mcp:server.json
+    No licence string; carries no `license` key.  ACTION: delete file (ARC-01-S03 leaf cut).
+
+engine: (no LICENSE file exists)
+    The engine tree has no LICENSE, NOTICE or COPYING file at all; its only licence assertion is the
+    `docs/README.md:157-159` section above.  ACTION: ARC-01-S01 adds the root `LICENSE` and `NOTICE`
+    from `spikes/licence/`.
+
+
+6. CROSS-CHECK AGAINST ARC-01's DELETION SCOPE, AND WHY THE CRITERION THEN PASSES
+----------------------------------------------------------------------------------
+ARC-01-S03's leaf `git rm -r` list includes `desktop/`, `clients/`, `.github/`, `Dockerfile`,
+`server.json`, `smithery.yaml`, `glama.json`, `TERMS.md`, `docs/CLIENT_SETUP.md`, `docs/index.html`,
+`package-lock.json`, `.gitignore`.  Six of this sweep's items are inside it and need no edit:
+
+    smithery.yaml                deleted   (MIT claim)
+    TERMS.md                     deleted   (source-available claim)
+    docs/index.html              deleted   (MIT badge)
+    server.json                  deleted   (no claim)
+    package-lock.json            deleted   (SEE LICENSE IN LICENSE; S05 regenerates)
+    desktop/**                   deleted   (SEE LICENSE IN LICENSE ×2 + dependency MIT lines)
+
+Three items need an explicit edit:
+
+    engine  docs/README.md:157-159   rewrite the licence section        ARC-01-S08
+    mcp     LICENSE                  replace text with Apache-2.0       ARC-01-S01 (root)
+                                     (imported as packages/snowarch/)   + ARC-01-S08 (server copy)
+    mcp     README.md:83-85          rewrite the licence section        ARC-01-S08
+
+One is a metadata field, neither deleted nor rewritten but re-valued:
+
+    mcp     package.json:97          "license" -> "Apache-2.0"          ARC-01-S03 (S08 verifies)
+
+After those four actions plus the six deletions, ARC-01-S08's criterion 1 —
+`git grep -n -i -E "source available|all rights reserved|not licensed for redistribution|license: MIT|SEE LICENSE IN LICENSE" -- . ':!LICENSE' ':!packages/snowarch/LICENSE' ':!NOTICE'`
+printing nothing — is satisfiable.  Note that the criterion's own path exclusions cover the two
+Apache-2.0 `LICENSE` files but NOT `NOTICE`'s neighbours or any lockfile, which is why the lockfile
+deletion above is load-bearing rather than incidental.  Neither the new `LICENSE` nor `NOTICE`
+matches any of the five patterns, so no allow-list entry is needed for either.
+
+
+7. WHAT THIS SWEEP DOES NOT COVER, AND WHAT WAS CORRECTED
+----------------------------------------------------------
+Not covered:
+
+- Source-file licence headers: none exist in either tree.  `git grep -n "SPDX-License-Identifier"`
+  matches 0 files in both trees.  A scan of the first three lines of all 108 tracked `.ts` files
+  under `snow-mcp/src/` at HEAD `bb09bde` (`git ls-tree -r --name-only bb09bde | grep -E '^src/.*\.ts$'`
+  — this includes `src/server.ts` and the one ambient declaration `src/reports/pdfmake.d.ts`) and of
+  all 6 tracked `*.mjs` / `*.ts` / `*.sh` files in the engine finds no copyright, licence or "all
+  rights reserved" header.  This matches ARC-01's note "no source file carries an old-licence header
+  (measured: none did)".
+- `desktop/electron-builder.yml:3` (`copyright: Copyright © 2024 cvetomirgrigorov`) — a build-config
+  copyright string, not a licence grant, inside the deleted `desktop/`.  No action.
+- The `@farstic/snow-mcp@1.0.0` npm record: **not touched** — no relicense, no deprecation, no
+  unpublish, no README edit (D-01 owner constraint).  It is not a file in either tree.
+- The engine's `ServiceNowDocs` submodule: Apache-2.0 upstream, attributed in `NOTICE`, ARC-03's.
+
+Corrected on 2026-09-06 after review (the first version of this file was wrong on all four):
+
+- Every `mcp:` action was attributed to ARC-01-S02, which imports the **engine**.  The server import,
+  leaf cut and package rename are **ARC-01-S03**; the licence edits are **ARC-01-S08**.
+- "the server copy is not imported" was false: `LICENSE` is not on the leaf-cut list, so
+  `packages/snowarch/LICENSE` does arrive and ARC-01-S08 must replace it.
+- "`SEE LICENSE IN LICENSE` … the only occurrence in either tree" was false: there are four.
+- `mcp:README.md:83-85` and `mcp:docs/index.html:279-280` were missing entirely, and the engine
+  hit was recorded as `:159` rather than the `:157-159` section ARC-01-S08 names.

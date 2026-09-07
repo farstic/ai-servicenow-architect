@@ -1,0 +1,24 @@
+{
+  "product": "snowarch",
+  "repo": "farstic/ai-servicenow-architect",
+  "cli": "snowarch",
+  "mcp": {
+    "serverKey": "servicenow",
+    "package": "@farstic/snowarch",
+    "packageDir": "packages/snowarch"
+  },
+  "floors": {
+    "claudeCode": "2.1.214",
+    "node": "20.0.0",
+    "git": "2.34.1"
+  },
+  "docs": {
+    "family": "australia",
+    "pin": "ba513f2c62d3698ef5bfdd8044110226b8419689",
+    "areasFile": "vendor/docs-areas.txt"
+  },
+  "roster": {
+    "skills": 28,
+    "agents": 9
+  }
+}
