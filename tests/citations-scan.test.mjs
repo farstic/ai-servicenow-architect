@@ -22,10 +22,10 @@ test('criterion 3 — one brace group expands to two paths and one area', () => 
 
 test('criterion 4 — a nested brace is a CitationSyntaxError naming file and line', () => {
   assert.throws(
-    () => extract('x\nmarkdown/servicenow-platform/x-{a,{b,c}}.md\n', 'skills/x/SKILL.md'),
+    () => extract('x\nmarkdown/servicenow-platform/x-{a,{b,c}}.md\n', '.claude/skills/x/SKILL.md'),
     (e) => {
       assert.ok(e instanceof CitationSyntaxError);
-      assert.match(e.message, /^skills\/x\/SKILL\.md:2: /);
+      assert.match(e.message, /^\.claude\/skills\/x\/SKILL\.md:2: /);
       return true;
     });
 });
@@ -82,13 +82,13 @@ test('the real tree: every emitted area is a plausible directory name', () => {
 // ---- ARC-03-S04b: the blind spot. A citation with no `markdown/` prefix cannot be resolved, so
 // `verify` reported dead: 0 on a skill that still pointed a reader at files existing nowhere.
 test('a bare (citation: `x.md`) is warned; the same citation with a full path is not', () => {
-  const bare = findBareCitations('see the rule *(citation: `subscription-itam-licensing.md`)*', 'skills/x/SKILL.md');
+  const bare = findBareCitations('see the rule *(citation: `subscription-itam-licensing.md`)*', '.claude/skills/x/SKILL.md');
   assert.equal(bare.length, 1);
-  assert.equal(bare[0].file, 'skills/x/SKILL.md');
+  assert.equal(bare[0].file, '.claude/skills/x/SKILL.md');
   assert.equal(bare[0].line, 1);
   assert.match(bare[0].reason, /citation without a markdown\/ path/);
 
-  const full = findBareCitations('see the rule *(citation: `markdown/it-asset-management/index.md`)*', 'skills/x/SKILL.md');
+  const full = findBareCitations('see the rule *(citation: `markdown/it-asset-management/index.md`)*', '.claude/skills/x/SKILL.md');
   assert.deepEqual(full, [], 'a full-path citation must NOT warn');
 });
 
@@ -100,7 +100,7 @@ test('a table cell that is only a bare *.md is warned; a full path is not; a rep
     '| c | d | `markdown/it-asset-management/index.md` |',
     '| e | f | `SKILL.md` |',
   ].join('\n');
-  const w = findBareCitations(rows, 'skills/x/SKILL.md');
+  const w = findBareCitations(rows, '.claude/skills/x/SKILL.md');
   assert.equal(w.length, 1, 'only the bare corpus filename should warn');
   assert.equal(w[0].line, 3);
   assert.match(w[0].reason, /table citation without a markdown\/ path/);

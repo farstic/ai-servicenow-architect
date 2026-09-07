@@ -81,14 +81,18 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
 
   plugin-validate:
-    name: plugin validate (advisory)
+    name: plugin validate
     runs-on: ubuntu-latest
-    # Advisory, and it stays advisory until two separate things are true. ARC-00 spike S-19 is
-    # CONFIRMED (headless `plugin validate` works on all three runners, needs no login and does
-    # discriminate), but making a job REQUIRED means wiring branch-protection contexts, and `main`
-    # — the branch that carries protection — does not exist until the milestone merge. Whoever
-    # performs that merge flips this to `false` and adds the context.
-    continue-on-error: true
+    # No longer advisory at the JOB level. ARC-00 spike S-19 is CONFIRMED — headless `plugin validate`
+    # works on all three runners, needs no login, and does discriminate — so a genuine validation
+    # failure should turn this workflow red. What is still outstanding is making it a REQUIRED status
+    # check, which needs branch-protection contexts on `main`, and `main` does not exist until the
+    # milestone merge. Whoever performs that merge adds the context; nothing here changes then.
+    #
+    # The one thing that must never turn this red is the CLI being absent (ARC-02-S02 criterion 7):
+    # the install step tolerates failure and the validate steps are guarded, so an unreachable
+    # registry skips the check with a reason instead of reporting a validation problem that nobody
+    # can act on.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -96,7 +100,27 @@ jobs:
           node-version: 22
       # Pinned: an unpinned global install makes this job's result depend on whatever was published
       # that morning, which is not a signal anyone can act on.
-      - run: npm i -g @anthropic-ai/claude-code@2.1.258
-      - run: claude --version
-      - run: claude plugin validate .claude/skills
-      - run: claude plugin validate .claude/agents
+      - name: install the pinned CLI
+        continue-on-error: true
+        run: npm i -g @anthropic-ai/claude-code@2.1.258
+      - name: is the CLI on PATH?
+        id: cli
+        run: |
+          if command -v claude >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            claude --version
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: skipped
+        if: steps.cli.outputs.available != 'true'
+        run: echo "claude CLI not available on this runner (S-19)"
+      # --strict promotes warnings to failures. S-19 found it rejects a missing `author` where the
+      # component type requires one; both directories pass it at the pinned version, so the strict
+      # form is the one worth running — the lax form lets a warning through unnoticed.
+      - name: validate .claude/skills
+        if: steps.cli.outputs.available == 'true'
+        run: claude plugin validate .claude/skills --strict
+      - name: validate .claude/agents
+        if: steps.cli.outputs.available == 'true'
+        run: claude plugin validate .claude/agents --strict

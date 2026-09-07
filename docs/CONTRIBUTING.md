@@ -168,6 +168,70 @@ while proving nothing.
 
 ---
 
+## Roster lint — the SK-xx and AG-xx rule ids
+
+Every skill and agent in `.claude/` is linted on every push. Each rule has a stable id; a failure quotes
+it, so `git grep SK-04` finds both the rule and the tests that prove it. The rules are functions in
+`tests/lib/lint-rules.mjs` — deliberately *not* inlined in the test bodies, because the negative cases in
+`tests/lint-negatives.test.mjs` must run **the same code** as the real-tree checks. A negative case that
+re-implements its rule proves only that the re-implementation works.
+
+| id | rule | why |
+|---|---|---|
+| SK-01 | `name` is a slug equal to the skill's directory | a mismatch registers the skill under a name nothing references |
+| SK-02 | `description` present, ≤ 500 chars unless allow-listed | the description is what the model routes on; the allow-list is a ratchet ARC-02-S03 empties |
+| SK-03 | no unquoted `": "` in `name`/`description` | a YAML plain scalar ends at `: ` — this is the hazard that stopped `now-assist-specialist` registering |
+| SK-04 | `version` lives at `metadata.version`, as semver | a top-level `version:` is rejected by claude.ai uploads (S-13) |
+| SK-05 | no unknown top-level frontmatter keys | an unrecognised key is silently ignored, so a typo'd rule never takes effect |
+| SK-06 | every skill ships an `EXAMPLES.md` | the roster's own standard |
+| SK-07 | directory count matches `engine.config.json` `roster.skills` | one number, one place |
+| SK-08 | no skill name collides with a Claude Code built-in command | the built-in wins and the skill is unreachable |
+| SK-09 | no retired vocabulary under `.claude/` — the token list is `RETIRED` in `tests/lib/lint-rules.mjs`, not repeated here | the v3 rebuild dropped the old permission-tier and product names; the rule stops them coming back while ARC-02-S06 sweeps the governing documents. Spelling the tokens in prose would trip the separate legacy-name ratchet, which is the point of keeping one source of truth |
+| SK-10 | every `.claude/…`, `governance/…`, `templates/…`, `docs/…` path quoted in a skill body, agent body or governing document resolves | a dead path routes the reader — or the model — to nothing |
+| AG-01 | `name` equals the agent's file stem | as SK-01 |
+| AG-02 | `description` present, no unquoted `": "` | as SK-03; the orchestrator dispatches on this text |
+| AG-03 | explicit `tools:` list, no `mcp__*`, no `Agent`/`Task` | **an agent with no `tools:` key inherits everything, MCP tools included** — a sub-agent must not hold instance access, and must not dispatch sub-agents |
+| AG-04 | `model: inherit` | a pinned model id rots; enabled by ARC-02-S04 |
+| AG-05 | `skills:` preloads existing roster skills | enabled by ARC-02-S04 |
+| AG-06 | combined description budget under the sub-agent threshold | every agent description sits in the main context |
+
+Two more tests carry no rule id, because the ARC-08 doctor does not quote them: a **ratchet** asserting
+the SK-02 length allow-lists never grow (ARC-02-S03 empties them), and a **pending** check recording the
+49 retired-vocabulary hits still in `CLAUDE.md` and `README.md` — SK-09's own surface is clean, so the
+rule is enabled rather than deferred, and the outstanding sweep is reported instead of hidden.
+
+An SK-09 exemption is anchored to **both a file and a substring of the matching line**, never a line
+number, so it cannot drift onto a different line as the file is edited. There is one today: an ITOM
+worked example quotes a customer's own "Tier 1 Strict / Tier 2 Standard / Tier 3 Relaxed" CI
+classification, which is the client's vocabulary, not the engine's retired permission model. A test
+asserts that exemption actually suppresses something — an allow-list entry that exempts nothing is dead
+weight pretending to be a decision.
+
+AG-04 and AG-05 are **written but switched off** behind `ENFORCE_S04` in `tests/agents-lint.test.mjs`,
+because ARC-02-S04 makes the content change they require. They are not merely skipped: a companion test
+asserts the *known-bad* state (all agents still carry a pinned model id, none preload skills), so fixing
+the agents early fails that test and points at the switch, rather than letting a disabled rule pass
+quietly over an already-clean tree.
+
+### Before you push
+
+```
+npm test
+claude plugin validate .claude/skills --strict
+claude plugin validate .claude/agents --strict
+```
+
+CI runs all three. `--strict` promotes warnings to failures — S-19 found it rejects a missing `author`
+where the component type requires one — so the strict form is the one worth running; the lax form lets a
+warning through unnoticed. The `plugin-validate` job is no longer `continue-on-error`: a real validation
+failure turns the workflow red. What it will not do is go red because the CLI is missing — the install
+step tolerates failure and the validate steps are guarded on `claude` being on `PATH`, so an unreachable
+registry logs `claude CLI not available on this runner (S-19)` and skips. Making the job a *required*
+status check still needs branch-protection contexts on `main`, which does not exist until the milestone
+merge.
+
+---
+
 ## The engine's git floor
 
 `floors.git` is **2.34.1** (ADR-0008), not ADR-0001's 2.25.0. Below 2.34.1 nothing has been measured, and
