@@ -664,7 +664,7 @@ When a test fails after a change to `CLAUDE.md`, `taxonomy.md`, `governance-rule
 3. **Fix the document** — edit only the governing document responsible (do not patch symptoms in other files).
 4. **Re-run the affected test** in a fresh session.
 5. **Re-run the full suite** before committing — a fix for one test must not break others.
-6. **Record the result** in the Test Run History table below with the new `CLAUDE.md` version and date.
+6. **Record the result** with the new `CLAUDE.md` version and date. *(The two dated run tables that used to follow this section were engagement residue from a single machine and were removed by ARC-01-S10 (P-13); ARC-02 decides where run results are recorded from now on.)*
 
 **Do not commit a CLAUDE.md or SKILL.md change that has a failing test in this file.**
 
@@ -686,30 +686,3 @@ git diff HEAD~1 HEAD --name-only   # should show both .claude/agents/developer.m
 ```
 
 Regression baseline: Full suite 10/10 PASS on 2026-05-29 against CLAUDE.md v2.6. Includes updated criteria for T-02 (design artefact definition), T-03 (Security & GRC mandatory), T-06 (full-pipeline setup).
-
----
-
-## Test Run History
-
-| Date | CLAUDE.md | T-01 | T-02 | T-03 | T-04 | T-05 | T-06 | T-07 | T-08 | T-09 | T-10 | T-11 | T-12 | T-13 | T-14 | T-15 | T-16 | T-17 | T-18 | Result |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 2026-05-29 | v2.6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | — | — | — | 7/7 (T-08+ not yet defined) |
-| 2026-05-29 | v2.6 | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | 3/3 (T-08–10 first run) |
-| 2026-05-29 | v2.6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | 10/10 PASS (full suite, updated criteria) |
-| 2026-05-30 | v2.6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | 10/10 PASS (post F-016/F-017; T-07 mechanical, T-01–10 exec) |
-| 2026-05-31 | v2.6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | 13/13 PASS — **T-11/T-12/T-13 ✅ (first behavioural run)**; T-07 mechanical, rest exec; post F-005/006/013/018 |
-| 2026-06-03 | v2.7.4 | — | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | — | **T-14/T-15/T-16 ✅ live-fired (Claude Code)** — CMDB & CSDM gateway, CSM↔ITSM↔CSDM co-fire, Security & GRC consult/review. Full T-01–T-16 regression + Tier 1 re-run pending |
-| 2026-06-04 | v2.7.6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | **16/16 PASS (Claude Code)** — full T-01–T-16 regression after the v1.1 skill depth-pass + v2.7.5/v2.7.6 build-out. T-07 mechanical; no routing regression. **Tier 1 (Claude.ai) re-run still pending.** |
-| 2026-06-06 | v2.8.0 | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | **T-17/T-18 ✅ live-fired (Claude Code)** — Licensing consult priced the §1.1 path (≈400 fulfiller + App Engine units, FSM-SKU flagged "verify"); Estimation produced a ROM range + complexity rubric + baseline-vs-custom §1.1 delta + RAID/SPM routing. Full T-01–T-18 regression + Tier 1 re-run pending. |
-| 2026-06-06 | v2.8.0 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **18/18 PASS (Claude Code)** — full T-01–T-18 regression on v2.8.0; no routing regression from the delivery-governance layer (5 gateways, §1.1 halts, §6.2 hooks, MCP gates, existing consults all unchanged). T-05/T-06 write-gates demonstrated without a live MCP write; T-07 mechanical (mirrors in sync). **Tier 1 (Claude.ai) re-run still pending.** |
-
----
-
-## Structural / Engine Integrity Runs
-
-Mechanical (non-behavioural) audit of the agents/skills roster, separate from the T-NN behavioural suite. Now enforced automatically at commit time by `scripts/verify-structure.sh` + `scripts/verify-citations.sh` (wired into `.githooks/pre-commit`).
-
-| Date | CLAUDE.md | Mirror parity | Frontmatter | name↔dir | Doc path refs | Agent→skill refs | ServiceNowDocs citations | Result |
-|---|---|---|---|---|---|---|---|---|
-| 2026-06-04 | v2.7.6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ 162/162 (0 dead) | **12/12 dimensions PASS.** Surfaced + fixed 16 dead citations in itom-discovery/hrsd/story-writer; bumped 8 sub-agents to opus-4-8; added the two verification gates above. Negative-tested: injected dead citation → gate exit 1 (blocks commit). |
-| 2026-06-06 | v2.8.0 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ 175/175 (0 dead) | **PASS.** Added Licensing & Estimation skills (+13 citations → 175) + `reference/` delivery-governance templates; mirrors synced; structure + citations green at commit (681b4ef). |
