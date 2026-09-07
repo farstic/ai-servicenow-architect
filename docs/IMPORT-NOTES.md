@@ -1,6 +1,6 @@
 # Diagram Import Notes
 
-**Repository:** [`farstic/claude-servicenow-live`](https://github.com/farstic/claude-servicenow-live)
+**Repository:** [`farstic/ai-servicenow-architect`](https://github.com/farstic/ai-servicenow-architect)
 **Purpose:** Conventions for the editable architecture diagrams — how to open and import them, the shared colour palette, and the editing rules that keep the visual language coherent.
 **Audience:** Anyone editing the architecture diagrams for presentations or stakeholder review.
 **Last updated:** 29 May 2026
@@ -107,4 +107,4 @@ For changes that *should* update the canonical documentation:
 
 ---
 
-*Documents the editable architecture diagram conventions for the [Claude ServiceNow Architecture Engine](https://github.com/farstic/claude-servicenow-live) v2.6.*
+*Documents the editable architecture diagram conventions for the [Claude ServiceNow Architecture Engine](https://github.com/farstic/ai-servicenow-architect) v2.6.*
