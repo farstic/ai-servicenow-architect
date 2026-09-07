@@ -1,7 +1,34 @@
+clients/
+deliverables/
+.backups/
+claude-ai-projects/
+.env
+start-mcp.sh
+
+# Audit / internal reports — may quote live instance data (URLs, sys_ids). Local-only, never pushed.
+reports/
+
+# Machine-specific Claude Code settings (contain absolute local paths and per-user permissions)
+.claude/settings.json
+.claude/settings.local.json
+
+# Local MCP server config — contains the live instance URL and a PLAINTEXT password. NEVER commit.
+.mcp.json
+
+# Scratch nowaikit example — hardcodes the live instance URL (instance values are local-only per the Standing Rule).
+nowaikit-example.ts
+
+# Editor workspace settings — machine-specific.
+.vscode/
+
+# Local rendered diagram previews (SVGs/HTML) — scratch viewing only, regenerable from .mmd.
+diagram-preview/
+
+# Added by ARC-01-S02b, ahead of ARC-01-S07's replacement of this file.
+# .local/ holds the per-checkout state ADR-0004 (D-04) puts instances.json in at mode 0600, so it
+# must never be unprotected -- not even between stories. node_modules/ goes live when ARC-01-S11
+# adds package.json. The other two are OS residue.
+.local/
+node_modules/
 .DS_Store
 Thumbs.db
-node_modules/
-.local/
-clients/
-.env
-.claude/settings.local.json

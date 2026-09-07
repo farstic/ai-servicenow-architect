@@ -1,5 +1,17 @@
 # ARC-09 — Release, versioning, upgrade and cross-platform proof
 
+> **Amendment 2026-09-07 (from ARC-01-S02's R-4 scan).** **Any `gitleaks` step in CI must exclude
+> `vendor/ServiceNowDocs`, or it will fail permanently from the moment the corpus lands.** Measured on
+> the engine's checkout of the corpus: **592 rule hits**, of which **`curl-auth-user` ×526** — the REST
+> API reference pages are full of `curl -u user:password` examples, plus `generic-api-key` ×44,
+> `curl-auth-header` ×8, `private-key` ×8, `jwt` ×4 and two single hits. **None is a real credential**;
+> they are documentation samples published by ServiceNow. For contrast the same scan over the engine's
+> own history (59 commits) and over the ARC-01-S02 import artefact (57 commits) each returned **no leaks
+> found**, so the corpus is the entire source of noise. Add `vendor/ServiceNowDocs` to `.gitleaksignore`
+> or to the workflow's path filter, and say in the workflow why — a future maintainer who deletes the
+> exclusion will get 592 failures and no explanation.
+
+
 Status: **Stories drafted 2026-09-04** · Depends on: ARC-01 (version of record, CI skeleton), ARC-02 (`CLAUDE.md` marker line; `/snowarch status` renders the doctor JSON whose `engine` header S04 feeds), ARC-03 (docs pin, `docs sync` recipe, `docs verify`, `docs-real.yml`), ARC-04 (store module, `build-dist.mjs`, `contract.json`, server doctor module, package identity), ARC-05 (contract gate, error registry), ARC-06 (first `version`, bootstrap state/resume, launchers, `bootstrap` CI job, handshake module), ARC-07 (`--password-stdin`, non-interactive `instance add` with `--no-probes`), ARC-08 (doctor registry/JSON, `doctor` CI job, banner nudge slot); ARC-00 S-03/S-04/S-07/S-08 verdicts and story S13 · Blocks: ARC-10 (the 2.0.0 tag)
 
 ## Goal

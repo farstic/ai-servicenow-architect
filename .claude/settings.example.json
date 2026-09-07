@@ -1,0 +1,39 @@
+{
+  "comment": "Copy this file to settings.json and configure for your local machine.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|WebFetch|Read|Grep|Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/path/to/your/npm-global/lib/node_modules/context-mode/hooks/pretooluse.mjs\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Read|WebFetch|Grep|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/path/to/your/npm-global/bin/context-mode hook claude-code posttooluse"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/path/to/your/npm-global/lib/node_modules/context-mode/hooks/sessionstart.mjs\""
+          }
+        ]
+      }
+    ]
+  },
+  "effortLevel": "low"
+}
