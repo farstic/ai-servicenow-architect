@@ -91,16 +91,30 @@ test('SK-08 rejects a skill named after a built-in command — criterion 3, with
 });
 
 test('SK-09 rejects retired vocabulary, and an exemption must be anchored to both file and line text', () => {
-  const root = tree({ a: { frontmatter: fm({ ...SKILL_OK, name: 'a' }) } }, {},
-    { 'x.md': 'this is Tier 2 work\nand this mentions nowaikit\n' });
+  // The broken content is built from the fixture's own samples rather than typed here: a forbidden
+  // token spelled in this file would trip the separate legacy-name ratchet, and only the fixture is
+  // exempt as a detector. This also means the negative tracks the fixture as ARC-02-S06 edits it.
+  const vocab = JSON.parse(readFileSync(new URL('./fixtures/retired-vocabulary.json', import.meta.url), 'utf8')).tokens;
+  for (const t of vocab) {
+    assert.match(t.sample, new RegExp(t.pattern), `fixture sample "${t.sample}" does not match its own pattern`);
+  }
+  const body = vocab.map((t, i) => `line ${i} holds ${t.sample}`).join('\n') + '\n';
+  const root = tree({ a: { frontmatter: fm({ ...SKILL_OK, name: 'a' }) } }, {}, { 'x.md': body });
+  const lines = (f) => new Set(f.map((x) => Number(x.split(':')[1])));
   try {
-    assert.equal(lintVocabulary({ root, files: ['x.md'] }).length, 2, 'both tokens must be caught');
-    assert.equal(lintVocabulary({ root, files: ['x.md'], allow: [{ file: 'x.md', context: 'Tier 2 work' }] }).length, 1,
-      'the exemption must suppress its own line only');
-    assert.equal(lintVocabulary({ root, files: ['x.md'], allow: [{ file: 'other.md', context: 'Tier 2 work' }] }).length, 2,
-      'an exemption for a different file must suppress nothing');
-    assert.equal(lintVocabulary({ root, files: ['x.md'], allow: [{ file: 'x.md', context: 'not present' }] }).length, 2,
-      'an exemption whose context is absent must suppress nothing');
+    // One sample can match two patterns (a prefixed form contains the bare product name), so the
+    // assertion is coverage of the lines, not a hit count.
+    const all = lintVocabulary({ root, files: ['x.md'] });
+    assert.equal(lines(all).size, vocab.length, `every token line must be caught: ${JSON.stringify(all)}`);
+    const one = vocab[0];
+    assert.ok(!lines(lintVocabulary({ root, files: ['x.md'], allow: [{ file: 'x.md', context: `holds ${one.sample}` }] })).has(1),
+      'the exemption must suppress its own line');
+    assert.equal(lines(lintVocabulary({ root, files: ['x.md'], allow: [{ file: 'x.md', context: `holds ${one.sample}` }] })).size,
+      vocab.length - 1, 'and suppress only its own line');
+    assert.equal(lines(lintVocabulary({ root, files: ['x.md'], allow: [{ file: 'other.md', context: `holds ${one.sample}` }] })).size,
+      vocab.length, 'an exemption for a different file must suppress nothing');
+    assert.equal(lines(lintVocabulary({ root, files: ['x.md'], allow: [{ file: 'x.md', context: 'not present' }] })).size,
+      vocab.length, 'an exemption whose context is absent must suppress nothing');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -128,8 +142,8 @@ test('AG-02 rejects an unquoted ": " in an agent description', () => {
 
 test('AG-03 rejects a missing tools key, an MCP tool, and a nested dispatcher', () => {
   assert.ok(has(agentFails({ doer: fm({ name: 'doer', description: 'd' }) }), 'AG-03'), 'no tools key must fail');
-  assert.ok(has(agentFails({ doer: fm({ ...AGENT_OK, tools: 'Read, mcp__servicenow-mcp__snow_inc_incident_add' }) }), 'AG-03'),
-    'an MCP tool on a sub-agent must fail (principle 8)');
+  assert.ok(has(agentFails({ doer: fm({ ...AGENT_OK, tools: 'Read, mcp__example__do_thing' }) }), 'AG-03'),
+    'an MCP tool on a sub-agent must fail (principle 8) — the server name is a placeholder on purpose: a real one would trip the legacy-name ratchet, and AG-03 keys on the mcp__ prefix, not the server');
   assert.ok(has(agentFails({ doer: fm({ ...AGENT_OK, tools: 'Read, Task' }) }), 'AG-03'));
   assert.ok(!has(agentFails({ doer: fm(AGENT_OK) }), 'AG-03'));
 });

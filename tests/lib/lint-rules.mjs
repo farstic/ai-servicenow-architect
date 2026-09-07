@@ -59,14 +59,13 @@ export function lintSkills({ root, skillsRoot = join(root, '.claude/skills'),
 
 const PATH_TOKEN = /`((?:\.claude\/(?:skills|agents)|governance|templates|docs)\/[A-Za-z0-9_./-]+)`/g;
 
-// Vocabulary retired by the v3 rebuild. The rule is written here from S02 and switched on by
-// ARC-02-S06, which does the sweep that makes it green.
-export const RETIRED = [
-  [/Tier [0-9]/g, 'the Tier 0/1/2 permission vocabulary'],
-  [/mcp__nowaikit__/g, 'the retired nowaikit tool prefix'],
-  [/mcp__servicenow-mcp__/g, 'a live-instance tool prefix — the engine must not name one'],
-  [/nowaikit/g, 'the retired product name'],
-];
+// Vocabulary retired by the v3 rebuild. The tokens themselves live in a fixture rather than here:
+// a file that spells a forbidden string is a detector, and no-legacy-names.test.mjs has to exempt it.
+// Exempting one small data file is honest; exempting this whole module would blind that ratchet to
+// every other line in it.
+export const RETIRED = JSON.parse(
+  readFileSync(new URL('../fixtures/retired-vocabulary.json', import.meta.url), 'utf8'),
+).tokens.map(({ pattern, why }) => [new RegExp(pattern, 'g'), why]);
 
 export function lintVocabulary({ root, files, allow = [] }) {
   const fail = [];
