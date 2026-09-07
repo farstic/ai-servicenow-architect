@@ -28,10 +28,11 @@ if ! bash "$REPO_ROOT/scripts/verify-structure.sh"; then
   exit 1
 fi
 
-# 3. ServiceNowDocs citation gate (every cited doc path must resolve).
-if ! bash "$REPO_ROOT/scripts/verify-citations.sh"; then
-  echo "Commit blocked: dead ServiceNowDocs citation(s) (see above). Remap, or bypass with: git commit --no-verify"
-  exit 1
-fi
+# 3. ServiceNowDocs citation gate — REMOVED by ARC-03-S03 (task 4: "delete scripts/verify-citations.sh
+#    and its .githooks/pre-commit call"). The gate is now `node scripts/docs.mjs verify`
+#    (tools/snowarch/lib/docs/verify.mjs), which FAILS on a missing corpus where the bash script
+#    exited 0 — the defect in 00 section 3.9. It is deliberately NOT called from here: this hook
+#    would then block every commit on a fresh clone that has not run `docs sync`, and the gate's
+#    proper homes are CI and `./snowarch doctor` (ARC-08). ARC-02-S01 deletes this hook chain.
 
 exit 0
