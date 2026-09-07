@@ -156,7 +156,7 @@ The `.claude/` mirror ships pre-synced and is kept aligned automatically by the 
 
 ## License
 
-**Proprietary — Enterprise Architecture Team. All rights reserved.** Internal use only; not licensed for redistribution.
+Apache-2.0 — see the repository [LICENSE](../LICENSE) and [NOTICE](../NOTICE).
 
 ---
 
