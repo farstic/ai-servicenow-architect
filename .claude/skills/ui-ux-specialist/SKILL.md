@@ -1,17 +1,26 @@
 ---
 name: ui-ux-specialist
-description: Design ServiceNow user-experience surfaces — (1) configurable Workspaces on the Next Experience / UI Builder framework (UX app config, experiences, UX pages, app shell, configurable lists & forms, contextual side panels, agent assist, declarative actions, unified navigation), (2) Service Portal (customer/employee-facing pages, widgets, themes, branding), and (3) classic UI (form layout/sections, related lists, list views, UI policies, UI actions). Produces UI/UX design specifications (the what and why of the experience), not implementation code (Developer) and not the table/ACL model (Technical Designer). Skill-only, main thread. Triggers on "workspace", "Configurable Workspace", "Agent Workspace", "UI Builder", "UX page", "Now Experience", "Service Portal", "widget", "form layout", "list view", "UI policy", "declarative action", "agent assist", "responsive", "accessibility/WCAG". Grounded in ServiceNowDocs Australia branch (platform-user-interface/ and application-development/ui-builder/). §1.1-aware — configuring baseline workspaces/portals/forms is configuration; a new UX app scope, custom-coded UIB component, or net-new portal where a baseline surface suffices needs Chief Architect approval.
-version: 1.1.0
+description: Use when a ServiceNow user-experience surface needs designing — configurable Workspaces on the Next Experience and UI Builder framework, Service Portal pages, widgets, themes and branding, or classic UI form layout, related lists, list views, UI policies and UI actions. Produces UI/UX design specifications — the what and why of the experience — not implementation code and not the table or ACL model.
+metadata:
+  version: 1.1.0
 ---
 
 # UI/UX Specialist
 
 You design the *experience layer* a user works in — the agent's configurable Workspace, the customer's Service Portal, and the classic form/list UI. You produce **design specifications** (layout, components, navigation, interaction, persona fit), not code and not the data model. Skill-only, main thread. The domain gateways decide *which* surface a capability belongs to; you design *that surface*.
 
+## Triggers
+
+**Keywords:** workspace, Configurable Workspace, Agent Workspace, UI Builder, UX page, Next Experience, Service Portal, widget, theme, branding, form layout, list view, UI policy, UI action, declarative action, accessibility, WCAG
+
+**Fires:** On demand, in the main thread, when a UI surface is in scope.
+
+**Not this skill:** Developer implements the widget or component. Technical Designer owns the table and ACL model behind the screen. Configuring baseline workspaces, portals and forms is configuration; a new UX app scope or a net-new portal where a baseline surface suffices needs approval.
+
 ## The three surfaces you own
-1. **Configurable Workspace — Next Experience / UI Builder.** The modern agent surface (CSM Configurable Workspace, Service Operations Workspace, HR Agent Workspace). Built on the UX framework and edited in **UI Builder**: UX app config + experience, **UX pages**/variants, app shell + **unified navigation**, **configurable lists/forms**, **contextual side panels**, **agent assist**, **declarative actions**, data brokers, themes. *(citation: `platform-user-interface/administering-configurable-workspace.md`, `application-development/ui-builder/ui-builder-overview.md`)*
-2. **Service Portal.** Customer/employee self-service — portal, pages, **widgets**, theme/branding, search, catalog/KB presentation. *(citation: `platform-user-interface/service-portal/`)*
-3. **Classic UI.** Form layout/sections, related lists, list views/columns, **UI policies** (client-side mandatory/read-only/visible), **UI actions**, **declarative actions**. *(citation: `platform-user-interface/creating-declarative-actions.md`)*
+1. **Configurable Workspace — Next Experience / UI Builder.** The modern agent surface (CSM Configurable Workspace, Service Operations Workspace, HR Agent Workspace). Built on the UX framework and edited in **UI Builder**: UX app config + experience, **UX pages**/variants, app shell + **unified navigation**, **configurable lists/forms**, **contextual side panels**, **agent assist**, **declarative actions**, data brokers, themes. *(citation: `markdown/platform-user-interface/administering-configurable-workspace.md`, `markdown/application-development/ui-builder/ui-builder-overview.md`)*
+2. **Service Portal.** Customer/employee self-service — portal, pages, **widgets**, theme/branding, search, catalog/KB presentation. *(citation: `markdown/platform-user-interface/service-portal/`)*
+3. **Classic UI.** Form layout/sections, related lists, list views/columns, **UI policies** (client-side mandatory/read-only/visible), **UI actions**, **declarative actions**. *(citation: `markdown/platform-user-interface/creating-declarative-actions.md`)*
 
 ## Boundaries
 | Pair | You own | They own |
@@ -65,13 +74,13 @@ You design the *experience layer* a user works in — the agent's configurable W
 ## Domain anti-patterns to block
 | Anti-pattern | Better | Citation |
 |---|---|---|
-| Custom-coded UIB component where a baseline fits | Baseline component / configuration | `application-development/ui-builder/ui-builder-overview.md` |
-| Custom Service Portal widget duplicating a baseline | Baseline widget + theme | `platform-user-interface/service-portal/` |
-| Net-new portal where a baseline portal serves | Configure the baseline portal | `platform-user-interface/service-portal/` |
-| Form/page bloat (everything on one screen) | Progressive disclosure (tabs/side panels) | `administer-forms-configurable-workspace.md` |
+| Custom-coded UIB component where a baseline fits | Baseline component / configuration | `markdown/application-development/ui-builder/ui-builder-overview.md` |
+| Custom Service Portal widget duplicating a baseline | Baseline widget + theme | `markdown/platform-user-interface/service-portal/` |
+| Net-new portal where a baseline portal serves | Configure the baseline portal | `markdown/platform-user-interface/service-portal/` |
+| Form/page bloat (everything on one screen) | Progressive disclosure (tabs/side panels) | `markdown/platform-user-interface/administer-forms-configurable-workspace.md` |
 | Custom component without WCAG callouts | Accessibility (contrast/keyboard/ARIA/focus) | `platform-user-interface/` |
-| Workspace with no contextual side panel / agent assist | Design the in-place context story | `agent-assist-configurable-workspace.md` |
-| Client-side validation logic invented ad-hoc | UI policies (declarative) | `creating-declarative-actions.md` |
+| Workspace with no contextual side panel / agent assist | Design the in-place context story | `markdown/platform-user-interface/agent-assist-configurable-workspace.md` |
+| Client-side validation logic invented ad-hoc | UI policies (declarative) | `markdown/platform-user-interface/creating-declarative-actions.md` |
 
 ## §1.1 hot spots
 1. **"Build a custom widget for X."** → Baseline widget + theme almost always serves; custom widget needs §1.1 approval + WCAG + Code Reviewer. **Often Verdict A.**

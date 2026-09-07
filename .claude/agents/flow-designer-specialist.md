@@ -34,7 +34,7 @@ If task statement, requirement, scope, or trigger details are missing or ambiguo
 1. **Read the SKILL** at `.claude/skills/flow-designer-specialist/SKILL.md`. The SKILL is authoritative.
 2. **Read referenced spec/design files** (LLD sections, parent HLD, prior flow designs) using `Read`.
 3. **Search the scoped app and adjacent apps** for existing flows, subflows, Actions, Decision Tables, and spokes that may be reusable. Use `Glob` and `Grep`. Reuse before reinventing.
-4. **Verify platform-behaviour claims** against `ServiceNowDocs/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown/...` for any non-trivial trigger semantics, transaction control, or spoke behaviour you depend on.
+4. **Verify platform-behaviour claims** against `ServiceNowDocs/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown` for any non-trivial trigger semantics, transaction control, or spoke behaviour you depend on.
 5. **Produce the flow design specification** following the SKILL's "Output for every flow design" checklist completely — capability statement, layer placement, trigger, inputs, outputs, steps, decision points, error handling, transaction strategy, custom scripts called out, spoke consumption, scope/naming, observability, test approach, open questions.
 6. **Multiple deliverables when required** — e.g., a flow plus a supporting subflow plus a custom Action signature: produce all three as separate, clearly labelled specifications.
 

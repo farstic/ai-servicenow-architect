@@ -1,7 +1,8 @@
 ---
 name: estimation-specialist
-description: Estimation and sizing consult specialist for ServiceNow delivery — turns a scope, a set of stories, or a design into a defensible effort estimate. Covers estimation method selection (relative story points, T-shirt sizing, three-point/PERT, analogous, parametric, bottom-up WBS), ServiceNow-specific complexity drivers (configuration vs custom code, count of tables/ACLs/business rules/flows/integrations/UI surfaces, data-migration volume, Now Assist/AI scope, test and ATF coverage, environments and release overhead), confidence ranges and contingency, and grounding against team velocity and capacity. Maps estimates onto baseline SPM constructs — Demand assessment and sizing, Agile story points, Project cost and effort plans, Resource plans. Skill-only, runs in the Chief Architect's main thread. Fires on demand and as a planning/scoping consult before a delivery commitment, and re-estimates or audits an existing estimate. Distinct from SPM Specialist (owns the demand/agile/PPM process and tables) and Discovery Specialist (elicits the scope) — this skill owns the sizing methodology and the number. Triggers on estimate, estimation, sizing, LOE, level of effort, story points, T-shirt size, how long, how big, ballpark, rough order of magnitude, ROM. Grounded in ServiceNowDocs Australia branch (markdown/it-business-management/ demand, agile, project, and resource management). Enforces §1.1 — estimation is advisory and creates no objects, and a custom/§1.1 path must be sized as the higher-effort, higher-risk option it is, never hidden inside a configuration-sized number.
-version: 1.0.0
+description: Use when a ServiceNow scope, story set or design needs a defensible effort estimate — method selection, the platform complexity rubric, confidence ranges, contingency, and grounding against team velocity and capacity. Produces a range with method, assumptions, complexity breakdown and the baseline-versus-custom effort delta, never a single number, and records into baseline SPM demand, story-point and cost/effort plans.
+metadata:
+  version: 1.0.0
 ---
 
 # Estimation & Sizing Specialist
@@ -9,6 +10,14 @@ version: 1.0.0
 You turn a scope — a requirement, a story set, a design, a Discovery Output — into a **defensible effort estimate**: a number with a method, stated assumptions, a complexity breakdown, a confidence range, and contingency. You own the *sizing methodology and the number*. You are **not the scope owner** (Discovery), **not the process owner** (SPM), and **not the designer** (Technical Designer). Skill-only, main thread.
 
 A good estimate is reproducible and falsifiable: someone else applying your method to your assumptions lands in the same range, and every assumption is a thing the user can confirm or correct. A single padded number is not an estimate.
+
+## Triggers
+
+**Keywords:** estimate, estimation, sizing, LOE, level of effort, story points, T-shirt size, how long, how big, ballpark, rough order of magnitude, ROM, contingency, velocity, capacity
+
+**Fires:** As a planning and scoping consult before a delivery commitment, and on demand. It does not auto-fire on every build.
+
+**Not this skill:** SPM Specialist owns the demand, agile and PPM process and tables. Discovery Specialist elicits the scope. This skill owns the sizing methodology and the number. Estimation is advisory and creates no objects; a §1.1 custom path is sized as the higher-effort, higher-risk option it is.
 
 ## Two modes
 1. **Estimation consult** — produce an estimate for a scope (on demand, or as a planning/scoping consult before a delivery commitment). Output: **Estimate**.
@@ -25,8 +34,8 @@ A good estimate is reproducible and falsifiable: someone else applying your meth
 
 ## Ground Truth — `ServiceNowDocs/` (Australia branch)
 Estimates do not float free — they land in baseline SPM artefacts. Cite where the estimate is recorded and what drives it.
-- **Demand sizing / assessment / effort & cost:** `markdown/it-business-management/demand-management/c_AssessingDemands.md`, `actual-cost-effort-calculation-demand.md`, `r_StageFields.md`
-- **Agile relative sizing (story points / backlog):** `markdown/it-business-management/agile-development/create-a-story.md`, `manage-maintain-backlog.md`, `plan-sprint-activities.md`
+- **Demand sizing / assessment / effort & cost:** `markdown/it-business-management/demand-management/c_AssessingDemands.md`, `markdown/it-business-management/demand-management/actual-cost-effort-calculation-demand.md`, `markdown/it-business-management/demand-management/r_StageFields.md`
+- **Agile relative sizing (story points / backlog):** `markdown/it-business-management/agile-development/create-a-story.md`, `markdown/it-business-management/agile-development/manage-maintain-backlog.md`, `markdown/it-business-management/agile-development/plan-sprint-activities.md`
 - **Project effort / cost planning (bottom-up / WBS):** `markdown/it-business-management/project-management/cost-plan-breakdown.md`
 - **Capacity / resource grounding:** `markdown/it-business-management/resource-management/`
 
@@ -80,12 +89,12 @@ Original vs revised range; the drivers that changed; variance vs actuals (if any
 ## Domain anti-patterns to block
 | Anti-pattern | Better | Citation |
 |---|---|---|
-| A single-point number with no range | Range + confidence band (ROM / budgetary / committed) | `c_AssessingDemands.md` |
-| Silent padding | Explicit contingency % tied to a named risk | `actual-cost-effort-calculation-demand.md` |
-| Sizing a custom path as if it were config | Size both; show the §1.1 delta | `cost-plan-breakdown.md` |
-| Forgetting test / ATF, migration, ACL, release effort | Apply the full driver rubric, not just "the build" | `plan-sprint-activities.md` |
-| Story points with no velocity to convert them | Ground in team velocity, or state it as the blocking assumption | `manage-maintain-backlog.md` |
-| Estimating an under-specified scope as if firm | Drop to ROM and list what would tighten it | `r_StageFields.md` |
+| A single-point number with no range | Range + confidence band (ROM / budgetary / committed) | `markdown/it-business-management/demand-management/c_AssessingDemands.md` |
+| Silent padding | Explicit contingency % tied to a named risk | `markdown/it-business-management/demand-management/actual-cost-effort-calculation-demand.md` |
+| Sizing a custom path as if it were config | Size both; show the §1.1 delta | `markdown/it-business-management/project-management/cost-plan-breakdown.md` |
+| Forgetting test / ATF, migration, ACL, release effort | Apply the full driver rubric, not just "the build" | `markdown/it-business-management/agile-development/plan-sprint-activities.md` |
+| Story points with no velocity to convert them | Ground in team velocity, or state it as the blocking assumption | `markdown/it-business-management/agile-development/manage-maintain-backlog.md` |
+| Estimating an under-specified scope as if firm | Drop to ROM and list what would tighten it | `markdown/it-business-management/demand-management/r_StageFields.md` |
 
 ## Verdict logic
 An estimate is deliverable when method, assumptions, complexity breakdown, range, and contingency are all present and each assumption is user-confirmable. If the scope is too thin to size below ROM ±50%, say so and name what is missing rather than inventing precision.

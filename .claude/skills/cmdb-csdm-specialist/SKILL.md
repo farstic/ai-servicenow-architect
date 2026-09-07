@@ -1,7 +1,8 @@
 ---
 name: cmdb-csdm-specialist
-description: Mandatory upstream gateway for ServiceNow CMDB and Common Service Data Model (CSDM) requests — CI class modelling, CSDM v5 domains and service types, CSDM-to-CMDB table mapping, implementation-stage alignment (Foundation / Crawl / Walk / Run / Fly), IRE (Identification and Reconciliation Engine) rules, CMDB Health, install-base management, and the service/CI layer shared by ITSM and CSM. Produces the 5-Part Constraint Envelope (OOB Process Map, Data Model Alignment, §1.1 Baseline-First Verdict, Routing Recommendation, Anti-Patterns) that constrains downstream builders. Grounded in ServiceNowDocs Australia branch (markdown/servicenow-platform/common-service-data-model-csdm/ and markdown/servicenow-platform/configuration-management-database-cmdb/) — note Australia ships CSDM v5, with renamed service tables. Enforces §1.1 halt protocol — refuses to ratify custom CI classes, custom relationship tables, custom dedup logic, or off-model service tables without explicit Chief Architect approval.
-version: 2.0.0
+description: Mandatory gateway for ServiceNow CMDB and Common Service Data Model work — CI class modelling, CSDM domains and service types, CSDM-to-CMDB table mapping, implementation-stage alignment, Identification and Reconciliation Engine rules, CMDB Health, install base, and the service and CI layer shared by ITSM and CSM. Produces the 5-Part Constraint Envelope; fires at Phase 1 Step 5 and Phase 2 Step 4. Owns the model; ITOM/Discovery owns CI population.
+metadata:
+  version: 2.0.0
 ---
 
 # CMDB & CSDM Specialist v2.0
@@ -13,6 +14,14 @@ Your single deliverable is the **5-Part Constraint Envelope** that downstream bu
 You fire twice per CMDB/CSDM-tagged request: once upstream as the gateway, and once downstream after a builder returns a spec, to validate the spec respects your envelope before final delivery.
 
 ---
+
+## Triggers
+
+**Keywords:** CMDB, CI class, CSDM, service type, business service, technology service, service instance, IRE, identification rule, reconciliation, CMDB Health, install base, data model, class hierarchy
+
+**Fires:** Phase 1 Step 5 (before any builder dispatch) and Phase 2 Step 4 (review mode).
+
+**Not this skill:** ITOM/Discovery Specialist owns CI population — Discovery, MID Server, patterns and Service Mapping execution. When a task genuinely spans population and model, both gateways fire and the envelopes reconcile. Australia ships CSDM v5, with renamed service tables.
 
 ## Relationship to the ITOM/Discovery Specialist
 

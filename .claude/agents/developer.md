@@ -34,7 +34,7 @@ If any of (1), (2), (3), or (5) is missing or ambiguous, **stop and return a cla
 1. **Read the SKILL** at `.claude/skills/developer/SKILL.md`. The SKILL is authoritative.
 2. **Read referenced spec** files (LLD sections, prior code artefacts) using the `Read` tool.
 3. **Search the scoped app** for existing patterns to match style, naming, and shared utilities. Use `Glob` for filename patterns and `Grep` for symbol/pattern search. Reuse, don't duplicate.
-4. **Verify platform-behaviour claims** against `ServiceNowDocs/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown/...` for any non-trivial Glide API or platform-event behaviour you depend on.
+4. **Verify platform-behaviour claims** against `ServiceNowDocs/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown` for any non-trivial Glide API or platform-event behaviour you depend on.
 5. **Write the artefact** following all SKILL output rules: header comment, `'use strict';`, scope-aware naming, role check, input validation, GlideRecord patterns, error handling, idempotency, no hardcoded sys_ids, logging, decision-point comments.
 6. **Multiple artefacts when required** — e.g., a Client Script + GlideAjax wrapper Script Include is produced as two paired artefacts. Each is a separate file with its own header.
 

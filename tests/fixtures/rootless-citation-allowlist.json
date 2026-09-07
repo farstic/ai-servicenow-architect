@@ -1,0 +1,10 @@
+{
+  "_rule": "SK-12 exemptions. The field is `citation`, not `token`: a JSON key named token with a long string value is exactly the shape tests/never-commit.test.mjs treats as a leaked credential, and weakening that check to accommodate a field name would be the wrong trade. A token that carries its area but not the `markdown/` root is citation-shaped enough that a reader trusts it, yet the gate's pattern requires the root — so it is neither checked nor warned. Every such token is a failure unless it appears here WITH a reason. Ceiling 1: there is exactly one legitimate case, a citation quoted in order to be contradicted. An addition is a decision that needs the same justification.",
+  "allow": [
+    {
+      "file": ".claude/skills/security-grc-specialist/SKILL.md",
+      "citation": "servicenow-platform/security/",
+      "reason": "Deliberately wrong. The sentence reads \"ACLs live under `markdown/platform-security/access-control/`, **not** `servicenow-platform/security/`.\" The second path is named because it does NOT exist; rooting it would destroy the correction the sentence is making."
+    }
+  ]
+}

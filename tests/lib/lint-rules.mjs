@@ -7,6 +7,7 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { parseFrontmatter, asList } from './frontmatter.mjs';
+import { findRootlessCitations } from '../../tools/snowarch/lib/docs/citations.mjs';
 
 export const MAX_DESCRIPTION = 500;
 export const ALLOWED_TOP_LEVEL = new Set(['name', 'description', 'allowed-tools', 'argument-hint',
@@ -45,6 +46,15 @@ export function lintSkills({ root, skillsRoot = join(root, '.claude/skills'),
     }
     if (!utility.has(d) && !existsSync(join(skillsRoot, d, 'EXAMPLES.md'))) {
       fail.push(`SK-06 .claude/skills/${d}: EXAMPLES.md missing`);
+    }
+    // SK-11 — the trigger material the descriptions no longer carry has to live somewhere, or
+    // shortening a description silently degrades routing. It is the first H2 of every SKILL.md.
+    const body = readFileSync(join(skillsRoot, d, 'SKILL.md'), 'utf8').split(/^---$/m).slice(2).join('---');
+    const firstH2 = body.match(/^## .*/m);
+    if (!firstH2) fail.push(`SK-11 ${rel}: no H2 at all`);
+    else if (firstH2[0].trim() !== '## Triggers') fail.push(`SK-11 ${rel}: first H2 is "${firstH2[0].trim()}", not "## Triggers"`);
+    else for (const field of ['**Keywords:**', '**Fires:**', '**Not this skill:**']) {
+      if (!body.includes(field)) fail.push(`SK-11 ${rel}: ## Triggers is missing ${field}`);
     }
     if (builtins.has(d)) {
       fail.push(`SK-08 .claude/skills/${d}: name "${d}" collides with a Claude Code built-in command — the built-in wins and the skill is unreachable (R-17)`);
@@ -94,6 +104,21 @@ export function lintPaths({ root, files }) {
         if (!existsSync(join(root, m[1]))) fail.push(`SK-10 ${rel}:${i + 1}: dead path ${m[1]}`);
       }
     });
+  }
+  return fail;
+}
+
+// SK-12 — a citation that carries its area but not the `markdown/` root. See findRootlessCitations:
+// it is invisible to the gate, so `dead: 0` never covered it. Exempt only with a recorded reason.
+export function lintRootless({ root, files, areas, allow = [] }) {
+  const fail = [];
+  for (const rel of files) {
+    const p = join(root, rel);
+    if (!existsSync(p)) continue;
+    for (const w of findRootlessCitations(readFileSync(p, 'utf8'), rel, areas)) {
+      if (allow.some((a) => a.file === rel && a.citation === w.raw)) continue;
+      fail.push(`SK-12 ${rel}:${w.line}: ${w.reason}`);
+    }
   }
   return fail;
 }

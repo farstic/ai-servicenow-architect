@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { lintSkills, lintAgents, lintPaths, lintVocabulary } from './lib/lint-rules.mjs';
+import { lintSkills, lintAgents, lintPaths, lintVocabulary, lintRootless } from './lib/lint-rules.mjs';
 
 const SKILL_OK = { name: 'thing', description: 'Does a thing.' };
 const AGENT_OK = { name: 'doer', description: 'Does it.', tools: 'Read, Write, Edit' };
@@ -116,6 +116,40 @@ test('SK-09 rejects retired vocabulary, and an exemption must be anchored to bot
     assert.equal(lines(lintVocabulary({ root, files: ['x.md'], allow: [{ file: 'x.md', context: 'not present' }] })).size,
       vocab.length, 'an exemption whose context is absent must suppress nothing');
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('SK-12 rejects an area-prefixed token missing the markdown/ root, and only that shape', () => {
+  const areas = new Set(['markdown/platform-security', 'markdown/it-service-management']);
+  const root = tree({ a: { frontmatter: fm({ ...SKILL_OK, name: 'a' }) } }, {}, { 'x.md':
+    'rooted `markdown/platform-security/access-control/a.md`\n' +          // fine
+    'rootless `platform-security/access-control/b.md`\n' +                 // SK-12
+    'rootless dir `platform-security/access-control/`\n' +                 // SK-12
+    'not an area `something-else/access-control/c.md`\n' +                 // not ours to judge
+    'prose url `https://example.invalid/tree/australia/markdown`\n' +      // the agent-file shape
+    'bare `c.md`\n' });                                                    // SK-02/SK-10 territory
+  try {
+    const f = lintRootless({ root, files: ['x.md'], areas });
+    assert.equal(f.length, 2, `only the two rootless tokens must fail, got ${JSON.stringify(f)}`);
+    assert.match(f[0], /b\.md/); assert.match(f[1], /access-control\//);
+    assert.deepEqual(lintRootless({ root, files: ['x.md'], areas,
+      allow: [{ file: 'x.md', citation: 'platform-security/access-control/b.md' }] }).length, 1,
+      'an exemption suppresses its own token only');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('SK-11 rejects a missing, misplaced or incomplete ## Triggers section', () => {
+  const withBody = (body) => {
+    const r = mkdtempSync(join(tmpdir(), 'snowarch-lint-'));
+    mkdirSync(join(r, '.claude/skills/a'), { recursive: true });
+    writeFileSync(join(r, '.claude/skills/a/SKILL.md'), `---\nname: a\ndescription: d\n---\n\n# A\n\n${body}`);
+    writeFileSync(join(r, '.claude/skills/a/EXAMPLES.md'), '# E\n');
+    try { return lintSkills({ root: r }); } finally { rmSync(r, { recursive: true, force: true }); }
+  };
+  const full = '## Triggers\n\n**Keywords:** k\n\n**Fires:** f\n\n**Not this skill:** n\n';
+  assert.ok(has(withBody('no headings here\n'), 'SK-11'), 'no H2 at all must fail');
+  assert.ok(has(withBody(`## When to use\n\ntext\n\n${full}`), 'SK-11'), 'Triggers must be the FIRST H2');
+  assert.ok(has(withBody('## Triggers\n\n**Keywords:** k\n\n**Fires:** f\n'), 'SK-11'), 'a missing field must fail');
+  assert.ok(!has(withBody(full), 'SK-11'), 'the complete section must pass');
 });
 
 test('SK-10 rejects a dead .claude path — criterion 6 puts the dangling token in a SKILL BODY', () => {

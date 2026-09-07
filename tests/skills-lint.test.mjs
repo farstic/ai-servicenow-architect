@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { lintSkills, lintPaths, lintVocabulary, MAX_DESCRIPTION } from './lib/lint-rules.mjs';
+import { lintSkills, lintPaths, lintVocabulary, lintRootless, MAX_DESCRIPTION } from './lib/lint-rules.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const json = (p) => JSON.parse(readFileSync(join(root, p), 'utf8'));
@@ -40,16 +40,18 @@ test('SK-06 every skill ships an EXAMPLES.md', () => report('SK-06'));
 test('SK-07 the roster count matches engine.config.json', () => report('SK-07'));
 test('SK-08 no skill name collides with a Claude Code built-in command', () => report('SK-08'));
 
-test('the allow-lists shrink or hold — they never grow (ARC-02-S03 empties them)', () => {
-  // A ratchet, not a cap: S03 removes entries. If someone adds one, this fails and asks why.
-  const CEILING = { length: 27, version: 27 };
+// The ratchet ceiling. ARC-02-S03 emptied both lists, so it is 0 — and one constant, so lowering it
+// again is one edit. An entry cannot be added without also raising this, which is the point.
+const CEILING = { length: 0, version: 0 };
+
+test('the allow-lists shrink or hold — they never grow (ARC-02-S03 emptied them)', () => {
   for (const k of ['length', 'version']) {
     assert.ok(allow[k].length <= CEILING[k], `${k} allow-list grew to ${allow[k].length} (ceiling ${CEILING[k]})`);
     for (const name of allow[k]) {
       assert.ok(existsSync(join(root, '.claude/skills', name)), `${k} allow-list names "${name}", which does not exist`);
     }
   }
-  console.log(`    ratchet: length ${allow.length.length}/${CEILING.length}, version ${allow.version.length}/${CEILING.version} — lower the ceiling as S03 empties them`);
+  console.log(`    ratchet: length ${allow.length.length}/${CEILING.length}, version ${allow.version.length}/${CEILING.version} — both emptied by ARC-02-S03`);
 });
 
 // Criterion 6 names a skill BODY, so the surface is every markdown file under .claude/ plus the
@@ -99,33 +101,54 @@ test('SK-09 the governing documents are still dirty — that surface belongs to 
   assert.ok(f.length > 0, 'the governing docs are already clean — enable SK-09 over GOVERNING too and delete this test');
 });
 
+const AREAS = new Set(readFileSync(join(root, 'vendor/docs-areas.txt'), 'utf8').split('\n').filter(Boolean));
+const rootlessAllow = json('tests/fixtures/rootless-citation-allowlist.json').allow;
+
+test('SK-12 no citation carries its area without the markdown/ root', () => {
+  const f = lintRootless({ root, files: SURFACE, areas: AREAS, allow: rootlessAllow });
+  assert.equal(f.length, 0, `${f.length} rootless citation(s):\n  ${f.join('\n  ')}`);
+  assert.ok(rootlessAllow.length <= 1, `SK-12 allow-list grew to ${rootlessAllow.length} (ceiling 1)`);
+  console.log(`    SK-12: ${SURFACE.length} file(s) clean, ${rootlessAllow.length} recorded exemption(s)`);
+});
+
+test('SK-12 the one exemption is load-bearing, and the agent prose does not match', () => {
+  const withOut = lintRootless({ root, files: SURFACE, areas: AREAS });
+  assert.equal(withOut.length, rootlessAllow.length, 'the exemption must suppress exactly one real hit');
+  assert.match(withOut[0], /servicenow-platform\/security\//);
+  // The four agent files end their URL at `.../markdown`, which is not area-prefixed and must not match.
+  const agents = SURFACE.filter((f) => f.startsWith('.claude/agents/'));
+  assert.deepEqual(lintRootless({ root, files: agents, areas: AREAS }), [],
+    'the `.../markdown` prose in the agent files must not be flagged');
+  console.log(`    SK-12: exemption covers ${withOut.length} hit — ${rootlessAllow[0].reason.split('.')[0]}.`);
+});
+
 test('SK-10 every .claude path quoted in a skill body, agent body or roster doc resolves', () => {
   const f = lintPaths({ root, files: SURFACE });
   assert.equal(f.length, 0, `${f.length} dead path(s):\n  ${f.join('\n  ')}`);
   console.log(`    SK-10: checked ${SURFACE.length} markdown file(s)`);
 });
 
-test('the measurement this story reports is reproducible', () => {
-  const dirs = readdirSync(join(root, '.claude/skills'), { withFileTypes: true })
-    .filter((e) => e.isDirectory()).map((e) => e.name);
-  const lens = dirs.map((d) => {
-    const m = readFileSync(join(root, '.claude/skills', d, 'SKILL.md'), 'utf8').match(/^description:\s*(.*)$/m);
-    return [d, m ? [...m[1].replace(/^"|"$/g, '')].length : 0];
-  });
-  const over = lens.filter(([, n]) => n > MAX_DESCRIPTION);
-  console.log(`    ${dirs.length} skills | ${over.length} description(s) over ${MAX_DESCRIPTION} chars | longest ${Math.max(...lens.map(([, n]) => n))}`);
-  assert.equal(over.length, allow.length.length, 'the length allow-list must name exactly the over-budget skills');
+function dirsOnDisk() {
+  return readdirSync(join(root, '.claude/skills'), { withFileTypes: true })
+    .filter((e) => e.isDirectory()).map((e) => e.name).sort();
+}
+function descriptionOf(d) {
+  const m = readFileSync(join(root, '.claude/skills', d, 'SKILL.md'), 'utf8').match(/^description:\s*(.*)$/m);
+  return m ? [...m[1].replace(/^"|"$/g, '')] : [];
+}
+
+test('SK-11 every skill carries a ## Triggers section as its first H2', () => {
+  report('SK-11');
+  console.log(`    SK-11: ${dirsOnDisk().length} skills carry ## Triggers with all three fields`);
 });
 
-test('criterion 1 — emptying the length allow-list fails, naming every over-long skill and its length', () => {
+test('criterion 1 — the lint passes with an EMPTY length allow-list, and reports the measured budget', () => {
+  // ARC-02-S02 asserted the inverse (27 failures, each naming its measured length). S03 rewrote the
+  // descriptions, so the assertion flips: no exemption is needed by any skill.
   const bare = lintSkills({ ...opts, lengthAllow: new Set() }).filter((f) => f.startsWith('SK-02'));
-  assert.equal(bare.length, allow.length.length,
-    `emptied, SK-02 must name exactly the ${allow.length.length} allow-listed skills; got ${bare.length}`);
-  for (const line of bare) {
-    assert.match(line, /^SK-02 \.claude\/skills\/[a-z0-9-]+\/SKILL\.md: description \d+ chars > 500$/,
-      `the message must carry the measured length: ${line}`);
-  }
-  const named = new Set(bare.map((l) => l.split('/')[2]));
-  assert.deepEqual([...named].sort(), [...allow.length].sort(), 'the allow-list and the failures must be the same set');
-  console.log(`    criterion 1: ${bare.length} would fail once S03 empties the list, e.g. ${bare.sort()[0]}`);
+  assert.deepEqual(bare, [], `no skill may need a length exemption now:\n  ${bare.join('\n  ')}`);
+  const lens = [...dirsOnDisk()].map((d) => descriptionOf(d).length);
+  const total = lens.reduce((a, b) => a + b, 0);
+  assert.ok(total <= 14000, `SK-02 total description budget ${total} > 14000 (story criterion 1)`);
+  console.log(`    criterion 1: ${lens.length} skills, total ${total} chars (ceiling 14000), longest ${Math.max(...lens)}, mean ${Math.round(total / lens.length)}`);
 });
