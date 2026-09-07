@@ -1,38 +1,37 @@
+# per-checkout state — never committed (01 §3, §7; D-04)
+.local/
 clients/
 deliverables/
-.backups/
-claude-ai-projects/
+memory/
 .env
-start-mcp.sh
-
-# Audit / internal reports — may quote live instance data (URLs, sys_ids). Local-only, never pushed.
-reports/
-
-# Machine-specific Claude Code settings (contain absolute local paths and per-user permissions)
-.claude/settings.json
+.env.*
+!.env.example
 .claude/settings.local.json
 
-# Local MCP server config — contains the live instance URL and a PLAINTEXT password. NEVER commit.
-.mcp.json
+# Audit / internal reports — may quote live instance data (URLs, sys_ids). Local-only, never pushed.
+# KEPT from the engine's .gitignore, which ARC-01-S07's exact list would otherwise have dropped:
+# nothing writes this directory today, but it was ignored for exactly the reason this story exists,
+# and re-adding it later is a decision someone has to remember to make. See the S07 report.
+reports/
 
-# Scratch nowaikit example — hardcodes the live instance URL (instance values are local-only per the Standing Rule).
-nowaikit-example.ts
-
-# Editor workspace settings — machine-specific.
-.vscode/
-
-# Local rendered diagram previews (SVGs/HTML) — scratch viewing only, regenerable from .mmd.
-diagram-preview/
-
-# Added by ARC-01-S02b, ahead of ARC-01-S07's replacement of this file.
-# .local/ holds the per-checkout state ADR-0004 (D-04) puts instances.json in at mode 0600, so it
-# must never be unprotected -- not even between stories. node_modules/ goes live when ARC-01-S11
-# adds package.json. The other two are OS residue.
-.local/
+# dependencies and build output
 node_modules/
+# `node_modules/` with a trailing slash matches DIRECTORIES ONLY — it does not ignore a SYMLINK
+# named node_modules, which pnpm and some yarn layouts create. Both forms are listed on purpose
+# (ARC-01-S05, measured: `git status` reported `?? node_modules` with only the slashed form).
+node_modules
+packages/snowarch/dist/
+*.tsbuildinfo
+coverage/
+
+# OS and editors
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
 
-# `node_modules/` with a trailing slash matches DIRECTORIES ONLY -- it does not ignore a SYMLINK
-# named node_modules, which pnpm and some yarn layouts create. Both forms are listed on purpose.
-node_modules
+# legacy scratch locations from the engine era (removed by ARC-10 once nothing writes them)
+.backups/
+scratchpad/
+diagram-preview/
+node-compile-cache/
