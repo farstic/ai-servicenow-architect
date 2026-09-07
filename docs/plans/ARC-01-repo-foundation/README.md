@@ -1,5 +1,20 @@
 # ARC-01 — Repository foundation and monorepo assembly
 
+> **Amendment 2026-09-07 — the R-4 obligation, sharpened by use.** Obligation 1 ("full-history secret
+> scan before any imported history is pushed") is not discharged by scanning and sanitising the working
+> tree. **A hit in an ancestor commit survives sanitising the tip**, because an import brings the whole
+> history — measured in ARC-01-S03, where a scan of the sanitised artefact still found the value in the
+> source's initial commit. When a scan finds a hit that cannot be certified benign, **the import
+> source's history is rewritten with `git filter-repo --replace-text` before the import**, the
+> replacement list is generated programmatically and deleted, and the import commit records the
+> `sha256` of both the original value and the file, before and after — so the deviation from
+> byte-identity is auditable without the value ever being reproduced. Two consequences follow and are
+> already applied to ARC-01-S03: a criterion that compares commit **SHAs** across an import cannot pass
+> after a rewrite and must compare subject, author-date and count instead; and `git subtree add` does
+> not compose with `git log --follow`, so the `filter-repo --to-subdirectory-filter` +
+> `merge --allow-unrelated-histories` route is the default rather than the fallback.
+
+
 Status: **Stories drafted 2026-09-04** (see [STORIES.md](STORIES.md)) · Depends on: ARC-00 (D-01, D-02, D-03 — all decided 2026-09-04; the S-14 plugin-channel hedge does **not** gate this ARC, the layout is plugin-shaped either way) · Blocks: ARC-02 … ARC-10
 
 ## Goal
