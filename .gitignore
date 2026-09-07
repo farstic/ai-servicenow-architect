@@ -32,3 +32,7 @@ diagram-preview/
 node_modules/
 .DS_Store
 Thumbs.db
+
+# `node_modules/` with a trailing slash matches DIRECTORIES ONLY -- it does not ignore a SYMLINK
+# named node_modules, which pnpm and some yarn layouts create. Both forms are listed on purpose.
+node_modules

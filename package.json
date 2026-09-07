@@ -1,0 +1,34 @@
+{
+  "name": "ai-servicenow-architect",
+  "version": "2.0.0-dev",
+  "private": true,
+  "description": "AI ServiceNow Architect — Claude Code engine + bundled ServiceNow MCP server (snowarch)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/farstic/ai-servicenow-architect.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "tools/snowarch"
+  ],
+  "scripts": {
+    "bootstrap": "node tools/snowarch/bin/snowarch.mjs bootstrap",
+    "doctor": "node tools/snowarch/bin/snowarch.mjs doctor",
+    "test": "node tests/run.mjs && npm test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "type-check": "npm run type-check --workspaces --if-present",
+    "build:dist": "node scripts/build-dist.mjs",
+    "release": "node scripts/release.mjs"
+  },
+  "overrides": {
+    "minimatch": "^10.2.2"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1"
+  }
+}
