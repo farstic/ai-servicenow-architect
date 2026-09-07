@@ -1,8 +1,7 @@
 {
-  "name": "servicenow-mcp",
-  "mcpName": "io.github.cvetomirgrigorov/servicenow-mcp",
-  "version": "1.0.0",
-  "description": "ServiceNow MCP server exposing 394 tools across ITSM, CMDB, scripting, platform, and AI domains over stdio/SSE/HTTP, with role-based tool packages and dynamic schema discovery.",
+  "name": "@farstic/snowarch",
+  "version": "2.0.0-dev",
+  "description": "ServiceNow MCP server and snowarch CLI \u2014 the live-instance half of AI ServiceNow Architect",
   "main": "dist/server.js",
   "types": "dist/server.d.ts",
   "exports": {
@@ -24,14 +23,11 @@
     }
   },
   "bin": {
-    "servicenow-mcp": "dist/cli/index.js",
-    "servicenow-mcp-server": "dist/server.js"
+    "snowarch": "dist/cli/index.js"
   },
   "type": "module",
   "files": [
     "dist/",
-    "desktop/serve.cjs",
-    "desktop/renderer/dist/",
     "instances.example.json",
     ".env.example"
   ],
@@ -51,8 +47,7 @@
   },
   "keywords": [
     "servicenow",
-    "servicenow-mcp",
-    "servicenow-mcp-server",
+    "snowarch",
     "servicenow-ai",
     "servicenow-agent",
     "servicenow-automation",
@@ -86,18 +81,16 @@
     "servicenow-sdk"
   ],
   "author": "Cvetomir Grigorov",
-  "homepage": "https://github.com/cvetomirgrigorov/servicenow-mcp#readme",
+  "homepage": "https://github.com/farstic/ai-servicenow-architect#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cvetomirgrigorov/servicenow-mcp.git"
+    "url": "git+https://github.com/farstic/ai-servicenow-architect.git",
+    "directory": "packages/snowarch"
   },
   "bugs": {
-    "url": "https://github.com/cvetomirgrigorov/servicenow-mcp/issues"
+    "url": "https://github.com/farstic/ai-servicenow-architect/issues"
   },
-  "license": "SEE LICENSE IN LICENSE",
-  "overrides": {
-    "minimatch": "^10.2.2"
-  },
+  "license": "Apache-2.0",
   "dependencies": {
     "@inquirer/prompts": "^8.2.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
@@ -118,5 +111,8 @@
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vitest": "^4.0.18"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
