@@ -1,0 +1,22 @@
+# ARC-01-S11 — findings gitleaks must not fail on, listed ONE BY ONE BY FINGERPRINT
+# (commit:file:rule:line) rather than by rule id or path glob. A rule-id exclusion would blind the
+# scan to every future generic-api-key anywhere in the repository; a path glob would blind two whole
+# documents. Each of these was inspected during ARC-01-S03 with its value masked, and is recorded
+# there. Adding a line here is a decision about ONE finding and nothing else.
+#
+# The fifth finding in that same file — a SERVICENOW_CLIENT_SECRET whose shape could not be
+# certified as fabricated — is deliberately NOT here. ARC-01-S03 removed it from every commit with
+# `git filter-repo --replace-text` before the import, which is why only these four remain. An
+# uncertifiable value gets rewritten out of history; it does not get an ignore line.
+#
+# These fingerprints pin the commit, so a history rewrite invalidates them and the scan turns red
+# until they are regenerated. That is intended: a rewrite is exactly when someone should look again.
+
+# the published JWT example header — base64 of {"alg":"HS256","typ":"JWT"}, ellipsis-truncated
+dd005fa46ef6786fa9be450803eee05d1f0eb143:packages/snowarch/docs/SERVICENOW_OAUTH_SETUP.md:generic-api-key:131
+# base64 of the literal string "thisisarefreshtokenexample"
+dd005fa46ef6786fa9be450803eee05d1f0eb143:packages/snowarch/docs/SERVICENOW_OAUTH_SETUP.md:generic-api-key:132
+# a comment line; the rule matches the surrounding construct and there is no value on it
+dd005fa46ef6786fa9be450803eee05d1f0eb143:packages/snowarch/docs/INSTALLATION.md:generic-api-key:273
+# a `curl -u` documentation example
+dd005fa46ef6786fa9be450803eee05d1f0eb143:packages/snowarch/EXAMPLES.md:curl-auth-header:200
