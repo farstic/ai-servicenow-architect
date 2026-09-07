@@ -7,7 +7,9 @@
 
 **Run by:** DEFERRED → ARC-02-S03 · **Verdict consumed by:** ARC-02-S02, ARC-05-S04
 
-**Status: PARTIAL — the census is done and it changes the question.** **27 of the 28 descriptions are
+**Status: DEFERRED → ARC-02-S03. The census stands; my length-threshold prediction was REFUTED by the
+architect, who had the listing.** The `≤ 500` figure in the assumption is unfounded, and the mechanism is
+**listing-level, not per-file**. The acceptance test that replaces the cap is stated below.
 already over 500 characters**, so the proposed cap is not a tweak but a rewrite of nearly the whole
 roster; and if a 500-character cap were the mechanism, 27 skills would have dropped, not 7. A specific,
 falsifiable alternative is stated below.
@@ -45,14 +47,60 @@ current length. Whoever owns that work should be told the size before agreeing t
 **27** skills would have dropped, not 7. So either the cause is not length, or the threshold is far higher
 than 500.
 
-**The falsifiable prediction.** If the cause *is* a length threshold, the boundary sits near **~1,100
-characters**, because exactly seven descriptions exceed roughly that figure — and they are the seven named
-in the table above. **If the 7 that dropped are those 7, the threshold hypothesis is strongly supported;
-if they are not, length is not the mechanism at all.** That is a one-minute check for whoever saw the
-original listing, and it decides the question.
+**The falsifiable prediction *(made 2026-09-07, and REFUTED the same day — kept because the refutation is
+the finding)*.** I predicted that if the cause were a length threshold it would sit near ~1,100 characters,
+since exactly seven descriptions exceed that; and that the seven that dropped would be estimation,
+licensing, migration, ui-ux, devops-release-manager, performance-scale and security-grc.
 
-**Explicitly not claimed:** which seven actually dropped. That observation is not in this record and was
-not available to me, so the table above is a *prediction*, not a finding. No skill file was modified.
+### The prediction was wrong — the architect had the listing
+
+The seven shown **name-only**, with their measured lengths:
+
+| chars | skill | | chars | skill |
+|---|---|---|---|---|
+| 1232 | ui-ux | | 1077 | reporting-analytics |
+| 1208 | performance-scale | | 961 | operational-documentation |
+| 1153 | security-grc | | **755** | **technical-designer** |
+| 1089 | spm | | | |
+
+**Three observations kill the length hypothesis outright.** The **four longest** descriptions —
+estimation (1,610), licensing (1,595), migration (1,301), devops (1,234) — were **shown**, two of them
+truncated with an ellipsis, which is per-skill truncation working as intended. **`story-writer` (784) was
+shown while `technical-designer` (755) was not** — a shorter description dropped and a longer one
+survived. And the dropped set is **not** a suffix of the length ordering in either direction.
+
+*(The lengths in this table differ by a few characters from my census — 1,208 vs 1,189 for
+performance-scale, 1,232 vs 1,214 for ui-ux, and so on — because the two measurements normalise the YAML
+scalar differently. The difference is immaterial to every conclusion here, and it is recorded rather than
+quietly reconciled.)*
+
+### What the architect eliminated, and what is left
+
+Every per-file cause was excluded: **no YAML hazard on any description line, no CRLF or BOM, identical
+frontmatter key sets** (`name`, `description`, optionally `version`), and **all 28 skills live only in the
+project `.claude/skills`** — so it is not a precedence or duplicate-source effect either.
+
+**What remains is listing-level: most likely a total byte budget for the whole skills block.** Two things
+point at it — per-skill truncation demonstrably exists (the ellipses on the two longest), and the
+name-only tail **clusters alphabetically around o–u**, which is what a budget exhausted partway through an
+ordered emission looks like rather than anything about the individual files.
+
+### Consequence — the remedy changes shape, and this spike closes
+
+**The `≤ 500` cap is unfounded and should not be implemented as stated.** Shortening descriptions is still
+the lever — a smaller total is a smaller block — but 500 is an arbitrary figure that would mandate
+rewriting 27 of 28 descriptions for a threshold no evidence supports.
+
+**Handed to ARC-02-S03 with a behavioural acceptance test in place of a number:**
+
+> **All 28 skills appear *with a description* in a fresh session.**
+
+Shortening is justified only by that test, and only as far as that test requires. **DEFERRED — the
+mechanism is a Claude Code listing behaviour, not a property of these files, and it is ARC-02-S03 that
+owns making the roster render.**
+
+**Provenance of the refutation:** the listing observation is the architect's, from their own session on
+2026-09-07; the census and the (wrong) prediction are mine. No skill file was modified by either.
 
 ## Assumption
 
