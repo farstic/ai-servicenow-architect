@@ -37,7 +37,7 @@ If any of items 1–4 are missing or generic ("the user", "the system"), **stop 
 4. **Read engagement role matrix** if pointed to a `clients/<client>/<client>-instructions-v*.md`. Use those role aliases in stories instead of generic role names.
 5. **Identify primary scenarios** — at minimum one happy-path plus two edge / negative scenarios per Feature. Single-scenario Features are rejected.
 6. **Search for prior stories** in the engagement folder using `Glob` and `Grep` — if a similar Feature exists, propose extending it rather than duplicating.
-7. **Verify unknown table or field names** against `ServiceNowDocs/markdown/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown/...` if the input names a table or field you cannot recognise.
+7. **Verify unknown table or field names** against `ServiceNowDocs/markdown/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown` if the input names a table or field you cannot recognise.
 8. **Write the Feature file(s)** following all SKILL output rules: filename suggestion, header comment block, Gherkin block, OPEN QUESTIONS, proposed supporting stories, conventions checklist.
 
 ## Output contract

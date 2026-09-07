@@ -81,7 +81,7 @@ Consult flags:
 
 ## Part 5 — Anti-Patterns to Block
 
-- **Do not create a bridging table** mapping case/incident → service. Both reference the same `cmdb_ci_service_*` records. (citation: `csdm-framework-for-install-base-management.md`)
+- **Do not create a bridging table** mapping case/incident → service. Both reference the same `cmdb_ci_service_*` records. (citation: `markdown/customer-service-management/csdm-framework-for-install-base-management.md`)
 - **Do not duplicate the service** as one record "for CSM" and another "for ITSM." One business service, one (or more) technology management service, linked by designed relationships.
 - **Do not invent a `cmdb_rel_type`** for the business↔technology service link — use the designed CSDM relationship.
 - **Do not model this at Crawl stage** if Foundation/Crawl service data is not yet trustworthy — confirm stage first.

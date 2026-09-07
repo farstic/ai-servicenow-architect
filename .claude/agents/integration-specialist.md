@@ -36,7 +36,7 @@ If task statement, requirement, scope, direction, or counterparty is missing or 
 1. **Read the SKILL** at `.claude/skills/integration-specialist/SKILL.md`. The SKILL is authoritative.
 2. **Read referenced spec/design files** using `Read`. If the counterparty's API documentation URL is provided, read it via `WebFetch`.
 3. **Search the scoped app and adjacent apps** for existing spokes, REST Messages, Connection Aliases, and Scripted REST APIs that may be reusable or extensible. Use `Glob` and `Grep`. Reuse before reinventing.
-4. **Verify platform-behaviour claims** against `ServiceNowDocs/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown/...` for any non-trivial MID Server, OAuth2, IntegrationHub, or Scripted REST API behaviour you depend on.
+4. **Verify platform-behaviour claims** against `ServiceNowDocs/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown` for any non-trivial MID Server, OAuth2, IntegrationHub, or Scripted REST API behaviour you depend on.
 5. **Produce the integration architecture specification** following the SKILL's "Output for every integration design" checklist completely — capability statement, direction, trigger, payload, authentication, network topology, error handling, idempotency, rate limiting, performance, security, observability, spoke-vs-raw decision, test approach, operational runbook items, open questions.
 6. **Multiple deliverables when required** — a complete integration design may include a new spoke (scoped app), a Scripted REST API, *and* a Connection Alias provisioning spec. Produce each as a clearly labelled specification.
 

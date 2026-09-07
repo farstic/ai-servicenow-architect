@@ -118,6 +118,21 @@ test('SK-09 rejects retired vocabulary, and an exemption must be anchored to bot
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('SK-11 rejects a missing, misplaced or incomplete ## Triggers section', () => {
+  const withBody = (body) => {
+    const r = mkdtempSync(join(tmpdir(), 'snowarch-lint-'));
+    mkdirSync(join(r, '.claude/skills/a'), { recursive: true });
+    writeFileSync(join(r, '.claude/skills/a/SKILL.md'), `---\nname: a\ndescription: d\n---\n\n# A\n\n${body}`);
+    writeFileSync(join(r, '.claude/skills/a/EXAMPLES.md'), '# E\n');
+    try { return lintSkills({ root: r }); } finally { rmSync(r, { recursive: true, force: true }); }
+  };
+  const full = '## Triggers\n\n**Keywords:** k\n\n**Fires:** f\n\n**Not this skill:** n\n';
+  assert.ok(has(withBody('no headings here\n'), 'SK-11'), 'no H2 at all must fail');
+  assert.ok(has(withBody(`## When to use\n\ntext\n\n${full}`), 'SK-11'), 'Triggers must be the FIRST H2');
+  assert.ok(has(withBody('## Triggers\n\n**Keywords:** k\n\n**Fires:** f\n'), 'SK-11'), 'a missing field must fail');
+  assert.ok(!has(withBody(full), 'SK-11'), 'the complete section must pass');
+});
+
 test('SK-10 rejects a dead .claude path — criterion 6 puts the dangling token in a SKILL BODY', () => {
   const root = mkdtempSync(join(tmpdir(), 'snowarch-lint-'));
   try {

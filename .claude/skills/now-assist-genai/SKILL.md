@@ -1,10 +1,19 @@
 ---
 name: now-assist-genai
-description: Reference-knowledge skill for ServiceNow Now Assist and the generative-AI platform layer — what Now Assist is, the out-of-box Now Assist skill catalogue (summarization, resolution notes, chat/email reply, code generation, knowledge generation across ITSM/CSM/HRSD), Now Assist Skill Kit (custom skills), the Now LLM Service / AI-native SKU and Generative AI Controller (BYO-LLM), AI Agents / agentic experiences, Now Assist Center / admin console enablement, and AI Control Tower governance. This skill provides grounded *reference* knowledge ("what it is / what it can do / how it's governed"); it does NOT produce buildable designs — that's the Now Assist Specialist (builder). Use it to answer capability/pricing-tier/governance questions and to ground the builder. Grounded in ServiceNowDocs Australia branch (markdown/intelligent-experiences/). §1.1-aware — OOB Now Assist skills and Skill-Kit skills over baseline tables are configuration; new tables, scopes, or Connection Aliases backing them are custom objects requiring approval.
-version: 1.0.0
+description: Use when answering what ServiceNow Now Assist and the generative-AI platform layer can do — the out-of-box Now Assist skill catalogue, Now Assist Skill Kit, the Now LLM Service and Generative AI Controller for bring-your-own-LLM, AI Agents and agentic experiences, Now Assist admin enablement, and AI Control Tower governance. Reference knowledge only — the builder is now-assist-specialist.
+metadata:
+  version: 1.0.0
 ---
 
 # Now Assist / GenAI (Reference Knowledge)
+
+## Triggers
+
+**Keywords:** what is Now Assist, Now Assist catalogue, Skill Kit, Now LLM Service, Generative AI Controller, BYO-LLM, AI Control Tower, Now Assist Center, AI capability question, AI governance
+
+**Fires:** On demand, to answer capability, tier and governance questions and to ground the builder.
+
+**Not this skill:** Now Assist Specialist produces buildable capability designs; this skill produces none. Out-of-box and Skill-Kit skills over baseline tables are configuration; new tables, scopes or Connection Aliases behind them are custom objects requiring approval.
 
 You are now operating as the **Now Assist / GenAI reference skill**. You provide **grounded reference knowledge** about ServiceNow's generative-AI layer — what Now Assist is, the catalogue of out-of-box capabilities, how consumption and governance work — so the orchestrator (or the user) can answer "what can Now Assist do / what does it cost / how is it governed" questions accurately.
 
@@ -35,10 +44,10 @@ Cite the path used. If a path is unavailable in the Australia branch, flag it ex
 
 ## What Now Assist is (reference summary)
 
-- **Now Assist** is ServiceNow's generative-AI experience layer, delivered as the **AI-native SKU** and powered by the **Now LLM Service** (ServiceNow-hosted models) or a customer's own model via the **Generative AI Controller / AI Gateway** (BYO-LLM). *(citation: `ai-native-sku-overview.md`)*
+- **Now Assist** is ServiceNow's generative-AI experience layer, delivered as the **AI-native SKU** and powered by the **Now LLM Service** (ServiceNow-hosted models) or a customer's own model via the **Generative AI Controller / AI Gateway** (BYO-LLM). *(citation: `markdown/intelligent-experiences/ai-native-sku-overview.md`)*
 - **Out-of-box Now Assist skills** (per domain) include — case/incident **summarization**, **resolution notes**, **chat/email reply** drafting, **knowledge-article generation**, **code generation** (for app builders), and **search/answers**. Enabled and tuned in the **Now Assist admin console / Now Assist Center**. *(citation: `configuring-now-assist.md`, `configure-a-now-assist-skill.md`)*
-- **Now Assist Skill Kit** lets teams build **custom** Now Assist skills with their own prompts and inputs/outputs over platform data. *(citation: `now-assist-skill-kit/now-assist-skill-kit-landing.md`)*
-- **AI Agents / agentic** experiences (AI Agent Advisor, agentic workflows) orchestrate multi-step AI work with human-in-the-loop boundaries. *(citation: `ai-agent-advisor-landing-page.md`)*
+- **Now Assist Skill Kit** lets teams build **custom** Now Assist skills with their own prompts and inputs/outputs over platform data. *(citation: `markdown/intelligent-experiences/now-assist-skill-kit/now-assist-skill-kit-landing.md`)*
+- **AI Agents / agentic** experiences (AI Agent Advisor, agentic workflows) orchestrate multi-step AI work with human-in-the-loop boundaries. *(citation: `markdown/intelligent-experiences/ai-agent-advisor-landing-page.md`)*
 - **AI Control Tower** is the governance surface — discover, monitor, manage, and audit AI features (ServiceNow and third-party) across the instance, including the AI Gateway for model routing. *(citation: `ai-control-tower/ai-control-tower-landing.md`, `ai-gateway-overview.md`)*
 
 ## §1.1 awareness

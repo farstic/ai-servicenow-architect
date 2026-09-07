@@ -160,6 +160,11 @@ product renumbered downward at the merge; it becomes a live assertion when ARC-0
 and the `vendor/ServiceNowDocs` gitlink check (ARC-03 creates it). **A check that passes because its
 subject is absent is not a check** — hence a skip with a reason rather than a silent pass.
 
+**Run the suite after `git add`, not before.** `tests/no-legacy-names.test.mjs` scans `git ls-files`,
+so an untracked file is invisible to it. In ARC-02-S02 a new module carrying a forbidden token passed
+locally and turned all nine CI cells red — `npm test` on an unstaged tree is simply not the check CI
+runs. The same applies to any test that walks the tracked set rather than the working directory.
+
 **Negative cases run in CI, not by hand.** Where a criterion asks "does X fail when it should", the test
 mutates an in-memory copy or a throwaway `git init` under `os.tmpdir()`. The working tree is never
 dirtied. And a fixture has to be able to fail: a `ghp_` token of 36 identical characters is *not* caught
@@ -229,6 +234,70 @@ step tolerates failure and the validate steps are guarded on `claude` being on `
 registry logs `claude CLI not available on this runner (S-19)` and skips. Making the job a *required*
 status check still needs branch-protection contexts on `main`, which does not exist until the milestone
 merge.
+
+---
+
+## Writing a skill description
+
+A skill's description is what the model routes on, and every description in the roster is sent to
+**every** session. That makes it a shared, finite resource: Claude Code applies a **total** listing
+budget across all skills in a session — the engine's, the user's own, and the bundled ones — and when
+the total is exceeded it truncates descriptions and drops some to empty. The CLI says so itself:
+
+```
+[WARN] Skill listing over budget: 42 skills, 34399 chars > 30000 budget — descriptions will be
+       truncated. Run /skills to disable some, or raise skillListingBudgetFraction in settings.
+```
+
+That is the mechanism behind P-09, confirmed and closed as spike S-13. The consequence is the rule:
+**the engine controls only its own share of the budget**, so a description that is longer than it
+needs to be spends a user's headroom, not just its own.
+
+The recipe, applied to all 28 (`scripts/maint/descriptions.mjs` holds the text):
+
+1. **Sentence 1 — the trigger sentence.** `Use when …` for builders, reviewers and consults;
+   `Mandatory gateway for …` for the five Domain Experts. Name the domain nouns a user would actually
+   type — tables, products, artefact names.
+2. **Sentence 2 — what it produces.** The artefact name. Gateways add: *Produces the 5-Part Constraint
+   Envelope; fires at Phase 1 Step 5 and Phase 2 Step 4.*
+3. **Sentence 3, optional — the one boundary** that prevents mis-routing.
+
+Hard limits, enforced by SK-02 and SK-11: **≤ 500 characters**, no ServiceNowDocs paths, no §1.1
+mechanics, and no keyword lists. Quote the scalar whenever it contains `: ` (SK-03).
+
+Nothing is deleted to hit the limit. The keyword list, the firing statement and the "not this skill"
+boundaries move into a `## Triggers` section, which is every SKILL.md's first H2:
+
+```markdown
+## Triggers
+
+**Keywords:** <comma-separated, the terms a user would type>
+
+**Fires:** <routing-time consult | post-build consult | Phase 1 Step 5 + Phase 2 Step 4 gateway | on demand>
+
+**Not this skill:** <the boundary sentences that used to live in the description>
+```
+
+Verify with `node scripts/ci/skill-listing-check.mjs`, which reads the CLI's own registration log
+rather than asking a session to describe itself — a model that omits a long description is
+indistinguishable from a description that was never registered.
+
+## Citations
+
+Every citation in the roster is a full `markdown/<area>/<page>.md` path that exists at the pinned
+corpus commit. Three shapes are **not** citations the gate can check, and all three were repaired in
+ARC-02-S03:
+
+- a bare `foo.md`, with no path at all;
+- an area-prefixed but rootless `platform-security/access-control/foo.md`, which looks checkable and
+  is not — the gate's pattern requires the `markdown/` root, so such a token is neither checked nor
+  warned, and a reader trusts it anyway;
+- a directory citation missing the same root.
+
+`node scripts/docs.mjs verify` reports `checked` / `dead` and warns on each unrepaired citation. It
+warns rather than fails, because the fix is prose. One token is deliberately left unrepaired: the
+security skill names `servicenow-platform/security/` as the path ACLs are *not* under. A citation
+quoted to be contradicted must stay wrong.
 
 ---
 

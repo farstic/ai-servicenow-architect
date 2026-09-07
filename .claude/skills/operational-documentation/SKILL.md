@@ -1,9 +1,19 @@
 ---
 name: operational-documentation
-description: Author operator- and end-user-facing documentation for a delivered ServiceNow capability — runbooks (operational procedures, on-call response, rollback), Knowledge Base Articles (kb_knowledge, knowledge bases, article templates, versioning/validity, review-and-publish, KCS create-from-incident/case), training material, and user guides. Skill-only, runs in the Chief Architect's main thread. Fires post-build per taxonomy §6.2 on a go-live signal ("ready for prod", "sign-off", "release", "go-live", "cutover", "deploy") or when an end-to-end feature completes across builders. Audience is operators / support engineers / end users — distinct from the HLD/LLD Writer (architect audience). Grounded in ServiceNowDocs Australia branch (markdown/servicenow-platform/knowledge-management/). §1.1-aware — KBAs use the baseline kb_knowledge / knowledge-base / article-template model (configuration); a custom documentation table is a §1.1 halt.
+description: Use when a delivered ServiceNow capability needs operator- and end-user-facing documentation — runbooks covering operational procedure, on-call response and rollback; Knowledge Base Articles including knowledge bases, article templates, versioning and validity, review-and-publish and KCS create-from-incident; training material and user guides. Audience is operators, support engineers and end users.
+metadata:
+  version: 1.0.0
 ---
 
 # Operational Documentation
+
+## Triggers
+
+**Keywords:** runbook, KBA, knowledge article, kb_knowledge, knowledge base, article template, KCS, training material, user guide, operational procedure, on-call response, handover pack
+
+**Fires:** Post-build per taxonomy §6.2 on a go-live signal — "ready for prod", "sign-off", "release", "go-live", "cutover", "deploy" — or when an end-to-end feature completes across builders.
+
+**Not this skill:** HLD/LLD Writer writes for architects; this skill writes for operators and end users. KBAs use the baseline knowledge model; a custom documentation table is a §1.1 halt.
 
 You turn a delivered capability into the documents the people who *run* and *use* it need: **runbooks, Knowledge Base Articles, training material, and user guides**. You do not design or build the capability; you document it for operations and end users. Skill-only, main thread — operational docs are written where the build, its spec, and its go-live decision live.
 
@@ -28,7 +38,7 @@ The KBA deliverable is grounded in Knowledge Management; cite the path. (Runbook
 | Create a knowledge base | `markdown/servicenow-platform/knowledge-management/create-a-knowledgebase.md` |
 | Create a knowledge article | `markdown/servicenow-platform/knowledge-management/create-knowledge-article.md` |
 | Article templates | `markdown/servicenow-platform/knowledge-management/configure-knowledge-article-templates.md` |
-| Article versioning / validity | `markdown/servicenow-platform/knowledge-management/article-versioning.md`, `article-validity.md` |
+| Article versioning / validity | `markdown/servicenow-platform/knowledge-management/article-versioning.md`, `markdown/servicenow-platform/knowledge-management/article-validity.md` |
 | Review & approve (publish) | `markdown/servicenow-platform/knowledge-management/approve-article-in-review.md` |
 | Create article from incident/case (KCS) | `markdown/servicenow-platform/knowledge-management/article-from-incident.md` |
 | Knowledge Manager role/admin | `markdown/servicenow-platform/knowledge-management/c_KnowledgeManager.md` |
@@ -36,9 +46,9 @@ The KBA deliverable is grounded in Knowledge Management; cite the path. (Runbook
 
 ## KBA platform model (respect this)
 - **Tables:** `kb_knowledge` (article); **`kb_knowledge_base`** (its KB); **`kb_category`** (categorisation).
-- **Templates:** article templates standardise structure (How-To, Known Error, Reference). *(citation: `configure-knowledge-article-templates.md`)*
-- **Lifecycle:** Draft → Review → Published → Retired, with **versioning** and **validity** (review/expiry) dates; publishing governed by the KB workflow + `knowledge_manager`/KB-owner roles. *(citation: `article-versioning.md`, `article-validity.md`, `approve-article-in-review.md`)*
-- **KCS:** support articles can be created from an incident/case so the fix is captured at source. *(citation: `article-from-incident.md`)*
+- **Templates:** article templates standardise structure (How-To, Known Error, Reference). *(citation: `markdown/servicenow-platform/knowledge-management/configure-knowledge-article-templates.md`)*
+- **Lifecycle:** Draft → Review → Published → Retired, with **versioning** and **validity** (review/expiry) dates; publishing governed by the KB workflow + `knowledge_manager`/KB-owner roles. *(citation: `article-versioning.md`, `markdown/servicenow-platform/knowledge-management/article-validity.md`, `markdown/servicenow-platform/knowledge-management/approve-article-in-review.md`)*
+- **KCS:** support articles can be created from an incident/case so the fix is captured at source. *(citation: `markdown/servicenow-platform/knowledge-management/article-from-incident.md`)*
 
 ## Deliverable types and structures
 ### Runbook (operators / on-call)
@@ -68,11 +78,11 @@ Task-oriented ("How do I…"), screenshots/placeholders, plain language, happy p
 ## Domain anti-patterns to block
 | Anti-pattern | Better | Citation |
 |---|---|---|
-| Custom table for runbooks/training/docs | `kb_knowledge` + KBs, or external docs | `create-knowledge-article.md` |
-| Custom publish workflow | Baseline review → publish | `approve-article-in-review.md` |
-| KBA with no validity/review date or category | Set validity + categorise (or it rots / is unfindable) | `article-validity.md` |
-| Publishing straight to live (skip review) | Draft → Review → Published | `approve-article-in-review.md` |
-| Theory dump in a runbook | Steps, indicators, escalation — operator-grade | `configuring-knowledge-management.md` |
+| Custom table for runbooks/training/docs | `kb_knowledge` + KBs, or external docs | `markdown/servicenow-platform/knowledge-management/create-knowledge-article.md` |
+| Custom publish workflow | Baseline review → publish | `markdown/servicenow-platform/knowledge-management/approve-article-in-review.md` |
+| KBA with no validity/review date or category | Set validity + categorise (or it rots / is unfindable) | `markdown/servicenow-platform/knowledge-management/article-validity.md` |
+| Publishing straight to live (skip review) | Draft → Review → Published | `markdown/servicenow-platform/knowledge-management/approve-article-in-review.md` |
+| Theory dump in a runbook | Steps, indicators, escalation — operator-grade | `markdown/servicenow-platform/knowledge-management/configuring-knowledge-management.md` |
 | Writing for the wrong audience | Match audience/register (runbook ≠ HLD ≠ end-user guide) | — |
 | Documenting intended-but-unconfirmed behaviour | Document what was built; flag unknowns as Open Questions | — |
 

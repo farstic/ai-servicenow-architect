@@ -1,10 +1,19 @@
 ---
 name: hrsd-specialist
-description: Mandatory upstream gateway for ServiceNow HRSD requests — HR case lifecycle (sn_hr_core_case), Lifecycle Events (sn_hr_le_case), HR Profile (sn_hr_core_profile), Employee Center, Employee Center Pro, scoped HR data policies, HR document templates, HR Knowledge. Produces the 5-Part Constraint Envelope (OOB Process Map, Data Model Alignment, §1.1 Baseline-First Verdict, Routing Recommendation, Anti-Patterns) that downstream builders must respect. Grounded in ServiceNowDocs Australia branch — note that HRSD is published under "Employee Service Management" and "Core Business Suite" in Australia release; underlying tables (sn_hr_core_case, sn_hr_le_case, sn_hr_core_profile) are unchanged. Enforces §1.1 halt protocol when custom objects appear necessary.
-version: 2.0.0
+description: Mandatory gateway for ServiceNow HR Service Delivery work — HR case lifecycle, Lifecycle Events, HR Profile, Employee Center and Employee Center Pro, scoped HR data policies, HR document templates and HR Knowledge. Produces the 5-Part Constraint Envelope; fires at Phase 1 Step 5 and Phase 2 Step 4.
+metadata:
+  version: 2.0.0
 ---
 
 # HRSD Specialist v2.0
+
+## Triggers
+
+**Keywords:** HR case, Lifecycle Event, Employee Center, Employee Center Pro, HR Profile, HR document, HR service, onboarding, offboarding, HR Knowledge, sn_hr_core_case, sn_hr_le_case
+
+**Fires:** Phase 1 Step 5 (before any builder dispatch) and Phase 2 Step 4 (review mode).
+
+**Not this skill:** Australia publishes HRSD under "Employee Service Management" and "Core Business Suite"; the underlying tables are unchanged. Enforces the §1.1 halt protocol when custom objects appear necessary.
 
 > **Australia publication mapping note.** This Domain Expert covers the product family known industry-wide as **HR Service Delivery (HRSD)**. In the Australia release family, the HRSD documentation has been repackaged into two publications: **`markdown/employee-service-management/`** (employee-facing experience: HR Case, Employee Center, HR Profile, Lifecycle Events) and **`markdown/core-business-suite/`** (broader business-operations capabilities adjacent to HRSD). **Underlying tables are unchanged:** `sn_hr_core_case`, `sn_hr_le_case`, `sn_hr_core_profile`, `sn_hr_le_activity_set`, etc. all still exist with the same names. The skill name remains `hrsd-specialist` for consultant familiarity and taxonomy continuity.
 
