@@ -47,6 +47,8 @@ ARC-04-S02/S04/S11/S12 (store module, `snow_core_capabilities_read`, network cla
 
 ## Risks
 
+> **Amendment 2026-09-07 (from `03` §F S-06 / S-16).** (1) MCP startup failure is signalled by the doctor's own `initialize`/`tools/list` handshake, never by Claude Code's exit code (0 on failure, no stderr). (2) `/snowarch status` and the in-session doctor summary are **MCP tool calls** (`snow_core_status_read`, `snow_core_doctor_read` — ARC-04 adds the latter), because MCP allow rules match exactly and Bash allow rules do not survive Claude's non-deterministic command wrapper. (3) The generated rule file states: on any MCP failure the engine quotes the doctor's output and never diagnoses (regression: a fabricated "PDI hibernating" diagnosis naming an unrelated real hostname).
+
 > **Amendment 2026-09-07 (from `03` §F S-24 / S-20).** The `--live` handshake and the CI end-to-end checks may use `claude -p --mcp-config <file> --settings <rules> --strict-mcp-config`, which reaches a project stdio server with no trust dialog and no approval (proven on macOS). E-26 (proxy/CA) reports the launching shell's variables as inherited on macOS; the Windows row stays hedged.
 
 > **Amendment 2026-09-06 (from `03` §F S-07).** The docs-corpus check reads the **superproject's** `git submodule status` and requires the initialised form (no leading `-`) at the pinned SHA; a populated `vendor/ServiceNowDocs` tree with an uninitialised gitlink is a FAIL with the remedy `git submodule init` (folded into `./snowarch docs sync`).
