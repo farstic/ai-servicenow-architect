@@ -234,15 +234,15 @@ The three checks are strictly ordered: **§1.1 (architecture) → §2.1 (authori
 
 | Builder | SKILL.md | Sub-agent | Output |
 |---|---|---|---|
-| Story Writer | `skills/story-writer/` | `agents/story-writer.md` | Gherkin Feature files |
-| HLD/LLD Writer | `skills/hld-lld-writer/` | `agents/hld-lld-writer.md` | HLD / LLD / PDD documents |
-| Technical Designer | `skills/technical-designer/` | `agents/technical-designer.md` | Table models, ACLs, BR lists |
-| Developer | `skills/developer/` | `agents/developer.md` | Script Includes, BRs, Client Scripts |
-| Flow Designer Specialist | `skills/flow-designer-specialist/` | `agents/flow-designer-specialist.md` | Flow / subflow / custom Action specs |
-| Integration Specialist | `skills/integration-specialist/` | `agents/integration-specialist.md` | REST/SOAP integrations, IH spokes |
-| Now Assist Specialist | `skills/now-assist-specialist/` | `agents/now-assist-specialist.md` | AI Agents, agentic workflows, skills |
+| Story Writer | `skills/story-writer/` | `.claude/agents/story-writer.md` | Gherkin Feature files |
+| HLD/LLD Writer | `skills/hld-lld-writer/` | `.claude/agents/hld-lld-writer.md` | HLD / LLD / PDD documents |
+| Technical Designer | `skills/technical-designer/` | `.claude/agents/technical-designer.md` | Table models, ACLs, BR lists |
+| Developer | `skills/developer/` | `.claude/agents/developer.md` | Script Includes, BRs, Client Scripts |
+| Flow Designer Specialist | `skills/flow-designer-specialist/` | `.claude/agents/flow-designer-specialist.md` | Flow / subflow / custom Action specs |
+| Integration Specialist | `skills/integration-specialist/` | `.claude/agents/integration-specialist.md` | REST/SOAP integrations, IH spokes |
+| Now Assist Specialist | `skills/now-assist-specialist/` | `.claude/agents/now-assist-specialist.md` | AI Agents, agentic workflows, skills |
 
-**Skill-only specialists** (no sub-agent): Code Reviewer; the five Domain Experts (ITSM, CSM, HRSD, ITOM/Discovery, CMDB & CSDM); Security & GRC and Operational Documentation; and the consult roster (Performance & Scale, DevOps/Release, SPM, App Engine, Migration, UI/UX, Reporting & Analytics, Discovery). **ATF Author** runs both ways — a skill for single-component coverage and the `agents/atf-author.md` sub-agent for full-app batch suites.
+**Skill-only specialists** (no sub-agent): Code Reviewer; the five Domain Experts (ITSM, CSM, HRSD, ITOM/Discovery, CMDB & CSDM); Security & GRC and Operational Documentation; and the consult roster (Performance & Scale, DevOps/Release, SPM, App Engine, Migration, UI/UX, Reporting & Analytics, Discovery). **ATF Author** runs both ways — a skill for single-component coverage and the `.claude/agents/atf-author.md` sub-agent for full-app batch suites.
 
 ### 6.4 Builder-pair routing rules
 
@@ -298,7 +298,7 @@ Behaviour is locked by `VALIDATION-TESTS.md` at repo root — **10 regression te
 
 ## 9. Repository mechanics — the auto-sync hook
 
-Claude Code reads agent and skill definitions from a `.claude/` mirror; the canonical source lives in the repo-root `agents/` and `skills/` folders. The two must never drift.
+Claude Code reads agent and skill definitions from a `.claude/` mirror; the canonical source lives in the repo-root `.claude/agents/` and `.claude/skills/` folders. The two must never drift.
 
 A **pre-commit hook keeps them in sync automatically:**
 
@@ -321,7 +321,7 @@ This behaviour is regression-tested by **T-07**. The mirror ships pre-synced, bu
 | Add an MCP write pattern / gotcha | Record it in [`nowaikit-field-notes.md`](./nowaikit-field-notes.md); commit and push immediately |
 | Modify §1.1 | **Authoritative source is `governance-rules.md`.** Update there first, then propagate to `CLAUDE.md` and every SKILL.md anti-pattern section *(plus the Tier 1 master instructions, once shipped)* |
 
-After any change to `skills/` or `agents/`, the pre-commit hook (§9) re-syncs the `.claude/` mirror automatically. Re-run the validation suite (§8) before committing protocol changes.
+After any change to `.claude/skills/` or `.claude/agents/`, the pre-commit hook (§9) re-syncs the `.claude/` mirror automatically. Re-run the validation suite (§8) before committing protocol changes.
 
 ---
 

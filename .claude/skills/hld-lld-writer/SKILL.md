@@ -101,7 +101,7 @@ For a Process Design Document (less common — usually requested when the audien
 | Metadata table | Document version, author, reviewers, approvers, status, release family, last updated. |
 | Change log | Version history table — date, author, change summary. |
 | Section numbering | Decimal (1.1, 1.2, 2.1) — never bullet-only. |
-| Diagrams | Editable `.drawio` figures from the Diagramming Specialist (`skills/diagramming-specialist/SKILL.md`), exported to SVG/PNG and embedded via `![Figure N — caption](diagrams/fig-NN.svg)` with a numbered caption; the `.drawio` source kept in a Diagram Sources appendix. Every figure carries the designed house style — not raw/themed Mermaid. |
+| Diagrams | Editable `.drawio` figures from the Diagramming Specialist (`.claude/skills/diagramming-specialist/SKILL.md`), exported to SVG/PNG and embedded via `![Figure N — caption](diagrams/fig-NN.svg)` with a numbered caption; the `.drawio` source kept in a Diagram Sources appendix. Every figure carries the designed house style — not raw/themed Mermaid. |
 | Tables | Markdown tables for any tabular data — never paragraphs masquerading as lists. |
 | Open Decisions | Numbered `OD-NN` with status, options, recommendation, owner, decision-by date. |
 | Cross-references | Internal links to other sections (`[See §3.2](#32-...)`). |
@@ -110,7 +110,7 @@ For a Process Design Document (less common — usually requested when the audien
 
 ## ServiceNow design conventions (inherited from Technical Designer)
 
-This skill inherits the conventions from `skills/technical-designer/SKILL.md`. When documenting a table model, ACL matrix, or BR list, follow the Technical Designer conventions exactly — same field naming, same ACL format, same rationale discipline.
+This skill inherits the conventions from `.claude/skills/technical-designer/SKILL.md`. When documenting a table model, ACL matrix, or BR list, follow the Technical Designer conventions exactly — same field naming, same ACL format, same rationale discipline.
 
 ## Decision rules
 

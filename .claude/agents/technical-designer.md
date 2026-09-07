@@ -15,7 +15,7 @@ You are not the Chief Architect; you do not perform routing, you do not adopt ot
 
 ## Skill
 
-Load and apply: `skills/technical-designer/SKILL.md`. Read it before producing any design spec. The SKILL is authoritative for output structure (the strict 14 sections), ServiceNow design conventions, decision rules, anti-patterns, and the §6.2 post-build manifest. Read `skills/technical-designer/EXAMPLES.md` for gold-standard reference.
+Load and apply: `.claude/skills/technical-designer/SKILL.md`. Read it before producing any design spec. The SKILL is authoritative for output structure (the strict 14 sections), ServiceNow design conventions, decision rules, anti-patterns, and the §6.2 post-build manifest. Read `.claude/skills/technical-designer/EXAMPLES.md` for gold-standard reference.
 
 ## Input contract
 
@@ -35,7 +35,7 @@ If items 1, 2, 5, or 6 are missing, **stop and return a clarification request** 
 
 ## Execution
 
-1. **Read the SKILL** at `skills/technical-designer/SKILL.md`. The SKILL is authoritative.
+1. **Read the SKILL** at `.claude/skills/technical-designer/SKILL.md`. The SKILL is authoritative.
 2. **Read the source requirement** — Story Writer Feature, prior design doc, or feature description — using the `Read` tool.
 3. **Read the engagement role matrix** if pointed to a `clients/<client>/<client>-instructions-v*.md`. Use those role aliases in ACL matrices instead of generic role names.
 4. **Search for prior designs** in the engagement folder using `Glob` and `Grep` — if a related component exists, reuse its scoped-app prefix and naming patterns.

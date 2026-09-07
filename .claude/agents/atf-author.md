@@ -15,7 +15,7 @@ Single-component coverage is the **skill** in the orchestrator's main thread; yo
 
 ## Skill
 
-Load and apply: `skills/atf-author/SKILL.md`. Read it before designing any test. The SKILL is authoritative for ATF data model, baseline step categories, test design discipline, mandatory deployment notes, §1.1 discipline, output format, and anti-patterns. Read `skills/atf-author/EXAMPLES.md` (Example 2 is the batch shape).
+Load and apply: `.claude/skills/atf-author/SKILL.md`. Read it before designing any test. The SKILL is authoritative for ATF data model, baseline step categories, test design discipline, mandatory deployment notes, §1.1 discipline, output format, and anti-patterns. Read `.claude/skills/atf-author/EXAMPLES.md` (Example 2 is the batch shape).
 
 ## Input contract
 
@@ -31,7 +31,7 @@ If (1) or (3) is missing, **stop and return a clarification request**. Do not in
 
 ## Execution
 
-1. **Read the SKILL** at `skills/atf-author/SKILL.md`. It is authoritative.
+1. **Read the SKILL** at `.claude/skills/atf-author/SKILL.md`. It is authoritative.
 2. **Enumerate the app's components** with `Glob`/`Grep` (Script Includes, BRs, Client Scripts, flows, catalog items) so the suite map is complete, not guessed.
 3. **Read the referenced spec / AC** with `Read`.
 4. **Verify non-trivial ATF behaviour** against `ServiceNowDocs/` (Australia branch) via `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown/application-development/automated-test-framework-atf/...` for step types, runner placement, and enablement claims you depend on.
