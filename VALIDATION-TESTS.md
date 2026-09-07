@@ -516,7 +516,7 @@ hidden from ITSM support staff who can see the related incident.
 
 1. Architect restates the task.
 2. **CSM gateway fires (Phase 1 Step 5)** — it's a CSM case design. (Gateway behaviour unchanged.)
-3. **Security & GRC consult fires (§3.1)** — PII + non-trivial ACL + cross-domain visibility triggers. The Architect adopts `skills/security-grc-specialist/SKILL.md` and produces a **Security & GRC Constraint Note** (field-ACL strategy, PII classification, default-deny, §1.1 verdict = configuration-only), BEFORE any builder is dispatched.
+3. **Security & GRC consult fires (§3.1)** — PII + non-trivial ACL + cross-domain visibility triggers. The Architect adopts `.claude/skills/security-grc-specialist/SKILL.md` and produces a **Security & GRC Constraint Note** (field-ACL strategy, PII classification, default-deny, §1.1 verdict = configuration-only), BEFORE any builder is dispatched.
 4. **Security & GRC does NOT auto-fire a 5-Part Constraint Envelope and does NOT halt all builders** — it is a consult, not a gateway. The five gateways are unchanged.
 5. If a Technical Designer spec is later returned, the skill re-adopts in **review mode** and returns a verdict (block / fix-before-prod / consider).
 
@@ -551,7 +551,7 @@ we'd stand up in a new scoped app.
 
 1. Architect restates the task.
 2. **§1.1 evaluation (Phase 1 Step 4) HALTS** — custom table + new scoped app, unapproved. No design artefact or build in the same turn.
-3. **Licensing & Entitlement consult fires (§3.1)** — custom table/scoped app (App Engine units) + 400 requester→write (fulfiller-subscription delta) triggers. The Architect adopts `skills/licensing-specialist/SKILL.md` and produces a **Licensing Constraint Note**.
+3. **Licensing & Entitlement consult fires (§3.1)** — custom table/scoped app (App Engine units) + 400 requester→write (fulfiller-subscription delta) triggers. The Architect adopts `.claude/skills/licensing-specialist/SKILL.md` and produces a **Licensing Constraint Note**.
 4. The Note **prices** the custom path (≈400 fulfiller subscriptions + App Engine units + build/upgrade) and feeds that into the §1.1 ruling — it does **not** approve the custom object.
 5. SKU/tier claims (e.g., FSM ownership) are flagged "verify against the engagement's subscription"; no prices quoted.
 6. The §1.1 ruling, once made, is recorded as an **ADR** (governance §4.1).
@@ -587,7 +587,7 @@ into ServiceNow and standing up a basic SAM dashboard?
 ### Expected behaviour
 
 1. Architect restates the task.
-2. **Estimation & Sizing consult fires** — "rough order of magnitude / how big" trigger. The Architect adopts `skills/estimation-specialist/SKILL.md` and produces an **Estimate**.
+2. **Estimation & Sizing consult fires** — "rough order of magnitude / how big" trigger. The Architect adopts `.claude/skills/estimation-specialist/SKILL.md` and produces an **Estimate**.
 3. The Estimate is a **range at ROM ±50%** (not a single number), with method, user-confirmable assumptions, the ServiceNow complexity rubric applied, and explicit **contingency tied to a named risk** (source data quality).
 4. **Baseline-first vs custom-object paths are sized separately** (the §1.1 delta shown).
 5. Risks routed to **RAID** (governance §4.3); the estimate **records into baseline SPM** (Demand assessment / cost plan); the licensing question (is SAM licensed?) handed to the **Licensing Specialist**; the one-time/ongoing fork handed back to scope.
@@ -608,7 +608,9 @@ into ServiceNow and standing up a basic SAM dashboard?
 
 ---
 
-## T-07 — agents/skills auto-sync on commit
+## T-07 — agents/skills auto-sync on commit  —  **RETIRED (ARC-02-S01)**
+
+> **RETIRED by ARC-02-S01.** This test exercised `scripts/sync-agents-skills.sh` and the `.githooks/` chain, which kept the root `skills/` and `agents/` mirrors equal to `.claude/`. Both mirrors and both mechanisms are deleted: there is one canonical copy under `.claude/`, so there is nothing left to sync and nothing left to verify. A replacement subject is defined in ARC-02-S13. The test text below is kept until then so the replacement can be written against what it replaces.
 
 **Covers:** Pre-commit hook auto-sync (Variant A)
 **Tiers:** Claude Code ✅
@@ -625,15 +627,15 @@ git commit -m "test: auto-sync"
 
 ### Expected behaviour
 
-1. Pre-commit hook detects mismatch between `.claude/agents/developer.md` and `agents/developer.md`.
+1. Pre-commit hook detects mismatch between `.claude/agents/developer.md` and `.claude/agents/developer.md`.
 2. Hook **automatically** runs `sync-agents-skills.sh` and stages the updated mirror.
-3. Commit succeeds and includes **both** `.claude/agents/developer.md` and `agents/developer.md`.
+3. Commit succeeds and includes **both** `.claude/agents/developer.md` and `.claude/agents/developer.md`.
 4. No manual intervention required.
 
 Output during commit:
 ```
 Auto-syncing agents/ and skills/ mirrors...
-UPDATED: agents/developer.md
+UPDATED: .claude/agents/developer.md
 Sync complete.
 Mirrors synced and staged automatically.
 ```
@@ -641,7 +643,7 @@ Mirrors synced and staged automatically.
 ### Pass criteria
 
 - Commit succeeds without any manual sync step.
-- Both `.claude/agents/developer.md` and `agents/developer.md` appear in the commit diff.
+- Both `.claude/agents/developer.md` and `.claude/agents/developer.md` appear in the commit diff.
 - `bash scripts/sync-agents-skills.sh --check` exits 0 immediately after commit.
 
 ### Fail signals
@@ -680,7 +682,7 @@ bash scripts/sync-agents-skills.sh --check
 echo "" >> .claude/agents/developer.md
 git add .claude/agents/developer.md
 git commit -m "test: auto-sync hook"
-git diff HEAD~1 HEAD --name-only   # should show both .claude/agents/developer.md and agents/developer.md
+git diff HEAD~1 HEAD --name-only   # should show both .claude/agents/developer.md and .claude/agents/developer.md
 
 # T-01 through T-10: manual — paste prompts into a fresh Claude session
 ```

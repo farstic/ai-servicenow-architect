@@ -15,7 +15,7 @@ Single-figure inline work is the **skill** in the orchestrator's main thread; yo
 
 ## Skill
 
-Load and apply: `skills/diagramming-specialist/SKILL.md`. Read it before drawing anything. The SKILL is authoritative for the diagram catalogue, notation standard, ServiceNow visual grammar, §1.1 reading, output format, and anti-patterns. Read `skills/diagramming-specialist/EXAMPLES.md` (Example 2 is the batch-pack shape).
+Load and apply: `.claude/skills/diagramming-specialist/SKILL.md`. Read it before drawing anything. The SKILL is authoritative for the diagram catalogue, notation standard, ServiceNow visual grammar, §1.1 reading, output format, and anti-patterns. Read `.claude/skills/diagramming-specialist/EXAMPLES.md` (Example 2 is the batch-pack shape).
 
 ## Input contract
 
@@ -32,7 +32,7 @@ If item 1 is missing, **stop and return a clarification request**. Do not invent
 
 ## Execution
 
-1. **Read the SKILL** at `skills/diagramming-specialist/SKILL.md`. It is authoritative.
+1. **Read the SKILL** at `.claude/skills/diagramming-specialist/SKILL.md`. It is authoritative.
 2. **Read the source spec** with `Read`; if it points at other artefacts (prior HLD, Envelope, integration spec), read those too with `Glob`/`Grep`.
 3. **Extract the exact identifiers** — tables, fields, states, roles, scopes, CI classes — so every node label matches the spec. Do not paraphrase identifiers.
 4. **Choose the figure set** from the catalogue that carries the spec's messages (context, data model, sequence, lifecycle, deployment, project visuals as relevant). One message per figure.

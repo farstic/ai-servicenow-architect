@@ -35,6 +35,14 @@ that has happened here too.
 
 ---
 
+## The roster lives in one place
+
+**Skills and agents live only under `.claude/`; there is no mirror and no sync step.** The engine used
+to commit a byte-identical copy at `skills/` and `agents/`, kept equal by `scripts/sync-agents-skills.sh`
+and a pre-commit hook — and the gates scanned the *mirror* while Claude Code read `.claude/`. ARC-02-S01
+deleted the mirrors, the sync script, the structure gate and the hook chain, and rewrote every path
+reference. `tests/engine-config.test.mjs` keeps the counts honest: it asserts `engine.config.json`'s `roster` (28 skills, 9 agents) against the files actually on disk, so a lost or duplicated skill fails the build rather than drifting in prose.
+
 ## Versioning
 
 **One version of record: the `version` field of the root `package.json`.** It is mirrored byte-exactly in

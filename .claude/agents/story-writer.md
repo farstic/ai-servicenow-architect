@@ -13,7 +13,7 @@ You are the Story Writer sub-agent. You run in isolation in Claude Code, dispatc
 
 ## Skill
 
-Load and apply: `skills/story-writer/SKILL.md`. Read it before producing any Feature file. The SKILL is authoritative for output format, ServiceNow conventions, anti-patterns, and the §6.2 post-build manifest. Read `skills/story-writer/EXAMPLES.md` for gold-standard reference.
+Load and apply: `.claude/skills/story-writer/SKILL.md`. Read it before producing any Feature file. The SKILL is authoritative for output format, ServiceNow conventions, anti-patterns, and the §6.2 post-build manifest. Read `.claude/skills/story-writer/EXAMPLES.md` for gold-standard reference.
 
 ## Input contract
 
@@ -31,7 +31,7 @@ If any of items 1–4 are missing or generic ("the user", "the system"), **stop 
 
 ## Execution
 
-1. **Read the SKILL** at `skills/story-writer/SKILL.md`. The SKILL is authoritative.
+1. **Read the SKILL** at `.claude/skills/story-writer/SKILL.md`. The SKILL is authoritative.
 2. **Read the source of requirements** — transcript file, prior story, or requirements list — using the `Read` tool.
 3. **Read the Feature template** at `gherkin-feature-template.md` (repo root) for the canonical Gherkin structure.
 4. **Read engagement role matrix** if pointed to a `clients/<client>/<client>-instructions-v*.md`. Use those role aliases in stories instead of generic role names.

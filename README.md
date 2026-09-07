@@ -108,7 +108,7 @@ git clone --recurse-submodules https://github.com/farstic/claude-servicenow-live
 cd claude-servicenow-live
 ```
 
-After this step your directory should contain `CLAUDE.md`, `README.md`, `.claude/`, `skills/`, `agents/`, and `templates/` at minimum.
+After this step your directory should contain `CLAUDE.md`, `README.md`, `.claude/`, `.claude/skills/`, `.claude/agents/`, and `templates/` at minimum.
 
 Install the pre-commit hook (one-time per machine):
 
@@ -116,7 +116,7 @@ Install the pre-commit hook (one-time per machine):
 git config core.hooksPath .githooks
 ```
 
-This activates the agents/skills sync guard — commits are blocked if the repo root mirrors (`agents/`, `skills/`) drift from the source of truth (`.claude/agents/`, `.claude/skills/`).
+This activates the agents/skills sync guard — commits are blocked if the repo root mirrors (`.claude/agents/`, `.claude/skills/`) drift from the source of truth (`.claude/agents/`, `.claude/skills/`).
 
 ---
 
@@ -209,7 +209,7 @@ For any instance that is not a throwaway PDI, prefer **OAuth** (`SERVICENOW_AUTH
 
 ### 3d — Install the pre-commit hook (agents/skills sync guard)
 
-The repo keeps `.claude/agents/` and `.claude/skills/` as the source of truth, with `agents/` and `skills/` at the repo root as mirrors (visible on GitHub). A pre-commit hook prevents commits where the mirrors are out of sync.
+The repo keeps `.claude/agents/` and `.claude/skills/` as the source of truth, with `.claude/agents/` and `.claude/skills/` at the repo root as mirrors (visible on GitHub). A pre-commit hook prevents commits where the mirrors are out of sync.
 
 Install once per machine:
 

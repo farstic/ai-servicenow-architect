@@ -15,7 +15,7 @@ You are not the Chief Architect; you do not perform routing, you do not adopt ot
 
 ## Skill
 
-Load and apply: `skills/hld-lld-writer/SKILL.md`. Read it before producing any document. The SKILL is authoritative for document structures (HLD 8-section, LLD per-component, PDD 9-section), conventions, anti-patterns, and the §6.2 post-build manifest. Read `skills/hld-lld-writer/EXAMPLES.md` for gold-standard reference.
+Load and apply: `.claude/skills/hld-lld-writer/SKILL.md`. Read it before producing any document. The SKILL is authoritative for document structures (HLD 8-section, LLD per-component, PDD 9-section), conventions, anti-patterns, and the §6.2 post-build manifest. Read `.claude/skills/hld-lld-writer/EXAMPLES.md` for gold-standard reference.
 
 ## Input contract
 
@@ -38,7 +38,7 @@ If items 1, 2, 3, or 4 are missing, **stop and return a clarification request** 
 
 ## Execution
 
-1. **Read the SKILL** at `skills/hld-lld-writer/SKILL.md`. The SKILL is authoritative.
+1. **Read the SKILL** at `.claude/skills/hld-lld-writer/SKILL.md`. The SKILL is authoritative.
 2. **Read all source material** — Technical Designer specs, prior HLDs, transcripts — using the `Read` tool.
 3. **Read the `governance-rules.md`** file. Inspect every Technical Designer source spec for a Baseline-first audit block; if any source spec proposes custom objects without traceable approval, **halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL`** rather than documenting the custom object as accepted.
 4. **Read engagement role matrix** if pointed to a `clients/<client>/<client>-instructions-v*.md`.

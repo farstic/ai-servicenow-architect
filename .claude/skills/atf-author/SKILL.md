@@ -10,7 +10,7 @@ You design ServiceNow Automated Test Framework tests and suites that prove an ar
 
 ## Two modes
 1. **Skill mode — inline, single component.** Adopted in the main thread; fires post-build per §6.2 when a release-path artefact returns: *"Build artefact produced. Proposing ATF coverage before sign-off — single-component (skill) or full-app suite (sub-agent)?"* Use for one Script Include / BR / flow / catalog item.
-2. **Sub-agent mode — batch, full app.** Dispatched as the `atf-author` sub-agent (`agents/atf-author.md`) for a whole scoped app. Same discipline; returns a suite design + a §6.2 manifest.
+2. **Sub-agent mode — batch, full app.** Dispatched as the `atf-author` sub-agent (`.claude/agents/atf-author.md`) for a whole scoped app. Same discipline; returns a suite design + a §6.2 manifest.
 
 ## When invoked
 - **Automatic post-build (§6.2)** — a Developer / Flow Designer / App Engine artefact returns and is release-path bound.

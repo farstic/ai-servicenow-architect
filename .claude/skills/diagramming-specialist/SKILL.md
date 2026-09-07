@@ -12,7 +12,7 @@ A diagram is a **representation artefact** (`.md` with Mermaid, draw.io `.drawio
 
 ## Two modes
 1. **Skill mode — inline, single diagram.** Adopted in the main thread; fires post-build per §6.2 when a design artefact returns: *"Design artefact produced. Proposing a Diagramming Specialist pass to render the architecture/process/data diagrams (Mermaid by default; draw.io or SVG for client-ready) before delivery — proceed?"* Use for one figure embedded in or alongside a doc.
-2. **Sub-agent mode — batch diagram pack.** Dispatched as the `diagramming-specialist` sub-agent (`agents/diagramming-specialist.md`) to produce the *full diagram set* for an HLD/LLD/programme — context + ERD + sequence + deployment + lifecycle, consistent across all figures. Returns the pack + a §6.2 manifest.
+2. **Sub-agent mode — batch diagram pack.** Dispatched as the `diagramming-specialist` sub-agent (`.claude/agents/diagramming-specialist.md`) to produce the *full diagram set* for an HLD/LLD/programme — context + ERD + sequence + deployment + lifecycle, consistent across all figures. Returns the pack + a §6.2 manifest.
 
 ## When invoked
 - **Automatic post-build (§6.2)** — an HLD/LLD Writer or Technical Designer artefact returns; offer to render its figures.

@@ -70,7 +70,7 @@ Fire automatically when the user request mentions any of:
 
 ## When NOT to use this skill
 
-- **Pure CMDB data-model design without Discovery involvement** → route to the **CMDB & CSDM Specialist** gateway (`skills/cmdb-csdm-specialist/SKILL.md`), which owns the CI/CSDM *model*. This skill owns CI *population* (Discovery/MID/patterns/Service Mapping execution). When a task spans both, both gateways co-fire and reconcile their envelopes.
+- **Pure CMDB data-model design without Discovery involvement** → route to the **CMDB & CSDM Specialist** gateway (`.claude/skills/cmdb-csdm-specialist/SKILL.md`), which owns the CI/CSDM *model*. This skill owns CI *population* (Discovery/MID/patterns/Service Mapping execution). When a task spans both, both gateways co-fire and reconcile their envelopes.
 - **ITSM (incident/problem/change) questions** → ITSM Specialist.
 - **CSM customer questions** → CSM Specialist.
 - **HRSD questions** → HRSD Specialist.
