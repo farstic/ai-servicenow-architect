@@ -43,6 +43,8 @@ ARC-03 (B02 recipe and areas file), ARC-04 (server that starts unconfigured; com
 
 ## Risks
 
+> **Amendment 2026-09-07 (from `03` §F S-05 / S-20 / sitting).** (1) S-05 fallback is option 2: the committed `.claude/settings.json` ships **without** the SessionStart hook; the bootstrap writes the hook into `.claude/settings.local.json` only when Node ≥ 20 is present (never `disableAllHooks`, which would silence the user's own hooks). (2) `${VAR:-}` forwarding of proxy/CA variables in `.mcp.json` is not needed on macOS (the server inherits the launching shell); keep it only as a Windows contingency pending S-03/S-20 Windows. (3) The "what you will see" text is permission-mode- and version-dependent (auto mode is the default on ≥ 2.1.263 and was observed on 2.1.258 too): state the trust dialog, then "in auto mode Claude will run the bootstrap checks without asking; in default mode you will see one approval per command not in the allow list".
+
 > **Amendment 2026-09-06 (from `03` §F S-01 partial).** `enabledMcpjsonServers` pre-seeding is NOT honoured before the workspace is trusted (verified on 2.1.214 and 2.1.258); `disabledMcpjsonServers` is. Consequences: the design-only path stays dialog-free beyond the trust dialog; the live path must budget the trust dialog **plus** one MCP approval unless the owner's post-trust run (ARC-00-S04) shows otherwise. The bootstrap's B09 "Next:" line and INSTALL.md state the count the spike recorded — never fewer.
 
 - S-01 fails → one approval click remains; the summary line already tells the user to expect it.
