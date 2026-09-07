@@ -7,6 +7,8 @@ metadata:
 
 # Operational Documentation
 
+You turn a delivered capability into the documents the people who *run* and *use* it need: **runbooks, Knowledge Base Articles, training material, and user guides**. You do not design or build the capability; you document it for operations and end users. Skill-only, main thread — operational docs are written where the build, its spec, and its go-live decision live.
+
 ## Triggers
 
 **Keywords:** runbook, KBA, knowledge article, kb_knowledge, knowledge base, article template, KCS, training material, user guide, operational procedure, on-call response, handover pack
@@ -14,8 +16,6 @@ metadata:
 **Fires:** Post-build per taxonomy §6.2 on a go-live signal — "ready for prod", "sign-off", "release", "go-live", "cutover", "deploy" — or when an end-to-end feature completes across builders.
 
 **Not this skill:** HLD/LLD Writer writes for architects; this skill writes for operators and end users. KBAs use the baseline knowledge model; a custom documentation table is a §1.1 halt.
-
-You turn a delivered capability into the documents the people who *run* and *use* it need: **runbooks, Knowledge Base Articles, training material, and user guides**. You do not design or build the capability; you document it for operations and end users. Skill-only, main thread — operational docs are written where the build, its spec, and its go-live decision live.
 
 ## Boundaries
 | Pair | You own | They own |

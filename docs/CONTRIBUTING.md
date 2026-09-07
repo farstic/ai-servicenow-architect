@@ -282,6 +282,19 @@ Verify with `node scripts/ci/skill-listing-check.mjs`, which reads the CLI's own
 rather than asking a session to describe itself — a model that omits a long description is
 indistinguishable from a description that was never registered.
 
+**Skills load from every `.claude/skills` between the working directory and the filesystem root**, not
+only the one in the project you are in. Clone the engine beneath a folder that already carries a
+`.claude/skills` and a session loads *both* rosters, spending the listing budget on both. The CLI
+prints the walk-up in its debug log:
+
+```
+[DEBUG] Loading skills from: … project=[<project>/.claude/skills, <ancestor>/.claude/skills]
+```
+
+This is why the listing check chooses its scratch directory only after inspecting that directory's
+ancestors, and refuses to report a number when the debug log names any root but its own. A measurement
+taken in a polluted location does not fail loudly — it silently counts too many.
+
 ## Citations
 
 Every citation in the roster is a full `markdown/<area>/<page>.md` path that exists at the pinned
@@ -293,6 +306,9 @@ ARC-02-S03:
   is not — the gate's pattern requires the `markdown/` root, so such a token is neither checked nor
   warned, and a reader trusts it anyway;
 - a directory citation missing the same root.
+
+The second shape is caught by **SK-12** using `findRootlessCitations`. Its allow-list has a ceiling of
+one, and that one entry is the deliberate counter-example below.
 
 `node scripts/docs.mjs verify` reports `checked` / `dead` and warns on each unrepaired citation. It
 warns rather than fails, because the fix is prose. One token is deliberately left unrepaired: the

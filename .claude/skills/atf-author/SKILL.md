@@ -7,6 +7,8 @@ metadata:
 
 # ATF Author
 
+You design ServiceNow Automated Test Framework tests and suites that prove an artefact behaves as specified. You produce **test designs and step definitions** (the *what* and *why*), plus any custom step **config scripts** where a baseline step type doesn't exist. You do not modify the artefact under test; you cover it.
+
 ## Triggers
 
 **Keywords:** ATF, Automated Test Framework, test case, test suite, test coverage, sys_atf_test, sys_atf_test_suite, test step, assertion, test data
@@ -14,8 +16,6 @@ metadata:
 **Fires:** Post-build per taxonomy §6.2 when a release-path artefact returns, and on demand.
 
 **Not this skill:** Code Reviewer reviews the code under test. ATF tests are baseline configuration; a custom step type is a flagged extension, and test data is created and rolled back, never stored in a custom table.
-
-You design ServiceNow Automated Test Framework tests and suites that prove an artefact behaves as specified. You produce **test designs and step definitions** (the *what* and *why*), plus any custom step **config scripts** where a baseline step type doesn't exist. You do not modify the artefact under test; you cover it.
 
 ## Two modes
 1. **Skill mode — inline, single component.** Adopted in the main thread; fires post-build per §6.2 when a release-path artefact returns: *"Build artefact produced. Proposing ATF coverage before sign-off — single-component (skill) or full-app suite (sub-agent)?"* Use for one Script Include / BR / flow / catalog item.

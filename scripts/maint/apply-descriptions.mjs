@@ -6,8 +6,12 @@
 //      (the SK-03 hazard: a YAML plain scalar ends at the first colon-space).
 //   2. top-level `version: x.y.z` removed and re-added as `metadata:\n  version: x.y.z`, preserving
 //      the value. operational-documentation has none today and receives 1.0.0.
-//   3. a `## Triggers` section inserted directly after the H1, carrying the keyword list, the firing
-//      statement and the boundary sentences moved out of the description — so nothing is lost.
+//   3. a `## Triggers` section carrying the keyword list, the firing statement and the boundary
+//      sentences moved out of the description — so nothing is lost. It is inserted immediately BEFORE
+//      the original first H2, NOT directly after the H1. Inserting it after the H1 leaves the skill's
+//      own preamble ("You are the App Engine Specialist…") sitting INSIDE the Triggers section, which
+//      changes what every paragraph belongs to while leaving the byte sequence intact — invisible to a
+//      whole-body diff, obvious to a section-wise one. It still ends up the first H2, so SK-11 holds.
 //
 // Deliberately NOT done: merging an existing `## When to use …` section into `## Triggers`. Those
 // headings answer different questions ("when do I adopt this persona" vs "what fires it, and what is
@@ -42,10 +46,17 @@ for (const dir of readdirSync(SKILLS_DIR).sort()) {
   const fmLines = raw.slice(4, end).split(nl);
   const body = raw.slice(end + nl.length + 4);
 
-  const version = (fmLines.find((l) => l.startsWith('version:')) ?? `version: ${DEFAULT_VERSION}`)
-    .slice('version:'.length).trim() || DEFAULT_VERSION;
+  // Read the version from wherever it currently lives. On a first run that is the top-level `version:`;
+  // on a re-run it has already moved under `metadata:`, and reading only the top-level key would
+  // silently reset every skill to the default — which is exactly what happened once.
+  const topLevel = fmLines.find((l) => l.startsWith('version:'));
+  const metaIdx = fmLines.findIndex((l) => l.startsWith('metadata:'));
+  const nested = metaIdx === -1 ? undefined
+    : fmLines.slice(metaIdx + 1).find((l) => /^\s+version:/.test(l));
+  const version = (topLevel ?? nested ?? `version: ${DEFAULT_VERSION}`).split(':').pop().trim() || DEFAULT_VERSION;
 
-  const kept = fmLines.filter((l) => !l.startsWith('version:') && !l.startsWith('description:'));
+  const kept = fmLines.filter((l) => !l.startsWith('version:') && !l.startsWith('description:')
+    && !l.startsWith('metadata:') && !/^\s+version:/.test(l));
   const nameIdx = kept.findIndex((l) => l.startsWith('name:'));
   kept.splice(nameIdx + 1, 0, `description: ${quote(spec.description)}`);
   const fm = [...kept, 'metadata:', `  version: ${version}`].join(nl);
@@ -62,14 +73,12 @@ for (const dir of readdirSync(SKILLS_DIR).sort()) {
     '',
   ].join(nl);
 
-  let newBody = body;
-  if (!/^## Triggers$/m.test(body)) {
-    const h1 = body.match(new RegExp(`^# .*${nl === '\r\n' ? '\r?' : ''}$`, 'm'));
-    if (!h1) throw new Error(`${dir}: no H1 to anchor the Triggers section`);
-    const at = body.indexOf(h1[0]) + h1[0].length;
-    const rest = body.slice(at).replace(/^(\r?\n)+/, '');
-    newBody = `${body.slice(0, at)}${nl}${nl}${triggers}${nl}${rest}`;
-  }
+  // Idempotent: strip any Triggers block this script placed before, then insert at the right anchor.
+  let newBody = body.replace(/^## Triggers\r?\n(?:\r?\n\*\*(?:Keywords|Fires|Not this skill):\*\*[^\n]*\r?\n)+\r?\n/m, '');
+  const h2 = newBody.match(/^## .*$/m);
+  if (!h2) throw new Error(`${dir}: no H2 to anchor the Triggers section before`);
+  const at = newBody.indexOf(h2[0]);
+  newBody = `${newBody.slice(0, at)}${triggers}${nl}${newBody.slice(at)}`;
 
   const out = `---${nl}${fm}${nl}---${nl}${newBody}`;
   if (out !== raw) {

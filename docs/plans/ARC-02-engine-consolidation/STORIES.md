@@ -143,6 +143,20 @@ Story order differs from the README's title list (which was written before the d
 **Risks / open points.** R-06: a shortened description can weaken auto-routing for a consult with many synonyms (licensing, estimation); mitigation is the `## Triggers` section and the S13 full run. If the per-listing budget (unknown mechanism) is a *total* budget rather than per-description, 28 × 500 = 14,000 chars may still overflow — the evidence file records the outcome and the fallback is a second pass at ≤ 300.
 **Definition of done.** Merged; lint green with empty allow-list; evidence file committed; `docs/CONTRIBUTING.md` "Writing a skill description" section added (the recipe above).
 
+
+> **Amendment 2026-09-08 (ruling on the S03 delivery).** **`## When to use` sections are NOT merged into
+> `## Triggers`.** The two headings answer different questions and both are load-bearing: `## Triggers`
+> says *what fires this skill and what it is not*; `## When to use` gives *adoption guidance* to a
+> reader who has already arrived. Merging them would also rewrite body prose, which criterion 3 exists
+> to forbid. `## Triggers` is inserted immediately **before** the original first H2 — not directly
+> after the H1, which leaves the skill's own preamble sitting inside the Triggers section (a change of
+> section membership that a whole-body diff cannot see; use a section-wise compare). It is still the
+> first H2, so SK-11 holds. Two further rulings folded in here: `scripts/maint/descriptions.mjs` does
+> **not** survive the ARC — SKILL.md frontmatter is the single source of truth for descriptions and a
+> second copy would drift, so it is deleted with the rest of `scripts/maint/` per S01, with git history
+> keeping it; and the rootless-citation class (`<area>/…` with no `markdown/` root) is closed **in this
+> story** as SK-12, not deferred to ARC-05.
+
 ### ARC-02-S04 — Agent frontmatter: `model: inherit`, `skills:` preload, `tools:` unchanged; §6.2 regression run
 **As** a maintainer **I want** the nine sub-agents to inherit the session's model and preload their persona skill through the documented `skills:` field **so that** no agent carries a hidden model dependency, no agent reads its persona by file path, and builders still cannot reach MCP tools.
 **Context.** P-10 (`00` §3.4: all nine pin `model: claude-opus-4-8`; they read `skills/<x>/SKILL.md` by path instead of the `skills:` preload; `docs:sub-agents` offers `inherit` and `skills:`). DR-13 (`01` §18): explicit `tools:` retained, `model: inherit`, `skills:` preload. ARC README acceptance criterion 7 ("every agent runs with `model: inherit` and loads its persona through `skills:`; a dispatched Developer sub-agent produces the same artefact structure as before"). The colon-space hazard rule (README story 4) is implemented in S02 (`AG-02`) and switched on here together with `AG-04`/`AG-05`.

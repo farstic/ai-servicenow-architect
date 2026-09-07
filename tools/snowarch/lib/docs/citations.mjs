@@ -107,6 +107,27 @@ function* walk(dir) {
   }
 }
 
+// A token that carries its area but not the `markdown/` root — `platform-security/access-control/x.md`
+// rather than `markdown/platform-security/access-control/x.md`. It looks checkable and is not: the
+// CITATION pattern requires the root, so the gate neither checks nor warns, and a reader trusts it
+// anyway. ARC-02-S03 found 11 of these behind a clean `dead: 0`. `areas` is the set from
+// vendor/docs-areas.txt, with or without the `markdown/` prefix.
+export function findRootlessCitations(text, file = '<inline>', areas = new Set()) {
+  const bare = new Set([...areas].map((a) => a.replace(/^markdown\//, '')));
+  const out = [];
+  text.split('\n').forEach((line, i) => {
+    for (const m of line.matchAll(/`([a-z0-9][a-z0-9-]*\/[A-Za-z0-9._/-]+)`/g)) {
+      const token = m[1];
+      if (token.startsWith('markdown/')) continue;
+      if (!bare.has(token.split('/')[0])) continue;
+      if (!/\.md$|\/$/.test(token)) continue;
+      out.push({ file, line: i + 1, raw: token,
+        reason: `citation carries its area but not the markdown/ root — the gate cannot check "${token}"` });
+    }
+  });
+  return out;
+}
+
 export function scanRepo({ root = process.cwd(), roots = DEFAULT_ROOTS, legacy = false } = {}) {
   const all = legacy ? [...roots, ...LEGACY_ROOTS] : roots;
   const citations = [], warnings = [], skipped = [], scanned = [];

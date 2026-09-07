@@ -224,3 +224,33 @@ with their descriptions.
 The story's fallback — shorten to ≤ 300 characters and re-test, then escalate to moving persona
 routing into `CLAUDE.md` — was not needed. ≤ 500 with the trigger material moved into a `## Triggers`
 body section cleared the budget with room to spare.
+
+## Addendum — skills load from every `.claude/skills` up the tree (2026-09-08)
+
+Found while the architect re-verified this story on a fresh clone: the measurement returned **56** where
+28 was expected, and the script reported OK on it.
+
+Claude Code discovers project skills from **every** `.claude/skills` between the working directory and
+the filesystem root. A scratch project created beneath a directory that already carries one loads both
+rosters. The CLI prints the walk-up itself:
+
+```
+[DEBUG] Loading skills from: managed=…, user=…, project=[<scratch>/.claude/skills, <ancestor>/.claude/skills]
+[DEBUG] Loaded 30 unique skills (… project: 29 …)
+```
+
+Reproduced deliberately with a one-skill decoy in an ancestor: `project: 29` instead of 28.
+`env -u CLAUDE_PROJECT_DIR` changes nothing — it is the directory walk-up, not an environment variable.
+
+Two consequences:
+
+1. **For the measurement.** `scripts/ci/skill-listing-check.mjs` now picks its scratch parent only after
+   inspecting that directory's ancestors, requires the debug log's `project=[…]` list to name exactly
+   its own scratch directory, and SKIPS with the polluting paths named when no clean parent exists. It
+   compares the count to `engine.config.json` and reports FAILED, not OK, on a mismatch — the earlier
+   version printed OK on 56 because only the test compared, and the two disagreed.
+2. **For the product.** This is not a test artefact. A user who clones the engine beneath a folder that
+   already has `.claude/skills` gets both sets, and both spend the same listing budget measured above.
+   Recorded as an S-13 addendum row in `docs/plans/03-RISKS-AND-UNKNOWNS.md` §F; a doctor check for it
+   is owned by ARC-04.
+

@@ -1,5 +1,10 @@
 // ARC-02-S03 — the rewritten skill descriptions and the trigger material moved out of them.
 //
+// THROWAWAY. This file is deleted with the rest of scripts/maint/ at the end of the ARC (S01), and it
+// is NOT a second source of truth in the meantime: SKILL.md frontmatter is authoritative for every
+// description, and a copy that outlived the rewrite would drift from it silently. It exists so the 28
+// rewrites could be authored and applied in one reviewable place. Git history keeps it.
+//
 // Recipe (story ARC-02-S03): sentence 1 is the trigger sentence — "Use when …" for builders,
 // reviewers and consults, "Mandatory gateway for …" for the five Domain Experts. Sentence 2 says what
 // the skill produces. An optional third sentence carries the one boundary that prevents mis-routing.

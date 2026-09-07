@@ -7,6 +7,7 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, basename } from 'node:path';
 import { parseFrontmatter, asList } from './frontmatter.mjs';
+import { findRootlessCitations } from '../../tools/snowarch/lib/docs/citations.mjs';
 
 export const MAX_DESCRIPTION = 500;
 export const ALLOWED_TOP_LEVEL = new Set(['name', 'description', 'allowed-tools', 'argument-hint',
@@ -103,6 +104,21 @@ export function lintPaths({ root, files }) {
         if (!existsSync(join(root, m[1]))) fail.push(`SK-10 ${rel}:${i + 1}: dead path ${m[1]}`);
       }
     });
+  }
+  return fail;
+}
+
+// SK-12 — a citation that carries its area but not the `markdown/` root. See findRootlessCitations:
+// it is invisible to the gate, so `dead: 0` never covered it. Exempt only with a recorded reason.
+export function lintRootless({ root, files, areas, allow = [] }) {
+  const fail = [];
+  for (const rel of files) {
+    const p = join(root, rel);
+    if (!existsSync(p)) continue;
+    for (const w of findRootlessCitations(readFileSync(p, 'utf8'), rel, areas)) {
+      if (allow.some((a) => a.file === rel && a.citation === w.raw)) continue;
+      fail.push(`SK-12 ${rel}:${w.line}: ${w.reason}`);
+    }
   }
   return fail;
 }

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { lintSkills, lintPaths, lintVocabulary, MAX_DESCRIPTION } from './lib/lint-rules.mjs';
+import { lintSkills, lintPaths, lintVocabulary, lintRootless, MAX_DESCRIPTION } from './lib/lint-rules.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const json = (p) => JSON.parse(readFileSync(join(root, p), 'utf8'));
@@ -99,6 +99,27 @@ test('SK-09 the governing documents are still dirty — that surface belongs to 
   for (const x of f) { const k = x.slice(6).split(':')[0]; byFile[k] = (byFile[k] ?? 0) + 1; }
   console.log(`    SK-09 outstanding for S06: ${f.length} hit(s) — ${Object.entries(byFile).map(([k, v]) => `${k} ${v}`).join(', ')}`);
   assert.ok(f.length > 0, 'the governing docs are already clean — enable SK-09 over GOVERNING too and delete this test');
+});
+
+const AREAS = new Set(readFileSync(join(root, 'vendor/docs-areas.txt'), 'utf8').split('\n').filter(Boolean));
+const rootlessAllow = json('tests/fixtures/rootless-citation-allowlist.json').allow;
+
+test('SK-12 no citation carries its area without the markdown/ root', () => {
+  const f = lintRootless({ root, files: SURFACE, areas: AREAS, allow: rootlessAllow });
+  assert.equal(f.length, 0, `${f.length} rootless citation(s):\n  ${f.join('\n  ')}`);
+  assert.ok(rootlessAllow.length <= 1, `SK-12 allow-list grew to ${rootlessAllow.length} (ceiling 1)`);
+  console.log(`    SK-12: ${SURFACE.length} file(s) clean, ${rootlessAllow.length} recorded exemption(s)`);
+});
+
+test('SK-12 the one exemption is load-bearing, and the agent prose does not match', () => {
+  const withOut = lintRootless({ root, files: SURFACE, areas: AREAS });
+  assert.equal(withOut.length, rootlessAllow.length, 'the exemption must suppress exactly one real hit');
+  assert.match(withOut[0], /servicenow-platform\/security\//);
+  // The four agent files end their URL at `.../markdown`, which is not area-prefixed and must not match.
+  const agents = SURFACE.filter((f) => f.startsWith('.claude/agents/'));
+  assert.deepEqual(lintRootless({ root, files: agents, areas: AREAS }), [],
+    'the `.../markdown` prose in the agent files must not be flagged');
+  console.log(`    SK-12: exemption covers ${withOut.length} hit — ${rootlessAllow[0].reason.split('.')[0]}.`);
 });
 
 test('SK-10 every .claude path quoted in a skill body, agent body or roster doc resolves', () => {
