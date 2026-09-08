@@ -7,14 +7,14 @@ ARC-07-S10 replaces the probe wording with what the wizard prints; every server 
 
 **`design-only`** — no instance is configured. Everything works from `vendor/ServiceNowDocs`, the MCP write rules are
 dormant, and `/mcp` shows `servicenow` disabled for this project. **`live`** — one or more instances in
-`.local/instances.json`, each with its own preset. See which with `/snowarch status` or `./snowarch doctor --quick`: the
-doctor's `Mode:` line is the statement of record, because a disabled family is still advertised in the tool list. Switch
-with `./snowarch mode live` / `./snowarch mode design`; the first instance arrives through `/snowarch setup-instance` or
-`./snowarch instance add`.
+`.local/instances.json`, each with its own preset. See which with `/snowarch status` or `./snowarch doctor --quick`:
+the doctor's `Mode:` line is the statement of record, because a disabled family is still advertised in the tool list.
+Switch with `./snowarch mode live` / `./snowarch mode design`; the first instance arrives through `/snowarch
+setup-instance` or `./snowarch instance add`.
 
-Flags belong to the **instance you are addressing**, not to the server process: one server can hold a PDI and a production
-instance at once, and `snow_core_instance_switch prod` makes the next write refuse while the same call on the PDI still
-succeeds.
+Flags belong to the **instance you are addressing**, not to the server process: one server can hold a PDI and a
+production instance at once, and `snow_core_instance_switch prod` makes the next write refuse while the same call on
+the PDI still succeeds.
 
 ## 2. Presets
 
@@ -33,9 +33,9 @@ plus `toolPackage: "full"` and `maxRecords: 100`. Stored `flags` disagreeing wit
 
 ## 3. What the system proposes
 
-The wizard never silently applies a preset. For a `pdi` / `dev` / `test` instance it *proposes* `full` — non-
-production environments start with every capability available (D-05) — then shows a per-flag review screen, each flag
-pre-set ON and annotated with its live probe result:
+The wizard never silently applies a preset. For a `pdi` / `dev` / `test` instance it *proposes* `full` —
+non-production environments start with every capability available (D-05) — then shows a per-flag review screen, each
+flag pre-set ON and annotated with its live probe result:
 
 ```
 Proposed preset for "pdi" (pdi): full  — non-production: everything on
@@ -72,9 +72,9 @@ are writes, so declaring either without `WRITE_ENABLED` is a contradiction, reso
 dependent flag is treated as `false`, `FLAG_DEPENDENCY_VIOLATION` says so, and the file on disk is never modified by
 the server.
 
-Upgrading from the 1.0.0 server: SCRIPTING used to gate *reads* too, so listing a Script Include needed a write
-flag. It no longer does. If you relied on that to keep script bodies out of a session, the control you want is a role-
-restricted ServiceNow account — the flag was never a confidentiality boundary, and treating it as one hid that.
+Upgrading from the 1.0.0 server: SCRIPTING used to gate *reads* too, so listing a Script Include needed a write flag.
+It no longer does. If you relied on that to keep script bodies out of a session, the control you want is a
+role-restricted ServiceNow account — the flag was never a confidentiality boundary, and treating it as one hid that.
 
 ## 5. Production safeguards
 
@@ -83,9 +83,9 @@ threshold is **any** flag raised, not just `WRITE_ENABLED` — a `custom` prod i
 runs tests against production, and the acknowledgement is about having chosen that. Raising it requires `./snowarch
 instance set-preset <label> <preset> --ack-prod`, with the label typed.
 
-Without it the instance is **not loaded**, but still appears in the listing with its reason — "it is not there" is a worse
-answer than "here is why it is not usable". Every refusal names the instance for the same reason: with several configured,
-"writes are disabled" is not actionable on its own. Both carry the command that changes it:
+Without it the instance is **not loaded**, but still appears in the listing with its reason — "it is not there" is a
+worse answer than "here is why it is not usable". Every refusal names the instance for the same reason: with several
+configured, "writes are disabled" is not actionable on its own. Both carry the command that changes it:
 
 ```
 [WARN] instance "prod": environment=prod with preset full but prodWriteAck is not true — not loaded.
@@ -147,8 +147,8 @@ is group or world **write** — replacing the file, or planting a symlink where 
 | any other group/world bit (e.g. 0755) | loads, with a warning |
 | 0700 | silent |
 
-On Windows the check is skipped and the log says `file modes: ACL-inherited (Windows)`: permissions there are ACL-
-inherited and the POSIX bits Node reports are synthetic, so asserting on them would fail for a protected file.
+On Windows the check is skipped and the log says `file modes: ACL-inherited (Windows)`: permissions there are
+ACL-inherited and the POSIX bits Node reports are synthetic, so asserting on them would fail for a protected file.
 
 Writes are atomic — temp file in the same directory, `fsync`, `rename` over the target — so a reader never sees a
 half-written store. Paths in logs are masked, home to `~` and the checkout to `<checkout>`: a log line reaches screen
