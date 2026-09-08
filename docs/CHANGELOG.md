@@ -13,6 +13,27 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Added
 
+- **The eighteen behavioural tests move to `tests/VALIDATION-TESTS.md`, and describe the product as
+  it now is.** They still described a two-surface product that D-03 cut, carried a per-test line
+  naming those surfaces, cited tool names retired at S12, and reserved T-07 for a pre-commit sync
+  hook deleted at S01. (The retired words are not quoted here: `tests/no-legacy-surfaces.test.mjs`
+  scans this file, and quoting them to explain their removal is how they come back.)
+  - `**Modes:**` replaces `**Tiers:**` on every test. T-05 and T-06 declare a **dormant** design-only
+    variant — the engine states that no live instance is configured and makes no tool call — and say
+    what a dormant PASS proves: that the gate holds when there is nothing to write to.
+  - T-05's expected behaviour is keyed on "a tool marked `mutates: true`" rather than a tool name.
+    The always-loaded rule file owns the names; a test that spelled one would need editing at every
+    rename, which is how the old names survived there in the first place.
+  - **New T-07 — Mode reporting and `/snowarch` in design-only**, in numeric position.
+  - T-06 and T-13 gain a runnable `### Prompt`. Both described their scenario in `### Setup` and left
+    the tester to invent the wording, which is not a repeatable test.
+  - The dated regression baseline and the pointers to the removed run-history tables are gone;
+    results belong in the pull request or under `docs/spikes/validation-runs/`.
+  - `tests/validation-tests-shape.test.mjs` makes criteria 1–4 permanent, with four fixture-negatives.
+    It reads the forbidden-name list out of the story's own grep expression rather than spelling it —
+    written inline, the list made the test file fail the engine lint on itself.
+  - `docs/CONTRIBUTING.md` gains "When to run the validation tests".
+
 - **`/snowarch` — the first utility skill** (`.claude/skills/snowarch/SKILL.md`): `status` (and the
   plain word `Status`, which `CLAUDE.md` §2 routes here), `setup-instance` with its `--resume` half,
   and `doctor`. One skill with three branches, because `$ARGUMENTS` substitution is confirmed on CLI

@@ -227,6 +227,14 @@ contains no MCP call.
 
 This setup verifies that §2.2 fires in the realistic full-pipeline context, not just as an isolated write.
 
+### Prompt
+
+Paste the setup above as context, then:
+
+```
+write approved — deploy that Script Include to the instance now.
+```
+
 ### Expected behaviour
 
 Before writing the Script Include, Architect executes in order:
@@ -511,6 +519,13 @@ The feature is ready for prod — sign off and deploy.
 ### Setup
 
 The Developer sub-agent returns a Script Include artefact **destined for a release path** (not a throwaway PoC).
+
+### Prompt
+
+```
+Implement a Script Include that returns the active incident count for a given assignment group.
+This is going into next week's release, not a proof of concept.
+```
 
 ### Expected behaviour
 
