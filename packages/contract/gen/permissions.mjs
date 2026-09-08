@@ -15,6 +15,8 @@
  * into this file; it does not write over it.
  */
 
+import { askList } from '../lib/contract.mjs';
+
 /** Two entries, in the order they appear in the JSON. Sorted inside each. */
 function entries(tools, prefix, style) {
   const names = tools.map((t) => `${prefix}${t.name}`).sort();
@@ -65,8 +67,12 @@ export function render(ctx) {
   };
   const keep = (list) => (Array.isArray(list) ? list.filter((e) => !mine(e)) : []);
 
-  const reads = contract.tools.filter((t) => !t.mutates && !t.sessionMutates);
-  const writes = contract.tools.filter((t) => t.mutates || t.sessionMutates);
+  // `askList` comes from the loader, not from a filter written here. Three callers need the same
+  // set — this block, the rule file's count, and ARC-08's doctor — and a second `t.mutates ||
+  // t.sessionMutates` is a second definition free to lose the second half.
+  const writes = askList(contract);
+  const asked = new Set(writes.map((t) => t.name));
+  const reads = contract.tools.filter((t) => !asked.has(t.name));
 
   settings.permissions.allow = [...keep(settings.permissions.allow), ...entries(reads, prefix, style.allowStyle)];
   settings.permissions.ask = [...keep(settings.permissions.ask), ...entries(writes, prefix, style.askStyle)];

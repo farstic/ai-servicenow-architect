@@ -657,6 +657,23 @@ same list `--check` prints.
 
 ---
 
+## Engine tooling imports the loader; never a list
+
+Anything outside `packages/snowarch` that needs a flag name, a preset, a tool's gate or an error
+code's remedy imports `packages/contract/lib/contract.mjs`. Not a constant of its own, not a copy in
+a comment, not `['WRITE_ENABLED', …]` at the top of a wizard. `tests/contract/no-literals.test.mjs`
+scans `tools/snowarch/**`, `packages/contract/gen/**` and `packages/contract/lint/**` for every name
+the contract owns — loaded from the contract at test time, so the guard grows with the catalogue
+instead of being a second list itself — and it runs in `npm run lint:contract`.
+
+Four places are allow-listed, each prose keyed by a name (the `Use it when…` advice for a preset,
+and the one error code the doctor reports specially). The ceiling is four: a fifth needs an argument
+rather than an edit, and the entry has to say why the name cannot come from the contract. A
+`mcp__${serverKey}__` template is not a literal and is never a hit — that construction is the fix,
+not the problem; a hard-coded `mcp__servicenow__` is.
+
+---
+
 ## The contract gate
 
 `npm run contract` is four checks in one command, and the same command runs in CI, before a release

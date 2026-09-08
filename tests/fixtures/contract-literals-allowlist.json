@@ -1,0 +1,25 @@
+{
+  "_rule": "ARC-05-S10's no-literal-names guard. Engine tooling reads names from the contract loader, never from a list of its own. These four places hold a name for a reason that survives the rule: each is PROSE keyed by a name, iterating the contract for the data. Every entry names the file, the literal it excuses, and why. The ceiling is 4 — a fifth needs an argument, not an edit.",
+  "allow": [
+    {
+      "file": "packages/contract/gen/presets.mjs",
+      "literals": ["read-only", "pdi-developer", "full", "custom"],
+      "reason": "The `Use it when…` column: advice about when to choose a preset, which no amount of flag data implies. The rows come from contract.presets; a preset with no entry renders an empty cell rather than a wrong one, and the coverage assertion below notices."
+    },
+    {
+      "file": "packages/contract/gen/protocols.mjs",
+      "literals": ["read-only", "pdi-developer", "full"],
+      "reason": "The same advice column in the long-form document. Same shape, same reason."
+    },
+    {
+      "file": "packages/contract/gen/rule-file.mjs",
+      "literals": ["read-only", "pdi-developer", "full", "custom"],
+      "reason": "The short preset gloss in the always-loaded rule file — `read-only (none)`, `full (all six)`. Prose, keyed by name; the names iterated are the contract's."
+    },
+    {
+      "file": "packages/contract/gen/troubleshooting.mjs",
+      "literals": ["FLUENT_NOT_INSTALLED"],
+      "reason": "The `Also reported by` rule: the doctor checks PATH for the SDK, so this one code is reported by the doctor while the rest of its family is not. A structural signal would be a guess; the exception is one line and says which code and why."
+    }
+  ]
+}
