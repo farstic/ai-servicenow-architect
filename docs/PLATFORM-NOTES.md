@@ -34,9 +34,11 @@ suppresses delivery but keeps the record, which is the correct outcome for a tes
 **Grounding:** none in ServiceNowDocs (`markdown/platform-administration/activate-email-service.md`
 for the baseline concept); observed behaviour
 **Evidence:** observed on PDI; regression test — none (platform, not server)
-**Engine consequence:** the Developer skill's default for any server-side handler that sends mail is
-the GlideRecord insert, not `gs.sendEmail()` — on a PDI the latter cannot be verified at all, and a
-design whose test plan says "check `sys_email`" would be untestable where it is most often tested.
+**Engine consequence:** designs keep baseline Notifications and events (§1.1). The Developer skill and
+the ATF Author put the PDI limitation in the **test strategy**: on a PDI, neither `gs.sendEmail()` nor
+an event-driven notification leaves a `sys_email` row, so a test plan that says "check `sys_email`" is
+untestable there — verify on a non-PDI instance, or insert a `sys_email` row as an explicit test
+fixture, never as the implementation.
 
 ## PN-03 — `action=DELETE` rows in an update set are normal and cannot be removed
 

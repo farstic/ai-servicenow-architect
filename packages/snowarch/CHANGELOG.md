@@ -464,7 +464,7 @@ that is whoever opened one last, and the engagement's objects landed in a strang
 set `is_default: true`, which does nothing for REST capture at all.
 
 **New: `snow_us_capture_target_set`.** REST writes are captured according to the authenticated user's
-`sys_user_preference` `name=sys_update_set` (`docs/nowaikit-field-notes.md` §1). This tool sets it, in
+`sys_user_preference` `name=sys_update_set` (`docs/PLATFORM-NOTES.md` PN-01). This tool sets it, in
 four steps: read the update set (refusing one that is not `in progress`), resolve the account in
 `sys_user`, look for an existing preference, then PATCH or POST it. Neither tool's response carries the
 user name.
