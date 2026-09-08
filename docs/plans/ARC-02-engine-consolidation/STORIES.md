@@ -195,6 +195,17 @@ Story order differs from the README's title list (which was written before the d
 **Risks / open points.** If `skills:` preload does not include content the agent relied on reading by path (it preloads `SKILL.md`, not `EXAMPLES.md`), the explicit `EXAMPLES.md` read keeps behaviour equal. If `inherit` makes a smaller session model produce a structurally different artefact, the baseline diff catches it and the fallback is `model: opus` (alias, still not a pinned ID) — decision recorded in the PR.
 **Definition of done.** Merged; lint green; `docs/ARCHITECTURE.md` "Sub-agents" paragraph states the three invariants (explicit tools, inherit, skills preload).
 
+> **Amendment 2026-09-08 (ruling on the S04 delivery). Criterion 4's structure comparison is the
+> SEVEN-ELEMENT CONTRACT SET, not heading equality.** Literal heading equality does not discriminate:
+> two captures of the same unchanged tree (6e77019) returned 7 and 5 H2 sections respectively — two
+> whole sections appearing and vanishing with no input change, because heading wording is model output.
+> What does not vary is the agent body's own Output contract, and that is what a regression check must
+> compare: a fenced JavaScript block; a suggested file path; the artefact type; a spec compliance
+> statement; decisions made; a `§6.2 … manifest` heading; and the manifest's verbatim proposal line.
+> Measured across four captures (2 before, 2 after the S04 change) all seven were present in all four
+> while the H2 count ran 7 / 5 / 5 / 5. The harness still prints the H2 listing — as information for
+> the reader, never as an assertion.
+
 ### ARC-02-S05 — Remove context-mode, the claude.ai surface, the settings example, the 9-step README manual; disposition of legacy docs
 **As** an individual practitioner **I want** the repository to contain nothing that describes a surface I cannot install or a tool I do not have **so that** the only install narrative is the one that works (ARC-06's page) and no personal tooling breaks my session.
 **Context.** D-03 items 8 and 9 (claude.ai "Tier 1" surface; context-mode); P-02 (three contradictory install narratives, `README.md:161-262,325-379`), P-07 (`claude-ai-projects/` never shipped; skills carry keys claude.ai rejects), P-14 (`.claude/settings.example.json` with context-mode hooks; `README.md:227-253` §3e), P-13 (engagement journals as product docs — the field notes are handled in S10, `LIVE-ARTEFACTS-CATALOGUE.md` is purged by ARC-01-S10). ARC README deliverable 7 and acceptance criterion 5 (`grep -rn "context-mode\|ctx_\|claude_desktop_config\|claude-ai-projects"` returns nothing outside `docs/ARCHITECTURE.md` history notes). `01` §3 fixes the target `docs/` set: `INSTALL.md`, `MODES-AND-PRESETS.md`, `TROUBLESHOOTING.md`, `PLATFORM-NOTES.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `CHANGELOG.md` — every other legacy document needs an explicit disposition.

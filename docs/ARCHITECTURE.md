@@ -61,7 +61,7 @@ ai-servicenow-architect/                      farstic/ai-servicenow-architect ·
 └── .local/                                   GITIGNORED per-checkout state: instances.json (0600) · config.json · bootstrap-state.json · doctor-last.json · audit.jsonl · logs/
 ```
 
-Not in the repository: any client engagement content (`clients/` stays gitignored and per checkout), `.claude/settings.local.json`, `.env`, the author's context-mode hooks, the Electron desktop app, the other-client guides.
+Not in the repository: any client engagement content (`clients/` stays gitignored and per checkout), `.claude/settings.local.json`, `.env`, the author's personal hook tooling (see the retired-name glossary below), the Electron desktop app, the other-client guides.
 
 ## Directory → owner ARC
 
@@ -103,6 +103,39 @@ The nine sub-agents under `.claude/agents/` hold three invariants, each enforced
   explicitly — verified in the ARC-02-S04 regression: the sub-agent read `SKILL.md` before the change
   and only `EXAMPLES.md` after it.
 
+## Engine
+
+**Audience split.** This document is for people changing the repository. The engine's own operating
+rules — how the Chief Architect routes, what each specialist owns, what a builder must return — live in
+`CLAUDE.md` and `governance/`, and are read by the model at runtime, not by a maintainer at design time.
+
+**The routing protocol has two phases and the gateways fire in both.** Phase 1 is routing-time: restate
+the task, read engagement context, surface assumptions, evaluate the §1.1 Baseline-First rule, and — if
+the task touches a domain a Domain Expert gateway covers — produce that gateway's 5-Part Constraint
+Envelope before any builder is dispatched. Phase 2 is post-build: hold the returned artefact, inspect it
+for §1.1 violations, re-fire the same Domain Expert in review mode against the Envelope, then evaluate
+the post-build consults. **The gateways fire twice per request** — Phase 1 Step 5 and Phase 2 Step 4 —
+and that is what stops a builder quietly substituting a custom object for the baseline one the Envelope
+named.
+
+**The §6.2 hook** is the post-build consult evaluation: a returned artefact containing a JavaScript block
+proposes a Code Reviewer pass; a release-path artefact proposes ATF coverage; a go-live signal proposes
+operational documentation; a design artefact proposes diagrams. The proposal is mandatory even though the
+user may decline it — skipping the proposal is the architectural defect, not declining it.
+
+**§1.1 Baseline-First** is the most consequential rule: no custom table, scoped app, state extension or
+other major custom architectural object without explicit approval, and **the user's original request does
+not constitute that approval**. A gateway that cannot map a request onto a baseline construct returns
+Verdict C and the dispatch halts — no design artefact is produced in the same turn as the open question.
+
+**The roster** — how many skills and agents ship, and what each one is — is generated from the tree
+rather than restated here; see the roster block (ARC-02-S07) and `engine.config.json`.
+
+**Live-instance execution** adds two gates in a fixed order: the write-approval gate, then update-set
+capture. Both are stated normatively in `governance/mcp-protocols.md` (ARC-05); a mutating call without
+an explicit approval in the current conversation halts, and a configuration write before the update-set
+preference is set cannot be captured retroactively.
+
 ## History
 
 | Commit / tag | What |
@@ -129,6 +162,24 @@ prefix without recording a rename, so `git log --follow -- packages/snowarch/src
 the engine import — makes the ordinary query work.
 
 ---
+
+### Retired names
+
+The only place these may be named. Each line carries the marker ARC-05's lint grep excludes, so the
+glossary can say what a name *was* without the ratchet reading it as a relapse.
+
+| Retired name | What it was | Replaced by |
+|---|---|---|
+| `claude-servicenow-live` | the engine's repository before the v3 rebuild | this repository <!-- retired-name: historical --> |
+| `nowaikit` | the MCP server's product name in the v2 line | `snowarch` <!-- retired-name: historical --> |
+| `context-mode` | the author's personal hook tooling, wired into the settings example and the README install steps | nothing — a personal dependency the product must not carry <!-- retired-name: historical --> |
+| `claude-ai-projects/` | a planned directory of claude.ai project-instruction templates | never shipped; the claude.ai surface is out of scope (D-03) <!-- retired-name: historical --> |
+| Tier 0 / 1 / 2 | the permission and surface vocabulary of the v2 line | Modes and Presets (`docs/MODES-AND-PRESETS.md`, S09) <!-- retired-name: historical --> |
+| `claude_desktop_config.json` | the Claude Desktop registration path in the v2 install narrative | the server registers itself; `docs/INSTALL.md` (ARC-06) <!-- retired-name: historical --> |
+
+`docs/IMPORT-NOTES.md` was **deleted, not folded here**: S05 expected repository-import history and it
+held diagram conventions for five `.drawio` files its own status note records as never committed. The
+palette and draw.io/Lucidchart rules it carried live in `.claude/skills/diagramming-specialist/`.
 
 ## The D-03 cut ledger
 

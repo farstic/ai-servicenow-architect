@@ -122,8 +122,21 @@ test('SK-12 the one exemption is load-bearing, and the agent prose does not matc
   console.log(`    SK-12: exemption covers ${withOut.length} hit — ${rootlessAllow[0].reason.split('.')[0]}.`);
 });
 
+const forthcoming = json('tests/fixtures/forthcoming-paths.json').allow;
+
+test('SK-10 a forthcoming path is exempt only where its story is named, and the ceiling holds', () => {
+  assert.ok(forthcoming.length <= 1, `SK-10 forthcoming list grew to ${forthcoming.length} (ceiling 1)`);
+  for (const f of forthcoming) {
+    assert.match(String(f.created_by), /^ARC-\d\d-S\d\d$/, `${f.path} names no creating story`);
+    assert.ok(!existsSync(join(root, f.path)), `${f.path} exists now — remove the entry, ${f.created_by} has landed`);
+    const hits = lintPaths({ root, files: [f.file] });
+    assert.ok(hits.some((h) => h.includes(f.path)), `the entry for ${f.path} suppresses nothing`);
+  }
+  console.log(`    SK-10: ${forthcoming.length} forthcoming path(s), each with a creating story`);
+});
+
 test('SK-10 every .claude path quoted in a skill body, agent body or roster doc resolves', () => {
-  const f = lintPaths({ root, files: SURFACE });
+  const f = lintPaths({ root, files: [...SURFACE, 'README.md'], forthcoming });
   assert.equal(f.length, 0, `${f.length} dead path(s):\n  ${f.join('\n  ')}`);
   console.log(`    SK-10: checked ${SURFACE.length} markdown file(s)`);
 });

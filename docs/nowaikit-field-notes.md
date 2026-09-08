@@ -236,7 +236,7 @@ alongside the handler (Script Action) and trigger (Business Rule) deletions.
 
 ## 8. MCP Config Reference
 
-Required env vars in `claude_desktop_config.json` (instance URL stored locally in MEMORY.md):
+Required env vars, wherever the MCP client stores its server configuration (instance URL kept locally, never committed):
 
 ```
 SERVICENOW_INSTANCE_URL: <your-instance>.service-now.com

@@ -85,6 +85,17 @@ Not in the repository: any client engagement content (`clients/` stays gitignore
 
 ---
 
+> **Amendment 2026-09-08 (ARC-02-S05, risk (a) — ACCEPTED by the architect).** The `docs/` line gains
+> two files not in the §3 layout as drafted:
+>
+> - **`docs/USER-GUIDE.md`** — the surviving half of `USER-GUIDE-AND-EXAMPLES.md`, renamed by S05. It is
+>   the worked-examples document a reader needs after installing; its vocabulary sweep is ARC-02-S06's,
+>   not S05's, so only the rename happened here.
+> - **`docs/CLIENT-ONBOARDING.md`** — the engagement ritual rewritten from root `client-onboarding.md`
+>   with the claude.ai satellite steps (1–2, 5–8) and the `claude_desktop_config` step (§9b) removed.
+>   It is the only document describing the confidentiality firewall's enforcement mechanism, which is
+>   folder discipline rather than anything the tool enforces.
+
 ## 4. Install flow — exact user actions
 
 ### 4.1 Prerequisites (checked, never installed, by step B00)
