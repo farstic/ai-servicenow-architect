@@ -27,7 +27,8 @@
     "lint:fix": "eslint src tests --fix",
     "pretest": "npm run build",
     "start": "node dist/server.js",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
+    "test:nocov": "vitest run",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit"
   },
@@ -81,6 +82,7 @@
     "@types/node": "^20.19.33",
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.56.0",
+    "@vitest/coverage-v8": "4.0.18",
     "eslint": "^9.39.3",
     "globals": "^17.3.0",
     "tsx": "^4.7.0",

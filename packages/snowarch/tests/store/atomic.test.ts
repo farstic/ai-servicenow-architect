@@ -164,16 +164,19 @@ describe('loadStore', () => {
     expect('error' in r && r.error.code).toBe('STORE_UNREADABLE');
   });
 
-  it('absent flags are completed to "false" on load, so no caller has to remember', () => {
+  it('absent flags are returned AS WRITTEN — completion happens at the point of use', () => {
+    // Changed deliberately by ARC-04-S03. S02 completed the flags here; that erased the
+    // difference between a store that omits `flags` and one that declares six "false"
+    // values, and S03 needs it: a preset instance with no flags key must not be reported as
+    // disagreeing with its own preset. `expandPreset` completes them where the question
+    // "does absent mean false?" is actually being asked.
     const p = join(tmp, 'partial.json');
     const s = store();
     (s.instances.pdi as { flags: unknown }).flags = { WRITE_ENABLED: 'true' };
     writeFileSync(p, JSON.stringify(s), { mode: 0o600 });
     const r = loadStore(p);
     if ('error' in r) throw new Error(r.error.message);
-    expect(r.store.instances.pdi.flags).toEqual({
-      WRITE_ENABLED: 'true', CMDB_WRITE_ENABLED: 'false', SCRIPTING_ENABLED: 'false',
-      ATF_ENABLED: 'false', NOW_ASSIST_ENABLED: 'false', FLUENT_ENABLED: 'false',
-    });
+    expect(r.store.instances.pdi.flags).toEqual({ WRITE_ENABLED: 'true' });
   });
+
 });

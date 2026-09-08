@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
-import { completeFlags, parseStore, type Store, type StoreError } from './schema.js';
+import { parseStore, type Store, type StoreError } from './schema.js';
 import { maskPath, shellRemedy } from './paths.js';
 
 export * from './paths.js';
@@ -95,8 +95,14 @@ export function loadStore(path: string): { store: Store; warning?: string } | { 
   if ('error' in parsed) {
     return { error: { ...parsed.error, message: `${maskPath(path)}: ${parsed.error.message}` } };
   }
-  // Absent flags mean "false" — normalise once, here, so no caller has to remember.
-  for (const inst of Object.values(parsed.store.instances)) inst.flags = completeFlags(inst.flags);
+  // The stored flags are returned AS WRITTEN, not completed.
+  //
+  // ARC-04-S02 completed them here ("absent means false, normalise once"), which was true
+  // for gating and wrong for everything else: it destroys the difference between a store
+  // that OMITS `flags` and one that declares all six as "false". ARC-04-S03 needs that
+  // difference — a preset instance with no flags key must not be reported as disagreeing
+  // with its own preset. Completion now happens at the point of use, in `expandPreset`,
+  // which is where "absent means false" is actually the question being asked.
   return modes.warning ? { store: parsed.store, warning: modes.warning } : parsed;
 }
 

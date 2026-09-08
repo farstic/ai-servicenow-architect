@@ -60,6 +60,21 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Changed (ARC-04-S03) — flags are per instance
+
+- The six permission flags belong to the **instance being addressed**, not to the process. One server
+  can hold a PDI and a production instance; `snow_core_instance_switch` moves the flags with the client.
+- `WRITE_ENABLED` and its siblings in the server's environment now apply **only to env-defined
+  instances** (`SERVICENOW_*`, `SN_INSTANCE_*`). They have no effect on an instance from the store.
+- `MAX_RECORDS` is superseded by the store's `maxRecords`, and **the default is now 100** (it was 10).
+  `MAX_RECORDS` still applies on the env-defined path.
+- A `prod` instance raised above `read-only` without `prodWriteAck: true` is **not loaded**; it is
+  listed with `status: "not_loaded"` and the reason `PROD_WRITE_NOT_ACKNOWLEDGED`.
+- New codes on the load report and on `snow_core_instance_switch`: `PROD_WRITE_NOT_ACKNOWLEDGED`,
+  `INSTANCE_NOT_LOADED`, `UNKNOWN_INSTANCE`, `NO_INSTANCE_CONFIGURED`. New warnings:
+  `FLAG_DEPENDENCY_VIOLATION`, `PRESET_FLAGS_MISMATCH`. The six `*_NOT_ENABLED` codes are unchanged.
+- Refusal messages now name the instance and carry the command that changes it.
+
 ### Store error codes
 
 Reported on the load report now; ARC-04-S06 lists them in the tool contract.

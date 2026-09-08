@@ -68,3 +68,64 @@ the file leaving the machine.
 
 The home directory becomes `~` and the checkout becomes `<checkout>`. A log line reaches screen
 shares, bug reports and support tickets, and an absolute path carries the account name.
+
+## How the server applies flags
+
+> Draft — ARC-07 owns the final wording.
+
+Six flags decide what a session may do, and they belong to the **instance you are addressing**, not to
+the server process. One server can hold a PDI and a customer's production instance at once;
+`snow_core_instance_switch prod` makes the next write refuse while the same call on the PDI still
+succeeds.
+
+### The presets
+
+| Preset | WRITE | CMDB_WRITE | SCRIPTING | ATF | NOW_ASSIST | FLUENT |
+|---|---|---|---|---|---|---|
+| `read-only` | false | false | false | false | false | false |
+| `pdi-developer` | true | true | true | true | false | false |
+| `full` | true | true | true | true | true | true |
+| `custom` | whatever the store declares; an omitted flag reads as `false` | | | | | |
+
+A named preset whose stored `flags` disagree with the table is reported as `PRESET_FLAGS_MISMATCH` and
+**the preset wins**. Omitting `flags` entirely is not a disagreement — it simply takes the preset.
+
+### The dependency rule
+
+`SCRIPTING_ENABLED` and `CMDB_WRITE_ENABLED` are writes. Declaring either without `WRITE_ENABLED` is a
+contradiction, and it is resolved towards *less* access: the dependent flag is treated as `false`, and
+`FLAG_DEPENDENCY_VIOLATION` says so. The file on disk is never modified by the server.
+
+### The production rule
+
+An instance tagged `environment: prod` is capped at `read-only` unless the store carries
+`prodWriteAck: true`. The threshold is **any** flag raised, not just `WRITE_ENABLED` — a `custom` prod
+instance with only `ATF_ENABLED` still runs tests against production, and the acknowledgement is about
+having chosen that deliberately.
+
+Without the acknowledgement the instance is **not loaded** — it still appears in the listing, with its
+reason, because "it is not there" is a worse answer than "it is there and here is why it is not usable":
+
+```
+[WARN] instance "prod": environment=prod with preset full but prodWriteAck is not true — not loaded.
+       Raise it deliberately with: ./snowarch instance set-preset prod full --ack-prod
+       (code PROD_WRITE_NOT_ACKNOWLEDGED)
+```
+
+### What a refusal looks like
+
+Every refusal names the instance — with several configured, "writes are disabled" is not actionable on
+its own — and carries the command that changes it:
+
+```
+Write operations are disabled for instance "prod" (preset read-only).
+Instance "prod" is tagged prod and capped at read-only.
+Raising it requires: ./snowarch instance set-preset prod <preset> --ack-prod
+```
+
+### Environment variables
+
+`WRITE_ENABLED` and its five siblings in the server's environment apply **only to env-defined
+instances** (`SERVICENOW_*`, `SN_INSTANCE_*`), which is the CI and automation path. They have no effect
+on an instance that came from the store.
+

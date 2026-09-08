@@ -255,6 +255,27 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
+> **Amendment 2026-09-08 (architect's rulings on the S03 delivery).**
+> - **Criterion 1's live half is deferred** to the owner's live sitting — the agent never holds
+>   instance credentials. The unit half (throwing-proxy client) plus the spawned-server probe are the
+>   gate here; the `RUN_LIVE_E2E=1` case stays in `tests/live/live-e2e.test.ts` for that sitting.
+> - **Prod posture is "any effective flag true"**, stricter than WRITE, and the refusal carries the
+>   `--ack-prod` remedy verbatim. Env-defined instances get the same rule via
+>   `SN_INSTANCE_<NAME>_PROD_WRITE_ACK`.
+> - **Criterion 7's failing half** is demonstrated by adding an uncovered branch to
+>   `src/utils/permissions.ts` rather than by deleting a test assertion: removing an assertion did not
+>   move the number, because the branches it touched are exercised elsewhere too. Exit 1 with the
+>   branch, exit 0 without.
+>
+> **Amendment 2026-09-08 (found during S03, changes an S02 behaviour).** `loadStore` no longer completes
+> absent flags to `"false"`. S02 normalised them on load ("absent means false, once, so no caller has to
+> remember"), which was right for gating and wrong for everything else: it erased the difference between
+> a store that OMITS `flags` and one that declares all six as `"false"`. S03 needs that difference — a
+> preset instance with no `flags` key was being reported as disagreeing with its own preset. Completion
+> now happens in `expandPreset`, where "does absent mean false?" is the question actually being asked.
+> **Found by spawning the server, not by the unit test**, which passed a partial object where production
+> passed a completed one — the fixture could not produce the failing shape.
+
 ### ARC-04-S04 — Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed`
 
 **As** an individual practitioner in design-only mode, or one who has just typed `./snowarch instance add` in another terminal, **I want** the server to start with no instance, describe its own state, and pick up a new store without a Claude Code restart **so that** an unconfigured checkout never shows a crashed MCP server and the `/snowarch setup-instance` `--resume` step (ARC-07) can finish in the same session.
