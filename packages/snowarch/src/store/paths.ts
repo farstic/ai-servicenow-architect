@@ -107,6 +107,31 @@ export function maskPathForShell(p: string): string {
   return p.startsWith(norm + sep) ? `~${p.slice(norm.length)}` : p;
 }
 
+/**
+ * The whole `Run:` clause for a remedy, phrased so it is BOTH pasteable and free of an
+ * absolute path. Which of the three it is depends on where the file actually lives:
+ *
+ *  - inside the checkout  → a checkout-relative path, with "from the checkout" said out
+ *    loud. This is the case `maskPathForShell` alone could not handle: a checkout on a
+ *    second volume, under /srv, in a sandbox or on a CI runner is not under HOME, so
+ *    there was no `~` to substitute and the absolute path was echoed.
+ *  - under HOME           → `~/…`, which a shell expands.
+ *  - anywhere else        → as given. The user chose that path explicitly (SNOW_STORE),
+ *    and rewriting it would make the remedy point somewhere they did not name.
+ */
+export function shellRemedy(command: string, target: string): string {
+  const checkout = envPath('CLAUDE_PROJECT_DIR');
+  if (checkout) {
+    const norm = checkout.endsWith(sep) ? checkout.slice(0, -1) : checkout;
+    if (target === norm) return `Run, from the checkout: ${command} .`;
+    if (target.startsWith(norm + sep)) {
+      const rel = target.slice(norm.length + 1).split(sep).join('/');
+      return `Run, from the checkout: ${command} ${rel}`;
+    }
+  }
+  return `Run: ${command} ${maskPathForShell(target)}`;
+}
+
 /** `cvetomir@corp.com` → `c***@corp.com`; `admin` → `a***`. Never the whole name. */
 export function maskUsername(u: string): string {
   if (!u) return u;

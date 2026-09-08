@@ -33,8 +33,13 @@ it carries any group or world bit, and the message names the exact remedy:
 
 ```
 Refusing to load <checkout>/.local/instances.json: file mode 0644 is group/world-readable.
-Run: chmod 600 ~/work/repo/.local/instances.json
+Run, from the checkout: chmod 600 .local/instances.json
 ```
+
+The remedy is phrased for where the file actually is, and never carries an absolute path: inside the
+checkout it is checkout-relative and says so; under your home directory it uses `~`, which a shell
+expands; anywhere else — a path you named yourself with `SNOW_STORE` — it is left exactly as you
+typed it, because rewriting it would point the command somewhere you did not choose.
 
 The **directory** is a different risk and is treated differently. A 0600 file is unreadable by
 anyone else whatever folder it sits in, so an ordinary 0755 directory is not a reason to refuse a

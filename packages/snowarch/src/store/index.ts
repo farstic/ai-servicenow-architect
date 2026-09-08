@@ -9,7 +9,7 @@ import {
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { completeFlags, parseStore, type Store, type StoreError } from './schema.js';
-import { maskPath, maskPathForShell } from './paths.js';
+import { maskPath, shellRemedy } from './paths.js';
 
 export * from './paths.js';
 export * from './schema.js';
@@ -35,9 +35,11 @@ const isWindows = process.platform === 'win32';
  *     about; not worth refusing a correctly protected file over.
  *
  * Every path in the message is masked at construction: `maskPath` for the prose, and
- * `maskPathForShell` after `Run:` so the remedy stays pasteable. Masking a whole sentence
- * afterwards misses every occurrence but the first — which is how the raw home directory
- * used to reach the log.
+ * `shellRemedy` for the `Run:` clause so the remedy is pasteable AND carries no absolute
+ * path — checkout-relative inside the checkout, `~` under HOME, as given elsewhere.
+ * Masking a whole sentence afterwards misses every occurrence but the first, which is how
+ * the raw home directory used to reach the log; and masking only to `~` left an absolute
+ * path whenever the checkout was not under HOME.
  *
  * Skipped entirely on Windows, where permissions are ACL-inherited and the POSIX mode bits
  * Node reports are synthetic (01 §13).
@@ -57,20 +59,20 @@ export function checkFileModes(path: string): { error?: StoreError; warning?: st
   if ((fileMode & 0o077) !== 0) {
     return { error: { code: 'STORE_PERMISSIONS_TOO_OPEN',
       message: `Refusing to load ${shown}: file mode ${oct(fileMode)} is group/world-readable. `
-        + `Run: chmod 600 ${maskPathForShell(path)}` } };
+        + shellRemedy('chmod 600', path) } };
   }
 
   const dirWritable = (dirMode & 0o022) !== 0;
   if (dirWritable && !sticky) {
     return { error: { code: 'STORE_PERMISSIONS_TOO_OPEN',
       message: `Refusing to load ${shown}: directory mode ${oct(dirMode)} is group/world-writable `
-        + `without the sticky bit, so the file can be replaced. Run: chmod 700 ${maskPathForShell(dir)}` } };
+        + `without the sticky bit, so the file can be replaced. ${shellRemedy('chmod 700', dir)}` } };
   }
 
   if ((dirMode & 0o077) !== 0) {
     return { warning: `store directory ${maskPath(dir)} is mode ${oct(dirMode)}`
       + `${sticky ? ' (sticky)' : ''}; the file itself is ${oct(fileMode)}. `
-      + `Consider: chmod 700 ${maskPathForShell(dir)}` };
+      + `Consider — ${shellRemedy('chmod 700', dir).replace(/^Run(, from the checkout)?: /, (m) => (m.includes('checkout') ? 'from the checkout: ' : ''))}` };
   }
 
   return {};
