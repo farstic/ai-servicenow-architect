@@ -68,7 +68,7 @@ export function coreToolManifest(): ToolDefinition[] {
       mutates: false,
     },
     {
-      name: 'snow_core_record_add',
+      name: 'snow_core_record_create',
       description: 'Create a new record in any ServiceNow table (requires WRITE_ENABLED=true)',
       inputSchema: {
         type: 'object',
@@ -398,7 +398,7 @@ export async function dispatchCoreAction(
       if (!p.table || !p.sys_id) throw new ServiceNowError('table and sys_id are required', 'INVALID_REQUEST');
       return await client.getRecord(p.table, p.sys_id, p.fields);
     }
-    case 'snow_core_record_add': {
+    case 'snow_core_record_create': {
       requireWrite();
       if (!args.table || !args.fields) throw new ServiceNowError('table and fields are required', 'INVALID_REQUEST');
       const created = await client.createRecord(args.table, args.fields);

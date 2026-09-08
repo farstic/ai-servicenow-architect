@@ -844,7 +844,7 @@
       "mutates": false
     },
     {
-      "name": "snow_core_record_add",
+      "name": "snow_core_record_create",
       "gate": "write",
       "mutates": true
     },
