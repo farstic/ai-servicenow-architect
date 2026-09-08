@@ -1,6 +1,7 @@
 // ARC-02-S02 — the agent roster, checked against the rules in tests/lib/lint-rules.mjs.
-// AG-04/AG-05 are written but switched off: ARC-02-S04 makes the content change they require and
-// flips ENFORCE_S04. The "pending" test below asserts today's known-bad state so the gap stays visible.
+// ARC-02-S04 made the content change AG-04/AG-05 required and flipped ENFORCE_S04 to true, so every
+// rule is now live. The companion test that used to assert the known-bad state is gone with it — its
+// job was to make the gap visible while it existed, not to outlive the fix.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -10,7 +11,7 @@ import { lintAgents } from './lib/lint-rules.mjs';
 import { parseFrontmatter } from './lib/frontmatter.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const ENFORCE_S04 = false;   // flipped by ARC-02-S04
+const ENFORCE_S04 = true;    // flipped by ARC-02-S04, which set model: inherit and added skills:
 
 const run = () => lintAgents({ root, enforceS04: ENFORCE_S04 });
 const report = (id) => { const f = run().fail.filter((x) => x.startsWith(id)); assert.equal(f.length, 0, `${f.length} failure(s):\n  ${f.join('\n  ')}`); };
@@ -24,17 +25,30 @@ test('AG-06 the combined agent description budget stays under the sub-agent warn
   console.log(`    AG-06: ${chars} chars across ${files} agents ≈ ${Math.round(chars / 4)} tokens (budget 12000)`);
 });
 
-test('AG-04 model is inherit', { skip: ENFORCE_S04 ? false : 'enabled by ARC-02-S04, which sets it' }, () => report('AG-04'));
-test('AG-05 skills preload names existing roster skills', { skip: ENFORCE_S04 ? false : 'enabled by ARC-02-S04, which adds it' }, () => report('AG-05'));
-
-test('AG-04/AG-05 pending: the defect they will fix is still present, so the switch is still needed', () => {
-  // Asserts the known-bad state on purpose. If someone fixes the agents early, this fails and points
-  // at ENFORCE_S04 — better than a skipped rule silently passing over an already-clean tree.
+test('AG-04 every agent inherits the session model — no pinned model id', () => report('AG-04'));
+test('AG-05 every agent preloads a persona skill that exists', () => {
+  report('AG-05');
   const files = readdirSync(join(root, '.claude/agents')).filter((f) => f.endsWith('.md')).sort();
-  const data = files.map((f) => parseFrontmatter(readFileSync(join(root, '.claude/agents', f), 'utf8'), f).data);
-  const pinned = data.filter((d) => d.model !== 'inherit').length;
-  const noSkills = data.filter((d) => !('skills' in d)).length;
-  assert.equal(pinned, files.length, `ENFORCE_S04 is off but ${files.length - pinned} agent(s) already say inherit — flip it in ARC-02-S04`);
-  assert.equal(noSkills, files.length, `ENFORCE_S04 is off but ${files.length - noSkills} agent(s) already preload skills — flip it in ARC-02-S04`);
-  console.log(`    pending for S04: ${pinned}/${files.length} pinned model ids (e.g. "${data[0].model}"), ${noSkills}/${files.length} with no skills preload`);
+  const total = files.reduce((n, f) => {
+    const d = parseFrontmatter(readFileSync(join(root, '.claude/agents', f), 'utf8'), f).data;
+    return n + (Array.isArray(d.skills) ? d.skills.length : 1);
+  }, 0);
+  console.log(`    AG-05: ${files.length} agents preload ${total} skill entries`);
+});
+
+test('the preloaded skill is the agent of the same name, and the body no longer loads it by path', () => {
+  // The preload replaces a file read. If a body still says "read SKILL.md", the coupling this story
+  // removes is back and the sub-agent spends a turn re-reading what it was already given.
+  for (const f of readdirSync(join(root, '.claude/agents')).filter((x) => x.endsWith('.md')).sort()) {
+    const name = f.replace(/\.md$/, '');
+    const text = readFileSync(join(root, '.claude/agents', f), 'utf8');
+    const { data } = parseFrontmatter(text, f);
+    const skills = Array.isArray(data.skills) ? data.skills : [data.skills];
+    assert.equal(skills[0], name, `${f}: first preloaded skill is "${skills[0]}", not the agent's own persona`);
+    assert.ok(!new RegExp(`skills/${name}/SKILL\\.md`).test(text),
+      `${f}: still loads its own SKILL.md by path — it is preloaded`);
+    // EXAMPLES.md is NOT preloaded, so the explicit read must survive.
+    assert.ok(new RegExp(`skills/${name}/EXAMPLES\\.md`).test(text),
+      `${f}: no longer reads EXAMPLES.md, which the preload does not cover`);
+  }
 });

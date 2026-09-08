@@ -567,6 +567,16 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S12 — Server doctor module (`src/doctor/`) and `snowarch doctor --json`
 
+> **Amendment 2026-09-08 (from ARC-02-S04, S-13 addendum).** **The doctor walks from the checkout up to
+> the filesystem root and WARNS on every ancestor `.claude/skills` it finds.** Claude Code loads project
+> skills from *every* such directory on that path, not only the checkout's own: the roster doubles and
+> the S-13 listing budget is spent twice, silently. Severity **warning**, not error — the checkout still
+> works. The message names the offending path(s) and the remedy: move the checkout out from under them,
+> or disable the ancestor's skills with `/skills`. See the `S-13 (addendum)` row in
+> `docs/plans/03-RISKS-AND-UNKNOWNS.md` §F for the measured evidence and the CLI's own `project=[…]`
+> log line; `pollutingAncestors()` in `scripts/ci/skill-listing-check.mjs` is a working implementation
+> of the walk, with unit tests in `tests/skill-listing.test.mjs`.
+
 **As** ARC-08's unified doctor and as a non-Architect user of `npx @farstic/snowarch` **I want** the server package to own the checks only it can perform — Node floor, dist resolvable, store validity and modes, per-instance flags and probes, the stdio handshake against itself, capabilities-equals-store **so that** one report can merge engine checks (E-xx) and server checks (S-xx) without re-implementing the flag rules in a second language (P-16, `00` §3.9 D25–D27).
 
 **Context.** `01` §8 "Server checks (S-xx, `packages/snowarch` doctor module, also usable stand-alone)"; ARC-08's dependency line names "ARC-04-S12 (server doctor module boundaries)". The check *content* for probes reuses ARC-07's probe functions once they exist; this story defines the module boundary, the check registry contract, and the checks that need no wizard code.
