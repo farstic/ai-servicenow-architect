@@ -280,6 +280,22 @@ asserts the *known-bad* state (all agents still carry a pinned model id, none pr
 the agents early fails that test and points at the switch, rather than letting a disabled rule pass
 quietly over an already-clean tree.
 
+### Evidence, not reasoning
+
+A criterion is reported as passing only by pasting the command and its actual output. Reasoning that
+it would pass is not evidence, and a report that reads as evidence when it is not is worse than no
+report — the reader stops checking.
+
+Two incidents. In ARC-01-S08 a positive clause was reported as PASS having never been run. In
+ARC-04-S09 a `grep | sed` pipeline was reported as "exit 1, no matches" when the `$?` read belonged
+to `sed`, not to `grep`; the answer happened to be right and the check was not the one claimed. Write
+the output to a file and check the exit status of the command you mean, or make the command the last
+in the pipeline.
+
+The same applies to a push. `git push` exiting 0 is not proof the remote moved — an ARC-01-S03 push
+was a no-op against a stale ref and was reported as done. `git ls-remote origin refs/heads/<branch>`
+is the proof, and it goes in the report.
+
 ### Never edit `packages/snowarch/dist/` — build it
 
 `dist/` is **committed** (ARC-04-S13), so a clone plus `npm ci` is a runnable live install with no

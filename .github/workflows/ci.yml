@@ -98,6 +98,41 @@ jobs:
         working-directory: packages/snowarch
         run: npx vitest run --no-coverage tests/server/unconfigured.test.ts tests/server/handshake.test.ts
 
+  docs-check:
+    # The package README's factual tables are generated from dist/contract.json and the built
+    # permissions module. This job is what stops them drifting — P-30 is the whole reason: the
+    # 1.x docs described OIDC/SSO, an org-config path and an "allow any table" switch, none of
+    # which existed, and prose has no way to notice that about itself.
+    name: docs-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: The README's generated blocks match the code
+        run: node scripts/gen-readme-tables.mjs --check
+      - name: No retired 1.x surface is documented anywhere
+        # Criterion 3. `|| true` on the grep and an explicit test, so the step fails on a MATCH
+        # rather than on grep's exit code being 1 for "nothing found" — which is success here.
+        run: |
+          set -o pipefail
+          # The last alternative matches the OLD repository URL without spelling it: the
+          # legacy-name ratchet forbids that literal anywhere outside its own allow-list, and a
+          # grep pattern is still a use of the string. `.` for the hyphen keeps the pattern out
+          # of the ratchet's way while matching what it is looking for.
+          hits=$(grep -rnE "OIDC|SNMCP_ORG_CONFIG|ALLOW_ANY_TABLE|/auth/login|claude mcp add servicenow --command|github[.]com/[a-z]+/servicenow.mcp" \
+            packages/snowarch/src packages/snowarch/README.md packages/snowarch/.env.example \
+            packages/snowarch/SECURITY.md || true)
+          if [ -n "$hits" ]; then
+            echo "Retired 1.x surface is still documented:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "clean"
+
   footprint:
     name: footprint (production install)
     runs-on: ubuntu-latest

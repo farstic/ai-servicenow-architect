@@ -13,6 +13,9 @@
 # until they are regenerated. That is intended: a rewrite is exactly when someone should look again.
 
 # the published JWT example header — base64 of {"alg":"HS256","typ":"JWT"}, ellipsis-truncated
+# The file these two name was DELETED by ARC-04-S14. The entries stay: `gitleaks git` walks
+# history, the findings are still in the commits that carried them, and a fingerprint is
+# pinned to a commit rather than to a path that still exists.
 dd005fa46ef6786fa9be450803eee05d1f0eb143:packages/snowarch/docs/SERVICENOW_OAUTH_SETUP.md:generic-api-key:131
 # base64 of the literal string "thisisarefreshtokenexample"
 dd005fa46ef6786fa9be450803eee05d1f0eb143:packages/snowarch/docs/SERVICENOW_OAUTH_SETUP.md:generic-api-key:132

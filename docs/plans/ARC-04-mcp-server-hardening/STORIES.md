@@ -1067,6 +1067,49 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S14 — Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes
 
+> **Amendment 2026-09-08 (from the S14 delivery).**
+> - **The catalogue is 397, not 398** — the story's figure predates S08's removal of
+>   `snow_rpt_report_generate`. The README does not state it in prose at all: the count is generated
+>   from `dist/contract.json`, so it cannot be wrong without CI saying so.
+> - **The version of record is `2.0.0-dev`.** The README says so explicitly and the CHANGELOG heading
+>   stays `## 2.0.0 — Unreleased`; ARC-09 cuts the release.
+> - **The env test found two undocumented switches**, which is the whole point of running it in both
+>   directions: `SERVICENOW_USERNAME` (a 1.x alias read *before* `SERVICENOW_BASIC_USERNAME` when
+>   deciding whose tasks "mine" are) and `AGILE_TABLE_PREFIX`. Both now documented. The scan needed a
+>   fourth pattern to see them — the env-instance loader reads keys through a helper whose second
+>   argument is the legacy name, `g('AUTH', 'SERVICENOW_AUTH_METHOD')`, which no `process.env.`
+>   matching reaches.
+> - **The "allow-list has no stale entries" assertion was written and then removed.** It reported six
+>   false positives — `HOME` is reached through `homedir()`, and `NODE_EXTRA_CA_CERTS` plus the
+>   lowercase proxy names live in an array literal. A staleness check built on a deliberately narrow
+>   scan cries wolf, and a test that cries wolf gets silenced. What is asserted instead is that the
+>   list stays short and explicit.
+> - **Criterion 3's grep caught my own prose.** The `.env.example` header explained what the 1.x docs
+>   had wrongly promised, naming one of them — and the grep that keeps those names out matched it.
+>   Reworded to point at the CHANGELOG instead. Second time in this arc that documenting a removed
+>   thing reproduced the thing (the first was a gitleaks false positive quoted verbatim in
+>   CONTRIBUTING).
+> - **`packages/snowarch/docs/SERVICENOW_OAUTH_SETUP.md` had two dead references** to the old
+>   repository (a `cd` and an issues URL); repointed. Both sit *after* the two lines allow-listed in
+>   `.gitleaksignore`, so the pinned fingerprints still resolve.
+> - **`packages/snowarch/docs/` is gone entirely — SIX files, not the five I first reported.** I
+>   miscounted in the delivery report; the architect's listing was right. `ATF.md`, `NOW_ASSIST.md`,
+>   `REPORTING.md`, `SCRIPTING.md`, `SERVICENOW_OAUTH_SETUP.md`, `TOOL_PACKAGES.md`. Two were
+>   demonstrably wrong (`REPORTING.md`: 13 reporting tools against a catalogue of 17;
+>   `TOOL_PACKAGES.md`: eight bundles against thirteen, each with a drifted hand count).
+> - **What moved to the README before they went.** An **Authentication** section — `basic` and
+>   `oauth` (ROPC), the four `SERVICENOW_OAUTH_*` keys, and the ServiceNow-side steps compressed to
+>   the three that matter (Application Registry → *OAuth API endpoint for external clients* → client
+>   id and secret; no redirect URL). And a **fourth generated block**, `bundles`, listing
+>   `MCP_TOOL_PACKAGE` values with their tool counts from `ROLE_BUNDLE_MAP` — generated precisely
+>   because the hand-maintained version was the thing that was wrong.
+> - **The `.gitleaksignore` entries for `SERVICENOW_OAUTH_SETUP.md` stay.** Its deletion removes the
+>   last copy of the 1.x placeholder OAuth client id from the *tree*, but `gitleaks git` walks
+>   history: the findings are still in the commits that carried them, and a fingerprint is pinned to
+>   a commit, not to a path. Annotated in the file so nobody prunes them as stale.
+> - **`docs/CLIENT_SETUP.md` never existed.** The story's deletion list was written from `00` before
+>   the import. Nothing to do; recorded so the next reader of that list is not left looking.
+
 **As** a non-Architect user of `npx @farstic/snowarch` and as the engine's documentation generators **I want** the package's own documentation to describe exactly what the code does — env contract, tool families, gates, error codes, store, audit, corporate networks — and a changelog that tells a snow-mcp 1.0.0 user what changed **so that** P-30 cannot recur and R-03 is honoured.
 
 **Context.** Closes P-30 (`docs/INSTALLATION.md` documents OIDC/SSO, `AUDIT_*`, `SNMCP_ORG_CONFIG`, `ALLOW_ANY_TABLE`, `/auth/login`, an 11-step wizard described as 5 — none implemented; wrong `claude mcp add` flags — `00` §4.9), the documentation half of P-18 (dead URLs), R-03 (migration note for gate split, precedence inversion, no cwd `.env`, unconfigured start; "the optional npm channel publishes as a new major" — 2.0.0 under the new record, D-01/R-1). ARC-09's generated `docs/CHANGELOG.md` for the product cites this file's 2.0.0 section.

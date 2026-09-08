@@ -5,8 +5,143 @@ All notable changes to this project are documented here. This project adheres to
 
 ## 2.0.0 — Unreleased
 
-Supersedes `servicenow-mcp` 1.0.0. Relicensed to Apache-2.0 and renamed to `@farstic/snowarch`;
-the old npm record is neither referenced nor touched (D-01, D-02).
+Supersedes `snow-mcp` 1.0.0. Relicensed to Apache-2.0 and renamed to `@farstic/snowarch`; the old
+npm record is neither referenced nor touched (D-01, D-02). The package version is `2.0.0-dev` until
+the release is cut, so a development checkout cannot be mistaken for a release.
+
+The sections below are grouped **Breaking · Added · Fixed · Tests · Migration from snow-mcp 1.0.0**.
+The per-story detail follows them, in reverse story order.
+
+---
+
+### Breaking
+
+**Nine surfaces removed (D-03).** Each was a second way in, and each is gone:
+
+1. **HTTP and SSE transport** — `src/transport/`. stdio is the only transport.
+2. **REST API** — `src/api/`. It could not exist without the HTTP transport.
+3. **A2A agent routes** — `src/a2a/`, including the `/.well-known/agent.json` agent card.
+4. **Web dashboard** — `src/dashboard/`.
+5. **Report generator** — `src/reports/`, and with it `pdfmake` and `pptxgenjs`. The
+   `snow_rpt_report_generate` tool went with it in ARC-04-S08: it had survived the cut and was
+   calling a route its own implementation no longer had.
+6. **Prompt catalogue** — `src/prompts/` and the MCP `prompts` capability.
+7. **Direct-execution engine and LLM client** — `src/direct/`.
+8. **CLI surfaces** — `setup` (and its `npm link` side effect), `auth`, `instances`, `web`,
+   `capabilities`, `run`, `report`.
+9. **The npm update check** — it fetched a third party's package record on every run.
+
+**`SCRIPTING_ENABLED` no longer gates reads (R-03).** It gates *writing* scripting objects. Listing
+business rules, reading a script include or exporting an update set now needs no flag at all. If you
+raised `SCRIPTING_ENABLED` only to read, you can lower it.
+
+**Store precedence is `SNOW_STORE` → project → global, first hit wins, never merged.** A missing
+file named by `SNOW_STORE` is an **error**, not a reason to fall back — a typo in an explicit
+override must not silently load a different instance.
+
+**The legacy store is not read.** `~/.config/servicenow-mcp/instances.json` and
+`SN_INSTANCES_CONFIG` are ignored; `./snowarch instance import --from-legacy` (ARC-07) will migrate
+one.
+
+**The current directory's `.env` is not read.** Set `SNOW_ENV_FILE` to name one. For an MCP server
+the current directory is your project, and an unrelated `WRITE_ENABLED=true` there would arm writes
+nobody chose.
+
+**`MAX_RECORDS` defaults to 100, not 10**, and is per-instance (`maxRecords` in the store) rather
+than process-global.
+
+**A per-call `instance` argument no longer routes.** No tool's schema declared one, so it was an
+undocumented side channel that could send a write to a different instance than the session believed
+it was addressing. `snow_core_instance_switch` is the only way to change instance.
+
+**`snow_disco_table_discover` no longer mints tools.** It used to add
+`dynamic_query_<table>`, `dynamic_create_<table>` and three more to `tools/list` for the rest of the
+session. It returns the columns as data now; use `snow_core_records_query` and its siblings, which
+are declared, gated and in the contract.
+
+**`snow_us_active_update_set_ensure` requires `name`** and returns only *your* in-progress update
+sets. It used to take any set with `state=in progress` — on a shared instance, whoever opened one
+last.
+
+**`snow_deploy_background_script_exec` and `snow_fluent_script_exec` always refuse** with
+`UNSUPPORTED_ON_THIS_INSTANCE`. Server-side script execution has no supported REST endpoint. They
+stay registered so the refusal is clear rather than reading as a typo.
+
+**The server starts with no instance configured** and advertises five core tools instead of failing.
+That is a supported state.
+
+**`REDACT_SENSITIVE_DATA` defaults to ON.** It was opt-in, so an unset variable — the normal case —
+printed passwords and Authorization headers.
+
+### Added
+
+- **An audit trail.** One JSON line per state-changing call, in `<store dir>/audit.jsonl`; rotated
+  at 10 MB, three kept; refusals recorded with their code; never payloads, credentials or the
+  instance URL. `@farstic/snowarch/audit` exports it.
+- **Proxy and CA support.** `HTTPS_PROXY`, `HTTP_PROXY`, `NO_PROXY` and `NODE_EXTRA_CA_CERTS` are
+  honoured, and network failures are classified — `DNS_FAILURE`, `TLS_CA_UNTRUSTED`,
+  `PROXY_UNREACHABLE`, `CONNECTION_REFUSED`, `CONNECTION_TIMEOUT` — each with a remedy naming the
+  variable actually set.
+- **A doctor.** `snowarch doctor [--json] [--no-network]`, nine checks `SV-00`…`SV-08`, exit 0/1/3,
+  exported as `@farstic/snowarch/doctor`.
+- **A tool contract.** `dist/contract.json` carries every tool with its gate, `mutates` and table,
+  generated from the registrations rather than written down twice.
+- **`snow_us_capture_target_set`.** Points REST update-set capture at a named set through
+  `sys_user_preference` — which is what the API actually honours.
+- **A result-size cap.** One call cannot flood a conversation: the client's `_meta` ceiling, else
+  `SNOW_MAX_RESULT_CHARS`, else 100,000 characters.
+- **A committed `dist/`.** A clone plus `npm ci` is a runnable install; CI rebuilds and diffs it.
+- **Per-instance flags, presets and a prod-write acknowledgement.** A `prod` instance raised above
+  `read-only` is refused unless `prodWriteAck` is set.
+
+### Fixed
+
+- **Descending sort returned ascending order.** `orderBy: '-field'` built
+  `ORDERBY<field>^ORDERBYDESC` — two terms, the first ascending and the second a bare operator with
+  no field. ServiceNow accepts that and sorts ascending, so every "newest first" query returned the
+  oldest records and looked like it had worked.
+- **`snow_intg_event_register` registered nothing usable.** It wrote `name`; `sysevent_register`
+  matches on `event_name`.
+- **A business rule created through the server fired on nothing.** The four `action_*` flags were
+  omitted entirely, and a `sys_script` row with none set never runs — while looking correct in the
+  UI list.
+- **Five tools wrote to the instance while declaring `mutates: false`**, so the generated approval
+  list omitted them.
+- **A successful `DELETE` (204) was reported as `DELETE_NOT_FOUND`** — the empty body was parsed as
+  JSON, which threw, which triggered a retry, whose second DELETE 404'd.
+- **`maskPath` could be switched off by an environment variable.** It masked against `$HOME`, so a
+  process started with HOME elsewhere printed absolute paths carrying the account name.
+- **`maxRetries` / `retryDelayMs` / `requestTimeoutMs` could not be set to zero** — they were
+  defaulted with `||`, under which a configured `0` is falsy.
+
+### Tests
+
+1,033 tests across 43 files, on three operating systems × Node 20/22/24. Beyond the unit suites:
+a real MCP client over stdio for the unconfigured server and the tool list; a recording fake REST
+client for update-set capture and payload shapes; a live CONNECT proxy and a generated self-signed
+TLS certificate for the network paths; a whole-catalogue sweep asserting no credential reaches the
+audit file or stderr; a rebuild-and-diff of the committed `dist/`; and generated-block checks for
+this package's own documentation.
+
+The live halves — anything needing a real instance — are deferred with written procedures in
+`tests/live/README.md` rather than mocked into a pass.
+
+### Migration from snow-mcp 1.0.0
+
+1. **Move your instance configuration.** The legacy `~/.config/servicenow-mcp/instances.json` is no
+   longer read. Recreate it as a store (see the README), or wait for
+   `./snowarch instance import --from-legacy`.
+2. **Check your flags.** If `SCRIPTING_ENABLED` was on only for reading, turn it off.
+3. **Name your `.env`.** Set `SNOW_ENV_FILE`; the current directory's file is ignored.
+4. **Re-check your limits.** `MAX_RECORDS` now defaults to 100 and belongs on the instance.
+5. **Stop passing `instance` per call.** Use `snow_core_instance_switch`.
+6. **Replace `dynamic_*` tool calls** with `snow_core_records_query` and its siblings after
+   `snow_disco_table_discover`.
+7. **Update HTTP callers.** There is no HTTP transport, REST API, dashboard or A2A endpoint. stdio
+   only.
+8. **`LOG_LEVEL` still works** as a fallback for `SNOW_LOG_LEVEL`; prefer the new name.
+
+---
 
 ### Removed (D-03 surface cut, ARC-04-S01)
 
@@ -59,6 +194,26 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
+
+### Removed (ARC-04-S14) — the package's own `docs/` folder
+
+All eleven package documents are gone: `INSTALLATION.md`, `CLIENT_SETUP.md` (which never existed —
+the plan's list predates the import), `MULTI_INSTANCE.md`, `TOOLS.md`, `EXAMPLES.md`,
+`instances.example.json`, the package `CONTRIBUTING.md` (folded into the repository's), and the six
+per-family guides `ATF.md`, `NOW_ASSIST.md`, `REPORTING.md`, `SCRIPTING.md`,
+`SERVICENOW_OAUTH_SETUP.md` and `TOOL_PACKAGES.md`.
+
+They were deleted because they were **wrong, and could not notice**. `REPORTING.md` claimed 13
+reporting tools where the catalogue has 17; `TOOL_PACKAGES.md` listed eight role bundles where the
+code has thirteen, each with a hand-counted total that had drifted (`400+` for `full`). What a
+reader needs from them is now either generated from `dist/contract.json` — the family table, the
+bundle table, the preset table, the error codes — or written into the README once: the two
+authentication methods with the OAuth application-registry steps, and what `MCP_TOOL_PACKAGE` does.
+
+**`SERVICENOW_OAUTH_SETUP.md` carried the last copy of the 1.x placeholder OAuth client id in the
+tree.** It leaves with the file. The two `.gitleaksignore` fingerprints for it stay: `gitleaks git`
+walks history, so the findings remain in the commits that carried them, and a fingerprint is pinned
+to a commit rather than to a path that still exists.
 
 ### Added (ARC-04-S13) — `dist/` is committed, and CI proves it matches the source
 
