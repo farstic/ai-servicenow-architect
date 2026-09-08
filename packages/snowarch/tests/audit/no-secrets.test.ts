@@ -1,11 +1,12 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectToolCatalog } from '../../src/tools/index.js';
+import { removeTempDir, reapServerChildren, trackServerChild } from '../helpers/server-child.js';
 
 const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/server.js');
 
@@ -84,6 +85,9 @@ async function connect(over: Record<string, string> = {}): Promise<{ client: Cli
   });
   const client = new Client({ name: 'audit-test', version: '0' }, { capabilities: {} });
   await client.connect(transport);
+  // After `connect`, not before: the transport spawns the child there, and until it does its
+  // `pid` is null — which `trackServerChild` refuses rather than silently reaping nothing.
+  trackServerChild(transport);
   transport.stderr?.on('data', (c: Buffer) => { captured += c.toString(); });
   return { client, stderr: () => captured };
 }
@@ -103,7 +107,11 @@ beforeEach(() => {
   mkdirSync(checkout, { recursive: true });
 });
 
-afterEach(() => { rmSync(base, { recursive: true, force: true }); });
+afterEach(async () => {
+  // Reap first: the removal is only safe once nothing can still write into the directory.
+  await reapServerChildren();
+  removeTempDir(base);
+});
 
 describe('criterion 1 - a mutating call writes one line, and the payload is not in it', () => {
   it('record_add under pdi-developer', async () => {
@@ -252,12 +260,23 @@ describe('criterion 4 - no credential in the audit file or on stderr', () => {
         .filter((t) => !SPAWNS_AN_EXTERNAL_PROCESS.includes(t.name));
       expect(mutating.length).toBeGreaterThan(100);
 
+      // The ceiling on this test is 180 s against a suite default of 30 s, and the reason is
+      // measured rather than guessed: one stdio round-trip per mutating tool, 160 of them,
+      // is ~61 s on an idle developer machine and ~64 s on a CI runner. The margin is for a
+      // loaded runner, not for the happy path. The elapsed time is logged so that a future
+      // slowdown arrives as a number in the run output rather than as a mystery timeout.
+      const started = Date.now();
+
       for (const t of mutating) {
         await client.callTool({
           name: t.name,
           arguments: { table: 'incident', fields: { x: MARKER }, name: MARKER, script: MARKER },
         }).catch(() => undefined);
       }
+
+      const elapsed = Date.now() - started;
+      // eslint-disable-next-line no-console
+      console.log(`  no-secrets sweep: ${mutating.length} mutating tools in ${elapsed} ms`);
 
       const audit = auditText();
       const log = stderr();

@@ -9,8 +9,14 @@ established and the reasons behind them — several exist because something went
 
 Work happens on an **ARC branch** (`arc-NN/<name>`), is **reviewed by the architect on a fresh clone**,
 and reaches `develop` by **pull request**. `main` is created only at a **milestone merge, with the
-owner's explicit approval**. It did not exist during ARC-01, which is why the CI workflow triggers on
-`main`, `develop`, `arc-*/**` **and** `chore/**`: a workflow watching only `main` would never have run.
+owner's explicit approval**.
+
+**Open the pull request as a draft at the first push of a story branch** — `gh pr create --draft --base
+develop` with the story report as the body — and let the architect mark it ready and merge. CI triggers
+on `pull_request` and on pushes to `main` and `develop` only, so until the pull request exists a work
+branch has no build at all; and while it existed as both, one push started two full 25-job matrices for
+the same commit, whose contention produced a real red build (2026-09-08 — see the teardown note under
+*A spawned child is reaped before its temp directory is removed*).
 
 **`main` exists as of 2026-09-08**, created from `793e58d` (the M1 milestone merge) once M1 was complete.
 Recorded here as commands rather than as prose, so the next milestone repeats it instead of

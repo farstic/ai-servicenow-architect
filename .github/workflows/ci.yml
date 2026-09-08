@@ -1,12 +1,19 @@
 name: ci
 
-# `main` does not exist yet: by the owner's directive it is created only at a milestone merge
-# (ARC-01-S01's branch-model reconciliation, 2026-09-07). Until then the integration branch is
-# `develop` and the work lands on `arc-*/**`, so all three are triggers — a workflow that only
-# watched `main` would never run during ARC-01 and would be unprovable.
+# Two long-lived branches: `develop` integrates, and `main` (created at the M1 milestone merge,
+# 2026-09-08) is the release line. Both are push triggers because a commit reaches them by merge,
+# and a merge result nobody built is a result nobody has.
+#
+# Work branches are NOT push triggers. They were, and a push to one that already had a pull
+# request open started two full 25-job matrices for the same commit — which is not just twice the
+# CI bill: the two runs share a runner pool, and the contention made a server test's teardown race
+# a child process it had not waited for (2026-09-08, `macos-latest` / node 24, ENOTEMPTY). Every
+# work branch reaches CI through `pull_request` instead, which is where its result is read; the
+# process rule that makes that reliable is in docs/CONTRIBUTING.md — a story branch gets its draft
+# PR at first push.
 on:
   push:
-    branches: [main, develop, 'arc-*/**', 'chore/**']
+    branches: [main, develop]
   pull_request: {}
 
 concurrency:
