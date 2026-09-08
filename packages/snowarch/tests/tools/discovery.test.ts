@@ -141,7 +141,6 @@ describe('dispatchDynamicAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     schemaCache.clear();
-    process.env.WRITE_ENABLED = 'true';
   });
 
   it('returns null for non-dynamic tool names', async () => {
@@ -260,16 +259,4 @@ describe('dispatchDynamicAction', () => {
     expect(mockClient.deleteRecord).toHaveBeenCalledWith('u_test', 'abc');
   });
 
-  it('throws when write operations are called without WRITE_ENABLED', async () => {
-    delete process.env.WRITE_ENABLED;
-    schemaCache.set(
-      'u_test',
-      [{ element: 'name', internal_type: 'string', label: 'Name', max_length: 255, mandatory: false, read_only: false }],
-      ['dynamic_create_u_test']
-    );
-
-    await expect(
-      dispatchDynamicAction(mockClient, 'dynamic_create_u_test', { name: 'Test' })
-    ).rejects.toThrow('Write operations are disabled');
-  });
 });

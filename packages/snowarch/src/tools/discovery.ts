@@ -9,8 +9,9 @@ import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { schemaCache, type ColumnSchema } from './schema-cache.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function discoveryToolManifest() {
+export function discoveryToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_disco_table_discover',
@@ -31,6 +32,8 @@ export function discoveryToolManifest() {
         },
         required: ['table'],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

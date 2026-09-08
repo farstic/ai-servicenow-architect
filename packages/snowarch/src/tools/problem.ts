@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function problemToolManifest() {
+export function problemToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_prb_problem_add',
@@ -21,6 +22,9 @@ export function problemToolManifest() {
         },
         required: ['short_description'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'problem',
     },
     {
       name: 'snow_prb_problem_read',
@@ -32,6 +36,8 @@ export function problemToolManifest() {
         },
         required: ['number_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_prb_problem_modify',
@@ -44,6 +50,9 @@ export function problemToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'problem',
     },
     {
       name: 'snow_prb_problem_resolve',
@@ -57,6 +66,9 @@ export function problemToolManifest() {
         },
         required: ['sys_id', 'root_cause', 'resolution_notes'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'problem',
     },
   ];
 }

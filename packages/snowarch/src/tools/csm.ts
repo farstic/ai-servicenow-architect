@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function csmToolManifest() {
+export function csmToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_csm_csm_case_add',
@@ -26,6 +27,8 @@ export function csmToolManifest() {
         },
         required: ['short_description'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_csm_csm_case_read',
@@ -37,6 +40,8 @@ export function csmToolManifest() {
         },
         required: ['number_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_csm_csm_case_modify',
@@ -49,6 +54,8 @@ export function csmToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_csm_csm_cases_index',
@@ -65,6 +72,8 @@ export function csmToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_csm_csm_case_close',
@@ -78,6 +87,8 @@ export function csmToolManifest() {
         },
         required: ['sys_id', 'resolution_notes'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_csm_csm_account_read',
@@ -89,6 +100,8 @@ export function csmToolManifest() {
         },
         required: ['name_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_csm_csm_accounts_index',
@@ -102,6 +115,8 @@ export function csmToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_csm_csm_contact_read',
@@ -113,6 +128,8 @@ export function csmToolManifest() {
         },
         required: ['name_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_csm_csm_contacts_index',
@@ -126,6 +143,8 @@ export function csmToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_csm_csm_case_sla_read',
@@ -137,6 +156,8 @@ export function csmToolManifest() {
         },
         required: ['case_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_csm_csm_products_index',
@@ -149,6 +170,8 @@ export function csmToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

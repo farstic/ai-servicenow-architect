@@ -1,0 +1,20 @@
+{
+  "//": "The base tsconfig excludes `tests`, so `tsc --noEmit` never type-checked them. That made tests/tools/types.test-d.ts \u2014 whose whole job is to assert that certain code does NOT compile \u2014 pass by never being compiled. This config type-checks the tests as well; `npm run type-check` runs both. rootDir is cleared because the base pins it to src/.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": [
+      "node",
+      "vitest/globals"
+    ]
+  },
+  "include": [
+    "src/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

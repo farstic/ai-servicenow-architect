@@ -6,8 +6,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function portalToolManifest() {
+export function portalToolManifest(): ToolDefinition[] {
   return [
     // ── Service Portal ──────────────────────────────────────────────────────
     {
@@ -21,6 +22,8 @@ export function portalToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_portal_portal_add',
@@ -43,6 +46,8 @@ export function portalToolManifest() {
         },
         required: ['title', 'url_suffix'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_portal_portal_page_add',
@@ -57,6 +62,8 @@ export function portalToolManifest() {
         },
         required: ['title', 'id', 'portal_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_portal_portal_read',
@@ -68,6 +75,8 @@ export function portalToolManifest() {
         },
         required: ['id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_portal_portal_pages_index',
@@ -81,6 +90,8 @@ export function portalToolManifest() {
         },
         required: ['portal_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_portal_portal_page_read',
@@ -92,6 +103,8 @@ export function portalToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── Widgets ──────────────────────────────────────────────────────────────
     {
@@ -105,6 +118,8 @@ export function portalToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_portal_portal_widget_read',
@@ -116,6 +131,8 @@ export function portalToolManifest() {
         },
         required: ['id_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_portal_portal_widget_add',
@@ -134,6 +151,8 @@ export function portalToolManifest() {
         },
         required: ['name', 'id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_portal_portal_widget_modify',
@@ -149,6 +168,8 @@ export function portalToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_portal_widget_instances_index',
@@ -161,6 +182,8 @@ export function portalToolManifest() {
         },
         required: ['widget_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── UI Builder (Next Experience) ────────────────────────────────────────
     {
@@ -174,6 +197,8 @@ export function portalToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_portal_ux_app_read',
@@ -185,6 +210,8 @@ export function portalToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_portal_ux_pages_index',
@@ -198,6 +225,8 @@ export function portalToolManifest() {
         },
         required: ['app_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── Themes & Branding ───────────────────────────────────────────────────
     {
@@ -210,6 +239,8 @@ export function portalToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_portal_portal_theme_read',
@@ -221,6 +252,8 @@ export function portalToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

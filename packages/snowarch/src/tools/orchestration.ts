@@ -6,6 +6,7 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireNowAssist, requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
 interface PlaybookStep {
   tool_name: string;
@@ -23,7 +24,7 @@ interface StepResult {
   duration_ms?: number;
 }
 
-export function orchestrationToolManifest() {
+export function orchestrationToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_orch_playbook_add',
@@ -50,6 +51,9 @@ export function orchestrationToolManifest() {
         },
         required: ['name', 'description', 'steps'],
       },
+      gate: 'now_assist',
+      mutates: true,
+      alsoRequires: 'write',
     },
     {
       name: 'snow_orch_playbook_exec',
@@ -84,6 +88,8 @@ export function orchestrationToolManifest() {
         },
         required: ['playbook'],
       },
+      gate: 'now_assist',
+      mutates: true,
     },
     {
       name: 'snow_orch_playbooks_index',
@@ -95,6 +101,8 @@ export function orchestrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

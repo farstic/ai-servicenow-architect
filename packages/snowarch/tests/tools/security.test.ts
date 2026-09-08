@@ -10,22 +10,11 @@ const mockClient: any = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  delete process.env.WRITE_ENABLED;
 });
 
 describe('Security Operations tools', () => {
   describe('snow_sec_security_incident_add', () => {
-    it('throws when write is disabled', async () => {
-      await expect(
-        dispatchSecurityAction(mockClient, 'snow_sec_security_incident_add', {
-          short_description: 'Ransomware detected',
-          category: 'Malware',
-        })
-      ).rejects.toThrow('Write operations are disabled');
-    });
-
     it('creates security incident when write enabled', async () => {
-      process.env.WRITE_ENABLED = 'true';
       mockClient.createRecord.mockResolvedValue({ sys_id: 'sec001', number: 'SIR0001' });
       const result = await dispatchSecurityAction(mockClient, 'snow_sec_security_incident_add', {
         short_description: 'Ransomware detected on server',

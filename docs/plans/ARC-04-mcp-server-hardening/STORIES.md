@@ -471,6 +471,37 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
+> **Amendment 2026-09-08 (architect's rulings on the S06 delivery, plus what the seeding found).**
+> - **`EXPECTED = 397` here**, with the arithmetic in the comment: S07 adds `snow_us_capture_target_set`
+>   (+1) and S08 removes `snow_rpt_report_generate` (−1) while keeping the two retired script-exec tools
+>   as `[Unsupported]` stubs; each bumps the constant in its own PR. `contract.toolCount` is DERIVED
+>   from the catalogue, never a literal, so the contract cannot disagree with the code even when the
+>   constant lags.
+> - **`contract.version` is `2.0.0-dev`**, the package version of record; ARC-09 sets the release number.
+> - **The error-code registry is `src/errors/codes.ts`** — no equivalent existed. 45 codes, each with a
+>   remedy, and `tests/errors/codes.test.ts` asserts BOTH directions: every code thrown in `src/` is
+>   registered, and every registered code is actually thrown. The second direction matters as much: a
+>   code the generator documents but nothing produces sends a reader hunting a failure that cannot happen.
+> - **`alsoRequires` added to the contract shape — needs ratification.** Six tools sit behind a
+>   module-wide gate AND a case-level one (`now_assist` then `write`, `fluent` then `write`). `gate` is
+>   the OUTER one, because that is what refuses first and therefore what predicts the refusal; without a
+>   second field the write requirement would be absent from the contract entirely and §2.1's ask list
+>   would under-report those six. The field is optional and additive: a consumer that ignores it still
+>   gets a correct prediction of the first refusal.
+> - **The seeding found 13 more instances of the S05 ordering bug** — `gate` after argument validation,
+>   so an unauthorised caller got `INVALID_REQUEST` instead of a permission code — across
+>   `sys-properties.ts`, `devops.ts`, `fluent.ts`, `itam.ts` and `va.ts`. All fixed; the anomaly list is
+>   empty.
+> - **Test consolidation:** ten per-suite refusal assertions removed across seven dispatcher suites
+>   (contract (a) asserts the same property for all 397 rather than nine hand-picked ones), the
+>   `tests/setup.ts` env-view glue and `tests/helpers/instance.ts` deleted, and 14 dead
+>   `process.env.*_ENABLED` lines stripped. A suite that needs more than `pdi-developer` now says so
+>   with `withPreset()`. `tests/tools/gate-split.test.ts` is KEPT: it asserts gate-before-validation
+>   ordering, which the contract test does not.
+> - **`tsconfig.json` excluded `tests/`**, so `tsc --noEmit` never type-checked them — which made the
+>   `@ts-expect-error` type test pass by never being compiled. `tsconfig.tests.json` and a two-step
+>   `type-check` script fix that; criterion 1 is verified in both directions.
+
 ### ARC-04-S07 — `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter
 
 **As** the engine executing §2.2 before a configuration write **I want** one tool that points the authenticated user's REST update-set capture at a named update set, and an ensure tool that never returns somebody else's in-progress set **so that** §2.2 is four generated calls and every created Script Include lands in the intended update set.

@@ -18,8 +18,9 @@ import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
 import { instanceManager } from '../servicenow/instances.js';
 import { currentCapabilities, reloadInstances, serverStatus } from './status.js';
+import type { ToolDefinition } from './types.js';
 
-export function coreToolManifest() {
+export function coreToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_core_records_query',
@@ -35,6 +36,8 @@ export function coreToolManifest() {
         },
         required: ['table'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_table_schema_read',
@@ -46,6 +49,8 @@ export function coreToolManifest() {
         },
         required: ['table'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_record_read',
@@ -59,6 +64,8 @@ export function coreToolManifest() {
         },
         required: ['table', 'sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_record_add',
@@ -71,6 +78,8 @@ export function coreToolManifest() {
         },
         required: ['table', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_core_record_modify',
@@ -84,6 +93,8 @@ export function coreToolManifest() {
         },
         required: ['table', 'sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_core_record_remove',
@@ -96,6 +107,8 @@ export function coreToolManifest() {
         },
         required: ['table', 'sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_core_user_read',
@@ -107,6 +120,8 @@ export function coreToolManifest() {
         },
         required: ['user_identifier'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_group_read',
@@ -118,6 +133,8 @@ export function coreToolManifest() {
         },
         required: ['group_identifier'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_cmdb_ci_query',
@@ -130,6 +147,8 @@ export function coreToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_cmdb_ci_read',
@@ -142,6 +161,8 @@ export function coreToolManifest() {
         },
         required: ['ci_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_relationships_index',
@@ -153,6 +174,8 @@ export function coreToolManifest() {
         },
         required: ['ci_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_discovery_schedules_index',
@@ -164,6 +187,8 @@ export function coreToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_mid_servers_index',
@@ -175,6 +200,8 @@ export function coreToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_active_events_index',
@@ -187,11 +214,15 @@ export function coreToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_health_dashboard_read',
       description: 'Get CMDB data quality metrics (completeness of server and network CI data)',
       inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_service_mapping_summary_read',
@@ -203,6 +234,8 @@ export function coreToolManifest() {
         },
         required: ['service_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_natural_language_query',
@@ -215,6 +248,8 @@ export function coreToolManifest() {
         },
         required: ['query'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_natural_language_modify',
@@ -227,6 +262,8 @@ export function coreToolManifest() {
         },
         required: ['instruction', 'table'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       // The three tools below need NO instance: they describe the server's own state, and
@@ -235,21 +272,29 @@ export function coreToolManifest() {
       name: 'snow_core_status_read',
       description: "Report the server's own state: mode, which store was used, which instances loaded or were refused, and how many tools are advertised. Needs no instance.",
       inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_capabilities_read',
       description: "Report the current instance's preset, flags and effective flags. Never returns a username or a secret.",
       inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_instances_reload',
       description: 'Re-read the instance store from disk and re-advertise the tool list. Use after adding an instance in another terminal, instead of restarting.',
       inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_instances_index',
       description: 'List all configured ServiceNow instances (multi-instance / multi-customer support)',
       inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_instance_switch',
@@ -261,11 +306,15 @@ export function coreToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_current_instance_read',
       description: 'Get the currently active ServiceNow instance name and URL',
       inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_ci_relationship_add',
@@ -279,6 +328,8 @@ export function coreToolManifest() {
         },
         required: ['parent', 'child', 'type'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_core_analysis_impact',
@@ -291,6 +342,8 @@ export function coreToolManifest() {
         },
         required: ['ci_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_discovery_scan_exec',
@@ -303,6 +356,8 @@ export function coreToolManifest() {
         },
         required: ['schedule_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
   ];
 }

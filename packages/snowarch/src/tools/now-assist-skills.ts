@@ -6,8 +6,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireNowAssist, requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function nowAssistSkillsToolManifest() {
+export function nowAssistSkillsToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_nas_now_assist_skill_add',
@@ -24,6 +25,9 @@ export function nowAssistSkillsToolManifest() {
         },
         required: ['name', 'description', 'input_schema', 'output_schema', 'prompt_template'],
       },
+      gate: 'now_assist',
+      mutates: true,
+      alsoRequires: 'write',
     },
     {
       name: 'snow_nas_now_assist_skills_index',
@@ -37,6 +41,8 @@ export function nowAssistSkillsToolManifest() {
         },
         required: [],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
     {
       name: 'snow_nas_now_assist_skill_read',
@@ -48,6 +54,8 @@ export function nowAssistSkillsToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
     {
       name: 'snow_nas_now_assist_skill_test',
@@ -60,6 +68,8 @@ export function nowAssistSkillsToolManifest() {
         },
         required: ['skill_sys_id', 'test_input'],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
   ];
 }

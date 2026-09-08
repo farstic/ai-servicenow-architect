@@ -10,8 +10,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function itamToolManifest() {
+export function itamToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_itam_assets_index',
@@ -28,6 +29,8 @@ export function itamToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_itam_asset_read',
@@ -39,6 +42,8 @@ export function itamToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_itam_asset_add',
@@ -59,6 +64,9 @@ export function itamToolManifest() {
         },
         required: ['display_name'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'alm_asset',
     },
     {
       name: 'snow_itam_asset_modify',
@@ -71,6 +79,9 @@ export function itamToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'alm_asset',
     },
     {
       name: 'snow_itam_asset_retire',
@@ -84,6 +95,9 @@ export function itamToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'alm_asset',
     },
     {
       name: 'snow_itam_software_licenses_index',
@@ -96,6 +110,8 @@ export function itamToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_itam_license_compliance_read',
@@ -107,6 +123,8 @@ export function itamToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_itam_asset_contracts_index',
@@ -120,6 +138,8 @@ export function itamToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_itam_asset_lifecycle_track',
@@ -133,6 +153,8 @@ export function itamToolManifest() {
         },
         required: ['asset_id', 'new_stage'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_itam_license_optimization_read',
@@ -145,6 +167,8 @@ export function itamToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }
@@ -178,8 +202,8 @@ export async function dispatchItamAction(
     }
 
     case 'snow_itam_asset_add': {
-      if (!args.display_name) throw new ServiceNowError('display_name is required', 'INVALID_REQUEST');
       requireWrite();
+      if (!args.display_name) throw new ServiceNowError('display_name is required', 'INVALID_REQUEST');
       const payload: Record<string, any> = { display_name: args.display_name };
       const fields = ['asset_tag', 'model_category', 'model', 'serial_number', 'assigned_to', 'location', 'cost', 'cost_center', 'purchase_date'];
       for (const f of fields) { if (args[f] !== undefined) payload[f] = args[f]; }
@@ -188,15 +212,15 @@ export async function dispatchItamAction(
     }
 
     case 'snow_itam_asset_modify': {
-      if (!args.sys_id || !args.fields) throw new ServiceNowError('sys_id and fields are required', 'INVALID_REQUEST');
       requireWrite();
+      if (!args.sys_id || !args.fields) throw new ServiceNowError('sys_id and fields are required', 'INVALID_REQUEST');
       const result = await client.updateRecord('alm_asset', args.sys_id, args.fields);
       return { action: 'updated', sys_id: args.sys_id, ...result };
     }
 
     case 'snow_itam_asset_retire': {
-      if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
       requireWrite();
+      if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
       const payload: Record<string, any> = { install_status: 'retired' };
       if (args.disposal_reason) payload.disposal_reason = args.disposal_reason;
       if (args.disposal_date) payload.disposal_date = args.disposal_date;
@@ -247,9 +271,9 @@ export async function dispatchItamAction(
     }
 
     case 'snow_itam_asset_lifecycle_track': {
+      requireWrite();
       if (!args.asset_id || !args.new_stage)
         throw new ServiceNowError('asset_id and new_stage are required', 'INVALID_REQUEST');
-      requireWrite();
       const stageMap: Record<string, string> = {
         in_stock: '6', in_use: '1', in_maintenance: '7', retired: '8', disposed: '9',
       };

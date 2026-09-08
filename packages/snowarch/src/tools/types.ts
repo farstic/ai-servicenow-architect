@@ -1,0 +1,42 @@
+/**
+ * What a tool registration must declare.
+ *
+ * Before ARC-04-S06 a manifest entry carried only name, description and inputSchema, and
+ * which flag gated a tool lived in prose — so the §2.1 approval list, the §2.2 update-set
+ * protocol and the doctor each had their own idea of it (P-36). `gate` and `mutates` are
+ * required fields, so a new tool that omits them does not compile.
+ *
+ * The declaration and the runtime cannot drift: `tests/contract.test.ts` (a) calls every
+ * tool with all flags false and asserts the thrown code is the one its `gate` implies.
+ */
+export type Gate = 'none' | 'write' | 'cmdb_write' | 'scripting' | 'atf' | 'now_assist' | 'fluent';
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  // The JSON Schema the MCP SDK advertises. Deliberately loose: it is data, and typing it
+  // here would mean re-declaring JSON Schema for no gain.
+  inputSchema: Record<string, unknown>;
+  /** Which flag family gates this tool. `none` means callable on any configured instance. */
+  gate: Gate;
+  /** True when a successful call changes state on the instance. Drives §2.1's ask list. */
+  mutates: boolean;
+  /**
+   * A SECOND gate the tool enforces after `gate` has passed.
+   *
+   * Six tools have a module-wide gate plus a case-level one — `now_assist` then `write`, or
+   * `fluent` then `write`. `gate` is the outer one, because that is what refuses first and
+   * therefore what a consumer needs in order to predict the refusal; without this field the
+   * write requirement would simply be absent from the contract, and §2.1's ask list would
+   * under-report what those tools need. Additive: a consumer that ignores it still gets a
+   * correct prediction of the FIRST refusal.
+   */
+  alsoRequires?: Gate;
+
+  /**
+   * The table this tool writes, where it is FIXED by the tool rather than passed in. The
+   * audit writer (ARC-04-S10) records it. Absent when the table comes from the arguments —
+   * naming a table the caller chose would put a guess in an audit record.
+   */
+  table?: string;
+}

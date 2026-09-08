@@ -15,7 +15,8 @@
  */
 import { Command } from 'commander';
 import { spawn } from 'child_process';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
+import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
@@ -73,9 +74,29 @@ program
 
 program
   .command('contract')
-  .description('Print or verify the tool contract')
-  .allowUnknownOption()
-  .allowExcessArguments()
-  .action(stub('contract', 'ARC-04-S06'));
+  .description('Print the tool contract, or its sha256')
+  .option('--json', 'print dist/contract.json verbatim')
+  .option('--sha', 'print sha256(dist/contract.json) and nothing else')
+  .action((opts: { json?: boolean; sha?: boolean }) => {
+    const contractPath = path.resolve(__cliDir, '..', 'contract.json');
+    if (!existsSync(contractPath)) {
+      process.stderr.write('contract.json is missing — run `npm run build` in the package\n');
+      process.exit(NOT_IMPLEMENTED_EXIT);
+    }
+    const text = readFileSync(contractPath, 'utf8');
+
+    if (opts.sha) {
+      // Exactly 64 hex characters and a newline. ARC-05 pins against this and ARC-06's B05
+      // compares it, so anything else on stdout — a label, a prefix — breaks both.
+      process.stdout.write(`${createHash('sha256').update(text).digest('hex')}\n`);
+      return;
+    }
+    if (opts.json) { process.stdout.write(text); return; }
+
+    const c = JSON.parse(text);
+    const sha = createHash('sha256').update(text).digest('hex');
+    process.stdout.write(
+      `contract ${c.contractVersion} · ${c.product} ${c.version} · ${c.toolCount} tools · sha256 ${sha.slice(0, 12)}\n`);
+  });
 
 program.parse();

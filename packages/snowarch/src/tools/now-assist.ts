@@ -14,8 +14,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireNowAssist } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function nowAssistToolManifest() {
+export function nowAssistToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_na_nlq_query',
@@ -29,6 +30,8 @@ export function nowAssistToolManifest() {
         },
         required: ['question'],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
     {
       name: 'snow_na_ai_query',
@@ -42,6 +45,8 @@ export function nowAssistToolManifest() {
         },
         required: ['query'],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
     {
       name: 'snow_na_summary_generate',
@@ -54,6 +59,8 @@ export function nowAssistToolManifest() {
         },
         required: ['table', 'sys_id'],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
     {
       name: 'snow_na_resolution_suggest',
@@ -65,6 +72,8 @@ export function nowAssistToolManifest() {
         },
         required: ['incident_sys_id'],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
     {
       name: 'snow_na_incident_categorize',
@@ -77,6 +86,8 @@ export function nowAssistToolManifest() {
         },
         required: ['short_description'],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
     {
       name: 'snow_na_virtual_agent_topics_read',
@@ -90,6 +101,8 @@ export function nowAssistToolManifest() {
         },
         required: [],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
     {
       name: 'snow_na_agentic_playbook_trigger',
@@ -102,6 +115,8 @@ export function nowAssistToolManifest() {
         },
         required: ['playbook_sys_id'],
       },
+      gate: 'now_assist',
+      mutates: true,
     },
     {
       name: 'snow_na_ms_copilot_topics_read',
@@ -113,6 +128,8 @@ export function nowAssistToolManifest() {
         },
         required: [],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
     {
       name: 'snow_na_work_notes_generate',
@@ -126,6 +143,8 @@ export function nowAssistToolManifest() {
         },
         required: ['table', 'sys_id'],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
     {
       name: 'snow_na_pi_models_read',
@@ -135,6 +154,8 @@ export function nowAssistToolManifest() {
         properties: {},
         required: [],
       },
+      gate: 'now_assist',
+      mutates: false,
     },
   ];
 }

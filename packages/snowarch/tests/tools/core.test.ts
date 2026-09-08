@@ -72,7 +72,6 @@ describe('dispatchCoreAction – get_record', () => {
 describe('dispatchCoreAction – create_record', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.WRITE_ENABLED = 'true';
   });
 
   it('creates a record when WRITE_ENABLED=true', async () => {
@@ -82,10 +81,6 @@ describe('dispatchCoreAction – create_record', () => {
     expect(result.sys_id).toBe('xyz');
   });
 
-  it('throws when WRITE_ENABLED=false', async () => {
-    process.env.WRITE_ENABLED = 'false';
-    await expect(dispatchCoreAction(mockClient, 'snow_core_record_add', { table: 'incident', fields: { short_description: 'x' } })).rejects.toThrow();
-  });
 });
 
 describe('dispatchCoreAction – unknown tool', () => {

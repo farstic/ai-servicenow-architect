@@ -13,93 +13,126 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite, requireScripting } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function workspaceToolManifest() {
+export function workspaceToolManifest(): ToolDefinition[] {
   return [
     // ─── UIB Pages ─────────────────────────────────────────────────
     {
       name: 'snow_ws_uib_pages_index',
       description: 'List UI Builder pages and their route configurations',
       inputSchema: { type: 'object', properties: { limit: { type: 'number', description: 'Max records (default 25)' }, app: { type: 'string', description: 'Filter by UX app sys_id' } }, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ws_uib_page_read',
       description: 'Get details of a specific UI Builder page including layout and child elements',
       inputSchema: { type: 'object', properties: { sys_id: { type: 'string', description: 'UIB page sys_id' } }, required: ['sys_id'] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ws_uib_page_add',
       description: 'Create a new UI Builder page with route registration. **[Write]**',
       inputSchema: { type: 'object', properties: { title: { type: 'string', description: 'Page title' }, path: { type: 'string', description: 'URL path segment' }, app: { type: 'string', description: 'Parent UX app sys_id' }, layout: { type: 'string', description: 'Layout type: single, sidebar, tabbed (default single)' } }, required: ['title', 'path'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_ws_uib_page_modify',
       description: 'Update an existing UI Builder page. **[Write]**',
       inputSchema: { type: 'object', properties: { sys_id: { type: 'string', description: 'UIB page sys_id' }, title: { type: 'string' }, path: { type: 'string' }, layout: { type: 'string' } }, required: ['sys_id'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_ws_uib_page_remove',
       description: 'Delete a UI Builder page. **[Write]**',
       inputSchema: { type: 'object', properties: { sys_id: { type: 'string', description: 'UIB page sys_id' } }, required: ['sys_id'] },
+      gate: 'write',
+      mutates: true,
     },
     // ─── UIB Components ────────────────────────────────────────────
     {
       name: 'snow_ws_uib_components_index',
       description: 'List available UI Builder components (macroponents) in the instance',
       inputSchema: { type: 'object', properties: { limit: { type: 'number', description: 'Max records (default 50)' }, scope: { type: 'string', description: 'Filter by scope/app' } }, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ws_uib_component_add',
       description: 'Create a custom UI Builder component (macroponent). **[Scripting]**',
       inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'Component name' }, label: { type: 'string', description: 'Display label' }, description: { type: 'string' }, category: { type: 'string', description: 'Component category' } }, required: ['name', 'label'] },
+      gate: 'scripting',
+      mutates: true,
     },
     {
       name: 'snow_ws_uib_component_modify',
       description: 'Update a UI Builder component. **[Scripting]**',
       inputSchema: { type: 'object', properties: { sys_id: { type: 'string', description: 'Component sys_id' }, label: { type: 'string' }, description: { type: 'string' } }, required: ['sys_id'] },
+      gate: 'scripting',
+      mutates: true,
     },
     // ─── UIB Data Brokers ──────────────────────────────────────────
     {
       name: 'snow_ws_uib_data_brokers_index',
       description: 'List UI Builder data brokers (data sources for pages)',
       inputSchema: { type: 'object', properties: { page_sys_id: { type: 'string', description: 'Filter by page' }, limit: { type: 'number' } }, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ws_uib_data_broker_add',
       description: 'Create a UI Builder data broker to feed data to a page. **[Scripting]**',
       inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'Broker name' }, table: { type: 'string', description: 'Source table' }, query: { type: 'string', description: 'Encoded query filter' }, page: { type: 'string', description: 'Target page sys_id' } }, required: ['name', 'table'] },
+      gate: 'scripting',
+      mutates: true,
     },
     // ─── Configurable Workspaces ───────────────────────────────────
     {
       name: 'snow_ws_workspaces_index',
       description: 'List all configurable agent workspaces',
       inputSchema: { type: 'object', properties: { active: { type: 'boolean', description: 'Filter active (default true)' }, limit: { type: 'number' } }, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ws_workspace_read',
       description: 'Get details of a configurable agent workspace including tabs and lists',
       inputSchema: { type: 'object', properties: { sys_id: { type: 'string', description: 'Workspace sys_id' } }, required: ['sys_id'] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ws_workspace_add',
       description: 'Create a new configurable agent workspace. **[Write]**',
       inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'Workspace name' }, description: { type: 'string' }, table: { type: 'string', description: 'Primary table (e.g. incident)' }, icon: { type: 'string', description: 'Workspace icon name' } }, required: ['name', 'table'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_ws_workspace_list_configure',
       description: 'Add or update a list view in an agent workspace. **[Write]**',
       inputSchema: { type: 'object', properties: { workspace_sys_id: { type: 'string', description: 'Workspace sys_id' }, table: { type: 'string', description: 'List table' }, title: { type: 'string', description: 'List title' }, query: { type: 'string', description: 'Encoded query filter' }, columns: { type: 'string', description: 'Comma-separated field names' } }, required: ['workspace_sys_id', 'table', 'title'] },
+      gate: 'write',
+      mutates: true,
     },
     // ─── UX App Configuration ──────────────────────────────────────
     {
       name: 'snow_ws_ux_app_route_add',
       description: 'Register a new route (URL path) in a UX app. **[Write]**',
       inputSchema: { type: 'object', properties: { app_sys_id: { type: 'string', description: 'UX app sys_id' }, path: { type: 'string', description: 'Route path' }, page_sys_id: { type: 'string', description: 'Target UIB page sys_id' }, title: { type: 'string', description: 'Route title' } }, required: ['app_sys_id', 'path', 'page_sys_id'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_ws_ux_experience_add',
       description: 'Create a new UX Experience (app shell) configuration. **[Write]**',
       inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'Experience name' }, app_sys_id: { type: 'string', description: 'UX app sys_id' }, landing_page: { type: 'string', description: 'Landing page sys_id' } }, required: ['name', 'app_sys_id'] },
+      gate: 'write',
+      mutates: true,
     },
   ];
 }

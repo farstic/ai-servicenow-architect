@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireCmdbWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function cmdbReconciliationToolManifest() {
+export function cmdbReconciliationToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_cmdb_duplicates_query',
@@ -24,6 +25,8 @@ export function cmdbReconciliationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cmdb_orphans_query',
@@ -36,6 +39,8 @@ export function cmdbReconciliationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cmdb_stale_query',
@@ -49,6 +54,8 @@ export function cmdbReconciliationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cmdb_reconcile',
@@ -70,6 +77,8 @@ export function cmdbReconciliationToolManifest() {
         },
         required: ['action', 'targets'],
       },
+      gate: 'cmdb_write',
+      mutates: true,
     },
   ];
 }

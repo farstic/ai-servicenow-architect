@@ -6,8 +6,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite, requireScripting } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function integrationToolManifest() {
+export function integrationToolManifest(): ToolDefinition[] {
   return [
     // ── Outbound REST Messages ───────────────────────────────────────────────
     {
@@ -21,6 +22,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_rest_message_read',
@@ -32,6 +35,8 @@ export function integrationToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_rest_message_functions_index',
@@ -44,6 +49,8 @@ export function integrationToolManifest() {
         },
         required: ['rest_message_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_rest_message_add',
@@ -62,6 +69,8 @@ export function integrationToolManifest() {
         },
         required: ['name', 'endpoint'],
       },
+      gate: 'write',
+      mutates: true,
     },
     // ── Transform Maps ──────────────────────────────────────────────────────
     {
@@ -76,6 +85,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_transform_map_read',
@@ -87,6 +98,8 @@ export function integrationToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_transform_map_exec',
@@ -99,6 +112,8 @@ export function integrationToolManifest() {
         },
         required: ['transform_map_sys_id', 'import_set_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_intg_transform_field_maps_index',
@@ -111,6 +126,8 @@ export function integrationToolManifest() {
         },
         required: ['transform_map_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── Import Sets ─────────────────────────────────────────────────────────
     {
@@ -125,6 +142,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_import_set_read',
@@ -136,6 +155,8 @@ export function integrationToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_import_set_row_add',
@@ -151,6 +172,8 @@ export function integrationToolManifest() {
         },
         required: ['staging_table', 'data'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_intg_data_sources_index',
@@ -164,6 +187,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── Event Registry & Management ─────────────────────────────────────────
     {
@@ -177,6 +202,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_event_registry_entry_read',
@@ -188,6 +215,8 @@ export function integrationToolManifest() {
         },
         required: ['name_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_event_register',
@@ -201,6 +230,8 @@ export function integrationToolManifest() {
         },
         required: ['name', 'table'],
       },
+      gate: 'scripting',
+      mutates: false,
     },
     {
       name: 'snow_intg_event_fire',
@@ -216,6 +247,8 @@ export function integrationToolManifest() {
         },
         required: ['event_name', 'table', 'record_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_intg_event_log_index',
@@ -232,6 +265,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── OAuth & Credentials ─────────────────────────────────────────────────
     {
@@ -245,6 +280,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_credential_aliases_index',
@@ -258,6 +295,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

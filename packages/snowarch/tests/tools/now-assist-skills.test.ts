@@ -4,6 +4,9 @@ import {
   nowAssistSkillsToolManifest,
 } from '../../src/tools/now-assist-skills.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
+import { withPreset } from '../helpers/preset.js';
+
+withPreset('full');
 
 const mockClient = {
   queryRecords: vi.fn(),
@@ -31,21 +34,11 @@ describe('nowAssistSkillsToolManifest', () => {
 describe('dispatchNowAssistSkillsAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.NOW_ASSIST_ENABLED = 'true';
-    process.env.WRITE_ENABLED = 'true';
   });
 
   it('returns null for unmatched tool names', async () => {
     const result = await dispatchNowAssistSkillsAction(mockClient, 'unknown_tool', {});
     expect(result).toBeNull();
-  });
-
-  it('throws when NOW_ASSIST_ENABLED is not set', async () => {
-    delete process.env.NOW_ASSIST_ENABLED;
-
-    await expect(
-      dispatchNowAssistSkillsAction(mockClient, 'snow_nas_now_assist_skills_index', {})
-    ).rejects.toThrow('Now Assist');
   });
 
   describe('snow_nas_now_assist_skills_index', () => {
@@ -144,22 +137,6 @@ describe('dispatchNowAssistSkillsAction', () => {
           prompt_template: 'Summarize: {{input}}',
         })
       );
-    });
-
-    it('requires NOW_ASSIST_ENABLED + WRITE_ENABLED', async () => {
-      delete process.env.WRITE_ENABLED;
-
-      await expect(
-        dispatchNowAssistSkillsAction(mockClient, 'snow_nas_now_assist_skill_add', validArgs)
-      ).rejects.toThrow('Write operations are disabled');
-    });
-
-    it('throws when NOW_ASSIST_ENABLED is not set even with WRITE_ENABLED', async () => {
-      delete process.env.NOW_ASSIST_ENABLED;
-
-      await expect(
-        dispatchNowAssistSkillsAction(mockClient, 'snow_nas_now_assist_skill_add', validArgs)
-      ).rejects.toThrow('Now Assist');
     });
 
     it('throws when required fields are missing', async () => {

@@ -7,8 +7,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireScripting } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function scriptToolManifest() {
+export function scriptToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_scr_business_rules_index',
@@ -22,6 +23,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_business_rule_read',
@@ -33,6 +36,8 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_business_rule_add',
@@ -50,6 +55,9 @@ export function scriptToolManifest() {
         },
         required: ['name', 'table', 'when', 'script'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script',
     },
     {
       name: 'snow_scr_business_rule_modify',
@@ -62,6 +70,9 @@ export function scriptToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script',
     },
     {
       name: 'snow_scr_script_includes_index',
@@ -75,6 +86,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_script_include_read',
@@ -86,6 +99,8 @@ export function scriptToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_script_include_add',
@@ -101,6 +116,9 @@ export function scriptToolManifest() {
         },
         required: ['name', 'script'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script_include',
     },
     {
       name: 'snow_scr_script_include_modify',
@@ -113,6 +131,9 @@ export function scriptToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script_include',
     },
     {
       name: 'snow_scr_client_scripts_index',
@@ -127,6 +148,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_client_script_read',
@@ -138,6 +161,8 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_changesets_index',
@@ -150,6 +175,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_changeset_read',
@@ -161,6 +188,8 @@ export function scriptToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_changeset_commit',
@@ -172,6 +201,8 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'scripting',
+      mutates: true,
     },
     {
       name: 'snow_scr_changeset_publish',
@@ -183,6 +214,8 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'scripting',
+      mutates: true,
     },
     // ── Client Script CRUD ───────────────────────────────────────────────────
     {
@@ -201,6 +234,9 @@ export function scriptToolManifest() {
         },
         required: ['name', 'table', 'type', 'script'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script_client',
     },
     {
       name: 'snow_scr_client_script_modify',
@@ -213,6 +249,9 @@ export function scriptToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script_client',
     },
     // ── UI Policies ──────────────────────────────────────────────────────────
     {
@@ -227,6 +266,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_ui_policy_read',
@@ -238,6 +279,8 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_ui_policy_add',
@@ -254,6 +297,9 @@ export function scriptToolManifest() {
         },
         required: ['short_description', 'table'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_ui_policy',
     },
     // ── UI Actions ───────────────────────────────────────────────────────────
     {
@@ -269,6 +315,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_ui_action_read',
@@ -280,6 +328,8 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_ui_action_add',
@@ -299,6 +349,9 @@ export function scriptToolManifest() {
         },
         required: ['name', 'table', 'action_name'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_ui_action',
     },
     {
       name: 'snow_scr_ui_action_modify',
@@ -311,6 +364,9 @@ export function scriptToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_ui_action',
     },
     // ── ACL Management ───────────────────────────────────────────────────────
     {
@@ -326,6 +382,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_acl_read',
@@ -337,6 +395,8 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_acl_add',
@@ -355,6 +415,9 @@ export function scriptToolManifest() {
         },
         required: ['name', 'operation'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_security_acl',
     },
     {
       name: 'snow_scr_acl_modify',
@@ -367,6 +430,9 @@ export function scriptToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_security_acl',
     },
   ];
 }

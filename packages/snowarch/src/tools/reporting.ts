@@ -6,8 +6,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function reportingToolManifest() {
+export function reportingToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_rpt_reports_index',
@@ -21,6 +22,8 @@ export function reportingToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_rpt_report_read',
@@ -32,6 +35,8 @@ export function reportingToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_rpt_aggregate_query_exec',
@@ -47,6 +52,8 @@ export function reportingToolManifest() {
         },
         required: ['table', 'group_by'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_rpt_query_trend',
@@ -62,6 +69,8 @@ export function reportingToolManifest() {
         },
         required: ['table', 'date_field', 'group_by'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_rpt_performance_analytics_read',
@@ -74,6 +83,8 @@ export function reportingToolManifest() {
         },
         required: ['widget_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_rpt_report_data_export',
@@ -88,6 +99,8 @@ export function reportingToolManifest() {
         },
         required: ['table'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_rpt_sys_log_read',
@@ -100,6 +113,8 @@ export function reportingToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_rpt_scheduled_jobs_index',
@@ -113,6 +128,8 @@ export function reportingToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_rpt_scheduled_job_read',
@@ -124,6 +141,8 @@ export function reportingToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_rpt_scheduled_job_add',
@@ -149,6 +168,8 @@ export function reportingToolManifest() {
         },
         required: ['name', 'script', 'run_type'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_rpt_scheduled_job_modify',
@@ -164,6 +185,8 @@ export function reportingToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_rpt_scheduled_job_trigger',
@@ -175,6 +198,8 @@ export function reportingToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_rpt_report_add',
@@ -200,6 +225,8 @@ export function reportingToolManifest() {
         },
         required: ['title', 'table', 'type'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_rpt_report_modify',
@@ -215,6 +242,8 @@ export function reportingToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_rpt_job_run_history_index',
@@ -228,6 +257,8 @@ export function reportingToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_rpt_scheduled_report_add',
@@ -244,6 +275,8 @@ export function reportingToolManifest() {
         },
         required: ['report_id', 'frequency', 'recipients'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_rpt_kpi_add',
@@ -260,6 +293,8 @@ export function reportingToolManifest() {
         },
         required: ['name', 'table', 'aggregate'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_rpt_report_generate',
@@ -287,6 +322,8 @@ export function reportingToolManifest() {
         },
         required: ['format', 'title'],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

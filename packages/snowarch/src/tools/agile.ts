@@ -6,10 +6,11 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
 const TABLE_PREFIX = process.env.AGILE_TABLE_PREFIX || 'rm_';
 
-export function agileToolManifest() {
+export function agileToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_agile_story_add',
@@ -26,6 +27,8 @@ export function agileToolManifest() {
         },
         required: ['short_description'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_agile_story_modify',
@@ -38,6 +41,8 @@ export function agileToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_agile_stories_index',
@@ -51,6 +56,8 @@ export function agileToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_agile_epic_add',
@@ -64,6 +71,8 @@ export function agileToolManifest() {
         },
         required: ['short_description'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_agile_epic_modify',
@@ -76,6 +85,8 @@ export function agileToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_agile_epics_index',
@@ -89,6 +100,8 @@ export function agileToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_agile_scrum_task_add',
@@ -102,6 +115,8 @@ export function agileToolManifest() {
         },
         required: ['short_description'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_agile_scrum_task_modify',
@@ -114,6 +129,8 @@ export function agileToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_agile_scrum_tasks_index',
@@ -127,6 +144,8 @@ export function agileToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }
