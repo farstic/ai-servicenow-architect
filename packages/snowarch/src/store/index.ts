@@ -1,0 +1,130 @@
+/**
+ * Reading and writing the store. The server only ever reads; the wizard (ARC-07) and the
+ * doctor's `--fix` (ARC-08) are the writers, through `saveStore` here.
+ */
+import {
+  chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync,
+  renameSync, rmSync, statSync, writeSync,
+} from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { dirname, join } from 'node:path';
+import { completeFlags, parseStore, type Store, type StoreError } from './schema.js';
+import { maskPath, shellRemedy } from './paths.js';
+
+export * from './paths.js';
+export * from './schema.js';
+
+const isWindows = process.platform === 'win32';
+
+/**
+ * POSIX mode check.
+ *
+ * THE FILE is what holds the password, so any group or world bit on it is a refusal.
+ *
+ * THE DIRECTORY is a different risk, and the first version of this got it wrong: it
+ * refused on any `0o077` directory bit, which rejects a 0600 store sitting in an ordinary
+ * 0755 folder — and `/tmp`, which is 1777, and is the path the story's own criterion 1
+ * uses. A 0600 file is unreadable whatever its directory. What a directory bit actually
+ * buys an attacker is group/world WRITE: the ability to replace the file or plant a
+ * symlink in its place. So:
+ *
+ *   - group/world WRITE on the directory, without the sticky bit → REFUSE. Sticky (1777,
+ *     as on /tmp) means only the owner can unlink or rename another user's entry, which
+ *     removes exactly that attack.
+ *   - any other group/world bit on the directory → WARN and load. Worth telling someone
+ *     about; not worth refusing a correctly protected file over.
+ *
+ * Every path in the message is masked at construction: `maskPath` for the prose, and
+ * `shellRemedy` for the `Run:` clause so the remedy is pasteable AND carries no absolute
+ * path — checkout-relative inside the checkout, `~` under HOME, as given elsewhere.
+ * Masking a whole sentence afterwards misses every occurrence but the first, which is how
+ * the raw home directory used to reach the log; and masking only to `~` left an absolute
+ * path whenever the checkout was not under HOME.
+ *
+ * Skipped entirely on Windows, where permissions are ACL-inherited and the POSIX mode bits
+ * Node reports are synthetic (01 §13).
+ */
+export function checkFileModes(path: string): { error?: StoreError; warning?: string } {
+  if (isWindows || !existsSync(path)) return {};
+
+  const fileMode = statSync(path).mode & 0o777;
+  const dir = dirname(path);
+  const dirStat = existsSync(dir) ? statSync(dir) : null;
+  const dirMode = dirStat ? dirStat.mode & 0o777 : 0;
+  const sticky = dirStat ? (dirStat.mode & 0o1000) !== 0 : false;
+
+  const oct = (m: number) => m.toString(8).padStart(4, '0');
+  const shown = maskPath(path);
+
+  if ((fileMode & 0o077) !== 0) {
+    return { error: { code: 'STORE_PERMISSIONS_TOO_OPEN',
+      message: `Refusing to load ${shown}: file mode ${oct(fileMode)} is group/world-readable. `
+        + shellRemedy('chmod 600', path) } };
+  }
+
+  const dirWritable = (dirMode & 0o022) !== 0;
+  if (dirWritable && !sticky) {
+    return { error: { code: 'STORE_PERMISSIONS_TOO_OPEN',
+      message: `Refusing to load ${shown}: directory mode ${oct(dirMode)} is group/world-writable `
+        + `without the sticky bit, so the file can be replaced. ${shellRemedy('chmod 700', dir)}` } };
+  }
+
+  if ((dirMode & 0o077) !== 0) {
+    return { warning: `store directory ${maskPath(dir)} is mode ${oct(dirMode)}`
+      + `${sticky ? ' (sticky)' : ''}; the file itself is ${oct(fileMode)}. `
+      + `Consider — ${shellRemedy('chmod 700', dir).replace(/^Run(, from the checkout)?: /, (m) => (m.includes('checkout') ? 'from the checkout: ' : ''))}` };
+  }
+
+  return {};
+}
+
+export function loadStore(path: string): { store: Store; warning?: string } | { error: StoreError } {
+  if (!existsSync(path)) {
+    return { error: { code: 'STORE_NOT_FOUND', message: `store not found: ${maskPath(path)}` } };
+  }
+  const modes = checkFileModes(path);
+  if (modes.error) return { error: modes.error };
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, 'utf8'));
+  } catch (e) {
+    return { error: { code: 'STORE_UNREADABLE', message: `${maskPath(path)}: ${(e as Error).message}` } };
+  }
+  const parsed = parseStore(raw);
+  if ('error' in parsed) {
+    return { error: { ...parsed.error, message: `${maskPath(path)}: ${parsed.error.message}` } };
+  }
+  // Absent flags mean "false" — normalise once, here, so no caller has to remember.
+  for (const inst of Object.values(parsed.store.instances)) inst.flags = completeFlags(inst.flags);
+  return modes.warning ? { store: parsed.store, warning: modes.warning } : parsed;
+}
+
+/**
+ * Atomic write: temp file in the same directory, fsync, rename over the target.
+ *
+ * Same directory because rename is only atomic within a filesystem. fsync before rename
+ * because a rename can land before the data does, leaving a valid name over a truncated
+ * file after a crash. `renameSync` replaces an existing file on Windows too — the
+ * windows-latest cell in tests/store/atomic.test.ts is what proves that here rather than
+ * on the documentation's word.
+ */
+export function saveStore(path: string, store: Store): void {
+  const dir = dirname(path);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const tmp = join(dir, `.instances.json.tmp-${process.pid}-${randomBytes(6).toString('hex')}`);
+  const fd = openSync(tmp, 'wx', 0o600);
+  try {
+    writeSync(fd, `${JSON.stringify(store, null, 2)}\n`);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  try {
+    renameSync(tmp, path);
+  } catch (e) {
+    rmSync(tmp, { force: true });
+    throw e;
+  }
+  if (!isWindows) chmodSync(path, 0o600);
+}

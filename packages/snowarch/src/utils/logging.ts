@@ -1,7 +1,9 @@
 /**
  * Structured stderr logger.
  *
- * - LOG_LEVEL (error | warn | info | debug, default: info) gates which messages are emitted.
+ * - SNOW_LOG_LEVEL, then LOG_LEVEL (error | warn | info | debug, default: info) gates which
+ *   messages are emitted. SNOW_LOG_LEVEL is what `.mcp.json` passes (01 §5); LOG_LEVEL stays as a
+ *   fallback so an existing environment keeps working.
  * - REDACT_SENSITIVE_DATA=true deep-scrubs sensitive keys (passwords, tokens, secrets, …)
  *   from logged data before output.
  * All output goes to stderr so stdout stays a clean JSON-RPC stream for the MCP stdio transport.
@@ -11,7 +13,7 @@ type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 const LEVEL_ORDER: Record<LogLevel, number> = { error: 0, warn: 1, info: 2, debug: 3 };
 
 function activeLevel(): number {
-  const lvl = (process.env.LOG_LEVEL || 'info').toLowerCase();
+  const lvl = (process.env.SNOW_LOG_LEVEL || process.env.LOG_LEVEL || 'info').toLowerCase();
   return LEVEL_ORDER[lvl as LogLevel] ?? LEVEL_ORDER.info;
 }
 

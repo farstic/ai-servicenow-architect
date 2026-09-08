@@ -169,6 +169,42 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
+> **Amendment 2026-09-08 (architect's rulings on the S02 delivery).**
+> - **Criterion 3's tool half belongs to ARC-04-S04.** `snow_core_status_read` does not exist yet,
+>   so S02 asserts on the `LoadReport` instead: `configErrors[0].code == "STORE_PERMISSIONS_TOO_OPEN"`
+>   and the message containing `chmod 600 <path>`. S04 re-asserts the same fact through the tool.
+> - **`SNOW_STORE` pointing at a missing file is `STORE_NOT_FOUND` with no fallback** (the story's
+>   own open point, ratified). An **empty string counts as unset** for both `SNOW_STORE` and
+>   `CLAUDE_PROJECT_DIR`, because `.mcp.json` passes `${SNOW_STORE:-}`.
+> - **`docs/MODES-AND-PRESETS.md` is created here as a stub** carrying only the precedence section,
+>   headed "draft — ARC-07 owns the final text".
+> - **Store error codes** are listed in `packages/snowarch/CHANGELOG.md` now; ARC-04-S06 lists them
+>   in the tool contract.
+> - **The exit-if-unconfigured guard is removed from `src/server.ts`.** It tested env vars only,
+>   which is wrong once a store can configure the server — it would have exited with a valid store
+>   present. Unconfigured start is ARC-04-S04's subject; until then the server runs and the startup
+>   line says `mode: unconfigured`.
+>
+> **Amendment 2026-09-08 (second S02 review — the file-mode rule is refined).** The design note's
+> "if `(stat.mode & 0o077) !== 0` the store is not loaded" is correct for the FILE and wrong for the
+> DIRECTORY. Applied to the directory it refuses a 0600 store in an ordinary 0755 folder, and in
+> `/tmp` — which is where criterion 1's own `SNOW_STORE=/tmp/a.json` example lives. A 0600 file is
+> unreadable by others whatever its directory; the directory risk is group/world **write**
+> (replacement or symlink planting), not read or execute. The rule is therefore:
+> **refuse** when the file has `0o077` bits, or the directory has `0o022` bits **without** the sticky
+> bit (`0o1000`); **warn** — a `warnings[]` entry on the `LoadReport` and a `[WARN]` log line, the
+> store still loading — for any other group/world directory bit, with the `chmod 700 <dir>` remedy.
+>
+> **Amendment 2026-09-08 (second S02 review — masking happens at construction).** Every path in a
+> message is masked where the message is BUILT, one path at a time, never by running `maskPath` over
+> a finished sentence: `maskPath` only rewrites a string that starts with the prefix, so a sentence
+> carrying two paths came through with both raw. The prose uses `maskPath` (`<checkout>`, `~`); the
+> text after `Run:` uses `maskPathForShell` (home → `~` only), because a remedy has to stay
+> pasteable and `<checkout>` is not a path. `tests/store/masking.test.ts` spawns the server under a
+> fake `HOME` and asserts no absolute prefix appears anywhere in stderr.
+
+
+
 ### ARC-04-S03 — Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage
 
 **As** an individual practitioner with a PDI and a customer's production instance in one store **I want** the six permission flags to belong to the instance I am currently addressing **so that** `snow_core_instance_switch prod` immediately makes every write refuse while the same call on `pdi` succeeds, without a second server process.
@@ -304,6 +340,12 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
+> **Amendment 2026-09-08 (from ARC-04-S01).** **The expected tool count arithmetic starts from 394
+> minus one removal.** `snow_rpt_report_generate` is dropped by ARC-04-S08 (see its amendment), so
+> this story's `EXPECTED` is `394 − 1 removed + <new tools>`. ARC-04-S01 left the tool registered and
+> failing with `NOT_IMPLEMENTED` precisely so the count stayed stable until the story that owns
+> catalogue changes could make the removal deliberate.
+
 ### ARC-04-S06 — `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract`
 
 **As** the engine (ARC-05's lint and generators) **I want** every tool to declare in code which flag family gates it and whether it mutates the instance, and the server to emit one contract file from those declarations **so that** the §2.1 `ask` list, the §2.2 protocol text and the doctor read tool names, gates and error codes from a generated artefact instead of prose.
@@ -406,6 +448,12 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 **Definition of done.** Merged; live case documented in `tests/live/README.md` (new file — today `tests/live/` holds only `live-e2e.test.ts`); contract protocol updated; ARC-05 generator consumes it.
 
 ---
+
+> **Amendment 2026-09-08 (from ARC-04-S01, architect's ruling). REMOVE `snow_rpt_report_generate`.**
+> Its backend — `src/reports/` with `pdfmake` and `pptxgenjs` — went with D-03 item 4, so the tool
+> has been registered-but-failing since S01 (an explicit `NOT_IMPLEMENTED` naming the cut, chosen
+> over an unresolved dynamic import). Remove it here, with a `CHANGELOG.md` line naming **D-03 item 4**
+> as the reason. The count arithmetic is S06's, amended there.
 
 ### ARC-04-S08 — Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap
 
