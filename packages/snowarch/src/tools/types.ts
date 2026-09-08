@@ -21,6 +21,27 @@ export interface ToolDefinition {
   gate: Gate;
   /** True when a successful call changes state on the instance. Drives §2.1's ask list. */
   mutates: boolean;
+
+  /**
+   * True when a successful call changes SESSION state — which instance subsequent calls
+   * address — without changing anything on any instance.
+   *
+   * `snow_core_instance_switch` is the only one, and it needs its own field rather than
+   * `mutates: true` for two reasons that pull in opposite directions. It must appear in §2.1's
+   * ask list (`03` S-23 names it): redirecting where every following write lands is precisely
+   * the decision a user should be asked about. But it is not a write, so `mutates: true` would
+   * fail the "a tool that mutates is never ungated" invariant unless it also gained a write
+   * gate — and gating it would stop a READ-ONLY session switching instances to read another
+   * one.
+   *
+   * So `mutates` keeps meaning "changes ServiceNow records", and the ask-list generator
+   * (ARC-05-S07) unions the two: `mutates || sessionMutates`. Overloading one field to mean
+   * both would have quietly changed what that invariant enforces.
+   *
+   * `snow_core_instances_reload` is deliberately NOT declared here: ARC-07's `--resume` depends
+   * on it not prompting.
+   */
+  sessionMutates?: boolean;
   /**
    * A SECOND gate the tool enforces after `gate` has passed.
    *

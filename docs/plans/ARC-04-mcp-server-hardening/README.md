@@ -82,7 +82,7 @@ Full write-ups (persona, context, scope, design notes, acceptance criteria, task
 | ARC-04-S07 | `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter | M | Done (2026-09-08) |
 | ARC-04-S08 | Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap | M | Done (2026-09-08) |
 | ARC-04-S09 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert` / `action_update` | M | Done (2026-09-08) |
-| ARC-04-S10 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | In progress |
+| ARC-04-S10 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | Done (2026-09-08) |
 | ARC-04-S11 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M | Not started |
 | ARC-04-S12 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | Not started |
 | ARC-04-S13 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | Not started |

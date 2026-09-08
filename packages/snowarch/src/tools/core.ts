@@ -316,10 +316,13 @@ export function coreToolManifest(): ToolDefinition[] {
       // list is generated from this field — so as things stand, redirecting where every
       // subsequent write lands is the one action that does not prompt.
       //
-      // Overloading `mutates` to cover session state would make one field mean two things and
-      // silently change what gate (c) enforces. The ask-list generator needs a second source
-      // instead. Left as declared, and escalated rather than papered over.
+      // Resolved in ARC-04-S10: `mutates` keeps meaning "changes ServiceNow records" and
+      // `sessionMutates` carries the other meaning, so the ask-list generator unions the two
+      // (ARC-05-S07) without changing what gate (c) enforces. This is the only tool that
+      // declares it — `snow_core_instances_reload` is deliberately left out, because ARC-07's
+      // `--resume` depends on it not prompting.
       mutates: false,
+      sessionMutates: true,
     },
     {
       name: 'snow_core_current_instance_read',

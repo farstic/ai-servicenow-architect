@@ -209,7 +209,7 @@ describe('(e) manifest, contract and catalogue agree', () => {
     // If they were, the sha would move whenever someone improved a sentence, and a pin
     // against it would mean nothing.
     for (const t of CONTRACT.tools) {
-      const allowed = ['alsoRequires', 'gate', 'mutates', 'name', 'table'];
+      const allowed = ['alsoRequires', 'gate', 'mutates', 'name', 'sessionMutates', 'table'];
       expect(Object.keys(t).filter((k) => !allowed.includes(k)), t.name).toEqual([]);
       expect(Object.keys(t)).toContain('gate');
       expect(Object.keys(t)).toContain('mutates');

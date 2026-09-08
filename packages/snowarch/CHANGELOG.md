@@ -60,6 +60,65 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Added (ARC-04-S10) — an audit trail, and redaction that is on by default
+
+**One JSON line per mutating call, in `<store dir>/audit.jsonl`.** §2.1 says a write needs "write
+approved"; before this, that was provable only from a conversation transcript, which the reviewer
+asking the question does not have. The line is
+`{ ts, instance, environment, tool, gate, table, sysId, query, result, ms, source, note? }`.
+
+What it omits is the design. **No payload** — `fields`, `data`, `script` and the response body never
+appear, because a trail recording what was written is a second copy of client data in a checkout.
+**No credential. No instance URL** — the label identifies the instance, and this file gets pasted into
+tickets. `query` IS recorded and can carry personal data (`caller_id=…`): it is the filter that selected
+the records, without it a line answers nothing, and the engine already had the string. The README says
+so, and `SNOW_AUDIT_FILE=off` is the way out.
+
+Refusals are written with their code — `WRITE_NOT_ENABLED` against a table on a date is the evidence
+that the gate held. Non-mutating tools append nothing. `snow_core_instance_switch` is audited under the
+new `sessionMutates` declaration with `table`/`sysId`/`query` null and a `note` naming the destination,
+because it redirects where every later write lands. A write failure warns exactly once per process and
+never fails the tool call; appends are synchronous, so nothing is buffered to lose on an abrupt exit.
+0600 in a 0700 directory, rotating at 10 MB keeping three. `@farstic/snowarch/audit` exports
+`appendAudit` / `tailAudit` / `readAuditTail` for ARC-07's CLI lines (`source: "cli"`).
+
+**`sessionMutates` on `ToolDefinition`.** Resolves the gap ARC-04-S09 raised rather than papering over
+it. `mutates` keeps meaning "changes ServiceNow records" — so contract test (c) still enforces a gate on
+every one — and the new field carries "changes which instance subsequent calls address".
+`snow_core_instance_switch` is the only tool that declares it, and ARC-05-S07's ask-list generator unions
+the two. `snow_core_instances_reload` stays out: ARC-07's `--resume` depends on it not prompting.
+
+### Changed (ARC-04-S10) — redaction defaults to ON
+
+`REDACT_SENSITIVE_DATA` was opt-in (`=== 'true'`), so an unset variable — the normal case — printed
+passwords and Authorization headers. It is now `!== 'false'`: a default that has to be switched on
+protects nobody who did not already know to switch it on, and the people most likely to paste a log into
+a ticket are the ones who never set it. `REDACT_SENSITIVE_DATA=false` still opts out for local
+debugging, and is documented as dangerous.
+
+Scrubbing now also matches credential-shaped **string values** (`/^(Basic|Bearer)\s+\S+/i`) anywhere in
+logged data, not only keys named like secrets — the same string reached the log unscrubbed whenever it
+arrived under an innocent key. It over-redacts prose beginning "Basic " and that trade-off is asserted
+in the tests: over-redaction costs a word in a log line, under-redaction publishes a credential. An
+eslint rule additionally forbids passing `headers` to the logger anywhere in `src/servicenow/`, because
+redaction is a runtime behaviour with an opt-out and a lint failure is not.
+
+### Fixed (ARC-04-S10) — three defects the new tests found
+
+**`client.ts` could not express zero.** `maxRetries`/`retryDelayMs`/`requestTimeoutMs` were defaulted
+with `||`, so a configured **0** is falsy and silently became 3 retries with a 1 s base delay. `MAX_RETRIES=0`
+did nothing and nothing said so — found when an audit test that set both to 0 took seven seconds a call,
+which is exactly 1 + 2 + 4 of exponential backoff. Now `??`.
+
+**The audit `note` was built from `args.name`.** The no-secrets sweep passes the payload marker as every
+argument and found it in the audit file through that field. A caller-supplied string in an audit line is
+a payload channel however innocuous the field sounds; the note is now built from server-side state (the
+destination label read back from the instance manager), and a refused switch echoes nothing at all.
+
+**The debug query log printed the authenticated username.** `snow_us_active_update_set_ensure` builds
+`…^sys_created_by=<username>` (ARC-04-S07), and at debug level that went straight to stderr. The client
+now replaces its own account name in the logged query with `<user>`.
+
 ### Fixed (ARC-04-S09) — three defects that failed silently
 
 Each of these returned a success. None of them raised an error, and all three had a documented

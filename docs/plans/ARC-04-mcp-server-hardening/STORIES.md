@@ -725,6 +725,41 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S10 — Audit trail writer with rotation; redaction defaults; Authorization header never logged
 
+> **Amendment 2026-09-08 (from the S10 delivery).**
+> - **Criterion 1's argument is `fields`, not `data`** — confirmed against the tool, which answers
+>   "table and fields are required". Named in the test, because getting it wrong yields an
+>   `INVALID_REQUEST` line that still passes the payload-marker grep, for the wrong reason.
+> - **Criterion 1's `result == "ok"` needs a reachable instance**, so the unit half asserts the line
+>   SHAPE and that `result` carries the failure rather than reporting success; the literal `ok` belongs
+>   to the owner's live sitting. Recorded rather than quietly asserted as `ok` against a fixture.
+> - **Criterion 4 is scoped to credentials, and the payload is asserted separately.** The sweep runs at
+>   `SNOW_LOG_LEVEL=debug` — more output, harder credential test — where echoing arguments is what debug
+>   logging is *for*. Forbidding the payload marker on stderr at that level would have been asserting
+>   that debug logging does not work. So: credentials forbidden in both surfaces at any level; the
+>   payload marker forbidden in the audit file always; and a separate case proves no payload reaches
+>   stderr at the **default** level.
+> - **Three defects found by these tests, all fixed here with the test that catches each.**
+>   (a) `client.ts` defaulted `maxRetries` / `retryDelayMs` / `requestTimeoutMs` with `||`, so a
+>   configured **0** was falsy and became 3 retries with a 1 s base delay — `MAX_RETRIES=0` did nothing
+>   and nothing said so. Found because an audit test that set both to 0 took 7 s a call, which is
+>   exactly 1 + 2 + 4 of backoff. (b) The audit `note` was built from `args.name`, and the sweep — which
+>   passes the payload marker as every argument — found the marker in the audit file through it; the
+>   note is now built from server-side state. (c) The debug query log printed the authenticated
+>   username, via ARC-04-S07's `sys_created_by=<username>` filter.
+> - **Test-fixture note worth keeping.** The sweep first used an `.invalid` hostname and took four
+>   minutes: a DNS round-trip per call, times ~130 tools. A closed loopback port fixed it — but **not**
+>   port 1 or 9, which Node rejects outright as "bad port" *before* the request layer, so the timeout
+>   path is never exercised. 49151 with `MAX_RETRIES=0` and a short timeout runs the whole sweep in
+>   about a second.
+> - **`snow_fluent_build` and `snow_fluent_validate` are excluded from the sweep** for the reason
+>   `contract.test.ts` excludes them (they spawn the `@servicenow/sdk` CLI, 92 s and 60 s). They are
+>   covered by a separate case under `read-only`, where the gate refuses before the spawn — skipping
+>   them outright would have left two tools no leak test ever touched.
+> - **`snow_fluent_validate` appends nothing**, correctly: it is `mutates: false`, validating a local
+>   source tree. Asserted, so the exclusion above cannot be mistaken for the audit rule failing.
+> - **The `transport.onclose` TODO is answered, not implemented.** Appends are synchronous, so there is
+>   nothing buffered to flush; the call site says so, so nobody adds a flush that has nothing to do.
+
 **As** a consultancy security reviewer **I want** every mutating call the engine makes against a client instance to leave one secret-free line in a file inside the checkout **so that** "write approved" (§2.1) is provable after the fact, and nothing the server logs can leak a credential.
 
 **Context.** Closes P-35 (no audit trail beyond prose). Implements `01` §7 "Audit trail" (JSON lines, rotation at 10 MB, never payloads or credentials) and `01` §7 "How never leaked" (`REDACT_SENSITIVE_DATA` default on; Authorization header never logged). Today `REDACT_SENSITIVE_DATA` is opt-in (`mcp:src/utils/logging.ts:36` — `=== 'true'`) and the logger's `SENSITIVE_KEY` regex only scrubs object keys, not header strings.
