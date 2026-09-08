@@ -31,7 +31,7 @@ You are the **Chief ServiceNow Architect** for this user. You orchestrate a rost
 ├── reference/                      ← engine-level reusable templates (delivery governance)
 │   └── templates/                  ← ADR · traceability matrix (RTM) · RAID log · NFR checklist
 ├── docs/                           ← cross-laptop knowledge base (MCP field notes, patterns)
-│   └── nowaikit-field-notes.md     ← MCP tool limitations and working patterns (committed to GitHub)
+│   └── PLATFORM-NOTES.md          ← platform behaviour learned on real instances, with corpus grounding
 ├── clients/<client-name>/          ← per-client working folder (state, transcripts, artefacts)
 └── ServiceNowDocs/                 ← official ServiceNow docs submodule (australia branch)
 ```
@@ -399,25 +399,17 @@ Expected chain:
 
 ## Standing Rule — Document Every Solved Problem
 
-When a technical problem is solved, a tool limitation is discovered, or a working pattern is confirmed during a session:
+When a technical problem is solved, a tool limitation is discovered, or a working pattern is confirmed during a session, it goes in the place that can enforce it. Which place depends on what kind of fact it is:
 
-1. Add the finding to `docs/nowaikit-field-notes.md` — generic patterns only, no instance URLs, no credentials, no sys_ids.
-2. Instance-specific values (URLs, sys_ids, usernames) go in `memory/MEMORY.md` (local, never committed).
-3. Commit and push `docs/nowaikit-field-notes.md` immediately after updating it.
+| Kind of finding | Where it goes |
+|---|---|
+| **Platform** — how ServiceNow itself behaves (an API or data-model pattern that works where the obvious one fails; a behaviour that took several attempts to get right) | `docs/PLATFORM-NOTES.md`, as a `PN-xx` entry with all five fields, including the `vendor/ServiceNowDocs/` page it is grounded in — or the exact "none in ServiceNowDocs" wording where the corpus does not state it |
+| **Server** — how this repository's MCP server behaves (a tool that writes the wrong field, refuses when it should not, or reports failure on success) | a failing test in `packages/snowarch/tests/`, then the fix. Until it is fixed, a row in the "Known limitations" section of `packages/snowarch/CHANGELOG.md` |
+| **Instance-specific values** — URLs, sys_ids, user names | `memory/MEMORY.md`, local, never committed |
 
-**MCP-server / MCP-tool findings are EXCLUDED from this repo (repo-owner decision, 2026-06-08).**
-Findings about the MCP tooling itself — connection/spawn failures, `.mcp.json` launch configuration, MCP tool-level bugs and their workarounds — are **not** committed or pushed to `claude-servicenow-live`. Keep them in local memory (`memory/`, never committed) and/or contribute them to the `snow-mcp` repo (the tool's own home). Do **not** add them to `docs/nowaikit-field-notes.md`. Steps 1 and 3 therefore apply only to ServiceNow *platform/API* patterns that are independent of the MCP tooling.
+Generic patterns only in either committed destination: no instance URLs, no credentials, no sys_ids, no user names.
 
-**What counts as a finding worth documenting (platform/API — in-repo):**
-- A ServiceNow API or data-model pattern that works vs one that fails (especially on PDI)
-- A platform behaviour that required multiple attempts to get right
-
-**Routed out of this repo (local memory or `snow-mcp` repo, per the exclusion above):**
-- MCP tool bug or unexpected behaviour with a confirmed workaround
-- MCP connection / launch-config issues
-- A gotcha specific to an MCP `create_*` / `update_*` tool
-
-This rule ensures that `git clone` + read `docs/nowaikit-field-notes.md` restores in-repo operational knowledge on any laptop, while MCP-tooling specifics stay out of this repository.
+The server half of this rule is new. Findings about the MCP tooling used to be routed *out* of the engine repository, because the server lived in a different one; they now belong here, next to the code they describe and the test that holds the fix in place.
 
 ## Maintenance reminders
 

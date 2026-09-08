@@ -143,6 +143,37 @@ false is a rule that fires on nothing while looking correct in the UI list.
 **Teardown.** `snow_core_record_remove { "table": "sys_script", "sys_id": "<BR>" }`, then complete the
 update set. `sys_update_xml` DELETE rows are expected — platform field notes, section 7.
 
+## ARC-02-S10 item 6 — `record_remove` on a scripting table: does the refusal mean anything?
+
+Carried from the 1.0.0 journal and never resolved: deleting a Script Include reported `NOT_FOUND`
+while the row was, in fact, gone. No fixture can settle it — the claim is about what the instance
+does *after* the call returns, so it needs a real one.
+
+```
+1  snow_scr_script_include_add { "name": "Arc02S10Probe",
+                                 "script": "var Arc02S10Probe = Class.create();" }
+   → sys_id = <SI>
+
+2  snow_core_records_query { "table": "sys_script_include", "query": "name=Arc02S10Probe" }
+   → expect count = 1
+
+3  snow_core_record_remove { "table": "sys_script_include", "sys_id": "<SI>" }
+   → record the exact code and message, whatever they are
+
+4  snow_core_records_query { "table": "sys_script_include", "query": "name=Arc02S10Probe" }
+   → count = 0 means the delete happened; count = 1 means it did not
+```
+
+**Expected.** Unknown — that is the point. Step 3 returning success and step 4 returning 0 closes the
+item as fixed. Step 3 returning `NOT_FOUND` with step 4 returning 0 reproduces the 1.0.0 behaviour: the
+delete works and the response lies, which is worse than a plain failure because a caller that trusts
+the code will retry or report a problem that does not exist.
+
+**Record.** Step 3's code and message verbatim, and step 4's count. Both halves — a code without the
+count says nothing.
+
+**Teardown.** None if step 4 is 0. If it is 1, delete the record in Studio and say so in the result.
+
 ## Redaction
 
 As S07: no instance URL, user name, password or token in anything recorded — key names only, values as

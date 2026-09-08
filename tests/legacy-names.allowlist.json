@@ -1,11 +1,9 @@
 {
   "_rule": "A file may appear here only while it still contains a forbidden pattern AND a named ARC owns its rewrite. The test fails in both directions: a non-listed file that matches, and a listed file that no longer matches (remove the entry). Generated from the measured tree at ARC-01-S10, not copied from the story's 2026-09-04 listing.",
   "files": {
-    "CLAUDE.md": "ARC-02",
     "docs/CHANGELOG.md": "ARC-09",
     "docs/CONTRIBUTING.md": "ARC-05",
     "docs/USER-GUIDE.md": "ARC-02",
-    "docs/nowaikit-field-notes.md": "ARC-02",
     "packages/contract/retired-identifiers.json": "ARC-05",
     "packages/contract/retired-names.json": "ARC-05",
     "packages/snowarch/CHANGELOG.md": "ARC-04",

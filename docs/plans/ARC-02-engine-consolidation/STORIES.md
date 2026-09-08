@@ -413,6 +413,36 @@ No "Tier", no old server key, no price or licence claims beyond "NOW_ASSIST need
 **Definition of done.** Merged; links in place; ARC-05/ARC-07 informed of the markers.
 
 ### ARC-02-S10 — `docs/PLATFORM-NOTES.md` from the field notes; server-behaviour sections handed to ARC-04 as regression-test titles
+
+> **Amendment 2026-09-08 (from the S10 delivery).**
+> - **Criterion 4 is recorded, not re-opened (ruled).** Four of the seven handover items were already
+>   delivered by ARC-04 and have tests: 1 `tests/tools/update-set-capture.test.ts`, 2
+>   `tests/tools/unsupported-stubs.test.ts`, 3 `tests/tools/integration-event.test.ts`, 4
+>   `tests/tools/script-business-rule.test.ts`. Item 6 is verify-only against a live instance and now
+>   has a written procedure in `packages/snowarch/tests/live/README.md` — the CHANGELOG pointed at
+>   that file, so the procedure had to exist for the pointer to be true. Items 5 and 7 are open. The
+>   whole mapping is the "Known limitations carried from snow-mcp 1.0.0" table in
+>   `packages/snowarch/CHANGELOG.md`; no checklist comment was opened on closed ARC-04 tickets.
+> - **Classification of the mixed section (task 1), decided without an owner round-trip:** field-notes
+>   §1's platform half — REST capture follows the user's `sys_user_preference` — is PN-01; its server
+>   half — `switch` only set `is_default` — is row 1 of the CHANGELOG table. §14's docx/diagram rule
+>   is present in `scripts/README.md` and was dropped. §8 named a config file this product no longer
+>   uses and was dropped.
+> - **The §11 observation about the error CODE was dropped from both destinations.** The note said the
+>   1.0.0 tool reported an invalid `close_code` as `INSUFFICIENT_PRIVILEGES`, making a validation
+>   failure look like an ACL problem. That is a server claim, so it does not belong in PN-04; but it
+>   is about a tool that no longer exists in that form, and whether the current server maps it
+>   correctly cannot be settled without a live instance. Adding it to the limitations table would
+>   assert a defect nobody has observed in 2.0.0. Recorded here instead: **worth a live check when
+>   the owner next has an instance open.**
+> - **SK-09 flipped from counting to enforcing.** The rule had a test asserting the governing
+>   documents were still dirty, so that "not yet swept" could not be mistaken for "swept". S06 took
+>   it to one hit; this story's Standing Rule rewrite took the last one, so the test now asserts the
+>   surface is clean.
+> - **Criterion 5 needed more than a path swap.** The Standing Rule routed MCP findings *out* of the
+>   repository (DR-16, from when the server lived elsewhere). It now names both destinations by kind
+>   of finding — platform to `docs/PLATFORM-NOTES.md`, server to a test plus the CHANGELOG. S08 still
+>   owns the section's structure.
 **As** the engine (Claude) **I want** the platform facts learned on real instances kept as product documentation with their ServiceNowDocs grounding, and the MCP-tool bugs turned into server tests **so that** an engagement journal stops being a product document (P-13) and the knowledge survives in the place that can enforce it.
 **Context.** P-13 (`00` §3.11: `docs/nowaikit-field-notes.md` — 15 PDI findings, section numbering 1-7,10,9,8,13,14,11,15, §8 still says `claude_desktop_config.json`), DR-16 (`01` §18: field-notes split; the "MCP findings excluded from this repo" standing rule lapses with the merge), `00` §8 field-notes classification (platform facts: §1-platform, §3, §7, §10, §11, §13, §15; server behaviours: §1-`switch_update_set`, §2, §4, §5, §6, §9a, §9b; obsolete: §8; engine tooling: §14), ARC README deliverable 4 ("each with the ServiceNowDocs citation it relies on"), `CLAUDE.md` Standing Rule (rewritten in S08).
 **Scope.** In: `docs/PLATFORM-NOTES.md`; the handover list for ARC-04; deletion of `docs/nowaikit-field-notes.md`; §14's docx/diagram rule confirmed present in `scripts/README.md` (it is — "Golden rule" section) and dropped from the notes. Out: writing the ARC-04 tests; new platform findings.
