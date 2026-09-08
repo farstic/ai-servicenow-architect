@@ -804,6 +804,44 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S11 — Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3)
 
+> **Amendment 2026-09-08 (from the S11 delivery).**
+> - **undici pinned to exactly 6.28.1.** It is the newest major whose `engines.node` admits our
+>   declared floor of 20.0.0: 8.10.2 requires `>=22.19.0` and 7.29.1 requires `>=20.18.1`. Node 7.x
+>   would in fact run on CI (the `node 20` cell resolves to a current 20.19+), which is exactly why it
+>   is the wrong choice — it would pass CI while breaking the floor the package advertises. Root
+>   production footprint after the addition: **15.3 MB** against the 80 MB ceiling.
+> - **S-20's status corrected.** The story text says "proposes spike S-20"; S-20 exists and is
+>   **CONFIRMED on macOS** (`03` §F). R-15 is closed by this story with Windows recorded as pending
+>   Robert's sitting, and ARC-06 keeps the `${VAR:-}` forwarding as the hedge — criterion 5's
+>   sanitisation is what makes that hedge safe rather than harmful.
+> - **Criterion 2's `127.0.0.1:1` replaced with a high closed port.** Node rejects the low well-known
+>   ports as "bad port" *before* the request layer, so the test would never reach the proxy code path
+>   while appearing to (ARC-04-S10's finding). The message shape the criterion specifies is unchanged
+>   and asserted verbatim.
+> - **Criterion 7 restated, and asserted as a test rather than a grep.** With the aliased import the
+>   literal `grep -rn "\bfetch("` now returns **nothing at all** — a stronger result than "only
+>   http.ts", but one that a broken grep would also produce. `tests/servicenow/proxy.test.ts` walks
+>   `src/` and asserts two things instead: nothing calls the global `fetch`, and `servicenow/http.ts`
+>   is the only module importing `undici`.
+> - **The TLS fixture generates its certificate at test time** (`selfsigned`, devDependency). A
+>   committed private key would be a real private key in the repository and the secret scan would be
+>   right to fail on it; suppressing that rule to make room for a fixture is how a real key gets in
+>   later. Nothing reaches the public internet: loopback server, `localhost` name.
+> - **Three defects found while building the tests.**
+>   (a) `execFileSync` for the `NODE_EXTRA_CA_CERTS` child **blocks this process's event loop**, so
+>   the in-process HTTPS fixture never accepted the connection and the child timed out — reading
+>   exactly like "NODE_EXTRA_CA_CERTS does not work". The child runs async now.
+>   (b) Routing every request through `snFetch` silently disarmed three suites that stubbed
+>   `global.fetch`: two then hung five seconds each on a real request. A stub on a function nothing
+>   calls does not fail, it stops testing — `tests/helpers/fetch-mock.ts` mocks the seam, and the
+>   `vi.mock` call has to live in each test file because it is hoisted per file.
+>   (c) `selfsigned@5` renamed `days` to `notAfterDate`; the runtime accepted the unknown key silently
+>   and defaulted to a year, and **`tsconfig.tests.json` caught it** — the type-checking of tests that
+>   ARC-04-S06 added paying for itself.
+> - **Note for ARC-06/ARC-08.** `EnvHttpProxyAgent` prints `[UNDICI-EHPA] Warning: EnvHttpProxyAgent is
+>   experimental` to stderr on first use. Left in place — suppressing Node warnings wholesale is worse
+>   than one line — but the bootstrap and doctor text should not treat it as an error.
+
 **As** an individual practitioner on a corporate laptop behind an HTTP proxy and a TLS-intercepting gateway **I want** the server's HTTP client to use my proxy settings and my company root CA, and to tell me by name whether a failure is DNS, TLS trust or the proxy **so that** a first live session does not fail with a bare `fetch failed`.
 
 **Context.** R-3 (owner ruling 2026-09-04): "ARC-04 — proxy agent honouring `HTTPS_PROXY` / `NO_PROXY` + documented `NODE_EXTRA_CA_CERTS`". `03` R-15: Node's built-in `fetch` (undici) ignores `HTTPS_PROXY` / `NO_PROXY` unless a proxy agent is configured; custom CAs need `NODE_EXTRA_CA_CERTS`. The surviving code calls the global `fetch` in three places (`mcp:src/servicenow/client.ts:144, 241, 1051`). ARC-07's wizard probe and ARC-08's doctor consume this story's classifier.

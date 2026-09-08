@@ -40,6 +40,14 @@ export const ERROR_CODES: ErrorCode[] = [
   { code: 'NOT_FOUND', remedy: 'the record or table does not exist on this instance' },
   { code: 'RATE_LIMITED', remedy: 'retry later; reduce maxRecords or the call rate' },
 
+  // The network, before the instance answers at all (R-3, ARC-04-S11). `classifyNetworkError`
+  // produces these; the per-call remedy it returns is longer and names the proxy actually set.
+  { code: 'DNS_FAILURE', remedy: 'the host name did not resolve; check the spelling, and set HTTPS_PROXY on a corporate network' },
+  { code: 'TLS_CA_UNTRUSTED', remedy: 'export your organisation root CA as PEM and set NODE_EXTRA_CA_CERTS to it; never disable certificate verification' },
+  { code: 'PROXY_UNREACHABLE', remedy: 'nothing is listening at the proxy named by HTTPS_PROXY/HTTP_PROXY; correct it or unset it' },
+  { code: 'CONNECTION_REFUSED', remedy: 'the instance refused the connection; check the URL, its port, and whether the instance is awake' },
+  { code: 'CONNECTION_TIMEOUT', remedy: 'the connection timed out; set HTTPS_PROXY on a corporate network, else check connectivity' },
+
   // The tool exists and the gate let it through, but the CAPABILITY does not exist over REST.
   // Distinct from NOT_FOUND (a record) and from a gate (a flag the user can turn on): nothing
   // the caller configures makes these work, so the remedy names the other route instead.

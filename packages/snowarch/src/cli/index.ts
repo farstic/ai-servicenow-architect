@@ -13,6 +13,11 @@
  * `capabilities`, `run` and `report` commands (D-03), and any coloured output — a
  * CLI that may be piped should not depend on a TTY library for four sub-commands.
  */
+// FIRST, before anything that constructs the proxy agent. ESM evaluates every import before
+// the importing module's body, so this cannot be a call in main(): `EnvHttpProxyAgent` reads
+// the environment when it is constructed, and by then it would already have been built from
+// the unsanitised one. Same ordering rule that bit ARC-04-S02 with dotenv.
+import '../env-sanitise.js';
 import { Command } from 'commander';
 import { spawn } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
