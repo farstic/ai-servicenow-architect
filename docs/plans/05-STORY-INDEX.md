@@ -42,7 +42,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-02-S04 | ARC-02 | Agent frontmatter: `model: inherit`, `skills:` preload, `tools:` unchanged; §6.2 regression run | M | S02 | M1 | Done (2026-09-08) |
 | ARC-02-S05 | ARC-02 | Remove context-mode, the claude.ai surface, the settings example, the 9-step README manual; disposition of legacy docs | M | S01; ARC-01-S10 | M1 | Done (2026-09-08) |
 | ARC-02-S06 | ARC-02 | Move governance texts to `governance/`; Mode/Preset vocabulary sweep across CLAUDE.md, governance, docs, skills, tests | M | S05; ARC-01-S04 | M2 | Done (2026-09-08) |
-| ARC-02-S07 | ARC-02 | Roster generator: `scripts/gen-roster.mjs` writes the roster table into `docs/ARCHITECTURE.md`; `--check` in CI | S | S02; ARC-01-S12 | M2 | Not started |
+| ARC-02-S07 | ARC-02 | Roster generator: `scripts/gen-roster.mjs` writes the roster table into `docs/ARCHITECTURE.md`; `--check` in CI | S | S02; ARC-01-S12 | M2 | Done (2026-09-08) |
 | ARC-02-S08 | ARC-02 | `CLAUDE.md` ≤ 200 lines rewrite; harness-neutral wording; `Status` → `/snowarch status`; version line owned by the release script | L | S06, S07; ARC-01-S06 | M2 | Not started |
 | ARC-02-S09 | ARC-02 | `docs/MODES-AND-PRESETS.md` — Mode semantics, the preset table and plain-language flags of `01` §6.3, principle 10 | S | S06 | M2 | Not started |
 | ARC-02-S10 | ARC-02 | `docs/PLATFORM-NOTES.md` from the field notes; server-behaviour sections handed to ARC-04 as regression-test titles | M | S05 | M2 | Not started |
