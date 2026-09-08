@@ -9,8 +9,6 @@
     "packages/snowarch/README.md": "ARC-04",
     "packages/snowarch/docs/INSTALLATION.md": "ARC-04",
     "packages/snowarch/docs/SERVICENOW_OAUTH_SETUP.md": "ARC-04",
-    "packages/snowarch/src/cli/index.ts": "ARC-04",
-    "packages/snowarch/src/cli/setup.ts": "ARC-04",
     "scripts/README.md": "ARC-02"
   }
 }

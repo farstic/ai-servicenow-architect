@@ -1094,7 +1094,7 @@ export class ServiceNowClient {
     }
 
     const batchPayload = {
-      batch_request_id: `servicenow-mcp_${Date.now()}`,
+      batch_request_id: `snowarch_${Date.now()}`,
       rest_requests: operations.map(op => ({
         id: op.id,
         method: op.method,

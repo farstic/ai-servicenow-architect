@@ -240,7 +240,7 @@ export async function dispatchOrchestrationAction(
           definition: JSON.stringify({
             steps: args.steps,
             version: '1.0',
-            created_by: 'servicenow-mcp',
+            created_by: 'snowarch',
           }),
           active: true,
         });
