@@ -1,4 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  resetFetchMock, respond, snFetchMockModule, type SnFetchState,
+} from '../helpers/fetch-mock.js';
+
+/**
+ * The HTTP seam, not `global.fetch`. ARC-04-S11 routed every request through
+ * `src/servicenow/http.ts` for proxy support, so a stub on the global would sit unused while a
+ * real request went out — a test that quietly stops testing rather than failing.
+ *
+ * `vi.mock` must be written here, in the test file: it is hoisted within its own file, and
+ * calling it from a helper registers it after the module under test has already loaded.
+ */
+const http = vi.hoisted<SnFetchState>(() => ({ calls: [], queue: [] }));
+vi.mock('../../src/servicenow/http.js', async () => snFetchMockModule(http));
+
 
 /**
  * The descending-sort defect, asserted on the CAPTURED URL.
@@ -20,17 +35,17 @@ function setEnv() {
   process.env.LOG_LEVEL = 'error';
 }
 
-/** The `sysparm_query` of the single request the call made, decoded. */
+
 async function sysparmQuery(params: Record<string, unknown>): Promise<string | null> {
   const { instanceManager } = await import('../../src/servicenow/instances.js');
-  const spy = vi.spyOn(global, 'fetch').mockResolvedValue({
+  resetFetchMock(http);
+  respond(http, {
     ok: true, status: 200, json: async () => ({ result: [] }), text: async () => '{"result":[]}',
     headers: { get: () => null },
-  } as unknown as Response);
+  });
   await instanceManager.getClient().queryRecords(params as never);
-  expect(spy).toHaveBeenCalledTimes(1);
-  const url = new URL(String(spy.mock.calls[0]![0]));
-  return url.searchParams.get('sysparm_query');
+  expect(http.calls).toHaveLength(1);
+  return new URL(http.calls[0]!.url).searchParams.get('sysparm_query');
 }
 
 beforeEach(() => setEnv());

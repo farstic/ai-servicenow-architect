@@ -70,7 +70,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-04-S08 | ARC-04 | Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap | M | S04, S06 | M2 | Done (2026-09-08) |
 | ARC-04-S09 | ARC-04 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert`/`action_update` | M | S01 | M2 | Done (2026-09-08) |
 | ARC-04-S10 | ARC-04 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | S02, S06 | M2 | Done (2026-09-08) |
-| ARC-04-S11 | ARC-04 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M | S01 | M2 | Not started |
+| ARC-04-S11 | ARC-04 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M | S01 | M2 | Done (2026-09-08) |
 | ARC-04-S12 | ARC-04 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | S04, S06 | M2 | Not started |
 | ARC-04-S13 | ARC-04 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | S06, S08 | M2 | Not started |
 | ARC-04-S14 | ARC-04 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M | S01, S13 | M2 | Not started |

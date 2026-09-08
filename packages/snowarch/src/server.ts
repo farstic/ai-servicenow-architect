@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+// FIRST, before anything that constructs the proxy agent. ESM evaluates every import before
+// the importing module's body, so this cannot be a call in main(): `EnvHttpProxyAgent` reads
+// the environment when it is constructed, and by then it would already have been built from
+// the unsanitised one. Same ordering rule that bit ARC-04-S02 with dotenv.
+import './env-sanitise.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,

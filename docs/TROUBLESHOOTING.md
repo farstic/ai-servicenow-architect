@@ -59,3 +59,28 @@ there. They stay in the catalogue, are marked `[Unsupported]` in their descripti
 
 **A note on Fix Scripts.** `sys_script_fix.name` silently truncates at 40 characters over REST, so a
 longer name comes back looking like a different record. Name it short enough to read back intact.
+
+---
+
+## Corporate networks — `DNS_FAILURE`, `TLS_CA_UNTRUSTED`, `PROXY_UNREACHABLE`
+
+**Why these exist.** Node's `fetch` fails with `TypeError: fetch failed` for all three of these, and
+the real reason sits two `cause` levels down. The three have three different fixes, and the one people
+check first — their credentials — is usually the one that is fine. The server now names which it was.
+
+| Code | What happened | What to do |
+|---|---|---|
+| `DNS_FAILURE` | The instance host name did not resolve (`ENOTFOUND`, `EAI_AGAIN`). | Check the spelling first. On a corporate network, set `HTTPS_PROXY`. Note that a proxy does **not** resolve names for you unless the request goes through it — so this code with a proxy already set usually means the name is wrong. |
+| `TLS_CA_UNTRUSTED` | The certificate was not signed by a CA this machine trusts. Normal on a network that intercepts TLS. | Export your organisation root CA as PEM and set `NODE_EXTRA_CA_CERTS` to its path, then **restart** — Node reads it once, at process start. See "Corporate networks" in the package README for the per-OS export steps. |
+| `PROXY_UNREACHABLE` | A proxy variable is set and nothing is listening there (or the connection timed out). | The message names the proxy, with any credentials masked. Correct the host and port, or unset the variable if you are not behind a proxy. |
+| `CONNECTION_REFUSED` | The instance refused the connection and **no** proxy is configured. | Check the URL, its port, and whether the instance is awake. |
+| `CONNECTION_TIMEOUT` | The connection timed out with no proxy configured. | Set `HTTPS_PROXY` if you are on a corporate network; otherwise check connectivity. |
+
+**Do not set `NODE_TLS_REJECT_UNAUTHORIZED=0`.** It is the first search result for the TLS error and it
+disables certificate verification for the whole process — on a network that intercepts TLS, that means
+trusting the interceptor and every other certificate too. The server never suggests it.
+
+**An empty value means unset.** `HTTPS_PROXY=""` is what `${HTTPS_PROXY:-}` expands to when the
+variable is not set in the launching shell, and an empty string is not a valid proxy URL. The server
+deletes empty proxy and CA variables at start-up, before the HTTP agent is built, so forwarding them is
+safe.

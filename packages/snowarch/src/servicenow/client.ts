@@ -9,6 +9,8 @@ import type {
 } from './types.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { logger } from '../utils/logging.js';
+import { snFetch } from './http.js';
+import { classifyNetworkError } from './net-errors.js';
 import { currentInstanceOrNull } from './context.js';
 
 // ─── Input validation helpers ────────────────────────────────────────────────
@@ -146,7 +148,7 @@ export class ServiceNowClient {
     });
 
     try {
-      const response = await fetch(tokenUrl, {
+      const response = await snFetch(tokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -243,7 +245,7 @@ export class ServiceNowClient {
           extraHeaders['X-Sn-Impersonate'] = impersonateHeader;
         }
 
-        const response = await fetch(url, {
+        const response = await snFetch(url, {
           ...options,
           signal: controller.signal,
           headers: {
@@ -334,13 +336,20 @@ export class ServiceNowClient {
       }
     }
 
-    // Surface the real cause from Node.js fetch failures
+    // Surface the real cause from a fetch failure, CLASSIFIED.
+    //
+    // This used to throw the raw system code — `ENOTFOUND`, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`,
+    // `ECONNREFUSED` — with the message `Failed to query records: <cause.message>`. Every one of
+    // those is accurate and none of them tells a user on a corporate laptop what to do, which is
+    // R-3: the three most common failures there have three different remedies, and the one people
+    // reach for first (their credentials) is the one that is fine.
     if (lastError) {
       const cause = (lastError as Error & { cause?: Error }).cause;
       if (cause) {
+        const diagnosis = classifyNetworkError(lastError);
         throw new ServiceNowError(
-          `Failed to query records: ${cause.message}`,
-          (cause as Error & { code?: string }).code || 'NETWORK_ERROR'
+          `Failed to query records: ${cause.message} — ${diagnosis.remedy}`,
+          diagnosis.code,
         );
       }
       throw lastError;
@@ -1098,7 +1107,7 @@ export class ServiceNowClient {
       // Decode base64 to binary
       const binary = Buffer.from(contentBase64, 'base64');
 
-      const response = await fetch(url, {
+      const response = await snFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': contentType,

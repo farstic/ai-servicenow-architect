@@ -60,6 +60,39 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Added (ARC-04-S11) — proxy support, a documented CA path, and errors that name the cause
+
+**Every request now goes through one HTTP seam that honours `HTTPS_PROXY`, `HTTP_PROXY` and
+`NO_PROXY`.** Node's built-in `fetch` ignores them — that is the specification, not a bug — so on a
+corporate laptop the server failed with a bare `fetch failed` while `curl` to the same URL worked,
+which reads as "the tool is broken". `src/servicenow/http.ts` wraps undici's `fetch` with an
+`EnvHttpProxyAgent`; `undici` is pinned to exactly **6.28.1**, the newest major whose `engines.node`
+admits this package's declared floor of 20.0.0 (8.x needs ≥22.19.0, 7.x needs ≥20.18.1 — 7.x would have
+passed CI while breaking the floor we advertise). Production footprint: 15.3 MB against an 80 MB
+ceiling.
+
+**Empty proxy and CA variables are deleted at start-up.** `src/env-sanitise.ts` is imported *first* by
+both entry points, because `EnvHttpProxyAgent` reads the environment when it is constructed and ESM
+evaluates imports before the importing module's body. ARC-06 forwards these as `${HTTPS_PROXY:-}`,
+which expands to an empty string rather than omitting the entry — and an empty string is not a valid
+proxy URL, so without this a laptop with no proxy at all would stop reaching ServiceNow the moment the
+forwarding was added.
+
+**`NODE_EXTRA_CA_CERTS` is documented per OS** in the package README's new "Corporate networks"
+section, with the Keychain / `certmgr.msc` export steps, and with a standing warning never to use
+`NODE_TLS_REJECT_UNAUTHORIZED=0` — on a network that intercepts TLS it means trusting the interceptor
+and every other certificate too.
+
+**Network failures are classified.** `classifyNetworkError` walks the `cause` chain (undici nests the
+real reason two levels down) and returns one of `DNS_FAILURE`, `TLS_CA_UNTRUSTED`, `PROXY_UNREACHABLE`,
+`CONNECTION_REFUSED`, `CONNECTION_TIMEOUT` or `NETWORK_ERROR`, each with a remedy naming the variable
+actually set. The same system code means different things depending on context: `ECONNREFUSED` with a
+proxy configured is the *proxy* refusing — the client never opened a socket to the instance — so
+reporting it as a connection failure would send the user to check a host that was never contacted.
+Proxy URLs are masked wherever they are printed: `http://user:pass@proxy:8080` renders as
+`http://***@proxy:8080`, since the host and port identify the proxy while the credentials identify the
+user. The five new codes are in the error registry, the contract and `docs/TROUBLESHOOTING.md`.
+
 ### Added (ARC-04-S10) — an audit trail, and redaction that is on by default
 
 **One JSON line per mutating call, in `<store dir>/audit.jsonl`.** §2.1 says a write needs "write

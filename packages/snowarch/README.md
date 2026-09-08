@@ -7,6 +7,41 @@ The server starts even with nothing configured, and five tools stay callable so 
 `snow_core_instances_index`, `snow_core_current_instance_read`. Everything else returns
 `NO_INSTANCE_CONFIGURED`. After adding an instance, call `snow_core_instances_reload` — no restart.
 
+## Corporate networks
+
+Node's built-in `fetch` ignores proxy environment variables entirely — that is the specification,
+not a bug — so before this the server failed with a bare `fetch failed` on a laptop where `curl` to
+the same URL worked. It now routes every request through an agent that reads these:
+
+| Variable | What it does |
+|---|---|
+| `HTTPS_PROXY` / `https_proxy` | Proxy for `https://` requests. `http://user:pass@proxy:8080` is accepted; credentials are masked wherever the proxy is printed. |
+| `HTTP_PROXY` / `http_proxy` | Proxy for `http://` requests. |
+| `NO_PROXY` / `no_proxy` | Comma-separated hosts to reach directly. |
+| `NODE_EXTRA_CA_CERTS` | Path to a PEM holding your organisation's root CA. Read **by Node at process start**, so it must be set before the server launches — changing it in a running session does nothing. |
+
+An **empty** value means unset. ARC-06 forwards these as `${HTTPS_PROXY:-}`, which expands to an
+empty string rather than omitting the entry, and an empty string is not a valid proxy URL — so the
+server deletes empty values at start-up, before the agent is built.
+
+**Exporting your root CA as PEM**
+
+- **macOS** — Keychain Access → System Roots (or Login) → find the CA → File → Export as `.cer`, then
+  `openssl x509 -inform der -outform pem -in ca.cer -out ca.pem`.
+- **Windows** — `certmgr.msc` → Trusted Root Certification Authorities → the CA → All Tasks → Export →
+  **Base-64 encoded X.509 (.CER)**. That file is already PEM; rename it `.pem` if you like.
+- **Linux** — usually already in `/etc/ssl/certs`; point `NODE_EXTRA_CA_CERTS` at the specific
+  organisation PEM rather than the bundle.
+
+**Never set `NODE_TLS_REJECT_UNAUTHORIZED=0`.** It is the first search result for the TLS error and it
+disables certificate verification for the whole process — on a network that intercepts TLS, that means
+trusting the interceptor and every other certificate too.
+
+**When something fails, the error says which of these it was.** `DNS_FAILURE`, `TLS_CA_UNTRUSTED`,
+`PROXY_UNREACHABLE`, `CONNECTION_REFUSED`, `CONNECTION_TIMEOUT` — each with a remedy naming the
+variable actually set. The three most common failures on a corporate laptop have three different
+fixes, and the one people reach for first, their credentials, is usually the one that is fine.
+
 ## The audit trail
 
 Every mutating call appends one JSON line to `<store dir>/audit.jsonl` (0600, rotated at 10 MB, three
