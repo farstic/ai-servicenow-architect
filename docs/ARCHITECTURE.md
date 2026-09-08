@@ -136,6 +136,19 @@ capture. Both are stated normatively in `governance/mcp-protocols.md` (ARC-05); 
 an explicit approval in the current conversation halts, and a configuration write before the update-set
 preference is set cannot be captured retroactively.
 
+### The server package
+
+`packages/snowarch/` is the MCP server, and after the ARC-04-S01 cut it is six directories:
+`src/server.ts` (stdio only), `src/tools/` (394 tools in 39 modules), `src/servicenow/` (the client,
+the instance manager and the types), `src/resources/`, `src/utils/`, and `src/cli/` (one file — `start`
+plus three stubs owned by later stories). Its production dependencies are four:
+`@modelcontextprotocol/sdk`, `commander`, `dotenv`, `zod`.
+
+Everything that offered a second way in is gone: the HTTP/SSE transport, the REST API, the A2A routes,
+the dashboard, the prompt catalogue, the direct-execution engine and the report generator. What that
+buys is a single protocol surface to reason about, and a production install that fell from 57.3 MB to
+14.1 MB. The per-removal detail is in `packages/snowarch/CHANGELOG.md`.
+
 ## History
 
 | Commit / tag | What |

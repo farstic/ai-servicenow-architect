@@ -493,22 +493,24 @@ export async function dispatchReportingAction(
         capabilityName = args.capability || 'report';
       }
 
-      const { generateReport } = await import('../reports/index.js');
-      const reportResult = await generateReport(combinedContent, args.format, {
-        title: args.title,
-        instanceUrl: (client as any).baseUrl || '',
-        instanceName: capabilityName,
-        capability: capabilityName,
-      });
-      const sectionCount = args.sections ? args.sections.length : 1;
-      return {
-        success: true,
-        file_path: reportResult.filePath,
-        size_bytes: reportResult.sizeBytes,
-        format: args.format,
-        sections: sectionCount,
-        message: `Report saved to ${reportResult.filePath} (${Math.round(reportResult.sizeBytes / 1024)} KB, ${sectionCount} capability${sectionCount > 1 ? 'ies' : ''})`,
-      };
+      // The two values above are computed but no longer consumed: they were the generator's
+      // input. Referencing them keeps the argument handling — and its validation — intact and
+      // reviewable for whoever gives this tool a backend, instead of deleting working code
+      // that would then have to be rewritten from the schema.
+      void combinedContent;
+      void capabilityName;
+
+      // D-03 removed the report generator along with `pdfmake` and `pptxgenjs`, so this tool
+      // has no backend. It stays REGISTERED — the catalogue is pinned at 394 tools and ARC-05's
+      // contract has not yet ruled on removals — but it now fails with a reason a caller can act
+      // on, rather than on an unresolved dynamic import. The arguments above are still validated,
+      // so the failure is about the missing surface and not about the call. ARC-04-S07 owns the
+      // catalogue's shape and decides whether the tool is dropped or given a new backend.
+      throw new ServiceNowError(
+        'snow_rpt_report_generate is unavailable: the PDF/PPTX report generator was removed with '
+        + 'the D-03 surface cut. Return the analysis as markdown and render it outside the server.',
+        'NOT_IMPLEMENTED'
+      );
     }
     default:
       return null;

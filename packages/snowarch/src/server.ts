@@ -2,21 +2,18 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
-  GetPromptRequestSchema,
-  ListPromptsRequestSchema,
   ListResourcesRequestSchema,
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import dotenv from 'dotenv';
 import { instanceManager } from './servicenow/instances.js';
 import { collectToolCatalog } from './tools/index.js';
 import { getResources, readResource } from './resources/index.js';
-import { getPrompts, resolvePromptAsync } from './prompts/index.js';
 import { logger } from './utils/logging.js';
 import { ServiceNowError } from './utils/errors.js';
 import { getPackageVersion } from './utils/version.js';
-import { connectTransport } from './transport/index.js';
 
 dotenv.config();
 
@@ -34,14 +31,13 @@ if (!hasLegacy && !hasMulti && !hasConfig) {
 export function createServer(): Server {
   const server = new Server(
     {
-      name: 'servicenow-mcp',
+      name: 'snowarch',
       version: getPackageVersion(),
     },
     {
       capabilities: {
         tools: {},
         resources: {},
-        prompts: {},
       },
     }
   );
@@ -130,24 +126,6 @@ export function createServer(): Server {
     }
   });
 
-  // ─── Prompts (/ slash commands) ─────────────────────────────────────────────
-
-  server.setRequestHandler(ListPromptsRequestSchema, async () => {
-    return { prompts: getPrompts() };
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  server.setRequestHandler(GetPromptRequestSchema, async (request): Promise<any> => {
-    const { name, arguments: args } = request.params;
-
-    const result = await resolvePromptAsync(name, args as Record<string, string> | undefined);
-    if (!result) {
-      throw new Error(`Unknown prompt: ${name}`);
-    }
-
-    return result;
-  });
-
   return server;
 }
 
@@ -155,25 +133,10 @@ export function createServer(): Server {
 
 async function main() {
   const server = createServer();
-  const tools = collectToolCatalog();
-  // Pass the factory so Streamable HTTP can create an isolated server per session.
-  const httpServer = await connectTransport(server, tools.length, createServer);
-
-  // If HTTP-based transport, mount API routes and A2A
-  if (httpServer) {
-    const { mountApiRoutes } = await import('./api/index.js');
-    mountApiRoutes(httpServer);
-
-    const { mountA2ARoutes } = await import('./a2a/index.js');
-    mountA2ARoutes(httpServer);
-
-    const { mountDashboard } = await import('./dashboard/index.js');
-    mountDashboard(httpServer);
-
-    logger.info(`REST API available at http://${process.env.HOST || '0.0.0.0'}:${process.env.PORT || '3000'}/api`);
-    logger.info(`A2A agent card at http://${process.env.HOST || '0.0.0.0'}:${process.env.PORT || '3000'}/.well-known/agent.json`);
-    logger.info(`Dashboard at http://${process.env.HOST || '0.0.0.0'}:${process.env.PORT || '3000'}/`);
-  }
+  // stdio is the only transport. The HTTP/SSE transport, the REST API, the A2A routes
+  // and the dashboard were removed with D-03 item 6; nothing else can be mounted here.
+  await server.connect(new StdioServerTransport());
+  logger.info(`snowarch ${getPackageVersion()} ready on stdio (${collectToolCatalog().length} tools)`);
 }
 
 main().catch((error) => {

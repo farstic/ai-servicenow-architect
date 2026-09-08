@@ -97,6 +97,14 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
+> **Amendment 2026-09-08 (architect's ruling on the S01 delivery).** **The package version stays
+> `2.0.0-dev`, not `2.0.0`.** This story predates ARC-01-S06's one-version-of-record, which makes the
+> root `package.json` authoritative and `tests/version-consistency.test.mjs` enforce it; the release
+> number is set once by ARC-09. Criterion 3 therefore reads `@farstic/snowarch 2.0.0-dev Apache-2.0`
+> and criterion 7 `serverInfo.version == "2.0.0-dev"`. **Open point ratified:** `src/sdk` is kept as
+> the client re-export only and `src/api` is removed — it imports the HTTP transport D-03 cuts and
+> cannot exist without it.
+
 ### ARC-04-S02 — Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed
 
 **As** the server **I want** exactly one configuration store with an explicit, logged precedence and a validated schema **so that** an instance can never be silently overridden, a group-readable secret file is never loaded, and the wizard (ARC-07) and doctor (ARC-08) read and write the same file through the same module.

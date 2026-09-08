@@ -59,9 +59,11 @@ class InstanceManager {
       }
     }
 
-    // 2. Try the wizard config store (~/.config/servicenow-mcp/instances.json)
-    //    Written by `servicenow-mcp setup` — allows the HTTP server and MCP server
-    //    to work without a .env file after running the setup wizard.
+    // 2. The LEGACY store, kept deliberately. ARC-04-S02 owns the store module and the
+    //    migration away from this path; removing the lookup here would change precedence
+    //    behaviour, which ARC-04-S01 puts out of scope. The directory carries the retired
+    //    product name because that is what exists on disk on an existing install — S02 reads
+    //    it in order to migrate off it, and it goes then, not before.
     const wizardConfigPath = join(homedir(), '.config', 'servicenow-mcp', 'instances.json');
     if (existsSync(wizardConfigPath)) {
       try {
