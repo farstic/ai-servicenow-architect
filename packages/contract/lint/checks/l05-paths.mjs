@@ -59,15 +59,28 @@ function skip(p) {
 /**
  * Files whose subject is paths that do not exist.
  *
- * `docs/decisions/**` records what was decided, including the paths a decision removed; an ADR is
- * immutable once accepted, so correcting its spelling would falsify it. `docs/ARCHITECTURE.md` is
- * the TARGET architecture: its owner table names directories a later ARC creates, and its D-03
- * ledger names files that were deliberately cut. Both are correct about what they describe.
+ * `docs/decisions/**` only. An ADR records what was decided, including the paths a decision
+ * removed, and is immutable once accepted — correcting its spelling would falsify it.
  *
- * This is a judgement, not a fact, and it is narrow on purpose — two files, both of which state in
- * their own text that they describe things that are not there. Everything else is checked.
+ * `docs/ARCHITECTURE.md` was here and should not have been. It describes the CURRENT architecture:
+ * its target tree is a fenced block, which this check already skips, and its History section names
+ * removed files through the historical marker. Excluding it hid two genuinely wrong paths that this
+ * very story then found by hand — which is the argument for checking it, not for exempting it.
  */
-const ABOUT_ABSENT_PATHS = ['docs/decisions/', 'docs/ARCHITECTURE.md'];
+const ABOUT_ABSENT_PATHS = ['docs/decisions/'];
+
+/**
+ * A row that names the ARC which creates the path.
+ *
+ * `docs/ARCHITECTURE.md`'s owner table is one row per directory with its owning story beside it —
+ * the same declaration `forthcoming-paths.json` carries, written where the reader sees it rather
+ * than in a fixture they will not open. Treating it as a citation would demand that a document
+ * about who builds what may only name things already built.
+ */
+const DECLARES_OWNER = /\*\*ARC-\d\d\*\*/;
+
+/** True once a line is at or below a heading whose subject is what used to be here. */
+const HISTORY_HEADING = /^#{2,3} (History|The D-03 cut ledger|Before \d)/;
 
 export function run(ctx) {
   const findings = [];
@@ -79,9 +92,14 @@ export function run(ctx) {
     // now L05 cannot drift apart about what counts as a record.
     if (isHistory(file) || ABOUT_ABSENT_PATHS.some((p) => file === p || file.startsWith(p))) continue;
     let fenced = false;
+    let historical = false;
     readLines(ctx.root, file).forEach((line, i) => {
       if (line.trimStart().startsWith('```')) { fenced = !fenced; return; }
       if (fenced) return;
+      // A document may be current above its history section and historical below it — the same
+      // boundary `docs/CHANGELOG.md` uses. Below it, a path that no longer exists is the subject.
+      if (HISTORY_HEADING.test(line)) historical = true;
+      if (historical || DECLARES_OWNER.test(line)) return;
       const seen = new Set();
       for (const re of [BACKTICK, LINK]) {
         re.lastIndex = 0;
