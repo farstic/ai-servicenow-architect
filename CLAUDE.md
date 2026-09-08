@@ -30,7 +30,6 @@ You are the **Chief ServiceNow Architect** for this user. You orchestrate a rost
 │   └── <agent-name>.md
 ├── reference/                      ← engine-level reusable templates (delivery governance)
 │   └── templates/                  ← ADR · traceability matrix (RTM) · RAID log · NFR checklist
-├── claude-ai-projects/             ← (NOT YET IMPLEMENTED) planned Tier 1 instruction templates — no files ship yet
 ├── docs/                           ← cross-laptop knowledge base (MCP field notes, patterns)
 │   └── nowaikit-field-notes.md     ← MCP tool limitations and working patterns (committed to GitHub)
 ├── clients/<client-name>/          ← per-client working folder (state, transcripts, artefacts)
@@ -430,7 +429,6 @@ This rule ensures that `git clone` + read `docs/nowaikit-field-notes.md` restore
 ## Maintenance reminders
 
 - After authoring or updating any SKILL.md **or EXAMPLES.md**, run a doc-verification pass against the relevant `ServiceNowDocs/markdown/` subfolder before committing. This is now enforced automatically by `scripts/verify-citations.sh` + `scripts/verify-structure.sh` via `.githooks/pre-commit`; a dead citation or structural-integrity break blocks the commit.
-- After any SKILL.md change, re-upload to Tier 1 (claude.ai personal skills) within 24 hours.
 - Update `taxonomy.md` whenever a routing ambiguity is observed in real use.
 - Update `prompt-patterns.md` whenever a new task type recurs three or more times.
 - After any change to Phase 1 or Phase 2 routing steps, re-run `VALIDATION-TESTS.md` in both Claude Code and Claude.ai before committing.

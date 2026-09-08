@@ -94,14 +94,18 @@ export function lintVocabulary({ root, files, allow = [] }) {
   return fail;
 }
 
-export function lintPaths({ root, files }) {
+export function lintPaths({ root, files, forthcoming = [] }) {
   const fail = [];
   for (const rel of files) {
     const p = join(root, rel);
     if (!existsSync(p)) continue;
     readFileSync(p, 'utf8').split('\n').forEach((line, i) => {
       for (const m of line.matchAll(PATH_TOKEN)) {
-        if (!existsSync(join(root, m[1]))) fail.push(`SK-10 ${rel}:${i + 1}: dead path ${m[1]}`);
+        if (existsSync(join(root, m[1]))) continue;
+        // A path named because it is coming, not because it exists — allowed only with the story that
+        // creates it, so the exemption has a removal condition (see tests/fixtures/forthcoming-paths.json).
+        if (forthcoming.some((f) => f.file === rel && f.path === m[1])) continue;
+        fail.push(`SK-10 ${rel}:${i + 1}: dead path ${m[1]}`);
       }
     });
   }

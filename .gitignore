@@ -12,7 +12,6 @@ memory/
 # KEPT from the engine's .gitignore, which ARC-01-S07's exact list would otherwise have dropped:
 # nothing writes this directory today, but it was ignored for exactly the reason this story exists,
 # and re-adding it later is a decision someone has to remember to make. See the S07 report.
-reports/
 
 # dependencies and build output
 node_modules/

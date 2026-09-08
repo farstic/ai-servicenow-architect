@@ -286,7 +286,7 @@ This is a documentation-only release. No changes to `CLAUDE.md`, the orchestrato
 ### Files updated
 
 - `CLAUDE.md` → v2.3
-- `claude-ai-projects/master-project-instructions.md` → v2.3
+- the planned claude.ai project-instruction templates (never shipped; see the retired-name glossary in `docs/ARCHITECTURE.md`) → v2.3
 
 ### Validation
 

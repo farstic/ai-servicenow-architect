@@ -1,0 +1,11 @@
+{
+  "_rule": "SK-10 exemptions: a path a document names because it is COMING, not because it exists. Each entry says which story creates the file, so the entry has a removal condition rather than an open end. Ceiling 1 — a document that points at more than one thing that does not exist is describing a product that does not exist.",
+  "allow": [
+    {
+      "file": "README.md",
+      "path": "docs/INSTALL.md",
+      "created_by": "ARC-06-S13",
+      "reason": "The interim README says installation arrives with ARC-06 and carries a note under the link saying the link does not resolve yet. ARC-06-S13 makes docs/INSTALL.md the README body; this entry goes with it."
+    }
+  ]
+}
