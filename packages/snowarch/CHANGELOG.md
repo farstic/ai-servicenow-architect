@@ -83,6 +83,10 @@ names would turn a clear refusal into `UNKNOWN_TOOL`, which reads as a typo — 
 `UNSUPPORTED_ON_THIS_INSTANCE` **before any HTTP request**, naming the UI route that does work
 (Scripts - Background, or a Fix Script). `ServiceNowClient.executeScript` is deleted.
 
+**`snow_fluent_script_exec` is gated `scripting`, not `write`.** Its handler always called
+`requireScripting()`; the declaration said `write`, so the generated ask-list under-reported it and a
+caller reading the contract would have believed WRITE alone was enough.
+
 **A per-call `instance` argument no longer routes.** No tool's `inputSchema` declared one, so it was an
 undocumented side channel that could send a write to a different instance than the session believed it
 was addressing. `snow_core_instance_switch` is the only way to change instance; an `instance` argument

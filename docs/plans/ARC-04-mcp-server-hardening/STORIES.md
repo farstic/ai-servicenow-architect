@@ -595,6 +595,15 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 >   exactly `discoveryToolManifest` and `dispatchDiscoveryAction`. The stdio byte-identical probe
 >   is the architect's to run; a probe on a *failed* discover would prove nothing, since the old
 >   code only minted tools on success.
+> - **F1/F2 (architect review).** `snow_fluent_script_exec` was declared `gate: 'write'` while its
+>   case calls `requireScripting()`, so the generated ask-list under-reported it. The declaration is
+>   now `scripting`. **F2 is why it survived:** the composite-gate test iterates only tools *declared*
+>   composite, and no preset grants WRITE alone — so a tool declared `write` that demands SCRIPTING
+>   threw `WRITE_NOT_ENABLED` with everything off, matched its declaration, and was never asked the
+>   one question that would expose it. The new assertion runs the other direction over a **synthetic**
+>   WRITE-only flag set rather than a preset, because the preset table was the fixture whose shape
+>   excluded the failing input. Recorded pre-fix output: `"snow_fluent_script_exec declares write but
+>   threw SCRIPTING_NOT_ENABLED"`.
 > - **Discovery's probe fallback keeps its `note`, now saying "placeholders".** A probe-derived
 >   `internal_type: 'string'` is a placeholder, not a dictionary reading, and a caller that
 >   trusted it would build the wrong query.

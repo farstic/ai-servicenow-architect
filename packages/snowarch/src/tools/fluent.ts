@@ -146,7 +146,10 @@ export function fluentToolManifest(): ToolDefinition[] {
         },
         required: ['script'],
       },
-      gate: 'write',
+      // `scripting`, matching the requireScripting() the case actually calls. It was declared
+      // `write`, so the generated ask-list under-reported it: a caller reading the contract
+      // would have believed WRITE alone was enough to run it.
+      gate: 'scripting',
       mutates: true,
     },
     {

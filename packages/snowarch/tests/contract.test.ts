@@ -78,6 +78,28 @@ describe('(a) the declared gate is the gate the runtime enforces', () => {
     },
   );
 
+  /**
+   * The other direction, and the one that was missing.
+   *
+   * The composite test below iterates only tools DECLARED composite, and no preset grants WRITE
+   * alone — so a tool declared `write` that actually calls `requireScripting()` threw
+   * `WRITE_NOT_ENABLED` with everything off (matching its declaration) and was never asked what
+   * it does when WRITE is on. `snow_fluent_script_exec` sat mis-declared behind exactly that
+   * gap: the contract's ask-list under-reported it as `write` while the runtime demanded
+   * SCRIPTING.
+   *
+   * A synthetic flag set, not a preset, precisely because the preset table is the fixture whose
+   * shape excluded the failing input.
+   */
+  it('every tool declared `write` is satisfied by WRITE alone', async () => {
+    const writeOnly = flags({ WRITE_ENABLED: 'true' });
+    const under = await Promise.all(catalogue.filter((t) => t.gate === 'write').map(async (t) => {
+      const code = await codeFor(t.name, writeOnly);
+      return /_NOT_ENABLED$/.test(code) ? `${t.name} declares write but threw ${code}` : null;
+    }));
+    expect(under.filter(Boolean)).toEqual([]);
+  });
+
   it('the composite gates are distinguished with WRITE on', async () => {
     // all-false cannot tell write from cmdb_write or scripting — WRITE is missing in each.
     // With WRITE on, the second flag is what refuses, and the declaration must match.
