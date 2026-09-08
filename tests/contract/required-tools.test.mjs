@@ -51,8 +51,11 @@ test('serverKey is a legal MCP registration key', () => {
   assert.match(pin.serverKey, /^[A-Za-z0-9_-]+$/);
 });
 
-test('the seed lists exactly 41 tools', () => {
-  assert.equal(pin.tools.length, 41);
+test('the seed lists exactly 42 tools', () => {
+  // 41 at S01, plus `snow_core_instance_switch` at S02. It changes no ServiceNow record, so it
+  // is not `mutates` — but `03` S-23 names it among the 14 that must prompt, and it is the only
+  // way to change which instance a write lands on. ARC-05-S07's ask list unions the two fields.
+  assert.equal(pin.tools.length, 42);
 });
 
 test('every name matches the tool-name convention', () => {
@@ -110,6 +113,17 @@ test('every used_by is non-empty and has no blank entries', () => {
     }
     assert.equal(new Set(t.used_by).size, t.used_by.length, `${t.name}: duplicate used_by`);
   }
+});
+
+test('every session-mutating tool is cited by a governance section too', () => {
+  // The same rule for the other field. Redirecting where every later write lands is a §2.1
+  // concern even though no record changes — and a tool that only a skill claimed would be one
+  // the approval rules were never told about, which is the whole point of the citation.
+  const bad = pin.tools
+    .filter((t) => t.sessionMutates === true)
+    .filter((t) => !t.used_by.some((u) => u.startsWith('§')))
+    .map((t) => t.name);
+  assert.deepEqual(bad, []);
 });
 
 test('every mutating tool is cited by a governance section, not only by a skill', () => {

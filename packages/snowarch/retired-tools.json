@@ -1,0 +1,11 @@
+{
+  "note": "Tool names that were REGISTERED and are now gone. The server answers them with UNKNOWN_TOOL, so they are retired names in the engine's sense — but they are not in tool-rename-map.json, because they were not renamed. This file is the single source: packages/snowarch/tests/tools/parity.test.ts and tests/contract.test.ts assert against it, and packages/contract/gen-retired-names.mjs merges it into retired-names.json. Duplicating the list in three places is how the fourth copy drifts.",
+  "retired": [
+    {
+      "name": "snow_rpt_report_generate",
+      "story": "ARC-04-S08",
+      "reason": "POSTed to a report-generation route that D-03 item 5 removed with src/reports/. It survived the cut and was calling an endpoint its own implementation no longer had.",
+      "replacement": "(removed)"
+    }
+  ]
+}

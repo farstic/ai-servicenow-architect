@@ -58,6 +58,16 @@
       ]
     },
     {
+      "name": "snow_core_instance_switch",
+      "gate": "none",
+      "mutates": false,
+      "sessionMutates": true,
+      "used_by": [
+        "§2.1",
+        "/snowarch status"
+      ]
+    },
+    {
       "name": "snow_core_instances_reload",
       "gate": "none",
       "mutates": false,

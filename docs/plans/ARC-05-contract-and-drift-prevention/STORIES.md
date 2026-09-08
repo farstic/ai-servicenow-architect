@@ -58,6 +58,10 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 >   update-set chain → `§2.2`, every mutating tool → `§2.1`, and the domain tools → the skill or
 >   agent directory that owns them. A test asserts every mutating tool carries a `§` citation, with
 >   the two `[Unsupported]` stubs named as the deliberate exception.
+> - **Amended by ARC-05-S02: the seed is 42, not 41.** `snow_core_instance_switch` was absent — it
+>   changes no ServiceNow record, so nothing in the 35 + 5 + 1 derivation reached it — yet `03` S-23
+>   names it among the 14 that must prompt, ARC-04 calls it the only way to change instance, and
+>   ARC-05-S07's ask list must carry it. Added with `sessionMutates: true` and a `§2.1` citation.
 
 > **Amendment 2026-09-08 (from ARC-04-S06, ratified). The ask-list generator must union `gates[gate]`
 > with `alsoRequires`.** The contract gained an optional `alsoRequires` field: six tools sit behind a
@@ -113,6 +117,47 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; `npm run lint:contract` green on ubuntu/macos/windows × Node 20/22/24; `docs/CONTRIBUTING.md` gains "Updating the contract pin" (finalised in S11); ARC-06 B05 and ARC-09 tag message can read `contractSha256`.
 
 ### ARC-05-S02 — `retired-names.json` generated from the rename map
+
+> **Amendment 2026-09-08 (from the S02 delivery).**
+> - **401 keys, not 400** — 394 renames + 6 identifiers + 1 removed tool, per the architect's ruling 1.
+>   The test derives the count from the three sources; a literal would make every future rename a
+>   two-file change and would say nothing about *why* the number moved.
+> - **`snow_rpt_report_generate` comes from a shared file, not a third copy of the list.**
+>   `packages/snowarch/retired-tools.json` is now the single source, read by `parity.test.ts`,
+>   `contract.test.ts` and this generator. It carries the story and the reason beside each name, so a
+>   reader of any of the three consumers can find out why.
+> - **A rename whose destination was later REMOVED collapses to `(removed)`.** The first run refused
+>   with `generate_report -> snow_rpt_report_generate (which is itself retired)`. The guard was right
+>   that a chain existed and wrong to treat it as an error: this one is real history, and the honest
+>   resolution is that the tool is *gone*, not moved. Left as a chain, the file would send a reader of
+>   the old name to one that also does not exist — and the second hop is the one nobody checks. The
+>   guard now fires only for a replacement that is retired-but-not-removed, which has no correct
+>   reading: a second rename must be a new KEY in the map, never a changed value.
+> - **Criterion 3 is stated as the property it was protecting.** "No key starts with `snow_`" was a
+>   guard against a rename map whose keys had become new names; a removed tool is a `snow_` key *and*
+>   a genuine retired name. The test now asserts: a `snow_` key must be in `retired-tools.json` AND
+>   absent from `dist/contract.json`.
+> - **`snow_core_instance_switch` added as the 42nd required tool** (architect's addition, folded in
+>   here): `gate: none`, `mutates: false`, `sessionMutates: true`, `used_by: ["§2.1", "/snowarch
+>   status"]`. S01's "41" amended below. The `§`-citation test gained the same assertion for
+>   `sessionMutates`, so the field cannot carry a tool the approval rules were never told about.
+> - **Four legacy-name allow-list rows, all owned by ARC-05, all the same principle:** a file whose
+>   *subject* is the list of dead names cannot avoid containing them.
+>   `packages/contract/retired-identifiers.json` and `retired-names.json` **are** the list;
+>   `tests/contract/retired-names.test.mjs` asserts which words are and are not on it; and
+>   `docs/CONTRIBUTING.md` explains the policy, which needs the words to be precise. Rewording to
+>   shapes was the alternative and it makes the rule vaguer exactly where a reader needs it exact.
+> - **And I broke the "run the suite after `git add`" rule while doing it.** The run that reported
+>   141 passing happened before those files were staged, so the ratchet — which scans `git ls-files`
+>   — could not see them, and nine CI cells went red on a tree that was green locally. That rule is
+>   in CONTRIBUTING *because I broke it in ARC-02-S02*; writing it down was not enough. The fix in
+>   both cases is the same and it is mechanical: stage first, then run.
+> - **Criterion 4 run now, hits expected and NOT fixed here** (it is ARC-02-S12's sweep):
+>   `CLAUDE.md` 14 · `.claude` 2 · `docs` 409 · `README.md` 0 · `tools` 0 — **425**. The `docs` figure
+>   is dominated by files that are supposed to contain them: `docs/nowaikit-field-notes.md` (40), the
+>   ARC plan documents that describe the migration (24 + 16 + 14), and 36 inside
+>   `docs/spikes/S-15-npm-ci/fixture/`, which is a pre-relicensing build artefact kept as a fixture.
+>   ARC-02-S12 will need an exclusion decision for the spike fixture, not a rewrite of it.
 **As** a maintainer **I want** one flat, committed list of every retired tool name and every retired identifier with its replacement **so that** the lint, the doctor and a plain `grep` can all prove no governing text uses a name the server rejects with `UNKNOWN_TOOL`.
 **Context.** Closes the file half of P-04 (118 retired occurrences) and P-05/P-15 (`mcp__nowaikit__`, `mcp__servicenow-mcp__`, NowAIKit). ARC README deliverable 2 and acceptance criterion 4 (`grep -rnw -f <(jq -r 'keys[]' …)`). ARC-02 S12 performs the sweep using this file; `01` §11 / DR-14 rules out any runtime alias layer, so the list is the only bridge from old to new names.
 **Scope.** In: the generator, the file, the identifier list, a test that the committed file equals the generator output. Out: the sweep itself (ARC-02 S12); the lint that consumes it (S03).

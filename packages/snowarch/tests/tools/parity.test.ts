@@ -65,9 +65,12 @@ describe('tool catalog parity (migration guard)', () => {
    * erasing the rename, and nothing would have failed. Declaring it keeps the count honest AND
    * keeps the removal visible in the one place that counts tools.
    */
-  const RETIRED_TOOLS = [
-    'snow_rpt_report_generate',     // ARC-04-S08
-  ];
+  // Read from the shared file, not written here. ARC-05-S02 needs the same list to generate
+  // `retired-names.json`, and a second copy is how the third one drifts — the file carries the
+  // story and the reason alongside each name.
+  const RETIRED_TOOLS: string[] = (JSON.parse(
+    readFileSync(new URL('../../retired-tools.json', import.meta.url), 'utf8'),
+  ) as { retired: Array<{ name: string }> }).retired.map((r) => r.name);
 
   it('3. rename map is a total bijection over the renamed tools', () => {
     const oldKeys = Object.keys(renameMap);
