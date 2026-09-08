@@ -11,6 +11,18 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ## Unreleased
 
+### Changed
+
+- `CLAUDE.md` rewritten to a line budget: **425 lines → 125**, 57,688 bytes → 10,997, against a cap
+  of 200 and 20,000. It is loaded before every turn, so its length is a cost paid on every request.
+  Nothing was deleted without a home: the repo map and the roster registry are now the generated
+  sections of `docs/ARCHITECTURE.md`, the write gate and capture protocol are the generated rule
+  file and `governance/mcp-protocols.md`, the worked example and the two embedded validation tests
+  are `VALIDATION-TESTS.md` T-01/T-02/T-03, and the two engine-version footers (v2.7.7–v2.8.0) are
+  the two newest entries under "Before 2.0.0" below, verbatim. The
+  five-row gateway table and the Code Reviewer proposal sentence are copied byte-for-byte, because
+  they are what the behavioural tests assert.
+
 ### Fixed
 
 - `snow_us_active_update_set_ensure` advertised the input shape it had *before* the update-set
@@ -31,6 +43,17 @@ historical** — it is the retired permission and surface vocabulary that ARC-02
 Mode (`design-only` | `live`) and Preset (`read-only` | `pdi-developer` | `full` | `custom`), and the
 file paths are the ones those entries were written against. Rewriting them would falsify the record
 of what was decided and when. ARC-09-S02 regenerates this file from conventional commits.
+
+The two entries that follow (v2.8.0 and v2.7.7–v2.7.8) are the engine's version footers, moved here
+verbatim from the imported `CLAUDE.md` by ARC-02-S08; the imported changelog itself ended at v2.7.6.
+
+## v2.8.0 — Phase 2.8 (Delivery Governance) opens
+
+*v2.8.0 — Phase 2.8 (Delivery Governance) opens. Two skill-only cross-cutting advisory consults added, taking the roster to 27 (corrected from "25" — see the authoritative roster-count note): **Licensing & Entitlement Specialist** (`skills/licensing-specialist/`) — what a design costs to license (subscription/fulfiller, SKU/tier, App Engine units, Now Assist Assists, third-party SaaS), §3.1 consult + post-build review; and **Estimation & Sizing Specialist** (`skills/estimation-specialist/`) — the sizing methodology and the number (ranges, ServiceNow complexity rubric, contingency, baseline-vs-custom §1.1 delta), recorded into baseline SPM. New governance family **§4 Delivery Artefact Governance** in `governance/governance-rules.md` — ADR (§4.1), Requirements Traceability / RTM (§4.2), RAID & NFR (§4.3) — seeded from new engine-level `templates/` (adr / traceability-matrix / raid-log / nfr-checklist). Wiring: taxonomy v1.5 (roster 25, §3.1 consults, §2.4 boundaries, §4.5 triggers), prompt-patterns v1.2 (PP-20 estimation, PP-21 licensing, PP-22 ADR, PP-23 RTM, PP-24 RAID/NFR), CLAUDE.md repo map + roster + §3.1 table + Artefact standards + Phase delivery-governance touchpoints. Carries forward v2.6: docs/ knowledge base, Standing Rule, repo map.*
+
+## v2.7.7 – v2.7.8 — Diagramming Specialist; the document-gateway rule
+
+*CLAUDE.md v2.7.8 — Phase 2.7 arc: CMDB & CSDM Specialist promoted to 5th v2.0 Domain Expert gateway with Phase 1 Step 5 wiring + multi-gateway co-fire rule (v2.7); Security & GRC consult/review skill (v2.7.1); repo-wide ServiceNowDocs citation-path audit, ~50 dead paths remapped (v2.7.2); ATF Author skill + batch sub-agent (v2.7.3); Operational Documentation skill, completing the §6.2 consult chain (v2.7.4); Discovery Specialist + UI/UX Specialist skills (v2.7.5); the final six specialist skills — Performance & Scale, SPM, App Engine, Migration, Reporting & Analytics, DevOps / Release Manager (v2.7.6), completing the 22-specialist roster (every specialist now has a SKILL.md). Diagramming Specialist added as the 23rd specialist and 9th sub-agent — skill + batch diagram-pack sub-agent, wired as a §6.2 post-build consult plus HLD/LLD Writer and Technical Designer downstream handoff; depicts architecture (Mermaid/draw.io/PlantUML/SVG), never decides it, and flags unapproved custom objects PENDING per §1.1 (v2.7.7). Merged with the RobertBH17 line (field notes, F-0xx fixes, T-11/12/13; this session's tests renumbered T-14/15/16). Document-gateway rule — Domain Expert gateways now also fire before finalizing a domain-scoped document deliverable (proposal / scoping doc / HLD / LLD / PDD), not only before builder dispatch; Phase 1 Step 5 intro + new "Document deliverables fire the gateway too" note, and taxonomy §6.1 Step 7, updated accordingly (v2.7.8).*
 
 ## v2.7.6 — Final six specialist skills — roster is now 100% skill-backed
 
