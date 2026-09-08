@@ -1,0 +1,24 @@
+{
+  "contractVersion": 1,
+  "product": "snowarch",
+  "version": "0.0.0-fixture",
+  "server": {
+    "suggestedName": "servicenow"
+  },
+  "toolCount": 2,
+  "tools": [
+    {
+      "name": "snow_core_records_query",
+      "gate": "none",
+      "mutates": false
+    },
+    {
+      "name": "snow_core_record_add",
+      "gate": "write",
+      "mutates": true
+    }
+  ],
+  "errorCodes": [],
+  "presets": {},
+  "flags": []
+}

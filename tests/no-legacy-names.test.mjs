@@ -39,7 +39,9 @@ const FORBIDDEN_PATHS = [
 // they are exempt for different reasons.
 //   history/decisions — a record of what was decided, quoting the superseded thing as evidence
 //   detectors        — code whose job is to match the old string
-const EXEMPT_PREFIXES = ['docs/plans/', 'docs/decisions/', 'docs/spikes/', 'scripts/legacy/'];
+//   fixtures         — trees that MUST contain the defect the lint detects (ARC-05-S03)
+const EXEMPT_PREFIXES = ['docs/plans/', 'docs/decisions/', 'docs/spikes/', 'scripts/legacy/',
+  'packages/contract/lint/tests/fixtures/'];
 const EXEMPT_FILES = new Set([
   'docs/ARCHITECTURE.md', 'docs/RELICENSING.md', 'docs/MIGRATION.md', 'NOTICE',
   'tests/no-legacy-names.test.mjs', 'tests/legacy-names.allowlist.json',

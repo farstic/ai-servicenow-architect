@@ -1,0 +1,16 @@
+{
+  "$schema": "../../required-tools.schema.json",
+  "contractVersion": 1,
+  "contractSha256": "69e5a19933c8a92b903f86e9ff5e7e360dee96c48b6d3336d0e95668e44805a4",
+  "serverKey": "servicenow",
+  "tools": [
+    {
+      "name": "snow_core_records_query",
+      "gate": "none",
+      "mutates": false,
+      "used_by": [
+        "VALIDATION-TESTS"
+      ]
+    }
+  ]
+}

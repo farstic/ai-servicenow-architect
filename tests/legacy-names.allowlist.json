@@ -10,6 +10,7 @@
     "packages/contract/retired-names.json": "ARC-05",
     "packages/snowarch/CHANGELOG.md": "ARC-04",
     "scripts/README.md": "ARC-02",
+    "tests/contract/engine-lint.test.mjs": "ARC-05",
     "tests/contract/retired-names.test.mjs": "ARC-05"
   }
 }
