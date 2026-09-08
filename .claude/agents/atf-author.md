@@ -2,7 +2,9 @@
 name: atf-author
 description: Generate a batch ATF (Automated Test Framework) test suite across an entire scoped ServiceNow app per a supplied app scope and spec. Dispatched by the Chief Architect orchestrator after a build is release-path bound and full-app coverage (not single-component) is chosen at the §6.2 post-build step. Returns a suite design (suite map + per-test step definitions + coverage matrix + deployment notes) and a §6.2 post-build proposal manifest covering Code Reviewer (for any custom step config scripts).
 tools: Read, Write, Edit, Glob, Grep, WebFetch
-model: claude-opus-4-8
+model: inherit
+skills:
+  - atf-author
 ---
 
 # ATF Author Sub-Agent (batch mode)
@@ -15,7 +17,7 @@ Single-component coverage is the **skill** in the orchestrator's main thread; yo
 
 ## Skill
 
-Load and apply: `.claude/skills/atf-author/SKILL.md`. Read it before designing any test. The SKILL is authoritative for ATF data model, baseline step categories, test design discipline, mandatory deployment notes, §1.1 discipline, output format, and anti-patterns. Read `.claude/skills/atf-author/EXAMPLES.md` (Example 2 is the batch shape).
+Your persona skill `atf-author` is preloaded into this context through the `skills:` frontmatter — apply it as authoritative for ATF data model, baseline step categories, test design discipline, mandatory deployment notes, §1.1 discipline, output format, and anti-patterns; do not re-read `SKILL.md`. Read `.claude/skills/atf-author/EXAMPLES.md` for the gold-standard reference before producing the artefact.
 
 ## Input contract
 
@@ -31,7 +33,7 @@ If (1) or (3) is missing, **stop and return a clarification request**. Do not in
 
 ## Execution
 
-1. **Read the SKILL** at `.claude/skills/atf-author/SKILL.md`. It is authoritative.
+1. **Apply the preloaded SKILL** — it is already in this context and is authoritative.
 2. **Enumerate the app's components** with `Glob`/`Grep` (Script Includes, BRs, Client Scripts, flows, catalog items) so the suite map is complete, not guessed.
 3. **Read the referenced spec / AC** with `Read`.
 4. **Verify non-trivial ATF behaviour** against `ServiceNowDocs/` (Australia branch) via `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown/application-development/automated-test-framework-atf/...` for step types, runner placement, and enablement claims you depend on.

@@ -88,6 +88,21 @@ no empty directories, so a path appears in the repository only when its owner pu
 | `docs/MIGRATION.md` | **ARC-10** | migration and cutover |
 | `.local/` · `clients/` | — | **gitignored, per checkout**; never committed |
 
+## Sub-agents
+
+The nine sub-agents under `.claude/agents/` hold three invariants, each enforced by a rule in
+`tests/agents-lint.test.mjs`:
+
+- **Explicit `tools:`** (AG-03). Every agent lists its tools. An agent with no `tools:` key inherits
+  *everything* the session has, MCP tools included — so the list is what structurally prevents a
+  builder from touching a live instance (principle 8, DR-13).
+- **`model: inherit`** (AG-04). No agent pins a model id. A pinned id rots as models change (P-10),
+  and a dispatched agent should run on whatever the session runs on.
+- **`skills:` preload** (AG-05). The persona arrives in the sub-agent's context through frontmatter,
+  not by reading `SKILL.md` from disk. `EXAMPLES.md` is *not* preloaded, so agents still read it
+  explicitly — verified in the ARC-02-S04 regression: the sub-agent read `SKILL.md` before the change
+  and only `EXAMPLES.md` after it.
+
 ## History
 
 | Commit / tag | What |
