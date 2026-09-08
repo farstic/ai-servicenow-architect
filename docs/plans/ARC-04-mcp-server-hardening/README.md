@@ -71,21 +71,21 @@ ARC-01. D-02 (relicensing) is a hard gate; D-03 fixes the cut list; D-05 fixes t
 
 Full write-ups (persona, context, scope, design notes, acceptance criteria, tasks, test strategy, dependencies, size, risks, definition of done) are in [`STORIES.md`](STORIES.md).
 
-| ID | Title | Size |
-|---|---|---|
-| ARC-04-S01 | D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI | L |
-| ARC-04-S02 | Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed | L |
-| ARC-04-S03 | Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage | L |
-| ARC-04-S04 | Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed` | L |
-| ARC-04-S05 | SCRIPTING / update-set read-gate split | M |
-| ARC-04-S06 | `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract` | L |
-| ARC-04-S07 | `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter | M |
-| ARC-04-S08 | Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap | M |
-| ARC-04-S09 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert` / `action_update` | M |
-| ARC-04-S10 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M |
-| ARC-04-S11 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M |
-| ARC-04-S12 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M |
-| ARC-04-S13 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M |
-| ARC-04-S14 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M |
+| ID | Title | Size | Status |
+|---|---|---|---|
+| ARC-04-S01 | D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI | L | Done (2026-09-08) |
+| ARC-04-S02 | Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed | L | Done (2026-09-08) |
+| ARC-04-S03 | Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage | L | Done (2026-09-08) |
+| ARC-04-S04 | Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed` | L | Done (2026-09-08) |
+| ARC-04-S05 | SCRIPTING / update-set read-gate split | M | Done (2026-09-08) |
+| ARC-04-S06 | `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract` | L | Done (2026-09-08) |
+| ARC-04-S07 | `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter | M | Done (2026-09-08) |
+| ARC-04-S08 | Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap | M | Done (2026-09-08) |
+| ARC-04-S09 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert` / `action_update` | M | Done (2026-09-08) |
+| ARC-04-S10 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | In progress |
+| ARC-04-S11 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M | Not started |
+| ARC-04-S12 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | Not started |
+| ARC-04-S13 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | Not started |
+| ARC-04-S14 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M | Not started |
 
 Mapping to the earlier titles-only list: former stories 2 and 7 merged into S04; former story 12 split into S01 (harness, CI) and S03 (coverage); S11 added per R-3; S12 added to carry the server doctor module ARC-08 depends on. Total 31–32 engineer-days. The full former-number → story-ID table is at the top of `STORIES.md`; ARC-05/06/07 still cite this ARC by the former numbers.

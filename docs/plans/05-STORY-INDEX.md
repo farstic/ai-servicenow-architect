@@ -10,20 +10,20 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 
 | ID | ARC | Title | Size | Depends on | Milestone | Status |
 |---|---|---|---|---|---|---|
-| ARC-00-S01 | ARC-00 | Spike workspace, stub MCP server and three clean test environments | L | — | M0 | Not started |
-| ARC-00-S02 | ARC-00 | Licence and relicensing statement (D-02): `LICENSE`, `NOTICE`, header sweep list | S | — | M0 | Not started |
-| ARC-00-S03 | ARC-00 | ADR-0001…ADR-0006 (+ ADR-0007 post-decision rulings) and the `engine.config.json` value set | M | S02 | M0 | Not started |
-| ARC-00-S04 | ARC-00 | First-session spikes: S-01 pre-seeded approval, S-16 project `permissions.allow`, S-17 unconfigured server | M | S01 | M0 | Not started |
-| ARC-00-S05 | ARC-00 | Permission-rule spikes: S-18 `permissions.ask` in auto mode, S-12 middle-wildcard globs | M | S01, S04 | M0 | Not started |
-| ARC-00-S06 | ARC-00 | Hook and path-expansion spikes: S-03 `${CLAUDE_PROJECT_DIR}` on native Windows, S-05 hook with Node absent, S-20 shell-env inheritance | M | S01 | M0 | Not started |
-| ARC-00-S07 | ARC-00 | Windows console spikes: S-04 raw-mode masked input, S-08 `bootstrap.cmd` under Restricted and GPO-locked policies | M | S01 | M0 | Not started |
-| ARC-00-S08 | ARC-00 | Server install and startup spikes: S-15 root `npm ci` footprint, S-06 `MCP_TIMEOUT` and 394-tool cold start | M | S01 | M0 | Not started |
-| ARC-00-S09 | ARC-00 | S-07 — ServiceNowDocs submodule recipes: size and time on three OSes | M | S01 | M0 | Not started |
-| ARC-00-S10 | ARC-00 | Session-dynamics spikes: S-09 Claude-first clone-into-cwd and restart, S-02 `list_changed` after reload | M | S01, S04 | M0 | Not started |
-| ARC-00-S11 | ARC-00 | S-11 — Claude Code 2.1.214 floor verdict over the spike matrix | S | S04, S10 | M0 | Not started |
-| ARC-00-S12 | ARC-00 | S-14a–g plugin channel spikes (D-06 hedge, one-week time-box) and S-19 `claude plugin validate` on headless CI | L | S01, S03 | M0 | Not started |
-| ARC-00-S13 | ARC-00 | Windows test recipe for ARC-06 / ARC-09 CI | S | S06, S07 | M0 | Not started |
-| ARC-00-S14 | ARC-00 | Close-out: `03` §A/§B Status column, deferred spikes S-10 / S-13, gate sign-off for ARC-01 and ARC-06 | M | S02, S13 | M0 | Not started |
+| ARC-00-S01 | ARC-00 | Spike workspace, stub MCP server and three clean test environments | L | — | M0 | Done (2026-09-07) |
+| ARC-00-S02 | ARC-00 | Licence and relicensing statement (D-02): `LICENSE`, `NOTICE`, header sweep list | S | — | M0 | Done (2026-09-07) |
+| ARC-00-S03 | ARC-00 | ADR-0001…ADR-0006 (+ ADR-0007 post-decision rulings) and the `engine.config.json` value set | M | S02 | M0 | Done (2026-09-07) |
+| ARC-00-S04 | ARC-00 | First-session spikes: S-01 pre-seeded approval, S-16 project `permissions.allow`, S-17 unconfigured server | M | S01 | M0 | Done (2026-09-07) |
+| ARC-00-S05 | ARC-00 | Permission-rule spikes: S-18 `permissions.ask` in auto mode, S-12 middle-wildcard globs | M | S01, S04 | M0 | Done (2026-09-07) |
+| ARC-00-S06 | ARC-00 | Hook and path-expansion spikes: S-03 `${CLAUDE_PROJECT_DIR}` on native Windows, S-05 hook with Node absent, S-20 shell-env inheritance | M | S01 | M0 | Done (2026-09-07) |
+| ARC-00-S07 | ARC-00 | Windows console spikes: S-04 raw-mode masked input, S-08 `bootstrap.cmd` under Restricted and GPO-locked policies | M | S01 | M0 | Done — parked items noted (2026-09-07) |
+| ARC-00-S08 | ARC-00 | Server install and startup spikes: S-15 root `npm ci` footprint, S-06 `MCP_TIMEOUT` and 394-tool cold start | M | S01 | M0 | Done (2026-09-07) |
+| ARC-00-S09 | ARC-00 | S-07 — ServiceNowDocs submodule recipes: size and time on three OSes | M | S01 | M0 | Done (2026-09-07) |
+| ARC-00-S10 | ARC-00 | Session-dynamics spikes: S-09 Claude-first clone-into-cwd and restart, S-02 `list_changed` after reload | M | S01, S04 | M0 | Done (2026-09-07) |
+| ARC-00-S11 | ARC-00 | S-11 — Claude Code 2.1.214 floor verdict over the spike matrix | S | S04, S10 | M0 | Done (2026-09-07) |
+| ARC-00-S12 | ARC-00 | S-14a–g plugin channel spikes (D-06 hedge, one-week time-box) and S-19 `claude plugin validate` on headless CI | L | S01, S03 | M0 | Done (2026-09-07) |
+| ARC-00-S13 | ARC-00 | Windows test recipe for ARC-06 / ARC-09 CI | S | S06, S07 | M0 | Done — parked items noted (2026-09-07) |
+| ARC-00-S14 | ARC-00 | Close-out: `03` §A/§B Status column, deferred spikes S-10 / S-13, gate sign-off for ARC-01 and ARC-06 | M | S02, S13 | M0 | Done (2026-09-07) |
 | ARC-01-S01 | ARC-01 | Found the repository: root commit with `LICENSE`/`NOTICE`, default branch, protection, skeleton | M | ARC-00-S02 | M1 | Done (2026-09-08) |
 | ARC-01-S02 | ARC-01 | Import the engine working tree with history (submodule dropped, legacy scripts parked) | M | S01; ARC-00-S02 | M1 | Done (2026-09-08) |
 | ARC-01-S03 | ARC-01 | Import the server into `packages/snowarch` with history; leaf-level D-03 cut; package rename | L | S01; ARC-00-S02/S03 | M1 | Done (2026-09-08) |
@@ -60,16 +60,16 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-03-S09 | ARC-03 | `.github/workflows/docs-bump.yml` weekly PR with pin, verification output and newly dead citations | M | S07; ARC-01 (all) | M2 | Not started |
 | ARC-03-S10 | ARC-03 | `NOTICE` attribution, the B02/`docs sync` attribution line, install-page attribution and size/time statement, `docs/ARCHITECTURE.md` corpus section | S | S05; ARC-00-S09; ARC-01 (all); verdicts S-07 | M2 | Not started |
 | ARC-03-S11 | ARC-03 | Windows long-path CI proof and `--docs skip` → doctor FAIL wiring (three-OS real-corpus job) | M | S05, S06; ARC-00-S09/S13; ARC-01-S11; verdicts S-07 | M2 | Not started |
-| ARC-04-S01 | ARC-04 | D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI | L | ARC-01-S05/S06 | M2 | Not started |
-| ARC-04-S02 | ARC-04 | Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed | L | S01 | M2 | Not started |
-| ARC-04-S03 | ARC-04 | Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage | L | S02 | M2 | Not started |
-| ARC-04-S04 | ARC-04 | Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed` | L | S03 | M2 | Not started |
-| ARC-04-S05 | ARC-04 | SCRIPTING / update-set read-gate split | M | S03 | M2 | Not started |
-| ARC-04-S06 | ARC-04 | `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract` | L | S04, S05 | M2 | Not started |
-| ARC-04-S07 | ARC-04 | `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter | M | S05, S06 | M2 | Not started |
-| ARC-04-S08 | ARC-04 | Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap | M | S04, S06 | M2 | Not started |
-| ARC-04-S09 | ARC-04 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert`/`action_update` | M | S01 | M2 | Not started |
-| ARC-04-S10 | ARC-04 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | S02, S06 | M2 | Not started |
+| ARC-04-S01 | ARC-04 | D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI | L | ARC-01-S05/S06 | M2 | Done (2026-09-08) |
+| ARC-04-S02 | ARC-04 | Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed | L | S01 | M2 | Done (2026-09-08) |
+| ARC-04-S03 | ARC-04 | Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage | L | S02 | M2 | Done (2026-09-08) |
+| ARC-04-S04 | ARC-04 | Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed` | L | S03 | M2 | Done (2026-09-08) |
+| ARC-04-S05 | ARC-04 | SCRIPTING / update-set read-gate split | M | S03 | M2 | Done (2026-09-08) |
+| ARC-04-S06 | ARC-04 | `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract` | L | S04, S05 | M2 | Done (2026-09-08) |
+| ARC-04-S07 | ARC-04 | `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter | M | S05, S06 | M2 | Done (2026-09-08) |
+| ARC-04-S08 | ARC-04 | Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap | M | S04, S06 | M2 | Done (2026-09-08) |
+| ARC-04-S09 | ARC-04 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert`/`action_update` | M | S01 | M2 | Done (2026-09-08) |
+| ARC-04-S10 | ARC-04 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | S02, S06 | M2 | In progress |
 | ARC-04-S11 | ARC-04 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M | S01 | M2 | Not started |
 | ARC-04-S12 | ARC-04 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | S04, S06 | M2 | Not started |
 | ARC-04-S13 | ARC-04 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | S06, S08 | M2 | Not started |
