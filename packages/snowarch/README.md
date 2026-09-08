@@ -1,5 +1,14 @@
 # ServiceNow MCP Toolkit
 
+## Without an instance
+
+The server starts even with nothing configured, and five tools stay callable so it can explain itself:
+`snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload`,
+`snow_core_instances_index`, `snow_core_current_instance_read`. Everything else returns
+`NO_INSTANCE_CONFIGURED`. After adding an instance, call `snow_core_instances_reload` — no restart.
+
+*(Minimal insert; ARC-04-S14 rewrites this file.)*
+
 A [Model Context Protocol](https://modelcontextprotocol.io) server for ServiceNow. It exposes **394 tools** spanning ITSM, CMDB, scripting, platform development, integration, security, and AI domains, so an MCP-capable assistant can read and operate a ServiceNow instance through a single, consistent interface.
 
 ## Highlights

@@ -24,9 +24,11 @@ const mockClient = {
 } as unknown as ServiceNowClient;
 
 describe('coreToolManifest', () => {
-  it('returns 24 core tool definitions', () => {
+  it('returns the core tool definitions', () => {
     const tools = coreToolManifest();
-    expect(tools.length).toBe(24);
+    // 24 + the three instance-free tools ARC-04-S04 added (status_read,
+    // capabilities_read, instances_reload).
+    expect(tools.length).toBe(27);
   });
 
   it('all tools have name, description and inputSchema', () => {

@@ -11,6 +11,10 @@ import { existsSync } from 'node:fs';
 import dotenv from 'dotenv';
 import { instanceManager } from './servicenow/instances.js';
 import { runWithInstance } from './servicenow/context.js';
+import {
+  CORE_TOOLS_UNCONFIGURED, NO_INSTANCE_MESSAGE, setAdvertisedCount, setFullCatalogueSize,
+  setToolListChangedNotifier,
+} from './tools/status.js';
 import { isUnderCloudSyncFolder } from './store/index.js';
 import { collectToolCatalog } from './tools/index.js';
 import { getResources, readResource } from './resources/index.js';
@@ -29,6 +33,16 @@ if (envFile && existsSync(envFile)) {
 
 // ─── Create MCP Server ───────────────────────────────────────────────────────
 
+/**
+ * What `tools/list` returns. The full catalogue once an instance is loaded; the five
+ * instance-free core tools before that.
+ */
+function advertisedTools(): ReturnType<typeof collectToolCatalog> {
+  const all = collectToolCatalog();
+  if (instanceManager.loadedCount() > 0) return all;
+  return all.filter((t) => (CORE_TOOLS_UNCONFIGURED as readonly string[]).includes(t.name));
+}
+
 export function createServer(): Server {
   const server = new Server(
     {
@@ -37,7 +51,10 @@ export function createServer(): Server {
     },
     {
       capabilities: {
-        tools: {},
+        // listChanged: the server re-advertises its tool set after
+        // snow_core_instances_reload, so a user who runs `./snowarch instance add` in
+        // another terminal does not have to restart Claude Code (S-02, CONFIRMED).
+        tools: { listChanged: true },
         resources: {},
       },
     }
@@ -48,7 +65,12 @@ export function createServer(): Server {
   // ─── Tools ──────────────────────────────────────────────────────────────────
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    return { tools: collectToolCatalog() };
+    // Unconfigured, only the five tools that need no instance are advertised. Offering the
+    // full catalogue would put ~397 tools in front of a session where every one of them
+    // fails — the list is the honest statement of what can actually be called.
+    const advertised = advertisedTools();
+    setAdvertisedCount(advertised.length);
+    return { tools: advertised };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -62,14 +84,32 @@ export function createServer(): Server {
         throw new ServiceNowError(`Unknown tool: ${name}`, 'UNKNOWN_TOOL');
       }
 
+      // A tool that exists but needs an instance we do not have. UNKNOWN_TOOL is reserved
+      // for names that exist in no configuration — telling a user their tool does not exist,
+      // when it does and is merely unusable right now, sends them looking in the wrong place.
+      if (instanceManager.loadedCount() === 0
+        && !(CORE_TOOLS_UNCONFIGURED as readonly string[]).includes(name)) {
+        throw new ServiceNowError(NO_INSTANCE_MESSAGE, 'NO_INSTANCE_CONFIGURED');
+      }
+
       const instanceName = (args as Record<string, unknown>)?.['instance'] as string | undefined;
+      const { routeToolInvocation } = await import('./tools/index.js');
+
+      // The instance-free core tools are dispatched WITHOUT resolving a client or entering a
+      // runtime. Resolving one first would throw "no instance is configured" from inside the
+      // very tools whose job is to report that — which is what happened the first time this
+      // ran, and is why the probe exercises them rather than trusting the guard above.
+      if ((CORE_TOOLS_UNCONFIGURED as readonly string[]).includes(name)) {
+        const result = await routeToolInvocation(null as never, name, args || {});
+        return { content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }] };
+      }
+
       const client = instanceManager.getClient(instanceName);
 
       // Every tool call runs inside the addressed instance's runtime, so the ~166 require*()
       // gates read THAT instance's effective flags rather than process.env. One switch, and
       // writes refuse on prod while the same call succeeds on the PDI — no second process.
       const runtime = instanceManager.getEntry(instanceName?.toLowerCase()) ?? instanceManager.current();
-      const { routeToolInvocation } = await import('./tools/index.js');
       const result = await runWithInstance(runtime, () => routeToolInvocation(client, name, args || {}));
 
       return {
@@ -117,6 +157,9 @@ export function createServer(): Server {
     const { uri } = request.params;
 
     try {
+      if (instanceManager.loadedCount() === 0) {
+        throw new ServiceNowError(NO_INSTANCE_MESSAGE, 'NO_INSTANCE_CONFIGURED');
+      }
       const client = instanceManager.getClient();
       // Resource reads need an instance for the same reason tool calls do.
       const result = await runWithInstance(instanceManager.current(), () => readResource(client, uri));
@@ -181,10 +224,31 @@ function logStartup(): void {
 async function main() {
   logStartup();
   const server = createServer();
+
+  // The reload tool re-advertises the tool set through the server it is running in; giving
+  // it a callback keeps tools/status.ts free of an import back into the server module.
+  setFullCatalogueSize(collectToolCatalog().length);
+  setAdvertisedCount(advertisedTools().length);
+  setToolListChangedNotifier(() => { void server.sendToolListChanged(); });
+
   // stdio is the only transport. The HTTP/SSE transport, the REST API, the A2A routes
   // and the dashboard were removed with D-03 item 6; nothing else can be mounted here.
-  await server.connect(new StdioServerTransport());
-  logger.info(`snowarch ${getPackageVersion()} ready on stdio (${collectToolCatalog().length} tools)`);
+  const transport = new StdioServerTransport();
+
+  // Exit when the client closes the transport (stdin EOF), with code 0.
+  //
+  // A signal is deliberately NOT used: Windows has no SIGTERM delivery, and on POSIX a
+  // process killed by an unhandled SIGTERM reports a signal rather than an exit code — so a
+  // test asserting "exited 0" could not pass on either. ARC-04-S10 adds the audit-writer
+  // flush at this point; until then there is nothing buffered to lose.
+  transport.onclose = () => {
+    logger.info('stdio closed by the client — exiting');
+    process.exit(0);
+  };
+
+  await server.connect(transport);
+  logger.info(`snowarch ${getPackageVersion()} ready on stdio (${advertisedTools().length} tools advertised, `
+    + `${collectToolCatalog().length} in the catalogue)`);
 }
 
 main().catch((error) => {

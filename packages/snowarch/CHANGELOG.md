@@ -60,6 +60,24 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Added (ARC-04-S04) — the server starts without an instance
+
+- **It no longer exits when no instance is configured.** An unconfigured checkout used to show a
+  crashed MCP server; the process now stays up and can explain itself.
+- While unconfigured, `tools/list` advertises exactly five tools that need no instance:
+  `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload`,
+  `snow_core_instances_index`, `snow_core_current_instance_read`. Any other tool returns
+  **`NO_INSTANCE_CONFIGURED`** with both remedies. `UNKNOWN_TOOL` stays reserved for names that exist
+  in no configuration.
+- **New tools** (394 → 397): `snow_core_status_read` (mode, store, instances, tool count),
+  `snow_core_capabilities_read` (preset, flags, effective flags — never a username or a secret),
+  `snow_core_instances_reload` (re-read the store and re-advertise).
+- `snow_core_instances_reload` sends `notifications/tools/list_changed` when the advertised set
+  changes, and the server declares `capabilities.tools.listChanged`. **Adding an instance in another
+  terminal no longer needs a Claude Code restart.**
+- `snow_core_current_instance_read` answers `{ name: null, mode: "unconfigured" }` instead of throwing.
+- Closing stdin exits the process with **code 0**, not a signal.
+
 ### Changed (ARC-04-S03) — flags are per instance
 
 - The six permission flags belong to the **instance being addressed**, not to the process. One server

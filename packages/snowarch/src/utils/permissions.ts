@@ -156,6 +156,21 @@ const HUMAN: Record<string, string> = {
 };
 
 /**
+ * The smallest preset whose expansion turns every missing flag on.
+ *
+ * Hard-coding `pdi-developer` was wrong and shipped: a FLUENT or NOW_ASSIST refusal on an
+ * instance already at `pdi-developer` told the reader to set the preset they were already
+ * on — a remedy that changes nothing. Those two flags are only in `full`.
+ *
+ * Ordered least-permissive first, so the suggestion never grants more than the caller
+ * actually needs.
+ */
+export function remedyPreset(missing: FlagName[] = []): Exclude<PresetName, 'custom'> {
+  const order: Array<Exclude<PresetName, 'custom'>> = ['read-only', 'pdi-developer', 'full'];
+  return order.find((name) => missing.every((f) => PRESETS[name][f] === 'true')) ?? 'full';
+}
+
+/**
  * The refusal a caller sees. It names the instance, because with several configured
  * "writes are disabled" is not actionable on its own, and it carries the command that
  * changes it. A prod instance gets the stronger sentence: the cap is deliberate, and
@@ -168,7 +183,7 @@ export function gateError(result: GateResult): ServiceNowError {
   const remedy = rt.environment === 'prod'
     ? `Instance "${rt.label}" is tagged prod and capped at read-only. `
       + `Raising it requires: ./snowarch instance set-preset ${rt.label} <preset> --ack-prod`
-    : `Run: ./snowarch instance set-preset ${rt.label} pdi-developer`;
+    : `Run: ./snowarch instance set-preset ${rt.label} ${remedyPreset(result.missing)}`;
   return new ServiceNowError(`${what} for instance "${rt.label}" (preset ${rt.preset}). ${remedy}`, code);
 }
 

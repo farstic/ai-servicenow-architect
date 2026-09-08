@@ -322,6 +322,25 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
+> **Amendment 2026-09-08 (architect's rulings on the S04 delivery).**
+> - **The catalogue is 397 here**, not 398: 394 + the three instance-free core tools. `EXPECTED` in
+>   `scripts/extract-tools.mjs` and `tests/tools/parity.test.ts` moved together in the same commit.
+>   ARC-04-S06 owns the arithmetic from here (397 − 1 removed + whatever it adds).
+> - **S-17 and S-02 are both CONFIRMED** (`03` §F and the spike records), so no fallback was shipped.
+>   Criterion 7 — the `/mcp` visual check under Claude Code — remains for the owner's live sitting; the
+>   agent does not attempt it.
+> - **Criterion 3 is asserted by a real MCP `Client` on `StdioClientTransport`** receiving
+>   `notifications/tools/list_changed`, not by reading the tool's own `listChangedSent`. Those are
+>   different claims: the second only says the server believes it sent something.
+> - **The bijection in `tests/tools/parity.test.ts` is now scoped to RENAMED tools.** A tool introduced
+>   after the v1 rename has no old name and cannot be in `tool-rename-map.json`; the three are listed
+>   in `POST_RENAME_TOOLS` with a companion test asserting they are genuinely absent from the map, so
+>   the count cannot drift silently.
+> - **The S03 remedy defect is fixed here** (architect's C4 run): `remedyPreset(missing)` returns the
+>   smallest preset whose expansion covers the missing flags — `pdi-developer` for WRITE / CMDB_WRITE /
+>   SCRIPTING / ATF, `full` for NOW_ASSIST / FLUENT. The hard-coded `pdi-developer` told a reader on
+>   `pdi-developer` to set the preset they already had. `permissions.ts` stays at 100 %.
+
 ### ARC-04-S05 — SCRIPTING / update-set read-gate split
 
 **As** the engine running the Code Reviewer against a live instance in the `read-only` preset **I want** to list and read Script Includes, Business Rules, Client Scripts, ACLs, UI Policies, UI Actions and update sets **so that** review and design work never needs a write flag, and SCRIPTING means what `01` §6.3 says: *writing* those objects.
@@ -366,6 +385,12 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 > this story's `EXPECTED` is `394 − 1 removed + <new tools>`. ARC-04-S01 left the tool registered and
 > failing with `NOT_IMPLEMENTED` precisely so the count stayed stable until the story that owns
 > catalogue changes could make the removal deliberate.
+
+> **Amendment 2026-09-08 (architect's ruling, from S03).** **The test glue introduced in ARC-04-S03 is
+> removed in THIS story, not rewritten twice.** `tests/setup.ts` enters a runtime whose flags are a live
+> view of `process.env`, and `outsideInstance()` exists so the no-instance property stays observable
+> despite that hook. S06's `gate`/`mutates` declarations and `tests/contract.test.ts` replace the seven
+> per-dispatcher suites' flag assertions; the glue goes with them.
 
 ### ARC-04-S06 — `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract`
 

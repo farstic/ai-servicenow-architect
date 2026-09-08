@@ -6,8 +6,8 @@ import {
 import {
   applyDependencyRule, checkPresetMismatch, checkProdPosture, evaluateGate, expandPreset,
   gateError, isAtfEnabled, isCmdbWriteEnabled, isFluentEnabled, isNowAssistEnabled,
-  isScriptingEnabled, isWriteEnabled, PRESETS, requireAtf, requireCmdbWrite, requireFluent,
-  requireNowAssist, requireScripting, requireWrite, type GateName,
+  isScriptingEnabled, isWriteEnabled, PRESETS, remedyPreset, requireAtf, requireCmdbWrite, requireFluent,
+  requireNowAssist, requireScripting, requireWrite, type GateName, type PresetName,
 } from '../../src/utils/permissions.js';
 
 /**
@@ -323,6 +323,49 @@ describe('the refusal message names the instance and the remedy — criterion 5 
         try { fn(); } catch (e) { expect((e as ServiceNowError).message).toContain(text); }
       }
     });
+  });
+
+  it('the remedy names the SMALLEST preset that actually enables the missing flag', () => {
+    // Shipped wrong in S03: the remedy hard-coded `pdi-developer`, so a FLUENT or
+    // NOW_ASSIST refusal on an instance ALREADY at pdi-developer told the reader to set
+    // the preset they were on — a remedy that changes nothing. Those two are only in `full`.
+    expect(remedyPreset(['WRITE_ENABLED'])).toBe('pdi-developer');
+    expect(remedyPreset(['CMDB_WRITE_ENABLED'])).toBe('pdi-developer');
+    expect(remedyPreset(['SCRIPTING_ENABLED'])).toBe('pdi-developer');
+    expect(remedyPreset(['ATF_ENABLED'])).toBe('pdi-developer');
+    expect(remedyPreset(['NOW_ASSIST_ENABLED'])).toBe('full');
+    expect(remedyPreset(['FLUENT_ENABLED'])).toBe('full');
+    // Nothing missing: the least permissive preset is enough, and it is never `custom`.
+    expect(remedyPreset([])).toBe('read-only');
+    expect(remedyPreset()).toBe('read-only');
+    // A combination takes the smallest preset that covers BOTH.
+    expect(remedyPreset(['WRITE_ENABLED', 'FLUENT_ENABLED'])).toBe('full');
+  });
+
+  it('a flag no preset enables falls back to full rather than returning undefined', () => {
+    // The defensive branch, exercised rather than ignored: if a seventh flag is added to
+    // FLAG_NAMES and forgotten in the PRESETS table, `find` returns undefined and the
+    // remedy would read "set-preset pdi undefined". The cast is how a future mistake is
+    // simulated today — there is no legal value that reaches this branch yet.
+    expect(remedyPreset(['SOMETHING_NEW' as never])).toBe('full');
+  });
+
+  it('each family suggests a preset that would actually work', () => {
+    const cases: Array<[() => void, PresetName, string]> = [
+      [requireAtf, 'read-only', 'pdi-developer'],
+      [requireNowAssist, 'pdi-developer', 'full'],
+      [requireFluent, 'pdi-developer', 'full'],
+    ];
+    for (const [fn, preset, expected] of cases) {
+      asInstance({ preset, effectiveFlags: expandPreset(preset) }, () => {
+        try { fn(); throw new Error('expected a throw'); } catch (e) {
+          const m = (e as ServiceNowError).message;
+          expect(m).toContain(`set-preset pdi ${expected}`);
+          // The suggestion must differ from what the instance already has.
+          expect(m).not.toContain(`set-preset pdi ${preset}`);
+        }
+      });
+    }
   });
 
   it('an unrecognised code still produces a usable sentence rather than "undefined"', () => {
