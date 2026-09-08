@@ -311,6 +311,15 @@ Three things make the output reproducible, and each is load-bearing:
 
 Every source PR now carries a `dist/` diff. `linguist-generated` collapses it in review.
 
+### Never spawn `npx` (or any `.cmd`) from a build or test script
+
+Node refuses to `spawnSync` a `.cmd` without a shell — `EINVAL` — and `npx` on Windows *is*
+`npx.cmd`. Passing `shell: true` fixes the spawn and hands cmd.exe the argument quoting, which is the
+other half of the same problem. Run the tool's own JS entry point with `process.execPath` instead:
+`node node_modules/typescript/bin/tsc …`. It has no shell, no `.cmd`, and it is unambiguously the
+pinned local copy rather than whatever `npx` would resolve. ARC-04-S13's first build script called
+`npx tsc` and was red on all three Windows cells while green on six others.
+
 ### Never mutate a shared build artefact in a test
 
 A test that edits `dist/` — even one that restores it in a `finally` — cannot be isolated by cleaning

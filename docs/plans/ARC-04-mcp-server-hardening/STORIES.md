@@ -1008,6 +1008,13 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 > - **The `no-build` job invokes `npx vitest run` directly, not `npm test`.** The package's `pretest`
 >   script builds, so `npm test` would silently rebuild `dist/` and the job would prove nothing about
 >   the committed artefact — which is the one thing it exists to prove.
+> - **The build script must not call `npx`.** `npx` on Windows is `npx.cmd`, and Node refuses to
+>   `spawnSync` a `.cmd` without a shell — `EINVAL` on all three Windows cells while macOS and Linux
+>   passed. `shell: true` would fix the spawn and hand cmd.exe the argument quoting, which is the
+>   other half of the same problem. The script now runs `node node_modules/typescript/bin/tsc`
+>   directly: no shell, no `.cmd`, and unambiguously the *pinned* TypeScript rather than whatever
+>   `npx` resolves. Same class as ARC-04-S12's file-URL `pathname` — a Windows-only defect that green
+>   macOS and Linux cells say nothing about.
 > - **`dist/` is 1.5 MB, not the 4.2 MB the story estimated** (that figure included source maps, which
 >   `tsconfig.build.json` turns off). 134 files tracked, no `.map`.
 

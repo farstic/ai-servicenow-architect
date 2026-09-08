@@ -26,22 +26,29 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = join(root, 'packages', 'snowarch');
 const dist = join(pkg, 'dist');
 
-const run = (cmd, args, cwd) => {
-  // `shell: false` — no shell means no quoting differences between cmd.exe and sh, which is
-  // the usual source of "works on my machine" in a build script.
-  execFileSync(cmd, args, { cwd, stdio: 'inherit', shell: false });
+const run = (args, cwd) => {
+  // Always `node <script>`, never a shell and never `npx`.
+  //
+  // `npx` on Windows is `npx.cmd`, and Node refuses to `spawnSync` a `.cmd` without a shell —
+  // `EINVAL`, which is what the first version of this script did on all three Windows cells
+  // while passing on macOS and Linux. Adding `shell: true` would have fixed the spawn and
+  // introduced cmd.exe quoting rules for the arguments, which is the other half of the same
+  // problem. Running the compiler's own JS entry point with `process.execPath` has neither:
+  // no shell, no `.cmd`, and it is unambiguously the pinned local TypeScript rather than
+  // whatever `npx` would resolve.
+  execFileSync(process.execPath, args, { cwd, stdio: 'inherit', shell: false });
 };
 
-const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const tsc = join(root, 'node_modules', 'typescript', 'bin', 'tsc');
 
 process.stdout.write(`build-dist: removing ${dist}\n`);
 rmSync(dist, { recursive: true, force: true });
 
 process.stdout.write('build-dist: tsc -p tsconfig.build.json\n');
-run(npx, ['tsc', '-p', 'tsconfig.build.json'], pkg);
+run([tsc, '-p', 'tsconfig.build.json'], pkg);
 
 process.stdout.write('build-dist: extract-tools\n');
-run(process.execPath, [join(pkg, 'scripts', 'extract-tools.mjs')], pkg);
+run([join(pkg, 'scripts', 'extract-tools.mjs')], pkg);
 
 const contract = readFileSync(join(dist, 'contract.json'), 'utf8');
 const sha = createHash('sha256').update(contract).digest('hex');
