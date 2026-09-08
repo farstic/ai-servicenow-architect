@@ -1,31 +1,48 @@
-# Security Policy
+# Security policy
 
-## Data Handling
+## Supported versions
 
-ServiceNow MCP Toolkit is designed with security as a priority:
+| Version | Supported |
+|---|---|
+| 2.x | Yes |
+| 1.x (`snow-mcp`) | No — superseded by 2.0.0; see `CHANGELOG.md` for the migration |
 
-### Authentication
-- Supports OAuth 2.0 (preferred) and Basic authentication
-- Credentials stored only in environment variables, never in code
-- No credentials are logged or written to disk
+## Reporting a vulnerability
 
-### Access Control
-- **Read-only by default**: All write operations disabled unless explicitly enabled
-- **Table allowlist**: Only approved tables accessible unless ALLOW_ANY_TABLE=true
-- **Script execution safeguards**: Requires both WRITE_ENABLED=true and SCRIPTING_ENABLED=true
+Open a **private security advisory** on the repository:
+<https://github.com/farstic/ai-servicenow-architect/security/advisories/new>
 
-### Production Recommendations
-1. Never enable SCRIPTING_ENABLED=true in production unless absolutely necessary
-2. Keep WRITE_ENABLED=false for read-only integrations
-3. Use OAuth authentication over Basic auth
-4. Regularly rotate credentials
-5. Use service accounts with minimal required permissions
+Please do not open a public issue for a vulnerability, and please do not include a real instance
+URL, username, password, token or customer record in the report — a masked description of the shape
+of the problem is enough to reproduce it, and the report itself becomes another copy of whatever it
+contains.
 
-## Reporting Vulnerabilities
+## What this server does with credentials
 
-If you discover a security vulnerability, please open a GitHub issue or contact the maintainers.
+- Credentials live in the **store** (`instances.json`), which must be `0600` in a `0700` directory
+  on POSIX. The server refuses to load a group- or world-readable store rather than reading
+  credentials out of one.
+- **Nothing logs a secret value.** Redaction is on unless `REDACT_SENSITIVE_DATA` is exactly
+  `false`, and it scrubs both keys that look sensitive and credential-shaped string values wherever
+  they appear. A lint rule additionally forbids passing HTTP headers to the logger anywhere in
+  `src/servicenow/`, because redaction is a runtime behaviour with an opt-out and a lint failure is
+  not.
+- **The audit trail records what was done, never what was written.** No payload values, no
+  credentials, no instance URL — the instance label is enough to identify it, and that file ends up
+  in tickets. `query` strings *are* recorded and can contain personal data; the README says so, and
+  `SNOW_AUDIT_FILE=off` turns the trail off.
+- **The doctor's output is written to be pasted**: masked paths, no clear usernames, no values.
 
-## Known Limitations
+## What gates a change to your instance
 
-1. **Script execution risk**: When enabled, execute_script_include can run arbitrary server-side code
-2. **Natural language processing**: Simplified NLP may misinterpret commands - always verify
+Six flags, off by default, and a tool that changes state is refused while its flag is off. A `prod`
+instance raised above `read-only` is refused entirely unless `prodWriteAck` is set on it — arming
+writes against production should be a decision someone made on purpose, on a date, in a file. See
+the README for the preset table.
+
+## Corporate TLS interception
+
+If your network intercepts TLS, set `NODE_EXTRA_CA_CERTS` to your organisation's root CA in PEM
+form. **Do not set `NODE_TLS_REJECT_UNAUTHORIZED=0`** — it disables certificate verification for the
+whole process, which on such a network means trusting the interceptor and every other certificate
+too. The server never suggests it.
