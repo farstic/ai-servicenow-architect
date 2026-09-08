@@ -8,13 +8,13 @@
 |---|---|
 | **ADR ID** | ADR-0006 |
 | **Title** | Distribution channel: monorepo and bootstrap for the first release, plugin channel spiked in parallel |
-| **Status** | Proposed — ARC-00-S12 moves it to Accepted ("monorepo path confirmed") or supersedes it with ADR-0008 ("channel decision re-opened") |
-| **Date** | 2026-09-06 (recorded) · decision taken 2026-09-04 |
+| **Status** | **Accepted (2026-09-08) — "monorepo path confirmed."** ARC-00-S12's spikes settled the D-06 hedge against the plugin channel for the first release; the evidence is in `03` §F and summarised below. Not superseded. |
+| **Date** | 2026-09-06 (recorded) · decision taken 2026-09-04 · **accepted 2026-09-08** |
 | **Decision owner** | Cvetomir Grigorov (owner) — initials `PENDING OWNER`, decision taken 2026-09-04 |
 | **Engagement** | AI ServiceNow Architect — product |
 | **Release family** | Australia (docs corpus) |
 | **§1.1 relevance** | None |
-| **Related** | Entry gate for ARC-06-S01 · spikes S-14a…S-14g and S-19 (ARC-00-S12) · `03` §B · roadmap item 1 |
+| **Related** | Entry gate for ARC-06-S01 · spikes S-14a…S-14g and S-19 (ARC-00-S12) · `03` §B · roadmap item 1 · entry gate for **ARC-06-S01** satisfied 2026-09-08 |
 
 ## Context
 
@@ -62,3 +62,35 @@ other platform object is created, extended or approved by this ADR. §1.1 govern
 ---
 
 *ADR — AI ServiceNow Architect. One decision per file; never edit a decision's history — supersede it with a new ADR. Produced by ARC-00-S03 from the owner's rulings of 2026-09-04 recorded in `docs/plans/02-DECISIONS-NEEDED.md`.*
+
+
+## Acceptance — 2026-09-08
+
+The hedge in D-06 was: take the monorepo now, spike the plugin channel in parallel, and let
+the spikes decide whether the plugin channel is ready. ARC-00-S12 ran them, and they decided.
+
+Four of the seven came back as silent failures rather than refusals — which is the pattern that
+matters, because a channel that refuses can be worked around and a channel that lies cannot:
+
+- **S-14a** — `sensitive: true` keeps a value out of a file **on macOS only**; Claude Code's secure
+  storage is the keychain, and elsewhere the value lands in plaintext. Non-sensitive options go to a
+  user-scoped `0644`/`664` file either way. A credential channel whose protection depends on the
+  operating system is not a credential channel.
+- **S-14b** — a plugin-bundled MCP server is **invisible to `claude mcp get` / `list`** (exit 1, "no
+  such server") while `plugin list --json` prints the whole entry. The doctor and every
+  troubleshooting instruction would have to know which of two tools can see the server.
+- **S-14c** — an unset option and a blank one are **one state**: `--config KEY=` is rejected, so the
+  wizard cannot distinguish "not answered" from "answered empty".
+- **S-14e** — a scaffolded `.claude/settings.json` registers the marketplace **user**-scoped and
+  enables the plugin **project**-scoped, so a teammate's checkout installs nothing and says nothing.
+- **S-14g** — the plugin cache's `npm ci` is capped at 60 seconds and, on a throttled network,
+  **truncates the install while reporting success**.
+
+**S-14f and S-19 were confirmed** — two plugins tag and validate cleanly at one commit, and
+`claude plugin validate` runs headless on CI with no login, which is why the plugin-validate job
+exists today. The channel is viable for *validation*; it is not yet viable for *distribution*.
+
+So: monorepo and bootstrap for the first release, as decided. The plugin channel stays spiked rather
+than closed — spike **S-14** answered "not yet", not "never", and ARC-05's contract work has already
+made the move cheap: the tool prefix is one `engine.config.json` line and a regeneration
+(`docs/ARCHITECTURE.md`, "The contract: who generates, who pins, what fails").
