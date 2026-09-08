@@ -299,6 +299,14 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 
 ### ARC-05-S05 — `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md`
 
+> **Amendment 2026-09-08 (from the ARC-02-S09 delivery).** **The preset table now lives between
+> `<!-- PRESETS:BEGIN (generated from the contract by scripts/gen-governance.mjs — ARC-05) -->` and
+> `<!-- PRESETS:END -->` in `docs/MODES-AND-PRESETS.md`**, hand-copied from `01` §6.3 and verified
+> row-for-row identical to it. The generator replaces what is between the markers; the prose either
+> side — the byte-exact `"true"`/`"false"` note, `PRESET_FLAGS_MISMATCH`, and the "preset wins" rule
+> — is outside them and stays hand-written. The block's seven lines are the four preset rows plus
+> the header and separator, in that order, with a `Use it when…` column.
+
 > **Amendment 2026-09-08 (from ARC-04-S06, ratified). The ask-list generator must union `gates[gate]`
 > with `alsoRequires`.** The contract gained an optional `alsoRequires` field: six tools sit behind a
 > module-wide gate AND a case-level one (`now_assist` then `write`, `fluent` then `write`), and `gate`

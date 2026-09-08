@@ -365,6 +365,28 @@ Story order differs from the README's title list (which was written before the d
 **Definition of done.** Merged; `tests/claude-md.test.mjs` green on the matrix; CONTRIBUTING budget table; `docs/CHANGELOG.md` "Before 2.0.0" receives the two removed footers.
 
 ### ARC-02-S09 — `docs/MODES-AND-PRESETS.md` — Mode semantics, the preset table and plain-language flags of `01` §6.3, principle 10
+
+> **Amendment 2026-09-08 (from the S09 delivery).**
+> - **The SCRIPTING risk note is spent.** ARC-04-S05 merged on 2026-09-08, so "reading is always
+>   allowed" is current fact and the page states it as one. The story's "the page states *from
+>   2.0.0*" instruction no longer applies; a forward-looking hedge on shipped behaviour would now be
+>   wrong in the other direction.
+> - **Criterion 4 is half-deliverable here.** `docs/ARCHITECTURE.md` links to the page in this
+>   story. `CLAUDE.md` links to it in **S08**, which owns that file's structure — S09 must not add a
+>   link to a document S08 is rewriting around it. Verify criterion 4's `CLAUDE.md` half at S08.
+> - **Criterion 1's ≤ 150-line budget is not met and needs a ruling: the page is 158 lines.** Per
+>   the merge ruling, ARC-04-S02/S03/S05's store precedence, permission and refusal claims are kept
+>   (they are tested) and the story's seven sections wrap around them. Prose was compressed hard —
+>   the file went 184 → 158 across four passes, with paragraphs reflowed to the width the rest of
+>   `docs/` uses and the two production code blocks merged into one. What remains is claims and
+>   their exact strings. Closing the last eight lines means either dropping a tested claim or
+>   running unrelated paragraphs together to save blank lines, and neither is "trim prose, never
+>   facts". `tests/no-legacy-surfaces.test.mjs` prints the count and guards a ceiling of 160 in the
+>   meantime; tighten it to whatever budget is ruled.
+> - **`servicenow-mcp` cannot appear here.** Criterion 2 forbids it and the upgrade note used it to
+>   name the package people upgrade *from*. The note now names the behaviour instead — "Upgrading
+>   from the 1.0.0 server" — which keeps the claim and satisfies the criterion. `docs/CONTRIBUTING.md`
+>   still records that the bare name is deliberately not retired repo-wide (D-01's npm record).
 **As** an individual practitioner **I want** one page that explains what `design-only` and `live` mean, what each preset turns on, what each flag does in plain words, and how production is protected **so that** I can decide on the per-flag review screen without reading the server source.
 **Context.** P-06, D-05 (owner-modified posture: `full` proposed for `pdi`/`dev`/`test`; `read-only` for `prod`, capped; `--ack-prod`), principle 10 ("Propose, don't impose"), `01` §6.3 (the table, the review screen, the flag meanings, the safety rules), `01` §9 (design-only), ARC README deliverable (`docs/MODES-AND-PRESETS.md`). ARC-07-S10 delivers the *final* text (probe wording, troubleshooting cross-links) and ARC-05-S05 generates the preset table from the contract — this story writes v1 with splice markers so both can land without rewriting.
 **Scope.** In: the page as specified below; cross-links from `CLAUDE.md` section 4 (S08) and `docs/ARCHITECTURE.md`. Out: probe result strings (ARC-07), `TROUBLESHOOTING.md` entries (ARC-05/ARC-07), any server behaviour claims not already in `01` §6.3.
