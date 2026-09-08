@@ -71,7 +71,7 @@ Detailed write-ups: [`STORIES.md`](STORIES.md) (11 stories, 15–20 engineer-day
 | ID | Title | Size | Status |
 |---|---|---|---|
 | ARC-05-S01 | `required-tools.json`: engine pin with `used_by` and `contractSha256` | M | Done (2026-09-08) |
-| ARC-05-S02 | `retired-names.json` generated from the rename map | S | Not started |
+| ARC-05-S02 | `retired-names.json` generated from the rename map | S | Done (2026-09-08) |
 | ARC-05-S03 | `engine-lint.mjs` core: tokens, prefix, retired names, pin | M | Not started |
 | ARC-05-S04 | `engine-lint.mjs` structural checks: descriptions, path references, `used_by`, generated-file byte check, plugin validate | M | Not started |
 | ARC-05-S05 | `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md` | M | Not started |

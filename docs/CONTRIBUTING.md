@@ -317,6 +317,39 @@ committed pin — which is how a demonstration of criterion 4 left the real file
 ARC-05-S03's L07 proves `serverKey` matches `engine.config.json`; ARC-05-S08 proves the gates match
 the running catalogue. Three checks, three reasons to go red, deliberately not one.
 
+### Never edit `retired-names.json` by hand — generate it
+
+```sh
+node packages/contract/gen-retired-names.mjs           # write it
+node packages/contract/gen-retired-names.mjs --check   # CI; exit 1 when stale, naming the key
+```
+
+It merges three sources, each authoritative for a different kind of dead name:
+
+| Source | What it holds |
+|---|---|
+| `packages/snowarch/tool-rename-map.json` | tools that were **renamed** — the value is what replaced them |
+| `packages/contract/retired-identifiers.json` | identifiers that were never tool names: the old product name, the old MCP prefixes, the old package path. Hand-authored; no build artefact knows them |
+| `packages/snowarch/retired-tools.json` | tools that were **registered and then removed**. The server answers them with `UNKNOWN_TOOL`, so they are retired — but nothing replaced them, and their value is the literal `(removed)` |
+
+Two shapes are load-bearing and easy to break:
+
+- **No metadata keys, not even `$schema`.** The file is read by `grep -f <(jq -r 'keys[]' …)`, so
+  every key is a forbidden word. A `$schema` key would make every file mentioning a JSON schema fail
+  the sweep.
+- **A rename whose destination was later removed collapses to `(removed)`.** `generate_report` →
+  `snow_rpt_report_generate` → gone. Left as a chain, the file would send a reader of the old name
+  to one that also does not exist — and the second hop is the one nobody checks.
+
+A **second** rename of the same tool is expressed as a **new key** in the rename map, never by
+changing a value. The generator refuses a replacement that is itself retired, which is what that
+mistake looks like.
+
+Bare `snow-mcp`, `servicenow-mcp` and `@farstic/snow-mcp` are deliberately **not** retired: they are
+legitimate in history sections and ADRs, they are ARC-10's legacy-store detector strings, and the
+npm record D-01 forbids touching has to stay nameable. Only the `mcp__…__` prefixes and
+`packages/snow-mcp` are. A test asserts both halves, so a tidy-up has to argue with it.
+
 ### Evidence, not reasoning
 
 A criterion is reported as passing only by pasting the command and its actual output. Reasoning that

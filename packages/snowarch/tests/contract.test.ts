@@ -236,7 +236,10 @@ describe('the update-set capture protocol resolves to registered tools', () => {
 
 describe('(f) the rename map still maps into the catalogue', () => {
   /** Renamed, then retired. See tests/tools/parity.test.ts for why the map keeps the entry. */
-  const RETIRED_TOOLS = ['snow_rpt_report_generate'];   // ARC-04-S08, D-03 item 4
+  // From the shared file — see packages/snowarch/retired-tools.json and ARC-05-S02.
+  const RETIRED_TOOLS: string[] = (JSON.parse(
+    readFileSync(new URL('../retired-tools.json', import.meta.url), 'utf8'),
+  ) as { retired: Array<{ name: string }> }).retired.map((r) => r.name);
 
   it('every mapped new name exists, or is declared retired', () => {
     const cat = new Set(catalogue.map((t) => t.name));
