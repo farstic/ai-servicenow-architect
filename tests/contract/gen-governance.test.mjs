@@ -29,7 +29,7 @@ function tree(mutate = () => {}) {
     writeFileSync(join(dir, rel), body);
   };
   const contract = realContract();
-  const config = { mcp: { serverKey: 'servicenow' } };
+  const config = { mcp: { serverKey: 'servicenow', permissions: { allowStyle: 'explicit', askStyle: 'ask' } } };
   const state = { contract, config, write, dir };
   mutate(state);
   write('packages/snowarch/dist/contract.json', `${JSON.stringify(state.contract, null, 2)}\n`);
@@ -39,6 +39,11 @@ function tree(mutate = () => {}) {
   // The pin is an input too since ARC-05-S06: `protocols.mjs` joins it with the contract, and the
   // CLI reads it before dispatching, so a tree without it cannot run at all.
   write('packages/contract/required-tools.json', readFileSync(join(root, 'packages/contract/required-tools.json'), 'utf8'));
+  // And the retired names: `permissions.mjs` recognises an entry for a tool the server used to
+  // have as one of its own, so a rename does not strand a dead rule.
+  write('packages/contract/retired-names.json', readFileSync(join(root, 'packages/contract/retired-names.json'), 'utf8'));
+  // A settings file is optional: `permissions.mjs` builds one from `{ permissions: {} }` when
+  // there is none, which is how it was created in the first place.
   return dir;
 }
 
@@ -203,7 +208,7 @@ test('criterion 6 — --check is green after a run and names the line after an e
     run(dir);
     const clean = run(dir, ['--check']);
     assert.equal(clean.code, 0);
-    assert.match(clean.out, /4 target\(s\) current \(contract [0-9a-f]{12}\)/);
+    assert.match(clean.out, /5 target\(s\) current \(contract [0-9a-f]{12}\)/);
 
     const p = join(dir, RULE);
     writeFileSync(p, readFileSync(p, 'utf8').replace('never infer mode', 'sometimes infer mode'));
@@ -334,6 +339,154 @@ test('the two unsupported stubs come from the contract, not from a literal', () 
     assert.equal(r.code, 2);
     assert.match(r.err, /no tool is marked unsupported in the contract/);
   } finally { cleanup(none); }
+});
+
+const SETTINGS = '.claude/settings.json';
+const settingsOf = (dir) => JSON.parse(readFileSync(join(dir, SETTINGS), 'utf8'));
+
+test('ARC-05-S07 criterion 1 — every read tool allowed, every mutating tool asked, no overlap', () => {
+  const dir = tree();
+  try {
+    run(dir, ['--only', 'permissions']);
+    const { allow, ask } = settingsOf(dir).permissions;
+    const c = realContract();
+    const reads = c.tools.filter((t) => !t.mutates && !t.sessionMutates);
+    const writes = c.tools.filter((t) => t.mutates || t.sessionMutates);
+    assert.equal(allow.length, reads.length);
+    assert.equal(ask.length, writes.length);
+    assert.deepEqual(allow.filter((e) => ask.includes(e)), [], 'a tool is both allowed and asked');
+    assert.deepEqual(allow, [...allow].sort());
+    assert.deepEqual(ask, [...ask].sort());
+
+    // `sessionMutates` is why this is not `mutates` alone. Switching instance changes no record and
+    // redirects where every later write lands; unprompted, it silently moves the target of the
+    // prompts that follow.
+    assert.ok(ask.includes('mcp__servicenow__snow_core_instance_switch'));
+    // And the five tools an unconfigured server advertises must never prompt, or the wizard's own
+    // resume path would ask permission to look at itself.
+    for (const n of ['snow_core_instances_index', 'snow_core_instances_reload',
+      'snow_core_current_instance_read', 'snow_core_capabilities_read', 'snow_core_status_read']) {
+      assert.ok(allow.includes(`mcp__servicenow__${n}`), `${n} is not pre-approved`);
+    }
+    console.log(`    permissions: allow ${allow.length} · ask ${ask.length} · overlap 0`);
+  } finally { cleanup(dir); }
+});
+
+test('ARC-05-S07 criterion 2 — everything that is not ours survives byte for byte', () => {
+  // The file belongs to ARC-06 as much as to this renderer: `env`, `hooks`, the Bash allows, and a
+  // rule for somebody else's MCP server. A renderer that rebuilt the whole file would delete them,
+  // and the deletion would look like a generated diff.
+  const dir = tree(({ write }) => {
+    write(SETTINGS, `${JSON.stringify({
+      env: { SNOW_STORE: '' },
+      permissions: {
+        allow: ['Bash(./snowarch doctor*)', 'mcp__other__thing',
+          // A tool this server used to have (it is in `retired-names.json`) — ours, and removed.
+          'mcp__servicenow__snow_rpt_report_generate',
+          // A name under our prefix that is neither current nor retired. NOT ours: nothing
+          // distinguishes it from another server's tool, and guessing would delete a stranger's
+          // rule. It survives, and that boundary is the reason ownership is by name.
+          'mcp__servicenow__not_a_tool_of_ours'],
+        ask: ['Bash(rm *)', 'mcp__servicenow__add_comment'],
+        deny: ['Bash(curl *)'],
+      },
+      hooks: { SessionStart: [{ matcher: '*', hooks: [] }] },
+    }, null, 2)}\n`);
+  });
+  try {
+    run(dir, ['--only', 'permissions']);
+    const after = settingsOf(dir);
+    assert.deepEqual(after.env, { SNOW_STORE: '' });
+    assert.deepEqual(after.hooks, { SessionStart: [{ matcher: '*', hooks: [] }] });
+    assert.deepEqual(after.permissions.deny, ['Bash(curl *)']);
+    // Non-MCP rules and another server's rules keep their place at the head of each list.
+    assert.equal(after.permissions.allow[0], 'Bash(./snowarch doctor*)');
+    assert.equal(after.permissions.allow[1], 'mcp__other__thing');
+    assert.equal(after.permissions.ask[0], 'Bash(rm *)');
+    // A retired tool's rule is ours and goes; an unrecognised name under our prefix stays.
+    assert.ok(!after.permissions.allow.includes('mcp__servicenow__snow_rpt_report_generate'));
+    assert.ok(!after.permissions.ask.includes('mcp__servicenow__add_comment'));
+    assert.ok(after.permissions.allow.includes('mcp__servicenow__not_a_tool_of_ours'));
+  } finally { cleanup(dir); }
+});
+
+test('ARC-05-S07 criterion 3 — a flipped `mutates` names the entry that moved', () => {
+  const dir = tree();
+  try {
+    run(dir, ['--only', 'permissions']);
+    // The contract now says a read tool mutates. The committed file still has it in `allow`.
+    const contractPath = join(dir, 'packages/snowarch/dist/contract.json');
+    const c = JSON.parse(readFileSync(contractPath, 'utf8'));
+    c.tools.find((t) => t.name === 'snow_core_records_query').mutates = true;
+    writeFileSync(contractPath, `${JSON.stringify(c, null, 2)}\n`);
+
+    const r = run(dir, ['--check', '--only', 'permissions']);
+    assert.equal(r.code, 1);
+    assert.match(r.out, /^-\s+"mcp__servicenow__snow_core_records_query",$/m);
+    assert.match(r.out, /^\+\s+"mcp__servicenow__snow_core_records_query",$/m);
+    assert.match(r.out, /run npm run gen and commit the result/);
+  } finally { cleanup(dir); }
+});
+
+test('ARC-05-S07 criterion 4 — a server-key change leaves nothing behind', () => {
+  // Starting from the COMMITTED file, not an empty template. That is the difference that hid a
+  // bug: ownership used to be decided by prefix, so after a key change the renderer treated all 397
+  // old entries as another server's rules and left them, then added 397 new ones beside them. A
+  // fixture that starts empty has no old entries and cannot see it.
+  const dir = tree(({ write }) => {
+    const committed = JSON.parse(readFileSync(join(root, SETTINGS), 'utf8'));
+    committed.permissions.allow.unshift('Bash(./snowarch doctor*)', 'mcp__other__thing');
+    write(SETTINGS, `${JSON.stringify(committed, null, 2)}\n`);
+  });
+  try {
+    const before = settingsOf(dir).permissions;
+    assert.ok(before.allow.some((e) => e.startsWith('mcp__servicenow__')), 'fixture has no old entries');
+
+    const configPath = join(dir, 'engine.config.json');
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    config.mcp.serverKey = 'snow';
+    writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+    run(dir, ['--only', 'permissions']);
+
+    const { allow, ask } = settingsOf(dir).permissions;
+    const mcp = [...allow, ...ask].filter((e) => e.startsWith('mcp__'));
+    assert.equal(mcp.filter((e) => e.startsWith('mcp__snow__')).length, realContract().tools.length);
+    assert.deepEqual(mcp.filter((e) => e.startsWith('mcp__servicenow__')), [], 'stale entries survived the rename');
+    assert.equal(mcp.length, realContract().tools.length + 1, 'something other than ours was rewritten');
+
+    // Ours is decided by the TOOL name, not the prefix — so a third-party rule is still safe, and
+    // that is the property the prefix rule was trying to protect in the first place.
+    assert.ok(allow.includes('mcp__other__thing'));
+    assert.equal(allow[0], 'Bash(./snowarch doctor*)');
+  } finally { cleanup(dir); }
+});
+
+test('ARC-05-S07 criterion 7 — the glob path renders, and is not what is selected', () => {
+  // Implemented and exercised against the full catalogue, per the story; the config chooses
+  // `explicit` because one entry per tool is deterministic and diffable, and a glob saves lines in
+  // a generated file at the cost of a matching bug nobody sees until a tool runs unprompted.
+  const dir = tree((s) => { s.config.mcp.permissions.allowStyle = 'glob'; });
+  try {
+    run(dir, ['--only', 'permissions']);
+    const { allow } = settingsOf(dir).permissions;
+    assert.ok(allow.every((e) => e.endsWith('_*')), 'a glob run emitted an explicit entry');
+    assert.ok(allow.length < 60, `${allow.length} globs is not a reduction`);
+    // Every read tool is still matched by one of them — the property a glob has to keep.
+    const reads = realContract().tools.filter((t) => !t.mutates && !t.sessionMutates);
+    for (const t of reads) {
+      const name = `mcp__servicenow__${t.name}`;
+      assert.ok(allow.some((g) => new RegExp(`^${g.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*/g, '.*')}$`).test(name)),
+        `${t.name} is matched by no glob`);
+    }
+    console.log(`    glob style: ${allow.length} rules cover ${reads.length} read tools`);
+  } finally { cleanup(dir); }
+
+  const fallback = tree((s) => { s.config.mcp.permissions.askStyle = 'deny-with-hook'; });
+  try {
+    const r = run(fallback, ['--only', 'permissions']);
+    assert.equal(r.code, 2);
+    assert.match(r.err, /S-18 CONFIRMED that "ask" prompts in auto mode, so it was never needed/);
+  } finally { cleanup(fallback); }
 });
 
 test('the generated files are in the repository and current', () => {

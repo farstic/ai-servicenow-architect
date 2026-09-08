@@ -208,6 +208,27 @@ list was consulted rather than guessed. No sys_id, no instance host.
 **Teardown.** None — step 3 leaves the incident resolved, which is the state the probe was aiming
 for. Use an incident opened for the sitting, never a real one.
 
+## ARC-05-S07 criterion 5 — the `ask` block actually prompts (after ARC-06)
+
+Not verifiable from a fixture: the claim is about what Claude Code does with the committed
+`.claude/settings.json`, not about what the generator wrote into it. S-18 confirmed the mechanism
+with a control; this is the re-run against the real file, once ARC-06 registers the server.
+
+```
+1  start a session in auto mode in the checkout
+2  call snow_core_records_query   → expect NO prompt   (it is in permissions.allow)
+3  call snow_core_record_add      → expect a prompt    (it is in permissions.ask)
+4  repeat both in default mode, and once in plan mode
+```
+
+**Expected.** Step 2 silent, step 3 prompting, in every mode. Step 3 prompting is the mechanical
+half of §2.1 — the half that works whether or not the session remembers the rule.
+
+**Record.** Which modes were tried and what each did. A mode where step 3 does NOT prompt is the
+finding, and it changes `askStyle` rather than the rule.
+
+**Teardown.** Decline the prompt at step 3. Nothing is written.
+
 ## Redaction
 
 As S07: no instance URL, user name, password or token in anything recorded — key names only, values as

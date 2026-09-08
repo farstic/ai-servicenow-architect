@@ -461,6 +461,32 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 
 ### ARC-05-S07 — Generated `permissions.allow` / `permissions.ask` blocks in `.claude/settings.json`
 
+> **Amendment 2026-09-08 (from the S07 delivery).**
+> - **`.claude/settings.json` did not exist; this story creates it.** The renderer builds from
+>   `{ "permissions": {} }` when there is no file, and preserves everything that is not an MCP entry
+>   of this server — `env`, `hooks`, `deny`, `Bash(...)` rules, and any other server's `mcp__` rules,
+>   which keep their place at the head of each list. **ARC-06-S01 merges into this file, it does not
+>   write over it.**
+> - **236 allow · 161 ask · intersection 0 · 397 total.** The five tools an unconfigured server
+>   advertises are all `mutates: false` and land in `allow`, so the wizard's resume path never asks
+>   permission to look at itself; `snow_core_instance_switch` is in `ask` through `sessionMutates`.
+> - **The permission-modes paragraph does NOT fit `docs/MODES-AND-PRESETS.md` (ruling 5).** The page
+>   is 159 of its 160-line budget and the paragraph is four lines including its blank. It is recorded
+>   as the **first item of ARC-07-S10's list** instead, with the wording drafted below.
+> - **F1, from the architect's review: ownership is by TOOL NAME, not by prefix.** Deciding by
+>   prefix meant a change to `mcp.serverKey` left every entry of the old key in place — they no
+>   longer matched, so they read as another server's rules — and the file ended up with 397 stale
+>   rules beside 397 new ones. My criterion-4 fixture started from an empty template and could not
+>   see it; the architect's started from the committed file and did. The renderer now owns any
+>   `mcp__<anything>__<tool>` whose tool part is in the contract catalogue **or in
+>   `retired-names.json`**, and criterion 4 starts from the committed file.
+>   The boundary is deliberate and asserted: a name under our prefix that is neither current nor
+>   retired is **not** ours and survives, because nothing distinguishes it from another server's
+>   tool and guessing would delete a stranger's rule.
+> - `deny-with-hook` throws rather than rendering: S-18 confirmed `ask` prompts in auto mode, so the
+>   fallback was never needed, and an unimplemented branch that returned something plausible would be
+>   worse than one that says why it is not there.
+
 > **Amendment 2026-09-08 (from ARC-04-S10 item 0, architect ruling).** The `ask` block is generated
 > from **`mutates || sessionMutates`**, not `mutates` alone. `sessionMutates` is a new optional field
 > on `ToolDefinition`, emitted in `contract.json`, and `snow_core_instance_switch` is the only tool

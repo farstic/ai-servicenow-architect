@@ -42,7 +42,7 @@ const ROOT = resolve(value('--root') ?? selfRoot);
 const CHECK = flag('--check');
 const only = (value('--only') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
-const RENDERERS = ['rule-file', 'presets', 'protocols', 'troubleshooting'];
+const RENDERERS = ['rule-file', 'presets', 'protocols', 'troubleshooting', 'permissions'];
 // `--only rule` reads better than `--only rule-file` and is what the story writes.
 const ALIAS = { rule: 'rule-file' };
 
@@ -69,6 +69,11 @@ try {
     // The engine's pin: what it depends on and who depends on it. `protocols.mjs` joins it with
     // the contract, which is the only place the two are shown side by side.
     pin: JSON.parse(read('packages/contract/required-tools.json')),
+    // The whole config, for a renderer that reads more of it than the server key.
+    config,
+    // The retired names, so a renderer that owns a set of entries can recognise the ones it
+    // used to own. `permissions.mjs` is the only caller today.
+    retired: JSON.parse(read('packages/contract/retired-names.json')),
     // The sha of the bytes on disk, not of a re-serialisation: the pin compares the same bytes.
     sha: createHash('sha256').update(contractText).digest('hex'),
     serverKey,
@@ -106,7 +111,10 @@ function compose(mod, name, current) {
   // it names, and the useful output is one line saying which — not a stack trace on a CI cell.
   let body;
   try {
-    body = mod.render({ ...ctx, header: headerFor(name) });
+      // `current` is the target's text. `permissions.mjs` is the only renderer that rewrites
+      // PART of a file it does not own: `.claude/settings.json` also carries `env`, `hooks` and
+      // rules that belong to ARC-06, and rebuilding the whole file would delete them.
+      body = mod.render({ ...ctx, header: headerFor(name), current });
   } catch (e) {
     cannotRun(`${name}: ${e.message}`);
   }
