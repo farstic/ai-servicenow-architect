@@ -36,11 +36,11 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-01-S10 | ARC-01 | Purge engagement residue; legacy-name ratchet test | M | S02, S03, S05, S09 | M1 | Done (2026-09-08) |
 | ARC-01-S11 | ARC-01 | CI skeleton: three OSes × Node 20/22/24; footprint gate; `claude plugin validate` job | M | S05, S06, S07, S10 | M1 | Done (2026-09-08) |
 | ARC-01-S12 | ARC-01 | `docs/ARCHITECTURE.md` and `docs/CONTRIBUTING.md` first versions | M | S01, S11 | M1 | Done (2026-09-08) |
-| ARC-02-S01 | ARC-02 | Make `.claude/` canonical: delete root mirrors, sync script, structure gate and pre-commit chain; rewrite every path reference | M | ARC-01-S02/S09 | M1 | Not started |
-| ARC-02-S02 | ARC-02 | Skills lint and agents lint (`tests/skills-lint.test.mjs`), wired into CI | M | S01; ARC-00-S12; ARC-01-S05/S11; verdicts S-19 | M1 | Not started |
-| ARC-02-S03 | ARC-02 | Rewrite every skill description to ≤ 500 chars; triggers into bodies; `version:` → `metadata.version`; S-13 verification | L | S02 | M1 | Not started |
-| ARC-02-S04 | ARC-02 | Agent frontmatter: `model: inherit`, `skills:` preload, `tools:` unchanged; §6.2 regression run | M | S02 | M1 | Not started |
-| ARC-02-S05 | ARC-02 | Remove context-mode, the claude.ai surface, the settings example, the 9-step README manual; disposition of legacy docs | M | S01; ARC-01-S10 | M1 | Not started |
+| ARC-02-S01 | ARC-02 | Make `.claude/` canonical: delete root mirrors, sync script, structure gate and pre-commit chain; rewrite every path reference | M | ARC-01-S02/S09 | M1 | Done (2026-09-08) |
+| ARC-02-S02 | ARC-02 | Skills lint and agents lint (`tests/skills-lint.test.mjs`), wired into CI | M | S01; ARC-00-S12; ARC-01-S05/S11; verdicts S-19 | M1 | Done (2026-09-08) |
+| ARC-02-S03 | ARC-02 | Rewrite every skill description to ≤ 500 chars; triggers into bodies; `version:` → `metadata.version`; S-13 verification | L | S02 | M1 | Done (2026-09-08) |
+| ARC-02-S04 | ARC-02 | Agent frontmatter: `model: inherit`, `skills:` preload, `tools:` unchanged; §6.2 regression run | M | S02 | M1 | Done (2026-09-08) |
+| ARC-02-S05 | ARC-02 | Remove context-mode, the claude.ai surface, the settings example, the 9-step README manual; disposition of legacy docs | M | S01; ARC-01-S10 | M1 | Done (2026-09-08) |
 | ARC-02-S06 | ARC-02 | Move governance texts to `governance/`; Mode/Preset vocabulary sweep across CLAUDE.md, governance, docs, skills, tests | M | S05; ARC-01-S04 | M2 | Not started |
 | ARC-02-S07 | ARC-02 | Roster generator: `scripts/gen-roster.mjs` writes the roster table into `docs/ARCHITECTURE.md`; `--check` in CI | S | S02; ARC-01-S12 | M2 | Not started |
 | ARC-02-S08 | ARC-02 | `CLAUDE.md` ≤ 200 lines rewrite; harness-neutral wording; `Status` → `/snowarch status`; version line owned by the release script | L | S06, S07; ARC-01-S06 | M2 | Not started |
@@ -49,10 +49,10 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-02-S11 | ARC-02 | `/snowarch` project skill: `status` (delegates to the doctor), `setup-instance` skeleton with the terminal hand-off, `doctor` | M | S02, S08; ARC-00-S04; verdicts S-16 | M2 | Not started |
 | ARC-02-S12 | ARC-02 | Retired-name final sweep with ARC-05's `retired-names.json` and `engine-lint.mjs` (incl. ITOM SKILL/EXAMPLES) | S | S06; ARC-05-S02/S04 | M2 | Not started |
 | ARC-02-S13 | ARC-02 | Refresh `VALIDATION-TESTS.md` (T-01…T-18) to Mode/Preset and current tool names; replace T-07; strip run history; execute in design-only mode | M | S08, S11, S12 | M2 | Not started |
-| ARC-03-S01 | ARC-03 | Shallow submodule at `vendor/ServiceNowDocs`, pin re-seeded to `ba513f2`, pin recorded in `engine.config.json` with a pin-equals-gitlink lint | M | ARC-01 (all) | M1 | Not started |
-| ARC-03-S02 | ARC-03 | Citation scanner library, `scripts/gen-docs-areas.mjs` and generated `vendor/docs-areas.txt` with a CI staleness check | M | S01 | M1 | Not started |
-| ARC-03-S03 | ARC-03 | Port `verify-citations.sh` to `tools/snowarch/lib/docs/verify.mjs`; brace and directory forms; missing corpus = FAIL | M | S02 | M1 | Not started |
-| ARC-03-S04 | ARC-03 | Repair the dead citations (two in the licensing skill, one in the Now Assist agent) | S | S03; ARC-02 (all) | M1 | Not started |
+| ARC-03-S01 | ARC-03 | Shallow submodule at `vendor/ServiceNowDocs`, pin re-seeded to `ba513f2`, pin recorded in `engine.config.json` with a pin-equals-gitlink lint | M | ARC-01 (all) | M1 | Done (2026-09-08) |
+| ARC-03-S02 | ARC-03 | Citation scanner library, `scripts/gen-docs-areas.mjs` and generated `vendor/docs-areas.txt` with a CI staleness check | M | S01 | M1 | Done (2026-09-08) |
+| ARC-03-S03 | ARC-03 | Port `verify-citations.sh` to `tools/snowarch/lib/docs/verify.mjs`; brace and directory forms; missing corpus = FAIL | M | S02 | M1 | Done (2026-09-08) |
+| ARC-03-S04 | ARC-03 | Repair the dead citations (two in the licensing skill, one in the Now Assist agent) | S | S03; ARC-02 (all) | M1 | Done (2026-09-08) |
 | ARC-03-S05 | ARC-03 | `snowarch docs sync` — the checkout/reconcile recipe (sparse · full · skip), pinned-SHA fetch, Windows long paths; the Node-free launcher recipe text | L | S01, S02; ARC-00-S09; verdicts S-07 | M2 | Not started |
 | ARC-03-S06 | ARC-03 | `snowarch docs verify` and `snowarch docs status`; the `docsStatus()` data shape consumed by the doctor and `/snowarch status` | M | S03, S05 | M2 | Not started |
 | ARC-03-S07 | ARC-03 | `snowarch docs sync --upstream` — move the pin to the upstream tip, verify, print the dead-citation diff (maintainer) | M | S05, S06 | M2 | Not started |

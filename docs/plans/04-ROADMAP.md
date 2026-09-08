@@ -9,11 +9,40 @@ Status: **Integrated 2026-09-04** · Basis: the 132 stories of `ARC-00`…`ARC-1
 | Milestone | ARCs (stories) | Stories | Effort (engineer-days) | Entry gate (§3) | Exit criterion |
 |---|---|---|---|---|---|
 | **M0 — Spikes and gates** | ARC-00 (all 14) | 14 | 19–30 (ARC total) | owner decisions in `02` (done); a Windows machine or VM; a PDI for S-10's later run | Every row S-01…S-20 in `03` §A/§B carries Status + Evidence; ADR-0001…0007 Accepted and ADR-0006 resolved ("monorepo path confirmed" or ADR-0008); `LICENSE`/`NOTICE`/`RELICENSING.md` agreed; `spikes/engine.config.seed.json` fixed; `spikes/windows-recipe.md` written; the gate sign-off block for ARC-01 and ARC-06 present with dates (ARC-00-S14) |
-| **M1 — Foundation** *(in progress: **ARC-01 complete 2026-09-08**, 12 of 21; ARC-02-S01…S05 and ARC-03-S01…S04 remain)* | ARC-01 (all 12) · ARC-03-S01…S04 · ARC-02-S01…S05 | 21 | 27–31 (per-story); ARC-01 alone 12–17 | G1, G2 | `farstic/ai-servicenow-architect` exists with both histories imported (`import/*` tags), Apache-2.0 root commit, `engine.config.json` + schema, one version of record (`2.0.0-dev`), root workspaces with `npm ci` green on three OSes, CI skeleton (3 OS × Node 20/22/24) green, legacy-name ratchet in place; `.claude/` canonical, skills lint green, descriptions ≤ 500 chars (S-13 verdict recorded), context-mode and the claude.ai surface gone; docs submodule pinned to `ba513f2` with 0 dead citations |
+| **M1 — Foundation** *(**COMPLETE 2026-09-08 — 21 of 21**)* | ARC-01 (all 12) · ARC-03-S01…S04 · ARC-02-S01…S05 | 21 | 27–31 (per-story); ARC-01 alone 12–17 | G1, G2 | `farstic/ai-servicenow-architect` exists with both histories imported (`import/*` tags), Apache-2.0 root commit, `engine.config.json` + schema, one version of record (`2.0.0-dev`), root workspaces with `npm ci` green on three OSes, CI skeleton (3 OS × Node 20/22/24) green, legacy-name ratchet in place; `.claude/` canonical, skills lint green, descriptions ≤ 500 chars (S-13 verdict recorded), context-mode and the claude.ai surface gone; docs submodule pinned to `ba513f2` with 0 dead citations |
 | **M2 — Server, contract and engine consolidation** | ARC-04 (all 14) · ARC-05 (all 11) · ARC-03-S05…S11 · ARC-02-S06…S13 | 40 | 71.5–81 (per-story); ARC totals 31–32 + 15–20 + rest of ARC-03/ARC-02 | G1 (ARC-04 hard gate), M1 | `node packages/snowarch/dist/server.js` starts unconfigured with the five core tools and answers `initialize` on three OSes from a fresh clone; `dist/contract.json` (398 tools, `gate`/`mutates`) pinned by `required-tools.json` (41 tools) with `contract.test.ts` and `engine-lint.mjs` green and generated texts byte-identical; S-10 verdict recorded (ARC-04-S05); `CLAUDE.md` ≤ 200 lines, Mode/Preset vocabulary everywhere, `/snowarch` skill skeleton, retired-name sweep complete, VALIDATION-TESTS T-01…T-18 executed in design-only; `snowarch docs sync|verify|status|sync --upstream|family` and `docs-bump.yml` working; proxy agent and network classifier in the server (R-3) |
 | **M3 — Install, wizard, doctor** | ARC-06 (all 14) · ARC-07 (all 11) · ARC-08 (all 11) | 36 | 57.5–91.5 (per-story); ARC totals 21.5–38.5 + 20–25 + 22–30 | G3 (S-14 before ARC-06-S01), G4 (Windows spikes before native-Windows promises), G5 | `git clone … && ./bootstrap.sh` reaches `Mode: design-only` on macOS/Linux/Windows with and without Node (13 CI bootstrap cells incl. Windows without Git Bash); `./bootstrap.sh` → wizard → `DOCTOR: … 0 fail` / `Mode: live — …` with `~/.claude.json` byte-identical; `snowarch instance add|list|test|set-preset --ack-prod|import --from-legacy` per D-04/D-05 with the per-flag review screen; `/snowarch status|setup-instance|doctor` work in-session (S-02/S-16 verdict texts applied); doctor 0 FAIL on the reference install, banner < 1 s, `--fix` idempotent, leftover detectors print exact commands; `docs/INSTALL.md`, `MODES-AND-PRESETS.md`, generated `TROUBLESHOOTING.md` |
 | **M4 — Release 2.0.0** | ARC-09 (all 11) | 11 | 15–25 | M3; G6; owner's npm token only for the optional S10 | `node scripts/release.mjs 2.0.0` produces one commit and tag `v2.0.0` (contract sha + docs pin in the message); `release.yml` re-runs every gate on three OSes and publishes the GitHub Release with doctor JSON and install-metrics assets; `docs/CHANGELOG.md` carries the "supersedes engine v2.8.0 and snow-mcp 1.0.0" note and the migration notes; `./snowarch version` equals the tag; `./snowarch upgrade` proven with two fixture releases and credentials byte-identical; nine CI cells + the Windows-without-Git-Bash cell green on every commit; `publish-npm.yml` dry run green (real publish is a manual dispatch) |
 | **M5 — Migration and cutover** | ARC-10 (all 10) | 10 | 10.5–14 + a fixed 14-calendar-day wait | G7 (`v2.0.0` tag) | `docs/MIGRATION.md` machine-checked against the doctor's leftover detectors; author's machine cut over (doctor 0 FAIL, legacy store and stale registrations gone); five clean-machine validation records (macOS/Ubuntu/Windows design-only, one live `pdi-developer`, one proxied laptop) committed under `docs/validation/`; deprecation notices in both old repositories with `@farstic/snow-mcp@1.0.0` untouched; two-week review held and the archive executed or deferred with a reason |
+
+### M1 exit evidence — recorded 2026-09-08
+
+Every exit condition from the M1 row, with what was measured rather than what was intended.
+
+| Exit condition | Evidence |
+|---|---|
+| both histories imported (`import/*` tags) | `import/engine-v2.8.0-worktree` → `7f99a3a`, `import/snow-mcp-1.0.0` → `58a66e0` |
+| Apache-2.0 root commit | `58f0b8c`; `LICENSE`, `NOTICE`, `docs/RELICENSING.md` |
+| `engine.config.json` + schema | both present; `tests/engine-config.test.mjs`, 13 tests |
+| one version of record | `2.0.0-dev`; `tests/version-consistency.test.mjs` |
+| root workspaces, `npm ci` green on three OSes | workspaces `packages/*`, `tools/snowarch`; nine green cells |
+| CI skeleton 3 OS × Node 20/22/24 | run 34174606714, 12 of 12 jobs |
+| legacy-name ratchet in place | `tests/no-legacy-names.test.mjs`; allow-list 19 → 11 rows |
+| `.claude/` canonical | 28 skills, 9 agents |
+| skills lint green | SK-01…SK-12, AG-01…AG-06, all enforced |
+| descriptions ≤ 500 chars | 28 skills, 11,191 chars total (was 27,119), longest 479 (was 1,587) |
+| S-13 verdict recorded | **CONFIRMED** — a total listing budget, stated by the CLI's own debug log; `docs/spikes/S-13-skill-description-cap/` |
+| context-mode and the claude.ai surface gone | `tests/no-legacy-surfaces.test.mjs`, permanent, on every cell |
+| docs pinned to `ba513f2` with 0 dead citations | gitlink `ba513f2c62d3698ef5bfdd8044110226b8419689`; `checked: 168 | dead: 0`, 0 warnings |
+
+Two findings from M1 that outlived their stories and are carried forward:
+
+- **The skill listing budget is a TOTAL across every skill in a session** — the engine's, the user's own
+  and the bundled ones — so the engine controls only its share (S-13, `03` §F). This is why ≤ 500
+  characters is a standing rule rather than a one-off cleanup.
+- **Claude Code loads project skills from every `.claude/skills` between the working directory and the
+  filesystem root.** A checkout beneath a folder that already has one loads both rosters and spends the
+  budget twice (S-13 addendum, `03` §F). ARC-04-S12's doctor warns on it.
 
 Story-to-milestone assignment is in `05-STORY-INDEX.md` (column *Milestone*). M1 and M2 split ARC-02 and ARC-03 because their first stories need only ARC-01 while their later stories need ARC-04/ARC-05 (the retired-name sweep, the generated governance texts) or the S-07 recipe verdict.
 
@@ -48,7 +77,7 @@ Two calendar-bound items sit beside the chain: ARC-00-S12 (S-14a–g, one-week h
 | **G3 — Channel hedge (D-06)** | **ARC-06-S01** — the first bootstrap story; ARC-07-S09 inherits | S-14a–g and S-19 carry verdicts within the one-week time-box; ADR-0006 moved to Accepted ("monorepo path confirmed") **or** superseded by ADR-0008 ("channel decision re-opened"), in which case ARC-06/ARC-07 are re-planned before any bootstrap investment | ARC-00-S12; sign-off in ARC-00-S14 |
 | **G4 — Native Windows (Q-B)** | every native-Windows promise: ARC-06-S11 (`bootstrap.ps1`/`.cmd`), ARC-06-S13 (INSTALL wording), ARC-07-S01 (masked input), ARC-09-S08 (Windows-without-Git-Bash cell), `01` §13 | S-03, S-04, S-08 executed on a Windows machine **without** Git Bash on PATH (ARC-00-S06/S07) and `spikes/windows-recipe.md` written (ARC-00-S13); if any fails, the pre-recorded "Git Bash required" fallback is applied by ARC-00-S14 without re-planning | ARC-00-S06/S07/S13/S14 |
 | **G5 — Server artefacts** | ARC-06-S07/S08 (B05/B08), ARC-07-S05 (B06 slot), ARC-08-S01/S04 | ARC-04-S13 (committed `dist/`) and ARC-05-S01 (contract pin) merged; ARC-04-S12 (doctor module) and ARC-05-S06/S10 for the doctor; ARC-05-S07 replaces the seed permission block before the M3 exit | story dependency lines |
-| **G6 — Deferred spikes** | ARC-04-S14 (CHANGELOG gate-split note), M2 exit; ARC-02 listing acceptance | S-10 verdict recorded by ARC-04-S05 (`docs/spikes/S-10-read-only-sufficiency/`), S-13 by ARC-02-S03 (`docs/spikes/S-13-skill-listing/`) | ARC-04-S05, ARC-02-S03 |
+| **G6 — Deferred spikes** | ARC-04-S14 (CHANGELOG gate-split note), M2 exit; ARC-02 listing acceptance | S-10 verdict recorded by ARC-04-S05 (`docs/spikes/S-10-read-only-sufficiency/`), S-13 by ARC-02-S03 (`docs/spikes/S-13-skill-description-cap/`) | ARC-04-S05, ARC-02-S03 |
 | **G7 — Tag** | ARC-10-S06 (author cutover), ARC-10-S08 (validation runs), ARC-10-S09 | `v2.0.0` exists (ARC-09-S01) and its Release page has the three-OS assets (ARC-09-S03) | ARC-09 |
 
 Owner-supplied inputs that no story can produce (kept out of the plan on purpose): the GitHub repository (ARC-01-S01), a Windows 10/11 machine or VM without Git Bash (ARC-00-S01), a PDI for the live E2E runs and S-10 (ARC-04/ARC-07/ARC-10), the second contributor's consent or the choice to rewrite (ARC-00-S02), an npm granular token for the optional publish (ARC-09-S10), and the owner's initials on the ARC-00-S14 sign-off block.
