@@ -36,3 +36,8 @@ scratchpad/
 diagram-preview/
 node-compile-cache/
 .t01/
+
+# ARC-04-S12: the doctor's criterion-5 test copies dist/ here so it can edit contract.json
+# without racing tests/contract.test.ts, which reads the real one in a parallel worker. Removed
+# in a finally; listed so a killed run leaves nothing tracked.
+packages/snowarch/.tmp-doctor-dist/

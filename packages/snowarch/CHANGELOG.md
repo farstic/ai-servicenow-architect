@@ -60,6 +60,37 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Added (ARC-04-S12) — a server doctor, and `snowarch doctor --json`
+
+`snowarch doctor [--json] [--no-network] [--section server]` runs nine checks and prints one line
+each, or the report object with `--json`. `@farstic/snowarch/doctor` exports the same runner so
+ARC-08 can merge this report with its engine checks — the runner returns data rather than printing,
+because a doctor that only prints has to be re-implemented to be composed, and two implementations of
+the flag rules diverge (P-16).
+
+`SV-00` Node floor · `SV-01` dist artefacts and contract sha · `SV-02` store source, schema and modes
+(skipped on Windows, where permissions are ACL-inherited) · `SV-03` per-instance URL, flags, prod
+posture · `SV-04` network probes (a declared interface with a `skip` stub until ARC-07-S03) · `SV-05`
+a real stdio handshake against `dist/server.js`, comparing advertised names to `dist/contract.json`
+and naming the differing ones · `SV-06` `snow_core_capabilities_read` equals the store entry · `SV-07`
+the audit file's location is writable · `SV-08` ancestor `.claude/skills` directories, which silently
+double the roster.
+
+Exit **0** when nothing failed, **1** on any failure, **3** when the doctor could not run at all — a
+caller scripting against it needs to tell "checks failed" from "the tool is broken".
+
+### Fixed (ARC-04-S12) — `maskPath` could be switched off by an environment variable
+
+It masked against `homedir()`, which returns `$HOME` when that is set — so a process started with HOME
+pointed elsewhere masked nothing and printed absolute paths containing the real account name. It now
+also masks against `userInfo().homedir`, which reads the OS user database. Found when the doctor's
+`SV-08` printed an ancestor path under a fixture HOME, which is the check whose output is most likely
+to be screenshotted.
+
+Separately, `SV-02` on a group-readable store reported the generic `STORE_PERMISSIONS_TOO_OPEN` error
+and threw away its own, more specific remedy — the reader got "correct the store file" where they
+could have had the exact `chmod`.
+
 ### Added (ARC-04-S11) — proxy support, a documented CA path, and errors that name the cause
 
 **Every request now goes through one HTTP seam that honours `HTTPS_PROXY`, `HTTP_PROXY` and

@@ -97,7 +97,13 @@ describe('criterion 3 - rotation at 10 MB, keeping three', () => {
     for (const f of [file, `${file}.1`]) {
       for (const l of lines(f)) expect(() => JSON.parse(l)).not.toThrow();
     }
-  });
+    // An explicit timeout, because this case is ~12 MB of synchronous I/O plus one open per
+    // append for the partial-line probe. It failed once inside a full-suite run — alongside
+    // nine child processes from the doctor suite — and passed alone and in seven repeats
+    // afterwards, which is the signature of the default 5 s limit under load rather than of a
+    // wrong assertion. A generous limit is the honest fix; making the fixture smaller would
+    // stop it crossing the 10 MB ceiling it exists to cross.
+  }, 60_000);
 
   it('shifts oldest-first so nothing is overwritten before it moves', () => {
     const file = resolveAuditPath()!;

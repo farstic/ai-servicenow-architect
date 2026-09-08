@@ -84,7 +84,7 @@ Full write-ups (persona, context, scope, design notes, acceptance criteria, task
 | ARC-04-S09 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert` / `action_update` | M | Done (2026-09-08) |
 | ARC-04-S10 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | Done (2026-09-08) |
 | ARC-04-S11 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M | Done (2026-09-08) |
-| ARC-04-S12 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | Not started |
+| ARC-04-S12 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | Done (2026-09-08) |
 | ARC-04-S13 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | Not started |
 | ARC-04-S14 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M | Not started |
 
