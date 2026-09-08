@@ -784,8 +784,33 @@ Two blocks are copied **byte-for-byte** and must not be paraphrased: the five-ro
 the Code Reviewer proposal sentence. Both are what the behavioural tests assert, and a paraphrase is
 a silent behaviour change — which is exactly what a line budget invites.
 
-**Run `VALIDATION-TESTS.md` after any change to `CLAUDE.md`, to `governance/`, to a `SKILL.md` or to
-an agent.** The file-level checks prove the shape; only a session proves the behaviour.
+---
+
+## When to run the validation tests
+
+**Run `tests/VALIDATION-TESTS.md` after any change to `CLAUDE.md`, to `governance/`, to a `SKILL.md`
+or to an agent.** The file-level checks prove the shape; only a session proves the behaviour, and
+these four are the inputs that decide it. `tests/validation-tests-shape.test.mjs` keeps the document
+itself honest — eighteen tests in order, each with its Modes line and four sections, no dates, no
+retired names — but a green shape test says nothing about whether a gateway still fires.
+
+**One fresh session per test.** A session that has already run T-01 is not a fresh session for T-02:
+the routing behaviour under test is precisely what prior context changes, so a suite run in one
+session proves less with every test it completes.
+
+**Modes.** Each test names the Mode(s) it applies to. In `design-only`, T-05 and T-06 run their
+dormant variant — the engine states that no live instance is configured and makes no tool call —
+and a dormant PASS is a real PASS: it proves the gate holds when there is nothing to write to. The
+live halves need a configured instance and are ARC-09/ARC-10's gate.
+
+**Record the run** in the pull request description, or in
+`docs/spikes/validation-runs/<date>-<what>.md` with the CLI version and the commit sha. Never in the
+test file: it is a specification, and the dated run tables it used to carry were removed for exactly
+that reason. Redact anything naming a real instance, user or credential.
+
+**A failure is a rework item against the story that changed the text**, not a note in the record.
+Fix the governing document, re-run the failed test in a fresh session, then re-run the whole suite
+before committing — a fix for one test must not break another.
 
 ---
 

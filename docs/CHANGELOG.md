@@ -13,6 +13,40 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Added
 
+- **The eighteen behavioural tests move to `tests/VALIDATION-TESTS.md`, and describe the product as
+  it now is.** They still described a two-surface product that D-03 cut, carried a per-test line
+  naming those surfaces, cited tool names retired at S12, and reserved T-07 for a pre-commit sync
+  hook deleted at S01. (The retired words are not quoted here: `tests/no-legacy-surfaces.test.mjs`
+  scans this file, and quoting them to explain their removal is how they come back.)
+  - `**Modes:**` replaces `**Tiers:**` on every test. T-05 and T-06 declare a **dormant** design-only
+    variant — the engine states that no live instance is configured and makes no tool call — and say
+    what a dormant PASS proves: that the gate holds when there is nothing to write to.
+  - T-05's expected behaviour is keyed on "a tool marked `mutates: true`" rather than a tool name.
+    The always-loaded rule file owns the names; a test that spelled one would need editing at every
+    rename, which is how the old names survived there in the first place.
+  - **New T-07 — Mode reporting and `/snowarch` in design-only**, in numeric position.
+  - T-06 and T-13 gain a runnable `### Prompt`. Both described their scenario in `### Setup` and left
+    the tester to invent the wording, which is not a repeatable test.
+  - The dated regression baseline and the pointers to the removed run-history tables are gone;
+    results belong in the pull request or under `docs/spikes/validation-runs/`.
+  - `tests/validation-tests-shape.test.mjs` makes criteria 1–4 permanent, with four fixture-negatives.
+    It reads the forbidden-name list out of the story's own grep expression rather than spelling it —
+    written inline, the list made the test file fail the engine lint on itself.
+  - `docs/CONTRIBUTING.md` gains "When to run the validation tests".
+  - **Executed once, in design-only, on a clean clone — 18 of 18.** The first pass was 16 of 18, and
+    both failures were real:
+    - The CSM Specialist skill claimed in five places that the baseline case-escalation tables are
+      absent from this release family. Ten corpus files name them. The published markdown escapes
+      the underscores, so the grep that would have caught it returned nothing — the skill now says
+      so, in its citation-discipline section, as a rule rather than a footnote. T-02's example rested
+      on that claim and is replaced by one verified against the corpus first; its pass criteria, fail
+      signals and bypass block are unchanged, because those are the test.
+    - The Operational Documentation consult did not survive a refused deployment. `CLAUDE.md` §8 now
+      says the go-live proposal fires even when the deployment is declined or deferred — a refusal is
+      exactly when the runbook is still outstanding. Line count unchanged at 125.
+    Both fixes were re-run twice each; the run record keeps the first tally and its analysis beneath
+    the final one.
+
 - **`/snowarch` — the first utility skill** (`.claude/skills/snowarch/SKILL.md`): `status` (and the
   plain word `Status`, which `CLAUDE.md` §2 routes here), `setup-instance` with its `--resume` half,
   and `doctor`. One skill with three branches, because `$ARGUMENTS` substitution is confirmed on CLI
@@ -39,7 +73,7 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   Nothing was deleted without a home: the repo map and the roster registry are now the generated
   sections of `docs/ARCHITECTURE.md`, the write gate and capture protocol are the generated rule
   file and `governance/mcp-protocols.md`, the worked example and the two embedded validation tests
-  are `VALIDATION-TESTS.md` T-01/T-02/T-03, and the two engine-version footers (v2.7.7–v2.8.0) are
+  are `tests/VALIDATION-TESTS.md` T-01/T-02/T-03, and the two engine-version footers (v2.7.7–v2.8.0) are
   the two newest entries under "Before 2.0.0" below, verbatim. The
   five-row gateway table and the Code Reviewer proposal sentence are copied byte-for-byte, because
   they are what the behavioural tests assert.

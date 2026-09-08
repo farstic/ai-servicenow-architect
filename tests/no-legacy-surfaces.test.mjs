@@ -145,7 +145,7 @@ function currentLines(rel) {
 }
 
 const IN_SCOPE = () => tracked().filter((f) =>
-  (f === 'CLAUDE.md' || f === 'VALIDATION-TESTS.md'
+  (f === 'CLAUDE.md' || f === 'tests/VALIDATION-TESTS.md'
     || f.startsWith('governance/') || f.startsWith('.claude/')
     // History, and each for its own reason:
     //   plans/spikes    — describe the vocabulary being retired, as evidence
