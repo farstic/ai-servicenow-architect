@@ -1,6 +1,6 @@
 # ARC-05 — Engine↔MCP contract and drift prevention
 
-Status: **S01–S03 + S04/S05/S06/S07/S08/S09/S10 merged 2026-09-08 (10 of 11)** · Depends on: ARC-04 (contract generator, `dist/contract.json`), ARC-01 · Blocks: ARC-02 (final sweep, generated texts)
+Status: **11 of 11 COMPLETE 2026-09-08** · Depends on: ARC-04 (contract generator, `dist/contract.json`), ARC-01 · Blocks: ARC-02 (final sweep, generated texts)
 
 Names in this README follow the owner's decisions of 2026-09-04 (`02-DECISIONS-NEEDED.md`): server package `packages/snowarch` (npm `@farstic/snowarch`, first release `2.0.0`), MCP key `servicenow` → prefix `mcp__servicenow__`, root launcher `./snowarch`, project skill `/snowarch` (`status` · `setup-instance` · `doctor`), vocabulary Mode `design-only` | `live` and Preset `read-only` | `pdi-developer` | `full` | `custom`.
 
@@ -33,16 +33,23 @@ Closes P-04 (118 retired-name occurrences the server rejects with `UNKNOWN_TOOL`
 
 ARC-04-S01/S02/S03/S04/S05/S06/S07/S08/S11/S13 (vitest scoping and the retained rename map; store codes; per-instance flags, presets and the dependency-first gate order; `NO_INSTANCE_CONFIGURED`; gate split; declarations + `contract.json` + the first-form contract test; `snow_us_capture_target_set` and the `updateSetCapture` protocol; the `[Unsupported]` stubs; the R-3 proxy agent and its reachability codes `DNS_FAILURE` / `TLS_CA_UNTRUSTED` / `PROXY_UNREACHABLE`; committed `dist/`). ARC-01 S04 for `engine.config.json` (`mcp.serverKey`, `mcp.package: "@farstic/snowarch"`, `mcp.packageDir: "packages/snowarch"` per D-01) and S11 for the CI skeleton. ARC-02 S09 for the `PRESETS:BEGIN/END` markers. ARC-00 verdicts S-12 (allow globs), S-18 (`ask` in auto mode), S-19 (`claude plugin validate` headless). ARC-06 S01 (`.mcp.json` / `.claude/settings.json` committed) for the permission-block merge and the `.mcp.json` leg of the prefix check.
 
-## Acceptance criteria
+## Exit evidence
 
-- [ ] Renaming any tool in `packages/snowarch/src` without updating the engine makes CI fail on the **server** side (sha mismatch, required-tool missing) **and** on the engine side (token not in contract, pin mismatch) — demonstrated by a deliberate rename in a throwaway branch.
-- [ ] Changing a required tool's `gate` without regenerating makes the engine lint fail on the expectation check and on a byte diff of the generated files (`governance/mcp-protocols.md` row; rule-file header sha).
-- [ ] Adding a seventh flag to `permissions.ts` fails the contract test until presets and the rule file include it.
-- [ ] `grep -rnw -f <(jq -r 'keys[]' packages/contract/retired-names.json) CLAUDE.md .claude governance docs tools README.md | grep -v 'retired-name: historical'` returns nothing.
-- [ ] `.claude/rules/00-mode-and-mcp-gate.md` names the prefix `mcp__servicenow__` exactly once, and the value comes from `engine.config.json` (changing the key there and regenerating updates the rule, the permission block and the doctor).
-- [ ] `docs/TROUBLESHOOTING.md` contains one entry per contract error code with a named remedy; the ARC-08 doctor and the ARC-07 wizard import the same table (`contract.errorCodes[]` via the loader / the registry).
-- [ ] `tools/snowarch` contains no literal flag name, preset name, tool name or error code (grep and the guard test prove it reads them from `dist/contract.json` through `packages/contract/lib/contract.mjs`).
-- [ ] In a session that starts in auto mode, a `mutates:true` tool call (e.g. `snow_core_record_add`) prompts the user because of the generated `permissions.ask` block, and a `mutates:false` call does not (S-18).
+The eight criteria, each with the test, job or PR that proves it. Closed 2026-09-08.
+
+| # | Criterion | Evidence |
+|---|---|---|
+| 1 | a rename without telling the engine fails on the server side | `contract.test.ts` tests 1, 10, 13 · lint `L01`, `L08`, `L11` · **drill PR #56**, 18 of 25 jobs red |
+| 2 | a re-gate fails the expectation check and the byte check | `contract.test.ts` test 2 · lint `L08`, `L11` · `pin.mjs` refuses a blanket `--accept-regate` and names the tool |
+| 3 | a seventh flag fails until presets and the rule file carry it | `contract.test.ts` test 5 · then `L06` until `npm run gen` |
+| 4 | no retired name outside the files whose subject is the past | lint `L03` — **closes at ARC-02-S12**; real tree today `L02 2 · L03 10`, all in ADRs, `RELICENSING.md` and the two ITOM skill files |
+| 5 | the prefix appears exactly once and comes from `engine.config.json` | S05 criterion 2, asserted both ways: with `serverKey: snow` the new prefix appears once and the old one nowhere |
+| 6 | one TROUBLESHOOTING entry per code, with a remedy, shared by doctor and wizard | S06 criterion 2 — 59 headings for 59 codes; the `AUTHENTICATION_FAILED` remedy is byte-identical in three documents |
+| 7 | no literal flag, preset, tool name or code in engine tooling | S10's `tests/contract/no-literals.test.mjs` — 22 files scanned, allow-list of 4, each reasoned and load-bearing |
+| 8 | a mutating tool prompts in auto mode | spike **S-18 CONFIRMED with a control** (`03` §F); `permissions.ask` carries 161 tools; the live re-run is on the owner's list in `packages/snowarch/tests/live/README.md` |
+
+**Not closed here, by design.** Criterion 4 needs ARC-02-S12's final sweep; criterion 8's live
+re-run needs ARC-06 to register the server. Both are named above rather than marked done.
 
 ## Risks
 
@@ -80,4 +87,4 @@ Detailed write-ups: [`STORIES.md`](STORIES.md) (11 stories, 15–20 engineer-day
 | ARC-05-S08 | Server `tests/contract.test.ts`: gates, presets, invariants, pin, dist parity | L | Done (2026-09-08) |
 | ARC-05-S09 | CI job `contract` and the release gate script | S | Done (2026-09-08) |
 | ARC-05-S10 | Contract loader for engine tooling and the no-literal-names guard | M | Done (2026-09-08) |
-| ARC-05-S11 | Drift drill and contributor documentation | M | Not started |
+| ARC-05-S11 | Drift drill and contributor documentation | M | Done (2026-09-08) |

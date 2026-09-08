@@ -657,6 +657,77 @@ same list `--check` prints.
 
 ---
 
+## Drill outputs — 8 September 2026
+
+The five drift scenarios, run for real on a throwaway branch, with the lines they actually printed.
+They are here because a mechanism described is a mechanism nobody has seen fail: when one of these
+appears in your terminal you should recognise it, and know which of the five it is.
+
+Retired and invented tool names are written as `<old-name>` and `<renamed>` — the checks that keep
+this file honest would otherwise fire on the very output that proves they work.
+
+**1 — a tool renamed in the server, the engine not told.** The gate stops at the server's own suite,
+and every layer that depends on the name is in the output at once:
+
+```
+CONTRACT GATE FAILED at step "dist" — the server agrees with itself
+AssertionError: pinned but not registered — a rename the engine has not been told about: [ '<old-name>' ]
+AssertionError: add the tool to a class in tests/contract-exceptions.json, with a reason: [ '<renamed>' ]
+AssertionError: contract sha changed — on the engine side run node packages/contract/pin.mjs
+```
+and, from the engine side run alone:
+```
+L01 FAIL governance/mcp-protocols.md:77 token <old-name> not in contract (nearest: snow_core_record_read)
+L08 FAIL packages/contract/required-tools.json:1 <old-name>: pinned but the contract has no such tool
+L11 FAIL packages/contract/required-tools.json contract sha mismatch: pinned 86b63770… committed 795a7208…
+```
+Note L01's second line: the generated `governance/mcp-protocols.md` still cites the old name, because
+the generators had not been re-run. One rename, four places.
+
+**2 — a tool re-gated.** `snow_scr_script_include_add` from `scripting` to `write`:
+```
+L08 FAIL packages/contract/required-tools.json:1 snow_scr_script_include_add: expected gate=scripting, contract declares gate=write
+L11 FAIL packages/contract/required-tools.json contract sha mismatch: pinned 86b63770… committed fbc3cea8…
+```
+and `pin.mjs` refuses to take it blind:
+```
+Re-run with: --accept-regate snow_scr_script_include_add
+Accepting one means the ENGINE now expects the server's declaration — check the texts
+that cite it first; a re-gate can change what a user is asked to approve.
+```
+
+**3 — a seventh flag.** `AUDIT_ENABLED` referenced in `permissions.ts` and nowhere else:
+```
+AssertionError: permissions.ts references a flag the contract does not declare:
+  expected [ Array(7) ] to deeply equal [ 'ATF_ENABLED', …(5) ]
+```
+
+**4 — a generated file edited by hand.** One word in `docs/TROUBLESHOOTING.md`:
+```
+-Every error code this server might return, with what it means and what to do about
++Every error code this server can return, with what it means and what to do about
+gen-all: 1 generator(s) stale — run npm run gen
+L06 FAIL docs/TROUBLESHOOTING.md:1 differs from generator output (gen-governance)
+```
+
+**5 — a retired name in prose.** One sentence added to `governance/mcp-protocols.md`:
+```
+L03 FAIL governance/mcp-protocols.md:63 retired name "<old-name>" → use snow_core_records_query
+```
+
+**6 — the auto-mode permission prompt.** Not run here: it needs a live checkout with the server
+registered. The evidence on record is spike **S-18 in `03` §F — CONFIRMED with a control**: an `ask`
+rule prompts in auto mode, and without one a mutating tool runs unprompted. **No fallback is in
+force**; `askStyle` stays `ask`. The re-run against this build is on the owner's live-sitting list in
+`packages/snowarch/tests/live/README.md` (ARC-05-S07 criterion 5).
+
+**The drill itself ran on the CI matrix**, not only locally: scenario 1 was pushed as a branch whose
+pull request went red across **18 of 25 jobs** — all nine `contract` cells and all nine `test` cells,
+the other seven green because a rename breaks neither the docs nor the secret scan. The branch was
+closed without merging and deleted; nothing of it is in the history.
+
+---
+
 ## Engine tooling imports the loader; never a list
 
 Anything outside `packages/snowarch` that needs a flag name, a preset, a tool's gate or an error
