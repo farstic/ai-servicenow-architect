@@ -49,7 +49,11 @@ export function run(ctx) {
 
     lines.forEach((line, i) => {
       if (!any.test(line)) return;
-      const isMarkedLine = marked && line.trimEnd().endsWith(HISTORICAL_MARKER);
+      // The marker anywhere on the line, not only at its end. It has to sit INSIDE a table cell to
+      // stay in the row it describes, and `docs/ARCHITECTURE.md`'s retired-name glossary is exactly
+      // that shape — a convention the one document that most needs it cannot use is not a
+      // convention. The marker still excuses only that line, and never a tool name.
+      const isMarkedLine = marked && line.includes(HISTORICAL_MARKER);
       for (const e of entries) {
         if (!e.re.test(line)) continue;
         // The marker excuses an identifier, never a tool name.

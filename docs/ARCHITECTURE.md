@@ -176,6 +176,60 @@ each enforced by a rule in `tests/agents-lint.test.mjs`:
 rules — how the Chief Architect routes, what each specialist owns, what a builder must return — live in
 `CLAUDE.md` and `governance/`, and are read by the model at runtime, not by a maintainer at design time.
 
+### The contract: who generates, who pins, what fails
+
+```mermaid
+flowchart LR
+  subgraph server["packages/snowarch — the server"]
+    reg["tool registrations<br/>flags · presets · error registry"]
+    ext["scripts/extract-tools.mjs<br/>buildContract()"]
+    con["dist/contract.json<br/>397 tools · sha256"]
+    st["tests/contract.test.ts<br/>14 invariants"]
+    reg --> ext --> con
+    con --> st
+  end
+  subgraph engine["packages/contract — the engine"]
+    pin["required-tools.json<br/>42 tools · used_by · pinned sha"]
+    lint["engine-lint.mjs<br/>11 checks"]
+    gen["gen-governance.mjs<br/>5 targets"]
+    con --> pin
+    con --> gen
+    pin --> lint
+  end
+  gen --> texts["rule file · mcp-protocols<br/>TROUBLESHOOTING · presets<br/>permissions.allow / ask"]
+  st --> gate{{"npm run contract"}}
+  lint --> gate
+  gen --> gate
+```
+
+**The invariants that make it hold** are `packages/snowarch/tests/contract.test.ts` 5–8: the flag set is closed — the
+contract, `permissions.ts` and every preset name the same six (5); no preset turns a flag on while
+its prerequisite is off (6); a mutating name mutates (7); and gate and `mutates` imply each other in
+both directions (8). Exceptions to 7 and 8 exist only as named classes in
+`packages/snowarch/tests/contract-exceptions.json`, each with a reason, each required to be
+load-bearing.
+
+**What fails, and where.**
+
+| Change | Fails | Says |
+|---|---|---|
+| a tool renamed, engine not told | server tests 1, 7, 10, 13 · lint `L01`, `L08`, `L11` | `pinned but not registered — a rename the engine has not been told about` |
+| a tool re-gated | server test 2 · lint `L08`, `L11` | `expected gate=scripting, contract declares gate=write` |
+| a seventh flag added to the source only | server test 5 | `permissions.ts references a flag the contract does not declare` |
+| a generated file edited by hand | `gen:check` · lint `L06` | `differs from generator output (gen-governance)` |
+| a retired name written into prose | lint `L03` | `retired name "…" → use …` |
+| the contract changed, the pin not updated | server test 13 · lint `L11` | `contract sha changed — on the engine side run node packages/contract/pin.mjs` |
+| a name typed into engine tooling | `tests/contract/no-literals.test.mjs` | `read it from the contract loader, or add it to the allow-list with a reason` |
+
+All of it is one command — `npm run contract` — which runs in CI on nine cells, before a release
+tag, and on your machine.
+
+**A distribution-channel move is one line.** Spike S-14 asked what changing the tool prefix would
+cost if the product moved to a plugin channel: `engine.config.json`'s `mcp.serverKey`, then
+`npm run gen`. The prefix appears exactly once in the always-loaded rule file and once in the
+long-form document, both rendered from that key, and `L02` fails on any other spelling — so the
+answer is a configuration change and a regeneration, not a sweep.
+
 **Engine tooling reads the contract through `packages/contract/lib/contract.mjs`.** Stdlib only,
 zero dependencies, importable before `npm ci` — because ARC-06's bootstrap and ARC-08's doctor both
 run in a checkout that has installed nothing yet. `loadContract({ root, verifyPin })` is the only
