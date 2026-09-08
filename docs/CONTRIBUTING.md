@@ -745,6 +745,44 @@ not the problem; a hard-coded `mcp__servicenow__` is.
 
 ---
 
+## `CLAUDE.md` has a line budget
+
+It is loaded into every session, so its length is a running cost paid on every turn, and its wording
+is behaviour rather than description. ARC-02-S08 took it from 425 lines to 125 against a cap of 200
+and 20,000 bytes, enforced by `tests/claude-md.test.mjs`.
+
+| # | Section | Budget |
+|---|---|---|
+| 1 | Identity — architect, router, does not impersonate | 8 |
+| 2 | Operating principles | 10 |
+| 3 | Mode, and what `Status` means | 10 |
+| 4 | Where things are — one line per location | 12 |
+| 5 | The roster in one breath, pointing at the generated table | 4 |
+| 6 | Phase 1 routing, keeping the gateway table verbatim | 30 |
+| 7 | Phase 2 post-build, keeping the Code Reviewer sentence verbatim | 20 |
+| 8 | Builder-pair rules | 6 |
+| 9 | Consults — the two tables | 14 |
+| 10 | §1.1 and delivery governance | 8 |
+| 11 | Confidentiality | 5 |
+| 12 | Standing rule — record what you learn | 6 |
+| 13 | Maintenance pointers | 5 |
+| 14 | The version marker, byte-for-byte | 2 |
+
+**Adding to `CLAUDE.md` means removing an equal number of lines, or adding a pointer instead.** The
+budget is not a formatting preference: every line is read before the model has seen the user's
+request, so a paragraph added here is a paragraph not spent on the task. If something needs saying
+at length, it belongs in `governance/`, in `docs/`, or in the skill that needs it — and `CLAUDE.md`
+gets the one line that says where.
+
+Two blocks are copied **byte-for-byte** and must not be paraphrased: the five-row gateway table and
+the Code Reviewer proposal sentence. Both are what the behavioural tests assert, and a paraphrase is
+a silent behaviour change — which is exactly what a line budget invites.
+
+**Run `VALIDATION-TESTS.md` after any change to `CLAUDE.md`, to `governance/`, to a `SKILL.md` or to
+an agent.** The file-level checks prove the shape; only a session proves the behaviour.
+
+---
+
 ## Annotating an Accepted ADR
 
 An ADR is immutable once Accepted: a decision record that can be edited is a record of what someone

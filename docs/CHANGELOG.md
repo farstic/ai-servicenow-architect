@@ -11,6 +11,17 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ## Unreleased
 
+### Changed
+
+- `CLAUDE.md` rewritten to a line budget: **425 lines → 125**, 57,688 bytes → 10,997, against a cap
+  of 200 and 20,000. It is loaded before every turn, so its length is a cost paid on every request.
+  Nothing was deleted without a home: the repo map and the roster registry are now the generated
+  sections of `docs/ARCHITECTURE.md`, the write gate and capture protocol are the generated rule
+  file and `governance/mcp-protocols.md`, the worked example and the two embedded validation tests
+  are `VALIDATION-TESTS.md` T-01/T-02/T-03, and the two engine-version footers are history. The
+  five-row gateway table and the Code Reviewer proposal sentence are copied byte-for-byte, because
+  they are what the behavioural tests assert.
+
 ### Fixed
 
 - `snow_us_active_update_set_ensure` advertised the input shape it had *before* the update-set
