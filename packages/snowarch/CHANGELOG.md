@@ -195,6 +195,26 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Removed (ARC-04-S14) — the package's own `docs/` folder
+
+All eleven package documents are gone: `INSTALLATION.md`, `CLIENT_SETUP.md` (which never existed —
+the plan's list predates the import), `MULTI_INSTANCE.md`, `TOOLS.md`, `EXAMPLES.md`,
+`instances.example.json`, the package `CONTRIBUTING.md` (folded into the repository's), and the six
+per-family guides `ATF.md`, `NOW_ASSIST.md`, `REPORTING.md`, `SCRIPTING.md`,
+`SERVICENOW_OAUTH_SETUP.md` and `TOOL_PACKAGES.md`.
+
+They were deleted because they were **wrong, and could not notice**. `REPORTING.md` claimed 13
+reporting tools where the catalogue has 17; `TOOL_PACKAGES.md` listed eight role bundles where the
+code has thirteen, each with a hand-counted total that had drifted (`400+` for `full`). What a
+reader needs from them is now either generated from `dist/contract.json` — the family table, the
+bundle table, the preset table, the error codes — or written into the README once: the two
+authentication methods with the OAuth application-registry steps, and what `MCP_TOOL_PACKAGE` does.
+
+**`SERVICENOW_OAUTH_SETUP.md` carried the last copy of the 1.x placeholder OAuth client id in the
+tree.** It leaves with the file. The two `.gitleaksignore` fingerprints for it stay: `gitleaks git`
+walks history, so the findings remain in the commits that carried them, and a fingerprint is pinned
+to a commit rather than to a path that still exists.
+
 ### Added (ARC-04-S13) — `dist/` is committed, and CI proves it matches the source
 
 A clone plus `npm ci` is now a runnable live install: no TypeScript, no build step, nothing for a

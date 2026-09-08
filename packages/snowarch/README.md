@@ -100,6 +100,23 @@ The server reads a `.env` file only when `SNOW_ENV_FILE` names one — never the
 For an MCP server that directory is your project, and an unrelated `WRITE_ENABLED=true` sitting in
 it would arm writes nobody chose.
 
+### Authentication
+
+Two methods, set by `SERVICENOW_AUTH_METHOD` (or `auth.method` in the store).
+
+**`basic`** — `SERVICENOW_BASIC_USERNAME` and `SERVICENOW_BASIC_PASSWORD`. Simplest, and what a
+PDI usually wants.
+
+**`oauth`** — the resource-owner password credentials flow, using
+`SERVICENOW_OAUTH_CLIENT_ID`, `SERVICENOW_OAUTH_CLIENT_SECRET`, `SERVICENOW_OAUTH_USERNAME` and
+`SERVICENOW_OAUTH_PASSWORD`. On the ServiceNow side: **System OAuth → Application Registry → New →
+"Create an OAuth API endpoint for external clients"**, then take the generated **Client ID** and
+**Client Secret**. Leave the redirect URL empty — this flow does not use one. If your instance has
+ROPC disabled, that shows up as an authentication failure, not a configuration error.
+
+Whichever you use, the credentials live in the store or the environment and appear in no log, no
+audit line and no doctor output.
+
 ### Switching instances
 
 **`snow_core_instance_switch` is the only way to change which instance a call goes to.** Every other
@@ -186,6 +203,36 @@ a decision someone made on purpose, on a date, in a file.
 | `snow_disco_*` | 1 | Schema discovery |
 
 <!-- /generated:families -->
+
+### Loading a subset
+
+<!-- generated:bundles -->
+
+`MCP_TOOL_PACKAGE` selects a subset of the catalogue. The default is `full`, and **`full` is
+what the AI ServiceNow Architect needs** — a bundle hides tools the engine cites by name.
+
+| `MCP_TOOL_PACKAGE` | Tools |
+|---|---:|
+| `full` | 397 |
+| `agile_manager` | 13 |
+| `ai_developer` | 35 |
+| `catalog_builder` | 14 |
+| `change_coordinator` | 19 |
+| `devops_engineer` | 24 |
+| `integration_engineer` | 29 |
+| `itam_analyst` | 12 |
+| `itom_engineer` | 21 |
+| `knowledge_author` | 13 |
+| `platform_developer` | 54 |
+| `portal_developer` | 37 |
+| `service_desk` | 23 |
+| `system_administrator` | 78 |
+
+The value is read once, at start-up: the catalogue is fixed for the life of the process, so
+`tools/list` answers the same way all session. An unknown name falls back to `full` with a
+warning on stderr.
+
+<!-- /generated:bundles -->
 
 Names follow `snow_<family>_<subject>_<verb>`. The verb tells you what it does: `_read`, `_index`
 and `_query` never change anything; everything else may.

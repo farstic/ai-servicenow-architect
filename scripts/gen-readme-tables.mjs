@@ -113,9 +113,37 @@ function errorCodesBlock() {
   ].join('\n');
 }
 
+async function bundlesBlock() {
+  // From ROLE_BUNDLE_MAP, not from a table someone maintained. The doc this replaces listed
+  // eight bundles where the code has thirteen, and gave every one a hand-counted tool count
+  // that had drifted — "400+" for `full` among them. That is the defect this whole story
+  // closes, so the list is generated.
+  const tools = await import(pathToFileURL(join(pkg, 'dist', 'tools', 'index.js')).href);
+  const { ROLE_BUNDLE_MAP } = tools;
+
+  const rows = Object.entries(ROLE_BUNDLE_MAP)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, list]) => `| \`${name}\` | ${list.length} |`);
+
+  return [
+    '`MCP_TOOL_PACKAGE` selects a subset of the catalogue. The default is `full`, and **`full` is',
+    'what the AI ServiceNow Architect needs** — a bundle hides tools the engine cites by name.',
+    '',
+    '| `MCP_TOOL_PACKAGE` | Tools |',
+    '|---|---:|',
+    `| \`full\` | ${contract.toolCount} |`,
+    ...rows,
+    '',
+    'The value is read once, at start-up: the catalogue is fixed for the life of the process, so',
+    '`tools/list` answers the same way all session. An unknown name falls back to `full` with a',
+    'warning on stderr.',
+  ].join('\n');
+}
+
 const BLOCKS = {
   families: familiesBlock,
   presets: presetsBlock,
+  bundles: bundlesBlock,
   'error-codes': errorCodesBlock,
 };
 

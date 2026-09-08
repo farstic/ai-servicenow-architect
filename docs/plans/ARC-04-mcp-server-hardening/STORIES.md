@@ -1092,13 +1092,23 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 > - **`packages/snowarch/docs/SERVICENOW_OAUTH_SETUP.md` had two dead references** to the old
 >   repository (a `cd` and an issues URL); repointed. Both sit *after* the two lines allow-listed in
 >   `.gitleaksignore`, so the pinned fingerprints still resolve.
-> - **Five package docs are left in place and are NOT all current**: `docs/REPORTING.md` claims 13
->   reporting tools where the contract has 17. They are outside this story's deletion list, so I have
->   not touched them beyond the dead URLs — **flagged for a ruling**: delete them, regenerate their
->   counts, or accept them as prose. My recommendation is deletion; the README plus
->   `dist/contract.json` cover what they claim to.
-> - **`docs/CLIENT_SETUP.md` does not exist** — the deletion list names it, but the package has no
->   such file. The other five named files were removed.
+> - **`packages/snowarch/docs/` is gone entirely — SIX files, not the five I first reported.** I
+>   miscounted in the delivery report; the architect's listing was right. `ATF.md`, `NOW_ASSIST.md`,
+>   `REPORTING.md`, `SCRIPTING.md`, `SERVICENOW_OAUTH_SETUP.md`, `TOOL_PACKAGES.md`. Two were
+>   demonstrably wrong (`REPORTING.md`: 13 reporting tools against a catalogue of 17;
+>   `TOOL_PACKAGES.md`: eight bundles against thirteen, each with a drifted hand count).
+> - **What moved to the README before they went.** An **Authentication** section — `basic` and
+>   `oauth` (ROPC), the four `SERVICENOW_OAUTH_*` keys, and the ServiceNow-side steps compressed to
+>   the three that matter (Application Registry → *OAuth API endpoint for external clients* → client
+>   id and secret; no redirect URL). And a **fourth generated block**, `bundles`, listing
+>   `MCP_TOOL_PACKAGE` values with their tool counts from `ROLE_BUNDLE_MAP` — generated precisely
+>   because the hand-maintained version was the thing that was wrong.
+> - **The `.gitleaksignore` entries for `SERVICENOW_OAUTH_SETUP.md` stay.** Its deletion removes the
+>   last copy of the 1.x placeholder OAuth client id from the *tree*, but `gitleaks git` walks
+>   history: the findings are still in the commits that carried them, and a fingerprint is pinned to
+>   a commit, not to a path. Annotated in the file so nobody prunes them as stale.
+> - **`docs/CLIENT_SETUP.md` never existed.** The story's deletion list was written from `00` before
+>   the import. Nothing to do; recorded so the next reader of that list is not left looking.
 
 **As** a non-Architect user of `npx @farstic/snowarch` and as the engine's documentation generators **I want** the package's own documentation to describe exactly what the code does — env contract, tool families, gates, error codes, store, audit, corporate networks — and a changelog that tells a snow-mcp 1.0.0 user what changed **so that** P-30 cannot recur and R-03 is honoured.
 
