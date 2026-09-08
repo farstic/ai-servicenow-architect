@@ -7,23 +7,23 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { existsSync } from 'node:fs';
 import dotenv from 'dotenv';
 import { instanceManager } from './servicenow/instances.js';
+import { isUnderCloudSyncFolder } from './store/index.js';
 import { collectToolCatalog } from './tools/index.js';
 import { getResources, readResource } from './resources/index.js';
 import { logger } from './utils/logging.js';
 import { ServiceNowError } from './utils/errors.js';
 import { getPackageVersion } from './utils/version.js';
 
-dotenv.config();
-
-// Require at least one instance to be configured
-const hasLegacy = !!process.env.SERVICENOW_INSTANCE_URL;
-const hasMulti = Object.keys(process.env).some(k => /^SN_INSTANCE_[A-Z0-9_]+_URL$/.test(k));
-const hasConfig = !!process.env.SN_INSTANCES_CONFIG;
-if (!hasLegacy && !hasMulti && !hasConfig) {
-  logger.error('No ServiceNow instance configured. Set SERVICENOW_INSTANCE_URL or SN_INSTANCES_CONFIG.');
-  process.exit(1);
+// dotenv ONLY when asked, and only for a file that exists. A bare `dotenv.config()` reads
+// the .env of whatever directory the server happens to start in — for an MCP server that is
+// the user's project, so an unrelated `WRITE_ENABLED=true` in their repo would arm writes on
+// this server without anyone choosing it (P-22).
+const envFile = process.env.SNOW_ENV_FILE;
+if (envFile && existsSync(envFile)) {
+  dotenv.config({ path: envFile });
 }
 
 // ─── Create MCP Server ───────────────────────────────────────────────────────
@@ -131,7 +131,48 @@ export function createServer(): Server {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
+/**
+ * The startup line (01 §5). It names the store that was used and the instances that came
+ * out of it, so "which file configured this" is answerable from the log rather than by
+ * guessing. Every path is masked — a log reaches screen shares and bug reports.
+ *
+ * It does NOT exit when nothing is configured. The old guard exited on missing env vars,
+ * which is wrong now that a store can configure the server, and unconfigured start is
+ * ARC-04-S04's subject; until then the server runs and individual tools fail with a
+ * reason, which is more useful than a process that vanishes.
+ */
+function logStartup(): void {
+  // Reload before reporting. `instanceManager` is a module-level singleton, and ESM
+  // evaluates imports BEFORE the importing module's body — so its constructor ran before
+  // the dotenv branch above. Without this, a store or instance named by SNOW_ENV_FILE
+  // would be read too late to matter, and the startup line would describe a state the
+  // server is not in. Caught by tests/store/dotenv.test.ts.
+  const report = instanceManager.reload();
+  const version = getPackageVersion();
+  const toolCount = collectToolCatalog().length;
+
+  for (const note of report.notes) logger.info(note);
+  for (const err of report.configErrors) logger.error(`${err.code}: ${err.message}`);
+  for (const nl of report.notLoaded) logger.warn(`instance ${nl.label} not loaded — ${nl.code}: ${nl.message}`);
+
+  if (process.platform === 'win32') logger.info('file modes: ACL-inherited (Windows)');
+  if (report.path && isUnderCloudSyncFolder(report.path)) {
+    logger.warn('store is under a cloud-sync folder; 0600 does not prevent synchronisation');
+  }
+
+  const where = report.path ? `${report.source} (${report.path})` : `${report.source}`;
+  const instances = report.loaded.length > 0
+    ? report.loaded.map((label) => {
+        const e = instanceManager.getEntry(label);
+        return `${label} (${e?.environment ?? '?'}, ${e?.preset ?? '?'}${label === instanceManager.getCurrentName() ? ', default' : ''})`;
+      }).join(', ')
+    : 'none';
+  const mode = report.loaded.length > 0 ? '' : ' — mode: unconfigured';
+  logger.info(`snowarch ${version} — store: ${where} — instances: ${instances}${mode} — tools: ${toolCount}`);
+}
+
 async function main() {
+  logStartup();
   const server = createServer();
   // stdio is the only transport. The HTTP/SSE transport, the REST API, the A2A routes
   // and the dashboard were removed with D-03 item 6; nothing else can be mounted here.

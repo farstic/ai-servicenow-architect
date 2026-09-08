@@ -36,6 +36,42 @@ Named individually, because each was a way in that no longer exists:
 - SDK entry point reduced to the client, its error type and the query types.
 - `vitest` scoped to this package, so a test run no longer walks up into sibling trees.
 
+### Migration notes (configuration)
+
+One store, one precedence. What changed for an existing install:
+
+- **`SN_INSTANCES_CONFIG` is removed.** Point `SNOW_STORE` at the file instead, or let the
+  per-checkout store at `<checkout>/.local/instances.json` be found. The old snake_case schema
+  is not read.
+- **The legacy wizard store is no longer read.** It used to be consulted *before* env-defined
+  instances and returned early, which meant a file in the home directory silently overrode
+  `SERVICENOW_INSTANCE_URL` (P-21). ARC-07's `instance import --from-legacy` reads it through
+  its own reader when the time comes.
+- **A project `.env` is no longer read.** `dotenv` runs only when `SNOW_ENV_FILE` names an
+  existing file. Before, the server read the `.env` of whatever directory it started in — for
+  an MCP server that is the user's project (P-22).
+- **`SNOW_LOG_LEVEL` is read before `LOG_LEVEL`**, which remains as a fallback.
+
+Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts as unset) →
+`<CLAUDE_PROJECT_DIR or cwd>/.local/instances.json` → `~/.config/snowarch/instances.json`
+(`%APPDATA%\snowarch\instances.json` on Windows). Env-defined instances (`SERVICENOW_*`,
+`SN_INSTANCE_*`) win over all of them and the startup line says which store was ignored.
+
+`SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
+typo in an explicit override loads a different instance than the one named, silently.
+
+### Store error codes
+
+Reported on the load report now; ARC-04-S06 lists them in the tool contract.
+
+| Code | Meaning |
+|---|---|
+| `STORE_NOT_FOUND` | the path resolved but no file is there |
+| `STORE_UNREADABLE` | the file exists but is not parseable JSON |
+| `STORE_SCHEMA_INVALID` | schema violation, message names the field path |
+| `STORE_SCHEMA_UNSUPPORTED` | written by a newer server — run `./snowarch upgrade` |
+| `STORE_PERMISSIONS_TOO_OPEN` | POSIX mode is group/world-readable; message carries the `chmod` |
+
 ### Unchanged
 
 - 394 tools, their names and their schemas. No tool was added or removed.
