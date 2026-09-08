@@ -203,6 +203,60 @@ test('ARC-02-S06 criterion 4 — every governance reference is prefixed and reso
   assert.deepEqual(unprefixed, [], `${unprefixed.length} unprefixed reference(s)`);
 });
 
+test('ARC-02-S10 criterion 1 — the platform notes carry nothing from an instance', () => {
+  const doc = read('docs/PLATFORM-NOTES.md');
+
+  // Five fields per entry, and the same number of each. An entry missing `Engine consequence:` is
+  // the failure mode worth catching: it reads as a finished note while saying nothing about what
+  // any specialist now does differently, which is the only reason the note is in the engine.
+  const entries = (doc.match(/^## PN-\d\d /gm) ?? []).length;
+  assert.ok(entries >= 7, `${entries} entries`);
+  for (const field of ['Applies to', 'Behaviour', 'Grounding', 'Evidence', 'Engine consequence']) {
+    const n = (doc.match(new RegExp(`^\\*\\*${field}:\\*\\*`, 'gm')) ?? []).length;
+    assert.equal(n, entries, `${field}: ${n} of ${entries} entries`);
+  }
+
+  // Nothing from an instance, ever. An engagement journal became a product document once (P-13);
+  // what made that unsafe was the instance data in it, not the prose.
+  const leaks = doc.split('\n')
+    .map((line, i) => [i + 1, line])
+    .filter(([, line]) => /dev[0-9]{5,}|[0-9a-f]{32}|@/.test(line))
+    .map(([n, line]) => `docs/PLATFORM-NOTES.md:${n}: ${line.trim().slice(0, 60)}`);
+  assert.deepEqual(leaks, []);
+
+  // The retired vocabulary and the old config surface, from the fixture rather than spelled here.
+  const vocab = JSON.parse(read('tests/fixtures/retired-vocabulary.json')).tokens.map((t) => t.pattern);
+  const banned = [...vocab, ...vocab.map((v) => v.replace(/^mcp__/, '').replace(/__$/, '')),
+    'claude_desktop_config'].map((v) => new RegExp(v));
+  assert.deepEqual(doc.split('\n').filter((l) => banned.some((re) => re.test(l))), []);
+
+  // An entry with no corpus page says so in those words. The alternative a reader cannot detect is
+  // an invented path that looks checkable, which is why the wording is fixed rather than free.
+  // A field is its marker line plus any continuation before the next field — two entries carry
+  // paths too long to sit on one line, and reading only the marker line would call them ungrounded.
+  const lines = doc.split('\n');
+  const grounding = lines.flatMap((l, i) => {
+    if (!l.startsWith('**Grounding:**')) return [];
+    const cont = [];
+    for (let k = i + 1; k < lines.length && lines[k].trim() && !lines[k].startsWith('**'); k += 1) {
+      cont.push(lines[k]);
+    }
+    return [[l, ...cont].join(' ')];
+  });
+  const ungrounded = grounding.filter((l) => !/markdown\//.test(l));
+  assert.deepEqual(ungrounded, [], 'a Grounding line names no path at all');
+  for (const l of grounding.filter((x) => /none in ServiceNowDocs/.test(x))) {
+    assert.match(l, /none in ServiceNowDocs \(/);
+  }
+  // Criterion 3. The old file's name is built from the retired product name in the fixture rather
+  // than written out — spelling it here would make this file a detector the ratchet has to exempt,
+  // which it duly caught when the first version of this test did exactly that.
+  const retiredProduct = vocab.find((v) => /^[a-z]+$/.test(v));
+  assert.ok(retiredProduct, 'no bare product name in the vocabulary fixture');
+  assert.ok(!existsSync(join(root, `docs/${retiredProduct}-field-notes.md`)),
+    'criterion 3: the field notes are gone');
+});
+
 test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it must', () => {
   // Each string is a decision someone has to be able to find: the four preset names and six flag
   // names (`01` §6.3), the review screen and the D-05 sentence about what a failed probe does and

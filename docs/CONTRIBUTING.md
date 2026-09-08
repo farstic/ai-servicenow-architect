@@ -657,6 +657,30 @@ same list `--check` prints.
 
 ---
 
+## Where a finding goes
+
+A thing learned on a real instance is one of two kinds, and they have different homes because they
+have different enforcement:
+
+| Kind | Home | What holds it in place |
+|---|---|---|
+| **Platform** — how ServiceNow behaves | `docs/PLATFORM-NOTES.md`, a `PN-xx` entry with all five fields | the citation gate: every path-shaped `Grounding:` must resolve under `vendor/ServiceNowDocs/`, and the file is in the scan set |
+| **Server** — how this MCP server behaves | a failing test under `packages/snowarch/tests/`, then the fix; a row in `packages/snowarch/CHANGELOG.md`'s "Known limitations" until then | the test |
+
+The distinction is not bureaucratic. A platform fact is true whatever we ship and cannot be fixed
+here, so the useful thing to record is the behaviour and where it is documented. A server fact is a
+defect in code we own, and writing it in prose instead of a test is how it comes back.
+
+Two rules for a `PN-xx` entry. **`Grounding:` is a real path or an admission** — where no corpus page
+states the behaviour, the line reads `none in ServiceNowDocs (<nearest area path> for the baseline
+concept); observed behaviour`, never an invented path that a reader would trust. And **nothing
+instance-specific ever lands here**: no URL, sys_id, user name or address. Those go in local memory.
+
+`Engine consequence:` is the field that earns the entry its place — what a specialist now does
+differently. An entry that changes nothing about how the engine works is a note, not a platform note.
+
+---
+
 ## Vocabulary
 
 The v3 rebuild retired four strings. **SK-09** (`.claude/`) and the criterion-2 sweep in

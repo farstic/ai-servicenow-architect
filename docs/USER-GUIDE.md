@@ -230,7 +230,7 @@ flowchart LR
 
 - Confirmation the Script Include is live, with its name.
 - Confirmation it was captured in the named Update Set (so it can be promoted).
-- Any patch-after-create note that applied (for a Business Rule, that `action_insert`/`action_update` were set; see [`nowaikit-field-notes.md`](./nowaikit-field-notes.md)).
+- Any patch-after-create note that applied (for a Business Rule, that `action_insert`/`action_update` were set; see [`PLATFORM-NOTES.md`](./PLATFORM-NOTES.md)).
 
 ### What to do next
 

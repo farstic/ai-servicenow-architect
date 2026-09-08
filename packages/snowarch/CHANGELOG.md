@@ -464,7 +464,7 @@ that is whoever opened one last, and the engagement's objects landed in a strang
 set `is_default: true`, which does nothing for REST capture at all.
 
 **New: `snow_us_capture_target_set`.** REST writes are captured according to the authenticated user's
-`sys_user_preference` `name=sys_update_set` (`docs/nowaikit-field-notes.md` §1). This tool sets it, in
+`sys_user_preference` `name=sys_update_set` (`docs/PLATFORM-NOTES.md` PN-01). This tool sets it, in
 four steps: read the update set (refusing one that is not `in progress`), resolve the account in
 `sys_user`, look for an existing preference, then PATCH or POST it. Neither tool's response carries the
 user name.
@@ -567,6 +567,26 @@ Reported on the load report now; ARC-04-S06 lists them in the tool contract.
 ### Unchanged
 
 - 394 tools, their names and their schemas. No tool was added or removed.
+
+### Known limitations carried from snow-mcp 1.0.0
+
+Seven behaviours were recorded against the 1.0.0 server on a PDI. Four are fixed in 2.0.0 and have a
+test that fails if they come back; one is verify-only against a live instance; two remain open. The
+platform-side findings from the same journal are `docs/PLATFORM-NOTES.md` — a fact about ServiceNow
+belongs there, a fact about this server belongs here.
+
+| # | 1.0.0 behaviour | State in 2.0.0 |
+|---|---|---|
+| 1 | `update_set_switch` set `is_default: true` and did not change the capture target | **Fixed.** `snow_us_capture_target_set` writes the user preference; `tests/tools/update-set-capture.test.ts` asserts the four requests it issues and that a completed set is refused |
+| 2 | `background_script_exec` / `sys_script_execution` unavailable on a PDI, surfaced as a transport error | **Fixed.** Refused with `UNSUPPORTED_ON_THIS_INSTANCE` and a message naming Scripts - Background; `tests/tools/unsupported-stubs.test.ts` |
+| 3 | `event_register` left `event_name` empty | **Fixed.** `tests/tools/integration-event.test.ts` — a dotted name splits into `event_name` and suffix, a single-segment name gets an empty suffix, and the response echoes `event_name` |
+| 4 | `business_rule_add` did not set `action_insert` / `action_update` | **Fixed.** `tests/tools/script-business-rule.test.ts` |
+| 5 | `flow_add` / `flow_action_add` create empty shells — the flow record exists, its logic does not | **Open in 2.0.0.** Not fixed: a flow's contents are not addressable over the Table API. Build the flow in Flow Designer; the tool is for the record, not the logic |
+| 6 | `record_remove` on a scripting table returned `NOT_FOUND` while the row was in fact deleted | **Verify on a live sitting.** No fixture can prove it — the claim is about what the instance does after the call. Procedure in `packages/snowarch/tests/live/README.md` |
+| 7 | `sysevent_register` deletion over the API was never verified either way | **Open, unverified.** Not a known defect and not a known-good path; it has simply never been exercised |
+
+Items 5 and 7 are the only ones a user can still be surprised by. Items 1–4 are regressions if they
+reappear, which is what their tests are for.
 
 ## [1.0.0] — 2026
 

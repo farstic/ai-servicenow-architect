@@ -143,6 +143,71 @@ false is a rule that fires on nothing while looking correct in the UI list.
 **Teardown.** `snow_core_record_remove { "table": "sys_script", "sys_id": "<BR>" }`, then complete the
 update set. `sys_update_xml` DELETE rows are expected — platform field notes, section 7.
 
+## ARC-02-S10 item 6 — `record_remove` on a scripting table: does the refusal mean anything?
+
+Carried from the 1.0.0 journal and never resolved: deleting a Script Include reported `NOT_FOUND`
+while the row was, in fact, gone. No fixture can settle it — the claim is about what the instance
+does *after* the call returns, so it needs a real one.
+
+```
+1  snow_scr_script_include_add { "name": "Arc02S10Probe",
+                                 "script": "var Arc02S10Probe = Class.create();" }
+   → sys_id = <SI>
+
+2  snow_core_records_query { "table": "sys_script_include", "query": "name=Arc02S10Probe" }
+   → expect count = 1
+
+3  snow_core_record_remove { "table": "sys_script_include", "sys_id": "<SI>" }
+   → record the exact code and message, whatever they are
+
+4  snow_core_records_query { "table": "sys_script_include", "query": "name=Arc02S10Probe" }
+   → count = 0 means the delete happened; count = 1 means it did not
+```
+
+**Expected.** Unknown — that is the point. Step 3 returning success and step 4 returning 0 closes the
+item as fixed. Step 3 returning `NOT_FOUND` with step 4 returning 0 reproduces the 1.0.0 behaviour: the
+delete works and the response lies, which is worse than a plain failure because a caller that trusts
+the code will retry or report a problem that does not exist.
+
+**Record.** Step 3's code and message verbatim, and step 4's count. Both halves — a code without the
+count says nothing.
+
+**Teardown.** None if step 4 is 0. If it is 1, delete the record in Studio and say so in the result.
+
+## ARC-02-S10 open question — does an invalid `close_code` still surface as a privilege error?
+
+Not a limitation claim: an unsettled question about this server, recorded here because it cannot be
+settled anywhere else. The 1.0.0 journal reported that setting `state=6` with a `close_code` that is
+not in the instance's choice list came back as `INSUFFICIENT_PRIVILEGES` — a validation failure
+wearing an ACL failure's code, which sends the reader to look at roles. Whether 2.0.0 does the same
+is unknown; the tool it was observed on no longer exists in that form, so nothing is asserted about
+it in `CHANGELOG.md` and PN-04 states only the platform half (a valid choice is required).
+
+```
+1  snow_core_records_query { "table": "sys_choice",
+                             "query": "name=incident^element=close_code^inactive=false" }
+   → note the values that actually exist here
+
+2  snow_inc_incident_modify { "sys_id": "<INC>", "state": "6",
+                              "close_code": "Definitely Not A Choice On This Instance",
+                              "close_notes": "ARC-02-S10 probe" }
+   → record the code and the message verbatim
+
+3  repeat step 2 with a value from step 1
+   → expect success
+```
+
+**Expected.** Step 3 succeeding and step 2 failing is the platform behaviour PN-04 already states.
+The question is only what step 2's **code** is. `INSUFFICIENT_PRIVILEGES` reproduces the old
+mapping and is worth a server fix; a validation-shaped code means it was the old tool and there is
+nothing to fix.
+
+**Record.** Step 2's code and message, and one value from step 1 so the reader can see the choice
+list was consulted rather than guessed. No sys_id, no instance host.
+
+**Teardown.** None — step 3 leaves the incident resolved, which is the state the probe was aiming
+for. Use an incident opened for the sitting, never a real one.
+
 ## Redaction
 
 As S07: no instance URL, user name, password or token in anything recorded — key names only, values as

@@ -99,13 +99,15 @@ test('SK-09 every exemption is load-bearing — without it the rule would fire',
   console.log(`    SK-09 exemption covers ${withOut.length} hit(s): ${mine[0].reason.split('.')[0]}.`);
 });
 
-test('SK-09 the governing documents are still dirty — that surface belongs to ARC-02-S06', () => {
-  // Recorded, not enforced. S06 sweeps these; until then the count is visible rather than unknown.
+test('SK-09 the governing documents are clean, and stay that way', () => {
+  // This was a counter while ARC-02-S06 swept the retired vocabulary out of CLAUDE.md and
+  // `governance/`, asserting the count was still non-zero so nobody would mistake "not yet done"
+  // for "done". S06 took it to one hit and ARC-02-S10 took the last one — the Standing Rule
+  // paragraph that named the field-notes file. It now enforces instead of counting: the surface it
+  // was waiting for is the surface it guards.
   const f = lintVocabulary({ root, files: GOVERNING, allow: vocabAllow });
-  const byFile = {};
-  for (const x of f) { const k = x.slice(6).split(':')[0]; byFile[k] = (byFile[k] ?? 0) + 1; }
-  console.log(`    SK-09 outstanding for S06: ${f.length} hit(s) — ${Object.entries(byFile).map(([k, v]) => `${k} ${v}`).join(', ')}`);
-  assert.ok(f.length > 0, 'the governing docs are already clean — enable SK-09 over GOVERNING too and delete this test');
+  assert.deepEqual(f, []);
+  console.log(`    SK-09: ${GOVERNING.length} governing file(s) clean`);
 });
 
 const AREAS = new Set(readFileSync(join(root, 'vendor/docs-areas.txt'), 'utf8').split('\n').filter(Boolean));
