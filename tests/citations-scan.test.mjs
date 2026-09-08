@@ -121,4 +121,3 @@ test('the warning never becomes a failure — verify still exits 0 with warnings
     assert.ok(r.warnings.some((w) => /citation without a markdown/.test(w.reason)));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
-

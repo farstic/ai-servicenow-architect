@@ -102,6 +102,3 @@ If you somehow receive a dispatch in the Master Project context (the orchestrato
 ---
 
 *End of Developer sub-agent definition v1.0.*
-
-
-
