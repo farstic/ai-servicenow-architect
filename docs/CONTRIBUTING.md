@@ -360,7 +360,7 @@ prefixes *as measured evidence*, and rewriting them would destroy the record.
 
 Two ways a file may legitimately name a dead thing:
 
-- **The historical marker** — a line ending `<!-- retired-name: historical -->`, honoured only in
+- **The historical marker** — an HTML comment reading `retired-name` then `historical`, honoured only in
   `docs/ARCHITECTURE.md`, `docs/decisions/**` and `docs/CHANGELOG.md`, and only for *identifiers*. A
   tool name is never excused: no sentence makes a name the server answers with `UNKNOWN_TOOL` safe to
   cite.
@@ -742,6 +742,21 @@ and the one error code the doctor reports specially). The ceiling is four: a fif
 rather than an edit, and the entry has to say why the name cannot come from the contract. A
 `mcp__${serverKey}__` template is not a literal and is never a hit — that construction is the fix,
 not the problem; a hard-coded `mcp__servicenow__` is.
+
+---
+
+## Annotating an Accepted ADR
+
+An ADR is immutable once Accepted: a decision record that can be edited is a record of what someone
+later wished had been decided. **The one permitted edit is a lint annotation** — appending the
+historical marker comment to a line so a name check stops firing on a name the ADR is *about*. It
+changes no word of the decision and no word of its reasoning; without it the alternative is either a
+permanently red check or an exemption for the whole file, and the second hides the next real hit.
+
+Everything else is a new ADR that supersedes the old one. `docs/RELICENSING.md` is treated the same
+way for the same reason, with one difference: its file list is quoted verbatim inside an indented
+block, so the per-line marker cannot go there without editing the list — it is excluded by path
+instead, in `packages/contract/lint/lib/scan.mjs`, with the reason beside it.
 
 ---
 

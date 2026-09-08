@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
  * now would make every unrelated PR ship past a red check, which is how a check stops being
  * read.
  */
-const NAME_CHECKS_REQUIRED = false;
+const NAME_CHECKS_REQUIRED = true;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const cli = join(root, 'packages', 'contract', 'lint', 'engine-lint.mjs');

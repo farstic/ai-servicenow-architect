@@ -1,6 +1,6 @@
 # User Guide and Examples
 
-**Repository:** [`farstic/claude-servicenow-live`](https://github.com/farstic/claude-servicenow-live)
+**Repository:** [`farstic/ai-servicenow-architect`](https://github.com/farstic/ai-servicenow-architect)
 **Purpose:** The day-to-day operator's guide — four worked scenarios covering the most common ways the team uses the engine, including live deployment to a ServiceNow instance.
 **Audience:** Whole team
 **Last updated:** 29 May 2026
@@ -279,4 +279,4 @@ Type `Status` any time to see the loaded engagement, the locked release family, 
 
 ---
 
-*Documents the [Claude ServiceNow Architecture Engine](https://github.com/farstic/claude-servicenow-live) v2.6 for day-to-day operators.*
+*Documents the [AI ServiceNow Architect](https://github.com/farstic/ai-servicenow-architect) v2.6 for day-to-day operators.*

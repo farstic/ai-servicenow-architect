@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 import { lintLineEndings, lintHyphenSplits } from './lib/editorconfig.mjs';
+import { isHistory } from '../packages/contract/lint/lib/scan.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const owners = JSON.parse(readFileSync(join(root, 'tests/legacy-names.allowlist.json'), 'utf8')).files;
@@ -203,6 +204,50 @@ test('ARC-02-S06 criterion 4 — every governance reference is prefixed and reso
   }
   assert.deepEqual(dangling, [], 'a reference points at a file that is not there');
   assert.deepEqual(unprefixed, [], `${unprefixed.length} unprefixed reference(s)`);
+});
+
+test('ARC-02-S12 criterion 2 — no retired name survives in the engine surface', () => {
+  // The permanent form of the sweep. Names come from `retired-names.json`, so the check grows with
+  // the catalogue rather than being a second list; history and the files whose subject is the past
+  // are excluded by the same helper the lint uses, so "clean" means one thing.
+  // Word boundaries for identifier-shaped keys, exactly as L03 matches them. A substring match
+  // reports an old name inside the CURRENT tool that replaced it — the new name is often the old
+  // one with a prefix — and produced 32 such false hits on the first run. (Stated without an
+  // example: naming one here would make this file a detector its own sweep then has to exempt.)
+  const escape = (k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matchers = Object.keys(JSON.parse(read('packages/contract/retired-names.json')))
+    .map((k) => [k, new RegExp(/^[A-Za-z0-9_]+$/.test(k) ? `\\b${escape(k)}\\b` : escape(k))]);
+  const hits = [];
+  for (const f of IN_SCOPE()) {
+    // The lint's own predicate for "a file whose subject is the past" — history and policy files,
+    // `docs/CONTRIBUTING.md` among them, because a document about which words are retired has to
+    // spell them. One definition of clean, shared with L01/L02/L03 rather than guessed again.
+    if (isHistory(f)) continue;
+    currentLines(f).forEach((line, i) => {
+      if (line.includes('retired-name: historical')) return;
+      for (const [name, re] of matchers) {
+        if (re.test(line)) hits.push(`${f}:${i + 1} ${name}`);
+      }
+    });
+  }
+  assert.deepEqual(hits, [], `${hits.length} retired name(s) in the engine surface`);
+});
+
+test('ARC-02-S12 criterion 4 — every tool named in the governing texts exists', () => {
+  // `governance/governance-rules.md` and `docs/PLATFORM-NOTES.md` name tools in prose. A name the
+  // server does not answer is worse there than anywhere else: those two are what a session reads
+  // before it acts.
+  const contract = JSON.parse(read('packages/snowarch/dist/contract.json'));
+  const names = new Set(contract.tools.map((t) => t.name));
+  const missing = [];
+  for (const f of ['governance/governance-rules.md', 'docs/PLATFORM-NOTES.md']) {
+    read(f).split('\n').forEach((line, i) => {
+      for (const m of line.matchAll(/\bsnow_[a-z0-9_]+\b/g)) {
+        if (!names.has(m[0])) missing.push(`${f}:${i + 1} ${m[0]}`);
+      }
+    });
+  }
+  assert.deepEqual(missing, [], 'a governing text names a tool the server does not have');
 });
 
 test('ARC-02-S10 criterion 1 — the platform notes carry nothing from an instance', () => {
