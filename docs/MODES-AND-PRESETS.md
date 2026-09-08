@@ -55,17 +55,18 @@ shown. **Environment detection:** a URL matching `^https://dev\d+\.service-now\.
 host is *asked* — "What is this instance? pdi / dev / test / prod" — never guessed. All of it is re-editable later:
 `./snowarch instance set-preset <label> <preset>`, `set-flags`, or `/snowarch setup-instance`.
 
-## 4. The six flags in plain language
+## 4. The six flags in plain language (in brackets, the key as written in the store and the environment)
 
-- **WRITE** — create, update and delete records (incidents, catalog items, users, agile work, update sets). Without it
-  everything is read-only.
-- **CMDB_WRITE** — additionally, CI and relationship reconciliation writes into the CMDB.
-- **SCRIPTING** — unlocks *writing* Script Includes, Business Rules, Client Scripts, ACLs, UI Actions and update-set
-  changes. ***Reading* them is always allowed.**
-- **ATF** — *execute* ATF tests and suites; authoring and reading are always allowed.
-- **NOW_ASSIST** — the Now Assist / generative-AI tools; needs a Now Assist licence on the instance.
-- **FLUENT** — the ServiceNow SDK (Fluent) build and deploy tools; needs `@servicenow/sdk`, and deploys also need
-  WRITE.
+- **WRITE** (`WRITE_ENABLED`) — create, update and delete records (incidents, catalog items, users, agile work, update
+  sets). Without it everything is read-only.
+- **CMDB_WRITE** (`CMDB_WRITE_ENABLED`) — additionally, CI and relationship reconciliation writes into the CMDB.
+- **SCRIPTING** (`SCRIPTING_ENABLED`) — unlocks *writing* Script Includes, Business Rules, Client Scripts, ACLs, UI
+  Actions and update-set changes. ***Reading* them is always allowed.**
+- **ATF** (`ATF_ENABLED`) — *execute* ATF tests and suites; authoring and reading are always allowed.
+- **NOW_ASSIST** (`NOW_ASSIST_ENABLED`) — the Now Assist / generative-AI tools; needs a Now Assist licence on the
+  instance.
+- **FLUENT** (`FLUENT_ENABLED`) — the ServiceNow SDK (Fluent) build and deploy tools; needs `@servicenow/sdk`, and
+  deploys also need WRITE.
 
 **The dependency rule**, enforced in the wizard and again in the server: `SCRIPTING_ENABLED` and `CMDB_WRITE_ENABLED`
 are writes, so declaring either without `WRITE_ENABLED` is a contradiction, resolved towards *less* access — the

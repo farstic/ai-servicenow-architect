@@ -213,6 +213,11 @@ test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it mu
   const required = [
     'read-only', 'pdi-developer', 'full', 'custom',
     'WRITE', 'CMDB_WRITE', 'SCRIPTING', 'ATF', 'NOW_ASSIST', 'FLUENT',
+    // And the keys a reader actually types. The short names are `01` §6.3's prose form; the store
+    // and the environment take the `*_ENABLED` form, and four of the six appeared in the page only
+    // incidentally while two did not appear at all — so a reader could not map a bullet to the key.
+    'WRITE_ENABLED', 'CMDB_WRITE_ENABLED', 'SCRIPTING_ENABLED',
+    'ATF_ENABLED', 'NOW_ASSIST_ENABLED', 'FLUENT_ENABLED',
     'Enter = accept as shown', String.raw`^https://dev\d+\.service-now\.com`,
     '--ack-prod', 'prodWriteAck', '.local/instances.json', '0600',
     'OneDrive', 'Dropbox', 'iCloud Drive', 'Google Drive',
@@ -244,12 +249,9 @@ test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it mu
     .map(([n]) => `docs/MODES-AND-PRESETS.md:${n}`);
   assert.deepEqual(offending, []);
 
-  // The budget of record is ARC-02-S09 criterion 1's "≤ 150 lines". This ceiling is deliberately
-  // looser: merging ARC-04's tested store and permission claims into the story's seven sections
-  // lands at 158 with every claim kept, and the difference is a ruling for the architect, not
-  // something to close by dropping a fact or by running paragraphs together. The guard here is
-  // against unbounded growth in the meantime; tighten it to 150 once the page is trimmed or the
-  // budget is raised.
+  // The budget of record is ARC-02-S09 criterion 1, amended 2026-09-08 from 150 to **160**: the
+  // page merges ARC-04's tested store and permission claims rather than replacing them, and
+  // ARC-07-S10 still has probe strings to add. 150 was set for a page written from scratch.
   // `.editorconfig` says `insert_final_newline = true` and nothing in the repository enforces it:
   // a reflow pass here dropped this file's last newline and all nineteen CI cells stayed green.
   // Guarded for this page at least, until something checks it repo-wide.
@@ -259,8 +261,8 @@ test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it mu
   assert.deepEqual(doc.split('\n').filter((l) => /\w-$/.test(l)), []);
 
   const lines = doc.trimEnd().split('\n').length;   // what `wc -l` reports for a file ending in \n
-  console.log(`    ARC-02-S09: docs/MODES-AND-PRESETS.md is ${lines} lines (budget of record: 150)`);
-  assert.ok(lines <= 160, `${lines} lines — over even the interim ceiling`);
+  console.log(`    ARC-02-S09: docs/MODES-AND-PRESETS.md is ${lines} lines (budget of record: 160)`);
+  assert.ok(lines <= 160, `${lines} lines — over criterion 1's budget of 160`);
 });
 
 test('ARC-02-S06 criterion 5 — governance §2 names no retired tool', () => {

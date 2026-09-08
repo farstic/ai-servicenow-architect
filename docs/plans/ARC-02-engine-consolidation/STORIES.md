@@ -374,15 +374,15 @@ Story order differs from the README's title list (which was written before the d
 > - **Criterion 4 is half-deliverable here.** `docs/ARCHITECTURE.md` links to the page in this
 >   story. `CLAUDE.md` links to it in **S08**, which owns that file's structure — S09 must not add a
 >   link to a document S08 is rewriting around it. Verify criterion 4's `CLAUDE.md` half at S08.
-> - **Criterion 1's ≤ 150-line budget is not met and needs a ruling: the page is 158 lines.** Per
->   the merge ruling, ARC-04-S02/S03/S05's store precedence, permission and refusal claims are kept
->   (they are tested) and the story's seven sections wrap around them. Prose was compressed hard —
->   the file went 184 → 158 across four passes, with paragraphs reflowed to the width the rest of
->   `docs/` uses and the two production code blocks merged into one. What remains is claims and
->   their exact strings. Closing the last eight lines means either dropping a tested claim or
->   running unrelated paragraphs together to save blank lines, and neither is "trim prose, never
->   facts". `tests/no-legacy-surfaces.test.mjs` prints the count and guards a ceiling of 160 in the
->   meantime; tighten it to whatever budget is ruled.
+> - **Criterion 1's line budget is amended from ≤ 150 to ≤ 160 (ruled 2026-09-08).** 150 was set for
+>   a page written from scratch; the merge ruling instead keeps ARC-04-S02/S03/S05's store
+>   precedence, permission and refusal claims (they are tested) and wraps the story's seven sections
+>   around them, and ARC-07-S10 still has probe strings to add. Prose was compressed hard first —
+>   184 → 158 across four passes, paragraphs reflowed to the width the rest of `docs/` uses and the
+>   two production code blocks merged into one — and what remained was claims and their exact
+>   strings, so the last eight lines could only have come from dropping a tested claim or running
+>   unrelated paragraphs together. The page is 159 lines; `tests/no-legacy-surfaces.test.mjs` prints
+>   the count and asserts the 160 ceiling.
 > - **`servicenow-mcp` cannot appear here.** Criterion 2 forbids it and the upgrade note used it to
 >   name the package people upgrade *from*. The note now names the behaviour instead — "Upgrading
 >   from the 1.0.0 server" — which keeps the claim and satisfies the criterion. `docs/CONTRIBUTING.md`
