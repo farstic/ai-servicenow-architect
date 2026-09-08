@@ -14,12 +14,15 @@ import { HISTORICAL_MARKER, honoursMarker, isHistory, readLines } from '../lib/s
 
 export const id = 'L03';
 
+const escape = (key) => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /** Word-boundary for identifier-shaped keys; literal for keys with `/` or `-`. */
+const pattern = (key) => (/^[A-Za-z0-9_]+$/.test(key)
+  ? `\\b${escape(key)}\\b`
+  : escape(key));
+
 function makeMatcher(key) {
-  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return /^[A-Za-z0-9_]+$/.test(key)
-    ? new RegExp(`\\b${escaped}\\b`)
-    : new RegExp(escaped);
+  return new RegExp(pattern(key));
 }
 
 export function run(ctx) {
@@ -30,6 +33,13 @@ export function run(ctx) {
     re: makeMatcher(key),
   }));
 
+  // One alternation over every key, used only to decide whether a line is worth looking at.
+  // Without it this check is 400-odd regex passes over every line of every scanned file and
+  // costs ~2 s of the lint's ~3 s; with it, the ~99% of lines that mention nothing retired cost
+  // a single pass. The per-entry loop below still produces the findings, so the output — and
+  // its order — is unchanged; this only decides which lines reach it.
+  const any = new RegExp(entries.map((e) => pattern(e.key)).join('|'));
+
   const findings = [];
   for (const file of ctx.files) {
     if (isHistory(file)) continue;
@@ -37,6 +47,7 @@ export function run(ctx) {
     const lines = readLines(ctx.root, file);
 
     lines.forEach((line, i) => {
+      if (!any.test(line)) return;
       const isMarkedLine = marked && line.trimEnd().endsWith(HISTORICAL_MARKER);
       for (const e of entries) {
         if (!e.re.test(line)) continue;

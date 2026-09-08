@@ -1,10 +1,10 @@
 # VALIDATION-TESTS.md — System Behaviour Tests
 
 > **Purpose:** Verify that the Chief Architect routing protocol, Domain Expert gateways, and §6.2
-> post-build hooks behave correctly after any change to CLAUDE.md, taxonomy.md, or a SKILL.md.
+> post-build hooks behave correctly after any change to CLAUDE.md, governance/taxonomy.md, or a SKILL.md.
 >
-> **When to run:** Before every commit that touches CLAUDE.md, taxonomy.md, governance-rules.md,
-> or any SKILL.md. Run in both Claude Code (Tier 2) and Claude.ai (Tier 1) where noted.
+> **When to run:** Before every commit that touches CLAUDE.md, governance/taxonomy.md, governance/governance-rules.md,
+> or any SKILL.md. Run in Claude Code, in Mode `design-only` or Mode `live` as each test notes.
 >
 > **How to run:** Paste the **Prompt** verbatim into a fresh session. Compare the actual response
 > against **Expected behaviour**. Any deviation from the pass criteria is a regression.
@@ -338,7 +338,7 @@ that writes escalation events to it.
 
 ## T-11 — Post-build §1.1 violation detection
 
-**Covers:** Phase 2 Step 3 (§1.1 post-build violation scan); `governance-rules.md` §1.1 Violation handling
+**Covers:** Phase 2 Step 3 (§1.1 post-build violation scan); `governance/governance-rules.md` §1.1 Violation handling
 **Tiers:** Claude Code ✅ · Claude.ai ✅
 
 ### Prompt
@@ -352,7 +352,7 @@ in the dispatch envelope. What happens?
 
 1. Architect holds the artefact (Phase 2 Step 1) and classifies it (Step 2).
 2. **Phase 2 Step 3 — §1.1 violation scan fires:** detects `x_acme_test_log`, a new `x_*_*` table **not present in the dispatch envelope**.
-3. Architect **halts the §6.2 sequence** and re-dispatches the originating Developer with the **§1.1 halt protocol as the rework brief** (`governance-rules.md` §1.1 "Violation handling").
+3. Architect **halts the §6.2 sequence** and re-dispatches the originating Developer with the **§1.1 halt protocol as the rework brief** (`governance/governance-rules.md` §1.1 "Violation handling").
 4. **No Domain Expert review, Code Reviewer, ATF Author, or Operational Documentation proposal** is surfaced until the violation is resolved.
 
 ### Pass criteria
@@ -537,7 +537,7 @@ hidden from ITSM support staff who can see the related incident.
 ## T-17 — Licensing & Entitlement consult (skill-only) fires + prices the §1.1 path
 
 **Covers:** §3.1 routing-time licensing consult with a backing skill (engine v2.8.0); custom-table/scoped-app + new-fulfiller-role triggers; the consult *prices* the §1.1 path so the verdict is made with cost visible; verify-against-subscription discipline; ADR touchpoint (governance §4.1)
-**Tiers:** Claude Code ✅ · Claude.ai ⬜ (pending Tier 1 upload)
+**Run in:** Claude Code ✅
 
 ### Prompt
 
@@ -575,7 +575,7 @@ we'd stand up in a new scoped app.
 ## T-18 — Estimation & Sizing consult (skill-only) produces a defensible range
 
 **Covers:** on-demand sizing consult with a backing skill (engine v2.8.0); range-not-point + complexity rubric + named contingency; baseline-vs-custom §1.1 delta; RAID + baseline-SPM routing; cross-consult hand-offs
-**Tiers:** Claude Code ✅ · Claude.ai ⬜ (pending Tier 1 upload)
+**Run in:** Claude Code ✅
 
 ### Prompt
 
@@ -655,13 +655,13 @@ Mirrors synced and staged automatically.
 
 ## Regression Workflow
 
-When a test fails after a change to `CLAUDE.md`, `taxonomy.md`, `governance-rules.md`, or any `SKILL.md`:
+When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
 
 1. **Identify the failing test** — note the test ID (T-NN) and the fail signal observed.
 2. **Locate the root cause** — common sources:
    - A Phase 1 Step 5 gateway not firing → check the Domain Expert trigger-keyword table in `CLAUDE.md` §Phase 1, Step 5.
    - A §6.2 Code Reviewer not firing → check the `§6.2 post-build hook` section in `CLAUDE.md`.
-   - A §1.1 halt not firing → check `governance-rules.md` §1.1 and the Domain Expert SKILL.md `Halt protocol` section.
+   - A §1.1 halt not firing → check `governance/governance-rules.md` §1.1 and the Domain Expert SKILL.md `Halt protocol` section.
    - An auto-sync not running → check `.githooks/pre-commit` and `scripts/sync-agents-skills.sh`.
 3. **Fix the document** — edit only the governing document responsible (do not patch symptoms in other files).
 4. **Re-run the affected test** in a fresh session.

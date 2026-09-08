@@ -415,7 +415,7 @@ Do not dispatch Technical Designer until the Chief Architect resolves the propos
 
 If the Chief Architect approves the custom-table proposal, the following are explicitly blocked in downstream design:
 
-- **Do not create a separate scoped app** for this table. One table in baseline scope (or in an existing scoped app) is sufficient. *(citation: `governance-rules.md` §1.1 hierarchy)*
+- **Do not create a separate scoped app** for this table. One table in baseline scope (or in an existing scoped app) is sufficient. *(citation: `governance/governance-rules.md` §1.1 hierarchy)*
 - **Do not duplicate `change_request.risk`** in the matrix table — reference the existing field.
 - **Do not duplicate baseline blackout-window checks** — call the baseline `ChangeSchedule` Script Include.
 - **Do not write the approver chain as a series of `sysapproval_approver` records pre-created** — generate them at the moment of approval-state entry, the baseline pattern.

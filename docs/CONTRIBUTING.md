@@ -181,6 +181,13 @@ option, not a default.
 scripts through `cmd.exe`, which does no glob expansion, and whether `node --test` expands a glob itself
 varies by Node line.
 
+**A timing assertion is a real assertion — fix the subject, not the budget.** A wall-clock check runs
+inside a runner that is saturating every core, so it measures contention as well as the thing timed.
+That is not a reason to loosen it: when `engine-lint`'s 5 s budget failed at 5055 ms, the standalone
+run was 2.9 s and 2.1 s of it was L03 scanning ~400 regexes over every line of every file. The budget
+was right and the check was slow — a prefilter took the whole lint to ~0.2 s, and the assertion that
+caught it would have gone red on the Windows cell first. Before touching a budget, time the parts.
+
 **A skipped test states its reason, and the reason is load-bearing.** Two skip deliberately today — the
 `docs/CHANGELOG.md` ordering guard (the imported changelog reads *ahead* of the root version because the
 product renumbered downward at the merge; it becomes a live assertion when ARC-09 regenerates the file)
@@ -612,3 +619,42 @@ quoted to be contradicted must stay wrong.
 never engages and the corpus checkout silently omits its five root files — `LICENSE` among them. ARC-03's
 recipe therefore carries an idempotent repair step, and the doctor asserts corpus *completeness* rather
 than just the pin: `rev-parse HEAD` matches the pin on a corpus missing five files.
+
+---
+
+## Vocabulary
+
+The v3 rebuild retired four strings. **SK-09** (`.claude/`) and the criterion-2 sweep in
+`tests/no-legacy-surfaces.test.mjs` (`CLAUDE.md`, `governance/`, `docs/`) both refuse them, and
+`packages/contract/lint/checks/l03-retired.mjs` refuses the tool-name half everywhere else. Three
+checks, one list: `tests/fixtures/retired-vocabulary.json`.
+
+The words are not spelled out here. A file that spells a forbidden string becomes a detector its own
+sweep then has to exempt, and an exemption in a document about the rule is the least defensible
+exemption in the repository — the fixture is where they live, and `node --test
+tests/skills-lint.test.mjs` prints each one it refuses.
+
+| Retired shape | Say instead |
+|---|---|
+| The word `Tier` followed by a digit — the old permission ladder | **Mode** and **preset** (below) |
+| The two `mcp__…__` prefixes of the previous servers | The prefix `engine.config.json` declares in `mcp.serverKey` |
+| The previous product name | `snowarch`, or "the server" |
+
+### Mode, and preset
+
+Two axes, and they answer different questions. Neither is a ladder: a session does not "have more
+permission" than another, it has a different set of flags, and the doctor is what says which.
+
+- **Mode** — whether an instance is configured at all. `design-only` means no instance is
+  reachable and every live call is a documented deferral; `live` means one is. `scripts/doctor.sh`
+  prints a `Mode:` line and that line is the statement of record. Do not infer it from the tool
+  list: a disabled family is still advertised, and reading the advertisement instead of the doctor
+  is exactly the mistake the old vocabulary encouraged.
+- **Preset** — which capability flags are on for that instance: `read-only`, `pdi-developer`,
+  `full`, or `custom`. Presets expand to the six `*_ENABLED` flags in
+  `packages/snowarch/src/utils/permissions.ts`, a dependency rule can turn one back off, and it is
+  the **effective** flags after that rule — not the preset's name — that decide whether a call is
+  refused.
+
+So "this session is `live` on a `pdi-developer` instance" is a complete statement, and one that
+survives a flag being switched off underneath it. The old single number could not say either half.
