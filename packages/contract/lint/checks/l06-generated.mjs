@@ -44,16 +44,27 @@ export function run(ctx) {
       // The generator's own diff already names the target and the line. Carry the first changed
       // line through rather than a count: "README.md differs" sends a reader to regenerate blindly,
       // and the line tells them what moved and therefore whether they expected it.
-      const first = out.split('\n').find((l) => /^[+-]/.test(l) && !/^[+-]{3}/.test(l));
-      const target = out.split('\n').find((l) => l.startsWith('--- a/'))?.slice(6)
-        ?? gen.targets[0];
-      findings.push({
-        file: target,
-        line: 1,
-        message: `differs from generator output (${gen.id})`
-          + `${first ? ` — first change: ${first.trim().slice(0, 100)}` : ''}`
-          + ` — run node ${gen.script}`,
+      // One finding per STALE TARGET, not one per generator. A contract change moves the header
+      // sha of every generated file at once, and a single line saying "gen-governance differs"
+      // would hide that four of its five targets moved with it.
+      const lines = out.split('\n');
+      const stale = [];
+      lines.forEach((l, i) => {
+        if (!l.startsWith('--- a/')) return;
+        const target = l.slice(6).trim();
+        const first = lines.slice(i + 1).find((x) => /^[+-]/.test(x) && !/^[+-]{3}/.test(x));
+        stale.push({ target, first });
       });
+      if (stale.length === 0) stale.push({ target: gen.targets[0], first: undefined });
+      for (const { target, first } of stale) {
+        findings.push({
+          file: target,
+          line: 1,
+          message: `differs from generator output (${gen.id})`
+            + `${first ? ` — first change: ${first.trim().slice(0, 90)}` : ''}`
+            + ` — run node ${gen.script}`,
+        });
+      }
     }
   }
   return findings;
