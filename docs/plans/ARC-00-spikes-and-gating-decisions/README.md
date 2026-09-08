@@ -40,10 +40,10 @@ None. The owner's answers in `02` are the only external input, and they are all 
 - [ ] S-03/S-04/S-08 were executed on a Windows machine **without** Git Bash on PATH (`where bash` empty, quoted in each record), and the Q-B outcome (native first-class vs "Git Bash required") is written into `01` §13 and ARC-09.
 - [ ] S-07 records size on disk and wall time for the three B02 candidate recipes on all three OSes and names the recipe ARC-03 documents.
 - [ ] S-18 shows a user prompt for a `mutates:true` tool in auto mode (or records the plan limitation and keeps ARC-05's PreToolUse fallback story open).
-- [ ] Seven ADRs exist; ADR-0001…0005 and 0007 with status Accepted and the owner's `DECIDED` text quoted; ADR-0006 resolved as above before ARC-06-S01.
+- [x] Seven ADRs exist; ADR-0001…0005 and 0007 with status Accepted and the owner's `DECIDED` text quoted; ADR-0006 resolved as above before ARC-06-S01. *(ADR-0006 Accepted 2026-09-08 — "monorepo path confirmed".)*
 - [ ] `spikes/engine.config.seed.json` values for names and floors are fixed (D-01, R-1, R-2, S-11) and referenced by the ADRs; `floors.claude` equals the S-11 verdict.
 - [ ] A relicensing statement for both source repositories is agreed in writing (D-02) and the `@farstic/snow-mcp@1.0.0` npm record is explicitly left untouched; `RELICENSING.md` quotes `git shortlog -sn HEAD` of both repositories and records, for the engine's second contributor, either written consent or the rewrite-before-import file list (story S02).
-- [ ] S-14a–g (plugin channel) and S-19 carry verdicts within the one-week time-box, and ADR-0006 records either "monorepo path confirmed" or "channel decision re-opened" **before** ARC-06's first story starts (D-06 hedge).
+- [x] S-14a–g (plugin channel) and S-19 carry verdicts within the one-week time-box, and ADR-0006 records either "monorepo path confirmed" or "channel decision re-opened" **before** ARC-06's first story starts (D-06 hedge). *(Verdicts in `03` §F; ADR-0006 Accepted 2026-09-08 — "monorepo path confirmed"; ARC-06-S01 not yet started.)*
 - [ ] The gate sign-off block (ARC-01 entry: D-01/D-02/D-03; ARC-06 entry: S-01/S-03/S-05/S-08/S-09/S-15/S-16 + S-14 conclusion + Q-B) is present at the end of this README with dates and the owner's initials.
 
 ## Risks

@@ -69,8 +69,9 @@ other platform object is created, extended or approved by this ADR. §1.1 govern
 The hedge in D-06 was: take the monorepo now, spike the plugin channel in parallel, and let
 the spikes decide whether the plugin channel is ready. ARC-00-S12 ran them, and they decided.
 
-Four of the seven came back as silent failures rather than refusals — which is the pattern that
-matters, because a channel that refuses can be worked around and a channel that lies cannot:
+Five of the seven were refuted in part or in full. Four of those five came back as silent failures
+rather than refusals — which is the pattern that matters, because a channel that refuses can be
+worked around and a channel that lies cannot (S-14c is the one refusal; the other four lie):
 
 - **S-14a** — `sensitive: true` keeps a value out of a file **on macOS only**; Claude Code's secure
   storage is the keychain, and elsewhere the value lands in plaintext. Non-sensitive options go to a
@@ -86,7 +87,9 @@ matters, because a channel that refuses can be worked around and a channel that 
 - **S-14g** — the plugin cache's `npm ci` is capped at 60 seconds and, on a throttled network,
   **truncates the install while reporting success**.
 
-**S-14f and S-19 were confirmed** — two plugins tag and validate cleanly at one commit, and
+**S-14d, S-14f and S-19 were confirmed** — a 12,299-byte SessionStart `additionalContext` survives
+startup, `/compact` and `--resume` intact (owner, 2.1.258; not load-bearing, since S-05 ruled out
+SessionStart injection); two plugins tag and validate cleanly at one commit; and
 `claude plugin validate` runs headless on CI with no login, which is why the plugin-validate job
 exists today. The channel is viable for *validation*; it is not yet viable for *distribution*.
 
