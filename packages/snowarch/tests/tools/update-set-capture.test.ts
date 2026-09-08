@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dispatchUpdateSetAction } from '../../src/tools/updateset.js';
+import { dispatchUpdateSetAction, updateSetToolManifest } from '../../src/tools/updateset.js';
 import { FakeRestClient } from '../helpers/fake-rest.js';
 import { withPreset } from '../helpers/preset.js';
 import { runWithInstance, FLAG_NAMES, type Flags, type InstanceRuntime } from '../../src/servicenow/context.js';
@@ -239,5 +239,37 @@ describe('criterion 6 - the gates', () => {
     });
     await call(client, 'snow_us_capture_target_set', { update_set_sys_id: SET_SYS_ID });
     expect(client.sequence.length).toBe(4);
+  });
+});
+
+describe('the advertised schema says what the handler enforces', () => {
+  // The handler has required `name` since the capture rework; the schema still advertised the
+  // shape before it — `default_name`, `required: []`. A caller that trusts the schema (which is
+  // every caller: it is what `tools/list` publishes) passes `default_name` and gets
+  // INVALID_REQUEST for a field it was told was optional. The refusal above proves the handler;
+  // this proves the advertisement, and the two are separate failures.
+  const ensure = updateSetToolManifest().find((t) => t.name === 'snow_us_active_update_set_ensure')!;
+  const schema = ensure.inputSchema as {
+    properties: Record<string, unknown>;
+    required?: string[];
+  };
+
+  it('name is required', () => {
+    expect(schema.required).toContain('name');
+  });
+
+  it('every advertised property is one the handler reads', async () => {
+    // The generalisation, and the reason this is not just an assertion about one string:
+    // `default_name` was advertised for a handler that never looked at it. ARC-05-S08 takes this
+    // property across the whole catalogue; here it is enforced for the tool §2.2 tells people to
+    // call first.
+    expect(Object.keys(schema.properties).sort()).toEqual(['description', 'name']);
+
+    // Both advertised keys demonstrably reach the instance: `name` into the lookup query, and
+    // `description` into the created record.
+    const client = base({ queries: {} });
+    await call(client, 'snow_us_active_update_set_ensure', { name: 'S', description: 'D' });
+    expect(client.calls.find((c) => c.op === 'query')?.arg ?? '').toContain('name=S');
+    expect(client.calls.find((c) => c.op === 'create')?.data).toMatchObject({ name: 'S', description: 'D' });
   });
 });

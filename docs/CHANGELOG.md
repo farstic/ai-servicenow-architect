@@ -9,6 +9,21 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ---
 
+## Unreleased
+
+### Fixed
+
+- `snow_us_active_update_set_ensure` advertised the input shape it had *before* the update-set
+  capture rework: `default_name`, and nothing required. The handler has required `name` since that
+  rework, so a caller following the published schema passed `default_name` and got
+  `INVALID_REQUEST` for a field it had been told was optional. The schema now says what the handler
+  enforces — `name` required, `description` optional, `default_name` gone — and the tool's own
+  description no longer promises to "create one automatically if none is in progress", which was
+  the same stale behaviour. `dist/contract.json` is unchanged (it carries no schemas), so the
+  engine pin and its sha are untouched.
+
+---
+
 ## Before 2.0.0
 
 Everything below is the imported engine's history, kept as written. **The term "Tier" below is
