@@ -3,10 +3,8 @@
   "files": {
     "docs/CHANGELOG.md": "ARC-09",
     "docs/CONTRIBUTING.md": "ARC-05",
-    "docs/USER-GUIDE.md": "ARC-02",
     "packages/contract/retired-identifiers.json": "ARC-05",
     "packages/contract/retired-names.json": "ARC-05",
-    "scripts/README.md": "ARC-02",
     "tests/contract/engine-lint.test.mjs": "ARC-05",
     "tests/contract/retired-names.test.mjs": "ARC-05"
   }

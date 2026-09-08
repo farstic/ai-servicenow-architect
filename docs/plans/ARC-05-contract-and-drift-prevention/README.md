@@ -42,14 +42,14 @@ The eight criteria, each with the test, job or PR that proves it. Closed 2026-09
 | 1 | a rename without telling the engine fails on the server side | `contract.test.ts` tests 1, 10, 13 · lint `L01`, `L08`, `L11` · **drill PR #56**, 18 of 25 jobs red |
 | 2 | a re-gate fails the expectation check and the byte check | `contract.test.ts` test 2 · lint `L08`, `L11` · `pin.mjs` refuses a blanket `--accept-regate` and names the tool |
 | 3 | a seventh flag fails until presets and the rule file carry it | `contract.test.ts` test 5 · then `L06` until `npm run gen` |
-| 4 | no retired name outside the files whose subject is the past | lint `L03` — **closes at ARC-02-S12**; real tree today `L02 2 · L03 10`, all in ADRs, `RELICENSING.md` and the two ITOM skill files |
+| 4 | no retired name outside the files whose subject is the past | **CLOSED at ARC-02-S12, 2026-09-08** — `L01 0 · L02 0 · L03 0` on the real tree, and `NAME_CHECKS_REQUIRED = true` makes the three checks required in `lint:contract` |
 | 5 | the prefix appears exactly once and comes from `engine.config.json` | S05 criterion 2, asserted both ways: with `serverKey: snow` the new prefix appears once and the old one nowhere |
 | 6 | one TROUBLESHOOTING entry per code, with a remedy, shared by doctor and wizard | S06 criterion 2 — 59 headings for 59 codes; the `AUTHENTICATION_FAILED` remedy is byte-identical in three documents |
 | 7 | no literal flag, preset, tool name or code in engine tooling | S10's `tests/contract/no-literals.test.mjs` — 22 files scanned, allow-list of 4, each reasoned and load-bearing |
 | 8 | a mutating tool prompts in auto mode | spike **S-18 CONFIRMED with a control** (`03` §F); `permissions.ask` carries 161 tools; the live re-run is on the owner's list in `packages/snowarch/tests/live/README.md` |
 
-**Not closed here, by design.** Criterion 4 needs ARC-02-S12's final sweep; criterion 8's live
-re-run needs ARC-06 to register the server. Both are named above rather than marked done.
+**Criterion 4 closed at ARC-02-S12 (2026-09-08).** Criterion 8's live re-run still needs ARC-06 to
+register the server, and is named above rather than marked done.
 
 ## Risks
 

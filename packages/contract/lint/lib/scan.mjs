@@ -52,7 +52,13 @@ export const NEVER_SCANNED = [
  * L01 (tool tokens), L02 (prefix) and L03 (retired names) skip these; every other check that
  * reads files still sees them, and the pin/server-key checks do not read the tree at all.
  */
-export const HISTORY_PATHS = ['docs/plans', 'docs/spikes', 'docs/CHANGELOG.md'];
+export const HISTORY_PATHS = ['docs/plans', 'docs/spikes', 'docs/CHANGELOG.md',
+  // The relicensing consent record. Its file list is quoted VERBATIM, inside an indented
+  // block, naming each file as it was named when consent was given — so the per-line marker
+  // cannot go there without editing the list itself, and editing the list would change what
+  // was agreed to. ARC-02-S06's vocabulary sweep excluded it for the same reason; this makes
+  // the name checks agree with that rather than hold a second opinion.
+  'docs/RELICENSING.md'];
 
 /**
  * Files whose SUBJECT is the list of dead names, exempt from L01/L02/L03.

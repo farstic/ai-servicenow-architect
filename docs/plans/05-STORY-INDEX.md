@@ -47,7 +47,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-02-S09 | ARC-02 | `docs/MODES-AND-PRESETS.md` — Mode semantics, the preset table and plain-language flags of `01` §6.3, principle 10 | S | S06 | M2 | Done (2026-09-08) |
 | ARC-02-S10 | ARC-02 | `docs/PLATFORM-NOTES.md` from the field notes; server-behaviour sections handed to ARC-04 as regression-test titles | M | S05 | M2 | Done (2026-09-08) |
 | ARC-02-S11 | ARC-02 | `/snowarch` project skill: `status` (delegates to the doctor), `setup-instance` skeleton with the terminal hand-off, `doctor` | M | S02, S08; ARC-00-S04; verdicts S-16 | M2 | Not started |
-| ARC-02-S12 | ARC-02 | Retired-name final sweep with ARC-05's `retired-names.json` and `engine-lint.mjs` (incl. ITOM SKILL/EXAMPLES) | S | S06; ARC-05-S02/S04 | M2 | Not started |
+| ARC-02-S12 | ARC-02 | Retired-name final sweep with ARC-05's `retired-names.json` and `engine-lint.mjs` (incl. ITOM SKILL/EXAMPLES) | S | S06; ARC-05-S02/S04 | M2 | Done (2026-09-08) |
 | ARC-02-S13 | ARC-02 | Refresh `VALIDATION-TESTS.md` (T-01…T-18) to Mode/Preset and current tool names; replace T-07; strip run history; execute in design-only mode | M | S08, S11, S12 | M2 | Not started |
 | ARC-03-S01 | ARC-03 | Shallow submodule at `vendor/ServiceNowDocs`, pin re-seeded to `ba513f2`, pin recorded in `engine.config.json` with a pin-equals-gitlink lint | M | ARC-01 (all) | M1 | Done (2026-09-08) |
 | ARC-03-S02 | ARC-03 | Citation scanner library, `scripts/gen-docs-areas.mjs` and generated `vendor/docs-areas.txt` with a CI staleness check | M | S01 | M1 | Done (2026-09-08) |

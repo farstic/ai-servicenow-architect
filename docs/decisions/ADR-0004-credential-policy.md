@@ -50,7 +50,7 @@ other platform object is created, extended or approved by this ADR. §1.1 govern
 - **Obligation on ARC-07 and ARC-08:** the wizard and the doctor must **WARN** when the checkout path lies under a known cloud-sync folder (OneDrive, Dropbox, iCloud Drive, Google Drive) — `0600` does not prevent synchronisation.
 - ARC-07 offers basic authentication first and labels the OAuth branch honestly: it still requires a user password plus a client id and secret, and ServiceNow's own documentation classifies it as legacy with a hardening switch that disables it (`00` P-38).
 - ARC-01-S07's never-commit test enforces that per-checkout state can never be committed; `.local/` is gitignored from the first commit.
-- ARC-08 detects leftover `servicenow-mcp` / `nowaikit` entries with plaintext secrets in `~/.claude.json` and its `.bak-*` files and prints the exact `claude mcp remove` commands (`03` R-07).
+- ARC-08 detects leftover `servicenow-mcp` / `nowaikit` entries with plaintext secrets in `~/.claude.json` and its `.bak-*` files and prints the exact `claude mcp remove` commands (`03` R-07). <!-- retired-name: historical -->
 - Roadmap, explicitly not in the first release: item 3 the OS-keychain backend, item 4 the OAuth client-credentials grant (no user password, but new server code and instance admin work).
 
 ## Follow-ups
