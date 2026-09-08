@@ -8,6 +8,7 @@ import type {
   ServiceNowRecord,
 } from './types.js';
 import { ServiceNowError } from '../utils/errors.js';
+import type { ErrorCodeName } from '../errors/codes.js';
 import { logger } from '../utils/logging.js';
 import { snFetch } from './http.js';
 import { classifyNetworkError } from './net-errors.js';
@@ -278,8 +279,12 @@ export class ServiceNowClient {
             // Error response wasn't JSON, use status text
           }
 
-          // Map HTTP status to error codes
-          let errorCode = 'API_ERROR';
+          // Map HTTP status to error codes. The default was `API_ERROR`, which is in no
+          // registry and so reached a caller with no meaning and no remedy attached —
+          // invisible until `ServiceNowError` took the registry's union as its code type.
+          // `REQUEST_FAILED` is the registered code for exactly this case: the instance
+          // refused and its response is the only information there is.
+          let errorCode: ErrorCodeName = 'REQUEST_FAILED';
           if (response.status === 401) {
             errorCode = 'AUTHENTICATION_FAILED';
           } else if (response.status === 403) {
@@ -983,7 +988,7 @@ export class ServiceNowClient {
     error: unknown,
     table: string,
     sysId: string
-  ): { code: string; message: string } {
+  ): { code: ErrorCodeName; message: string } {
     const sn = error instanceof ServiceNowError ? error : undefined;
     const meta = sn && sn.details && typeof sn.details === 'object' ? (sn.details as { status?: number; detail?: string }) : {};
     const status = meta.status;

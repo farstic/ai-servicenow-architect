@@ -36,6 +36,9 @@ function tree(mutate = () => {}) {
   write('engine.config.json', `${JSON.stringify(state.config, null, 2)}\n`);
   // The page is a block target, so it must exist with its markers before the generator runs.
   write(PAGE, readFileSync(join(root, PAGE), 'utf8'));
+  // The pin is an input too since ARC-05-S06: `protocols.mjs` joins it with the contract, and the
+  // CLI reads it before dispatching, so a tree without it cannot run at all.
+  write('packages/contract/required-tools.json', readFileSync(join(root, 'packages/contract/required-tools.json'), 'utf8'));
   return dir;
 }
 
@@ -133,11 +136,14 @@ test('criterion 5 — the ask count is the union of mutates and sessionMutates',
       { name: 'snow_b_modify', gate: 'write', mutates: true },
       { name: 'snow_c_switch', gate: 'none', mutates: false, sessionMutates: true },
       { name: 'snow_d_read', gate: 'none', mutates: false },
+      // Every real contract has at least one, and the rule file refuses to render without one —
+      // its "not a substitute" sentence would otherwise name nothing.
+      { name: 'snow_e_exec', gate: 'scripting', mutates: true, unsupported: true },
     ];
   });
   try {
     run(dir);
-    assert.match(ruleOf(dir), /— 3 tools;/);
+    assert.match(ruleOf(dir), /— 4 tools;/);   // three mutating plus the unsupported stub, which also mutates
   } finally { cleanup(dir); }
 
   const real = tree();
@@ -197,7 +203,7 @@ test('criterion 6 — --check is green after a run and names the line after an e
     run(dir);
     const clean = run(dir, ['--check']);
     assert.equal(clean.code, 0);
-    assert.match(clean.out, /2 target\(s\) current \(contract [0-9a-f]{12}\)/);
+    assert.match(clean.out, /4 target\(s\) current \(contract [0-9a-f]{12}\)/);
 
     const p = join(dir, RULE);
     writeFileSync(p, readFileSync(p, 'utf8').replace('never infer mode', 'sometimes infer mode'));
@@ -239,19 +245,23 @@ test('the runtime remedies are the registry\'s, not a second copy', () => {
   });
   try {
     run(dir);
-    assert.match(ruleOf(dir), /`NO_INSTANCE_CONFIGURED` → run the wizard, obviously\./);
+    assert.match(ruleOf(dir), /`NO_INSTANCE_CONFIGURED` → run the wizard, obviously —/);
   } finally { cleanup(dir); }
 });
 
-test('a code the rule file names but the registry does not have is a hard failure', () => {
-  // Silently omitting the line would leave a session with no remedy for an error it will meet.
+test('the wildcard line\'s code is required, and its absence cannot pass silently', () => {
+  // Which codes the rule file lists is now the registry's `showInRule`, so a code that leaves the
+  // registry simply leaves the file — self-consistent, and nothing to assert. One code is still
+  // named directly: `WRITE_NOT_ENABLED` supplies the `*_NOT_ENABLED` wildcard line's remedy. Losing
+  // it would drop the remedy for the six most common refusals, and silently rendering a shorter
+  // file is the failure worth catching.
   const dir = tree((s) => {
-    s.contract.errorCodes = s.contract.errorCodes.filter((e) => e.code !== 'UNKNOWN_TOOL');
+    s.contract.errorCodes = s.contract.errorCodes.filter((e) => e.code !== 'WRITE_NOT_ENABLED');
   });
   try {
     const r = run(dir);
     assert.equal(r.code, 2);
-    assert.match(r.err, /UNKNOWN_TOOL is not in contract\.errorCodes/);
+    assert.match(r.err, /WRITE_NOT_ENABLED is not in contract\.errorCodes/);
   } finally { cleanup(dir); }
 });
 
@@ -264,6 +274,66 @@ test('the two "not a substitute" tools are real tools in the contract', () => {
   for (const n of ['snow_deploy_background_script_exec', 'snow_fluent_script_exec', 'snow_us_update_set_switch']) {
     assert.ok(names.has(n), `${n} is not in the contract`);
   }
+});
+
+test("ARC-05-S06 criterion 3 — one remedy string, three documents", () => {
+  // The whole reason the registry exists. Asserted on the exact bytes, not on "both mention the
+  // command": a paraphrase in one of the three is how a user ends up following the older advice.
+  const contract = realContract();
+  const auth = contract.errorCodes.find((e) => e.code === 'AUTHENTICATION_FAILED');
+  assert.ok(auth?.remedy, 'AUTHENTICATION_FAILED left the registry');
+  for (const f of [RULE, 'docs/TROUBLESHOOTING.md', 'governance/mcp-protocols.md']) {
+    assert.ok(readFileSync(join(root, f), 'utf8').includes(auth.remedy), `${f} paraphrases the remedy`);
+  }
+  console.log(`    one remedy string in three documents: ${JSON.stringify(auth.remedy).slice(0, 56)}…`);
+});
+
+test('ARC-05-S06 criterion 2 — one section per code, each with a remedy', () => {
+  const doc = readFileSync(join(root, 'docs/TROUBLESHOOTING.md'), 'utf8');
+  const codes = realContract().errorCodes;
+  const headings = doc.split('\n').filter((l) => l.startsWith('### '));
+  assert.equal(headings.length, codes.length);
+  for (const e of codes) {
+    assert.ok(doc.includes(`### ${e.code}\n`), `${e.code} has no section`);
+    assert.ok(e.remedy.trim().length > 0, `${e.code} has an empty remedy`);
+  }
+});
+
+test('ARC-05-S06 criteria 4 and 5 — the tool table, and no retired vocabulary', () => {
+  const doc = readFileSync(join(root, 'governance/mcp-protocols.md'), 'utf8');
+  const pin = JSON.parse(readFileSync(join(root, 'packages/contract/required-tools.json'), 'utf8'));
+  const rows = doc.split('\n').filter((l) => /^\| `snow_[a-z0-9_]+` \|/.test(l));
+  assert.equal(rows.length, pin.tools.length);
+  const live = new Set(realContract().tools.map((t) => t.name));
+  for (const t of pin.tools) {
+    assert.ok(doc.includes(`| \`${t.name}\` |`), `${t.name} has no row`);
+    assert.ok(live.has(t.name), `${t.name} is pinned but not in the contract`);
+  }
+  // The retired capture vocabulary, from the fixture rather than spelled here.
+  const vocab = JSON.parse(readFileSync(join(root, 'tests/fixtures/retired-vocabulary.json'), 'utf8'))
+    .tokens.map((t) => t.pattern);
+  const banned = [...vocab, ...vocab.map((v) => v.replace(/^mcp__/, '').replace(/__$/, ''))];
+  assert.deepEqual(banned.filter((v) => new RegExp(v).test(doc)), []);
+});
+
+test('the two unsupported stubs come from the contract, not from a literal', () => {
+  // ARC-05-S06 added `unsupported` to the tool entry precisely so this sentence stops being a
+  // claim about the server made from outside the contract. A fixture that marks a THIRD tool
+  // proves the renderer reads the flag rather than remembering the two names.
+  const dir = tree((s) => {
+    s.contract.tools.find((t) => t.name === 'snow_core_records_query').unsupported = true;
+  });
+  try {
+    run(dir);
+    assert.match(ruleOf(dir), /`snow_core_records_query`/);
+  } finally { cleanup(dir); }
+
+  const none = tree((s) => { for (const t of s.contract.tools) delete t.unsupported; });
+  try {
+    const r = run(none);
+    assert.equal(r.code, 2);
+    assert.match(r.err, /no tool is marked unsupported in the contract/);
+  } finally { cleanup(none); }
 });
 
 test('the generated files are in the repository and current', () => {

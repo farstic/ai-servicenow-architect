@@ -57,6 +57,9 @@ export function deploymentToolManifest() {
             inputSchema: { type: 'object', properties: { script: { type: 'string', description: 'JavaScript code to execute' }, scope: { type: 'string', description: 'Application scope (default global)' } }, required: ['script'] },
             gate: 'scripting',
             mutates: true,
+            // Registered, and always refuses: no REST endpoint backs it. It stays registered so a
+            // caller reaching for a server-side script finds it and is told the route that works.
+            unsupported: true,
         },
         {
             name: 'snow_deploy_cmdb_data_import',

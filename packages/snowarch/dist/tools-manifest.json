@@ -9119,7 +9119,8 @@
       ]
     },
     "gate": "scripting",
-    "mutates": true
+    "mutates": true,
+    "unsupported": true
   },
   {
     "name": "snow_deploy_cmdb_data_import",
@@ -9321,7 +9322,8 @@
       ]
     },
     "gate": "scripting",
-    "mutates": true
+    "mutates": true,
+    "unsupported": true
   },
   {
     "name": "snow_fluent_explain",

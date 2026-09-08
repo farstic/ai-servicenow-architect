@@ -60,4 +60,15 @@ export interface ToolDefinition {
    * naming a table the caller chose would put a guess in an audit record.
    */
   table?: string;
+
+  /**
+   * The tool is registered but no REST endpoint backs it: it always refuses with
+   * `UNSUPPORTED_ON_THIS_INSTANCE`, naming the UI route that does work.
+   *
+   * Declared rather than inferred because a caller reaching for a server-side script FINDS these
+   * two and assumes they work — that is why they stay registered instead of being removed. The
+   * generated rule file names them in its "not a substitute" line, and before this field it had to
+   * name them from a literal, which is a claim about the server kept outside the contract.
+   */
+  unsupported?: boolean;
 }

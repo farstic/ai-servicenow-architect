@@ -176,6 +176,12 @@ each enforced by a rule in `tests/agents-lint.test.mjs`:
 rules — how the Chief Architect routes, what each specialist owns, what a builder must return — live in
 `CLAUDE.md` and `governance/`, and are read by the model at runtime, not by a maintainer at design time.
 
+**A tool's contract entry carries `unsupported: true` when no REST endpoint backs it.** Two do —
+the script-execution stubs — and they stay registered so a refusal can name the route that works
+instead of reading as a misspelling. The generated rule file filters on that flag; before it
+existed, the file named the two tools from a literal, which is a claim about the server made
+from outside the contract.
+
 **Mode and preset are the two axes of what a session may do**, and they are documented once, in
 `docs/MODES-AND-PRESETS.md`: what `design-only` and `live` mean, what each of the four presets turns on,
 what each of the six flags does in plain language, and how a `prod` instance is protected. Nothing about

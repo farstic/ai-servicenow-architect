@@ -657,6 +657,25 @@ same list `--check` prints.
 
 ---
 
+## Adding an error code: the registry first
+
+A code exists when it has an entry in `packages/snowarch/src/errors/codes.ts` — `meaning`, `remedy`,
+optionally a `command`, and `showInRule`. `ServiceNowError` takes the registry's union as its code
+type, so `throw new ServiceNowError(msg, 'NEW_CODE')` without an entry is a compile error at the
+throw site, where the author is, rather than a string that reaches a user with nothing attached to
+it. `tests/errors/codes.test.ts` scans `src/` for thrown literals as the second, independent check.
+
+**Never write a remedy anywhere else.** `.claude/rules/00-mode-and-mcp-gate.md`,
+`docs/TROUBLESHOOTING.md`, `governance/mcp-protocols.md`, the wizard and the doctor all render from
+that one string; a remedy repeated in five places is five things to correct and four that will not
+be. `remedy` is prose, `command` is a command — renderers set `command` as code and never parse the
+prose looking for one.
+
+Then `npm run gen`, and commit the regenerated files. `npm run lint` runs `--check` and fails on a
+generated file that does not match its source.
+
+---
+
 ## `.editorconfig` is enforced
 
 `tests/editorconfig.test.mjs` checks every tracked `.md .mjs .ts .json .yml .yaml` file for exactly
