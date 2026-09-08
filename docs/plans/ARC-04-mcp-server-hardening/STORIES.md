@@ -884,6 +884,50 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S12 — Server doctor module (`src/doctor/`) and `snowarch doctor --json`
 
+> **Amendment 2026-09-08 (from the S12 delivery).**
+> - **Ids ship as `SV-00`…`SV-08` from the first commit**, in one exported constant
+>   (`CHECK_IDS` in `src/doctor/types.ts`). **ARC-08-S01's "rename `S-` → `SV-` in the server
+>   module" step is a no-op** — there is nothing to rename.
+> - **The S-13 ancestor walk ships as `SV-08`**, severity `warn`, implemented from
+>   `pollutingAncestors()` and exported by name so **ARC-08 can re-home it as an engine check
+>   without moving the walk**. It excludes the checkout's own `.claude/skills`: that one is
+>   expected and is not the finding.
+> - **SV-04 is a declared interface plus a stub that returns `skip`** with the reason naming
+>   ARC-07-S03. Deferring the check entirely was the alternative and it is worse: a check that is
+>   absent until a later story reads as a check that passed.
+> - **SV-05 ignores the child's stderr.** `EnvHttpProxyAgent` prints
+>   `[UNDICI-EHPA] Warning: … experimental` on first use (ARC-04-S11), and treating any stderr
+>   output as an error would make this check red on every machine. **Recorded for ARC-06/ARC-08:
+>   that line is noise, never an error.** The handshake is hand-rolled JSON-RPC rather than the SDK
+>   client — the doctor must work from a plain install with no dev dependencies, and a failure
+>   inside a client library would be reported as a server fault.
+> - **SV-05 in unconfigured mode compares against five, not the contract.** Unconfigured mode
+>   advertises the core tools deliberately (ARC-04-S04); comparing against the full contract there
+>   would report a 392-name difference for a server behaving correctly.
+> - **Two defects found while building it.**
+>   (a) **SV-02 lost its own remedy.** A 0644 store also produces a `STORE_PERMISSIONS_TOO_OPEN`
+>   config error, and the generic branch overwrote the specific one — the reader got "correct the
+>   store file" where they could have had the exact `chmod 600 <masked path>`. The mode finding now
+>   wins.
+>   (b) **`maskPath` could be switched off by an environment variable.** It masks against
+>   `homedir()`, which returns `$HOME` when set — so a process started with HOME pointed elsewhere
+>   masked nothing and SV-08 printed an absolute path containing the real account name. It now also
+>   masks against `userInfo().homedir`, which reads the OS user database. A redaction helper that an
+>   environment variable can disarm is not one, and this is the check whose output is most likely to
+>   be screenshotted.
+> - **Criterion 5 does NOT edit `dist/contract.json`; it runs against a copy.** The first version
+>   edited it in place and restored it in a `finally`, which passed — for that test. It also made
+>   `tests/contract.test.ts` fail intermittently (2 of 6 full-suite runs, in a file this story never
+>   touched): vitest runs files in parallel workers, so that suite read the contract mid-edit and saw
+>   396 tools. **A test that mutates a shared build artefact cannot be isolated by cleaning up
+>   afterwards — the window is the problem, not the residue.** Worth CONTRIBUTING at the close-out.
+>   The copy must live *inside* the package (`.tmp-doctor-dist/`, gitignored, removed in a `finally`):
+>   Node resolves `commander` and the MCP SDK by walking up from the module, so a `dist/` in a temp
+>   directory fails with `ERR_MODULE_NOT_FOUND` before the doctor runs at all.
+> - **The rotation test in `tests/audit/writer.test.ts` gained an explicit 60 s timeout** — ~12 MB of
+>   synchronous I/O next to the doctor suite's child processes, which is the default 5 s limit under
+>   load rather than a wrong assertion. Six consecutive clean full runs after both fixes.
+
 > **Amendment 2026-09-08 (from ARC-02-S04, S-13 addendum).** **The doctor walks from the checkout up to
 > the filesystem root and WARNS on every ancestor `.claude/skills` it finds.** Claude Code loads project
 > skills from *every* such directory on that path, not only the checkout's own: the roster doubles and

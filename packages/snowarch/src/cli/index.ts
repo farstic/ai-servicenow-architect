@@ -73,9 +73,26 @@ program
 program
   .command('doctor')
   .description('Diagnose the installation')
-  .allowUnknownOption()
-  .allowExcessArguments()
-  .action(stub('doctor', 'ARC-04-S12'));
+  .option('--json', 'print the report object and nothing else')
+  .option('--no-network', 'skip checks that contact the instance')
+  .option('--section <name>', 'only this section (server)', 'server')
+  .action(async (opts: { json?: boolean; network?: boolean; section?: string }) => {
+    // commander turns `--no-network` into `network: false`, so the flag the doctor takes is
+    // the negation. Spelled out because reading `opts.network` as "network requested" is the
+    // obvious misreading, and it would silently run the probes the user asked to skip.
+    const { runServerDoctor, exitCodeFor, formatReport } = await import('../doctor/index.js');
+    let report;
+    try {
+      report = await runServerDoctor({ noNetwork: opts.network === false, cwd: process.cwd() });
+    } catch (e) {
+      // Exit 3: the doctor could not run at all, which is a different thing from "checks
+      // failed". A caller scripting against this needs to tell them apart.
+      process.stderr.write(`snowarch doctor: could not run — ${(e as Error).message}\n`);
+      process.exit(3);
+    }
+    process.stdout.write(opts.json ? `${JSON.stringify(report, null, 2)}\n` : formatReport(report));
+    process.exit(exitCodeFor(report));
+  });
 
 program
   .command('contract')

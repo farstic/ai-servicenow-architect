@@ -1,14 +1,15 @@
 {
   "name": "@farstic/snowarch",
   "version": "2.0.0-dev",
-  "description": "ServiceNow MCP server and snowarch CLI — the live-instance half of AI ServiceNow Architect",
+  "description": "ServiceNow MCP server and snowarch CLI \u2014 the live-instance half of AI ServiceNow Architect",
   "main": "dist/server.js",
   "types": "dist/server.d.ts",
   "exports": {
     ".": "./dist/server.js",
     "./sdk": "./dist/sdk/index.js",
     "./client": "./dist/servicenow/client.js",
-    "./audit": "./dist/audit/writer.js"
+    "./audit": "./dist/audit/writer.js",
+    "./doctor": "./dist/doctor/index.js"
   },
   "bin": {
     "snowarch": "dist/cli/index.js"

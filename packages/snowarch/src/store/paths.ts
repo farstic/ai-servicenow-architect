@@ -5,7 +5,7 @@
  * probes the precedence needs.
  */
 import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, userInfo } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 
 export type StoreSource = 'env' | 'project' | 'global' | 'none';
@@ -82,8 +82,18 @@ export function maskPath(p: string): string {
   if (!p) return p;
   let out = p;
   const checkout = envPath('CLAUDE_PROJECT_DIR');
+  // `homedir()` returns `$HOME` when it is set, so a process started with HOME pointed
+  // elsewhere — a test harness, a sandbox, a service account — masks nothing and prints the
+  // real account name. `userInfo().homedir` reads the OS user database instead, so both are
+  // tried. A redaction helper that an environment variable can switch off is not one; found
+  // when ARC-04-S12's SV-08 printed an absolute home path under a fixture HOME.
+  let osHome: string | undefined;
+  try { osHome = userInfo().homedir; } catch { osHome = undefined; }
+
   // Checkout first: it is usually *under* home, so masking home first would hide it.
-  for (const [prefix, label] of [[checkout, '<checkout>'], [homedir(), '~']] as const) {
+  for (const [prefix, label] of [
+    [checkout, '<checkout>'], [homedir(), '~'], [osHome, '~'],
+  ] as const) {
     if (!prefix) continue;
     const norm = prefix.endsWith(sep) ? prefix.slice(0, -1) : prefix;
     if (out === norm) return label;
