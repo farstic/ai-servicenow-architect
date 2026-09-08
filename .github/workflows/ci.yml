@@ -211,3 +211,11 @@ jobs:
       - name: validate .claude/agents
         if: steps.cli.outputs.available == 'true'
         run: claude plugin validate .claude/agents --strict
+
+      # L10 is the same check inside the engine lint. Here — where the CLI is installed — it runs
+      # with `--require-claude`, so a job that lost its CLI fails as misconfigured instead of
+      # reporting a reassuring skip. The `lint` job runs the same check without the flag and says
+      # it skipped, which is honest: enforcement lives where the tool is.
+      - name: engine lint L10 against the installed CLI
+        if: steps.cli.outputs.available == 'true'
+        run: node packages/contract/lint/engine-lint.mjs --only L10 --require-claude

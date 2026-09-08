@@ -265,6 +265,27 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; green on the CI matrix; `docs/CONTRIBUTING.md` lists the check ids; ARC-02 S12 can use `--only L01,L03` as its exit test.
 
 ### ARC-05-S04 — `engine-lint.mjs` structural checks: descriptions, path references, `used_by`, generated-file byte check, plugin validate
+
+> **Amendment 2026-09-08 (from the S04 delivery, with two architect fixups).**
+> - **Criterion 7's 5 s figure is a CI observation, not a local assertion.** Measured on the Windows
+>   cell, where the lint runs alone: **619 / 630 / 544 ms** — six to nine times inside the budget.
+>   Locally it is a different measurement: S04 gave the lint six child processes (four generators
+>   for L06, two `claude plugin validate` runs for L10), and inside a parallel test runner the best
+>   of three swings between 872 ms and 3786 ms on the same tree, with single samples past 8 s.
+>   Asserting 5 s there would assert how loaded the machine is. The test prints all three samples
+>   and asserts 15 s — a hang detector — while the budget is checked where it is measurable.
+> - **`docs/ARCHITECTURE.md` stays IN L05's scope.** It was excluded as "the target architecture";
+>   it is the current one. Its target tree is a fenced block, which L05 already skips; its History
+>   and D-03 sections are below a history heading, which L05 now stops at exactly as
+>   `docs/CHANGELOG.md` does; and its owner table declares each forthcoming directory beside the
+>   ARC that creates it — the same contract as `forthcoming-paths.json`, written where the reader
+>   sees it. **The proof it must stay checked is that excluding it hid two wrong paths this story
+>   found by hand.** A test plants a dangling path in the current section and asserts it is the only
+>   finding. `docs/decisions/**` stays excluded: an ADR is immutable once accepted.
+> - Real-tree L05 went 998 → 26 → 6 → 0: history, then a path-shape rule (a citation is a file with
+>   an extension or a directory with a trailing slash — which is what separates `tools/list`, an MCP
+>   method, from `tools/snowarch/lib/`), then six fixes. L08 and L09 were clean on first run, and
+>   not vacuously: 42 distinct tool tokens are cited across the engine texts and all 42 are pinned.
 **As** a maintainer **I want** the same lint to prove that skill descriptions fit the listing budget, that every internal path a document cites exists, that every `used_by` claim resolves, that every generated file is byte-identical to its generator's output, and that `claude plugin validate` passes where it can run **so that** a stale generated file or a broken governance citation is caught before merge.
 **Context.** ARC README deliverable 3 (second half) and acceptance criterion 2 (byte diff of a generated file). `01` §11 lists description ≤ 500 and `claude plugin validate`; ARC-02's risk "governance relocation breaks citations — mitigation: ARC-05 lint checks internal path references". S-13 (description budget) and S-19 (`claude plugin validate` on headless CI) inform L04 and L10.
 **Scope.** In: checks L04 (descriptions), L05 (path references), L06 (generated files), L08 (required-tools expectations vs contract — engine-side mirror of S08's assertion, so the engine lint alone detects a regate), L09 (`used_by` resolves), L10 (plugin validate); the check-module boundary ARC-08 imports. Out: ServiceNowDocs citation checking (ARC-03 `verify-citations.mjs`); skill frontmatter key rules beyond description length (ARC-02 S02's `tests/skills-lint.test.mjs` owns those and may import L04's module to avoid two implementations).

@@ -30,10 +30,16 @@ import { renderJson, renderText, statusOf } from './lib/report.mjs';
 import * as l01 from './checks/l01-tokens.mjs';
 import * as l02 from './checks/l02-prefix.mjs';
 import * as l03 from './checks/l03-retired.mjs';
+import * as l04 from './checks/l04-descriptions.mjs';
+import * as l05 from './checks/l05-paths.mjs';
+import * as l06 from './checks/l06-generated.mjs';
+import * as l08 from './checks/l08-expectations.mjs';
+import * as l09 from './checks/l09-used-by.mjs';
 import * as l07 from './checks/l07-serverkey.mjs';
+import * as l10 from './checks/l10-plugin-validate.mjs';
 import * as l11 from './checks/l11-pin.mjs';
 
-const CHECKS = [l01, l02, l03, l07, l11];
+const CHECKS = [l01, l02, l03, l04, l05, l06, l07, l08, l09, l10, l11];
 
 const argv = process.argv.slice(2);
 const flag = (name) => argv.includes(name);
@@ -80,9 +86,19 @@ try {
     files: scanFiles(root),
     contractText,
     contract: JSON.parse(contractText),
-    pin: readJson(pinPath),
-    retired: readJson(retiredPath),
+    requiredTools: readJson(pinPath),
+    retiredNames: readJson(retiredPath),
     serverKey,
+    config,
+    // True when the lint is running against its own repository rather than a fixture tree.
+    // L06 needs it: two generators take no --root and would check the real repo from a fixture.
+    isSelfRoot: root === selfRoot,
+    requireClaude: flag('--require-claude'),
+    // A check that cannot run says so through the CLI rather than deciding an exit code itself.
+    cannotRun,
+    // A check that could not run adds its id here; `statusOf` already has the vocabulary
+    // for it, and a skip rendered as a pass is the one outcome a reader must not see.
+    skipped: new Set(),
     mcpJson: existsSync(mcpPath) ? readJson(mcpPath) : null,
     skipNotes: [],
   };
@@ -98,7 +114,11 @@ if (only.length > 0) {
 
 const results = selected.map((check) => {
   const findings = check.run(ctx);
-  return { id: check.id, findings, status: statusOf(check, findings) };
+  return {
+    id: check.id,
+    findings,
+    status: statusOf({ ...check, skipped: ctx.skipped.has(check.id) }, findings),
+  };
 });
 
 process.stdout.write(asJson ? renderJson(results) : renderText(results));

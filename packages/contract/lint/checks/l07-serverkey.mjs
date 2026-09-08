@@ -8,15 +8,16 @@
  * finds it.
  */
 export const id = 'L07';
+export const title = 'the registration key agrees across its declarations';
 
 export function run(ctx) {
   const findings = [];
   const expected = ctx.serverKey;
 
-  if (ctx.pin.serverKey !== expected) {
+  if (ctx.requiredTools.serverKey !== expected) {
     findings.push({
       file: 'packages/contract/required-tools.json',
-      message: `serverKey ${ctx.pin.serverKey} ≠ engine.config.json ${expected}`,
+      message: `serverKey ${ctx.requiredTools.serverKey} ≠ engine.config.json ${expected}`,
     });
   }
 

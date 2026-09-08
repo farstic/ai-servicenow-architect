@@ -13,6 +13,7 @@
 import { HISTORICAL_MARKER, honoursMarker, isHistory, readLines } from '../lib/scan.mjs';
 
 export const id = 'L03';
+export const title = 'no retired name outside the files whose subject is the past';
 
 const escape = (key) => key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -26,7 +27,7 @@ function makeMatcher(key) {
 }
 
 export function run(ctx) {
-  const entries = Object.entries(ctx.retired).map(([key, replacement]) => ({
+  const entries = Object.entries(ctx.retiredNames).map(([key, replacement]) => ({
     key,
     replacement,
     isTool: key.startsWith('snow_'),

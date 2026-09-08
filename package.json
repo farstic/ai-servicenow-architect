@@ -24,7 +24,7 @@
     "type-check": "npm run type-check --workspaces --if-present",
     "build:dist": "node scripts/build-dist.mjs",
     "release": "node scripts/release.mjs",
-    "lint:contract": "node packages/contract/validate.mjs && node packages/contract/gen-retired-names.mjs --check && node packages/contract/lint/engine-lint.mjs --only L07,L11 && node scripts/ci/lint-name-summary.mjs",
+    "lint:contract": "node packages/contract/validate.mjs && node packages/contract/gen-retired-names.mjs --check && node packages/contract/lint/engine-lint.mjs --only L04,L05,L06,L07,L08,L09,L11 && node scripts/ci/lint-name-summary.mjs",
     "pin": "node packages/contract/pin.mjs",
     "gen": "node scripts/gen-governance.mjs"
   },

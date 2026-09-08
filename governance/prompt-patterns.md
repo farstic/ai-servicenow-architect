@@ -393,7 +393,7 @@ Conventions:
 ---
 
 ### PP-19: Deploy approved artefact to live instance
-**When to use:** A design artefact has been approved (§1.1 Verdict A or B, Code Reviewer passed) and you want the engine to deploy it directly to the connected ServiceNow instance via MCP. This pattern triggers the §2.1 Write Approval Gate and §2.2 Update Set Capture protocol. See `docs/MCP-OPERATIONS-GUIDE.md` for the full gate sequence.
+**When to use:** A design artefact has been approved (§1.1 Verdict A or B, Code Reviewer passed) and you want the engine to deploy it directly to the connected ServiceNow instance via MCP. This pattern triggers the §2.1 Write Approval Gate and §2.2 Update Set Capture protocol. See `governance/mcp-protocols.md` for the full gate sequence.
 
 **Template:**
 > Deploy {{ARTEFACT_TYPE}} named {{ARTEFACT_NAME}} to the instance.

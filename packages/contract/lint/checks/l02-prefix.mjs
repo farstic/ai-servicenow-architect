@@ -13,6 +13,7 @@ import { HISTORICAL_MARKER, honoursMarker, isHistory, readLines } from '../lib/s
 const PREFIX = /\bmcp__[a-z0-9_-]+__/g;
 
 export const id = 'L02';
+export const title = 'every mcp__ prefix is the one engine.config.json declares';
 
 export function run(ctx) {
   const expected = `mcp__${ctx.serverKey}__`;

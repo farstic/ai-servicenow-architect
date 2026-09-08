@@ -9,13 +9,14 @@
 import { createHash } from 'node:crypto';
 
 export const id = 'L11';
+export const title = 'the pinned sha still describes the committed contract';
 
 export function run(ctx) {
   const actual = createHash('sha256').update(ctx.contractText).digest('hex');
-  if (actual === ctx.pin.contractSha256) return [];
+  if (actual === ctx.requiredTools.contractSha256) return [];
   return [{
     file: 'packages/contract/required-tools.json',
-    message: `contract sha mismatch: pinned ${ctx.pin.contractSha256.slice(0, 8)}… `
+    message: `contract sha mismatch: pinned ${ctx.requiredTools.contractSha256.slice(0, 8)}… `
       + `committed ${actual.slice(0, 8)}… — run node packages/contract/pin.mjs and review the `
       + 'REGATE/MISSING lines',
   }];
