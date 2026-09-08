@@ -46,36 +46,46 @@ jobs:
       - run: npm run type-check
       - run: npm test
 
-  dist-check:
-    # dist/ is committed so a clone plus `npm ci` is a runnable live install. That is only honest
-    # if the committed bytes can be shown to come from the source — which is this job. Three OSes
-    # because Windows is where the LF rule earns its place: without `text eol=lf` in
-    # .gitattributes the checkout rewrites every line and the diff is 100 % noise.
-    name: dist-check (${{ matrix.os }})
+  contract:
+    # The contract gate, on every cell. It SUBSUMES the old `dist-check` job: its first step is the
+    # same rebuild-and-diff, and three more follow — the server's own invariants, the generated
+    # texts, and the engine's pin. One command, the same one a developer and the release script
+    # run, so a failure here is reproducible with `npm run contract` rather than a CI-only ritual.
+    #
+    # Three OSes because Windows is where the LF rule earns its place: without `text eol=lf` in
+    # .gitattributes the checkout rewrites every line and step 1's diff is 100 % noise. Three Node
+    # lines because the generators and the gate are the code most likely to depend on a runtime
+    # detail — a path separator, a JSON key order, a newly available built-in.
+    #
+    # No `needs:`. There is no separate lint job to wait for — `npm run lint` runs inside `test` —
+    # and waiting for the whole nine-cell test matrix would double the critical path to save a
+    # fifteen-second job.
+    name: contract (${{ matrix.os }}, node ${{ matrix.node }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [20, 22, 24]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Show the attributes that make this diffable
+      - name: Show the attributes that make dist/ diffable
         run: git check-attr -a packages/snowarch/dist/server.js
-      - run: node scripts/build-dist.mjs
-      - name: Diff the rebuilt output against the committed one
-        run: git diff --exit-code -- packages/snowarch/dist
+      - run: npm run contract
       - name: Explain a failure
         if: failure()
-        # `git diff --stat` and not the full patch: a stale dist/ can be thousands of lines, and
-        # the reader needs the file names and the command, not the bytes.
+        # The gate already printed the failing step and its remedy. This adds the file names for
+        # the one failure whose output is a stat rather than a message.
         run: |
-          echo "dist/ is stale — run node scripts/build-dist.mjs and commit"
-          git diff --stat -- packages/snowarch/dist
+          echo "Reproduce locally with: npm run contract"
+          git diff --stat -- packages/snowarch/dist || true
 
   no-build:
     # The committed artefact, exercised with NO build step — the state a user is actually in

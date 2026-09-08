@@ -657,6 +657,43 @@ same list `--check` prints.
 
 ---
 
+## The contract gate
+
+`npm run contract` is four checks in one command, and the same command runs in CI, before a release
+tag, and on your machine — a gate that exists in only one of those is a gate somebody meets for the
+first time at the worst moment.
+
+| Step | Proves | Fails when |
+|---|---|---|
+| `server` | the committed `dist/` is what the source builds | you changed a tool and did not rebuild |
+| `dist` | the server agrees with itself (the 14 invariants) | a gate, a name or a code contradicts its declaration |
+| `generated` | the generated texts are what the generators produce | you edited a generated file, or changed the contract and did not regenerate |
+| `engine` | the engine agrees with the server (pin + required lint checks) | the sha moved and the pin was not updated |
+
+It **stops at the first failing step**. Later steps are usually downstream of an earlier failure — a
+stale `dist/` makes the pin wrong, which makes every generated header wrong — so running all four
+would report one fault four times and bury the one that matters. `generated` deliberately precedes
+`engine`: a stale generated file is a *cause* of engine disagreement, and reporting it as a pin
+problem would send you to `pin.mjs` for a file you only had to regenerate.
+
+`--skip-build` skips step 1, for a caller that has just rebuilt. **ARC-09-S01's release script calls
+`node scripts/contract-gate.mjs --skip-build` after its own rebuild and refuses to tag on a non-zero
+exit** — the gate is what makes a tag mean the artefacts agree.
+
+### CI gates — 25 jobs
+
+| Job | Cells | What it proves |
+|---|---|---|
+| `test` | 9 (3 OS × Node 20/22/24) | the suites pass, and `npm run lint` with them |
+| `contract` | 9 (3 OS × Node 20/22/24) | the contract gate — it subsumes the old `dist-check`, whose rebuild-and-diff is its first step |
+| `no-build handshake` | 3 (3 OS) | the committed artefact answers a real stdio handshake with no build step — the state a user is in after `git clone && npm ci` |
+| `docs-check` | 1 | the README's generated blocks are current and no retired surface is documented |
+| `footprint` | 1 | a production install stays within its size budget |
+| `secret scan` | 1 | gitleaks over the history, not just the tree |
+| `plugin validate` | 1 | `claude plugin validate --strict` on skills and agents, plus engine-lint L10 with `--require-claude` |
+
+---
+
 ## Adding a tool
 
 Five steps, in this order. Each one has a check that fails if it is skipped, which is the point of
