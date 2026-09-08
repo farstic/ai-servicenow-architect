@@ -565,6 +565,50 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S08 — Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap
 
+> **Amendment 2026-09-08 (from the S08 delivery).**
+> - **The story's "S-25 candidate" is filed as S-26.** S-25 was already taken by the
+>   marketplace-source spike; the row is in `03` §F and records that nothing in the SDK types,
+>   the schema, or this repo's own stdio probes shows a client sending
+>   `_meta["anthropic/maxResultSizeChars"]`. The server honours it and the env fallback covers
+>   the other branch, so only a *documentation* claim would be wrong — hence a candidate row
+>   rather than a statement in the contract or the USER-GUIDE.
+> - **The rename map is not rewritten when a tool is retired.** Removing
+>   `snow_rpt_report_generate` broke three tests that assert the map maps into the catalogue.
+>   Deleting `"generate_report": "snow_rpt_report_generate"` would have made every count balance
+>   and quietly erased a rename that really happened. A declared `RETIRED_TOOLS` list carries it
+>   instead, and a companion test asserts both halves — the name is gone from the catalogue AND
+>   still in the map — because either one alone still balances the arithmetic.
+> - **The static catalogue invalidated `tests/tools/router.test.ts`, and it needed rewriting, not
+>   fixing.** Those tests set `MCP_TOOL_PACKAGE` mid-process and called `collectToolCatalog()`
+>   again. That is precisely the behaviour S08 removes, so the failures were correct — and the
+>   tempting repair (make the catalogue dynamic again) would have undone the story. The role
+>   bundles are now asserted through an exported pure `selectPackage(all, name)`, and two new
+>   tests assert the guarantee directly: the same array by identity, and no effect from changing
+>   the env var. *(Same class as the recurring lesson: a fixture whose shape quietly excluded the
+>   failing input. Here it was a test whose mechanism quietly asserted the defect.)*
+> - **`UNSUPPORTED_ON_THIS_INSTANCE` counts as passing the gate** in `contract.test.ts` (b). The
+>   gate did let the two stubs through; the capability then refused. Special-casing them out of
+>   the suite instead would have removed the only test that walks them.
+> - **Criterion 3's live half is deferred** to the owner's sitting, per the architect's ruling.
+>   The unit gate is `tests/tools/discovery.test.ts` — the catalogue is compared name-for-name and
+>   in order across a successful discover call, and the module's exports are asserted to be
+>   exactly `discoveryToolManifest` and `dispatchDiscoveryAction`. The stdio byte-identical probe
+>   is the architect's to run; a probe on a *failed* discover would prove nothing, since the old
+>   code only minted tools on success.
+> - **F1/F2 (architect review).** `snow_fluent_script_exec` was declared `gate: 'write'` while its
+>   case calls `requireScripting()`, so the generated ask-list under-reported it. The declaration is
+>   now `scripting`. **F2 is why it survived:** the composite-gate test iterates only tools *declared*
+>   composite, and no preset grants WRITE alone — so a tool declared `write` that demands SCRIPTING
+>   threw `WRITE_NOT_ENABLED` with everything off, matched its declaration, and was never asked the
+>   one question that would expose it. The new assertion runs the other direction over a **synthetic**
+>   WRITE-only flag set rather than a preset, because the preset table was the fixture whose shape
+>   excluded the failing input. Recorded pre-fix output: `"snow_fluent_script_exec declares write but
+>   threw SCRIPTING_NOT_ENABLED"`.
+> - **Discovery's probe fallback keeps its `note`, now saying "placeholders".** A probe-derived
+>   `internal_type: 'string'` is a placeholder, not a dictionary reading, and a caller that
+>   trusted it would build the wrong query.
+
+
 > **Amendment 2026-09-08 (from ARC-04-S01, architect's ruling). REMOVE `snow_rpt_report_generate`.**
 > Its backend — `src/reports/` with `pdfmake` and `pptxgenjs` — went with D-03 item 4, so the tool
 > has been registered-but-failing since S01 (an explicit `NOT_IMPLEMENTED` naming the cut, chosen

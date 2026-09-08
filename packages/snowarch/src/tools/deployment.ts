@@ -67,7 +67,7 @@ export function deploymentToolManifest(): ToolDefinition[] {
     },
     {
       name: 'snow_deploy_background_script_exec',
-      description: 'Execute a background script on the instance (server-side JavaScript). **[Scripting]**',
+      description: '[Unsupported] Execute a server-side script: no working endpoint exists on this instance. Run the script in System Definition > Scripts - Background, or author it as a Fix Script (sys_script_fix) and run it from the UI.',
       inputSchema: { type: 'object', properties: { script: { type: 'string', description: 'JavaScript code to execute' }, scope: { type: 'string', description: 'Application scope (default global)' } }, required: ['script'] },
       gate: 'scripting',
       mutates: true,
@@ -163,13 +163,17 @@ export async function dispatchDeploymentAction(
 
     case 'snow_deploy_background_script_exec': {
       requireScripting();
-      if (!args.script) throw new ServiceNowError('script is required', 'INVALID_REQUEST');
-      try {
-        const resp = await client.callNowAssist('/api/now/sp/background_script', { script: args.script, scope: args.scope || 'global' });
-        return { action: 'executed', output: resp };
-      } catch (err) {
-        return { action: 'failed', error: err instanceof Error ? err.message : String(err) };
-      }
+      // Retired by ARC-04-S08. Every endpoint this tool tried — /api/now/sp/background_script
+      // among them — returns 400 or 404 on a PDI; there is no supported REST surface for
+      // server-side script execution. It stays REGISTERED because the engine cites it and
+      // ARC-05's required-tools.json lists it: a name that vanishes is a worse answer than a
+      // name that says why it cannot work. The throw happens BEFORE any HTTP, so a caller
+      // never waits on a request that was always going to fail.
+      throw new ServiceNowError(
+        'Server-side script execution has no supported REST endpoint on this instance. Run the '
+        + 'script in System Definition > Scripts - Background, or author it as a Fix Script '
+        + '(sys_script_fix) and run it from the UI.'
+        , 'UNSUPPORTED_ON_THIS_INSTANCE');
     }
 
     case 'snow_deploy_cmdb_data_import': {

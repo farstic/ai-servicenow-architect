@@ -1,262 +1,172 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  dispatchDiscoveryAction,
-  dispatchDynamicAction,
-  discoveryToolManifest,
-} from '../../src/tools/discovery.js';
+import { dispatchDiscoveryAction, discoveryToolManifest } from '../../src/tools/discovery.js';
 import { schemaCache } from '../../src/tools/schema-cache.js';
+import { collectToolCatalog } from '../../src/tools/index.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
 
+/**
+ * The version of this suite before ARC-04-S08 asserted that discovery MINTED tools:
+ * `expect(result.available_tools).toContain('dynamic_create_incident')`. It passed, and what
+ * it was protecting was the defect — a catalogue that changed shape depending on what had been
+ * called earlier in the session, with write tools whose names did not exist until runtime and
+ * so were walked by no parity or gate test.
+ *
+ * So the assertions below are the inverse. Removing the phantom tools is not proved by the old
+ * tests being deleted; it is proved by asserting that nothing mints them.
+ */
 const mockClient = {
   queryRecords: vi.fn(),
   getRecord: vi.fn(),
   createRecord: vi.fn(),
   updateRecord: vi.fn(),
   deleteRecord: vi.fn(),
-  callNowAssist: vi.fn(),
-  batchRequest: vi.fn(),
-  executeScript: vi.fn(),
 } as unknown as ServiceNowClient;
 
-describe('discoveryToolManifest', () => {
-  it('returns the discover_table tool definition', () => {
+const dictRow = (over: Record<string, unknown> = {}) => ({
+  element: 'short_description', internal_type: 'string', column_label: 'Short Description',
+  max_length: '160', mandatory: 'true', read_only: 'false', reference: '', default_value: '',
+  ...over,
+});
+
+beforeEach(() => { vi.clearAllMocks(); schemaCache.clear(); });
+
+describe('the manifest', () => {
+  it('declares one tool, taking only a table', () => {
     const tools = discoveryToolManifest();
     expect(tools).toHaveLength(1);
     expect(tools[0]!.name).toBe('snow_disco_table_discover');
     expect(tools[0]!.inputSchema.required).toContain('table');
+    // `operations` existed only to choose which dynamic tools to mint.
+    expect(Object.keys((tools[0]!.inputSchema as { properties: object }).properties)).toEqual(['table']);
+  });
+
+  it('the description promises columns and names the tools to use them with', () => {
+    const d = discoveryToolManifest()[0]!.description;
+    expect(d).toContain('snow_core_records_query');
+    expect(d).not.toContain('dynamic_');
+  });
+
+  it('it is a read, and gated as one', () => {
+    expect(discoveryToolManifest()[0]!.mutates).toBe(false);
+    expect(discoveryToolManifest()[0]!.gate).toBe('none');
+  });
+});
+
+describe('the catalogue does not change when a table is discovered', () => {
+  it('no dynamic_* tool exists before or after a discover call', async () => {
+    const before = collectToolCatalog().map((t) => t.name);
+    expect(before.filter((n) => n.startsWith('dynamic_'))).toEqual([]);
+
+    (mockClient.queryRecords as ReturnType<typeof vi.fn>)
+      .mockResolvedValue({ count: 1, records: [dictRow()] });
+    await dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'incident' });
+
+    // Identical, name for name and in order — not merely "the same length".
+    expect(collectToolCatalog().map((t) => t.name)).toEqual(before);
+  });
+
+  it('the removed dispatcher is gone from the module', async () => {
+    const mod = await import('../../src/tools/discovery.js') as Record<string, unknown>;
+    expect(Object.keys(mod).sort()).toEqual(['discoveryToolManifest', 'dispatchDiscoveryAction']);
   });
 });
 
 describe('dispatchDiscoveryAction', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    schemaCache.clear();
+  it('returns null for a name it does not own', async () => {
+    expect(await dispatchDiscoveryAction(mockClient, 'unknown_tool', {})).toBeNull();
   });
 
-  it('returns null for non-matching tool name', async () => {
-    const result = await dispatchDiscoveryAction(mockClient, 'unknown_tool', {});
-    expect(result).toBeNull();
-  });
-
-  it('throws when table argument is missing', async () => {
-    await expect(
-      dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', {})
-    ).rejects.toThrow('table is required');
-  });
-
-  it('returns cached schema if available', async () => {
-    // Pre-populate cache
-    schemaCache.set(
-      'u_test_table',
-      [{ element: 'name', internal_type: 'string', label: 'Name', max_length: 255, mandatory: false, read_only: false }],
-      ['dynamic_query_u_test_table', 'dynamic_get_u_test_table']
-    );
-
-    const result = await dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'u_test_table' });
-
-    expect(result.source).toBe('cache');
-    expect(result.table).toBe('u_test_table');
-    expect(result.columns).toBe(1);
-    expect(result.available_tools).toEqual(['dynamic_query_u_test_table', 'dynamic_get_u_test_table']);
-    // Should not have called the client
+  it('a missing table is refused before any request', async () => {
+    await expect(dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', {}))
+      .rejects.toThrow('table is required');
     expect(mockClient.queryRecords).not.toHaveBeenCalled();
   });
 
-  it('queries sys_dictionary for schema when not cached', async () => {
+  it('reads sys_dictionary and returns the COLUMNS, not a count', async () => {
+    // The fixture carries the three columns criterion 3 names for `incident`, so the unit half
+    // of that criterion is satisfied by the same shape the live half would produce.
     (mockClient.queryRecords as ReturnType<typeof vi.fn>).mockResolvedValue({
-      count: 2,
+      count: 4,
       records: [
-        { element: 'short_description', internal_type: 'string', column_label: 'Short Description', max_length: '160', mandatory: 'true', read_only: 'false' },
-        { element: 'number', internal_type: 'string', column_label: 'Number', max_length: '40', mandatory: 'false', read_only: 'true' },
+        dictRow(),
+        dictRow({ element: 'number', column_label: 'Number', max_length: '40', mandatory: 'false' }),
+        dictRow({ element: 'state', internal_type: 'integer', column_label: 'State',
+          max_length: '40', mandatory: 'false', default_value: '1' }),
+        dictRow({ element: 'caller_id', internal_type: 'reference', column_label: 'Caller',
+          max_length: '32', mandatory: 'false', read_only: 'true', reference: 'sys_user' }),
       ],
     });
 
-    const result = await dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'incident' });
+    const r = await dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'incident' });
 
-    expect(result.source).toBe('sys_dictionary');
-    expect(result.table).toBe('incident');
-    expect(result.columns).toBe(2);
-    expect(result.available_tools).toContain('dynamic_query_incident');
-    expect(result.available_tools).toContain('dynamic_get_incident');
-    expect(result.available_tools).toContain('dynamic_create_incident');
-    expect(result.column_details).toHaveLength(2);
-    expect(result.column_details[0].mandatory).toBe(true);
-    expect(mockClient.queryRecords).toHaveBeenCalledWith(
-      expect.objectContaining({
-        table: 'sys_dictionary',
-        query: expect.stringContaining('name=incident'),
-      })
-    );
+    expect(r.source).toBe('instance');
+    expect(r.table).toBe('incident');
+    expect(Array.isArray(r.columns)).toBe(true);
+    expect(r.columns.map((c: { element: string }) => c.element))
+      .toEqual(expect.arrayContaining(['number', 'short_description', 'state']));
+    expect(r.columns).toHaveLength(4);
+    expect(r.columns[0]).toEqual({
+      element: 'short_description', internal_type: 'string', label: 'Short Description',
+      max_length: 160, mandatory: true, reference: undefined, read_only: false,
+      default_value: undefined,
+    });
+    // Strings off the wire become the types the story asked for.
+    expect(r.columns[3].reference).toBe('sys_user');
+    expect(r.columns[3].read_only).toBe(true);
+    expect(r.columns[2].default_value).toBe('1');
+    expect(r.cache_expires_in_minutes).toBe(30);
+    expect(mockClient.queryRecords).toHaveBeenCalledWith(expect.objectContaining({
+      table: 'sys_dictionary', query: expect.stringContaining('name=incident'),
+    }));
   });
 
-  it('returns schema from record probe when sys_dictionary is empty', async () => {
-    // First call: sys_dictionary returns no results
+  it('nothing in the response mints or names a tool', async () => {
+    (mockClient.queryRecords as ReturnType<typeof vi.fn>)
+      .mockResolvedValue({ count: 1, records: [dictRow()] });
+    const r = await dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'incident' });
+    expect(JSON.stringify(r)).not.toContain('dynamic_');
+    expect(r.available_tools).toBeUndefined();
+    expect(r.generated_tools).toBeUndefined();
+    expect(Object.keys(r).sort()).toEqual(['cache_expires_in_minutes', 'columns', 'source', 'table']);
+  });
+
+  it('a second call is served from cache without touching the instance', async () => {
+    (mockClient.queryRecords as ReturnType<typeof vi.fn>)
+      .mockResolvedValue({ count: 1, records: [dictRow()] });
+    const first = await dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'incident' });
+    (mockClient.queryRecords as ReturnType<typeof vi.fn>).mockClear();
+
+    const second = await dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'incident' });
+
+    expect(second.source).toBe('cache');
+    expect(mockClient.queryRecords).not.toHaveBeenCalled();
+    // The cached answer is the same answer — a cache that returned a different SHAPE would
+    // make every caller handle two contracts.
+    expect(second.columns).toEqual(first.columns);
+    expect(Object.keys(second).sort()).toEqual(Object.keys(first).sort());
+  });
+
+  it('falls back to a record probe when sys_dictionary is empty, and says so', async () => {
     (mockClient.queryRecords as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({ count: 0, records: [] })
-      // Second call: table probe returns a record
-      .mockResolvedValueOnce({
-        count: 1,
-        records: [{ sys_id: 'abc123', name: 'Test Server', ip_address: '10.0.0.1', sys_class_name: 'cmdb_ci_server' }],
-      });
+      .mockResolvedValueOnce({ count: 1, records: [{ sys_id: 'abc', name: 'x', ip_address: '10.0.0.1' }] });
 
-    const result = await dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'u_custom_table' });
+    const r = await dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'u_custom' });
 
-    expect(result.source).toBe('record_probe');
-    expect(result.table).toBe('u_custom_table');
-    expect(result.columns).toBe(4); // sys_id, name, ip_address, sys_class_name
-    expect(result.note).toContain('record structure');
-    expect(result.available_tools).toContain('dynamic_query_u_custom_table');
+    expect(r.source).toBe('instance');
+    expect(r.columns.map((c: { element: string }) => c.element)).toEqual(['sys_id', 'name', 'ip_address']);
+    // The placeholder types are declared as placeholders rather than passed off as dictionary
+    // values — a caller that trusted internal_type here would build the wrong query.
+    expect(r.note).toContain('placeholders');
+    expect(r.columns[0].read_only).toBe(true);   // sys_* is read-only
+    expect(r.columns[1].read_only).toBe(false);
   });
 
-  it('throws for non-existent tables when both sys_dictionary and probe are empty', async () => {
+  it('a table that is in neither is NOT_FOUND', async () => {
     (mockClient.queryRecords as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({ count: 0, records: [] })
       .mockResolvedValueOnce({ count: 0, records: [] });
-
-    await expect(
-      dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'nonexistent_table' })
-    ).rejects.toThrow('not found');
+    await expect(dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'nope' }))
+      .rejects.toThrow('not found');
   });
-
-  it('respects operations filter for tool generation', async () => {
-    (mockClient.queryRecords as ReturnType<typeof vi.fn>).mockResolvedValue({
-      count: 1,
-      records: [
-        { element: 'name', internal_type: 'string', column_label: 'Name', max_length: '255', mandatory: 'false', read_only: 'false' },
-      ],
-    });
-
-    const result = await dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', {
-      table: 'u_limited',
-      operations: ['query', 'get'],
-    });
-
-    expect(result.available_tools).toEqual(['dynamic_query_u_limited', 'dynamic_get_u_limited']);
-    expect(result.available_tools).not.toContain('dynamic_create_u_limited');
-    expect(result.available_tools).not.toContain('dynamic_delete_u_limited');
-  });
-});
-
-describe('dispatchDynamicAction', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    schemaCache.clear();
-  });
-
-  it('returns null for non-dynamic tool names', async () => {
-    const result = await dispatchDynamicAction(mockClient, 'snow_core_records_query', {});
-    expect(result).toBeNull();
-  });
-
-  it('throws when schema is not cached', async () => {
-    await expect(
-      dispatchDynamicAction(mockClient, 'dynamic_query_u_missing', {})
-    ).rejects.toThrow('schema not cached');
-  });
-
-  it('executes dynamic_query correctly', async () => {
-    schemaCache.set(
-      'u_test',
-      [{ element: 'name', internal_type: 'string', label: 'Name', max_length: 255, mandatory: false, read_only: false }],
-      ['dynamic_query_u_test']
-    );
-    (mockClient.queryRecords as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 3, records: [{}, {}, {}] });
-
-    const result = await dispatchDynamicAction(mockClient, 'dynamic_query_u_test', {
-      query: 'active=true',
-      limit: 10,
-    });
-
-    expect(result.count).toBe(3);
-    expect(mockClient.queryRecords).toHaveBeenCalledWith(
-      expect.objectContaining({ table: 'u_test', query: 'active=true', limit: 10 })
-    );
-  });
-
-  it('caps query limit at 200', async () => {
-    schemaCache.set(
-      'u_test',
-      [{ element: 'name', internal_type: 'string', label: 'Name', max_length: 255, mandatory: false, read_only: false }],
-      ['dynamic_query_u_test']
-    );
-    (mockClient.queryRecords as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 0, records: [] });
-
-    await dispatchDynamicAction(mockClient, 'dynamic_query_u_test', { limit: 500 });
-
-    expect(mockClient.queryRecords).toHaveBeenCalledWith(
-      expect.objectContaining({ limit: 200 })
-    );
-  });
-
-  it('executes dynamic_get correctly', async () => {
-    schemaCache.set(
-      'u_test',
-      [{ element: 'name', internal_type: 'string', label: 'Name', max_length: 255, mandatory: false, read_only: false }],
-      ['dynamic_get_u_test']
-    );
-    (mockClient.getRecord as ReturnType<typeof vi.fn>).mockResolvedValue({ sys_id: 'abc', name: 'Test' });
-
-    const result = await dispatchDynamicAction(mockClient, 'dynamic_get_u_test', { sys_id: 'abc' });
-
-    expect(result.sys_id).toBe('abc');
-    expect(mockClient.getRecord).toHaveBeenCalledWith('u_test', 'abc', undefined);
-  });
-
-  it('throws when dynamic_get is called without sys_id', async () => {
-    schemaCache.set(
-      'u_test',
-      [{ element: 'name', internal_type: 'string', label: 'Name', max_length: 255, mandatory: false, read_only: false }],
-      ['dynamic_get_u_test']
-    );
-
-    await expect(
-      dispatchDynamicAction(mockClient, 'dynamic_get_u_test', {})
-    ).rejects.toThrow('sys_id is required');
-  });
-
-  it('executes dynamic_create correctly', async () => {
-    schemaCache.set(
-      'u_test',
-      [{ element: 'name', internal_type: 'string', label: 'Name', max_length: 255, mandatory: false, read_only: false }],
-      ['dynamic_create_u_test']
-    );
-    (mockClient.createRecord as ReturnType<typeof vi.fn>).mockResolvedValue({ sys_id: 'new123', name: 'Created' });
-
-    const result = await dispatchDynamicAction(mockClient, 'dynamic_create_u_test', { name: 'Created' });
-
-    expect(result.sys_id).toBe('new123');
-    expect(mockClient.createRecord).toHaveBeenCalledWith('u_test', { name: 'Created' });
-  });
-
-  it('executes dynamic_update correctly', async () => {
-    schemaCache.set(
-      'u_test',
-      [{ element: 'name', internal_type: 'string', label: 'Name', max_length: 255, mandatory: false, read_only: false }],
-      ['dynamic_update_u_test']
-    );
-    (mockClient.updateRecord as ReturnType<typeof vi.fn>).mockResolvedValue({ sys_id: 'abc', name: 'Updated' });
-
-    const result = await dispatchDynamicAction(mockClient, 'dynamic_update_u_test', {
-      sys_id: 'abc',
-      name: 'Updated',
-    });
-
-    expect(result.name).toBe('Updated');
-    expect(mockClient.updateRecord).toHaveBeenCalledWith('u_test', 'abc', { name: 'Updated' });
-  });
-
-  it('executes dynamic_delete correctly', async () => {
-    schemaCache.set(
-      'u_test',
-      [{ element: 'name', internal_type: 'string', label: 'Name', max_length: 255, mandatory: false, read_only: false }],
-      ['dynamic_delete_u_test']
-    );
-    (mockClient.deleteRecord as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
-
-    const result = await dispatchDynamicAction(mockClient, 'dynamic_delete_u_test', { sys_id: 'abc' });
-
-    expect(result.success).toBe(true);
-    expect(mockClient.deleteRecord).toHaveBeenCalledWith('u_test', 'abc');
-  });
-
 });

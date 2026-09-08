@@ -35,3 +35,27 @@ searched and whether anything was there.
 | `STORE_SCHEMA_INVALID` | A field is wrong; the message names its path, e.g. `instances.pdi.flags.WRITE_ENABLED`. |
 | `STORE_SCHEMA_UNSUPPORTED` | Written by a newer server — run `./snowarch upgrade`. |
 | `PROD_WRITE_NOT_ACKNOWLEDGED` | A `prod` instance is raised above `read-only` without `prodWriteAck`. It is listed but not loaded; the message carries the `--ack-prod` command. |
+
+---
+
+## `UNSUPPORTED_ON_THIS_INSTANCE` — the tool exists, the capability does not
+
+**What it means.** The tool is registered, your preset let it through, and the server then refused
+without contacting the instance. The operation has **no REST endpoint** — not on your instance, not
+on any instance. No flag, preset or role changes that, which is why the remedy is a different route
+rather than a setting.
+
+**Where it fires today.**
+
+| Tool | Why | What to do instead |
+|---|---|---|
+| `snow_deploy_background_script_exec` | Server-side script execution is not part of the REST API. The tool used to POST to an endpoint that does not exist and returned a 400/404 the caller had to interpret. | Run the script in **System Definition → Scripts - Background**, or author it as a Fix Script (`sys_script_fix`) and run it from the UI. |
+| `snow_fluent_script_exec` | Same endpoint, same absence. | As above. |
+
+**Why they are still registered.** Removing the names would turn a clear refusal into
+`UNKNOWN_TOOL`, which reads as "you spelled it wrong" and sends you looking for a typo that is not
+there. They stay in the catalogue, are marked `[Unsupported]` in their descriptions, and fail
+**before** any HTTP request — so nothing reaches the instance and nothing is half-done.
+
+**A note on Fix Scripts.** `sys_script_fix.name` silently truncates at 40 characters over REST, so a
+longer name comes back looking like a different record. Name it short enough to read back intact.

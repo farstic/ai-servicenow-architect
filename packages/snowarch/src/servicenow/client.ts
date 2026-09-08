@@ -1162,63 +1162,9 @@ export class ServiceNowClient {
     }
   }
 
-  /**
-   * Execute a server-side script via the Background Script API.
-   * Useful for GlideQuery, GlideAggregate, and complex operations.
-   */
-  async executeScript(script: string, scope?: string): Promise<any> {
-    await this.authenticate();
-    logger.info('Executing server-side script');
-
-    try {
-      // Use the standard script execution endpoint
-      const response = await this.request<any>(
-        `${this.baseUrl}/api/now/v1/batch`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            batch_request_id: `script_${Date.now()}`,
-            rest_requests: [{
-              id: 'script_exec',
-              method: 'POST',
-              url: '/api/now/table/sys_script_execution',
-              headers: [
-                { name: 'Content-Type', value: 'application/json' },
-                { name: 'Accept', value: 'application/json' },
-              ],
-              body: JSON.stringify({
-                script,
-                scope: scope || 'global',
-              }),
-            }],
-          }),
-        }
-      );
-
-      const results = response.serviced_requests || [];
-      if (results.length > 0) {
-        let body: any;
-        try {
-          body = typeof results[0].body === 'string' ? JSON.parse(results[0].body) : results[0].body;
-        } catch {
-          body = results[0].body;
-        }
-        return {
-          status: results[0].status_code,
-          output: body,
-          scope: scope || 'global',
-        };
-      }
-
-      return { status: 200, output: 'Script executed (no output captured)', scope: scope || 'global' };
-    } catch (error) {
-      if (error instanceof ServiceNowError) throw error;
-      throw new ServiceNowError(
-        `Script execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'SCRIPT_FAILED'
-      );
-    }
-  }
+  // client.executeScript was removed by ARC-04-S08. It posted to sys_script_execution, an
+  // endpoint that does not exist on a PDI; the two tools that used it are now [Unsupported]
+  // stubs that fail before any HTTP rather than after a 404.
 
   /**
    * Natural language update (simplified implementation)
