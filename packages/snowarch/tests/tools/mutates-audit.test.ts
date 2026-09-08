@@ -38,6 +38,7 @@ function caseBodies(): Map<string, string> {
 
 const BODIES = caseBodies();
 const DECLARED = new Map(collectToolCatalog().map((t) => [t.name, t.mutates]));
+const SESSION = new Map(collectToolCatalog().map((t) => [t.name, t.sessionMutates ?? false]));
 
 describe('the scan itself works', () => {
   it('finds a case body for most of the catalogue', () => {
@@ -64,21 +65,18 @@ describe('every tool that writes declares mutates: true', () => {
   });
 
   /**
-   * `snow_core_instance_switch` is named in S-23 and is NOT `mutates: true`.
+   * What the §2.1 ask list is generated from: `mutates || sessionMutates` (ARC-05-S07).
    *
-   * It changes no ServiceNow record, so declaring it would break contract test (c) unless it
-   * also gained a write gate — and gating it would stop a read-only session from switching
-   * instances to READ another one. Overloading `mutates` to also mean "changes session state"
-   * would make one field carry two meanings and quietly change what (c) enforces.
-   *
-   * So it is listed here as a declared exception rather than forced either way, and the real
-   * gap — S-23 requires it to prompt, and the ask-list is generated from `mutates` alone —
-   * is escalated to the architect for ARC-05-S07 to resolve with a second source. The
-   * exception is written down so the hole cannot be mistaken for completeness.
+   * ARC-04-S09 left `snow_core_instance_switch` as a declared gap because it changes no
+   * ServiceNow record — `mutates: true` would have failed contract test (c) unless it also
+   * gained a write gate, and gating it would stop a read-only session switching instances to
+   * READ another one. ARC-04-S10 resolved it with a second field rather than by overloading
+   * the first, so the union below is the real predicate and the gap list is gone.
    */
-  const ASK_LIST_GAP = ['snow_core_instance_switch'];
+  const asks = (name: string): boolean =>
+    DECLARED.get(name) === true || SESSION.get(name) === true;
 
-  it('the 14 tools named in 03 S-23 are mutates: true, except the one declared gap', () => {
+  it('the 14 tools named in 03 S-23 all reach the ask list', () => {
     // Stated here because the ask-list is generated from this field and S-23 named these
     // specifically as the ones a name-derived gate would miss.
     const S23 = [
@@ -91,16 +89,21 @@ describe('every tool that writes declares mutates: true', () => {
     ];
     const missing = S23.filter((n) => !DECLARED.has(n));
     expect(missing, 'named in S-23 but not in the catalogue').toEqual([]);
-    expect(S23.filter((n) => !ASK_LIST_GAP.includes(n) && DECLARED.get(n) !== true)).toEqual([]);
+    expect(S23.filter((n) => !asks(n)), 'these would not prompt').toEqual([]);
   });
 
-  it('the declared gap is exactly that, and no wider', () => {
-    // Both halves: every name in the exception list is really in S-23 (so the list cannot be
-    // used to excuse an unrelated tool), and every one of them is really still `false` (so a
-    // later fix does not leave a stale exception standing).
-    for (const n of ASK_LIST_GAP) {
-      expect(DECLARED.has(n), `${n} is not in the catalogue`).toBe(true);
-      expect(DECLARED.get(n), `${n} is no longer a gap — remove it from ASK_LIST_GAP`).toBe(false);
-    }
+  it('sessionMutates is exactly one tool, and it is not also mutates', () => {
+    // Both halves. A second tool acquiring it silently would widen the ask list without anyone
+    // deciding to; and a tool carrying both fields would mean the union is hiding a real
+    // `mutates` declaration that contract test (c) should have been enforcing a gate on.
+    const session = [...SESSION.entries()].filter(([, v]) => v).map(([n]) => n).sort();
+    expect(session).toEqual(['snow_core_instance_switch']);
+    expect(session.filter((n) => DECLARED.get(n) === true)).toEqual([]);
+  });
+
+  it('instances_reload stays out of the ask list', () => {
+    // ARC-07's `--resume` depends on it not prompting. Asserted rather than left to a comment,
+    // because the obvious next step after declaring one core tool is to declare its neighbour.
+    expect(asks('snow_core_instances_reload')).toBe(false);
   });
 });

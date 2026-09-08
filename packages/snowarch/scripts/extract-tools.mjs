@@ -21,6 +21,7 @@ const manifest = tools.map(t => ({
   inputSchema: t.inputSchema,
   gate: t.gate,
   mutates: t.mutates,
+  ...(t.sessionMutates ? { sessionMutates: t.sessionMutates } : {}),
   ...(t.alsoRequires ? { alsoRequires: t.alsoRequires } : {}),
   ...(t.table ? { table: t.table } : {}),
 }));
@@ -94,6 +95,7 @@ console.log(`✓ Parity OK: ${EXPECTED} unique snow_* tools.`);
     tools: manifest
       .map((t) => ({
         name: t.name, gate: t.gate, mutates: t.mutates,
+        ...(t.sessionMutates ? { sessionMutates: t.sessionMutates } : {}),
         ...(t.alsoRequires ? { alsoRequires: t.alsoRequires } : {}),
         ...(t.table ? { table: t.table } : {}),
       }))

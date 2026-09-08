@@ -15,13 +15,15 @@ import {
   CORE_TOOLS_UNCONFIGURED, NO_INSTANCE_MESSAGE, setAdvertisedCount, setFullCatalogueSize,
   setToolListChangedNotifier,
 } from './tools/status.js';
-import { isUnderCloudSyncFolder } from './store/index.js';
+import { isUnderCloudSyncFolder, maskPath } from './store/index.js';
 import { collectToolCatalog } from './tools/index.js';
 import { getResources, readResource } from './resources/index.js';
 import { logger } from './utils/logging.js';
 import { ServiceNowError } from './utils/errors.js';
 import { getPackageVersion } from './utils/version.js';
 import { capResult, resolveCap } from './utils/result-size.js';
+import { appendAudit, auditDisabled, resolveAuditPath } from './audit/writer.js';
+import type { ToolDefinition } from './tools/types.js';
 
 // dotenv ONLY when asked, and only for a file that exists. A bare `dotenv.config()` reads
 // the .env of whatever directory the server happens to start in — for an MCP server that is
@@ -79,11 +81,76 @@ export function createServer(): Server {
 
     logger.info(`Tool called: ${name}`);
 
+    // Audit state, gathered as the call proceeds and written once at the end. Declared out here
+    // because a REFUSAL is as audit-worthy as a success — arguably more so, since "a write was
+    // attempted under read-only" is exactly what an after-the-fact reviewer looks for — and
+    // refusals leave through the catch block below.
+    const started = performance.now();
+    let auditTool: ToolDefinition | undefined;
+    let auditResult = 'ok';
+    let auditSysId: string | null = null;
+    // The instance as it was when the call STARTED. It matters for exactly one tool: after
+    // snow_core_instance_switch has run, `current()` is the destination, so reading it at the
+    // end produced `instance: "other", note: "switch -> other"` — which says the same thing
+    // twice and loses the one fact a reviewer needs, namely what it switched FROM. Every other
+    // tool leaves it unchanged, so taking it here costs nothing and is right in both cases.
+    const startInstance = instanceManager.loadedCount() > 0 ? instanceManager.current() : null;
+
+    const writeAudit = (): void => {
+      // Only declared mutating tools. `mutates` is the ServiceNow-write claim; `sessionMutates`
+      // is snow_core_instance_switch, which writes nothing but redirects where every subsequent
+      // write lands — the one line a reviewer most needs when a later entry names a different
+      // instance. A read appends nothing at all: a trail that logged everything would be a
+      // request log, and nobody reads a request log to answer "was this write approved".
+      if (!auditTool || !(auditTool.mutates || auditTool.sessionMutates)) return;
+
+      const a = (args ?? {}) as Record<string, unknown>;
+      const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+      const rt = startInstance;
+      const session = auditTool.sessionMutates === true;
+
+      appendAudit({
+        ts: new Date().toISOString(),
+        // The label, never the URL: this file gets pasted into tickets.
+        instance: rt?.label ?? '(none)',
+        environment: rt?.environment ?? '(none)',
+        tool: name,
+        gate: auditTool.gate,
+        // `table` from the argument, else the tool's FIXED declaration. Never a guess — a table
+        // name invented for an audit record is worse than a null.
+        table: session ? null : (str(a.table) ?? auditTool.table ?? null),
+        sysId: session ? null : (str(a.sys_id) ?? auditSysId),
+        // A query is a filter, not a payload. It can carry personal data and is recorded
+        // knowingly — see the writer's header and the README.
+        query: session ? null : (str(a.query) ?? str(a.sysparm_query)),
+        result: auditResult,
+        ms: Math.round(performance.now() - started),
+        source: 'mcp',
+        // Free text built from SERVER-side state, never from the arguments.
+        //
+        // This first read `args.name`, and the no-secrets sweep — which passes the payload
+        // marker as every argument, including `name` — found the marker in the audit file
+        // through it. A caller-supplied string in an audit line is a payload channel however
+        // innocuous the field sounds. On success the destination is read back from the manager
+        // as a store-defined label; on a refusal nothing is echoed at all, because the result
+        // code already says what happened.
+        ...(session
+          ? { note: auditResult === 'ok'
+            ? `switch → ${instanceManager.loadedCount() > 0 ? instanceManager.current().label : '(none)'}`
+            : 'switch refused' }
+          : {}),
+      });
+    };
+
     try {
       const tool = tools.find(t => t.name === name);
       if (!tool) {
+        // Left un-audited on purpose: a name that exists in no configuration reached no
+        // instance and changed nothing, and there is no declaration to say what it would have
+        // done. An audit line for it would record a typo as an attempted write.
         throw new ServiceNowError(`Unknown tool: ${name}`, 'UNKNOWN_TOOL');
       }
+      auditTool = tool;
 
       // A tool that exists but needs an instance we do not have. UNKNOWN_TOOL is reserved
       // for names that exist in no configuration — telling a user their tool does not exist,
@@ -104,6 +171,7 @@ export function createServer(): Server {
 
       if ((CORE_TOOLS_UNCONFIGURED as readonly string[]).includes(name)) {
         const result = await routeToolInvocation(null as never, name, args || {});
+        writeAudit();
         return { content: [{ type: 'text' as const, text: capResult(result, cap).text }] };
       }
 
@@ -120,6 +188,13 @@ export function createServer(): Server {
       // P-27: capped HERE rather than in each tool. A per-tool cap is a rule 397 authors have
       // to remember; this is the single place every result already passes through, so a new
       // tool is capped by existing, not by its author having read this comment.
+      // The sys_id the instance assigned, for a create that did not carry one in. Read from
+      // the result rather than the arguments, and only this one field — the rest of the
+      // response body never reaches the line.
+      const created = (result as { sys_id?: unknown })?.sys_id;
+      if (typeof created === 'string') auditSysId = created;
+      writeAudit();
+
       const capped = capResult(result, cap);
       if (capped.truncated) {
         logger.warn(`${name}: result truncated to ${cap} chars (${capped.strategy})`);
@@ -128,6 +203,9 @@ export function createServer(): Server {
       return { content: [{ type: 'text' as const, text: capped.text }] };
     } catch (error) {
       logger.error(`Tool execution error: ${name}`, error);
+
+      auditResult = error instanceof ServiceNowError ? error.code : 'ERROR';
+      writeAudit();
 
       if (error instanceof ServiceNowError) {
         return {
@@ -227,6 +305,16 @@ function logStartup(): void {
     : 'none';
   const mode = report.loaded.length > 0 ? '' : ' — mode: unconfigured';
   logger.info(`snowarch ${version} — store: ${where} — instances: ${instances}${mode} — tools: ${toolCount}`);
+
+  // Said ONCE, at start-up, and never again. A per-call notice would be noise; complete silence
+  // would mean an operator who set SNOW_AUDIT_FILE=off months ago discovers there is no trail
+  // at the moment they go looking for one.
+  if (auditDisabled()) {
+    logger.warn('audit trail disabled');
+  } else {
+    const p = resolveAuditPath();
+    if (p) logger.info(`audit trail: ${maskPath(p)}`);
+  }
 }
 
 async function main() {
@@ -247,8 +335,14 @@ async function main() {
   //
   // A signal is deliberately NOT used: Windows has no SIGTERM delivery, and on POSIX a
   // process killed by an unhandled SIGTERM reports a signal rather than an exit code — so a
-  // test asserting "exited 0" could not pass on either. ARC-04-S10 adds the audit-writer
-  // flush at this point; until then there is nothing buffered to lose.
+  // test asserting "exited 0" could not pass on either.
+  //
+  // ARC-04-S10's answer to the audit-writer flush that was TODO'd here: there is nothing to
+  // flush. `appendAudit` uses `appendFileSync` per line, so every line is already on disk
+  // before its tool call returns — chosen for exactly this reason. Writes are rare enough that
+  // durability beats throughput, and a buffered writer would lose the last few lines on the one
+  // occasion an audit matters most: an abrupt exit. Stated here rather than left silent, so
+  // nobody adds a flush that has nothing to do.
   transport.onclose = () => {
     logger.info('stdio closed by the client — exiting');
     process.exit(0);

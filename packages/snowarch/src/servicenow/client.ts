@@ -78,9 +78,13 @@ export class ServiceNowClient {
     this.authMode = config.authMode || 'service-account';
     this.oauthConfig = config.oauth;
     this.basicConfig = config.basic;
-    this.maxRetries = config.maxRetries || 3;
-    this.retryDelayMs = config.retryDelayMs || 1000;
-    this.requestTimeoutMs = config.requestTimeoutMs || 30000;
+    // `??`, not `||`. With `||`, a configured **0** is falsy and silently becomes the default,
+    // so `MAX_RETRIES=0` gave three retries and `RETRY_DELAY_MS=0` gave a one-second backoff —
+    // "no retries" and "no delay" were unexpressible, and nothing said so. Found while an
+    // audit test that set both to 0 took seven seconds a call (1 s + 2 s + 4 s of backoff).
+    this.maxRetries = config.maxRetries ?? 3;
+    this.retryDelayMs = config.retryDelayMs ?? 1000;
+    this.requestTimeoutMs = config.requestTimeoutMs ?? 30000;
     this.impersonateUserSysId = config.impersonateUserSysId;
     this.perUserBearerToken = config.perUserBearerToken;
   }
@@ -412,7 +416,7 @@ export class ServiceNowClient {
     const url = `${this.baseUrl}/api/now/table/${params.table}?${queryParams.toString()}`;
 
     logger.info(`Querying ServiceNow table: ${params.table}`);
-    logger.debug(`Query: ${params.query || 'none'}`);
+    logger.debug(`Query: ${this.maskQuery(params.query)}`);
 
     try {
       const response = await this.request<ServiceNowApiResponse<ServiceNowRecord[]>>(url);
@@ -488,6 +492,26 @@ export class ServiceNowClient {
    */
   getAuthUsername(): string | undefined {
     return this.authMethod === 'oauth' ? this.oauthConfig?.username : this.basicConfig?.username;
+  }
+
+  /**
+   * The encoded query, with this client's own account name replaced.
+   *
+   * `snow_us_active_update_set_ensure` builds `…^sys_created_by=<username>` (ARC-04-S07, so
+   * that it returns only the caller's update sets), and at debug level that string went
+   * straight to stderr. ARC-04-S10's no-secrets sweep caught it: the fixture username appeared
+   * in the captured log.
+   *
+   * Replacing the known account name rather than pattern-matching `sys_created_by=`: the value
+   * is the thing that must not be printed, and it can arrive under any field. This does not
+   * make queries free of personal data in general — a caller's own `caller_id=` filter still
+   * prints, which is documented — it removes the ONE value the server itself put there.
+   */
+  private maskQuery(query?: string): string {
+    if (!query) return 'none';
+    const user = this.getAuthUsername();
+    if (!user) return query;
+    return query.split(user).join('<user>');
   }
 
   async getRecord(table: string, sysId: string, fields?: string): Promise<ServiceNowRecord> {

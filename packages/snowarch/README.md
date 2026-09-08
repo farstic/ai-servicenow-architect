@@ -7,6 +7,29 @@ The server starts even with nothing configured, and five tools stay callable so 
 `snow_core_instances_index`, `snow_core_current_instance_read`. Everything else returns
 `NO_INSTANCE_CONFIGURED`. After adding an instance, call `snow_core_instances_reload` — no restart.
 
+## The audit trail
+
+Every mutating call appends one JSON line to `<store dir>/audit.jsonl` (0600, rotated at 10 MB, three
+kept). `SNOW_AUDIT_FILE` moves it; `SNOW_AUDIT_FILE=off` disables it, warned once at start-up.
+
+```json
+{"ts":"2026-09-08T10:22:31.412Z","instance":"pdi","environment":"pdi","tool":"snow_core_record_add",
+ "gate":"write","table":"incident","sysId":"a1b2…","query":null,"result":"ok","ms":312,"source":"mcp"}
+```
+
+**Never in it:** payload values (`fields`, `data`, `script`, the response body), credentials, or the
+instance URL — the label identifies the instance, and this file ends up in tickets. **Refusals are
+recorded** with their code (`WRITE_NOT_ENABLED`, …); non-mutating tools append nothing.
+
+**`query` is recorded, and can contain personal data** — `caller_id=…`, a name in a `LIKE` filter. It is
+the filter that selected the records, so a line without it answers nothing; it is also a string the
+engine already had. If that is not acceptable for an engagement, set `SNOW_AUDIT_FILE=off` and lose the
+trail, or point it outside the checkout.
+
+`snow_core_instance_switch` is audited too, with `table`/`sysId`/`query` null and a `note` naming the
+destination: it redirects where every later write lands, so a line after it naming a different instance
+would otherwise be unexplained.
+
 ## Changing instance
 
 **`snow_core_instance_switch` is the only way to change the instance a call goes to.** Every other tool

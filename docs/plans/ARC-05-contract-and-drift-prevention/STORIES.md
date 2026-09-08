@@ -313,6 +313,20 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; server and engine tests green on the CI matrix; three generated files committed and `gen:check` green; ARC-07/ARC-08 can call `remedyFor(code)`; `docs/CONTRIBUTING.md` says "add a code: registry first".
 
 ### ARC-05-S07 — Generated `permissions.allow` / `permissions.ask` blocks in `.claude/settings.json`
+
+> **Amendment 2026-09-08 (from ARC-04-S10 item 0, architect ruling).** The `ask` block is generated
+> from **`mutates || sessionMutates`**, not `mutates` alone. `sessionMutates` is a new optional field
+> on `ToolDefinition`, emitted in `contract.json`, and `snow_core_instance_switch` is the only tool
+> that carries it: it changes no ServiceNow record — so `mutates: true` would fail the "a tool that
+> mutates is never ungated" invariant unless it also gained a write gate, and gating it would stop a
+> read-only session switching instances to *read* another one — but it redirects where every
+> subsequent write lands, which `03` S-23 names as one of the 14 that must prompt. A generator reading
+> `mutates` alone would leave that one action unprompted while prompting every write that follows it.
+>
+> `snow_core_instances_reload` stays out of the `ask` block: ARC-07's `--resume` depends on it not
+> prompting. `tests/tools/mutates-audit.test.ts` asserts the union covers all 14 S-23 names, that
+> `sessionMutates` is exactly one tool and never set alongside `mutates`, and that `instances_reload`
+> is not in the ask list.
 **As** an individual practitioner **I want** every non-mutating server tool pre-approved and every mutating tool to prompt me, generated from the contract into the committed `.claude/settings.json` **so that** reads never interrupt me and no write can run without my consent even when the session starts in auto mode.
 **Context.** ARC README deliverable 4 (permission blocks) and acceptance criterion 8 (auto-mode prompt, S-18). `01` §5: the `ask` block is the mechanical half of §2.1 — on Pro/Max/Team plans a session starts in auto mode where a classifier approves calls, but an explicit `ask` rule resolves to a user prompt before the classifier (`docs:permission-modes`; `03` S-18). S-12 decides explicit names vs middle-wildcard globs; `03` fallback: explicit list (~250 entries). ARC-06 S01 commits `.claude/settings.json` (env, hook, static `Bash(...)` allows) — this story generates the MCP part of its `permissions`.
 **Scope.** In: the renderer that rewrites only the MCP entries of `permissions.allow` and `permissions.ask`, preserving everything else byte-for-byte; the style switch driven by `engine.config.json`; the S-18 fallback design note. Out: the hook-based fallback implementation (a new story if S-18 fails — see Risks); the non-MCP content of the file (ARC-06 S01).

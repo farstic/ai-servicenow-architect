@@ -140,14 +140,43 @@ preference is set cannot be captured retroactively.
 
 `packages/snowarch/` is the MCP server, and after the ARC-04-S01 cut it is six directories:
 `src/server.ts` (stdio only), `src/tools/` (397 tools in 39 modules), `src/servicenow/` (the client,
-the instance manager and the types), `src/resources/`, `src/utils/`, and `src/cli/` (one file — `start`
-plus three stubs owned by later stories). Its production dependencies are four:
+the instance manager and the types), `src/resources/`, `src/utils/`, `src/audit/` (the trail below), and
+`src/cli/` (one file — `start` plus three stubs owned by later stories). Its production dependencies are four:
 `@modelcontextprotocol/sdk`, `commander`, `dotenv`, `zod`.
 
 Everything that offered a second way in is gone: the HTTP/SSE transport, the REST API, the A2A routes,
 the dashboard, the prompt catalogue, the direct-execution engine and the report generator. What that
 buys is a single protocol surface to reason about, and a production install that fell from 57.3 MB to
 14.1 MB. The per-removal detail is in `packages/snowarch/CHANGELOG.md`.
+
+### The audit trail
+
+Every call to a tool declared `mutates` or `sessionMutates` appends one JSON line to
+`<store dir>/audit.jsonl` — beside the store, so the record sits with the configuration it describes.
+`SNOW_AUDIT_FILE` overrides the location and `SNOW_AUDIT_FILE=off` disables it, with one
+`[WARN] audit trail disabled` at start-up so nobody discovers the absence at the moment they need the
+file. It is created 0600 in a 0700 directory, rotates at 10 MB keeping three older files, and
+`@farstic/snowarch/audit` exports `appendAudit` / `tailAudit` / `readAuditTail` so the CLI can write
+its own lines with `source: "cli"`.
+
+The line is `{ ts, instance, environment, tool, gate, table, sysId, query, result, ms, source, note? }`.
+What it deliberately omits is the point: **no payload** — `fields`, `data`, `script` and the response
+body never appear, because a trail that recorded what was written would be a second copy of client
+data sitting in a checkout — **no credential**, and **no instance URL**, only the label, because this
+file gets pasted into tickets. `query` is the one exception and is recorded knowingly: it is the filter
+that selected the records, it can contain personal data (`caller_id=…`), and without it a line saying
+"updated some incidents" answers nothing.
+
+Refusals are written with their code, which is what an after-the-fact reviewer is usually looking for:
+`WRITE_NOT_ENABLED` against a table on a date is the evidence that §2.1 held. Reads append nothing —
+a trail that logged everything would be a request log, and nobody reads a request log to answer "was
+this write approved". A write failure (read-only filesystem) warns exactly once per process and never
+fails the tool call: the instance write already happened, and reporting it as failed would be worse
+than losing the line.
+
+Appends are synchronous, one `appendFileSync` per line. Writes are rare enough that durability beats
+throughput, and a buffered writer would lose the last few lines exactly when an audit matters most —
+an abrupt exit. There is consequently nothing to flush on shutdown.
 
 ### The contract: who generates it, and what it is for
 
