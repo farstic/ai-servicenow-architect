@@ -176,6 +176,17 @@ each enforced by a rule in `tests/agents-lint.test.mjs`:
 rules — how the Chief Architect routes, what each specialist owns, what a builder must return — live in
 `CLAUDE.md` and `governance/`, and are read by the model at runtime, not by a maintainer at design time.
 
+**Engine tooling reads the contract through `packages/contract/lib/contract.mjs`.** Stdlib only,
+zero dependencies, importable before `npm ci` — because ARC-06's bootstrap and ARC-08's doctor both
+run in a checkout that has installed nothing yet. `loadContract({ root, verifyPin })` is the only
+function that touches the filesystem and throws `ContractPinMismatch` carrying both shas; everything
+else is a pure function of the object it returns: `flags`, `flagNames`, `presets`, `expandPreset`
+(which enforces the dependency rule and names the offending pair), `tools`, `toolNames({ mutates })`,
+`askList` (`mutates || sessionMutates` — one definition, shared by the permission block, the rule
+file's count and the doctor), `unsupportedTools`, `alsoRequires`, `errorCodes`, `remedyFor`,
+`prefix(config)` and `updateSetCaptureSequence`. `tests/contract/no-literals.test.mjs` is the other
+half of the rule: no engine tool holds a flag name, a preset name or an error code of its own.
+
 **A tool's contract entry carries `unsupported: true` when no REST endpoint backs it.** Two do —
 the script-execution stubs — and they stay registered so a refusal can name the route that works
 instead of reading as a misspelling. The generated rule file filters on that flag; before it

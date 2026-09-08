@@ -58,7 +58,12 @@ export function render(ctx) {
   // Everything else carrying `showInRule` gets its own line, in registry order.
   const flagCodes = new Set(contract.flags.map((f) => `${f.name.replace('_ENABLED', '')}_NOT_ENABLED`));
   const ruleCodes = contract.errorCodes.filter((e) => e.showInRule && !flagCodes.has(e.code));
-  const wildcard = entry('WRITE_NOT_ENABLED');
+  // The wildcard line borrows one flag's remedy, and which flag is derived rather than named: the
+  // base flag is the one the others `require`, which is what makes its remedy the right one for the
+  // whole family. Naming WRITE here would be a literal the loader exists to remove.
+  const base = contract.flags.find((f) => contract.flags.some((o) => o.requires.includes(f.name)));
+  if (!base) throw new Error('rule-file: no flag is required by another — the family has no base');
+  const wildcard = entry(`${base.name.replace('_ENABLED', '')}_NOT_ENABLED`);
 
   const steps = contract.protocols.updateSetCapture;
   if (steps.length < 4) throw new Error('rule-file: updateSetCapture has fewer than four entries');
