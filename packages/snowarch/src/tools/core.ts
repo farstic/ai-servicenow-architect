@@ -307,6 +307,18 @@ export function coreToolManifest(): ToolDefinition[] {
         required: ['name'],
       },
       gate: 'none',
+      // `false`, and this is not an oversight — it is an unresolved gap, raised by ARC-04-S09.
+      //
+      // It changes no ServiceNow record, so `mutates: true` would break contract test (c)
+      // ("a tool that mutates is never ungated") unless it were also given a write gate, and
+      // gating it would stop a read-only session from switching instances to READ another one.
+      // But `03` S-23 names it among the 14 that must appear in the §2.1 ask-list, and that
+      // list is generated from this field — so as things stand, redirecting where every
+      // subsequent write lands is the one action that does not prompt.
+      //
+      // Overloading `mutates` to cover session state would make one field mean two things and
+      // silently change what gate (c) enforces. The ask-list generator needs a second source
+      // instead. Left as declared, and escalated rather than papered over.
       mutates: false,
     },
     {

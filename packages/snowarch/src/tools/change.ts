@@ -91,7 +91,9 @@ export function changeToolManifest(): ToolDefinition[] {
         required: ['sys_id'],
       },
       gate: 'write',
-      mutates: false,
+      // It calls updateRecord on change_request (state=-5). Declared `false` until ARC-04-S09, which kept it out of the
+      // generated §2.1 ask-list — a write that never prompted.
+      mutates: true,
     },
     {
       name: 'snow_chg_change_request_close',

@@ -232,7 +232,9 @@ export function securityToolManifest(): ToolDefinition[] {
         required: [],
       },
       gate: 'write',
-      mutates: false,
+      // It calls createRecord on sn_vul_scan_request. Declared `false` until ARC-04-S09, which kept it out of the
+      // generated §2.1 ask-list — a write that never prompted.
+      mutates: true,
     },
     // ─── GRC Compliance ───────────────────────────────────────────────
     {

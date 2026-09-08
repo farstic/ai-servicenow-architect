@@ -228,7 +228,9 @@ export function flowToolManifest(): ToolDefinition[] {
         required: ['flow_sys_id'],
       },
       gate: 'write',
-      mutates: false,
+      // It calls createRecord on sys_hub_flow_trigger. Declared `false` until ARC-04-S09, which kept it out of the
+      // generated §2.1 ask-list — a write that never prompted.
+      mutates: true,
     },
     {
       name: 'snow_flow_flow_error_log_read',

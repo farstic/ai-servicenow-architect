@@ -124,7 +124,9 @@ export function sysPropertiesToolManifest(): ToolDefinition[] {
         required: ['properties'],
       },
       gate: 'write',
-      mutates: false,
+      // It calls createRecord/updateRecord on sys_properties (dry_run skips the write, but the tool can write). Declared `false` until ARC-04-S09, which kept it out of the
+      // generated §2.1 ask-list — a write that never prompted.
+      mutates: true,
     },
     {
       name: 'snow_cfg_properties_export',

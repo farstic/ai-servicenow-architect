@@ -60,6 +60,59 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Fixed (ARC-04-S09) — three defects that failed silently
+
+Each of these returned a success. None of them raised an error, and all three had a documented
+workaround because the only way to notice them was to check the result by hand.
+
+**Descending sort returned ascending order** (P-26). `orderBy: '-sys_created_on'` built
+`ORDERBY<field>^ORDERBYDESC` — two terms, the first sorting ascending and the second a bare operator
+with no field. ServiceNow accepts that and sorts ascending, so every "newest first" query returned the
+OLDEST records and looked like it had worked. The encoded form is one term, `ORDERBYDESC<field>`.
+Multiple fields are now joined one term per field, each keeping its own direction
+(`-priority,sys_created_on` → `ORDERBYDESCpriority^ORDERBYsys_created_on`). The
+`servicenow://query-syntax` resource states the same grammar and names the wrong form explicitly.
+
+*Retires the workaround in the legacy setup text. **ARC-02's docs rewrite must delete two passages
+from `scripts/legacy/SETUP.md`:*** the troubleshooting row at **line 138** (*"No error, but the answer
+is wrong … Never use `orderBy: \"-field\"`. Put the sort in the encoded query instead"*) and the
+smoke-test sentence at **line 154** (*"If the newest is years old, `orderBy` has been used instead of
+an `ORDERBYDESC` encoded query — see the troubleshooting row above."*). Both describe a defect that no
+longer exists; left in place they teach users to avoid a parameter that now works.
+
+**`snow_intg_event_register` registered nothing usable** (platform field notes §4). It wrote
+`{ name, table, description }`, but `sysevent_register`'s matching key is `event_name` — `name` exists
+as a column and is not what the platform matches on. The row was created, a sys_id came back, and
+`event_name` read back empty. The body now carries `event_name`, a `suffix` derived from everything
+after the first dot segment (empty for a single-segment name, as the UI produces), and an optional
+`fired_by`; the response echoes `event_name`.
+
+**A business rule created through the server fired on nothing** (platform field notes §5).
+`snow_scr_business_rule_add` omitted the four `action_*` flags entirely, and a `sys_script` row with no
+action flags never runs — while appearing in the UI list looking exactly like a working rule. All four
+are now always sent as booleans, defaulting to the platform's own form: `action_insert` and
+`action_update` true, `action_delete` and `action_query` false. Each is settable, an explicit `false` is
+honoured, and the description states the defaults. `snow_scr_business_rule_modify` is unchanged — it
+takes an explicit field map, and defaulting anything there would silently re-enable a flag the caller
+had turned off.
+
+**Five tools wrote to the instance while declaring `mutates: false`.** Found by a source scan while
+fixing the first of them, not by the story. `mutates` is what the §2.1 ask-list is generated from
+(ARC-05-S07), so each was a write that would never prompt: `snow_intg_event_register`,
+`snow_chg_change_for_approval_submit`, `snow_flow_flow_test`, `snow_sec_vulnerabilities_scan`,
+`snow_cfg_set_properties_bulk` — the last of these named in `03` S-23 as one of the 14 that MUST be in
+that list. Every gate was correct and every refusal was correct; only the label the contract generator
+reads was wrong, which is why no gate test could see it. `tests/tools/mutates-audit.test.ts` now scans
+each tool's case body for create/update/deleteRecord and fails on any that declares `mutates: false`.
+
+**Known gap, raised not closed: `snow_core_instance_switch` still does not appear in the ask-list.**
+S-23 names it among the 14, but it changes no ServiceNow record — declaring `mutates: true` would break
+the "a tool that mutates is never ungated" invariant unless it also gained a write gate, and gating it
+would stop a read-only session from switching instances to *read* another one. Overloading `mutates` to
+also mean "changes session state" would make one field carry two meanings. The generator needs a second
+source; the exception is declared in `tests/tools/mutates-audit.test.ts` with a test asserting it is
+exactly one tool and that it is still a gap, so it cannot be mistaken for completeness.
+
 ### Changed (ARC-04-S08) — `tools/list` is the same list all session, and results have a ceiling
 
 **The runtime-generated `dynamic_<op>_<table>` tools are gone.** `snow_disco_table_discover` used to

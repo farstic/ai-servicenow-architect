@@ -384,20 +384,28 @@ export class ServiceNowClient {
     }
 
     if (params.orderBy) {
-      // Handle descending sort (prefix with "-")
-      if (params.orderBy.startsWith('-')) {
-        const field = params.orderBy.substring(1);
-        queryParams.set('sysparm_query',
-          params.query
-            ? `${params.query}^ORDERBY${field}^ORDERBYDESC`
-            : `ORDERBY${field}^ORDERBYDESC`
-        );
-      } else {
-        queryParams.set('sysparm_query',
-          params.query
-            ? `${params.query}^ORDERBY${params.orderBy}`
-            : `ORDERBY${params.orderBy}`
-        );
+      // `-field` means descending, and the platform's encoded form is `ORDERBYDESC<field>` —
+      // ONE term. This used to build `ORDERBY<field>^ORDERBYDESC`: two terms, the first sorting
+      // ascending and the second a bare operator with no field. ServiceNow does not reject it,
+      // it just sorts ascending, so every "newest first" query returned the OLDEST records and
+      // looked like it had worked. That is the defect behind field-notes' sort workaround and
+      // the "newest is years old" note in the legacy setup text.
+      //
+      // Multiple fields are comma-separated and joined per term, each carrying its own
+      // direction: `-priority,sys_created_on` → `ORDERBYDESCpriority^ORDERBYsys_created_on`.
+      const terms = params.orderBy.split(',')
+        .map((raw) => raw.trim())
+        .filter((raw) => raw.length > 0)
+        .map((raw) => (raw.startsWith('-')
+          ? `ORDERBYDESC${raw.slice(1)}`
+          : `ORDERBY${raw}`));
+
+      if (terms.length > 0) {
+        const sort = terms.join('^');
+        queryParams.set('sysparm_query', params.query ? `${params.query}^${sort}` : sort);
+      } else if (params.query) {
+        // `orderBy: ','` or `'  '` — nothing to sort by, but the query must still survive.
+        queryParams.set('sysparm_query', params.query);
       }
     }
 
