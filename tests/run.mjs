@@ -9,7 +9,22 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const files = readdirSync(here).filter((f) => f.endsWith('.test.mjs')).sort().map((f) => join(here, f));
+
+/**
+ * RECURSIVE, as of ARC-05-S01.
+ *
+ * It used to read only the top level, so `tests/contract/required-tools.test.mjs` would have
+ * been written, committed, green when run by hand — and never once run by `npm test`. A check
+ * that is not wired to a command is documentation, and the failure mode is silent: the file
+ * exists, so nobody goes looking for why it never fails.
+ */
+function walk(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory()
+    ? walk(join(dir, e.name))
+    : (e.name.endsWith('.test.mjs') ? [join(dir, e.name)] : [])));
+}
+
+const files = walk(here).sort();
 if (files.length === 0) {
   console.error('tests/run.mjs: no *.test.mjs found in', here);
   process.exit(1);

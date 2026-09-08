@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/farstic/ai-servicenow-architect/packages/contract/required-tools.schema.json",
+  "title": "Engine pin of the ServiceNow MCP contract",
+  "description": "What the engine's governance texts and skills depend on, and the hash of the server contract they were written against. A rename or a re-gate on the server side cannot merge without a conscious change here (P-36).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "contractVersion", "contractSha256", "serverKey", "tools"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "contractVersion": {
+      "description": "The contract shape this file is written against, not the server version.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "contractSha256": {
+      "description": "sha256 of packages/snowarch/dist/contract.json, byte for byte. Written by pin.mjs, never by hand.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "serverKey": {
+      "description": "The MCP registration key. Duplicated from engine.config.json on purpose: a second, independently edited declaration that the lint cross-checks (L07). engine.config.json remains the value of record.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "tools": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/tool" }
+    }
+  },
+  "$defs": {
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "gate", "mutates", "used_by"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^snow_[a-z0-9_]+$"
+        },
+        "gate": {
+          "description": "The flag family that refuses FIRST. For a tool behind two gates this is the outer one, and alsoRequires carries the second.",
+          "enum": ["none", "write", "scripting", "cmdb_write", "atf", "now_assist", "fluent"]
+        },
+        "alsoRequires": {
+          "description": "A second gate the tool enforces after the first has passed. Six tools have one (now_assist then write, fluent then write). Optional, and additive: a consumer that ignores it still predicts the first refusal correctly — but the ask-list generator must union it, or those six are under-reported.",
+          "enum": ["none", "write", "scripting", "cmdb_write", "atf", "now_assist", "fluent"]
+        },
+        "mutates": {
+          "description": "True when a successful call changes state on the ServiceNow INSTANCE. Server-local state does not count.",
+          "type": "boolean"
+        },
+        "sessionMutates": {
+          "description": "True when a call changes which instance later calls address, without changing anything on any instance. snow_core_instance_switch only, and its mutates stays false. The ask-list is generated from the union of the two.",
+          "type": "boolean"
+        },
+        "used_by": {
+          "description": "Who depends on this tool. Vocabulary: a governance section, a command, VALIDATION-TESTS, or the directory name of a .claude/skills/<name> or .claude/agents/<name>. Validated by the lint (L-series).",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}
