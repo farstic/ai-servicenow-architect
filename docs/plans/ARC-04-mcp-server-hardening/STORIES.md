@@ -657,6 +657,36 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S09 — Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert` / `action_update`
 
+> **Amendment 2026-09-08 (from the S09 delivery).**
+> - **Live criteria 2, 3 and 4 are deferred to the owner's sitting**, per the architect's ruling; the
+>   procedure is appended to `packages/snowarch/tests/live/README.md` inside a `[LIVE E2E]` update set
+>   with teardown. Criterion 2's procedure carries a **negative control** the story did not ask for: an
+>   ascending query whose result must DIFFER from the descending one. On a fresh PDI with under five
+>   incidents both queries return the same rows, and a "non-increasing" check passes against either
+>   grammar — the same defect the unit test exists to catch would survive the live run.
+> - **A defect the story did not name: five tools wrote to the instance while declaring
+>   `mutates: false`** — `snow_intg_event_register` (in scope here), plus
+>   `snow_chg_change_for_approval_submit`, `snow_flow_flow_test`, `snow_sec_vulnerabilities_scan` and
+>   `snow_cfg_set_properties_bulk`. The ask-list is generated from `mutates` (ARC-05-S07), so each was
+>   a write that would never prompt, and `snow_cfg_set_properties_bulk` is one of the 14 `03` S-23
+>   names explicitly. No gate test could see them: every gate and every refusal was correct — the
+>   wrong thing was the label the generator reads. Found by scanning each case body for
+>   create/update/deleteRecord against its declaration, the same source-vs-behaviour technique S06
+>   used; `tests/tools/mutates-audit.test.ts` keeps it from regressing.
+> - **`snow_core_instance_switch` is left as a declared gap, not fixed.** S-23 names it, but it changes
+>   no ServiceNow record: `mutates: true` breaks contract test (c) unless it also gains a write gate,
+>   and gating it stops a read-only session from switching instances to *read* another one.
+>   Overloading `mutates` to mean "changes session state" would make one field carry two meanings and
+>   silently change what (c) enforces. **Architect decision needed** — the ask-list generator likely
+>   needs a second source (an explicit always-ask list, or a distinct `sessionMutates` flag). Declared
+>   in the audit test with a both-halves check so it cannot be mistaken for completeness.
+> - **ARC-02 handover, precise.** Two passages in `scripts/legacy/SETUP.md` must go with the sort fix:
+>   the troubleshooting row at **line 138** and the smoke-test sentence at **line 154**. Both are named
+>   verbatim in the CHANGELOG entry. Left in place they teach users to avoid a parameter that now works.
+> - **Degenerate `orderBy` is handled explicitly.** `','` or `'  '` drops the sort and keeps the query
+>   rather than emitting a trailing bare `^` or an `ORDERBY` with no field — the platform accepts both
+>   of those and quietly returns something else, which is the same class of failure as the original bug.
+
 **As** the engine **I want** descending sorts, event registrations and business rules created through the server to behave as the ServiceNow platform requires **so that** the three documented workarounds (`engine:SETUP.md:154`, field-notes §4, §5) disappear and cannot regress.
 
 **Context.** Closes P-26 (defects) — `00` §4.8 table: descending sort is built as `ORDERBY<field>^ORDERBYDESC` (`mcp:src/servicenow/client.ts:384-388`) where the platform's encoded form is `ORDERBYDESC<field>` (`engine:ServiceNowDocs/markdown/api-reference/GlideListClientAPINEx.md:191` — `^ORDERBYDESCpriority`); `snow_intg_event_register` writes only `name`, `table`, `description` (`mcp:src/tools/integration.ts:428-438`), leaving `event_name` empty so the notification engine cannot match the event (field-notes §4); `snow_scr_business_rule_add` sends `name, collection, when, script, condition, active, order` (`mcp:src/tools/script.ts:405-411`) and never `action_insert` / `action_update`, so the rule never fires (field-notes §5). ARC-02-S10 hands these three field-note sections over as regression-test titles.

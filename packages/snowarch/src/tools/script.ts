@@ -41,7 +41,7 @@ export function scriptToolManifest(): ToolDefinition[] {
     },
     {
       name: 'snow_scr_business_rule_add',
-      description: '[Scripting] Create a new business rule (requires SCRIPTING_ENABLED=true). ServiceNow supports ES2021 async/await in scripts.',
+      description: '[Scripting] Create a new business rule (requires SCRIPTING_ENABLED=true). ServiceNow supports ES2021 async/await in scripts. Defaults: action_insert true, action_update true, action_delete false, action_query false.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -52,6 +52,10 @@ export function scriptToolManifest(): ToolDefinition[] {
           condition: { type: 'string', description: 'Optional condition script' },
           active: { type: 'boolean', description: 'Whether to activate the rule (default: true)' },
           order: { type: 'number', description: 'Execution order (default: 100)' },
+          action_insert: { type: 'boolean', description: 'Run on insert (default: true)' },
+          action_update: { type: 'boolean', description: 'Run on update (default: true)' },
+          action_delete: { type: 'boolean', description: 'Run on delete (default: false)' },
+          action_query: { type: 'boolean', description: 'Run on query (default: false)' },
         },
         required: ['name', 'table', 'when', 'script'],
       },
@@ -476,7 +480,19 @@ export async function dispatchScriptAction(
       requireScripting();
       if (!args.name || !args.table || !args.when || !args.script)
         throw new ServiceNowError('name, table, when, and script are required', 'INVALID_REQUEST');
-      const data = { name: args.name, collection: args.table, when: args.when, script: args.script, condition: args.condition, active: args.active !== false, order: args.order || 100 };
+      // All four action_* flags are ALWAYS sent, as booleans. The payload used to omit them
+      // entirely, and a sys_script row created with no action flags fires on nothing — the rule
+      // existed, looked correct in the UI list, and never ran (field-notes §5). Defaults match
+      // the platform's own form: insert and update on, delete and query off.
+      const flag = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : fallback);
+      const data = {
+        name: args.name, collection: args.table, when: args.when, script: args.script,
+        condition: args.condition, active: args.active !== false, order: args.order || 100,
+        action_insert: flag(args.action_insert, true),
+        action_update: flag(args.action_update, true),
+        action_delete: flag(args.action_delete, false),
+        action_query: flag(args.action_query, false),
+      };
       const result = await client.createRecord('sys_script', data);
       return { ...result, summary: `Created business rule ${args.name}`, note: 'GlideEncrypter is deprecated in recent releases; use new sn_si.Vault or keystore APIs instead' };
     }
