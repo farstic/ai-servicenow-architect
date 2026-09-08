@@ -39,6 +39,9 @@ function tree(mutate = () => {}) {
   // The pin is an input too since ARC-05-S06: `protocols.mjs` joins it with the contract, and the
   // CLI reads it before dispatching, so a tree without it cannot run at all.
   write('packages/contract/required-tools.json', readFileSync(join(root, 'packages/contract/required-tools.json'), 'utf8'));
+  // And the retired names: `permissions.mjs` recognises an entry for a tool the server used to
+  // have as one of its own, so a rename does not strand a dead rule.
+  write('packages/contract/retired-names.json', readFileSync(join(root, 'packages/contract/retired-names.json'), 'utf8'));
   // A settings file is optional: `permissions.mjs` builds one from `{ permissions: {} }` when
   // there is none, which is how it was created in the first place.
   return dir;
@@ -377,8 +380,14 @@ test('ARC-05-S07 criterion 2 — everything that is not ours survives byte for b
     write(SETTINGS, `${JSON.stringify({
       env: { SNOW_STORE: '' },
       permissions: {
-        allow: ['Bash(./snowarch doctor*)', 'mcp__other__thing', 'mcp__servicenow__snow_stale_read'],
-        ask: ['Bash(rm *)', 'mcp__servicenow__snow_gone_add'],
+        allow: ['Bash(./snowarch doctor*)', 'mcp__other__thing',
+          // A tool this server used to have (it is in `retired-names.json`) — ours, and removed.
+          'mcp__servicenow__snow_rpt_report_generate',
+          // A name under our prefix that is neither current nor retired. NOT ours: nothing
+          // distinguishes it from another server's tool, and guessing would delete a stranger's
+          // rule. It survives, and that boundary is the reason ownership is by name.
+          'mcp__servicenow__not_a_tool_of_ours'],
+        ask: ['Bash(rm *)', 'mcp__servicenow__add_comment'],
         deny: ['Bash(curl *)'],
       },
       hooks: { SessionStart: [{ matcher: '*', hooks: [] }] },
@@ -394,9 +403,10 @@ test('ARC-05-S07 criterion 2 — everything that is not ours survives byte for b
     assert.equal(after.permissions.allow[0], 'Bash(./snowarch doctor*)');
     assert.equal(after.permissions.allow[1], 'mcp__other__thing');
     assert.equal(after.permissions.ask[0], 'Bash(rm *)');
-    // Our own stale entries are gone, because ours are the ones this renderer owns.
-    assert.ok(!after.permissions.allow.includes('mcp__servicenow__snow_stale_read'));
-    assert.ok(!after.permissions.ask.includes('mcp__servicenow__snow_gone_add'));
+    // A retired tool's rule is ours and goes; an unrecognised name under our prefix stays.
+    assert.ok(!after.permissions.allow.includes('mcp__servicenow__snow_rpt_report_generate'));
+    assert.ok(!after.permissions.ask.includes('mcp__servicenow__add_comment'));
+    assert.ok(after.permissions.allow.includes('mcp__servicenow__not_a_tool_of_ours'));
   } finally { cleanup(dir); }
 });
 
@@ -418,15 +428,36 @@ test('ARC-05-S07 criterion 3 — a flipped `mutates` names the entry that moved'
   } finally { cleanup(dir); }
 });
 
-test('ARC-05-S07 criterion 4 — the prefix is the config\'s, everywhere', () => {
-  const dir = tree((s) => { s.config.mcp.serverKey = 'snow'; });
+test('ARC-05-S07 criterion 4 — a server-key change leaves nothing behind', () => {
+  // Starting from the COMMITTED file, not an empty template. That is the difference that hid a
+  // bug: ownership used to be decided by prefix, so after a key change the renderer treated all 397
+  // old entries as another server's rules and left them, then added 397 new ones beside them. A
+  // fixture that starts empty has no old entries and cannot see it.
+  const dir = tree(({ write }) => {
+    const committed = JSON.parse(readFileSync(join(root, SETTINGS), 'utf8'));
+    committed.permissions.allow.unshift('Bash(./snowarch doctor*)', 'mcp__other__thing');
+    write(SETTINGS, `${JSON.stringify(committed, null, 2)}\n`);
+  });
   try {
+    const before = settingsOf(dir).permissions;
+    assert.ok(before.allow.some((e) => e.startsWith('mcp__servicenow__')), 'fixture has no old entries');
+
+    const configPath = join(dir, 'engine.config.json');
+    const config = JSON.parse(readFileSync(configPath, 'utf8'));
+    config.mcp.serverKey = 'snow';
+    writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
     run(dir, ['--only', 'permissions']);
+
     const { allow, ask } = settingsOf(dir).permissions;
-    const all = [...allow, ...ask];
-    assert.ok(all.every((e) => e.startsWith('mcp__snow__')), 'an entry kept the old prefix');
-    assert.deepEqual(all.filter((e) => e.startsWith('mcp__servicenow__')), []);
-    assert.equal(all.length, realContract().tools.length);
+    const mcp = [...allow, ...ask].filter((e) => e.startsWith('mcp__'));
+    assert.equal(mcp.filter((e) => e.startsWith('mcp__snow__')).length, realContract().tools.length);
+    assert.deepEqual(mcp.filter((e) => e.startsWith('mcp__servicenow__')), [], 'stale entries survived the rename');
+    assert.equal(mcp.length, realContract().tools.length + 1, 'something other than ours was rewritten');
+
+    // Ours is decided by the TOOL name, not the prefix — so a third-party rule is still safe, and
+    // that is the property the prefix rule was trying to protect in the first place.
+    assert.ok(allow.includes('mcp__other__thing'));
+    assert.equal(allow[0], 'Bash(./snowarch doctor*)');
   } finally { cleanup(dir); }
 });
 

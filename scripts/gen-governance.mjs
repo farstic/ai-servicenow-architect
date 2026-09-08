@@ -71,6 +71,9 @@ try {
     pin: JSON.parse(read('packages/contract/required-tools.json')),
     // The whole config, for a renderer that reads more of it than the server key.
     config,
+    // The retired names, so a renderer that owns a set of entries can recognise the ones it
+    // used to own. `permissions.mjs` is the only caller today.
+    retired: JSON.parse(read('packages/contract/retired-names.json')),
     // The sha of the bytes on disk, not of a re-serialisation: the pin compares the same bytes.
     sha: createHash('sha256').update(contractText).digest('hex'),
     serverKey,

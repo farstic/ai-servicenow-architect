@@ -30,7 +30,7 @@ function entries(tools, prefix, style) {
 export const target = '.claude/settings.json';
 
 export function render(ctx) {
-  const { contract, serverKey, config, current } = ctx;
+  const { contract, serverKey, config, current, retired } = ctx;
   const prefix = `mcp__${serverKey}__`;
   const style = config?.mcp?.permissions ?? {};
   if (!style.allowStyle || !style.askStyle) {
@@ -47,9 +47,22 @@ export function render(ctx) {
   const settings = current ? JSON.parse(current) : { permissions: {} };
   settings.permissions ??= {};
 
-  const mine = (e) => typeof e === 'string' && e.startsWith(prefix);
-  // Any `mcp__` entry of ANOTHER server is somebody else's rule and is kept where it was; only this
-  // server's entries are ours to rewrite.
+  // Ownership is decided by the TOOL name, not by the prefix.
+  //
+  // By prefix, a change to `mcp.serverKey` leaves every entry of the old key in place — they no
+  // longer match, so they read as another server's rules — and the file ends up carrying 397 rules
+  // for a server that no longer exists under that name, beside 397 new ones. The prefix rule was
+  // trying to protect a third party's entries; the tool name protects them just as well, because
+  // `mcp__other__thing` is not one of our tools whatever prefix it wears.
+  //
+  // Retired names are included: an entry for a tool this server used to have is ours to remove, and
+  // leaving it would keep a dead rule alive across a rename.
+  const ours = new Set([...contract.tools.map((t) => t.name), ...Object.keys(retired ?? {})]);
+  const mine = (e) => {
+    if (typeof e !== 'string') return false;
+    const m = /^mcp__(.+?)__(.+)$/.exec(e);
+    return m ? ours.has(m[2]) : false;
+  };
   const keep = (list) => (Array.isArray(list) ? list.filter((e) => !mine(e)) : []);
 
   const reads = contract.tools.filter((t) => !t.mutates && !t.sessionMutates);
