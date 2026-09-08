@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 import { lintLineEndings, lintHyphenSplits } from './lib/editorconfig.mjs';
-import { isHistory } from '../packages/contract/lint/lib/scan.mjs';
+import { isHistory, honoursMarker } from '../packages/contract/lint/lib/scan.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const owners = JSON.parse(readFileSync(join(root, 'tests/legacy-names.allowlist.json'), 'utf8')).files;
@@ -224,7 +224,10 @@ test('ARC-02-S12 criterion 2 — no retired name survives in the engine surface'
     // spell them. One definition of clean, shared with L01/L02/L03 rather than guessed again.
     if (isHistory(f)) continue;
     currentLines(f).forEach((line, i) => {
-      if (line.includes('retired-name: historical')) return;
+      // The marker excuses a line only where the LINT honours it — `honoursMarker`, not "any file".
+      // Skipping it everywhere would let a marker planted in a skill silence this check while L03
+      // still failed on it, which is two answers to one question even when CI stays red.
+      if (honoursMarker(f) && line.includes('retired-name: historical')) return;
       for (const [name, re] of matchers) {
         if (re.test(line)) hits.push(`${f}:${i + 1} ${name}`);
       }
@@ -385,4 +388,19 @@ test('ARC-02-S06 criterion 5 — governance §2 names no retired tool', () => {
   });
   assert.deepEqual(hits, [], `${hits.length} retired name(s) in the governance text`);
   assert.ok(retired.length > 300, `only ${retired.length} names loaded — the source moved`);
+});
+
+test('and a marker planted where the lint does not honour it is still reported', () => {
+  // `honoursMarker` is true for ARCHITECTURE, the ADRs and the CHANGELOG — documents whose subject
+  // includes the past. A SKILL.md is not one of them, and a comment does not make it one.
+  // The retired name comes from the fixture, not from this line: a test that spells one becomes a
+  // detector its own sweep has to exempt, which is how this file already failed L03 twice.
+  const someRetired = Object.keys(JSON.parse(read('packages/contract/retired-names.json')))
+    .find((k) => /^[a-z][a-z0-9_]+$/.test(k));
+  const line = `Use \`${someRetired}\` here. <!-- retired-name: historical -->`;
+  const skill = '.claude/skills/developer/SKILL.md';
+  assert.equal(honoursMarker(skill), false, 'a skill must not honour the marker');
+  assert.equal(honoursMarker('docs/ARCHITECTURE.md'), true, 'ARCHITECTURE must honour it');
+  // The predicate is what this check now consults, so the marker on that line excuses nothing.
+  assert.ok(!(honoursMarker(skill) && line.includes('retired-name: historical')));
 });
