@@ -58,12 +58,25 @@ test('mcp.packageDir exists and its package.json name equals mcp.package', () =>
 });
 
 test('roster counts equal the files on disk', () => {
-  const skills = readdirSync(join(root, '.claude/skills'), { withFileTypes: true })
-    .filter((e) => e.isDirectory() && existsSync(join(root, '.claude/skills', e.name, 'SKILL.md'))).length;
+  // `roster.skills` counts PERSONAS. A utility skill — `/snowarch`, which is tooling rather than a
+  // specialist — is a directory on disk and not a roster row, so it is excluded here exactly as it
+  // is excluded by the skills lint and by the roster generator. One source: `roster.utility`.
+  const utility = new Set(config.roster.utility ?? []);
+  const skillDirs = readdirSync(join(root, '.claude/skills'), { withFileTypes: true })
+    .filter((e) => e.isDirectory() && existsSync(join(root, '.claude/skills', e.name, 'SKILL.md')))
+    .map((e) => e.name);
+  const skills = skillDirs.filter((d) => !utility.has(d)).length;
   const agents = readdirSync(join(root, '.claude/agents'))
     .filter((f) => f.endsWith('.md')).length;
   assert.equal(skills, config.roster.skills, 'roster.skills disagrees with .claude/skills/*/SKILL.md');
   assert.equal(agents, config.roster.agents, 'roster.agents disagrees with .claude/agents/*.md');
+
+  // The negative: a utility name with no directory would silently lower the persona count, which
+  // is the one way this exclusion can be used to hide a missing skill rather than to classify one.
+  for (const name of utility) {
+    assert.ok(skillDirs.includes(name),
+      `roster.utility names "${name}", which is not a skill directory — it excludes nothing and lowers nothing`);
+  }
 });
 
 test('docs.pin equals the vendor/ServiceNowDocs gitlink', (t) => {

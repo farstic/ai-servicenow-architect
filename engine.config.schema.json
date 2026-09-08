@@ -158,6 +158,14 @@
         "agents": {
           "type": "integer",
           "minimum": 1
+        },
+        "utility": {
+          "description": "Skill directories that are tooling rather than a specialist persona \u2014 the /snowarch skill. They are excluded from the roster count, listed in their own table by gen-roster.mjs, and exempt from the persona rules (EXAMPLES.md, the ## Triggers section). One source for all of them.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
         }
       }
     }

@@ -275,7 +275,6 @@ describe('criterion 4 - no credential in the audit file or on stderr', () => {
       }
 
       const elapsed = Date.now() - started;
-      // eslint-disable-next-line no-console
       console.log(`  no-secrets sweep: ${mutating.length} mutating tools in ${elapsed} ms`);
 
       const audit = auditText();

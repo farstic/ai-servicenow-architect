@@ -11,6 +11,27 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ## Unreleased
 
+### Added
+
+- **`/snowarch` — the first utility skill** (`.claude/skills/snowarch/SKILL.md`): `status` (and the
+  plain word `Status`, which `CLAUDE.md` §2 routes here), `setup-instance` with its `--resume` half,
+  and `doctor`. One skill with three branches, because `$ARGUMENTS` substitution is confirmed on CLI
+  2.1.258 — the three-skill fallback was not needed. It reports and configures; it never designs,
+  never calls an MCP tool, and never asks for a credential: `setup-instance` collects a label and a
+  URL in chat and hands the rest to the user's own terminal.
+  - `engine.config.json` gains `roster.utility`, the single source that keeps a utility skill out of
+    the persona count in the roster generator, the skills lint, `tests/engine-config.test.mjs` and
+    `tests/skill-listing.test.mjs`. A name there that has no directory now fails.
+  - `tests/snowarch-skill.test.mjs` holds the shapes that carry the guarantee — the tool grant, the
+    Mode-line shapes, the five-step hand-off with its Windows line, and the count of sentences
+    mentioning a password — each proved against a deliberately broken copy.
+  - `tests/fixtures/snowarch-doctor-stub.sh` stands in for the doctor until ARC-06/ARC-08 build it.
+  - Two defects found by running it rather than reading it, both in the file and both fixed: the
+    Mode line was being decorated, and the "doctor unavailable" fallback named a cause it had not
+    checked. Evidence: `docs/spikes/validation-runs/ARC-02-S11-snowarch-skill.md`.
+- `docs/USER-GUIDE.md` gains a "`/snowarch` commands" section — the three sub-commands, how to read
+  the four `Mode:` shapes, and why setup hands off to the terminal.
+
 ### Changed
 
 - `CLAUDE.md` rewritten to a line budget: **425 lines → 125**, 57,688 bytes → 10,997, against a cap
