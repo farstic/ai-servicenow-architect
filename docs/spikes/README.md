@@ -385,7 +385,7 @@ One line per spike; ARC-00-S14 copies the final verdicts here from the records.
 | Spike | Record | Run by | Verdict |
 |---|---|---|---|
 | S-01 | `S-01-preseeded-approval/` | ARC-00-S04 | `S-01: NOT PROVEN — design-only half confirmed on the CLI surface (claude mcp get / mcp list) on 2.1.214 + 2.1.258; the /mcp panel and the live half need one interactive run` |
-| S-02 | `S-02-list-changed-after-reload/` | ARC-00-S10 | `S-02: NOT RUN` |
+| S-02 | `S-02-list-changed-after-reload/` | ARC-00-S10 | `S-02: CONFIRMED on 2.1.258, macOS, non-interactively, with a negative control — after snow_core_instances_reload the newly advertised tools are callable in the same session, no restart and no /mcp reconnect` |
 | S-03 | `S-03-project-dir-expansion-windows/` | ARC-00-S06 | `S-03: NOT RUN` — blocked on the Windows VM |
 | S-04 | `S-04-raw-mode-masked-input/` | ARC-00-S07 | `S-04: NOT RUN` — blocked on the Windows VM |
 | S-05 | `S-05-hook-without-node/` | ARC-00-S06 | `S-05: NOT RUN` |

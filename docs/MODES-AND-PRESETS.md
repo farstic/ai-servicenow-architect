@@ -90,6 +90,21 @@ succeeds.
 A named preset whose stored `flags` disagree with the table is reported as `PRESET_FLAGS_MISMATCH` and
 **the preset wins**. Omitting `flags` entirely is not a disagreement — it simply takes the preset.
 
+### What each flag unlocks
+
+- **WRITE** — create, update and delete records. Without it everything is read-only.
+- **CMDB_WRITE** — additionally, CI and relationship reconciliation writes into the CMDB.
+- **SCRIPTING** — unlocks *writing* Script Includes, Business Rules, Client Scripts, ACLs, UI Actions
+  and update-set changes. ***Reading* them is always allowed.**
+- **ATF** — *execute* ATF tests and suites. Authoring and reading are always allowed.
+- **NOW_ASSIST** — the Now Assist / generative-AI tools; needs a Now Assist licence on the instance.
+- **FLUENT** — the ServiceNow SDK (Fluent) build and deploy tools; deploys also need WRITE.
+
+A note for anyone upgrading from `servicenow-mcp` 1.0.0: SCRIPTING used to gate *reads* as well, so
+listing a Script Include required a write flag. It no longer does. If you were relying on that to keep
+script bodies out of a session, the control you actually want is a role-restricted ServiceNow account —
+the flag was never a confidentiality boundary, and treating it as one hid that.
+
 ### The dependency rule
 
 `SCRIPTING_ENABLED` and `CMDB_WRITE_ENABLED` are writes. Declaring either without `WRITE_ENABLED` is a

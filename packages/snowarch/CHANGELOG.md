@@ -60,6 +60,25 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Changed (ARC-04-S05) — SCRIPTING gates writes, not reads
+
+**Migration note (R-03), for anyone upgrading from `servicenow-mcp` 1.0.0.** `SCRIPTING_ENABLED` no
+longer gates *reads*. Listing and reading Script Includes, Business Rules, Client Scripts, ACLs, UI
+Policies, UI Actions, change sets and update sets now works with no write flag at all, which is what
+SCRIPTING was always documented to mean: *writing* those objects.
+
+**If you were relying on SCRIPTING to keep script bodies out of a session, that control is gone —
+and it was never the right one.** A flag the client sets is not a confidentiality boundary. Use a
+ServiceNow account whose roles do not grant read access to the tables you want withheld.
+
+- Reads ungated: the seven `snow_scr_*_index` / `_read` pairs, plus `snow_us_update_sets_index`,
+  `snow_us_current_update_set_read`, `snow_us_update_set_preview` and **`snow_us_update_set_export`**
+  — the last of these required SCRIPTING before, so exporting an update set for review needed a
+  write flag.
+- Writes unchanged, and the gate is now the first statement of each mutating case rather than a
+  single check before the dispatch switch.
+- Mutating scripting tools carry a `[Scripting]` description prefix; reads carry none.
+
 ### Added (ARC-04-S04) — the server starts without an instance
 
 - **It no longer exits when no instance is configured.** An unconfigured checkout used to show a

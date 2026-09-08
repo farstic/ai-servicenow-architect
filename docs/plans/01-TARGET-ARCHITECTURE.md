@@ -299,7 +299,7 @@ What each flag means, as shown to the user:
 
 - **WRITE** — lets the engine create, update and delete records (incidents, catalog items, users, agile work, update sets). Without it everything is read-only.
 - **CMDB_WRITE** — additionally allows CI and relationship reconciliation writes into the CMDB.
-- **SCRIPTING** — unlocks *writing* Script Includes, Business Rules, Client Scripts, ACLs, UI Actions and update-set changes. *Reading* them is always allowed (ARC-04 splits the gate; today it blocks reads too).
+- **SCRIPTING** — unlocks *writing* Script Includes, Business Rules, Client Scripts, ACLs, UI Actions and update-set changes. *Reading* them is always allowed (split by ARC-04-S05, 2026-09-08).
 - **ATF** — lets the engine *execute* ATF tests and suites (authoring and reading are always allowed).
 - **NOW_ASSIST** — enables the Now Assist / generative-AI tools; needs a Now Assist licence on the instance.
 - **FLUENT** — enables the ServiceNow SDK (Fluent) build/deploy tools; needs `@servicenow/sdk`; deploys also need WRITE.

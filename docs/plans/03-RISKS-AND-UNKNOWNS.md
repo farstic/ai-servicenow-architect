@@ -55,7 +55,7 @@ Every spike is run by exactly one ARC-00 story (or, for the two that need produc
 | S-11 | ARC-00-S11 | ARC-01-S04 (floors in `engine.config.json`), ARC-06-S04 |
 | S-12, S-18 | ARC-00-S05 | ARC-05-S07 (globs vs explicit list; `ask` in auto mode), ARC-05-S11 |
 | S-14a–g, S-19 | ARC-00-S12 | ADR-0006/0008 → entry gate of ARC-06-S01 (D-06 hedge); S-19 → ARC-01-S11, ARC-02-S02, ARC-05-S04 |
-| S-10 | deferred → ARC-04-S05 | ARC-04-S14 (CHANGELOG note), ARC-08 doctor note |
+| S-10 | **deferred to the owner's live sitting (build @ `7a91986`)** — the agent holds no instance credentials. The unit half is CI-enforced by `tests/tools/gate-split.test.ts` (35 tools derived from the registered catalogue, three flag states); the runnable procedure with the exact fixture, both preset runs and the T-01…T-18 order is `docs/spikes/S-10-readonly-preset-sufficiency/PROCEDURE.md` | ARC-04-S14 (CHANGELOG note), ARC-08 doctor note |
 | S-13 | deferred → ARC-02-S03 | ARC-02-S02, ARC-05-S04 |
 | Close-out (Status/Evidence columns, deferrals, gate sign-off) | ARC-00-S14 | ARC-01-S01 (entry), ARC-06-S01 (entry) |
 
