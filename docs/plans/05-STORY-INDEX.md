@@ -81,7 +81,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-05-S05 | ARC-05 | `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md` | M | S01; ARC-02-S09; ARC-04-S03/S06/S07 | M2 | Done (2026-09-08) |
 | ARC-05-S06 | ARC-05 | Error-code registry, `governance/mcp-protocols.md` and `docs/TROUBLESHOOTING.md` | M | S05; ARC-04-S02/S03/S04/S08/S11 | M2 | Done (2026-09-08) |
 | ARC-05-S07 | ARC-05 | Generated `permissions.allow` / `permissions.ask` blocks in `.claude/settings.json` | M | S05; ARC-00-S05; ARC-06-S01; verdicts S-12 S-18 | M2 | Done (2026-09-08) |
-| ARC-05-S08 | ARC-05 | Server `tests/contract.test.ts`: gates, presets, invariants, pin, dist parity | L | S01, S06; ARC-04-S01/S03/S05/S06/S13 | M2 | Not started |
+| ARC-05-S08 | ARC-05 | Server `tests/contract.test.ts`: gates, presets, invariants, pin, dist parity | L | S01, S06; ARC-04-S01/S03/S05/S06/S13 | M2 | Done (2026-09-08) |
 | ARC-05-S09 | ARC-05 | CI job `contract` and the release gate script | S | S03, S04, S08; ARC-01-S11 | M2 | Not started |
 | ARC-05-S10 | ARC-05 | Contract loader for engine tooling and the no-literal-names guard | M | S01, S06 | M2 | Not started |
 | ARC-05-S11 | ARC-05 | Drift drill and contributor documentation | M | S01, S10 | M2 | Not started |

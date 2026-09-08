@@ -1,0 +1,38 @@
+{
+  "_rule": "Exceptions to the naming invariants in tests/contract.test.ts (tests 7 and 8). Every entry carries a reason, and the reason is the point: an exception without one is a way to make a test green rather than a statement about the catalogue. Grouped into CLASSES, because a per-tool list of the same reason repeated is a list nobody reads. Removed tools are NOT here \u2014 test 10 reads retired-tools.json, which is the shared source.",
+  "suffixClasses": [
+    {
+      "id": "session-state",
+      "reason": "Changes which instance later calls address, and no record on any instance. It carries sessionMutates instead of mutates, so the suffix says 'writes' and the declaration correctly says it does not \u2014 while \u00a72.1 still asks about it, because it decides where every later write lands.",
+      "tools": [
+        "snow_core_instance_switch"
+      ]
+    },
+    {
+      "id": "exec-that-computes",
+      "reason": "An `exec` suffix that runs a computation and returns its result rather than writing anything: an NLU evaluation and an aggregate query. The verb is right and the inference from it is wrong.",
+      "tools": [
+        "snow_ml_virtual_agent_nlu_exec",
+        "snow_rpt_aggregate_query_exec"
+      ]
+    },
+    {
+      "id": "verb-is-not-the-last-segment",
+      "reason": "The mutating verb sits earlier in the name \u2014 `set_properties_bulk`, `request_batch` \u2014 because the last segment describes the shape of the call rather than what it does. Renaming them would be a breaking change to fit a test.",
+      "tools": [
+        "snow_cfg_set_properties_bulk",
+        "snow_fluent_request_batch"
+      ]
+    },
+    {
+      "id": "runs-and-writes",
+      "reason": "Runs something on the instance, and running it writes: executing a flow creates its execution record, and an SDK build or init writes to the application. `test` in particular is ambiguous across the catalogue \u2014 snow_nas_now_assist_skill_test evaluates and writes nothing \u2014 so it cannot be decided by suffix at all.",
+      "tools": [
+        "snow_flow_flow_test",
+        "snow_fluent_build",
+        "snow_fluent_init"
+      ]
+    }
+  ],
+  "gateClasses": []
+}

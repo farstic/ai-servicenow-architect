@@ -442,3 +442,21 @@ See `docs/CONTRIBUTING.md` at the repository root.
 
 Apache-2.0. See `LICENSE` and `NOTICE` at the repository root.
 Repository: <https://github.com/farstic/ai-servicenow-architect>
+
+## The invariants
+
+`tests/contract.test.ts` holds fourteen, and they are what makes the contract worth pinning. In
+short: the engine pins a subset of the catalogue and agrees with it about every field (1, 2); a tool
+refuses with exactly its declared gate's code (3) and a preset opens exactly its families (4); the
+six flags are the same six in the source, the contract and every preset, and no preset turns one on
+while its prerequisite is off (5, 6); a mutating name mutates and a writing gate implies it (7, 8),
+with exceptions only through `tests/contract-exceptions.json` and only with a reason; the manifest,
+the contract and the catalogue list the same names (9); every renamed tool still lands somewhere
+real (10); every code the server throws has a meaning and a remedy, and every schema advertises what
+its handler enforces (11); and the committed `dist/contract.json` is byte-identical to what the
+extractor produces, matches the engine's pin, and carries the server key `engine.config.json`
+declares (12, 13, 14).
+
+The whole suite runs with `WRITE_ENABLED=true` in the environment on purpose. Flags belong to the
+instance, not to the process — if a gate ever read `process.env`, the all-flags-off probes would
+start passing and the suite would go green for exactly the wrong reason.
