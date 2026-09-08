@@ -1,6 +1,6 @@
 # ARC-05 — Engine↔MCP contract and drift prevention
 
-Status: **Stories drafted 2026-09-04** · Depends on: ARC-04 (contract generator, `dist/contract.json`), ARC-01 · Blocks: ARC-02 (final sweep, generated texts), ARC-06 (B05, permission block, loader), ARC-08 (data-driven checks), ARC-09 (release gate)
+Status: **S01–S03 + S05 merged 2026-09-08 (4 of 11)** · Depends on: ARC-04 (contract generator, `dist/contract.json`), ARC-01 · Blocks: ARC-02 (final sweep, generated texts)
 
 Names in this README follow the owner's decisions of 2026-09-04 (`02-DECISIONS-NEEDED.md`): server package `packages/snowarch` (npm `@farstic/snowarch`, first release `2.0.0`), MCP key `servicenow` → prefix `mcp__servicenow__`, root launcher `./snowarch`, project skill `/snowarch` (`status` · `setup-instance` · `doctor`), vocabulary Mode `design-only` | `live` and Preset `read-only` | `pdi-developer` | `full` | `custom`.
 
@@ -74,7 +74,7 @@ Detailed write-ups: [`STORIES.md`](STORIES.md) (11 stories, 15–20 engineer-day
 | ARC-05-S02 | `retired-names.json` generated from the rename map | S | Done (2026-09-08) |
 | ARC-05-S03 | `engine-lint.mjs` core: tokens, prefix, retired names, pin | M | Done (2026-09-08) |
 | ARC-05-S04 | `engine-lint.mjs` structural checks: descriptions, path references, `used_by`, generated-file byte check, plugin validate | M | Not started |
-| ARC-05-S05 | `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md` | M | Not started |
+| ARC-05-S05 | `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md` | M | Done (2026-09-08) |
 | ARC-05-S06 | Error-code registry, `governance/mcp-protocols.md` and `docs/TROUBLESHOOTING.md` | M | Not started |
 | ARC-05-S07 | Generated `permissions.allow` / `permissions.ask` blocks in `.claude/settings.json` | M | Not started |
 | ARC-05-S08 | Server `tests/contract.test.ts`: gates, presets, invariants, pin, dist parity | L | Not started |
