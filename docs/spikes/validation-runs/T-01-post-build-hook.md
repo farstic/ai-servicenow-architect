@@ -4,7 +4,7 @@
 `claude -p --resume <session_id>` for the approval turn. Two turns, because T-01's chain crosses an
 approval gate: a single non-interactive prompt can only reach step 4.
 
-**Verdict: PASS on both pass criteria**, against `CLAUDE.md` v2.9.0-dev (the S08 rewrite).
+**Verdict: PASS on both pass criteria**, against `CLAUDE.md` at engine version 2.0.0-dev (the S08 rewrite, commit 36351d2).
 
 ## Turn 1 — the prompt, verbatim from T-01
 
