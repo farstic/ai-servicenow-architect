@@ -70,7 +70,7 @@ Reported on the load report now; ARC-04-S06 lists them in the tool contract.
 | `STORE_UNREADABLE` | the file exists but is not parseable JSON |
 | `STORE_SCHEMA_INVALID` | schema violation, message names the field path |
 | `STORE_SCHEMA_UNSUPPORTED` | written by a newer server — run `./snowarch upgrade` |
-| `STORE_PERMISSIONS_TOO_OPEN` | POSIX mode is group/world-readable; message carries the `chmod` |
+| `STORE_PERMISSIONS_TOO_OPEN` | the file is group/world-readable, or its directory is group/world-writable without the sticky bit; the message carries the `chmod`. Any other group/world directory bit is a warning, not a refusal — a 0600 file is unreadable whatever folder it sits in |
 
 ### Unchanged
 

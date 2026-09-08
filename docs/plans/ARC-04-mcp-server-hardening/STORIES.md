@@ -180,6 +180,30 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 >   headed "draft — ARC-07 owns the final text".
 > - **Store error codes** are listed in `packages/snowarch/CHANGELOG.md` now; ARC-04-S06 lists them
 >   in the tool contract.
+> - **The exit-if-unconfigured guard is removed from `src/server.ts`.** It tested env vars only,
+>   which is wrong once a store can configure the server — it would have exited with a valid store
+>   present. Unconfigured start is ARC-04-S04's subject; until then the server runs and the startup
+>   line says `mode: unconfigured`.
+>
+> **Amendment 2026-09-08 (second S02 review — the file-mode rule is refined).** The design note's
+> "if `(stat.mode & 0o077) !== 0` the store is not loaded" is correct for the FILE and wrong for the
+> DIRECTORY. Applied to the directory it refuses a 0600 store in an ordinary 0755 folder, and in
+> `/tmp` — which is where criterion 1's own `SNOW_STORE=/tmp/a.json` example lives. A 0600 file is
+> unreadable by others whatever its directory; the directory risk is group/world **write**
+> (replacement or symlink planting), not read or execute. The rule is therefore:
+> **refuse** when the file has `0o077` bits, or the directory has `0o022` bits **without** the sticky
+> bit (`0o1000`); **warn** — a `warnings[]` entry on the `LoadReport` and a `[WARN]` log line, the
+> store still loading — for any other group/world directory bit, with the `chmod 700 <dir>` remedy.
+>
+> **Amendment 2026-09-08 (second S02 review — masking happens at construction).** Every path in a
+> message is masked where the message is BUILT, one path at a time, never by running `maskPath` over
+> a finished sentence: `maskPath` only rewrites a string that starts with the prefix, so a sentence
+> carrying two paths came through with both raw. The prose uses `maskPath` (`<checkout>`, `~`); the
+> text after `Run:` uses `maskPathForShell` (home → `~` only), because a remedy has to stay
+> pasteable and `<checkout>` is not a path. `tests/store/masking.test.ts` spawns the server under a
+> fake `HOME` and asserts no absolute prefix appears anywhere in stderr.
+
+
 
 ### ARC-04-S03 — Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage
 

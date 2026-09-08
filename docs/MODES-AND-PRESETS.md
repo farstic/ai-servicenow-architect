@@ -28,12 +28,25 @@ and automation path, not a user path, and the startup line says so:
 
 ## What protects the file
 
-The store holds a password, so on macOS and Linux a mode with any group or world bit set is
-**refused**, not warned about, and the message carries the exact remedy:
+The store holds a password, so on macOS and Linux the **file** is refused — not warned about — if
+it carries any group or world bit, and the message names the exact remedy:
 
 ```
-Refusing to load <path>: file mode 0644 is group/world-readable. Run: chmod 600 <path>
+Refusing to load <checkout>/.local/instances.json: file mode 0644 is group/world-readable.
+Run: chmod 600 ~/work/repo/.local/instances.json
 ```
+
+The **directory** is a different risk and is treated differently. A 0600 file is unreadable by
+anyone else whatever folder it sits in, so an ordinary 0755 directory is not a reason to refuse a
+correctly protected store. What a directory bit actually buys an attacker is group or world
+**write**: the ability to replace the file or plant a symlink where it was. So:
+
+| Directory | Result |
+|---|---|
+| group/world writable, **no sticky bit** (e.g. 0777) | **refused** — the file can be replaced |
+| group/world writable **with** the sticky bit (1777, as `/tmp` is) | loads, with a warning — sticky means only the owner can unlink or rename their own entry |
+| any other group/world bit (e.g. 0755) | loads, with a warning |
+| 0700 | silent |
 
 On Windows the check is skipped — permissions there are ACL-inherited and the POSIX mode bits
 Node reports are synthetic, so asserting on them would fail for a correctly protected file. The

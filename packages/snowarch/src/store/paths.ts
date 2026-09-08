@@ -92,6 +92,21 @@ export function maskPath(p: string): string {
   return out;
 }
 
+/**
+ * A path fit for a REMEDY the reader will paste into a shell: home becomes `~`, which a
+ * shell expands, and the checkout is left alone because `<checkout>` is not a path.
+ *
+ * `maskPath` is for prose and log lines; this is for the text after `Run:`. A remedy that
+ * has been prettified into something unrunnable is worse than one that was never offered.
+ */
+export function maskPathForShell(p: string): string {
+  if (!p) return p;
+  const home = homedir();
+  const norm = home.endsWith(sep) ? home.slice(0, -1) : home;
+  if (p === norm) return '~';
+  return p.startsWith(norm + sep) ? `~${p.slice(norm.length)}` : p;
+}
+
 /** `cvetomir@corp.com` → `c***@corp.com`; `admin` → `a***`. Never the whole name. */
 export function maskUsername(u: string): string {
   if (!u) return u;

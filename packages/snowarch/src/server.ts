@@ -153,6 +153,7 @@ function logStartup(): void {
 
   for (const note of report.notes) logger.info(note);
   for (const err of report.configErrors) logger.error(`${err.code}: ${err.message}`);
+  for (const w of report.warnings) logger.warn(w);
   for (const nl of report.notLoaded) logger.warn(`instance ${nl.label} not loaded — ${nl.code}: ${nl.message}`);
 
   if (process.platform === 'win32') logger.info('file modes: ACL-inherited (Windows)');

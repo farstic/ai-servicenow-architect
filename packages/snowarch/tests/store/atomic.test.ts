@@ -74,42 +74,80 @@ describe('saveStore — criterion 5', () => {
   });
 });
 
-describe('checkFileModes — criterion 3', () => {
-  it.skipIf(win32)('POSIX: 0644 is refused with STORE_PERMISSIONS_TOO_OPEN and a chmod 600 remedy (skipped on Windows: ACL-inherited)', () => {
-    const dir = join(tmp, 'perm');
+describe('checkFileModes — criterion 3, as refined by the S02 review', () => {
+  // The first version of this suite asserted that ANY group/world bit on the directory was
+  // a refusal — and passed, because `mkdtemp` creates 0700 directories, so the case that
+  // mattered was never exercised. It encoded a wrong assumption as a green test. The rule
+  // now separates the two risks: the FILE holds the password, the DIRECTORY controls
+  // whether the file can be replaced.
+
+  it.skipIf(win32)('a 0644 FILE is refused — it is readable by others whatever the directory (skipped on Windows: ACL-inherited)', () => {
+    const dir = join(tmp, 'openfile');
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const p = join(dir, 'instances.json');
     writeFileSync(p, JSON.stringify(store()));
     chmodSync(p, 0o644);
-    const e = checkFileModes(p);
-    expect(e?.code).toBe('STORE_PERMISSIONS_TOO_OPEN');
-    expect(e?.message).toContain('file mode 0644 is group/world-readable');
-    expect(e?.message).toContain(`chmod 600 ${p}`);
+    const r = checkFileModes(p);
+    expect(r.error?.code).toBe('STORE_PERMISSIONS_TOO_OPEN');
+    expect(r.error?.message).toContain('file mode 0644 is group/world-readable');
+    expect(r.error?.message).toContain('chmod 600');
   });
 
-  it.skipIf(win32)('POSIX: an open DIRECTORY adds chmod 700 for the directory (skipped on Windows: ACL-inherited)', () => {
-    const dir = join(tmp, 'opendir');
+  it.skipIf(win32)('a 0600 file in a 0755 directory LOADS, with a warning (skipped on Windows: ACL-inherited)', () => {
+    // The regression the review caught: an ordinary 0755 folder is the normal case, and a
+    // 0600 file inside it is unreadable by anyone else. Refusing here rejected every store
+    // a user points SNOW_STORE at.
+    const dir = join(tmp, 'normal');
     mkdirSync(dir, { recursive: true, mode: 0o755 });
     const p = join(dir, 'instances.json');
     writeFileSync(p, JSON.stringify(store()), { mode: 0o600 });
-    chmodSync(dir, 0o755);
-    const e = checkFileModes(p);
-    expect(e?.code).toBe('STORE_PERMISSIONS_TOO_OPEN');
-    expect(e?.message).toContain(`chmod 700 ${dir}`);
+    chmodSync(dir, 0o755); chmodSync(p, 0o600);
+    const r = checkFileModes(p);
+    expect(r.error).toBeUndefined();
+    expect(r.warning).toContain('mode 0755');
+    expect(r.warning).toContain('chmod 700');
+    expect(loadStore(p)).toHaveProperty('store');
   });
 
-  it.skipIf(win32)('POSIX: 0600 in a 0700 directory passes (skipped on Windows: ACL-inherited)', () => {
+  it.skipIf(win32)('a 0600 file in a 1777 STICKY directory loads with a warning — this is /tmp (skipped on Windows: ACL-inherited)', () => {
+    // The story's own criterion 1 puts the store at /tmp/a.json. Sticky means only the
+    // owner can unlink or rename their entry, which removes the replacement attack.
+    const dir = join(tmp, 'sticky');
+    mkdirSync(dir, { recursive: true });
+    chmodSync(dir, 0o1777);
+    const p = join(dir, 'instances.json');
+    writeFileSync(p, JSON.stringify(store()), { mode: 0o600 });
+    chmodSync(p, 0o600);
+    const r = checkFileModes(p);
+    expect(r.error).toBeUndefined();
+    expect(r.warning).toContain('(sticky)');
+    expect(loadStore(p)).toHaveProperty('store');
+  });
+
+  it.skipIf(win32)('a 0777 NON-sticky directory IS refused — the file can be replaced (skipped on Windows: ACL-inherited)', () => {
+    const dir = join(tmp, 'worldwritable');
+    mkdirSync(dir, { recursive: true });
+    chmodSync(dir, 0o777);
+    const p = join(dir, 'instances.json');
+    writeFileSync(p, JSON.stringify(store()), { mode: 0o600 });
+    chmodSync(p, 0o600);
+    const r = checkFileModes(p);
+    expect(r.error?.code).toBe('STORE_PERMISSIONS_TOO_OPEN');
+    expect(r.error?.message).toContain('group/world-writable without the sticky bit');
+    expect(r.error?.message).toContain('chmod 700');
+  });
+
+  it.skipIf(win32)('0600 in a 0700 directory is silent — no error and no warning (skipped on Windows: ACL-inherited)', () => {
     const p = join(tmp, 'ok', 'instances.json');
     saveStore(p, store());
-    expect(checkFileModes(p)).toBeNull();
+    expect(checkFileModes(p)).toEqual({});
   });
 
-  it.skipIf(!win32)('Windows: the mode check is skipped, so a file that would fail on POSIX still loads', () => {
+  it.skipIf(!win32)('Windows: the mode check is skipped entirely, so any file loads', () => {
     const p = join(tmp, 'instances.json');
     saveStore(p, store());
-    expect(checkFileModes(p)).toBeNull();
-    const r = loadStore(p);
-    expect('store' in r).toBe(true);
+    expect(checkFileModes(p)).toEqual({});
+    expect(loadStore(p)).toHaveProperty('store');
   });
 });
 

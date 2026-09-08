@@ -37,6 +37,8 @@ export interface LoadReport {
   loaded: string[];
   notLoaded: Array<{ label: string; code: string; message: string }>;
   configErrors: StoreError[];
+  /** Non-fatal: the store loaded, but something about it is worth saying out loud. */
+  warnings: string[];
   notes: string[];
 }
 
@@ -59,7 +61,7 @@ function envInt(name: string, fallback: number): number {
 class InstanceManager {
   private instances: Map<string, InstanceEntry> = new Map();
   private currentName = 'default';
-  private report: LoadReport = { source: 'none', path: null, loaded: [], notLoaded: [], configErrors: [], notes: [] };
+  private report: LoadReport = { source: 'none', path: null, loaded: [], notLoaded: [], configErrors: [], warnings: [], notes: [] };
 
   constructor() {
     this.load();
@@ -70,7 +72,7 @@ class InstanceManager {
   load(): LoadReport {
     this.instances.clear();
     this.currentName = 'default';
-    this.report = { source: 'none', path: null, loaded: [], notLoaded: [], configErrors: [], notes: [] };
+    this.report = { source: 'none', path: null, loaded: [], notLoaded: [], configErrors: [], warnings: [], notes: [] };
 
     // Env-defined instances win outright and the store is not read. This is the CI and
     // automation path; a user who has both is told which one is in effect.
@@ -103,9 +105,14 @@ class InstanceManager {
     if ('error' in result) {
       // SNOW_STORE is explicit: a missing file is an error, never a reason to try the
       // next candidate — otherwise a typo in the override silently loads another instance.
-      this.report.configErrors.push({ ...result.error, message: maskPath(result.error.message) });
+      //
+      // The message arrives already masked. It used to be masked HERE, with maskPath over
+      // the whole sentence — which masks a leading path and nothing else, so the remedy
+      // after `Run:` kept the raw home directory all the way into the log.
+      this.report.configErrors.push(result.error);
       return this.report;
     }
+    if (result.warning) this.report.warnings.push(result.warning);
 
     for (const [label, inst] of Object.entries(result.store.instances)) {
       try {
