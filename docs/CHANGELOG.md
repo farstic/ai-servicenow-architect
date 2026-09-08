@@ -39,7 +39,7 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   Nothing was deleted without a home: the repo map and the roster registry are now the generated
   sections of `docs/ARCHITECTURE.md`, the write gate and capture protocol are the generated rule
   file and `governance/mcp-protocols.md`, the worked example and the two embedded validation tests
-  are `VALIDATION-TESTS.md` T-01/T-02/T-03, and the two engine-version footers (v2.7.7–v2.8.0) are
+  are `tests/VALIDATION-TESTS.md` T-01/T-02/T-03, and the two engine-version footers (v2.7.7–v2.8.0) are
   the two newest entries under "Before 2.0.0" below, verbatim. The
   five-row gateway table and the Code Reviewer proposal sentence are copied byte-for-byte, because
   they are what the behavioural tests assert.

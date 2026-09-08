@@ -46,6 +46,8 @@ const BARE_IN_CELL = /`([A-Za-z0-9][A-Za-z0-9._-]*\.md)`/g;
 // Repository files, not corpus pages — naming these in a table cell is not a citation.
 const REPO_FILES = new Set(['SKILL.md', 'EXAMPLES.md', 'CLAUDE.md', 'README.md', 'STORIES.md',
   'NOTICE.md', 'CONTRIBUTING.md', 'ARCHITECTURE.md', 'VALIDATION-TESTS.md']);
+// Matched on the BASENAME above, so the S13 move to `tests/` needs no entry here — but the set
+// is basenames by design, and a path-shaped citation would not match it at all.
 
 export function findBareCitations(text, file = '<inline>') {
   const out = [];

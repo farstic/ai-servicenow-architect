@@ -32,7 +32,7 @@ When the user types `Status` or `/snowarch status`: run `./snowarch doctor --qui
 - `docs/PLATFORM-NOTES.md` — platform behaviour confirmed on real instances, each with its grounding.
 - `templates/` — ADR, traceability matrix, RAID log, NFR checklist.
 - `clients/<name>/` — per-engagement state, transcripts and artefacts.
-- `VALIDATION-TESTS.md` — the behavioural tests for this file and the protocols below.
+- `tests/VALIDATION-TESTS.md` — the behavioural tests for this file and the protocols below.
 
 ## 4. The roster, in one breath
 
@@ -122,4 +122,4 @@ When a ServiceNow platform behaviour is confirmed against a live instance, add i
 
 ## 12. Maintenance
 
-Run `npm run lint && npm test` before committing. Run `VALIDATION-TESTS.md` after any change to this file, to `governance/`, to a `SKILL.md` or to an agent. `.claude/skills/` and `.claude/agents/` are the only copies of the roster — there are no mirrors.
+Run `npm run lint && npm test` before committing. Run `tests/VALIDATION-TESTS.md` after any change to this file, to `governance/`, to a `SKILL.md` or to an agent. `.claude/skills/` and `.claude/agents/` are the only copies of the roster — there are no mirrors.

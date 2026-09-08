@@ -784,7 +784,7 @@ Two blocks are copied **byte-for-byte** and must not be paraphrased: the five-ro
 the Code Reviewer proposal sentence. Both are what the behavioural tests assert, and a paraphrase is
 a silent behaviour change — which is exactly what a line budget invites.
 
-**Run `VALIDATION-TESTS.md` after any change to `CLAUDE.md`, to `governance/`, to a `SKILL.md` or to
+**Run `tests/VALIDATION-TESTS.md` after any change to `CLAUDE.md`, to `governance/`, to a `SKILL.md` or to
 an agent.** The file-level checks prove the shape; only a session proves the behaviour.
 
 ---

@@ -261,7 +261,7 @@ Explicit "do not route X to Y" cases to prevent known confusion.
 
 ## 6. Resolution algorithm
 
-The algorithm runs in two phases that map directly onto the CLAUDE.md routing protocol: routing-time (§6.1 = CLAUDE.md Phase 1) and post-build evaluation (§6.2 = CLAUDE.md Phase 2). The numbered sub-steps below are taxonomy's finer-grained resolution procedure; the canonical phase/step references used across CLAUDE.md, the SKILL.md files, and VALIDATION-TESTS.md are Phase 1 Step 5 (Domain Expert gateway) and Phase 2 Step 4 (Domain Expert post-build review).
+The algorithm runs in two phases that map directly onto the CLAUDE.md routing protocol: routing-time (§6.1 = CLAUDE.md Phase 1) and post-build evaluation (§6.2 = CLAUDE.md Phase 2). The numbered sub-steps below are taxonomy's finer-grained resolution procedure; the canonical phase/step references used across CLAUDE.md, the SKILL.md files, and `tests/VALIDATION-TESTS.md` are Phase 1 Step 5 (Domain Expert gateway) and Phase 2 Step 4 (Domain Expert post-build review).
 
 ### 6.1 Routing-time phase
 
