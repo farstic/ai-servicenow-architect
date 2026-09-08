@@ -596,6 +596,16 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ### ARC-07-S10 — `docs/MODES-AND-PRESETS.md` final text; error-registry entries; runtime rule text for `AUTHENTICATION_FAILED` / `INSUFFICIENT_PRIVILEGES` / `PROD_WRITE_NOT_ACKNOWLEDGED`
 
+> **Amendment 2026-09-08 (from ARC-05-S07). First item of this story's list: the permission-modes
+> paragraph, which did not fit ARC-02-S09's 160-line budget** (the page is at 159). Drafted, to be
+> placed after section 3:
+>
+> > **Permission modes.** `disabledMcpjsonServers` removes the server, so no tool exists and the
+> > generated `allow`/`ask` lists are inert. `dontAsk` denies what `ask` would have prompted for,
+> > which is safe. `bypassPermissions` skips both — never with a live write preset.
+>
+> Adding it means the budget moves again, or something else in the page goes; say which.
+
 > **Amendment 2026-09-08 (from the ARC-02-S09 delivery).** **`docs/MODES-AND-PRESETS.md` exists with
 > the v1 text; this story replaces the probe wording, not the page.** Section 3 carries a review
 > screen with placeholder probe strings (`probe: ok`, `probe: no Now Assist licence detected …`,
