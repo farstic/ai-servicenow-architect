@@ -13,6 +13,31 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Added
 
+- **`docs sync` completed: modes, reconcile, refusal, failure mapping and a printable recipe.** S03
+  delivered the checkout; this is the rest of it, in the same module rather than a second one.
+  - `--mode sparse|full`, defaulting to `docs.mode` in `.local/bootstrap-state.json` when ARC-06 has
+    written one. `skip` is a bootstrap flag, not a mode: it means *do not call sync*, so it is
+    refused rather than quietly treated as sparse. Switching either way is a config change on the
+    existing checkout — no re-clone, `.git` unchanged.
+  - **Reconcile**, each step idempotent and in order: dirty tree refused first, then clone, mode,
+    pin (fetch by hash only when the object is absent), gitlink, and ADR-0008's root-file repair. A
+    second run on a clean checkout issues no git write at all and says `[docs] up to date (…)`.
+  - A dirty working tree inside the submodule exits **4** with one sentence and touches nothing;
+    `--force` is never reached for. Every other git failure exits **5** with the sentence the
+    operator needs — DNS, proxy (address printed, credentials masked), TLS interception, an
+    unfetchable pin, no disk space, or git's own first stderr line, never swallowed. The classifier
+    is unit-tested against canned stderr because a `file://` fixture cannot produce any of it.
+  - `--print-recipe` prints the git commands for the caller's actual state, and
+    `docs/ARCHITECTURE.md` gains the git-only launcher recipe that ARC-06 executes when Node is
+    absent. `tests/docs-recipe.test.mjs` asserts the two are byte-identical, so the block cannot
+    drift from the module.
+  - `--json` prints a minimal `{ pin, mode, areas, files, bytes, complete }` object. **Temporary:**
+    ARC-03-S06's `docsStatus()` replaces this shape; nothing should be built on these keys.
+  - `tests/docs-sync.test.mjs` builds a fixture corpus and serves it over `file://` — no network.
+    Two states it goes out of its way to produce, because they are the ones that break the recipe:
+    a pin that is not the branch tip (so fetch-by-hash is genuinely exercised) and a submodule whose
+    `.git` is a file rather than a directory.
+
 - **The eighteen behavioural tests move to `tests/VALIDATION-TESTS.md`, and describe the product as
   it now is.** They still described a two-surface product that D-03 cut, carried a per-test line
   naming those surfaces, cited tool names retired at S12, and reserved T-07 for a pre-commit sync

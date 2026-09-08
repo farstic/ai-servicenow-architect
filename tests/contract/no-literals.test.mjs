@@ -79,7 +79,9 @@ test('ARC-05-S10 criterion 4 — no engine tool holds a name the contract owns',
 });
 
 test('the allow-list is small, reasoned, and load-bearing', () => {
-  assert.ok(allow.length <= 4, `the allow-list grew to ${allow.length} (ceiling 4) — argue for it, do not edit it`);
+  // Raised from 4 to 5 at ARC-03-S05 for one homograph — a docs-checkout mode spelled like a tool
+  // package. The argument is in the entry; a sixth should be answered by renaming, not by a row.
+  assert.ok(allow.length <= 5, `the allow-list grew to ${allow.length} (ceiling 5) — argue for it, do not edit it`);
   for (const a of allow) {
     assert.ok(existsSync(join(root, a.file)), `${a.file} is allow-listed but does not exist`);
     assert.ok(a.reason.length > 60, `${a.file}: the reason is too short to be one`);

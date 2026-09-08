@@ -1,25 +1,48 @@
 {
-  "_rule": "ARC-05-S10's no-literal-names guard. Engine tooling reads names from the contract loader, never from a list of its own. These four places hold a name for a reason that survives the rule: each is PROSE keyed by a name, iterating the contract for the data. Every entry names the file, the literal it excuses, and why. The ceiling is 4 — a fifth needs an argument, not an edit.",
+  "_rule": "ARC-05-S10's no-literal-names guard. Engine tooling reads names from the contract loader, never from a list of its own. These five places hold a name for a reason that survives the rule. Four are PROSE keyed by a name, iterating the contract for the data. The fifth is a HOMOGRAPH: a docs-checkout mode that happens to be spelled like a tool package and has nothing to do with one. Every entry names the file, the literal it excuses, and why. The ceiling is 5 \u2014 a sixth needs an argument, not an edit. The fifth was argued at ARC-03-S05 (2026-09-09) and is the only entry of its kind; another homograph should be answered by renaming, not by a sixth row.",
   "allow": [
     {
       "file": "packages/contract/gen/presets.mjs",
-      "literals": ["read-only", "pdi-developer", "full", "custom"],
-      "reason": "The `Use it when…` column: advice about when to choose a preset, which no amount of flag data implies. The rows come from contract.presets; a preset with no entry renders an empty cell rather than a wrong one, and the coverage assertion below notices."
+      "literals": [
+        "read-only",
+        "pdi-developer",
+        "full",
+        "custom"
+      ],
+      "reason": "The `Use it when\u2026` column: advice about when to choose a preset, which no amount of flag data implies. The rows come from contract.presets; a preset with no entry renders an empty cell rather than a wrong one, and the coverage assertion below notices."
     },
     {
       "file": "packages/contract/gen/protocols.mjs",
-      "literals": ["read-only", "pdi-developer", "full"],
+      "literals": [
+        "read-only",
+        "pdi-developer",
+        "full"
+      ],
       "reason": "The same advice column in the long-form document. Same shape, same reason."
     },
     {
       "file": "packages/contract/gen/rule-file.mjs",
-      "literals": ["read-only", "pdi-developer", "full", "custom"],
-      "reason": "The short preset gloss in the always-loaded rule file — `read-only (none)`, `full (all six)`. Prose, keyed by name; the names iterated are the contract's."
+      "literals": [
+        "read-only",
+        "pdi-developer",
+        "full",
+        "custom"
+      ],
+      "reason": "The short preset gloss in the always-loaded rule file \u2014 `read-only (none)`, `full (all six)`. Prose, keyed by name; the names iterated are the contract's."
     },
     {
       "file": "packages/contract/gen/troubleshooting.mjs",
-      "literals": ["FLUENT_NOT_INSTALLED"],
+      "literals": [
+        "FLUENT_NOT_INSTALLED"
+      ],
       "reason": "The `Also reported by` rule: the doctor checks PATH for the SDK, so this one code is reported by the doctor while the rest of its family is not. A structural signal would be a guess; the exception is one line and says which code and why."
+    },
+    {
+      "file": "tools/snowarch/lib/docs/sync.mjs",
+      "literals": [
+        "full"
+      ],
+      "reason": "A HOMOGRAPH, not a contract name. `MODE.full` is how much of the ServiceNow docs corpus is on disk \u2014 the opposite of a sparse checkout \u2014 and has no relationship to the `full` tool package, which is about which MCP tools a preset exposes. The story fixes the CLI as `--mode sparse|full` and ARC-06's launchers depend on that spelling, so it cannot be renamed away. Written once, in one frozen constant the module compares against; the four call sites hold no literal."
     }
   ]
 }
