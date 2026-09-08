@@ -66,7 +66,7 @@ describe.skipIf(!LIVE)('LIVE E2E against a real ServiceNow instance (opt-in: RUN
     expect(del.action).toBe('deleted');
     created.pop();
     await expect(client.getRecord('incident', c.sys_id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
-  }, 30000);
+  });
 
   it('attachment upload (.png) is accepted by the Attachment API', async () => {
     const c = await routeToolInvocation(client, 'snow_inc_incident_add', { short_description: `${TAG} attach` });
@@ -75,7 +75,7 @@ describe.skipIf(!LIVE)('LIVE E2E against a real ServiceNow instance (opt-in: RUN
     await client.uploadAttachment('incident', c.sys_id, 'live.png', 'image/png', png);
     const att = await client.queryRecords({ table: 'sys_attachment', query: `table_name=incident^table_sys_id=${c.sys_id}`, limit: 5 });
     expect(att.records.length).toBeGreaterThanOrEqual(1);
-  }, 30000);
+  });
 
   it('pagination returns distinct pages via limit/offset', async () => {
     const p1 = await client.queryRecords({ table: 'incident', limit: 2, offset: 0 });
@@ -103,7 +103,7 @@ describe.skipIf(!LIVE)('LIVE E2E against a real ServiceNow instance (opt-in: RUN
     } as any);
     const r = await oauthClient.queryRecords({ table: 'incident', limit: 1 });
     expect(Array.isArray(r.records)).toBe(true);
-  }, 30000);
+  });
 
   // Requires impersonation rights + a target user sys_id — gated by SN_LIVE_IMPERSONATE_SYSID.
   it.skipIf(!process.env.SN_LIVE_IMPERSONATE_SYSID)('impersonation: query routed as the target user via X-Sn-Impersonate', async () => {
@@ -115,5 +115,5 @@ describe.skipIf(!LIVE)('LIVE E2E against a real ServiceNow instance (opt-in: RUN
     } as any).withUser({ sysId: process.env.SN_LIVE_IMPERSONATE_SYSID });
     const r = await impClient.queryRecords({ table: 'sys_user', limit: 1 });
     expect(Array.isArray(r.records)).toBe(true);
-  }, 30000);
+  });
 });
