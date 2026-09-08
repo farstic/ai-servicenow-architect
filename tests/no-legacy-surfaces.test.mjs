@@ -19,6 +19,8 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
+import { lintLineEndings, lintHyphenSplits } from './lib/editorconfig.mjs';
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const owners = JSON.parse(readFileSync(join(root, 'tests/legacy-names.allowlist.json'), 'utf8')).files;
 
@@ -306,13 +308,13 @@ test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it mu
   // The budget of record is ARC-02-S09 criterion 1, amended 2026-09-08 from 150 to **160**: the
   // page merges ARC-04's tested store and permission claims rather than replacing them, and
   // ARC-07-S10 still has probe strings to add. 150 was set for a page written from scratch.
-  // `.editorconfig` says `insert_final_newline = true` and nothing in the repository enforces it:
-  // a reflow pass here dropped this file's last newline and all nineteen CI cells stayed green.
-  // Guarded for this page at least, until something checks it repo-wide.
-  assert.ok(doc.endsWith('\n') && !doc.endsWith('\n\n'), 'must end with exactly one newline');
-  assert.ok(!doc.includes('\r'), 'CRLF line endings');
-  // Words split across a wrap boundary read as two words once markdown joins the lines.
-  assert.deepEqual(doc.split('\n').filter((l) => /\w-$/.test(l)), []);
+  // The three ways a wrapping pass damages a document without changing a sentence. They were
+  // page-local here until `tests/lib/editorconfig.mjs` took the rule repo-wide; delegating rather
+  // than keeping a second copy means "malformed" means one thing, and this page cannot drift into
+  // being held to a different standard than every other file.
+  const ec = [...lintLineEndings(root, ['docs/MODES-AND-PRESETS.md']),
+    ...lintHyphenSplits(root, ['docs/MODES-AND-PRESETS.md'])];
+  assert.deepEqual(ec, []);
 
   const lines = doc.trimEnd().split('\n').length;   // what `wc -l` reports for a file ending in \n
   console.log(`    ARC-02-S09: docs/MODES-AND-PRESETS.md is ${lines} lines (budget of record: 160)`);

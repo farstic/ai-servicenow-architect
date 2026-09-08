@@ -657,6 +657,27 @@ same list `--check` prints.
 
 ---
 
+## `.editorconfig` is enforced
+
+`tests/editorconfig.test.mjs` checks every tracked `.md .mjs .ts .json .yml .yaml` file for exactly
+one final newline and no CR, and markdown prose for a word split across a wrap boundary. It exists
+because the config declared those rules for two years and nothing read them: five files were in
+breach when the check was written, and every one had passed CI.
+
+Excluded, because a "fix" there would be a falsification rather than a repair: `vendor/**` (not
+ours), `packages/snowarch/dist/**` (build output — fix the build), `**/fixtures/**` (several are
+malformed on purpose, that being their subject), `scripts/legacy/**` (the v2 engine as imported) and
+`docs/spikes/**` (records of what was run). `.ps1` and `.cmd` are outside the extension list because
+`.editorconfig` gives them CRLF — a check assuming LF everywhere would be wrong about the two file
+types the config is most explicit on.
+
+**If you rewrite a whole file from a script, the terminator is yours to restore.** All five original
+breaches came from the same shape: read a file, split it, transform, join the parts, write it back —
+`'\n\n'.join(paragraphs)` has no trailing newline and nothing complains. Write
+`text.rstrip('\n') + '\n'`, or run the test.
+
+---
+
 ## Where a finding goes
 
 A thing learned on a real instance is one of two kinds, and they have different homes because they
