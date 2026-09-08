@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
@@ -20,9 +20,12 @@ const SERVER = resolve(here, '../../dist/server.js');
  * module does not call dotenv, not that the file is ignored.
  */
 function runServer(cwd: string, env: Record<string, string | undefined>): { stdout: string; stderr: string } {
+  // pathToFileURL, not the bare path: on Windows a dynamic import of an absolute path
+  // fails with ERR_UNSUPPORTED_ESM_URL_SCHEME, because `D:\\...` parses as a URL scheme.
+  // Only the windows-latest cells could have shown this.
   const r = spawnSync(process.execPath, ['-e', `
     process.env.NODE_ENV = 'test';
-    import(${JSON.stringify(SERVER)}).catch((e) => { console.error(String(e)); process.exit(1); });
+    import(${JSON.stringify(pathToFileURL(SERVER).href)}).catch((e) => { console.error(String(e)); process.exit(1); });
     setTimeout(() => process.exit(0), 1500);
   `], {
     cwd,
