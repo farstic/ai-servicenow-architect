@@ -475,6 +475,17 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; tests green; `.claude/settings.json` committed with generated arrays and `gen:check` green; `docs/MODES-AND-PRESETS.md` paragraph delivered to ARC-02; S-12/S-18 verdict lines in `03` reference this story.
 
 ### ARC-05-S08 — Server `tests/contract.test.ts`: gates, presets, invariants, pin, dist parity
+
+> **Amendment 2026-09-08 (from the `fix/ensure-input-schema` PR).** **The final contract test must
+> assert schema-vs-validation agreement across the catalogue, not just the gates.**
+> `snow_us_active_update_set_ensure` shipped a handler that refused `name is required` behind an
+> `inputSchema` that listed `name` nowhere and `required: []` — the published contract said a call
+> was valid and the server refused it. That one tool is fixed in its own PR with a local regression
+> test; the general property belongs here, because only this test sees every tool at once. The
+> shape: for every tool, each `<x> is required` refusal the handler can raise names a property the
+> schema marks required, and every property the schema advertises is one the handler reads. The
+> second half is what caught it — `default_name` was advertised for a handler that never looked at
+> it, so nothing failed until a caller trusted the schema.
 **As** the server **I want** a test that proves every tool throws exactly its declared gate code when flags are off, that presets open exactly their families, that `mutates` and `gate` are consistent with each other and with tool names, that the committed `dist/contract.json` equals both the generator output and the engine's pin, and that every thrown error code is registered **so that** a server change that would break the engine fails on the server side before the engine ever sees it.
 **Context.** ARC README deliverable 5 and acceptance criteria 1 (server side: sha mismatch on rename) and 3 (seventh flag). `01` §11 "Server test" — extends `tests/tools/parity.test.ts`' throwing-Proxy pattern (`mcp:tests/tools/parity.test.ts:14-18`: a client whose every method throws `MOCK_CLIENT_CALL`, so a recognised tool either permission-throws or reaches the client). ARC-04 S06 writes the first form of the file (its tests (a)–(g)); ARC-04 S01 scopes vitest to the package; this story completes the file.
 **Scope.** In: `packages/snowarch/tests/contract.test.ts` (final form) and `tests/contract-exceptions.json`; the per-tool gate probe; preset probes; invariants; pin and generator parity; error-code registry test; rename-map subset test. Out: changing any gate or declaration (ARC-04); live tests (ARC-04's `RUN_LIVE_E2E`).

@@ -132,13 +132,18 @@ export function updateSetToolManifest(): ToolDefinition[] {
     },
     {
       name: 'snow_us_active_update_set_ensure',
-      description: 'Ensure an active Update Set exists; create one automatically if none is in progress. **[Scripting]**',
+      description: 'Find the caller\'s own in-progress Update Set by name, or create it. **[Scripting]**',
       inputSchema: {
         type: 'object',
         properties: {
-          default_name: { type: 'string', description: 'Name to use when auto-creating (default: "AI Session Update Set")' },
+          name: {
+            type: 'string',
+            description: 'Update set name the engagement uses, e.g. "ENG-123 story 4". Matched against '
+              + "the caller's own in-progress sets, and used as the name if one has to be created.",
+          },
+          description: { type: 'string', description: 'Description to set when a new update set is created' },
         },
-        required: [],
+        required: ['name'],
       },
       gate: 'scripting',
       mutates: true,
