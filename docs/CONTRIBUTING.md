@@ -188,6 +188,13 @@ run was 2.9 s and 2.1 s of it was L03 scanning ~400 regexes over every line of e
 was right and the check was slow — a prefilter took the whole lint to ~0.2 s, and the assertion that
 caught it would have gone red on the Windows cell first. Before touching a budget, time the parts.
 
+**And the other half of the same rule:** time the parts first; when the parts are fast and the budget
+is what fails under contention, the budget *is* the subject — a wall-clock limit inside a parallel
+runner measures contention as well as its subject. That is the snowarch suite's 5 s default, which
+failed on three different tests across four runs while their real costs were ~220 ms and ~1 s. A green
+CI cell is not evidence against it either: a 2-core runner spawns fewer workers and contends less, so
+it says something about the runner, not about the suite.
+
 **A skipped test states its reason, and the reason is load-bearing.** Two skip deliberately today — the
 `docs/CHANGELOG.md` ordering guard (the imported changelog reads *ahead* of the root version because the
 product renumbered downward at the merge; it becomes a live assertion when ARC-09 regenerates the file)

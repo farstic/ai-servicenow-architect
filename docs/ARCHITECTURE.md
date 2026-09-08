@@ -176,6 +176,11 @@ each enforced by a rule in `tests/agents-lint.test.mjs`:
 rules — how the Chief Architect routes, what each specialist owns, what a builder must return — live in
 `CLAUDE.md` and `governance/`, and are read by the model at runtime, not by a maintainer at design time.
 
+**Mode and preset are the two axes of what a session may do**, and they are documented once, in
+`docs/MODES-AND-PRESETS.md`: what `design-only` and `live` mean, what each of the four presets turns on,
+what each of the six flags does in plain language, and how a `prod` instance is protected. Nothing about
+those semantics is restated here — a second copy is the thing that drifts.
+
 **The routing protocol has two phases and the gateways fire in both.** Phase 1 is routing-time: restate
 the task, read engagement context, surface assumptions, evaluate the §1.1 Baseline-First rule, and — if
 the task touches a domain a Domain Expert gateway covers — produce that gateway's 5-Part Constraint

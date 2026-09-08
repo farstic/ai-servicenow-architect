@@ -203,6 +203,68 @@ test('ARC-02-S06 criterion 4 — every governance reference is prefixed and reso
   assert.deepEqual(unprefixed, [], `${unprefixed.length} unprefixed reference(s)`);
 });
 
+test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it must', () => {
+  // Each string is a decision someone has to be able to find: the four preset names and six flag
+  // names (`01` §6.3), the review screen and the D-05 sentence about what a failed probe does and
+  // does not do, the environment regex, the production acknowledgement, and D-04's store facts.
+  // Asserted by presence rather than by prose, because ARC-07-S10 rewrites the wording around
+  // them and must be free to — without dropping any of them on the way.
+  const doc = read('docs/MODES-AND-PRESETS.md');
+  const required = [
+    'read-only', 'pdi-developer', 'full', 'custom',
+    'WRITE', 'CMDB_WRITE', 'SCRIPTING', 'ATF', 'NOW_ASSIST', 'FLUENT',
+    // And the keys a reader actually types. The short names are `01` §6.3's prose form; the store
+    // and the environment take the `*_ENABLED` form, and four of the six appeared in the page only
+    // incidentally while two did not appear at all — so a reader could not map a bullet to the key.
+    'WRITE_ENABLED', 'CMDB_WRITE_ENABLED', 'SCRIPTING_ENABLED',
+    'ATF_ENABLED', 'NOW_ASSIST_ENABLED', 'FLUENT_ENABLED',
+    'Enter = accept as shown', String.raw`^https://dev\d+\.service-now\.com`,
+    '--ack-prod', 'prodWriteAck', '.local/instances.json', '0600',
+    'OneDrive', 'Dropbox', 'iCloud Drive', 'Google Drive',
+    '--yes', "Propose, don't impose",
+    // Verbatim from D-05: the whole point of the review screen is that a probe informs the user
+    // and never decides for them, and a paraphrase is exactly how that guarantee gets softened.
+    'A probe that fails downgrades the recommendation shown on that line; '
+      + 'it never flips the toggle by itself',
+    '<!-- PRESETS:BEGIN (generated from the contract by scripts/gen-governance.mjs — ARC-05) -->',
+    '<!-- PRESETS:END -->',
+  ];
+  assert.deepEqual(required.filter((r) => !doc.includes(r)), []);
+
+  // Criterion 2. The page is current-facing, so neither the retired vocabulary nor a legacy product
+  // name belongs in it — including in the upgrade note, which names the BEHAVIOUR that changed
+  // rather than the package it changed in.
+  //
+  // The words come from the vocabulary fixture, never spelled here: a file that spells one becomes
+  // a detector the legacy-name ratchet then has to exempt, which is exactly what this file did on
+  // the first attempt. Bare product names are derived by unwrapping the `mcp__…__` patterns —
+  // `servicenow-mcp` is deliberately NOT retired repo-wide (D-01's npm record is nameable), it is
+  // forbidden in THIS file, so the criterion needs the bare form and the fixture holds the prefix.
+  const vocab = JSON.parse(read('tests/fixtures/retired-vocabulary.json')).tokens.map((t) => t.pattern);
+  const bare = vocab.map((v) => v.replace(/^mcp__/, '').replace(/__$/, ''));
+  const banned = [...new Set([...vocab, ...bare])].map((v) => new RegExp(v));
+  const offending = doc.split('\n')
+    .map((line, i) => [i + 1, line])
+    .filter(([, line]) => banned.some((re) => re.test(line)))
+    .map(([n]) => `docs/MODES-AND-PRESETS.md:${n}`);
+  assert.deepEqual(offending, []);
+
+  // The budget of record is ARC-02-S09 criterion 1, amended 2026-09-08 from 150 to **160**: the
+  // page merges ARC-04's tested store and permission claims rather than replacing them, and
+  // ARC-07-S10 still has probe strings to add. 150 was set for a page written from scratch.
+  // `.editorconfig` says `insert_final_newline = true` and nothing in the repository enforces it:
+  // a reflow pass here dropped this file's last newline and all nineteen CI cells stayed green.
+  // Guarded for this page at least, until something checks it repo-wide.
+  assert.ok(doc.endsWith('\n') && !doc.endsWith('\n\n'), 'must end with exactly one newline');
+  assert.ok(!doc.includes('\r'), 'CRLF line endings');
+  // Words split across a wrap boundary read as two words once markdown joins the lines.
+  assert.deepEqual(doc.split('\n').filter((l) => /\w-$/.test(l)), []);
+
+  const lines = doc.trimEnd().split('\n').length;   // what `wc -l` reports for a file ending in \n
+  console.log(`    ARC-02-S09: docs/MODES-AND-PRESETS.md is ${lines} lines (budget of record: 160)`);
+  assert.ok(lines <= 160, `${lines} lines — over criterion 1's budget of 160`);
+});
+
 test('ARC-02-S06 criterion 5 — governance §2 names no retired tool', () => {
   // The interim §2.2 will be replaced twice (ARC-05-S05, S06). This asserts that whatever it
   // says, it does not tell a reader to call something the server answers with UNKNOWN_TOOL.

@@ -583,6 +583,16 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ### ARC-07-S10 — `docs/MODES-AND-PRESETS.md` final text; error-registry entries; runtime rule text for `AUTHENTICATION_FAILED` / `INSUFFICIENT_PRIVILEGES` / `PROD_WRITE_NOT_ACKNOWLEDGED`
 
+> **Amendment 2026-09-08 (from the ARC-02-S09 delivery).** **`docs/MODES-AND-PRESETS.md` exists with
+> the v1 text; this story replaces the probe wording, not the page.** Section 3 carries a review
+> screen with placeholder probe strings (`probe: ok`, `probe: no Now Assist licence detected …`,
+> `probe: @servicenow/sdk not on PATH …`) — replace those with what the wizard actually prints. Two
+> things in that section are load-bearing and asserted by `tests/no-legacy-surfaces.test.mjs`: the
+> line `Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset`, and
+> the D-05 sentence *"A probe that fails downgrades the recommendation shown on that line; it never
+> flips the toggle by itself"*, which must survive verbatim — a paraphrase is how that guarantee gets
+> softened. The preset table between the `PRESETS:` markers belongs to ARC-05-S05, not to this story.
+
 **As** an individual practitioner (and the engine reading the generated rule file) **I want** one page that explains Mode, the four presets, the six flags, the review screen, production rules, where credentials live and how to use a password manager, plus a troubleshooting entry for every error the wizard can print, and a runtime rule that makes the engine stop on `AUTHENTICATION_FAILED` **so that** nobody has to read source code or a transcript to recover.
 
 **Context.** README deliverables "`docs/MODES-AND-PRESETS.md` final; `docs/TROUBLESHOOTING.md` entries for `AUTHENTICATION_FAILED`, `INSUFFICIENT_PRIVILEGES`, `PROD_WRITE_NOT_ACKNOWLEDGED`, URL-shape errors" and "`AUTHENTICATION_FAILED` runtime rule in the generated rule file". ARC-02-S09 creates the page (the `01` §6.3 table between `<!-- PRESETS:BEGIN … -->` / `<!-- PRESETS:END -->`); ARC-05-S05 generates the rule file and the PRESETS block, ARC-05-S06 owns the error-code registry (`packages/snowarch/src/utils/error-codes.ts`, `ERROR_CODES: Record<string, { meaning, remedy, command?, showInRule, httpStatus? }>`) and generates `docs/TROUBLESHOOTING.md` from it ("the doctor and the wizard import the same table" — ARC-05 acceptance criterion 6); ARC-08-S10 reviews the `showInRule` set and wires T-19. `01` §8 runtime error mapping: `AUTHENTICATION_FAILED` → stop, no retry, `./snowarch instance test|set-credentials <label>`; `INSUFFICIENT_PRIVILEGES` → role list per preset. P-06 (one vocabulary), R-04 (password-manager path documented meanwhile).
