@@ -150,8 +150,7 @@ never edit between the markers.
 
 | Skill | Version |
 |---|---|
-
-*None yet — ARC-02-S11 adds `snowarch`.*
+| `snowarch` | 2.0.0 |
 
 <!-- ROSTER:END -->
 

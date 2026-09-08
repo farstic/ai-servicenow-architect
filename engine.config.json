@@ -25,6 +25,9 @@
   },
   "roster": {
     "skills": 28,
-    "agents": 9
+    "agents": 9,
+    "utility": [
+      "snowarch"
+    ]
   }
 }

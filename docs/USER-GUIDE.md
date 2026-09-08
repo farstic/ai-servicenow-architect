@@ -14,7 +14,53 @@ For each scenario: what you type, what the engine does, what you receive, and wh
 
 Open Claude Code (`claude` from the repo root) and type your request at the `❯` prompt. If you prefer the browser, the same prompts work in the Master Project chat on Claude.ai — with one difference: **live deployment to an instance (Scenario 4) is CLI-only**, because the MCP connection runs through Claude Code. See [`INSTALLATION-GUIDE.md`](./INSTALLATION-GUIDE.md) or [`ADVANCED-WEB-SETUP.md`](./ADVANCED-WEB-SETUP.md) if you haven't set up yet.
 
-There are no special commands or syntax. Describe what you need in plain English. Mention the module (ITSM, CSM, HRSD, ITOM) if it's obvious, mention "Australia release" so the engine doesn't recommend a feature you don't have, and let the engine handle the rest.
+Describe what you need in plain English — that is the whole interface for design work. There is one
+exception, the `/snowarch` command below, which configures and reports on the engine itself rather
+than doing ServiceNow work. Mention the module (ITSM, CSM, HRSD, ITOM) if it's obvious, mention "Australia release" so the engine doesn't recommend a feature you don't have, and let the engine handle the rest.
+
+---
+
+## `/snowarch` commands
+
+Three sub-commands, none of which design anything: they tell you what state this checkout is in, and
+they walk you through connecting a ServiceNow instance.
+
+| You type | What you get |
+|---|---|
+| `/snowarch status`, or just `Status` | The authoritative `Mode:` line, then the engine version, the docs pin, the roster and the capability flags in force. |
+| `/snowarch setup-instance` | The steps for adding an instance — with the credential part handed to your own terminal. |
+| `/snowarch setup-instance --resume` | Picks up after you have finished in the terminal, and confirms what is now configured. |
+| `/snowarch doctor` | The full health check: `DOCTOR: n ok, n warn, n fail`, then every failure with its remedy. |
+
+### Reading the Mode line
+
+`Mode:` is the answer to "can this session touch a real instance?", and it comes from the doctor —
+never from what the session infers. Four shapes:
+
+```
+Mode: live — instance=pdi (pdi) preset=pdi-developer — doctor 2026-09-08 41 ok
+Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance
+Mode: unknown — this checkout has not been bootstrapped; run ./bootstrap.sh (Windows: bootstrap.cmd)
+Mode: <mode> — from bootstrap state; doctor unavailable until Node 20+ is installed
+```
+
+If you ever see a mode stated without one of these shapes, the session has guessed and you should
+ask it to run `/snowarch status` again. **Live mode is not the same as permission to write** — every
+write still needs its own `write approved` message (see *Approving a write*, below).
+
+### Adding an instance
+
+`/snowarch setup-instance` asks you, in chat, for two things only: a short label and the instance URL.
+Everything else — environment, authentication method, preset — the terminal wizard proposes and shows
+you for review.
+
+It then hands you a five-step block to run in your own terminal, ending with
+`/snowarch setup-instance --resume` to come back here. That hand-off is the point of the command:
+**your password never passes through the chat.** The session will not ask you for a password, token or
+client secret, and if anything claiming to be this command does, stop and report it.
+
+Nothing is written to the instance by any of this. Setup configures a connection; using it is a
+separate, explicitly approved act.
 
 ---
 

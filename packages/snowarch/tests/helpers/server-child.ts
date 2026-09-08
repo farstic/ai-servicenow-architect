@@ -44,8 +44,15 @@ const SIGKILL_AFTER_MS = 500;
  * `SIGKILL` cannot be caught, so a child that ignores the transport's `SIGTERM` still dies; a
  * pid that has already been reaped is simply absent and costs one failed `kill`. Signalling is
  * deferred by half a second rather than sent immediately so that an ordinary graceful exit —
- * the normal case — is never turned into a kill, and the delay is short enough that a pid
- * cannot plausibly have been recycled onto an unrelated process within it.
+ * the normal case — is never turned into a kill.
+ *
+ * KNOWN LIMITATION, accepted: this signals a pid, not a handle. If the child exited and the OS
+ * recycled its pid between the reap starting and the `SIGKILL` — 500 ms to 2 s later — the
+ * signal would land on an unrelated process. There is no handle to signal instead: the SDK
+ * transport clears its own reference to the child at the start of `close()`, so by the time a
+ * teardown runs, the pid captured at spawn is the only identifier that survives. On a runner
+ * allocating pids sequentially through a 32-bit space the window is remote, and the alternative
+ * — not reaping — is the failure this file exists to stop.
  */
 export async function reapServerChildren(): Promise<void> {
   const pids = [...spawned];

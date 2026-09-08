@@ -15,7 +15,12 @@ import { dirname, join, resolve } from 'node:path';
 import { measure, pollutingAncestors, cleanScratchParent } from '../scripts/ci/skill-listing-check.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const roster = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')).roster.skills;
+// Every skill DIRECTORY registers, personas and utility alike — the CLI does not know the
+// difference and should not. `roster.skills` counts personas, so the utility skills are added back
+// here rather than excluded from the listing: a `/snowarch` that failed to register would be a
+// silent loss of the status command, which is exactly what this test exists to catch.
+const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+const roster = config.roster.skills + (config.roster.utility ?? []).length;
 
 function poisoned() {
   // realpath: on macOS /var is a symlink to /private/var, and cleanScratchParent resolves its

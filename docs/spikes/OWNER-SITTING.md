@@ -462,6 +462,7 @@ python3 -c "import json,os;print(json.load(open(os.path.expanduser('~/.claude.js
 | Item | Why it is not here |
 |---|---|
 | **S-03, S-04, S-08** and the Windows halves of S-01 / S-07 / S-15 / S-20 | `DEFERRED — Windows VM pending (owner input #2)`. A machine without Git Bash on `PATH` is needed. |
+| **ARC-02-S11 criterion 9** — `/snowarch status` through `./snowarch` or the `node tools/snowarch/bin/snowarch.mjs` fallback, on Windows | `DEFERRED — Windows VM pending (owner input #2)`, same machine as the row above. The half that a file can prove is done and permanent: `snowarch.cmd instance add …` is in the hand-off text and `tests/snowarch-skill.test.mjs` fails if it leaves. What needs the VM is whether a Windows shell reaches the launcher at all — and before ARC-06 there is no launcher to reach, so this cannot be closed until ARC-06 ships either way. |
 | **The Ubuntu VM rows** | ✅ **No longer blocked.** `arc00-ubuntu` is logged in and running Claude Code **2.1.263**; `claude -p` works there. **S-07 and S-05 have been run on it since** — see those records, and note S-07's Ubuntu row changed the spike's conclusion (recipe B does not exist on Ubuntu 22.04's stock git 2.34.1, and that git silently omits the corpus's five root files including `LICENSE`). |
 | **S-14e** second machine | Now runnable without you — no longer waiting on a login. |
 | **S-14g** throttled network | Day 4 of the time-box, on the VM (`tc qdisc … rate 2mbit`). Unthrottled it already installs in **1.9 s** against a 60-second cap. |
