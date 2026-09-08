@@ -68,16 +68,16 @@ ARC-04-S01/S02/S03/S04/S05/S06/S07/S08/S11/S13 (vitest scoping and the retained 
 
 Detailed write-ups: [`STORIES.md`](STORIES.md) (11 stories, 15–20 engineer-days).
 
-| ID | Title | Size |
-|---|---|---|
-| ARC-05-S01 | `required-tools.json`: engine pin with `used_by` and `contractSha256` | M |
-| ARC-05-S02 | `retired-names.json` generated from the rename map | S |
-| ARC-05-S03 | `engine-lint.mjs` core: tokens, prefix, retired names, pin | M |
-| ARC-05-S04 | `engine-lint.mjs` structural checks: descriptions, path references, `used_by`, generated-file byte check, plugin validate | M |
-| ARC-05-S05 | `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md` | M |
-| ARC-05-S06 | Error-code registry, `governance/mcp-protocols.md` and `docs/TROUBLESHOOTING.md` | M |
-| ARC-05-S07 | Generated `permissions.allow` / `permissions.ask` blocks in `.claude/settings.json` | M |
-| ARC-05-S08 | Server `tests/contract.test.ts`: gates, presets, invariants, pin, dist parity | L |
-| ARC-05-S09 | CI job `contract` and the release gate script | S |
-| ARC-05-S10 | Contract loader for engine tooling and the no-literal-names guard | M |
-| ARC-05-S11 | Drift drill and contributor documentation | M |
+| ID | Title | Size | Status |
+|---|---|---|---|
+| ARC-05-S01 | `required-tools.json`: engine pin with `used_by` and `contractSha256` | M | Done (2026-09-08) |
+| ARC-05-S02 | `retired-names.json` generated from the rename map | S | Not started |
+| ARC-05-S03 | `engine-lint.mjs` core: tokens, prefix, retired names, pin | M | Not started |
+| ARC-05-S04 | `engine-lint.mjs` structural checks: descriptions, path references, `used_by`, generated-file byte check, plugin validate | M | Not started |
+| ARC-05-S05 | `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md` | M | Not started |
+| ARC-05-S06 | Error-code registry, `governance/mcp-protocols.md` and `docs/TROUBLESHOOTING.md` | M | Not started |
+| ARC-05-S07 | Generated `permissions.allow` / `permissions.ask` blocks in `.claude/settings.json` | M | Not started |
+| ARC-05-S08 | Server `tests/contract.test.ts`: gates, presets, invariants, pin, dist parity | L | Not started |
+| ARC-05-S09 | CI job `contract` and the release gate script | S | Not started |
+| ARC-05-S10 | Contract loader for engine tooling and the no-literal-names guard | M | Not started |
+| ARC-05-S11 | Drift drill and contributor documentation | M | Not started |

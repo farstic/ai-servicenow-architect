@@ -74,7 +74,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-04-S12 | ARC-04 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | S04, S06 | M2 | Done (2026-09-08) |
 | ARC-04-S13 | ARC-04 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | S06, S08 | M2 | Done (2026-09-08) |
 | ARC-04-S14 | ARC-04 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M | S01, S13 | M2 | Done (2026-09-08) |
-| ARC-05-S01 | ARC-05 | `required-tools.json`: engine pin with `used_by` and `contractSha256` | M | ARC-01-S04; ARC-04-S06/S13 | M2 | Not started |
+| ARC-05-S01 | ARC-05 | `required-tools.json`: engine pin with `used_by` and `contractSha256` | M | ARC-01-S04; ARC-04-S06/S13 | M2 | Done (2026-09-08) |
 | ARC-05-S02 | ARC-05 | `retired-names.json` generated from the rename map | S | ARC-04-S01 | M2 | Not started |
 | ARC-05-S03 | ARC-05 | `engine-lint.mjs` core: tokens, prefix, retired names, pin | M | S01, S02 | M2 | Not started |
 | ARC-05-S04 | ARC-05 | `engine-lint.mjs` structural checks: descriptions, path references, `used_by`, generated-file byte check, plugin validate | M | S03, S05, S06, S07; ARC-00-S12; verdicts S-19 | M2 | Not started |

@@ -280,6 +280,43 @@ asserts the *known-bad* state (all agents still carry a pinned model id, none pr
 the agents early fails that test and points at the switch, rather than letting a disabled rule pass
 quietly over an already-clean tree.
 
+### Updating the contract pin
+
+`packages/contract/required-tools.json` declares what the engine's texts and skills depend on — the
+tool names, the gate each is *expected* to carry, and the sha256 of the server contract they were
+written against. It exists because `execute_script` was once renamed to `snow_fluent_script_exec`
+**and re-gated in the same change**, and nothing on the engine side noticed (`00` §8).
+
+After any change to `packages/snowarch/dist/contract.json`:
+
+```sh
+node packages/contract/pin.mjs          # proposes, then asks
+node packages/contract/pin.mjs --yes    # proposes and applies
+```
+
+It prints a proposal first and writes nothing until you agree — and on a non-TTY (CI, a hook, an
+agent) it exits **2** rather than deciding for you. Exit **0** applied, **1** refused, **2** cannot
+run, **3** aborted.
+
+Two things it refuses to do on its own:
+
+- **`MISSING <name>`** — a tool the engine depends on is not in the contract. Never auto-resolved:
+  either it was renamed, and the texts that cite it need updating too, or it was removed, and
+  somebody has to decide what the engine does instead.
+- **`REGATE <name>: expected …, server declares …`** — the gate or `mutates` changed. Accept it
+  deliberately with `--accept-regate <name>…`, **and name each one in the commit message**.
+  Accepting means the engine now expects the server's declaration, and a re-gate can change what a
+  user is asked to approve.
+
+`SNOW_CONTRACT_PATH` and `SNOW_PIN_PATH` override the two files, for fixtures. Use **both** when
+demonstrating a re-gate: with only the first, the run writes its conclusion about a fixture into the
+committed pin — which is how a demonstration of criterion 4 left the real file claiming
+`snow_fluent_script_exec` is `write`, and the next honest run then refused.
+
+`npm run lint` validates the file against its schema. The unit test proves it is *self-consistent*;
+ARC-05-S03's L07 proves `serverKey` matches `engine.config.json`; ARC-05-S08 proves the gates match
+the running catalogue. Three checks, three reasons to go red, deliberately not one.
+
 ### Evidence, not reasoning
 
 A criterion is reported as passing only by pasting the command and its actual output. Reasoning that

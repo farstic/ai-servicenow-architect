@@ -25,6 +25,40 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 
 ### ARC-05-S01 — `required-tools.json`: engine pin with `used_by` and `contractSha256`
 
+> **Amendment 2026-09-08 (from the S01 delivery).**
+> - **The first real pin raised TWO re-gates, and both were accepted after checking the source**
+>   (not the contract — the contract is what is under suspicion):
+>   `snow_intg_event_register` and `snow_flow_flow_action_add`, each `write/true` expected against
+>   `scripting/true` declared, each verified at its `case` label calling `requireScripting()`. The
+>   engine's expectations came from `00` §8, written before ARC-04 split the SCRIPTING gate. **Final
+>   expectations: both `scripting/true`.**
+> - **`snow_fluent_script_exec` did NOT re-gate.** The story predicted it would, and it is the tool
+>   whose silent re-gate is the reason this file exists — but ARC-04-S08's F1 already corrected its
+>   declaration to `scripting`, so engine and server now agree. Criterion 4 is therefore exercised
+>   against a **fixture** contract, exactly as the story specifies, and not against the live one.
+> - **`snow_flow_flow_add` stayed `write` while `snow_flow_flow_action_add` moved to `scripting`.**
+>   Worth stating rather than smoothing over: adding a flow is a write, and adding an Action carries
+>   a server-side script. The pair differing is the correct answer, not an inconsistency.
+> - **`SNOW_PIN_PATH` was added alongside `SNOW_CONTRACT_PATH`, and it had to be.** With only the
+>   contract overridable, a fixture run writes its conclusions into the COMMITTED pin: demonstrating
+>   criterion 4 against a fixture that re-gates `snow_fluent_script_exec` to `write` left the real
+>   file saying `write`, and the next honest run then refused because the real contract says
+>   `scripting`. The tool was right both times; the harness was wrong. A fixture run must not be able
+>   to edit the artefact it is pretending about.
+> - **A closed stdin at the prompt is an abort, not a hang.** Ctrl-D — or any harness whose stdin
+>   ends while the question is open — previously left the promise unsettled: Node printed *"Detected
+>   unsettled top-level await"* and exited 13. `readline`'s `close` now resolves to `n`. Closing
+>   stdin is not consent.
+> - **`tests/run.mjs` now walks subdirectories.** It read only the top level, so
+>   `tests/contract/required-tools.test.mjs` would have been written, committed, green by hand — and
+>   never once run by `npm test`. The failure mode is silent: the file exists, so nobody asks why it
+>   never fails. Root suite 114 → 128.
+> - **`used_by` was derived from where each tool is actually used**, not from `00` §8 (which records
+>   only that the 35 are cited, not by whom): the five core tools → the commands that call them, the
+>   update-set chain → `§2.2`, every mutating tool → `§2.1`, and the domain tools → the skill or
+>   agent directory that owns them. A test asserts every mutating tool carries a `§` citation, with
+>   the two `[Unsupported]` stubs named as the deliberate exception.
+
 > **Amendment 2026-09-08 (from ARC-04-S06, ratified). The ask-list generator must union `gates[gate]`
 > with `alsoRequires`.** The contract gained an optional `alsoRequires` field: six tools sit behind a
 > module-wide gate AND a case-level one (`now_assist` then `write`, `fluent` then `write`), and `gate`
