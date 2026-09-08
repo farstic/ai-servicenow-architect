@@ -24,6 +24,15 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 ## Stories
 
 ### ARC-05-S01 — `required-tools.json`: engine pin with `used_by` and `contractSha256`
+
+> **Amendment 2026-09-08 (from ARC-04-S06, ratified). The ask-list generator must union `gates[gate]`
+> with `alsoRequires`.** The contract gained an optional `alsoRequires` field: six tools sit behind a
+> module-wide gate AND a case-level one (`now_assist` then `write`, `fluent` then `write`), and `gate`
+> carries only the OUTER one — the gate that refuses first, which is what predicts the refusal a caller
+> sees. A generator that reads `gate` alone will under-report what those six need. The six are
+> `snow_ai_agentic_workflow_add`, `snow_ai_ai_agent_add`, `snow_fluent_build`, `snow_fluent_init`,
+> `snow_nas_now_assist_skill_add`, `snow_orch_playbook_add`; the contract entry names the field, so the
+> union needs no hard-coded list.
 **As** the engine (Claude) **I want** a committed, machine-readable declaration of every server tool my governance texts and skills depend on — with the gate and mutating nature I expect for each — and a hash pin of the server contract I was written against **so that** a rename or a re-gate on the server side cannot merge without a conscious engine-side change.
 **Context.** Closes P-36 (no machine-readable contract) and the `execute_script` → `snow_fluent_script_exec` rename-with-regate that nobody caught (`00` §8). `01` §11 fixes the shape: the 35 engine-cited tools (`00` §8) plus the five core tools, each `{ name, gate, mutates, used_by[] }`, and `contractSha256`. ARC README deliverable 1; acceptance criteria 1 and 5 (server-key agreement). Consumed by ARC-06 B05 (`01` §4.2), ARC-08 doctor, ARC-09 release tag message.
 **Scope.** In: the file, its JSON schema, the pin-update command, a unit test on the engine side that the file is well-formed and internally consistent. Out: checking the file against the live server catalogue (S08 does that on the server side; S03 does the token side); any change to `packages/snowarch/src` (ARC-04 S06 owns the declarations); the permission blocks (S07).
@@ -171,6 +180,15 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; CI matrix green (L04 exception as above until ARC-02 S03 merges); check ids table in `docs/CONTRIBUTING.md`; ARC-08 can import `packages/contract/lint/checks/*.mjs`.
 
 ### ARC-05-S05 — `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md`
+
+> **Amendment 2026-09-08 (from ARC-04-S06, ratified). The ask-list generator must union `gates[gate]`
+> with `alsoRequires`.** The contract gained an optional `alsoRequires` field: six tools sit behind a
+> module-wide gate AND a case-level one (`now_assist` then `write`, `fluent` then `write`), and `gate`
+> carries only the OUTER one — the gate that refuses first, which is what predicts the refusal a caller
+> sees. A generator that reads `gate` alone will under-report what those six need. The six are
+> `snow_ai_agentic_workflow_add`, `snow_ai_ai_agent_add`, `snow_fluent_build`, `snow_fluent_init`,
+> `snow_nas_now_assist_skill_add`, `snow_orch_playbook_add`; the contract entry names the field, so the
+> union needs no hard-coded list.
 **As** the engine (Claude) **I want** the §2.1 write gate, the §2.2 capture sequence and the Mode semantics delivered as one short, always-loaded rule file generated from the contract **so that** the tool names, the prefix, the flag codes and the capture sequence I follow are the server's actual ones, in one place, and the 60-line §2.1/§2.2 prose leaves `CLAUDE.md`.
 **Context.** Closes P-05 (gate keyed on the wrong prefix) and P-33 (§2.2 stated in four places with two naming generations — `CLAUDE.md`, `governance-rules.md`, `README.md`, `SETUP.md`). ARC README deliverable 4 (rule file) and acceptance criteria 2 and 5 (prefix exactly once, from `engine.config.json`). `01` §3 (`.claude/rules/00-mode-and-mcp-gate.md`, ~40 lines, always loaded — `00` §9: `.claude/rules/*.md` without `paths` frontmatter load at launch), §9 (design-only wording), §11 (§2.2 becomes `ensure → capture_target_set → write → verify`; ARC-04 S06/S07 fix the verify call as `snow_us_update_set_preview` in `contract.protocols.updateSetCapture[]`). ARC-02 S08 (`CLAUDE.md` ≤ 200 lines), ARC-02 S09 (`docs/MODES-AND-PRESETS.md` carries the preset table between `<!-- PRESETS:BEGIN … -->` / `<!-- PRESETS:END -->` markers "so ARC-05's generator can own it later") and ARC-08 S10 (runtime error mapping in the rule file) consume this.
 **Scope.** In: `scripts/gen-governance.mjs` CLI and the generator module layout; the rule-file renderer; the `presets` block renderer for `docs/MODES-AND-PRESETS.md`; header convention; `npm run gen`. Out: the other three targets (S06, S07); editing `CLAUDE.md`/`governance-rules.md` to point at the rule file (ARC-02 S08/S06 — this story hands them the exact pointer text); the prose of `docs/MODES-AND-PRESETS.md` outside the markers (ARC-02 S09).

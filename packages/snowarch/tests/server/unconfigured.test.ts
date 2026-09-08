@@ -7,9 +7,18 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collectToolCatalog } from '../../src/tools/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
+
+/**
+ * Derived, not pinned. These assertions are about the SHAPE — "the full catalogue is
+ * advertised once an instance loads" — and a literal here means every story that adds or
+ * removes a tool edits this file for no reason. The count itself is pinned once, in
+ * tests/contract.test.ts (e).
+ */
+const FULL_CATALOGUE = collectToolCatalog().length;
 
 /**
  * The unconfigured server, driven by a real MCP client over stdio.
@@ -175,13 +184,13 @@ describe('criterion 3 - reload picks up a store written after start', () => {
       expect(r.action).toBe('reloaded');
       expect(r.loaded).toEqual(['pdi']);
       expect(r.listChangedSent).toBe(true);
-      expect(r.toolsAdvertised).toBe(397);
+      expect(r.toolsAdvertised).toBe(FULL_CATALOGUE);
 
       // The notification is delivered asynchronously; give the transport a turn.
       await new Promise((res) => { setTimeout(res, 300); });
       expect(notifications).toEqual(['notifications/tools/list_changed']);
 
-      expect((await client.listTools()).tools).toHaveLength(397);
+      expect((await client.listTools()).tools).toHaveLength(FULL_CATALOGUE);
     } finally { await client.close(); }
   }, 60_000);
 });
@@ -191,7 +200,7 @@ describe('criterion 5 - reload after the store is deleted', () => {
     writeStore();
     const { client, notifications } = await connect();
     try {
-      expect((await client.listTools()).tools).toHaveLength(397);
+      expect((await client.listTools()).tools).toHaveLength(FULL_CATALOGUE);
 
       rmSync(join(checkout, '.local', 'instances.json'));
       const r = json(await client.callTool({ name: 'snow_core_instances_reload', arguments: {} }));
@@ -224,7 +233,7 @@ describe('criterion 4 - a refused instance alongside a loaded one', () => {
       const instances = s.instances as unknown as { loaded: string[]; notLoaded: Array<{ code: string }> };
       expect(instances.loaded).toEqual(['pdi']);
       expect(instances.notLoaded[0].code).toBe('PROD_WRITE_NOT_ACKNOWLEDGED');
-      expect(s.toolsAdvertised).toBe(397);
+      expect(s.toolsAdvertised).toBe(FULL_CATALOGUE);
     } finally { await client.close(); }
   }, 40_000);
 });

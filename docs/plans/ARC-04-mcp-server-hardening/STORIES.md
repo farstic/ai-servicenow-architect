@@ -54,6 +54,14 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S01 — D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI
 
+> **Amendment 2026-09-08 (architect's ruling on the S01 delivery).** **The package version stays
+> `2.0.0-dev`, not `2.0.0`.** This story predates ARC-01-S06's one-version-of-record, which makes the
+> root `package.json` authoritative and `tests/version-consistency.test.mjs` enforce it; the release
+> number is set once by ARC-09. Criterion 3 therefore reads `@farstic/snowarch 2.0.0-dev Apache-2.0`
+> and criterion 7 `serverInfo.version == "2.0.0-dev"`. **Open point ratified:** `src/sdk` is kept as
+> the client re-export only and `src/api` is removed — it imports the HTTP transport D-03 cuts and
+> cannot exist without it.
+
 **As** a maintainer **I want** `packages/snowarch` to contain only the stdio server, its tools, the ServiceNow client, the resources, the utilities and a minimal CLI, under its final name and version, with a green test run on every CI OS **so that** every later ARC-04 story edits a package that already builds, lints and tests clean and carries no surface the owner removed.
 
 **Context.** Closes P-18 (package and bin names belong to third parties; update nag fetches a stranger's package — `mcp:src/cli/index.ts:57-85`), P-19 (version drift across `package.json`, `server.json`, `smithery.yaml`, dashboard HTML), P-28 (HTTP/SSE, dashboard, desktop, `web`), P-29 (`npm test` red — 12 failing `desktop/tests/**` files; CI never runs tests — `mcp:.github/workflows/ci.yml:26-36`), P-31 (26 prompts, 10 Copilot personas). Applies D-01 (names), D-03 (cut list), R-1 (2.0.0). ARC-01-S03 removes the *directories* `desktop/`, `clients/`, `src/direct`, `src/a2a`, `src/dashboard`, `src/reports`, `src/prompts`, `.github/agents`, `Dockerfile`, `server.json`, `smithery.yaml`, `TERMS.md` at import; this story removes what is left inside the surviving tree and makes it compile.
@@ -97,15 +105,41 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
-> **Amendment 2026-09-08 (architect's ruling on the S01 delivery).** **The package version stays
-> `2.0.0-dev`, not `2.0.0`.** This story predates ARC-01-S06's one-version-of-record, which makes the
-> root `package.json` authoritative and `tests/version-consistency.test.mjs` enforce it; the release
-> number is set once by ARC-09. Criterion 3 therefore reads `@farstic/snowarch 2.0.0-dev Apache-2.0`
-> and criterion 7 `serverInfo.version == "2.0.0-dev"`. **Open point ratified:** `src/sdk` is kept as
-> the client re-export only and `src/api` is removed — it imports the HTTP transport D-03 cuts and
-> cannot exist without it.
-
 ### ARC-04-S02 — Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed
+
+> **Amendment 2026-09-08 (architect's rulings on the S02 delivery).**
+> - **Criterion 3's tool half belongs to ARC-04-S04.** `snow_core_status_read` does not exist yet,
+>   so S02 asserts on the `LoadReport` instead: `configErrors[0].code == "STORE_PERMISSIONS_TOO_OPEN"`
+>   and the message containing `chmod 600 <path>`. S04 re-asserts the same fact through the tool.
+> - **`SNOW_STORE` pointing at a missing file is `STORE_NOT_FOUND` with no fallback** (the story's
+>   own open point, ratified). An **empty string counts as unset** for both `SNOW_STORE` and
+>   `CLAUDE_PROJECT_DIR`, because `.mcp.json` passes `${SNOW_STORE:-}`.
+> - **`docs/MODES-AND-PRESETS.md` is created here as a stub** carrying only the precedence section,
+>   headed "draft — ARC-07 owns the final text".
+> - **Store error codes** are listed in `packages/snowarch/CHANGELOG.md` now; ARC-04-S06 lists them
+>   in the tool contract.
+> - **The exit-if-unconfigured guard is removed from `src/server.ts`.** It tested env vars only,
+>   which is wrong once a store can configure the server — it would have exited with a valid store
+>   present. Unconfigured start is ARC-04-S04's subject; until then the server runs and the startup
+>   line says `mode: unconfigured`.
+>
+> **Amendment 2026-09-08 (second S02 review — the file-mode rule is refined).** The design note's
+> "if `(stat.mode & 0o077) !== 0` the store is not loaded" is correct for the FILE and wrong for the
+> DIRECTORY. Applied to the directory it refuses a 0600 store in an ordinary 0755 folder, and in
+> `/tmp` — which is where criterion 1's own `SNOW_STORE=/tmp/a.json` example lives. A 0600 file is
+> unreadable by others whatever its directory; the directory risk is group/world **write**
+> (replacement or symlink planting), not read or execute. The rule is therefore:
+> **refuse** when the file has `0o077` bits, or the directory has `0o022` bits **without** the sticky
+> bit (`0o1000`); **warn** — a `warnings[]` entry on the `LoadReport` and a `[WARN]` log line, the
+> store still loading — for any other group/world directory bit, with the `chmod 700 <dir>` remedy.
+>
+> **Amendment 2026-09-08 (second S02 review — masking happens at construction).** Every path in a
+> message is masked where the message is BUILT, one path at a time, never by running `maskPath` over
+> a finished sentence: `maskPath` only rewrites a string that starts with the prefix, so a sentence
+> carrying two paths came through with both raw. The prose uses `maskPath` (`<checkout>`, `~`); the
+> text after `Run:` uses `maskPathForShell` (home → `~` only), because a remedy has to stay
+> pasteable and `<checkout>` is not a path. `tests/store/masking.test.ts` spawns the server under a
+> fake `HOME` and asserts no absolute prefix appears anywhere in stderr.
 
 **As** the server **I want** exactly one configuration store with an explicit, logged precedence and a validated schema **so that** an instance can never be silently overridden, a group-readable secret file is never loaded, and the wizard (ARC-07) and doctor (ARC-08) read and write the same file through the same module.
 
@@ -169,43 +203,28 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
-> **Amendment 2026-09-08 (architect's rulings on the S02 delivery).**
-> - **Criterion 3's tool half belongs to ARC-04-S04.** `snow_core_status_read` does not exist yet,
->   so S02 asserts on the `LoadReport` instead: `configErrors[0].code == "STORE_PERMISSIONS_TOO_OPEN"`
->   and the message containing `chmod 600 <path>`. S04 re-asserts the same fact through the tool.
-> - **`SNOW_STORE` pointing at a missing file is `STORE_NOT_FOUND` with no fallback** (the story's
->   own open point, ratified). An **empty string counts as unset** for both `SNOW_STORE` and
->   `CLAUDE_PROJECT_DIR`, because `.mcp.json` passes `${SNOW_STORE:-}`.
-> - **`docs/MODES-AND-PRESETS.md` is created here as a stub** carrying only the precedence section,
->   headed "draft — ARC-07 owns the final text".
-> - **Store error codes** are listed in `packages/snowarch/CHANGELOG.md` now; ARC-04-S06 lists them
->   in the tool contract.
-> - **The exit-if-unconfigured guard is removed from `src/server.ts`.** It tested env vars only,
->   which is wrong once a store can configure the server — it would have exited with a valid store
->   present. Unconfigured start is ARC-04-S04's subject; until then the server runs and the startup
->   line says `mode: unconfigured`.
->
-> **Amendment 2026-09-08 (second S02 review — the file-mode rule is refined).** The design note's
-> "if `(stat.mode & 0o077) !== 0` the store is not loaded" is correct for the FILE and wrong for the
-> DIRECTORY. Applied to the directory it refuses a 0600 store in an ordinary 0755 folder, and in
-> `/tmp` — which is where criterion 1's own `SNOW_STORE=/tmp/a.json` example lives. A 0600 file is
-> unreadable by others whatever its directory; the directory risk is group/world **write**
-> (replacement or symlink planting), not read or execute. The rule is therefore:
-> **refuse** when the file has `0o077` bits, or the directory has `0o022` bits **without** the sticky
-> bit (`0o1000`); **warn** — a `warnings[]` entry on the `LoadReport` and a `[WARN]` log line, the
-> store still loading — for any other group/world directory bit, with the `chmod 700 <dir>` remedy.
->
-> **Amendment 2026-09-08 (second S02 review — masking happens at construction).** Every path in a
-> message is masked where the message is BUILT, one path at a time, never by running `maskPath` over
-> a finished sentence: `maskPath` only rewrites a string that starts with the prefix, so a sentence
-> carrying two paths came through with both raw. The prose uses `maskPath` (`<checkout>`, `~`); the
-> text after `Run:` uses `maskPathForShell` (home → `~` only), because a remedy has to stay
-> pasteable and `<checkout>` is not a path. `tests/store/masking.test.ts` spawns the server under a
-> fake `HOME` and asserts no absolute prefix appears anywhere in stderr.
-
-
-
 ### ARC-04-S03 — Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage
+
+> **Amendment 2026-09-08 (architect's rulings on the S03 delivery).**
+> - **Criterion 1's live half is deferred** to the owner's live sitting — the agent never holds
+>   instance credentials. The unit half (throwing-proxy client) plus the spawned-server probe are the
+>   gate here; the `RUN_LIVE_E2E=1` case stays in `tests/live/live-e2e.test.ts` for that sitting.
+> - **Prod posture is "any effective flag true"**, stricter than WRITE, and the refusal carries the
+>   `--ack-prod` remedy verbatim. Env-defined instances get the same rule via
+>   `SN_INSTANCE_<NAME>_PROD_WRITE_ACK`.
+> - **Criterion 7's failing half** is demonstrated by adding an uncovered branch to
+>   `src/utils/permissions.ts` rather than by deleting a test assertion: removing an assertion did not
+>   move the number, because the branches it touched are exercised elsewhere too. Exit 1 with the
+>   branch, exit 0 without.
+>
+> **Amendment 2026-09-08 (found during S03, changes an S02 behaviour).** `loadStore` no longer completes
+> absent flags to `"false"`. S02 normalised them on load ("absent means false, once, so no caller has to
+> remember"), which was right for gating and wrong for everything else: it erased the difference between
+> a store that OMITS `flags` and one that declares all six as `"false"`. S03 needs that difference — a
+> preset instance with no `flags` key was being reported as disagreeing with its own preset. Completion
+> now happens in `expandPreset`, where "does absent mean false?" is the question actually being asked.
+> **Found by spawning the server, not by the unit test**, which passed a partial object where production
+> passed a completed one — the fixture could not produce the failing shape.
 
 **As** an individual practitioner with a PDI and a customer's production instance in one store **I want** the six permission flags to belong to the instance I am currently addressing **so that** `snow_core_instance_switch prod` immediately makes every write refuse while the same call on `pdi` succeeds, without a second server process.
 
@@ -255,28 +274,26 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
-> **Amendment 2026-09-08 (architect's rulings on the S03 delivery).**
-> - **Criterion 1's live half is deferred** to the owner's live sitting — the agent never holds
->   instance credentials. The unit half (throwing-proxy client) plus the spawned-server probe are the
->   gate here; the `RUN_LIVE_E2E=1` case stays in `tests/live/live-e2e.test.ts` for that sitting.
-> - **Prod posture is "any effective flag true"**, stricter than WRITE, and the refusal carries the
->   `--ack-prod` remedy verbatim. Env-defined instances get the same rule via
->   `SN_INSTANCE_<NAME>_PROD_WRITE_ACK`.
-> - **Criterion 7's failing half** is demonstrated by adding an uncovered branch to
->   `src/utils/permissions.ts` rather than by deleting a test assertion: removing an assertion did not
->   move the number, because the branches it touched are exercised elsewhere too. Exit 1 with the
->   branch, exit 0 without.
->
-> **Amendment 2026-09-08 (found during S03, changes an S02 behaviour).** `loadStore` no longer completes
-> absent flags to `"false"`. S02 normalised them on load ("absent means false, once, so no caller has to
-> remember"), which was right for gating and wrong for everything else: it erased the difference between
-> a store that OMITS `flags` and one that declares all six as `"false"`. S03 needs that difference — a
-> preset instance with no `flags` key was being reported as disagreeing with its own preset. Completion
-> now happens in `expandPreset`, where "does absent mean false?" is the question actually being asked.
-> **Found by spawning the server, not by the unit test**, which passed a partial object where production
-> passed a completed one — the fixture could not produce the failing shape.
-
 ### ARC-04-S04 — Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed`
+
+> **Amendment 2026-09-08 (architect's rulings on the S04 delivery).**
+> - **The catalogue is 397 here**, not 398: 394 + the three instance-free core tools. `EXPECTED` in
+>   `scripts/extract-tools.mjs` and `tests/tools/parity.test.ts` moved together in the same commit.
+>   ARC-04-S06 owns the arithmetic from here (397 − 1 removed + whatever it adds).
+> - **S-17 and S-02 are both CONFIRMED** (`03` §F and the spike records), so no fallback was shipped.
+>   Criterion 7 — the `/mcp` visual check under Claude Code — remains for the owner's live sitting; the
+>   agent does not attempt it.
+> - **Criterion 3 is asserted by a real MCP `Client` on `StdioClientTransport`** receiving
+>   `notifications/tools/list_changed`, not by reading the tool's own `listChangedSent`. Those are
+>   different claims: the second only says the server believes it sent something.
+> - **The bijection in `tests/tools/parity.test.ts` is now scoped to RENAMED tools.** A tool introduced
+>   after the v1 rename has no old name and cannot be in `tool-rename-map.json`; the three are listed
+>   in `POST_RENAME_TOOLS` with a companion test asserting they are genuinely absent from the map, so
+>   the count cannot drift silently.
+> - **The S03 remedy defect is fixed here** (architect's C4 run): `remedyPreset(missing)` returns the
+>   smallest preset whose expansion covers the missing flags — `pdi-developer` for WRITE / CMDB_WRITE /
+>   SCRIPTING / ATF, `full` for NOW_ASSIST / FLUENT. The hard-coded `pdi-developer` told a reader on
+>   `pdi-developer` to set the preset they already had. `permissions.ts` stays at 100 %.
 
 **As** an individual practitioner in design-only mode, or one who has just typed `./snowarch instance add` in another terminal, **I want** the server to start with no instance, describe its own state, and pick up a new store without a Claude Code restart **so that** an unconfigured checkout never shows a crashed MCP server and the `/snowarch setup-instance` `--resume` step (ARC-07) can finish in the same session.
 
@@ -322,26 +339,24 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
-> **Amendment 2026-09-08 (architect's rulings on the S04 delivery).**
-> - **The catalogue is 397 here**, not 398: 394 + the three instance-free core tools. `EXPECTED` in
->   `scripts/extract-tools.mjs` and `tests/tools/parity.test.ts` moved together in the same commit.
->   ARC-04-S06 owns the arithmetic from here (397 − 1 removed + whatever it adds).
-> - **S-17 and S-02 are both CONFIRMED** (`03` §F and the spike records), so no fallback was shipped.
->   Criterion 7 — the `/mcp` visual check under Claude Code — remains for the owner's live sitting; the
->   agent does not attempt it.
-> - **Criterion 3 is asserted by a real MCP `Client` on `StdioClientTransport`** receiving
->   `notifications/tools/list_changed`, not by reading the tool's own `listChangedSent`. Those are
->   different claims: the second only says the server believes it sent something.
-> - **The bijection in `tests/tools/parity.test.ts` is now scoped to RENAMED tools.** A tool introduced
->   after the v1 rename has no old name and cannot be in `tool-rename-map.json`; the three are listed
->   in `POST_RENAME_TOOLS` with a companion test asserting they are genuinely absent from the map, so
->   the count cannot drift silently.
-> - **The S03 remedy defect is fixed here** (architect's C4 run): `remedyPreset(missing)` returns the
->   smallest preset whose expansion covers the missing flags — `pdi-developer` for WRITE / CMDB_WRITE /
->   SCRIPTING / ATF, `full` for NOW_ASSIST / FLUENT. The hard-coded `pdi-developer` told a reader on
->   `pdi-developer` to set the preset they already had. `permissions.ts` stays at 100 %.
-
 ### ARC-04-S05 — SCRIPTING / update-set read-gate split
+
+> **Amendment 2026-09-08 (architect's rulings on the S05 delivery).**
+> - **Task 4 and criterion 1's live half are deferred to the owner's live sitting** — the agent never
+>   holds instance credentials. Delivered instead:
+>   `docs/spikes/S-10-readonly-preset-sufficiency/PROCEDURE.md`, a runnable procedure naming the build
+>   under test, the exact store fixture, both preset runs and the T-01…T-18 order. The `03` §A S-10
+>   status cell records the deferral and the build sha.
+> - **The gate-split test derives its two families from the REGISTERED CATALOGUE**, not a hand-written
+>   list: 35 tools, each classified read or write, and an unclassified name fails the test. A stale
+>   entry fails too, so a rename cannot leave the table asserting nothing.
+> - **Found while writing that test:** `snow_us_update_set_add`, `_switch` and `_complete` validated
+>   their arguments BEFORE calling the gate, so an unauthorised caller got `INVALID_REQUEST` instead of
+>   a permission code. The story says the gate is the first statement of each mutating case; it now is,
+>   in `updateset.ts` as well as `script.ts`.
+> - **`01` §6.3's parenthetical is now false** and was updated: "(ARC-04 splits the gate; today it
+>   blocks reads too)" → "(split by ARC-04-S05, 2026-09-08)". The phrase survives only inside this
+>   story, which quotes it as the string to remove.
 
 **As** the engine running the Code Reviewer against a live instance in the `read-only` preset **I want** to list and read Script Includes, Business Rules, Client Scripts, ACLs, UI Policies, UI Actions and update sets **so that** review and design work never needs a write flag, and SCRIPTING means what `01` §6.3 says: *writing* those objects.
 
@@ -380,6 +395,8 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
+### ARC-04-S06 — `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract`
+
 > **Amendment 2026-09-08 (from ARC-04-S01).** **The expected tool count arithmetic starts from 394
 > minus one removal.** `snow_rpt_report_generate` is dropped by ARC-04-S08 (see its amendment), so
 > this story's `EXPECTED` is `394 − 1 removed + <new tools>`. ARC-04-S01 left the tool registered and
@@ -392,24 +409,44 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 > despite that hook. S06's `gate`/`mutates` declarations and `tests/contract.test.ts` replace the seven
 > per-dispatcher suites' flag assertions; the glue goes with them.
 
-> **Amendment 2026-09-08 (architect's rulings on the S05 delivery).**
-> - **Task 4 and criterion 1's live half are deferred to the owner's live sitting** — the agent never
->   holds instance credentials. Delivered instead:
->   `docs/spikes/S-10-readonly-preset-sufficiency/PROCEDURE.md`, a runnable procedure naming the build
->   under test, the exact store fixture, both preset runs and the T-01…T-18 order. The `03` §A S-10
->   status cell records the deferral and the build sha.
-> - **The gate-split test derives its two families from the REGISTERED CATALOGUE**, not a hand-written
->   list: 35 tools, each classified read or write, and an unclassified name fails the test. A stale
->   entry fails too, so a rename cannot leave the table asserting nothing.
-> - **Found while writing that test:** `snow_us_update_set_add`, `_switch` and `_complete` validated
->   their arguments BEFORE calling the gate, so an unauthorised caller got `INVALID_REQUEST` instead of
->   a permission code. The story says the gate is the first statement of each mutating case; it now is,
->   in `updateset.ts` as well as `script.ts`.
-> - **`01` §6.3's parenthetical is now false** and was updated: "(ARC-04 splits the gate; today it
->   blocks reads too)" → "(split by ARC-04-S05, 2026-09-08)". The phrase survives only inside this
->   story, which quotes it as the string to remove.
+> **Amendment 2026-09-08 (S06 deviation, accepted).** **The contract serialiser lives in
+> `scripts/extract-tools.mjs`, not a shared `src/contract/build.ts`, and the CLI reads
+> `dist/contract.json` rather than re-serialising.** One producer, one consumer, and the file on disk
+> is the interface between them — which is also what makes the sha meaningful: `contract --sha` hashes
+> exactly the bytes ARC-05 pins and ARC-06 compares, not a re-serialisation that could differ by a key
+> order. `contract --sha` fails with a message naming `npm run build` when the file is absent, because
+> the remedy for a missing build artefact is a build.
 
-### ARC-04-S06 — `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract`
+> **Amendment 2026-09-08 (architect's rulings on the S06 delivery, plus what the seeding found).**
+> - **`EXPECTED = 397` here**, with the arithmetic in the comment: S07 adds `snow_us_capture_target_set`
+>   (+1) and S08 removes `snow_rpt_report_generate` (−1) while keeping the two retired script-exec tools
+>   as `[Unsupported]` stubs; each bumps the constant in its own PR. `contract.toolCount` is DERIVED
+>   from the catalogue, never a literal, so the contract cannot disagree with the code even when the
+>   constant lags.
+> - **`contract.version` is `2.0.0-dev`**, the package version of record; ARC-09 sets the release number.
+> - **The error-code registry is `src/errors/codes.ts`** — no equivalent existed. 45 codes, each with a
+>   remedy, and `tests/errors/codes.test.ts` asserts BOTH directions: every code thrown in `src/` is
+>   registered, and every registered code is actually thrown. The second direction matters as much: a
+>   code the generator documents but nothing produces sends a reader hunting a failure that cannot happen.
+> - **`alsoRequires` added to the contract shape — needs ratification.** Six tools sit behind a
+>   module-wide gate AND a case-level one (`now_assist` then `write`, `fluent` then `write`). `gate` is
+>   the OUTER one, because that is what refuses first and therefore what predicts the refusal; without a
+>   second field the write requirement would be absent from the contract entirely and §2.1's ask list
+>   would under-report those six. The field is optional and additive: a consumer that ignores it still
+>   gets a correct prediction of the first refusal.
+> - **The seeding found 13 more instances of the S05 ordering bug** — `gate` after argument validation,
+>   so an unauthorised caller got `INVALID_REQUEST` instead of a permission code — across
+>   `sys-properties.ts`, `devops.ts`, `fluent.ts`, `itam.ts` and `va.ts`. All fixed; the anomaly list is
+>   empty.
+> - **Test consolidation:** ten per-suite refusal assertions removed across seven dispatcher suites
+>   (contract (a) asserts the same property for all 397 rather than nine hand-picked ones), the
+>   `tests/setup.ts` env-view glue and `tests/helpers/instance.ts` deleted, and 14 dead
+>   `process.env.*_ENABLED` lines stripped. A suite that needs more than `pdi-developer` now says so
+>   with `withPreset()`. `tests/tools/gate-split.test.ts` is KEPT: it asserts gate-before-validation
+>   ordering, which the contract test does not.
+> - **`tsconfig.json` excluded `tests/`**, so `tsc --noEmit` never type-checked them — which made the
+>   `@ts-expect-error` type test pass by never being compiled. `tsconfig.tests.json` and a two-step
+>   `type-check` script fix that; criterion 1 is verified in both directions.
 
 **As** the engine (ARC-05's lint and generators) **I want** every tool to declare in code which flag family gates it and whether it mutates the instance, and the server to emit one contract file from those declarations **so that** the §2.1 `ask` list, the §2.2 protocol text and the doctor read tool names, gates and error codes from a generated artefact instead of prose.
 
@@ -471,38 +508,21 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
-> **Amendment 2026-09-08 (architect's rulings on the S06 delivery, plus what the seeding found).**
-> - **`EXPECTED = 397` here**, with the arithmetic in the comment: S07 adds `snow_us_capture_target_set`
->   (+1) and S08 removes `snow_rpt_report_generate` (−1) while keeping the two retired script-exec tools
->   as `[Unsupported]` stubs; each bumps the constant in its own PR. `contract.toolCount` is DERIVED
->   from the catalogue, never a literal, so the contract cannot disagree with the code even when the
->   constant lags.
-> - **`contract.version` is `2.0.0-dev`**, the package version of record; ARC-09 sets the release number.
-> - **The error-code registry is `src/errors/codes.ts`** — no equivalent existed. 45 codes, each with a
->   remedy, and `tests/errors/codes.test.ts` asserts BOTH directions: every code thrown in `src/` is
->   registered, and every registered code is actually thrown. The second direction matters as much: a
->   code the generator documents but nothing produces sends a reader hunting a failure that cannot happen.
-> - **`alsoRequires` added to the contract shape — needs ratification.** Six tools sit behind a
->   module-wide gate AND a case-level one (`now_assist` then `write`, `fluent` then `write`). `gate` is
->   the OUTER one, because that is what refuses first and therefore what predicts the refusal; without a
->   second field the write requirement would be absent from the contract entirely and §2.1's ask list
->   would under-report those six. The field is optional and additive: a consumer that ignores it still
->   gets a correct prediction of the first refusal.
-> - **The seeding found 13 more instances of the S05 ordering bug** — `gate` after argument validation,
->   so an unauthorised caller got `INVALID_REQUEST` instead of a permission code — across
->   `sys-properties.ts`, `devops.ts`, `fluent.ts`, `itam.ts` and `va.ts`. All fixed; the anomaly list is
->   empty.
-> - **Test consolidation:** ten per-suite refusal assertions removed across seven dispatcher suites
->   (contract (a) asserts the same property for all 397 rather than nine hand-picked ones), the
->   `tests/setup.ts` env-view glue and `tests/helpers/instance.ts` deleted, and 14 dead
->   `process.env.*_ENABLED` lines stripped. A suite that needs more than `pdi-developer` now says so
->   with `withPreset()`. `tests/tools/gate-split.test.ts` is KEPT: it asserts gate-before-validation
->   ordering, which the contract test does not.
-> - **`tsconfig.json` excluded `tests/`**, so `tsc --noEmit` never type-checked them — which made the
->   `@ts-expect-error` type test pass by never being compiled. `tsconfig.tests.json` and a two-step
->   `type-check` script fix that; criterion 1 is verified in both directions.
-
 ### ARC-04-S07 — `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter
+
+> **Amendment 2026-09-08 (architect's rulings on the S07 delivery).**
+> - **Criterion 4's live run is deferred to the owner's live sitting** — the agent never holds instance
+>   credentials. `packages/snowarch/tests/live/README.md` carries the exact run, the build sha, the
+>   `sys_update_xml` evidence to record, the redaction rules and a **negative control**: a Script
+>   Include created BEFORE `capture_target_set` must not appear in the set, because without it a run
+>   where the UI default happened to be the same set looks identical to a working one.
+> - **`EXPECTED` → 398** here, with the arithmetic comment updated; ARC-04-S08 takes it to 397.
+> - The contract's `protocols.updateSetCapture` is now asserted to resolve to registered tools — a step
+>   naming a tool that does not exist would generate an instruction nobody can follow.
+> - Declarations: `snow_us_capture_target_set` = `write` / `mutates: true` / `table sys_user_preference`;
+>   `snow_us_active_update_set_ensure` = `scripting` / `mutates: true` / `table sys_update_set`.
+> - `client.getAuthUsername()` was added (the auth config was private). It returns the user NAME only,
+>   and no tool puts it in a response — a response is also a log line.
 
 **As** the engine executing §2.2 before a configuration write **I want** one tool that points the authenticated user's REST update-set capture at a named update set, and an ensure tool that never returns somebody else's in-progress set **so that** §2.2 is four generated calls and every created Script Include lands in the intended update set.
 
@@ -543,13 +563,13 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ---
 
+### ARC-04-S08 — Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap
+
 > **Amendment 2026-09-08 (from ARC-04-S01, architect's ruling). REMOVE `snow_rpt_report_generate`.**
 > Its backend — `src/reports/` with `pdfmake` and `pptxgenjs` — went with D-03 item 4, so the tool
 > has been registered-but-failing since S01 (an explicit `NOT_IMPLEMENTED` naming the cut, chosen
 > over an unresolved dynamic import). Remove it here, with a `CHANGELOG.md` line naming **D-03 item 4**
 > as the reason. The count arithmetic is S06's, amended there.
-
-### ARC-04-S08 — Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap
 
 **As** the engine **I want** every advertised tool to either work or fail with a clear, immediate `UNSUPPORTED_ON_THIS_INSTANCE`, the tool list to be static and equal to the contract, and large query results to be bounded **so that** no builder wastes a turn on a 404, no phantom tool appears, and the first live session cannot blow Claude Code's MCP output cap.
 

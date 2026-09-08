@@ -169,7 +169,7 @@ describe('(e) manifest, contract and catalogue agree', () => {
     expect(MANIFEST.map((t: { name: string }) => t.name).sort()).toEqual(cat);
     expect(CONTRACT.tools.map((t: { name: string }) => t.name).sort()).toEqual(cat);
     expect(CONTRACT.toolCount).toBe(cat.length);
-    expect(cat.length).toBe(397);
+    expect(cat.length).toBe(398);
   });
 
   it('every contract entry carries gate and mutates', () => {
@@ -193,6 +193,18 @@ describe('(e) manifest, contract and catalogue agree', () => {
   it('the contract is sorted by name, so the sha is stable across rebuilds', () => {
     const names = CONTRACT.tools.map((t: { name: string }) => t.name);
     expect(names).toEqual([...names].sort());
+  });
+});
+
+describe('the update-set capture protocol resolves to registered tools', () => {
+  it('every step of protocols.updateSetCapture that names a tool exists', () => {
+    // The protocol is what ARC-05 generates §2.2 from. A step naming a tool that does not
+    // exist would generate an instruction nobody can follow.
+    const steps: string[] = CONTRACT.protocols.updateSetCapture;
+    const names = new Set(catalogue.map((t) => t.name));
+    const missing = steps.filter((s) => s.startsWith('snow_') && !names.has(s));
+    expect(missing).toEqual([]);
+    expect(steps).toContain('snow_us_capture_target_set');
   });
 });
 

@@ -80,7 +80,13 @@ program
   .action((opts: { json?: boolean; sha?: boolean }) => {
     const contractPath = path.resolve(__cliDir, '..', 'contract.json');
     if (!existsSync(contractPath)) {
-      process.stderr.write('contract.json is missing — run `npm run build` in the package\n');
+      // The contract is a BUILD artefact — `scripts/extract-tools.mjs` emits it from the tool
+      // registrations, and this command only reads it. Saying so is the whole message: the
+      // remedy is a build, not a reinstall or a missing flag.
+      process.stderr.write(
+        `snowarch contract: ${contractPath} is missing.\n`
+        + 'The contract is generated at build time from the tool registrations.\n'
+        + 'Run: npm run build  (in packages/snowarch)\n');
       process.exit(NOT_IMPLEMENTED_EXIT);
     }
     const text = readFileSync(contractPath, 'utf8');

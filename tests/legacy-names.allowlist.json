@@ -5,6 +5,7 @@
     "docs/CHANGELOG.md": "ARC-09",
     "docs/USER-GUIDE.md": "ARC-02",
     "docs/nowaikit-field-notes.md": "ARC-02",
+    "packages/snowarch/CHANGELOG.md": "ARC-04",
     "packages/snowarch/EXAMPLES.md": "ARC-04",
     "packages/snowarch/README.md": "ARC-04",
     "packages/snowarch/docs/INSTALLATION.md": "ARC-04",
