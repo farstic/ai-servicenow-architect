@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireNowAssist, requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function aiAgentsToolManifest() {
+export function aiAgentsToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_ai_ai_agent_add',
@@ -21,6 +22,9 @@ export function aiAgentsToolManifest() {
         },
         required: ['name', 'description', 'capabilities'],
       },
+      gate: 'now_assist',
+      mutates: true,
+      alsoRequires: 'write',
     },
     {
       name: 'snow_ai_ai_agents_index',
@@ -33,6 +37,8 @@ export function aiAgentsToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ai_ai_agent_read',
@@ -44,6 +50,8 @@ export function aiAgentsToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ai_agentic_workflow_add',
@@ -72,6 +80,9 @@ export function aiAgentsToolManifest() {
         },
         required: ['name', 'description', 'agent_sys_id', 'steps'],
       },
+      gate: 'now_assist',
+      mutates: true,
+      alsoRequires: 'write',
     },
   ];
 }

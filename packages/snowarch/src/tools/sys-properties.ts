@@ -10,8 +10,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function sysPropertiesToolManifest() {
+export function sysPropertiesToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_cfg_system_property_read',
@@ -23,6 +24,8 @@ export function sysPropertiesToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cfg_system_property_set',
@@ -37,6 +40,9 @@ export function sysPropertiesToolManifest() {
         },
         required: ['name', 'value'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'sys_properties',
     },
     {
       name: 'snow_cfg_system_properties_index',
@@ -51,6 +57,8 @@ export function sysPropertiesToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cfg_system_property_remove',
@@ -62,6 +70,9 @@ export function sysPropertiesToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'sys_properties',
     },
     {
       name: 'snow_cfg_system_properties_query',
@@ -74,6 +85,8 @@ export function sysPropertiesToolManifest() {
         },
         required: ['search'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cfg_get_properties_bulk',
@@ -85,6 +98,8 @@ export function sysPropertiesToolManifest() {
         },
         required: ['names'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cfg_set_properties_bulk',
@@ -108,6 +123,8 @@ export function sysPropertiesToolManifest() {
         },
         required: ['properties'],
       },
+      gate: 'write',
+      mutates: false,
     },
     {
       name: 'snow_cfg_properties_export',
@@ -120,6 +137,8 @@ export function sysPropertiesToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cfg_properties_import',
@@ -135,6 +154,8 @@ export function sysPropertiesToolManifest() {
         },
         required: ['properties'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_cfg_property_validate',
@@ -147,6 +168,8 @@ export function sysPropertiesToolManifest() {
         },
         required: ['name', 'value'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cfg_property_categories_index',
@@ -156,6 +179,8 @@ export function sysPropertiesToolManifest() {
         properties: {},
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cfg_property_history_read',
@@ -168,6 +193,8 @@ export function sysPropertiesToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }
@@ -191,8 +218,8 @@ export async function dispatchSysPropertiesAction(
     }
 
     case 'snow_cfg_system_property_set': {
-      if (!args.name || args.value === undefined) throw new ServiceNowError('name and value are required', 'INVALID_REQUEST');
       requireWrite();
+      if (!args.name || args.value === undefined) throw new ServiceNowError('name and value are required', 'INVALID_REQUEST');
       // Check if exists
       const existing = await client.queryRecords({ table: 'sys_properties', query: `name=${args.name}`, limit: 1, fields: 'sys_id,value' });
       if (existing.count > 0) {
@@ -226,8 +253,8 @@ export async function dispatchSysPropertiesAction(
     }
 
     case 'snow_cfg_system_property_remove': {
-      if (!args.name) throw new ServiceNowError('name is required', 'INVALID_REQUEST');
       requireWrite();
+      if (!args.name) throw new ServiceNowError('name is required', 'INVALID_REQUEST');
       const existing = await client.queryRecords({ table: 'sys_properties', query: `name=${args.name}`, limit: 1, fields: 'sys_id,value' });
       if (existing.count === 0) return { deleted: false, name: args.name, message: 'Property not found' };
       const sysId = String(existing.records[0].sys_id);
@@ -268,10 +295,10 @@ export async function dispatchSysPropertiesAction(
     }
 
     case 'snow_cfg_set_properties_bulk': {
+      requireWrite();
       if (!args.properties || !Array.isArray(args.properties)) {
         throw new ServiceNowError('properties array is required', 'INVALID_REQUEST');
       }
-      requireWrite();
       const results: any[] = [];
       for (const prop of args.properties) {
         const existing = await client.queryRecords({ table: 'sys_properties', query: `name=${prop.name}`, limit: 1, fields: 'sys_id,value' });
@@ -305,10 +332,10 @@ export async function dispatchSysPropertiesAction(
     }
 
     case 'snow_cfg_properties_import': {
+      if (!args.dry_run) requireWrite();
       if (!args.properties || typeof args.properties !== 'object') {
         throw new ServiceNowError('properties object is required', 'INVALID_REQUEST');
       }
-      if (!args.dry_run) requireWrite();
       const entries = Object.entries(args.properties);
       const changes: any[] = [];
       for (const [propName, propValue] of entries) {

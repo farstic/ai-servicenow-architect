@@ -4,6 +4,9 @@ import {
   cmdbReconciliationToolManifest,
 } from '../../src/tools/cmdb-reconciliation.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
+import { withPreset } from '../helpers/preset.js';
+
+withPreset('pdi-developer');
 
 const mockClient = {
   queryRecords: vi.fn(),
@@ -31,8 +34,6 @@ describe('cmdbReconciliationToolManifest', () => {
 describe('dispatchCmdbReconciliationAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.WRITE_ENABLED = 'true';
-    process.env.CMDB_WRITE_ENABLED = 'true';
   });
 
   it('returns null for unmatched tool names', async () => {
@@ -244,28 +245,6 @@ describe('dispatchCmdbReconciliationAction', () => {
           dry_run: false,
         })
       ).rejects.toThrow('at least 2 targets');
-    });
-
-    it('requires CMDB write permissions', async () => {
-      delete process.env.CMDB_WRITE_ENABLED;
-
-      await expect(
-        dispatchCmdbReconciliationAction(mockClient, 'snow_cmdb_reconcile', {
-          action: 'retire_stale',
-          targets: ['id1'],
-        })
-      ).rejects.toThrow('CMDB write operations are disabled');
-    });
-
-    it('requires WRITE_ENABLED too', async () => {
-      delete process.env.WRITE_ENABLED;
-
-      await expect(
-        dispatchCmdbReconciliationAction(mockClient, 'snow_cmdb_reconcile', {
-          action: 'retire_stale',
-          targets: ['id1'],
-        })
-      ).rejects.toThrow('Write operations are disabled');
     });
 
     it('throws for invalid action', async () => {

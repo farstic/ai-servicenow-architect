@@ -1,0 +1,3972 @@
+[
+  {
+    "name": "snow_agile_epic_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_agile_epic_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_agile_epics_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_agile_scrum_task_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_agile_scrum_task_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_agile_scrum_tasks_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_agile_stories_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_agile_story_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_agile_story_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ai_agentic_workflow_add",
+    "gate": "now_assist",
+    "mutates": true,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": "write",
+    "marker": ""
+  },
+  {
+    "name": "snow_ai_ai_agent_add",
+    "gate": "now_assist",
+    "mutates": true,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": "write",
+    "marker": ""
+  },
+  {
+    "name": "snow_ai_ai_agent_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ai_ai_agents_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_atf_atf_failure_insight_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_atf_atf_suite_exec",
+    "gate": "atf",
+    "mutates": true,
+    "probed": "atf",
+    "source": "atf",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_atf_atf_suite_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_atf_atf_suite_result_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_atf_atf_suites_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_atf_atf_test_exec",
+    "gate": "atf",
+    "mutates": true,
+    "probed": "atf",
+    "source": "atf",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_atf_atf_test_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_atf_atf_test_results_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_atf_atf_tests_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_active_slas_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_approval_rule_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_approvals_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_catalog_item_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_catalog_item_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_catalog_item_order",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_catalog_item_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_catalog_items_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_catalog_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_catalog_ui_policy_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Write"
+  },
+  {
+    "name": "snow_cat_catalog_variable_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Write"
+  },
+  {
+    "name": "snow_cat_my_approvals_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_request_approve",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_request_reject",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cat_sla_details_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_get_properties_bulk",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_properties_export",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_properties_import",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_property_categories_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_property_history_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_property_validate",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_set_properties_bulk",
+    "gate": "write",
+    "mutates": false,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_system_properties_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_system_properties_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_system_property_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_system_property_remove",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cfg_system_property_set",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_chg_cab_meeting_schedule",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Write"
+  },
+  {
+    "name": "snow_chg_change_for_approval_submit",
+    "gate": "write",
+    "mutates": false,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_chg_change_request_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_chg_change_request_close",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_chg_change_request_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_chg_change_request_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_chg_change_requests_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cmdb_duplicates_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cmdb_orphans_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cmdb_reconcile",
+    "gate": "cmdb_write",
+    "mutates": true,
+    "probed": "cmdb_write",
+    "source": "cmdb_write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_cmdb_stale_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_active_events_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_analysis_impact",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_capabilities_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_ci_relationship_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Write"
+  },
+  {
+    "name": "snow_core_cmdb_ci_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_cmdb_ci_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_current_instance_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_discovery_scan_exec",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Write"
+  },
+  {
+    "name": "snow_core_discovery_schedules_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_group_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_health_dashboard_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_instance_switch",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_instances_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_instances_reload",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_mid_servers_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_natural_language_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_natural_language_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_record_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_record_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_record_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_record_remove",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_records_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_relationships_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_service_mapping_summary_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_status_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_table_schema_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_core_user_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_account_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_accounts_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_case_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_case_close",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_case_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_case_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_case_sla_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_cases_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_contact_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_contacts_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_csm_csm_products_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_deploy_artifact_clone",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_deploy_artifact_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_deploy_artifact_validate",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_deploy_background_script_exec",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_deploy_cmdb_data_import",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_deploy_data_quality_analyze",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_deploy_deployment_history_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_deploy_deployment_rollback",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_deploy_deployment_validate",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_deploy_solution_package_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_devops_deployment_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_devops_deployment_track",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_devops_deployments_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_devops_devops_change_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_devops_devops_insights_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_devops_devops_pipeline_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_devops_devops_pipelines_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_disco_table_discover",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_action_instances_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_flow_action_add",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_flow_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_flow_error_log_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_flow_execution_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_flow_executions_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_flow_publish",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_flow_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_flow_test",
+    "gate": "write",
+    "mutates": false,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_flow_trigger",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_flows_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_process_automation_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_process_automations_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_subflow_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_subflow_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_flow_subflows_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_fluent_build",
+    "gate": "fluent",
+    "mutates": true,
+    "probed": "fluent",
+    "source": "fluent",
+    "gateAfterValidation": false,
+    "alsoRequires": "write",
+    "marker": ""
+  },
+  {
+    "name": "snow_fluent_explain",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_fluent_init",
+    "gate": "fluent",
+    "mutates": true,
+    "probed": "fluent",
+    "source": "fluent",
+    "gateAfterValidation": false,
+    "alsoRequires": "write",
+    "marker": ""
+  },
+  {
+    "name": "snow_fluent_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_fluent_request_batch",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_fluent_script_exec",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_fluent_validate",
+    "gate": "fluent",
+    "mutates": false,
+    "probed": "fluent",
+    "source": "fluent",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_case_activity_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_case_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_case_close",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_case_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_case_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_cases_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_document_templates_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_lifecycle_events_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_profile_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_profile_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_service_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_services_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_task_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_hr_tasks_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_offboarding_case_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_hr_onboarding_case_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_inc_comment_annotate",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_inc_incident_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_inc_incident_close",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_inc_incident_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_inc_incident_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_inc_incident_resolve",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_inc_work_note_annotate",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_credential_aliases_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_data_sources_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_event_fire",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_event_log_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_event_register",
+    "gate": "scripting",
+    "mutates": false,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_event_registry_entry_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_event_registry_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_import_set_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_import_set_row_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_import_sets_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_oauth_applications_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_rest_message_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_rest_message_functions_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_rest_message_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_rest_messages_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_transform_field_maps_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_transform_map_exec",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_transform_map_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_intg_transform_maps_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_itam_asset_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_itam_asset_contracts_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_itam_asset_lifecycle_track",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_itam_asset_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_itam_asset_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_itam_asset_retire",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_itam_assets_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_itam_license_compliance_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_itam_license_optimization_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_itam_software_licenses_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_kb_knowledge_article_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_kb_knowledge_article_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_kb_knowledge_article_publish",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_kb_knowledge_article_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_kb_knowledge_article_retire",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Write"
+  },
+  {
+    "name": "snow_kb_knowledge_bases_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_kb_knowledge_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_anomalies_detect",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_anomaly_detector_train",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_auto_categorize",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_change_risk_predict",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_change_risk_train",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_incident_classifier_train",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_incidents_forecast",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_model_evaluate",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_model_training_history_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_process_optimization_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_similar_incidents_query",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ml_virtual_agent_nlu_exec",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_mob_mobile_analytics_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_mob_mobile_app_config_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_mob_mobile_app_config_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_mob_mobile_app_configs_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_mob_mobile_applet_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_mob_mobile_applets_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_mob_mobile_layout_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_mob_mobile_layouts_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_mob_offline_sync_configure",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_mob_push_notification_send",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_na_agentic_playbook_trigger",
+    "gate": "now_assist",
+    "mutates": true,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_na_ai_query",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_na_incident_categorize",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_na_ms_copilot_topics_read",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_na_nlq_query",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_na_pi_models_read",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_na_resolution_suggest",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_na_summary_generate",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_na_virtual_agent_topics_read",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_na_work_notes_generate",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_nas_now_assist_skill_add",
+    "gate": "now_assist",
+    "mutates": true,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": "write",
+    "marker": ""
+  },
+  {
+    "name": "snow_nas_now_assist_skill_read",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_nas_now_assist_skill_test",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_nas_now_assist_skills_index",
+    "gate": "now_assist",
+    "mutates": false,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_attachment_metadata_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_attachment_remove",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_attachment_upload",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_attachments_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_email_log_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_email_logs_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_email_templates_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_emergency_broadcast_send",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Write"
+  },
+  {
+    "name": "snow_ntf_notification_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_notification_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_notification_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_notification_schedule",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Write"
+  },
+  {
+    "name": "snow_ntf_notification_subscriptions_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ntf_notifications_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_orch_playbook_add",
+    "gate": "now_assist",
+    "mutates": true,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": "write",
+    "marker": ""
+  },
+  {
+    "name": "snow_orch_playbook_exec",
+    "gate": "now_assist",
+    "mutates": true,
+    "probed": "now_assist",
+    "source": "now_assist",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_orch_playbooks_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_dashboard_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_dashboard_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_homepages_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_pa_breakdowns_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_pa_dashboard_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_pa_dashboards_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_pa_indicator_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_pa_indicators_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_pa_job_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_pa_jobs_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_pa_scorecard_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_pa_time_series_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_record_counts_compare",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_table_completeness_check",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_perf_table_record_count_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_page_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_page_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_pages_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_theme_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_themes_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_widget_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_widget_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_widget_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portal_widgets_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_portals_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_ux_app_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_ux_apps_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_ux_pages_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_portal_widget_instances_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_prb_problem_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_prb_problem_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_prb_problem_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_prb_problem_resolve",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_aggregate_query_exec",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_job_run_history_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_kpi_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Write"
+  },
+  {
+    "name": "snow_rpt_performance_analytics_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_query_trend",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_report_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_report_data_export",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_report_generate",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_report_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_report_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_reports_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_scheduled_job_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_scheduled_job_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_scheduled_job_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_scheduled_job_trigger",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_scheduled_jobs_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_rpt_scheduled_report_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Write"
+  },
+  {
+    "name": "snow_rpt_sys_log_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_acl_add",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_acl_modify",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_acl_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_acls_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_business_rule_add",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_business_rule_modify",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_business_rule_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_business_rules_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_changeset_commit",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_changeset_publish",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_changeset_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_changesets_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_client_script_add",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_client_script_modify",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_client_script_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_client_scripts_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_script_include_add",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_script_include_modify",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_script_include_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_script_includes_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_ui_action_add",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_ui_action_modify",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_ui_action_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_ui_actions_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_ui_policies_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_scr_ui_policy_add",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": "Scripting"
+  },
+  {
+    "name": "snow_scr_ui_policy_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_audit_results_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_compliance_assessment_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_compliance_policies_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_grc_controls_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_grc_risk_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_grc_risk_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_grc_risks_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_security_dashboard_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_security_incident_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_security_incident_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_security_incident_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_security_incidents_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_security_playbook_exec",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_security_playbooks_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_threat_intelligence_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_vulnerabilities_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_vulnerabilities_scan",
+    "gate": "write",
+    "mutates": false,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_vulnerability_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_sec_vulnerability_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_studio_scoped_app_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_studio_scoped_app_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_studio_scoped_app_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_studio_scoped_apps_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_tsk_my_tasks_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_tsk_task_complete",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_tsk_task_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_tsk_task_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_us_active_update_set_ensure",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_us_current_update_set_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_us_update_set_add",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_us_update_set_complete",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_us_update_set_export",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_us_update_set_preview",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_us_update_set_switch",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_us_update_sets_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_usr_group_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_usr_group_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_usr_groups_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_usr_user_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_usr_user_group_assign",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_usr_user_group_unassign",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_usr_user_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_usr_users_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_va_va_categories_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_va_va_conversation_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_va_va_conversations_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_va_va_topic_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_va_va_topic_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_va_va_topic_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_va_va_topics_full_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_uib_component_add",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_uib_component_modify",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_uib_components_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_uib_data_broker_add",
+    "gate": "scripting",
+    "mutates": true,
+    "probed": "scripting",
+    "source": "scripting",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_uib_data_brokers_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_uib_page_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_uib_page_modify",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_uib_page_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_uib_page_remove",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_uib_pages_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_ux_app_route_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_ux_experience_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_workspace_add",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_workspace_list_configure",
+    "gate": "write",
+    "mutates": true,
+    "probed": "write",
+    "source": "write",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_workspace_read",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  },
+  {
+    "name": "snow_ws_workspaces_index",
+    "gate": "none",
+    "mutates": false,
+    "probed": "none",
+    "source": "none",
+    "gateAfterValidation": false,
+    "alsoRequires": null,
+    "marker": ""
+  }
+]

@@ -30,7 +30,7 @@
     "test": "vitest run --coverage",
     "test:nocov": "vitest run",
     "test:watch": "vitest",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.tests.json"
   },
   "keywords": [
     "servicenow",

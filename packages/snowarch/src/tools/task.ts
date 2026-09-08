@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function taskToolManifest() {
+export function taskToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_tsk_task_read',
@@ -18,6 +19,8 @@ export function taskToolManifest() {
         },
         required: ['number_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_tsk_task_modify',
@@ -30,6 +33,8 @@ export function taskToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_tsk_my_tasks_index',
@@ -41,6 +46,8 @@ export function taskToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_tsk_task_complete',
@@ -53,6 +60,8 @@ export function taskToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
   ];
 }

@@ -15,13 +15,16 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireScripting } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function updateSetToolManifest() {
+export function updateSetToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_us_current_update_set_read',
       description: 'Get the currently active Update Set for the session',
       inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_us_update_sets_index',
@@ -35,6 +38,8 @@ export function updateSetToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_us_update_set_add',
@@ -49,6 +54,9 @@ export function updateSetToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_update_set',
     },
     {
       name: 'snow_us_update_set_switch',
@@ -60,6 +68,9 @@ export function updateSetToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_update_set',
     },
     {
       name: 'snow_us_update_set_complete',
@@ -71,6 +82,9 @@ export function updateSetToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_update_set',
     },
     {
       name: 'snow_us_update_set_preview',
@@ -83,6 +97,8 @@ export function updateSetToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_us_update_set_export',
@@ -94,6 +110,8 @@ export function updateSetToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_us_active_update_set_ensure',
@@ -105,6 +123,9 @@ export function updateSetToolManifest() {
         },
         required: [],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_update_set',
     },
   ];
 }

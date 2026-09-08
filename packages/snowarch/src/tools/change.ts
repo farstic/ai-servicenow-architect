@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function changeToolManifest() {
+export function changeToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_chg_change_request_add',
@@ -32,6 +33,9 @@ export function changeToolManifest() {
         },
         required: ['short_description', 'type'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'change_request',
     },
     {
       name: 'snow_chg_change_request_read',
@@ -43,6 +47,8 @@ export function changeToolManifest() {
         },
         required: ['number_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_chg_change_request_modify',
@@ -55,6 +61,9 @@ export function changeToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'change_request',
     },
     {
       name: 'snow_chg_change_requests_index',
@@ -68,6 +77,8 @@ export function changeToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_chg_change_for_approval_submit',
@@ -79,6 +90,8 @@ export function changeToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'write',
+      mutates: false,
     },
     {
       name: 'snow_chg_change_request_close',
@@ -92,6 +105,9 @@ export function changeToolManifest() {
         },
         required: ['sys_id', 'close_code', 'close_notes'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'change_request',
     },
     {
       name: 'snow_chg_cab_meeting_schedule',
@@ -106,6 +122,8 @@ export function changeToolManifest() {
         },
         required: ['change_id', 'date'],
       },
+      gate: 'write',
+      mutates: true,
     },
   ];
 }

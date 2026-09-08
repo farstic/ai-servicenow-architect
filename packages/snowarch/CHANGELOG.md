@@ -60,6 +60,25 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Added (ARC-04-S06) — every tool declares its gate, and the contract is generated
+
+- Each of the 397 registrations now carries `gate` and `mutates` (and `table` where the tool's table is
+  fixed). Both are required fields, so a new tool that omits one does not compile.
+- **`dist/contract.json`** is emitted at build time from those declarations plus the flag, preset and
+  error-code tables. Descriptions and input schemas are deliberately excluded, so its sha moves when
+  behaviour moves and not when prose does.
+- **`snowarch contract`** prints a summary, `--json` the file, `--sha` the sha256 and nothing else.
+- **`src/errors/codes.ts`** is the single registry of error codes and their remedies, checked in both
+  directions against what `src/` actually throws.
+
+**Fixed while seeding the declarations:** thirteen tools called their permission gate *after* validating
+arguments, so an unauthorised caller was told their arguments were wrong about an operation they were
+not allowed to attempt — `snow_cfg_properties_import`, `snow_cfg_set_properties_bulk`,
+`snow_cfg_system_property_set`, `snow_cfg_system_property_remove`, `snow_devops_deployment_track`,
+`snow_devops_devops_change_add`, `snow_fluent_request_batch`, `snow_itam_asset_add`,
+`snow_itam_asset_modify`, `snow_itam_asset_retire`, `snow_itam_asset_lifecycle_track`,
+`snow_va_va_topic_add`, `snow_va_va_topic_modify`. The gate is now the first statement in each.
+
 ### Changed (ARC-04-S05) — SCRIPTING gates writes, not reads
 
 **Migration note (R-03), for anyone upgrading from `servicenow-mcp` 1.0.0.** `SCRIPTING_ENABLED` no

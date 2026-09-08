@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function hrsdToolManifest() {
+export function hrsdToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_hr_hr_case_add',
@@ -23,6 +24,8 @@ export function hrsdToolManifest() {
         },
         required: ['short_description', 'hr_service'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_hr_hr_case_read',
@@ -34,6 +37,8 @@ export function hrsdToolManifest() {
         },
         required: ['number_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_hr_hr_case_modify',
@@ -46,6 +51,8 @@ export function hrsdToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_hr_hr_cases_index',
@@ -61,6 +68,8 @@ export function hrsdToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_hr_hr_case_close',
@@ -74,6 +83,8 @@ export function hrsdToolManifest() {
         },
         required: ['sys_id', 'close_notes'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_hr_hr_services_index',
@@ -87,6 +98,8 @@ export function hrsdToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_hr_hr_service_read',
@@ -98,6 +111,8 @@ export function hrsdToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_hr_hr_profile_read',
@@ -109,6 +124,8 @@ export function hrsdToolManifest() {
         },
         required: ['user_identifier'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_hr_hr_profile_modify',
@@ -121,6 +138,8 @@ export function hrsdToolManifest() {
         },
         required: ['user_sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_hr_hr_tasks_index',
@@ -133,6 +152,8 @@ export function hrsdToolManifest() {
         },
         required: ['hr_case_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_hr_hr_task_add',
@@ -147,6 +168,8 @@ export function hrsdToolManifest() {
         },
         required: ['hr_case_sysid', 'short_description'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_hr_hr_case_activity_read',
@@ -158,6 +181,8 @@ export function hrsdToolManifest() {
         },
         required: ['hr_case_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ─── Onboarding / Offboarding ─────────────────────────────────────
     {
@@ -175,6 +200,8 @@ export function hrsdToolManifest() {
         },
         required: ['employee_sys_id', 'start_date'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_hr_offboarding_case_add',
@@ -189,6 +216,8 @@ export function hrsdToolManifest() {
         },
         required: ['employee_sys_id', 'last_day'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_hr_hr_lifecycle_events_read',
@@ -202,6 +231,8 @@ export function hrsdToolManifest() {
         },
         required: ['employee_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_hr_hr_document_templates_index',
@@ -215,6 +246,8 @@ export function hrsdToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

@@ -6,8 +6,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function notificationToolManifest() {
+export function notificationToolManifest(): ToolDefinition[] {
   return [
     // ── Email Notifications ──────────────────────────────────────────────────
     {
@@ -24,6 +25,8 @@ export function notificationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ntf_notification_read',
@@ -35,6 +38,8 @@ export function notificationToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ntf_notification_add',
@@ -56,6 +61,8 @@ export function notificationToolManifest() {
         },
         required: ['name', 'table'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_ntf_notification_modify',
@@ -71,6 +78,8 @@ export function notificationToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     // ── Email Log ────────────────────────────────────────────────────────────
     {
@@ -86,6 +95,8 @@ export function notificationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ntf_email_log_read',
@@ -97,6 +108,8 @@ export function notificationToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── Attachments ──────────────────────────────────────────────────────────
     {
@@ -111,6 +124,8 @@ export function notificationToolManifest() {
         },
         required: ['table', 'record_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ntf_attachment_metadata_read',
@@ -122,6 +137,8 @@ export function notificationToolManifest() {
         },
         required: ['attachment_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ntf_attachment_remove',
@@ -133,6 +150,8 @@ export function notificationToolManifest() {
         },
         required: ['attachment_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_ntf_attachment_upload',
@@ -157,6 +176,8 @@ export function notificationToolManifest() {
         },
         required: ['table', 'record_sys_id', 'file_name', 'content_type', 'content_base64'],
       },
+      gate: 'write',
+      mutates: true,
     },
     // ── Notification Templates ────────────────────────────────────────────────
     {
@@ -170,6 +191,8 @@ export function notificationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── Subscriptions ────────────────────────────────────────────────────────
     {
@@ -184,6 +207,8 @@ export function notificationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ntf_emergency_broadcast_send',
@@ -198,6 +223,8 @@ export function notificationToolManifest() {
         },
         required: ['subject', 'body', 'recipients'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_ntf_notification_schedule',
@@ -211,6 +238,8 @@ export function notificationToolManifest() {
         },
         required: ['notification_id', 'schedule'],
       },
+      gate: 'write',
+      mutates: true,
     },
   ];
 }

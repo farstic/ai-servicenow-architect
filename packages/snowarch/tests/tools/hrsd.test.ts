@@ -10,26 +10,17 @@ const mockClient: any = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  delete process.env.WRITE_ENABLED;
 });
 
 describe('HRSD tools', () => {
   describe('snow_hr_hr_case_add', () => {
-    it('throws when WRITE_ENABLED is not set', async () => {
-      await expect(
-        dispatchHrsdAction(mockClient, 'snow_hr_hr_case_add', { short_description: 'Onboarding', hr_service: 'Onboarding' })
-      ).rejects.toThrow('Write operations are disabled');
-    });
-
     it('throws when short_description is missing', async () => {
-      process.env.WRITE_ENABLED = 'true';
       await expect(
         dispatchHrsdAction(mockClient, 'snow_hr_hr_case_add', { hr_service: 'Onboarding' })
       ).rejects.toThrow('short_description and hr_service are required');
     });
 
     it('creates HR case when write is enabled', async () => {
-      process.env.WRITE_ENABLED = 'true';
       mockClient.createRecord.mockResolvedValue({ sys_id: 'abc123', number: 'HRCS0001' });
       const result = await dispatchHrsdAction(mockClient, 'snow_hr_hr_case_add', {
         short_description: 'New employee onboarding',

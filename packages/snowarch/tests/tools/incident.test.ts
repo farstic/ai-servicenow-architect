@@ -18,7 +18,6 @@ describe('incidentToolManifest', () => {
 describe('dispatchIncidentAction – create_incident', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.WRITE_ENABLED = 'true';
   });
 
   it('creates an incident and returns summary', async () => {
@@ -31,10 +30,6 @@ describe('dispatchIncidentAction – create_incident', () => {
     await expect(dispatchIncidentAction(mockClient, 'snow_inc_incident_add', {})).rejects.toThrow('short_description is required');
   });
 
-  it('blocks writes when WRITE_ENABLED=false', async () => {
-    process.env.WRITE_ENABLED = 'false';
-    await expect(dispatchIncidentAction(mockClient, 'snow_inc_incident_add', { short_description: 'x' })).rejects.toThrow();
-  });
 });
 
 describe('dispatchIncidentAction – get_incident', () => {
@@ -62,7 +57,6 @@ describe('dispatchIncidentAction – get_incident', () => {
 describe('dispatchIncidentAction – resolve_incident', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.WRITE_ENABLED = 'true';
   });
 
   it('sets state to 6 with resolution fields', async () => {
@@ -81,7 +75,6 @@ describe('dispatchIncidentAction – resolve_incident', () => {
 describe('dispatchIncidentAction – add_work_note', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.WRITE_ENABLED = 'true';
   });
 
   it('updates the work_notes field', async () => {

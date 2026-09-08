@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function knowledgeToolManifest() {
+export function knowledgeToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_kb_knowledge_bases_index',
@@ -18,6 +19,8 @@ export function knowledgeToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_kb_knowledge_query',
@@ -31,6 +34,8 @@ export function knowledgeToolManifest() {
         },
         required: ['query'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_kb_knowledge_article_read',
@@ -42,6 +47,8 @@ export function knowledgeToolManifest() {
         },
         required: ['number_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_kb_knowledge_article_add',
@@ -56,6 +63,9 @@ export function knowledgeToolManifest() {
         },
         required: ['short_description', 'text', 'knowledge_base_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'kb_knowledge',
     },
     {
       name: 'snow_kb_knowledge_article_modify',
@@ -68,6 +78,9 @@ export function knowledgeToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'kb_knowledge',
     },
     {
       name: 'snow_kb_knowledge_article_publish',
@@ -79,6 +92,9 @@ export function knowledgeToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'kb_knowledge',
     },
     {
       name: 'snow_kb_knowledge_article_retire',
@@ -90,6 +106,9 @@ export function knowledgeToolManifest() {
         },
         required: ['article_id'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'kb_knowledge',
     },
   ];
 }
