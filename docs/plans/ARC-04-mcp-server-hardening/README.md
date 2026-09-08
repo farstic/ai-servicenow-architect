@@ -85,7 +85,7 @@ Full write-ups (persona, context, scope, design notes, acceptance criteria, task
 | ARC-04-S10 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | Done (2026-09-08) |
 | ARC-04-S11 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M | Done (2026-09-08) |
 | ARC-04-S12 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | Done (2026-09-08) |
-| ARC-04-S13 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | Not started |
+| ARC-04-S13 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | Done (2026-09-08) |
 | ARC-04-S14 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M | Not started |
 
 Mapping to the earlier titles-only list: former stories 2 and 7 merged into S04; former story 12 split into S01 (harness, CI) and S03 (coverage); S11 added per R-3; S12 added to carry the server doctor module ARC-08 depends on. Total 31–32 engineer-days. The full former-number → story-ID table is at the top of `STORIES.md`; ARC-05/06/07 still cite this ARC by the former numbers.

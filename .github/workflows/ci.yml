@@ -46,6 +46,58 @@ jobs:
       - run: npm run type-check
       - run: npm test
 
+  dist-check:
+    # dist/ is committed so a clone plus `npm ci` is a runnable live install. That is only honest
+    # if the committed bytes can be shown to come from the source — which is this job. Three OSes
+    # because Windows is where the LF rule earns its place: without `text eol=lf` in
+    # .gitattributes the checkout rewrites every line and the diff is 100 % noise.
+    name: dist-check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Show the attributes that make this diffable
+        run: git check-attr -a packages/snowarch/dist/server.js
+      - run: node scripts/build-dist.mjs
+      - name: Diff the rebuilt output against the committed one
+        run: git diff --exit-code -- packages/snowarch/dist
+      - name: Explain a failure
+        if: failure()
+        # `git diff --stat` and not the full patch: a stale dist/ can be thousands of lines, and
+        # the reader needs the file names and the command, not the bytes.
+        run: |
+          echo "dist/ is stale — run node scripts/build-dist.mjs and commit"
+          git diff --stat -- packages/snowarch/dist
+
+  no-build:
+    # The committed artefact, exercised with NO build step — the state a user is actually in
+    # after `git clone && npm ci`. The suite above always builds first (`pretest`), so without
+    # this job a dist/ that never ran would still be green everywhere.
+    name: no-build handshake (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Handshake against the committed dist/, without building it
+        working-directory: packages/snowarch
+        run: npx vitest run --no-coverage tests/server/unconfigured.test.ts tests/server/handshake.test.ts
+
   footprint:
     name: footprint (production install)
     runs-on: ubuntu-latest

@@ -23,7 +23,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "build": "tsc && node scripts/extract-tools.mjs",
+    "build": "node ../../scripts/build-dist.mjs",
     "dev": "tsx watch src/server.ts",
     "lint": "eslint src tests",
     "lint:fix": "eslint src tests --fix",
@@ -90,7 +90,7 @@
     "globals": "^17.3.0",
     "selfsigned": "5.5.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3",
+    "typescript": "5.9.3",
     "vitest": "^4.0.18"
   },
   "publishConfig": {

@@ -1,8 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
-  chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync,
+  chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
@@ -259,6 +260,29 @@ describe('SV-07 and SV-08', () => {
     expect(['ok', 'warn']).toContain(sv08.status);
     if (sv08.status === 'warn') expect(sv08.remedy).toContain('/skills');
   }, 120_000);
+});
+
+describe('the criterion-5 copy leaves no residue', () => {
+  it('.tmp-doctor-dist is gone, and the working tree is clean', () => {
+    // ARC-04-S13 commits `dist/`, so a stray copy beside it would show up in `git status` and
+    // in any size or file-count check over the package. The `finally` removes it; this asserts
+    // that it did, because "cleaned up in a finally" is a claim, not a guarantee — a killed run
+    // skips it, which is why the path is also gitignored.
+    expect(existsSync(resolve(HERE, '../../.tmp-doctor-dist'))).toBe(false);
+
+    // The git half is a bonus, and it does not get to fail this test on its own. `git status`
+    // throws while another process holds `.git/index.lock` — a concurrent `git add` in the same
+    // checkout is enough — and a test that shells out to git can then go red for a reason that
+    // has nothing to do with its subject. The filesystem check above is the actual claim.
+    let status: string;
+    try {
+      status = execFileSync('git', ['status', '--porcelain', '--', resolve(HERE, '../..')],
+        { encoding: 'utf8', cwd: resolve(HERE, '../../../..'), stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+      return;
+    }
+    expect(status.split('\n').filter((l) => l.includes('.tmp-doctor-dist'))).toEqual([]);
+  });
 });
 
 describe('no module derives a path from a file URL pathname', () => {

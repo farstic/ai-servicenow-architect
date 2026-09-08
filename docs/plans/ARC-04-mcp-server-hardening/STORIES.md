@@ -985,6 +985,46 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S13 — `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff
 
+> **Amendment 2026-09-08 (from the S13 delivery).**
+> - **`tsconfig.build.json` uses JSONC comments, not `"//"` keys.** A `"//3"` key inside
+>   `compilerOptions` is rejected outright (`TS5023: Unknown compiler option`) — tsconfig accepts
+>   real `//` comments instead.
+> - **`typescript` pinned to exactly `5.9.3`** (installed version; the caret would have allowed a
+>   minor to regenerate all of `dist/` under a contributor mid-PR).
+> - **`noUnusedLocals` / `noUnusedParameters` are relaxed in `tsconfig.build.json` only.** `tsc`
+>   refuses to EMIT on an unused local, and the committed artefact has to build from whatever is in
+>   the tree; `npm run type-check` still enforces both against `tsconfig.json`, which is where they
+>   belong.
+> - **No exclusion is needed anywhere for `.tmp-doctor-dist/`**, and here is why for each check the
+>   ruling names: `scripts/ci/footprint.mjs` walks `node_modules` (argv[3] default), which never
+>   contains it; criterion 6's `du -sh packages/snowarch/dist` measures `dist/`, and the copy is a
+>   *sibling* of it, not a child; `dist-check`'s `git diff` is path-scoped to `packages/snowarch/dist`
+>   and the copy is gitignored. `tests/doctor/doctor.test.ts` now also **asserts the residue is gone**
+>   after the suite — "cleaned up in a finally" is a claim, not a guarantee, and a killed run skips it.
+> - **CI job names, for the branch-protection contexts at the close-out:**
+>   `dist-check (ubuntu-latest)`, `dist-check (macos-latest)`, `dist-check (windows-latest)`,
+>   `no-build handshake (ubuntu-latest)`, `no-build handshake (macos-latest)`,
+>   `no-build handshake (windows-latest)` — six, taking the required contexts from 12 to 18.
+> - **The `no-build` job invokes `npx vitest run` directly, not `npm test`.** The package's `pretest`
+>   script builds, so `npm test` would silently rebuild `dist/` and the job would prove nothing about
+>   the committed artefact — which is the one thing it exists to prove.
+> - **The build script must not call `npx`.** `npx` on Windows is `npx.cmd`, and Node refuses to
+>   `spawnSync` a `.cmd` without a shell — `EINVAL` on all three Windows cells while macOS and Linux
+>   passed. `shell: true` would fix the spawn and hand cmd.exe the argument quoting, which is the
+>   other half of the same problem. The script now runs `node node_modules/typescript/bin/tsc`
+>   directly: no shell, no `.cmd`, and unambiguously the *pinned* TypeScript rather than whatever
+>   `npx` resolves. Same class as ARC-04-S12's file-URL `pathname` — a Windows-only defect that green
+>   macOS and Linux cells say nothing about.
+> - **The `bin` target must be committed executable, and the build script must set the bit.** `tsc`
+>   emits 0644, npm sets 0755 itself when it links the workspace — so `npm ci` MODIFIED a tracked
+>   file and the pre-existing "install changed nothing tracked" gate went red on ubuntu and macOS,
+>   while Windows passed for having no executable bit at all. `chmodSync(dist/cli/index.js, 0o755)`
+>   in `build-dist.mjs` makes the committed mode and the built mode agree everywhere, so neither
+>   `npm ci` nor `dist-check` sees a difference. Third Windows-vs-Unix asymmetry in two stories, and
+>   the first one where **Unix** was the platform that failed.
+> - **`dist/` is 1.5 MB, not the 4.2 MB the story estimated** (that figure included source maps, which
+>   `tsconfig.build.json` turns off). 134 files tracked, no `.map`.
+
 **As** an individual practitioner cloning the repository **I want** a runnable `packages/snowarch/dist/server.js` in the tree **so that** live mode needs `npm ci` and nothing else, and as a maintainer **I want** CI to prove the committed output matches the source.
 
 **Context.** Closes P-20 (`dist/` gitignored — every install compiles TypeScript; `mcp:.gitignore:5`). Implements `01` §2 principle 2 (everything committable is committed), §3 (`dist/` committed, CI rebuilds and diffs), §12 (the release script refuses to tag on a diff — ARC-09). Risk R-02 (stale `dist/`) is mitigated here.
