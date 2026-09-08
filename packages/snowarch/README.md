@@ -327,61 +327,70 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (50), with what to do about it.
+Every code the server can throw (59), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
 |---|---|
-| `ATF_NOT_ENABLED` | ./snowarch instance set-preset <label> pdi-developer |
-| `ATTACHMENT_UPLOAD_FAILED` | check the file size and the target record |
-| `AUTHENTICATION_FAILED` | stop; ./snowarch instance set-credentials <label> |
-| `BATCH_FAILED` | one or more requests in the batch failed; the message lists them |
-| `CMDB_WRITE_NOT_ENABLED` | ./snowarch instance set-preset <label> pdi-developer |
-| `CONNECTION_REFUSED` | the instance refused the connection; check the URL, its port, and whether the instance is awake |
-| `CONNECTION_TIMEOUT` | the connection timed out; set HTTPS_PROXY on a corporate network, else check connectivity |
+| `ATF_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
+| `ATTACHMENT_UPLOAD_FAILED` | check the file size and that the target record exists |
+| `AUTHENTICATION_FAILED` | stop and re-enter them; do not retry, repeated failures lock the account |
+| `BATCH_FAILED` | the message lists which |
+| `CMDB_WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
+| `CONNECTION_REFUSED` | check the URL and its port, and whether the instance is awake — a hibernating PDI refuses |
+| `CONNECTION_TIMEOUT` | on a corporate network set `HTTPS_PROXY`; otherwise check connectivity and the firewall |
 | `CREATE_FAILED` | the message carries the instance response |
-| `DELETE_ACL_DENIED` | the account lacks delete access to that table; this is not a flag |
-| `DELETE_CONSTRAINT` | another record references it; remove the reference first |
+| `DELETE_ACL_DENIED` | use an account with the role |
+| `DELETE_CONSTRAINT` | remove the reference first |
 | `DELETE_FAILED` | the message carries the instance response |
-| `DELETE_NOT_FOUND` | nothing to delete at that sys_id |
-| `DNS_FAILURE` | the host name did not resolve; check the spelling, and set HTTPS_PROXY on a corporate network |
-| `ECONNREFUSED` | the instance refused the connection; check the url and any proxy |
-| `ENOTFOUND` | the instance host does not resolve; check the url in the store |
-| `ETIMEDOUT` | the instance did not answer in time |
+| `DELETE_NOT_FOUND` | check the sys_id |
+| `DNS_FAILURE` | check the spelling first; on a VPN-only instance connect first; on a corporate network set `HTTPS_PROXY`. A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong |
+| `ECONNREFUSED` | as `CONNECTION_REFUSED`: check the URL, the port and any proxy |
+| `ENOTFOUND` | as `DNS_FAILURE`: check the host in the store |
+| `ETIMEDOUT` | as `CONNECTION_TIMEOUT` |
 | `FLUENT_ERROR` | the message carries the SDK output |
-| `FLUENT_NOT_ENABLED` | ./snowarch instance set-preset <label> full |
-| `FLUENT_NOT_INSTALLED` | install @servicenow/sdk in the checkout |
-| `INSTANCE_NOT_LOADED` | read the reason in snow_core_status_read; usually ./snowarch instance set-preset <label> <preset> --ack-prod |
-| `INSTANCE_UNUSABLE` | the store entry parsed but a client could not be built; the message says why |
-| `INSUFFICIENT_PRIVILEGES` | the account lacks a ServiceNow role for this table; this is not a flag |
-| `INVALID_REQUEST` | the message names the missing or malformed argument |
-| `NETWORK_ERROR` | the instance was unreachable; the message carries the cause |
-| `NO_INSTANCE_CONFIGURED` | /snowarch setup-instance |
-| `NOT_FOUND` | the record or table does not exist on this instance |
-| `NOT_IMPLEMENTED` | the surface was removed; the message names what replaced it |
-| `NOW_ASSIST_ERROR` | the message carries the instance response; check the Now Assist licence |
-| `NOW_ASSIST_NOT_ENABLED` | ./snowarch instance set-preset <label> full |
-| `PROD_WRITE_NOT_ACKNOWLEDGED` | ./snowarch instance set-preset <label> <preset> --ack-prod |
-| `PROXY_UNREACHABLE` | nothing is listening at the proxy named by HTTPS_PROXY/HTTP_PROXY; correct it or unset it |
+| `FLUENT_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
+| `FLUENT_NOT_INSTALLED` | install it globally — the doctor checks `PATH`, so a checkout-local install would pass here and fail there |
+| `INSTANCE_NOT_LOADED` | read the reason in the instance listing; a `prod` instance without `prodWriteAck` needs the acknowledgement |
+| `INSTANCE_UNUSABLE` | the message says which field is impossible |
+| `INSUFFICIENT_PRIVILEGES` | grant the role, or use an account that has it; the message names the table |
+| `INVALID_REQUEST` | the message names the argument |
+| `NETWORK_ERROR` | the message carries the underlying cause |
+| `NO_INSTANCE_CONFIGURED` | add an instance, then call the reload tool — Claude Code does not need restarting, the server re-advertises its catalogue in the same session |
+| `NOT_FOUND` | check the sys_id and the table name |
+| `NOT_IMPLEMENTED` | the message names what replaced it |
+| `NOW_ASSIST_ERROR` | the message carries the instance response; check the Now Assist licence on the instance |
+| `NOW_ASSIST_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
+| `OAUTH_CLIENT_INVALID` | check them against the Application Registry entry on the instance |
+| `OAUTH_ROPC_DISABLED` | use basic authentication, or have an administrator enable the grant type |
+| `PROD_WRITE_NOT_ACKNOWLEDGED` | raise it deliberately, typing the label |
+| `PROXY_UNREACHABLE` | the message names the proxy with any credentials masked; correct the host and port, or unset the variable if you are not behind a proxy. `NO_PROXY` exempts internal hosts |
 | `QUERY_FAILED` | the message carries the instance response |
-| `RATE_LIMITED` | retry later; reduce maxRecords or the call rate |
-| `REQUEST_FAILED` | the message carries the instance response |
+| `RATE_LIMITED` | retry later; reduce `maxRecords` or the call rate |
+| `REQUEST_FAILED` | the message carries that response |
 | `SCHEMA_NOT_CACHED` | call the schema read tool for that table first |
-| `SCRIPT_FAILED` | the script ran and errored; the message carries the instance output |
-| `SCRIPTING_NOT_ENABLED` | ./snowarch instance set-preset <label> pdi-developer |
-| `STORE_NOT_FOUND` | SNOW_STORE names a file that is not there; correct it or unset it |
-| `STORE_PERMISSIONS_TOO_OPEN` | the message carries the exact chmod |
+| `SCRIPT_FAILED` | the message carries the instance output |
+| `SCRIPTING_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
+| `STORE_IN_CLOUD_SYNC_FOLDER` | move the checkout, or accept it deliberately |
+| `STORE_NOT_FOUND` | correct the variable, unset it, or create the store |
+| `STORE_PERMISSIONS_TOO_OPEN` | tighten the mode; on Windows the check is skipped and the doctor notes it instead |
 | `STORE_SCHEMA_INVALID` | the message names the field path; correct it in the store |
-| `STORE_SCHEMA_UNSUPPORTED` | ./snowarch upgrade |
-| `STORE_UNREADABLE` | the store is not valid JSON; repair or recreate it |
-| `TLS_CA_UNTRUSTED` | export your organisation root CA as PEM and set NODE_EXTRA_CA_CERTS to it; never disable certificate verification |
-| `UNKNOWN_GATE` | server defect: a tool declares a gate the evaluator does not know |
-| `UNKNOWN_INSTANCE` | snow_core_instances_index lists the configured labels |
-| `UNKNOWN_TOOL` | the name exists in no configuration; check the spelling |
-| `UNSUPPORTED_ON_THIS_INSTANCE` | no REST endpoint backs this operation; the message names the UI route that does (e.g. Scripts - Background, or a Fix Script) |
+| `STORE_SCHEMA_UNSUPPORTED` | upgrade this checkout, rather than editing the store down |
+| `STORE_UNREADABLE` | repair or recreate it; the message names the parse error |
+| `TLS_CA_UNTRUSTED` | export your organisation root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it |
+| `TLS_CERT_INVALID` | check the instance URL and the certificate; this is not a CA-trust problem |
+| `UNKNOWN_GATE` | report it; no user action can help |
+| `UNKNOWN_INSTANCE` | the listing prints the labels that exist |
+| `UNKNOWN_TOOL` | use the `snow_*` name from `governance/mcp-protocols.md`; maintainers: `npm run lint:contract` |
+| `UNSUPPORTED_ON_THIS_INSTANCE` | take the other route: run the script in System Definition > Scripts - Background, or author a Fix Script and run it from the UI. Keep `sys_script_fix.name` to 40 characters — it truncates silently over REST (see `docs/PLATFORM-NOTES.md` PN-07) |
 | `UPDATE_FAILED` | the message carries the instance response |
-| `VALIDATION_ERROR` | the message names the argument and the expected shape |
-| `WRITE_NOT_ENABLED` | ./snowarch instance set-preset <label> pdi-developer |
+| `URL_HAS_CREDENTIALS` | remove them; the wizard asks for credentials separately |
+| `URL_HAS_PATH` | drop everything after the host |
+| `URL_INVALID` | enter it as `https://<host>.service-now.com` |
+| `URL_NOT_HTTPS` | use the https form of the same host |
+| `URL_REQUIRED` | enter the full https URL of the instance |
+| `VALIDATION_ERROR` | the message names the argument and the shape |
+| `WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 
 <!-- /generated:error-codes -->
 

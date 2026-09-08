@@ -209,7 +209,10 @@ describe('(e) manifest, contract and catalogue agree', () => {
     // If they were, the sha would move whenever someone improved a sentence, and a pin
     // against it would mean nothing.
     for (const t of CONTRACT.tools) {
-      const allowed = ['alsoRequires', 'gate', 'mutates', 'name', 'sessionMutates', 'table'];
+      // `unsupported` joined the list in ARC-05-S06: the rule file's "not a substitute"
+      // sentence names the two script-execution stubs, and it named them from a literal
+      // until the contract could say which tools they are.
+      const allowed = ['alsoRequires', 'gate', 'mutates', 'name', 'sessionMutates', 'table', 'unsupported'];
       expect(Object.keys(t).filter((k) => !allowed.includes(k)), t.name).toEqual([]);
       expect(Object.keys(t)).toContain('gate');
       expect(Object.keys(t)).toContain('mutates');

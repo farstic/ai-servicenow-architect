@@ -42,9 +42,9 @@ const ROOT = resolve(value('--root') ?? selfRoot);
 const CHECK = flag('--check');
 const only = (value('--only') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
-const RENDERERS = ['rule-file', 'presets'];
+const RENDERERS = ['rule-file', 'presets', 'protocols', 'troubleshooting'];
 // `--only rule` reads better than `--only rule-file` and is what the story writes.
-const ALIAS = { rule: 'rule-file', presets: 'presets' };
+const ALIAS = { rule: 'rule-file' };
 
 const cannotRun = (message) => { process.stderr.write(`gen-governance: ${message}\n`); process.exit(2); };
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
@@ -66,6 +66,9 @@ try {
   ctx = {
     root: ROOT,
     contract: JSON.parse(contractText),
+    // The engine's pin: what it depends on and who depends on it. `protocols.mjs` joins it with
+    // the contract, which is the only place the two are shown side by side.
+    pin: JSON.parse(read('packages/contract/required-tools.json')),
     // The sha of the bytes on disk, not of a re-serialisation: the pin compares the same bytes.
     sha: createHash('sha256').update(contractText).digest('hex'),
     serverKey,

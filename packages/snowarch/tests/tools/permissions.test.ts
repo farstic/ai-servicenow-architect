@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ErrorCodeName } from '../../src/errors/codes.js';
 import { ServiceNowError } from '../../src/utils/errors.js';
 import {
   outsideInstance, runWithInstance, FLAG_NAMES, type Flags, type InstanceRuntime,
@@ -370,7 +371,12 @@ describe('the refusal message names the instance and the remedy — criterion 5 
 
   it('an unrecognised code still produces a usable sentence rather than "undefined"', () => {
     asInstance({}, () => {
-      expect(gateError({ ok: false, code: 'SOMETHING_NEW' }).message).toContain('Operation is disabled');
+        // The cast is the point of the case, not a way around the type. Since ARC-05-S06 the
+        // code is the registry's union, so this literal cannot occur by accident — but the
+        // runtime path it exercises is still reachable: a flag added to the contract before its
+        // code reaches the registry arrives here as a string nobody registered, and the sentence
+        // a user reads must not become "undefined".
+      expect(gateError({ ok: false, code: 'SOMETHING_NEW' as ErrorCodeName }).message).toContain('Operation is disabled');
       expect(gateError({ ok: false }).message).toContain('Write operations are disabled');
     });
   });

@@ -217,8 +217,12 @@ export class ServiceNowClient {
                     catch {
                         // Error response wasn't JSON, use status text
                     }
-                    // Map HTTP status to error codes
-                    let errorCode = 'API_ERROR';
+                    // Map HTTP status to error codes. The default was `API_ERROR`, which is in no
+                    // registry and so reached a caller with no meaning and no remedy attached —
+                    // invisible until `ServiceNowError` took the registry's union as its code type.
+                    // `REQUEST_FAILED` is the registered code for exactly this case: the instance
+                    // refused and its response is the only information there is.
+                    let errorCode = 'REQUEST_FAILED';
                     if (response.status === 401) {
                         errorCode = 'AUTHENTICATION_FAILED';
                     }

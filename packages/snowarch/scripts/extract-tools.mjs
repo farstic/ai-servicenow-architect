@@ -24,6 +24,7 @@ const manifest = tools.map(t => ({
   ...(t.sessionMutates ? { sessionMutates: t.sessionMutates } : {}),
   ...(t.alsoRequires ? { alsoRequires: t.alsoRequires } : {}),
   ...(t.table ? { table: t.table } : {}),
+  ...(t.unsupported ? { unsupported: t.unsupported } : {}),
 }));
 
 const outPath = join(__dirname, '..', 'dist', 'tools-manifest.json');
@@ -98,6 +99,9 @@ console.log(`✓ Parity OK: ${EXPECTED} unique snow_* tools.`);
         ...(t.sessionMutates ? { sessionMutates: t.sessionMutates } : {}),
         ...(t.alsoRequires ? { alsoRequires: t.alsoRequires } : {}),
         ...(t.table ? { table: t.table } : {}),
+        // The rule file's "not a substitute" line filters on this rather than naming the
+        // two stubs from a literal — a claim about the server belongs in the contract.
+        ...(t.unsupported ? { unsupported: t.unsupported } : {}),
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     presets: PRESETS,

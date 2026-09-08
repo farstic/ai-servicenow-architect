@@ -151,6 +151,9 @@ export function fluentToolManifest(): ToolDefinition[] {
       // would have believed WRITE alone was enough to run it.
       gate: 'scripting',
       mutates: true,
+      // Registered, and always refuses: no REST endpoint backs it. It stays registered so a
+      // caller reaching for a server-side script finds it and is told the route that works.
+      unsupported: true,
     },
     {
       name: 'snow_fluent_explain',

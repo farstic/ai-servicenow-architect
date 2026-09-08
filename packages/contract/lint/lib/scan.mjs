@@ -76,6 +76,12 @@ export const POLICY_FILES = [
   // This lint's own suite: it asserts the exact text of an L02/L03 finding, which means
   // quoting the retired prefix it is detecting.
   'tests/contract/engine-lint.test.mjs',
+  // ARC-05-S05's generator suite, for both reasons at once: it renders against fixture contracts
+  // whose tool names are deliberately not real (`snow_a_add`), and it asserts that the retired
+  // capture vocabulary is ABSENT from the generated rule file, which means naming it. Neither is
+  // avoidable — a fixture built from real tool names would not prove the renderer read the
+  // contract, and an absence cannot be asserted without saying what is absent.
+  'tests/contract/gen-governance.test.mjs',
   // The policy itself. It has to name the words to state which are retired and which are not.
   'docs/CONTRIBUTING.md',
 ];

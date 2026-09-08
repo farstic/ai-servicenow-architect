@@ -11,6 +11,7 @@
  * means — which they could if each gate carried its own copy of the rule.
  */
 import { ServiceNowError } from './errors.js';
+import type { ErrorCodeName } from '../errors/codes.js';
 import { currentInstance, FLAG_NAMES, type FlagName, type Flags } from '../servicenow/context.js';
 
 export { FLAG_NAMES };
@@ -104,7 +105,7 @@ export function checkProdPosture(entry: {
 
 export interface GateResult {
   ok: boolean;
-  code?: string;
+  code?: ErrorCodeName;
   missing?: FlagName[];
 }
 

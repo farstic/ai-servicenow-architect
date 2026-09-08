@@ -391,6 +391,27 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; snapshot tests green; `npm run gen:check` in CI; `docs/CONTRIBUTING.md` "Generated files" section lists the target and its renderer; ARC-02 has the pointer text.
 
 ### ARC-05-S06 — Error-code registry, `governance/mcp-protocols.md` and `docs/TROUBLESHOOTING.md`
+
+> **Amendment 2026-09-08 (from the S06 delivery).**
+> - **The registry is `packages/snowarch/src/errors/codes.ts`, not a new `src/utils/error-codes.ts`.**
+>   ARC-04-S06 already created it and already emits it into the contract; this story extended the
+>   entry shape (`meaning`, `command?`, `showInRule`, `httpStatus?`) rather than starting a second
+>   one. 59 codes: the 50 the server throws or classifies, plus ARC-07's nine wizard-side codes
+>   registered with `showInRule: false` so `docs/TROUBLESHOOTING.md` covers what the wizard prints.
+> - **`NETWORK_TIMEOUT` and `PROXY_AUTH_REQUIRED` are NOT registered (ruled).** The classifier emits
+>   `CONNECTION_TIMEOUT` and does not distinguish a 407 at all, and a registry entry for a code
+>   nothing throws is a remedy nobody will ever read. The 407 case is an ARC-07 note.
+> - **ARC-07-S02/S05 must rename.** Their `PROXY_CONNECT_FAILED` and `STORE_MODE_UNSAFE` are not
+>   registry keys; the conditions they name are `PROXY_UNREACHABLE` and `STORE_PERMISSIONS_TOO_OPEN`.
+>   With `ServiceNowError` typed to the union, those literals will not compile.
+> - **The narrowing found a code that no scan could.** `client.ts` initialised its HTTP-status
+>   mapping to `API_ERROR`, a literal in no registry, so any unmapped status reached a caller with
+>   no meaning and no remedy. The grep-based completeness test could not see it — the string was
+>   never an argument to `new ServiceNowError`, it was a variable initialiser. It is now
+>   `REQUEST_FAILED`, which is the registered code for that case.
+> - **Criterion 1's counts differ from the story's.** 349 throw sites in 42 files, not 388 in 41,
+>   and all 17 distinct literals were already registered — so the migration was a type change with
+>   three computed-code sites to narrow, not a sweep of 388 literals.
 **As** an individual practitioner **I want** every error code the server can return to have exactly one documented meaning and remedy, shown identically by the rule file, the wizard, the doctor and the troubleshooting page **so that** a failure always names the next command, and a new code cannot ship without a remedy.
 **Context.** ARC README deliverables 4 (`governance/mcp-protocols.md`, `docs/TROUBLESHOOTING.md`) and acceptance criterion 6 (one entry per code; doctor and wizard import the same table). `01` §8 "Runtime error mapping". ARC-07 needs entries for `AUTHENTICATION_FAILED`, `INSUFFICIENT_PRIVILEGES`, `PROD_WRITE_NOT_ACKNOWLEDGED`, URL-shape errors, and — per R-3 — the wizard probe must distinguish DNS / TLS-CA / proxy failures with exact remedies; ARC-08 S10 maps runtime errors. `01` §11 leaves `errorCodes: []` in the contract shape for this story to fill.
 **Scope.** In: the server-side error-code registry (single source, emitted into the contract), the two renderers, the contract test that every thrown code is registered. Out: the wizard and doctor UIs that display remedies (ARC-07, ARC-08); the proxy agent itself (ARC-04 R-3 story) — this story only requires that its codes are registered with remedies.
