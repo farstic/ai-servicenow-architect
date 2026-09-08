@@ -105,7 +105,7 @@ When a returned artefact contains a JavaScript code block, propose verbatim: *"C
 | Domain Expert (review mode) | the task went through a gateway at Phase 1 |
 | Code Reviewer | the artefact contains a JavaScript code block |
 | ATF Author | the artefact is release-path bound |
-| Operational Documentation | a go-live signal — sign-off, release, cutover, deploy |
+| Operational Documentation | a go-live signal — sign-off, release, cutover, deploy — proposed even when the deployment itself is declined or deferred (design-only, no approval): a refusal is exactly when the runbook is still outstanding |
 | Diagramming Specialist | a design artefact returned, or a figure was asked for |
 
 ## 9. §1.1 and delivery governance

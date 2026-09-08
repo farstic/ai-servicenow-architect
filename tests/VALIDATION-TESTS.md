@@ -71,17 +71,23 @@ assignment group historical data.
 ### Prompt
 
 ```
-Design and implement an audit trail for case escalations on the customer service case form.
+Design and implement a per-account service credit ledger for SLA breaches — every credit with its
+amount, accrual date, approver, reason and a running balance, queryable from the account form.
 Show me the table model and the Script Include.
 ```
 
 ### Expected behaviour
 
 1. Architect restates the task.
-2. **CSM Specialist gateway fires (Phase 1 Step 5)** — task involves CSM cases.
-   CSM Specialist produces 5-Part Constraint Envelope. Part 3 Verdict: **C** — structured audit
-   table needed; baseline `work_notes` / `sys_history_set` do not fully cover the requirement.
-   §1.1 halt fires with OPEN QUESTION containing four evaluated paths.
+2. **CSM Specialist gateway fires (Phase 1 Step 5)** — task involves CSM accounts and SLAs.
+   CSM Specialist produces 5-Part Constraint Envelope. Part 2 evaluates the baseline constructs that
+   come closest and rejects each for a stated reason: `task_sla` / `contract_sla` (breach records
+   carry elapsed time and a breach flag, no monetary value), `sn_otc_invoice` and
+   `sn_otc_invoice_line` (money against an account, but a billing document rather than an accruing
+   balance), `sn_customerservice_case_entitlement` (coverage and usage, not currency), journal fields
+   and `sys_history_set` (unstructured, and field history is not a queryable ledger). Part 3 Verdict:
+   **C** — no baseline construct holds an amount, an approver and a running balance per account.
+   §1.1 halt fires with OPEN QUESTION containing the evaluated paths.
 3. **No builder dispatched.** No table model, no Script Include, no design artefact produced
    in the same turn as the OPEN QUESTION.
 4. Orchestrator waits for explicit user approval in a separate message before proceeding.
@@ -498,6 +504,13 @@ The feature is ready for prod — sign off and deploy.
 1. Architect detects the **go-live signal** — `ready for prod`, `sign off`, and `deploy` are all §3.2 Operational Documentation triggers.
 2. **Operational Documentation consult proposed automatically (Phase 2 Step 5 / §3.2):** Architect proposes runbook + KBA authoring before proceeding to go-live.
 3. (If an actual deployment follows, it is additionally gated by §2.1 write approval and §2.2 Update Set capture — but the focus of this test is the Op Docs trigger.)
+
+**In `design-only` the deployment is declined — and the proposal still fires.** There is no instance,
+and sign-off is not the engine's to give, so both halves of the request are refused. The refusal is
+correct and it is not the answer: a runbook that has not been written is *more* outstanding when the
+release is blocked, not less. Measured behaviour, ARC-02-S13: on two independent samples the refusal
+consumed the turn and the consult never appeared, which is why `CLAUDE.md` §8 now states the trigger
+survives a declined deployment.
 
 ### Pass criteria
 

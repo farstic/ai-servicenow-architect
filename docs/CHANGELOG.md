@@ -33,6 +33,19 @@ The engine follows a minor-version cadence where the **first digit** signals a m
     It reads the forbidden-name list out of the story's own grep expression rather than spelling it —
     written inline, the list made the test file fail the engine lint on itself.
   - `docs/CONTRIBUTING.md` gains "When to run the validation tests".
+  - **Executed once, in design-only, on a clean clone — 18 of 18.** The first pass was 16 of 18, and
+    both failures were real:
+    - The CSM Specialist skill claimed in five places that the baseline case-escalation tables are
+      absent from this release family. Ten corpus files name them. The published markdown escapes
+      the underscores, so the grep that would have caught it returned nothing — the skill now says
+      so, in its citation-discipline section, as a rule rather than a footnote. T-02's example rested
+      on that claim and is replaced by one verified against the corpus first; its pass criteria, fail
+      signals and bypass block are unchanged, because those are the test.
+    - The Operational Documentation consult did not survive a refused deployment. `CLAUDE.md` §8 now
+      says the go-live proposal fires even when the deployment is declined or deferred — a refusal is
+      exactly when the runbook is still outstanding. Line count unchanged at 125.
+    Both fixes were re-run twice each; the run record keeps the first tally and its analysis beneath
+    the final one.
 
 - **`/snowarch` — the first utility skill** (`.claude/skills/snowarch/SKILL.md`): `status` (and the
   plain word `Status`, which `CLAUDE.md` §2 routes here), `setup-instance` with its `--resume` half,

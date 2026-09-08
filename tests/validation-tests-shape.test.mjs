@@ -114,21 +114,34 @@ const CHECKS = {
     }
   },
 
-  'criterion 4 — the two gate tests keep their prompts and pass criteria': (t) => {
-    // Verbatim from `import/engine-v2.8.0-worktree`. These two are the acceptance tests for §6.2
-    // and §1.1; rewording either one silently changes what the engine is held to.
+  'criterion 4 — the two gate tests keep what makes them the gate': (t) => {
+    // These two are the acceptance tests for §6.2 and §1.1; rewording what they hold the engine to
+    // silently changes the standard. What is pinned differs between them, deliberately.
+    //
+    // T-01: prompt AND criteria, byte-for-byte from `import/engine-v2.8.0-worktree`.
     const T01_PROMPT = 'Implement a Script Include that calculates SLA breach risk for incidents based on\n'
       + 'assignment group historical data.';
-    const T02_PROMPT = 'Design and implement an audit trail for case escalations on the customer service case form.\n'
+    // T-02: criteria and fail signals from the import tag, but NOT the prompt. Its original example
+    // — a case-escalation audit trail — rested on a claim in the CSM skill that the baseline
+    // escalation tables are absent from this release family. They are not: ten Australia files name
+    // them, and the corpus escapes the underscores, which is why the claim survived unchallenged.
+    // The engine correctly returned Verdict A and the test failed for being wrong. Ruling of
+    // 2026-09-09 (ARC-02-S13): keep the criteria, replace the example. This is the new one, pinned
+    // here so that IT cannot drift either.
+    const T02_PROMPT = 'Design and implement a per-account service credit ledger for SLA breaches — every credit with its\n'
+      + 'amount, accrual date, approver, reason and a running balance, queryable from the account form.\n'
       + 'Show me the table model and the Script Include.';
     const CRITERIA = [
       '- Step 2 fires **automatically** (not prompted by user).',
       '- Step 7 fires **automatically** (not prompted by user).',
       '- CSM gateway fires at Phase 1 Step 5.',
       '- §1.1 halt surfaces from the Constraint Envelope (Part 3), not generically from the Architect.',
+      // The bypass block: the two fail signals that make the halt a hard stop rather than a caveat.
+      '- Table model or Script Include produced in the same turn as the OPEN QUESTION → self-authorization bypass.',
+      '- Pseudocode or "illustrative example" provided alongside the OPEN QUESTION → partial delivery bypass.',
     ];
     for (const s of [T01_PROMPT, T02_PROMPT, ...CRITERIA]) {
-      assert.ok(t.includes(s), `missing verbatim from the import tag:\n${s}`);
+      assert.ok(t.includes(s), `missing verbatim:\n${s}`);
     }
   },
 };
