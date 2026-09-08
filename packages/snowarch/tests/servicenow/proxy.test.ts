@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AddressInfo, Socket } from 'node:net';
 import { proxyConfigured, resetHttpDispatcher, snFetch } from '../../src/servicenow/http.js';
@@ -153,6 +153,15 @@ describe('criterion 7 - one HTTP call site', () => {
 
   const files = walk(SRC);
 
+  /**
+   * Repo-relative, with forward slashes on every platform.
+   *
+   * Windows `readdirSync`+`join` yields `servicenow\\http.ts`, so the first version of this
+   * assertion passed on macOS and Linux and failed on all three Windows cells — a
+   * platform-specific failure in a test whose subject has nothing to do with platforms.
+   */
+  const rel = (f: string): string => f.slice(SRC.length + 1).split(sep).join('/');
+
   it('there are source files to scan', () => {
     expect(files.length).toBeGreaterThan(30);
   });
@@ -163,14 +172,14 @@ describe('criterion 7 - one HTTP call site', () => {
     // able to debug it.
     const importers = files
       .filter((f) => /from\s+'undici'/.test(readFileSync(f, 'utf8')))
-      .map((f) => f.slice(SRC.length + 1));
+      .map(rel);
     expect(importers).toEqual(['servicenow/http.ts']);
   });
 
   it('nothing calls the global fetch', () => {
     const callers = files
       .filter((f) => /(?<![\w.])fetch\s*\(/.test(readFileSync(f, 'utf8')))
-      .map((f) => f.slice(SRC.length + 1));
+      .map(rel);
     expect(callers).toEqual([]);
   });
 });
