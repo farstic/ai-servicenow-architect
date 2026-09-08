@@ -193,6 +193,45 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; test green on the CI matrix; `docs/CONTRIBUTING.md` says "never edit `retired-names.json` by hand".
 
 ### ARC-05-S03 — `engine-lint.mjs` core: tokens, prefix, retired names, pin
+
+> **Amendment 2026-09-08 (from the S03 delivery).**
+> - **One definition of clean, and it is `lib/scan.mjs`.** History is exempt from L01/L02/L03 per the
+>   architect's ruling: `docs/plans/**`, `docs/spikes/**` (the S-14 records carry `mcp__plugin_…__`
+>   prefixes as measured evidence) and `docs/CHANGELOG.md`. `docs/decisions/**` and
+>   `docs/ARCHITECTURE.md` stay in scope behind the marker.
+> - **`POLICY_FILES` had to exist, and the lint could not reach exit 0 without it.** A file whose
+>   *subject* is the list of dead names must contain them: the ratchet and its allow-list, ARC-05-S02's
+>   assertion about which words are retired, ARC-02-S02's negative fixtures, this lint's own suite, and
+>   `docs/CONTRIBUTING.md`. Without the list, ARC-02-S12's "sweep until exit 0, then flip the constant"
+>   plan has no reachable end state. Five entries, each named with its reason; the line to hold is that
+>   naming the dead thing is what the file is *for*.
+> - **L02 now honours the historical marker too**, not just L03. The real tree showed
+>   `docs/decisions/ADR-0001-names.md` failing L02 for quoting the registration keys it *rejected* —
+>   which is the decision that ADR records. A check that forbade it would make the record unwritable.
+> - **L02 cannot be required today, and I have not forced it green.** The architect's ruling 2 put it
+>   in the required set; the real tree has **5** L02 findings, three of them in `CLAUDE.md:295/299`
+>   carrying the old prefixes, and two in that ADR pending its markers. Those are ARC-02-S12's to
+>   sweep, and exempting `CLAUDE.md` to satisfy the ruling would be defeating the check rather than
+>   passing it. **Required set is `L07,L11`; L01/L02/L03 are the reported SUMMARY**, and the named
+>   constant in `scripts/ci/lint-name-summary.mjs` flips all three at once. **Architect decision
+>   wanted** on the two ADR lines: adding `<!-- retired-name: historical -->` to them would clear
+>   L02's ADR half now, but ADRs are immutable once Accepted, so I have not touched it.
+> - **Criterion 2's hint is unreachable by Levenshtein alone.** `snow_core_query_records` and
+>   `snow_core_records_query` are eight edits apart and one thought apart, so a distance-only
+>   implementation gives no hint precisely where the hint matters most. L01 tries a **segment
+>   reordering** first — same underscore-separated parts in a different order — then falls back to
+>   distance ≤ 3. The criterion's exact expected line is asserted.
+> - **A retired name is L03's finding, not L01's.** L01 skips tokens that appear in
+>   `retired-names.json`, so one defect produces one message with one remedy rather than two.
+> - **Findings must use forward slashes on every platform.** Three Windows cells went red on
+>   `governance\mcp-protocols.md` versus `governance/mcp-protocols.md`. The fix is in the product,
+>   not the test: a finding that cannot be diffed between cells, or pasted into a `grep` on another
+>   platform, is worth less than one that can. The exemption lists are now `/` literals rather than
+>   `join()` calls for the same reason — comparing a built path against a literal silently changes
+>   *which files are checked*. Same class as ARC-04-S13's source scan; now a CONTRIBUTING rule.
+> - **Current real-tree state, for ARC-02-S12:** `L01 0 · L02 5 · L03 72 · L07 ok · L11 ok`. L01 being
+>   already clean is worth noting — every `snow_*` token in the engine's texts names a tool that
+>   exists. The work is prefixes and identifiers, not tool names.
 **As** a maintainer **I want** one command that fails when any engine text cites a tool the server does not have, uses a wrong MCP prefix, uses a retired name, or when the pin no longer matches the committed contract **so that** P-04 and P-05 cannot recur after ARC-02's sweep.
 **Context.** ARC README deliverable 3 (first half) and acceptance criteria 1 (engine side), 4, 5 (prefix from `engine.config.json`). `01` §11 "Engine lint". ARC-02 S12 and ARC-02's acceptance criterion "engine-lint passes" depend on this story. ARC-08 E-checks "retired names" and "prefix consistency" import the check modules (S04 finalises the module boundary).
 **Scope.** In: `packages/contract/lint/engine-lint.mjs` CLI, checks L01 (tool tokens), L02 (prefix), L03 (retired names), L07 (server-key agreement), L11 (sha pin), the scan set, output format, exit codes. Out: L04–L06, L08–L10 (S04); any auto-fix beyond `--fix-pin` delegation to `pin.mjs`.

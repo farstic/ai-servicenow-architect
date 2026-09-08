@@ -76,7 +76,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-04-S14 | ARC-04 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M | S01, S13 | M2 | Done (2026-09-08) |
 | ARC-05-S01 | ARC-05 | `required-tools.json`: engine pin with `used_by` and `contractSha256` | M | ARC-01-S04; ARC-04-S06/S13 | M2 | Done (2026-09-08) |
 | ARC-05-S02 | ARC-05 | `retired-names.json` generated from the rename map | S | ARC-04-S01 | M2 | Done (2026-09-08) |
-| ARC-05-S03 | ARC-05 | `engine-lint.mjs` core: tokens, prefix, retired names, pin | M | S01, S02 | M2 | Not started |
+| ARC-05-S03 | ARC-05 | `engine-lint.mjs` core: tokens, prefix, retired names, pin | M | S01, S02 | M2 | Done (2026-09-08) |
 | ARC-05-S04 | ARC-05 | `engine-lint.mjs` structural checks: descriptions, path references, `used_by`, generated-file byte check, plugin validate | M | S03, S05, S06, S07; ARC-00-S12; verdicts S-19 | M2 | Not started |
 | ARC-05-S05 | ARC-05 | `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md` | M | S01; ARC-02-S09; ARC-04-S03/S06/S07 | M2 | Not started |
 | ARC-05-S06 | ARC-05 | Error-code registry, `governance/mcp-protocols.md` and `docs/TROUBLESHOOTING.md` | M | S05; ARC-04-S02/S03/S04/S08/S11 | M2 | Not started |

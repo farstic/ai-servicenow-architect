@@ -1,0 +1,7 @@
+{
+  "mcp__nowaikit__": "mcp__servicenow__",
+  "mcp__servicenow-mcp__": "mcp__servicenow__",
+  "nowaikit": "servicenow",
+  "query_records": "snow_core_records_query",
+  "snow_rpt_report_generate": "(removed)"
+}

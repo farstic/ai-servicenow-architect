@@ -317,6 +317,48 @@ committed pin — which is how a demonstration of criterion 4 left the real file
 ARC-05-S03's L07 proves `serverKey` matches `engine.config.json`; ARC-05-S08 proves the gates match
 the running catalogue. Three checks, three reasons to go red, deliberately not one.
 
+### The engine lint
+
+```sh
+node packages/contract/lint/engine-lint.mjs [--json] [--root <dir>] [--only L01,L03]
+```
+
+Exit **0** pass · **1** findings · **2** cannot run. The third is separate on purpose: a missing
+`dist/contract.json` means the check never happened, and a caller that read that as a pass would be
+reassured by silence.
+
+| Id | Checks |
+|---|---|
+| `L01` | every `snow_*` token in an engine text is a tool in `dist/contract.json`, with the nearest real name as a hint |
+| `L02` | every `mcp__…__` prefix equals the one `engine.config.json` declares |
+| `L03` | no retired name outside the files where naming the past is the job |
+| `L07` | the registration key agrees across `engine.config.json`, `required-tools.json`, `dist/contract.json` and `.mcp.json` |
+| `L11` | the pin's sha still describes the committed contract |
+
+ARC-08's doctor imports these modules and reuses the ids, so `--json`'s shape
+(`{ checks: [{ id, status, findings: [{ file, line, message }] }] }`) is a contract with that story.
+
+**One definition of clean.** The scan set lives in `lib/scan.mjs` and nothing else defines it — no
+hand-written `grep -r` anywhere should be enforcing a different one, because two definitions is how
+a sweep gets declared done against the narrower of them. `docs/plans/**`, `docs/spikes/**` and
+`docs/CHANGELOG.md` are **history** and exempt from the name checks: the spike records cite old
+prefixes *as measured evidence*, and rewriting them would destroy the record.
+
+Two ways a file may legitimately name a dead thing:
+
+- **The historical marker** — a line ending `<!-- retired-name: historical -->`, honoured only in
+  `docs/ARCHITECTURE.md`, `docs/decisions/**` and `docs/CHANGELOG.md`, and only for *identifiers*. A
+  tool name is never excused: no sentence makes a name the server answers with `UNKNOWN_TOOL` safe to
+  cite.
+- **`POLICY_FILES`** in `lib/scan.mjs` — files whose *subject* is the list of dead names. A test that
+  asserts which words are retired must contain them; a fixture must contain the defect it detects.
+  The line to hold is that naming the dead thing is what the file is *for*, not merely convenient.
+
+**L01, L02 and L03 are reported, not required, until ARC-02-S12 sweeps the tree.**
+`scripts/ci/lint-name-summary.mjs` prints a `SUMMARY` line and exits 0; S12 flips one named constant
+there and the same command becomes blocking. Requiring them today would make every unrelated PR ship
+past a red check, which is how a check stops being read.
+
 ### Never edit `retired-names.json` by hand — generate it
 
 ```sh
@@ -414,6 +456,15 @@ residue. ARC-04-S12's doctor test did exactly that and made `tests/contract.test
 full runs, in a file that story never touched. Copy the artefact and run against the copy; the copy
 has to live **inside** the package, because Node resolves dependencies by walking up from the module
 and a copy in `os.tmpdir()` dies with `ERR_MODULE_NOT_FOUND`.
+
+### Report paths with forward slashes, on every platform
+
+A tool that prints `governance\mcp-protocols.md` on Windows and `governance/…` on Unix produces
+output that cannot be diffed between CI cells, and a reader who pastes one into a `grep` on the
+other gets nothing back. Normalise once, where the path is produced — and write path *literals* in
+exemption lists with `/` rather than building them with `join()`, or the comparison silently changes
+which files are checked at all. ARC-05-S03 went red on three Windows cells for this; ARC-04-S13 had
+the same class in a source scan.
 
 ### Never derive a path from a file URL's `pathname`
 
