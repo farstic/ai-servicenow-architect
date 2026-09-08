@@ -57,6 +57,7 @@ function nearest(token, names) {
 }
 
 export const id = 'L01';
+export const title = 'every snow_ token names a tool the contract has';
 
 export function run(ctx) {
   const names = new Set(ctx.contract.tools.map((t) => t.name));
@@ -73,7 +74,7 @@ export function run(ctx) {
         if (names.has(token)) continue;
         // A retired name is L03's finding, not L01's. Reporting it twice would make one defect
         // look like two and split the remedy across two messages.
-        if (ctx.retired[token] !== undefined) continue;
+        if (ctx.retiredNames[token] !== undefined) continue;
         const hint = nearest(token, names);
         findings.push({
           file,

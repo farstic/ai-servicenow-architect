@@ -657,6 +657,42 @@ same list `--check` prints.
 
 ---
 
+## The engine lint's checks
+
+`packages/contract/lint/engine-lint.mjs` runs eleven checks over the engine's texts. Each is a
+module in `checks/` exporting **`{ id, title, run(ctx) }`**, where
+`ctx = { root, config, contract, requiredTools, retiredNames, files }` plus `skipNotes`, `skipped`,
+`cannotRun` and `isSelfRoot`. ARC-08's doctor imports these modules rather than shelling out, so the
+shape is a contract with a story that has not been written yet — add a check by adding a module, not
+by adding a branch to an existing one.
+
+| Id | What it refuses | In CI |
+|---|---|---|
+| `L01` | a `snow_` token that is not a tool in the contract | summary only, until ARC-02-S12 |
+| `L02` | an `mcp__…__` prefix that is not the one `engine.config.json` declares | summary only |
+| `L03` | a retired name outside the files whose subject is the past | summary only |
+| `L04` | a description over 500 characters, or an unquoted `": "` that stops the entry registering | **required** |
+| `L05` | a repository path cited in prose that does not resolve | **required** |
+| `L06` | a generated file that is not what its generator produces | **required** |
+| `L07` | the registration key disagreeing across its declarations | **required** |
+| `L08` | the pin and the contract disagreeing about a tool's gate, mutates, sessionMutates or alsoRequires | **required** |
+| `L09` | a `used_by` nobody can resolve, or a cited tool the pin does not carry | **required** |
+| `L10` | `claude plugin validate` failing on the skills or agents directory | see below |
+| `L11` | a pinned sha that no longer describes the committed contract | **required** |
+
+**L10 is the one check that needs a tool outside this repository, and it behaves accordingly.** In
+the `lint` job the CLI is not installed, so L10 reports `skip` with the reason. Enforcement lives in
+the `plugin validate` job, where the CLI *is* installed and the check runs with `--require-claude` —
+there, a missing CLI means the job is misconfigured rather than that there is nothing to check. A
+check that passed silently when it could not run would make that job look redundant while it was the
+one doing the work.
+
+Exit codes are the same everywhere: **0** current, **1** findings, **2** could not run. The third is
+not a nicety — "the contract lost something this file names" and "this file is stale" call for
+different actions, and a stack trace on a CI cell calls for neither.
+
+---
+
 ## Adding an error code: the registry first
 
 A code exists when it has an entry in `packages/snowarch/src/errors/codes.ts` — `meaning`, `remedy`,
