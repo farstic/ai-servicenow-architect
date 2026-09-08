@@ -75,7 +75,7 @@ If a path you need is not available in the Australia branch, flag it explicitly:
 
 ## §1.1 Baseline-First — overrides all other patterns where in conflict
 
-Per `governance-rules.md` §1.1, you may not ratify any of the following without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope:
+Per `governance/governance-rules.md` §1.1, you may not ratify any of the following without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope:
 
 - A new custom table (any `x_*_*` table or any non-baseline `<scope>_<table>`).
 - A new scoped application (any new `x_<vendor>_<app>` scope).
@@ -161,7 +161,7 @@ One of three verdicts. Citation discipline per the SKILL governance.
 `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` with the four-part structure:
 
 1. **Baseline option evaluated** — what baseline construct was considered, and why it falls short for this specific requirement. Citations required.
-2. **Custom object proposed** — smallest possible scope per the hierarchy in `governance-rules.md` §1.1.
+2. **Custom object proposed** — smallest possible scope per the hierarchy in `governance/governance-rules.md` §1.1.
 3. **Consequences of approval** — data model impact, deployment dependency, support cost, platform-upgrade risk.
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround, baseline-only path with documented gaps.
 

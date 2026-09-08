@@ -4,7 +4,12 @@
     {
       "file": ".claude/skills/itom-discovery-specialist/EXAMPLES.md",
       "context": "compliance baseline tier",
-      "reason": "A customer's CI classification in a worked example — 'Tier 1 Strict / Tier 2 Standard / Tier 3 Relaxed' is the client's own vocabulary, not the engine's retired Tier 0/1/2 permission model. Sweeping it would corrupt the example."
+      "reason": "A customer's CI classification in a worked example \u2014 'Tier 1 Strict / Tier 2 Standard / Tier 3 Relaxed' is the client's own vocabulary, not the engine's retired Tier 0/1/2 permission model. Sweeping it would corrupt the example."
+    },
+    {
+      "file": "docs/CONTRIBUTING.md",
+      "context": "Tier 1 Strict / Tier 2 Standard / Tier 3 Relaxed",
+      "reason": "The same customer CI classification, quoted in CONTRIBUTING while explaining why the itom-discovery example is exempt. Anchored to the quoted string so the exemption cannot widen to another line in the file."
     }
   ]
 }

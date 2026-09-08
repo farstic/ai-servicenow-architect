@@ -67,7 +67,7 @@ If a path is unavailable in the Australia branch, flag explicitly: *"Citation un
 
 ## §1.1 Baseline-First — overrides all other patterns where in conflict
 
-Per `governance-rules.md` §1.1, you may not ratify any of the following without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope:
+Per `governance/governance-rules.md` §1.1, you may not ratify any of the following without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope:
 
 - A new custom table (any `x_*_*` table or any non-baseline `<scope>_<table>`).
 - A new scoped application.

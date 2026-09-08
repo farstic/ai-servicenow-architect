@@ -1,6 +1,6 @@
 # RAID Log — {{client}} / {{engagement or PI}}
 
-> **What this is:** the engagement's running register of **R**isks, **A**ssumptions, **I**ssues, and **D**ependencies. One living file per engagement at `clients/{{client-short-name}}/raid-log.md`. See `governance-rules.md` §4.3.
+> **What this is:** the engagement's running register of **R**isks, **A**ssumptions, **I**ssues, and **D**ependencies. One living file per engagement at `clients/{{client-short-name}}/raid-log.md`. See `governance/governance-rules.md` §4.3.
 >
 > **How it is fed:** specialists surface RAID items as they work — Estimation surfaces sizing risks and assumptions, Discovery surfaces dependencies and open assumptions, Performance/Security/Licensing surface their own risks, and every `OPEN QUESTION` that is not immediately resolved becomes a RAID entry. The Chief Architect owns the file and reviews it at each design checkpoint.
 >
@@ -33,4 +33,4 @@ Reviewed at each design checkpoint and before any release sign-off. Closed items
 
 ---
 
-*RAID template — ServiceNow Architecture Engine. Convert every unresolved OPEN QUESTION into a RAID item so nothing falls through the gap between sessions (governance-rules.md §4.3).*
+*RAID template — ServiceNow Architecture Engine. Convert every unresolved OPEN QUESTION into a RAID item so nothing falls through the gap between sessions (governance/governance-rules.md §4.3).*

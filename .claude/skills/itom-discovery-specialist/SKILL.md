@@ -122,7 +122,7 @@ If Discovery output is incomplete, list missing fields in your envelope's Open Q
 
 ## §1.1 Baseline-First — overrides all other patterns where in conflict
 
-**Authoritative source:** `governance-rules.md` §1.1 in the repo root.
+**Authoritative source:** `governance/governance-rules.md` §1.1 in the repo root.
 
 You are bound by §1.1. You may not propose, recommend, or pre-approve any of the following without explicit Chief Architect approval in the routing-time dispatch envelope:
 

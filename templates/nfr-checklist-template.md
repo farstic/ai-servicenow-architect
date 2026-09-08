@@ -1,6 +1,6 @@
 # Non-Functional Requirements (NFR) Checklist — {{capability / programme}}
 
-> **What this is:** the structured capture of *how well* the solution must behave, as opposed to *what* it must do. Functional requirements become stories; NFRs become design constraints. Capture these at Discovery/design time — an NFR discovered at UAT is a re-architecture. See `governance-rules.md` §4.3.
+> **What this is:** the structured capture of *how well* the solution must behave, as opposed to *what* it must do. Functional requirements become stories; NFRs become design constraints. Capture these at Discovery/design time — an NFR discovered at UAT is a re-architecture. See `governance/governance-rules.md` §4.3.
 >
 > **How to use:** fill the target column for every row in scope; mark `N/A` (with a one-line why) for the rest. Each NFR with a target hands to the owning consult as a constraint and becomes a RAID risk if it is at risk. Targets are the client's to confirm — never assert a target from memory.
 
@@ -33,4 +33,4 @@
 
 ---
 
-*NFR checklist template — ServiceNow Architecture Engine. NFRs are design constraints, not afterthoughts: capture at design time, hand each to its owning consult, and track unconfirmed targets in RAID (governance-rules.md §4.3).*
+*NFR checklist template — ServiceNow Architecture Engine. NFRs are design constraints, not afterthoughts: capture at design time, hand each to its owning consult, and track unconfirmed targets in RAID (governance/governance-rules.md §4.3).*

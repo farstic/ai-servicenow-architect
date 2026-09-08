@@ -9,6 +9,14 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ---
 
+## Before 2.0.0
+
+Everything below is the imported engine's history, kept as written. **The term "Tier" below is
+historical** — it is the retired permission and surface vocabulary that ARC-02-S06 replaced with
+Mode (`design-only` | `live`) and Preset (`read-only` | `pdi-developer` | `full` | `custom`), and the
+file paths are the ones those entries were written against. Rewriting them would falsify the record
+of what was decided and when. ARC-09-S02 regenerates this file from conventional commits.
+
 ## v2.7.6 — Final six specialist skills — roster is now 100% skill-backed
 
 **Released:** June 2026

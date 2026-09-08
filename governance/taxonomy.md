@@ -2,7 +2,7 @@
 
 > **Purpose:** Authoritative reference for resolving routing ambiguity between specialists. When a user task could plausibly route to two or more specialists, the boundary tables and trigger-keyword maps in this document determine which specialist is correct.
 >
-> **Read by:** CLAUDE.md (Tier 2 orchestrator), master-project-instructions.md (Tier 1 master), each satellite project's instructions, and the Chief ServiceNow Architect persona at routing time.
+> **Read by:** `CLAUDE.md` (the Chief Architect) and every SKILL.md at routing time, and the Chief ServiceNow Architect persona at routing time.
 >
 > **Maintenance:** Updated whenever a new specialist is added or whenever a real misroute is observed in production use.
 
@@ -34,7 +34,7 @@ See `governance-rules.md` for the full text of all rules, halt protocols, and vi
 
 The system's 27 specialists fall into four functional groups:
 
-### Builders — Tier 2 sub-agent execution
+### Builders — sub-agent execution
 
 These specialists run as isolated sub-agents in Claude Code. They read files, write code, and produce concrete artefacts.
 

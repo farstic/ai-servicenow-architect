@@ -71,45 +71,76 @@ This rule applies to all 25 specialists at all tiers — builders, reviewers, do
 
 ## §2.1 — MCP Write Operations Explicit Approval Gate
 
-Every MCP write operation against a live ServiceNow instance requires an explicit **"write approved"** from the user in the current conversation before the tool is called. This gate applies to any `create_*`, `update_*`, `delete_*`, `execute_*`, and any other MCP tool that mutates instance state.
+> **Interim.** ARC-05-S05 generates the machine-readable rule file from `dist/contract.json`; this
+> section is the human statement of the same rule until then, and is written to say the same thing.
+
+Every MCP write against a live ServiceNow instance requires an explicit **"write approved"** from the
+user *in the current conversation*, before the tool is called.
+
+**Which tools this covers.** Any tool of the `servicenow` server whose contract entry says
+`mutates: true` or `sessionMutates: true`. That is the definition — not a list of names, and not a
+guess from the name's suffix. `packages/contract/required-tools.json` records what the engine expects
+of each tool it depends on, and `packages/snowarch/dist/contract.json` is what the server declares.
+
+Naming tools by their suffix was tried and does not work: over the real catalogue, a suffix rule
+leaves **more than thirty** state-changing tools ungated — among them approving a request, rolling
+back a deployment, retiring an article or an asset, completing a task, firing an event and setting
+system properties (`03` S-23). If a tool changes anything, the gate applies, whatever it is called.
+
+`sessionMutates` is in the definition for one tool: switching instance changes no record, and it
+decides **where every later write lands**. Approving it is approving that.
 
 **What counts as "write approved":**
-- A clear, explicit user message in the current conversation that authorises the specific write action about to be taken (e.g., "write approved", "go ahead and create", "yes, deploy it", "yes, update it").
+- A clear, explicit user message in the current conversation authorising the specific write about to
+  be made — "write approved", "go ahead and create it", "да, качи".
 
-**What does NOT count as "write approved":**
-- A previous "yes" to a read-only operation (approving a routing proposal, approving a Code Reviewer pass).
-- A general go-ahead earlier in the conversation that did not name the specific write action.
+**What does NOT count:**
+- A previous "yes" to a read (approving a routing proposal, approving a Code Reviewer pass).
+- A general go-ahead earlier in the conversation that did not name this write.
 - The user's original task description, however detailed.
-- A tier or permission upgrade.
+- **Switching Mode (`design-only` → `live`) or raising a Preset.** That is a configuration change: it
+  makes a write *possible*, and says nothing about whether this write is *wanted*.
 
-**Halt protocol:** If a write operation is about to be executed without a "write approved" in the current conversation, stop and surface: *"About to [describe action] — write approved?"* Wait for explicit confirmation before proceeding.
+**Halt protocol.** About to write without an approval in the current conversation: stop and ask —
+*"About to [describe the action] — write approved?"* — then wait.
 
-**Self-approval is prohibited.** Claude may not infer write approval from context, urgency, or logical flow. Approval must be a discrete user message.
+**Self-approval is prohibited.** Approval is a discrete user message. It is never inferred from
+context, from urgency, or from the logic of the task.
 
 ---
 
 ## §2.2 — MCP Update Set Capture Mandatory Pre-Write Protocol
 
-Before executing any `create_*` or `update_*` MCP write operation that produces a ServiceNow configuration object (Script Include, Business Rule, Client Script, UI Policy, Flow, etc.), the active `sys_user_preference` for `sys_update_set` **must** be set to the target Update Set for the authenticated user.
+> **Interim.** ARC-05-S06 generates the protocol file from the contract's
+> `protocols.updateSetCapture` and this section will point at it; the four calls below are that
+> protocol, written out. (The generated file is named only once it exists — a path in backticks
+> that resolves to nothing is a claim the reader cannot check.)
 
-**Why:** ServiceNow REST API calls honour the `sys_user_preference` record with `name=sys_update_set` for the authenticated user. Setting this preference before write operations causes automatic capture of created/updated objects into the target Update Set. Without this step, objects land on the instance but are not captured in any Update Set and cannot be promoted or migrated.
+Before any MCP write that produces a ServiceNow **configuration object** — Script Include, Business
+Rule, Client Script, UI Policy, Flow, ACL — point the update-set capture at a named set. Four calls:
 
-**Mandatory steps before any configuration write:**
+1. `snow_us_active_update_set_ensure { name }` — the name is required, and only *your* in-progress
+   sets are returned. Without both, a shared instance hands back whoever opened one last, and the
+   engagement's objects land in a stranger's update set.
+2. `snow_us_capture_target_set { update_set_sys_id }` — points capture at it.
+3. Do the write.
+4. `snow_us_update_set_preview { sys_id }` — confirm the objects are in the set. This step is the
+   evidence; without it the protocol was performed but not verified.
 
-1. Identify or create the target Update Set — `create_update_set` or confirm an existing one is `in progress`.
-2. Resolve the authenticated user's sys_id — `query_records(sys_user, user_name=<username>)`.
-3. Set the user preference — `query_records(sys_user_preference, user=<sys_id>^name=sys_update_set)`:
-   - If exists → `update_record(sys_user_preference, <pref_sys_id>, {value: <update_set_sys_id>})`
-   - If not exists → `create_record(sys_user_preference, {user: <sys_id>, name: 'sys_update_set', value: <update_set_sys_id>, type: 'string'})`
-4. Execute the write operation — object is now captured automatically.
-5. Verify capture — `query_records(sys_update_xml, update_set=<update_set_sys_id>)`.
+**Why a preference and not a "current update set".** REST honours the authenticated user's
+`sys_user_preference` with `name=sys_update_set`. The `is_default` flag on an update set is a UI
+concept and does nothing for the API — setting it looks like success and captures nothing.
 
-**What does NOT work (confirmed non-functional on ServiceNow REST API):**
-- `switch_update_set` — only sets `is_default: true` on the record; does NOT switch session context.
-- Direct POST to `sys_update_xml` — blocked by `INSUFFICIENT_PRIVILEGES` even for admin users.
-- `execute_script` / `execute_background_script` — call non-existent ServiceNow endpoints; fail with 400/404.
+**What does not work, confirmed:**
+- Switching the update set by flag: `is_default` does not change the API's capture target.
+- Writing `sys_update_xml` directly: refused with `INSUFFICIENT_PRIVILEGES`, admin included.
+- Running a server-side script to do it: there is no supported REST endpoint for script execution.
+  The two tools that once tried are still registered and refuse with
+  `UNSUPPORTED_ON_THIS_INSTANCE` — they are **not** substitutes. Run the script in
+  **System Definition → Scripts - Background**, or as a Fix Script from the UI.
 
-**Halt protocol:** If steps 1–3 have not been completed before a configuration write, stop and complete them first. Retroactive capture via REST is not possible.
+**Halt protocol.** Steps 1–2 not done before a configuration write: stop and do them. Capture cannot
+be applied retroactively over REST — the object is already outside the set.
 
 ---
 
@@ -168,4 +199,4 @@ Drift between this file and downstream references is a maintenance bug. Resolve 
 
 ---
 
-*End of governance-rules.md v1.3 — added §4 Delivery Artefact Governance (ADR §4.1, Requirements Traceability §4.2, RAID & NFR §4.3), seeded from `templates/`; §3 deliberately skipped to avoid the routing-consult §3.x namespace; §1.1 scope updated 22 → 25 specialists. Prior — v1.2: §2.1 MCP write gate + §2.2 update-set capture.*
+*End of governance-rules.md v1.4 — ARC-02-S06: moved to `governance/`; Mode/Preset vocabulary replaces the retired Tier model; §2.1 keyed on the contract's `mutates` / `sessionMutates` rather than on tool names; §2.2 rewritten to the four calls that exist today, with the two retired script-execution tools named as NOT substitutes. Both §2 sections are interim: ARC-05-S05/S06 generate them. Prior — v1.3: added §4 Delivery Artefact Governance (ADR §4.1, Requirements Traceability §4.2, RAID & NFR §4.3), seeded from `templates/`; §3 deliberately skipped to avoid the routing-consult §3.x namespace; §1.1 scope updated 22 → 25 specialists. Prior — v1.2: §2.1 MCP write gate + §2.2 update-set capture.*

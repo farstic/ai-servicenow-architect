@@ -1,6 +1,6 @@
 # ARC-02 — Engine consolidation and hardening
 
-Status: **Stories drafted 2026-09-04** · **S01–S05 merged 2026-09-08 (5 of 13) — the M1 half of this ARC is complete; the rest is M2** · Depends on: ARC-01 (all stories); ARC-05 for the generated governance texts and the final retired-name sweep; ARC-00 verdicts S-13 (closed by this ARC's evidence), S-16, S-19 · Blocks: ARC-07 (the `/snowarch setup-instance` skeleton it extends), ARC-08 (roster checks, the `/snowarch status` body), ARC-10
+Status: **Stories drafted 2026-09-04** · **S01–S06 merged 2026-09-08 (6 of 13) — M1 complete; S06 opens M2** · Depends on: ARC-01 (all stories); ARC-05 for the generated governance texts and the final retired-name sweep; ARC-00 verdicts S-13 (closed by this ARC's evidence), S-16, S-19 · Blocks: ARC-07 (the `/snowarch setup-instance` skeleton it extends), ARC-08 (roster checks, the `/snowarch status` body), ARC-10
 
 Decisions applied (from `02-DECISIONS-NEEDED.md`, all closed 2026-09-04): D-01 names (`packages/snowarch`, `@farstic/snowarch`, CLI `snowarch`, server key `servicenow` → `mcp__servicenow__`), D-02 licence wording, D-03 scope cut (claude.ai surface and context-mode leave), D-05/principle 10 (documented in `docs/MODES-AND-PRESETS.md`; the interactive behaviour is ARC-06/ARC-07's), D-06 hedge (the `/snowarch setup-instance` skill guides the terminal hand-off), Q-B (native Windows first-class — the in-session skills still need Git for Windows because Claude Code's Bash tool does, `01` §4.1), R-1 (`2.0.0`), R-2 (`/snowarch` with sub-commands `status` · `setup-instance` · `doctor`; no `/status` skill), R-3 (proxy stories are ARC-04/07/08; this ARC only carries their remedies in the skill's hand-off text once they exist). Vocabulary: **Mode** `design-only` | `live`; **Preset** `read-only` | `pdi-developer` | `full` | `custom`.
 
@@ -38,7 +38,7 @@ ARC-01 — by story ID as written in `ARC-01/STORIES.md`: S02 (engine import, ta
 
 - [ ] `diff -rq` of the old `.claude/skills` against the new one shows only frontmatter/description, `## Triggers` and citation-path changes (no body-content loss) — verified by `scripts/maint/compare-skill-bodies.mjs`, which strips frontmatter and the new section and compares (S01, S03).
 - [ ] In a fresh `claude` session in the repository, the skill listing shows **all 28 roster skills (29 entries with `snowarch`) with a description** (S-13, evidence file committed) and `/snowarch status` — and the plain-text `Status` — return the doctor's `Mode:` line (S03, S11; against the doctor stub until ARC-08, against the real doctor from ARC-08's CI run).
-- [ ] `wc -l CLAUDE.md` ≤ 200; `grep -c "Task tool" CLAUDE.md governance/*.md` = 0; `grep -rn "Tier [0-9]" CLAUDE.md governance docs .claude tests` = 0 — with one ruling for the verifier: lines under the `## Before 2.0.0` heading of `docs/CHANGELOG.md` are history and are excluded by the test with a disclaimer sentence (S06 open point — closed at integration 2026-09-04: exclusion with disclaimer, no rewrite) (S06, S08).
+- [ ] `wc -l CLAUDE.md` ≤ 200; `grep -c "Task tool" CLAUDE.md governance/*.md` = 0; `grep -rn "Tier [0-9]" CLAUDE.md governance docs .claude tests` = 0 — with one ruling for the verifier: lines under the `## Before 2.0.0` heading of `docs/CHANGELOG.md` are history and are excluded by the test with a disclaimer sentence (S06 open point — closed at integration 2026-09-04: exclusion with disclaimer, no rewrite; **resolved in S06 2026-09-08**: criteria 2 and 4 of `tests/no-legacy-surfaces.test.mjs` share one `currentLines()` helper that stops at the `## Before 2.0.0` heading, and the heading carries the disclaimer sentence. `docs/RELICENSING.md` is excluded by path for the same reason and a second one — it is a consent record naming the files as they were named when consent was given) (S06, S08).
 - [ ] `node packages/contract/lint/engine-lint.mjs` (from ARC-05) passes: no retired name, correct prefix, all tool tokens in the contract (S12).
 - [ ] `grep -rn "context-mode\|ctx_\|claude_desktop_config\|claude-ai-projects" --include=*.md --include=*.json --include=*.sh .` (excluding `vendor/`, `node_modules/`, `.git/` and `scripts/legacy/`, which ARC-10 deletes) returns nothing outside the `## History` section of `docs/ARCHITECTURE.md` (S05).
 - [ ] `tests/VALIDATION-TESTS.md` T-01 … T-18 pass in design-only mode on a clean machine (the two §1.1/§6.2 gate tests included; T-05/T-06 on their dormant variant; live-mode execution deferred to ARC-09/ARC-10) — recorded under `docs/spikes/validation-runs/` (S13).
@@ -64,20 +64,20 @@ Detailed write-ups: [`STORIES.md`](STORIES.md). Story order differs from the pre
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Story ID | S01 | S02 | S03 | S04 | S08 | S06 | S09 | S10 | S05 | S11 | S12 | S13 | S07 |
 
-| ID | Title | Size |
-|---|---|---|
-| ARC-02-S01 | Make `.claude/` canonical: delete root mirrors, sync script, structure gate and pre-commit chain; rewrite every path reference | M |
-| ARC-02-S02 | Skills lint and agents lint (`tests/skills-lint.test.mjs`), wired into CI | M |
-| ARC-02-S03 | Rewrite every skill description to ≤ 500 chars; triggers into bodies; `version:` → `metadata.version`; S-13 verification | L |
-| ARC-02-S04 | Agent frontmatter: `model: inherit`, `skills:` preload, `tools:` unchanged; §6.2 regression run | M |
-| ARC-02-S05 | Remove context-mode, the claude.ai surface, the settings example, the 9-step README manual; disposition of legacy docs | M |
-| ARC-02-S06 | Move governance texts to `governance/`; Mode/Preset vocabulary sweep across CLAUDE.md, governance, docs, skills, tests | M |
-| ARC-02-S07 | Roster generator: `scripts/gen-roster.mjs` writes the roster table into `docs/ARCHITECTURE.md`; `--check` in CI | S |
-| ARC-02-S08 | `CLAUDE.md` ≤ 200 lines rewrite; harness-neutral wording; `Status` → `/snowarch status`; version line owned by the release script | L |
-| ARC-02-S09 | `docs/MODES-AND-PRESETS.md` — Mode semantics, the preset table and plain-language flags of `01` §6.3, principle 10 | S |
-| ARC-02-S10 | `docs/PLATFORM-NOTES.md` from the field notes; server-behaviour sections handed to ARC-04 as regression-test titles | M |
-| ARC-02-S11 | `/snowarch` project skill: `status` (delegates to the doctor), `setup-instance` skeleton with the terminal hand-off, `doctor` | M |
-| ARC-02-S12 | Retired-name final sweep with ARC-05's `retired-names.json` and `engine-lint.mjs` (incl. ITOM SKILL/EXAMPLES) | S |
-| ARC-02-S13 | Refresh `VALIDATION-TESTS.md` (T-01…T-18) to Mode/Preset and current tool names; replace T-07; strip run history; execute in design-only mode | M |
+| ID | Title | Size | Status |
+|---|---|---|---|
+| ARC-02-S01 | Make `.claude/` canonical: delete root mirrors, sync script, structure gate and pre-commit chain; rewrite every path reference | M | Done (2026-09-08) |
+| ARC-02-S02 | Skills lint and agents lint (`tests/skills-lint.test.mjs`), wired into CI | M | Done (2026-09-08) |
+| ARC-02-S03 | Rewrite every skill description to ≤ 500 chars; triggers into bodies; `version:` → `metadata.version`; S-13 verification | L | Done (2026-09-08) |
+| ARC-02-S04 | Agent frontmatter: `model: inherit`, `skills:` preload, `tools:` unchanged; §6.2 regression run | M | Done (2026-09-08) |
+| ARC-02-S05 | Remove context-mode, the claude.ai surface, the settings example, the 9-step README manual; disposition of legacy docs | M | Done (2026-09-08) |
+| ARC-02-S06 | Move governance texts to `governance/`; Mode/Preset vocabulary sweep across CLAUDE.md, governance, docs, skills, tests | M | Done (2026-09-08) |
+| ARC-02-S07 | Roster generator: `scripts/gen-roster.mjs` writes the roster table into `docs/ARCHITECTURE.md`; `--check` in CI | S | Not started |
+| ARC-02-S08 | `CLAUDE.md` ≤ 200 lines rewrite; harness-neutral wording; `Status` → `/snowarch status`; version line owned by the release script | L | Not started |
+| ARC-02-S09 | `docs/MODES-AND-PRESETS.md` — Mode semantics, the preset table and plain-language flags of `01` §6.3, principle 10 | S | Not started |
+| ARC-02-S10 | `docs/PLATFORM-NOTES.md` from the field notes; server-behaviour sections handed to ARC-04 as regression-test titles | M | Not started |
+| ARC-02-S11 | `/snowarch` project skill: `status` (delegates to the doctor), `setup-instance` skeleton with the terminal hand-off, `doctor` | M | Not started |
+| ARC-02-S12 | Retired-name final sweep with ARC-05's `retired-names.json` and `engine-lint.mjs` (incl. ITOM SKILL/EXAMPLES) | S | Not started |
+| ARC-02-S13 | Refresh `VALIDATION-TESTS.md` (T-01…T-18) to Mode/Preset and current tool names; replace T-07; strip run history; execute in design-only mode | M | Not started |
 
 Sizing: ≈ 22.5 engineer-days (range 20–28); critical path S01 → S02 → S03 → S04 → S05 → S06 → S07 → S08 → S11 → S13; S12 waits on ARC-05.

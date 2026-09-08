@@ -30,8 +30,8 @@ ai-servicenow-architect/                      farstic/ai-servicenow-architect ·
 │   │   └── snowarch/SKILL.md                 /snowarch status · setup-instance · doctor (R-2): quotes the doctor Mode line; guided front-end of the wizard (§6); roster from directory listing
 │   └── agents/<9>.md                         single canonical copy; model: inherit; skills: [<persona>] preload; explicit tools lists (no MCP)
 ├── governance/
-│   ├── governance-rules.md                   §1.1, §2 (references the generated rule), §4 — read on demand as today
-│   ├── taxonomy.md · prompt-patterns.md      read on demand as today
+│   ├── governance/governance-rules.md                   §1.1, §2 (references the generated rule), §4 — read on demand as today
+│   ├── governance/taxonomy.md · governance/prompt-patterns.md      read on demand as today
 │   └── mcp-protocols.md                      GENERATED long form of §2.1/§2.2 with current tool names (the rule file is its digest)
 ├── packages/
 │   ├── snowarch/                             the server + CLI package (from farstic/snow-mcp, server-only scope — ARC-04)
