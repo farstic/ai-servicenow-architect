@@ -114,7 +114,7 @@ function walk(root, dir, out) {
   try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
   for (const e of entries) {
     const full = join(dir, e.name);
-    const rel = relative(root, full);
+      const rel = posix(relative(root, full));
     if (e.isDirectory()) {
       if (NEVER_SCANNED.includes(e.name)) continue;
       // Any directory named `fixtures`, at any depth. S01's contract fixtures deliberately hold

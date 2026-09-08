@@ -29,7 +29,9 @@ const findings = (out) => out.split('\n').filter((l) => l.includes(' FAIL '));
 
 test('criterion 1 — a clean tree passes, and says so per check', () => {
   const r = lint('tree-clean');
-  assert.equal(r.code, 0);
+  // The findings go in the assertion message. `1 !== 0` on a CI cell tells the reader nothing
+  // they can act on, and this suite's own subject is that a finding's TEXT is the product.
+  assert.equal(r.code, 0, `expected a clean tree; got:\n${r.stdout}${r.stderr ?? ''}`);
   // Every check named, even the passing ones: a lint that is silent on success leaves the
   // reader unable to tell "all five ran and passed" from "three of them ran".
   assert.match(r.stdout, /L01 ok · L02 ok · L03 ok · L07 ok · L11 ok/);
