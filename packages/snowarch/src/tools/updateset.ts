@@ -139,8 +139,8 @@ export async function dispatchUpdateSetAction(
     }
 
     case 'snow_us_update_set_add': {
-      if (!args.name) throw new ServiceNowError('name is required', 'INVALID_REQUEST');
       requireScripting();
+      if (!args.name) throw new ServiceNowError('name is required', 'INVALID_REQUEST');
       const payload: Record<string, any> = { name: args.name, state: 'in progress' };
       if (args.description) payload.description = args.description;
       if (args.release) payload.release = args.release;
@@ -154,15 +154,15 @@ export async function dispatchUpdateSetAction(
     }
 
     case 'snow_us_update_set_switch': {
-      if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
       requireScripting();
+      if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
       const result = await client.updateRecord('sys_update_set', args.sys_id, { is_default: true });
       return { action: 'switched', sys_id: args.sys_id, ...result };
     }
 
     case 'snow_us_update_set_complete': {
-      if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
       requireScripting();
+      if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
       const result = await client.updateRecord('sys_update_set', args.sys_id, { state: 'complete' });
       return { action: 'completed', sys_id: args.sys_id, ...result };
     }
@@ -192,7 +192,9 @@ export async function dispatchUpdateSetAction(
 
     case 'snow_us_update_set_export': {
       if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
-      requireScripting();
+      // No gate: this only READS sys_update_set and sys_update_xml and returns a summary.
+      // It called requireScripting() before, which meant exporting an update set for review
+      // required a write flag — the same conflation the pre-switch gate in script.ts had.
       const updateSet = await client.getRecord('sys_update_set', args.sys_id);
       const xmlRecords = await client.queryRecords({
         table: 'sys_update_xml',

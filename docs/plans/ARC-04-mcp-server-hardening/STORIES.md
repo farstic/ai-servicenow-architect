@@ -392,6 +392,23 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 > despite that hook. S06's `gate`/`mutates` declarations and `tests/contract.test.ts` replace the seven
 > per-dispatcher suites' flag assertions; the glue goes with them.
 
+> **Amendment 2026-09-08 (architect's rulings on the S05 delivery).**
+> - **Task 4 and criterion 1's live half are deferred to the owner's live sitting** — the agent never
+>   holds instance credentials. Delivered instead:
+>   `docs/spikes/S-10-readonly-preset-sufficiency/PROCEDURE.md`, a runnable procedure naming the build
+>   under test, the exact store fixture, both preset runs and the T-01…T-18 order. The `03` §A S-10
+>   status cell records the deferral and the build sha.
+> - **The gate-split test derives its two families from the REGISTERED CATALOGUE**, not a hand-written
+>   list: 35 tools, each classified read or write, and an unclassified name fails the test. A stale
+>   entry fails too, so a rename cannot leave the table asserting nothing.
+> - **Found while writing that test:** `snow_us_update_set_add`, `_switch` and `_complete` validated
+>   their arguments BEFORE calling the gate, so an unauthorised caller got `INVALID_REQUEST` instead of
+>   a permission code. The story says the gate is the first statement of each mutating case; it now is,
+>   in `updateset.ts` as well as `script.ts`.
+> - **`01` §6.3's parenthetical is now false** and was updated: "(ARC-04 splits the gate; today it
+>   blocks reads too)" → "(split by ARC-04-S05, 2026-09-08)". The phrase survives only inside this
+>   story, which quotes it as the string to remove.
+
 ### ARC-04-S06 — `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract`
 
 **As** the engine (ARC-05's lint and generators) **I want** every tool to declare in code which flag family gates it and whether it mutates the instance, and the server to emit one contract file from those declarations **so that** the §2.1 `ask` list, the §2.2 protocol text and the doctor read tool names, gates and error codes from a generated artefact instead of prose.

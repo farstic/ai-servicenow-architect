@@ -198,7 +198,9 @@ function logStartup(): void {
   // server is not in. Caught by tests/store/dotenv.test.ts.
   const report = instanceManager.reload();
   const version = getPackageVersion();
-  const toolCount = collectToolCatalog().length;
+  // The ADVERTISED count, not the catalogue's. Unconfigured, five tools can be called and
+  // 397 exist; printing 397 beside "mode: unconfigured" invites the reader to try one.
+  const toolCount = advertisedTools().length;
 
   for (const note of report.notes) logger.info(note);
   for (const err of report.configErrors) logger.error(`${err.code}: ${err.message}`);
