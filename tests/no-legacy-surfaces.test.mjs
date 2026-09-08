@@ -250,6 +250,14 @@ test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it mu
   // something to close by dropping a fact or by running paragraphs together. The guard here is
   // against unbounded growth in the meantime; tighten it to 150 once the page is trimmed or the
   // budget is raised.
+  // `.editorconfig` says `insert_final_newline = true` and nothing in the repository enforces it:
+  // a reflow pass here dropped this file's last newline and all nineteen CI cells stayed green.
+  // Guarded for this page at least, until something checks it repo-wide.
+  assert.ok(doc.endsWith('\n') && !doc.endsWith('\n\n'), 'must end with exactly one newline');
+  assert.ok(!doc.includes('\r'), 'CRLF line endings');
+  // Words split across a wrap boundary read as two words once markdown joins the lines.
+  assert.deepEqual(doc.split('\n').filter((l) => /\w-$/.test(l)), []);
+
   const lines = doc.trimEnd().split('\n').length;   // what `wc -l` reports for a file ending in \n
   console.log(`    ARC-02-S09: docs/MODES-AND-PRESETS.md is ${lines} lines (budget of record: 150)`);
   assert.ok(lines <= 160, `${lines} lines — over even the interim ceiling`);
