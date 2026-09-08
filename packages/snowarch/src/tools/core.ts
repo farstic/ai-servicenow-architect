@@ -17,6 +17,7 @@ import type {
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
 import { instanceManager } from '../servicenow/instances.js';
+import { currentCapabilities, reloadInstances, serverStatus } from './status.js';
 
 export function coreToolManifest() {
   return [
@@ -228,6 +229,24 @@ export function coreToolManifest() {
       },
     },
     {
+      // The three tools below need NO instance: they describe the server's own state, and
+      // they are what a session has to fall back on when nothing is configured. Gate `none`
+      // and mutates false — ARC-04-S06 formalises those fields on every tool.
+      name: 'snow_core_status_read',
+      description: "Report the server's own state: mode, which store was used, which instances loaded or were refused, and how many tools are advertised. Needs no instance.",
+      inputSchema: { type: 'object', properties: {}, required: [] },
+    },
+    {
+      name: 'snow_core_capabilities_read',
+      description: "Report the current instance's preset, flags and effective flags. Never returns a username or a secret.",
+      inputSchema: { type: 'object', properties: {}, required: [] },
+    },
+    {
+      name: 'snow_core_instances_reload',
+      description: 'Re-read the instance store from disk and re-advertise the tool list. Use after adding an instance in another terminal, instead of restarting.',
+      inputSchema: { type: 'object', properties: {}, required: [] },
+    },
+    {
       name: 'snow_core_instances_index',
       description: 'List all configured ServiceNow instances (multi-instance / multi-customer support)',
       inputSchema: { type: 'object', properties: {}, required: [] },
@@ -375,9 +394,19 @@ export async function dispatchCoreAction(
       requireWrite();
       return await client.naturalLanguageUpdate(args.instruction, args.table);
 
+    case 'snow_core_status_read':
+      return serverStatus();
+
+    case 'snow_core_capabilities_read':
+      return currentCapabilities();
+
+    case 'snow_core_instances_reload':
+      return reloadInstances();
+
     case 'snow_core_instances_index':
       return {
-        current: instanceManager.getCurrentName(),
+        current: instanceManager.loadedCount() > 0 ? instanceManager.getCurrentName() : null,
+        mode: instanceManager.loadedCount() > 0 ? 'configured' : 'unconfigured',
         instances: instanceManager.listAll(),
         total: instanceManager.listNames().length,
       };
@@ -392,11 +421,15 @@ export async function dispatchCoreAction(
       };
 
     case 'snow_core_current_instance_read':
-      return {
-        name: instanceManager.getCurrentName(),
-        url: instanceManager.getCurrentUrl(),
-        all_instances: instanceManager.listNames(),
-      };
+      // Returns a shape rather than throwing when nothing is loaded: this is one of the
+      // five tools a session has while unconfigured, and its job is to say so.
+      return instanceManager.loadedCount() === 0
+        ? { name: null, mode: 'unconfigured', all_instances: [] }
+        : {
+          name: instanceManager.getCurrentName(),
+          url: instanceManager.getCurrentUrl(),
+          all_instances: instanceManager.listNames(),
+        };
 
     case 'snow_core_ci_relationship_add': {
       requireWrite();

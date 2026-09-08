@@ -25,8 +25,12 @@ const outPath = join(__dirname, '..', 'dist', 'tools-manifest.json');
 writeFileSync(outPath, JSON.stringify(manifest, null, 2));
 console.log(`Extracted ${manifest.length} tools → dist/tools-manifest.json`);
 
-// Migration guard: the catalog must expose exactly 394 unique, namespaced tools.
-const EXPECTED = 394;
+// Migration guard: the catalog must expose exactly this many unique, namespaced tools.
+// ARC-04-S04 raised this from 394 to 397: three core tools that need no instance
+// (snow_core_status_read, snow_core_capabilities_read, snow_core_instances_reload).
+// ARC-04-S06 owns the arithmetic from here — its EXPECTED is 397 minus the one removal
+// (snow_rpt_report_generate, ARC-04-S08) plus whatever it adds.
+const EXPECTED = 397;
 const unique = new Set(manifest.map(t => t.name));
 if (manifest.length !== EXPECTED || unique.size !== EXPECTED) {
   console.error(`✗ Tool count parity failed: ${manifest.length} tools (${unique.size} unique), expected ${EXPECTED}.`);

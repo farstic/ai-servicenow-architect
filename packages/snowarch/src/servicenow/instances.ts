@@ -286,6 +286,9 @@ class InstanceManager {
       `Unknown instance "${name}". Configured: ${configured.join(', ') || 'none'}`, 'UNKNOWN_INSTANCE');
   }
 
+  /** How many instances actually loaded — the server advertises its tool set on this. */
+  loadedCount(): number { return this.instances.size; }
+
   getCurrentName(): string { return this.currentName; }
   getCurrentUrl(): string { return this.instances.get(this.currentName)?.url || ''; }
   getEntry(name?: string): InstanceEntry | undefined { return this.instances.get(name ?? this.currentName); }
