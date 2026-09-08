@@ -10,6 +10,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { existsSync } from 'node:fs';
 import dotenv from 'dotenv';
 import { instanceManager } from './servicenow/instances.js';
+import { runWithInstance } from './servicenow/context.js';
 import { isUnderCloudSyncFolder } from './store/index.js';
 import { collectToolCatalog } from './tools/index.js';
 import { getResources, readResource } from './resources/index.js';
@@ -64,8 +65,12 @@ export function createServer(): Server {
       const instanceName = (args as Record<string, unknown>)?.['instance'] as string | undefined;
       const client = instanceManager.getClient(instanceName);
 
+      // Every tool call runs inside the addressed instance's runtime, so the ~166 require*()
+      // gates read THAT instance's effective flags rather than process.env. One switch, and
+      // writes refuse on prod while the same call succeeds on the PDI — no second process.
+      const runtime = instanceManager.getEntry(instanceName?.toLowerCase()) ?? instanceManager.current();
       const { routeToolInvocation } = await import('./tools/index.js');
-      const result = await routeToolInvocation(client, name, args || {});
+      const result = await runWithInstance(runtime, () => routeToolInvocation(client, name, args || {}));
 
       return {
         content: [
@@ -113,7 +118,8 @@ export function createServer(): Server {
 
     try {
       const client = instanceManager.getClient();
-      const result = await readResource(client, uri);
+      // Resource reads need an instance for the same reason tool calls do.
+      const result = await runWithInstance(instanceManager.current(), () => readResource(client, uri));
       const mimeType = uri === 'servicenow://query-syntax' ? 'text/markdown' : 'application/json';
       const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
 

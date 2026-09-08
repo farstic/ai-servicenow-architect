@@ -21,6 +21,12 @@ export default defineConfig({
       // The CLI is a thin commander wiring around a child-process spawn and three stubs;
       // covering it would measure commander, not this package.
       exclude: ['src/cli/index.ts'],
+      // permissions.ts decides whether a write reaches a customer's instance. A branch
+      // nobody exercised is a branch nobody has checked, so it is held at 100 % rather
+      // than at a project-wide average that a large well-covered file could carry.
+      thresholds: {
+        'src/utils/permissions.ts': { lines: 100, functions: 100, branches: 100, statements: 100 },
+      },
     },
   },
 });

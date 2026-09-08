@@ -9,6 +9,7 @@ import type {
 } from './types.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { logger } from '../utils/logging.js';
+import { currentInstanceOrNull } from './context.js';
 
 // ─── Input validation helpers ────────────────────────────────────────────────
 
@@ -368,8 +369,13 @@ export class ServiceNowClient {
     if (params.limit !== undefined && params.limit > 0) {
       queryParams.set('sysparm_limit', Math.min(params.limit, 1000).toString());
     } else {
-      // Default page size from MAX_RECORDS (capped at 1000), falling back to 10.
-      const defaultLimit = Math.min(Number(process.env.MAX_RECORDS) || 10, 1000);
+      // Default page size from the addressed instance's maxRecords (store-declared, default
+      // 100), capped at 1000. It used to come from process.env.MAX_RECORDS with a fallback
+      // of 10 — process-global, and so the same for every instance the server held.
+      // Outside a request (a direct client construction in a test) there is no ambient
+      // instance, and 100 is the documented default.
+      const rt = currentInstanceOrNull();
+      const defaultLimit = Math.min(rt?.maxRecords ?? (Number(process.env.MAX_RECORDS) || 100), 1000);
       queryParams.set('sysparm_limit', defaultLimit.toString());
     }
 
