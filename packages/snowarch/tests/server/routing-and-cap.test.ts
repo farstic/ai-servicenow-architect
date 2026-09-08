@@ -1,10 +1,11 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { removeTempDir, reapServerChildren, trackServerChild } from '../helpers/server-child.js';
 
 const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/server.js');
 
@@ -56,9 +57,13 @@ function env(): Record<string, string> {
 
 async function connect(extraEnv: Record<string, string> = {}): Promise<Client> {
   const client = new Client({ name: 'routing-test', version: '0' }, { capabilities: {} });
-  await client.connect(new StdioClientTransport({
+  const transport = new StdioClientTransport({
     command: process.execPath, args: [SERVER], env: { ...env(), ...extraEnv }, stderr: 'ignore',
-  }));
+  });
+  await client.connect(transport);
+  // After `connect`, not before: the transport spawns the child there, and until it does its
+  // `pid` is null — which `trackServerChild` refuses rather than silently reaping nothing.
+  trackServerChild(transport);
   return client;
 }
 
@@ -73,7 +78,11 @@ beforeEach(() => {
   writeStore();
 });
 
-afterEach(() => { rmSync(base, { recursive: true, force: true }); });
+afterEach(async () => {
+  // Reap first: the removal is only safe once nothing can still write into the directory.
+  await reapServerChildren();
+  removeTempDir(base);
+});
 
 describe('criterion 4 - a per-call `instance` argument does not route', () => {
   it('the call goes to the CURRENT instance even when another is named', async () => {

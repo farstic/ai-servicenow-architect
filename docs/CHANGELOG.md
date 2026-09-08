@@ -25,6 +25,22 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Fixed
 
+- **A spawned child is reaped before its temp directory is removed.** Three suites drive the built
+  server over stdio into a `mkdtemp` directory and remove it in `afterEach`. `client.close()` is a
+  graceful shutdown, not a join — the SDK transport races the child's exit against a 2 s timer and
+  returns either way — so on a loaded runner the removal walked a directory the child was still
+  writing into and threw `ENOTEMPTY`, failing the build on the teardown of a test that had passed
+  (`macos-latest` / node 24, one job of 25). `tests/helpers/server-child.ts` now tracks each child by
+  the pid captured at spawn time, waits for it to be gone (`SIGKILL` after 500 ms, since a child that
+  ignores `SIGTERM` cannot be waited out) and only then removes the directory, with `maxRetries` to
+  absorb a write already in flight. Proved against a fixture child that ignores `SIGTERM` and writes
+  every 2 ms: the old teardown gives `ENOTEMPTY`, the new one removes the directory.
+- **CI ran twice per commit on a work branch.** `on.push.branches` included `arc-*/**` and `chore/**`
+  as well as the branches a merge lands on, so a push to a branch with an open pull request started
+  two full 25-job matrices for the same SHA. They shared a runner pool, and that contention is what
+  surfaced the teardown race above. Push now triggers on `main` and `develop` only; work branches
+  reach CI through `pull_request`, which is where their result is read. `docs/CONTRIBUTING.md` carries
+  the process rule that makes this reliable — a story branch gets its draft pull request at first push.
 - `snow_us_active_update_set_ensure` advertised the input shape it had *before* the update-set
   capture rework: `default_name`, and nothing required. The handler has required `name` since that
   rework, so a caller following the published schema passed `default_name` and got

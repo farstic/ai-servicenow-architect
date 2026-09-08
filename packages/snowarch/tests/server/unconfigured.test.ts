@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectToolCatalog } from '../../src/tools/index.js';
+import { removeTempDir, reapServerChildren, trackServerChild } from '../helpers/server-child.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
@@ -77,9 +78,13 @@ async function connect(): Promise<{ client: Client; notifications: string[] }> {
   client.setNotificationHandler(ToolListChangedNotificationSchema, () => {
     notifications.push('notifications/tools/list_changed');
   });
-  await client.connect(new StdioClientTransport({
+  const transport = new StdioClientTransport({
     command: process.execPath, args: [SERVER], env: env(), stderr: 'ignore',
-  }));
+  });
+  await client.connect(transport);
+  // After `connect`, not before: the transport spawns the child there, and until it does its
+  // `pid` is null — which `trackServerChild` refuses rather than silently reaping nothing.
+  trackServerChild(transport);
   return { client, notifications };
 }
 
@@ -95,7 +100,11 @@ beforeEach(() => {
   mkdirSync(checkout, { recursive: true });
 });
 
-afterEach(() => { rmSync(base, { recursive: true, force: true }); });
+afterEach(async () => {
+  // Reap first: the removal is only safe once nothing can still write into the directory.
+  await reapServerChildren();
+  removeTempDir(base);
+});
 
 describe('criterion 1 and 2 - the server starts with no instance', () => {
   it('advertises exactly the five instance-free core tools', async () => {
