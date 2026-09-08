@@ -1,6 +1,6 @@
 # ARC-02 — Engine consolidation and hardening
 
-Status: **Stories drafted 2026-09-04** · **S01–S06 merged 2026-09-08 (6 of 13) — M1 complete; S06 opens M2** · Depends on: ARC-01 (all stories); ARC-05 for the generated governance texts and the final retired-name sweep; ARC-00 verdicts S-13 (closed by this ARC's evidence), S-16, S-19 · Blocks: ARC-07 (the `/snowarch setup-instance` skeleton it extends), ARC-08 (roster checks, the `/snowarch status` body), ARC-10
+Status: **Stories drafted 2026-09-04** · **S01–S07 merged 2026-09-08 (7 of 13) — M1 complete; S06/S07 into M2** · Depends on: ARC-01 (all stories); ARC-05 for the generated governance texts and the final retired-name sweep; ARC-00 verdicts S-13 (closed by this ARC's evidence), S-16, S-19 · Blocks: ARC-07 (the `/snowarch setup-instance` skeleton it extends), ARC-08 (roster checks, the `/snowarch status` body), ARC-10
 
 Decisions applied (from `02-DECISIONS-NEEDED.md`, all closed 2026-09-04): D-01 names (`packages/snowarch`, `@farstic/snowarch`, CLI `snowarch`, server key `servicenow` → `mcp__servicenow__`), D-02 licence wording, D-03 scope cut (claude.ai surface and context-mode leave), D-05/principle 10 (documented in `docs/MODES-AND-PRESETS.md`; the interactive behaviour is ARC-06/ARC-07's), D-06 hedge (the `/snowarch setup-instance` skill guides the terminal hand-off), Q-B (native Windows first-class — the in-session skills still need Git for Windows because Claude Code's Bash tool does, `01` §4.1), R-1 (`2.0.0`), R-2 (`/snowarch` with sub-commands `status` · `setup-instance` · `doctor`; no `/status` skill), R-3 (proxy stories are ARC-04/07/08; this ARC only carries their remedies in the skill's hand-off text once they exist). Vocabulary: **Mode** `design-only` | `live`; **Preset** `read-only` | `pdi-developer` | `full` | `custom`.
 
@@ -72,7 +72,7 @@ Detailed write-ups: [`STORIES.md`](STORIES.md). Story order differs from the pre
 | ARC-02-S04 | Agent frontmatter: `model: inherit`, `skills:` preload, `tools:` unchanged; §6.2 regression run | M | Done (2026-09-08) |
 | ARC-02-S05 | Remove context-mode, the claude.ai surface, the settings example, the 9-step README manual; disposition of legacy docs | M | Done (2026-09-08) |
 | ARC-02-S06 | Move governance texts to `governance/`; Mode/Preset vocabulary sweep across CLAUDE.md, governance, docs, skills, tests | M | Done (2026-09-08) |
-| ARC-02-S07 | Roster generator: `scripts/gen-roster.mjs` writes the roster table into `docs/ARCHITECTURE.md`; `--check` in CI | S | Not started |
+| ARC-02-S07 | Roster generator: `scripts/gen-roster.mjs` writes the roster table into `docs/ARCHITECTURE.md`; `--check` in CI | S | Done (2026-09-08) |
 | ARC-02-S08 | `CLAUDE.md` ≤ 200 lines rewrite; harness-neutral wording; `Status` → `/snowarch status`; version line owned by the release script | L | Not started |
 | ARC-02-S09 | `docs/MODES-AND-PRESETS.md` — Mode semantics, the preset table and plain-language flags of `01` §6.3, principle 10 | S | Not started |
 | ARC-02-S10 | `docs/PLATFORM-NOTES.md` from the field notes; server-behaviour sections handed to ARC-04 as regression-test titles | M | Not started |
