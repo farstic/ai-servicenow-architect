@@ -60,6 +60,44 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Changed (ARC-04-S08) — `tools/list` is the same list all session, and results have a ceiling
+
+**The runtime-generated `dynamic_<op>_<table>` tools are gone.** `snow_disco_table_discover` used to
+MINT tools: discovering `u_widget` added `dynamic_query_u_widget`, `dynamic_create_u_widget` and three
+more to `tools/list` for the rest of the session. A catalogue that changes shape cannot be described by
+`contract.json`, cannot be cached by any client, and — the part that mattered — minted *write* tools
+whose names did not exist until runtime, so no parity or gate test ever walked them. Discovery now
+returns the columns as data (`{ table, source: 'instance' | 'cache', columns: [...],
+cache_expires_in_minutes }`) and the caller uses `snow_core_records_query`,
+`snow_core_record_add` and their siblings, which are declared, gated and counted.
+`schema-cache.ts` is a column cache and nothing else.
+
+**Removed: `snow_rpt_report_generate`.** It POSTed to a report-generation endpoint that is not part of
+the REST API — the reason the D-03 surface cut removed `src/reports/` and the `pdfmake` / `pptxgenjs`
+dependencies (**D-03 item 4**, "Report generator"). The tool survived that cut and had been calling a
+route its own implementation no longer had. Tool count: **398 → 397.**
+
+**`snow_deploy_background_script_exec` and `snow_fluent_script_exec` are `[Unsupported]` stubs.**
+Server-side script execution has no supported REST endpoint. Both stay *registered* — deleting the
+names would turn a clear refusal into `UNKNOWN_TOOL`, which reads as a typo — and both now throw
+`UNSUPPORTED_ON_THIS_INSTANCE` **before any HTTP request**, naming the UI route that does work
+(Scripts - Background, or a Fix Script). `ServiceNowClient.executeScript` is deleted.
+
+**A per-call `instance` argument no longer routes.** No tool's `inputSchema` declared one, so it was an
+undocumented side channel that could send a write to a different instance than the session believed it
+was addressing. `snow_core_instance_switch` is the only way to change instance; an `instance` argument
+is now ignored rather than refused, since it was never advertised.
+
+**Results are capped.** Every `CallTool` result passes through `resolveCap` / `capResult`:
+`_meta["anthropic/maxResultSizeChars"]` if the client sent a positive number, else
+`SNOW_MAX_RESULT_CHARS`, else 100,000 characters. A records-shaped result drops whole records from the
+end and gains `{ truncated: true, returned, total_fetched, hint }` — still valid JSON; anything else is
+cut with `… [truncated at <cap> chars]`. A result under the cap is untouched and gains **no**
+`truncated` key. Capping happens in the one place every result already passes through, so a new tool is
+capped by existing rather than by its author remembering to. *(Whether any client actually sends that
+`_meta` key is unverified — recorded as S-26 in `docs/plans/03-RISKS-AND-UNKNOWNS.md`, not asserted
+here.)*
+
 ### Changed (ARC-04-S07) — §2.2 is now four calls, and it captures what you meant
 
 **`snow_us_active_update_set_ensure` now requires `name` and returns only YOUR in-progress update

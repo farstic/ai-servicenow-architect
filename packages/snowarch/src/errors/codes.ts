@@ -40,6 +40,11 @@ export const ERROR_CODES: ErrorCode[] = [
   { code: 'NOT_FOUND', remedy: 'the record or table does not exist on this instance' },
   { code: 'RATE_LIMITED', remedy: 'retry later; reduce maxRecords or the call rate' },
 
+  // The tool exists and the gate let it through, but the CAPABILITY does not exist over REST.
+  // Distinct from NOT_FOUND (a record) and from a gate (a flag the user can turn on): nothing
+  // the caller configures makes these work, so the remedy names the other route instead.
+  { code: 'UNSUPPORTED_ON_THIS_INSTANCE', remedy: 'no REST endpoint backs this operation; the message names the UI route that does (e.g. Scripts - Background, or a Fix Script)' },
+
   // The call itself.
   { code: 'UNKNOWN_TOOL', remedy: 'the name exists in no configuration; check the spelling' },
   { code: 'INVALID_REQUEST', remedy: 'the message names the missing or malformed argument' },

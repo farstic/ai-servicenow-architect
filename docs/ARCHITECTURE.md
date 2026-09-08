@@ -139,7 +139,7 @@ preference is set cannot be captured retroactively.
 ### The server package
 
 `packages/snowarch/` is the MCP server, and after the ARC-04-S01 cut it is six directories:
-`src/server.ts` (stdio only), `src/tools/` (394 tools in 39 modules), `src/servicenow/` (the client,
+`src/server.ts` (stdio only), `src/tools/` (397 tools in 39 modules), `src/servicenow/` (the client,
 the instance manager and the types), `src/resources/`, `src/utils/`, and `src/cli/` (one file — `start`
 plus three stubs owned by later stories). Its production dependencies are four:
 `@modelcontextprotocol/sdk`, `commander`, `dotenv`, `zod`.

@@ -61,7 +61,11 @@ const GATE_CODE: Record<Gate, string | null> = {
 
 /** Reached the tool body: validation, the client, or a clean return. Not a gate refusal. */
 const PASSED = [SENTINEL, 'INVALID_REQUEST', 'VALIDATION_ERROR', 'RETURNED', 'NO_CODE',
-  'NOT_IMPLEMENTED', 'SCHEMA_NOT_CACHED', 'FLUENT_NOT_INSTALLED'];
+  'NOT_IMPLEMENTED', 'SCHEMA_NOT_CACHED', 'FLUENT_NOT_INSTALLED',
+  // ARC-04-S08's two retired script-exec stubs. The gate LET THEM THROUGH and the capability
+  // then refused — which is the whole point of the code being distinct from a gate code, and
+  // is why it counts as passing here rather than being special-cased out of the suite.
+  'UNSUPPORTED_ON_THIS_INSTANCE'];
 
 describe('(a) the declared gate is the gate the runtime enforces', () => {
   it.each(catalogue.map((t) => [t.name, t.gate] as const))(
@@ -169,7 +173,7 @@ describe('(e) manifest, contract and catalogue agree', () => {
     expect(MANIFEST.map((t: { name: string }) => t.name).sort()).toEqual(cat);
     expect(CONTRACT.tools.map((t: { name: string }) => t.name).sort()).toEqual(cat);
     expect(CONTRACT.toolCount).toBe(cat.length);
-    expect(cat.length).toBe(398);
+    expect(cat.length).toBe(397);
   });
 
   it('every contract entry carries gate and mutates', () => {
@@ -209,9 +213,18 @@ describe('the update-set capture protocol resolves to registered tools', () => {
 });
 
 describe('(f) the rename map still maps into the catalogue', () => {
-  it('every mapped new name exists', () => {
+  /** Renamed, then retired. See tests/tools/parity.test.ts for why the map keeps the entry. */
+  const RETIRED_TOOLS = ['snow_rpt_report_generate'];   // ARC-04-S08, D-03 item 4
+
+  it('every mapped new name exists, or is declared retired', () => {
     const cat = new Set(catalogue.map((t) => t.name));
-    expect(Object.values(RENAME_MAP).filter((n) => !cat.has(n as string))).toEqual([]);
+    expect(Object.values(RENAME_MAP)
+      .filter((n) => !cat.has(n as string) && !RETIRED_TOOLS.includes(n as string))).toEqual([]);
+  });
+
+  it('and a retired name is really absent — the declaration is not a way to hide a live tool', () => {
+    const cat = new Set(catalogue.map((t) => t.name));
+    expect(RETIRED_TOOLS.filter((n) => cat.has(n))).toEqual([]);
   });
 });
 

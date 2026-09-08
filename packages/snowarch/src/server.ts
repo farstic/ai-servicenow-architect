@@ -21,6 +21,7 @@ import { getResources, readResource } from './resources/index.js';
 import { logger } from './utils/logging.js';
 import { ServiceNowError } from './utils/errors.js';
 import { getPackageVersion } from './utils/version.js';
+import { capResult, resolveCap } from './utils/result-size.js';
 
 // dotenv ONLY when asked, and only for a file that exists. A bare `dotenv.config()` reads
 // the .env of whatever directory the server happens to start in — for an MCP server that is
@@ -92,34 +93,39 @@ export function createServer(): Server {
         throw new ServiceNowError(NO_INSTANCE_MESSAGE, 'NO_INSTANCE_CONFIGURED');
       }
 
-      const instanceName = (args as Record<string, unknown>)?.['instance'] as string | undefined;
       const { routeToolInvocation } = await import('./tools/index.js');
 
       // The instance-free core tools are dispatched WITHOUT resolving a client or entering a
       // runtime. Resolving one first would throw "no instance is configured" from inside the
       // very tools whose job is to report that — which is what happened the first time this
       // ran, and is why the probe exercises them rather than trusting the guard above.
+      // The client's own ceiling, if it named one, else SNOW_MAX_RESULT_CHARS, else 100000.
+      const cap = resolveCap(request.params._meta);
+
       if ((CORE_TOOLS_UNCONFIGURED as readonly string[]).includes(name)) {
         const result = await routeToolInvocation(null as never, name, args || {});
-        return { content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: capResult(result, cap).text }] };
       }
 
-      const client = instanceManager.getClient(instanceName);
-
-      // Every tool call runs inside the addressed instance's runtime, so the ~166 require*()
-      // gates read THAT instance's effective flags rather than process.env. One switch, and
-      // writes refuse on prod while the same call succeeds on the PDI — no second process.
-      const runtime = instanceManager.getEntry(instanceName?.toLowerCase()) ?? instanceManager.current();
+      // The CURRENT instance, always. A per-call `instance` argument used to route here, and
+      // no tool's inputSchema declares one — so it was an undocumented side channel that could
+      // send a write to a different instance than the session believed it was addressing.
+      // `snow_core_instance_switch` is the only way to change instance, and it is visible.
+      // An `instance` argument is now ignored silently: it was never advertised, so refusing
+      // it would break a caller for using something we never offered.
+      const runtime = instanceManager.current();
+      const client = instanceManager.getClient();
       const result = await runWithInstance(runtime, () => routeToolInvocation(client, name, args || {}));
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
-          },
-        ],
-      };
+      // P-27: capped HERE rather than in each tool. A per-tool cap is a rule 397 authors have
+      // to remember; this is the single place every result already passes through, so a new
+      // tool is capped by existing, not by its author having read this comment.
+      const capped = capResult(result, cap);
+      if (capped.truncated) {
+        logger.warn(`${name}: result truncated to ${cap} chars (${capped.strategy})`);
+      }
+
+      return { content: [{ type: 'text' as const, text: capped.text }] };
     } catch (error) {
       logger.error(`Tool execution error: ${name}`, error);
 

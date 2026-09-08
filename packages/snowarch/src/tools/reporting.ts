@@ -296,35 +296,6 @@ export function reportingToolManifest(): ToolDefinition[] {
       gate: 'write',
       mutates: true,
     },
-    {
-      name: 'snow_rpt_report_generate',
-      description: 'Generate a branded PDF or PPTX report from capability analysis results. Call this after completing a scan, review, or audit to create a management-ready document with charts, tables, and ServiceNow links. Supports single capability (content) or multiple capabilities (sections) in one combined report.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          content: { type: 'string', description: 'Full markdown analysis to convert into a branded report (for single capability)' },
-          sections: {
-            type: 'array',
-            description: 'Multiple capability analyses to combine into one report. Each section becomes a chapter. Use this instead of content for multi-capability reports.',
-            items: {
-              type: 'object',
-              properties: {
-                content: { type: 'string', description: 'Markdown analysis for this capability' },
-                title: { type: 'string', description: 'Section title (e.g. "Instance Health Scan")' },
-                capability: { type: 'string', description: 'Capability name (e.g. "scan-health")' },
-              },
-              required: ['content', 'title'],
-            },
-          },
-          format: { type: 'string', enum: ['pdf', 'pptx'], description: 'Output format: pdf (branded document) or pptx (slide deck)' },
-          title: { type: 'string', description: 'Report title (e.g. "Instance Health Scan", "Comprehensive Instance Audit")' },
-          capability: { type: 'string', description: 'Capability name that produced the analysis (e.g. "scan-health", "review-code", "combined-audit")' },
-        },
-        required: ['format', 'title'],
-      },
-      gate: 'none',
-      mutates: false,
-    },
   ];
 }
 
@@ -507,47 +478,6 @@ export async function dispatchReportingAction(
         unit: args.unit || '',
       });
       return { ...result, summary: `Created KPI "${args.name}" (${args.aggregate} on ${args.table})` };
-    }
-    case 'snow_rpt_report_generate': {
-      if (!args.format || !args.title)
-        throw new ServiceNowError('format and title are required', 'INVALID_REQUEST');
-      if (!args.content && !args.sections)
-        throw new ServiceNowError('Either content (single capability) or sections (multiple capabilities) is required', 'INVALID_REQUEST');
-      if (args.format !== 'pdf' && args.format !== 'pptx')
-        throw new ServiceNowError('format must be "pdf" or "pptx"', 'INVALID_REQUEST');
-
-      // Combine sections into a single markdown document if multiple capabilities provided
-      let combinedContent: string;
-      let capabilityName: string;
-      if (args.sections && Array.isArray(args.sections) && args.sections.length > 0) {
-        combinedContent = args.sections
-          .map((s: { content: string; title: string; capability?: string }) =>
-            `\n\n---\n\n# ${s.title}\n\n${s.content}`)
-          .join('\n');
-        capabilityName = args.capability || (args.sections.length > 1 ? 'combined-audit' : args.sections[0].capability || 'report');
-      } else {
-        combinedContent = args.content;
-        capabilityName = args.capability || 'report';
-      }
-
-      // The two values above are computed but no longer consumed: they were the generator's
-      // input. Referencing them keeps the argument handling — and its validation — intact and
-      // reviewable for whoever gives this tool a backend, instead of deleting working code
-      // that would then have to be rewritten from the schema.
-      void combinedContent;
-      void capabilityName;
-
-      // D-03 removed the report generator along with `pdfmake` and `pptxgenjs`, so this tool
-      // has no backend. It stays REGISTERED — the catalogue is pinned at 394 tools and ARC-05's
-      // contract has not yet ruled on removals — but it now fails with a reason a caller can act
-      // on, rather than on an unresolved dynamic import. The arguments above are still validated,
-      // so the failure is about the missing surface and not about the call. ARC-04-S07 owns the
-      // catalogue's shape and decides whether the tool is dropped or given a new backend.
-      throw new ServiceNowError(
-        'snow_rpt_report_generate is unavailable: the PDF/PPTX report generator was removed with '
-        + 'the D-03 surface cut. Return the analysis as markdown and render it outside the server.',
-        'NOT_IMPLEMENTED'
-      );
     }
     default:
       return null;

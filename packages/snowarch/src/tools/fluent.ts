@@ -13,7 +13,7 @@ import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
-import { requireWrite, requireFluent } from '../utils/permissions.js';
+import { requireFluent, requireScripting, requireWrite } from '../utils/permissions.js';
 import type { ToolDefinition } from './types.js';
 
 const execFileAsync = promisify(execFileCb);
@@ -131,11 +131,7 @@ export function fluentToolManifest(): ToolDefinition[] {
     },
     {
       name: 'snow_fluent_script_exec',
-      description:
-        'Execute a server-side script on the ServiceNow instance (Background Script). ' +
-        'Supports GlideRecord, GlideQuery, GlideAggregate, and all server-side APIs. ' +
-        'Returns the script output. Use for complex queries that cannot be expressed via REST. ' +
-        'REQUIRES WRITE_ENABLED=true.',
+      description: '[Unsupported] Execute a server-side script: no working endpoint exists on this instance. Run the script in System Definition > Scripts - Background, or author it as a Fix Script (sys_script_fix) and run it from the UI.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -399,12 +395,15 @@ export async function dispatchFluentAction(
     }
 
     case 'snow_fluent_script_exec': {
-      requireWrite();
-      const script = args.script;
-      if (!script) throw new ServiceNowError('script is required', 'INVALID_REQUEST');
-
-      const result = await client.executeScript(script, args.scope);
-      return result;
+      requireScripting();
+      // Retired by ARC-04-S08, same reason as snow_deploy_background_script_exec: it called
+      // client.executeScript, which posted to sys_script_execution — an endpoint that does
+      // not exist. Registered, gated, and failing before any HTTP.
+      throw new ServiceNowError(
+        'Server-side script execution has no supported REST endpoint on this instance. Run the '
+        + 'script in System Definition > Scripts - Background, or author it as a Fix Script '
+        + '(sys_script_fix) and run it from the UI.',
+        'UNSUPPORTED_ON_THIS_INSTANCE');
     }
 
     case 'snow_fluent_explain': {

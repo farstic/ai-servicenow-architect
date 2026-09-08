@@ -7,13 +7,20 @@ The server starts even with nothing configured, and five tools stay callable so 
 `snow_core_instances_index`, `snow_core_current_instance_read`. Everything else returns
 `NO_INSTANCE_CONFIGURED`. After adding an instance, call `snow_core_instances_reload` — no restart.
 
+## Changing instance
+
+**`snow_core_instance_switch` is the only way to change the instance a call goes to.** Every other tool
+acts on the *current* instance, whatever its arguments say. A per-call `instance` argument used to route
+— it was in no tool's `inputSchema`, so it was an undocumented side channel that could send a write to a
+different instance than the session believed it was addressing. Passing one now has no effect.
+
 *(Minimal insert; ARC-04-S14 rewrites this file.)*
 
-A [Model Context Protocol](https://modelcontextprotocol.io) server for ServiceNow. It exposes **394 tools** spanning ITSM, CMDB, scripting, platform development, integration, security, and AI domains, so an MCP-capable assistant can read and operate a ServiceNow instance through a single, consistent interface.
+A [Model Context Protocol](https://modelcontextprotocol.io) server for ServiceNow. It exposes **397 tools** spanning ITSM, CMDB, scripting, platform development, integration, security, and AI domains, so an MCP-capable assistant can read and operate a ServiceNow instance through a single, consistent interface.
 
 ## Highlights
 
-- **394 tools** across 37 functional domains, each with a typed input schema.
+- **397 tools** across 37 functional domains, each with a typed input schema.
 - **Resource-first naming grammar** — every tool is named `snow_<domain>_<entity>_<action>`, so all operations on one entity sit together (e.g. `snow_inc_incident_add`, `snow_inc_incident_read`, `snow_inc_incident_modify`, `snow_inc_incident_resolve`).
 - **Tiered write safety** — reads are always available; writes, CMDB writes, scripting, AI, ATF, and Fluent SDK operations are each gated behind an explicit environment flag.
 - **Role-based tool packages** — load only the tools a persona needs via `MCP_TOOL_PACKAGE`.

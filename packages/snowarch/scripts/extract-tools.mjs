@@ -30,10 +30,11 @@ writeFileSync(outPath, JSON.stringify(manifest, null, 2));
 console.log(`Extracted ${manifest.length} tools → dist/tools-manifest.json`);
 
 // ARC-04-S07 raised this from 397 to 398: snow_us_capture_target_set. ARC-04-S08 takes it
-// to 397 by removing snow_rpt_report_generate while keeping the two retired script-exec tools
-// as [Unsupported] stubs. `contract.toolCount` is DERIVED from the catalogue, never a
-// literal, so the contract cannot disagree with the code even when this constant lags.
-const EXPECTED = 398;
+// back to 397 by removing snow_rpt_report_generate (D-03 item 4) while KEEPING the two retired
+// script-exec tools registered as [Unsupported] stubs. `contract.toolCount` is DERIVED from the
+// catalogue, never a literal, so the contract cannot disagree with the code even when this
+// constant lags.
+const EXPECTED = 397;
 // S07 adds snow_us_capture_target_set (+1) and S08 removes snow_rpt_report_generate (−1)
 // while keeping the two retired script-exec tools as [Unsupported] stubs; each bumps this
 // constant in its own PR. `contract.toolCount` is DERIVED from the catalogue, never a
