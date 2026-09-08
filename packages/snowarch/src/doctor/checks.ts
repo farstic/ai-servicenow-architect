@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto';
 import { accessSync, constants, existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, parse, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { instanceManager } from '../servicenow/instances.js';
 import { isUnderCloudSyncFolder } from '../store/index.js';
@@ -20,8 +20,15 @@ import type { Check, CheckContext, CheckResult } from './types.js';
 
 const isWindows = process.platform === 'win32';
 
-/** Where `dist/` is, relative to this module once built. */
-const distDir = (): string => resolve(dirname(new URL(import.meta.url).pathname), '..');
+/**
+ * Where `dist/` is, relative to this module once built.
+ *
+ * `fileURLToPath`, never `new URL(...).pathname`. On Windows the pathname of a file URL is
+ * `/C:/…` — a leading slash before the drive letter, which is not a filesystem path. The first
+ * version used it, so `dist/contract.json` was never found on any Windows cell: SV-05 skipped,
+ * SV-01 failed, and the report read as a broken installation on a perfectly good one.
+ */
+const distDir = (): string => resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const ok = (id: Check['id'], title: string, detail: string): CheckResult =>
   ({ id, title, status: 'ok', detail, fixable: false });

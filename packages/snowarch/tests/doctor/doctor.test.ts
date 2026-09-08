@@ -2,10 +2,10 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
-  chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+  chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECK_IDS } from '../../src/doctor/types.js';
 
@@ -259,6 +259,27 @@ describe('SV-07 and SV-08', () => {
     expect(['ok', 'warn']).toContain(sv08.status);
     if (sv08.status === 'warn') expect(sv08.remedy).toContain('/skills');
   }, 120_000);
+});
+
+describe('no module derives a path from a file URL pathname', () => {
+  it('nothing uses `new URL(import.meta.url).pathname`', () => {
+    // A cross-platform guard for a Windows-only defect. `distDir()` used that form, so on every
+    // Windows cell the pathname was `/C:/…` — a leading slash before the drive letter, which is
+    // not a filesystem path. `dist/contract.json` was never found: SV-05 skipped and SV-01
+    // failed, and the doctor reported a broken installation on a perfectly good one. It passed
+    // on macOS and Linux, which is exactly why the guard scans the source instead of relying on
+    // the platform that has the bug being in the matrix.
+    const src = resolve(HERE, '../../src');
+    const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })
+      .flatMap((e) => (e.isDirectory() ? walk(join(dir, e.name))
+        : (e.name.endsWith('.ts') ? [join(dir, e.name)] : [])));
+
+    const offenders = walk(src)
+      .filter((f) => /new URL\([^)]*import\.meta\.url[^)]*\)\s*\.pathname/.test(readFileSync(f, 'utf8')))
+      .map((f) => f.slice(src.length + 1).split(sep).join('/'));
+
+    expect(offenders, 'use fileURLToPath(import.meta.url) instead').toEqual([]);
+  });
 });
 
 describe('criterion 7 - importable through the exports map', () => {

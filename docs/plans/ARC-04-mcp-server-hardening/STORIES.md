@@ -924,6 +924,12 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 >   The copy must live *inside* the package (`.tmp-doctor-dist/`, gitignored, removed in a `finally`):
 >   Node resolves `commander` and the MCP SDK by walking up from the module, so a `dist/` in a temp
 >   directory fails with `ERR_MODULE_NOT_FOUND` before the doctor runs at all.
+> - **`new URL(import.meta.url).pathname` is not a path on Windows.** `distDir()` used it, so on
+>   every Windows cell the pathname was `/C:/…` — a leading slash before the drive letter — and
+>   `dist/contract.json` was never found: SV-05 skipped, SV-01 failed, and the doctor reported a
+>   broken installation on a good one. Nine green cells on macOS and Linux said nothing about it.
+>   Fixed with `fileURLToPath`, and guarded by a **source scan** rather than by the Windows cells,
+>   so the class is caught on the platforms that do not have the bug.
 > - **The rotation test in `tests/audit/writer.test.ts` gained an explicit 60 s timeout** — ~12 MB of
 >   synchronous I/O next to the doctor suite's child processes, which is the default 5 s limit under
 >   load rather than a wrong assertion. Six consecutive clean full runs after both fixes.
