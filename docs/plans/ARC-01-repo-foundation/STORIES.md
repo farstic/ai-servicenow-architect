@@ -27,6 +27,26 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 
 ### ARC-01-S01 — Found the repository: root commit with `LICENSE`/`NOTICE`, default branch, protection, skeleton
 
+> **Amendment 2026-09-08 (evidence, post-`main`).** Criteria 1, 3 and 4 were unverifiable while `main`
+> did not exist; ARC-01-S01 landed with them open and this records the evidence now that it does.
+> `main` was created on 2026-09-08 from `793e58d` (the M1 milestone merge):
+> `git push origin 793e58d:refs/heads/main`, then branch protection via
+> `gh api -X PUT .../branches/main/protection --input protection.json`, then
+> `gh repo edit --default-branch main`.
+>
+> - **AC 1** — `defaultBranchRef.name` = `main`; `licenseInfo.key` = `apache-2.0`.
+> - **AC 3** — `allow_force_pushes.enabled` and `allow_deletions.enabled` both `false`.
+> - **AC 4** — a force-push from a second clone is refused with `GH006: Protected branch update failed`.
+> - **Required status checks: 12, not the 10 this plan assumed.** The count was written before
+>   `secret scan` and `plugin validate` became jobs. The contexts are the `ci.yml` job names verbatim
+>   (nine `test (<os>, node <v>)` cells plus `footprint (production install)`, `secret scan`,
+>   `plugin validate`) — a context that does not match a job name is a check that never reports and so
+>   never blocks, which is the failure mode worth naming: protection that looks configured and gates
+>   nothing.
+>
+> `enforce_admins: false` is deliberate, so the owner can recover the branch without first removing the
+> protection. Commands and `protection.json` are recorded in `docs/CONTRIBUTING.md`.
+
 > **Branch-model reconciliation (architect ruling, 2026-09-07 — read before implementing).** The repository already exists with `develop` as its integration branch and the programme plans as its first commit (`811163f`, 2026-09-06); `main` does not exist yet and, by the owner's directive, is created only at a milestone merge with the owner's explicit approval. Therefore: (1) **this story's "root commit" is the *foundation commit* on `arc-01/foundation`** — the first commit that carries LICENSE, NOTICE, `docs/RELICENSING.md`, `docs/decisions/`, `docs/spikes/`, `docs/ARCHITECTURE.md` and `engine.config.json`; the relicensing sentence goes verbatim into *this* commit's message (it precedes every imported line of code, which is what D-02 requires). No history rewrite. (2) AC 2 reads: `git show --stat <foundation commit>` lists exactly those paths (plus nothing else), and its message contains the relicensing sentence. (3) AC 1, 3 and 4 (`main` default branch, `main` protection, force-push rejection on `main`) are **deferred to the milestone merge** that creates `main` (ARC-01's exit / M1) and are executed there by the architect; in the meantime the same protection (no force pushes, no deletions) is applied to `develop` by the architect — AC 3/4 are run against `develop` now. (4) The GitHub default branch is switched to `main` at that same merge (`gh repo edit --default-branch main`). AC 5 unchanged.
 
 > **Amendment 2026-09-06 (from ARC-00-S03 finding a).** The root commit ALSO carries the ARC-00 artefacts, copied verbatim from `farstic/snowarch-spikes` at its final tag: `spikes/licence/LICENSE` → `/LICENSE`, `spikes/licence/NOTICE` → `/NOTICE`, `spikes/licence/RELICENSING.md` → `docs/RELICENSING.md`, `spikes/licence/header-sweep.txt` → `docs/spikes/licence/header-sweep.txt`, `docs/decisions/` → `docs/decisions/`, `spikes/` (records, TEMPLATE, stub server, recipes, hooks) → `docs/spikes/`, `spikes/engine.config.seed.json` → `engine.config.json` (validated by S04). No ARC-01 story imported these before; this is the story that does. **Gate:** `docs/spikes/` contains pre-relicensing server build output as fixtures (`S-15-npm-ci/fixture/`, from snow-mcp `bb09bde`); it must not be committed to the public repository before ADR-0002 is Accepted (D-02 owner confirmation + the RobertBH17 resolution). Acceptance: `diff -rq <snowarch-spikes>/docs/decisions docs/decisions` and `diff -rq <snowarch-spikes>/spikes docs/spikes` are empty at the root commit.
@@ -699,6 +719,23 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 ---
 
 ### ARC-01-S12 — `docs/ARCHITECTURE.md` and `docs/CONTRIBUTING.md` first versions
+
+> **Amendment 2026-09-08 (post-`main` close-out).** `docs/CONTRIBUTING.md` gained the `main` creation
+> and protection commands, the force-push rule of record (ARC-04-S08), the per-PR status-update rule
+> (owner directive), and four testing paragraphs recording defects that a green suite had hidden:
+> tests were never type-checked (S06), the coverage gate was configured but not run (S03), the
+> fixture-shape question (S02/S03/S08), and the closed-loopback-port rule for network tests (S10).
+>
+> **Criterion 5 re-run and holding.** The added commands name the repository and the branch and carry
+> no client, engagement, instance hostname or credential; `protection.json` contains only job names and
+> booleans. `gitleaks git --no-banner --exit-code 1 .` reports 0 findings on the branch. Worth stating
+> rather than assuming: the natural way to document a protection call is to paste a real API response,
+> and those carry account identifiers.
+>
+> Two sentences that had gone stale were replaced rather than left: "`main` … does not exist during
+> ARC-01" and "Making the job a *required* status check still needs branch-protection contexts on
+> `main`, which does not exist until the milestone merge." Both were true when written and are now the
+> opposite of true — `plugin validate` is one of the 12 required contexts.
 
 **As** a maintainer (and any future contributor) **I want** two documents that explain the layout, the audience split, where every product constant lives, what was cut and where its history is, and how to run the lints and tests **so that** the repository explains itself without the plan folder, and the README acceptance criterion "old names appear only in `docs/ARCHITECTURE.md` (history section) and ADRs" has a defined home for the history.
 

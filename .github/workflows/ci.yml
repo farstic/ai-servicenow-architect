@@ -6,7 +6,7 @@ name: ci
 # watched `main` would never run during ARC-01 and would be unprovable.
 on:
   push:
-    branches: [main, develop, 'arc-*/**']
+    branches: [main, develop, 'arc-*/**', 'chore/**']
   pull_request: {}
 
 concurrency:

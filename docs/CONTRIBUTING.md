@@ -9,8 +9,35 @@ established and the reasons behind them — several exist because something went
 
 Work happens on an **ARC branch** (`arc-NN/<name>`), is **reviewed by the architect on a fresh clone**,
 and reaches `develop` by **pull request**. `main` is created only at a **milestone merge, with the
-owner's explicit approval** — it does not exist during ARC-01, which is why the CI workflow triggers on
-`main`, `develop` **and** `arc-*/**`: a workflow watching only `main` would never have run.
+owner's explicit approval**. It did not exist during ARC-01, which is why the CI workflow triggers on
+`main`, `develop`, `arc-*/**` **and** `chore/**`: a workflow watching only `main` would never have run.
+
+**`main` exists as of 2026-09-08**, created from `793e58d` (the M1 milestone merge) once M1 was complete.
+Recorded here as commands rather than as prose, so the next milestone repeats it instead of
+reconstructing it:
+
+```sh
+git push origin 793e58d:refs/heads/main
+gh api -X PUT repos/farstic/ai-servicenow-architect/branches/main/protection --input protection.json
+gh repo edit --default-branch main
+```
+
+`protection.json` — the 12 required contexts are the `ci.yml` job names, not names invented for the
+rule; a context that does not match a job name is a check that never reports and therefore never blocks:
+
+```json
+{"required_status_checks":{"strict":true,"contexts":[
+  "test (ubuntu-latest, node 20)","test (ubuntu-latest, node 22)","test (ubuntu-latest, node 24)",
+  "test (macos-latest, node 20)","test (macos-latest, node 22)","test (macos-latest, node 24)",
+  "test (windows-latest, node 20)","test (windows-latest, node 22)","test (windows-latest, node 24)",
+  "footprint (production install)","secret scan","plugin validate"]},
+ "enforce_admins":false,"required_pull_request_reviews":null,"restrictions":null,
+ "allow_force_pushes":false,"allow_deletions":false}
+```
+
+Proved rather than assumed: a force-push from a second clone is refused with **GH006**, deletion is
+refused, `licenseInfo.key` reads `apache-2.0`, and CI on `main` is green. `enforce_admins:false` is
+deliberate — the owner must be able to recover the branch without deleting the protection first.
 
 **Never push to `develop` or `main` directly.** `develop` is protected (no force pushes, no deletions).
 
@@ -160,10 +187,45 @@ product renumbered downward at the merge; it becomes a live assertion when ARC-0
 and the `vendor/ServiceNowDocs` gitlink check (ARC-03 creates it). **A check that passes because its
 subject is absent is not a check** — hence a skip with a reason rather than a silent pass.
 
+**Run `gitleaks` after committing, not on a staged tree.** `gitleaks git` walks **commits**; staged and
+unstaged changes are invisible to it, so a clean local run on a tree you have not committed proves
+nothing about what CI will scan. Writing this very paragraph proved it: the sentence above originally
+quoted the offending line verbatim, a local scan of the staged tree reported zero findings, and CI went
+red on the quoted text — the documentation of the false positive reproduced the false positive. Note
+also that a rewrite is not optional when this happens: a follow-up commit leaves the line in history,
+where `gitleaks git` keeps finding it.
+
 **Run the suite after `git add`, not before.** `tests/no-legacy-names.test.mjs` scans `git ls-files`,
 so an untracked file is invisible to it. In ARC-02-S02 a new module carrying a forbidden token passed
 locally and turned all nine CI cells red — `npm test` on an unstaged tree is simply not the check CI
 runs. The same applies to any test that walks the tracked set rather than the working directory.
+
+**Ask what shape the fixture cannot produce.** The single most repeated defect in this repo is a test
+that passed because its fixture could not express the failing input. `mkdtempSync` only ever makes 0700
+directories, so a test of the directory-mode rule went green against a rule that was wrong (ARC-04-S02).
+A fake checkout created *inside* a fake HOME cannot exercise path masking, because the mask matched HOME
+first and the checkout branch never ran (S02). No preset grants WRITE alone, so a tool declared `write`
+that actually demanded SCRIPTING was never asked the one question that would expose it (S08). In each
+case the assertion was reasonable and the fixture was the problem. Before trusting a green test, name
+the input it cannot construct.
+
+**Network tests use a closed loopback port — never `.invalid`, never port 1 or 9.** An unresolvable
+hostname costs a DNS round-trip per call (about 1.4 s), which turned a ~130-call security sweep into a
+four-minute test of the resolver (ARC-04-S10). And Node rejects the low well-known ports outright with
+"bad port" *before* the request layer, so a test pointed at `127.0.0.1:1` never exercises the timeout or
+retry path it was written for, while looking as though it did. A high closed port (49151) refuses in
+about 20 ms and goes through the real code path.
+
+**Tests are type-checked, and the coverage gate runs in CI.** `tsconfig.json` excludes `tests/`, so a
+`@ts-expect-error` type test was passing by never being compiled — `npm run type-check` now runs
+`tsc --noEmit` twice, the second time against `tsconfig.tests.json` (ARC-04-S06). Separately, `npm test`
+was `vitest run`, so the per-file coverage thresholds were configured and never enforced; it is now
+`vitest run --coverage` (S03). A gate that is not wired to a command is documentation.
+
+**Probe scripts are Node, not shell.** GNU-only `sed -i` and `\s` forms silently no-op on macOS's BSD
+`sed` — no error, no match, and a "fix" that changed nothing (found by the architect during ARC-04-S06).
+The same applies to `python str.replace`, which returns the string unchanged when the indentation does
+not match: assert on every replacement, or edit by line index.
 
 **Negative cases run in CI, not by hand.** Where a criterion asks "does X fail when it should", the test
 mutates an in-memory copy or a throwaway `git init` under `os.tmpdir()`. The working tree is never
@@ -218,6 +280,31 @@ asserts the *known-bad* state (all agents still carry a pinned model id, none pr
 the agents early fails that test and points at the switch, rather than letting a disabled rule pass
 quietly over an already-clean tree.
 
+### The force-push rule of record
+
+**Never on `develop` or `main`.** On an ARC or chore branch, only your **own unmerged** commits, always
+with `--force-with-lease=<branch>:<the sha you expect to replace>`, and always stated in the report —
+a rewrite nobody mentions is a rewrite nobody can review.
+
+It came up in ARC-04-S08: a pushed commit failed the secret scan on a false positive — a constant whose
+name ended in `_KEY`, assigned a slash-separated string, which `generic-api-key` reads as a credential —
+and the choice was to amend or to add a `.gitleaksignore` fingerprint. The fingerprint is pinned to the commit sha and would have
+been a permanent suppression entry for a line that no longer exists, so the commit was amended and the
+constant renamed to `META_CAP_FIELD`. The rule is the general form of that: prefer rewriting your own
+unmerged history over leaving a permanent exception behind, and never rewrite anyone else's.
+
+### Every PR carries its own status update
+
+A story PR that does not update its status is incomplete and comes back as rework, exactly like a
+missing test (owner directive, 2026-09-08). Three places, in the same PR as the work:
+
+- the story's row in `docs/plans/05-STORY-INDEX.md` → `Done (<date>)`,
+- the status table in that ARC's `README.md`,
+- the milestone counter in `docs/plans/04-ROADMAP.md`.
+
+Status filled in later is status nobody can trust; the point of the rule is that the plan is never
+describing a state the repository is not in.
+
 ### Before you push
 
 ```
@@ -231,9 +318,9 @@ where the component type requires one — so the strict form is the one worth ru
 warning through unnoticed. The `plugin-validate` job is no longer `continue-on-error`: a real validation
 failure turns the workflow red. What it will not do is go red because the CLI is missing — the install
 step tolerates failure and the validate steps are guarded on `claude` being on `PATH`, so an unreachable
-registry logs `claude CLI not available on this runner (S-19)` and skips. Making the job a *required*
-status check still needs branch-protection contexts on `main`, which does not exist until the milestone
-merge.
+registry logs `claude CLI not available on this runner (S-19)` and skips. It is now one of the **12 required status
+checks on `main`** (see "The review model"), alongside the nine test cells, the footprint job and the
+secret scan.
 
 ---
 
