@@ -1,0 +1,25 @@
+// The config that produces the COMMITTED dist/.
+//
+// Every option here exists to make the output byte-identical across machines and runs: CI
+// rebuilds dist/ and diffs it, so any nondeterminism becomes a red job nobody can act on.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Maps embed source paths and roughly double the artefact for no runtime benefit.
+    "sourceMap": false,
+    "declarationMap": false,
+    // LF on every platform, so a Windows checkout does not rewrite every line of dist/.
+    "newLine": "lf",
+    // Comments stay: dist/ is what an `npx` user actually reads when something breaks.
+    "removeComments": false,
+    // tsc refuses to emit at all on an unused local. dist/ has to build from whatever is in
+    // the tree, so these are relaxed HERE only — `npm run type-check` still enforces them
+    // against tsconfig.json, which is where they belong.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  // `src/cli/**` is included, unlike tsconfig.server.json: without it the committed dist has
+  // no CLI, and `snowarch doctor` does not exist on a fresh clone.
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "tests"]
+}

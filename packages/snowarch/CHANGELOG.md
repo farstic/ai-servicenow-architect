@@ -60,6 +60,29 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Added (ARC-04-S13) — `dist/` is committed, and CI proves it matches the source
+
+A clone plus `npm ci` is now a runnable live install: no TypeScript, no build step, nothing for a
+first-time user to get wrong (P-20). The price of a build artefact under version control is that it
+can go stale, and the only thing that makes it honest is that CI rebuilds it and diffs it — the
+`dist-check` job runs `node scripts/build-dist.mjs` and `git diff --exit-code` on three OSes, and a
+separate `no-build` job exercises the *committed* file with no build step at all, which is the state
+a user is actually in.
+
+`scripts/build-dist.mjs` removes `dist/` first — an incremental build leaves the output of deleted
+source files behind, and a stale `dist/x.js` with no `src/x.ts` would be committed once and then
+match forever. It prints the contract sha256 on the last line, which is what ARC-05-S01 pins.
+
+Reproducibility rests on three things: `tsconfig.build.json` (no source maps, `newLine: lf`, comments
+kept, `src/cli/**` included so the committed dist has a CLI); `typescript` pinned **exactly**, since a
+minor upgrade regenerates every file and that is a maintainer's deliberate commit rather than
+something a fresh `npm install` does to a contributor mid-PR; and `.gitattributes` marking
+`dist/**` `linguist-generated=true text eol=lf` — without the LF rule a Windows checkout rewrites every
+line. `merge=ours` is deliberately not set: it would resolve every `dist/` conflict silently in favour
+of the current branch.
+
+134 files, **1.5 MB**, no `.map`.
+
 ### Added (ARC-04-S12) — a server doctor, and `snowarch doctor --json`
 
 `snowarch doctor [--json] [--no-network] [--section server]` runs nine checks and prints one line

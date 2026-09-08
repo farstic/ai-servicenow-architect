@@ -280,6 +280,61 @@ asserts the *known-bad* state (all agents still carry a pinned model id, none pr
 the agents early fails that test and points at the switch, rather than letting a disabled rule pass
 quietly over an already-clean tree.
 
+### Never edit `packages/snowarch/dist/` — build it
+
+`dist/` is **committed** (ARC-04-S13), so a clone plus `npm ci` is a runnable live install with no
+build step and nothing for a first-time user to get wrong. The price of a build artefact under
+version control is that it can go stale, and the only thing that makes it honest is that CI can
+rebuild it and prove the bytes match:
+
+```sh
+node scripts/build-dist.mjs          # rm -rf dist → tsc -p tsconfig.build.json → extract-tools
+git add packages/snowarch/dist
+```
+
+The `dist-check` job runs exactly that on three OSes and then `git diff --exit-code --
+packages/snowarch/dist`. A source change without a rebuild fails it with *"dist/ is stale — run
+node scripts/build-dist.mjs and commit"* and a `--stat` of the files that differ.
+
+Three things make the output reproducible, and each is load-bearing:
+
+- **`tsconfig.build.json`** turns off `sourceMap` and `declarationMap` (they embed paths and roughly
+  double the artefact), sets `newLine: lf`, and keeps comments — `dist/` is what an `npx` user reads
+  when something breaks.
+- **`typescript` is pinned exactly**, no caret. A minor upgrade regenerates every file in `dist/`;
+  that is a deliberate maintainer commit, not something a fresh `npm install` should do to a
+  contributor mid-PR.
+- **`.gitattributes`** marks `dist/**` `linguist-generated=true text eol=lf`. Without the LF rule a
+  Windows checkout rewrites every line and `dist-check` is red there for line endings alone.
+  `merge=ours` is deliberately **not** set: it resolves every `dist/` conflict silently in favour of
+  the current branch, which is how a stale artefact gets merged with nobody seeing it.
+
+Every source PR now carries a `dist/` diff. `linguist-generated` collapses it in review.
+
+### Never mutate a shared build artefact in a test
+
+A test that edits `dist/` — even one that restores it in a `finally` — cannot be isolated by cleaning
+up, because vitest runs test files in parallel workers and the *window* is the problem, not the
+residue. ARC-04-S12's doctor test did exactly that and made `tests/contract.test.ts` fail in 2 of 6
+full runs, in a file that story never touched. Copy the artefact and run against the copy; the copy
+has to live **inside** the package, because Node resolves dependencies by walking up from the module
+and a copy in `os.tmpdir()` dies with `ERR_MODULE_NOT_FOUND`.
+
+### Never derive a path from a file URL's `pathname`
+
+`new URL(import.meta.url).pathname` is `/C:/…` on Windows — a leading slash before the drive letter,
+which is not a filesystem path. Use `fileURLToPath(import.meta.url)`. ARC-04-S12 shipped the wrong
+form; nine green cells on macOS and Linux said nothing while all three Windows cells spent 223 seconds
+timing out and reporting a broken installation on a good one. `tests/doctor/doctor.test.ts` scans the
+source for the bad form, so the class is caught on the platforms that do not have the bug.
+
+### Pin a dependency against the floor you advertise, not the floor CI happens to run
+
+ARC-04-S11 needed `undici`. The newest major, and the one after it, both declare an `engines.node`
+above this package's stated floor of 20.0.0 — and `undici@7` would have **passed CI**, because the
+`node 20` matrix cell resolves to a current 20.19+. Read `engines` before choosing, and record the
+version and the reason.
+
 ### The force-push rule of record
 
 **Never on `develop` or `main`.** On an ARC or chore branch, only your **own unmerged** commits, always
