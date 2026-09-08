@@ -31,11 +31,9 @@ const outPath = join(__dirname, '..', 'dist', 'tools-manifest.json');
 writeFileSync(outPath, JSON.stringify(manifest, null, 2));
 console.log(`Extracted ${manifest.length} tools → dist/tools-manifest.json`);
 
-// ARC-04-S07 raised this from 397 to 398: snow_us_capture_target_set. ARC-04-S08 takes it
-// back to 397 by removing snow_rpt_report_generate (D-03 item 4) while KEEPING the two retired
-// script-exec tools registered as [Unsupported] stubs. `contract.toolCount` is DERIVED from the
-// catalogue, never a literal, so the contract cannot disagree with the code even when this
-// constant lags.
+// The catalogue's expected size lives in `tests/helpers/contract.ts`; `toolCount` below is
+// DERIVED from the catalogue and never from a literal, so the contract cannot disagree with
+// the code even when that constant lags a change.
 const EXPECTED = 397;
 // S07 adds snow_us_capture_target_set (+1) and S08 removes snow_rpt_report_generate (−1)
 // while keeping the two retired script-exec tools as [Unsupported] stubs; each bumps this
@@ -62,7 +60,15 @@ console.log(`✓ Parity OK: ${EXPECTED} unique snow_* tools.`);
 // that moved every time someone improved a sentence would be pinned to nothing. The sha
 // covers what a consumer's behaviour depends on: names, gates, mutates, tables, flags,
 // presets, error codes.
-{
+/**
+ * Build the contract text, without writing it.
+ *
+ * Exported so `tests/contract.test.ts` (test 12) can call it in process and compare the bytes with
+ * the committed `dist/contract.json`. The alternative — spawning this script into a temp directory
+ * — would test that the script writes what the script builds, which is not in doubt; what is in
+ * doubt is whether the committed artefact is still what the code produces.
+ */
+export async function buildContract(manifest) {
   const { PRESETS, FLAG_NAMES } = await import('../dist/utils/permissions.js');
   const { ERROR_CODES } = await import('../dist/errors/codes.js');
   const { createHash } = await import('node:crypto');
@@ -121,7 +127,16 @@ console.log(`✓ Parity OK: ${EXPECTED} unique snow_* tools.`);
   // ARC-04-S13's rebuild-diff is stable and a sha means something.
   const text = `${JSON.stringify(contract, null, 2)}\n`;
   const contractPath = join(__dirname, '..', 'dist', 'contract.json');
+  return text;
+}
+
+// The script half: build it, write it, say what it wrote.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  const text = await buildContract(manifest);
+  const contractPath = join(__dirname, '..', 'dist', 'contract.json');
   writeFileSync(contractPath, text);
+  const { createHash } = await import('node:crypto');
   const sha = createHash('sha256').update(text).digest('hex');
-  console.log(`Wrote dist/contract.json (${contract.toolCount} tools, sha256 ${sha.slice(0, 12)}…)`);
+  const count = JSON.parse(text).toolCount;
+  console.log(`Wrote dist/contract.json (${count} tools, sha256 ${sha.slice(0, 12)}…)`);
 }

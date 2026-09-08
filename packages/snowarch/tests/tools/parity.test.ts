@@ -2,13 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { collectToolCatalog, routeToolInvocation, ROLE_BUNDLE_MAP } from '../../src/tools/index.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
+import { EXPECTED_TOOL_COUNT } from '../helpers/contract.js';
 
-// ARC-04-S07 raised this from 397 to 398: snow_us_capture_target_set. ARC-04-S08 takes it
-// back to 397 by removing snow_rpt_report_generate (D-03 item 4) while KEEPING the two retired
-// script-exec tools registered as [Unsupported] stubs. `contract.toolCount` is DERIVED from the
-// catalogue, never a literal, so the contract cannot disagree with the code even when this
-// constant lags.
-const EXPECTED = 397;
+// One number, in `tests/helpers/contract.ts`, because three places now read it: this suite, the
+// contract suite, and the extractor's comment. Its history and why it is 397 are stated there.
+const EXPECTED = EXPECTED_TOOL_COUNT;
 
 // canonical old -> new map produced by scripts/build-rename-map.mjs
 const renameMap: Record<string, string> = JSON.parse(

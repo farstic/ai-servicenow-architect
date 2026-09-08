@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectToolCatalog, routeToolInvocation } from '../src/tools/index.js';
@@ -13,8 +15,28 @@ const here = dirname(fileURLToPath(import.meta.url));
 const CONTRACT = JSON.parse(readFileSync(resolve(here, '../dist/contract.json'), 'utf8'));
 const MANIFEST = JSON.parse(readFileSync(resolve(here, '../dist/tools-manifest.json'), 'utf8'));
 const RENAME_MAP = JSON.parse(readFileSync(resolve(here, '../tool-rename-map.json'), 'utf8'));
+const REQUIRED = JSON.parse(readFileSync(resolve(here, '../../contract/required-tools.json'), 'utf8'));
+const EXCEPTIONS = JSON.parse(readFileSync(resolve(here, 'contract-exceptions.json'), 'utf8'));
+const ENGINE_CONFIG = JSON.parse(readFileSync(resolve(here, '../../../engine.config.json'), 'utf8'));
+
+// Criterion 8's canary. The whole suite runs with WRITE_ENABLED=true in the ENVIRONMENT, and every
+// probe below still expects a refusal: flags belong to the instance, not to the process. If a gate
+// ever consulted `process.env`, the all-false probes would start passing and this suite would go
+// green for exactly the wrong reason — which is the failure mode a gate test cannot detect from
+// inside its own assertions.
+process.env.WRITE_ENABLED = 'true';
+process.env.SCRIPTING_ENABLED = 'true';
 
 const catalogue = collectToolCatalog() as ToolDefinition[];
+
+/** Every `.ts` under a directory. The registry scan needs the files, not a glob dependency. */
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const p = join(dir, entry);
+    if (statSync(p).isDirectory()) return sourceFiles(p);
+    return p.endsWith('.ts') ? [p] : [];
+  });
+}
 
 /**
  * The contract, checked against the code that produced it.
@@ -66,6 +88,41 @@ const PASSED = [SENTINEL, 'INVALID_REQUEST', 'VALIDATION_ERROR', 'RETURNED', 'NO
   // then refused — which is the whole point of the code being distinct from a gate code, and
   // is why it counts as passing here rather than being special-cased out of the suite.
   'UNSUPPORTED_ON_THIS_INSTANCE'];
+
+// ---------------------------------------------------------------------------------------------
+// ARC-05-S08 brings this suite to its final form: 14 numbered invariants. The blocks below that
+// carry letters are ARC-04-S06's first form and map onto them — (a)→3, (b)→4, (c)→8, (d)→7,
+// (e)→9, (f)→10, (g)→5 — extended in place rather than duplicated beside a second copy.
+// ---------------------------------------------------------------------------------------------
+
+describe('1 and 2 — the engine pins a subset of the catalogue, and agrees about it', () => {
+  // The server-side mirror of the engine lint's L08. Both are wanted: this one fails in the
+  // package that changed the tool, at the moment it changes; L08 fails in a clone with no
+  // node_modules, in the lint everyone runs.
+  const names = new Set(catalogue.map((t) => t.name));
+
+  it('1. every required tool is in the catalogue', () => {
+    const missing = (REQUIRED.tools as { name: string }[])
+      .map((t) => t.name).filter((n) => !names.has(n));
+    expect(missing, 'pinned but not registered — a rename the engine has not been told about').toEqual([]);
+  });
+
+  it('2. and the catalogue agrees with the engine about gate, mutates and the rest', () => {
+    const byName = new Map(catalogue.map((t) => [t.name, t]));
+    const show = (v: unknown) => (v === undefined ? '—' : String(v));
+    const differing: string[] = [];
+    for (const pinned of REQUIRED.tools) {
+      const live = byName.get(pinned.name);
+      if (!live) continue;                       // test 1 reports it; twice would read as two faults
+      for (const f of ['gate', 'mutates', 'sessionMutates', 'alsoRequires'] as const) {
+        const a = show((pinned as Record<string, unknown>)[f]);
+        const b = show((live as unknown as Record<string, unknown>)[f]);
+        if (a !== b) differing.push(`${pinned.name}: engine expects ${f}=${a}, catalogue declares ${f}=${b}`);
+      }
+    }
+    expect(differing).toEqual([]);
+  });
+});
 
 describe('(a) the declared gate is the gate the runtime enforces', () => {
   it.each(catalogue.map((t) => [t.name, t.gate] as const))(
@@ -175,10 +232,27 @@ describe('composite gates — an outer gate plus a second requirement', () => {
   });
 });
 
-describe('(c) a tool that mutates is never ungated', () => {
-  it('every mutates:true tool has a gate', () => {
-    const bad = catalogue.filter((t) => t.mutates && t.gate === 'none').map((t) => t.name);
+describe('8 — gate and mutates imply each other, and every exception says why', () => {
+  const WRITING_GATES = new Set(['write', 'scripting', 'cmdb_write', 'atf']);
+  const exempt = new Map<string, string>(
+    (EXCEPTIONS.gateClasses as { id: string; tools: string[] }[])
+      .flatMap((c) => c.tools.map((t) => [t, c.id] as const)));
+
+  it('8a. a tool that mutates is never ungated', () => {
+    const bad = catalogue.filter((t) => t.mutates && t.gate === 'none' && !exempt.has(t.name))
+      .map((t) => t.name);
     expect(bad, 'these change the instance with no flag required').toEqual([]);
+  });
+
+  it('8b. and a writing gate implies it mutates', () => {
+    // The other direction, and the one that catches a declaration drifting: a tool behind WRITE
+    // that says it does not mutate is either mis-declared or wrongly gated, and both make the
+    // §2.1 ask list wrong — it is built from `mutates`, not from the gate.
+    const bad = catalogue
+      .filter((t) => WRITING_GATES.has(t.gate) && !t.mutates && !t.sessionMutates && !exempt.has(t.name))
+      .map((t) => `${t.name} (gate ${t.gate}, mutates false)`);
+    expect(bad, 'gated as a write but declared not to mutate — add a class to tests/contract-exceptions.json with a reason')
+      .toEqual([]);
   });
 });
 
@@ -289,5 +363,166 @@ describe('(g) the contract mirrors permissions.ts, never a retyped copy', () => 
     expect(CONTRACT.maxRecordsDefault).toBe(100);
     // The package version of record — ARC-09 sets the release number.
     expect(CONTRACT.version).toBe('2.0.0-dev');
+  });
+});
+
+describe('5 and 6 — the flag set is closed, and no preset contradicts the dependency rule', () => {
+  const declared = CONTRACT.flags.map((f: { name: string }) => f.name).sort();
+
+  it('5. the contract, the source and every preset name the same flags', () => {
+    // A seventh flag added to permissions.ts with a guard, and nowhere else, is the failure this
+    // catches: the server would gate on it while the contract, the presets and the generated rule
+    // file all described six.
+    const source = readFileSync(resolve(here, '../src/utils/permissions.ts'), 'utf8');
+    // `*_NOT_ENABLED` are error codes, not flags — the same words in the other direction.
+    const referenced = [...new Set(source.match(/\b[A-Z][A-Z_]*_ENABLED\b/g) ?? [])]
+      .filter((n) => !n.endsWith('_NOT_ENABLED')).sort();
+    expect(referenced, 'permissions.ts references a flag the contract does not declare').toEqual(declared);
+    expect([...FLAG_NAMES].sort()).toEqual(declared);
+    for (const [name, values] of Object.entries(CONTRACT.presets as Record<string, Flags>)) {
+      expect(Object.keys(values).sort(), `preset ${name} does not carry all six flags`).toEqual(declared);
+    }
+  });
+
+  it('6. no preset turns a flag on while its prerequisite is off', () => {
+    const requires = new Map<string, string[]>(
+      CONTRACT.flags.map((f: { name: string; requires: string[] }) => [f.name, f.requires]));
+    const broken: string[] = [];
+    for (const [name, values] of Object.entries(CONTRACT.presets as Record<string, Flags>)) {
+      for (const [flag, value] of Object.entries(values)) {
+        if (value !== 'true') continue;
+        for (const need of requires.get(flag) ?? []) {
+          if (values[need as keyof Flags] !== 'true') broken.push(`${name}: ${flag} is on but ${need} is off`);
+        }
+      }
+    }
+    // A preset that did this would be resolved towards LESS access at runtime, so the instance
+    // would be safe and the preset would be a lie — which is worse than a refusal, because the
+    // user reads the preset and believes it.
+    expect(broken).toEqual([]);
+  });
+});
+
+describe('7 — a mutating name mutates, and every exception says why', () => {
+  const MUTATING_SUFFIXES = new Set(['add', 'modify', 'remove', 'exec', 'publish', 'trigger',
+    'switch', 'resolve', 'annotate', 'schedule', 'complete', 'retire', 'send', 'import',
+    'configure', 'submit', 'order', 'assign', 'unassign', 'reconcile', 'close', 'approve',
+    'reject', 'set', 'rollback', 'clone', 'upload', 'fire', 'register', 'commit', 'ensure',
+    'train', 'track', 'scan']);
+  const exempt = new Map<string, string>(
+    (EXCEPTIONS.suffixClasses as { id: string; tools: string[] }[])
+      .flatMap((c) => c.tools.map((t) => [t, c.id] as const)));
+
+  it('7. the last segment agrees with mutates, or the tool is in a named class', () => {
+    const disagreeing = catalogue
+      .filter((t) => MUTATING_SUFFIXES.has(t.name.split('_').pop() as string) !== t.mutates)
+      .map((t) => t.name)
+      .filter((n) => !exempt.has(n));
+    expect(disagreeing, 'add the tool to a class in tests/contract-exceptions.json, with a reason').toEqual([]);
+  });
+
+  it('every exception names a real tool, and every class carries a reason', () => {
+    // Both lists, not just the suffix one: a gate exception is the more consequential of the two,
+    // since it excuses a tool from the rule that keeps the §2.1 ask list honest.
+    // An exception list is a governance surface: it says which parts of the catalogue do not
+    // follow the rule and why. Left unchecked it becomes a way to make a test green — a stale
+    // entry silences nothing and a reasonless one explains nothing.
+    const names = new Set(catalogue.map((t) => t.name));
+    const allClasses = [...EXCEPTIONS.suffixClasses, ...EXCEPTIONS.gateClasses] as
+      { id: string; reason: string; tools: string[] }[];
+    for (const c of allClasses) {
+      expect(c.reason.length, `class ${c.id} has no reason`).toBeGreaterThan(40);
+      expect(c.reason.toUpperCase()).not.toContain('TODO');
+      expect(c.tools.length, `class ${c.id} exempts nothing`).toBeGreaterThan(0);
+      for (const t of c.tools) expect(names.has(t), `${t} is exempted but not registered`).toBe(true);
+    }
+    // And each exemption is load-bearing: without it the rule would fire on that tool.
+    for (const [name, id] of exempt) {
+      const t = catalogue.find((x) => x.name === name)!;
+      const wouldFire = MUTATING_SUFFIXES.has(t.name.split('_').pop() as string) !== t.mutates;
+      expect(wouldFire, `${name} is exempted in ${id} but the rule does not fire on it`).toBe(true);
+    }
+  });
+});
+
+describe('11 — every code the server can throw has a meaning and a remedy', () => {
+  it('11a. every literal thrown in src/ is a registry key', () => {
+    // `ServiceNowError` takes the registry's union, so `tsc` already refuses an unregistered
+    // literal. This is the second, independent check: a type can be widened by accident, and a
+    // scan of the source notices when it has been.
+    const registered = new Set<string>(ERROR_CODES.map((e) => e.code));
+    const thrown = new Set<string>();
+    for (const file of sourceFiles(resolve(here, '../src'))) {
+      const text = readFileSync(file, 'utf8');
+      for (const m of text.matchAll(/new ServiceNowError\(\s*(?:[^,]|\([^)]*\))+?,\s*'([A-Z_]+)'/gs)) {
+        thrown.add(m[1]);
+      }
+    }
+    expect([...thrown].filter((c) => !registered.has(c)).sort(),
+      'add these to src/errors/codes.ts with a meaning and a remedy').toEqual([]);
+    expect(thrown.size, 'the scan found nothing — it is not looking where the throws are').toBeGreaterThan(10);
+  });
+
+  it('11b. and every registry entry is usable', () => {
+    const empty = ERROR_CODES.filter((e) => !e.meaning?.trim() || !e.remedy?.trim()).map((e) => e.code);
+    expect(empty, 'a code with no meaning or no remedy reaches a user with nothing to do').toEqual([]);
+    for (const e of ERROR_CODES) {
+      expect(e.meaning.length, `${e.code}: the meaning is too short to mean anything`).toBeGreaterThan(20);
+      expect(typeof e.showInRule, `${e.code}: showInRule is not declared`).toBe('boolean');
+    }
+  });
+
+  it('11c. a schema advertises what its handler enforces', () => {
+    // The `default_name` class, from the ARC-05-S06 amendment. Two halves: a required property is
+    // marked required, and a property nobody reads is not advertised. The second half is the one
+    // that caught the original — `default_name` was advertised for a handler that never read it,
+    // so nothing failed until a caller trusted the schema.
+    const problems: string[] = [];
+    for (const file of sourceFiles(resolve(here, '../src/tools'))) {
+      const text = readFileSync(file, 'utf8');
+      // `x is required` refusals name the property in the message, which is where a caller looks.
+      for (const m of text.matchAll(/'([a-z_]+) is required/g)) {
+        const prop = m[1];
+        // The enclosing handler, not the nearest tool DEFINITION: refusals live in the dispatch
+        // switch, a long way from the manifest, and "the last name above it" picks a neighbour.
+        const near = text.slice(0, m.index);
+        const tool = [...near.matchAll(/case '(snow_[a-z0-9_]+)':/g)].pop()?.[1];
+        if (!tool) continue;
+        const def = catalogue.find((t) => t.name === tool);
+        const schema = def?.inputSchema as { required?: string[] } | undefined;
+        if (schema && !(schema.required ?? []).includes(prop)) {
+          problems.push(`${tool}: refuses without "${prop}" but its schema does not mark it required`);
+        }
+      }
+    }
+    expect([...new Set(problems)]).toEqual([]);
+  });
+});
+
+describe('12, 13 and 14 — the committed artefacts are the ones the code produces', () => {
+  it('12. buildContract() in-process is byte-identical to the committed contract', async () => {
+    // The extractor is plain JavaScript with no declaration file, and it should stay that way: a
+    // hand-written .d.ts would be a second statement of its signature, free to drift from the one
+    // that matters. `@ts-expect-error` rather than a cast, because it fails loudly if the module
+    // ever gains types — at which point this line should go, not be quietly kept.
+    // @ts-expect-error — untyped .mjs; the assertion below is what checks the shape
+    const { buildContract } = await import('../scripts/extract-tools.mjs');
+    const manifest = JSON.parse(readFileSync(resolve(here, '../dist/tools-manifest.json'), 'utf8'));
+    const rebuilt = await buildContract(manifest);
+    const committed = readFileSync(resolve(here, '../dist/contract.json'), 'utf8');
+    expect(rebuilt, 'dist/contract.json is not what the extractor now produces — run node scripts/build-dist.mjs')
+      .toBe(committed);
+  });
+
+  it('13. the engine pin still describes the committed contract', () => {
+    const committed = readFileSync(resolve(here, '../dist/contract.json'), 'utf8');
+    const sha = createHash('sha256').update(committed).digest('hex');
+    expect(sha, 'contract sha changed — on the engine side run node packages/contract/pin.mjs')
+      .toBe(REQUIRED.contractSha256);
+  });
+
+  it('14. the server key is the one engine.config.json declares', () => {
+    expect(CONTRACT.server.suggestedName).toBe(ENGINE_CONFIG.mcp.serverKey);
+    expect(REQUIRED.serverKey).toBe(ENGINE_CONFIG.mcp.serverKey);
   });
 });

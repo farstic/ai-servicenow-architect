@@ -657,6 +657,29 @@ same list `--check` prints.
 
 ---
 
+## Adding a tool
+
+Five steps, in this order. Each one has a check that fails if it is skipped, which is the point of
+the order — you cannot get halfway and have a green tree.
+
+1. **Declare it.** Register the `ToolDefinition` with its `gate` and `mutates`. A tool that changes
+   the instance is never `gate: none`, and a tool behind a writing gate always mutates —
+   `tests/contract.test.ts` test 8 refuses both directions. If the name's last segment disagrees
+   with `mutates`, test 7 asks for a class in `tests/contract-exceptions.json` **with a reason**;
+   the reason is the deliverable, not the exemption.
+2. **Rebuild.** `node scripts/build-dist.mjs`. The contract is derived — `toolCount` is counted, not
+   typed — so this is what makes the declaration real.
+3. **Run the server tests.** `npm test -w packages/snowarch`. Test 12 proves the committed contract
+   is what the extractor produces; test 3 proves the tool refuses with its declared gate's code.
+4. **Pin, on the engine side.** `node packages/contract/pin.mjs` — it prints the proposal and names
+   any re-gate before it applies. Test 13 and L11 both fail until you do.
+5. **Regenerate.** `npm run gen`. A new mutating tool changes the `ask` list in
+   `.claude/settings.json` and every generated file's header sha; L06 fails until they are committed.
+
+**Adding an error code** is its own list, above: registry first, then `npm run gen`.
+
+---
+
 ## The engine lint's checks
 
 `packages/contract/lint/engine-lint.mjs` runs eleven checks over the engine's texts. Each is a
