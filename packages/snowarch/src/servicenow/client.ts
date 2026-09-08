@@ -470,6 +470,18 @@ export class ServiceNowClient {
   /**
    * Get a single record by sys_id
    */
+  /**
+   * The user name this client authenticates as.
+   *
+   * `snow_us_capture_target_set` needs it to resolve `sys_user` and to scope
+   * `snow_us_active_update_set_ensure` to the caller's own in-progress update sets. It is
+   * the USER NAME, never the password, and no tool puts it in a response — a caller who can
+   * see the answer can already see the instance, but a response is also a log line.
+   */
+  getAuthUsername(): string | undefined {
+    return this.authMethod === 'oauth' ? this.oauthConfig?.username : this.basicConfig?.username;
+  }
+
   async getRecord(table: string, sysId: string, fields?: string): Promise<ServiceNowRecord> {
     validateTableName(table);
     validateSysId(sysId);

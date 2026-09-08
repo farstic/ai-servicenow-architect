@@ -60,6 +60,31 @@ Precedence, first existing wins, never merged: `SNOW_STORE` (empty string counts
 `SNOW_STORE` pointing at a missing file is an **error**, not a reason to fall back — otherwise a
 typo in an explicit override loads a different instance than the one named, silently.
 
+### Changed (ARC-04-S07) — §2.2 is now four calls, and it captures what you meant
+
+**`snow_us_active_update_set_ensure` now requires `name` and returns only YOUR in-progress update
+sets.** It used to take any set with `state=in progress`, with no user filter — on a shared instance
+that is whoever opened one last, and the engagement's objects landed in a stranger's update set. It also
+set `is_default: true`, which does nothing for REST capture at all.
+
+**New: `snow_us_capture_target_set`.** REST writes are captured according to the authenticated user's
+`sys_user_preference` `name=sys_update_set` (`docs/nowaikit-field-notes.md` §1). This tool sets it, in
+four steps: read the update set (refusing one that is not `in progress`), resolve the account in
+`sys_user`, look for an existing preference, then PATCH or POST it. Neither tool's response carries the
+user name.
+
+`snow_us_update_set_switch`'s description now says what it does and does not do: it sets `is_default`
+for the UI and **does not** change what REST writes are captured into.
+
+The protocol is now:
+
+```
+snow_us_active_update_set_ensure { name }   →  snow_us_capture_target_set { update_set_sys_id }
+  →  <your write>  →  snow_us_update_set_preview
+```
+
+Catalogue 397 → 398.
+
 ### Added (ARC-04-S06) — every tool declares its gate, and the contract is generated
 
 - Each of the 397 registrations now carries `gate` and `mutates` (and `table` where the tool's table is

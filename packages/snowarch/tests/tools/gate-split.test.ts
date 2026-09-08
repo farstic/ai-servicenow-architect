@@ -32,6 +32,19 @@ const WRITES = new Set([
   'snow_us_active_update_set_ensure',
 ]);
 
+/**
+ * Mutating, but gated `write` rather than `scripting`.
+ *
+ * ARC-04-S07's `snow_us_capture_target_set` writes `sys_user_preference` — not a scripting
+ * object — and requiring SCRIPTING to point capture at an update set would put the §2.2
+ * protocol behind a flag the protocol does not need. Keeping it in the SCRIPTING set would
+ * have made this suite assert the wrong thing about it, which is why the two are separate
+ * rather than one "writes" bucket.
+ */
+const WRITE_GATED = new Set([
+  'snow_us_capture_target_set',
+]);
+
 const READS = new Set([
   'snow_scr_business_rules_index', 'snow_scr_business_rule_read',
   'snow_scr_script_includes_index', 'snow_scr_script_include_read',
@@ -82,25 +95,37 @@ const PASSED_THE_GATE = [MOCK_CLIENT_CALL, 'INVALID_REQUEST', 'RETURNED', 'NO_CO
 
 describe('the classification is complete — a new tool cannot escape the split', () => {
   it('every registered snow_scr_* / snow_us_* name is classified as a read or a write', () => {
-    const unclassified = registered.filter((n) => !WRITES.has(n) && !READS.has(n));
+    const unclassified = registered.filter((n) => !WRITES.has(n) && !WRITE_GATED.has(n) && !READS.has(n));
     expect(unclassified).toEqual([]);
-    expect(registered.length).toBe(WRITES.size + READS.size);
+    expect(registered.length).toBe(WRITES.size + WRITE_GATED.size + READS.size);
   });
 
   it('no classified name has disappeared from the catalogue', () => {
     // The other direction: a rename would otherwise leave a stale entry asserting nothing.
     const known = new Set(registered);
-    expect([...WRITES, ...READS].filter((n) => !known.has(n))).toEqual([]);
+    expect([...WRITES, ...WRITE_GATED, ...READS].filter((n) => !known.has(n))).toEqual([]);
   });
 
   it('prints the derived table', () => {
-    const rows = registered.map((n) => `${WRITES.has(n) ? 'write' : 'read '}  ${n}`);
+    const rows = registered.map((n) => {
+      const kind = WRITES.has(n) ? 'scripting' : WRITE_GATED.has(n) ? 'write    ' : 'read     ';
+      return `${kind}  ${n}`;
+    });
     console.log(`\n    ${registered.length} tools in the two families:\n    ${rows.join('\n    ')}\n`);
     expect(rows.length).toBeGreaterThan(30);
   });
 });
 
 describe('criterion 2 - all flags false', () => {
+  it.each([...WRITE_GATED].sort())('write-gated %s is refused with WRITE_NOT_ENABLED', async (name) => {
+    expect(await codeFor(name, allFalse, 'read-only')).toBe('WRITE_NOT_ENABLED');
+  });
+
+  it.each([...WRITE_GATED].sort())('write-gated %s passes with WRITE alone', async (name) => {
+    // The distinction from the SCRIPTING set: WRITE is enough here.
+    expect(PASSED_THE_GATE).toContain(await codeFor(name, writeOnly));
+  });
+
   it.each([...READS].sort())('read %s reaches the client', async (name) => {
     expect(PASSED_THE_GATE).toContain(await codeFor(name, allFalse, 'read-only'));
   });

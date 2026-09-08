@@ -3,11 +3,11 @@ import { readFileSync } from 'fs';
 import { collectToolCatalog, routeToolInvocation, ROLE_BUNDLE_MAP } from '../../src/tools/index.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
 
-// ARC-04-S04 raised this from 394 to 397: three core tools that need no instance
-// (snow_core_status_read, snow_core_capabilities_read, snow_core_instances_reload).
-// ARC-04-S06 owns the arithmetic from here — its EXPECTED is 397 minus the one removal
-// (snow_rpt_report_generate, ARC-04-S08) plus whatever it adds.
-const EXPECTED = 397;
+// ARC-04-S07 raised this from 397 to 398: snow_us_capture_target_set. ARC-04-S08 takes it
+// to 397 by removing snow_rpt_report_generate while keeping the two retired script-exec tools
+// as [Unsupported] stubs. `contract.toolCount` is DERIVED from the catalogue, never a
+// literal, so the contract cannot disagree with the code even when this constant lags.
+const EXPECTED = 398;
 
 // canonical old -> new map produced by scripts/build-rename-map.mjs
 const renameMap: Record<string, string> = JSON.parse(
@@ -50,6 +50,7 @@ describe('tool catalog parity (migration guard)', () => {
     'snow_core_status_read',        // ARC-04-S04
     'snow_core_capabilities_read',  // ARC-04-S04
     'snow_core_instances_reload',   // ARC-04-S04
+    'snow_us_capture_target_set',   // ARC-04-S07
   ];
 
   it('3. rename map is a total bijection over the renamed tools', () => {
