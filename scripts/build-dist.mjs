@@ -15,7 +15,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, rmSync } from 'node:fs';
+import { chmodSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,6 +46,16 @@ rmSync(dist, { recursive: true, force: true });
 
 process.stdout.write('build-dist: tsc -p tsconfig.build.json\n');
 run([tsc, '-p', 'tsconfig.build.json'], pkg);
+
+// The `bin` target has to be executable, and `tsc` emits 0644.
+//
+// npm sets the bit itself when it links the workspace, so `npm ci` MODIFIED a tracked file and
+// the "install changed nothing tracked" gate went red on ubuntu and macOS — while Windows,
+// which has no executable bit, passed. Setting it here means the committed mode and the built
+// mode agree on every platform, so neither `npm ci` nor `dist-check` sees a difference.
+const bin = join(dist, 'cli', 'index.js');
+chmodSync(bin, 0o755);
+process.stdout.write('build-dist: chmod 755 dist/cli/index.js (the bin target)\n');
 
 process.stdout.write('build-dist: extract-tools\n');
 run([join(pkg, 'scripts', 'extract-tools.mjs')], pkg);

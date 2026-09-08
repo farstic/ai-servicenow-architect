@@ -1015,6 +1015,13 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 >   directly: no shell, no `.cmd`, and unambiguously the *pinned* TypeScript rather than whatever
 >   `npx` resolves. Same class as ARC-04-S12's file-URL `pathname` — a Windows-only defect that green
 >   macOS and Linux cells say nothing about.
+> - **The `bin` target must be committed executable, and the build script must set the bit.** `tsc`
+>   emits 0644, npm sets 0755 itself when it links the workspace — so `npm ci` MODIFIED a tracked
+>   file and the pre-existing "install changed nothing tracked" gate went red on ubuntu and macOS,
+>   while Windows passed for having no executable bit at all. `chmodSync(dist/cli/index.js, 0o755)`
+>   in `build-dist.mjs` makes the committed mode and the built mode agree everywhere, so neither
+>   `npm ci` nor `dist-check` sees a difference. Third Windows-vs-Unix asymmetry in two stories, and
+>   the first one where **Unix** was the platform that failed.
 > - **`dist/` is 1.5 MB, not the 4.2 MB the story estimated** (that figure included source maps, which
 >   `tsconfig.build.json` turns off). 134 files tracked, no `.map`.
 
