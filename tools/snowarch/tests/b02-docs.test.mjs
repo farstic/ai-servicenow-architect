@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { run as runB02, gitlink, mapSyncFailure } from '../lib/steps/B02.mjs';
-import { CORPUS_TEXT } from '../lib/steps/format.mjs';
+import { CORPUS_TEXT, stepLine } from '../lib/steps/format.mjs';
 import { ATTRIBUTION, CORPUS_DIR, EXIT as DOCS_EXIT, SyncError } from '../lib/docs/sync.mjs';
 import { docsStatus } from '../lib/docs/status.mjs';
 import {
@@ -110,6 +110,18 @@ test('AC 3 — skip touches no network, and the corpus is then MISSING to the do
   assert.equal(runsWhen({ docs: 'skip' }), false);
   assert.equal(runsWhen({ docs: 'sparse' }), true);
   assert.equal(skipReason, '--docs skip');
+  // The story's line carries the CONSEQUENCE too. It is a constant beside the other B02 texts so
+  // the Node-free launchers print the same bytes, and the step line renders it after the reason.
+  const { skipNote } = await import('../lib/steps/B02.mjs');
+  assert.equal(skipNote, CORPUS_TEXT.skipConsequence);
+  assert.equal(
+    stepLine({ id: 'B02', title: 'docs', status: 'skipped', detail: skipReason, note: skipNote,
+      last: 'B09' }),
+    '[B02/09] docs … skipped (--docs skip) — the doctor will report the corpus as FAIL until you '
+    + 'run ./snowarch docs sync');
+  // A skip that costs nothing says nothing extra.
+  assert.equal(stepLine({ id: 'B06', title: 'instance', status: 'skipped', detail: 'design-only',
+    last: 'B09' }), '[B06/09] instance … skipped (design-only)');
 
   // ...and proven rather than argued: a proxy pointing at a closed loopback port would break any
   // outbound connection, and the step still completes because it makes none.
@@ -209,5 +221,5 @@ test('AC 6 — the Node-free texts are constants, so the launchers print the sam
     + 'or re-run ./bootstrap.sh');
   // The launchers cannot import this file, so what keeps them honest is that these are the only
   // definitions and S10/S11's parity test reads them from here.
-  assert.equal(Object.keys(CORPUS_TEXT).length, 3);
+  assert.equal(Object.keys(CORPUS_TEXT).length, 4);
 });

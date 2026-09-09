@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { CORPUS_DIR, EXIT as DOCS_EXIT, MODE, SyncError, syncCorpus } from '../docs/sync.mjs';
 import { docsStatus } from '../docs/status.mjs';
 import { verifyCitations } from '../docs/verify.mjs';
+import { CORPUS_TEXT } from './format.mjs';
 import { FILE, TEXT, ABSENT } from './inputs.mjs';
 
 export const id = 'B02';
@@ -19,6 +20,8 @@ export const title = 'docs';
 export const needsNode = false;
 export const runsWhen = (ctx) => ctx.docs !== 'skip';
 export const skipReason = '--docs skip';
+/** What skipping costs, said when the choice is made rather than sprung by the doctor later. */
+export const skipNote = CORPUS_TEXT.skipConsequence;
 
 /**
  * The gitlink, from the INDEX — the one value that changes exactly when the corpus is supposed to

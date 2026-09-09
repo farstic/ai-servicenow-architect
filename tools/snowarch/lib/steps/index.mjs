@@ -78,10 +78,12 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
 
     if (!runs(step, ctx)) {
       const detail = step.skipReason ?? 'not applicable';
+      const note = step.skipNote ?? null;
       state.steps[step.id] = { status: 'skipped', inputsHash: null, detail,
         finishedAt: now().toISOString(), durationMs: 0 };
       summary.skipped += 1;
-      onLine(stepLine({ id: step.id, title: step.title, status: 'skipped', detail, last: lastId }));
+      onLine(stepLine({ id: step.id, title: step.title, status: 'skipped', detail, note,
+        last: lastId }));
       continue;
     }
 
