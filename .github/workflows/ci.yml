@@ -261,7 +261,10 @@ jobs:
         # instead, and pass. `Git\cmd` stays (git itself is a prerequisite); `Git\usr\bin`,
         # `Git\bin` and `Git\mingw64\bin` — the Git Bash tools — do not.
         run: |
-          set "PATH=C:\Windows\system32;C:\Windows;C:\Program Files\Git\cmd"
+          rem WindowsPowerShell\v1.0 is part of the DEFAULT Windows PATH, which is what a
+          rem double-click gets, so a rebuild that omitted it was testing a machine nobody has —
+          rem `powershell` then fails 9009 before bootstrap.ps1 is ever read.
+          set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
           rem `C:\Windows\System32\bash.exe` is the WSL stub and is on every Windows machine, so
           rem "no bash at all" is not a state a Windows user is ever in. What must be gone is GIT
           rem Bash — the interpreter bootstrap.sh needs — and it is the one under \Git\.
