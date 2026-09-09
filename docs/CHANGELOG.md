@@ -29,6 +29,14 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **A Node-free Windows install was silently losing a corpus file — found by the new job, on its
+  third run.** The recipe set `core.longpaths` as its second-to-last line, so the clone, the
+  sparse-checkout and the CHECKOUT all ran with the default `false`; one documentation file whose
+  path exceeds 260 characters never reached the working tree, and the only outward sign was the
+  submodule reading "modified" with an unmoved pointer. Every Windows git command in the recipe
+  carries `-c core.longpaths=true` now — the Node path never had the bug, because `withLongPaths`
+  has always wrapped every call there. The test that asserted the Windows form differed by exactly
+  one line was asserting the bug, and says so.
 - **The `bootstrap` job — the install promise, executed on every commit.** Thirteen cells: nine
   install through the Node CLI (three operating systems × Node 20/22/24), three rebuild PATH from
   the system directories and let the launcher finish design-only ITSELF with no Node to hand over

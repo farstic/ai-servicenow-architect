@@ -99,19 +99,35 @@ test('full mode disables sparse instead of setting it', () => {
   assert.ok(!full.some((l) => l.includes('sparse-checkout set')));
 });
 
-test('the Windows recipe adds the long-paths line, and only that', () => {
+test('every Windows git command carries long paths — not just the last one', () => {
+  // AMENDED by ARC-06-S14. This test used to assert the Windows form differed by exactly ONE line:
+  // a trailing `config core.longpaths true`. That was the bug, not the specification. The clone,
+  // the sparse-checkout and the CHECKOUT all ran with the default `false`, and the first Node-free
+  // Windows install ever performed — the `no-node, windows-latest` CI cell — finished with one
+  // corpus file missing from the working tree, its path over 260 characters. `git status` inside
+  // the submodule said ` D markdown/platform-security/…/sc-limit-attachme…`; the pointer had not
+  // moved, so the outer repository just said "modified" and nothing said why.
   const areas = readAreas(root, config.docs.areasFile);
   const posix = planRecipe({ config, areas, state: { present: false }, platform: 'linux' });
   const win = planRecipe({ config, areas, state: { present: false }, platform: 'win32' });
-  // The attribution echo is LAST on both, so the Windows line is inserted before it rather than
-  // appended after — compared with the echo set aside, which is what makes the delta one line.
   const attribution = `echo "${ATTRIBUTION}"`;
   assert.equal(posix[posix.length - 1], attribution);
   assert.equal(win[win.length - 1], attribution);
-  const p2 = posix.slice(0, -1);
-  const w2 = win.slice(0, -1);
-  assert.deepEqual(w2.slice(0, p2.length), p2);
-  assert.deepEqual(w2.slice(p2.length), ['git -C vendor/ServiceNowDocs config core.longpaths true']);
+
+  const gitLines = (lines) => lines.filter((l) => l.startsWith('git '));
+  for (const line of gitLines(win)) {
+    assert.match(line, /^git -c core\.longpaths=true /, `a Windows git command without long paths: ${line}`);
+  }
+  for (const line of gitLines(posix)) {
+    assert.equal(line.includes('core.longpaths'), false, `POSIX does not need it: ${line}`);
+  }
+  // The persistent setting stays as its own line, because a person typing `git -C
+  // vendor/ServiceNowDocs …` afterwards has no `-c` flag on their command.
+  assert.equal(win[win.length - 2], 'git -c core.longpaths=true -C vendor/ServiceNowDocs config core.longpaths true');
+  // And the two forms are otherwise the same recipe: strip the flag and the extra line, and what
+  // is left is POSIX, in order.
+  const stripped = win.slice(0, -2).map((l) => l.replace('-c core.longpaths=true ', ''));
+  assert.deepEqual(stripped, posix.slice(0, -1));
 });
 
 /**
@@ -200,10 +216,15 @@ test('the Windows launcher carries the long-paths line and the POSIX one does no
   const sh = launcherRecipe(readFileSync(join(root, LAUNCHERS[0].path), 'utf8'), 'sparse');
   const ps1 = launcherRecipe(readFileSync(join(root, LAUNCHERS[1].path), 'utf8'), 'sparse');
 
-  assert.ok(ps1.some((l) => l.includes('core.longpaths')), 'a 197-character path needs it there');
+  // Every command, not just the last (see the amendment above): the checkout is the one that
+  // drops the file, and it is not the last line.
+  for (const line of ps1) assert.match(line, /^(git -c core\.longpaths=true |echo )/, line);
   assert.ok(!sh.some((l) => l.includes('core.longpaths')), 'and POSIX does not');
-  assert.equal(ps1.length, sh.length + 1, 'that line is the only difference');
-  assert.deepEqual(ps1.filter((l) => !l.includes('core.longpaths')), sh);
+  assert.equal(ps1.length, sh.length + 1, 'the persistent config line is the only EXTRA line');
+  assert.deepEqual(
+    ps1.filter((l) => !l.endsWith('config core.longpaths true'))
+      .map((l) => l.replace('-c core.longpaths=true ', '')),
+    sh);
   assert.ok(areasList.length > 0);
 });
 
