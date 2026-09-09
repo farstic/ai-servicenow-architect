@@ -27,7 +27,11 @@ let checkout: string;
 let home: string;
 
 const instance = (host: string, environment: string) => ({
-  url: `https://${host}.example.invalid`,
+  // A fixture hostname, never resolved: these assertions are about the STRING the router and the
+  // capability report echo back. Renamed off the reserved TLD with the rest of the suite — a name
+  // that "cannot resolve" is a promise the network does not always keep, and no test here should
+  // depend on it either way.
+  url: `https://${host}.test-only`,
   environment,
   auth: { method: 'basic', username: 'fixture.user', password: 'Fixture-Secret-1' },
   preset: 'pdi-developer',
@@ -92,7 +96,7 @@ describe('criterion 4 - a per-call `instance` argument does not route', () => {
         name: 'snow_core_records_query',
         arguments: { table: 'incident', instance: 'other' },
       }));
-      expect(r).toContain('pdi-host.example.invalid');
+      expect(r).toContain('pdi-host.test-only');
       expect(r).not.toContain('other-host');
     } finally { await client.close(); }
   }, 40_000);
@@ -118,7 +122,7 @@ describe('criterion 4 - a per-call `instance` argument does not route', () => {
     try {
       expect(text(await client.callTool({
         name: 'snow_core_records_query', arguments: { table: 'incident' },
-      }))).toContain('pdi-host.example.invalid');
+      }))).toContain('pdi-host.test-only');
     } finally { await client.close(); }
   }, 40_000);
 });

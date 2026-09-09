@@ -23,8 +23,17 @@ import { fetch as undiciFetch } from 'undici';
  * For tests only. Production code changes no proxy variable after start-up, and a caller that
  * did would be changing where requests go mid-session — which is the kind of thing
  * `snow_core_instance_switch` exists to make visible rather than something to support quietly.
+ *
+ * `connect` is the same escape hatch, for the same audience: undici passes these straight to
+ * `net.connect`, so a test can supply its own `lookup` and make a name fail to resolve WITHOUT
+ * asking the machine's resolver. That matters because the alternative — pointing a test at a
+ * name that "cannot resolve" — is a test that depends on the network it is trying not to use, and
+ * it failed exactly that way on a macOS runner where something answered for a `.invalid` host.
+ *
+ * Passing nothing clears both, so the seam cannot leak from one test into the next: the existing
+ * `afterEach` calls this with no arguments and gets the production agent back for free.
  */
-export declare function resetHttpDispatcher(): void;
+export declare function resetHttpDispatcher(connect?: Record<string, unknown>): void;
 /** True when a proxy variable is set to a non-empty value — for diagnostics, not for routing. */
 export declare function proxyConfigured(env?: NodeJS.ProcessEnv): boolean;
 /** `fetch`, through the proxy agent. Same signature as the global. */

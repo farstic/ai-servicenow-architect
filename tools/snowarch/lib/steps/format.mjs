@@ -32,14 +32,19 @@ export function humanDuration(ms) {
  * The denominator is derived from the last step's id, never typed: a tenth step would otherwise
  * leave nine printed on every line of a ten-step run.
  */
-export function stepLine({ id, title, status, detail = null, durationMs = null, last }) {
+export function stepLine({ id, title, status, detail = null, note = null, durationMs = null, last }) {
   // `[B02/09]` — the id keeps its letter, the denominator does not. That asymmetry is the
   // conventions block's, not a slip: the left half is a name you can grep for in the state file and
   // in `--from B06`, the right half is a count.
   const total = String(last).replace(/^B/, '');
   const head = `[${id}/${total}] ${title} ${WORDING.running} `;
 
-  if (status === 'skipped') return `${head}${WORDING.skipped} (${detail})`;
+  // `note` is the CONSEQUENCE of a skip, not the reason for it: `(--docs skip)` says what the
+  // operator asked for, and the note says what it will cost them. Optional, because most skips cost
+  // nothing — a live-only step skipped in design-only is simply not applicable.
+  if (status === 'skipped') {
+    return `${head}${WORDING.skipped} (${detail})${note ? ` — ${note}` : ''}`;
+  }
   if (status === 'cached') return `${head}${WORDING.cached}`;
   if (status === 'fail') return `${head}${WORDING.fail}`;
 
@@ -74,6 +79,9 @@ export function failureBlock({ id, cause, remedy, launcher = './bootstrap.sh' })
  */
 export const CORPUS_TEXT = Object.freeze({
   citationsUnverified: 'citations: not verified until Node 20+ is installed',
+  // The consequence of `--docs skip`, said at the moment the operator chooses it rather than left
+  // for the doctor to spring on them later. It rides on the step line as `skipNote`.
+  skipConsequence: 'the doctor will report the corpus as FAIL until you run ./snowarch docs sync',
   areasPresent: (present, total) => `areas: ${present}/${total} present`,
   areaMissing: (area) => `area ${area} missing — run ./snowarch docs sync once Node is installed, `
     + 'or re-run ./bootstrap.sh',
