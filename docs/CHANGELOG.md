@@ -29,6 +29,18 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   byte-for-byte parity test failed on every bump pull request by construction. `gen-docs-recipe.mjs`
   joins the generator list and `--check` is the same guarantee without the built-in failure — *a
   documentation block that embeds a moving value must be generated, not asserted.*
+- **...and the bump now regenerates it, because generating it was only half the fix.** Making the
+  block generated stopped the parity test failing by construction; it did not stop the block going
+  stale. `syncUpstream` writes the pin, so the instant it does, the document embedding that pin
+  contradicts it — and the pull request would have shipped a recipe naming the commit it was
+  moving away from, with a red `gen-docs-recipe --check` in its own CI. The refresh now runs the
+  generator after the pin write and stages `docs/ARCHITECTURE.md` as a third path when the block
+  actually changed. The rendering and the splice moved to one module both callers import, so
+  "what the block looks like" is not defined twice. Two things fell out of writing it: the
+  refresh has to re-read the config it just wrote (the in-memory copy still held the old pin, and
+  rendering from it would have reported "current" and staged nothing — a fix that looks like it
+  works), and the dry run's restore had to stop naming one file and start following the staged
+  list, or it left the regenerated document modified in the tree.
 - **`docs-bump.yml` builds from the pull request's base**, not the ref it was dispatched on. The
   first real run was dispatched from `main` and computed its "from" pin against main's tree — right
   only while the two branches share a pin. One value, used by the checkout and by `--base`, asserted

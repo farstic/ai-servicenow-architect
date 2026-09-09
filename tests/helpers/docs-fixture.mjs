@@ -127,6 +127,12 @@ function writeCitingSkill(root, page = CITED_PAGE) {
 function makeWorkspace({ scratch, pin, upstreamUrl }) {
   const w = mkdtempSync(join(scratch, 'work-'));
   git(['init', '-q'], w);
+  // The engine repository pins line endings (`* text=auto eol=lf`), so a fixture standing in for it
+  // must too. Without this the workspace inherits the machine's `core.autocrlf`, and on the Windows
+  // runner a file written LF, committed, and restored comes back CRLF — which is git behaving
+  // correctly and a fixture that no longer resembles the repository it models. A dry-run restore
+  // test comparing bytes across that round trip fails on line endings alone, which is what happened.
+  writeFileSync(join(w, '.gitattributes'), '* text=auto eol=lf\n');
   mkdirSync(join(w, 'vendor'), { recursive: true });
   writeFileSync(join(w, 'vendor/docs-areas.txt'), `${AREAS.join('\n')}\n`);
   // The engine repository registers the corpus in `.gitmodules`, and recipe C's step 5
@@ -134,7 +140,7 @@ function makeWorkspace({ scratch, pin, upstreamUrl }) {
   // would exercise a path production never takes.
   writeFileSync(join(w, '.gitmodules'),
     `[submodule "${CORPUS_DIR}"]\n\tpath = ${CORPUS_DIR}\n\turl = ${upstreamUrl}\n\tbranch = australia\n\tshallow = true\n`);
-  git(['add', '.gitmodules', 'vendor/docs-areas.txt'], w);
+  git(['add', '.gitattributes', '.gitmodules', 'vendor/docs-areas.txt'], w);
   // ...and the gitlink itself, unpopulated. A cloned engine repository arrives exactly like this:
   // `.gitmodules` plus a 160000 index entry and no checkout, which is what makes `git submodule
   // status` print a leading `-` until recipe C's step 5 runs. `update-index --cacheinfo` is how to
