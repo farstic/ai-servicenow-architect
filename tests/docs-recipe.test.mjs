@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { planRecipe, readAreas } from '../tools/snowarch/lib/docs/sync.mjs';
+import { ATTRIBUTION, planRecipe, readAreas } from '../tools/snowarch/lib/docs/sync.mjs';
 
 /**
  * The launcher recipe in `docs/ARCHITECTURE.md` and the module must be the same commands.
@@ -17,7 +17,10 @@ const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')
 const arch = readFileSync(join(root, 'docs/ARCHITECTURE.md'), 'utf8');
 
 const blockOf = (text) => {
-  const m = /## The git-only corpus recipe\n[\s\S]*?```sh\n([\s\S]*?)```/.exec(text);
+  // The heading moved a level deeper when ARC-03-S10 consolidated six corpus sections under one.
+  // Matched at either level rather than pinned to `###`, so the next reorganisation moves prose
+  // without breaking a test about git commands.
+  const m = /#{2,3} The git-only corpus recipe\n[\s\S]*?```sh\n([\s\S]*?)```/.exec(text);
   assert.ok(m, 'no git-only recipe block in docs/ARCHITECTURE.md');
   return m[1].trimEnd().split('\n');
 };
@@ -33,6 +36,14 @@ test('the ARCHITECTURE block equals the recipe for a fresh sparse checkout', () 
   // Windows matrix cell for a difference that is by design.
   const planned = planRecipe({ config, areas, mode: 'sparse', state: { present: false }, platform: 'linux' });
   assert.deepEqual(blockOf(arch), planned);
+});
+
+test('the block ends with the attribution line, the same string sync prints', () => {
+  // Three copies of a licence attribution is three chances for one to be wrong. The recipe's last
+  // line is an `echo` of the module's own constant, and this is what compares them.
+  const block = blockOf(arch);
+  assert.equal(block[block.length - 1], `echo "${ATTRIBUTION}"`);
+  assert.match(ATTRIBUTION, /^docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2\.0 — vendor\/ServiceNowDocs\/LICENSE$/);
 });
 
 test('the block carries the pin, the family and every area', () => {
@@ -64,6 +75,13 @@ test('the Windows recipe adds the long-paths line, and only that', () => {
   const areas = readAreas(root, config.docs.areasFile);
   const posix = planRecipe({ config, areas, state: { present: false }, platform: 'linux' });
   const win = planRecipe({ config, areas, state: { present: false }, platform: 'win32' });
-  assert.deepEqual(win.slice(0, posix.length), posix);
-  assert.deepEqual(win.slice(posix.length), ['git -C vendor/ServiceNowDocs config core.longpaths true']);
+  // The attribution echo is LAST on both, so the Windows line is inserted before it rather than
+  // appended after — compared with the echo set aside, which is what makes the delta one line.
+  const attribution = `echo "${ATTRIBUTION}"`;
+  assert.equal(posix[posix.length - 1], attribution);
+  assert.equal(win[win.length - 1], attribution);
+  const p2 = posix.slice(0, -1);
+  const w2 = win.slice(0, -1);
+  assert.deepEqual(w2.slice(0, p2.length), p2);
+  assert.deepEqual(w2.slice(p2.length), ['git -C vendor/ServiceNowDocs config core.longpaths true']);
 });

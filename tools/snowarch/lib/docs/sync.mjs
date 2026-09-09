@@ -11,7 +11,31 @@ import { join } from 'node:path';
 
 export const ROOT_FILES = ['.gitignore', 'LICENSE', 'README.md', 'llms.txt', 'llms_template.txt'];
 
+/**
+ * Directories the checkout carries whatever the cone says.
+ *
+ * `legal/` is one file at the pin and it is the corpus's own legal notice. Cone mode materialises
+ * root-level FILES automatically but not root-level DIRECTORIES, so a sparse checkout had `LICENSE`
+ * and not `legal/` — which would have made the NOTICE paragraph's "preserved in every checkout,
+ * sparse or full" untrue at the moment it was written. Measured, then fixed, rather than softened
+ * into a claim about `LICENSE` alone.
+ */
+export const ALWAYS_DIRS = ['legal'];
+
+/** What `sparse-checkout set --cone` is given: the generated areas, plus what must always be here. */
+export const coneArgs = (areas) => [...areas, ...ALWAYS_DIRS];
+
 export const CORPUS_DIR = 'vendor/ServiceNowDocs';
+
+/**
+ * Whose documentation this is, in one string, in one place.
+ *
+ * It appears in three: the end of a successful `docs sync`, the last line of `--print-recipe`, and
+ * `README.md`. Three copies of a licence attribution is three chances for one of them to be wrong,
+ * so the other two are compared against this constant by test.
+ */
+export const ATTRIBUTION =
+  'docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE';
 
 /**
  * The two checkout modes, defined once.
@@ -183,7 +207,7 @@ export function repairRootFiles(corpusPath) {
 
 export function checkCompleteness(root, corpusDir, areas, pin) {
   const corpus = join(root, corpusDir);
-  const missingRoot = ROOT_FILES.filter((f) => !existsSync(join(corpus, f)));
+  const missingRoot = [...ROOT_FILES, ...ALWAYS_DIRS].filter((f) => !existsSync(join(corpus, f)));
   const missingAreas = areas.filter((a) => !existsSync(join(corpus, ...a.split('/'))));
   let head = null, submodule = null;
   try { head = run(['rev-parse', 'HEAD'], corpus, true).trim(); } catch { /* not a repo */ }
@@ -260,8 +284,13 @@ export function inspect(root, config, areas) {
   const submodule = probe(['submodule', 'status', CORPUS_DIR], root).out;
   const pinPresent = probe(['cat-file', '-e', `${config.docs.pin}^{commit}`], corpus).ok;
 
-  const sameSet = sparseList.length === areas.length
-    && [...sparseList].sort().join('\0') === [...areas].sort().join('\0');
+  // Compared against what the recipe WRITES, not against the areas file alone. Those diverged the
+  // moment `legal/` joined the cone: the write included it, the comparison did not, and `sync`
+  // therefore reported "up to date" over a checkout that was missing a directory it had just been
+  // taught to require. One definition of the cone, used by both.
+  const cone = coneArgs(areas);
+  const sameSet = sparseList.length === cone.length
+    && [...sparseList].sort().join('\0') === [...cone].sort().join('\0');
 
   return {
     present: true, head, dirty, sparseOn, coneOn, sparseList, sameSet, pinPresent,
@@ -290,7 +319,7 @@ export function planRecipe({ config, areas, mode = MODE.sparse, state = { presen
   }
   if (mode === MODE.sparse) {
     if (state.present && state.sparseOn && !state.coneOn) lines.push(g(...C, 'sparse-checkout', 'init', '--cone'));
-    lines.push(g(...C, 'sparse-checkout', 'set', '--cone', ...areas));
+    lines.push(g(...C, 'sparse-checkout', 'set', '--cone', ...coneArgs(areas)));
   } else {
     lines.push(g(...C, 'sparse-checkout', 'disable'));
   }
@@ -304,6 +333,9 @@ export function planRecipe({ config, areas, mode = MODE.sparse, state = { presen
   // this line as the Windows addition; `tests/docs-recipe.test.mjs` compares against the POSIX
   // plan explicitly, and `--print-recipe` prints for the platform the operator is actually on.
   if (platform === 'win32') lines.push(g(...C, 'config', 'core.longpaths', 'true'));
+  // The recipe's last line, so a launcher that has no Node still tells the user whose docs these
+  // are. It is an `echo`, not a git command — the block is a shell script, not a git script.
+  lines.push(`echo "${ATTRIBUTION}"`);
   return lines;
 }
 
@@ -366,7 +398,7 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
       phase('sparse init --cone (pattern-mode config found)', () => runMapped(['sparse-checkout', 'init', '--cone'], corpus, ctx));
     }
     if (!state.sparseOn || !state.coneOn || !state.sameSet) {
-      phase(`sparse set (${areas.length} areas)`, () => runMapped(['sparse-checkout', 'set', '--cone', ...areas], corpus, ctx));
+      phase(`sparse set (${areas.length} areas)`, () => runMapped(['sparse-checkout', 'set', '--cone', ...coneArgs(areas)], corpus, ctx));
     }
   }
 
@@ -404,11 +436,18 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   const changed = !state.present || !state.atPin || !state.sameSet || repaired > 0
     || (mode === MODE.full) !== !after.sparseOn;
 
+  // Printed once, on success, and nowhere else: `--quiet` suppresses it and `--json` never carries
+  // it, because a caller parsing JSON is not a reader who needs to be told whose documentation this
+  // is. The string is exact — README and the launcher recipe repeat it, and a test compares them.
+  const attribute = () => say(ATTRIBUTION);
+
   if (!changed) {
     say(`[docs] up to date (pin ${docs.pin.slice(0, 7)}, ${mode}, ${areas.length} areas)`);
+    attribute();
   } else {
     say(`[docs] ${elapsed.toFixed(1)} s · pin ${docs.pin.slice(0, 7)} · ${mode} · `
       + `${completeness.ok ? 'complete' : 'INCOMPLETE'}`);
+    attribute();
   }
   return { completeness, repaired, areas, mode, elapsed, changed, state: after };
 }
