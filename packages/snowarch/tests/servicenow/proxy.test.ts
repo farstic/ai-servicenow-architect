@@ -42,10 +42,14 @@ let resolved: string[];
 const HOST = 'sn-fixture.test-only';
 const URL_UNDER_TEST = `https://${HOST}/api/now/table/sys_user`;
 
+// `hostname` is not on `NodeJS.ErrnoException` — it is what `dns.lookup` adds to a real
+// getaddrinfo failure, and the shape is copied so the error reads like the one this replaces.
+type LookupError = NodeJS.ErrnoException & { hostname?: string };
+
 const failingLookup = (hostname: string, _options: unknown,
-  cb: (e: NodeJS.ErrnoException) => void): void => {
+  cb: (e: LookupError) => void): void => {
   resolved.push(hostname);
-  const e: NodeJS.ErrnoException = new Error(`getaddrinfo ENOTFOUND ${hostname}`);
+  const e: LookupError = new Error(`getaddrinfo ENOTFOUND ${hostname}`);
   e.code = 'ENOTFOUND';
   e.syscall = 'getaddrinfo';
   e.hostname = hostname;
