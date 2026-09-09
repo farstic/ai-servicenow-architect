@@ -262,6 +262,40 @@ files to decide whether to skip a step would cost more than the step, and an unr
 invalidate it. B06 hashes only the store's schema version and whether it exists: `.local/instances.json`
 holds credentials, and a hash that read further would put one a careless line away from the log.
 
+### B00 preflight — the seven checks
+
+Every prerequisite is checked before anything is installed, and **every check runs even after one
+has failed**: an operator missing git *and* behind a TLS-intercepting proxy learns both in one pass
+rather than discovering the second after fixing the first. Any FAIL ends the run with
+`FAIL B00: <n> prerequisite(s) missing` and **exit 3** — before the plan screen, and before
+`.local/` exists.
+
+| # | Check | Fails when | Remedy comes from |
+|---|---|---|---|
+| 1 | root | `cwd` is not the checkout, or git reports a different toplevel (both compared through `realpath`) | `remedies.json` → the platform's own `cd` |
+| 2 | git | absent, or below `floors.git` | `xcode-select` · `winget` · the distribution package |
+| 3 | Claude Code | absent, or below `floors.claudeCode`. Not logged in is a **WARN**, never a FAIL — signing in is Claude Code's own first-run flow | the install page |
+| 4 | disk | less than 1 GiB free (1.5 GiB for the full corpus). Unmeasurable is a WARN, not a FAIL | `free up <n> MB on <mount>` |
+| 5 | network | `HEAD https://github.com/` fails — through `HTTPS_PROXY` by CONNECT tunnel, honouring `NO_PROXY` | the shared network vocabulary (below) |
+| 6 | Node | absent or below `floors.node` — a `note:` in design-only, a FAIL only for live | `brew` · `winget` · nvm |
+| 7 | platform | never; 32-bit is a WARN | — |
+
+The floors are read from `engine.config.json` and **never typed into the code**; a test strips
+comments from every module under `tools/snowarch/lib/` and asserts none of them spells a configured
+floor, so lowering a floor in the config genuinely lowers the threshold.
+
+Remedies live in `tools/snowarch/lib/remedies.json` as `{ checkId: { darwin, win32, linux, default } }`
+because the Node-free launchers (S10/S11) print the same sentences with no Node to read them, and
+the doctor quotes the same table. One wording, three programs.
+
+**One network vocabulary.** `lib/net-sentences.mjs` owns the DNS, proxy, TLS and disk sentences;
+`classifyGitFailure` (git's stderr) and `probe-net.mjs` (Node's HTTPS) both import them, so an
+operator behind a corporate proxy does not learn two vocabularies for one problem depending on which
+half of the tool noticed first. The single parameterised difference is the CA sentence: it names the
+failing tool's knob first (`GIT_SSL_CAINFO` or `NODE_EXTRA_CA_CERTS`) and the other second, because
+a corporate bundle is always needed by both. A proxy URL is masked to `***@host:port` where the
+sentence is built, not on the way to the terminal.
+
 ### The resume rule
 
 For each step in order: `runsWhen` false → `skipped (<reason>)`; `--from BNN` and the step is at or
