@@ -8,7 +8,6 @@ import { NPM_SENTENCE, classifyNpmFailure } from '../lib/npm-failures.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const isWindows = process.platform === 'win32';
 
 const ctxFor = (root, over = {}) => ({
   root, config: JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')),
@@ -91,12 +90,19 @@ test('an unmapped failure shows the log rather than shrugging', () => {
   assert.match(out, /Full log: \/tmp\/x\.log$/);
 });
 
-test('B04 reports a missing npm rather than failing obscurely', async () => {
+test('B04 reports a missing npm with the remedy for the platform it was asked about', async () => {
+  // The remedy follows the ctx's PLATFORM, not the runner's. The first version asserted against
+  // `process.platform` while telling B04 it was Linux, so it passed on macOS and Linux and failed
+  // on all three Windows cells — a platform-specific failure in a test that had itself chosen the
+  // platform. All three are asserted now, which is both deterministic and more coverage.
   const root = makeCheckout();
-  const r = await runB04(ctxFor(root, { env: { PATH: '' }, plat: 'linux' }));
-  assert.equal(r.status, 'fail');
-  assert.equal(r.detail, NPM_SENTENCE.missing);
-  assert.match(r.remedy, isWindows ? /winget|nodejs/i : /brew|apt|nvm|nodejs/i);
+  for (const [plat, expected] of [['linux', /apt|nvm|distribution/i], ['darwin', /brew/i],
+    ['win32', /winget/i]]) {
+    const r = await runB04(ctxFor(root, { env: { PATH: '' }, plat }));
+    assert.equal(r.status, 'fail', plat);
+    assert.equal(r.detail, NPM_SENTENCE.missing, plat);
+    assert.match(r.remedy, expected, plat);
+  }
 });
 
 test('B04 maps a failing install and keeps the whole log out of the console', async () => {
