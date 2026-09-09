@@ -358,6 +358,20 @@ test('and the Windows launcher runs the same probe, with the same flags', () => 
   }
 });
 
+test('no argument to a native command carries an embedded double quote', () => {
+  // PowerShell 5.1 rewrites native-command arguments cmd-style on the way out, and a `"` inside
+  // one does not survive: `node -p 'process.versions.node.split(".")[0]'` reached node as
+  // `split(.)[0]`, so the launcher decided Node was unusable on a machine that had it. Found by
+  // CI on the run WITH Node — the Node-free cells could never have shown it.
+  const calls = [...ps1.matchAll(/^\s*(?:\$\w+ = \()?& (node|git|claude)\b([^\r\n]*)/gm)];
+  assert.ok(calls.length >= 3, `only ${calls.length} native calls found — is the regex right?`);
+  for (const [line, cmd, args] of calls) {
+    assert.ok(!/'[^']*"[^']*'/.test(args), `${cmd}: an argument embeds a double quote — ${line.trim()}`);
+  }
+  // Not vacuous: the shape it is looking for is exactly the one that broke.
+  assert.ok(/'[^']*"[^']*'/.test(`& node -p 'process.versions.node.split(".")[0]'`));
+});
+
 test('the Windows path never reaches for bash', () => {
   // The CI job rebuilds PATH without Git Bash to prove this from the outside; this proves it from
   // the inside, where no runner is needed. `C:\\Windows\\System32\\bash.exe` (the WSL stub) is on every

@@ -104,7 +104,12 @@ if ($Reset) {
 # The hand-over. Everything below runs only when Node cannot.
 $NodeMajor = ''
 if (Get-Command node -ErrorAction SilentlyContinue) {
-  $NodeMajor = (& node -p 'process.versions.node.split(".")[0]' 2>$null)
+  # No embedded double quotes in the argument: PowerShell hands native commands their arguments
+  # through a cmd-style rewrite that eats them, so `split(".")` reached node as `split(.)` and it
+  # answered with a syntax error. Ask for the whole version and split it here, where the rules are
+  # PowerShell's own. (CI, again — with Node present this time.)
+  $NodeVersion = (& node -p 'process.versions.node' 2>$null)
+  if ($NodeVersion) { $NodeMajor = ($NodeVersion -split '\.')[0] }
 }
 if ($NodeMajor -and (VersionGe ("$NodeMajor.0.0") (Floor 'node'))) {
   # Our spawn, so the session variable is SET rather than inherited (ARC-06-S08). PowerShell has no
