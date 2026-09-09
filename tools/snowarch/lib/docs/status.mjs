@@ -33,12 +33,29 @@ const git = (args, cwd) => {
   } catch { return { ok: false, out: '' }; }
 };
 
-/** The gitlink the superproject records for the corpus, or null when it records none. */
+/**
+ * The gitlink the superproject records — from the INDEX, falling back to HEAD.
+ *
+ * After `docs sync --upstream` the moved gitlink is staged and not yet committed, so HEAD still
+ * holds the old commit while the index holds the new one. Reading HEAD would report a MISMATCH
+ * against a pin the maintainer has just deliberately moved, which is the opposite of useful. The
+ * index is what will be committed, so the index is what is reported — and `gitlinkStaged` says so,
+ * because "this is not committed yet" is worth seeing.
+ */
 function gitlinkOf(root) {
-  const r = git(['ls-tree', 'HEAD', '--', CORPUS_DIR], root);
-  if (!r.ok) return null;
-  const m = /^160000 commit ([0-9a-f]{40})/.exec(r.out);
-  return m ? m[1] : null;
+  // The two commands print the mode differently and neither is `160000 <sha>` alone:
+  //   ls-tree      `160000 commit <sha>\t<path>`
+  //   ls-files -s  `160000 <sha> <stage>\t<path>`
+  // Reading one format for both silently returned null for the index, which is how the staged
+  // gitlink went unnoticed on the first run.
+  const shaFrom = (r, re) => {
+    if (!r.ok) return null;
+    const m = re.exec(r.out);
+    return m ? m[1] : null;
+  };
+  const head = shaFrom(git(['ls-tree', 'HEAD', '--', CORPUS_DIR], root), /^160000 commit ([0-9a-f]{40})/);
+  const index = shaFrom(git(['ls-files', '--stage', '--', CORPUS_DIR], root), /^160000 ([0-9a-f]{40})/);
+  return { sha: index ?? head, staged: index !== null && head !== null && index !== head };
 }
 
 /**
@@ -119,7 +136,7 @@ export function docsStatus({ root = process.cwd(), verify = true, measure: doMea
   try { areasExpected = readAreas(root, docs.areasFile); } catch { /* generated file absent */ }
 
   const base = {
-    present, path: CORPUS_DIR, pin: docs.pin, gitlink: gitlinkOf(root),
+    present, path: CORPUS_DIR, pin: docs.pin, gitlink: null, gitlinkStaged: false,
     head: null, pinMatchesGitlink: null, headMatchesPin: null,
     family: docs.family, branch: null, familyMatches: null,
     sparse: 'none', areasExpected, areasPresent: [], areasMissing: areasExpected,
@@ -130,6 +147,9 @@ export function docsStatus({ root = process.cwd(), verify = true, measure: doMea
     longpaths: null,
     schema: SCHEMA,
   };
+  const link = gitlinkOf(root);
+  base.gitlink = link.sha;
+  base.gitlinkStaged = link.staged;
   base.pinMatchesGitlink = base.gitlink === null ? null : base.gitlink === docs.pin;
 
   if (!present) {
@@ -182,7 +202,7 @@ export function formatStatus(s) {
   const rows = [];
   const add = (label, body, ok, remedy) => rows.push({ label, body, ok, remedy });
 
-  add('pin', `${short(s.pin)}  gitlink ${short(s.gitlink)}  HEAD ${short(s.head)}`,
+  add('pin', `${short(s.pin)}  gitlink ${short(s.gitlink)}${s.gitlinkStaged ? ' (staged)' : ''}  HEAD ${short(s.head)}`,
     s.headMatchesPin && s.pinMatchesGitlink !== false,
     s.pinMatchesGitlink === false
       // S01's lint prints this sentence too; the two must not diverge. S07/S09 own the script.

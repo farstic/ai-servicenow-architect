@@ -64,11 +64,51 @@ function buildUpstream(dir) {
   git(['add', '-A'], src);
   git(['commit', '-qm', 'the pinned commit'], src);
   const pin = git(['rev-parse', 'HEAD'], src).trim();
+
+  // ARC-03-S07 needs the FAMILY TIP ahead of the pin, so `australia` fast-forwards onto the pinned
+  // commit and then moves on. S05's property survives untouched: a `--depth 1` clone of `australia`
+  // still lands on the tip and still does not have the pin, so fetch-by-hash is exercised there.
+  git(['checkout', '-q', 'australia'], src);
+  git(['merge', '-q', '--ff-only', 'side'], src);
+  writeFileSync(join(src, 'markdown/gamma/added-upstream.md'), '# added upstream\n');
+  git(['add', '-A'], src);
+  git(['commit', '-qm', 'the upstream tip, one ahead of the pin'], src);
+  const tip = git(['rev-parse', 'HEAD'], src).trim();
+
+  // A tip that DELETES a cited file — the AC 2 shape. Its own branch, so one upstream serves both.
+  git(['checkout', '-q', '-b', 'deletes-cited', pin], src);
+  git(['rm', '-q', join('markdown', 'beta', 'extra.md')], src);
+  git(['commit', '-qm', 'upstream removed a cited page'], src);
+  const deletesCited = git(['rev-parse', 'HEAD'], src).trim();
+
+  // A branch BEHIND the pin — an upstream history rewrite. The ruling (2026-09-09) is to move to it
+  // anyway and say so on the pin line, rather than silently refusing to go backwards.
+  git(['branch', 'behind', `${pin}~1`], src);
+  const behind = git(['rev-parse', 'behind'], src).trim();
+
   git(['checkout', '-q', 'australia'], src);
 
   const bare = join(dir, 'upstream.git');
   git(['clone', '-q', '--bare', src, bare], dir);
-  return { bare, pin };
+  return { bare, pin, tip, deletesCited, behind };
+}
+
+/** The path the fixture's citing skill points at, and which `deletes-cited` removes. */
+const CITED_PAGE = 'markdown/beta/extra.md';
+
+/**
+ * A citation the corpus can satisfy or fail to satisfy.
+ *
+ * `verifyCitations` scans `.claude/skills` among its roots, so a workspace needs one to have any
+ * citations at all — without it every before/after diff is empty and the S07 tests prove nothing.
+ */
+function writeCitingSkill(root, page = CITED_PAGE) {
+  const dir = join(root, '.claude', 'skills', 'fixture');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'SKILL.md'),
+    `---\nname: fixture\ndescription: a fixture skill that cites the corpus\n---\n\n`
+    + `# fixture\n\nGrounded in the corpus (citation: \`${page}\`).\n`);
+  return join('.claude', 'skills', 'fixture', 'SKILL.md');
 }
 
 function makeWorkspace({ scratch, pin, upstreamUrl }) {
@@ -100,4 +140,4 @@ function makeWorkspace({ scratch, pin, upstreamUrl }) {
 }
 
 
-export { AREAS, LONG_NAME, git, buildUpstream, makeWorkspace };
+export { AREAS, CITED_PAGE, LONG_NAME, git, buildUpstream, makeWorkspace, writeCitingSkill };

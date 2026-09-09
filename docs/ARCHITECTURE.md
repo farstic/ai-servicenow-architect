@@ -125,6 +125,45 @@ exits 0 unless the command itself failed, so a caller reading the object always 
 | `longpaths` | `true`/`false` on Windows, `null` elsewhere — the setting does not exist there, and `false` would read as "off" |
 | `schema` | `1` |
 
+## The maintainer refresh, and the exit codes
+
+`node scripts/docs.mjs sync --upstream [--to <sha>] [--json] [--no-verify]` moves the pin forward
+and shows what it broke. Five things happen, in this order and no other:
+
+1. **Refuse a dirty tree outside `vendor/`** — before any network call. A dirty *corpus* does not
+   block it: that is `sync`'s refusal, and this command is about to move the corpus anyway.
+2. **Fetch** the family branch, or the named SHA.
+3. **Verify at the current pin** — the baseline. It has to run before the move, because "which
+   citations *became* dead" is a difference between two states and the first one stops existing the
+   moment the corpus moves.
+4. **Move and verify again**, sparse set untouched.
+5. **Write the pin and stage** `engine.config.json` and `vendor/ServiceNowDocs`. **Nothing is
+   committed.** A human reads the report and decides.
+
+The pin write replaces one 40-hex string in the file rather than reparsing it, so the diff a
+reviewer reads is one token, not a reformat. An upstream that rewrote history can leave the tip
+*behind* the current pin: the command follows it and says `(older than the current pin)` on the pin
+line, because silently staying put would hide the rewrite.
+
+The report's headings are a contract — ARC-03-S09's workflow pastes them verbatim into a pull
+request body and keys on **exit 1** meaning "the pin moved and citations broke, someone must remap".
+
+### Exit codes — every `docs` sub-command shares one table
+
+| Code | Meaning |
+|---|---|
+| **0** | ok |
+| **1** | `sync`: the checkout is incomplete · `--upstream`: the pin moved **and** citations broke · `verify`: dead citations · `status`: a mismatch |
+| **3** | the corpus is missing |
+| **4** | the working tree is not clean — nothing was touched |
+| **5** | git failed; the message says how (DNS · proxy · TLS · unfetchable pin · disk) |
+| **6** | the upstream does not have what was asked for — a renamed family branch, or an unreachable SHA |
+
+4 and 5 are deliberately distinct: one is "you have unsaved work", the other "the transport failed",
+and a caller that collapsed them would send someone to check their network over an unstaged edit.
+6 is narrower still — neither the operator's fault nor a transport failure, and its remedy is to
+find out what the branch is called now.
+
 ## The git-only corpus recipe
 
 ARC-06's launchers run this when Node is absent — `bootstrap.sh` on bash 3.2 (macOS ships it) and

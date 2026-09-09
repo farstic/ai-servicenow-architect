@@ -786,6 +786,22 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## Refreshing the corpus
+
+Monthly, or when a citation goes dead upstream. Five steps, and the tool does the first one only:
+
+1. `node scripts/docs.mjs sync --upstream` — fetches the family tip, moves the pin and the gitlink,
+   re-runs the citation gate and prints the before/after diff. It **stages** both paths and commits
+   nothing.
+2. **Read the report.** `newly dead (0)` and exit 0 means the refresh is clean.
+3. **Remap what broke.** Every `newly dead` line names a file and a line to repair. Fix the
+   citation, never the pin — and never delete a citation to make the gate pass.
+4. `git commit -m "chore(docs): bump ServiceNowDocs to <7>"` — the report prints the exact command.
+5. Push, and open the pull request as usual.
+
+Exit 1 means the pin moved *and* citations broke. Both are true and both matter: the pin is staged
+because you need the new corpus in order to repair the citations against it.
+
 ## When to run the validation tests
 
 **Run `tests/VALIDATION-TESTS.md` after any change to `CLAUDE.md`, to `governance/`, to a `SKILL.md`
