@@ -299,7 +299,11 @@ test('a launcher that names a sentence the generator does not have is an error, 
   }
 });
 
-test('the network probe believes git\'s exit code, and says which failure it was', () => {
+test('the network probe believes git\'s exit code, and says which failure it was', {
+  // bootstrap.sh is the POSIX launcher and the stub is a `#!/bin/sh` script; the Windows
+  // twin of this assertion is the windows-launcher job, which runs the real .ps1.
+  skip: process.platform === 'win32' ? 'POSIX launcher; the .ps1 is proved in CI' : false,
+}, () => {
   // The bug this pins, found by the Windows job: `ls-remote --exit-code -h <url> HEAD` matches no
   // HEAD ref, so git exits 2 and prints NOTHING. bash read only stderr and called that reachable;
   // the PowerShell port read only the exit code and called a working network unreachable. Same
@@ -389,6 +393,10 @@ test('the Windows launcher is a launcher too — the budget, with the region rep
   // PowerShell is wordier than bash for the same work — `[ordered]@{}` state, typed parameters, a
   // `switch -Regex` — so the budget is its own rather than bash's 180. The total is reported so the
   // number is a measurement rather than a target to game.
-  assert.ok(lines - generated <= 250,
+  // Raised from 250 to 265 when the one JSON writer landed (`Set-Content -Encoding UTF8` is
+  // BOM'd on 5.1, which Node then refuses): eight lines, five of them the comment that records
+  // why. Deleting the explanation to hold a number would be the wrong trade — the budget exists
+  // to stop a launcher becoming an application, and the total is printed either way.
+  assert.ok(lines - generated <= 265,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
 });

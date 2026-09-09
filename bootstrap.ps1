@@ -30,6 +30,14 @@ $MSG_CITATIONS = 'citations: not verified until Node 20+ is installed'
 $Mode = 'design'; $Docs = 'sparse'; $Yes = $false; $Reset = $false; $SkipClaude = $false
 $NodeOnly = $false; $Orig = @()
 
+# `Set-Content -Encoding UTF8` on 5.1 means UTF-8 WITH a BOM, and every file written below is
+# read back by something that calls JSON.parse — where a leading BOM is a syntax error, not a
+# hint. .NET writes it without one. (Found by CI: Node refused the state this file had just
+# written, on the only platform that could have shown it.)
+function Write-Json([string]$Path, $Value, [int]$Depth) {
+  $json = $Value | ConvertTo-Json -Depth $Depth
+  [System.IO.File]::WriteAllText($Path, $json, (New-Object System.Text.UTF8Encoding($false)))
+}
 function Say([string]$Text) { Write-Host $Text }
 function Step([string]$Id, [string]$Title, [string]$Status) { Write-Host ("[{0}/09] {1} … {2}" -f $Id, $Title, $Status) }
 function Die([string]$Id, [string]$Cause, [string]$Remedy, [int]$Code) {
@@ -184,7 +192,7 @@ function Save-State {
     startedAt = $Started; updatedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
     steps = $StepStates
   }
-  $state | ConvertTo-Json -Depth 5 | Set-Content -Path "$Root\.local\bootstrap-state.json" -Encoding UTF8
+  Write-Json "$Root\.local\bootstrap-state.json" $state 5
 }
 function Record([string]$Id, [string]$Status) {
   $StepStates[$Id] = [ordered]@{
@@ -228,7 +236,7 @@ $LocalSettings = "$Root\.claude\settings.local.json"
 if (-not (Test-Path $LocalSettings)) {
   # S-05 variant B with no Node: the disable toggle only. No hook — nothing could run it.
   $toggle = [ordered]@{ disabledMcpjsonServers = @($SERVER_KEY) }
-  $toggle | ConvertTo-Json -Depth 3 | Set-Content -Path $LocalSettings -Encoding UTF8
+  Write-Json $LocalSettings $toggle 3
 } else {
   $existing = Get-Content $LocalSettings -Raw
   if (($existing -match '"disabledMcpjsonServers"') -and ($existing -match ('"' + $SERVER_KEY + '"'))) {
@@ -241,7 +249,7 @@ $config = [ordered]@{
   version = 1; mode = 'design-only'; defaultInstance = $null; registration = 'project'
   updatedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 }
-$config | ConvertTo-Json -Depth 3 | Set-Content -Path "$Root\.local\config.json" -Encoding UTF8
+Write-Json "$Root\.local\config.json" $config 3
 Step 'B07' 'toggles' 'ok'; Record 'B07' 'ok'
 
 $cache = [ordered]@{
@@ -254,7 +262,7 @@ $cache = [ordered]@{
   )
   summary = [ordered]@{ ok = 3; warn = 0; fail = 0 }
 }
-$cache | ConvertTo-Json -Depth 5 | Set-Content -Path "$Root\.local\doctor-last.json" -Encoding UTF8
+Write-Json "$Root\.local\doctor-last.json" $cache 5
 Step 'B09' 'summary' 'ok'; Record 'B09' 'ok'
 Say $MSG_DOCTOR
 Say $MSG_MODE

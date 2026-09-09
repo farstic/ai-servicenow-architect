@@ -277,6 +277,15 @@ jobs:
       - name: The state it wrote says powershell, and Node reads it
         shell: powershell
         run: |
+          # The bug this pins: `Set-Content -Encoding UTF8` on 5.1 writes a BOM, and JSON.parse
+          # calls a BOM a syntax error rather than a hint. Every file the launcher writes here is
+          # read back by Node or by Claude Code.
+          foreach ($f in '.local\bootstrap-state.json', '.local\config.json', '.local\doctor-last.json') {
+            $b = [System.IO.File]::ReadAllBytes((Resolve-Path $f))
+            if ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) {
+              Write-Host ("BOM in " + $f); exit 1
+            }
+          }
           $s = Get-Content .\.local\bootstrap-state.json -Raw | ConvertFrom-Json
           Write-Host ("writer={0} mode={1} fileModes={2}" -f $s.writer, $s.mode, $s.fileModes)
           if ($s.writer -ne 'powershell') { exit 1 }
