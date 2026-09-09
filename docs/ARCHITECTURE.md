@@ -168,6 +168,21 @@ proposal (principle 10), and `--yes` applies exactly what it printed.
 5. **Never commits.** History (`docs/plans`, `docs/spikes`, `docs/decisions`, the changelog,
    RELICENSING) is never scanned, listed or edited: it records what was true when it was written.
 
+### The weekly bump
+
+`.github/workflows/docs-bump.yml` (Mondays 05:17 UTC, plus `workflow_dispatch` with `to` and
+`dry_run`) runs the refresh on a clean runner and opens **one** pull request — branch
+`chore/docs-bump-<short>`, stable per target SHA, so a re-run updates rather than duplicates and a
+newer tip closes the older PR as superseded. `scripts/docs-bump.mjs` is a thin wrapper: it renders
+the pull-request body from S07's report **verbatim inside a fence** and decides nothing. Labels are
+`docs-corpus`, plus `needs-remap` when a citation broke.
+
+**It never merges.** A bump changes what every gateway skill is grounded in; the PR's own CI goes red
+on a dead citation and stays red until a human remaps it. A **dry run** exits 0 with the body in the
+log and a `::warning::` for newly dead citations — reporting is its job, and the red build belongs on
+the pull request where someone can act on it. Exit 6 fails the job loudly; exit 4 cannot happen on a
+fresh checkout and is treated as a bug in the recipe if it does.
+
 ### Exit codes — every `docs` sub-command shares one table
 
 | Code | Meaning |

@@ -1,0 +1,143 @@
+name: docs-bump
+
+# The monthly refresh that P-11 records as never having been executed — as a schedule instead of an
+# intention. It opens a pull request and never merges it: a corpus bump changes what every gateway
+# skill is grounded in, and that is a review, not a deployment.
+#
+# Before ARC-06 there is no `./snowarch` launcher, so the steps below call `node scripts/…` directly.
+# ARC-06-S06 flips them to the launcher form; the scripts themselves do not change.
+
+on:
+  schedule:
+    # Mondays 05:17 UTC — off the hour, because every workflow scheduled on the hour queues behind
+    # every other workflow scheduled on the hour.
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      to:
+        description: 'Target SHA (default: the family branch tip)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Print the PR body and open nothing'
+        required: false
+        default: false
+        type: boolean
+
+# One bump at a time, and a running one is never cancelled: it may already have pushed a branch.
+concurrency:
+  group: docs-bump
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    name: bump the docs pin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The corpus is fetched by `docs sync` at the pin, not by the checkout: a submodule
+          # checkout here would clone the whole history before the sparse recipe could avoid it.
+          submodules: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+
+      - name: Obtain the corpus at the current pin
+        run: node scripts/docs.mjs sync
+
+      - name: Refresh the pin and render the pull-request body
+        id: bump
+        run: |
+          set +e
+          node scripts/docs-bump.mjs \
+            ${{ inputs.to && format('--to {0}', inputs.to) || '' }} \
+            ${{ inputs.dry_run && '--dry-run' || '' }} \
+            --json --body-out body.md
+          code=$?
+          set -e
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          # 0 = clean move or nothing to do · 1 = the pin moved and citations broke (a pull request
+          # still opens; its own CI goes red, which is the point) · 6 = the upstream does not have
+          # what we asked for, and there is nothing to review. 4 cannot happen on a fresh runner —
+          # the checkout is clean — so it is a bug in the recipe rather than an operator's state.
+          if [ "$code" = "6" ]; then exit 1; fi
+          if [ "$code" = "4" ]; then
+            echo "::error::docs-bump exited 4 (dirty tree) on a fresh runner — that should be impossible"
+            exit 1
+          fi
+          if [ "$code" != "0" ] && [ "$code" != "1" ]; then exit "$code"; fi
+
+      - name: Read what the refresh decided
+        id: plan
+        run: |
+          node -e '
+            const b = JSON.parse(require("node:fs").readFileSync("bump.json", "utf8"));
+            const set = (k, v) => require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, `${k}=${v}\n`);
+            set("from", b.from); set("to", b.to);
+            set("short", b.to.slice(0, 7));
+            set("moved", String(b.from !== b.to));
+            set("newly_dead", String(b.newlyDead.length));
+            set("date", b.upstreamDate);
+          '
+
+      - name: Nothing to do
+        if: steps.plan.outputs.moved != 'true'
+        run: echo "corpus already at upstream tip (${{ steps.plan.outputs.short }})"
+
+      - name: Dry run — the body, and no pull request
+        if: inputs.dry_run
+        run: |
+          echo "dry run: opened nothing, pushed nothing"
+          cat body.md
+
+      - name: Open or update the pull request
+        if: ${{ !inputs.dry_run && steps.plan.outputs.moved == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: chore/docs-bump-${{ steps.plan.outputs.short }}
+          SHORT: ${{ steps.plan.outputs.short }}
+          DATE: ${{ steps.plan.outputs.date }}
+          NEWLY_DEAD: ${{ steps.plan.outputs.newly_dead }}
+        run: |
+          set -euo pipefail
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+
+          # The branch name is stable per target SHA, so a second run against the same tip updates
+          # one pull request instead of opening a second.
+          git switch -c "$BRANCH" 2>/dev/null || git switch "$BRANCH"
+          git commit -m "chore(docs): bump ServiceNowDocs to $SHORT ($DATE)" \
+            -m "Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          git push -u origin "$BRANCH" --force-with-lease
+
+          gh label create docs-corpus --color 0e8a16 --description 'ServiceNowDocs corpus' 2>/dev/null || true
+          gh label create needs-remap --color d93f0b --description 'A citation broke and needs remapping' 2>/dev/null || true
+
+          labels=docs-corpus
+          if [ "$NEWLY_DEAD" != "0" ]; then labels="$labels,needs-remap"; fi
+
+          existing=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --body-file body.md --add-label "$labels"
+            echo "PR #$existing up to date"
+            number="$existing"
+          else
+            number=$(gh pr create --base develop --head "$BRANCH" \
+              --title "chore(docs): bump ServiceNowDocs to $SHORT ($DATE)" \
+              --body-file body.md --label "$labels" | grep -oE '[0-9]+$')
+            echo "opened PR #$number"
+          fi
+
+          # One open bump at a time: an older target is superseded, not left to rot beside the new
+          # one. Closed with a comment rather than deleted, so the trail survives.
+          for other in $(gh pr list --state open --json number,headRefName \
+              --jq ".[] | select(.headRefName | startswith(\"chore/docs-bump-\")) | select(.number != $number) | .number"); do
+            gh pr close "$other" --comment "superseded by #$number"
+          done

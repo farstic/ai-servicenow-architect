@@ -13,6 +13,23 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Added
 
+- **The weekly docs bump, as a schedule rather than an intention.** P-11 records a monthly refresh
+  ritual that was never executed; `.github/workflows/docs-bump.yml` runs it on Mondays at 05:17 UTC
+  and opens one pull request. **It never merges.**
+  - `scripts/docs-bump.mjs` is a thin wrapper. Everything that decides anything stays in the
+    upstream refresh; this renders the pull-request body — a three-item checklist, then S07's report
+    **verbatim inside a fence**, so a reviewer comparing it against a local run finds the same bytes.
+  - One bump at a time: the branch is named for the target SHA, so a re-run updates the PR instead
+    of opening a second, and a newer tip closes the older one as `superseded by #<n>`.
+  - A **dry run** exits 0 with the body in the log and a `::warning::` annotation for newly dead
+    citations — reporting is its job, and the red build belongs on the pull request where someone
+    can act on it. Exit 6 fails the job loudly; exit 4 cannot happen on a fresh checkout and is
+    treated as a bug in the recipe if it ever does.
+  - `actionlint` joins CI. The workflows are code, this one has a multi-line shell step with `gh`
+    calls and expression interpolation, and nothing else was checking them.
+  - Tests stub `gh` with a script on PATH that records its argv — never the real one. A test that
+    could open a pull request would defeat the point of a workflow that never merges.
+
 - **`docs family <name>` — the release-family switch, proposed before it is applied.** The dry run
   is the proposal and `--yes` applies exactly what it printed; no line is edited that was not shown.
   - **EDIT only when the matched phrase is the line's ONLY family mention.** Anything else —

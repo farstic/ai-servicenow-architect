@@ -805,6 +805,19 @@ Exit 2 means you asked without `--yes` and got the plan. Exit 6 means the branch
 Exit 1 means a lint failed with the edits staged: fix what it named, or abandon with the two
 commands the output prints.
 
+## Reviewing a docs-bump PR
+
+`.github/workflows/docs-bump.yml` runs on Mondays at 05:17 UTC and opens one pull request when
+upstream has moved. It never merges anything.
+
+- **Read the fenced report first.** It is `docs sync --upstream`'s output verbatim — the same bytes
+  you would get running it locally. `newly dead (n)` is the whole reason the PR exists.
+- **Remap the citations on the PR's branch**, then push. The `needs-remap` label and the red
+  `docs-check` job both clear when `docs verify` reports `dead: 0`.
+- **One bump at a time.** The branch is named for the target SHA, so a re-run against the same tip
+  updates the PR rather than opening another; a newer tip closes the older one with `superseded
+  by #<n>`. If you see two open, something went wrong — say so rather than merging both.
+
 ## Refreshing the corpus
 
 Monthly, or when a citation goes dead upstream. Five steps, and the tool does the first one only:

@@ -164,6 +164,23 @@ jobs:
       # same tree, ARC-01-S05), so only the content figure is comparable across the matrix.
       - run: node scripts/ci/footprint.mjs 80
 
+  actionlint:
+    # The workflows are code and nothing else checks them. ARC-03-S09 added a second workflow with a
+    # multi-line shell step, `gh` calls and expression interpolation — three things a typo survives
+    # in until the schedule fires at 05:17 on a Monday and nobody is looking.
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actionlint (pinned)
+        run: |
+          curl -sSfL -o /tmp/actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz
+          tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
+          /tmp/actionlint --version
+      - name: Lint every workflow
+        run: /tmp/actionlint -color
+
   secrets:
     name: secret scan
     runs-on: ubuntu-latest
