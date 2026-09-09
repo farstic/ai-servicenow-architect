@@ -13,6 +13,23 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Added
 
+- **`docs status`, `docs verify --json`, and one description of the corpus.**
+  `tools/snowarch/lib/docs/status.mjs` computes what the doctor and `/snowarch status` will both
+  quote — present, pinned, right family, correctly sparse, fully cited — instead of each re-deriving
+  it. Twenty keys, `schema: 1`, never a network call.
+  - Two distinctions the shape is built around. `mode` is what was **asked for** (ARC-06's state
+    file) and `sparse` is what is **on disk**; they can disagree, both are reported, and the
+    disagreement is the finding. `citations` is `null` under `verify: false` but **the key is always
+    present**, so a consumer can tell "not asked" from "asked and empty" — the doctor's `--quick`
+    path and the SessionStart banner depend on that difference.
+  - `familyMatches` comes from the tracked branch, not from HEAD: recipe C leaves a detached HEAD at
+    the pin, so HEAD says nothing about the family.
+  - `sync --json` now prints this object; S05's placeholder and its "replaced by S06" comment are
+    gone.
+  - `LEGACY_ROOTS` and `scanRepo`'s `legacy` flag are retired — ARC-02 deleted the root mirrors, and
+    a flag whose only value pointed at directories that no longer exist is a way to scan nothing and
+    report success.
+
 - **`docs sync` completed: modes, reconcile, refusal, failure mapping and a printable recipe.** S03
   delivered the checkout; this is the rest of it, in the same module rather than a second one.
   - `--mode sparse|full`, defaulting to `docs.mode` in `.local/bootstrap-state.json` when ARC-06 has

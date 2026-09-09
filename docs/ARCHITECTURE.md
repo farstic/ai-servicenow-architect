@@ -88,6 +88,43 @@ no empty directories, so a path appears in the repository only when its owner pu
 | `docs/MIGRATION.md` | **ARC-10** | migration and cutover |
 | `.local/` · `clients/` | — | **gitignored, per checkout**; never committed |
 
+## `docs status` and the `docsStatus()` shape
+
+**Computed here, wrapped by ARC-08.** `tools/snowarch/lib/docs/status.mjs` answers whether the corpus
+is present, pinned, on the right family, correctly sparse and fully cited. The doctor assigns check
+ids, severities and `--fix` actions to what it returns, and `/snowarch status` quotes the doctor —
+so there is one derivation of these facts, not three. It never touches the network; `--fetch` is
+ARC-03-S07's.
+
+```
+docs corpus: vendor/ServiceNowDocs
+  pin        ba513f2  gitlink ba513f2  HEAD ba513f2            ok
+  family     australia  branch australia                       ok
+  checkout   sparse (cone), 19/19 areas, 34,359 files, 179 MB  ok
+  citations  checked: 180 | dead: 0                            ok
+```
+
+Divergences print `MISMATCH` in the last column with the remedy on the next line — `run node
+scripts/docs.mjs sync`, except `pin ≠ gitlink`, which is a maintainer action
+(`node scripts/docs-bump.mjs --to <gitlink>`, owned by S07/S09). An absent corpus prints one
+`docs corpus: MISSING` block. Exit codes: **0** all ok · **1** any mismatch · **3** missing; `--json`
+exits 0 unless the command itself failed, so a caller reading the object always gets the object.
+
+**Schema v1.** Twenty keys, versioned so additions are non-breaking:
+
+| Key | Meaning |
+|---|---|
+| `present` · `path` | is there a corpus, and where |
+| `pin` · `gitlink` · `head` · `pinMatchesGitlink` · `headMatchesPin` | the three commits that must agree, and the two comparisons |
+| `family` · `branch` · `familyMatches` | recipe C leaves a DETACHED head, so the family comes from the tracked branch, not from HEAD |
+| `sparse` | `cone` · `full` · `pattern` · `none`. `pattern` is ADR-0008's shape — sparse on, cone off — reported separately because the remedy differs |
+| `areasExpected` · `areasPresent` · `areasMissing` | against the generated areas file |
+| `mode` | what was ASKED for (`.local/bootstrap-state.json`, written by ARC-06), inferred from the checkout when absent. `mode` and `sparse` can disagree, and both are reported: the disagreement is the finding |
+| `fileCount` · `sizeBytes` | opt-in — a 35k-file walk costs about a second and does not belong in a hook's budget |
+| `citations` | the S03 verify result, or `null` when `verify: false`. **The key is always present**, so a consumer distinguishes "not asked" from "asked and empty" |
+| `longpaths` | `true`/`false` on Windows, `null` elsewhere — the setting does not exist there, and `false` would read as "off" |
+| `schema` | `1` |
+
 ## The git-only corpus recipe
 
 ARC-06's launchers run this when Node is absent — `bootstrap.sh` on bash 3.2 (macOS ships it) and

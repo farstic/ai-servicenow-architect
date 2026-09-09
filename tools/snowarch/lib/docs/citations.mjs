@@ -99,7 +99,9 @@ export function extract(text, file = '<inline>') {
 export const DEFAULT_ROOTS = [
   '.claude/skills', '.claude/agents', 'governance', 'docs/PLATFORM-NOTES.md', 'CLAUDE.md',
 ];
-export const LEGACY_ROOTS = ['skills', 'agents'];   // the imported root mirrors; dropped when ARC-02 closes
+// The root `skills/` and `agents/` mirrors were scanned behind a `legacy` flag until ARC-02
+// deleted them (S01) and the ARC closed (2026-09-09). Both are gone: a flag whose only value
+// pointed at directories that no longer exist is a way to scan nothing and report success.
 
 function* walk(dir) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -130,8 +132,8 @@ export function findRootlessCitations(text, file = '<inline>', areas = new Set()
   return out;
 }
 
-export function scanRepo({ root = process.cwd(), roots = DEFAULT_ROOTS, legacy = false } = {}) {
-  const all = legacy ? [...roots, ...LEGACY_ROOTS] : roots;
+export function scanRepo({ root = process.cwd(), roots = DEFAULT_ROOTS } = {}) {
+  const all = roots;
   const citations = [], warnings = [], skipped = [], scanned = [];
   for (const r of all) {
     const abs = join(root, r);

@@ -9,6 +9,11 @@ import {
   CORPUS_DIR, EXIT, SyncError, classifyGitFailure, inspect, maskProxy, planRecipe, resolveMode,
   ROOT_FILES, syncCorpus,
 } from '../tools/snowarch/lib/docs/sync.mjs';
+// One fixture, shared with tests/docs-status.test.mjs — see tests/helpers/docs-fixture.mjs.
+import { AREAS, LONG_NAME, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
+
+let scratch, upstream, upstreamUrl;
+const workspace = () => makeWorkspace({ scratch, pin: upstream.pin, upstreamUrl });
 
 /**
  * The whole recipe, against a corpus we build ourselves.
@@ -25,86 +30,6 @@ import {
  * whose `.git` is a **file** rather than a directory (what `absorbgitdirs` leaves behind), so the
  * "is there a checkout here" probe is tested both ways.
  */
-const AREAS = ['markdown/alpha', 'markdown/beta', 'markdown/gamma'];
-// 197 characters, the longest path in the real corpus — the Windows long-path case, on the matrix.
-const LONG_NAME = `${'l'.repeat(197 - 'markdown/alpha/'.length - '.md'.length)}.md`;
-
-let scratch, upstream, upstreamUrl, work;
-
-/**
- * The fixture's own git, carrying `-c core.longpaths=true` on Windows exactly as the module does.
- *
- * Not defensive dressing — without it this fixture cannot be BUILT on `windows-latest`:
- * `git add -A` fails with `unable to index file` on the 197-character path, because a temp
- * directory prefix (`D:\a\…\Temp\snowarch-docs-sync-XXXXXX\src\`) is far longer than a normal
- * checkout prefix and the total passes 260. Worth recording against ARC-00 S-07 acceptance
- * criterion 2, which was refuted on the grounds that today's corpus fits: it fits under a SHORT
- * prefix. The margin is the prefix, and a temp directory eats it.
- */
-const git = (args, cwd) => execFileSync(
-  'git', process.platform === 'win32' ? ['-c', 'core.longpaths=true', ...args] : args,
-  { cwd, encoding: 'utf8', stdio: 'pipe' },
-);
-
-function buildUpstream(dir) {
-  const src = join(dir, 'src');
-  mkdirSync(src, { recursive: true });
-  git(['init', '-q', '-b', 'australia'], src);
-  git(['config', 'user.email', 'fixture@example.invalid'], src);
-  git(['config', 'user.name', 'fixture'], src);
-
-  // Content, not the filename: a `.gitignore` whose body is `.gitignore` ignores itself, so
-  // `git add -A` silently skips it and the completeness check then reports it missing — which it
-  // did, on the first run of this fixture. The checker was right; the fixture was wrong.
-  for (const f of ROOT_FILES) writeFileSync(join(src, f), `# fixture ${f}\n`);
-  for (const a of AREAS) {
-    mkdirSync(join(src, ...a.split('/')), { recursive: true });
-    writeFileSync(join(src, ...a.split('/'), 'index.md'), `# ${a}\n`);
-  }
-  writeFileSync(join(src, 'markdown/alpha', LONG_NAME), '# long\n');
-  git(['add', '-A'], src);
-  git(['commit', '-qm', 'first'], src);
-
-  // The pin is NOT the branch tip: it sits on a side branch, so a `--depth 1` clone of `australia`
-  // cannot have it and the fetch-by-hash step is genuinely exercised rather than skipped.
-  git(['checkout', '-q', '-b', 'side'], src);
-  writeFileSync(join(src, 'markdown/beta/extra.md'), '# extra\n');
-  git(['add', '-A'], src);
-  git(['commit', '-qm', 'the pinned commit'], src);
-  const pin = git(['rev-parse', 'HEAD'], src).trim();
-  git(['checkout', '-q', 'australia'], src);
-
-  const bare = join(dir, 'upstream.git');
-  git(['clone', '-q', '--bare', src, bare], dir);
-  return { bare, pin };
-}
-
-function makeWorkspace(pin) {
-  const w = mkdtempSync(join(scratch, 'work-'));
-  git(['init', '-q'], w);
-  mkdirSync(join(w, 'vendor'), { recursive: true });
-  writeFileSync(join(w, 'vendor/docs-areas.txt'), `${AREAS.join('\n')}\n`);
-  // The engine repository registers the corpus in `.gitmodules`, and recipe C's step 5
-  // (`submodule init`) is what clears the superproject's leading `-`. A fixture without the entry
-  // would exercise a path production never takes.
-  writeFileSync(join(w, '.gitmodules'),
-    `[submodule "${CORPUS_DIR}"]\n\tpath = ${CORPUS_DIR}\n\turl = ${upstreamUrl}\n\tbranch = australia\n\tshallow = true\n`);
-  git(['add', '.gitmodules', 'vendor/docs-areas.txt'], w);
-  // ...and the gitlink itself, unpopulated. A cloned engine repository arrives exactly like this:
-  // `.gitmodules` plus a 160000 index entry and no checkout, which is what makes `git submodule
-  // status` print a leading `-` until recipe C's step 5 runs. `update-index --cacheinfo` is how to
-  // produce that state without a corpus on disk yet.
-  git(['update-index', '--add', '--cacheinfo', '160000', pin, CORPUS_DIR], w);
-  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'fixture'], w);
-  assert.match(git(['submodule', 'status', CORPUS_DIR], w), /^-/, 'the fixture is not uninitialised');
-  return {
-    root: w,
-    config: {
-      docs: { family: 'australia', pin, areasFile: 'vendor/docs-areas.txt', upstream: upstreamUrl },
-    },
-  };
-}
-
 const silent = () => {};
 const corpusOf = (w) => join(w.root, CORPUS_DIR);
 
@@ -119,7 +44,7 @@ before(() => {
 after(() => { rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 
 test('AC 1 — a fresh sync lands at the pin, sparse, complete, initialised', () => {
-  const w = makeWorkspace(upstream.pin);
+  const w = workspace();
   const r = syncCorpus({ ...w, log: silent });
   const s = inspect(w.root, w.config, r.areas);
 
@@ -136,20 +61,26 @@ test('AC 1 — a fresh sync lands at the pin, sparse, complete, initialised', ()
 });
 
 test('AC 2 — a second run changes nothing, quickly, and says so', () => {
-  const w = makeWorkspace(upstream.pin);
+  const w = workspace();
   syncCorpus({ ...w, log: silent });
   const lines = [];
   const t = Date.now();
   const r = syncCorpus({ ...w, log: (l) => lines.push(l) });
   const elapsed = (Date.now() - t) / 1000;
 
+  // The substance is that NOTHING WAS DONE — `changed: false` and the up-to-date line. The story's
+  // "< 5 s" is a claim about the reference machine and is measured there and reported in the PR;
+  // asserted here it measures contention, not the subject. It failed at 20.5 s in the full suite
+  // while passing alone, once S06 added two more git-spawning files to the same parallel run.
+  // What stays is a hang detector: a second run that takes a minute is doing real work.
   assert.equal(r.changed, false, 'the second run reported a change');
-  assert.ok(elapsed < 5, `second run took ${elapsed.toFixed(1)} s`);
+  console.log(`    second run: ${elapsed.toFixed(1)} s`);
+  assert.ok(elapsed < 60, `second run took ${elapsed.toFixed(1)} s — it is not a no-op`);
   assert.deepEqual(lines, [`[docs] up to date (pin ${upstream.pin.slice(0, 7)}, sparse, ${AREAS.length} areas)`]);
 });
 
 test('AC 3 — a checkout at the wrong commit is returned to the pin by hash', () => {
-  const w = makeWorkspace(upstream.pin);
+  const w = workspace();
   syncCorpus({ ...w, log: silent });
   const corpus = corpusOf(w);
   const parent = git(['rev-parse', 'HEAD~1'], corpus).trim();
@@ -161,7 +92,7 @@ test('AC 3 — a checkout at the wrong commit is returned to the pin by hash', (
 });
 
 test('AC 4 — a narrowed sparse set is restored and the files come back', () => {
-  const w = makeWorkspace(upstream.pin);
+  const w = workspace();
   syncCorpus({ ...w, log: silent });
   const corpus = corpusOf(w);
   git(['sparse-checkout', 'set', '--cone', AREAS[0]], corpus);
@@ -174,7 +105,7 @@ test('AC 4 — a narrowed sparse set is restored and the files come back', () =>
 });
 
 test('AC 5 — full and sparse switch on the existing checkout, no re-clone', () => {
-  const w = makeWorkspace(upstream.pin);
+  const w = workspace();
   syncCorpus({ ...w, log: silent });
   const corpus = corpusOf(w);
   // `du` is not on Windows. Walked instead — one definition that works on every matrix cell.
@@ -207,7 +138,7 @@ test('AC 5 — full and sparse switch on the existing checkout, no re-clone', ()
 });
 
 test('AC 6 — a dirty tree is refused with the exact sentence, and nothing is touched', () => {
-  const w = makeWorkspace(upstream.pin);
+  const w = workspace();
   syncCorpus({ ...w, log: silent });
   const corpus = corpusOf(w);
   writeFileSync(join(corpus, 'README.md'), 'edited by a human\n');
@@ -226,17 +157,25 @@ test('AC 6 — a dirty tree is refused with the exact sentence, and nothing is t
 test('a pattern-mode sparse config is repaired to cone mode', () => {
   // ADR-0008's defect on git 2.34.1 stores --cone as a pattern. Simulated here by turning cone off,
   // because the reconcile has to cope with whatever the last git left behind.
-  const w = makeWorkspace(upstream.pin);
+  const w = workspace();
   syncCorpus({ ...w, log: silent });
   const corpus = corpusOf(w);
-  git(['config', 'core.sparseCheckoutCone', 'false'], corpus);
+  // `--worktree`, not a plain `config`: `sparse-checkout` turns on `extensions.worktreeConfig` and
+  // stores cone mode in `config.worktree`, which OUTRANKS the repository config. Writing the plain
+  // key leaves the effective value untouched — `git config --get` still answers `true` — so a test
+  // that flips it the obvious way asserts nothing at all.
+  //
+  // Found at ARC-03-S06: written the plain way, this test PASSED WITHOUT EXERCISING THE REPAIR —
+  // the checkout was never in pattern mode, so `coneOn` was true before the sync and true after.
+  git(['config', '--worktree', 'core.sparseCheckoutCone', 'false'], corpus);
+  assert.equal(inspect(w.root, w.config, AREAS).coneOn, false, 'the fixture did not leave cone mode');
 
   const r = syncCorpus({ ...w, log: silent });
   assert.equal(inspect(w.root, w.config, r.areas).coneOn, true);
 });
 
 test('the .git of the submodule is a file after absorbgitdirs, and inspect copes', () => {
-  const w = makeWorkspace(upstream.pin);
+  const w = workspace();
   syncCorpus({ ...w, log: silent });
   const dotGit = join(corpusOf(w), '.git');
   // absorbgitdirs replaces the directory with a `gitdir:` pointer file. Both shapes must read as
@@ -247,7 +186,7 @@ test('the .git of the submodule is a file after absorbgitdirs, and inspect copes
 });
 
 test('resolveMode: explicit wins, state file is read, skip is refused both ways', () => {
-  const w = makeWorkspace(upstream.pin);
+  const w = workspace();
   assert.equal(resolveMode(w.root), 'sparse');
   assert.equal(resolveMode(w.root, 'full'), 'full');
   assert.throws(() => resolveMode(w.root, 'skip'), /bootstrap flag/);
@@ -263,7 +202,7 @@ test('resolveMode: explicit wins, state file is read, skip is refused both ways'
 });
 
 test('the recipe printed for an existing checkout is shorter than for a fresh one', () => {
-  const w = makeWorkspace(upstream.pin);
+  const w = workspace();
   const fresh = planRecipe({ config: w.config, areas: AREAS, mode: 'sparse', state: { present: false } });
   syncCorpus({ ...w, log: silent });
   const state = inspect(w.root, w.config, AREAS);
