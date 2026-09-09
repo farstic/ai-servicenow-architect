@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -31,7 +31,14 @@ walk(join(repoRoot, 'tools', 'snowarch'));
 walk(join(repoRoot, 'tests'));
 walk(join(repoRoot, 'scripts'));
 
-const rel = (f) => f.slice(repoRoot.length + 1);
+/**
+ * Repo-relative, with forward slashes on every platform.
+ *
+ * `readdirSync` + `join` yields `tools\\snowarch\\…` on Windows, so comparing against a
+ * forward-slash literal failed there — in the very test whose subject is Windows path handling.
+ * The server suite learned the same thing at ARC-04 and its `rel()` does exactly this.
+ */
+const rel = (f) => f.slice(repoRoot.length + 1).split(sep).join('/');
 
 test('no module derives a path from import.meta.url with .pathname', () => {
   const hits = files
