@@ -50,6 +50,15 @@ export const GENERATORS = [
     targets: ['tools/snowarch/lib/text.json'],
   },
   {
+    // ARC-06-S10: the sentences `bootstrap.sh` prints. bash cannot read JSON, so they are generated
+    // into a marked region — the launcher runs on machines with no Node to check it, which is
+    // exactly where a drifted copy would go unnoticed.
+    id: 'gen-launcher-text',
+    script: 'scripts/gen-launcher-text.mjs',
+    supportsRoot: true,
+    targets: ['bootstrap.sh'],
+  },
+  {
     id: 'gen-retired-names',
     script: 'packages/contract/gen-retired-names.mjs',
     supportsRoot: false,

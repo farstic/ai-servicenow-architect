@@ -786,6 +786,18 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## Never edit the generated region of `bootstrap.sh`
+
+Everything between `# text-begin` and `# text-end` comes from `scripts/gen-launcher-text.mjs`, which
+reads `remedies.json`, `net-sentences.mjs` and `text.json`. Edit the source and run the generator;
+`npm run gen:check` fails otherwise, and `tests/launcher-parity.test.mjs` compares every sentence
+against its origin. The recipe is *sourced* from `tools/snowarch/launcher/docs-recipe.sh` — never
+pasted in.
+
+The launcher also has a line budget and a bash-3.2 constraint list, both enforced by that test. If
+you are adding a step to it, ask first whether the step belongs on the Node path instead: this file
+exists for the machines that cannot run the other one, not as a second implementation.
+
 ## The Mode line has one definition
 
 `Mode:` is quoted by the bootstrap's summary, the SessionStart banner, `/snowarch status` and

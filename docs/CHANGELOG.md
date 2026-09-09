@@ -29,6 +29,19 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **`./bootstrap.sh` — the launcher, and the Node-free design-only path.** With Node ≥ 20 it
+  `exec`s the Node CLI, forwarding every flag and exporting `CLAUDE_PROJECT_DIR` (the launcher's
+  spawn is our spawn). Without Node it finishes design-only itself in bash 3.2 — the version macOS
+  ships — with a test that greps for every forbidden 4.0+ construct and proves the grep is not
+  vacuous. **Nothing is written twice:** the recipe is *sourced* from the generated
+  `docs-recipe.sh`, and the sentences are generated into a marked region from `remedies.json`,
+  `net-sentences.mjs` and `text.json`, with a parity test comparing each against its source. This is
+  the file that runs on machines with no Node to check it, so a drifted copy would go unnoticed for
+  a release. **B07 without Node never merges**: it writes the disable toggle when the file is
+  absent, says `ok (already set)` when the toggle is there, and otherwise fails with the exact key
+  to add by hand — merging JSON in bash is how someone's settings get destroyed. The state and the
+  cache are written by heredoc in S03's and S08's schemas and the Node readers accept them, checked
+  against a fixture captured from a real bash-3.2 run.
 - **B09 — one verdict, one Mode line, and the exact next thing to type.** The `Mode:` line now has
   **one definition** (`lib/text.mjs`), quoted verbatim by four programs; the doctor's detailed
   variant appends its findings rather than being a second Mode line, and the ARC-02-S11 stub and the

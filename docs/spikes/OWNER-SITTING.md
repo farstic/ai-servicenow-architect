@@ -23,6 +23,14 @@
 > Part A is only the **2.1.214 floor row**, and only if the floor is still worth a second sitting.
 >
 > **Parts B, C and D are complete too (2026-09-07).** Nothing remains for this version.
+>
+> **The floor row, and what turns on it (added by ARC-06-S09, 2026-09-09).** The dialog count is
+> measured on 2.1.258: `live` = 1, `design` = 1, `control` = 2. The engine's floor is **2.1.214**,
+> whose row is still pending, and the bootstrap's closing block promises the measured number.
+> **If the floor repeat shows 2, `EXPECTED_DIALOGS` in `tools/snowarch/lib/text.mjs` becomes 2 and
+> the block grows its second sentence by itself** — no other change, because the sentence per dialog
+> is generated from that constant. Until then the install text states the measurement and names the
+> floor as where a second approval may still appear: a stated measurement, not a promise.
 > **Several steps were answered without you since this file was written and are struck out below** — do
 > not spend time on them.
 

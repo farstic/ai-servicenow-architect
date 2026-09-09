@@ -49,6 +49,14 @@ Windows), and **tree plus `.git`** is 302 MB macOS / 305 MB Ubuntu / 315 MB Wind
 takes the whole corpus instead: **447 MB and 48,997 files** (measured 2026-09-09 on the reference
 macOS machine — ARC-00 S-07 did not measure full mode).
 
+<!-- ARC-06-S13: move to docs/INSTALL.md -->
+**Install.** `git clone https://github.com/farstic/ai-servicenow-architect.git && cd
+ai-servicenow-architect && ./bootstrap.sh` — that is the whole thing. With Node.js 20+ present the
+launcher hands over to the Node CLI; without it, design-only completes anyway, which is the mode
+most people want. Starting `claude` afterwards shows **one dialog** (workspace trust), *measured on
+Claude Code 2.1.258*; the engine's floor is 2.1.214, where a second approval for the MCP server may
+still appear. The summary tells you which to expect before you start.
+
 <!-- ARC-06-S13: move to docs/INSTALL.md "Operators and CI" -->
 **Operators and CI — a live install with no keyboard.** `./snowarch bootstrap --mode live --yes
 --instance-file <path>` reads its connection details from a file instead of prompting, so a

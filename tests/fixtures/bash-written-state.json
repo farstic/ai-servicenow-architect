@@ -1,0 +1,85 @@
+{
+  "$comment": "Captured from a real bash-3.2 run of ./bootstrap.sh with Node absent from PATH. The Node readers must accept exactly this — see tests/launcher-parity.test.mjs.",
+  "state": {
+    "version": 1,
+    "product": "snowarch",
+    "mode": "design-only",
+    "docs": {
+      "mode": "skip",
+      "pin": "11b39be17307dd4b21df15a54e8011ae68f64dba"
+    },
+    "node": {
+      "present": false,
+      "version": null
+    },
+    "writer": "bash",
+    "platform": "darwin",
+    "registration": "project",
+    "registrationReason": "default",
+    "hooksDisabledByBootstrap": false,
+    "startedAt": "2026-09-09T18:25:19Z",
+    "updatedAt": "2026-09-09T18:25:19Z",
+    "steps": {
+      "B00": {
+        "status": "ok",
+        "inputsHash": null,
+        "finishedAt": "2026-09-09T18:25:19Z",
+        "durationMs": 0
+      },
+      "B01": {
+        "status": "ok",
+        "inputsHash": null,
+        "finishedAt": "2026-09-09T18:25:19Z",
+        "durationMs": 0
+      },
+      "B02": {
+        "status": "skipped",
+        "inputsHash": null,
+        "finishedAt": "2026-09-09T18:25:19Z",
+        "durationMs": 0
+      },
+      "B07": {
+        "status": "ok",
+        "inputsHash": null,
+        "finishedAt": "2026-09-09T18:25:19Z",
+        "durationMs": 0
+      },
+      "B09": {
+        "status": "ok",
+        "inputsHash": null,
+        "finishedAt": "2026-09-09T18:25:19Z",
+        "durationMs": 0
+      }
+    }
+  },
+  "cache": {
+    "version": 1,
+    "at": "2026-09-09T18:25:19Z",
+    "writer": "bootstrap",
+    "engineVersion": null,
+    "contractSha": null,
+    "mode": "design-only",
+    "checks": [
+      {
+        "id": "B01",
+        "status": "ok",
+        "detail": "workspace"
+      },
+      {
+        "id": "B02",
+        "status": "ok",
+        "detail": "docs"
+      },
+      {
+        "id": "B07",
+        "status": "ok",
+        "detail": "toggles"
+      }
+    ],
+    "summary": {
+      "ok": 3,
+      "warn": 0,
+      "fail": 0
+    }
+  }
+}
