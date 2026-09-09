@@ -2,18 +2,22 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import {
   SENTENCE, checkLocation, checkMode, presetsFrom, proposeFor, readInstanceFile,
 } from '../lib/instance-file.mjs';
 import { NO_TERMINAL, WIZARD_ABSENT, fromInstanceFile, run as runB06 } from '../lib/steps/B06.mjs';
 import { codeForStatus, probeAuth } from '../lib/probe-auth.mjs';
 import { redact, reset } from '../lib/redact.mjs';
+import { fileURLToPath } from 'node:url';
 import { startStub } from './fixtures/sn-stub.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
 
 const isWindows = process.platform === 'win32';
-const repoRoot = new URL('../../../', import.meta.url).pathname;
+// `fileURLToPath`, never `new URL(...).pathname`: on Windows the latter is `/D:/…`, a leading
+// slash before the drive letter, and joining it produced `D:\D:\a\…`. The repository documents
+// this trap in two other modules; I wrote the wrong one anyway.
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const contract = JSON.parse(readFileSync(join(repoRoot, 'packages/snowarch/dist/contract.json'), 'utf8'));
 
 /** Assembled, never spelled: written whole it matches this repository's own credential sweep. */
