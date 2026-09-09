@@ -88,6 +88,42 @@ no empty directories, so a path appears in the repository only when its owner pu
 | `docs/MIGRATION.md` | **ARC-10** | migration and cutover |
 | `.local/` · `clients/` | — | **gitignored, per checkout**; never committed |
 
+## The git-only corpus recipe
+
+ARC-06's launchers run this when Node is absent — `bootstrap.sh` on bash 3.2 (macOS ships it) and
+`bootstrap.ps1` on PowerShell 5.1. It is the **only** git-only sequence, and it is not a paraphrase
+of what `tools/snowarch/lib/docs/sync.mjs` does: `tests/docs-recipe.test.mjs` asserts this block is
+byte-identical to `node scripts/docs.mjs sync --print-recipe --mode sparse` on a tree with no
+checkout, which is the launcher's situation. Edit the module, regenerate, paste; never the reverse.
+
+The area list is one long line on purpose. `sparse-checkout set --cone` takes the directories as
+arguments, and a wrapped or reordered list is a different checkout.
+
+```sh
+git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs
+git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform
+git -C vendor/ServiceNowDocs fetch --depth 1 origin ba513f2c62d3698ef5bfdd8044110226b8419689
+git -C vendor/ServiceNowDocs checkout --detach ba513f2c62d3698ef5bfdd8044110226b8419689
+git submodule absorbgitdirs vendor/ServiceNowDocs
+git submodule init -- vendor/ServiceNowDocs
+```
+
+Then the launcher checks only that each line of `vendor/docs-areas.txt` exists as a directory under
+`vendor/ServiceNowDocs/markdown/`, and prints `citations: not verified until Node 20+ is installed`
+— citation verification needs the corpus reader, which needs Node.
+
+**On Windows the sequence above gains one line**, and the PowerShell launcher must run it after the
+clone — a single block cannot be byte-identical on both platforms, so this one is the POSIX form:
+
+```powershell
+git -C vendor/ServiceNowDocs config core.longpaths true
+```
+
+The module also adds `-c core.longpaths=true` to every git call it makes on `win32`. ARC-00 S-07 acceptance criterion 2 was **refuted** — every recipe passed on
+`windows-latest` with the setting off, because the longest corpus path (197 characters) plus a
+checkout prefix still fits in 260. It is kept for the margin, not for a failure anyone can
+reproduce today; the reasoning is in the module so it is not removed as dead weight.
+
 ## Roster
 
 Generated from the directory listing by `scripts/gen-roster.mjs`, and checked by `npm run lint`.
