@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -31,7 +31,20 @@ const LONG_NAME = `${'l'.repeat(197 - 'markdown/alpha/'.length - '.md'.length)}.
 
 let scratch, upstream, upstreamUrl, work;
 
-const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
+/**
+ * The fixture's own git, carrying `-c core.longpaths=true` on Windows exactly as the module does.
+ *
+ * Not defensive dressing — without it this fixture cannot be BUILT on `windows-latest`:
+ * `git add -A` fails with `unable to index file` on the 197-character path, because a temp
+ * directory prefix (`D:\a\…\Temp\snowarch-docs-sync-XXXXXX\src\`) is far longer than a normal
+ * checkout prefix and the total passes 260. Worth recording against ARC-00 S-07 acceptance
+ * criterion 2, which was refuted on the grounds that today's corpus fits: it fits under a SHORT
+ * prefix. The margin is the prefix, and a temp directory eats it.
+ */
+const git = (args, cwd) => execFileSync(
+  'git', process.platform === 'win32' ? ['-c', 'core.longpaths=true', ...args] : args,
+  { cwd, encoding: 'utf8', stdio: 'pipe' },
+);
 
 function buildUpstream(dir) {
   const src = join(dir, 'src');
@@ -164,7 +177,21 @@ test('AC 5 — full and sparse switch on the existing checkout, no re-clone', ()
   const w = makeWorkspace(upstream.pin);
   syncCorpus({ ...w, log: silent });
   const corpus = corpusOf(w);
-  const gitSize = () => Number(execFileSync('du', ['-sk', join(corpus, '.git')], { encoding: 'utf8' }).split(/\s+/)[0]);
+  // `du` is not on Windows. Walked instead — one definition that works on every matrix cell.
+  const gitSize = () => {
+    let kb = 0;
+    const walk = (d) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        const q = join(d, e.name);
+        if (e.isDirectory()) walk(q);
+        else if (e.isFile()) kb += statSync(q).size / 1024;
+      }
+    };
+    // `absorbgitdirs` has already turned `<corpus>/.git` into a POINTER FILE; the objects live under
+    // the superproject's `.git/modules/…`. Ask git where they are rather than assuming a directory.
+    walk(git(['rev-parse', '--absolute-git-dir'], corpus).trim());
+    return kb;
+  };
   const before = gitSize();
 
   syncCorpus({ ...w, mode: 'full', log: silent });
