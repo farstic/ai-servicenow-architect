@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DESIGN_CACHE_STEPS, doctorCounts, run as runB09, warningsFrom } from '../lib/steps/B09.mjs';
-import { EXPECTED_DIALOGS, summaryBlock } from '../lib/text.mjs';
+import { EXPECTED_DIALOGS, spellings, summaryBlock } from '../lib/text.mjs';
 import { cachePath } from '../lib/doctor-cache.mjs';
 import { bootstrapCommand } from '../lib/bootstrap.mjs';
 import { commandArgs, makeCheckout, recorder } from './helpers/workspace.mjs';
@@ -161,7 +161,11 @@ test('AC 1 — the last five lines of a real run are the block', async () => {
   assert.match(last[0], /^DOCTOR: \d+ ok, \d+ warn, \d+ fail$/);
   assert.equal(last[1], 'Mode: design-only');
   assert.match(last[2], /^Next: run `claude` here\./);
-  assert.match(last[4], /Add a live instance later with \.\/snowarch mode live/);
+  // The spelling comes from `spellings()` for THIS shell, not from a POSIX literal: on the Windows
+  // runner the block correctly says `snowarch.cmd`, and asserting `./snowarch` there was the test
+  // choosing a platform and then checking a different one.
+  assert.equal(last[4], `      Add a live instance later with ${spellings().cli} mode live, `
+    + 'or /snowarch setup-instance inside Claude.');
   // ...and the step line is above them, not below.
   assert.match(log.lines.at(-6), /^\[B09\/09\] summary … ok/);
 });
