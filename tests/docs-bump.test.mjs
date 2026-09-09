@@ -277,6 +277,9 @@ test('a dry run restores the regenerated document too, not just the pin', () => 
     { cwd: w.root, encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: '' } });
 
   assert.match(r, /dry run — tree restored, porcelain empty, nothing staged/);
+  // Bytes, not a normalised comparison: the fixture workspace pins `eol=lf` exactly as this
+  // repository does, so a document that came back with different line endings would be a fixture
+  // that stopped modelling the real one — worth failing over rather than papering over.
   assert.equal(read(w.root, RECIPE_TARGET), before, 'the document was left modified');
   assert.equal(JSON.parse(read(w.root, 'engine.config.json')).docs.pin, pinBefore);
   assert.equal(git(['status', '--porcelain'], w.root).trim(), '');
