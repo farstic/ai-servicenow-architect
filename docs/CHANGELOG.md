@@ -13,6 +13,27 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Added
 
+- **The MCP registration travels with the clone.** `.mcp.json` and the non-permissions half of
+  `.claude/settings.json` are committed, secret-free and asserted — the first story of M3.
+  - `.mcp.json`: `stdio` · `node` · `${CLAUDE_PROJECT_DIR:-.}/packages/snowarch/dist/server.js`,
+    forward slashes only, every `${…}` carrying a `:-` default because an unset variable without one
+    is passed through as literal text. The `env` block is **`SNOW_STORE` and `SNOW_LOG_LEVEL` only**:
+    ARC-00 S-20 confirmed the spawned server inherits the launching shell's environment, so proxy
+    and CA variables need no repeating.
+  - `settings.json` gains `env.MCP_TIMEOUT: "120000"` — S-06's measurement, about 160× the worst
+    handshake over 27 runs on nine CI cells — beside the **generated** `permissions`. It stays
+    **hook-free** per S-05: a `SessionStart` hook in the committed file would run before Node is
+    known to exist.
+  - `tests/registration-files.test.mjs` asserts the server key against `engine.config.json` rather
+    than a literal, every placeholder's default, the S-20 key set, the absence of a `hooks` key, that
+    neither file carries a credential-shaped key or value, that both are tracked while
+    `settings.local.json` and `.local/` are ignored, and that a regeneration leaves `env` intact.
+  - **Engine lint L02 and L07 no longer SKIP.** Both `.mcp.json` legs run: eleven checks, no notes.
+  - **`~/.claude.json` is written by nothing here** — P-01's file. Measured: starting a session
+    changes exactly one top-level key, `cachedGrowthBookFeaturesAt`, the CLI's feature-flag cache.
+
+### Added
+
 - **The recipe, proved against the real corpus on three operating systems — and ARC-03 is complete.**
   `.github/workflows/docs-real.yml` fetches the actual 300 MB corpus on Ubuntu, macOS and Windows,
   weekly and whenever the code that decides the checkout changes. Measured on its first green run:

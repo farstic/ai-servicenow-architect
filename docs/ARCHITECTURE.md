@@ -88,6 +88,30 @@ no empty directories, so a path appears in the repository only when its owner pu
 | `docs/MIGRATION.md` | **ARC-10** | migration and cutover |
 | `.local/` · `clients/` | — | **gitignored, per checkout**; never committed |
 
+## Registration files
+
+Two files travel with the clone and one never does.
+
+**`.mcp.json`** registers the server: `stdio`, `node`, and
+`${CLAUDE_PROJECT_DIR:-.}/packages/snowarch/dist/server.js` — forward slashes, because Node accepts
+them on Windows and a backslash in JSON is an escape waiting to be got wrong. Every `${…}` carries a
+`:-` default, since an unset variable without one is passed through as the literal text. The `env`
+block holds `SNOW_STORE` and `SNOW_LOG_LEVEL` and nothing else: ARC-00 S-20 confirmed the spawned
+server **inherits** the launching shell's environment, so proxy and CA variables need no repeating
+(the story's other branch, listing them, belongs to the "forward" verdict we did not get).
+
+**`.claude/settings.json`** holds `permissions` — **generated** from the contract by
+`gen-governance.mjs`, never hand-written — and `env.MCP_TIMEOUT: "120000"`, which is ARC-00 S-06's
+measurement: about 160× the worst handshake observed over 27 runs on nine CI cells. It is
+**hook-free** by ARC-00 S-05: a `SessionStart` hook in the committed file would run before Node is
+known to exist, so the bootstrap writes it into the gitignored `settings.local.json` once Node ≥ 20
+is confirmed.
+
+**`~/.claude.json` is never written by anything here.** That file is why P-01 exists — the previous
+engine was registered by hand-editing it and ended up holding a plaintext password keyed on an
+absolute path. Measured on this checkout: starting a session changes exactly one top-level key,
+`cachedGrowthBookFeaturesAt`, the CLI's own feature-flag cache.
+
 ## Docs corpus: how the pin, the areas file and the gate relate
 
 Three artefacts, and the design is which of them may disagree with which.

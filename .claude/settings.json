@@ -401,5 +401,8 @@
       "mcp__servicenow__snow_ws_workspace_add",
       "mcp__servicenow__snow_ws_workspace_list_configure"
     ]
+  },
+  "env": {
+    "MCP_TIMEOUT": "120000"
   }
 }

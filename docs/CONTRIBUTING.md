@@ -786,6 +786,19 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## Editing the registration files
+
+**Never hand-edit `permissions` in `.claude/settings.json`.** It is generated from the server
+contract — 236 allow entries and 161 ask entries, regenerated whenever a tool's gate changes — and a
+hand-edit is overwritten by the next `npm run gen`. **`env` and `hooks` are yours**: the generator
+rewrites only the key it owns and carries the rest through, which is asserted by test rather than
+trusted.
+
+`.mcp.json` is hand-written and small. Every `${…}` must carry a `:-` default, no key may look like
+a credential, and the server key must equal `engine.config.json`'s `mcp.serverKey` — all three are
+enforced by `tests/registration-files.test.mjs`, and the engine lint's L02/L07 cross-check the key
+against the rule file and the pin.
+
 ## Switching release family
 
 `node scripts/docs.mjs family zurich --dry-run` first, always. It prints every edit it would make
