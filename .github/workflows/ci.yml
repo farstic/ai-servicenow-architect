@@ -262,7 +262,10 @@ jobs:
         # `Git\bin` and `Git\mingw64\bin` — the Git Bash tools — do not.
         run: |
           set "PATH=C:\Windows\system32;C:\Windows;C:\Program Files\Git\cmd"
-          where bash && exit /b 1
+          rem `C:\Windows\System32\bash.exe` is the WSL stub and is on every Windows machine, so
+          rem "no bash at all" is not a state a Windows user is ever in. What must be gone is GIT
+          rem Bash — the interpreter bootstrap.sh needs — and it is the one under \Git\.
+          where bash 2>nul | find /i "\Git\" >nul && exit /b 1
           where node && exit /b 1
           powershell -NoProfile -Command "Set-ExecutionPolicy Restricted -Scope Process -Force; Get-ExecutionPolicy -Scope Process"
           .\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check

@@ -299,6 +299,19 @@ test('a launcher that names a sentence the generator does not have is an error, 
   }
 });
 
+test('the Windows path never reaches for bash', () => {
+  // The CI job rebuilds PATH without Git Bash to prove this from the outside; this proves it from
+  // the inside, where no runner is needed. `C:\\Windows\\System32\\bash.exe` (the WSL stub) is on every
+  // Windows machine, so the environment can never assert the absence of `bash` itself — only that
+  // the launcher does not depend on the Git one.
+  const cmd = readFileSync(join(root, 'bootstrap.cmd'), 'utf8');
+  const sn = readFileSync(join(root, 'snowarch.cmd'), 'utf8');
+  for (const [name, doc] of [['bootstrap.ps1', ps1], ['bootstrap.cmd', cmd], ['snowarch.cmd', sn]]) {
+    const body = doc.split('\n').filter((l) => !/^\s*(#|rem )/i.test(l)).join('\n');
+    assert.ok(!/\b(bash|sh\.exe|bootstrap\.sh)\b/.test(body), `${name} invokes a POSIX shell`);
+  }
+});
+
 test('bootstrap.ps1 carries a UTF-8 BOM, because 5.1 reads a file without one as ANSI', () => {
   const bytes = readFileSync(join(root, 'bootstrap.ps1'));
   assert.deepEqual([...bytes.subarray(0, 3)], [0xEF, 0xBB, 0xBF],
