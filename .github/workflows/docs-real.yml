@@ -15,7 +15,11 @@ on:
     - cron: '41 4 * * 2'          # Tuesdays, a day after the bump, so a fresh pin gets exercised
   workflow_dispatch:
   pull_request:
-    paths: &trigger_paths
+    # Written out twice rather than shared by a YAML anchor: actionlint's schema check does not
+    # follow an alias here ("paths section must be sequence node but got alias node"), and a
+    # suppressed linter is worse than a repeated list. `tests/workflows.test.mjs` asserts the two
+    # copies are identical, so the duplication cannot drift.
+    paths:
       - 'tools/snowarch/lib/docs/**'
       - 'scripts/docs.mjs'
       - 'scripts/ci/assert-docs.mjs'
@@ -25,7 +29,14 @@ on:
       - '.github/workflows/docs-real.yml'
   push:
     branches: [main, develop]
-    paths: *trigger_paths
+    paths:
+      - 'tools/snowarch/lib/docs/**'
+      - 'scripts/docs.mjs'
+      - 'scripts/ci/assert-docs.mjs'
+      - 'vendor/docs-areas.txt'
+      - '.gitmodules'
+      - 'engine.config.json'
+      - '.github/workflows/docs-real.yml'
 
 concurrency:
   group: docs-real-${{ github.ref }}
