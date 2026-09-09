@@ -786,6 +786,24 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## A variable Claude Code sets per session is never read — it is set
+
+`CLAUDE_PROJECT_DIR` is the project root of the session that spawned the process. When one of our
+tools spawns something, **our tool is that session**, so an inherited value is somebody else's
+answer to our question. Every child goes through `childEnv(root, extra)` in
+`tools/snowarch/lib/spawn-env.mjs`, which pins it to the checkout.
+
+This is not hypothetical and it is not visible where most people work. Inside a Claude Code session
+pointed at another repository, the inherited value made B08 spawn
+`…/other-repo/packages/snowarch/dist/server.js` — `Cannot find module`, exit 1 — and would have made
+the server CLI read and write **that repository's** `.local/instances.json`, because the server
+resolves its store as `<CLAUDE_PROJECT_DIR ?? cwd>/.local/instances.json`. In a plain terminal and
+in CI the variable is unset, so everything passes. `tools/snowarch/tests/spawn-env.test.mjs` plants
+a bogus value and asserts every spawn's environment carries the checkout.
+
+The `${CLAUDE_PROJECT_DIR}` in `.mcp.json` and in the SessionStart hook command is a different
+thing: those are templates **Claude Code expands itself**, and they are correct as they stand.
+
 ## B08 spawns the server; it never imports it
 
 The server package has an in-process doctor, and reusing it from B08 would prove that a library

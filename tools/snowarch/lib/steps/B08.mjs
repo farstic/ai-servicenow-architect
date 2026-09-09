@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url';
 import { contractSha, version as engineVersion } from '../config.mjs';
 import { writeDoctorCache } from '../doctor-cache.mjs';
 import { HandshakeError, handshake, serverCommand } from '../mcp-handshake.mjs';
+import { childEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
 
 export const id = 'B08';
@@ -112,8 +113,10 @@ export function runProbes(root, { run = spawnSync } = {}) {
   const cli = join(root, 'packages', 'snowarch', 'dist', 'cli', 'index.js');
   if (!existsSync(cli)) return { status: 'unavailable', probes: null };
 
-  const help = run(process.execPath, [cli, 'instance', '--help'],
-    { encoding: 'utf8', stdio: 'pipe', cwd: root });
+  // Every child is TOLD which checkout it serves: the server CLI resolves its store from
+  // `CLAUDE_PROJECT_DIR`, so an inherited value would have it read another repository's store.
+  const options = { encoding: 'utf8', stdio: 'pipe', cwd: root, env: childEnv(root) };
+  const help = run(process.execPath, [cli, 'instance', '--help'], options);
   // ARC-07-S06 adds `instance test`. Until it does, the cache records "unavailable" and the step
   // warns: a probe that does not exist yet is not a failed probe, and calling it a FAIL would stop
   // installations for a feature nobody has promised yet.
@@ -121,15 +124,13 @@ export function runProbes(root, { run = spawnSync } = {}) {
     return { status: 'unavailable', probes: null };
   }
 
-  const list = run(process.execPath, [cli, 'instance', 'list', '--json'],
-    { encoding: 'utf8', stdio: 'pipe', cwd: root });
+  const list = run(process.execPath, [cli, 'instance', 'list', '--json'], options);
   let labels = [];
   try { labels = (JSON.parse(list.stdout ?? '[]').instances ?? []).map((i) => i.label); } catch { /* none */ }
 
   const probes = {};
   for (const label of labels) {
-    const out = run(process.execPath, [cli, 'instance', 'test', label, '--json'],
-      { encoding: 'utf8', stdio: 'pipe', cwd: root });
+    const out = run(process.execPath, [cli, 'instance', 'test', label, '--json'], options);
     try { probes[label] = JSON.parse(out.stdout ?? '{}'); } catch { probes[label] = { error: 'unparsable' }; }
   }
   return { status: 'ok', probes };

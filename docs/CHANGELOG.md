@@ -29,6 +29,15 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **Every child the bootstrap spawns is now TOLD which checkout it serves.** `CLAUDE_PROJECT_DIR`
+  is the project root of the session that spawned a process, so when our tools spawn something they
+  *are* that session and an inherited value is somebody else's answer. Read from the environment, it
+  made B08 start a server from whichever repository the surrounding Claude Code session was in
+  (`Cannot find module`, exit 1) and would have made the server CLI read and write **that**
+  repository's `.local/instances.json`. Invisible in a plain terminal and in CI, where the variable
+  is unset — found by a reviewer running the tests inside a session, which is the context ARC-07 and
+  ARC-08 will live in. One helper (`childEnv`) now serves every spawn, npm included, and a test
+  plants a bogus value.
 - **B08 — the server started the way Claude Code will start it.** `lib/mcp-handshake.mjs` speaks
   newline-delimited JSON-RPC over a real child's stdio, stdlib only, with cursor pagination, one
   retry on an EPIPE at spawn, and every exit through one settle under one deadline. B08 **spawns

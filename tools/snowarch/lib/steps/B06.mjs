@@ -14,6 +14,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { codeForStatus, probeAuth } from '../probe-auth.mjs';
 import { readInstanceFile, SENTENCE } from '../instance-file.mjs';
+import { childEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
 
 export const id = 'B06';
@@ -61,7 +62,7 @@ export function wizardAvailable(root, { run = spawnSync } = {}) {
   const cli = join(root, CLI);
   if (!existsSync(cli)) return false;
   const r = run(process.execPath, [cli, 'instance', '--help'],
-    { encoding: 'utf8', stdio: 'pipe', cwd: root });
+    { encoding: 'utf8', stdio: 'pipe', cwd: root, env: childEnv(root) });
   return /\badd\b/.test(`${r.stdout ?? ''}${r.stderr ?? ''}`);
 }
 
@@ -135,7 +136,8 @@ export const run = async (ctx) => {
   // afterwards — never a URL, a username or a credential.
   const spawn = ctx.spawn ?? spawnSync;
   const r = spawn(process.execPath, [join(ctx.root, CLI), 'instance', 'add', '--from-bootstrap'],
-    { stdio: 'inherit', cwd: ctx.root });
+    // The wizard writes the store; it must write THIS checkout's.
+    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) });
   if (r.status !== 0) {
     return { status: 'fail', remedy: null,
       detail: `the instance wizard exited ${r.status ?? 'abnormally'} — nothing was saved by B06` };

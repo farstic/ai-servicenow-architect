@@ -101,8 +101,10 @@ test('a tools/call result comes back parsed, and a non-JSON one is not a crash',
 
 test('the placeholder expansion is Claude Code\'s, defaults and all', () => {
   assert.equal(expand('${CLAUDE_PROJECT_DIR:-.}/x', {}, '/repo'), '/repo/x');
+  // INHERITED VALUES ARE IGNORED. Claude Code sets this per session; when we spawn the server we
+  // are that session, so somebody else's value is never the answer to our question.
   assert.equal(expand('${CLAUDE_PROJECT_DIR:-.}/x', { CLAUDE_PROJECT_DIR: '/elsewhere' }, '/repo'),
-    '/elsewhere/x');
+    '/repo/x');
   // An unset variable becomes its DEFAULT, not the literal characters — which is what a naive
   // expansion hands the server as a path.
   assert.equal(expand('${SNOW_STORE:-}', {}, '/repo'), '');
@@ -118,8 +120,11 @@ test('serverCommand builds the spawn .mcp.json describes, and refuses a key it l
   const cmd = serverCommand({ mcp, serverKey: config.mcp.serverKey, root: '/repo', env: {} });
   assert.equal(cmd.command, 'node');
   assert.deepEqual(cmd.args, ['/repo/packages/snowarch/dist/server.js']);
-  assert.deepEqual(Object.keys(cmd.env).sort(), ['SNOW_LOG_LEVEL', 'SNOW_STORE']);
+  assert.deepEqual(Object.keys(cmd.env).sort(),
+    ['CLAUDE_PROJECT_DIR', 'SNOW_LOG_LEVEL', 'SNOW_STORE'],
+    'the session variable is added deliberately, not inherited');
   assert.equal(cmd.env.SNOW_STORE, '', 'the unset default');
+  assert.equal(cmd.env.CLAUDE_PROJECT_DIR, '/repo', 'set for the child, never inherited');
   assert.throws(() => serverCommand({ mcp, serverKey: 'not-registered', root: '/repo' }),
     /has no "not-registered" server/);
 });
@@ -150,4 +155,44 @@ test('AC 2 — the REAL server, unconfigured, advertises exactly the core set', 
   assert.equal(r.exited, 'clean');
   // The server logs its store path to stderr; the handshake redacts every line before it is kept.
   assert.ok(!r.stderr.includes('Basic '), r.stderr.slice(0, 120));
+});
+
+test('a session variable from the surrounding Claude Code session is never ours', () => {
+  // The defect this pins: inside a Claude Code session `CLAUDE_PROJECT_DIR` is the SESSION's
+  // project directory, which may be a different repository entirely. Reading it made the bootstrap
+  // spawn `…/other-repo/packages/snowarch/dist/server.js` — `Cannot find module`, exit 1 — and it
+  // was invisible in a plain terminal and in CI, where the variable is unset.
+  const mcp = JSON.parse(readFileSync(join(repoRoot, '.mcp.json'), 'utf8'));
+  const config = JSON.parse(readFileSync(join(repoRoot, 'engine.config.json'), 'utf8'));
+  const bogus = { CLAUDE_PROJECT_DIR: '/nonexistent/some-other-repository' };
+
+  const cmd = serverCommand({ mcp, serverKey: config.mcp.serverKey, root: '/repo', env: bogus });
+
+  assert.deepEqual(cmd.args, ['/repo/packages/snowarch/dist/server.js'],
+    'the args resolved against the inherited value');
+  assert.equal(cmd.env.CLAUDE_PROJECT_DIR, '/repo',
+    'the child must be TOLD which project it serves, not left to inherit one');
+  assert.ok(!JSON.stringify(cmd).includes('some-other-repository'), JSON.stringify(cmd));
+});
+
+test('AC 2 again, with a bogus session variable in the test\'s own environment', async () => {
+  // The negative control for the test above, against the REAL server: this is the exact shape that
+  // failed on a reviewer's clone, and it passes here only because the value is now ignored.
+  const mcp = JSON.parse(readFileSync(join(repoRoot, '.mcp.json'), 'utf8'));
+  const config = JSON.parse(readFileSync(join(repoRoot, 'engine.config.json'), 'utf8'));
+  const { LATEST_PROTOCOL_VERSION } = await import(
+    pathToFileURL(join(repoRoot, 'node_modules/@modelcontextprotocol/sdk/dist/esm/types.js')).href);
+
+  const cmd = serverCommand({
+    mcp, serverKey: config.mcp.serverKey, root: repoRoot,
+    // The variable is set HERE, in the arguments this call is given — never by mutating the
+    // runner's environment, which would leak into every other test in the file.
+    env: { CLAUDE_PROJECT_DIR: '/nonexistent/some-other-repository',
+      SNOW_STORE: join(repoRoot, '.local', 'no-such-store-for-this-test.json') },
+  });
+
+  const r = await handshake({ ...cmd, cwd: repoRoot, timeoutMs: 30_000,
+    protocolVersion: LATEST_PROTOCOL_VERSION, clientVersion: '0.0.0-test' });
+  assert.equal(r.serverInfo.name, 'snowarch');
+  assert.ok(r.tools.length > 0);
 });

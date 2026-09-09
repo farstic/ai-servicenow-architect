@@ -10,6 +10,7 @@
 // is worse than one that fails, because the bootstrap then has nothing to report and no way out.
 import { spawn } from 'node:child_process';
 import { redact } from './redact.mjs';
+import { childEnv } from './spawn-env.mjs';
 
 export const CLIENT_NAME = 'snowarch-bootstrap';
 export const SHUTDOWN_GRACE_MS = 5_000;
@@ -29,10 +30,18 @@ export class HandshakeError extends Error {
  * Every placeholder in `.mcp.json` carries a default — ARC-06-S01's test enforces that — so an
  * unset variable becomes the default rather than the literal characters `${SNOW_STORE}`, which is
  * what a naive expansion would hand the server as a path.
+ *
+ * `CLAUDE_PROJECT_DIR` is bound to `root` UNCONDITIONALLY, and that is the whole point of it being
+ * special-cased here. Claude Code sets that variable to the project root of the session that spawns
+ * the server; when WE spawn it, we are that session, so an inherited value is somebody else's
+ * answer to our question. Reading it made the bootstrap start a server from whichever repository
+ * the surrounding Claude Code session happened to be in — `Cannot find module`, exit 1 — and it was
+ * invisible in a plain terminal and in CI, where the variable is unset. Found by running the tests
+ * inside a session, which is exactly the context ARC-07-S09 and ARC-08 will live in.
  */
 export function expand(value, env, root) {
   return String(value).replace(/\$\{([A-Z_][A-Z0-9_]*)(?::-([^}]*))?\}/g, (whole, name, fallback) => {
-    if (name === 'CLAUDE_PROJECT_DIR') return env.CLAUDE_PROJECT_DIR ?? root;
+    if (name === 'CLAUDE_PROJECT_DIR') return root;
     const found = env[name];
     if (found !== undefined && found !== '') return found;
     return fallback ?? whole;
@@ -46,8 +55,13 @@ export function serverCommand({ mcp, serverKey, root, env = process.env }) {
   return {
     command: entry.command,
     args: (entry.args ?? []).map((a) => expand(a, env, root)),
-    env: Object.fromEntries(Object.entries(entry.env ?? {})
-      .map(([k, v]) => [k, expand(v, env, root)])),
+    env: {
+      ...Object.fromEntries(Object.entries(entry.env ?? {})
+        .map(([k, v]) => [k, expand(v, env, root)])),
+      // Set, never inherited — the child resolves its own store path from this, so a stale value
+      // from the surrounding session would point the server at another checkout's `.local/`.
+      CLAUDE_PROJECT_DIR: root,
+    },
   };
 }
 
@@ -83,7 +97,9 @@ function once({ command, args, cwd, env, timeoutMs, protocolVersion, clientVersi
   capabilityTool, spawnFn, onStderr }) {
   return new Promise((resolve, reject) => {
     const child = spawnFn(command, args, {
-      cwd, env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'],
+      // `childEnv`, so the session variable is SET rather than inherited — the server resolves its
+      // own store path from it.
+      cwd, env: childEnv(cwd, env), stdio: ['pipe', 'pipe', 'pipe'],
     });
 
     let settled = false;
