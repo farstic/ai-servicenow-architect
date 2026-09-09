@@ -47,15 +47,20 @@ const json = (rel) => JSON.parse(read(rel));
 // The install writes to `.local/`, `.claude/settings.local.json` and `vendor/` — all ignored. A
 // tracked file that changed means the install edited the repository, which is the one thing an
 // installer must never do to a checkout somebody else will commit from.
-const porcelain = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim();
+// UNTRIMMED, because porcelain's first two characters are the status and ` M path` loses its
+// leading space to `trim()` — which is how the submodule diagnostic below silently matched
+// nothing on its first run.
+const porcelainRaw = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' })
+  .replace(/\n+$/, '');
+const porcelain = porcelainRaw.trim();
 if (porcelain !== '') {
   // A dirty SUBMODULE is one line — ` M vendor/ServiceNowDocs` — and that line does not say
   // whether it moved commits, changed content or gained untracked files. Without the detail the
   // reader of a Windows-only failure has nothing to go on and no Windows machine to ask, so the
   // assertion explains itself here rather than in the next person's afternoon.
-  let detail = porcelain;
-  for (const line of porcelain.split('\n')) {
-    const sub = /^.M (vendor\/\S+)/.exec(line);
+  let detail = porcelainRaw;
+  for (const line of porcelainRaw.split('\n')) {
+    const sub = /^.{0,2}M\s+(vendor\/\S+)/.exec(line);
     if (!sub) continue;
     const at = join(root, sub[1]);
     const inner = execFileSync('git', ['-C', at, 'status', '--porcelain'], { encoding: 'utf8' })
