@@ -8,6 +8,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { contractSha, version as engineVersion } from '../config.mjs';
 import { writeDoctorCache } from '../doctor-cache.mjs';
 import { HandshakeError, handshake, serverCommand } from '../mcp-handshake.mjs';
@@ -223,16 +224,24 @@ export const run = async (ctx) => {
     data: { toolCount: result.tools.length, initializeMs: result.initializeMs, configured: true } };
 };
 
-/** The version the SERVER's own SDK negotiates — read, never typed. */
+/**
+ * The version the SERVER's own SDK negotiates — read, never typed.
+ *
+ * `pathToFileURL`, because a dynamic `import()` of an ABSOLUTE path is a URL: on Windows
+ * `D:\\a\\repo\\node_modules\\…` is rejected with "Only URLs with a scheme in: file, data, and node
+ * are supported". Relative specifiers are unaffected, which is why only the absolute ones here
+ * needed it — and why it was invisible until three Windows cells said so.
+ */
 async function latestProtocolVersion(root) {
-  const mod = await import(join(root, 'node_modules/@modelcontextprotocol/sdk/dist/esm/types.js'));
+  const mod = await import(pathToFileURL(
+    join(root, 'node_modules/@modelcontextprotocol/sdk/dist/esm/types.js')).href);
   return mod.LATEST_PROTOCOL_VERSION;
 }
 
 /** The unconfigured core set, from the server build that decides it. */
 async function coreToolNames(root) {
   try {
-    const mod = await import(join(root, 'packages/snowarch/dist/tools/status.js'));
+    const mod = await import(pathToFileURL(join(root, 'packages/snowarch/dist/tools/status.js')).href);
     return mod.CORE_TOOLS_UNCONFIGURED;
   } catch { return null; }
 }

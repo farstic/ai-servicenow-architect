@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   NO_INSTANCE, PROBES_UNAVAILABLE, compareCapabilities, compareTools, differentStore, runProbes,
   timeoutSentence, run as runB08,
@@ -60,8 +60,9 @@ test('a configured server must advertise the whole catalogue, gated or not', () 
 });
 
 test('unconfigured is a different expectation, not a relaxed one', async () => {
+  // `pathToFileURL`: a dynamic import of an absolute path is a URL, and a Windows path is not one.
   const { CORE_TOOLS_UNCONFIGURED } = await import(
-    join(repoRoot, 'packages/snowarch/dist/tools/status.js'));
+    pathToFileURL(join(repoRoot, 'packages/snowarch/dist/tools/status.js')).href);
   const core = [...CORE_TOOLS_UNCONFIGURED];
   assert.deepEqual(compareTools({ advertised: core, contract, pin, configured: false,
     coreTools: core }), []);

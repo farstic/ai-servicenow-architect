@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { HandshakeError, expand, handshake, parseToolResult, serverCommand } from '../lib/mcp-handshake.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -130,10 +130,11 @@ test('AC 2 — the REAL server, unconfigured, advertises exactly the core set', 
   // thing that fails.
   const mcp = JSON.parse(readFileSync(join(repoRoot, '.mcp.json'), 'utf8'));
   const config = JSON.parse(readFileSync(join(repoRoot, 'engine.config.json'), 'utf8'));
+  // `pathToFileURL`: a dynamic import of an absolute path is a URL, and a Windows path is not one.
   const { LATEST_PROTOCOL_VERSION } = await import(
-    join(repoRoot, 'node_modules/@modelcontextprotocol/sdk/dist/esm/types.js'));
+    pathToFileURL(join(repoRoot, 'node_modules/@modelcontextprotocol/sdk/dist/esm/types.js')).href);
   const { CORE_TOOLS_UNCONFIGURED } = await import(
-    join(repoRoot, 'packages/snowarch/dist/tools/status.js'));
+    pathToFileURL(join(repoRoot, 'packages/snowarch/dist/tools/status.js')).href);
 
   const cmd = serverCommand({ mcp, serverKey: config.mcp.serverKey, root: repoRoot,
     // A store path that does not exist: unconfigured is the state under test, and the developer's
