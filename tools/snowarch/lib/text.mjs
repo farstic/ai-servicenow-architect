@@ -52,6 +52,46 @@ export function modeLine({ mode, instance = null } = {}) {
     + `preset=${instance.preset}`;
 }
 
+/**
+ * THE registration line. One definition, three consumers: `snowarch mode`, the doctor's report
+ * (ARC-08) and the troubleshooting page's wording.
+ *
+ * The parenthesis is the whole message. "local" and "user" both mean `~/.claude.json`, and the
+ * difference between them — this checkout, or every project on the machine — is the thing a user
+ * has to understand before they choose one; the kind's name alone does not carry it.
+ */
+export const REGISTRATION_KINDS = Object.freeze({
+  project: 'project (.mcp.json)',
+  local: 'local (~/.claude.json, this checkout only)',
+  user: 'user (~/.claude.json, every project — not recommended)',
+});
+
+export function registrationLine(kind) {
+  return `registration: ${REGISTRATION_KINDS[kind] ?? `${kind} (unknown kind)`}`;
+}
+
+/**
+ * What to do after a registration or a mode switch — the one thing a user must not have to guess.
+ *
+ * A running Claude session has already read its MCP configuration; nothing this command does
+ * reaches it. Saying so here is the difference between "it did not work" and "it works after a
+ * reconnect", which is a support conversation either way if the sentence is missing.
+ */
+export const restartSentence = (serverKey) =>
+  `Restart claude (or /mcp → ${serverKey} → reconnect) to load the server.`;
+
+/**
+ * `mode design` keeps the store. This says so, names the label, and gives the two commands that
+ * undo it in either direction — because "design-only" reads like "the instance is gone" to
+ * everyone who has not read the code.
+ */
+export function instanceKeptNote({ label, platform, env } = {}) {
+  const s = spellings({ platform, env });
+  if (!label) return `note: no instance is configured; ${s.cli} mode live adds one`;
+  return `note: instance "${label}" kept in .local/instances.json; ${s.cli} mode live re-enables `
+    + `it; ${s.cli} instance remove ${label} deletes it`;
+}
+
 /** `DOCTOR: 41 ok, 0 warn, 0 fail`, or the honest absence when Node cannot run one. */
 export function doctorLine({ ok = 0, warn = 0, fail = 0, nodeUsable = true } = {}) {
   return nodeUsable

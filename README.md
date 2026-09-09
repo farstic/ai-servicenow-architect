@@ -58,6 +58,13 @@ most people want. Starting `claude` afterwards shows **one dialog** (workspace t
 Claude Code 2.1.258*; the engine's floor is 2.1.214, where a second approval for the MCP server may
 still appear. The summary tells you which to expect before you start.
 
+<!-- ARC-06-S13: move to docs/INSTALL.md "Adding live mode later" -->
+**Getting an instance later.** `./snowarch mode live` (Windows: `snowarch.cmd mode live`) turns a
+design-only checkout into a live one — no re-clone and no re-registration — and `./snowarch mode
+design` turns it back, keeping the instance in the store. `./snowarch mode` on its own says which
+you are in. If your organisation's policy blocks project MCP servers, `./snowarch mode live
+--register local` registers the same secret-free entry for this checkout only.
+
 <!-- ARC-06-S13: move to docs/INSTALL.md "Operators and CI" -->
 **Operators and CI — a live install with no keyboard.** `./snowarch bootstrap --mode live --yes
 --instance-file <path>` reads its connection details from a file instead of prompting, so a

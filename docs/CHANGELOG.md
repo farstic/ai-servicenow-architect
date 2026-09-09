@@ -29,6 +29,25 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **`snowarch mode live` / `mode design` — the switch, and the `--register local|user` fallback.**
+  `mode live` runs B00 then the registry (B01–B03 cached); `mode design` runs B07 and B09 only and
+  does NOT touch the credential store — the closing note names the instance it kept and the two
+  commands that undo it either way. `mode` on its own prints the S09 Mode line and the registration
+  kind, where the kind's consequence is the message: `local (~/.claude.json, this checkout only)`
+  against `user (~/.claude.json, every project — not recommended)`. User scope is refused outright
+  without `--ack-user-scope`, because attaching the server to every project on a machine is an
+  engagement-firewall decision and not a convenience. **`~/.claude.json` is never opened by this
+  project**: every read and write goes through `claude mcp add-json|get|remove` in one module, a
+  test fails the build if any module under `lib/` builds a path to that file or calls `homedir()`,
+  and every call passes `-s <scope>` — without it `claude mcp remove` deletes from whichever scope
+  it finds, which for our key is the committed project entry. An entry this tool did not create is
+  never removed, only reported. The registration is saved to the state the moment it happens rather
+  than at the end of the run: `~/.claude.json` has already changed by then, and a later failure
+  that left the state saying `project` would orphan an entry the undo refuses to touch.
+- **`bootstrap.sh` now recognises Git Bash.** `platform()` answered `linux` for MINGW/MSYS, so a
+  Windows user running the POSIX launcher was told to `apt install git`. It answers `win32` and gets
+  the `winget` remedies — which S11's derivation rule put back into the generated region on its own,
+  no edit, because the file started referencing them again.
 - **`bootstrap.cmd`, `bootstrap.ps1` and `snowarch.cmd` — native Windows, without Git Bash.** The
   `.cmd` runs PowerShell with `-ExecutionPolicy Bypass`, which is what makes a double-click work
   under the default Restricted policy, and pauses only when double-clicked with no arguments. The

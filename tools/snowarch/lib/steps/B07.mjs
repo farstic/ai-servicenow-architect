@@ -9,7 +9,7 @@ import { join } from 'node:path';
 // JavaScript, not an npm dependency — the bootstrap still installs nothing, and `label.js` is
 // zod-free precisely so it can be read in a checkout that has never run `npm ci`.
 import { readDefaultLabel } from '../../../../packages/snowarch/dist/store/label.js';
-import { applyToggles, SETTINGS_LOCAL, writeJsonAtomic } from '../settings-local.mjs';
+import { applyToggles, HOOKS_LEFT_ALONE, SETTINGS_LOCAL, writeJsonAtomic } from '../settings-local.mjs';
 import { TEXT } from './inputs.mjs';
 
 export const id = 'B07';
@@ -66,6 +66,11 @@ export const run = async (ctx) => {
     ...(ctx.checkIgnored ? { check: ctx.checkIgnored } : {}),
   });
   if (!result.ok) return { status: 'fail', detail: result.reason, remedy: null };
+  // S-05 variant B's whole of AC 3: the hook entry follows Node's presence (`computeSettings`
+  // adds it when Node is here and removes it when it is not), and a user-set `disableAllHooks` is
+  // left alone with this note. Printed through the runner's sink so it is redacted and logged
+  // like every other line.
+  if (result.userDisabledHooks && ctx.line) ctx.line(HOOKS_LEFT_ALONE);
 
   const config = writeConfig(ctx.root, { mode: ctx.mode, registration,
     ...(ctx.readLabel ? { readLabel: ctx.readLabel } : {}) });

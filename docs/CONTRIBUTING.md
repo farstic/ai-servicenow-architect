@@ -1203,3 +1203,14 @@ permission" than another, it has a different set of flags, and the doctor is wha
 
 So "this session is `live` on a `pdi-developer` instance" is a complete statement, and one that
 survives a flag being switched off underneath it. The old single number could not say either half.
+
+## `claude mcp` is called in exactly one module
+
+`~/.claude.json` belongs to Claude Code. Nothing in this repository opens it: every read and write
+goes through `claude mcp add-json|get|remove` in `tools/snowarch/lib/registration-claude.mjs`, and a
+test fails the build if any module under `lib/` builds a path to that file or calls `homedir()`.
+
+If you need a new `claude mcp` call, add it there — not in the command that wants it. The module
+also owns two things that are easy to get wrong once and never notice: `-s <scope>` on every call
+(without it, `remove` deletes from whichever scope it finds, and ours is committed), and the
+`cwd: root` that local scope is keyed on.

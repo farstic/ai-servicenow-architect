@@ -336,6 +336,20 @@ jobs:
           if ($json.mode -ne 'design-only') { exit 1 }
           $s = Get-Content .\.local\bootstrap-state.json -Raw | ConvertFrom-Json
           if ($s.writer -ne 'node') { Write-Host ("writer=" + $s.writer); exit 1 }
+      - name: Git Bash on Windows gets the Windows remedies, not apt
+        # ARC-06-S12 ruling (4). The POSIX launcher runs perfectly well under Git Bash on Windows,
+        # and until now it told that user to `apt install git`. This is the only cell in the matrix
+        # where `uname -s` says MINGW64_NT, so it is the only place the arm can be proved.
+        shell: bash
+        run: |
+          export PATH="/usr/bin:/mingw64/bin:/c/Program Files/Git/cmd"
+          command -v node && exit 1
+          uname -s
+          rm -rf .local .claude/settings.local.json
+          ./bootstrap.sh --mode design --yes --docs skip --skip-claude-check | tee /tmp/gitbash.txt
+          grep -q 'winget install OpenJS.NodeJS.LTS' /tmp/gitbash.txt
+          grep -q 'apt install git' /tmp/gitbash.txt && exit 1
+          exit 0
       - name: snowarch.cmd, with Node and without
         shell: cmd
         run: |

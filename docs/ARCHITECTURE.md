@@ -499,6 +499,33 @@ bash is how someone's settings get destroyed.
 The state and the cache are written by heredoc in S03's and S08's schemas, `writer: "bash"`, and the
 Node readers accept them — asserted against a fixture captured from a real bash-3.2 run.
 
+### `mode` — the switch, and where the server is registered
+
+`snowarch mode` reports: the S09 Mode line and the registration kind, nothing written. `mode live`
+runs B00 as a preflight and then the registry — B01–B03 stand on their cached results, B04–B09 run.
+`mode design` runs B07 and B09 only, and does NOT touch `.local/instances.json`: the instance is
+kept, and the closing note says so with the two commands that undo it either way. Both forms end
+with `Restart claude (or /mcp → <key> → reconnect)`, because a session that is already open has read
+its MCP configuration and nothing this command does reaches it. `mode live` is not a second
+bootstrap: same registry, same runner, same state file, same closing block — the only thing it
+decides is which steps are in the list.
+
+| Registration | Who writes it | Who verifies it | When |
+|---|---|---|---|
+| `project` | the repository — `.mcp.json` is committed | B01, against ARC-06-S01's rules | the default, always |
+| `local` | `claude mcp add-json … -s local`, keyed on the CHECKOUT | `claude mcp get`, immediately after | a policy that blocks project servers |
+| `user` | `claude mcp add-json … -s user`, every project on the machine | the same, plus a doctor WARN every run | last resort, and only with `--ack-user-scope` |
+
+`~/.claude.json` is never opened by this project. Every read and write goes through the CLI that
+owns it, in `lib/registration-claude.mjs`, and a test asserts that nothing under `lib/` builds a
+path to that file or reaches into the home directory at all. Two consequences worth knowing: a
+`remove` WITHOUT `-s` deletes from whichever scope the CLI finds it in — which for our key would be
+the committed project entry, so every call passes the flag — and an entry this tool did not create
+is never removed, only reported (ARC-08-S03 prints the command for the user to run).
+
+When the registration is not `project`, B07 writes `disabledMcpjsonServers: ["servicenow"]` so the
+project entry is rejected and only the local or user one loads. Otherwise both carry the same key.
+
 ### The Windows launchers
 
 `bootstrap.cmd` runs `powershell -NoProfile -ExecutionPolicy Bypass -File bootstrap.ps1` — the

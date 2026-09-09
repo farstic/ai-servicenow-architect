@@ -33,6 +33,18 @@ export const hookEntry = () => ({
   }],
 });
 
+/**
+ * S-05 variant B, stated as a sentence because a step has to print it.
+ *
+ * No bootstrap and no `mode` run ever writes `disableAllHooks` — the state's
+ * `hooksDisabledByBootstrap` is therefore always false, and a key that IS there was put there by
+ * the user or by Claude Code. It stays. What changes is that the user is told, because from their
+ * side "the banner never appears" and "the toggle I set two months ago" are the same event.
+ */
+export const HOOKS_LEFT_ALONE =
+  'note: disableAllHooks is set in .claude/settings.local.json — the SessionStart banner will not '
+  + 'run; this installation did not set it and has left it alone';
+
 const without = (list, value) => (Array.isArray(list) ? list.filter((v) => v !== value) : []);
 const withValue = (list, value) => (Array.isArray(list) && list.includes(value)
   ? list
@@ -135,8 +147,11 @@ export function applyToggles({ root, mode, nodePresent, registration = 'project'
   if (!check(root)) return { ok: false, reason: NOT_IGNORED, changed: false };
 
   const next = computeSettings(current, { mode, nodePresent, registration, serverKey });
+  // Reported, never acted on. The caller prints the note; deciding here would make this function
+  // both a writer and a narrator, and B07 already owns the console.
+  const userDisabledHooks = current.disableAllHooks === true;
   const text = `${JSON.stringify(next, null, 2)}\n`;
-  if (before === text) return { ok: true, changed: false, settings: next };
+  if (before === text) return { ok: true, changed: false, settings: next, userDisabledHooks };
   writeJsonAtomic(path, next);
-  return { ok: true, changed: true, settings: next };
+  return { ok: true, changed: true, settings: next, userDisabledHooks };
 }
