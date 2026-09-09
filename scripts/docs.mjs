@@ -9,6 +9,7 @@ import { syncCorpus, planRecipe, readAreas, inspect, resolveMode, SyncError, EXI
   from '../tools/snowarch/lib/docs/sync.mjs';
 import { verifyCitations, formatResult, EXIT } from '../tools/snowarch/lib/docs/verify.mjs';
 import { docsStatus, formatStatus } from '../tools/snowarch/lib/docs/status.mjs';
+import { syncUpstream, formatUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
@@ -33,6 +34,28 @@ if (cmd === 'sync') {
     } catch (e) {
       console.error(e.message);
       process.exit(e instanceof SyncError ? e.code : 2);
+    }
+  }
+
+  // The maintainer refresh is a different command wearing the same word. Kept under `sync` because
+  // the story names it `sync --upstream`, and refused alongside `--mode` because "reconcile my
+  // checkout" and "move the repository's pin" are not one operation.
+  if (flag('--upstream')) {
+    if (value('--mode') !== undefined) {
+      console.error('--upstream is the maintainer refresh; run `sync --mode` separately');
+      process.exit(2);
+    }
+    try {
+      const r = syncUpstream({
+        root, config, to: value('--to') ?? null,
+        verify: !flag('--no-verify'), log: asJson ? null : console.log,
+      });
+      if (asJson) console.log(JSON.stringify(r, null, 2));
+      process.exit(formatUpstream(r).code);
+    } catch (e) {
+      if (!(e instanceof SyncError)) throw e;
+      console.error(e.message);
+      process.exit(e.code);
     }
   }
 
@@ -89,6 +112,10 @@ if (cmd === 'status') {
 }
 
 console.error('usage: node scripts/docs.mjs '
-  + '(sync [--mode sparse|full] [--json] [--quiet] [--print-recipe] '
-  + '| verify [--allow-missing] [--json] | status [--json])');
+  + '(sync [--mode sparse|full] [--json] [--quiet] [--print-recipe]\n'
+  + '     | sync --upstream [--to <sha>] [--json] [--no-verify]\n'
+  + '     | verify [--allow-missing] [--json]\n'
+  + '     | status [--json])\n'
+  + '\nexit: 0 ok · 1 incomplete, or the pin moved and citations broke · 3 corpus missing\n'
+  + '      4 working tree not clean · 5 git failed · 6 upstream does not have it');
 process.exit(2);

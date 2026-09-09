@@ -25,12 +25,20 @@ export const CORPUS_DIR = 'vendor/ServiceNowDocs';
 export const MODE = Object.freeze({ sparse: 'sparse', full: 'full' });
 
 /**
- * Exit codes. 0/1 are S03's; 4 and 5 are this story's, and they are distinct on purpose: 4 means
- * the operator has work in the tree and nothing was touched, 5 means git could not do the job. A
- * caller that collapsed them would tell someone to check their network when the real answer is
- * "you have unsaved edits".
+ * Exit codes, in one table because every `docs` sub-command shares them.
+ *
+ * 0/1 are S03's; 4 and 5 arrived with S05 and are distinct on purpose — 4 means the operator has
+ * work in the tree and nothing was touched, 5 means git could not do the job, and a caller that
+ * collapsed them would tell someone to check their network when the real answer is "you have
+ * unsaved edits". 6 is S07's and is narrower still: the upstream does not have what was asked for,
+ * which is neither the operator's fault nor a transport failure, and whose remedy is to look at
+ * what the family branch is called now.
+ *
+ * `1` carries two meanings that never co-occur: an incomplete checkout from `sync`, and "the pin
+ * moved but citations broke" from `--upstream`. Both mean "look at this before you continue",
+ * which is what a caller keys on.
  */
-export const EXIT = { ok: 0, incomplete: 1, dirty: 4, git: 5 };
+export const EXIT = { ok: 0, incomplete: 1, dirty: 4, git: 5, upstream: 6 };
 
 /** Carries the exit code out of the library so the CLI does not have to guess from the message. */
 export class SyncError extends Error {

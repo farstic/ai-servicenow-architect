@@ -20,7 +20,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const EVERY_KEY = [
   'present', 'path', 'pin', 'gitlink', 'head', 'pinMatchesGitlink', 'headMatchesPin',
   'family', 'branch', 'familyMatches', 'sparse', 'areasExpected', 'areasPresent', 'areasMissing',
-  'mode', 'fileCount', 'sizeBytes', 'citations', 'longpaths', 'schema',
+  'mode', 'fileCount', 'sizeBytes', 'citations', 'longpaths', 'schema', 'gitlinkStaged',
 ];
 
 let scratch, upstream, upstreamUrl;

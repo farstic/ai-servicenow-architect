@@ -13,6 +13,24 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Added
 
+- **`docs sync --upstream` — the maintainer refresh.** Fetches the family tip (or a named SHA),
+  moves the pin and the gitlink, re-runs the citation gate and prints which citations *became* dead.
+  It stages both paths and **commits nothing**: a human reads the diff and decides.
+  - The baseline verify runs **before** the move, because "newly dead" is a difference between two
+    states and the first stops existing the moment the corpus moves.
+  - The pin write replaces one 40-hex string rather than reparsing the file, so the reviewer's diff
+    is one token and not a reformat; it refuses outright if the file does not hold the pin it was
+    told to replace.
+  - Exit **1** means the pin moved *and* citations broke — both true, and the pin is staged because
+    you need the new corpus to repair the citations against it. Exit **6** is new: the upstream does
+    not have what was asked for (renamed family branch, unreachable SHA), and nothing moved.
+  - An upstream history rewrite that leaves the tip *behind* the pin is followed, not refused, and
+    the report says `(older than the current pin)` — staying put would hide the rewrite.
+  - `docs status` now reads the gitlink from the **index**, so a staged bump reads as `ok` with
+    `(staged)` rather than as a mismatch against a pin the maintainer just moved.
+  - `docs/CONTRIBUTING.md` gains "Refreshing the corpus"; `docs/ARCHITECTURE.md` gains the sequence
+    and one exit-code table for every `docs` sub-command.
+
 - **`docs status`, `docs verify --json`, and one description of the corpus.**
   `tools/snowarch/lib/docs/status.mjs` computes what the doctor and `/snowarch status` will both
   quote — present, pinned, right family, correctly sparse, fully cited — instead of each re-deriving
