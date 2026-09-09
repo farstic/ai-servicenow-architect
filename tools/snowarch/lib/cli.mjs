@@ -7,6 +7,7 @@
 import { EXIT_OK, EXIT_USAGE } from './exit.mjs';
 import { contractSha, cwdNote, loadConfig, root, version } from './config.mjs';
 import { createLogger } from './log.mjs';
+import { USAGE as BOOTSTRAP_USAGE } from './bootstrap.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
 const UNIVERSAL = ['json', 'quiet', 'verbose', 'help'];
@@ -86,6 +87,11 @@ function versionCommand({ flags, log }) {
  * npm scripts, CI and the two workflows keep working byte-for-byte and there is one implementation
  * of every sub-command. A test asserts the two entry points agree.
  */
+async function bootstrapCommand(args) {
+  const { bootstrapCommand: run } = await import('./bootstrap.mjs');
+  return run(args);
+}
+
 async function docsCommand({ argv }) {
   const { runDocs } = await import('./docs/cli.mjs');
   return runDocs(argv);
@@ -97,7 +103,9 @@ export const COMMANDS = {
   docs: { summary: 'sync, verify, describe or re-family the documentation corpus', run: docsCommand,
     usage: 'usage: ./snowarch docs (sync | verify | status | family) …\n\n'
       + '  Run `./snowarch docs` with no sub-command for the full flag list.' },
-  bootstrap: PLACEHOLDER('bootstrap', 'ARC-06-S03'),
+  bootstrap: { summary: 'install this checkout: plan, then the numbered steps, resumable',
+    run: bootstrapCommand, usage: BOOTSTRAP_USAGE, booleans: ['yes', 'reset', 'skip-claude-check'],
+    defersLog: true },
   mode: PLACEHOLDER('mode', 'ARC-06-S12'),
   doctor: PLACEHOLDER('doctor', 'ARC-08'),
   instance: PLACEHOLDER('instance', 'ARC-07'),
@@ -128,7 +136,7 @@ export async function main(argv, { out = process.stdout, err = process.stderr } 
     return EXIT_USAGE;
   }
 
-  const { flags, errors } = parseArgs(rest);
+  const { flags, errors } = parseArgs(rest, { booleans: command.booleans ?? [] });
   if (flags.help) { out.write(`${command.usage}\n`); return EXIT_OK; }
   if (errors.length > 0 && name !== 'docs') {
     // `docs` parses its own arguments — it has sub-commands of its own — so the frame does not
@@ -140,10 +148,12 @@ export async function main(argv, { out = process.stdout, err = process.stderr } 
 
   const log = createLogger({
     command: name, quiet: Boolean(flags.quiet), verbose: Boolean(flags.verbose),
-    json: Boolean(flags.json), out, err,
+    json: Boolean(flags.json), defer: Boolean(command.defersLog), out, err,
   });
   const note = cwdNote();
   if (note) log.note(note);
 
-  return command.run({ flags, argv: rest, log, root });
+  const code = await command.run({ flags, argv: rest, log, root, out, err });
+  log.commit();          // a deferred logger that was never committed still gets its lines on disk
+  return code;
 }

@@ -6,6 +6,15 @@
 const SECRET_KEY = /(PASSWORD|SECRET|TOKEN|_KEY)$/i;
 
 /**
+ * Does this name look like it holds a secret?
+ *
+ * Exported because ARC-06-S03's state file needs the same answer at WRITE time: the redactor stops
+ * a secret being printed, and the state guard stops one being stored. Two regexes would be two
+ * opinions about which names matter, and the pair would drift the first time either is widened.
+ */
+export const isSecretKey = (name) => SECRET_KEY.test(String(name));
+
+/**
  * Second segments that make a dotted token something other than a person.
  *
  * Not exhaustive and does not need to be: a false negative here prints a username that the email

@@ -1,6 +1,6 @@
 # ARC-06 — Bootstrap and MCP registration
 
-Status: **Stories drafted 2026-09-04** · **S01–S02 merged (2 of 14) — entry gate ADR-0006 Accepted 2026-09-08, satisfied** · Depends on: ARC-01, ARC-03 (B02), ARC-04 (committed `dist/`, unconfigured mode), ARC-05 (B05 contract check, permission block); ARC-00 S-01/S-03/S-05/S-08/S-09/S-15/S-16/S-20 and — entry condition for S01 (D-06 hedge) — the S-14a–g conclusion recorded in ADR-0006 ("monorepo path confirmed"; ARC-00-S12/S14) · Blocks: ARC-07 (B06 slot), ARC-08, ARC-09, ARC-10
+Status: **Stories drafted 2026-09-04** · **S01–S03 merged (3 of 14) — entry gate ADR-0006 Accepted 2026-09-08, satisfied** · Depends on: ARC-01, ARC-03 (B02), ARC-04 (committed `dist/`, unconfigured mode), ARC-05 (B05 contract check, permission block); ARC-00 S-01/S-03/S-05/S-08/S-09/S-15/S-16/S-20 and — entry condition for S01 (D-06 hedge) — the S-14a–g conclusion recorded in ADR-0006 ("monorepo path confirmed"; ARC-00-S12/S14) · Blocks: ARC-07 (B06 slot), ARC-08, ARC-09, ARC-10
 
 ## Goal
 

@@ -11,6 +11,32 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ## Unreleased
 
+### Added
+
+- **`./snowarch bootstrap` — one amendable plan, then ten numbered steps that remember where they
+  got to.** The plan screen is the only interactive moment of an installation (principle 10): it is
+  shown once, before anything is written, and quitting it leaves no `.local/` at all — not even a
+  log, which is why the logger learned to defer opening its file until a run is accepted. After
+  that the steps run uninterrupted, each recording its status, duration and an input hash, so a
+  second run prints `ok (cached)` and a failure, a Ctrl-C or an upgrade never means starting over.
+  `--from BNN` forces a re-run from a step; `--reset` clears the state and the doctor cache and
+  nothing else — the credential store and `.local/config.json` are named in the sentence it prints.
+  `--mode live --yes` without `--instance-file` is refused before anything is written, because
+  credentials cannot be typed non-interactively.
+- **`.local/bootstrap-state.json` v1** — atomic (temp file + `rename`), `0600` on POSIX, and
+  **guarded at write time**: `saveState` walks the whole object and refuses a key that names a
+  secret (the redactor's own rule, imported rather than restated) or a value that looks like a URL
+  or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
+  keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
+  `docsStatus()` and the `/snowarch status` skill already read them.
+- **The step registry** (`lib/steps/B00…B09.mjs` + `lib/steps/index.mjs`), with the step bodies
+  still to come in ARC-06-S04…S09. Their `inputs()` are real now, so the cache, resume, `--from`,
+  `--reset` and interrupt semantics are all exercised today rather than after the last body lands.
+  Inputs are tagged `file:` or `text:` and an untagged one throws — read as a path, a literal like
+  `design-only` would hash as `<absent>` and two different modes would share a digest. B02 hashes
+  the corpus **gitlink** rather than 35,000 files; B06 hashes only whether the credential store
+  exists and its schema version, so no hash input ever reads a credential.
+
 ### Fixed
 
 - **A fresh install whose pin equals the branch tip produced an EMPTY corpus that called itself

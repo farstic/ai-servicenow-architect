@@ -46,6 +46,8 @@ ai-servicenow-architect/                      farstic/ai-servicenow-architect ·
 ├── tools/snowarch/                           ZERO-DEPENDENCY Node ESM CLI (node:fs, child_process, readline, https, crypto)
 │   ├── bin/snowarch.mjs                      bootstrap | doctor | instance … | docs … | mode … | upgrade | version
 │   ├── lib/steps/B00…B09.mjs                 one file per bootstrap step (idempotent; declares an inputs hash)
+│   ├── lib/steps/index.mjs                   the registry and the runner: order, cache decision, interrupt
+│   ├── lib/plan.mjs                          the one amendable plan screen (principle 10)
 │   ├── lib/state.mjs                         .local/bootstrap-state.json read/write/resume
 │   ├── lib/doctor/                           engine-side checks E-xx; merges server checks SV-xx from packages/snowarch
 │   └── hooks/session-start.mjs               prints the Mode banner (<300 ms; reads .local/doctor-last.json)
@@ -218,6 +220,102 @@ temp directory ate that margin at ARC-03-S05, so `core.longpaths` stays.
 
 4, 5 and 6 stay distinct: "you have unsaved work", "the transport failed" and "it is not there" have
 three different remedies, and a caller that collapsed them would send someone to the wrong one.
+
+## Bootstrap steps and state file
+
+`./snowarch bootstrap` shows one amendable plan, then runs ten numbered steps uninterrupted,
+recording each one so a failure, a Ctrl-C or an upgrade never means starting over.
+
+### The steps
+
+Each step module in `tools/snowarch/lib/steps/` — `B00.mjs` through `B09.mjs` — exports
+`{ id, title, needsNode, runsWhen, inputs, run }`
+and, when it can be skipped, a `skipReason`. Every module is importable and its `run(ctx)` callable
+on its own, so ARC-08's `--fix` can invoke one without the runner.
+
+| Step | Title | Needs Node | Runs when | Inputs hashed |
+|---|---|---|---|---|
+| B00 | preflight | no | always (never cached) | — |
+| B01 | workspace | no | always | `.mcp.json`, `.claude/settings.json`, mode |
+| B02 | docs | no (checkout) / yes (citations) | docs mode ≠ skip | the areas file, the corpus gitlink from the index, docs mode |
+| B03 | mode | no | always | the accepted mode |
+| B04 | deps | yes | mode = live | `package-lock.json`, Node **major** |
+| B05 | contract | yes | Node present | `dist/contract.json`, `required-tools.json` |
+| B06 | instance | yes | mode = live | store schema version, store presence, whether `--instance-file` was given |
+| B07 | toggles | no | always | mode, Node present, the hook branch, registration kind |
+| B08 | verify | yes | mode = live | contract sha, store mtime |
+| B09 | summary | no | always (never cached) | — |
+
+B00 and B09 are never cached, and each says so on the step rather than in the runner: B00 decides
+whether the machine can run the others, and B09 describes the run that just happened.
+
+### The hash, and what it is allowed to read
+
+Every input is TAGGED — `file:<path>` or `text:<value>` — and `sha256` runs over the tag, the key
+and the content of each, NUL-separated, in the order the step declared them. A missing file hashes
+as the literal `<absent>`, so "not installed yet" and "installed nothing" are different digests. An
+untagged entry is an error rather than a guess: read as a path, `design-only` would be found missing
+and hashed as `<absent>`, which would give live and design-only the same digest.
+
+Two inputs are deliberately narrow. B02 hashes the **gitlink**, not the corpus — reading 35,000
+files to decide whether to skip a step would cost more than the step, and an unrelated `touch` would
+invalidate it. B06 hashes only the store's schema version and whether it exists: `.local/instances.json`
+holds credentials, and a hash that read further would put one a careless line away from the log.
+
+### The resume rule
+
+For each step in order: `runsWhen` false → `skipped (<reason>)`; `--from BNN` and the step is at or
+after `BNN` → run; recorded `ok` and `sha256(inputs)` unchanged → `ok (cached)`; otherwise run. A
+`fail` stops the run after the state is written; a `warn` continues. An interrupt outranks whatever
+the step goes on to return, because the record of why a run stopped is what the next one reads.
+
+`--reset` removes `.local/bootstrap-state.json` and `.local/doctor-last.json` and nothing else —
+`.local/instances.json` (the credential store) and `.local/config.json` are never touched, and the
+command says so.
+
+### `.local/bootstrap-state.json` v1
+
+Atomic (temp file + `rename`), `0600` on POSIX, and on Windows it records `"fileModes":
+"acl-inherited"` rather than implying a mode nobody applied.
+
+```json
+{ "version": 1, "product": "snowarch", "engineVersion": "2.0.0",
+  "mode": "design-only", "docs": { "mode": "sparse", "pin": "ba513f2c…" },
+  "node": { "present": true, "version": "22.11.0" },
+  "writer": "node", "platform": "darwin",
+  "registration": "project", "registrationReason": "default",
+  "hooksDisabledByBootstrap": false,
+  "startedAt": "…", "updatedAt": "…",
+  "steps": { "B00": { "status": "ok", "inputsHash": null, "finishedAt": "…", "durationMs": 812 },
+             "B04": { "status": "failed", "inputsHash": "sha256:…", "reason": "interrupted" } } }
+```
+
+`mode` is `null` until the plan is accepted. `writer` is `node`, `bash` or `powershell` — the
+Node-free launchers write the same schema. `docs.mode` sits exactly where `docsStatus()` reads it,
+and `mode` where the `/snowarch status` skill reads it when the doctor cannot run; both are why the
+shape is versioned, and why a `version` this build does not know is refused rather than migrated on
+the fly.
+
+**Nothing sensitive may be stored, and that is enforced at write time**, not by a grep afterwards:
+`saveState` walks the whole object and refuses any key that names a secret — the same rule the
+redactor uses, imported rather than restated — and any value that looks like a URL or an address, or
+that the redactor would rewrite. A step three stories from now that puts an instance URL in its
+`data` blob fails on the write, not in review.
+
+### Exit codes — the CLI family
+
+| Code | Meaning |
+|---|---|
+| **0** | ok |
+| **1** | a step or command failed; the cause and a remedy were printed |
+| **2** | usage error |
+| **3** | a prerequisite is missing |
+| **130** | interrupted (Ctrl-C); the state was flushed first |
+
+This is a **different table** from the `docs` one above, and the overlap is worth naming: `3` means
+"the corpus is missing" there and "a prerequisite is missing" here. Both are "the thing you need is
+not present", which is why the two coexist — but a caller keying on a number must know which family
+it is reading. `lib/exit.mjs` holds these five and deliberately does not re-export the docs codes.
 
 ## Roster
 

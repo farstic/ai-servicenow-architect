@@ -786,6 +786,19 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## Adding a bootstrap step
+
+1. Add a `BNN.mjs` to `tools/snowarch/lib/steps/` exporting `id`, `title`, `needsNode`, `runsWhen`,
+   `inputs`, `run` — plus `skipReason` if it can be skipped, and `cacheable: false` if a recorded
+   `ok` must never stand in for running it.
+2. `inputs(ctx)` returns TAGGED entries only — `FILE('path')` or `TEXT('key=value')`. An untagged
+   entry throws, because a literal read as a path hashes as `<absent>` and two different runs then
+   share a digest.
+3. Add it to `STEPS` in `lib/steps/index.mjs`, in order. That list is the only place order lives.
+4. Spawn children through `ctx.spawn` and nothing else — that is how Ctrl-C reaches them.
+5. Add its row to "Bootstrap steps and state file" in `docs/ARCHITECTURE.md`, and never store a URL,
+   a username or a credential in the step's `data`: `saveState` refuses it at write time.
+
 ## Editing the registration files
 
 **Never hand-edit `permissions` in `.claude/settings.json`.** It is generated from the server
