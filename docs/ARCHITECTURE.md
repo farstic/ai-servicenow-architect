@@ -182,8 +182,8 @@ list is one long line on purpose; wrapped or reordered is a different checkout.
 ```sh
 git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs
 git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform legal
-git -C vendor/ServiceNowDocs fetch --depth 1 origin ba513f2c62d3698ef5bfdd8044110226b8419689
-git -C vendor/ServiceNowDocs checkout --detach ba513f2c62d3698ef5bfdd8044110226b8419689
+git -C vendor/ServiceNowDocs fetch --depth 1 origin 11b39be17307dd4b21df15a54e8011ae68f64dba
+git -C vendor/ServiceNowDocs checkout --detach 11b39be17307dd4b21df15a54e8011ae68f64dba
 git submodule absorbgitdirs vendor/ServiceNowDocs
 git submodule init -- vendor/ServiceNowDocs
 echo "docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE"
