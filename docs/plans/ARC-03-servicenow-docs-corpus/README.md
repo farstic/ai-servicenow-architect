@@ -50,6 +50,21 @@ ARC-01 (layout, `engine.config.json` + schema, `LICENSE`/`NOTICE` files, CI skel
 - [ ] `--docs full` yields the full checkout (every `markdown/*` directory); `--docs skip` yields a doctor FAIL with the sync remedy. (S05, S11)
 - [ ] The three-OS real-corpus job is green on native `windows-latest` with `core.longpaths` set by the recipe. (S11)
 
+## Known state of upstream at ARC-03-S07 (2026-09-09)
+
+Measured by the one real `docs sync --upstream` run, then reverted — the pin in the repository is
+still `ba513f2…`:
+
+| | |
+|---|---|
+| pinned | `ba513f2` (2026-07-09) |
+| upstream tip of `australia` | `11b39be` (2026-08-28) — **seven weeks ahead** |
+| citations after the move | `checked: 180 \| dead: 1` |
+| what breaks | `.claude/skills/now-assist-genai/SKILL.md:40` → `markdown/intelligent-experiences/ai-control-tower/ai-gateway-overview.md` |
+
+**S09's first bump PR will exit 1 and carry exactly one remap.** Recorded here so that is a known
+quantity rather than a surprise on the first automated run.
+
 ## Risks
 
 > **Amendment 2026-09-07 (ADR-0008 option A).** Recipe C is five steps **plus an idempotent repair step** that materialises any root-level path git left `skip-worktree` after `sparse-checkout set --cone` (git 2.34.1 stores the flag as a pattern; no-op on ≥ 2.39). `floors.git` stays 2.34.1 — stock Ubuntu 22.04 LTS remains supported. The completeness check (five root files + every cone area) is the safety net.

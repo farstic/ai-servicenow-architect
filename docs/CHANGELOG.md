@@ -126,6 +126,25 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 - `docs/USER-GUIDE.md` gains a "`/snowarch` commands" section — the three sub-commands, how to read
   the four `Mode:` shapes, and why setup hands off to the terminal.
 
+### Fixed
+
+- **Preconditions in tests are now asserted, and one guard could never have worked.** A sweep of all
+  75 test files after ARC-03-S06 found a vacuous test — a `git config` the worktree config outranked,
+  so the state it "broke" was never broken and the repair it claimed to exercise never ran. Three
+  fixes and a standing check:
+  - `tests/docs-status.test.mjs` — the HEAD-off-the-pin and narrowed-sparse-set cases assert the
+    fixture actually moved before asking the subject about it, so a fixture failure no longer reads
+    as a module failure.
+  - `packages/snowarch/tests/tools/parity.test.ts` — its `beforeEach`/`afterEach` deleted and
+    restored `MCP_TOOL_PACKAGE`, **which cannot work**: `src/tools/index.ts` builds the catalogue at
+    module scope, so the variable was read at import, long before either hook ran. Replaced by an
+    import-time assertion that names the variable and says a different package needs a different
+    process. No change to the code under test.
+  - `tests/precondition-asserts.test.mjs` — the rule as a test. Mutating state that already exists
+    (git config, checkout, sparse set, index) must be followed within two lines by an assertion that
+    it took. Building a fixture from nothing is deliberately not covered: there the write is the
+    input, and a failed write fails the test on its own.
+
 ### Changed
 
 - `CLAUDE.md` rewritten to a line budget: **425 lines → 125**, 57,688 bytes → 10,997, against a cap
