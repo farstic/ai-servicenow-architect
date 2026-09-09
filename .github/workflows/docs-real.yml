@@ -83,10 +83,11 @@ jobs:
           # removed entries are logged: a silent PATH edit is impossible to review later.
           $before = $env:PATH -split ';'
           $removed = $before | Where-Object { $_ -match 'Git\\usr\\bin' -or $_ -match 'Git\\bin' }
-          $kept = $before | Where-Object { $_ -notmatch 'Git\\usr\\bin' -and $_ -notmatch 'Git\\bin' }
+          $kept    = $before | Where-Object { $_ -notmatch 'Git\\usr\\bin' -and $_ -notmatch 'Git\\bin' }
           "removed from PATH:"; $removed | ForEach-Object { "  $_" }
-          ($kept -join ';') | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 -NoNewline `
-            -InputObject "PATH=$($kept -join ';')"
+          # `Add-Content`, not `Out-File` with both a pipeline and -InputObject — that is a
+          # PowerShell error, and it is what the first run of this workflow failed on.
+          Add-Content -Path $env:GITHUB_ENV -Value "PATH=$($kept -join ';')"
           "bash still reachable: $([bool](Get-Command bash -ErrorAction SilentlyContinue))"
 
       - name: Fetch the corpus at the pin
