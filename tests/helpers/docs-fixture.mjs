@@ -81,6 +81,15 @@ function buildUpstream(dir) {
   git(['commit', '-qm', 'upstream removed a cited page'], src);
   const deletesCited = git(['rev-parse', 'HEAD'], src).trim();
 
+  // ARC-03-S08 switches families, so the fixture upstream carries a second release family. Its own
+  // commit, so a switch genuinely moves the pin rather than landing on the same tree.
+  git(['checkout', '-q', '-b', 'zurich', 'australia'], src);
+  writeFileSync(join(src, 'markdown/alpha/zurich-only.md'), '# zurich\n');
+  git(['add', '-A'], src);
+  git(['commit', '-qm', 'the zurich family tip'], src);
+  const zurichTip = git(['rev-parse', 'HEAD'], src).trim();
+  git(['checkout', '-q', 'australia'], src);
+
   // A branch BEHIND the pin — an upstream history rewrite. The ruling (2026-09-09) is to move to it
   // anyway and say so on the pin line, rather than silently refusing to go backwards.
   git(['branch', 'behind', `${pin}~1`], src);
@@ -90,7 +99,7 @@ function buildUpstream(dir) {
 
   const bare = join(dir, 'upstream.git');
   git(['clone', '-q', '--bare', src, bare], dir);
-  return { bare, pin, tip, deletesCited, behind };
+  return { bare, pin, tip, deletesCited, behind, zurichTip };
 }
 
 /** The path the fixture's citing skill points at, and which `deletes-cited` removes. */

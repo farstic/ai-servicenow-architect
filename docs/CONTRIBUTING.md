@@ -786,6 +786,25 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## Switching release family
+
+`node scripts/docs.mjs family zurich --dry-run` first, always. It prints every edit it would make
+and every line it will not touch, and changes nothing.
+
+1. **Read the plan.** `EDIT` lines are mechanical substitutions of the family name inside a fixed
+   phrase set. `REVIEW (not edited)` lines are the ones that matter: a sentence that says which
+   family ships which table is a platform fact, and only a human knows whether it survives the
+   switch.
+2. `node scripts/docs.mjs family zurich --yes` — applies exactly those edits, moves the pin to the
+   new family's tip, re-runs the citation gate and the lints, and stages everything.
+3. **Do the REVIEW pass by hand.** The delta folders upstream (`markdown/delta-<new>-<old>/`) are
+   where the platform differences are documented; the REVIEW list is your worklist against them.
+4. **Commit** — the command prints the message to use — and open the pull request.
+
+Exit 2 means you asked without `--yes` and got the plan. Exit 6 means the branch is not upstream.
+Exit 1 means a lint failed with the edits staged: fix what it named, or abandon with the two
+commands the output prints.
+
 ## Refreshing the corpus
 
 Monthly, or when a citation goes dead upstream. Five steps, and the tool does the first one only:

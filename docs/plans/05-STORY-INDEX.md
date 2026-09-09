@@ -56,7 +56,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-03-S05 | ARC-03 | `snowarch docs sync` — the checkout/reconcile recipe (sparse · full · skip), pinned-SHA fetch, Windows long paths; the Node-free launcher recipe text | L | S01, S02; ARC-00-S09; verdicts S-07 | M2 | Done (2026-09-09) |
 | ARC-03-S06 | ARC-03 | `snowarch docs verify` and `snowarch docs status`; the `docsStatus()` data shape consumed by the doctor and `/snowarch status` | M | S03, S05 | M2 | Done (2026-09-09) |
 | ARC-03-S07 | ARC-03 | `snowarch docs sync --upstream` — move the pin to the upstream tip, verify, print the dead-citation diff (maintainer) | M | S05, S06 | M2 | Done (2026-09-09) |
-| ARC-03-S08 | ARC-03 | `snowarch docs family <name> --dry-run\|--yes` — release-family switch with a printed edit plan and gateway-skill re-lint | M | S07 | M2 | Not started |
+| ARC-03-S08 | ARC-03 | `snowarch docs family <name> --dry-run\|--yes` — release-family switch with a printed edit plan and gateway-skill re-lint | M | S07 | M2 | Done (2026-09-09) |
 | ARC-03-S09 | ARC-03 | `.github/workflows/docs-bump.yml` weekly PR with pin, verification output and newly dead citations | M | S07; ARC-01 (all) | M2 | Not started |
 | ARC-03-S10 | ARC-03 | `NOTICE` attribution, the B02/`docs sync` attribution line, install-page attribution and size/time statement, `docs/ARCHITECTURE.md` corpus section | S | S05; ARC-00-S09; ARC-01 (all); verdicts S-07 | M2 | Not started |
 | ARC-03-S11 | ARC-03 | Windows long-path CI proof and `--docs skip` → doctor FAIL wiring (three-OS real-corpus job) | M | S05, S06; ARC-00-S09/S13; ARC-01-S11; verdicts S-07 | M2 | Not started |

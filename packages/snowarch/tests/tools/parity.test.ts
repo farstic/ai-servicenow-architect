@@ -36,7 +36,10 @@ const throwingClient = new Proxy(
 if (process.env.MCP_TOOL_PACKAGE !== undefined && process.env.MCP_TOOL_PACKAGE !== 'full') {
   throw new Error(
     `MCP_TOOL_PACKAGE=${process.env.MCP_TOOL_PACKAGE} was set before this file was imported, so the `
-    + 'tool catalogue is already filtered and the parity counts below cannot hold. Unset it and re-run.',
+    + 'tool catalogue is already filtered and the parity counts below cannot hold. Unset it and '
+    + 're-run. Note that this variable takes a ROLE BUNDLE, not a preset — the values are the keys '
+    + `of ROLE_BUNDLE_MAP (${Object.keys(ROLE_BUNDLE_MAP).slice(0, 3).join(', ')}, …) plus "full"; a `
+    + 'preset name like "read-only" is not one of them and is silently ignored with a warning.',
   );
 }
 

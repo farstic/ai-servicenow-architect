@@ -13,6 +13,22 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Added
 
+- **`docs family <name>` — the release-family switch, proposed before it is applied.** The dry run
+  is the proposal and `--yes` applies exactly what it printed; no line is edited that was not shown.
+  - **EDIT only when the matched phrase is the line's ONLY family mention.** Anything else —
+    "NOT available in the Australia release family, unlike Vancouver" — is listed under REVIEW
+    whole, because half a sentence about the new family and half about the old is worse than a line
+    nobody touched. On the real tree that is **53 EDIT and 69 REVIEW** lines, every gateway skill
+    carrying at least one of each.
+  - **The pin moves first, while the tree is still clean**, so S07's dirty-tree refusal guards the
+    whole operation instead of tripping on this command's own edits. A tree dirtied between the dry
+    run and the apply is refused before anything is written.
+  - A failing lint exits 1 with everything staged — the maintainer needs the edits to fix what the
+    lint caught — and the output ends with how to finish and how to abandon.
+  - History (`docs/plans`, `docs/spikes`, `docs/decisions`, the changelog, RELICENSING) is never
+    scanned, listed or edited: it records what was true when it was written.
+  - The stored transcript is `docs/validation/ARC-03-S08-family-dry-run.md`.
+
 - **`docs sync --upstream` — the maintainer refresh.** Fetches the family tip (or a named SHA),
   moves the pin and the gitlink, re-runs the citation gate and prints which citations *became* dead.
   It stages both paths and **commits nothing**: a human reads the diff and decides.
