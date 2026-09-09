@@ -221,15 +221,30 @@ test('AC 5 — Node absent is a note in design-only and a FAIL for live', () => 
   assert.equal(checkNode({ exec: oldNode, floors: FLOORS, plat: 'linux', mode: 'live' }).status, 'fail');
   assert.equal(checkNode({ exec: oldNode, floors: FLOORS, plat: 'linux', mode: 'design-only' }).status, 'ok');
 
-  // npm missing is the same finding: live cannot work, design-only is unaffected.
-  const noNpm = execWith({ ...GOOD, 'npm --version': null });
-  assert.equal(checkNode({ exec: noNpm, floors: FLOORS, plat: 'win32', mode: 'live' }).status, 'fail');
-  assert.match(checkNode({ exec: noNpm, floors: FLOORS, plat: 'win32', mode: 'design-only' }).detail,
+  // npm missing is the same finding: live cannot work, design-only is unaffected. Presence is
+  // located rather than executed, so `locate` is what the test controls.
+  const noNpm = { exec: execWith(GOOD), locate: (n) => (n === 'npm' ? null : `/usr/bin/${n}`) };
+  assert.equal(checkNode({ ...noNpm, floors: FLOORS, plat: 'win32', mode: 'live' }).status, 'fail');
+  assert.match(checkNode({ ...noNpm, floors: FLOORS, plat: 'win32', mode: 'design-only' }).detail,
     /npm is not on PATH/);
 
-  const fine = checkNode({ exec: execWith(GOOD), floors: FLOORS, plat: 'darwin', mode: 'live' });
+  const present = { exec: execWith(GOOD), locate: (n) => `/usr/bin/${n}` };
+  const fine = checkNode({ ...present, floors: FLOORS, plat: 'darwin', mode: 'live' });
   assert.equal(fine.status, 'ok');
   assert.equal(fine.detail, '22.11.0 · npm 10.9.0');
+
+  // On Windows npm is a `.cmd`, which Node ≥ 20.12 refuses to spawn without a shell — so it is
+  // located and NOT run. Reading its version is a nicety; reading it wrongly is a wrong FAIL on
+  // every Windows machine, which is what the runner showed.
+  const onWindows = checkNode({
+    exec: (name, a) => {
+      if (name === 'npm') throw new Error('npm.cmd must not be spawned');
+      return execWith(GOOD)(name, a);
+    },
+    locate: (n) => (n === 'npm' ? 'C:\\npm.cmd' : 'C:\\node.exe'),
+    floors: FLOORS, plat: 'win32', mode: 'live' });
+  assert.equal(onWindows.status, 'ok');
+  assert.equal(onWindows.detail, '22.11.0 · npm present', 'located, not executed');
 });
 
 test('check 7 — the machine is recorded, and only 32-bit is worth saying anything about', () => {
@@ -266,6 +281,7 @@ test('the recorded data is versions and a machine — never a path beyond the ro
   const r = await runB00({
     root: '/repo', cwd: '/repo', config: { floors: FLOORS }, docs: 'sparse', mode: 'design-only',
     env: {}, plat: 'darwin', line: () => {}, exec: execWith(GOOD),
+    locate: (n) => `/usr/bin/${n}`,
     statfs: () => ({ bavail: 1e9, bsize: 4096 }),
     probe: async () => ({ ok: true, status: 200, proxy: null }),
   });

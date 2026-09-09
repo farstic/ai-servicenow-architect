@@ -77,7 +77,13 @@ export const samePath = (a, b, plat = process.platform) => {
     let x = String(p).trim();
     // `realpath` first: on macOS `/tmp` and `/var` are symlinks, managed machines symlink home
     // directories, and git always reports the resolved path.
-    try { x = realpathSync(x); } catch { /* a path that does not exist yet still normalises */ }
+    // `.native` is not a detail on Windows: the plain `realpathSync` resolves junctions but leaves
+    // an 8.3 SHORT name alone, so the runner's `C:\Users\RUNNER~1\...` stayed short while git
+    // reported `C:/Users/runneradmin/...` long — one directory, two names, compared unequal. The
+    // native call goes through `GetFinalPathNameByHandle` and canonicalises both.
+    try { x = realpathSync.native(x); } catch {
+      try { x = realpathSync(x); } catch { /* a path that does not exist yet still normalises */ }
+    }
     // Then the PLATFORM'S OWN resolver, chosen by the parameter rather than by which machine is
     // running. `path.resolve` is whichever flavour the host is, so on macOS it leaves
     // `C:/Users/...` untouched and the Windows branch could not be exercised anywhere but
@@ -194,7 +200,7 @@ export async function checkNetwork({ env, plat, probe = probeNetwork, target }) 
  * `note:` there and a hard stop only when the operator asked for the mode that cannot work without
  * it. Saying "install Node" to someone who does not need it is how installers earn their reputation.
  */
-export function checkNode({ exec, floors, plat, mode }) {
+export function checkNode({ exec, locate = (n) => which(n), floors, plat, mode }) {
   const remedy = remedyFor('node', { platform: plat });
   const live = mode === 'live';
   // `usable` is recorded separately from the STATUS, because the two answer different questions:
@@ -216,12 +222,21 @@ export function checkNode({ exec, floors, plat, mode }) {
     return missing(`Node.js ${formatVersion(found) ?? r.stdout.trim()} found, `
       + `≥ ${floors.node} needed for live mode (${remedy})`);
   }
-  const npm = exec('npm', ['--version']);
-  if (!npm.found || !npm.ok) {
+  // npm is checked for PRESENCE, and deliberately not run on Windows.
+  //
+  // There it is `npm.cmd`, and since the CVE-2024-27980 fix (Node 20.12 / 21.7) `child_process`
+  // refuses to spawn a `.cmd` without a shell — so asking it for `--version` fails and npm looks
+  // missing on every Windows machine, which is what the runner showed. Spawning it through a shell
+  // is the thing this module does not do. Presence is the requirement anyway: no floor is compared
+  // against npm's version, so reading it is a nicety and reading it wrongly is a wrong FAIL.
+  const npmPath = locate('npm');
+  if (!npmPath) {
     return missing(`Node.js ${formatVersion(found)} found but npm is not on PATH (${remedy})`);
   }
-  return ok('node', `${formatVersion(found)} · npm ${parseVersion(npm.stdout)
-    ? formatVersion(parseVersion(npm.stdout)) : npm.stdout.trim()}`, { usable: true });
+  const shim = /\.(cmd|bat)$/i.test(npmPath);
+  const npmVersion = shim ? null : parseVersion(exec('npm', ['--version']).stdout);
+  return ok('node', `${formatVersion(found)} · npm ${npmVersion ? formatVersion(npmVersion) : 'present'}`,
+    { usable: true });
 }
 
 /** 7. What machine this is — recorded for B09 and the doctor; only 32-bit is worth a warning. */
@@ -235,7 +250,8 @@ export function checkPlatform({ plat, cpu = arch(), rel = release() }) {
 /** All seven, in order, none of them short-circuiting. */
 export async function runChecks(ctx) {
   const exec = ctx.exec ?? makeExec({ env: ctx.env, plat: ctx.plat });
-  const common = { ...ctx, exec };
+  const locate = ctx.locate ?? ((n) => which(n, { env: ctx.env, platform: ctx.plat }));
+  const common = { ...ctx, exec, locate };
   return [
     checkRoot(common),
     checkGit(common),
@@ -258,7 +274,8 @@ export const run = async (ctx) => {
   const checks = await runChecks({
     root: ctx.root, cwd: ctx.cwd ?? process.cwd(), env: ctx.env ?? process.env,
     floors: ctx.config.floors, docs: ctx.docs, mode: ctx.mode, plat,
-    skip: Boolean(ctx.skipClaudeCheck), exec: ctx.exec, probe: ctx.probe, statfs: ctx.statfs,
+    skip: Boolean(ctx.skipClaudeCheck), exec: ctx.exec, locate: ctx.locate, probe: ctx.probe,
+    statfs: ctx.statfs,
     target: ctx.env?.SNOWARCH_TEST_NET_URL,
   });
 
