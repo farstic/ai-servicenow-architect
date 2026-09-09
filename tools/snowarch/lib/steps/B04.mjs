@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { classifyNpmFailure, NPM_SENTENCE } from '../npm-failures.mjs';
 import { remedyFor } from '../remedies.mjs';
 import { parseVersion, formatVersion } from '../versions.mjs';
+import { childEnv } from '../spawn-env.mjs';
 import { which } from '../which.mjs';
 import { FILE, TEXT } from './inputs.mjs';
 
@@ -152,7 +153,17 @@ export const run = async (ctx) => {
   };
 };
 
-const defaultRunNpm = (npm, root, env) => execFileSync(npm.exec, [...npm.prefix, ...NPM_ARGS], {
+/**
+ * The spawn options npm is given. Exported so the environment can be asserted rather than assumed.
+ *
+ * npm does not read the session variable, but it goes through the same helper as every other child:
+ * an exception maintained by memory is an exception somebody forgets, and the next child added here
+ * may well be one that does read it.
+ */
+export const npmSpawnOptions = (root, env) => ({
   cwd: root, encoding: 'utf8', stdio: 'pipe', maxBuffer: 64 * 1024 * 1024,
-  env: { ...env, NODE_ENV: 'production' },
+  env: childEnv(root, { NODE_ENV: 'production' }, env),
 });
+
+const defaultRunNpm = (npm, root, env) =>
+  execFileSync(npm.exec, [...npm.prefix, ...NPM_ARGS], npmSpawnOptions(root, env));

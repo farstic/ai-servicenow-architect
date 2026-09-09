@@ -29,6 +29,30 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **Every child the bootstrap spawns is now TOLD which checkout it serves.** `CLAUDE_PROJECT_DIR`
+  is the project root of the session that spawned a process, so when our tools spawn something they
+  *are* that session and an inherited value is somebody else's answer. Read from the environment, it
+  made B08 start a server from whichever repository the surrounding Claude Code session was in
+  (`Cannot find module`, exit 1) and would have made the server CLI read and write **that**
+  repository's `.local/instances.json`. Invisible in a plain terminal and in CI, where the variable
+  is unset — found by a reviewer running the tests inside a session, which is the context ARC-07 and
+  ARC-08 will live in. One helper (`childEnv`) now serves every spawn, npm included, and a test
+  plants a bogus value.
+- **B08 — the server started the way Claude Code will start it.** `lib/mcp-handshake.mjs` speaks
+  newline-delimited JSON-RPC over a real child's stdio, stdlib only, with cursor pagination, one
+  retry on an EPIPE at spawn, and every exit through one settle under one deadline. B08 **spawns
+  rather than imports**: the server package has an in-process doctor, and reusing it would prove a
+  library works when imported, which is not the thing that fails. Three comparisons catch opposite
+  mistakes — a tool the contract does not know means `dist/` is ahead of the pin; a *pinned* tool
+  the server does not advertise names its `used_by`, because those are the files that will break.
+- **`.local/doctor-last.json` v1 — the banner's contract.** ARC-08 may add keys, never rename
+  `version`, `at`, `writer`, `mode`, `checks` or `summary`. 0600 and atomic, with the mode applied
+  to the temp file **before** the rename so the finished file is never briefly world-readable, and
+  through the same write-time secret guard as the bootstrap state.
+- **A refused instance file now costs nothing.** Its mode and path are checked at parse time as
+  well as in B06: both answers need no read and no network, and B06 is reached only after B04 has
+  installed 72 MB. Checked twice on purpose — the file can change in between, and B06 is also
+  reachable from a resume that never passed through the parser.
 - **B03, B04, B05 and the B06 slot — live mode becomes one uninterrupted run.** B03 writes down the
   mode the plan already collected and asks nothing; because the mode is a hashed input of B06, B07
   and B08, changing it re-runs exactly those three as a property of the inputs rather than a rule.

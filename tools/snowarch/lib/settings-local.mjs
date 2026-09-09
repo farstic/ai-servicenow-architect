@@ -9,7 +9,7 @@
 // Exported because ARC-08's `--fix` and ARC-06-S12's `mode` both need to write the same file the
 // same way. A second writer would be a second opinion about what "the toggles" are.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const SETTINGS_LOCAL = join('.claude', 'settings.local.json');
@@ -90,11 +90,18 @@ export function isIgnored(root, relative = SETTINGS_LOCAL, env = process.env) {
   } catch { return false; }
 }
 
-/** 2-space JSON with a trailing newline, written through a temp file so a crash cannot truncate it. */
-export function writeJsonAtomic(path, value) {
+/**
+ * 2-space JSON with a trailing newline, written through a temp file so a crash cannot truncate it.
+ *
+ * `mode` is applied to the TEMP file, before the rename: setting it afterwards would leave a
+ * window in which the finished file is world-readable, which for `.local/doctor-last.json` is the
+ * whole point of asking for 0600.
+ */
+export function writeJsonAtomic(path, value, { mode = null } = {}) {
   const tmp = `${path}.tmp-${process.pid}`;
   try {
-    writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`);
+    writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, mode === null ? undefined : { mode });
+    if (mode !== null && process.platform !== 'win32') chmodSync(tmp, mode);
     renameSync(tmp, path);
   } catch (e) {
     rmSync(tmp, { force: true });

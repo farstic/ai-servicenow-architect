@@ -421,6 +421,34 @@ restrictive" are roles the contract expresses as how many flags each raises. Pas
 registered with the redactor the moment they are parsed, before any line is logged, and the
 credential is authenticated exactly **once**.
 
+### B08 verify — the server, spawned the way Claude Code will spawn it
+
+B08 is the first moment the product is actually exercised, and it **spawns** rather than imports:
+the failures worth catching are the child's — a cold start slower than `MCP_TIMEOUT`, a `dist/`
+that does not match the pinned contract, an `SNOW_STORE` in the operator's shell pointing somewhere
+else — and none of them reproduce in-process. `lib/mcp-handshake.mjs` speaks newline-delimited
+JSON-RPC over the child's stdio, stdlib only: `initialize` → `notifications/initialized` →
+`tools/list` with cursor pagination → (live) one `tools/call`, then stdin closed and ≤ 5 s to exit.
+One retry on an EPIPE at spawn, because npm has just written `node_modules`; every other failure is
+a failure, and every exit goes through one settle under one deadline.
+
+Three comparisons, catching opposite mistakes: a tool the server advertises that the contract does
+not know means `dist/` is ahead of the pin; a **pinned** tool the server does not advertise means
+the governance texts cite something nobody can call, so that one names its `used_by` — those are
+the files that will break. Unconfigured is a different expectation rather than a relaxed one: S-17
+says exactly the core set, and the names come from the build that decides them.
+
+#### `.local/doctor-last.json` v1 — what the banner reads
+
+The SessionStart banner must print a verdict in under 300 ms on a machine that may have no Node, so
+it cannot run checks; it reads the last ones. That makes this file a **contract**: ARC-08-S01's
+schema may add keys, never rename `version`, `at`, `writer`, `mode`, `checks[]{id,status,detail,remedy?}`
+or `summary`. `writer` says who produced it — `bootstrap` here, `doctor` in ARC-08 — so a banner
+reading a cache from a run that skipped half the checks can tell. It is 0600 and atomic, with the
+mode applied to the temp file **before** the rename so the finished file is never briefly
+world-readable, and it goes through the same write-time secret guard as the bootstrap state: a URL,
+an address or a registered secret fails the write rather than reaching a file things read casually.
+
 ### The resume rule
 
 For each step in order: `runsWhen` false → `skipped (<reason>)`; `--from BNN` and the step is at or

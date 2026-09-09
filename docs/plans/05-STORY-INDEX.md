@@ -92,7 +92,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-06-S05 | ARC-06 | B01 workspace and B07 `settings.local.json` toggles (merge, never overwrite); cloud-sync WARN; `.local/config.json` | M | S03; ARC-00-S04/S06; verdicts S-01 S-05 | M3 | Done (2026-09-09) |
 | ARC-06-S06 | ARC-06 | B02 docs step calling the ARC-03 recipe; `--docs sparse\|full\|skip`; launcher recipe parity | M | S03; ARC-03-S05/S06 | M3 | Done (2026-09-09) |
 | ARC-06-S07 | ARC-06 | B03 mode line of the plan; B04 `npm ci`; B05 contract sha check; the B06 wizard slot; `--instance-file` non-interactive live bootstrap | L | S03, S05; ARC-00-S08; ARC-04-S02/S03/S13; ARC-05-S01; verdicts S-15 | M3 | Done (2026-09-09) |
-| ARC-06-S08 | ARC-06 | B08 MCP stdio handshake and live-probe invocation; `.local/doctor-last.json` v1 | M | S07; ARC-04-S04/S13; ARC-07-S06 | M3 | Not started |
+| ARC-06-S08 | ARC-06 | B08 MCP stdio handshake and live-probe invocation; `.local/doctor-last.json` v1 | M | S07; ARC-04-S04/S13; ARC-07-S06 | M3 | Done (2026-09-09) |
 | ARC-06-S09 | ARC-06 | B09 summary: `DOCTOR:` line, authoritative `Mode:` line, next-step text with the dialog budget | S | S05, S08; ARC-00-S04; verdicts S-01 | M3 | Not started |
 | ARC-06-S10 | ARC-06 | `bootstrap.sh` (bash 3.2-clean) with the Node-free design-only path | L | S04, S05, S06, S09 | M3 | Not started |
 | ARC-06-S11 | ARC-06 | `bootstrap.ps1` + `bootstrap.cmd` with the Node-free design-only path; `snowarch.cmd` | L | S10; ARC-00-S06/S07/S13; verdicts S-03 S-08 | M3 | Not started |
