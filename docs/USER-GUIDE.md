@@ -38,11 +38,18 @@ they walk you through connecting a ServiceNow instance.
 never from what the session infers. Four shapes:
 
 ```
-Mode: live — instance=pdi (pdi) preset=pdi-developer — doctor 2026-09-08 41 ok
-Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance
+Mode: live — instance=pdi (pdi) preset=pdi-developer
+Mode: design-only
 Mode: unknown — this checkout has not been bootstrapped; run ./bootstrap.sh (Windows: bootstrap.cmd)
 Mode: <mode> — from bootstrap state; doctor unavailable until Node 20+ is installed
 ```
+
+The first two are the **base** line, produced by one function (`tools/snowarch/lib/text.mjs`
+`modeLine()`) and quoted verbatim by the bootstrap's summary, the SessionStart banner,
+`/snowarch status` and `snowarch mode` — four programs, one string, so they cannot answer "what am
+I in" three different ways. The doctor additionally prints a **detailed** variant that appends its
+own findings (` — doctor <date> <n> ok`, flags, tool count); that is a longer line for a longer
+report, not a second definition of the Mode line.
 
 If you ever see a mode stated without one of these shapes, the session has guessed and you should
 ask it to run `/snowarch status` again. **Live mode is not the same as permission to write** — every
