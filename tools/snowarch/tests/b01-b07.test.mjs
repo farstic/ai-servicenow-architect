@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { run as runB01, ensureLocalDir, committedFilesUnchanged } from '../lib/steps/B01.mjs';
 import { run as runB07, writeConfig, CONFIG_FILE } from '../lib/steps/B07.mjs';
 import {
@@ -343,17 +344,24 @@ test('B01 and B07 run in a checkout with no node_modules at all', () => {
   // `npm ci`, so anything either step touches has to work with an empty `node_modules`.
   const root = makeCheckout();
   assert.equal(existsSync(join(root, 'node_modules')), false, 'precondition: nothing installed');
-  const script = `
-    import { run as b01 } from ${JSON.stringify(join(process.cwd(), 'tools/snowarch/lib/steps/B01.mjs'))};
-    import { run as b07 } from ${JSON.stringify(join(process.cwd(), 'tools/snowarch/lib/steps/B07.mjs'))};
-    const cfg = JSON.parse(require('node:fs').readFileSync(${JSON.stringify(join(root, 'engine.config.json'))}, 'utf8'));
-    const ctx = { root: ${JSON.stringify(root)}, config: cfg, mode: 'design-only',
-      node: { present: true }, state: { steps: {}, registration: 'project' }, line: () => {} };
-    const a = await b01(ctx); const b = await b07(ctx);
-    process.stdout.write(a.status + ' ' + b.status);
-  `;
-  const out = execFileSync(process.execPath, ['--input-type=module', '-e',
-    `import { createRequire } from 'node:module'; const require = createRequire(${JSON.stringify(join(root, 'x.js'))}); ${script}`],
-  { cwd: root, encoding: 'utf8' });
+
+  // Written to a FILE and run by path, not passed as `-e`. A one-line `--input-type=module -e`
+  // carrying two absolute Windows paths is a quoting problem waiting to happen, and it duly
+  // happened on all three Windows cells while passing here.
+  const probe = join(root, 'probe.mjs');
+  const url = (p) => pathToFileURL(join(process.cwd(), p)).href;
+  writeFileSync(probe, [
+    `import { run as b01 } from ${JSON.stringify(url('tools/snowarch/lib/steps/B01.mjs'))};`,
+    `import { run as b07 } from ${JSON.stringify(url('tools/snowarch/lib/steps/B07.mjs'))};`,
+    "import { readFileSync } from 'node:fs';",
+    `const root = ${JSON.stringify(root)};`,
+    "const cfg = JSON.parse(readFileSync(root + '/engine.config.json', 'utf8'));",
+    "const ctx = { root, config: cfg, mode: 'design-only', node: { present: true },",
+    "  state: { steps: {}, registration: 'project' }, line: () => {} };",
+    'const a = await b01(ctx); const b = await b07(ctx);',
+    "process.stdout.write(a.status + ' ' + b.status);",
+  ].join('\n'));
+
+  const out = execFileSync(process.execPath, [probe], { cwd: root, encoding: 'utf8' });
   assert.equal(out, 'ok ok');
 });
