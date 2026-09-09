@@ -49,6 +49,30 @@ Windows), and **tree plus `.git`** is 302 MB macOS / 305 MB Ubuntu / 315 MB Wind
 takes the whole corpus instead: **447 MB and 48,997 files** (measured 2026-09-09 on the reference
 macOS machine — ARC-00 S-07 did not measure full mode).
 
+<!-- ARC-06-S13: move to docs/INSTALL.md "Operators and CI" -->
+**Operators and CI — a live install with no keyboard.** `./snowarch bootstrap --mode live --yes
+--instance-file <path>` reads its connection details from a file instead of prompting, so a
+credential never passes through a command line, a transcript, an environment dump or a shared
+config file. The file is a **store document** — the same shape as `.local/instances.json`, so `cp`
+from another checkout works:
+
+```json
+{ "version": 1,
+  "instances": {
+    "pdi": { "url": "https://dev123456.service-now.com",
+             "auth": { "method": "basic", "username": "<user>", "password": "<password>" } } } }
+```
+
+It must be **mode 0600 or stricter** (checked before it is read) and **somewhere git could not
+commit it** — outside the checkout, or gitignored inside it. `environment` and `preset` may be
+omitted: a `dev*.service-now.com` URL proposes `pdi`, a sandbox proposes the most permissive preset
+and production the most restrictive, and every proposal is printed with `accepted: --yes` so nothing
+is decided silently. A production instance above the read-only preset additionally needs
+`"prodWriteAck": true` in the file. The credential is authenticated **once** — there is no retry,
+because a second attempt is the same wrong password sent again — and nothing is saved unless it
+succeeds. The file is never copied, moved or deleted; the run reminds you it still holds your
+credentials. On Windows the mode cannot be checked and the run says so: delete the file after use.
+
 Every `docs sync` ends with the line
 `docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE`,
 and the corpus's own `LICENSE` and `legal/` are present in every checkout, sparse or full.

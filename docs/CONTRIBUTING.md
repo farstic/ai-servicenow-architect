@@ -786,6 +786,18 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## Import the store modules lazily, and type-check before you push
+
+`packages/snowarch/dist/store/schema.js` and `index.js` import zod, which exists only after B04's
+`npm ci`. Anything the step registry loads — B06, `lib/instance-file.mjs` — must therefore reach
+them with a dynamic `import()` inside the function that needs them, never at module load: a static
+import would make `./snowarch bootstrap --mode design` fail on a fresh clone, which is the product's
+whole first impression. A test asserts it by scanning the sources.
+
+And run `npm run type-check` before pushing any change under `packages/` — `npm test` does not
+type-check the server package, and nine CI cells will find in a minute what one command finds
+locally.
+
 ## The recipe has one source
 
 The git-only corpus recipe lives in `tools/snowarch/lib/docs/recipe-block.mjs` and nowhere else.

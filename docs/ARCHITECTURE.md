@@ -367,6 +367,60 @@ endings, because `.gitattributes` stores `*.ps1` as `eol=crlf` and a generator t
 it would report STALE for ever on a clean checkout. A pin bump regenerates all three, so its staged
 list is five paths when the pin moves and two when it does not.
 
+### B03–B06 — mode, dependencies, contract, instance
+
+**B03** writes down the answer the plan screen already collected — into the state and
+`.local/config.json`, through B07's writer — and asks nothing. Because the mode is a hashed input of
+B06, B07 and B08, changing it re-runs exactly those three; that is a property of the inputs, not a
+rule somewhere.
+
+**B04** runs `npm ci --omit=dev --ignore-scripts --no-audit --no-fund` at the root (the S-15
+verdict), as a script under the running Node rather than through the `npm` shim — `child_process`
+refuses a `.cmd` without a shell, and a shell is what the bootstrap does not use. `--ignore-scripts`
+is the difference between installing packages and running whatever their authors put in
+`postinstall`, on a machine that has just cloned a repository. The post-check asks whether every
+dependency the server *declares* resolves *from `dist/server.js`* — hoisting-safe, no names typed —
+and treats `ERR_PACKAGE_PATH_NOT_EXPORTED` as present, because only an installed package can refuse
+a subpath. npm's failures map to remedies that fit them: registry DNS, TLS interception, lockfile
+integrity, `EACCES`, disk; anything else shows the last twenty log lines and the log's path.
+
+**B05** asks three questions about the checkout's own consistency — the contract's sha against the
+engine's pin, every pinned tool present in the contract, and the server's suggested registration key
+against `engine.config.json`. It runs in **both** modes: design-only grounds its rules in the same
+contract. ARC-05's CI proves this on every commit; B05 proves it on the machine about to run.
+
+#### The B06 slot
+
+Two ways in, and they are different jobs.
+
+```js
+// Interactive — SPAWN, never import: the wizard reads raw-mode keystrokes and masks a password,
+// and a library called in-process cannot own a TTY the bootstrap is also using.
+spawnSync(process.execPath,
+  [root + '/packages/snowarch/dist/cli/index.js', 'instance', 'add', '--from-bootstrap'],
+  { stdio: 'inherit', cwd: root })
+// exit 0 → the wizard printed its own secret-free summary; B06 then reads the label back through
+//          the store module, and learns nothing else — never a URL, a username or a credential.
+
+// Non-interactive — ARC-07-S05's addInstance(); until it lands, the store module directly:
+addInstance({ label, url, environment, auth, preset | flags, makeDefault, global: false, yes: true },
+            io) → { saved, entry /* masked */, lastProbe, exitCode }
+```
+
+`dist/cli/index.js` exists only after B04, so both are reached lazily; the CLI is probed for
+`instance add` **before** it is spawned, so a build that does not have it yet is named rather than
+spawned into. No terminal and no `--instance-file` is a named failure, not a hang.
+
+**`--instance-file`** is the operator's path (README, "Operators and CI"). The file is a store
+document, checked for mode 0600 *before it is read* — a file the group can read has already leaked —
+and refused if git could commit it. **The D-05 proposals are applied before validation**, and that
+order is forced rather than chosen: the store schema is strict and requires `environment` and
+`preset`, so a file that omits them — exactly the file D-05 says to accept — cannot be parsed until
+they are filled in. The presets are chosen by **shape**, not by name: "most permissive" and "most
+restrictive" are roles the contract expresses as how many flags each raises. Passwords are
+registered with the redactor the moment they are parsed, before any line is logged, and the
+credential is authenticated exactly **once**.
+
 ### The resume rule
 
 For each step in order: `runsWhen` false → `skipped (<reason>)`; `--from BNN` and the step is at or

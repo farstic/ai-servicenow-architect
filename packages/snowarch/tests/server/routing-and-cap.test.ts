@@ -17,10 +17,11 @@ const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/serv
  * the handler USES them — a `capResult` with no caller passes every unit test it has, and a
  * grep proves only that one spelling of the routing is absent.
  *
- * The two instances below use `.invalid` hosts on purpose: the name is guaranteed never to
- * resolve, so the DNS failure is deterministic and its message names the host that was
- * contacted. That name is the evidence — a call that had honoured `instance: "other"` would
- * fail against the other host, and the assertion would read the difference.
+ * The two instances below use distinct fixture hostnames on purpose: the name that appears in the
+ * failure is the evidence — a call that had honoured `instance: "other"` would name the other
+ * host, and the assertion reads the difference. The names are never resolved, and they no longer
+ * lean on a reserved TLD: "guaranteed never to resolve" turned out to be a promise a corporate or
+ * CI resolver does not always keep.
  */
 let base: string;
 let checkout: string;
