@@ -13,6 +13,35 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Added
 
+- **Attribution, the measured figures, and one corpus section instead of six.**
+  - Every successful `docs sync` now ends with
+    `docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE`
+    — suppressed by `--quiet`, never inside `--json`, and the same constant closes the launcher
+    recipe and appears in `README.md`. Three copies of a licence line is three chances for one to be
+    wrong, so a test compares them.
+  - `NOTICE` gains the corpus paragraph. Its claim that the corpus's `LICENSE` **and `legal/`** are
+    "preserved in every checkout, sparse or full" was **not true when written**: `legal/` is a root
+    DIRECTORY and cone mode materialises root files only. The recipe now carries it by name and the
+    completeness check fails without it — the claim is enforced rather than softened.
+  - `README.md` carries the install figures: **302 MB and about 35 s** sparse (measured 2026-09-06,
+    ARC-00 S-07), and **447 MB / 48,997 files** for `--mode full` (measured 2026-09-09 — S-07 never
+    measured full mode, and the README says so rather than borrowing a number).
+  - `docs/ARCHITECTURE.md`: the six corpus sections S05–S09 each added are folded into one —
+    "Docs corpus: how the pin, the areas file and the gate relate" — three artefacts, who writes and
+    reads each, four invariants, then the commands, the exit table and the recipe block.
+
+### Fixed
+
+- **`sync` reported "up to date" over a checkout missing a directory it required.** Adding `legal/`
+  to the cone changed what the recipe WRITES but not what `inspect` COMPARED, so the two disagreed
+  and the comparison won. One definition of the cone now, used by both.
+- **The `ai-gateway-overview.md` citation, remapped in three places.** Upstream withdrew the AI
+  Gateway surface between `ba513f2` and `11b39be` — at the tip there is no `ai-gateway*` page and no
+  MCP page in `ai-control-tower/` at all, so this was a withdrawal, not a rename. The rows now cite
+  `configure-third-party-llms-using-ai-control-tower.md` and `ai-model-providers.md`, which resolve
+  at **both** pins. The bump report named one dead path; there were **three citation sites**, because
+  the report groups by path, and a remap has to fix every site.
+
 - **The weekly docs bump, as a schedule rather than an intention.** P-11 records a monthly refresh
   ritual that was never executed; `.github/workflows/docs-bump.yml` runs it on Mondays at 05:17 UTC
   and opens one pull request. **It never merges.**

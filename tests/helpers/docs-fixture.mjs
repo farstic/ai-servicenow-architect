@@ -53,6 +53,10 @@ function buildUpstream(dir) {
     mkdirSync(join(src, ...a.split('/')), { recursive: true });
     writeFileSync(join(src, ...a.split('/'), 'index.md'), `# ${a}\n`);
   }
+  // `legal/` mirrors the real corpus: a root-level DIRECTORY that cone mode would not materialise,
+  // which is why the recipe names it and the completeness check enforces it (ARC-03-S10).
+  mkdirSync(join(src, 'legal'), { recursive: true });
+  writeFileSync(join(src, 'legal', 'README.md'), '# Legal Information\n');
   writeFileSync(join(src, 'markdown/alpha', LONG_NAME), '# long\n');
   git(['add', '-A'], src);
   git(['commit', '-qm', 'first'], src);

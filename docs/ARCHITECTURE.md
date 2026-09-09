@@ -88,153 +88,99 @@ no empty directories, so a path appears in the repository only when its owner pu
 | `docs/MIGRATION.md` | **ARC-10** | migration and cutover |
 | `.local/` · `clients/` | — | **gitignored, per checkout**; never committed |
 
-## `docs status` and the `docsStatus()` shape
+## Docs corpus: how the pin, the areas file and the gate relate
 
-**Computed here, wrapped by ARC-08.** `tools/snowarch/lib/docs/status.mjs` answers whether the corpus
-is present, pinned, on the right family, correctly sparse and fully cited. The doctor assigns check
-ids, severities and `--fix` actions to what it returns, and `/snowarch status` quotes the doctor —
-so there is one derivation of these facts, not three. It never touches the network; `--fetch` is
-ARC-03-S07's.
+Three artefacts, and the design is which of them may disagree with which.
 
-```
-docs corpus: vendor/ServiceNowDocs
-  pin        ba513f2  gitlink ba513f2  HEAD ba513f2            ok
-  family     australia  branch australia                       ok
-  checkout   sparse (cone), 19/19 areas, 34,359 files, 179 MB  ok
-  citations  checked: 180 | dead: 0                            ok
-```
+| Artefact | Written by | Read by |
+|---|---|---|
+| **the commit** — the gitlink and `docs.pin`, the same SHA | the seed commit, then only `docs sync --upstream` — never by hand | the recipe, the launchers, the doctor's E-checks, `docs-bump.yml`, ARC-09's release tag |
+| **`vendor/docs-areas.txt`** — which areas materialise | `scripts/gen-docs-areas.mjs`, from the areas actually cited; CI fails when stale | the cone, the completeness check, the launcher recipe |
+| **the citation gate** — every `markdown/…` path cited in the engine | nobody: a property of the skills | `docs verify`, `docs status`, the bump workflow, CI |
 
-Divergences print `MISMATCH` in the last column with the remedy on the next line — `run node
-scripts/docs.mjs sync`, except `pin ≠ gitlink`, which is a maintainer action
-(`node scripts/docs-bump.mjs --to <gitlink>`, owned by S07/S09). An absent corpus prints one
-`docs corpus: MISSING` block. Exit codes: **0** all ok · **1** any mismatch · **3** missing; `--json`
-exits 0 unless the command itself failed, so a caller reading the object always gets the object.
+**The invariants**, in the order they are checked:
 
-**Schema v1.** Twenty keys, versioned so additions are non-breaking:
+- `docs.pin` **==** the gitlink. They diverge only while a bump is staged; `docs status` prints
+  `(staged)` for exactly that window instead of MISMATCH.
+- the cone **==** the areas file **plus `legal/`**. `legal/` is neither an area nor a root file, so
+  cone mode leaves it out — the recipe names it and the completeness check enforces it, because
+  NOTICE claims it is in every checkout and a claim nothing checks is a claim that decays.
+- **dead citations == 0.** A citation upstream removed is the corpus saying a skill is now wrong
+  about the platform. Never fixed by deleting the citation.
+- **an absent corpus is a FAIL, never a skip** — the script this replaced exited 0 with the corpus
+  missing, so a fresh clone passed with every citation unverified.
 
-| Key | Meaning |
-|---|---|
-| `present` · `path` | is there a corpus, and where |
-| `pin` · `gitlink` · `head` · `pinMatchesGitlink` · `headMatchesPin` | the three commits that must agree, and the two comparisons |
-| `family` · `branch` · `familyMatches` | recipe C leaves a DETACHED head, so the family comes from the tracked branch, not from HEAD |
-| `sparse` | `cone` · `full` · `pattern` · `none`. `pattern` is ADR-0008's shape — sparse on, cone off — reported separately because the remedy differs |
-| `areasExpected` · `areasPresent` · `areasMissing` | against the generated areas file |
-| `mode` | what was ASKED for (`.local/bootstrap-state.json`, written by ARC-06), inferred from the checkout when absent. `mode` and `sparse` can disagree, and both are reported: the disagreement is the finding |
-| `fileCount` · `sizeBytes` | opt-in — a 35k-file walk costs about a second and does not belong in a hook's budget |
-| `citations` | the S03 verify result, or `null` when `verify: false`. **The key is always present**, so a consumer distinguishes "not asked" from "asked and empty" |
-| `longpaths` | `true`/`false` on Windows, `null` elsewhere — the setting does not exist there, and `false` would read as "off" |
-| `schema` | `1` |
+### The commands
 
-## The maintainer refresh, and the exit codes
+`docs sync` reconciles locally and is safe for anyone: clone if absent, mode, pin, gitlink, the
+ADR-0008 root repair. A clean second run issues no git write and prints `up to date`. Every
+successful run ends with the attribution line.
 
-`node scripts/docs.mjs sync --upstream [--to <sha>] [--json] [--no-verify]` moves the pin forward
-and shows what it broke. Five things happen, in this order and no other:
+`docs status` answers "is this corpus right" in four lines — pin/gitlink/HEAD, family/branch,
+checkout shape and areas, citations — each `ok` or `MISMATCH` with the remedy beneath. It is
+computed by `docsStatus()`, which ARC-08's doctor wraps rather than re-derives.
 
-1. **Refuse a dirty tree outside `vendor/`** — before any network call. A dirty *corpus* does not
-   block it: that is `sync`'s refusal, and this command is about to move the corpus anyway.
-2. **Fetch** the family branch, or the named SHA.
-3. **Verify at the current pin** — the baseline. It has to run before the move, because "which
-   citations *became* dead" is a difference between two states and the first one stops existing the
-   moment the corpus moves.
-4. **Move and verify again**, sparse set untouched.
-5. **Write the pin and stage** `engine.config.json` and `vendor/ServiceNowDocs`. **Nothing is
-   committed.** A human reads the report and decides.
+`docs sync --upstream` is the maintainer refresh: refuse a dirty tree, fetch, **verify at the old
+pin**, move, verify again, write the pin, stage. The baseline runs first because "newly dead" is a
+difference between two states and the first stops existing when the corpus moves. It stages and
+**never commits**.
 
-The pin write replaces one 40-hex string in the file rather than reparsing it, so the diff a
-reviewer reads is one token, not a reformat. An upstream that rewrote history can leave the tip
-*behind* the current pin: the command follows it and says `(older than the current pin)` on the pin
-line, because silently staying put would hide the rewrite.
+`docs family <name>` switches release family. The dry run **is** the proposal; `--yes` applies
+exactly what it printed. A prose line is edited only when the matched phrase is its *only* family
+mention — anything else is REVIEW, because half a sentence about the new family and half about the
+old is worse than an untouched line. The pin moves first, while the tree is still clean, so the
+dirty-tree refusal guards the whole operation rather than tripping on the command's own edits.
 
-The report's headings are a contract — ARC-03-S09's workflow pastes them verbatim into a pull
-request body and keys on **exit 1** meaning "the pin moved and citations broke, someone must remap".
-
-### Switching release family
-
-`node scripts/docs.mjs family <name> [--dry-run | --yes] [--from <name>]` — the dry run **is** the
-proposal (principle 10), and `--yes` applies exactly what it printed.
-
-1. **Validate and look upstream.** `ls-remote --heads` needs the network even for a dry run, and the
-   output says so. A branch that is not there exits 6 with S07's sentence.
-2. **Plan.** `.gitmodules`, `engine.config.json`, the schema enum when the target is new, and every
-   prose line whose *only* family mention sits inside the phrase set. A line with any other mention
-   goes to **REVIEW** whole: half a sentence about the new family and half about the old is worse
-   than a line nobody touched.
-3. **Apply, pin first.** The pin moves against the new branch while the tree is still clean, so
-   S07's dirty-tree refusal still guards the whole operation instead of tripping on this command's
-   own edits.
-4. **Re-lint and stage.** A failing lint exits 1 with everything staged — the maintainer needs the
-   edits in order to fix what the lint caught — and the last two lines say how to finish and how to
-   abandon.
-5. **Never commits.** History (`docs/plans`, `docs/spikes`, `docs/decisions`, the changelog,
-   RELICENSING) is never scanned, listed or edited: it records what was true when it was written.
-
-### The weekly bump
-
-`.github/workflows/docs-bump.yml` (Mondays 05:17 UTC, plus `workflow_dispatch` with `to` and
-`dry_run`) runs the refresh on a clean runner and opens **one** pull request — branch
-`chore/docs-bump-<short>`, stable per target SHA, so a re-run updates rather than duplicates and a
-newer tip closes the older PR as superseded. `scripts/docs-bump.mjs` is a thin wrapper: it renders
-the pull-request body from S07's report **verbatim inside a fence** and decides nothing. Labels are
-`docs-corpus`, plus `needs-remap` when a citation broke.
-
-**It never merges.** A bump changes what every gateway skill is grounded in; the PR's own CI goes red
-on a dead citation and stays red until a human remaps it. A **dry run** exits 0 with the body in the
-log and a `::warning::` for newly dead citations — reporting is its job, and the red build belongs on
-the pull request where someone can act on it. Exit 6 fails the job loudly; exit 4 cannot happen on a
-fresh checkout and is treated as a bug in the recipe if it does.
+`.github/workflows/docs-bump.yml` runs the refresh weekly and opens **one** pull request — branch
+named for the target SHA, so a re-run updates rather than duplicates and a newer tip supersedes the
+older. **It never merges.** A dry run exits 0 with a `::warning::`; the red build belongs on the
+pull request, where someone can act on it.
 
 ### Exit codes — every `docs` sub-command shares one table
 
 | Code | Meaning |
 |---|---|
 | **0** | ok |
-| **2** | a plan was printed and not applied — `family <name>` without `--yes` |
-| **1** | `sync`: the checkout is incomplete · `--upstream`: the pin moved **and** citations broke · `verify`: dead citations · `status`: a mismatch |
+| **1** | incomplete checkout · the pin moved **and** citations broke · dead citations · a status mismatch |
+| **2** | a plan was printed and not applied (`family` without `--yes`) |
 | **3** | the corpus is missing |
 | **4** | the working tree is not clean — nothing was touched |
 | **5** | git failed; the message says how (DNS · proxy · TLS · unfetchable pin · disk) |
-| **6** | the upstream does not have what was asked for — a renamed family branch, or an unreachable SHA |
+| **6** | the upstream does not have what was asked for — renamed branch, unreachable SHA |
 
-4 and 5 are deliberately distinct: one is "you have unsaved work", the other "the transport failed",
-and a caller that collapsed them would send someone to check their network over an unstaged edit.
-6 is narrower still — neither the operator's fault nor a transport failure, and its remedy is to
-find out what the branch is called now.
+4, 5 and 6 stay distinct: "you have unsaved work", "the transport failed" and "it is not there" have
+three different remedies, and a caller that collapsed them would send someone to the wrong one.
 
-## The git-only corpus recipe
+### The git-only corpus recipe
 
-ARC-06's launchers run this when Node is absent — `bootstrap.sh` on bash 3.2 (macOS ships it) and
-`bootstrap.ps1` on PowerShell 5.1. It is the **only** git-only sequence, and it is not a paraphrase
-of what `tools/snowarch/lib/docs/sync.mjs` does: `tests/docs-recipe.test.mjs` asserts this block is
-byte-identical to `node scripts/docs.mjs sync --print-recipe --mode sparse` on a tree with no
-checkout, which is the launcher's situation. Edit the module, regenerate, paste; never the reverse.
-
-The area list is one long line on purpose. `sparse-checkout set --cone` takes the directories as
-arguments, and a wrapped or reordered list is a different checkout.
+ARC-06's launchers run this when Node is absent. It is not a paraphrase of
+`tools/snowarch/lib/docs/sync.mjs`: `tests/docs-recipe.test.mjs` asserts this block is byte-identical
+to `--print-recipe` on a tree with no checkout. Edit the module, regenerate, paste — never the
+reverse. The area list is one long line on purpose; a wrapped or reordered list is a different
+checkout.
 
 ```sh
 git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs
-git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform
+git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform legal
 git -C vendor/ServiceNowDocs fetch --depth 1 origin ba513f2c62d3698ef5bfdd8044110226b8419689
 git -C vendor/ServiceNowDocs checkout --detach ba513f2c62d3698ef5bfdd8044110226b8419689
 git submodule absorbgitdirs vendor/ServiceNowDocs
 git submodule init -- vendor/ServiceNowDocs
+echo "docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE"
 ```
 
-Then the launcher checks only that each line of `vendor/docs-areas.txt` exists as a directory under
-`vendor/ServiceNowDocs/markdown/`, and prints `citations: not verified until Node 20+ is installed`
-— citation verification needs the corpus reader, which needs Node.
-
-**On Windows the sequence above gains one line**, and the PowerShell launcher must run it after the
-clone — a single block cannot be byte-identical on both platforms, so this one is the POSIX form:
+**On Windows the sequence gains one line** — a single block cannot be byte-identical on both
+platforms, so this one is the POSIX form:
 
 ```powershell
 git -C vendor/ServiceNowDocs config core.longpaths true
 ```
 
-The module also adds `-c core.longpaths=true` to every git call it makes on `win32`. ARC-00 S-07 acceptance criterion 2 was **refuted** — every recipe passed on
-`windows-latest` with the setting off, because the longest corpus path (197 characters) plus a
-checkout prefix still fits in 260. It is kept for the margin, not for a failure anyone can
-reproduce today; the reasoning is in the module so it is not removed as dead weight.
+The launcher then checks that each line of `vendor/docs-areas.txt` exists under
+`vendor/ServiceNowDocs/markdown/` and prints `citations: not verified until Node 20+ is installed`.
+ARC-00 S-07 acceptance criterion 2 was refuted — the corpus fits inside 260 characters under a
+*short* prefix — but a CI temp directory ate that margin in ARC-03-S05, so `core.longpaths` stays.
+
 
 ## Roster
 

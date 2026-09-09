@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  CORPUS_DIR, EXIT, SyncError, classifyGitFailure, inspect, maskProxy, planRecipe, resolveMode,
-  ROOT_FILES, syncCorpus,
+  ALWAYS_DIRS, ATTRIBUTION, CORPUS_DIR, EXIT, SyncError, classifyGitFailure, coneArgs, inspect, maskProxy,
+  planRecipe, resolveMode, ROOT_FILES, syncCorpus,
 } from '../tools/snowarch/lib/docs/sync.mjs';
 // One fixture, shared with tests/docs-status.test.mjs — see tests/helpers/docs-fixture.mjs.
 import { AREAS, LONG_NAME, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
@@ -51,10 +51,13 @@ test('AC 1 — a fresh sync lands at the pin, sparse, complete, initialised', ()
   assert.equal(s.head, upstream.pin, 'HEAD is not the pin');
   assert.equal(s.sparseOn, true);
   assert.equal(s.coneOn, true);
-  assert.deepEqual([...s.sparseList].sort(), [...AREAS].sort());
+  assert.deepEqual([...s.sparseList].sort(), [...coneArgs(AREAS)].sort());
   assert.equal(s.initialised, true, `superproject still reports uninitialised: ${s.submodule}`);
   assert.equal(r.completeness.ok, true);
   for (const f of ROOT_FILES) assert.ok(existsSync(join(corpusOf(w), f)), `missing root file ${f}`);
+  // The NOTICE claim, enforced: cone mode would leave a root-level DIRECTORY out, so the recipe
+  // names it and this is what stops the claim decaying into prose nobody checks.
+  for (const d of ALWAYS_DIRS) assert.ok(existsSync(join(corpusOf(w), d)), `missing always-dir ${d}`);
   // The pin's own content, not just its hash — proof the checkout followed the fetch.
   assert.ok(existsSync(join(corpusOf(w), 'markdown/beta/extra.md')), 'the pinned commit is not checked out');
   assert.ok(existsSync(join(corpusOf(w), 'markdown/alpha', LONG_NAME)), 'the 197-char path is absent');
@@ -76,7 +79,13 @@ test('AC 2 — a second run changes nothing, quickly, and says so', () => {
   assert.equal(r.changed, false, 'the second run reported a change');
   console.log(`    second run: ${elapsed.toFixed(1)} s`);
   assert.ok(elapsed < 60, `second run took ${elapsed.toFixed(1)} s — it is not a no-op`);
-  assert.deepEqual(lines, [`[docs] up to date (pin ${upstream.pin.slice(0, 7)}, sparse, ${AREAS.length} areas)`]);
+  // Two lines now: the up-to-date line, then the attribution — printed on EVERY successful sync,
+  // including a no-op one, because whose documentation this is does not depend on whether anything
+  // changed. Asserted as a pair so a third line cannot appear unnoticed.
+  assert.deepEqual(lines, [
+    `[docs] up to date (pin ${upstream.pin.slice(0, 7)}, sparse, ${AREAS.length} areas)`,
+    ATTRIBUTION,
+  ]);
 });
 
 test('AC 3 — a checkout at the wrong commit is returned to the pin by hash', () => {
@@ -100,7 +109,7 @@ test('AC 4 — a narrowed sparse set is restored and the files come back', () =>
 
   const r = syncCorpus({ ...w, log: silent });
   const s = inspect(w.root, w.config, r.areas);
-  assert.deepEqual([...s.sparseList].sort(), [...AREAS].sort());
+  assert.deepEqual([...s.sparseList].sort(), [...coneArgs(AREAS)].sort());
   for (const a of AREAS) assert.ok(existsSync(join(corpus, ...a.split('/'))), `${a} did not come back`);
 });
 
