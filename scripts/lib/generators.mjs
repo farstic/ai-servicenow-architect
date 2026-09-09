@@ -56,7 +56,8 @@ export const GENERATORS = [
     id: 'gen-launcher-text',
     script: 'scripts/gen-launcher-text.mjs',
     supportsRoot: true,
-    targets: ['bootstrap.sh'],
+    // Two since ARC-06-S11: the PowerShell launcher shares the same sentences in its own syntax.
+    targets: ['bootstrap.sh', 'bootstrap.ps1'],
   },
   {
     id: 'gen-retired-names',
@@ -68,6 +69,17 @@ export const GENERATORS = [
     id: 'gen-readme-tables',
     script: 'scripts/gen-readme-tables.mjs',
     supportsRoot: false,
-    targets: ['README.md'],
+    // The SERVER package's README — the presets, families, bundles and error-code tables rendered
+    // from `dist/contract.json`. Listed as `README.md` until ARC-06-S13 looked: that is a different
+    // document from the root README, and the root one has never had a generated block.
+    targets: ['packages/snowarch/README.md'],
+  },
+  {
+    // ARC-06-S13, and LAST on purpose: it reads `text.json`, which `gen-text` writes, and composes
+    // `README.md` from `docs/INSTALL.md` — so anything that changes either has to have run first.
+    id: 'gen-readme',
+    script: 'scripts/gen-readme.mjs',
+    supportsRoot: true,
+    targets: ['docs/INSTALL.md', 'README.md'],
   },
 ];

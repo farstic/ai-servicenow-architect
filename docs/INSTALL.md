@@ -1,13 +1,7 @@
-# AI ServiceNow Architect
-
-**v2.0.0-dev** · Apache-2.0 · Claude Code ≥ 2.1.214
-
-A virtual ServiceNow consulting team that runs inside Claude Code. You describe what you need; a Chief
-Architect routes the request to the right specialist, reviews what comes back, and hands you the
-artefact — a design, a set of stories, a Script Include, a test suite. It runs **design-only** — no
-instance, no credentials — or **live**, connected through the bundled MCP server, where every write
-is gated on your explicit approval and captured into an update set. Baseline-first throughout: a
-custom table or scoped application needs your approval, never the model's own.
+<!-- This page IS the README's body: `README.md` = `docs/README-head.md` + everything from the
+     first `## ` below, composed by `scripts/gen-readme.mjs` and checked in CI. Edit this file, never
+     README.md. The four `<!-- generated:… -->` regions are written from the code that prints those
+     sentences, so the page cannot describe an install the tool does not perform. -->
 
 ## Install
 
@@ -253,25 +247,3 @@ claude mcp remove servicenow -s local     # or -s user, whichever you chose
 
 Claude Code keeps its own record that you trusted the folder. It is harmless and refers to a path
 that no longer exists.
-
-## What is here
-
-| Path | What |
-|---|---|
-| `.claude/skills/`, `.claude/agents/` | the specialists — one skill each, nine of them also sub-agents |
-| `governance/` | the rules the architect reads at routing time |
-| `packages/snowarch/` | the MCP server that talks to a ServiceNow instance |
-| `docs/ARCHITECTURE.md` | how the repository is laid out and how the engine works |
-| `docs/PLATFORM-NOTES.md` | platform behaviour learned on real instances, and the Windows notes |
-| `docs/CONTRIBUTING.md` | how to change it |
-
-## Licence and attribution
-
-Licensed under **Apache-2.0** — see `LICENSE` and `NOTICE`.
-
-ServiceNow platform documentation is vendored from **ServiceNowDocs**
-(<https://github.com/ServiceNow/ServiceNowDocs>) at a pinned commit and is the property of ServiceNow,
-Inc., used under its own licence. This project is not affiliated with or endorsed by ServiceNow.
-Every `docs sync` ends with the line
-`docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE`,
-and the corpus's own `LICENSE` and `legal/` are present in every checkout, sparse or full.
