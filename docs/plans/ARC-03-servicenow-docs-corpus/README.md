@@ -12,7 +12,7 @@
 > exclusion will get 592 failures and no explanation.
 
 
-Status: **Stories drafted 2026-09-04** · **S01–S05 merged (5 of 11) — the M1 half of this ARC is complete; the rest is M2** · Depends on: ARC-01 · Blocks: ARC-06 (B02), ARC-08 (docs checks)
+Status: **Stories drafted 2026-09-04** · **S01–S06 merged (6 of 11) — the M1 half of this ARC is complete; the rest is M2** · Depends on: ARC-01 · Blocks: ARC-06 (B02), ARC-08 (docs checks)
 
 ## Goal
 

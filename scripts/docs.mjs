@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { syncCorpus, planRecipe, readAreas, inspect, resolveMode, SyncError, EXIT as SYNC_EXIT }
   from '../tools/snowarch/lib/docs/sync.mjs';
 import { verifyCitations, formatResult, EXIT } from '../tools/snowarch/lib/docs/verify.mjs';
+import { docsStatus, formatStatus } from '../tools/snowarch/lib/docs/status.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
@@ -46,32 +47,13 @@ if (cmd === 'sync') {
   const { completeness } = result;
 
   if (asJson) {
-    // MINIMAL AND TEMPORARY. ARC-03-S06 introduces `docsStatus()` and this object is REPLACED by
-    // its shape — do not build a consumer on these keys.
-    const corpus = join(root, 'vendor/ServiceNowDocs');
-    let files = 0, bytes = 0;
-    const walk = (dir) => {
-      for (const e of readdirSync(dir, { withFileTypes: true })) {
-        if (e.name === '.git') continue;
-        const p = join(dir, e.name);
-        if (e.isDirectory()) walk(p);
-        else { files += 1; bytes += statSync(p).size; }
-      }
-    };
-    if (existsSync(corpus)) walk(corpus);
-    console.log(JSON.stringify({
-      pin: config.docs.pin, mode: result.mode, areas: result.areas.length,
-      files, bytes, complete: completeness.ok,
-    }, null, 2));
+    // The S06 shape, replacing S05's minimal placeholder: one description of the corpus, the same
+    // one the doctor embeds. `verify: false` — a sync has just run the completeness check, and the
+    // citation scan is `docs verify`'s job, not a second cost on every sync.
+    console.log(JSON.stringify(docsStatus({ root, verify: false, measure: true }), null, 2));
     process.exit(completeness.ok ? 0 : 1);
   }
-  if (!completeness.ok) {
-    if (completeness.missingRoot.length) console.error(`INCOMPLETE: missing root file(s): ${completeness.missingRoot.join(', ')}`);
 
-    if (completeness.head !== completeness.pin) console.error(`INCOMPLETE: HEAD ${completeness.head} != pin ${completeness.pin}`);
-    if (!completeness.initialised) console.error(`INCOMPLETE: superproject reports the submodule uninitialised: ${completeness.submodule}`);
-    process.exit(1);
-  }
   // A cited area that upstream does not have is a citation defect; `verify` is where it fails.
   for (const a of completeness.missingAreas) {
     console.error(`WARN: cited area "${a}" does not exist at the pin — `
@@ -83,11 +65,30 @@ if (cmd === 'sync') {
 
 if (cmd === 'verify') {
   const r = verifyCitations({ root, allowMissing: rest.includes('--allow-missing') });
+  if (rest.includes('--json')) {
+    console.log(JSON.stringify(r, null, 2));
+    process.exit(formatResult(r).code);
+  }
   const { text, code } = formatResult(r);
   (code === EXIT.ok ? console.log : console.error)(text);
   process.exit(code);
 }
 
+if (cmd === 'status') {
+  const s = docsStatus({ root, verify: true, measure: true });
+  if (rest.includes('--json')) {
+    // `--json` exits 0 unless the command itself failed: a caller reading the object wants the
+    // object, and would have to distinguish "the corpus is missing" from "the tool crashed"
+    // through an exit code that says both.
+    console.log(JSON.stringify(s, null, 2));
+    process.exit(0);
+  }
+  const { text, code } = formatStatus(s);
+  (code === 0 ? console.log : console.error)(text);
+  process.exit(code);
+}
+
 console.error('usage: node scripts/docs.mjs '
-  + '(sync [--mode sparse|full] [--json] [--quiet] [--print-recipe] | verify [--allow-missing])');
+  + '(sync [--mode sparse|full] [--json] [--quiet] [--print-recipe] '
+  + '| verify [--allow-missing] [--json] | status [--json])');
 process.exit(2);

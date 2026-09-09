@@ -173,6 +173,14 @@ therefore stands **unanswered for the case that matters**, and the honest next s
 (owner input #2) with the checkout at a realistic path — not another hosted-runner cell. Nor does this
 control isolate the OS-level `LongPathsEnabled` policy, which the runner image may have on.
 
+**Amendment 2026-09-09 (ARC-03-S05, confirmed by ARC-03-S06).** The prefix finally bit, in the one
+place nobody was watching: the S05 fixture builder could not run on `windows-latest` at all —
+`git add -A` failed with `unable to index file` on the 197-character path — because a runner temp
+directory (`D:\a\…\Temp\snowarch-docs-sync-XXXXXX\src\`) is far longer than the ≤56-character
+prefix this control measured. So acceptance criterion 2 is not merely unanswered for the case that
+matters; a longer-than-typical prefix has now been observed failing on the same corpus, in CI. The
+`core.longpaths` setting stays, and the fixture carries it too.
+
 **Cross-run caveat on the table above:** the `longpaths=true` column is quoted from run `34046585778` and
 the `longpaths=false` column from run `34048226638`. Within run `34048226638` alone the `false` cells are
 2.9 s / 5.2 s / 0.6 s *faster* than that run's own `true` cells; the near-identical times shown here are
