@@ -88,6 +88,11 @@ jobs:
           # `Add-Content`, not `Out-File` with both a pipeline and -InputObject — that is a
           # PowerShell error, and it is what the first run of this workflow failed on.
           Add-Content -Path $env:GITHUB_ENV -Value "PATH=$($kept -join ';')"
+          # ...and in THIS process too, or the lines below report the PATH as it was: `$GITHUB_ENV`
+          # applies to SUBSEQUENT steps, so a check written here would measure the state the strip
+          # was meant to replace. Third shell trap in this one step, and the same shape as the first
+          # two — the log claiming something the mechanism had not yet done.
+          $env:PATH = $kept -join ';'
           # Recorded, not asserted: the hosted image carries a second bash outside Git's directories
           # (System32), so this prints True even here. What the strip removes is GIT BASH and the
           # Unix tools that come with it — which is what a Windows user who installed git without
