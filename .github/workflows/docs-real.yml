@@ -88,29 +88,17 @@ jobs:
           # `Add-Content`, not `Out-File` with both a pipeline and -InputObject — that is a
           # PowerShell error, and it is what the first run of this workflow failed on.
           Add-Content -Path $env:GITHUB_ENV -Value "PATH=$($kept -join ';')"
-          "bash still reachable: $([bool](Get-Command bash -ErrorAction SilentlyContinue))"
+          # Recorded, not asserted: the hosted image carries a second bash outside Git's directories
+          # (System32), so this prints True even here. What the strip removes is GIT BASH and the
+          # Unix tools that come with it — which is what a Windows user who installed git without
+          # them would lack. The job proves the recipe under that condition; it cannot prove a
+          # machine with no bash at all, and says so rather than implying it.
+          "bash still reachable (expected True — System32 carries one): $([bool](Get-Command bash -ErrorAction SilentlyContinue))"
+          "git bash reachable: $([bool](Get-Command bash -ErrorAction SilentlyContinue | Where-Object { $_.Source -match 'Git' }))"
 
-      - name: Fetch the corpus at the pin
-        id: sync
-        shell: bash
-        run: |
-          set -o pipefail
-          start=$(date +%s)
-          # One retry: a 300 MB fetch across the public internet fails occasionally for reasons that
-          # are not this repository's, and a flake that reruns the whole matrix teaches nothing.
-          node scripts/docs.mjs sync || { echo "::warning::first sync failed, retrying once"; node scripts/docs.mjs sync; }
-          echo "seconds=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
-
-      - name: Describe the checkout
-        shell: bash
-        run: node scripts/docs.mjs status --json > docs.json
-
-      - name: The citation gate, against the real corpus
-        shell: bash
-        run: node scripts/docs.mjs verify
-
-      - name: Assert what a real checkout must look like
-        shell: bash
-        env:
-          SYNC_SECONDS: ${{ steps.sync.outputs.seconds }}
+      # ONE step, and the platform's DEFAULT shell — pwsh on Windows, bash elsewhere. Every step
+      # here used to say `shell: bash`, which on Windows means Git Bash and made the PATH-stripped
+      # cell prove nothing: `shell: bash` resolves independently of PATH. There is no shell logic
+      # left to depend on; the retry, the timing and the assertions are all in Node.
+      - name: Sync, verify and assert the real corpus
         run: node scripts/ci/assert-docs.mjs

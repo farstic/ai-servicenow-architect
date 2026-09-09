@@ -5,7 +5,7 @@
 // every platform, and two shells would be two chances for them to drift. The only platform-specific
 // part is the long-path check, which is meaningful on Windows and vacuous elsewhere — and it says so
 // rather than silently passing.
-import { existsSync, readFileSync, readdirSync, statSync, appendFileSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, appendFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, relative, resolve } from 'node:path';
 
@@ -14,7 +14,41 @@ const CORPUS = 'vendor/ServiceNowDocs';
 const corpus = join(root, CORPUS);
 const CAP_BYTES = 350 * 1000 * 1000;
 
-const status = JSON.parse(readFileSync(join(root, 'docs.json'), 'utf8'));
+/**
+ * Sync, describe, verify, assert — all of it, in Node.
+ *
+ * Every step used to be `shell: bash`, which on Windows means Git Bash. That made acceptance
+ * criterion 5 VACUOUS: the cell that strips Git Bash from PATH still ran its steps under bash,
+ * because `shell: bash` resolves independently of PATH. (And the runner has a second bash in
+ * System32 regardless — `bash still reachable: True` even after both Git directories were removed.)
+ *
+ * So the workflow now invokes this file and nothing else, with the platform's default shell. There
+ * is no shell logic left to depend on: the retry, the timing and the assertions are all here.
+ */
+function step(label, args) {
+  process.stdout.write(`::group::${label}\n`);
+  const r = execFileSync(process.execPath, args, { cwd: root, encoding: 'utf8' });
+  process.stdout.write(r);
+  process.stdout.write('::endgroup::\n');
+  return r;
+}
+
+const started = Date.now();
+try {
+  step('docs sync', ['scripts/docs.mjs', 'sync']);
+} catch {
+  // One retry: a 300 MB fetch across the public internet fails occasionally for reasons that are
+  // not this repository's, and a flake that reruns the whole matrix teaches nothing.
+  process.stdout.write('::warning::first sync failed, retrying once\n');
+  step('docs sync (retry)', ['scripts/docs.mjs', 'sync']);
+}
+const syncSeconds = (Date.now() - started) / 1000;
+
+const statusJson = execFileSync(process.execPath, ['scripts/docs.mjs', 'status', '--json'],
+  { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+step('docs verify', ['scripts/docs.mjs', 'verify']);
+
+const status = JSON.parse(statusJson);
 const fail = [];
 const check = (ok, what) => { if (!ok) fail.push(what); };
 
@@ -65,7 +99,7 @@ if (isWindows) {
 }
 
 const mb = Math.round(status.sizeBytes / 1e6);
-const seconds = Number(process.env.SYNC_SECONDS ?? 0).toFixed(1);
+const seconds = syncSeconds.toFixed(1);
 const dead = status.citations ? status.citations.dead.length : 'not run';
 const summary = `${process.platform} · sparse ${mb} MB · ${status.fileCount} files · ${seconds} s · `
   + `dead ${dead} · longest path ${longestInCorpus.n} in corpus / ${longestAbsolute.n} absolute`
