@@ -148,11 +148,32 @@ line, because silently staying put would hide the rewrite.
 The report's headings are a contract — ARC-03-S09's workflow pastes them verbatim into a pull
 request body and keys on **exit 1** meaning "the pin moved and citations broke, someone must remap".
 
+### Switching release family
+
+`node scripts/docs.mjs family <name> [--dry-run | --yes] [--from <name>]` — the dry run **is** the
+proposal (principle 10), and `--yes` applies exactly what it printed.
+
+1. **Validate and look upstream.** `ls-remote --heads` needs the network even for a dry run, and the
+   output says so. A branch that is not there exits 6 with S07's sentence.
+2. **Plan.** `.gitmodules`, `engine.config.json`, the schema enum when the target is new, and every
+   prose line whose *only* family mention sits inside the phrase set. A line with any other mention
+   goes to **REVIEW** whole: half a sentence about the new family and half about the old is worse
+   than a line nobody touched.
+3. **Apply, pin first.** The pin moves against the new branch while the tree is still clean, so
+   S07's dirty-tree refusal still guards the whole operation instead of tripping on this command's
+   own edits.
+4. **Re-lint and stage.** A failing lint exits 1 with everything staged — the maintainer needs the
+   edits in order to fix what the lint caught — and the last two lines say how to finish and how to
+   abandon.
+5. **Never commits.** History (`docs/plans`, `docs/spikes`, `docs/decisions`, the changelog,
+   RELICENSING) is never scanned, listed or edited: it records what was true when it was written.
+
 ### Exit codes — every `docs` sub-command shares one table
 
 | Code | Meaning |
 |---|---|
 | **0** | ok |
+| **2** | a plan was printed and not applied — `family <name>` without `--yes` |
 | **1** | `sync`: the checkout is incomplete · `--upstream`: the pin moved **and** citations broke · `verify`: dead citations · `status`: a mismatch |
 | **3** | the corpus is missing |
 | **4** | the working tree is not clean — nothing was touched |

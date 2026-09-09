@@ -10,6 +10,8 @@ import { syncCorpus, planRecipe, readAreas, inspect, resolveMode, SyncError, EXI
 import { verifyCitations, formatResult, EXIT } from '../tools/snowarch/lib/docs/verify.mjs';
 import { docsStatus, formatStatus } from '../tools/snowarch/lib/docs/status.mjs';
 import { syncUpstream, formatUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
+import { planFamilySwitch, formatPlan, applyFamilySwitch, EXIT_NEEDS_YES }
+  from '../tools/snowarch/lib/docs/family.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
@@ -97,6 +99,33 @@ if (cmd === 'verify') {
   process.exit(code);
 }
 
+if (cmd === 'family') {
+  const [name, ...flags] = rest;
+  const has = (f) => flags.includes(f);
+  const val = (f) => { const i = flags.indexOf(f); return i === -1 ? undefined : flags[i + 1]; };
+  if (!name || name.startsWith('--')) {
+    console.error('usage: node scripts/docs.mjs family <name> [--dry-run | --yes] [--from <name>] [--json]');
+    process.exit(2);
+  }
+  try {
+    const plan = planFamilySwitch({ root, config, to: name, from: val('--from') ?? null });
+    if (has('--json')) { console.log(JSON.stringify(plan, null, 2)); process.exit(0); }
+    if (!has('--yes')) {
+      console.log(formatPlan(plan).text);
+      // No flag at all is not a dry run: the maintainer asked for something and got a plan, so the
+      // exit code has to say the thing they asked for did not happen.
+      if (!has('--dry-run')) { console.error('refusing to apply without --yes'); process.exit(EXIT_NEEDS_YES); }
+      process.exit(0);
+    }
+    const r = applyFamilySwitch(plan, { root, config });
+    process.exit(r.code);
+  } catch (e) {
+    if (!(e instanceof SyncError)) throw e;
+    console.error(e.message);
+    process.exit(e.code);
+  }
+}
+
 if (cmd === 'status') {
   const s = docsStatus({ root, verify: true, measure: true });
   if (rest.includes('--json')) {
@@ -115,7 +144,8 @@ console.error('usage: node scripts/docs.mjs '
   + '(sync [--mode sparse|full] [--json] [--quiet] [--print-recipe]\n'
   + '     | sync --upstream [--to <sha>] [--json] [--no-verify]\n'
   + '     | verify [--allow-missing] [--json]\n'
-  + '     | status [--json])\n'
-  + '\nexit: 0 ok · 1 incomplete, or the pin moved and citations broke · 3 corpus missing\n'
-  + '      4 working tree not clean · 5 git failed · 6 upstream does not have it');
+  + '     | status [--json]\n'
+  + '     | family <name> [--dry-run | --yes] [--from <name>] [--json])\n'
+  + '\nexit: 0 ok · 1 incomplete, or the pin moved and citations broke · 2 plan printed, not applied\n'
+  + '      3 corpus missing · 4 working tree not clean · 5 git failed · 6 upstream does not have it');
 process.exit(2);
