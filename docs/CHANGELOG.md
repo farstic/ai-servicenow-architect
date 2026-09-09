@@ -29,6 +29,21 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **The `bootstrap` job — the install promise, executed on every commit.** Thirteen cells: nine
+  install through the Node CLI (three operating systems × Node 20/22/24), three rebuild PATH from
+  the system directories and let the launcher finish design-only ITSELF with no Node to hand over
+  to, and one does the whole Windows path on a machine with Git Bash stripped. Each cell installs
+  twice — the second run must report `ok (cached)` for B01/B02/B07, enter no docs phase and finish
+  under 30 seconds — and then ten assertions run from ONE script for every OS: nothing tracked
+  modified, the state says `design-only` with the expected *writer*, the toggles equal what S05
+  computes (hook present iff Node is, `disableAllHooks` never written), no credential-shaped key in
+  five files, the corpus really present at the pin, `.local` at 0700, and the committed
+  `dist/server.js` answering a real handshake. The corpus is fetched for real: this is the only job
+  that proves an end-to-end design-only install. **When it is red, the install is broken, not the
+  test** — and three fixture pull requests were opened red once, to prove each negative fails the
+  way it claims. One story assertion could not be implemented as written and says so in the story
+  text: B00 probes github.com on every run by design, so the "unreachable proxy on the second run"
+  check would have measured B00 failing rather than the cache working.
 - **One install page, and the README is a copy of it.** `docs/INSTALL.md` is the page —
   prerequisites, both paths, what you will see, live mode, operators, uninstall — and `README.md` is
   `docs/README-head.md` + that page's body + `docs/README-tail.md`, composed by

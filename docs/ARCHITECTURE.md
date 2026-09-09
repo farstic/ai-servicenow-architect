@@ -499,6 +499,17 @@ bash is how someone's settings get destroyed.
 The state and the cache are written by heredoc in S03's and S08's schemas, `writer: "bash"`, and the
 Node readers accept them — asserted against a fixture captured from a real bash-3.2 run.
 
+### The `bootstrap` job — the install promise, executed
+
+Thirteen cells on every commit. Nine `node-cli` (three operating systems × Node 20/22/24) install
+through the Node CLI; three `no-node` rebuild PATH from the system directories, assert `node` is
+gone, and let the launcher finish design-only itself; one `no-gitbash` does the whole Windows path
+on a machine with Git Bash stripped from PATH. Each cell runs the install twice — the second run
+must report `ok (cached)` for B01/B02/B07, enter no docs phase and finish in under 30 seconds — then
+`scripts/ci/assert-bootstrap.mjs` checks the ten assertions with ONE implementation for every OS,
+and the `node-cli` cells hand the committed `dist/server.js` a real handshake. The corpus is fetched
+for real: this is the only job that proves an end-to-end design-only install.
+
 ### `mode` — the switch, and where the server is registered
 
 `snowarch mode` reports: the S09 Mode line and the registration kind, nothing written. `mode live`

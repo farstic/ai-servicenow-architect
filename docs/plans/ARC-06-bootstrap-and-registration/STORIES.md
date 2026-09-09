@@ -788,6 +788,11 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
 3. A commit adding `"SNOW_PASSWORD": "${SNOW_PASSWORD:-}"` to `.mcp.json` fails assertion 5 (and S01's test) on all cells.
 4. A commit that breaks the committed `dist/server.js` (fixture: syntax error) fails assertion 9 on all `node-cli` cells with the handshake error text.
 5. Assertion 8 passes: the second run's log shows `ok (cached)` for B01, B02, B07 and no network access to github.com (proxy env set to an unreachable host for the second run).
+   *Amended 2026-09-10 (ARC-06-S14):* the unreachable-proxy half cannot be implemented as
+   written. B00 probes github.com on EVERY run by design (S04 — the check is never cached),
+   so a proxy pointing nowhere makes B00 FAIL and proves nothing about caching. What
+   idempotence means here is asserted instead: `ok (cached)` for B01/B02/B07, no `[docs]`
+   phase line, B02's recorded `durationMs` under 1000, and exit 0 in under 30 s.
 6. The job summary table is present with a non-empty seconds/MB value for every cell.
 7. After ARC-08 S11, the same job additionally asserts `summary.fail == 0` from `./snowarch doctor --json` in the `node-cli` cells without restructuring.
 
