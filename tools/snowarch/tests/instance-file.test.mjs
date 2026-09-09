@@ -272,3 +272,36 @@ test('the wizard is probed for before it is spawned, and its absence is named', 
   assert.equal(spawned.stdio, 'inherit', 'the wizard needs the TTY for masked input');
   assert.equal(spawned.exec, process.execPath, 'never a shell, never npx');
 });
+
+test('a refused instance file costs nothing — it is caught at parse time, before B04', async () => {
+  // The review nit from ARC-06-S07: both checks need no read and no network, and B06 is reached
+  // only after B04 has installed 72 MB. A file that was always going to be refused should not buy
+  // an install first. Checked in BOTH places on purpose — the file can change in between, and B06
+  // is also reachable from a resume that never passed through the parser.
+  const { bootstrapCommand } = await import('../lib/bootstrap.mjs');
+  const { recorder } = await import('./helpers/workspace.mjs');
+  const sink = () => ({ write() {} });
+
+  for (const [name, make] of [
+    ['group-readable', () => instanceFile(basic(), { mode: 0o644 })],
+    ['committable', (root) => {
+      const p = join(root, 'pdi.json');
+      writeFileSync(p, `${JSON.stringify({ version: 1, instances: { pdi: basic() } })}\n`);
+      if (!isWindows) chmodSync(p, 0o600);
+      return p;
+    }],
+  ]) {
+    if (name === 'group-readable' && isWindows) continue;   // no POSIX modes to be wrong about
+    const root = makeCheckout();
+    const log = recorder();
+    const code = await bootstrapCommand({
+      flags: { mode: 'live', yes: true, 'instance-file': make(root) },
+      log, root, cwd: root, out: sink(), err: sink(),
+    });
+    assert.equal(code, 1, name);
+    assert.match(log.lines[0], name === 'group-readable' ? /chmod 600/ : /git could commit/, name);
+    assert.equal(existsSync(join(root, '.local')), false, `${name}: something was written`);
+    // The plan screen is never reached either — there is nothing to plan.
+    assert.ok(!log.lines.some((l) => l.startsWith('Plan —')), name);
+  }
+});

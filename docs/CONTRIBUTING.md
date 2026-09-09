@@ -786,6 +786,15 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## B08 spawns the server; it never imports it
+
+The server package has an in-process doctor, and reusing it from B08 would prove that a library
+works when imported — which is not the thing that fails. What fails is the child process. So B08
+goes through `lib/mcp-handshake.mjs`, which spawns `dist/server.js` exactly as `.mcp.json` describes
+it, with the placeholders expanded the way Claude Code expands them. If you are tempted to import
+for speed, the failures you would stop catching are precisely the ones a first `claude` session
+hits.
+
 ## Import the store modules lazily, and type-check before you push
 
 `packages/snowarch/dist/store/schema.js` and `index.js` import zod, which exists only after B04's

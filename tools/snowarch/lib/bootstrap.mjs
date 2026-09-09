@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from './exit.mjs';
 import { loadConfig, root as defaultRoot, version } from './config.mjs';
+import { checkLocation, checkMode } from './instance-file.mjs';
 import { DOCS, buildPlan, runPlanScreen } from './plan.mjs';
 import { LAST, STEPS, interrupt, runSteps, stepById } from './steps/index.mjs';
 import { RESET_MESSAGE, StateError, emptyState, loadState, resetState, saveState } from './state.mjs';
@@ -81,6 +82,21 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
   // already broken that promise.
   if (flags.mode === 'live' && flags.yes && !flags['instance-file']) {
     return refuse(LIVE_YES_WITHOUT_FILE);
+  }
+
+  // The instance file's MODE and PATH are checked here, at parse time, as well as in B06.
+  //
+  // Both answers need no read and no network, and B06 is reached only after B04 has installed
+  // 72 MB — so a file that was always going to be refused would cost an install first. Checked
+  // twice on purpose: the file can change between this moment and B06, and B06 is also reachable
+  // from a resume that never passed through this code.
+  if (flags['instance-file']) {
+    const path = flags['instance-file'];
+    if (!existsSync(path)) return refuse(`${path} does not exist`);
+    const mode = checkMode(path);
+    if (!mode.ok) return refuse(mode.reason, EXIT_FAIL);
+    const location = checkLocation(path, root);
+    if (!location.ok) return refuse(location.reason, EXIT_FAIL);
   }
 
   if (flags.reset) {
