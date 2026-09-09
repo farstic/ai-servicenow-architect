@@ -5,6 +5,7 @@ import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootstrapCommand } from '../lib/bootstrap.mjs';
+import { which } from '../lib/which.mjs';
 import { makeCheckout, recorder } from './helpers/workspace.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -77,10 +78,16 @@ test('AC 3 — with git off the child\'s PATH: FAIL, the platform remedy, exit 3
   mkdirSync(emptyBin, { recursive: true });
   // Node itself must stay reachable, or the test is about something else entirely.
   const nodeDir = dirname(process.execPath);
+  // PRECONDITION, and it is not decoration: on the macOS runner git and node share a directory, so
+  // a PATH built this way can silently contain the very tool the test removes. Asserting the hole
+  // means a runner that collocates them fails loudly instead of testing nothing.
+  const builtPath = [emptyBin, nodeDir].join(delimiter);
+  assert.equal(which('git', { env: { PATH: builtPath, PATHEXT: '.EXE;.CMD' } }), null,
+    'git is still resolvable on the constructed PATH — this test would prove nothing');
   const a = args(root);
 
   const code = await bootstrapCommand({ ...a, cwd: root, ...noNetwork,
-    env: { PATH: [emptyBin, nodeDir].join(delimiter), PATHEXT: '.EXE;.CMD' } });
+    env: { PATH: builtPath, PATHEXT: '.EXE;.CMD' } });
 
   assert.equal(code, 3);
   assert.ok(a.log.lines.includes('FAIL B00: git not found'), a.log.lines.join('\n'));
@@ -93,20 +100,26 @@ test('AC 3 — with git off the child\'s PATH: FAIL, the platform remedy, exit 3
 
 test('AC 5 — Node absent: design-only passes with a note, live stops at B00', async () => {
   const root = gitCheckout();
-  // A PATH with git but no node. The CLI is already running under Node — what B00 checks is what
-  // is on PATH for the steps that will SPAWN it, which is a different question and the right one.
-  const gitDir = dirname(execFileSync(isWindows ? 'where' : 'which', ['git'],
-    { encoding: 'utf8' }).split('\n')[0].trim());
-  const env = { PATH: gitDir, PATHEXT: '.EXE;.CMD' };
+  // `exec` is INJECTED here, and the reason is the macOS runner: the first version built a PATH
+  // holding git's directory and expected node to be absent from it, which is true on my machine
+  // and false on that one — git and node share `/usr/local/bin` there, so "Node absent" quietly
+  // became "Node 24 found" and the test asserted nothing. A fixture must make the state it is
+  // about rather than hope the environment supplies it. AC 3 above keeps the real-PATH proof, with
+  // a precondition guarding the same trap.
+  const noNode = (name, cmdArgs) => (name === 'git'
+    ? (cmdArgs[0] === '--version'
+      ? { found: true, ok: true, stdout: 'git version 2.39.5', stderr: '' }
+      : { found: true, ok: true, stdout: root, stderr: '' })
+    : { found: false, ok: false, stdout: '', stderr: '' });
 
   const design = args(root);
-  const designCode = await bootstrapCommand({ ...design, cwd: root, ...noNetwork, env });
+  const designCode = await bootstrapCommand({ ...design, cwd: root, ...noNetwork, exec: noNode });
   assert.equal(designCode, 0, 'design-only must not need Node — the launchers do that path');
   assert.ok(design.log.lines.some((l) => /^ok B00 node: note: Node\.js not found/.test(l)),
     design.log.lines.join('\n'));
 
   const live = args(root, { mode: 'live', yes: undefined });
-  const liveCode = await bootstrapCommand({ ...live, cwd: root, ...noNetwork, env,
+  const liveCode = await bootstrapCommand({ ...live, cwd: root, ...noNetwork, exec: noNode,
     asker: { ask: async () => '', close: () => {} } });
   assert.equal(liveCode, 3);
   assert.ok(live.log.lines.some((l) => /^FAIL B00: live mode needs Node\.js \d+\+ — /.test(l)),
@@ -115,12 +128,9 @@ test('AC 5 — Node absent: design-only passes with a note, live stops at B00', 
 
 test('AC 6 — without --skip-claude-check on a runner that has none, B00 fails', async () => {
   const root = gitCheckout();
-  const gitDir = dirname(execFileSync(isWindows ? 'where' : 'which', ['git'],
-    { encoding: 'utf8' }).split('\n')[0].trim());
   const a = args(root, { 'skip-claude-check': undefined });
 
-  const code = await bootstrapCommand({ ...a, cwd: root, ...noNetwork,
-    env: { PATH: [gitDir, dirname(process.execPath)].join(delimiter), PATHEXT: '.EXE;.CMD' } });
+  const code = await bootstrapCommand({ ...a, cwd: root, ...noNetwork });
 
   // A machine that genuinely has Claude Code passes here, which is the correct outcome and not a
   // vacuous one — so the assertion is on the pair, not on the failure alone.

@@ -16,7 +16,7 @@
 import { execFileSync } from 'node:child_process';
 import { realpathSync, statfsSync } from 'node:fs';
 import { arch, platform, release } from 'node:os';
-import { resolve } from 'node:path';
+import { posix, resolve, win32 } from 'node:path';
 import { EXIT_PREREQ } from '../exit.mjs';
 import { remedyFor } from '../remedies.mjs';
 import { formatVersion, meetsFloor, parseVersion } from '../versions.mjs';
@@ -72,14 +72,27 @@ const fail = (id2, detail, remedy, extra = {}) => ({ id: id2, status: 'fail', de
  * reports the resolved path — so a checkout reached through a link compared unequal to itself and
  * the user was told to `cd` to the directory they were already standing in.
  */
-const samePath = (a, b) => {
-  const real = (p) => { try { return realpathSync(p); } catch { return resolve(p); } };
-  return real(a) === real(b);
+export const samePath = (a, b, plat = process.platform) => {
+  const norm = (p) => {
+    let x = String(p).trim();
+    // `realpath` first: on macOS `/tmp` and `/var` are symlinks, managed machines symlink home
+    // directories, and git always reports the resolved path.
+    try { x = realpathSync(x); } catch { /* a path that does not exist yet still normalises */ }
+    // Then the PLATFORM'S OWN resolver, chosen by the parameter rather than by which machine is
+    // running. `path.resolve` is whichever flavour the host is, so on macOS it leaves
+    // `C:/Users/...` untouched and the Windows branch could not be exercised anywhere but
+    // Windows — which is how it shipped broken: git prints forward slashes there, Node hands
+    // back backslashes, and every command exited 3 saying "not at the repository root".
+    // Windows paths are also case-insensitive, so `D:\A\repo` and `D:\a\repo` are one place.
+    if (plat === 'win32') return win32.resolve(x.replace(/\//g, '\\')).toLowerCase();
+    return posix.resolve(x);
+  };
+  return norm(a) === norm(b);
 };
 
 export function checkRoot({ root, cwd, exec, plat }) {
   const remedy = remedyFor('root', { platform: plat, values: { root } });
-  if (!samePath(cwd, root)) {
+  if (!samePath(cwd, root, plat)) {
     return fail('root', `not at the repository root — run: ${remedy}`, remedy);
   }
   const top = exec('git', ['-C', root, 'rev-parse', '--show-toplevel']);
@@ -88,7 +101,7 @@ export function checkRoot({ root, cwd, exec, plat }) {
     // operator fix one problem and see two lines about it.
     return warn('root', `${root} (git could not confirm the repository root)`);
   }
-  if (!samePath(top.stdout.trim(), root)) {
+  if (!samePath(top.stdout.trim(), root, plat)) {
     return fail('root', `not at the repository root — run: ${remedy}`, remedy);
   }
   return ok('root', root);

@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   DISK_FULL, DISK_SPARSE, checkClaudeCode, checkDisk, checkGit, checkNetwork, checkNode,
-  checkPlatform, checkRoot, checkLine, run as runB00,
+  checkPlatform, checkRoot, checkLine, samePath, run as runB00,
 } from '../lib/steps/B00.mjs';
 import { CHECK_IDS, TABLE, remedyFor } from '../lib/remedies.mjs';
 import { compareVersion, formatVersion, meetsFloor, parseVersion } from '../lib/versions.mjs';
@@ -312,4 +312,24 @@ test('which() resolves on PATH and honours PATHEXT — the Windows half proven f
   assert.ok(found === null || found.endsWith('engine.config.json'));
   assert.equal(which('git', { env: { PATH: '' }, platform: process.platform }), null,
     'an empty PATH finds nothing — no ambient fallback');
+});
+
+test('two spellings of one directory are one directory — the Windows half proven from here', () => {
+  // Every command on Windows exited 3 with "not at the repository root" because git prints
+  // `C:/Users/...` with forward slashes and Node hands back `C:\\Users\\...`. The platform is a
+  // parameter so the branch is provable from the machine that is not it — the same seam the
+  // tree-kill uses, and for the same reason: a branch only one runner can reach is a branch that
+  // is discovered in CI rather than in a test.
+  assert.equal(samePath('C:/Users/runner/repo', 'C:\\Users\\runner\\repo', 'win32'), true,
+    'forward and back slashes name one place');
+  assert.equal(samePath('D:\\A\\repo', 'D:\\a\\repo', 'win32'), true,
+    'Windows paths are case-insensitive');
+  assert.equal(samePath('/repo/a', '/repo/b', 'win32'), false, 'and different places stay different');
+
+  // POSIX keeps its case sensitivity: `/repo` and `/REPO` are two directories there.
+  assert.equal(samePath('/repo', '/REPO', 'linux'), false);
+  assert.equal(samePath('/repo/./sub/..', '/repo', 'linux'), true, 'normalised, not compared raw');
+
+  // And a path that does not exist still normalises rather than throwing.
+  assert.equal(samePath('/no/such/path', '/no/such/path', 'linux'), true);
 });

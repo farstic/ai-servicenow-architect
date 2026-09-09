@@ -54,7 +54,7 @@ const stdinAsker = (input, output) => {
 
 export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = [],
   input = process.stdin, out = process.stdout, err = process.stderr, env = process.env,
-  cwd = process.cwd(), probe = undefined, asker = null } = {}) {
+  cwd = process.cwd(), probe = undefined, exec = undefined, asker = null } = {}) {
   // With `--json`, stdout carries ONE thing: the object. The plan screen is prose, so it follows
   // every other human line to stderr — a caller piping this into `jq` must not have to strip a
   // banner first. (`--json` with no `--yes` still shows the screen and still waits: the operator is
@@ -122,7 +122,7 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
     // `cwd` and `probe` are seams, not configuration: the root check has to be asked about a
     // directory, and the network check must be answerable without a socket. Both default to the
     // real thing, so the product path is the one every test is a deviation from.
-    root, ctx: { ...ctx, cwd, probe, mode: proposed.mode, docs: proposed.docs },
+    root, ctx: { ...ctx, cwd, probe, exec, mode: proposed.mode, docs: proposed.docs },
     state: ctx.state, steps: [STEPS[0]], last: LAST, onLine: (l) => log.step(l), save: () => {},
   });
   if (preflight.code !== EXIT_OK) {
