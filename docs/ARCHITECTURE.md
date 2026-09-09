@@ -473,6 +473,32 @@ five lines would not be the last five. `--json`'s `next` carries that same strin
 drift. Design-only runs also write the banner's cache here, since they never reach B08 — and a live
 run's cache is left alone, because a handshake's findings should not be replaced by a summary's.
 
+### `bootstrap.sh` — the launcher
+
+Two jobs. When Node ≥ 20 is present it **`exec`s** the Node CLI, forwarding every flag, with
+`CLAUDE_PROJECT_DIR` exported — the launcher's spawn is our spawn, so the session variable is set
+rather than inherited. When Node is absent it finishes **design-only itself**: B00 (git, Claude
+Code, disk, and a network probe through `git ls-remote`), a two-line plan, B01, B02 through the
+generated recipe, a restricted B07, and B09's block.
+
+bash 3.2, because macOS ships it and always will: no associative arrays, no `mapfile`, no
+`${var,,}`, no `[[ =~ ]]` captures, and none of `curl`/`jq`/`python`/`timeout`. A test greps for
+every one of those and proves the grep is not vacuous.
+
+**Nothing is written twice.** The recipe is *sourced* from `tools/snowarch/launcher/docs-recipe.sh`;
+the sentences — remedies, the network vocabulary, the closing block — are generated into a marked
+region from `remedies.json`, `net-sentences.mjs` and `text.json`. `tests/launcher-parity.test.mjs`
+compares every one against its source, because this is the file that runs on machines with no Node
+to check it, and a drifted copy there would go unnoticed for a release.
+
+**B07 without Node writes the disable toggle and nothing else** — no hook, because nothing could run
+it — and it **never merges**: an existing `settings.local.json` that already carries the toggle is
+`ok (already set)`, and any other one is a hand-edit FAIL with the exact key to add. Merging JSON in
+bash is how someone's settings get destroyed.
+
+The state and the cache are written by heredoc in S03's and S08's schemas, `writer: "bash"`, and the
+Node readers accept them — asserted against a fixture captured from a real bash-3.2 run.
+
 ### The resume rule
 
 For each step in order: `runsWhen` false → `skipped (<reason>)`; `--from BNN` and the step is at or

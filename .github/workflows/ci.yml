@@ -181,6 +181,46 @@ jobs:
       - name: Lint every workflow
         run: /tmp/actionlint -color
 
+  launcher:
+    # `bootstrap.sh` is the one file that runs on a machine with NO Node — which means none of the
+    # engine's own tooling can check it, and none of the other jobs would notice it broken. Two
+    # things here: shellcheck, and a real run with Node stripped from PATH, because "it parses" and
+    # "it works without Node" are different claims and only the second is the story.
+    name: launcher
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck (pinned)
+        run: |
+          curl -sSfL -o /tmp/sc.tar.xz \
+            "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.$(uname -s | tr '[:upper:]' '[:lower:]').x86_64.tar.xz"
+          tar -xJf /tmp/sc.tar.xz -C /tmp
+          /tmp/shellcheck-v0.10.0/shellcheck --version
+      - name: shellcheck
+        run: /tmp/shellcheck-v0.10.0/shellcheck -s bash --severity=warning bootstrap.sh
+      - name: bash -n
+        run: bash -n bootstrap.sh
+      - name: The Node-free design-only path, with Node removed from PATH
+        # The whole point of this job. `command -v node` must find nothing, so PATH is rebuilt from
+        # the system directories rather than filtered — a filter that missed one entry would test
+        # the hand-over instead, and pass.
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin TERM=dumb \
+            bash -o posix ./bootstrap.sh --mode design --yes --docs skip --skip-claude-check
+      - name: The state it wrote is the one Node reads
+        run: |
+          node --input-type=module -e "
+            import { loadState, assertStorable } from './tools/snowarch/lib/state.mjs';
+            const s = loadState(process.cwd());
+            if (s.writer !== 'bash') { console.error('writer is', s.writer); process.exit(1); }
+            assertStorable(s);
+            console.log('state ok:', s.version, s.writer, Object.keys(s.steps).length, 'steps');
+          "
+
   secrets:
     name: secret scan
     runs-on: ubuntu-latest
