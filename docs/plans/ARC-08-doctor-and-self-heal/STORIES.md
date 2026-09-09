@@ -64,7 +64,8 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
     E-00 ok    Claude Code CLI: 2.1.258 ≥ 2.1.214, logged in
     E-01 ok    git: 2.45.2 ≥ 2.25.0
   docs
-    E-12 FAIL  docs corpus: absent (bootstrap recorded docs mode "skip")
+    E-12 docs corpus: FAIL — corpus absent (docs mode "skip"); grounding and citations are unverified — run ./snowarch docs sync
+    (amended at ARC-03-S11: quoted verbatim from E12_ABSENT() in tools/snowarch/lib/docs/status.mjs, which ARC-08 imports rather than retypes)
                → run ./snowarch docs sync            [fixable: ./snowarch doctor --fix]
   server
     SV-03 warn instance "pdi": 4/6 flags explicit — NOW_ASSIST_ENABLED, FLUENT_ENABLED absent (treated as "false")

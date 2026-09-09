@@ -44,7 +44,11 @@ test('the README figures are attributed to a measurement, not asserted from nowh
   // Every number in the install sentences carries where it came from. S-07 measured sparse; it did
   // not measure full mode, and the README says so rather than borrowing the figure.
   assert.match(readme, /302 MB/);
-  assert.match(readme, /measured 2026-09-06, ARC-00 S-07/);
+  assert.match(readme, /measured\s+2026-09-06, ARC-00 S-07/);
+  // S11 added the job's own numbers beside S-07's, because they count different things — the tree
+  // you read against the tree plus `.git` the disk loses. Both carry their measurement.
+  assert.match(readme, /179 MB on Linux and macOS/);
+  assert.match(readme, /measured 2026-09-09 by `docs-real\.yml`/);
   assert.match(readme, /447 MB and 48,997 files/);
   assert.match(readme, /measured 2026-09-09 on the reference\s+macOS machine — ARC-00 S-07 did not measure full mode/);
 });
@@ -66,6 +70,9 @@ test('the consolidated corpus section is one heading and stays under the cap', (
   const end = arch.findIndex((l, i) => i > start && l.startsWith('## '));
   const length = end - start;
   console.log(`    corpus section: ${length} lines`);
+  // 100, ruled at ARC-03-S11: the plan guessed 80 before the byte-identical recipe block and the
+  // shared exit table existed, and cutting either would hide what ARC-06 and the tests point at.
+  // The cap stays so the section cannot grow back silently.
   assert.ok(length <= 100, `${length} lines — the section is meant to be read, not skimmed past`);
 
   // And it is ONE section: the six that S05–S09 each added are folded in, not left beside it.

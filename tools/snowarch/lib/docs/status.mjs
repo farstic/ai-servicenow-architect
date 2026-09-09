@@ -11,6 +11,19 @@ import { join } from 'node:path';
 import { CORPUS_DIR, MODE, readAreas } from './sync.mjs';
 import { verifyCitations } from './verify.mjs';
 
+/**
+ * The doctor's E-12 line, owned here and imported by ARC-08 — never retyped.
+ *
+ * It is a FAIL and never a WARN or a SKIP. An absent corpus means every citation in every skill is
+ * unverified, and the engine's whole claim is that its ServiceNow facts are grounded; reporting that
+ * as a warning would be reporting the failure of the thing the product is for as a note in the
+ * margin. The mode is quoted because "skip" and "sparse" fail for different reasons — one was asked
+ * for, the other went wrong — and the remedy is the same command either way.
+ */
+export const E12_ABSENT = (mode) =>
+  `E-12 docs corpus: FAIL — corpus absent (docs mode "${mode}"); grounding and citations are `
+  + 'unverified — run ./snowarch docs sync';
+
 /** The object's version. Additions are non-breaking; a removal or a changed meaning is not. */
 export const SCHEMA = 1;
 
@@ -153,6 +166,12 @@ export function docsStatus({ root = process.cwd(), verify = true, measure: doMea
   base.pinMatchesGitlink = base.gitlink === null ? null : base.gitlink === docs.pin;
 
   if (!present) {
+    // No corpus and no state file: there is nothing to infer FROM. S06's rule reads the shape of the
+    // checkout, and an absent checkout has no shape — so the mode is reported as `skip`, which is
+    // the honest reading of "no corpus is here and nothing says one was ever asked for". A recorded
+    // mode still wins: an operator who asked for `sparse` and has no corpus has a broken install,
+    // not a skipped one, and E-12 quotes the difference.
+    base.mode = base.mode ?? 'skip';
     if (verify) base.citations = verifyCitations({ root });
     return base;
   }
@@ -194,7 +213,12 @@ const mb = (b) => (b === null ? '—' : `${Math.round(b / 1_000_000)} MB`);
 export function formatStatus(s) {
   if (!s.present) {
     return {
-      text: `docs corpus: MISSING — run ./bootstrap.sh --docs sparse (or node scripts/docs.mjs sync)`,
+      text: [
+        'docs corpus: MISSING — run ./bootstrap.sh --docs sparse (or node scripts/docs.mjs sync)',
+        // The doctor's exact line, so `docs status` and the doctor cannot disagree about what an
+        // absent corpus means or what to do about it.
+        E12_ABSENT(s.mode),
+      ].join('\n'),
       code: 3,
     };
   }

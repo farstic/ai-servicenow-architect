@@ -59,7 +59,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-03-S08 | ARC-03 | `snowarch docs family <name> --dry-run\|--yes` — release-family switch with a printed edit plan and gateway-skill re-lint | M | S07 | M2 | Done (2026-09-09) |
 | ARC-03-S09 | ARC-03 | `.github/workflows/docs-bump.yml` weekly PR with pin, verification output and newly dead citations | M | S07; ARC-01 (all) | M2 | Done (2026-09-09) |
 | ARC-03-S10 | ARC-03 | `NOTICE` attribution, the B02/`docs sync` attribution line, install-page attribution and size/time statement, `docs/ARCHITECTURE.md` corpus section | S | S05; ARC-00-S09; ARC-01 (all); verdicts S-07 | M2 | Done (2026-09-09) |
-| ARC-03-S11 | ARC-03 | Windows long-path CI proof and `--docs skip` → doctor FAIL wiring (three-OS real-corpus job) | M | S05, S06; ARC-00-S09/S13; ARC-01-S11; verdicts S-07 | M2 | Not started |
+| ARC-03-S11 | ARC-03 | Windows long-path CI proof and `--docs skip` → doctor FAIL wiring (three-OS real-corpus job) | M | S05, S06; ARC-00-S09/S13; ARC-01-S11; verdicts S-07 | M2 | Done (2026-09-09) |
 | ARC-04-S01 | ARC-04 | D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI | L | ARC-01-S05/S06 | M2 | Done (2026-09-08) |
 | ARC-04-S02 | ARC-04 | Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed | L | S01 | M2 | Done (2026-09-08) |
 | ARC-04-S03 | ARC-04 | Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage | L | S02 | M2 | Done (2026-09-08) |
