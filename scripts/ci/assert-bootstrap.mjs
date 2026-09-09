@@ -33,6 +33,8 @@ const value = (name, fallback = null) => {
 const variant = value('variant', 'node-cli');
 const writer = value('writer', 'node');
 const secondLog = value('second-log');
+const firstState = value('first-state');
+const firstSettings = value('first-settings');
 const seconds = Number(value('seconds', '0'));
 
 const problems = [];
@@ -134,22 +136,57 @@ if (process.platform === 'win32') {
 }
 
 // ── 8. the second run stands on the first ────────────────────────────────────────────────────
-// AMENDED (ARC-06-S14): the story asked for no network access on the second run, enforced with an
-// unreachable proxy. B00 probes github.com on EVERY run by design (S04, never cached), so that
-// setup makes B00 FAIL and proves nothing about caching. What idempotence actually means here is
-// asserted instead: the cached step lines, no docs phase, a B02 that did no work, and a fast exit.
-if (secondLog) {
+// AMENDED TWICE, and both amendments are things this job discovered on its first run.
+//
+// (a) The story asked for "no network access on the second run", enforced with an unreachable
+//     proxy. B00 probes github.com on EVERY run by design (S04 — that check is never cached), so
+//     that setup makes B00 FAIL and measures nothing about the cache.
+//
+// (b) The brief asked for B02's recorded `durationMs` under 1000 ms. A CACHED step is not
+//     re-recorded — the runner prints its line and moves on — so `durationMs` still holds the
+//     FIRST run's number and can never be small. What proves the step did not run is that its
+//     entry did not change, which is asserted here instead.
+//
+// And the two variants mean different things by idempotence, because THE LAUNCHERS HAVE NO CACHE:
+// `bootstrap.sh` and `bootstrap.ps1` record `"inputsHash": null` (bash cannot compute the repo's
+// input hashes, and pretending it could would cache a step whose inputs had changed). So a
+// Node-free second run RE-RUNS its steps by design; what must hold there is that nothing changed.
+if (secondLog && existsSync(secondLog)) {
   const log = readFileSync(secondLog, 'utf8');
-  for (const id of ['B01', 'B02', 'B07']) {
-    if (!new RegExp(`\\[${id}/09\\][^\\n]*ok \\(cached\\)`).test(log)) {
-      fail(8, `${id} did not report "ok (cached)" on the second run`);
+  const first = firstState && existsSync(firstState) ? JSON.parse(readFileSync(firstState, 'utf8')) : null;
+
+  if (variant === 'no-node') {
+    if (!/ok B07: already set/.test(log)) {
+      fail(8, 'the second run did not report B07 as already set — it rewrote the toggle');
     }
+    if (firstSettings && existsSync(firstSettings)) {
+      if (readFileSync(firstSettings, 'utf8') !== read(settingsPath)) {
+        fail(8, 'the second run changed .claude/settings.local.json');
+      }
+    }
+    if (first) {
+      const before = Object.fromEntries(Object.entries(first.steps ?? {}).map(([k, v]) => [k, v.status]));
+      const after = Object.fromEntries(Object.entries(state?.steps ?? {}).map(([k, v]) => [k, v.status]));
+      if (JSON.stringify(before) !== JSON.stringify(after)) {
+        fail(8, `the second run changed a step's outcome:\n  before ${JSON.stringify(before)}\n  after  ${JSON.stringify(after)}`);
+      }
+    }
+    notes.push('second run: launcher re-ran its steps and changed nothing (no cache by design)');
+  } else {
+    for (const id of ['B01', 'B02', 'B07']) {
+      if (!new RegExp(`\\[${id}/09\\][^\\n]*ok \\(cached\\)`).test(log)) {
+        fail(8, `${id} did not report "ok (cached)" on the second run`);
+      }
+      // The entry a cached step leaves alone. This is the assertion that survives a runner change:
+      // a step that secretly re-ran would have a new `finishedAt` even if its line still said ok.
+      if (first && first.steps?.[id]?.finishedAt !== state?.steps?.[id]?.finishedAt) {
+        fail(8, `${id} was re-run on the second pass (finishedAt moved)`);
+      }
+    }
+    if (/^\[docs\]/m.test(log)) fail(8, 'the second run entered the docs phase');
+    notes.push('second run: B01/B02/B07 cached, entries unchanged');
   }
-  if (/^\[docs\]/m.test(log)) fail(8, 'the second run entered the docs phase');
-  const b02 = state?.steps?.B02?.durationMs;
-  if (!(b02 < 1000)) fail(8, `B02 took ${b02} ms on the second run — it did work it should have cached`);
   if (seconds >= 30) fail(8, `the second run took ${seconds} s (budget: 30)`);
-  notes.push(`second run ${seconds} s, B02 ${b02} ms`);
 }
 
 // ── the job summary row ──────────────────────────────────────────────────────────────────────

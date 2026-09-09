@@ -293,28 +293,75 @@ jobs:
       # Node is back on PATH here on purpose: it was removed for the RUN, which is the subject. A
       # bash-and-PowerShell twin of the assertion script would be two opinions about what a correct
       # install looks like.
-      - name: The second run stands on the first
-        shell: bash
+      # ── the second run, in the SAME environment as the first ────────────────────────────────
+      # It has to be. A `no-node` cell whose second run found Node would hand over to the Node CLI,
+      # flip `writer` to "node", add the SessionStart hook and re-run B01/B02 — and the first run's
+      # result would be gone. That is exactly what the first version of this job did, and all three
+      # no-node cells said so.
+      #
+      # The log and the first run's state go to RUNNER_TEMP, OUTSIDE the checkout: a file written
+      # into the repository to check that nothing was written into the repository fails assertion 2
+      # by existing. That was the other thing the first run found.
+      - name: Keep the first run's state, then run it again (POSIX)
+        if: matrix.os != 'windows-latest'
         run: |
-          start=$(date +%s)
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            ./bootstrap.cmd --mode design --yes --skip-claude-check > second.log 2>&1
-          else
-            ./bootstrap.sh --mode design --yes --skip-claude-check > second.log 2>&1
+          cp .local/bootstrap-state.json "$RUNNER_TEMP/first-state.json"
+          cp .claude/settings.local.json "$RUNNER_TEMP/first-settings.json"
+          if [ "${{ matrix.variant }}" = "no-node" ]; then
+            export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+            command -v node && exit 1
           fi
+          start=$(date +%s)
+          ./bootstrap.sh --mode design --yes --skip-claude-check > "$RUNNER_TEMP/second.log" 2>&1
           echo "SECOND_SECONDS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
-          cat second.log
+          cat "$RUNNER_TEMP/second.log"
+      # The Windows cells measure in PowerShell rather than Git Bash: using Git Bash here would put
+      # a POSIX shell into the one cell whose premise is that there is not one. The encoding matters
+      # too — `>` in 5.1 writes UTF-16LE — so the log goes through .NET as UTF-8 without a BOM, the
+      # lesson S12 learned about `Set-Content -Encoding UTF8`.
+      - name: Keep the first run's state, then run it again (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          Copy-Item .local\bootstrap-state.json "$env:RUNNER_TEMP\first-state.json" -Force
+          Copy-Item .claude\settings.local.json "$env:RUNNER_TEMP\first-settings.json" -Force
+          $bare = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
+          if ('${{ matrix.variant }}' -eq 'no-node') {
+            $env:PATH = $bare
+            if (Get-Command node -ErrorAction SilentlyContinue) { exit 1 }
+          }
+          # The no-gitbash cell keeps its premise on the second run too: Git Bash out, Node in.
+          if ('${{ matrix.variant }}' -eq 'no-gitbash') {
+            $env:PATH = "$bare;C:\Program Files\nodejs"
+            if (-not (Get-Command node -ErrorAction SilentlyContinue)) { exit 1 }
+          }
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
+          $start = Get-Date
+          $out = (& cmd /c ".\bootstrap.cmd --mode design --yes --skip-claude-check 2>&1") | Out-String
+          $rc = $LASTEXITCODE
+          $seconds = [int]((Get-Date) - $start).TotalSeconds
+          [System.IO.File]::WriteAllText("$env:RUNNER_TEMP\second.log", $out, $utf8)
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, "SECOND_SECONDS=$seconds`n", $utf8)
+          Write-Host $out
+          if ($rc -ne 0) { exit 1 }
+          exit 0
+
+      # ── the assertions, one implementation for every cell ────────────────────────────────────
+      # Node is back on PATH here on purpose: it was removed for the RUN, which is the subject. A
+      # bash-and-PowerShell twin of the assertion script would be two opinions about what a correct
+      # install looks like.
       - name: Assert the install promise
+        shell: bash
         run: >
           node scripts/ci/assert-bootstrap.mjs
           --variant ${{ matrix.variant }} --writer ${{ matrix.writer }}
-          --second-log second.log --seconds $SECOND_SECONDS --summary
+          --second-log "$RUNNER_TEMP/second.log"
+          --first-state "$RUNNER_TEMP/first-state.json"
+          --first-settings "$RUNNER_TEMP/first-settings.json"
+          --seconds "$SECOND_SECONDS" --summary
+      - name: ...and that two installs left nothing tracked behind
         shell: bash
-      - name: Remove the second run's log, then assert nothing tracked changed
-        shell: bash
-        run: |
-          rm -f second.log
-          node scripts/ci/assert-clean.mjs
+        run: node scripts/ci/assert-clean.mjs
 
       # Assertion 9's second half: the committed dist/ answers a handshake. Needs the runtime
       # dependencies, which a design-only install deliberately does not fetch — so they are

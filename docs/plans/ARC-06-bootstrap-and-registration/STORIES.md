@@ -791,8 +791,15 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
    *Amended 2026-09-10 (ARC-06-S14):* the unreachable-proxy half cannot be implemented as
    written. B00 probes github.com on EVERY run by design (S04 — the check is never cached),
    so a proxy pointing nowhere makes B00 FAIL and proves nothing about caching. What
-   idempotence means here is asserted instead: `ok (cached)` for B01/B02/B07, no `[docs]`
-   phase line, B02's recorded `durationMs` under 1000, and exit 0 in under 30 s.
+   idempotence means here is asserted instead — and it means two different things by variant,
+   which the job's first run is what revealed. In a **Node-CLI** cell: `ok (cached)` for
+   B01/B02/B07, no `[docs]` phase line, those three entries' `finishedAt` UNCHANGED (a cached step
+   is not re-recorded, so the `durationMs < 1000` the brief asked for can never hold — the number
+   is still the first run's), and exit 0 in under 30 s. In a **no-node** cell there is no cache at
+   all: the launchers record `"inputsHash": null` because bash cannot compute the repository's
+   input hashes, and pretending it could would cache a step whose inputs had changed. So the
+   launcher re-runs its steps by design, and what must hold is that nothing changed — `ok B07:
+   already set`, a byte-identical `settings.local.json`, and the same step outcomes.
 6. The job summary table is present with a non-empty seconds/MB value for every cell.
 7. After ARC-08 S11, the same job additionally asserts `summary.fail == 0` from `./snowarch doctor --json` in the `node-cli` cells without restructuring.
 
