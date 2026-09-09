@@ -449,6 +449,30 @@ mode applied to the temp file **before** the rename so the finished file is neve
 world-readable, and it goes through the same write-time secret guard as the bootstrap state: a URL,
 an address or a registered secret fails the write rather than reaching a file things read casually.
 
+### B09 summary — one verdict, one Mode line, and what to type next
+
+The last five lines are the only part of the installation most people read twice, and two of them
+are **promises**. The `Mode:` line is quoted verbatim by four programs — the bootstrap's summary,
+the SessionStart banner, `/snowarch status` and `snowarch mode` — so it has **one definition**, in
+`tools/snowarch/lib/text.mjs`. The doctor additionally prints a *detailed* variant that appends its
+own findings; that is a longer line for a longer report, not a second Mode line.
+
+The dialog count is the other promise: one sentence per dialog, never a hedge, because "you may see
+one or two" makes a reader distrust every other line in the summary. `EXPECTED_DIALOGS` is 1, from
+the owner's 2.1.258 sitting recorded in `docs/plans/03-RISKS-AND-UNKNOWNS.md` §F, and a test reads
+that row rather than another copy of the number.
+
+The command spellings follow the **shell**, not only the platform: Git Bash on Windows runs
+`./bootstrap.sh` perfectly well, so `.\bootstrap.cmd` is printed only when `SHELL` and `MSYSTEM`
+are both unset. `text.json` is generated from the same module, and the Node-free launchers read it
+— one definition, three programs, the same shape as `remedies.json`.
+
+B09 **returns** its block rather than printing it: the runner prints a step's line after `run()`
+returns, so a block written from inside would be followed by `[B09/09] summary … ok` and the closing
+five lines would not be the last five. `--json`'s `next` carries that same string, so the two cannot
+drift. Design-only runs also write the banner's cache here, since they never reach B08 — and a live
+run's cache is left alone, because a handshake's findings should not be replaced by a summary's.
+
 ### The resume rule
 
 For each step in order: `runsWhen` false → `skipped (<reason>)`; `--from BNN` and the step is at or

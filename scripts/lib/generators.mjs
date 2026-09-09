@@ -43,6 +43,13 @@ export const GENERATORS = [
     ],
   },
   {
+    // ARC-06-S09: the closing block's strings, so the Node-free launchers print the same bytes.
+    id: 'gen-text',
+    script: 'scripts/gen-text.mjs',
+    supportsRoot: true,
+    targets: ['tools/snowarch/lib/text.json'],
+  },
+  {
     id: 'gen-retired-names',
     script: 'packages/contract/gen-retired-names.mjs',
     supportsRoot: false,

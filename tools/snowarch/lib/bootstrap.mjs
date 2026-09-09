@@ -199,6 +199,10 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
   }
   saveState(root, runState);
 
+  // The closing block, after the last step line, so the five lines a user reads at the end really
+  // are the last five.
+  if (outcome.next && !flags.json) for (const line of outcome.next.split('\n')) log.step(line);
+
   if (flags.json) {
     log.json({
       mode: runState.mode,
@@ -208,7 +212,7 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
         fail: outcome.summary.fail, skipped: outcome.summary.skipped },
       next: nextText(outcome, runState),
     });
-  } else {
+  } else if (!outcome.next) {
     log.step(nextText(outcome, runState));
   }
   return outcome.code === EXIT_OK ? EXIT_OK : EXIT_FAIL;
@@ -219,6 +223,9 @@ export function nextText(outcome, state) {
   if (outcome.stoppedAt) {
     return `stopped at ${outcome.stoppedAt} — fix the cause above and re-run ./bootstrap.sh`;
   }
+  // B09's block, verbatim. `--json`'s `next` and the lines a human read are then the same string
+  // rather than two renderings that can drift — which is what criterion 3 asks.
+  if (outcome.next) return outcome.next;
   return state.mode === 'live'
     ? `bootstrap complete (${LAST}) — run /snowarch status in Claude Code to confirm the instance`
     : `bootstrap complete (${LAST}) — design-only; add an instance later with ./snowarch mode live`;

@@ -63,6 +63,9 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
   now = () => new Date(), save = saveState, steps = STEPS, last = null,
   live = { child: null, step: null } }) {
   const summary = { ok: 0, warn: 0, fail: 0, skipped: 0, cached: 0 };
+  // B09 composes the closing block; the runner carries it out so `--json` prints the SAME string a
+  // human saw rather than a second rendering of it.
+  let next = null;
   const fromIndex = from ? steps.findIndex((s) => s.id === from) : -1;
   // `live` is the caller's handle on what is running RIGHT NOW, and it is passed IN rather than
   // created here: the SIGINT handler is registered outside this function and fires while the
@@ -154,6 +157,7 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
       return { code: result.code ?? EXIT_FAIL, summary, state, stoppedAt: step.id, live };
     }
 
+    if (result.next) next = result.next;
     summary[result.status === 'warn' ? 'warn' : 'ok'] += 1;
     onLine(stepLine({ id: step.id, title: step.title, status: result.status, durationMs, last: lastId }));
     // Saved after EVERY step, not at the end: the whole point of the state file is that a run which
@@ -161,7 +165,7 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
     save(root, state);
   }
 
-  return { code: EXIT_OK, summary, state, stoppedAt: null, live };
+  return { code: EXIT_OK, summary, state, stoppedAt: null, live, next };
 }
 
 /**

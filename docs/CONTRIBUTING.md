@@ -786,6 +786,17 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## The Mode line has one definition
+
+`Mode:` is quoted by the bootstrap's summary, the SessionStart banner, `/snowarch status` and
+`snowarch mode`. All four call `modeLine()` in `tools/snowarch/lib/text.mjs`; none of them builds
+the string. Four programs answering "what am I in" three different ways is the failure this
+prevents, and it is the kind that only shows up in a screenshot from a confused user.
+
+The same module owns the dialog count and the command spellings, and `text.json` is generated from
+it for the Node-free launchers. If you are about to type one of those sentences into a second file,
+generate it instead.
+
 ## A variable Claude Code sets per session is never read — it is set
 
 `CLAUDE_PROJECT_DIR` is the project root of the session that spawned the process. When one of our

@@ -29,6 +29,15 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **B09 — one verdict, one Mode line, and the exact next thing to type.** The `Mode:` line now has
+  **one definition** (`lib/text.mjs`), quoted verbatim by four programs; the doctor's detailed
+  variant appends its findings rather than being a second Mode line, and the ARC-02-S11 stub and the
+  user guide are reconciled to that split. The dialog count is one sentence per dialog and never a
+  hedge — `EXPECTED_DIALOGS` is 1 from the owner's 2.1.258 sitting, and a test reads the
+  `03-RISKS-AND-UNKNOWNS.md` §F row rather than another copy of the number. Command spellings follow
+  the **shell**, not only the platform: Git Bash on Windows runs `./bootstrap.sh` perfectly well.
+  `text.json` is generated from the same module for the Node-free launchers, and `--json`'s `next`
+  carries the very string the human run printed.
 - **Every child the bootstrap spawns is now TOLD which checkout it serves.** `CLAUDE_PROJECT_DIR`
   is the project root of the session that spawned a process, so when our tools spawn something they
   *are* that session and an inherited value is somebody else's answer. Read from the environment, it
