@@ -786,6 +786,15 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## Adding a preflight check
+
+1. Add the check function to `tools/snowarch/lib/steps/B00.mjs`, returning `ok` / `warn` / `fail`
+   with a detail, and list it in `runChecks` — order is the operator's reading order.
+2. Add its row to `lib/remedies.json` for all four platform keys; a failure without a remedy is a
+   status, not help, and the test refuses a missing row or an unfilled `{placeholder}`.
+3. Never spell a floor: read it from `ctx.config.floors`, and add the row to the seven-check table
+   in `docs/ARCHITECTURE.md`.
+
 ## Adding a bootstrap step
 
 1. Add a `BNN.mjs` to `tools/snowarch/lib/steps/` exporting `id`, `title`, `needsNode`, `runsWhen`,

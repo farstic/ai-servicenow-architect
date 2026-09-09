@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { DOCS, MODES, applyChoice, buildPlan, formatPlan, runPlanScreen } from '../lib/plan.mjs';
 import { LIVE_YES_WITHOUT_FILE, USAGE, bootstrapCommand } from '../lib/bootstrap.mjs';
 import { loadState, statePath } from '../lib/state.mjs';
-import { makeCheckout, recorder } from './helpers/workspace.mjs';
+import { commandArgs, makeCheckout, recorder } from './helpers/workspace.mjs';
 
 const ctxOf = (root, { present = true } = {}) => ({
   root, env: {}, areaCount: 19,
@@ -122,16 +122,16 @@ test('stdin closing is a quit, never an accept', async () => {
 test('AC 2 — q exits 0 and leaves no .local/ at all', async () => {
   const root = makeCheckout();
   const log = recorder();
-  const code = await bootstrapCommand({ flags: {}, log, root, asker: scripted(['q']),
+  const code = await bootstrapCommand({ ...commandArgs(root), log, asker: scripted(['q']),
     out: sink(), err: sink() });
-  assert.equal(code, 0);
+  assert.equal(code, 0, log.lines.join('\n'));
   assert.equal(existsSync(join(root, '.local')), false, 'quitting must write nothing');
 });
 
 test('AC 7 — live with --yes and no instance file is a usage error that writes nothing', async () => {
   const root = makeCheckout();
   const log = recorder();
-  const code = await bootstrapCommand({ flags: { mode: 'live', yes: true }, log, root,
+  const code = await bootstrapCommand({ ...commandArgs(root, { mode: 'live', yes: true }), log,
     out: sink(), err: sink() });
   assert.equal(code, 2);
   assert.ok(log.lines.includes(LIVE_YES_WITHOUT_FILE));
@@ -143,7 +143,8 @@ test('a bad --mode, --docs or --from is refused by name, and writes nothing', as
   for (const flags of [{ mode: 'lively' }, { docs: 'some' }, { from: 'B42' }]) {
     const root = makeCheckout();
     const log = recorder();
-    const code = await bootstrapCommand({ flags, log, root, asker: scripted([]), out: sink(), err: sink() });
+    const code = await bootstrapCommand({ ...commandArgs(root, flags), log, asker: scripted([]),
+      out: sink(), err: sink() });
     assert.equal(code, 2, `${JSON.stringify(flags)} should be a usage error`);
     assert.equal(existsSync(join(root, '.local')), false);
   }
@@ -153,7 +154,7 @@ test('a bad --mode, --docs or --from is refused by name, and writes nothing', as
 test('AC 1 — a design-only run writes the state the other consumers read', async () => {
   const root = makeCheckout();
   const log = recorder();
-  const code = await bootstrapCommand({ flags: { mode: 'design', yes: true }, log, root,
+  const code = await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true }), log,
     out: sink(), err: sink() });
 
   assert.equal(code, 0);
@@ -176,9 +177,11 @@ test('AC 1 — a design-only run writes the state the other consumers read', asy
 test('AC 1 — the second run caches and the summary counts it', async () => {
   const root = makeCheckout();
   const first = recorder();
-  await bootstrapCommand({ flags: { mode: 'design', yes: true }, log: first, root, out: sink(), err: sink() });
+  await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true }), log: first,
+    out: sink(), err: sink() });
   const second = recorder();
-  await bootstrapCommand({ flags: { mode: 'design', yes: true }, log: second, root, out: sink(), err: sink() });
+  await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true }), log: second,
+    out: sink(), err: sink() });
 
   const cached = second.lines.filter((l) => l.includes('ok (cached)')).map((l) => /\[(B\d\d)/.exec(l)[1]);
   for (const id of ['B01', 'B02', 'B05', 'B07']) {
@@ -192,7 +195,7 @@ test('--json puts the object on stdout and every human line on stderr', async ()
   const root = makeCheckout();
   const log = recorder();
   const out = sink(); const err = sink();
-  await bootstrapCommand({ flags: { mode: 'design', yes: true, json: true }, log, root, out, err });
+  await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true, json: true }), log, out, err });
 
   // The plan screen is prose: under --json it must not reach the stream carrying the object.
   assert.equal(out.text(), '', 'stdout was polluted by the plan screen');
@@ -208,7 +211,7 @@ test('--json puts the object on stdout and every human line on stderr', async ()
 
 test('AC 6 — --reset clears the state and leaves the store byte-identical', async () => {
   const root = makeCheckout();
-  await bootstrapCommand({ flags: { mode: 'design', yes: true }, log: recorder(), root,
+  await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true }), log: recorder(),
     out: sink(), err: sink() });
   const store = join(root, '.local', 'instances.json');
   writeFileSync(store, '{"version":1,"instances":[]}\n');
@@ -216,7 +219,7 @@ test('AC 6 — --reset clears the state and leaves the store byte-identical', as
   writeFileSync(join(root, '.local', 'doctor-last.json'), '{}\n');
 
   const log = recorder();
-  const code = await bootstrapCommand({ flags: { reset: true }, log, root, out: sink(), err: sink() });
+  const code = await bootstrapCommand({ ...commandArgs(root, { reset: true }), log, out: sink(), err: sink() });
 
   assert.equal(code, 0);
   assert.equal(existsSync(statePath(root)), false);
@@ -227,13 +230,13 @@ test('AC 6 — --reset clears the state and leaves the store byte-identical', as
 
 test('a state file from a newer snowarch stops the run with the upgrade sentence', async () => {
   const root = makeCheckout();
-  await bootstrapCommand({ flags: { mode: 'design', yes: true }, log: recorder(), root,
+  await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true }), log: recorder(),
     out: sink(), err: sink() });
   const s = JSON.parse(readFileSync(statePath(root), 'utf8'));
   writeFileSync(statePath(root), JSON.stringify({ ...s, version: 99 }));
 
   const log = recorder();
-  const code = await bootstrapCommand({ flags: { mode: 'design', yes: true }, log, root,
+  const code = await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true }), log,
     out: sink(), err: sink() });
   assert.equal(code, 1);
   assert.ok(log.lines.includes('state file is from a newer snowarch — run ./snowarch upgrade'));

@@ -29,6 +29,26 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **B00 preflight — seven checks, one named remedy each, before anything is installed.** Root
+  (compared through `realpath`, because `/tmp` and `/var` are symlinks on macOS and a checkout
+  reached through a link used to be told to `cd` to where it already was), git, Claude Code, disk,
+  network, Node and the machine. **Every check runs even after one has failed**: an operator
+  missing git *and* behind a TLS-intercepting proxy learns both in one pass. Any FAIL is exit 3 —
+  a missing prerequisite is not the same event as a failed step — and it happens before the plan
+  screen, so nothing is written and no question is asked that the machine has already answered.
+  Floors come from `engine.config.json`, and a test strips comments from every module under
+  `lib/` to prove none of them spells one.
+- **One network vocabulary, now shared.** ARC-03-S05's DNS / proxy / TLS / disk sentences moved to
+  `lib/net-sentences.mjs`; `classifyGitFailure` and the new `lib/probe-net.mjs` both import them, so
+  an operator behind a corporate proxy does not learn two vocabularies for one problem depending on
+  which half of the tool noticed first. The one parameterised difference is the CA sentence, which
+  names the failing tool's knob first and the other second. The probe speaks CONNECT to an
+  `HTTPS_PROXY` over `node:net` + `node:tls` — stdlib only — honours `NO_PROXY`, and **never puts a
+  credential on the CONNECT line**: a proxy that needs authentication is a case it reports rather
+  than solves.
+- **`lib/remedies.json`** — `{ checkId: { darwin, win32, linux, default } }`, held as data because
+  the Node-free launchers print the same sentences with no Node to read them and the doctor quotes
+  the same table. An unfilled `{placeholder}` throws rather than being shown to a user.
 - **The step registry** (`lib/steps/B00…B09.mjs` + `lib/steps/index.mjs`), with the step bodies
   still to come in ARC-06-S04…S09. Their `inputs()` are real now, so the cache, resume, `--from`,
   `--reset` and interrupt semantics are all exercised today rather than after the last body lands.

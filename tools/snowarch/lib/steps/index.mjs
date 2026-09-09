@@ -60,7 +60,7 @@ export function killTree(child, { platform = process.platform, spawn = nodeSpawn
  * logger of its own would be a second place deciding what a step line says.
  */
 export async function runSteps({ root, ctx, state, from = null, onLine = () => {},
-  now = () => new Date(), save = saveState, steps = STEPS,
+  now = () => new Date(), save = saveState, steps = STEPS, last = null,
   live = { child: null, step: null } }) {
   const summary = { ok: 0, warn: 0, fail: 0, skipped: 0, cached: 0 };
   const fromIndex = from ? steps.findIndex((s) => s.id === from) : -1;
@@ -70,7 +70,7 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
   // was the first version, and it meant Ctrl-C left the child running.
   // The denominator comes from the list being run, not from the module constant: a test driving
   // three stub steps must not print `/09`, or every line it asserts is a line no user ever sees.
-  const last = steps[steps.length - 1].id;
+  const lastId = last ?? steps[steps.length - 1].id;
 
   for (let i = 0; i < steps.length; i += 1) {
     const step = steps[i];
@@ -81,7 +81,7 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
       state.steps[step.id] = { status: 'skipped', inputsHash: null, detail,
         finishedAt: now().toISOString(), durationMs: 0 };
       summary.skipped += 1;
-      onLine(stepLine({ id: step.id, title: step.title, status: 'skipped', detail, last }));
+      onLine(stepLine({ id: step.id, title: step.title, status: 'skipped', detail, last: lastId }));
       continue;
     }
 
@@ -95,7 +95,7 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
     if (cached) {
       summary.cached += 1;
       summary.ok += 1;
-      onLine(stepLine({ id: step.id, title: step.title, status: 'cached', last }));
+      onLine(stepLine({ id: step.id, title: step.title, status: 'cached', last: lastId }));
       continue;
     }
 
@@ -106,6 +106,12 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
       result = await step.run({
         ...ctx,
         state,
+        /**
+         * A step's own output. B00 prints seven check lines before its step line, and a step that
+         * reached for `console.log` would bypass redaction and the log file both — so the runner
+         * hands it the same sink every step line goes through.
+         */
+        line: onLine,
         /** Steps spawn through here so the interrupt handler can reach their children. */
         spawn: (cmd, args, opts) => {
           const child = nodeSpawn(cmd, args, opts);
@@ -136,16 +142,18 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
 
     if (result.status === 'fail') {
       summary.fail += 1;
-      onLine(stepLine({ id: step.id, title: step.title, status: 'fail', last }));
+      onLine(stepLine({ id: step.id, title: step.title, status: 'fail', last: lastId }));
       for (const l of failureBlock({ id: step.id, cause: result.detail, remedy: result.remedy })) {
         onLine(l);
       }
       save(root, state);
-      return { code: EXIT_FAIL, summary, state, stoppedAt: step.id, live };
+      // A step may name its own exit code — B00's failures are missing PREREQUISITES, which is a
+      // different thing from "a step failed" and a different number to key on.
+      return { code: result.code ?? EXIT_FAIL, summary, state, stoppedAt: step.id, live };
     }
 
     summary[result.status === 'warn' ? 'warn' : 'ok'] += 1;
-    onLine(stepLine({ id: step.id, title: step.title, status: result.status, durationMs, last }));
+    onLine(stepLine({ id: step.id, title: step.title, status: result.status, durationMs, last: lastId }));
     // Saved after EVERY step, not at the end: the whole point of the state file is that a run which
     // does not reach the end still knows where it got to.
     save(root, state);

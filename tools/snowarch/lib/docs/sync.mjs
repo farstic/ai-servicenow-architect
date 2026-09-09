@@ -83,29 +83,19 @@ const isWindows = () => process.platform === 'win32';
 const withLongPaths = (args) => (isWindows() ? ['-c', 'core.longpaths=true', ...args] : args);
 
 /**
- * The proxy URL as it may be printed: credentials removed, host and port kept.
+ * The sentences moved to `../net-sentences.mjs` at ARC-06-S04, and are re-exported here so every
+ * existing importer keeps working.
  *
- * `user:password@host` is the shape a corporate proxy is configured in, and the whole point of the
- * proxy message is to print the address back at the operator — so it has to be printed without the
- * password that is sitting in their environment variable.
+ * The preflight (B00) reaches the same internet over `node:https` and hits the same four walls —
+ * DNS, an unreachable proxy, a TLS-intercepting gateway, a full disk. An operator behind a
+ * corporate proxy must not learn two vocabularies for one problem depending on which half of the
+ * tool noticed first, and two copies of "cannot reach proxy …" would drift the first time either
+ * was reworded. What stays here is git's stderr → WHICH sentence, which is genuinely git's
+ * business: the matched substrings are libcurl's, as surfaced by git.
  */
-export function maskProxy(url) {
-  if (!url) return null;
-  return String(url).replace(/\/\/[^/@]*@/, '//***@');
-}
+import * as SENTENCE from '../net-sentences.mjs';
 
-/** `host:port` from a proxy URL, for the message. Falls back to the masked URL if it will not parse. */
-function proxyAddress(url) {
-  try {
-    const u = new URL(/^[a-z]+:\/\//i.test(url) ? url : `http://${url}`);
-    return u.port ? `${u.hostname}:${u.port}` : u.hostname;
-  } catch { return maskProxy(url); }
-}
-
-/** The host an upstream URL points at, for the DNS message. `file://` fixtures have none. */
-export function upstreamHost(upstream) {
-  try { return new URL(upstream).hostname || null; } catch { return null; }
-}
+export { maskProxy, upstreamHost } from '../net-sentences.mjs';
 
 /**
  * git's stderr → the sentence the operator needs.
@@ -120,30 +110,26 @@ export function classifyGitFailure(stderr, { upstream, pin, env = process.env } 
   const text = String(stderr ?? '');
   const low = text.toLowerCase();
   const proxy = env.HTTPS_PROXY || env.https_proxy || null;
-  const host = upstreamHost(upstream) ?? 'the upstream';
+  const host = SENTENCE.upstreamHost(upstream) ?? 'the upstream';
 
   // Proxy first: with a proxy configured, "could not resolve" is about the PROXY, not github.com,
   // and sending someone to check their DNS is sending them to the wrong problem. (S-07 record,
   // "proxy misconfiguration" transcript.)
   if (proxy && (low.includes('could not resolve proxy') || low.includes('failed to connect to'))) {
-    return `cannot reach proxy ${proxyAddress(proxy)} (HTTPS_PROXY) — fix the proxy address, `
-      + 'or unset HTTPS_PROXY / add github.com to NO_PROXY, and re-run';
+    return SENTENCE.proxyUnreachable(proxy);
   }
   if (!proxy && low.includes('could not resolve host')) {
-    return `cannot reach ${host} (DNS) — check your network and re-run`;
+    return SENTENCE.dnsFailure(host);
   }
   if (low.includes('ssl certificate problem')) {
-    return 'TLS interception detected — set GIT_SSL_CAINFO (or git config http.sslCAInfo) to your '
-      + 'corporate CA bundle and re-run; the MCP server needs the same bundle via '
-      + 'NODE_EXTRA_CA_CERTS (docs/TROUBLESHOOTING.md)';
+    return SENTENCE.tlsIntercepted({ tool: SENTENCE.TOOL.git });
   }
   if (low.includes('not our ref') || low.includes("couldn't find remote ref")
       || low.includes('could not find remote ref')) {
-    return `pin ${String(pin ?? '').slice(0, 7)} not fetchable from upstream (force-push or history `
-      + 'rewrite?) — maintainer: run ./snowarch docs sync --upstream';
+    return SENTENCE.unfetchablePin(pin);
   }
   if (low.includes('no space left on device')) {
-    return 'insufficient disk space: need ~400 MB free (~700 MB for --mode full)';
+    return SENTENCE.noDiskSpace;
   }
   const first = text.split('\n').map((l) => l.trim()).find(Boolean) ?? '(no stderr)';
   return `git failed: ${first}`;

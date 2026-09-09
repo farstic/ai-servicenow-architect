@@ -54,7 +54,7 @@ const stdinAsker = (input, output) => {
 
 export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = [],
   input = process.stdin, out = process.stdout, err = process.stderr, env = process.env,
-  asker = null } = {}) {
+  cwd = process.cwd(), probe = undefined, exec = undefined, asker = null } = {}) {
   // With `--json`, stdout carries ONE thing: the object. The plan screen is prose, so it follows
   // every other human line to stderr — a caller piping this into `jq` must not have to strip a
   // banner first. (`--json` with no `--yes` still shows the screen and still waits: the operator is
@@ -107,7 +107,36 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
     state: state ?? emptyState({ engineVersion: version(root), node }),
   };
 
-  const plan = buildPlan({ ctx, state, flags });
+  // B00 runs BEFORE the plan screen, and writes nothing.
+  //
+  // The order is the story's and the reason is worth stating: the plan asks the operator to choose
+  // between modes, and offering `live` on a machine with no Node — or any plan at all on a machine
+  // that cannot reach github.com — is asking someone to decide something already decided. A
+  // preflight FAIL therefore ends the run before a single question and before `.local/` exists, so
+  // `save` is a no-op here rather than the real one.
+  // The plan is PROPOSED before the preflight so B00 knows which mode to check for — asking
+  // "is Node good enough?" without knowing whether live was requested has no answer. The proposal
+  // is pure and writes nothing; the screen that shows it comes after.
+  const proposed = buildPlan({ ctx, state, flags });
+  const preflight = await runSteps({
+    // `cwd` and `probe` are seams, not configuration: the root check has to be asked about a
+    // directory, and the network check must be answerable without a socket. Both default to the
+    // real thing, so the product path is the one every test is a deviation from.
+    root, ctx: { ...ctx, cwd, probe, exec, mode: proposed.mode, docs: proposed.docs },
+    state: ctx.state, steps: [STEPS[0]], last: LAST, onLine: (l) => log.step(l), save: () => {},
+  });
+  if (preflight.code !== EXIT_OK) {
+    // The runner has already printed the FAIL line, the cause and the remedy. Printing them again
+    // here — which the first version did — makes the operator read the same three lines twice and
+    // wonder which one is the real one.
+    log.discard();
+    return preflight.code;
+  }
+
+  // ...and B00's verdict feeds back into the screen: a machine it has just said cannot run live
+  // must not be offered live. `nodeUsable` is read rather than re-derived, so there is one answer.
+  const usable = ctx.state.steps.B00?.data?.nodeUsable !== false;
+  const plan = usable ? proposed : { ...proposed, mode: 'design-only', nodeFixed: true };
   const io = asker ?? stdinAsker(input, humanOut);
   let accepted;
   try {
@@ -127,7 +156,7 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
   // The plan's answers become the state's, here. B03 will own this once ARC-06-S07 gives it a body;
   // until then the decision still has to reach the file, because acceptance criterion 1 reads it
   // back and every step's `runsWhen` is asked about it.
-  const runState = state ?? emptyState({ engineVersion: version(root), node });
+  const runState = ctx.state;          // the same object B00 recorded into, not a second empty one
   runState.mode = accepted.plan.mode;
   runState.docs = { mode: accepted.plan.docs, pin: config.docs.pin };
   runState.node = node;
@@ -147,8 +176,8 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
   process.on('SIGINT', onSigint);
   let outcome;
   try {
-    outcome = await runSteps({ root, ctx, state: runState, live, from: flags.from
-      ? String(flags.from).toUpperCase() : null, onLine });
+    outcome = await runSteps({ root, ctx, state: runState, live, steps: STEPS.slice(1), last: LAST,
+      from: flags.from ? String(flags.from).toUpperCase() : null, onLine });
   } finally {
     process.off('SIGINT', onSigint);
   }
