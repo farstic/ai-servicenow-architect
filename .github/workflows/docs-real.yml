@@ -70,6 +70,10 @@ jobs:
           git config --global --unset core.longpaths 2>$null
           "system: $(git config --system --get core.longpaths)"
           "global: $(git config --global --get core.longpaths)"
+          # `git config --get` exits 1 when the key is NOT SET — which is precisely the state this
+          # step exists to produce. PowerShell propagates the last exit code, so the step failed on
+          # its own success. Caught by this workflow's first real run, which is what it is for.
+          exit 0
 
       - name: Take Git Bash off PATH
         if: runner.os == 'Windows' && !matrix.git-bash
