@@ -112,8 +112,14 @@ Then the launcher checks only that each line of `vendor/docs-areas.txt` exists a
 `vendor/ServiceNowDocs/markdown/`, and prints `citations: not verified until Node 20+ is installed`
 — citation verification needs the corpus reader, which needs Node.
 
-On Windows the module adds `-c core.longpaths=true` to every call and sets `core.longpaths true`
-inside the checkout. ARC-00 S-07 acceptance criterion 2 was **refuted** — every recipe passed on
+**On Windows the sequence above gains one line**, and the PowerShell launcher must run it after the
+clone — a single block cannot be byte-identical on both platforms, so this one is the POSIX form:
+
+```powershell
+git -C vendor/ServiceNowDocs config core.longpaths true
+```
+
+The module also adds `-c core.longpaths=true` to every git call it makes on `win32`. ARC-00 S-07 acceptance criterion 2 was **refuted** — every recipe passed on
 `windows-latest` with the setting off, because the longest corpus path (197 characters) plus a
 checkout prefix still fits in 260. It is kept for the margin, not for a failure anyone can
 reproduce today; the reasoning is in the module so it is not removed as dead weight.

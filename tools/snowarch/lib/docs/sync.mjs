@@ -269,7 +269,8 @@ export function inspect(root, config, areas) {
  * Written from the repository root with `-C`, because that is where a launcher stands. `state`
  * defaults to "nothing on disk", which is the case the ARCHITECTURE block documents.
  */
-export function planRecipe({ config, areas, mode = MODE.sparse, state = { present: false } } = {}) {
+export function planRecipe({ config, areas, mode = MODE.sparse, state = { present: false },
+  platform = process.platform } = {}) {
   const { docs } = config;
   const C = ['-C', CORPUS_DIR];
   const g = (...a) => `git ${a.join(' ')}`;
@@ -289,7 +290,12 @@ export function planRecipe({ config, areas, mode = MODE.sparse, state = { presen
   if (!state.present || !state.atPin) lines.push(g(...C, 'checkout', '--detach', docs.pin));
   lines.push(g('submodule', 'absorbgitdirs', CORPUS_DIR));
   if (!state.present || !state.initialised) lines.push(g('submodule', 'init', '--', CORPUS_DIR));
-  if (isWindows()) lines.push(g(...C, 'config', 'core.longpaths', 'true'));
+  // Platform-scoped on purpose, and `platform` is a parameter rather than a read of the ambient
+  // process: the recipe a Windows launcher must run is genuinely a different list, so ONE block
+  // cannot be byte-identical on both. `docs/ARCHITECTURE.md` carries the POSIX sequence and names
+  // this line as the Windows addition; `tests/docs-recipe.test.mjs` compares against the POSIX
+  // plan explicitly, and `--print-recipe` prints for the platform the operator is actually on.
+  if (platform === 'win32') lines.push(g(...C, 'config', 'core.longpaths', 'true'));
   return lines;
 }
 
