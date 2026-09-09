@@ -250,14 +250,30 @@ test('the Windows files arrive CRLF in every checkout', () => {
   assert.match(sh, /w\/lf/, 'the POSIX launcher must not arrive CRLF');
 });
 
+test('Git Bash gets the Windows remedies, and the region followed it back', () => {
+  // ARC-06-S12's ruling (4): `platform()` answered `linux` for MINGW/MSYS, so a Windows user
+  // running the POSIX launcher was told to `apt install git`. The arm is the fix; the interesting
+  // half is that the generated region needed NO edit — S11's derivation rule saw the two new
+  // references and put the sentences back on the next generate.
+  assert.match(launcher, /MINGW\*\|MSYS\*\|CYGWIN\*\) echo win32/);
+  assert.match(launcher, /^MSG_NODE_WIN=/m);
+  assert.match(launcher, /^MSG_GIT_WIN=/m);
+  assert.equal(shellVar('MSG_NODE_WIN'), remedies.node.win32);
+  assert.equal(shellVar('MSG_GIT_WIN'), remedies.git.win32);
+  // ...and the three arms each pick a different pair, rather than one arm shadowing the rest.
+  const arms = launcher.match(/^\s*(darwin|win32|\*)\)\s+NODE_REMEDY="\$(\w+)" ; GIT_REMEDY="\$(\w+)"/gm) ?? [];
+  assert.equal(arms.length, 3, `expected three platform arms, found ${arms.length}`);
+  assert.equal(new Set(arms.map((a) => a.split('NODE_REMEDY=')[1])).size, 3);
+});
+
 test('each launcher declares the sentences it uses, and only those', () => {
   // Both linters call an assigned-never-read variable a defect — shellcheck SC2034 and
   // PSScriptAnalyzer PSUseDeclaredVarsMoreThanAssignments — and the first version of this
   // generator wrote every sentence into both files, so `bootstrap.sh` declared the `winget`
   // remedies it can never print and `bootstrap.ps1` the `brew` ones. Six findings, one cause.
   // The region is now derived from each file's own references, which is why this holds.
-  assert.ok(!/^MSG_NODE_WIN=/m.test(launcher), 'bootstrap.sh declares a Windows remedy it never prints');
-  assert.ok(!/^MSG_GIT_WIN=/m.test(launcher), 'bootstrap.sh declares a Windows remedy it never prints');
+  // `bootstrap.sh` DOES carry the Windows remedies now — S12 gave it a Git Bash arm that prints
+  // them, and the region followed. The rule is unchanged: declared iff used.
   assert.ok(!/^\$MSG_NODE_DARWIN = /m.test(ps1), 'bootstrap.ps1 declares a macOS remedy it never prints');
   assert.ok(!/^\$MSG_GIT_LINUX = /m.test(ps1), 'bootstrap.ps1 declares a Linux remedy it never prints');
 

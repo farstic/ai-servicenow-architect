@@ -24,6 +24,30 @@
 >
 > **Parts B, C and D are complete too (2026-09-07).** Nothing remains for this version.
 >
+> **A robustness CANDIDATE, not a change (ruling 3, ARC-06-S12, 2026-09-10).** `bootstrap.cmd`
+> invokes `powershell` by NAME, so a machine whose PATH has been rewritten (a GPO, a shell started
+> with a scrubbed environment) gets cmd's own `'powershell' is not recognized` instead of our
+> sentence. `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe` removes the dependency
+> in one line. AC 3 fixes the `.cmd` text byte for byte and a test asserts it, so this is recorded
+> here to be tried during the sitting's mangled-PATH check rather than changed on my own judgement.
+>
+> **The registration sitting (added by ARC-06-S12, 2026-09-10).** Everything `--register` does goes
+> through `claude mcp`, which writes `~/.claude.json` — a file this agent is not permitted to touch,
+> so the CLI halves below were never run here. The flag spellings WERE verified read-only on
+> 2.1.258 (`claude mcp add-json --help`: `-s, --scope <scope>`, default `local`; `claude mcp remove
+> --help`: `-s` optional, and **without it the CLI removes from whichever scope it finds** — which
+> is why every call this tool makes passes `-s`). For the sitting, in a trusted checkout:
+> **(1) AC 4** — `./snowarch mode live --register local`, then `claude mcp get servicenow` shows a
+> local entry whose args still read `${CLAUDE_PROJECT_DIR:-.}/…/server.js` UNEXPANDED, and a Claude
+> session in the folder shows the server connected exactly once (no duplicate — the project entry
+> must be rejected by `disabledMcpjsonServers`). **(2) AC 5** — `--register project` afterwards, and
+> `claude mcp get` shows the project entry again. **(3) AC 6** — `--register user --ack-user-scope`,
+> then `./snowarch mode` prints the user-scope line. **(4) AC 1/2** — `/mcp` after `mode live` and
+> after `mode design`. **(5)** the same-key coexistence question the story's task 1 asks: with a
+> local AND a project entry both named `servicenow`, which one loads — recorded with the CLI
+> version. `~/.claude.json` should be fingerprinted by KEY NAME before and after (never contents);
+> for `--register local` the one key that may change is that project's `mcpServers` entry.
+>
 > **The Windows sitting, four rows (added by ARC-06-S11, 2026-09-09).** The Windows launchers ship
 > verified by CI for everything CI can reach; four things need a Windows console with a human:
 > **(1) AC 1** — double-click `bootstrap.cmd` on the `clean` snapshot: the plan appears, Enter runs

@@ -8,6 +8,7 @@ import { EXIT_OK, EXIT_USAGE } from './exit.mjs';
 import { contractSha, cwdNote, loadConfig, root, version } from './config.mjs';
 import { createLogger } from './log.mjs';
 import { USAGE as BOOTSTRAP_USAGE } from './bootstrap.mjs';
+import { USAGE as MODE_USAGE } from './mode.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
 const UNIVERSAL = ['json', 'quiet', 'verbose', 'help'];
@@ -97,6 +98,11 @@ async function docsCommand({ argv }) {
   return runDocs(argv);
 }
 
+async function modeCommand(args) {
+  const { modeCommand: run } = await import('./mode.mjs');
+  return run(args);
+}
+
 export const COMMANDS = {
   version: { summary: 'print versions, the contract sha and the floors', run: versionCommand,
     usage: 'usage: ./snowarch version [--json]' },
@@ -106,7 +112,9 @@ export const COMMANDS = {
   bootstrap: { summary: 'install this checkout: plan, then the numbered steps, resumable',
     run: bootstrapCommand, usage: BOOTSTRAP_USAGE, booleans: ['yes', 'reset', 'skip-claude-check'],
     defersLog: true },
-  mode: PLACEHOLDER('mode', 'ARC-06-S12'),
+  mode: { summary: 'switch this checkout between design-only and live, or report which it is',
+    run: modeCommand, usage: MODE_USAGE,
+    booleans: ['yes', 'ack-user-scope', 'skip-claude-check'] },
   doctor: PLACEHOLDER('doctor', 'ARC-08'),
   instance: PLACEHOLDER('instance', 'ARC-07'),
   upgrade: PLACEHOLDER('upgrade', 'ARC-09'),
@@ -136,7 +144,7 @@ export async function main(argv, { out = process.stdout, err = process.stderr } 
     return EXIT_USAGE;
   }
 
-  const { flags, errors } = parseArgs(rest, { booleans: command.booleans ?? [] });
+  const { flags, positional, errors } = parseArgs(rest, { booleans: command.booleans ?? [] });
   if (flags.help) { out.write(`${command.usage}\n`); return EXIT_OK; }
   if (errors.length > 0 && name !== 'docs') {
     // `docs` parses its own arguments — it has sub-commands of its own — so the frame does not
@@ -153,7 +161,10 @@ export async function main(argv, { out = process.stdout, err = process.stderr } 
   const note = cwdNote();
   if (note) log.note(note);
 
-  const code = await command.run({ flags, argv: rest, log, root, out, err });
+  // `positional` is passed as well as `flags`: `mode live` is an argument, not a flag, and a
+  // sub-command that had to re-parse `argv` to find it would be a second parser with a second
+  // opinion about `--`.
+  const code = await command.run({ flags, positional, argv: rest, log, root, out, err });
   log.commit();          // a deferred logger that was never committed still gets its lines on disk
   return code;
 }

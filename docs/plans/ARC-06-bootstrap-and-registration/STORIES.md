@@ -636,6 +636,10 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
 6. `tests/launcher-parity.test.mjs` (S10) also passes for `bootstrap.ps1` (recipe lines, remedy and Next sentences).
 7. With a pre-existing `settings.local.json` lacking the toggle and no Node, B07 fails with the hand-edit sentence (Windows spelling: `install Node 20+ and re-run .\bootstrap.cmd`).
 8. `git ls-files --eol bootstrap.ps1 bootstrap.cmd snowarch.cmd` shows `w/crlf` on a Windows checkout and `i/crlf` in the index.
+   *Amended 2026-09-10 (ARC-06-S11 review):* the assertion is `w/crlf` plus
+   `attr/text eol=crlf`. With that attribute the INDEX keeps LF and the checkout converts,
+   which is the attribute working; `i/crlf` would require `-text`, turning normalisation off
+   for a repository three platforms clone.
 
 **Tasks.**
 
@@ -680,6 +684,11 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
 1. After a design-only install with Node 22, `./snowarch mode live` runs B04/B05/B06(wizard)/B07/B08/B09 only (B01–B03 cached), `settings.local.json` flips to `enabledMcpjsonServers: ["servicenow"]` with no `disabledMcpjsonServers` member `servicenow`, and after a Claude restart `/mcp` shows `servicenow ✔ connected`.
 2. `./snowarch mode design` afterwards flips the toggle back, prints the "instance kept" note, leaves `.local/instances.json` byte-identical, and `/mcp` shows the server disabled; `./snowarch mode` prints `Mode: design-only` and `registration: project (.mcp.json)`.
 3. Given `disableAllHooks: true` written by a Node-free install (state `hooksDisabledByBootstrap: true`), `mode design` or `mode live` with Node now present removes the key; given the key was pre-existing (state flag absent), it is left and a note printed.
+   *Amended 2026-09-10 (S-05 variant B):* no bootstrap and no `mode` run ever writes
+   `disableAllHooks`, so `hooksDisabledByBootstrap` is always `false` and branch A has
+   nothing to remove. What remains is variant B's own rule, and it is what the tests assert:
+   `applyToggles` ADDS the SessionStart hook entry when Node is present and REMOVES it when
+   it is not; a pre-existing user-set `disableAllHooks` is left alone and a note is printed.
 4. `./snowarch mode live --register local` (with an existing store) results in `claude mcp get servicenow` showing a local-scope entry whose `command` is `node` and whose args contain `${CLAUDE_PROJECT_DIR:-.}/packages/snowarch/dist/server.js` unexpanded, `.local/config.json.registration = "local"`, `settings.local.json` containing `disabledMcpjsonServers: ["servicenow"]`, and a Claude session in the folder showing `servicenow ✔ connected` exactly once (no duplicate). `~/.claude.json` contains no key matching `/PASSWORD|SECRET|TOKEN/i` under that entry.
 5. `./snowarch mode live --register project` after (4) removes the local entry (`claude mcp get servicenow` shows the project entry) and restores the live toggle.
 6. `./snowarch mode live --register user` exits 2 with the firewall sentence; with `--ack-user-scope` it registers at user scope and `./snowarch mode` prints `registration: user (~/.claude.json, every project — not recommended)`.

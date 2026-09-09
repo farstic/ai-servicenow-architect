@@ -12,8 +12,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SERVER_KEY='servicenow'
 MSG_NODE_DARWIN='brew install node@22'
 MSG_NODE_LINUX='install Node.js from your distribution'\''s package manager, or use nvm'
+MSG_NODE_WIN='winget install OpenJS.NodeJS.LTS'
 MSG_GIT_DARWIN='xcode-select --install (or: brew install git)'
 MSG_GIT_LINUX='install git with your distribution'\''s package manager (apt install git · dnf install git)'
+MSG_GIT_WIN='winget install Git.Git'
 MSG_CLAUDE='install Claude Code from https://code.claude.com/docs/en/setup, then re-run'
 MSG_NET='check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run'
 MSG_DNS='cannot reach github.com (DNS) — check your network and re-run'
@@ -34,7 +36,10 @@ ORIG=("$@")          # kept intact for the hand-over: Node parses its own flags
 say() { printf '%s\n' "$*" ; }
 step() { printf '[%s/09] %s … %s\n' "$1" "$2" "$3" ; }
 die() { say "FAIL $1: $2" ; [ -n "${3:-}" ] && say "Remedy: $3" ; exit "$4" ; }
-platform() { case "$(uname -s)" in Darwin) echo darwin ;; *) echo linux ;; esac ; }
+# Git Bash and MSYS2 report MINGW64_NT / MSYS_NT: a Windows machine running the POSIX launcher.
+# Telling that user to `apt install git` — which is what the `*` arm did until ARC-06-S12 — is
+# telling them to type something that cannot work on the machine they are sitting at.
+platform() { case "$(uname -s)" in Darwin) echo darwin ;; MINGW*|MSYS*|CYGWIN*) echo win32 ;; *) echo linux ;; esac ; }
 # The floors, from the generated config: one key per line, which ARC-06-S14 asserts.
 floor() { sed -n 's/.*"'"$1"'": *"\([0-9][0-9.]*\)".*/\1/p' "$ROOT/engine.config.json" ; }
 # Version compare without `sort -V`, which BSD does not have. Three numeric fields.
@@ -73,12 +78,15 @@ if [ -n "$NODE_MAJOR" ] && ge "$NODE_MAJOR.0.0" "$(floor node)" ; then
   exec node "$ROOT/tools/snowarch/bin/snowarch.mjs" bootstrap ${ORIG[@]+"${ORIG[@]}"}
 fi
 
-PLAT="$(platform)" ; NODE_REMEDY="$MSG_NODE_LINUX"
-[ "$PLAT" = darwin ] && NODE_REMEDY="$MSG_NODE_DARWIN"
+PLAT="$(platform)"
+case "$PLAT" in
+  darwin) NODE_REMEDY="$MSG_NODE_DARWIN" ; GIT_REMEDY="$MSG_GIT_DARWIN" ;;
+  win32)  NODE_REMEDY="$MSG_NODE_WIN" ; GIT_REMEDY="$MSG_GIT_WIN" ;;
+  *)      NODE_REMEDY="$MSG_NODE_LINUX" ; GIT_REMEDY="$MSG_GIT_LINUX" ;;
+esac
 [ "$NODE_ONLY" = 1 ] && die B00 "that flag needs Node.js 20+" "$NODE_REMEDY" 3
 [ "$MODE" = live ] && die B00 "live mode needs Node.js 20+" "$NODE_REMEDY" 3
 GIT_V="$(git --version 2>/dev/null | sed -n 's/^git version \([0-9][0-9.]*\).*/\1/p')"
-GIT_REMEDY="$MSG_GIT_LINUX" ; [ "$PLAT" = darwin ] && GIT_REMEDY="$MSG_GIT_DARWIN"
 [ -n "$GIT_V" ] || die B00 "git not found" "$GIT_REMEDY" 3
 ge "$GIT_V" "$(floor git)" || die B00 "git $GIT_V found, >= $(floor git) required" "$GIT_REMEDY" 3
 say "ok B00 git: $GIT_V"
