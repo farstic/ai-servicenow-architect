@@ -40,7 +40,7 @@ const DNS_CODES = new Set([NOTFOUND, 'EAI_AGAIN']);
 const REFUSED_CODES = errnoNames(constants.errno.ECONNREFUSED, constants.errno.ETIMEDOUT,
   constants.errno.EHOSTUNREACH, constants.errno.ENETUNREACH, constants.errno.ECONNRESET,
   constants.errno.EPIPE);
-const TIMED_OUT = ERRNO_NAME.get(constants.errno.ETIMEDOUT);
+export const TIMED_OUT = ERRNO_NAME.get(constants.errno.ETIMEDOUT);
 const isTlsCode = (code) => typeof code === 'string'
   && (code.startsWith('CERT_') || code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
     || code === 'SELF_SIGNED_CERT_IN_CHAIN' || code === 'DEPTH_ZERO_SELF_SIGNED_CERT'

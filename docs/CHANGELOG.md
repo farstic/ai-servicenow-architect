@@ -29,6 +29,28 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **B03, B04, B05 and the B06 slot — live mode becomes one uninterrupted run.** B03 writes down the
+  mode the plan already collected and asks nothing; because the mode is a hashed input of B06, B07
+  and B08, changing it re-runs exactly those three as a property of the inputs rather than a rule.
+  B04 runs `npm ci --omit=dev --ignore-scripts` at the root as a script under the running Node —
+  `child_process` refuses a `.cmd` without a shell, and `--ignore-scripts` is the difference between
+  installing packages and running whatever their authors put in `postinstall` on a freshly cloned
+  machine. Its post-check asks whether every dependency the server *declares* resolves *from
+  `dist/server.js`*, so it is hoisting-safe and cannot go stale; it treats
+  `ERR_PACKAGE_PATH_NOT_EXPORTED` as present, because only an installed package can refuse a
+  subpath — the obvious probe reported `commander` as missing in this very repository. B05 checks
+  the contract's sha, the pinned tools and the registration key, in **both** modes.
+- **`--instance-file` — a live install with no keyboard.** A store-shaped document, mode 0600
+  checked **before it is read** (a file the group can read has already leaked), refused if git could
+  commit it, and never copied, moved or deleted. **The D-05 proposals are applied before
+  validation**, an order that is forced rather than chosen: the store schema is strict and requires
+  `environment` and `preset`, so a file that omits them — exactly the file D-05 says to accept —
+  cannot be parsed until they are filled in. Presets are chosen by **shape** rather than by name,
+  since "most permissive" and "most restrictive" are roles the contract expresses as flag counts.
+  The password is registered with the redactor the moment it is parsed, and the credential is
+  authenticated **exactly once**: a non-interactive path has nobody to ask for a correction, so a
+  retry is the same wrong password sent again — noise in the instance's audit log and, on some
+  configurations, a lockout.
 - **B02 — the documentation corpus, as one step over ARC-03's recipe.** `--docs sparse|full` pass
   the plan's mode through; `--docs skip` never reaches the step, so no code path can make a network
   call the operator declined. The step maps the docs family's exit codes onto remedies and keeps

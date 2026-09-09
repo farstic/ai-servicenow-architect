@@ -25,5 +25,10 @@ export function storeMtime(root) {
 export const inputs = (ctx) => [
   TEXT(`contract=${contractSha(ctx.root) ?? 'not-built'}`),
   TEXT(`storeMtime=${storeMtime(ctx.root)}`),
+  // The MODE, because a design → live → design round trip can leave the other two unchanged while
+  // the recorded `ok` describes a verification of a different installation. ARC-06-S07's story says
+  // a mode change invalidates B06, B07 and B08; for the first two that already fell out of their
+  // inputs, and this is the line that makes it true of the third.
+  TEXT(`mode=${ctx.mode}`),
 ];
 export const run = async () => ({ status: 'ok', detail: 'placeholder until ARC-06-S08' });

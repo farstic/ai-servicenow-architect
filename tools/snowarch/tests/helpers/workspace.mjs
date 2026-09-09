@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -42,6 +43,33 @@ export function makeCheckout({ pin = 'a'.repeat(40), family = 'australia' } = {}
   // The two files B01 and B07 must find gitignored, and a commit — `git diff HEAD` has nothing to
   // compare against without one.
   writeFileSync(join(root, '.gitignore'), '.local/\n.claude/settings.local.json\n');
+  // A contract and a pin that agree, because ARC-06-S07's B05 checks exactly that on every run
+  // where Node is present — which is every command test. The sha is COMPUTED from the bytes
+  // written, never typed: a fixture whose pin was a literal would need editing every time the
+  // fixture contract changed, and would fail for a reason unrelated to the test.
+  mkdirSync(join(root, 'packages/snowarch/dist'), { recursive: true });
+  mkdirSync(join(root, 'packages/contract'), { recursive: true });
+  const contract = `${JSON.stringify({
+    contractVersion: 1,
+    server: { suggestedName: 'servicenow' },
+    flags: [{ name: 'WRITE_ENABLED', requires: [] }],
+    presets: { 'read-only': { WRITE_ENABLED: 'false' }, full: { WRITE_ENABLED: 'true' } },
+    tools: [{ name: 'snow_core_record_read', gate: 'none', mutates: false }],
+  }, null, 2)}\n`;
+  writeFileSync(join(root, 'packages/snowarch/dist/contract.json'), contract);
+  // The server package's manifest, because ARC-06-S07's B04 reads its `dependencies` to decide
+  // what must resolve. Two names, so the check has something to check.
+  writeFileSync(join(root, 'packages/snowarch/package.json'), `${JSON.stringify({
+    name: '@fixture/snowarch', version: '0.0.0', type: 'module',
+    dependencies: { undici: '*', zod: '*' },
+  }, null, 2)}\n`);
+  writeFileSync(join(root, 'packages/contract/required-tools.json'), `${JSON.stringify({
+    $schema: './required-tools.schema.json',
+    contractVersion: 1,
+    contractSha256: createHash('sha256').update(contract).digest('hex'),
+    serverKey: 'servicenow',
+    tools: [{ name: 'snow_core_record_read', gate: 'none', mutates: false, used_by: ['fixture'] }],
+  }, null, 2)}\n`);
   // A real repository, because ARC-06-S04's preflight asks git where the top of the tree is. A
   // fixture that was not one would fail the root check for a reason that has nothing to do with
   // what the test is about.
