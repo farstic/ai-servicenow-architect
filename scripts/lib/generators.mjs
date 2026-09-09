@@ -29,6 +29,14 @@ export const GENERATORS = [
     targets: ['docs/ARCHITECTURE.md'],
   },
   {
+    // ARC-06 fix: the recipe block embeds the docs pin, which moves on every bump. Generated, so a
+    // bump regenerates it instead of failing the parity test by construction.
+    id: 'gen-docs-recipe',
+    script: 'scripts/gen-docs-recipe.mjs',
+    supportsRoot: true,
+    targets: ['docs/ARCHITECTURE.md'],
+  },
+  {
     id: 'gen-retired-names',
     script: 'packages/contract/gen-retired-names.mjs',
     supportsRoot: false,

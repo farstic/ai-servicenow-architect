@@ -6,6 +6,13 @@ name: docs-bump
 #
 # Before ARC-06 there is no `./snowarch` launcher, so the steps below call `node scripts/…` directly.
 # ARC-06-S06 flips them to the launcher form; the scripts themselves do not change.
+#
+# TWO REPOSITORY SETTINGS this workflow depends on and cannot assert, because settings are not in the
+# tree — both learned by running it, both candidates for an ARC-08 doctor check:
+#   · Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests".
+#     Without it the run moves the pin, pushes the branch, and fails at `gh pr create`.
+#   · Runs on a bot-authored pull request may need "Approve and run" the first time, since GitHub
+#     gates first-time-contributor workflows and `github-actions` counts as one.
 
 on:
   schedule:
@@ -40,6 +47,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # THE PULL REQUEST'S BASE, not the ref the run was dispatched on. The first real run was
+          # dispatched from `main` and computed its "from" pin against main's tree — right only while
+          # the two branches share a pin, and wrong the moment develop runs ahead of it. One value,
+          # used by the checkout and by `gh pr create --base`, asserted equal by test.
+          ref: develop
           # The corpus is fetched by `docs sync` at the pin, not by the checkout: a submodule
           # checkout here would clone the whole history before the sparse recipe could avoid it.
           submodules: false

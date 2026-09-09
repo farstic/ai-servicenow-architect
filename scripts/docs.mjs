@@ -79,6 +79,25 @@ if (cmd === 'sync') {
     process.exit(completeness.ok ? 0 : 1);
   }
 
+  // THE GATE, restored. ARC-03-S06 deleted it by accident: replacing the `--json` object swallowed
+  // the block between it and the WARN loop, so from then on a sync printed `INCOMPLETE` in its
+  // summary line and then said `docs sync: complete` and exited 0. A summary that contradicts the
+  // line above it is worse than no summary, and an exit code that contradicts both is how CI passes
+  // over an empty corpus.
+  if (!completeness.ok) {
+    if (completeness.missingRoot.length) {
+      console.error(`INCOMPLETE: missing root path(s): ${completeness.missingRoot.join(', ')}`);
+    }
+    if (completeness.head !== completeness.pin) {
+      console.error(`INCOMPLETE: HEAD ${completeness.head} != pin ${completeness.pin}`);
+    }
+    if (!completeness.initialised) {
+      console.error('INCOMPLETE: the superproject reports the submodule uninitialised: '
+        + `${completeness.submodule}`);
+    }
+    process.exit(1);
+  }
+
   // A cited area that upstream does not have is a citation defect; `verify` is where it fails.
   for (const a of completeness.missingAreas) {
     console.error(`WARN: cited area "${a}" does not exist at the pin — `
