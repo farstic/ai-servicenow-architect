@@ -77,7 +77,7 @@ test('mutation: a duplicated marker line is caught too', () => {
 
 test('mutation: a version token smuggled back into the heading is caught', () => {
   const lines = readText('CLAUDE.md').split('\n');
-  lines[0] = '# CLAUDE.md — ServiceNow Architecture Engine v2.8.0 (Tier 2 / Claude Code)';
+  lines[0] = '# CLAUDE.md — ServiceNow Architecture Engine v2.8.0';
   assert.throws(() => checkMarker(lines.join('\n'), rootVersion), /version token outside the marker line/);
 });
 

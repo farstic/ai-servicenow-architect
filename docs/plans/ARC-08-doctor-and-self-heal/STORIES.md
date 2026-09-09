@@ -64,7 +64,8 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
     E-00 ok    Claude Code CLI: 2.1.258 ≥ 2.1.214, logged in
     E-01 ok    git: 2.45.2 ≥ 2.25.0
   docs
-    E-12 FAIL  docs corpus: absent (bootstrap recorded docs mode "skip")
+    E-12 docs corpus: FAIL — corpus absent (docs mode "skip"); grounding and citations are unverified — run ./snowarch docs sync
+    (amended at ARC-03-S11: quoted verbatim from E12_ABSENT() in tools/snowarch/lib/docs/status.mjs, which ARC-08 imports rather than retypes)
                → run ./snowarch docs sync            [fixable: ./snowarch doctor --fix]
   server
     SV-03 warn instance "pdi": 4/6 flags explicit — NOW_ASSIST_ENABLED, FLUENT_ENABLED absent (treated as "false")
@@ -99,6 +100,8 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S02 — Engine checks E-00…E-22: prerequisites, repo wiring, docs corpus, roster, contract
+
+> **Amendment 2026-09-08 (from the ARC-02-S07 delivery).** **The roster check calls `node scripts/gen-roster.mjs --json`** — it does not re-read `.claude/skills` and `.claude/agents` itself. That output carries `skills` (with `firesAs` and `version`), `agents` (with `skills` preloads), `utility`, and a `problems` array that is the same list `--check` prints: count mismatches against `engine.config.json.roster`, an agent preloading a skill that does not exist, and an agent that does not preload its own persona. Exit is 1 when `problems` is non-empty. A second implementation would be a second definition of the roster, which is the defect ARC-02-S07 exists to close (P-12).
 **As** an individual practitioner **I want** the doctor to verify every piece of committed wiring, the docs corpus, the roster and the contract pin against their generators and `engine.config.json` **so that** a passing report proves the install is correct, and the four failures the old reference install produced (dead citations, absent NOW_ASSIST/FLUENT flags, retired names — `00` P-17) cannot recur silently.
 **Context.** README deliverable "Engine checks E-00 …" and acceptance criterion 1 (0 FAIL on the reference machine; the old four failures impossible by construction). `01` §8 engine-check list; §5 (every `${…}` placeholder carries `:-`, credential-shaped keys forbidden); §10 (absent corpus = FAIL, never SKIP); §12 (floors from `engine.config.json`). `00` §3.9 (D08 parses `CLAUDE.md` prose for roster counts; D15 SKIP when the submodule is missing). ARC-03-S06 (`docsStatus()`), ARC-03-S11 (`E-12` text is owned there), ARC-05-S03/S04 (lint library functions), ARC-06-S01 (committed files), ARC-06-S05 (toggle writer and `disableAllHooks`).
 **Scope.** In: check bodies `E-00…E-22` in `tools/snowarch/lib/doctor/checks/engine-*.mjs` (one file per section), their fixtures and tests. Out: detectors of host leftovers (S03: E-23…E-26), server checks (S04), the Mode line and cache (S05), fixers (S06 — checks only declare `fixable` and put a machine-readable `data.fix` hint in their result).

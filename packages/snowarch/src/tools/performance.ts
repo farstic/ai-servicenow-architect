@@ -6,8 +6,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function performanceToolManifest() {
+export function performanceToolManifest(): ToolDefinition[] {
   return [
     // ── PA Indicators ────────────────────────────────────────────────────────
     {
@@ -23,6 +24,8 @@ export function performanceToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_perf_pa_indicator_read',
@@ -34,6 +37,8 @@ export function performanceToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_perf_pa_scorecard_read',
@@ -55,6 +60,8 @@ export function performanceToolManifest() {
         },
         required: ['indicator_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_perf_pa_time_series_read',
@@ -72,6 +79,8 @@ export function performanceToolManifest() {
         },
         required: ['indicator_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_perf_pa_breakdowns_index',
@@ -84,6 +93,8 @@ export function performanceToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── Dashboards ───────────────────────────────────────────────────────────
     {
@@ -97,6 +108,8 @@ export function performanceToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_perf_pa_dashboard_read',
@@ -108,6 +121,8 @@ export function performanceToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_perf_homepages_index',
@@ -120,6 +135,8 @@ export function performanceToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── PA Jobs ──────────────────────────────────────────────────────────────
     {
@@ -134,6 +151,8 @@ export function performanceToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_perf_pa_job_read',
@@ -145,6 +164,8 @@ export function performanceToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── Dashboard Management ─────────────────────────────────────────────────
     {
@@ -164,6 +185,8 @@ export function performanceToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_perf_dashboard_modify',
@@ -179,6 +202,8 @@ export function performanceToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     // ── Data Quality ─────────────────────────────────────────────────────────
     {
@@ -205,6 +230,8 @@ export function performanceToolManifest() {
         },
         required: ['table', 'fields'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_perf_table_record_count_read',
@@ -217,6 +244,8 @@ export function performanceToolManifest() {
         },
         required: ['table'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_perf_record_counts_compare',
@@ -234,6 +263,8 @@ export function performanceToolManifest() {
         },
         required: ['tables'],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

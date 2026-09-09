@@ -92,29 +92,16 @@ pwsh scripts/render-pdf-pages.ps1 clients\<client>\designs\MyDesign.docx
 
 ## First-run setup
 
-Before any of the toolchain above matters, the engine itself has to be bootstrapped. Two commands
-cover it, and they are the only two a new user needs — the full walkthrough lives in
-[`SETUP.md`](../SETUP.md).
+**The v2 bootstrap is not in this directory any more.** `setup.sh` and `doctor.sh` were imported
+unchanged into `scripts/legacy/`, together with the walkthrough they refer to
+(`scripts/legacy/SETUP.md`), and they are kept as a record of what the v2 engine did rather than as
+a path anyone should run. They still describe the retired permission vocabulary and the registration
+flow of the previous server, which is exactly why they were not carried forward.
 
-```bash
-bash scripts/setup.sh     # fix  — bootstrap the engine (idempotent; safe to re-run)
-bash scripts/doctor.sh    # check — "is my setup correct?" before work starts
-```
+ARC-06 delivers the bootstrap that replaces them — `./snowarch` and `/snowarch setup-instance`. Until
+it lands, `README.md` at the repository root is the install narrative, and `npm ci` plus
+`npm run contract` is what a contributor actually needs.
 
-`setup.sh` initialises the `ServiceNowDocs` submodule, arms the pre-commit guards, syncs the
-`agents/` ↔ `skills/` mirrors and writes a working `.claude/settings.json`, then stops at a tier
-gate. **Tier 0 (design-only) is a complete, supported end state** — the whole specialist roster and
-every design deliverable work with no ServiceNow instance and no credentials. Answer *yes* at the
-gate (or re-run later with `--mcp`) to also register the `servicenow-mcp` server against a live
-instance: it prompts for the instance URL, the credential (`read -rs`, never echoed) and each of the
-six capability flags, then registers via `claude mcp add` after taking a verified, mode-`600` backup
-of `~/.claude.json`. A zero exit from the CLI is not trusted: the written config is re-read and the
-entry, its entrypoint and every required env **key name** are checked, so an absent
-`SCRIPTING_ENABLED` fails here rather than mid-task. No credential is ever written into this
-repository, and no value is ever read back out of the config. Useful flags: `--yes`
-(non-interactive, stops at Tier 0), `--tier0`, `--mcp`, `--creds-only`, `--snow-mcp <path>`.
-
----
 
 ## Script reference
 
@@ -129,8 +116,8 @@ repository, and no value is ever read back out of the config. Useful flags: `--y
 | `mermaid-theme.json` | — | House Mermaid palette/fonts (applied automatically by `render-diagrams.*`). |
 | `verify-citations.sh`, `verify-structure.sh` | all | Pre-commit guards (ServiceNowDocs citation paths; agents/skills structural integrity). |
 | `sync-agents-skills.sh` | all | Keeps `agents/` ↔ `skills/` registry in sync. |
-| `doctor.sh` | Mac/Linux (Win via Git Bash/WSL) | **"Is my setup correct?"** — 30+ **read-only** checks across host toolchain, engine integrity (roster, structure audit, hooks, submodule, citations) and the MCP layer (registration, build, tier flags, live instance + per-tier role probes). Ends in a verdict plus a derived capability line (`Mode: design-only` / `Mode: live — WRITE=on …`). Prints remedies, **never applies them**. `--tier0 --no-network --json`. Exit 0/1/3. |
-| `setup.sh` | Mac/Linux (Win via Git Bash/WSL) | First-run bootstrap — submodule, hooks, mirrors, `settings.json`, then a tier gate: stop at Tier 0 (design-only) or register the `servicenow-mcp` server via `claude mcp add`. Idempotent. `--yes --tier0 --mcp --creds-only --snow-mcp <path>`. Exit 0/1/3. |
+| `legacy/doctor.sh` | Mac/Linux (Win via Git Bash/WSL) | **"Is my setup correct?"** — 30+ **read-only** checks across host toolchain, engine integrity (roster, structure audit, hooks, submodule, citations) and the MCP layer (registration, build, tier flags, live instance + per-tier role probes). Ends in a verdict plus a derived capability line (`Mode: design-only` / `Mode: live — WRITE=on …`). Prints remedies, **never applies them**. `--tier0 --no-network --json`. Exit 0/1/3. |
+| `legacy/setup.sh` | Mac/Linux (Win via Git Bash/WSL) | The v2 first-run bootstrap, imported unchanged — submodule, hooks, mirrors, settings, then a permission gate. Superseded by ARC-06; kept as a record. |
 
 ---
 

@@ -8,58 +8,79 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function mobileToolManifest() {
+export function mobileToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_mob_mobile_app_configs_index',
       description: 'List ServiceNow mobile app configurations',
       inputSchema: { type: 'object', properties: { active: { type: 'boolean', description: 'Filter active (default true)' }, limit: { type: 'number' } }, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_mob_mobile_app_config_read',
       description: 'Get details of a specific mobile app configuration',
       inputSchema: { type: 'object', properties: { sys_id: { type: 'string', description: 'Mobile app config sys_id' } }, required: ['sys_id'] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_mob_mobile_app_config_add',
       description: 'Create a new mobile app configuration. **[Write]**',
       inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'App name' }, description: { type: 'string' }, branding_color: { type: 'string', description: 'Primary colour hex' } }, required: ['name'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_mob_mobile_applets_index',
       description: 'List mobile applets (mini-apps within the mobile experience)',
       inputSchema: { type: 'object', properties: { app_config: { type: 'string', description: 'Filter by app config sys_id' }, limit: { type: 'number' } }, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_mob_mobile_applet_add',
       description: 'Create a mobile applet in a mobile app. **[Write]**',
       inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'Applet name' }, table: { type: 'string', description: 'Applet data table' }, icon: { type: 'string', description: 'Applet icon' }, app_config: { type: 'string', description: 'Parent app config sys_id' } }, required: ['name', 'table'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_mob_mobile_layouts_index',
       description: 'List mobile layout configurations',
       inputSchema: { type: 'object', properties: { limit: { type: 'number' } }, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_mob_mobile_layout_add',
       description: 'Create a mobile layout for a specific view. **[Write]**',
       inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'Layout name' }, table: { type: 'string', description: 'Target table' }, type: { type: 'string', description: 'Layout type: list, form, detail' } }, required: ['name', 'table'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_mob_offline_sync_configure',
       description: 'Configure which tables/records are available offline in mobile. **[Write]**',
       inputSchema: { type: 'object', properties: { table: { type: 'string', description: 'Table to sync offline' }, query: { type: 'string', description: 'Filter query for sync scope' }, max_records: { type: 'number', description: 'Max offline records (default 500)' } }, required: ['table'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_mob_push_notification_send',
       description: 'Send a push notification to mobile app users. **[Write]**',
       inputSchema: { type: 'object', properties: { user: { type: 'string', description: 'Target user sys_id' }, group: { type: 'string', description: 'Target group sys_id (alternative to user)' }, title: { type: 'string', description: 'Notification title' }, body: { type: 'string', description: 'Notification body text' }, action_url: { type: 'string', description: 'Deep link URL on tap' } }, required: ['title', 'body'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_mob_mobile_analytics_read',
       description: 'Get mobile app usage analytics — sessions, active users, popular applets',
       inputSchema: { type: 'object', properties: { days: { type: 'number', description: 'Analysis period in days (default 30)' } }, required: [] },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

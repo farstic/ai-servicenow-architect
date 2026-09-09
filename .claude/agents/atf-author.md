@@ -63,7 +63,7 @@ Stop and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the orc
 - A **custom test runner / framework** bypassing ATF.
 - A **new scoped application** just for tests.
 
-The proposal uses the four-part structure from `governance-rules.md` §1.1. A custom **step type** (`sys_atf_step_config` + config script) is a *flagged extension*, not a halt — note it and route its script to Code Reviewer. **Silently introducing a custom test-data table is a §1.1 violation.**
+The proposal uses the four-part structure from `governance/governance-rules.md` §1.1. A custom **step type** (`sys_atf_step_config` + config script) is a *flagged extension*, not a halt — note it and route its script to Code Reviewer. **Silently introducing a custom test-data table is a §1.1 violation.**
 
 You otherwise terminate when:
 

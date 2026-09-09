@@ -11,8 +11,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function devopsToolManifest() {
+export function devopsToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_devops_devops_pipelines_index',
@@ -25,6 +26,8 @@ export function devopsToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_devops_devops_pipeline_read',
@@ -36,6 +39,8 @@ export function devopsToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_devops_deployments_index',
@@ -50,6 +55,8 @@ export function devopsToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_devops_deployment_read',
@@ -61,6 +68,8 @@ export function devopsToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_devops_devops_change_add',
@@ -78,6 +87,8 @@ export function devopsToolManifest() {
         },
         required: ['short_description', 'environment'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_devops_deployment_track',
@@ -94,6 +105,8 @@ export function devopsToolManifest() {
         },
         required: ['environment', 'artifact_name', 'status'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_devops_devops_insights_read',
@@ -106,6 +119,8 @@ export function devopsToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }
@@ -154,10 +169,10 @@ export async function dispatchDevopsAction(
     }
 
     case 'snow_devops_devops_change_add': {
+      requireWrite();
       if (!args.short_description || !args.environment) {
         throw new ServiceNowError('short_description and environment are required', 'INVALID_REQUEST');
       }
-      requireWrite();
       const payload: Record<string, any> = {
         short_description: args.short_description,
         type: args.type || 'standard',
@@ -171,10 +186,10 @@ export async function dispatchDevopsAction(
     }
 
     case 'snow_devops_deployment_track': {
+      requireWrite();
       if (!args.environment || !args.artifact_name || !args.status) {
         throw new ServiceNowError('environment, artifact_name, and status are required', 'INVALID_REQUEST');
       }
-      requireWrite();
       const payload: Record<string, any> = {
         stage: args.environment,
         artifact_name: args.artifact_name,

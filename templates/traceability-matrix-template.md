@@ -1,6 +1,6 @@
 # Requirements Traceability Matrix (RTM) — {{client}} / {{release or PI}}
 
-> **What this is:** the "golden thread" that links every requirement to the story, design, build, test, and deployment that satisfies it. One living file per engagement (or per release/PI), kept at `clients/{{client-short-name}}/traceability.md`. See `governance-rules.md` §4.2.
+> **What this is:** the "golden thread" that links every requirement to the story, design, build, test, and deployment that satisfies it. One living file per engagement (or per release/PI), kept at `clients/{{client-short-name}}/traceability.md`. See `governance/governance-rules.md` §4.2.
 >
 > **Who maintains it:** the Chief Architect owns the file; each specialist **appends its row reference as it produces an artefact** (Story Writer adds the story ID, Technical Designer the design ref, Developer the build artefact, ATF Author the test ID, DevOps the update set). The matrix is updated at Phase 2 post-build, not retro-fitted at the end.
 >
@@ -33,4 +33,4 @@ List every row where Coverage is ❌ or where a downstream column is empty for a
 
 ---
 
-*RTM template — ServiceNow Architecture Engine. The thread is only useful if it is current: update the row the moment an artefact is produced, per governance-rules.md §4.2.*
+*RTM template — ServiceNow Architecture Engine. The thread is only useful if it is current: update the row the moment an artefact is produced, per governance/governance-rules.md §4.2.*

@@ -24,6 +24,53 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 ## Stories
 
 ### ARC-05-S01 — `required-tools.json`: engine pin with `used_by` and `contractSha256`
+
+> **Amendment 2026-09-08 (from the S01 delivery).**
+> - **The first real pin raised TWO re-gates, and both were accepted after checking the source**
+>   (not the contract — the contract is what is under suspicion):
+>   `snow_intg_event_register` and `snow_flow_flow_action_add`, each `write/true` expected against
+>   `scripting/true` declared, each verified at its `case` label calling `requireScripting()`. The
+>   engine's expectations came from `00` §8, written before ARC-04 split the SCRIPTING gate. **Final
+>   expectations: both `scripting/true`.**
+> - **`snow_fluent_script_exec` did NOT re-gate.** The story predicted it would, and it is the tool
+>   whose silent re-gate is the reason this file exists — but ARC-04-S08's F1 already corrected its
+>   declaration to `scripting`, so engine and server now agree. Criterion 4 is therefore exercised
+>   against a **fixture** contract, exactly as the story specifies, and not against the live one.
+> - **`snow_flow_flow_add` stayed `write` while `snow_flow_flow_action_add` moved to `scripting`.**
+>   Worth stating rather than smoothing over: adding a flow is a write, and adding an Action carries
+>   a server-side script. The pair differing is the correct answer, not an inconsistency.
+> - **`SNOW_PIN_PATH` was added alongside `SNOW_CONTRACT_PATH`, and it had to be.** With only the
+>   contract overridable, a fixture run writes its conclusions into the COMMITTED pin: demonstrating
+>   criterion 4 against a fixture that re-gates `snow_fluent_script_exec` to `write` left the real
+>   file saying `write`, and the next honest run then refused because the real contract says
+>   `scripting`. The tool was right both times; the harness was wrong. A fixture run must not be able
+>   to edit the artefact it is pretending about.
+> - **A closed stdin at the prompt is an abort, not a hang.** Ctrl-D — or any harness whose stdin
+>   ends while the question is open — previously left the promise unsettled: Node printed *"Detected
+>   unsettled top-level await"* and exited 13. `readline`'s `close` now resolves to `n`. Closing
+>   stdin is not consent.
+> - **`tests/run.mjs` now walks subdirectories.** It read only the top level, so
+>   `tests/contract/required-tools.test.mjs` would have been written, committed, green by hand — and
+>   never once run by `npm test`. The failure mode is silent: the file exists, so nobody asks why it
+>   never fails. Root suite 114 → 128.
+> - **`used_by` was derived from where each tool is actually used**, not from `00` §8 (which records
+>   only that the 35 are cited, not by whom): the five core tools → the commands that call them, the
+>   update-set chain → `§2.2`, every mutating tool → `§2.1`, and the domain tools → the skill or
+>   agent directory that owns them. A test asserts every mutating tool carries a `§` citation, with
+>   the two `[Unsupported]` stubs named as the deliberate exception.
+> - **Amended by ARC-05-S02: the seed is 42, not 41.** `snow_core_instance_switch` was absent — it
+>   changes no ServiceNow record, so nothing in the 35 + 5 + 1 derivation reached it — yet `03` S-23
+>   names it among the 14 that must prompt, ARC-04 calls it the only way to change instance, and
+>   ARC-05-S07's ask list must carry it. Added with `sessionMutates: true` and a `§2.1` citation.
+
+> **Amendment 2026-09-08 (from ARC-04-S06, ratified). The ask-list generator must union `gates[gate]`
+> with `alsoRequires`.** The contract gained an optional `alsoRequires` field: six tools sit behind a
+> module-wide gate AND a case-level one (`now_assist` then `write`, `fluent` then `write`), and `gate`
+> carries only the OUTER one — the gate that refuses first, which is what predicts the refusal a caller
+> sees. A generator that reads `gate` alone will under-report what those six need. The six are
+> `snow_ai_agentic_workflow_add`, `snow_ai_ai_agent_add`, `snow_fluent_build`, `snow_fluent_init`,
+> `snow_nas_now_assist_skill_add`, `snow_orch_playbook_add`; the contract entry names the field, so the
+> union needs no hard-coded list.
 **As** the engine (Claude) **I want** a committed, machine-readable declaration of every server tool my governance texts and skills depend on — with the gate and mutating nature I expect for each — and a hash pin of the server contract I was written against **so that** a rename or a re-gate on the server side cannot merge without a conscious engine-side change.
 **Context.** Closes P-36 (no machine-readable contract) and the `execute_script` → `snow_fluent_script_exec` rename-with-regate that nobody caught (`00` §8). `01` §11 fixes the shape: the 35 engine-cited tools (`00` §8) plus the five core tools, each `{ name, gate, mutates, used_by[] }`, and `contractSha256`. ARC README deliverable 1; acceptance criteria 1 and 5 (server-key agreement). Consumed by ARC-06 B05 (`01` §4.2), ARC-08 doctor, ARC-09 release tag message.
 **Scope.** In: the file, its JSON schema, the pin-update command, a unit test on the engine side that the file is well-formed and internally consistent. Out: checking the file against the live server catalogue (S08 does that on the server side; S03 does the token side); any change to `packages/snowarch/src` (ARC-04 S06 owns the declarations); the permission blocks (S07).
@@ -70,6 +117,47 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; `npm run lint:contract` green on ubuntu/macos/windows × Node 20/22/24; `docs/CONTRIBUTING.md` gains "Updating the contract pin" (finalised in S11); ARC-06 B05 and ARC-09 tag message can read `contractSha256`.
 
 ### ARC-05-S02 — `retired-names.json` generated from the rename map
+
+> **Amendment 2026-09-08 (from the S02 delivery).**
+> - **401 keys, not 400** — 394 renames + 6 identifiers + 1 removed tool, per the architect's ruling 1.
+>   The test derives the count from the three sources; a literal would make every future rename a
+>   two-file change and would say nothing about *why* the number moved.
+> - **`snow_rpt_report_generate` comes from a shared file, not a third copy of the list.**
+>   `packages/snowarch/retired-tools.json` is now the single source, read by `parity.test.ts`,
+>   `contract.test.ts` and this generator. It carries the story and the reason beside each name, so a
+>   reader of any of the three consumers can find out why.
+> - **A rename whose destination was later REMOVED collapses to `(removed)`.** The first run refused
+>   with `generate_report -> snow_rpt_report_generate (which is itself retired)`. The guard was right
+>   that a chain existed and wrong to treat it as an error: this one is real history, and the honest
+>   resolution is that the tool is *gone*, not moved. Left as a chain, the file would send a reader of
+>   the old name to one that also does not exist — and the second hop is the one nobody checks. The
+>   guard now fires only for a replacement that is retired-but-not-removed, which has no correct
+>   reading: a second rename must be a new KEY in the map, never a changed value.
+> - **Criterion 3 is stated as the property it was protecting.** "No key starts with `snow_`" was a
+>   guard against a rename map whose keys had become new names; a removed tool is a `snow_` key *and*
+>   a genuine retired name. The test now asserts: a `snow_` key must be in `retired-tools.json` AND
+>   absent from `dist/contract.json`.
+> - **`snow_core_instance_switch` added as the 42nd required tool** (architect's addition, folded in
+>   here): `gate: none`, `mutates: false`, `sessionMutates: true`, `used_by: ["§2.1", "/snowarch
+>   status"]`. S01's "41" amended below. The `§`-citation test gained the same assertion for
+>   `sessionMutates`, so the field cannot carry a tool the approval rules were never told about.
+> - **Four legacy-name allow-list rows, all owned by ARC-05, all the same principle:** a file whose
+>   *subject* is the list of dead names cannot avoid containing them.
+>   `packages/contract/retired-identifiers.json` and `retired-names.json` **are** the list;
+>   `tests/contract/retired-names.test.mjs` asserts which words are and are not on it; and
+>   `docs/CONTRIBUTING.md` explains the policy, which needs the words to be precise. Rewording to
+>   shapes was the alternative and it makes the rule vaguer exactly where a reader needs it exact.
+> - **And I broke the "run the suite after `git add`" rule while doing it.** The run that reported
+>   141 passing happened before those files were staged, so the ratchet — which scans `git ls-files`
+>   — could not see them, and nine CI cells went red on a tree that was green locally. That rule is
+>   in CONTRIBUTING *because I broke it in ARC-02-S02*; writing it down was not enough. The fix in
+>   both cases is the same and it is mechanical: stage first, then run.
+> - **Criterion 4 run now, hits expected and NOT fixed here** (it is ARC-02-S12's sweep):
+>   `CLAUDE.md` 14 · `.claude` 2 · `docs` 409 · `README.md` 0 · `tools` 0 — **425**. The `docs` figure
+>   is dominated by files that are supposed to contain them: `docs/nowaikit-field-notes.md` (40), the
+>   ARC plan documents that describe the migration (24 + 16 + 14), and 36 inside
+>   `docs/spikes/S-15-npm-ci/fixture/`, which is a pre-relicensing build artefact kept as a fixture.
+>   ARC-02-S12 will need an exclusion decision for the spike fixture, not a rewrite of it.
 **As** a maintainer **I want** one flat, committed list of every retired tool name and every retired identifier with its replacement **so that** the lint, the doctor and a plain `grep` can all prove no governing text uses a name the server rejects with `UNKNOWN_TOOL`.
 **Context.** Closes the file half of P-04 (118 retired occurrences) and P-05/P-15 (`mcp__nowaikit__`, `mcp__servicenow-mcp__`, NowAIKit). ARC README deliverable 2 and acceptance criterion 4 (`grep -rnw -f <(jq -r 'keys[]' …)`). ARC-02 S12 performs the sweep using this file; `01` §11 / DR-14 rules out any runtime alias layer, so the list is the only bridge from old to new names.
 **Scope.** In: the generator, the file, the identifier list, a test that the committed file equals the generator output. Out: the sweep itself (ARC-02 S12); the lint that consumes it (S03).
@@ -105,6 +193,45 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; test green on the CI matrix; `docs/CONTRIBUTING.md` says "never edit `retired-names.json` by hand".
 
 ### ARC-05-S03 — `engine-lint.mjs` core: tokens, prefix, retired names, pin
+
+> **Amendment 2026-09-08 (from the S03 delivery).**
+> - **One definition of clean, and it is `lib/scan.mjs`.** History is exempt from L01/L02/L03 per the
+>   architect's ruling: `docs/plans/**`, `docs/spikes/**` (the S-14 records carry `mcp__plugin_…__`
+>   prefixes as measured evidence) and `docs/CHANGELOG.md`. `docs/decisions/**` and
+>   `docs/ARCHITECTURE.md` stay in scope behind the marker.
+> - **`POLICY_FILES` had to exist, and the lint could not reach exit 0 without it.** A file whose
+>   *subject* is the list of dead names must contain them: the ratchet and its allow-list, ARC-05-S02's
+>   assertion about which words are retired, ARC-02-S02's negative fixtures, this lint's own suite, and
+>   `docs/CONTRIBUTING.md`. Without the list, ARC-02-S12's "sweep until exit 0, then flip the constant"
+>   plan has no reachable end state. Five entries, each named with its reason; the line to hold is that
+>   naming the dead thing is what the file is *for*.
+> - **L02 now honours the historical marker too**, not just L03. The real tree showed
+>   `docs/decisions/ADR-0001-names.md` failing L02 for quoting the registration keys it *rejected* —
+>   which is the decision that ADR records. A check that forbade it would make the record unwritable.
+> - **L02 cannot be required today, and I have not forced it green.** The architect's ruling 2 put it
+>   in the required set; the real tree has **5** L02 findings, three of them in `CLAUDE.md:295/299`
+>   carrying the old prefixes, and two in that ADR pending its markers. Those are ARC-02-S12's to
+>   sweep, and exempting `CLAUDE.md` to satisfy the ruling would be defeating the check rather than
+>   passing it. **Required set is `L07,L11`; L01/L02/L03 are the reported SUMMARY**, and the named
+>   constant in `scripts/ci/lint-name-summary.mjs` flips all three at once. **Architect decision
+>   wanted** on the two ADR lines: adding `<!-- retired-name: historical -->` to them would clear
+>   L02's ADR half now, but ADRs are immutable once Accepted, so I have not touched it.
+> - **Criterion 2's hint is unreachable by Levenshtein alone.** `snow_core_query_records` and
+>   `snow_core_records_query` are eight edits apart and one thought apart, so a distance-only
+>   implementation gives no hint precisely where the hint matters most. L01 tries a **segment
+>   reordering** first — same underscore-separated parts in a different order — then falls back to
+>   distance ≤ 3. The criterion's exact expected line is asserted.
+> - **A retired name is L03's finding, not L01's.** L01 skips tokens that appear in
+>   `retired-names.json`, so one defect produces one message with one remedy rather than two.
+> - **Findings must use forward slashes on every platform.** Three Windows cells went red on
+>   `governance\mcp-protocols.md` versus `governance/mcp-protocols.md`. The fix is in the product,
+>   not the test: a finding that cannot be diffed between cells, or pasted into a `grep` on another
+>   platform, is worth less than one that can. The exemption lists are now `/` literals rather than
+>   `join()` calls for the same reason — comparing a built path against a literal silently changes
+>   *which files are checked*. Same class as ARC-04-S13's source scan; now a CONTRIBUTING rule.
+> - **Current real-tree state, for ARC-02-S12:** `L01 0 · L02 5 · L03 72 · L07 ok · L11 ok`. L01 being
+>   already clean is worth noting — every `snow_*` token in the engine's texts names a tool that
+>   exists. The work is prefixes and identifiers, not tool names.
 **As** a maintainer **I want** one command that fails when any engine text cites a tool the server does not have, uses a wrong MCP prefix, uses a retired name, or when the pin no longer matches the committed contract **so that** P-04 and P-05 cannot recur after ARC-02's sweep.
 **Context.** ARC README deliverable 3 (first half) and acceptance criteria 1 (engine side), 4, 5 (prefix from `engine.config.json`). `01` §11 "Engine lint". ARC-02 S12 and ARC-02's acceptance criterion "engine-lint passes" depend on this story. ARC-08 E-checks "retired names" and "prefix consistency" import the check modules (S04 finalises the module boundary).
 **Scope.** In: `packages/contract/lint/engine-lint.mjs` CLI, checks L01 (tool tokens), L02 (prefix), L03 (retired names), L07 (server-key agreement), L11 (sha pin), the scan set, output format, exit codes. Out: L04–L06, L08–L10 (S04); any auto-fix beyond `--fix-pin` delegation to `pin.mjs`.
@@ -138,6 +265,27 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; green on the CI matrix; `docs/CONTRIBUTING.md` lists the check ids; ARC-02 S12 can use `--only L01,L03` as its exit test.
 
 ### ARC-05-S04 — `engine-lint.mjs` structural checks: descriptions, path references, `used_by`, generated-file byte check, plugin validate
+
+> **Amendment 2026-09-08 (from the S04 delivery, with two architect fixups).**
+> - **Criterion 7's 5 s figure is a CI observation, not a local assertion.** Measured on the Windows
+>   cell, where the lint runs alone: **619 / 630 / 544 ms** — six to nine times inside the budget.
+>   Locally it is a different measurement: S04 gave the lint six child processes (four generators
+>   for L06, two `claude plugin validate` runs for L10), and inside a parallel test runner the best
+>   of three swings between 872 ms and 3786 ms on the same tree, with single samples past 8 s.
+>   Asserting 5 s there would assert how loaded the machine is. The test prints all three samples
+>   and asserts 15 s — a hang detector — while the budget is checked where it is measurable.
+> - **`docs/ARCHITECTURE.md` stays IN L05's scope.** It was excluded as "the target architecture";
+>   it is the current one. Its target tree is a fenced block, which L05 already skips; its History
+>   and D-03 sections are below a history heading, which L05 now stops at exactly as
+>   `docs/CHANGELOG.md` does; and its owner table declares each forthcoming directory beside the
+>   ARC that creates it — the same contract as `forthcoming-paths.json`, written where the reader
+>   sees it. **The proof it must stay checked is that excluding it hid two wrong paths this story
+>   found by hand.** A test plants a dangling path in the current section and asserts it is the only
+>   finding. `docs/decisions/**` stays excluded: an ADR is immutable once accepted.
+> - Real-tree L05 went 998 → 26 → 6 → 0: history, then a path-shape rule (a citation is a file with
+>   an extension or a directory with a trailing slash — which is what separates `tools/list`, an MCP
+>   method, from `tools/snowarch/lib/`), then six fixes. L08 and L09 were clean on first run, and
+>   not vacuously: 42 distinct tool tokens are cited across the engine texts and all 42 are pinned.
 **As** a maintainer **I want** the same lint to prove that skill descriptions fit the listing budget, that every internal path a document cites exists, that every `used_by` claim resolves, that every generated file is byte-identical to its generator's output, and that `claude plugin validate` passes where it can run **so that** a stale generated file or a broken governance citation is caught before merge.
 **Context.** ARC README deliverable 3 (second half) and acceptance criterion 2 (byte diff of a generated file). `01` §11 lists description ≤ 500 and `claude plugin validate`; ARC-02's risk "governance relocation breaks citations — mitigation: ARC-05 lint checks internal path references". S-13 (description budget) and S-19 (`claude plugin validate` on headless CI) inform L04 and L10.
 **Scope.** In: checks L04 (descriptions), L05 (path references), L06 (generated files), L08 (required-tools expectations vs contract — engine-side mirror of S08's assertion, so the engine lint alone detects a regate), L09 (`used_by` resolves), L10 (plugin validate); the check-module boundary ARC-08 imports. Out: ServiceNowDocs citation checking (ARC-03 `verify-citations.mjs`); skill frontmatter key rules beyond description length (ARC-02 S02's `tests/skills-lint.test.mjs` owns those and may import L04's module to avoid two implementations).
@@ -171,6 +319,23 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; CI matrix green (L04 exception as above until ARC-02 S03 merges); check ids table in `docs/CONTRIBUTING.md`; ARC-08 can import `packages/contract/lint/checks/*.mjs`.
 
 ### ARC-05-S05 — `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md`
+
+> **Amendment 2026-09-08 (from the ARC-02-S09 delivery).** **The preset table now lives between
+> `<!-- PRESETS:BEGIN (generated from the contract by scripts/gen-governance.mjs — ARC-05) -->` and
+> `<!-- PRESETS:END -->` in `docs/MODES-AND-PRESETS.md`**, hand-copied from `01` §6.3 and verified
+> row-for-row identical to it. The generator replaces what is between the markers; the prose either
+> side — the byte-exact `"true"`/`"false"` note, `PRESET_FLAGS_MISMATCH`, and the "preset wins" rule
+> — is outside them and stays hand-written. The block's seven lines are the four preset rows plus
+> the header and separator, in that order, with a `Use it when…` column.
+
+> **Amendment 2026-09-08 (from ARC-04-S06, ratified). The ask-list generator must union `gates[gate]`
+> with `alsoRequires`.** The contract gained an optional `alsoRequires` field: six tools sit behind a
+> module-wide gate AND a case-level one (`now_assist` then `write`, `fluent` then `write`), and `gate`
+> carries only the OUTER one — the gate that refuses first, which is what predicts the refusal a caller
+> sees. A generator that reads `gate` alone will under-report what those six need. The six are
+> `snow_ai_agentic_workflow_add`, `snow_ai_ai_agent_add`, `snow_fluent_build`, `snow_fluent_init`,
+> `snow_nas_now_assist_skill_add`, `snow_orch_playbook_add`; the contract entry names the field, so the
+> union needs no hard-coded list.
 **As** the engine (Claude) **I want** the §2.1 write gate, the §2.2 capture sequence and the Mode semantics delivered as one short, always-loaded rule file generated from the contract **so that** the tool names, the prefix, the flag codes and the capture sequence I follow are the server's actual ones, in one place, and the 60-line §2.1/§2.2 prose leaves `CLAUDE.md`.
 **Context.** Closes P-05 (gate keyed on the wrong prefix) and P-33 (§2.2 stated in four places with two naming generations — `CLAUDE.md`, `governance-rules.md`, `README.md`, `SETUP.md`). ARC README deliverable 4 (rule file) and acceptance criteria 2 and 5 (prefix exactly once, from `engine.config.json`). `01` §3 (`.claude/rules/00-mode-and-mcp-gate.md`, ~40 lines, always loaded — `00` §9: `.claude/rules/*.md` without `paths` frontmatter load at launch), §9 (design-only wording), §11 (§2.2 becomes `ensure → capture_target_set → write → verify`; ARC-04 S06/S07 fix the verify call as `snow_us_update_set_preview` in `contract.protocols.updateSetCapture[]`). ARC-02 S08 (`CLAUDE.md` ≤ 200 lines), ARC-02 S09 (`docs/MODES-AND-PRESETS.md` carries the preset table between `<!-- PRESETS:BEGIN … -->` / `<!-- PRESETS:END -->` markers "so ARC-05's generator can own it later") and ARC-08 S10 (runtime error mapping in the rule file) consume this.
 **Scope.** In: `scripts/gen-governance.mjs` CLI and the generator module layout; the rule-file renderer; the `presets` block renderer for `docs/MODES-AND-PRESETS.md`; header convention; `npm run gen`. Out: the other three targets (S06, S07); editing `CLAUDE.md`/`governance-rules.md` to point at the rule file (ARC-02 S08/S06 — this story hands them the exact pointer text); the prose of `docs/MODES-AND-PRESETS.md` outside the markers (ARC-02 S09).
@@ -247,6 +412,27 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; snapshot tests green; `npm run gen:check` in CI; `docs/CONTRIBUTING.md` "Generated files" section lists the target and its renderer; ARC-02 has the pointer text.
 
 ### ARC-05-S06 — Error-code registry, `governance/mcp-protocols.md` and `docs/TROUBLESHOOTING.md`
+
+> **Amendment 2026-09-08 (from the S06 delivery).**
+> - **The registry is `packages/snowarch/src/errors/codes.ts`, not a new `src/utils/error-codes.ts`.**
+>   ARC-04-S06 already created it and already emits it into the contract; this story extended the
+>   entry shape (`meaning`, `command?`, `showInRule`, `httpStatus?`) rather than starting a second
+>   one. 59 codes: the 50 the server throws or classifies, plus ARC-07's nine wizard-side codes
+>   registered with `showInRule: false` so `docs/TROUBLESHOOTING.md` covers what the wizard prints.
+> - **`NETWORK_TIMEOUT` and `PROXY_AUTH_REQUIRED` are NOT registered (ruled).** The classifier emits
+>   `CONNECTION_TIMEOUT` and does not distinguish a 407 at all, and a registry entry for a code
+>   nothing throws is a remedy nobody will ever read. The 407 case is an ARC-07 note.
+> - **ARC-07-S02/S05 must rename.** Their `PROXY_CONNECT_FAILED` and `STORE_MODE_UNSAFE` are not
+>   registry keys; the conditions they name are `PROXY_UNREACHABLE` and `STORE_PERMISSIONS_TOO_OPEN`.
+>   With `ServiceNowError` typed to the union, those literals will not compile.
+> - **The narrowing found a code that no scan could.** `client.ts` initialised its HTTP-status
+>   mapping to `API_ERROR`, a literal in no registry, so any unmapped status reached a caller with
+>   no meaning and no remedy. The grep-based completeness test could not see it — the string was
+>   never an argument to `new ServiceNowError`, it was a variable initialiser. It is now
+>   `REQUEST_FAILED`, which is the registered code for that case.
+> - **Criterion 1's counts differ from the story's.** 349 throw sites in 42 files, not 388 in 41,
+>   and all 17 distinct literals were already registered — so the migration was a type change with
+>   three computed-code sites to narrow, not a sweep of 388 literals.
 **As** an individual practitioner **I want** every error code the server can return to have exactly one documented meaning and remedy, shown identically by the rule file, the wizard, the doctor and the troubleshooting page **so that** a failure always names the next command, and a new code cannot ship without a remedy.
 **Context.** ARC README deliverables 4 (`governance/mcp-protocols.md`, `docs/TROUBLESHOOTING.md`) and acceptance criterion 6 (one entry per code; doctor and wizard import the same table). `01` §8 "Runtime error mapping". ARC-07 needs entries for `AUTHENTICATION_FAILED`, `INSUFFICIENT_PRIVILEGES`, `PROD_WRITE_NOT_ACKNOWLEDGED`, URL-shape errors, and — per R-3 — the wizard probe must distinguish DNS / TLS-CA / proxy failures with exact remedies; ARC-08 S10 maps runtime errors. `01` §11 leaves `errorCodes: []` in the contract shape for this story to fill.
 **Scope.** In: the server-side error-code registry (single source, emitted into the contract), the two renderers, the contract test that every thrown code is registered. Out: the wizard and doctor UIs that display remedies (ARC-07, ARC-08); the proxy agent itself (ARC-04 R-3 story) — this story only requires that its codes are registered with remedies.
@@ -295,6 +481,46 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; server and engine tests green on the CI matrix; three generated files committed and `gen:check` green; ARC-07/ARC-08 can call `remedyFor(code)`; `docs/CONTRIBUTING.md` says "add a code: registry first".
 
 ### ARC-05-S07 — Generated `permissions.allow` / `permissions.ask` blocks in `.claude/settings.json`
+
+> **Amendment 2026-09-08 (from the S07 delivery).**
+> - **`.claude/settings.json` did not exist; this story creates it.** The renderer builds from
+>   `{ "permissions": {} }` when there is no file, and preserves everything that is not an MCP entry
+>   of this server — `env`, `hooks`, `deny`, `Bash(...)` rules, and any other server's `mcp__` rules,
+>   which keep their place at the head of each list. **ARC-06-S01 merges into this file, it does not
+>   write over it.**
+> - **236 allow · 161 ask · intersection 0 · 397 total.** The five tools an unconfigured server
+>   advertises are all `mutates: false` and land in `allow`, so the wizard's resume path never asks
+>   permission to look at itself; `snow_core_instance_switch` is in `ask` through `sessionMutates`.
+> - **The permission-modes paragraph does NOT fit `docs/MODES-AND-PRESETS.md` (ruling 5).** The page
+>   is 159 of its 160-line budget and the paragraph is four lines including its blank. It is recorded
+>   as the **first item of ARC-07-S10's list** instead, with the wording drafted below.
+> - **F1, from the architect's review: ownership is by TOOL NAME, not by prefix.** Deciding by
+>   prefix meant a change to `mcp.serverKey` left every entry of the old key in place — they no
+>   longer matched, so they read as another server's rules — and the file ended up with 397 stale
+>   rules beside 397 new ones. My criterion-4 fixture started from an empty template and could not
+>   see it; the architect's started from the committed file and did. The renderer now owns any
+>   `mcp__<anything>__<tool>` whose tool part is in the contract catalogue **or in
+>   `retired-names.json`**, and criterion 4 starts from the committed file.
+>   The boundary is deliberate and asserted: a name under our prefix that is neither current nor
+>   retired is **not** ours and survives, because nothing distinguishes it from another server's
+>   tool and guessing would delete a stranger's rule.
+> - `deny-with-hook` throws rather than rendering: S-18 confirmed `ask` prompts in auto mode, so the
+>   fallback was never needed, and an unimplemented branch that returned something plausible would be
+>   worse than one that says why it is not there.
+
+> **Amendment 2026-09-08 (from ARC-04-S10 item 0, architect ruling).** The `ask` block is generated
+> from **`mutates || sessionMutates`**, not `mutates` alone. `sessionMutates` is a new optional field
+> on `ToolDefinition`, emitted in `contract.json`, and `snow_core_instance_switch` is the only tool
+> that carries it: it changes no ServiceNow record — so `mutates: true` would fail the "a tool that
+> mutates is never ungated" invariant unless it also gained a write gate, and gating it would stop a
+> read-only session switching instances to *read* another one — but it redirects where every
+> subsequent write lands, which `03` S-23 names as one of the 14 that must prompt. A generator reading
+> `mutates` alone would leave that one action unprompted while prompting every write that follows it.
+>
+> `snow_core_instances_reload` stays out of the `ask` block: ARC-07's `--resume` depends on it not
+> prompting. `tests/tools/mutates-audit.test.ts` asserts the union covers all 14 S-23 names, that
+> `sessionMutates` is exactly one tool and never set alongside `mutates`, and that `instances_reload`
+> is not in the ask list.
 **As** an individual practitioner **I want** every non-mutating server tool pre-approved and every mutating tool to prompt me, generated from the contract into the committed `.claude/settings.json` **so that** reads never interrupt me and no write can run without my consent even when the session starts in auto mode.
 **Context.** ARC README deliverable 4 (permission blocks) and acceptance criterion 8 (auto-mode prompt, S-18). `01` §5: the `ask` block is the mechanical half of §2.1 — on Pro/Max/Team plans a session starts in auto mode where a classifier approves calls, but an explicit `ask` rule resolves to a user prompt before the classifier (`docs:permission-modes`; `03` S-18). S-12 decides explicit names vs middle-wildcard globs; `03` fallback: explicit list (~250 entries). ARC-06 S01 commits `.claude/settings.json` (env, hook, static `Bash(...)` allows) — this story generates the MCP part of its `permissions`.
 **Scope.** In: the renderer that rewrites only the MCP entries of `permissions.allow` and `permissions.ask`, preserving everything else byte-for-byte; the style switch driven by `engine.config.json`; the S-18 fallback design note. Out: the hook-based fallback implementation (a new story if S-18 fails — see Risks); the non-MCP content of the file (ARC-06 S01).
@@ -325,6 +551,17 @@ Story-title mapping to the README's original list: README 1 → S01 + S02 (split
 **Definition of done.** Merged; tests green; `.claude/settings.json` committed with generated arrays and `gen:check` green; `docs/MODES-AND-PRESETS.md` paragraph delivered to ARC-02; S-12/S-18 verdict lines in `03` reference this story.
 
 ### ARC-05-S08 — Server `tests/contract.test.ts`: gates, presets, invariants, pin, dist parity
+
+> **Amendment 2026-09-08 (from the `fix/ensure-input-schema` PR).** **The final contract test must
+> assert schema-vs-validation agreement across the catalogue, not just the gates.**
+> `snow_us_active_update_set_ensure` shipped a handler that refused `name is required` behind an
+> `inputSchema` that listed `name` nowhere and `required: []` — the published contract said a call
+> was valid and the server refused it. That one tool is fixed in its own PR with a local regression
+> test; the general property belongs here, because only this test sees every tool at once. The
+> shape: for every tool, each `<x> is required` refusal the handler can raise names a property the
+> schema marks required, and every property the schema advertises is one the handler reads. The
+> second half is what caught it — `default_name` was advertised for a handler that never looked at
+> it, so nothing failed until a caller trusted the schema.
 **As** the server **I want** a test that proves every tool throws exactly its declared gate code when flags are off, that presets open exactly their families, that `mutates` and `gate` are consistent with each other and with tool names, that the committed `dist/contract.json` equals both the generator output and the engine's pin, and that every thrown error code is registered **so that** a server change that would break the engine fails on the server side before the engine ever sees it.
 **Context.** ARC README deliverable 5 and acceptance criteria 1 (server side: sha mismatch on rename) and 3 (seventh flag). `01` §11 "Server test" — extends `tests/tools/parity.test.ts`' throwing-Proxy pattern (`mcp:tests/tools/parity.test.ts:14-18`: a client whose every method throws `MOCK_CLIENT_CALL`, so a recognised tool either permission-throws or reaches the client). ARC-04 S06 writes the first form of the file (its tests (a)–(g)); ARC-04 S01 scopes vitest to the package; this story completes the file.
 **Scope.** In: `packages/snowarch/tests/contract.test.ts` (final form) and `tests/contract-exceptions.json`; the per-tool gate probe; preset probes; invariants; pin and generator parity; error-code registry test; rename-map subset test. Out: changing any gate or declaration (ARC-04); live tests (ARC-04's `RUN_LIVE_E2E`).

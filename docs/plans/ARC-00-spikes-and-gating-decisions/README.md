@@ -40,10 +40,10 @@ None. The owner's answers in `02` are the only external input, and they are all 
 - [ ] S-03/S-04/S-08 were executed on a Windows machine **without** Git Bash on PATH (`where bash` empty, quoted in each record), and the Q-B outcome (native first-class vs "Git Bash required") is written into `01` §13 and ARC-09.
 - [ ] S-07 records size on disk and wall time for the three B02 candidate recipes on all three OSes and names the recipe ARC-03 documents.
 - [ ] S-18 shows a user prompt for a `mutates:true` tool in auto mode (or records the plan limitation and keeps ARC-05's PreToolUse fallback story open).
-- [ ] Seven ADRs exist; ADR-0001…0005 and 0007 with status Accepted and the owner's `DECIDED` text quoted; ADR-0006 resolved as above before ARC-06-S01.
+- [x] Seven ADRs exist; ADR-0001…0005 and 0007 with status Accepted and the owner's `DECIDED` text quoted; ADR-0006 resolved as above before ARC-06-S01. *(ADR-0006 Accepted 2026-09-08 — "monorepo path confirmed".)*
 - [ ] `spikes/engine.config.seed.json` values for names and floors are fixed (D-01, R-1, R-2, S-11) and referenced by the ADRs; `floors.claude` equals the S-11 verdict.
 - [ ] A relicensing statement for both source repositories is agreed in writing (D-02) and the `@farstic/snow-mcp@1.0.0` npm record is explicitly left untouched; `RELICENSING.md` quotes `git shortlog -sn HEAD` of both repositories and records, for the engine's second contributor, either written consent or the rewrite-before-import file list (story S02).
-- [ ] S-14a–g (plugin channel) and S-19 carry verdicts within the one-week time-box, and ADR-0006 records either "monorepo path confirmed" or "channel decision re-opened" **before** ARC-06's first story starts (D-06 hedge).
+- [x] S-14a–g (plugin channel) and S-19 carry verdicts within the one-week time-box, and ADR-0006 records either "monorepo path confirmed" or "channel decision re-opened" **before** ARC-06's first story starts (D-06 hedge). *(Verdicts in `03` §F; ADR-0006 Accepted 2026-09-08 — "monorepo path confirmed"; ARC-06-S01 not yet started.)*
 - [ ] The gate sign-off block (ARC-01 entry: D-01/D-02/D-03; ARC-06 entry: S-01/S-03/S-05/S-08/S-09/S-15/S-16 + S-14 conclusion + Q-B) is present at the end of this README with dates and the owner's initials.
 
 ## Risks
@@ -59,21 +59,21 @@ None. The owner's answers in `02` are the only external input, and they are all 
 
 Detailed write-ups (persona, context, scope, design notes, acceptance criteria, tasks, tests, size, risks, definition of done) are in [`STORIES.md`](STORIES.md). Each story keeps one record folder and one verdict line per spike; merges group spikes that share an environment and a procedure.
 
-| ID | Title | Size |
-|---|---|---|
-| ARC-00-S01 | Spike workspace, stub MCP server and three clean test environments | L |
-| ARC-00-S02 | Licence and relicensing statement (D-02): `LICENSE`, `NOTICE`, header sweep list | S |
-| ARC-00-S03 | ADR-0001…ADR-0006 (+ ADR-0007 post-decision rulings) and the `engine.config.json` value set | M |
-| ARC-00-S04 | First-session spikes: S-01 pre-seeded approval, S-16 project `permissions.allow`, S-17 unconfigured server | M |
-| ARC-00-S05 | Permission-rule spikes: S-18 `permissions.ask` in auto mode, S-12 middle-wildcard globs | M |
-| ARC-00-S06 | Hook and path-expansion spikes: S-03 `${CLAUDE_PROJECT_DIR}` on native Windows, S-05 hook with Node absent, S-20 shell-env inheritance | M |
-| ARC-00-S07 | Windows console spikes: S-04 raw-mode masked input, S-08 `bootstrap.cmd` under Restricted and GPO-locked policies | M |
-| ARC-00-S08 | Server install and startup spikes: S-15 root `npm ci` footprint, S-06 `MCP_TIMEOUT` and 394-tool cold start | M |
-| ARC-00-S09 | S-07 — ServiceNowDocs submodule recipes: size and time on three OSes | M |
-| ARC-00-S10 | Session-dynamics spikes: S-09 Claude-first clone-into-cwd and restart, S-02 `list_changed` after reload | M |
-| ARC-00-S11 | S-11 — Claude Code 2.1.214 floor verdict over the spike matrix | S |
-| ARC-00-S12 | S-14a–g plugin channel spikes (D-06 hedge, one-week time-box) and S-19 `claude plugin validate` on headless CI | L |
-| ARC-00-S13 | Windows test recipe for ARC-06 / ARC-09 CI | S |
-| ARC-00-S14 | Close-out: `03` §A/§B Status column, deferred spikes S-10 / S-13, gate sign-off for ARC-01 and ARC-06 | M |
+| ID | Title | Size | Status |
+|---|---|---|---|
+| ARC-00-S01 | Spike workspace, stub MCP server and three clean test environments | L | Done (2026-09-07) |
+| ARC-00-S02 | Licence and relicensing statement (D-02): `LICENSE`, `NOTICE`, header sweep list | S | Done (2026-09-07) |
+| ARC-00-S03 | ADR-0001…ADR-0006 (+ ADR-0007 post-decision rulings) and the `engine.config.json` value set | M | Done (2026-09-07) |
+| ARC-00-S04 | First-session spikes: S-01 pre-seeded approval, S-16 project `permissions.allow`, S-17 unconfigured server | M | Done (2026-09-07) |
+| ARC-00-S05 | Permission-rule spikes: S-18 `permissions.ask` in auto mode, S-12 middle-wildcard globs | M | Done (2026-09-07) |
+| ARC-00-S06 | Hook and path-expansion spikes: S-03 `${CLAUDE_PROJECT_DIR}` on native Windows, S-05 hook with Node absent, S-20 shell-env inheritance | M | Done (2026-09-07) |
+| ARC-00-S07 | Windows console spikes: S-04 raw-mode masked input, S-08 `bootstrap.cmd` under Restricted and GPO-locked policies | M | Done — parked items noted (2026-09-07) |
+| ARC-00-S08 | Server install and startup spikes: S-15 root `npm ci` footprint, S-06 `MCP_TIMEOUT` and 394-tool cold start | M | Done (2026-09-07) |
+| ARC-00-S09 | S-07 — ServiceNowDocs submodule recipes: size and time on three OSes | M | Done (2026-09-07) |
+| ARC-00-S10 | Session-dynamics spikes: S-09 Claude-first clone-into-cwd and restart, S-02 `list_changed` after reload | M | Done (2026-09-07) |
+| ARC-00-S11 | S-11 — Claude Code 2.1.214 floor verdict over the spike matrix | S | Done (2026-09-07) |
+| ARC-00-S12 | S-14a–g plugin channel spikes (D-06 hedge, one-week time-box) and S-19 `claude plugin validate` on headless CI | L | Done (2026-09-07) |
+| ARC-00-S13 | Windows test recipe for ARC-06 / ARC-09 CI | S | Done — parked items noted (2026-09-07) |
+| ARC-00-S14 | Close-out: `03` §A/§B Status column, deferred spikes S-10 / S-13, gate sign-off for ARC-01 and ARC-06 | M | Done (2026-09-07) |
 
 Sizing: 19–30 engineer-days (≈ 4–6 weeks for one engineer; the upper bound assumes most verdicts FAIL and every propagation row is needed); S12 runs in parallel with S04–S10 so that it concludes before ARC-06-S01 without extending the ARC. Story IDs are `ARC-00-SNN`; spike IDs are `S-NN` — `ARC-00-S13` (Windows recipe) is not spike S-13 (skill listing, deferred to ARC-02).

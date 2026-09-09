@@ -1,0 +1,8 @@
+{
+  "nowaikit": "servicenow",
+  "NowAIKit": "AI ServiceNow Architect",
+  "mcp__nowaikit__": "mcp__servicenow__",
+  "mcp__servicenow-mcp__": "mcp__servicenow__",
+  "mcp__snow-mcp__": "mcp__servicenow__",
+  "packages/snow-mcp": "packages/snowarch"
+}

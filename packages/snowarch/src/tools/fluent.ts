@@ -13,7 +13,8 @@ import { execFile as execFileCb } from 'child_process';
 import { promisify } from 'util';
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
-import { requireWrite, requireFluent } from '../utils/permissions.js';
+import { requireFluent, requireScripting, requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
 const execFileAsync = promisify(execFileCb);
 
@@ -29,7 +30,7 @@ async function runNowSdk(args: string[], timeoutMs = 30000): Promise<{ stdout: s
   }
 }
 
-export function fluentToolManifest() {
+export function fluentToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_fluent_query',
@@ -94,6 +95,8 @@ export function fluentToolManifest() {
         },
         required: ['table'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_fluent_request_batch',
@@ -123,14 +126,12 @@ export function fluentToolManifest() {
         },
         required: ['operations'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_fluent_script_exec',
-      description:
-        'Execute a server-side script on the ServiceNow instance (Background Script). ' +
-        'Supports GlideRecord, GlideQuery, GlideAggregate, and all server-side APIs. ' +
-        'Returns the script output. Use for complex queries that cannot be expressed via REST. ' +
-        'REQUIRES WRITE_ENABLED=true.',
+      description: '[Unsupported] Execute a server-side script: no working endpoint exists on this instance. Run the script in System Definition > Scripts - Background, or author it as a Fix Script (sys_script_fix) and run it from the UI.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -145,6 +146,14 @@ export function fluentToolManifest() {
         },
         required: ['script'],
       },
+      // `scripting`, matching the requireScripting() the case actually calls. It was declared
+      // `write`, so the generated ask-list under-reported it: a caller reading the contract
+      // would have believed WRITE alone was enough to run it.
+      gate: 'scripting',
+      mutates: true,
+      // Registered, and always refuses: no REST endpoint backs it. It stays registered so a
+      // caller reaching for a server-side script finds it and is told the route that works.
+      unsupported: true,
     },
     {
       name: 'snow_fluent_explain',
@@ -161,6 +170,8 @@ export function fluentToolManifest() {
         },
         required: ['topic'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_fluent_init',
@@ -176,6 +187,9 @@ export function fluentToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'fluent',
+      mutates: true,
+      alsoRequires: 'write',
     },
     {
       name: 'snow_fluent_build',
@@ -189,6 +203,9 @@ export function fluentToolManifest() {
         },
         required: [],
       },
+      gate: 'fluent',
+      mutates: true,
+      alsoRequires: 'write',
     },
     {
       name: 'snow_fluent_validate',
@@ -202,6 +219,8 @@ export function fluentToolManifest() {
         },
         required: [],
       },
+      gate: 'fluent',
+      mutates: false,
     },
   ];
 }
@@ -363,6 +382,7 @@ export async function dispatchFluentAction(
     }
 
     case 'snow_fluent_request_batch': {
+        requireWrite();
       const operations = args.operations;
       if (!operations || !Array.isArray(operations) || operations.length === 0) {
         throw new ServiceNowError('operations array is required', 'INVALID_REQUEST');
@@ -374,7 +394,6 @@ export async function dispatchFluentAction(
       // Check for write operations
       const hasWrites = operations.some((op: any) => op.method !== 'GET');
       if (hasWrites) {
-        requireWrite();
       }
 
       const result = await client.batchRequest(operations);
@@ -382,12 +401,15 @@ export async function dispatchFluentAction(
     }
 
     case 'snow_fluent_script_exec': {
-      requireWrite();
-      const script = args.script;
-      if (!script) throw new ServiceNowError('script is required', 'INVALID_REQUEST');
-
-      const result = await client.executeScript(script, args.scope);
-      return result;
+      requireScripting();
+      // Retired by ARC-04-S08, same reason as snow_deploy_background_script_exec: it called
+      // client.executeScript, which posted to sys_script_execution — an endpoint that does
+      // not exist. Registered, gated, and failing before any HTTP.
+      throw new ServiceNowError(
+        'Server-side script execution has no supported REST endpoint on this instance. Run the '
+        + 'script in System Definition > Scripts - Background, or author it as a Fix Script '
+        + '(sys_script_fix) and run it from the UI.',
+        'UNSUPPORTED_ON_THIS_INSTANCE');
     }
 
     case 'snow_fluent_explain': {

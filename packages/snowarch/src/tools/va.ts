@@ -13,8 +13,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function vaToolManifest() {
+export function vaToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_va_va_topic_add',
@@ -30,6 +31,8 @@ export function vaToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_va_va_topic_modify',
@@ -42,6 +45,8 @@ export function vaToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_va_va_topic_read',
@@ -53,6 +58,8 @@ export function vaToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_va_va_topics_full_index',
@@ -67,6 +74,8 @@ export function vaToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_va_va_conversation_read',
@@ -79,6 +88,8 @@ export function vaToolManifest() {
         },
         required: ['conversation_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_va_va_conversations_index',
@@ -92,6 +103,8 @@ export function vaToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_va_va_categories_index',
@@ -103,6 +116,8 @@ export function vaToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }
@@ -114,8 +129,8 @@ export async function dispatchVaAction(
 ): Promise<any> {
   switch (name) {
     case 'snow_va_va_topic_add': {
-      if (!args.name) throw new ServiceNowError('name is required', 'INVALID_REQUEST');
       requireWrite();
+      if (!args.name) throw new ServiceNowError('name is required', 'INVALID_REQUEST');
       const payload: Record<string, any> = {
         name: args.name,
         active: args.active !== false,
@@ -128,8 +143,8 @@ export async function dispatchVaAction(
     }
 
     case 'snow_va_va_topic_modify': {
-      if (!args.sys_id || !args.fields) throw new ServiceNowError('sys_id and fields are required', 'INVALID_REQUEST');
       requireWrite();
+      if (!args.sys_id || !args.fields) throw new ServiceNowError('sys_id and fields are required', 'INVALID_REQUEST');
       const result = await client.updateRecord('sys_cs_topic', args.sys_id, args.fields);
       return { action: 'updated', sys_id: args.sys_id, ...result };
     }

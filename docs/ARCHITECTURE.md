@@ -30,8 +30,8 @@ ai-servicenow-architect/                      farstic/ai-servicenow-architect ·
 │   │   └── snowarch/SKILL.md                 /snowarch status · setup-instance · doctor (R-2): quotes the doctor Mode line; guided front-end of the wizard (§6); roster from directory listing
 │   └── agents/<9>.md                         single canonical copy; model: inherit; skills: [<persona>] preload; explicit tools lists (no MCP)
 ├── governance/
-│   ├── governance-rules.md                   §1.1, §2 (references the generated rule), §4 — read on demand as today
-│   ├── taxonomy.md · prompt-patterns.md      read on demand as today
+│   ├── governance/governance-rules.md                   §1.1, §2 (references the generated rule), §4 — read on demand as today
+│   ├── governance/taxonomy.md · governance/prompt-patterns.md      read on demand as today
 │   └── mcp-protocols.md                      GENERATED long form of §2.1/§2.2 with current tool names (the rule file is its digest)
 ├── packages/
 │   ├── snowarch/                             the server + CLI package (from farstic/snow-mcp, server-only scope — ARC-04)
@@ -88,10 +88,176 @@ no empty directories, so a path appears in the repository only when its owner pu
 | `docs/MIGRATION.md` | **ARC-10** | migration and cutover |
 | `.local/` · `clients/` | — | **gitignored, per checkout**; never committed |
 
+## Docs corpus: how the pin, the areas file and the gate relate
+
+Three artefacts, and the design is which of them may disagree with which.
+
+| Artefact | Written by | Read by |
+|---|---|---|
+| **the commit** — the gitlink and `docs.pin`, the same SHA | the seed commit, then only `docs sync --upstream` — never by hand | the recipe, the launchers, the doctor's E-checks, `docs-bump.yml`, ARC-09's release tag |
+| **`vendor/docs-areas.txt`** — which areas materialise | `scripts/gen-docs-areas.mjs`, from the areas actually cited; CI fails when stale | the cone, the completeness check, the launcher recipe |
+| **the citation gate** — every `markdown/…` path cited in the engine | nobody: a property of the skills | `docs verify`, `docs status`, the bump workflow, CI |
+
+**The invariants**, in the order they are checked:
+
+- `docs.pin` **==** the gitlink. They diverge only while a bump is staged; `docs status` prints
+  `(staged)` for exactly that window instead of MISMATCH.
+- the cone **==** the areas file **plus `legal/`**. `legal/` is neither an area nor a root file, so
+  cone mode leaves it out — the recipe names it and the completeness check enforces it, because
+  NOTICE claims it is in every checkout and a claim nothing checks is a claim that decays.
+- **dead citations == 0.** A citation upstream removed is the corpus saying a skill is now wrong
+  about the platform. Never fixed by deleting the citation.
+- **an absent corpus is a FAIL, never a skip** — the script this replaced exited 0 with the corpus
+  missing, so a fresh clone passed with every citation unverified.
+
+### The commands
+
+`docs sync` reconciles locally and is safe for anyone: clone if absent, mode, pin, gitlink, the
+ADR-0008 root repair. A clean second run issues no git write, prints `up to date`, and ends — as
+every successful run does — with the attribution line. `docs status` answers "is this corpus right"
+in four lines (pin/gitlink/HEAD · family/branch · shape and areas · citations), each `ok` or
+`MISMATCH` with its remedy beneath, computed by `docsStatus()` — which ARC-08's doctor wraps rather
+than re-derives.
+
+`docs sync --upstream` is the maintainer refresh: refuse a dirty tree, fetch, **verify at the old
+pin**, move, verify again, write the pin, stage — never commit. The baseline runs first because
+"newly dead" is a difference between two states and the first stops existing when the corpus moves.
+
+`docs family <name>` switches release family. The dry run **is** the proposal; `--yes` applies
+exactly what it printed. A prose line is edited only when the matched phrase is its *only* family
+mention — anything else is REVIEW, because half a sentence about the new family and half about the
+old is worse than an untouched line. The pin moves first, while the tree is still clean, so the
+dirty-tree refusal guards the whole operation rather than tripping on the command's own edits.
+
+`docs-bump.yml` runs the refresh weekly and opens **one** pull request — branch named for the
+target SHA, so a re-run updates rather than duplicates and a newer tip supersedes the older. **It
+never merges.** A dry run exits 0 with a `::warning::`; the red build belongs on the pull request.
+
+`docs-real.yml` runs the recipe against the **real** corpus on all three OSes — weekly, on demand,
+and when the code that decides the checkout changes; not a required context (network, a minute per
+OS). Its Windows cell strips Git Bash and clears `core.longpaths` first so it measures the recipe
+rather than the image, and a second cell keeps Git Bash: the two passing identically is the proof
+nothing here depends on bash.
+
+**E-12** is `E12_ABSENT(mode)` in `status.mjs`, printed by `docs status` and imported by the doctor,
+never retyped — **FAIL**, never WARN or SKIP, because an absent corpus leaves every citation in every
+skill unverified.
+
+### Exit codes — every `docs` sub-command shares one table
+
+| Code | Meaning |
+|---|---|
+| **0** | ok |
+| **1** | incomplete checkout · the pin moved **and** citations broke · dead citations · a status mismatch |
+| **2** | a plan was printed and not applied (`family` without `--yes`) |
+| **3** | the corpus is missing |
+| **4** | the working tree is not clean — nothing was touched |
+| **5** | git failed; the message says how (DNS · proxy · TLS · unfetchable pin · disk) |
+| **6** | the upstream does not have what was asked for — renamed branch, unreachable SHA |
+
+4, 5 and 6 stay distinct: "you have unsaved work", "the transport failed" and "it is not there" have
+three different remedies, and a caller that collapsed them would send someone to the wrong one.
+
+### The git-only corpus recipe
+
+ARC-06's launchers run this when Node is absent. Not a paraphrase of `sync.mjs`:
+`tests/docs-recipe.test.mjs` asserts the block is byte-identical to `--print-recipe` on a tree with
+no checkout, down to one character. Edit the module, regenerate, paste — never the reverse. The area
+list is one long line on purpose; wrapped or reordered is a different checkout.
+
+```sh
+git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs
+git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform legal
+git -C vendor/ServiceNowDocs fetch --depth 1 origin ba513f2c62d3698ef5bfdd8044110226b8419689
+git -C vendor/ServiceNowDocs checkout --detach ba513f2c62d3698ef5bfdd8044110226b8419689
+git submodule absorbgitdirs vendor/ServiceNowDocs
+git submodule init -- vendor/ServiceNowDocs
+echo "docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE"
+```
+
+**On Windows the sequence gains one line** — a single block cannot be byte-identical on both
+platforms, so this one is the POSIX form:
+
+```powershell
+git -C vendor/ServiceNowDocs config core.longpaths true
+```
+
+The launcher then checks that each line of `vendor/docs-areas.txt` exists under
+`vendor/ServiceNowDocs/markdown/` and prints `citations: not verified until Node 20+ is installed`.
+ARC-00 S-07 acceptance criterion 2 was refuted — the corpus fits inside 260 characters under a
+*short* prefix — but a CI temp directory ate that margin in ARC-03-S05, so `core.longpaths` stays.
+
+
+## Roster
+
+Generated from the directory listing by `scripts/gen-roster.mjs`, and checked by `npm run lint`.
+Five documents used to disagree about these numbers, and every one of them was true when it was
+written (P-12) — so nothing here is typed. Edit a skill or an agent and re-run the generator;
+never edit between the markers.
+
+<!-- ROSTER:BEGIN (generated by scripts/gen-roster.mjs — do not edit) -->
+
+**27 specialist personas · 28 skills (incl. now-assist-genai reference companion) · 9 sub-agents**
+
+### Skills
+
+| Skill | Fires as | Sub-agent | Version |
+|---|---|---|---|
+| `app-engine-specialist` | on demand | — | 1.1.0 |
+| `atf-author` | post-build consult | yes | 1.1.0 |
+| `cmdb-csdm-specialist` | gateway | — | 2.0.0 |
+| `code-reviewer` | post-build consult | — | 1.0.0 |
+| `csm-specialist` | gateway | — | 2.0.0 |
+| `developer` | builder | yes | 1.0.0 |
+| `devops-release-manager` | routing-time consult | — | 1.1.0 |
+| `diagramming-specialist` | post-build consult | yes | 1.0.0 |
+| `discovery-specialist` | on demand | — | 1.1.0 |
+| `estimation-specialist` | on demand | — | 1.0.0 |
+| `flow-designer-specialist` | builder | yes | 1.0.0 |
+| `hld-lld-writer` | builder | yes | 1.0.0 |
+| `hrsd-specialist` | gateway | — | 2.0.0 |
+| `integration-specialist` | builder | yes | 1.0.0 |
+| `itom-discovery-specialist` | gateway | — | 2.0.0 |
+| `itsm-specialist` | gateway | — | 2.0.0 |
+| `licensing-specialist` | routing-time consult | — | 1.0.0 |
+| `migration-specialist` | on demand | — | 1.0.0 |
+| `now-assist-genai` | reference | — | 1.0.0 |
+| `now-assist-specialist` | builder | yes | 1.0.0 |
+| `operational-documentation` | post-build consult | — | 1.0.0 |
+| `performance-scale-specialist` | routing-time consult | — | 1.0.0 |
+| `reporting-analytics-specialist` | on demand | — | 1.1.0 |
+| `security-grc-specialist` | routing-time consult | — | 1.1.0 |
+| `spm-specialist` | on demand | — | 1.1.0 |
+| `story-writer` | builder | yes | 1.0.0 |
+| `technical-designer` | builder | yes | 1.0.0 |
+| `ui-ux-specialist` | on demand | — | 1.1.0 |
+
+### Sub-agents
+
+| Agent | Preloads | What it does |
+|---|---|---|
+| `atf-author` | `atf-author` | Generate a batch ATF (Automated Test Framework) test suite across an entire scoped ServiceNow app per a supplied app scope and spec. |
+| `developer` | `developer` | Implement ServiceNow code (Script Includes, Business Rules, Client Scripts, UI Scripts, Scheduled Jobs, Background Scripts, Fix Scripts, custom Flow Action scripts) per a supplied spec. |
+| `diagramming-specialist` | `diagramming-specialist` | Generate diagrams for a ServiceNow design from a supplied spec — one figure or a full pack of context/C4, ERD, sequence, swimlane, state, deployment, CSDM/CMDB map and roadmap/Gantt/RACI. |
+| `flow-designer-specialist` | `flow-designer-specialist` | Design Flow Designer flows, subflows, custom Actions, and decision-table-driven branching per a supplied requirement. |
+| `hld-lld-writer` | `hld-lld-writer` | Produce ServiceNow High-Level Design (HLD), Low-Level Design (LLD) or Process Design Document (PDD) artefacts. |
+| `integration-specialist` | `integration-specialist` | Design integration architecture between ServiceNow and external systems — outbound REST/SOAP, inbound Scripted REST APIs, IntegrationHub spokes, MID Server topology, authentication, retry/DLQ patterns, payload security — per a supplied requirement. |
+| `now-assist-specialist` | `now-assist-specialist`, `now-assist-genai` | Design ServiceNow Now Assist AI capabilities — AI Agents, agentic workflows, Now Assist skills, Virtual Agent topics, AI Search, AI Control Tower governance, prompt engineering, confidence routing, human-in-loop gates. |
+| `story-writer` | `story-writer` | Convert requirements into sprint-ready Gherkin Feature files with ServiceNow conventions, OPEN QUESTIONS blocks, and proposed supporting stories. |
+| `technical-designer` | `technical-designer` | Produce ServiceNow component design specifications — table model, field types, ACL matrix, business rule list with a rationale per item, client-side logic, flow outline, integration touchpoints, performance and security considerations, test strategy. |
+
+### Utility skills
+
+| Skill | Version |
+|---|---|
+| `snowarch` | 2.0.0 |
+
+<!-- ROSTER:END -->
+
 ## Sub-agents
 
-The nine sub-agents under `.claude/agents/` hold three invariants, each enforced by a rule in
-`tests/agents-lint.test.mjs`:
+The sub-agents under `.claude/agents/` — counted in the roster block above — hold three invariants,
+each enforced by a rule in `tests/agents-lint.test.mjs`:
 
 - **Explicit `tools:`** (AG-03). Every agent lists its tools. An agent with no `tools:` key inherits
   *everything* the session has, MCP tools included — so the list is what structurally prevents a
@@ -108,6 +274,82 @@ The nine sub-agents under `.claude/agents/` hold three invariants, each enforced
 **Audience split.** This document is for people changing the repository. The engine's own operating
 rules — how the Chief Architect routes, what each specialist owns, what a builder must return — live in
 `CLAUDE.md` and `governance/`, and are read by the model at runtime, not by a maintainer at design time.
+
+### The contract: who generates, who pins, what fails
+
+```mermaid
+flowchart LR
+  subgraph server["packages/snowarch — the server"]
+    reg["tool registrations<br/>flags · presets · error registry"]
+    ext["scripts/extract-tools.mjs<br/>buildContract()"]
+    con["dist/contract.json<br/>397 tools · sha256"]
+    st["tests/contract.test.ts<br/>14 invariants"]
+    reg --> ext --> con
+    con --> st
+  end
+  subgraph engine["packages/contract — the engine"]
+    pin["required-tools.json<br/>42 tools · used_by · pinned sha"]
+    lint["engine-lint.mjs<br/>11 checks"]
+    gen["gen-governance.mjs<br/>5 targets"]
+    con --> pin
+    con --> gen
+    pin --> lint
+  end
+  gen --> texts["rule file · mcp-protocols<br/>TROUBLESHOOTING · presets<br/>permissions.allow / ask"]
+  st --> gate{{"npm run contract"}}
+  lint --> gate
+  gen --> gate
+```
+
+**The invariants that make it hold** are `packages/snowarch/tests/contract.test.ts` 5–8: the flag set is closed — the
+contract, `permissions.ts` and every preset name the same six (5); no preset turns a flag on while
+its prerequisite is off (6); a mutating name mutates (7); and gate and `mutates` imply each other in
+both directions (8). Exceptions to 7 and 8 exist only as named classes in
+`packages/snowarch/tests/contract-exceptions.json`, each with a reason, each required to be
+load-bearing.
+
+**What fails, and where.**
+
+| Change | Fails | Says |
+|---|---|---|
+| a tool renamed, engine not told | server tests 1, 7, 10, 13 · lint `L01`, `L08`, `L11` | `pinned but not registered — a rename the engine has not been told about` |
+| a tool re-gated | server test 2 · lint `L08`, `L11` | `expected gate=scripting, contract declares gate=write` |
+| a seventh flag added to the source only | server test 5 | `permissions.ts references a flag the contract does not declare` |
+| a generated file edited by hand | `gen:check` · lint `L06` | `differs from generator output (gen-governance)` |
+| a retired name written into prose | lint `L03` | `retired name "…" → use …` |
+| the contract changed, the pin not updated | server test 13 · lint `L11` | `contract sha changed — on the engine side run node packages/contract/pin.mjs` |
+| a name typed into engine tooling | `tests/contract/no-literals.test.mjs` | `read it from the contract loader, or add it to the allow-list with a reason` |
+
+All of it is one command — `npm run contract` — which runs in CI on nine cells, before a release
+tag, and on your machine.
+
+**A distribution-channel move is one line.** Spike S-14 asked what changing the tool prefix would
+cost if the product moved to a plugin channel: `engine.config.json`'s `mcp.serverKey`, then
+`npm run gen`. The prefix appears exactly once in the always-loaded rule file and once in the
+long-form document, both rendered from that key, and `L02` fails on any other spelling — so the
+answer is a configuration change and a regeneration, not a sweep.
+
+**Engine tooling reads the contract through `packages/contract/lib/contract.mjs`.** Stdlib only,
+zero dependencies, importable before `npm ci` — because ARC-06's bootstrap and ARC-08's doctor both
+run in a checkout that has installed nothing yet. `loadContract({ root, verifyPin })` is the only
+function that touches the filesystem and throws `ContractPinMismatch` carrying both shas; everything
+else is a pure function of the object it returns: `flags`, `flagNames`, `presets`, `expandPreset`
+(which enforces the dependency rule and names the offending pair), `tools`, `toolNames({ mutates })`,
+`askList` (`mutates || sessionMutates` — one definition, shared by the permission block, the rule
+file's count and the doctor), `unsupportedTools`, `alsoRequires`, `errorCodes`, `remedyFor`,
+`prefix(config)` and `updateSetCaptureSequence`. `tests/contract/no-literals.test.mjs` is the other
+half of the rule: no engine tool holds a flag name, a preset name or an error code of its own.
+
+**A tool's contract entry carries `unsupported: true` when no REST endpoint backs it.** Two do —
+the script-execution stubs — and they stay registered so a refusal can name the route that works
+instead of reading as a misspelling. The generated rule file filters on that flag; before it
+existed, the file named the two tools from a literal, which is a claim about the server made
+from outside the contract.
+
+**Mode and preset are the two axes of what a session may do**, and they are documented once, in
+`docs/MODES-AND-PRESETS.md`: what `design-only` and `live` mean, what each of the four presets turns on,
+what each of the six flags does in plain language, and how a `prod` instance is protected. Nothing about
+those semantics is restated here — a second copy is the thing that drifts.
 
 **The routing protocol has two phases and the gateways fire in both.** Phase 1 is routing-time: restate
 the task, read engagement context, surface assumptions, evaluate the §1.1 Baseline-First rule, and — if
@@ -135,6 +377,108 @@ rather than restated here; see the roster block (ARC-02-S07) and `engine.config.
 capture. Both are stated normatively in `governance/mcp-protocols.md` (ARC-05); a mutating call without
 an explicit approval in the current conversation halts, and a configuration write before the update-set
 preference is set cannot be captured retroactively.
+
+### The server package
+
+`packages/snowarch/` is the MCP server, and after the ARC-04-S01 cut it is six directories:
+`src/server.ts` (stdio only), `src/tools/` (397 tools in 39 modules), `src/servicenow/` (the client,
+the instance manager and the types), `src/resources/`, `src/utils/`, `src/audit/` (the trail below), and
+`src/cli/` (one file — `start` plus three stubs owned by later stories). Its production dependencies are four:
+`@modelcontextprotocol/sdk`, `commander`, `dotenv`, `zod`.
+
+Everything that offered a second way in is gone: the HTTP/SSE transport, the REST API, the A2A routes,
+the dashboard, the prompt catalogue, the direct-execution engine and the report generator. What that
+buys is a single protocol surface to reason about, and a production install that fell from 57.3 MB to
+14.1 MB. The per-removal detail is in `packages/snowarch/CHANGELOG.md`.
+
+### The audit trail
+
+Every call to a tool declared `mutates` or `sessionMutates` appends one JSON line to
+`<store dir>/audit.jsonl` — beside the store, so the record sits with the configuration it describes.
+`SNOW_AUDIT_FILE` overrides the location and `SNOW_AUDIT_FILE=off` disables it, with one
+`[WARN] audit trail disabled` at start-up so nobody discovers the absence at the moment they need the
+file. It is created 0600 in a 0700 directory, rotates at 10 MB keeping three older files, and
+`@farstic/snowarch/audit` exports `appendAudit` / `tailAudit` / `readAuditTail` so the CLI can write
+its own lines with `source: "cli"`.
+
+The line is `{ ts, instance, environment, tool, gate, table, sysId, query, result, ms, source, note? }`.
+What it deliberately omits is the point: **no payload** — `fields`, `data`, `script` and the response
+body never appear, because a trail that recorded what was written would be a second copy of client
+data sitting in a checkout — **no credential**, and **no instance URL**, only the label, because this
+file gets pasted into tickets. `query` is the one exception and is recorded knowingly: it is the filter
+that selected the records, it can contain personal data (`caller_id=…`), and without it a line saying
+"updated some incidents" answers nothing.
+
+Refusals are written with their code, which is what an after-the-fact reviewer is usually looking for:
+`WRITE_NOT_ENABLED` against a table on a date is the evidence that §2.1 held. Reads append nothing —
+a trail that logged everything would be a request log, and nobody reads a request log to answer "was
+this write approved". A write failure (read-only filesystem) warns exactly once per process and never
+fails the tool call: the instance write already happened, and reporting it as failed would be worse
+than losing the line.
+
+Appends are synchronous, one `appendFileSync` per line. Writes are rare enough that durability beats
+throughput, and a buffered writer would lose the last few lines exactly when an audit matters most —
+an abrupt exit. There is consequently nothing to flush on shutdown.
+
+### The server doctor
+
+`snowarch doctor [--json] [--no-network] [--section server]` runs the checks only this package
+can perform, and `@farstic/snowarch/doctor` exports the same runner so ARC-08 can merge this report
+with its engine checks. That hand-off is why the runner returns data rather than printing: a doctor
+that only prints has to be re-implemented to be composed, and two implementations of the flag rules
+diverge (P-16).
+
+| Id | Checks |
+|---|---|
+| `SV-00` | Node meets the declared floor of 20 |
+| `SV-01` | `dist/server.js` and `dist/contract.json` exist and parse; contract sha printed |
+| `SV-02` | Store resolution (source, masked path), schema, 0600/0700 modes (skipped on Windows, where permissions are ACL-inherited), cloud-sync warning |
+| `SV-03` | Per instance: bare-https URL, flags explicit, dependency-consistent, `toolPackage`, prod posture |
+| `SV-04` | Network probes — a declared interface with a stub that returns `skip`; ARC-07-S03 supplies the implementation. `--no-network` skips it explicitly |
+| `SV-05` | A real stdio handshake against `dist/server.js`: `initialize` + `tools/list`, names compared to `dist/contract.json`. Unconfigured mode expects the five core tools |
+| `SV-06` | `snow_core_capabilities_read` over that handshake equals the store entry (flags, effectiveFlags, preset, environment, maxRecords) |
+| `SV-07` | The audit file's location is writable; warns when `SNOW_AUDIT_FILE=off` |
+| `SV-08` | Ancestor `.claude/skills` directories above the checkout (warning) — Claude Code loads project skills from every one of them, so the roster silently doubles and the listing budget is spent twice (`03` §F, S-13 addendum) |
+
+Ids are `SV-xx` from the first commit. `01` §8 called them `S-xx`, which collides with the spike ids
+in `03`; shipping the settled prefix now makes ARC-08-S01's planned rename a no-op, and they live in
+one exported constant so a re-home is a single line.
+
+**The report.** `{ product, version, ranAt, mode, checks[], summary{ok,warn,fail,skip}, instances[] }`,
+each check `{ id, title, status, detail, remedy?, fixable }`. Exit **0** when nothing failed, **1** on
+any `fail`, **3** when the doctor could not run at all — a caller scripting against it needs to tell
+"checks failed" from "the tool is broken".
+
+Every string in a result is written to be pasted: masked paths, no clear usernames, secrets as
+`set (len n)`. The doctor is what people run *because* something is wrong, which is exactly when they
+screenshot it.
+
+**One note for ARC-06/ARC-08.** `EnvHttpProxyAgent` prints `[UNDICI-EHPA] Warning: … experimental` to
+stderr on first use, so the handshake ignores the child's stderr entirely. A server that warns is not a
+server that failed, and treating any stderr output as an error would make `SV-05` red on every machine.
+
+### The contract: who generates it, and what it is for
+
+`packages/snowarch/dist/contract.json` is generated by `packages/snowarch/scripts/extract-tools.mjs` from the tool
+registrations themselves. Every tool declares `gate` and `mutates` in code — required fields on
+`ToolDefinition`, so a registration that omits one does not compile — and the contract is the emitted
+form of those declarations plus the flag table, the preset table and the error-code registry.
+
+It exists because the alternative was prose. The §2.1 approval list, the §2.2 update-set protocol and
+the doctor each need to know which tools mutate an instance and which flag gates them, and before this
+they each carried their own idea of it (P-36).
+
+Two properties make it worth pinning:
+
+- **Descriptions and input schemas are not in it.** They change for editorial reasons. A sha that moved
+  whenever someone improved a sentence would be pinned to nothing; this one moves when a `gate`, a
+  `mutates`, a table, a flag or an error code moves.
+- **The declaration cannot drift from the runtime.** `packages/snowarch/tests/contract.test.ts` (a) calls every tool with
+  all flags off and asserts the code it throws is the one its `gate` implies. Swap a
+  `requireScripting()` for a `requireWrite()` without touching the declaration and it fails.
+
+`./snowarch contract --sha` prints the sha256 and nothing else; ARC-05 pins against it and ARC-06's
+bootstrap compares it. ARC-05 completes this section with the generators that read the file.
 
 ## History
 

@@ -140,7 +140,7 @@ Record-triggered flow that fires on state transition, then has a Wait For Durati
 
 ### §1.1 Baseline-First — overrides all other patterns where in conflict
 
-Per `governance-rules.md` §1.1, you may not propose, design, or create any of the following without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope:
+Per `governance/governance-rules.md` §1.1, you may not propose, design, or create any of the following without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope:
 
 - A new custom table (any `x_*_*` table or any non-baseline `<scope>_<table>`).
 - A new scoped application (any new `x_<vendor>_<app>` scope).
@@ -154,7 +154,7 @@ Per `governance-rules.md` §1.1, you may not propose, design, or create any of t
 **Halt protocol.** If you conclude — after honest baseline evaluation — that a custom object is genuinely the only viable technical path, you must halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the Chief Architect containing:
 
 1. **Baseline option evaluated** — what baseline construct was considered and why it falls short.
-2. **Custom object proposed** — the smallest possible scope per the hierarchy in `governance-rules.md` §1.1.
+2. **Custom object proposed** — the smallest possible scope per the hierarchy in `governance/governance-rules.md` §1.1.
 3. **Consequences of approval** — data model, deployment, support, upgrade-risk impact.
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround.
 

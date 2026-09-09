@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function incidentToolManifest() {
+export function incidentToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_inc_incident_add',
@@ -26,6 +27,9 @@ export function incidentToolManifest() {
         },
         required: ['short_description'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'incident',
     },
     {
       name: 'snow_inc_incident_read',
@@ -37,6 +41,8 @@ export function incidentToolManifest() {
         },
         required: ['number_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_inc_incident_modify',
@@ -49,6 +55,9 @@ export function incidentToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'incident',
     },
     {
       name: 'snow_inc_incident_resolve',
@@ -62,6 +71,9 @@ export function incidentToolManifest() {
         },
         required: ['sys_id', 'resolution_code', 'resolution_notes'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'incident',
     },
     {
       name: 'snow_inc_incident_close',
@@ -73,6 +85,9 @@ export function incidentToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'incident',
     },
     {
       name: 'snow_inc_work_note_annotate',
@@ -86,6 +101,8 @@ export function incidentToolManifest() {
         },
         required: ['table', 'sys_id', 'note'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_inc_comment_annotate',
@@ -99,6 +116,8 @@ export function incidentToolManifest() {
         },
         required: ['table', 'sys_id', 'comment'],
       },
+      gate: 'write',
+      mutates: true,
     },
   ];
 }

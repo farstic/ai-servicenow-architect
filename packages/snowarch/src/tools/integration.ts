@@ -6,8 +6,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite, requireScripting } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function integrationToolManifest() {
+export function integrationToolManifest(): ToolDefinition[] {
   return [
     // ── Outbound REST Messages ───────────────────────────────────────────────
     {
@@ -21,6 +22,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_rest_message_read',
@@ -32,6 +35,8 @@ export function integrationToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_rest_message_functions_index',
@@ -44,6 +49,8 @@ export function integrationToolManifest() {
         },
         required: ['rest_message_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_rest_message_add',
@@ -62,6 +69,8 @@ export function integrationToolManifest() {
         },
         required: ['name', 'endpoint'],
       },
+      gate: 'write',
+      mutates: true,
     },
     // ── Transform Maps ──────────────────────────────────────────────────────
     {
@@ -76,6 +85,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_transform_map_read',
@@ -87,6 +98,8 @@ export function integrationToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_transform_map_exec',
@@ -99,6 +112,8 @@ export function integrationToolManifest() {
         },
         required: ['transform_map_sys_id', 'import_set_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_intg_transform_field_maps_index',
@@ -111,6 +126,8 @@ export function integrationToolManifest() {
         },
         required: ['transform_map_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── Import Sets ─────────────────────────────────────────────────────────
     {
@@ -125,6 +142,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_import_set_read',
@@ -136,6 +155,8 @@ export function integrationToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_import_set_row_add',
@@ -151,6 +172,8 @@ export function integrationToolManifest() {
         },
         required: ['staging_table', 'data'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_intg_data_sources_index',
@@ -164,6 +187,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── Event Registry & Management ─────────────────────────────────────────
     {
@@ -177,6 +202,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_event_registry_entry_read',
@@ -188,19 +215,28 @@ export function integrationToolManifest() {
         },
         required: ['name_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_event_register',
-      description: 'Register a new custom event in the event registry (requires SCRIPTING_ENABLED=true)',
+      description: 'Register a new custom event in the event registry. The name is written '
+        + 'to event_name (the matching key on sysevent_register) and suffix is derived from '
+        + 'everything after the first dot segment. Requires SCRIPTING_ENABLED=true.',
       inputSchema: {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'Unique event name (e.g. "my_app.record_created")' },
           description: { type: 'string', description: 'Description of when this event fires' },
           table: { type: 'string', description: 'Table that fires this event (e.g. "incident")' },
+          fired_by: { type: 'string', description: 'What fires this event (e.g. "Business Rule: Duplicate detection")' },
         },
         required: ['name', 'table'],
       },
+      gate: 'scripting',
+      // It calls createRecord on sysevent_register. Declared `false` until ARC-04-S09,
+      // which left it out of the generated §2.1 ask-list — a write that never prompted.
+      mutates: true,
     },
     {
       name: 'snow_intg_event_fire',
@@ -216,6 +252,8 @@ export function integrationToolManifest() {
         },
         required: ['event_name', 'table', 'record_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_intg_event_log_index',
@@ -232,6 +270,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ── OAuth & Credentials ─────────────────────────────────────────────────
     {
@@ -245,6 +285,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_intg_credential_aliases_index',
@@ -258,6 +300,8 @@ export function integrationToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }
@@ -428,13 +472,26 @@ export async function dispatchIntegrationAction(
     case 'snow_intg_event_register': {
       requireScripting();
       if (!args.name || !args.table) throw new ServiceNowError('name and table are required', 'INVALID_REQUEST');
+      // `event_name`, not `name`. `sysevent_register`'s matching key is `event_name`; the `name`
+      // column exists but is not what the platform matches on, so a row written with only `name`
+      // registered nothing usable and read back with an empty `event_name` (field-notes §4).
+      // `suffix` is everything after the first dot segment, the convention the UI applies — a
+      // single-segment name has no suffix, and the empty string is correct rather than a
+      // fallback to the whole name.
+      const eventName = String(args.name);
       const data = {
-        name: args.name,
+        event_name: eventName,
         table: args.table,
         description: args.description || '',
+        suffix: eventName.split('.').slice(1).join('.'),
+        fired_by: args.fired_by || '',
       };
       const result = await client.createRecord('sysevent_register', data);
-      return { ...result, summary: `Registered event "${args.name}" for table "${args.table}"` };
+      return {
+        ...result,
+        event_name: eventName,
+        summary: `Registered event "${eventName}" for table "${args.table}"`,
+      };
     }
     case 'snow_intg_event_fire': {
       requireWrite();

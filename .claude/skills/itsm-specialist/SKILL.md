@@ -75,7 +75,7 @@ If a path you need is not available in the Australia branch, flag it explicitly:
 
 ## §1.1 Baseline-First — overrides all other patterns where in conflict
 
-Per `governance-rules.md` §1.1, you may not ratify any of the following without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope:
+Per `governance/governance-rules.md` §1.1, you may not ratify any of the following without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope:
 
 - A new custom table (any `x_*_*` table or any non-baseline `<scope>_<table>`).
 - A new scoped application (any new `x_<vendor>_<app>` scope).
@@ -161,7 +161,7 @@ One of three verdicts. Citation discipline per the SKILL governance.
 `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` with the four-part structure:
 
 1. **Baseline option evaluated** — what baseline construct was considered, and why it falls short for this specific requirement. Citations required.
-2. **Custom object proposed** — smallest possible scope per the hierarchy in `governance-rules.md` §1.1.
+2. **Custom object proposed** — smallest possible scope per the hierarchy in `governance/governance-rules.md` §1.1.
 3. **Consequences of approval** — data model impact, deployment dependency, support cost, platform-upgrade risk.
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround, baseline-only path with documented gaps.
 
@@ -246,11 +246,11 @@ Universal ITSM anti-patterns (always include if the relevant concept is in scope
 
 **Tables:** `contract_sla` (SLA definitions), `task_sla` (per-task SLA progress), `business_calendar_table` (business hours).
 
-**Baseline stage vocabulary on `task_sla.stage`:** `in_progress`, `paused`, `breached`, `complete`, `cancelled`. **Note:** the baseline value is `complete` (no -ed) — `completed` is a common misspelling that returns zero rows in queries.
+**Stages a Task SLA moves through**, as the docs name them: **In Progress**, **Paused**, **Achieved**, **Breached**, **Completed**, **Cancelled** (citation: `markdown/it-service-management/service-level-management/c_SLAProcessing.md`; **Achieved** and **Breached** together in `markdown/it-service-management/service-level-management/sla-timer.md`). **These are the labels the documentation uses; it does not publish the stored values.** Check the choice list on the instance before writing a query against `task_sla.stage`, and never assume the stored value is the label lower-cased.
 
-**Breach behaviour:** when `task_sla.business_percentage` reaches 100 and the linked task hasn't met its stop condition, `task_sla.has_breached` = true and `task_sla.stage` = `breached`.
+**Breach behaviour:** when the SLA's duration elapses without the task meeting its stop condition, the Task SLA for that record has **Has Breached** set to **true** and its stage becomes **Breached** (citation: `markdown/it-service-management/service-level-management/t_SLAProcessExample.md`). `has_breached` is the reliable predicate — it is a boolean the docs state directly, where the stage is a label whose stored value they do not give.
 
-*Citation:* `markdown/it-service-management/service-level-management/service-level-management-concepts.md`
+*Citations:* `markdown/it-service-management/service-level-management/service-level-management-concepts.md` · `markdown/it-service-management/service-level-management/c_SLAProcessing.md` · `markdown/it-service-management/service-level-management/t_SLAProcessExample.md` · `markdown/it-service-management/service-level-management/sla-timer.md`
 
 ### Assignment and routing
 

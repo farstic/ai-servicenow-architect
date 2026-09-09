@@ -19,7 +19,10 @@ node_modules/
 # named node_modules, which pnpm and some yarn layouts create. Both forms are listed on purpose
 # (ARC-01-S05, measured: `git status` reported `?? node_modules` with only the slashed form).
 node_modules
-packages/snowarch/dist/
+# packages/snowarch/dist/ is NOT ignored (ARC-04-S13). The compiled server is committed so that
+# a clone plus `npm ci` is a runnable live install with no build step — and CI rebuilds it and
+# diffs it, which is the only thing that makes a committed build artefact honest. Never edit it
+# by hand: run `node scripts/build-dist.mjs`.
 *.tsbuildinfo
 coverage/
 
@@ -36,3 +39,8 @@ scratchpad/
 diagram-preview/
 node-compile-cache/
 .t01/
+
+# ARC-04-S12: the doctor's criterion-5 test copies dist/ here so it can edit contract.json
+# without racing tests/contract.test.ts, which reads the real one in a parallel worker. Removed
+# in a finally; listed so a killed run leaves nothing tracked.
+packages/snowarch/.tmp-doctor-dist/

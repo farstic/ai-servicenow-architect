@@ -39,7 +39,8 @@
       "required": [
         "serverKey",
         "package",
-        "packageDir"
+        "packageDir",
+        "permissions"
       ],
       "properties": {
         "serverKey": {
@@ -54,6 +55,29 @@
         "packageDir": {
           "type": "string",
           "pattern": "^packages/[a-z0-9-]+$"
+        },
+        "permissions": {
+          "description": "How the generated permission blocks in .claude/settings.json are written. allowStyle \"explicit\" lists one entry per read tool \u2014 deterministic and lint-checkable; \"glob\" is implemented and tested but not selected, because a glob buys nothing worth a matching bug. askStyle \"ask\" prompts on every mutating tool; \"deny-with-hook\" is the S-18 fallback.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allowStyle",
+            "askStyle"
+          ],
+          "properties": {
+            "allowStyle": {
+              "enum": [
+                "explicit",
+                "glob"
+              ]
+            },
+            "askStyle": {
+              "enum": [
+                "ask",
+                "deny-with-hook"
+              ]
+            }
+          }
         }
       }
     },
@@ -134,6 +158,14 @@
         "agents": {
           "type": "integer",
           "minimum": 1
+        },
+        "utility": {
+          "description": "Skill directories that are tooling rather than a specialist persona \u2014 the /snowarch skill. They are excluded from the roster count, listed in their own table by gen-roster.mjs, and exempt from the persona rules (EXAMPLES.md, the ## Triggers section). One source for all of them.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
         }
       }
     }

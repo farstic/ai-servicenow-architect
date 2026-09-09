@@ -1,0 +1,120 @@
+name: docs-real
+
+# The recipe against the real corpus, on all three operating systems.
+#
+# `ci.yml` proves the docs code with fixtures in seconds. This proves the thing fixtures cannot: that
+# a 300 MB sparse blobless checkout of somebody else's repository actually lands, on Windows as well
+# as on Unix, with every cited area present and no dead citation. It needs the network and about a
+# minute per OS, so it is NOT one of `main`'s required contexts — it runs weekly, on demand, and
+# whenever the code or configuration that decides the checkout changes.
+#
+# Before ARC-06 there is no launcher; the steps call `node scripts/…` directly.
+
+on:
+  schedule:
+    - cron: '41 4 * * 2'          # Tuesdays, a day after the bump, so a fresh pin gets exercised
+  workflow_dispatch:
+  pull_request:
+    # Written out twice rather than shared by a YAML anchor: actionlint's schema check does not
+    # follow an alias here ("paths section must be sequence node but got alias node"), and a
+    # suppressed linter is worse than a repeated list. `tests/workflows.test.mjs` asserts the two
+    # copies are identical, so the duplication cannot drift.
+    paths:
+      - 'tools/snowarch/lib/docs/**'
+      - 'scripts/docs.mjs'
+      - 'scripts/ci/assert-docs.mjs'
+      - 'vendor/docs-areas.txt'
+      - '.gitmodules'
+      - 'engine.config.json'
+      - '.github/workflows/docs-real.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'tools/snowarch/lib/docs/**'
+      - 'scripts/docs.mjs'
+      - 'scripts/ci/assert-docs.mjs'
+      - 'vendor/docs-areas.txt'
+      - '.gitmodules'
+      - 'engine.config.json'
+      - '.github/workflows/docs-real.yml'
+
+concurrency:
+  group: docs-real-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read                  # it reads a corpus and writes nothing, here or anywhere
+
+jobs:
+  real:
+    name: ${{ matrix.os }}${{ matrix.git-bash && ' (Git Bash on PATH)' || '' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false            # one OS failing is a finding about that OS, not a reason to hide the others
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        git-bash: [false]
+        include:
+          # AC 5: the same Windows job with Git Bash left on PATH. If the recipe ever grew a
+          # dependency on bash, this cell would be the one that passes and the stripped one that
+          # fails — which is the comparison worth having.
+          - os: windows-latest
+            git-bash: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+
+      - name: Remove every long-path setting the image may have shipped with
+        if: runner.os == 'Windows' && !matrix.git-bash
+        shell: pwsh
+        run: |
+          # Hosted Windows images sometimes ship `core.longpaths=true` at system level, which would
+          # make the recipe look correct without it having set anything. Cleared first — failures
+          # ignored, because "it was not set" is the state we want either way.
+          git config --system --unset core.longpaths 2>$null
+          git config --global --unset core.longpaths 2>$null
+          "system: $(git config --system --get core.longpaths)"
+          "global: $(git config --global --get core.longpaths)"
+          # `git config --get` exits 1 when the key is NOT SET — which is precisely the state this
+          # step exists to produce. PowerShell propagates the last exit code, so the step failed on
+          # its own success. Caught by this workflow's first real run, which is what it is for.
+          exit 0
+
+      - name: Take Git Bash off PATH
+        if: runner.os == 'Windows' && !matrix.git-bash
+        shell: pwsh
+        run: |
+          # The recipe must work for a Windows user who installed git without the Unix tools. The
+          # removed entries are logged: a silent PATH edit is impossible to review later.
+          $before = $env:PATH -split ';'
+          $removed = $before | Where-Object { $_ -match 'Git\\usr\\bin' -or $_ -match 'Git\\bin' }
+          $kept    = $before | Where-Object { $_ -notmatch 'Git\\usr\\bin' -and $_ -notmatch 'Git\\bin' }
+          "removed from PATH:"; $removed | ForEach-Object { "  $_" }
+          # `Add-Content`, not `Out-File` with both a pipeline and -InputObject — that is a
+          # PowerShell error, and it is what the first run of this workflow failed on.
+          Add-Content -Path $env:GITHUB_ENV -Value "PATH=$($kept -join ';')"
+          # ...and in THIS process too, or the lines below report the PATH as it was: `$GITHUB_ENV`
+          # applies to SUBSEQUENT steps, so a check written here would measure the state the strip
+          # was meant to replace. Third shell trap in this one step, and the same shape as the first
+          # two — the log claiming something the mechanism had not yet done.
+          $env:PATH = $kept -join ';'
+          # Recorded, not asserted: the hosted image carries a second bash outside Git's directories
+          # (System32), so this prints True even here. What the strip removes is GIT BASH and the
+          # Unix tools that come with it — which is what a Windows user who installed git without
+          # them would lack. The job proves the recipe under that condition; it cannot prove a
+          # machine with no bash at all, and says so rather than implying it.
+          "bash still reachable (expected True — System32 carries one): $([bool](Get-Command bash -ErrorAction SilentlyContinue))"
+          "git bash reachable: $([bool](Get-Command bash -ErrorAction SilentlyContinue | Where-Object { $_.Source -match 'Git' }))"
+
+      # ONE step, and the platform's DEFAULT shell — pwsh on Windows, bash elsewhere. Every step
+      # here used to say `shell: bash`, which on Windows means Git Bash and made the PATH-stripped
+      # cell prove nothing: `shell: bash` resolves independently of PATH. There is no shell logic
+      # left to depend on; the retry, the timing and the assertions are all in Node.
+      - name: Sync, verify and assert the real corpus
+        run: node scripts/ci/assert-docs.mjs

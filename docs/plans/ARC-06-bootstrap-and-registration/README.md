@@ -27,7 +27,7 @@ Closes P-01 (two clones + hand-edited `~/.claude.json` with a plaintext password
 
 ## Dependencies
 
-ARC-03 (B02 recipe and areas file), ARC-04 (server that starts unconfigured; committed `dist/`), ARC-05 (contract sha for B05; permission block). ARC-00 spike verdicts for S-01, S-03, S-05, S-08, S-09, S-15, S-16, S-20. **Entry gate (D-06 hedge):** S-14a–g concluded within their time-box and ADR-0006 resolved — "monorepo path confirmed", or ADR-0008 re-opening the channel — before S01 starts (ARC-00-S12/S14 gate sign-off).
+ARC-03 (B02 recipe and areas file), ARC-04 (server that starts unconfigured; committed `dist/`), ARC-05 (contract sha for B05; permission block). ARC-00 spike verdicts for S-01, S-03, S-05, S-08, S-09, S-15, S-16, S-20. **Entry gate (D-06 hedge): SATISFIED 2026-09-08.** S-14a–g concluded within their time-box and **ADR-0006 is Accepted — "monorepo path confirmed"**, on the evidence in `03` §F: four of the seven came back as silent failures rather than refusals (secure storage macOS-only, the bundled server invisible to `claude mcp`, blank and unset indistinguishable, a scaffolded settings file installing nothing for a teammate, and the plugin cache truncating an install while reporting success). S-14f and S-19 confirmed — the channel is viable for validation, not yet for distribution, so it stays spiked rather than closed. S01 may start.
 
 ## Acceptance criteria
 

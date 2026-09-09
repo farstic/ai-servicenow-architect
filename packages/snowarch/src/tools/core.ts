@@ -17,8 +17,10 @@ import type {
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
 import { instanceManager } from '../servicenow/instances.js';
+import { currentCapabilities, reloadInstances, serverStatus } from './status.js';
+import type { ToolDefinition } from './types.js';
 
-export function coreToolManifest() {
+export function coreToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_core_records_query',
@@ -34,6 +36,8 @@ export function coreToolManifest() {
         },
         required: ['table'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_table_schema_read',
@@ -45,6 +49,8 @@ export function coreToolManifest() {
         },
         required: ['table'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_record_read',
@@ -58,6 +64,8 @@ export function coreToolManifest() {
         },
         required: ['table', 'sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_record_add',
@@ -70,6 +78,8 @@ export function coreToolManifest() {
         },
         required: ['table', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_core_record_modify',
@@ -83,6 +93,8 @@ export function coreToolManifest() {
         },
         required: ['table', 'sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_core_record_remove',
@@ -95,6 +107,8 @@ export function coreToolManifest() {
         },
         required: ['table', 'sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_core_user_read',
@@ -106,6 +120,8 @@ export function coreToolManifest() {
         },
         required: ['user_identifier'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_group_read',
@@ -117,6 +133,8 @@ export function coreToolManifest() {
         },
         required: ['group_identifier'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_cmdb_ci_query',
@@ -129,6 +147,8 @@ export function coreToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_cmdb_ci_read',
@@ -141,6 +161,8 @@ export function coreToolManifest() {
         },
         required: ['ci_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_relationships_index',
@@ -152,6 +174,8 @@ export function coreToolManifest() {
         },
         required: ['ci_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_discovery_schedules_index',
@@ -163,6 +187,8 @@ export function coreToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_mid_servers_index',
@@ -174,6 +200,8 @@ export function coreToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_active_events_index',
@@ -186,11 +214,15 @@ export function coreToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_health_dashboard_read',
       description: 'Get CMDB data quality metrics (completeness of server and network CI data)',
       inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_service_mapping_summary_read',
@@ -202,6 +234,8 @@ export function coreToolManifest() {
         },
         required: ['service_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_natural_language_query',
@@ -214,6 +248,8 @@ export function coreToolManifest() {
         },
         required: ['query'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_natural_language_modify',
@@ -226,11 +262,39 @@ export function coreToolManifest() {
         },
         required: ['instruction', 'table'],
       },
+      gate: 'write',
+      mutates: true,
+    },
+    {
+      // The three tools below need NO instance: they describe the server's own state, and
+      // they are what a session has to fall back on when nothing is configured. Gate `none`
+      // and mutates false — ARC-04-S06 formalises those fields on every tool.
+      name: 'snow_core_status_read',
+      description: "Report the server's own state: mode, which store was used, which instances loaded or were refused, and how many tools are advertised. Needs no instance.",
+      inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
+    },
+    {
+      name: 'snow_core_capabilities_read',
+      description: "Report the current instance's preset, flags and effective flags. Never returns a username or a secret.",
+      inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
+    },
+    {
+      name: 'snow_core_instances_reload',
+      description: 'Re-read the instance store from disk and re-advertise the tool list. Use after adding an instance in another terminal, instead of restarting.',
+      inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_instances_index',
       description: 'List all configured ServiceNow instances (multi-instance / multi-customer support)',
       inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_instance_switch',
@@ -242,11 +306,30 @@ export function coreToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'none',
+      // `false`, and this is not an oversight — it is an unresolved gap, raised by ARC-04-S09.
+      //
+      // It changes no ServiceNow record, so `mutates: true` would break contract test (c)
+      // ("a tool that mutates is never ungated") unless it were also given a write gate, and
+      // gating it would stop a read-only session from switching instances to READ another one.
+      // But `03` S-23 names it among the 14 that must appear in the §2.1 ask-list, and that
+      // list is generated from this field — so as things stand, redirecting where every
+      // subsequent write lands is the one action that does not prompt.
+      //
+      // Resolved in ARC-04-S10: `mutates` keeps meaning "changes ServiceNow records" and
+      // `sessionMutates` carries the other meaning, so the ask-list generator unions the two
+      // (ARC-05-S07) without changing what gate (c) enforces. This is the only tool that
+      // declares it — `snow_core_instances_reload` is deliberately left out, because ARC-07's
+      // `--resume` depends on it not prompting.
+      mutates: false,
+      sessionMutates: true,
     },
     {
       name: 'snow_core_current_instance_read',
       description: 'Get the currently active ServiceNow instance name and URL',
       inputSchema: { type: 'object', properties: {}, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_ci_relationship_add',
@@ -260,6 +343,8 @@ export function coreToolManifest() {
         },
         required: ['parent', 'child', 'type'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_core_analysis_impact',
@@ -272,6 +357,8 @@ export function coreToolManifest() {
         },
         required: ['ci_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_core_discovery_scan_exec',
@@ -284,6 +371,8 @@ export function coreToolManifest() {
         },
         required: ['schedule_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
   ];
 }
@@ -375,9 +464,19 @@ export async function dispatchCoreAction(
       requireWrite();
       return await client.naturalLanguageUpdate(args.instruction, args.table);
 
+    case 'snow_core_status_read':
+      return serverStatus();
+
+    case 'snow_core_capabilities_read':
+      return currentCapabilities();
+
+    case 'snow_core_instances_reload':
+      return reloadInstances();
+
     case 'snow_core_instances_index':
       return {
-        current: instanceManager.getCurrentName(),
+        current: instanceManager.loadedCount() > 0 ? instanceManager.getCurrentName() : null,
+        mode: instanceManager.loadedCount() > 0 ? 'configured' : 'unconfigured',
         instances: instanceManager.listAll(),
         total: instanceManager.listNames().length,
       };
@@ -392,11 +491,15 @@ export async function dispatchCoreAction(
       };
 
     case 'snow_core_current_instance_read':
-      return {
-        name: instanceManager.getCurrentName(),
-        url: instanceManager.getCurrentUrl(),
-        all_instances: instanceManager.listNames(),
-      };
+      // Returns a shape rather than throwing when nothing is loaded: this is one of the
+      // five tools a session has while unconfigured, and its job is to say so.
+      return instanceManager.loadedCount() === 0
+        ? { name: null, mode: 'unconfigured', all_instances: [] }
+        : {
+          name: instanceManager.getCurrentName(),
+          url: instanceManager.getCurrentUrl(),
+          all_instances: instanceManager.listNames(),
+        };
 
     case 'snow_core_ci_relationship_add': {
       requireWrite();

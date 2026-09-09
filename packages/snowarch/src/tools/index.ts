@@ -58,6 +58,7 @@ import { vaToolManifest, dispatchVaAction } from './va.js';
 import { itamToolManifest, dispatchItamAction } from './itam.js';
 // DevOps & pipeline tracking
 import { devopsToolManifest, dispatchDevopsAction } from './devops.js';
+import type { ToolDefinition } from './types.js';
 // Scoped Application (App Studio)
 import { appStudioToolManifest, dispatchAppStudioAction } from './app-studio.js';
 // Machine Learning & Predictive Intelligence
@@ -79,8 +80,7 @@ import { cmdbReconciliationToolManifest, dispatchCmdbReconciliationAction } from
 // Orchestration (playbooks)
 import { orchestrationToolManifest, dispatchOrchestrationAction } from './orchestration.js';
 // Dynamic Schema Discovery
-import { discoveryToolManifest, dispatchDiscoveryAction, dispatchDynamicAction } from './discovery.js';
-import { schemaCache } from './schema-cache.js';
+import { discoveryToolManifest, dispatchDiscoveryAction } from './discovery.js';
 
 // ─── Package Definitions ──────────────────────────────────────────────────────
 
@@ -174,7 +174,7 @@ export const ROLE_BUNDLE_MAP: Record<string, string[]> = {
     'snow_cfg_get_properties_bulk', 'snow_cfg_set_properties_bulk', 'snow_cfg_property_categories_index',
     'snow_us_current_update_set_read', 'snow_us_update_sets_index',
     'snow_us_update_set_add', 'snow_us_update_set_switch', 'snow_us_update_set_complete', 'snow_us_update_set_preview', 'snow_us_active_update_set_ensure',
-    'snow_rpt_scheduled_report_add', 'snow_rpt_kpi_add', 'snow_rpt_report_generate',
+    'snow_rpt_scheduled_report_add', 'snow_rpt_kpi_add',
     // v4.0 additions
     'snow_cmdb_duplicates_query', 'snow_cmdb_orphans_query', 'snow_cmdb_stale_query', 'snow_cmdb_reconcile',
     'snow_disco_table_discover',
@@ -190,7 +190,7 @@ export const ROLE_BUNDLE_MAP: Record<string, string[]> = {
     'snow_scr_acls_index', 'snow_scr_acl_read', 'snow_scr_acl_add', 'snow_scr_acl_modify',
     'snow_scr_changesets_index', 'snow_scr_changeset_read', 'snow_scr_changeset_commit', 'snow_scr_changeset_publish',
     'snow_atf_atf_suites_index', 'snow_atf_atf_suite_read', 'snow_atf_atf_suite_exec', 'snow_atf_atf_tests_index', 'snow_atf_atf_test_read', 'snow_atf_atf_test_exec', 'snow_atf_atf_suite_result_read', 'snow_atf_atf_test_results_index', 'snow_atf_atf_failure_insight_read',
-    'snow_fluent_query', 'snow_fluent_request_batch', 'snow_fluent_script_exec', 'snow_rpt_report_generate',
+    'snow_fluent_query', 'snow_fluent_request_batch', 'snow_fluent_script_exec',
     // v4.0 Fluent SDK + discovery
     'snow_fluent_explain', 'snow_fluent_init', 'snow_fluent_build', 'snow_fluent_validate',
     'snow_disco_table_discover',
@@ -217,7 +217,7 @@ export const ROLE_BUNDLE_MAP: Record<string, string[]> = {
     'snow_na_nlq_query', 'snow_na_ai_query', 'snow_na_summary_generate', 'snow_na_resolution_suggest', 'snow_na_incident_categorize',
     'snow_na_virtual_agent_topics_read', 'snow_na_agentic_playbook_trigger', 'snow_na_ms_copilot_topics_read', 'snow_na_work_notes_generate', 'snow_na_pi_models_read',
     'snow_kb_knowledge_query', 'snow_kb_knowledge_article_read',
-    'snow_fluent_query', 'snow_fluent_request_batch', 'snow_fluent_script_exec', 'snow_rpt_report_generate',
+    'snow_fluent_query', 'snow_fluent_request_batch', 'snow_fluent_script_exec',
     // v4.0 additions
     'snow_nas_now_assist_skill_add', 'snow_nas_now_assist_skills_index', 'snow_nas_now_assist_skill_read', 'snow_nas_now_assist_skill_test',
     'snow_ai_ai_agent_add', 'snow_ai_ai_agents_index', 'snow_ai_ai_agent_read', 'snow_ai_agentic_workflow_add',
@@ -229,7 +229,7 @@ export const ROLE_BUNDLE_MAP: Record<string, string[]> = {
 
 // ─── All Tool Definitions ─────────────────────────────────────────────────────
 
-const ALL_TOOLS = [
+const ALL_TOOLS: ToolDefinition[] = [
   ...coreToolManifest(),
   ...incidentToolManifest(),
   ...problemToolManifest(),
@@ -271,22 +271,41 @@ const ALL_TOOLS = [
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export function collectToolCatalog() {
-  const packageName = (process.env.MCP_TOOL_PACKAGE || 'full').toLowerCase();
-  const dynamicTools = schemaCache.getGeneratedTools();
-
-  if (packageName === 'full') {
-    return [...ALL_TOOLS, ...dynamicTools];
-  }
-
-  const allowed = ROLE_BUNDLE_MAP[packageName];
+/**
+ * The catalogue. Computed once at module load and returned as the SAME array every time.
+ *
+ * It used to append `schemaCache.getGeneratedTools()` — tools invented at runtime from a
+ * discovered table's columns. That made `tools/list` answer differently depending on what had
+ * been called earlier in the session: a client that cached the list held a stale one, and a
+ * tool could appear that no contract, no test and no documentation had ever seen. The
+ * contract (ARC-04-S06) cannot describe a catalogue that changes shape, so the catalogue does
+ * not change shape. `snow_disco_table_discover` still discovers columns; it just returns them
+ * as data instead of minting tools.
+ */
+/**
+ * The role-bundle filter, exported as a pure function of (tools, package name).
+ *
+ * Separated from the constant below so the bundles can be tested without a test setting an
+ * environment variable and calling `collectToolCatalog()` again — which is what the suite used
+ * to do, and which now proves nothing, because re-reading the environment is exactly the
+ * behaviour that was removed.
+ */
+export function selectPackage(all: ToolDefinition[], packageName: string): ToolDefinition[] {
+  const key = (packageName || 'full').toLowerCase();
+  if (key === 'full') return all;
+  const allowed = ROLE_BUNDLE_MAP[key];
   if (!allowed) {
     console.error(`[WARN] Unknown MCP_TOOL_PACKAGE "${packageName}". Using "full".`);
-    return [...ALL_TOOLS, ...dynamicTools];
+    return all;
   }
-
   const allowedSet = new Set(allowed);
-  return [...ALL_TOOLS.filter(t => allowedSet.has(t.name)), ...dynamicTools];
+  return all.filter((t) => allowedSet.has(t.name));
+}
+
+const CATALOGUE: ToolDefinition[] = selectPackage(ALL_TOOLS, process.env.MCP_TOOL_PACKAGE || 'full');
+
+export function collectToolCatalog(): ToolDefinition[] {
+  return CATALOGUE;
 }
 
 export async function routeToolInvocation(
@@ -333,7 +352,6 @@ export async function routeToolInvocation(
     () => dispatchCmdbReconciliationAction(client, name, args),
     () => dispatchOrchestrationAction(client, name, args),
     () => dispatchDiscoveryAction(client, name, args),
-    () => dispatchDynamicAction(client, name, args),
   ];
 
   for (const handler of handlers) {

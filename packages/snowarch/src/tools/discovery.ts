@@ -1,39 +1,47 @@
 /**
- * Dynamic Schema Discovery tool — reads table schema at runtime and generates
- * ad-hoc CRUD tools for any ServiceNow table.
+ * Table schema discovery: what are this table's columns?
  *
- * Tools:
- *   discover_table — Discover a table's schema and register dynamic CRUD tools
+ * It used to do more than that. `snow_disco_table_discover` MINTED tools — after discovering
+ * `u_widget` the session gained `dynamic_query_u_widget`, `dynamic_create_u_widget` and three
+ * more, dispatched by `dispatchDynamicAction` and named by `buildToolNames`. ARC-04-S08 removed
+ * all of it, because a catalogue that depends on what was called earlier in the session cannot
+ * be described by any contract, cannot be cached by any client, and — the part that matters for
+ * the gates — mints WRITE tools whose gating lives in a code path no parity test walks, since
+ * the names do not exist until runtime.
+ *
+ * What replaces them is not smaller: the columns come back as DATA, and the caller uses
+ * `snow_core_records_query`, `snow_core_record_add` and their siblings, which are declared,
+ * gated, counted and in the contract. Same operations, on tools someone can audit.
  */
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { schemaCache, type ColumnSchema } from './schema-cache.js';
-import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function discoveryToolManifest() {
+export function discoveryToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_disco_table_discover',
       description:
-        'Discover a ServiceNow table schema and register dynamic CRUD tools for it. ' +
-        'After discovery, new tools become available: dynamic_query_<table>, dynamic_get_<table>, ' +
-        'dynamic_create_<table>, dynamic_update_<table>, dynamic_delete_<table>. ' +
-        'Schemas are cached for 30 minutes.',
+        'Read a ServiceNow table schema and return its columns (element, type, label, '
+        + 'max_length, mandatory, reference, read_only, default_value). Use the result to build '
+        + 'calls to snow_core_records_query / snow_core_record_read / snow_core_record_add. '
+        + 'Schemas are cached for 30 minutes.',
       inputSchema: {
         type: 'object',
         properties: {
           table: { type: 'string', description: 'Table name to discover (e.g., "u_custom_table")' },
-          operations: {
-            type: 'array',
-            description: 'Operations to enable: query, get, create, update, delete. Default: all.',
-            items: { type: 'string', enum: ['query', 'get', 'create', 'update', 'delete'] },
-          },
         },
         required: ['table'],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }
+
+const minutesLeft = (cachedAt: number, ttlMs: number): number =>
+  Math.round((ttlMs - (Date.now() - cachedAt)) / 60000);
 
 export async function dispatchDiscoveryAction(
   client: ServiceNowClient,
@@ -47,19 +55,19 @@ export async function dispatchDiscoveryAction(
     throw new ServiceNowError('table is required', 'INVALID_REQUEST');
   }
 
-  // Check cache first
   const cached = schemaCache.get(table);
   if (cached) {
     return {
       table,
       source: 'cache',
-      columns: cached.columns.length,
-      available_tools: cached.generatedToolNames,
-      cache_expires_in_minutes: Math.round((cached.ttlMs - (Date.now() - cached.cachedAt)) / 60000),
+      // The columns themselves. This used to be `columns: cached.columns.length` beside an
+      // `available_tools` list — a caller was told how MANY columns there were and given tool
+      // names instead of the schema, so the one thing the tool is for had to be inferred.
+      columns: cached.columns,
+      cache_expires_in_minutes: minutesLeft(cached.cachedAt, cached.ttlMs),
     };
   }
 
-  // Query sys_dictionary for detailed schema
   const dictResult = await client.queryRecords({
     table: 'sys_dictionary',
     query: `name=${table}^elementISNOTEMPTY^internal_type!=collection`,
@@ -68,15 +76,17 @@ export async function dispatchDiscoveryAction(
   });
 
   if (dictResult.count === 0) {
-    // Fallback: try to query the table directly to verify it exists
+    // sys_dictionary can be empty for a table the account can read rows of but not the
+    // dictionary of. Probing one row gives the column NAMES, which is less than the dictionary
+    // gives but more than nothing — and the `note` says which of the two happened, because a
+    // probe-derived `internal_type: 'string'` is a placeholder, not a finding.
     try {
       const probe = await client.queryRecords({ table, limit: 1 });
       if (probe.count === 0 && probe.records.length === 0) {
         throw new ServiceNowError(`Table "${table}" not found or has no schema`, 'NOT_FOUND');
       }
-      // Table exists but no sys_dictionary entries — build minimal schema from record keys
       const record = probe.records[0] || {};
-      const columns: ColumnSchema[] = Object.keys(record).map(key => ({
+      const probed: ColumnSchema[] = Object.keys(record).map((key) => ({
         element: key,
         internal_type: 'string',
         label: key,
@@ -86,15 +96,15 @@ export async function dispatchDiscoveryAction(
         default_value: undefined,
       }));
 
-      const toolNames = buildToolNames(table, args.operations);
-      schemaCache.set(table, columns, toolNames);
+      schemaCache.set(table, probed);
 
       return {
         table,
-        source: 'record_probe',
-        columns: columns.length,
-        available_tools: toolNames,
-        note: 'Schema derived from record structure (sys_dictionary unavailable)',
+        source: 'instance',
+        columns: probed,
+        cache_expires_in_minutes: minutesLeft(Date.now(), schemaCache.get(table)!.ttlMs),
+        note: 'Schema derived from record structure (sys_dictionary returned nothing for this '
+          + 'table); internal_type and max_length are placeholders, not the dictionary values.',
       };
     } catch (e) {
       if (e instanceof ServiceNowError) throw e;
@@ -102,7 +112,6 @@ export async function dispatchDiscoveryAction(
     }
   }
 
-  // Parse sys_dictionary results into ColumnSchema
   const columns: ColumnSchema[] = dictResult.records.map((r: any) => ({
     element: r.element,
     internal_type: r.internal_type || 'string',
@@ -114,88 +123,15 @@ export async function dispatchDiscoveryAction(
     default_value: r.default_value || undefined,
   }));
 
-  const toolNames = buildToolNames(table, args.operations);
-  schemaCache.set(table, columns, toolNames);
+  schemaCache.set(table, columns);
 
   return {
     table,
-    source: 'sys_dictionary',
-    columns: columns.length,
-    column_details: columns.slice(0, 20).map(c => ({
-      name: c.element,
-      type: c.internal_type,
-      label: c.label,
-      mandatory: c.mandatory,
-      reference: c.reference,
-    })),
-    available_tools: toolNames,
+    source: 'instance',
+    columns,
+    cache_expires_in_minutes: minutesLeft(Date.now(), schemaCache.get(table)!.ttlMs),
   };
 }
 
-/** Execute a dynamically discovered tool. */
-export async function dispatchDynamicAction(
-  client: ServiceNowClient,
-  name: string,
-  args: Record<string, any>
-): Promise<any> {
-  // Check if this is a dynamic tool
-  const match = name.match(/^dynamic_(query|get|create|update|delete)_(.+)$/);
-  if (!match) return null;
-
-  const operation = match[1]!;
-  const table = match[2]!;
-
-  // Verify schema is cached
-  const cached = schemaCache.get(table);
-  if (!cached) {
-    throw new ServiceNowError(
-      `Table "${table}" schema not cached. Run discover_table first.`,
-      'SCHEMA_NOT_CACHED'
-    );
-  }
-
-  switch (operation) {
-    case 'query': {
-      const limit = Math.min(args.limit || 20, 200);
-      return client.queryRecords({
-        table,
-        query: args.query,
-        fields: args.fields,
-        limit,
-        orderBy: args.orderBy,
-      });
-    }
-
-    case 'get': {
-      if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
-      return client.getRecord(table, args.sys_id, args.fields);
-    }
-
-    case 'create': {
-      requireWrite();
-      const { sys_id: _sysId, ...fields } = args; // eslint-disable-line @typescript-eslint/no-unused-vars
-      return client.createRecord(table, fields);
-    }
-
-    case 'update': {
-      requireWrite();
-      if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
-      const { sys_id, ...fields } = args;
-      return client.updateRecord(table, sys_id, fields);
-    }
-
-    case 'delete': {
-      requireWrite();
-      if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
-      return client.deleteRecord(table, args.sys_id);
-    }
-
-    default:
-      return null;
-  }
-}
-
-function buildToolNames(table: string, operations?: string[]): string[] {
-  const ops = operations || ['query', 'get', 'create', 'update', 'delete'];
-  return ops.map(op => `dynamic_${op}_${table}`);
-}
+// dispatchDynamicAction and buildToolNames were removed by ARC-04-S08 along with the
+// runtime-generated `dynamic_<op>_<table>` tools — see the file header.

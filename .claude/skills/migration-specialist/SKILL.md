@@ -52,7 +52,7 @@ If a needed path is unavailable in the Australia branch, flag explicitly: *"Cita
 
 ## §1.1 Baseline-First — overrides all other patterns where in conflict
 
-**Authoritative source:** `governance-rules.md` §1.1. Migration has a clean baseline toolchain, so §1.1 is usually satisfied — but three reflexes must be halted.
+**Authoritative source:** `governance/governance-rules.md` §1.1. Migration has a clean baseline toolchain, so §1.1 is usually satisfied — but three reflexes must be halted.
 
 **Configuration — NOT a §1.1 trigger:**
 - Data sources, import sets, the **auto-created staging table** (`sys_import_set_row` / `imp_*`), transform maps, field maps, **coalesce**, choice/reference resolution, transform scripts, scheduled imports.

@@ -1,6 +1,6 @@
 # Licensing & Entitlement Specialist — EXAMPLES
 
-Worked examples of the two modes. Illustrative scopes only — every SKU/tier/user-count claim must be confirmed against the engagement's real subscription before commitment (governance-rules.md §1.1 applies to any custom object referenced).
+Worked examples of the two modes. Illustrative scopes only — every SKU/tier/user-count claim must be confirmed against the engagement's real subscription before commitment (governance/governance-rules.md §1.1 applies to any custom object referenced).
 
 ---
 

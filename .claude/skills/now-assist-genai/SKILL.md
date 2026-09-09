@@ -37,7 +37,7 @@ If the request is *design/build it* → **Now Assist Specialist**. If it's *what
 | AI-native SKU overview (packaging/consumption) | `markdown/intelligent-experiences/ai-native-sku-overview.md` |
 | Now Assist Skill Kit (build custom skills) | `markdown/intelligent-experiences/now-assist-skill-kit/now-assist-skill-kit-landing.md` |
 | AI Control Tower (governance) | `markdown/intelligent-experiences/ai-control-tower/ai-control-tower-landing.md` |
-| AI Gateway (BYO-LLM / Generative AI Controller) | `markdown/intelligent-experiences/ai-control-tower/ai-gateway-overview.md` |
+| Third-party LLMs (BYO-LLM), model providers and data routing | `markdown/intelligent-experiences/ai-control-tower/configure-third-party-llms-using-ai-control-tower.md` · `markdown/intelligent-experiences/ai-control-tower/ai-model-providers.md` |
 | AI Agent Advisor / agentic | `markdown/intelligent-experiences/ai-agent-advisor-landing-page.md` |
 
 Cite the path used. If a path is unavailable in the Australia branch, flag it explicitly. **Do not assert version-sensitive capability claims from memory** — Now Assist evolves fast between releases; ground them or flag as "verify against the engagement's release."
@@ -48,7 +48,7 @@ Cite the path used. If a path is unavailable in the Australia branch, flag it ex
 - **Out-of-box Now Assist skills** (per domain) include — case/incident **summarization**, **resolution notes**, **chat/email reply** drafting, **knowledge-article generation**, **code generation** (for app builders), and **search/answers**. Enabled and tuned in the **Now Assist admin console / Now Assist Center**. *(citation: `configuring-now-assist.md`, `configure-a-now-assist-skill.md`)*
 - **Now Assist Skill Kit** lets teams build **custom** Now Assist skills with their own prompts and inputs/outputs over platform data. *(citation: `markdown/intelligent-experiences/now-assist-skill-kit/now-assist-skill-kit-landing.md`)*
 - **AI Agents / agentic** experiences (AI Agent Advisor, agentic workflows) orchestrate multi-step AI work with human-in-the-loop boundaries. *(citation: `markdown/intelligent-experiences/ai-agent-advisor-landing-page.md`)*
-- **AI Control Tower** is the governance surface — discover, monitor, manage, and audit AI features (ServiceNow and third-party) across the instance, including the AI Gateway for model routing. *(citation: `ai-control-tower/ai-control-tower-landing.md`, `ai-gateway-overview.md`)*
+- **AI Control Tower** is the governance surface — discover, monitor, manage, and audit AI features (ServiceNow and third-party) across the instance, including where third-party models are configured and routed. *(citation: `ai-control-tower/ai-control-tower-landing.md`, `ai-control-tower/configure-third-party-llms-using-ai-control-tower.md`)*
 
 ## §1.1 awareness
 

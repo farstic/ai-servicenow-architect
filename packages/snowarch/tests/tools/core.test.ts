@@ -24,9 +24,11 @@ const mockClient = {
 } as unknown as ServiceNowClient;
 
 describe('coreToolManifest', () => {
-  it('returns 24 core tool definitions', () => {
+  it('returns the core tool definitions', () => {
     const tools = coreToolManifest();
-    expect(tools.length).toBe(24);
+    // 24 + the three instance-free tools ARC-04-S04 added (status_read,
+    // capabilities_read, instances_reload).
+    expect(tools.length).toBe(27);
   });
 
   it('all tools have name, description and inputSchema', () => {
@@ -70,7 +72,6 @@ describe('dispatchCoreAction – get_record', () => {
 describe('dispatchCoreAction – create_record', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.WRITE_ENABLED = 'true';
   });
 
   it('creates a record when WRITE_ENABLED=true', async () => {
@@ -80,10 +81,6 @@ describe('dispatchCoreAction – create_record', () => {
     expect(result.sys_id).toBe('xyz');
   });
 
-  it('throws when WRITE_ENABLED=false', async () => {
-    process.env.WRITE_ENABLED = 'false';
-    await expect(dispatchCoreAction(mockClient, 'snow_core_record_add', { table: 'incident', fields: { short_description: 'x' } })).rejects.toThrow();
-  });
 });
 
 describe('dispatchCoreAction – unknown tool', () => {

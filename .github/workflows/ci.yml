@@ -1,12 +1,19 @@
 name: ci
 
-# `main` does not exist yet: by the owner's directive it is created only at a milestone merge
-# (ARC-01-S01's branch-model reconciliation, 2026-09-07). Until then the integration branch is
-# `develop` and the work lands on `arc-*/**`, so all three are triggers — a workflow that only
-# watched `main` would never run during ARC-01 and would be unprovable.
+# Two long-lived branches: `develop` integrates, and `main` (created at the M1 milestone merge,
+# 2026-09-08) is the release line. Both are push triggers because a commit reaches them by merge,
+# and a merge result nobody built is a result nobody has.
+#
+# Work branches are NOT push triggers. They were, and a push to one that already had a pull
+# request open started two full 25-job matrices for the same commit — which is not just twice the
+# CI bill: the two runs share a runner pool, and the contention made a server test's teardown race
+# a child process it had not waited for (2026-09-08, `macos-latest` / node 24, ENOTEMPTY). Every
+# work branch reaches CI through `pull_request` instead, which is where its result is read; the
+# process rule that makes that reliable is in docs/CONTRIBUTING.md — a story branch gets its draft
+# PR at first push.
 on:
   push:
-    branches: [main, develop, 'arc-*/**']
+    branches: [main, develop]
   pull_request: {}
 
 concurrency:
@@ -46,6 +53,103 @@ jobs:
       - run: npm run type-check
       - run: npm test
 
+  contract:
+    # The contract gate, on every cell. It SUBSUMES the old `dist-check` job: its first step is the
+    # same rebuild-and-diff, and three more follow — the server's own invariants, the generated
+    # texts, and the engine's pin. One command, the same one a developer and the release script
+    # run, so a failure here is reproducible with `npm run contract` rather than a CI-only ritual.
+    #
+    # Three OSes because Windows is where the LF rule earns its place: without `text eol=lf` in
+    # .gitattributes the checkout rewrites every line and step 1's diff is 100 % noise. Three Node
+    # lines because the generators and the gate are the code most likely to depend on a runtime
+    # detail — a path separator, a JSON key order, a newly available built-in.
+    #
+    # No `needs:`. There is no separate lint job to wait for — `npm run lint` runs inside `test` —
+    # and waiting for the whole nine-cell test matrix would double the critical path to save a
+    # fifteen-second job.
+    name: contract (${{ matrix.os }}, node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [20, 22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Show the attributes that make dist/ diffable
+        run: git check-attr -a packages/snowarch/dist/server.js
+      - run: npm run contract
+      - name: Explain a failure
+        if: failure()
+        # The gate already printed the failing step and its remedy. This adds the file names for
+        # the one failure whose output is a stat rather than a message.
+        run: |
+          echo "Reproduce locally with: npm run contract"
+          git diff --stat -- packages/snowarch/dist || true
+
+  no-build:
+    # The committed artefact, exercised with NO build step — the state a user is actually in
+    # after `git clone && npm ci`. The suite above always builds first (`pretest`), so without
+    # this job a dist/ that never ran would still be green everywhere.
+    name: no-build handshake (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Handshake against the committed dist/, without building it
+        working-directory: packages/snowarch
+        run: npx vitest run --no-coverage tests/server/unconfigured.test.ts tests/server/handshake.test.ts
+
+  docs-check:
+    # The package README's factual tables are generated from dist/contract.json and the built
+    # permissions module. This job is what stops them drifting — P-30 is the whole reason: the
+    # 1.x docs described OIDC/SSO, an org-config path and an "allow any table" switch, none of
+    # which existed, and prose has no way to notice that about itself.
+    name: docs-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: The README's generated blocks match the code
+        run: node scripts/gen-readme-tables.mjs --check
+      - name: No retired 1.x surface is documented anywhere
+        # Criterion 3. `|| true` on the grep and an explicit test, so the step fails on a MATCH
+        # rather than on grep's exit code being 1 for "nothing found" — which is success here.
+        run: |
+          set -o pipefail
+          # The last alternative matches the OLD repository URL without spelling it: the
+          # legacy-name ratchet forbids that literal anywhere outside its own allow-list, and a
+          # grep pattern is still a use of the string. `.` for the hyphen keeps the pattern out
+          # of the ratchet's way while matching what it is looking for.
+          hits=$(grep -rnE "OIDC|SNMCP_ORG_CONFIG|ALLOW_ANY_TABLE|/auth/login|claude mcp add servicenow --command|github[.]com/[a-z]+/servicenow.mcp" \
+            packages/snowarch/src packages/snowarch/README.md packages/snowarch/.env.example \
+            packages/snowarch/SECURITY.md || true)
+          if [ -n "$hits" ]; then
+            echo "Retired 1.x surface is still documented:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "clean"
+
   footprint:
     name: footprint (production install)
     runs-on: ubuntu-latest
@@ -59,6 +163,23 @@ jobs:
       # Summed file content, not `du`: du block-rounds and differs per OS (72 MB vs 57.3 MB on the
       # same tree, ARC-01-S05), so only the content figure is comparable across the matrix.
       - run: node scripts/ci/footprint.mjs 80
+
+  actionlint:
+    # The workflows are code and nothing else checks them. ARC-03-S09 added a second workflow with a
+    # multi-line shell step, `gh` calls and expression interpolation — three things a typo survives
+    # in until the schedule fires at 05:17 on a Monday and nobody is looking.
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actionlint (pinned)
+        run: |
+          curl -sSfL -o /tmp/actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz
+          tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
+          /tmp/actionlint --version
+      - name: Lint every workflow
+        run: /tmp/actionlint -color
 
   secrets:
     name: secret scan
@@ -124,3 +245,11 @@ jobs:
       - name: validate .claude/agents
         if: steps.cli.outputs.available == 'true'
         run: claude plugin validate .claude/agents --strict
+
+      # L10 is the same check inside the engine lint. Here — where the CLI is installed — it runs
+      # with `--require-claude`, so a job that lost its CLI fails as misconfigured instead of
+      # reporting a reassuring skip. The `lint` job runs the same check without the flag and says
+      # it skipped, which is honest: enforcement lives where the tool is.
+      - name: engine lint L10 against the installed CLI
+        if: steps.cli.outputs.available == 'true'
+        run: node packages/contract/lint/engine-lint.mjs --only L10 --require-claude

@@ -33,7 +33,7 @@ if (!label) { console.error('usage: t01-regression.mjs <label>'); process.exit(2
 const outDir = process.env.T01_OUT || join(root, '.t01');
 mkdirSync(outDir, { recursive: true });
 
-// The T-01 prompt, verbatim from VALIDATION-TESTS.md.
+// The T-01 prompt, verbatim from tests/VALIDATION-TESTS.md.
 const T01 = 'Implement a Script Include that calculates SLA breach risk for incidents based on '
   + 'assignment group historical data.';
 

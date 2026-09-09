@@ -54,6 +54,14 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S01 — D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI
 
+> **Amendment 2026-09-08 (architect's ruling on the S01 delivery).** **The package version stays
+> `2.0.0-dev`, not `2.0.0`.** This story predates ARC-01-S06's one-version-of-record, which makes the
+> root `package.json` authoritative and `tests/version-consistency.test.mjs` enforce it; the release
+> number is set once by ARC-09. Criterion 3 therefore reads `@farstic/snowarch 2.0.0-dev Apache-2.0`
+> and criterion 7 `serverInfo.version == "2.0.0-dev"`. **Open point ratified:** `src/sdk` is kept as
+> the client re-export only and `src/api` is removed — it imports the HTTP transport D-03 cuts and
+> cannot exist without it.
+
 **As** a maintainer **I want** `packages/snowarch` to contain only the stdio server, its tools, the ServiceNow client, the resources, the utilities and a minimal CLI, under its final name and version, with a green test run on every CI OS **so that** every later ARC-04 story edits a package that already builds, lints and tests clean and carries no surface the owner removed.
 
 **Context.** Closes P-18 (package and bin names belong to third parties; update nag fetches a stranger's package — `mcp:src/cli/index.ts:57-85`), P-19 (version drift across `package.json`, `server.json`, `smithery.yaml`, dashboard HTML), P-28 (HTTP/SSE, dashboard, desktop, `web`), P-29 (`npm test` red — 12 failing `desktop/tests/**` files; CI never runs tests — `mcp:.github/workflows/ci.yml:26-36`), P-31 (26 prompts, 10 Copilot personas). Applies D-01 (names), D-03 (cut list), R-1 (2.0.0). ARC-01-S03 removes the *directories* `desktop/`, `clients/`, `src/direct`, `src/a2a`, `src/dashboard`, `src/reports`, `src/prompts`, `.github/agents`, `Dockerfile`, `server.json`, `smithery.yaml`, `TERMS.md` at import; this story removes what is left inside the surviving tree and makes it compile.
@@ -98,6 +106,40 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 ---
 
 ### ARC-04-S02 — Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed
+
+> **Amendment 2026-09-08 (architect's rulings on the S02 delivery).**
+> - **Criterion 3's tool half belongs to ARC-04-S04.** `snow_core_status_read` does not exist yet,
+>   so S02 asserts on the `LoadReport` instead: `configErrors[0].code == "STORE_PERMISSIONS_TOO_OPEN"`
+>   and the message containing `chmod 600 <path>`. S04 re-asserts the same fact through the tool.
+> - **`SNOW_STORE` pointing at a missing file is `STORE_NOT_FOUND` with no fallback** (the story's
+>   own open point, ratified). An **empty string counts as unset** for both `SNOW_STORE` and
+>   `CLAUDE_PROJECT_DIR`, because `.mcp.json` passes `${SNOW_STORE:-}`.
+> - **`docs/MODES-AND-PRESETS.md` is created here as a stub** carrying only the precedence section,
+>   headed "draft — ARC-07 owns the final text".
+> - **Store error codes** are listed in `packages/snowarch/CHANGELOG.md` now; ARC-04-S06 lists them
+>   in the tool contract.
+> - **The exit-if-unconfigured guard is removed from `src/server.ts`.** It tested env vars only,
+>   which is wrong once a store can configure the server — it would have exited with a valid store
+>   present. Unconfigured start is ARC-04-S04's subject; until then the server runs and the startup
+>   line says `mode: unconfigured`.
+>
+> **Amendment 2026-09-08 (second S02 review — the file-mode rule is refined).** The design note's
+> "if `(stat.mode & 0o077) !== 0` the store is not loaded" is correct for the FILE and wrong for the
+> DIRECTORY. Applied to the directory it refuses a 0600 store in an ordinary 0755 folder, and in
+> `/tmp` — which is where criterion 1's own `SNOW_STORE=/tmp/a.json` example lives. A 0600 file is
+> unreadable by others whatever its directory; the directory risk is group/world **write**
+> (replacement or symlink planting), not read or execute. The rule is therefore:
+> **refuse** when the file has `0o077` bits, or the directory has `0o022` bits **without** the sticky
+> bit (`0o1000`); **warn** — a `warnings[]` entry on the `LoadReport` and a `[WARN]` log line, the
+> store still loading — for any other group/world directory bit, with the `chmod 700 <dir>` remedy.
+>
+> **Amendment 2026-09-08 (second S02 review — masking happens at construction).** Every path in a
+> message is masked where the message is BUILT, one path at a time, never by running `maskPath` over
+> a finished sentence: `maskPath` only rewrites a string that starts with the prefix, so a sentence
+> carrying two paths came through with both raw. The prose uses `maskPath` (`<checkout>`, `~`); the
+> text after `Run:` uses `maskPathForShell` (home → `~` only), because a remedy has to stay
+> pasteable and `<checkout>` is not a path. `tests/store/masking.test.ts` spawns the server under a
+> fake `HOME` and asserts no absolute prefix appears anywhere in stderr.
 
 **As** the server **I want** exactly one configuration store with an explicit, logged precedence and a validated schema **so that** an instance can never be silently overridden, a group-readable secret file is never loaded, and the wizard (ARC-07) and doctor (ARC-08) read and write the same file through the same module.
 
@@ -163,6 +205,27 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S03 — Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage
 
+> **Amendment 2026-09-08 (architect's rulings on the S03 delivery).**
+> - **Criterion 1's live half is deferred** to the owner's live sitting — the agent never holds
+>   instance credentials. The unit half (throwing-proxy client) plus the spawned-server probe are the
+>   gate here; the `RUN_LIVE_E2E=1` case stays in `tests/live/live-e2e.test.ts` for that sitting.
+> - **Prod posture is "any effective flag true"**, stricter than WRITE, and the refusal carries the
+>   `--ack-prod` remedy verbatim. Env-defined instances get the same rule via
+>   `SN_INSTANCE_<NAME>_PROD_WRITE_ACK`.
+> - **Criterion 7's failing half** is demonstrated by adding an uncovered branch to
+>   `src/utils/permissions.ts` rather than by deleting a test assertion: removing an assertion did not
+>   move the number, because the branches it touched are exercised elsewhere too. Exit 1 with the
+>   branch, exit 0 without.
+>
+> **Amendment 2026-09-08 (found during S03, changes an S02 behaviour).** `loadStore` no longer completes
+> absent flags to `"false"`. S02 normalised them on load ("absent means false, once, so no caller has to
+> remember"), which was right for gating and wrong for everything else: it erased the difference between
+> a store that OMITS `flags` and one that declares all six as `"false"`. S03 needs that difference — a
+> preset instance with no `flags` key was being reported as disagreeing with its own preset. Completion
+> now happens in `expandPreset`, where "does absent mean false?" is the question actually being asked.
+> **Found by spawning the server, not by the unit test**, which passed a partial object where production
+> passed a completed one — the fixture could not produce the failing shape.
+
 **As** an individual practitioner with a PDI and a customer's production instance in one store **I want** the six permission flags to belong to the instance I am currently addressing **so that** `snow_core_instance_switch prod` immediately makes every write refuse while the same call on `pdi` succeeds, without a second server process.
 
 **Context.** Closes P-03 (absent flag = disabled but still advertised; flags are pure `process.env` checks — `mcp:src/utils/permissions.ts:14-68`) and the process-global half of P-24 (`00` §4.3; `docs/MULTI_INSTANCE.md:182` acknowledges it). Implements `01` §6.3 (presets, dependency rule, byte-exact strings, prod safety rule) and D-05 (prod capped at `read-only`; `prodWriteAck: true` required in the store; `--ack-prod` typing is ARC-07's UX, the refusal is the server's). README risk: "per-instance flag evaluation touches every dispatcher" — mitigated below without touching the ~158 `require*()` call sites.
@@ -213,6 +276,25 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S04 — Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed`
 
+> **Amendment 2026-09-08 (architect's rulings on the S04 delivery).**
+> - **The catalogue is 397 here**, not 398: 394 + the three instance-free core tools. `EXPECTED` in
+>   `scripts/extract-tools.mjs` and `tests/tools/parity.test.ts` moved together in the same commit.
+>   ARC-04-S06 owns the arithmetic from here (397 − 1 removed + whatever it adds).
+> - **S-17 and S-02 are both CONFIRMED** (`03` §F and the spike records), so no fallback was shipped.
+>   Criterion 7 — the `/mcp` visual check under Claude Code — remains for the owner's live sitting; the
+>   agent does not attempt it.
+> - **Criterion 3 is asserted by a real MCP `Client` on `StdioClientTransport`** receiving
+>   `notifications/tools/list_changed`, not by reading the tool's own `listChangedSent`. Those are
+>   different claims: the second only says the server believes it sent something.
+> - **The bijection in `tests/tools/parity.test.ts` is now scoped to RENAMED tools.** A tool introduced
+>   after the v1 rename has no old name and cannot be in `tool-rename-map.json`; the three are listed
+>   in `POST_RENAME_TOOLS` with a companion test asserting they are genuinely absent from the map, so
+>   the count cannot drift silently.
+> - **The S03 remedy defect is fixed here** (architect's C4 run): `remedyPreset(missing)` returns the
+>   smallest preset whose expansion covers the missing flags — `pdi-developer` for WRITE / CMDB_WRITE /
+>   SCRIPTING / ATF, `full` for NOW_ASSIST / FLUENT. The hard-coded `pdi-developer` told a reader on
+>   `pdi-developer` to set the preset they already had. `permissions.ts` stays at 100 %.
+
 **As** an individual practitioner in design-only mode, or one who has just typed `./snowarch instance add` in another terminal, **I want** the server to start with no instance, describe its own state, and pick up a new store without a Claude Code restart **so that** an unconfigured checkout never shows a crashed MCP server and the `/snowarch setup-instance` `--resume` step (ARC-07) can finish in the same session.
 
 **Context.** Closes the "exit 1 without instance" half of P-21 (`mcp:src/server.ts:23-30`) and the "reload exists but nothing calls it" half of P-27 (`mcp:src/servicenow/instances.ts:209-214`; no `tools/list_changed` ever sent — `00` §4.8). Implements `01` §9 (defence in depth), §6.2 step 8, §14. Spikes: S-17 (unconfigured stdio server accepted as connected) and S-02 (`list_changed` honoured after reload) — both ARC-00; fallbacks are designed in.
@@ -259,6 +341,23 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S05 — SCRIPTING / update-set read-gate split
 
+> **Amendment 2026-09-08 (architect's rulings on the S05 delivery).**
+> - **Task 4 and criterion 1's live half are deferred to the owner's live sitting** — the agent never
+>   holds instance credentials. Delivered instead:
+>   `docs/spikes/S-10-readonly-preset-sufficiency/PROCEDURE.md`, a runnable procedure naming the build
+>   under test, the exact store fixture, both preset runs and the T-01…T-18 order. The `03` §A S-10
+>   status cell records the deferral and the build sha.
+> - **The gate-split test derives its two families from the REGISTERED CATALOGUE**, not a hand-written
+>   list: 35 tools, each classified read or write, and an unclassified name fails the test. A stale
+>   entry fails too, so a rename cannot leave the table asserting nothing.
+> - **Found while writing that test:** `snow_us_update_set_add`, `_switch` and `_complete` validated
+>   their arguments BEFORE calling the gate, so an unauthorised caller got `INVALID_REQUEST` instead of
+>   a permission code. The story says the gate is the first statement of each mutating case; it now is,
+>   in `updateset.ts` as well as `script.ts`.
+> - **`01` §6.3's parenthetical is now false** and was updated: "(ARC-04 splits the gate; today it
+>   blocks reads too)" → "(split by ARC-04-S05, 2026-09-08)". The phrase survives only inside this
+>   story, which quotes it as the string to remove.
+
 **As** the engine running the Code Reviewer against a live instance in the `read-only` preset **I want** to list and read Script Includes, Business Rules, Client Scripts, ACLs, UI Policies, UI Actions and update sets **so that** review and design work never needs a write flag, and SCRIPTING means what `01` §6.3 says: *writing* those objects.
 
 **Context.** Closes the gate-placement half of P-24: `dispatchScriptAction` calls `requireScripting()` before the `switch`, gating every `snow_scr_*` tool including `_index` / `_read` (`mcp:src/tools/script.ts:389-391`); `snow_us_*` writes call `requireScripting` per case while reads are ungated (`mcp:src/tools/updateset.ts:143-195`). Spike S-10 (ARC-00) checks that `read-only` suffices for the Code Reviewer / Developer read workflows once this lands. README risk R-03 (behaviour change for snow-mcp 1.0.0 users) — CHANGELOG note.
@@ -297,6 +396,57 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 ---
 
 ### ARC-04-S06 — `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract`
+
+> **Amendment 2026-09-08 (from ARC-04-S01).** **The expected tool count arithmetic starts from 394
+> minus one removal.** `snow_rpt_report_generate` is dropped by ARC-04-S08 (see its amendment), so
+> this story's `EXPECTED` is `394 − 1 removed + <new tools>`. ARC-04-S01 left the tool registered and
+> failing with `NOT_IMPLEMENTED` precisely so the count stayed stable until the story that owns
+> catalogue changes could make the removal deliberate.
+
+> **Amendment 2026-09-08 (architect's ruling, from S03).** **The test glue introduced in ARC-04-S03 is
+> removed in THIS story, not rewritten twice.** `tests/setup.ts` enters a runtime whose flags are a live
+> view of `process.env`, and `outsideInstance()` exists so the no-instance property stays observable
+> despite that hook. S06's `gate`/`mutates` declarations and `tests/contract.test.ts` replace the seven
+> per-dispatcher suites' flag assertions; the glue goes with them.
+
+> **Amendment 2026-09-08 (S06 deviation, accepted).** **The contract serialiser lives in
+> `scripts/extract-tools.mjs`, not a shared `src/contract/build.ts`, and the CLI reads
+> `dist/contract.json` rather than re-serialising.** One producer, one consumer, and the file on disk
+> is the interface between them — which is also what makes the sha meaningful: `contract --sha` hashes
+> exactly the bytes ARC-05 pins and ARC-06 compares, not a re-serialisation that could differ by a key
+> order. `contract --sha` fails with a message naming `npm run build` when the file is absent, because
+> the remedy for a missing build artefact is a build.
+
+> **Amendment 2026-09-08 (architect's rulings on the S06 delivery, plus what the seeding found).**
+> - **`EXPECTED = 397` here**, with the arithmetic in the comment: S07 adds `snow_us_capture_target_set`
+>   (+1) and S08 removes `snow_rpt_report_generate` (−1) while keeping the two retired script-exec tools
+>   as `[Unsupported]` stubs; each bumps the constant in its own PR. `contract.toolCount` is DERIVED
+>   from the catalogue, never a literal, so the contract cannot disagree with the code even when the
+>   constant lags.
+> - **`contract.version` is `2.0.0-dev`**, the package version of record; ARC-09 sets the release number.
+> - **The error-code registry is `src/errors/codes.ts`** — no equivalent existed. 45 codes, each with a
+>   remedy, and `tests/errors/codes.test.ts` asserts BOTH directions: every code thrown in `src/` is
+>   registered, and every registered code is actually thrown. The second direction matters as much: a
+>   code the generator documents but nothing produces sends a reader hunting a failure that cannot happen.
+> - **`alsoRequires` added to the contract shape — needs ratification.** Six tools sit behind a
+>   module-wide gate AND a case-level one (`now_assist` then `write`, `fluent` then `write`). `gate` is
+>   the OUTER one, because that is what refuses first and therefore what predicts the refusal; without a
+>   second field the write requirement would be absent from the contract entirely and §2.1's ask list
+>   would under-report those six. The field is optional and additive: a consumer that ignores it still
+>   gets a correct prediction of the first refusal.
+> - **The seeding found 13 more instances of the S05 ordering bug** — `gate` after argument validation,
+>   so an unauthorised caller got `INVALID_REQUEST` instead of a permission code — across
+>   `sys-properties.ts`, `devops.ts`, `fluent.ts`, `itam.ts` and `va.ts`. All fixed; the anomaly list is
+>   empty.
+> - **Test consolidation:** ten per-suite refusal assertions removed across seven dispatcher suites
+>   (contract (a) asserts the same property for all 397 rather than nine hand-picked ones), the
+>   `tests/setup.ts` env-view glue and `tests/helpers/instance.ts` deleted, and 14 dead
+>   `process.env.*_ENABLED` lines stripped. A suite that needs more than `pdi-developer` now says so
+>   with `withPreset()`. `tests/tools/gate-split.test.ts` is KEPT: it asserts gate-before-validation
+>   ordering, which the contract test does not.
+> - **`tsconfig.json` excluded `tests/`**, so `tsc --noEmit` never type-checked them — which made the
+>   `@ts-expect-error` type test pass by never being compiled. `tsconfig.tests.json` and a two-step
+>   `type-check` script fix that; criterion 1 is verified in both directions.
 
 **As** the engine (ARC-05's lint and generators) **I want** every tool to declare in code which flag family gates it and whether it mutates the instance, and the server to emit one contract file from those declarations **so that** the §2.1 `ask` list, the §2.2 protocol text and the doctor read tool names, gates and error codes from a generated artefact instead of prose.
 
@@ -360,6 +510,20 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S07 — `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter
 
+> **Amendment 2026-09-08 (architect's rulings on the S07 delivery).**
+> - **Criterion 4's live run is deferred to the owner's live sitting** — the agent never holds instance
+>   credentials. `packages/snowarch/tests/live/README.md` carries the exact run, the build sha, the
+>   `sys_update_xml` evidence to record, the redaction rules and a **negative control**: a Script
+>   Include created BEFORE `capture_target_set` must not appear in the set, because without it a run
+>   where the UI default happened to be the same set looks identical to a working one.
+> - **`EXPECTED` → 398** here, with the arithmetic comment updated; ARC-04-S08 takes it to 397.
+> - The contract's `protocols.updateSetCapture` is now asserted to resolve to registered tools — a step
+>   naming a tool that does not exist would generate an instruction nobody can follow.
+> - Declarations: `snow_us_capture_target_set` = `write` / `mutates: true` / `table sys_user_preference`;
+>   `snow_us_active_update_set_ensure` = `scripting` / `mutates: true` / `table sys_update_set`.
+> - `client.getAuthUsername()` was added (the auth config was private). It returns the user NAME only,
+>   and no tool puts it in a response — a response is also a log line.
+
 **As** the engine executing §2.2 before a configuration write **I want** one tool that points the authenticated user's REST update-set capture at a named update set, and an ensure tool that never returns somebody else's in-progress set **so that** §2.2 is four generated calls and every created Script Include lands in the intended update set.
 
 **Context.** Closes P-33 (`active_update_set_ensure` picks an arbitrary `state=in progress` set with no user filter — `mcp:src/tools/updateset.ts:210-222`; `grep sys_user_preference src` → descriptions only; the working pattern is a five-call composition in `CLAUDE.md` §2.2). Platform fact relied on: ServiceNow honours `sys_user_preference` `name=sys_update_set` for REST calls (`engine:docs/nowaikit-field-notes.md` §1, confirmed 2026-05-27); `snow_us_update_set_switch` only sets `is_default: true` and does not change REST capture (same note). Implements `01` §11 last paragraph and `01` §14.
@@ -400,6 +564,56 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 ---
 
 ### ARC-04-S08 — Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap
+
+> **Amendment 2026-09-08 (from the S08 delivery).**
+> - **The story's "S-25 candidate" is filed as S-26.** S-25 was already taken by the
+>   marketplace-source spike; the row is in `03` §F and records that nothing in the SDK types,
+>   the schema, or this repo's own stdio probes shows a client sending
+>   `_meta["anthropic/maxResultSizeChars"]`. The server honours it and the env fallback covers
+>   the other branch, so only a *documentation* claim would be wrong — hence a candidate row
+>   rather than a statement in the contract or the USER-GUIDE.
+> - **The rename map is not rewritten when a tool is retired.** Removing
+>   `snow_rpt_report_generate` broke three tests that assert the map maps into the catalogue.
+>   Deleting `"generate_report": "snow_rpt_report_generate"` would have made every count balance
+>   and quietly erased a rename that really happened. A declared `RETIRED_TOOLS` list carries it
+>   instead, and a companion test asserts both halves — the name is gone from the catalogue AND
+>   still in the map — because either one alone still balances the arithmetic.
+> - **The static catalogue invalidated `tests/tools/router.test.ts`, and it needed rewriting, not
+>   fixing.** Those tests set `MCP_TOOL_PACKAGE` mid-process and called `collectToolCatalog()`
+>   again. That is precisely the behaviour S08 removes, so the failures were correct — and the
+>   tempting repair (make the catalogue dynamic again) would have undone the story. The role
+>   bundles are now asserted through an exported pure `selectPackage(all, name)`, and two new
+>   tests assert the guarantee directly: the same array by identity, and no effect from changing
+>   the env var. *(Same class as the recurring lesson: a fixture whose shape quietly excluded the
+>   failing input. Here it was a test whose mechanism quietly asserted the defect.)*
+> - **`UNSUPPORTED_ON_THIS_INSTANCE` counts as passing the gate** in `contract.test.ts` (b). The
+>   gate did let the two stubs through; the capability then refused. Special-casing them out of
+>   the suite instead would have removed the only test that walks them.
+> - **Criterion 3's live half is deferred** to the owner's sitting, per the architect's ruling.
+>   The unit gate is `tests/tools/discovery.test.ts` — the catalogue is compared name-for-name and
+>   in order across a successful discover call, and the module's exports are asserted to be
+>   exactly `discoveryToolManifest` and `dispatchDiscoveryAction`. The stdio byte-identical probe
+>   is the architect's to run; a probe on a *failed* discover would prove nothing, since the old
+>   code only minted tools on success.
+> - **F1/F2 (architect review).** `snow_fluent_script_exec` was declared `gate: 'write'` while its
+>   case calls `requireScripting()`, so the generated ask-list under-reported it. The declaration is
+>   now `scripting`. **F2 is why it survived:** the composite-gate test iterates only tools *declared*
+>   composite, and no preset grants WRITE alone — so a tool declared `write` that demands SCRIPTING
+>   threw `WRITE_NOT_ENABLED` with everything off, matched its declaration, and was never asked the
+>   one question that would expose it. The new assertion runs the other direction over a **synthetic**
+>   WRITE-only flag set rather than a preset, because the preset table was the fixture whose shape
+>   excluded the failing input. Recorded pre-fix output: `"snow_fluent_script_exec declares write but
+>   threw SCRIPTING_NOT_ENABLED"`.
+> - **Discovery's probe fallback keeps its `note`, now saying "placeholders".** A probe-derived
+>   `internal_type: 'string'` is a placeholder, not a dictionary reading, and a caller that
+>   trusted it would build the wrong query.
+
+
+> **Amendment 2026-09-08 (from ARC-04-S01, architect's ruling). REMOVE `snow_rpt_report_generate`.**
+> Its backend — `src/reports/` with `pdfmake` and `pptxgenjs` — went with D-03 item 4, so the tool
+> has been registered-but-failing since S01 (an explicit `NOT_IMPLEMENTED` naming the cut, chosen
+> over an unresolved dynamic import). Remove it here, with a `CHANGELOG.md` line naming **D-03 item 4**
+> as the reason. The count arithmetic is S06's, amended there.
 
 **As** the engine **I want** every advertised tool to either work or fail with a clear, immediate `UNSUPPORTED_ON_THIS_INSTANCE`, the tool list to be static and equal to the contract, and large query results to be bounded **so that** no builder wastes a turn on a 404, no phantom tool appears, and the first live session cannot blow Claude Code's MCP output cap.
 
@@ -443,6 +657,36 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S09 — Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert` / `action_update`
 
+> **Amendment 2026-09-08 (from the S09 delivery).**
+> - **Live criteria 2, 3 and 4 are deferred to the owner's sitting**, per the architect's ruling; the
+>   procedure is appended to `packages/snowarch/tests/live/README.md` inside a `[LIVE E2E]` update set
+>   with teardown. Criterion 2's procedure carries a **negative control** the story did not ask for: an
+>   ascending query whose result must DIFFER from the descending one. On a fresh PDI with under five
+>   incidents both queries return the same rows, and a "non-increasing" check passes against either
+>   grammar — the same defect the unit test exists to catch would survive the live run.
+> - **A defect the story did not name: five tools wrote to the instance while declaring
+>   `mutates: false`** — `snow_intg_event_register` (in scope here), plus
+>   `snow_chg_change_for_approval_submit`, `snow_flow_flow_test`, `snow_sec_vulnerabilities_scan` and
+>   `snow_cfg_set_properties_bulk`. The ask-list is generated from `mutates` (ARC-05-S07), so each was
+>   a write that would never prompt, and `snow_cfg_set_properties_bulk` is one of the 14 `03` S-23
+>   names explicitly. No gate test could see them: every gate and every refusal was correct — the
+>   wrong thing was the label the generator reads. Found by scanning each case body for
+>   create/update/deleteRecord against its declaration, the same source-vs-behaviour technique S06
+>   used; `tests/tools/mutates-audit.test.ts` keeps it from regressing.
+> - **`snow_core_instance_switch` is left as a declared gap, not fixed.** S-23 names it, but it changes
+>   no ServiceNow record: `mutates: true` breaks contract test (c) unless it also gains a write gate,
+>   and gating it stops a read-only session from switching instances to *read* another one.
+>   Overloading `mutates` to mean "changes session state" would make one field carry two meanings and
+>   silently change what (c) enforces. **Architect decision needed** — the ask-list generator likely
+>   needs a second source (an explicit always-ask list, or a distinct `sessionMutates` flag). Declared
+>   in the audit test with a both-halves check so it cannot be mistaken for completeness.
+> - **ARC-02 handover, precise.** Two passages in `scripts/legacy/SETUP.md` must go with the sort fix:
+>   the troubleshooting row at **line 138** and the smoke-test sentence at **line 154**. Both are named
+>   verbatim in the CHANGELOG entry. Left in place they teach users to avoid a parameter that now works.
+> - **Degenerate `orderBy` is handled explicitly.** `','` or `'  '` drops the sort and keeps the query
+>   rather than emitting a trailing bare `^` or an `ORDERBY` with no field — the platform accepts both
+>   of those and quietly returns something else, which is the same class of failure as the original bug.
+
 **As** the engine **I want** descending sorts, event registrations and business rules created through the server to behave as the ServiceNow platform requires **so that** the three documented workarounds (`engine:SETUP.md:154`, field-notes §4, §5) disappear and cannot regress.
 
 **Context.** Closes P-26 (defects) — `00` §4.8 table: descending sort is built as `ORDERBY<field>^ORDERBYDESC` (`mcp:src/servicenow/client.ts:384-388`) where the platform's encoded form is `ORDERBYDESC<field>` (`engine:ServiceNowDocs/markdown/api-reference/GlideListClientAPINEx.md:191` — `^ORDERBYDESCpriority`); `snow_intg_event_register` writes only `name`, `table`, `description` (`mcp:src/tools/integration.ts:428-438`), leaving `event_name` empty so the notification engine cannot match the event (field-notes §4); `snow_scr_business_rule_add` sends `name, collection, when, script, condition, active, order` (`mcp:src/tools/script.ts:405-411`) and never `action_insert` / `action_update`, so the rule never fires (field-notes §5). ARC-02-S10 hands these three field-note sections over as regression-test titles.
@@ -480,6 +724,41 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 ---
 
 ### ARC-04-S10 — Audit trail writer with rotation; redaction defaults; Authorization header never logged
+
+> **Amendment 2026-09-08 (from the S10 delivery).**
+> - **Criterion 1's argument is `fields`, not `data`** — confirmed against the tool, which answers
+>   "table and fields are required". Named in the test, because getting it wrong yields an
+>   `INVALID_REQUEST` line that still passes the payload-marker grep, for the wrong reason.
+> - **Criterion 1's `result == "ok"` needs a reachable instance**, so the unit half asserts the line
+>   SHAPE and that `result` carries the failure rather than reporting success; the literal `ok` belongs
+>   to the owner's live sitting. Recorded rather than quietly asserted as `ok` against a fixture.
+> - **Criterion 4 is scoped to credentials, and the payload is asserted separately.** The sweep runs at
+>   `SNOW_LOG_LEVEL=debug` — more output, harder credential test — where echoing arguments is what debug
+>   logging is *for*. Forbidding the payload marker on stderr at that level would have been asserting
+>   that debug logging does not work. So: credentials forbidden in both surfaces at any level; the
+>   payload marker forbidden in the audit file always; and a separate case proves no payload reaches
+>   stderr at the **default** level.
+> - **Three defects found by these tests, all fixed here with the test that catches each.**
+>   (a) `client.ts` defaulted `maxRetries` / `retryDelayMs` / `requestTimeoutMs` with `||`, so a
+>   configured **0** was falsy and became 3 retries with a 1 s base delay — `MAX_RETRIES=0` did nothing
+>   and nothing said so. Found because an audit test that set both to 0 took 7 s a call, which is
+>   exactly 1 + 2 + 4 of backoff. (b) The audit `note` was built from `args.name`, and the sweep — which
+>   passes the payload marker as every argument — found the marker in the audit file through it; the
+>   note is now built from server-side state. (c) The debug query log printed the authenticated
+>   username, via ARC-04-S07's `sys_created_by=<username>` filter.
+> - **Test-fixture note worth keeping.** The sweep first used an `.invalid` hostname and took four
+>   minutes: a DNS round-trip per call, times ~130 tools. A closed loopback port fixed it — but **not**
+>   port 1 or 9, which Node rejects outright as "bad port" *before* the request layer, so the timeout
+>   path is never exercised. 49151 with `MAX_RETRIES=0` and a short timeout runs the whole sweep in
+>   about a second.
+> - **`snow_fluent_build` and `snow_fluent_validate` are excluded from the sweep** for the reason
+>   `contract.test.ts` excludes them (they spawn the `@servicenow/sdk` CLI, 92 s and 60 s). They are
+>   covered by a separate case under `read-only`, where the gate refuses before the spawn — skipping
+>   them outright would have left two tools no leak test ever touched.
+> - **`snow_fluent_validate` appends nothing**, correctly: it is `mutates: false`, validating a local
+>   source tree. Asserted, so the exclusion above cannot be mistaken for the audit rule failing.
+> - **The `transport.onclose` TODO is answered, not implemented.** Appends are synchronous, so there is
+>   nothing buffered to flush; the call site says so, so nobody adds a flush that has nothing to do.
 
 **As** a consultancy security reviewer **I want** every mutating call the engine makes against a client instance to leave one secret-free line in a file inside the checkout **so that** "write approved" (§2.1) is provable after the fact, and nothing the server logs can leak a credential.
 
@@ -525,6 +804,44 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S11 — Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3)
 
+> **Amendment 2026-09-08 (from the S11 delivery).**
+> - **undici pinned to exactly 6.28.1.** It is the newest major whose `engines.node` admits our
+>   declared floor of 20.0.0: 8.10.2 requires `>=22.19.0` and 7.29.1 requires `>=20.18.1`. Node 7.x
+>   would in fact run on CI (the `node 20` cell resolves to a current 20.19+), which is exactly why it
+>   is the wrong choice — it would pass CI while breaking the floor the package advertises. Root
+>   production footprint after the addition: **15.3 MB** against the 80 MB ceiling.
+> - **S-20's status corrected.** The story text says "proposes spike S-20"; S-20 exists and is
+>   **CONFIRMED on macOS** (`03` §F). R-15 is closed by this story with Windows recorded as pending
+>   Robert's sitting, and ARC-06 keeps the `${VAR:-}` forwarding as the hedge — criterion 5's
+>   sanitisation is what makes that hedge safe rather than harmful.
+> - **Criterion 2's `127.0.0.1:1` replaced with a high closed port.** Node rejects the low well-known
+>   ports as "bad port" *before* the request layer, so the test would never reach the proxy code path
+>   while appearing to (ARC-04-S10's finding). The message shape the criterion specifies is unchanged
+>   and asserted verbatim.
+> - **Criterion 7 restated, and asserted as a test rather than a grep.** With the aliased import the
+>   literal `grep -rn "\bfetch("` now returns **nothing at all** — a stronger result than "only
+>   http.ts", but one that a broken grep would also produce. `tests/servicenow/proxy.test.ts` walks
+>   `src/` and asserts two things instead: nothing calls the global `fetch`, and `servicenow/http.ts`
+>   is the only module importing `undici`.
+> - **The TLS fixture generates its certificate at test time** (`selfsigned`, devDependency). A
+>   committed private key would be a real private key in the repository and the secret scan would be
+>   right to fail on it; suppressing that rule to make room for a fixture is how a real key gets in
+>   later. Nothing reaches the public internet: loopback server, `localhost` name.
+> - **Three defects found while building the tests.**
+>   (a) `execFileSync` for the `NODE_EXTRA_CA_CERTS` child **blocks this process's event loop**, so
+>   the in-process HTTPS fixture never accepted the connection and the child timed out — reading
+>   exactly like "NODE_EXTRA_CA_CERTS does not work". The child runs async now.
+>   (b) Routing every request through `snFetch` silently disarmed three suites that stubbed
+>   `global.fetch`: two then hung five seconds each on a real request. A stub on a function nothing
+>   calls does not fail, it stops testing — `tests/helpers/fetch-mock.ts` mocks the seam, and the
+>   `vi.mock` call has to live in each test file because it is hoisted per file.
+>   (c) `selfsigned@5` renamed `days` to `notAfterDate`; the runtime accepted the unknown key silently
+>   and defaulted to a year, and **`tsconfig.tests.json` caught it** — the type-checking of tests that
+>   ARC-04-S06 added paying for itself.
+> - **Note for ARC-06/ARC-08.** `EnvHttpProxyAgent` prints `[UNDICI-EHPA] Warning: EnvHttpProxyAgent is
+>   experimental` to stderr on first use. Left in place — suppressing Node warnings wholesale is worse
+>   than one line — but the bootstrap and doctor text should not treat it as an error.
+
 **As** an individual practitioner on a corporate laptop behind an HTTP proxy and a TLS-intercepting gateway **I want** the server's HTTP client to use my proxy settings and my company root CA, and to tell me by name whether a failure is DNS, TLS trust or the proxy **so that** a first live session does not fail with a bare `fetch failed`.
 
 **Context.** R-3 (owner ruling 2026-09-04): "ARC-04 — proxy agent honouring `HTTPS_PROXY` / `NO_PROXY` + documented `NODE_EXTRA_CA_CERTS`". `03` R-15: Node's built-in `fetch` (undici) ignores `HTTPS_PROXY` / `NO_PROXY` unless a proxy agent is configured; custom CAs need `NODE_EXTRA_CA_CERTS`. The surviving code calls the global `fetch` in three places (`mcp:src/servicenow/client.ts:144, 241, 1051`). ARC-07's wizard probe and ARC-08's doctor consume this story's classifier.
@@ -566,6 +883,56 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 ---
 
 ### ARC-04-S12 — Server doctor module (`src/doctor/`) and `snowarch doctor --json`
+
+> **Amendment 2026-09-08 (from the S12 delivery).**
+> - **Ids ship as `SV-00`…`SV-08` from the first commit**, in one exported constant
+>   (`CHECK_IDS` in `src/doctor/types.ts`). **ARC-08-S01's "rename `S-` → `SV-` in the server
+>   module" step is a no-op** — there is nothing to rename.
+> - **The S-13 ancestor walk ships as `SV-08`**, severity `warn`, implemented from
+>   `pollutingAncestors()` and exported by name so **ARC-08 can re-home it as an engine check
+>   without moving the walk**. It excludes the checkout's own `.claude/skills`: that one is
+>   expected and is not the finding.
+> - **SV-04 is a declared interface plus a stub that returns `skip`** with the reason naming
+>   ARC-07-S03. Deferring the check entirely was the alternative and it is worse: a check that is
+>   absent until a later story reads as a check that passed.
+> - **SV-05 ignores the child's stderr.** `EnvHttpProxyAgent` prints
+>   `[UNDICI-EHPA] Warning: … experimental` on first use (ARC-04-S11), and treating any stderr
+>   output as an error would make this check red on every machine. **Recorded for ARC-06/ARC-08:
+>   that line is noise, never an error.** The handshake is hand-rolled JSON-RPC rather than the SDK
+>   client — the doctor must work from a plain install with no dev dependencies, and a failure
+>   inside a client library would be reported as a server fault.
+> - **SV-05 in unconfigured mode compares against five, not the contract.** Unconfigured mode
+>   advertises the core tools deliberately (ARC-04-S04); comparing against the full contract there
+>   would report a 392-name difference for a server behaving correctly.
+> - **Two defects found while building it.**
+>   (a) **SV-02 lost its own remedy.** A 0644 store also produces a `STORE_PERMISSIONS_TOO_OPEN`
+>   config error, and the generic branch overwrote the specific one — the reader got "correct the
+>   store file" where they could have had the exact `chmod 600 <masked path>`. The mode finding now
+>   wins.
+>   (b) **`maskPath` could be switched off by an environment variable.** It masks against
+>   `homedir()`, which returns `$HOME` when set — so a process started with HOME pointed elsewhere
+>   masked nothing and SV-08 printed an absolute path containing the real account name. It now also
+>   masks against `userInfo().homedir`, which reads the OS user database. A redaction helper that an
+>   environment variable can disarm is not one, and this is the check whose output is most likely to
+>   be screenshotted.
+> - **Criterion 5 does NOT edit `dist/contract.json`; it runs against a copy.** The first version
+>   edited it in place and restored it in a `finally`, which passed — for that test. It also made
+>   `tests/contract.test.ts` fail intermittently (2 of 6 full-suite runs, in a file this story never
+>   touched): vitest runs files in parallel workers, so that suite read the contract mid-edit and saw
+>   396 tools. **A test that mutates a shared build artefact cannot be isolated by cleaning up
+>   afterwards — the window is the problem, not the residue.** Worth CONTRIBUTING at the close-out.
+>   The copy must live *inside* the package (`.tmp-doctor-dist/`, gitignored, removed in a `finally`):
+>   Node resolves `commander` and the MCP SDK by walking up from the module, so a `dist/` in a temp
+>   directory fails with `ERR_MODULE_NOT_FOUND` before the doctor runs at all.
+> - **`new URL(import.meta.url).pathname` is not a path on Windows.** `distDir()` used it, so on
+>   every Windows cell the pathname was `/C:/…` — a leading slash before the drive letter — and
+>   `dist/contract.json` was never found: SV-05 skipped, SV-01 failed, and the doctor reported a
+>   broken installation on a good one. Nine green cells on macOS and Linux said nothing about it.
+>   Fixed with `fileURLToPath`, and guarded by a **source scan** rather than by the Windows cells,
+>   so the class is caught on the platforms that do not have the bug.
+> - **The rotation test in `tests/audit/writer.test.ts` gained an explicit 60 s timeout** — ~12 MB of
+>   synchronous I/O next to the doctor suite's child processes, which is the default 5 s limit under
+>   load rather than a wrong assertion. Six consecutive clean full runs after both fixes.
 
 > **Amendment 2026-09-08 (from ARC-02-S04, S-13 addendum).** **The doctor walks from the checkout up to
 > the filesystem root and WARNS on every ancestor `.claude/skills` it finds.** Claude Code loads project
@@ -618,6 +985,46 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 ### ARC-04-S13 — `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff
 
+> **Amendment 2026-09-08 (from the S13 delivery).**
+> - **`tsconfig.build.json` uses JSONC comments, not `"//"` keys.** A `"//3"` key inside
+>   `compilerOptions` is rejected outright (`TS5023: Unknown compiler option`) — tsconfig accepts
+>   real `//` comments instead.
+> - **`typescript` pinned to exactly `5.9.3`** (installed version; the caret would have allowed a
+>   minor to regenerate all of `dist/` under a contributor mid-PR).
+> - **`noUnusedLocals` / `noUnusedParameters` are relaxed in `tsconfig.build.json` only.** `tsc`
+>   refuses to EMIT on an unused local, and the committed artefact has to build from whatever is in
+>   the tree; `npm run type-check` still enforces both against `tsconfig.json`, which is where they
+>   belong.
+> - **No exclusion is needed anywhere for `.tmp-doctor-dist/`**, and here is why for each check the
+>   ruling names: `scripts/ci/footprint.mjs` walks `node_modules` (argv[3] default), which never
+>   contains it; criterion 6's `du -sh packages/snowarch/dist` measures `dist/`, and the copy is a
+>   *sibling* of it, not a child; `dist-check`'s `git diff` is path-scoped to `packages/snowarch/dist`
+>   and the copy is gitignored. `tests/doctor/doctor.test.ts` now also **asserts the residue is gone**
+>   after the suite — "cleaned up in a finally" is a claim, not a guarantee, and a killed run skips it.
+> - **CI job names, for the branch-protection contexts at the close-out:**
+>   `dist-check (ubuntu-latest)`, `dist-check (macos-latest)`, `dist-check (windows-latest)`,
+>   `no-build handshake (ubuntu-latest)`, `no-build handshake (macos-latest)`,
+>   `no-build handshake (windows-latest)` — six, taking the required contexts from 12 to 18.
+> - **The `no-build` job invokes `npx vitest run` directly, not `npm test`.** The package's `pretest`
+>   script builds, so `npm test` would silently rebuild `dist/` and the job would prove nothing about
+>   the committed artefact — which is the one thing it exists to prove.
+> - **The build script must not call `npx`.** `npx` on Windows is `npx.cmd`, and Node refuses to
+>   `spawnSync` a `.cmd` without a shell — `EINVAL` on all three Windows cells while macOS and Linux
+>   passed. `shell: true` would fix the spawn and hand cmd.exe the argument quoting, which is the
+>   other half of the same problem. The script now runs `node node_modules/typescript/bin/tsc`
+>   directly: no shell, no `.cmd`, and unambiguously the *pinned* TypeScript rather than whatever
+>   `npx` resolves. Same class as ARC-04-S12's file-URL `pathname` — a Windows-only defect that green
+>   macOS and Linux cells say nothing about.
+> - **The `bin` target must be committed executable, and the build script must set the bit.** `tsc`
+>   emits 0644, npm sets 0755 itself when it links the workspace — so `npm ci` MODIFIED a tracked
+>   file and the pre-existing "install changed nothing tracked" gate went red on ubuntu and macOS,
+>   while Windows passed for having no executable bit at all. `chmodSync(dist/cli/index.js, 0o755)`
+>   in `build-dist.mjs` makes the committed mode and the built mode agree everywhere, so neither
+>   `npm ci` nor `dist-check` sees a difference. Third Windows-vs-Unix asymmetry in two stories, and
+>   the first one where **Unix** was the platform that failed.
+> - **`dist/` is 1.5 MB, not the 4.2 MB the story estimated** (that figure included source maps, which
+>   `tsconfig.build.json` turns off). 134 files tracked, no `.map`.
+
 **As** an individual practitioner cloning the repository **I want** a runnable `packages/snowarch/dist/server.js` in the tree **so that** live mode needs `npm ci` and nothing else, and as a maintainer **I want** CI to prove the committed output matches the source.
 
 **Context.** Closes P-20 (`dist/` gitignored — every install compiles TypeScript; `mcp:.gitignore:5`). Implements `01` §2 principle 2 (everything committable is committed), §3 (`dist/` committed, CI rebuilds and diffs), §12 (the release script refuses to tag on a diff — ARC-09). Risk R-02 (stale `dist/`) is mitigated here.
@@ -659,6 +1066,49 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 ---
 
 ### ARC-04-S14 — Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes
+
+> **Amendment 2026-09-08 (from the S14 delivery).**
+> - **The catalogue is 397, not 398** — the story's figure predates S08's removal of
+>   `snow_rpt_report_generate`. The README does not state it in prose at all: the count is generated
+>   from `dist/contract.json`, so it cannot be wrong without CI saying so.
+> - **The version of record is `2.0.0-dev`.** The README says so explicitly and the CHANGELOG heading
+>   stays `## 2.0.0 — Unreleased`; ARC-09 cuts the release.
+> - **The env test found two undocumented switches**, which is the whole point of running it in both
+>   directions: `SERVICENOW_USERNAME` (a 1.x alias read *before* `SERVICENOW_BASIC_USERNAME` when
+>   deciding whose tasks "mine" are) and `AGILE_TABLE_PREFIX`. Both now documented. The scan needed a
+>   fourth pattern to see them — the env-instance loader reads keys through a helper whose second
+>   argument is the legacy name, `g('AUTH', 'SERVICENOW_AUTH_METHOD')`, which no `process.env.`
+>   matching reaches.
+> - **The "allow-list has no stale entries" assertion was written and then removed.** It reported six
+>   false positives — `HOME` is reached through `homedir()`, and `NODE_EXTRA_CA_CERTS` plus the
+>   lowercase proxy names live in an array literal. A staleness check built on a deliberately narrow
+>   scan cries wolf, and a test that cries wolf gets silenced. What is asserted instead is that the
+>   list stays short and explicit.
+> - **Criterion 3's grep caught my own prose.** The `.env.example` header explained what the 1.x docs
+>   had wrongly promised, naming one of them — and the grep that keeps those names out matched it.
+>   Reworded to point at the CHANGELOG instead. Second time in this arc that documenting a removed
+>   thing reproduced the thing (the first was a gitleaks false positive quoted verbatim in
+>   CONTRIBUTING).
+> - **`packages/snowarch/docs/SERVICENOW_OAUTH_SETUP.md` had two dead references** to the old
+>   repository (a `cd` and an issues URL); repointed. Both sit *after* the two lines allow-listed in
+>   `.gitleaksignore`, so the pinned fingerprints still resolve.
+> - **`packages/snowarch/docs/` is gone entirely — SIX files, not the five I first reported.** I
+>   miscounted in the delivery report; the architect's listing was right. `ATF.md`, `NOW_ASSIST.md`,
+>   `REPORTING.md`, `SCRIPTING.md`, `SERVICENOW_OAUTH_SETUP.md`, `TOOL_PACKAGES.md`. Two were
+>   demonstrably wrong (`REPORTING.md`: 13 reporting tools against a catalogue of 17;
+>   `TOOL_PACKAGES.md`: eight bundles against thirteen, each with a drifted hand count).
+> - **What moved to the README before they went.** An **Authentication** section — `basic` and
+>   `oauth` (ROPC), the four `SERVICENOW_OAUTH_*` keys, and the ServiceNow-side steps compressed to
+>   the three that matter (Application Registry → *OAuth API endpoint for external clients* → client
+>   id and secret; no redirect URL). And a **fourth generated block**, `bundles`, listing
+>   `MCP_TOOL_PACKAGE` values with their tool counts from `ROLE_BUNDLE_MAP` — generated precisely
+>   because the hand-maintained version was the thing that was wrong.
+> - **The `.gitleaksignore` entries for `SERVICENOW_OAUTH_SETUP.md` stay.** Its deletion removes the
+>   last copy of the 1.x placeholder OAuth client id from the *tree*, but `gitleaks git` walks
+>   history: the findings are still in the commits that carried them, and a fingerprint is pinned to
+>   a commit, not to a path. Annotated in the file so nobody prunes them as stale.
+> - **`docs/CLIENT_SETUP.md` never existed.** The story's deletion list was written from `00` before
+>   the import. Nothing to do; recorded so the next reader of that list is not left looking.
 
 **As** a non-Architect user of `npx @farstic/snowarch` and as the engine's documentation generators **I want** the package's own documentation to describe exactly what the code does — env contract, tool families, gates, error codes, store, audit, corporate networks — and a changelog that tells a snow-mcp 1.0.0 user what changed **so that** P-30 cannot recur and R-03 is honoured.
 

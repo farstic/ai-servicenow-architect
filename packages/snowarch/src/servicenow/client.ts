@@ -8,7 +8,11 @@ import type {
   ServiceNowRecord,
 } from './types.js';
 import { ServiceNowError } from '../utils/errors.js';
+import type { ErrorCodeName } from '../errors/codes.js';
 import { logger } from '../utils/logging.js';
+import { snFetch } from './http.js';
+import { classifyNetworkError } from './net-errors.js';
+import { currentInstanceOrNull } from './context.js';
 
 // ─── Input validation helpers ────────────────────────────────────────────────
 
@@ -77,9 +81,13 @@ export class ServiceNowClient {
     this.authMode = config.authMode || 'service-account';
     this.oauthConfig = config.oauth;
     this.basicConfig = config.basic;
-    this.maxRetries = config.maxRetries || 3;
-    this.retryDelayMs = config.retryDelayMs || 1000;
-    this.requestTimeoutMs = config.requestTimeoutMs || 30000;
+    // `??`, not `||`. With `||`, a configured **0** is falsy and silently becomes the default,
+    // so `MAX_RETRIES=0` gave three retries and `RETRY_DELAY_MS=0` gave a one-second backoff —
+    // "no retries" and "no delay" were unexpressible, and nothing said so. Found while an
+    // audit test that set both to 0 took seven seconds a call (1 s + 2 s + 4 s of backoff).
+    this.maxRetries = config.maxRetries ?? 3;
+    this.retryDelayMs = config.retryDelayMs ?? 1000;
+    this.requestTimeoutMs = config.requestTimeoutMs ?? 30000;
     this.impersonateUserSysId = config.impersonateUserSysId;
     this.perUserBearerToken = config.perUserBearerToken;
   }
@@ -141,7 +149,7 @@ export class ServiceNowClient {
     });
 
     try {
-      const response = await fetch(tokenUrl, {
+      const response = await snFetch(tokenUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -238,7 +246,7 @@ export class ServiceNowClient {
           extraHeaders['X-Sn-Impersonate'] = impersonateHeader;
         }
 
-        const response = await fetch(url, {
+        const response = await snFetch(url, {
           ...options,
           signal: controller.signal,
           headers: {
@@ -271,8 +279,12 @@ export class ServiceNowClient {
             // Error response wasn't JSON, use status text
           }
 
-          // Map HTTP status to error codes
-          let errorCode = 'API_ERROR';
+          // Map HTTP status to error codes. The default was `API_ERROR`, which is in no
+          // registry and so reached a caller with no meaning and no remedy attached —
+          // invisible until `ServiceNowError` took the registry's union as its code type.
+          // `REQUEST_FAILED` is the registered code for exactly this case: the instance
+          // refused and its response is the only information there is.
+          let errorCode: ErrorCodeName = 'REQUEST_FAILED';
           if (response.status === 401) {
             errorCode = 'AUTHENTICATION_FAILED';
           } else if (response.status === 403) {
@@ -329,13 +341,20 @@ export class ServiceNowClient {
       }
     }
 
-    // Surface the real cause from Node.js fetch failures
+    // Surface the real cause from a fetch failure, CLASSIFIED.
+    //
+    // This used to throw the raw system code — `ENOTFOUND`, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`,
+    // `ECONNREFUSED` — with the message `Failed to query records: <cause.message>`. Every one of
+    // those is accurate and none of them tells a user on a corporate laptop what to do, which is
+    // R-3: the three most common failures there have three different remedies, and the one people
+    // reach for first (their credentials) is the one that is fine.
     if (lastError) {
       const cause = (lastError as Error & { cause?: Error }).cause;
       if (cause) {
+        const diagnosis = classifyNetworkError(lastError);
         throw new ServiceNowError(
-          `Failed to query records: ${cause.message}`,
-          (cause as Error & { code?: string }).code || 'NETWORK_ERROR'
+          `Failed to query records: ${cause.message} — ${diagnosis.remedy}`,
+          diagnosis.code,
         );
       }
       throw lastError;
@@ -368,8 +387,13 @@ export class ServiceNowClient {
     if (params.limit !== undefined && params.limit > 0) {
       queryParams.set('sysparm_limit', Math.min(params.limit, 1000).toString());
     } else {
-      // Default page size from MAX_RECORDS (capped at 1000), falling back to 10.
-      const defaultLimit = Math.min(Number(process.env.MAX_RECORDS) || 10, 1000);
+      // Default page size from the addressed instance's maxRecords (store-declared, default
+      // 100), capped at 1000. It used to come from process.env.MAX_RECORDS with a fallback
+      // of 10 — process-global, and so the same for every instance the server held.
+      // Outside a request (a direct client construction in a test) there is no ambient
+      // instance, and 100 is the documented default.
+      const rt = currentInstanceOrNull();
+      const defaultLimit = Math.min(rt?.maxRecords ?? (Number(process.env.MAX_RECORDS) || 100), 1000);
       queryParams.set('sysparm_limit', defaultLimit.toString());
     }
 
@@ -378,27 +402,35 @@ export class ServiceNowClient {
     }
 
     if (params.orderBy) {
-      // Handle descending sort (prefix with "-")
-      if (params.orderBy.startsWith('-')) {
-        const field = params.orderBy.substring(1);
-        queryParams.set('sysparm_query',
-          params.query
-            ? `${params.query}^ORDERBY${field}^ORDERBYDESC`
-            : `ORDERBY${field}^ORDERBYDESC`
-        );
-      } else {
-        queryParams.set('sysparm_query',
-          params.query
-            ? `${params.query}^ORDERBY${params.orderBy}`
-            : `ORDERBY${params.orderBy}`
-        );
+      // `-field` means descending, and the platform's encoded form is `ORDERBYDESC<field>` —
+      // ONE term. This used to build `ORDERBY<field>^ORDERBYDESC`: two terms, the first sorting
+      // ascending and the second a bare operator with no field. ServiceNow does not reject it,
+      // it just sorts ascending, so every "newest first" query returned the OLDEST records and
+      // looked like it had worked. That is the defect behind field-notes' sort workaround and
+      // the "newest is years old" note in the legacy setup text.
+      //
+      // Multiple fields are comma-separated and joined per term, each carrying its own
+      // direction: `-priority,sys_created_on` → `ORDERBYDESCpriority^ORDERBYsys_created_on`.
+      const terms = params.orderBy.split(',')
+        .map((raw) => raw.trim())
+        .filter((raw) => raw.length > 0)
+        .map((raw) => (raw.startsWith('-')
+          ? `ORDERBYDESC${raw.slice(1)}`
+          : `ORDERBY${raw}`));
+
+      if (terms.length > 0) {
+        const sort = terms.join('^');
+        queryParams.set('sysparm_query', params.query ? `${params.query}^${sort}` : sort);
+      } else if (params.query) {
+        // `orderBy: ','` or `'  '` — nothing to sort by, but the query must still survive.
+        queryParams.set('sysparm_query', params.query);
       }
     }
 
     const url = `${this.baseUrl}/api/now/table/${params.table}?${queryParams.toString()}`;
 
     logger.info(`Querying ServiceNow table: ${params.table}`);
-    logger.debug(`Query: ${params.query || 'none'}`);
+    logger.debug(`Query: ${this.maskQuery(params.query)}`);
 
     try {
       const response = await this.request<ServiceNowApiResponse<ServiceNowRecord[]>>(url);
@@ -464,6 +496,38 @@ export class ServiceNowClient {
   /**
    * Get a single record by sys_id
    */
+  /**
+   * The user name this client authenticates as.
+   *
+   * `snow_us_capture_target_set` needs it to resolve `sys_user` and to scope
+   * `snow_us_active_update_set_ensure` to the caller's own in-progress update sets. It is
+   * the USER NAME, never the password, and no tool puts it in a response — a caller who can
+   * see the answer can already see the instance, but a response is also a log line.
+   */
+  getAuthUsername(): string | undefined {
+    return this.authMethod === 'oauth' ? this.oauthConfig?.username : this.basicConfig?.username;
+  }
+
+  /**
+   * The encoded query, with this client's own account name replaced.
+   *
+   * `snow_us_active_update_set_ensure` builds `…^sys_created_by=<username>` (ARC-04-S07, so
+   * that it returns only the caller's update sets), and at debug level that string went
+   * straight to stderr. ARC-04-S10's no-secrets sweep caught it: the fixture username appeared
+   * in the captured log.
+   *
+   * Replacing the known account name rather than pattern-matching `sys_created_by=`: the value
+   * is the thing that must not be printed, and it can arrive under any field. This does not
+   * make queries free of personal data in general — a caller's own `caller_id=` filter still
+   * prints, which is documented — it removes the ONE value the server itself put there.
+   */
+  private maskQuery(query?: string): string {
+    if (!query) return 'none';
+    const user = this.getAuthUsername();
+    if (!user) return query;
+    return query.split(user).join('<user>');
+  }
+
   async getRecord(table: string, sysId: string, fields?: string): Promise<ServiceNowRecord> {
     validateTableName(table);
     validateSysId(sysId);
@@ -924,7 +988,7 @@ export class ServiceNowClient {
     error: unknown,
     table: string,
     sysId: string
-  ): { code: string; message: string } {
+  ): { code: ErrorCodeName; message: string } {
     const sn = error instanceof ServiceNowError ? error : undefined;
     const meta = sn && sn.details && typeof sn.details === 'object' ? (sn.details as { status?: number; detail?: string }) : {};
     const status = meta.status;
@@ -1048,7 +1112,7 @@ export class ServiceNowClient {
       // Decode base64 to binary
       const binary = Buffer.from(contentBase64, 'base64');
 
-      const response = await fetch(url, {
+      const response = await snFetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': contentType,
@@ -1094,7 +1158,7 @@ export class ServiceNowClient {
     }
 
     const batchPayload = {
-      batch_request_id: `servicenow-mcp_${Date.now()}`,
+      batch_request_id: `snowarch_${Date.now()}`,
       rest_requests: operations.map(op => ({
         id: op.id,
         method: op.method,
@@ -1144,63 +1208,9 @@ export class ServiceNowClient {
     }
   }
 
-  /**
-   * Execute a server-side script via the Background Script API.
-   * Useful for GlideQuery, GlideAggregate, and complex operations.
-   */
-  async executeScript(script: string, scope?: string): Promise<any> {
-    await this.authenticate();
-    logger.info('Executing server-side script');
-
-    try {
-      // Use the standard script execution endpoint
-      const response = await this.request<any>(
-        `${this.baseUrl}/api/now/v1/batch`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            batch_request_id: `script_${Date.now()}`,
-            rest_requests: [{
-              id: 'script_exec',
-              method: 'POST',
-              url: '/api/now/table/sys_script_execution',
-              headers: [
-                { name: 'Content-Type', value: 'application/json' },
-                { name: 'Accept', value: 'application/json' },
-              ],
-              body: JSON.stringify({
-                script,
-                scope: scope || 'global',
-              }),
-            }],
-          }),
-        }
-      );
-
-      const results = response.serviced_requests || [];
-      if (results.length > 0) {
-        let body: any;
-        try {
-          body = typeof results[0].body === 'string' ? JSON.parse(results[0].body) : results[0].body;
-        } catch {
-          body = results[0].body;
-        }
-        return {
-          status: results[0].status_code,
-          output: body,
-          scope: scope || 'global',
-        };
-      }
-
-      return { status: 200, output: 'Script executed (no output captured)', scope: scope || 'global' };
-    } catch (error) {
-      if (error instanceof ServiceNowError) throw error;
-      throw new ServiceNowError(
-        `Script execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'SCRIPT_FAILED'
-      );
-    }
-  }
+  // client.executeScript was removed by ARC-04-S08. It posted to sys_script_execution, an
+  // endpoint that does not exist on a PDI; the two tools that used it are now [Unsupported]
+  // stubs that fail before any HTTP rather than after a 404.
 
   /**
    * Natural language update (simplified implementation)

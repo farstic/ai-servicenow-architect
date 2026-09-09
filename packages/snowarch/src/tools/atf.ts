@@ -6,8 +6,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireAtf } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function atfToolManifest() {
+export function atfToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_atf_atf_suites_index',
@@ -21,6 +22,8 @@ export function atfToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_atf_atf_suite_read',
@@ -32,6 +35,8 @@ export function atfToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_atf_atf_suite_exec',
@@ -43,6 +48,8 @@ export function atfToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'atf',
+      mutates: true,
     },
     {
       name: 'snow_atf_atf_tests_index',
@@ -56,6 +63,8 @@ export function atfToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_atf_atf_test_read',
@@ -67,6 +76,8 @@ export function atfToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_atf_atf_test_exec',
@@ -78,6 +89,8 @@ export function atfToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'atf',
+      mutates: true,
     },
     {
       name: 'snow_atf_atf_suite_result_read',
@@ -89,6 +102,8 @@ export function atfToolManifest() {
         },
         required: ['result_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_atf_atf_test_results_index',
@@ -101,6 +116,8 @@ export function atfToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_atf_atf_failure_insight_read',
@@ -112,6 +129,8 @@ export function atfToolManifest() {
         },
         required: ['result_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

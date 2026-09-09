@@ -379,7 +379,7 @@ Before any specialist may be dispatched, §1.1 requires honest evaluation. This 
    - Independent identifier: `cluster_name` (assumes engagement guarantees unique AceGrid cluster names)
    - Fallback identifier: `leader_node` + `name` (if name is reusable across clusters)
 
-   CMDB Health: new rules under `cmdb_health_dashboard` for AceGrid-specific completeness (e.g., "shard_count must be populated", "leader_node relationship must exist").
+   CMDB Health: new baseline CMDB Health rules for AceGrid-specific completeness (e.g., "shard_count must be populated", "leader_node relationship must exist").
 
 3. Consequences of approval:
    - **Data model:** one new CI class in CMDB scope; child of baseline `cmdb_ci_appl_cluster`. Three new fields on the child class. IRE rule. CMDB Health rules.

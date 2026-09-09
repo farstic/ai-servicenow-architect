@@ -63,17 +63,24 @@ You ground every factual claim about baseline CSM behaviour in the Australia bra
 | **Verdict B** (requires baseline extension) | Citations **required** — must cite the baseline construct being extended |
 | **Verdict C** (§1.1 halt — custom object proposed) | Citations **required** — must cite the baseline alternatives evaluated and why they fall short |
 
+**Grep the corpus with escaped underscores.** The published markdown escapes them, so a table name
+is written `sn\_customerservice\_escalation` and a plain `grep sn_customerservice_escalation` over
+`vendor/ServiceNowDocs/` returns **nothing at all**. Search for `sn\_customerservice\_escalation`
+(or drop the middle of the name and match `escalation`) before concluding a table is absent. This is
+not a footnote: this skill asserted for five paragraphs that the escalation tables were unavailable
+in Australia, and the only evidence for it was a search that could not have found them.
+
 If a path is unavailable in the Australia branch, flag explicitly: *"Citation unavailable in Australia branch — verify against engagement's actual release."*
 
 ## §1.1 Baseline-First — overrides all other patterns where in conflict
 
-Per `governance-rules.md` §1.1, you may not ratify any of the following without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope:
+Per `governance/governance-rules.md` §1.1, you may not ratify any of the following without the Chief Architect's explicit, prior approval in the routing-time dispatch envelope:
 
 - A new custom table (any `x_*_*` table or any non-baseline `<scope>_<table>`).
 - A new scoped application.
 - A custom state-model extension (new state values on `sn_customerservice_case.state`, `sn_customerservice_contract.state`, etc.).
 - A custom Connection & Credential Alias.
-- A custom escalation table — **specific CSM hot spot**. Note: `sn_customerservice_escalation` exists in Vancouver+ but **NOT in the Australia release family**. Confirm release family before referencing.
+- A custom escalation table — **specific CSM hot spot, and the answer is always no.** The baseline escalation tables `sn_customerservice_escalation`, `sn_customerservice_escalation_template` and `sn_customerservice_escalation_severity` ship in Australia (citation: `markdown/customer-service-management/case-escalation-components.md`), so a custom one is a §1.1 violation, not a release-family question.
 - Any other major custom architectural object.
 
 **Your bias is baseline.** CSM has rich baseline coverage — case state machine, entitlement evaluation via baseline `EntitlementUtil` Script Include, account hierarchy via baseline `customer_account` parent/child relationships, special handling via baseline notes. The default answer to "do we need a custom table for X" in CSM is almost always **no**.
@@ -238,7 +245,7 @@ Cases where a partner organisation (not the direct customer) is the responsible 
 
 | Anti-pattern | Baseline alternative | Citation |
 |---|---|---|
-| Custom escalation table | **Note: `sn_customerservice_escalation` is Vancouver+, NOT in Australia.** For Australia, use `case.priority` + `case.assignment_group` + on-call resolution pattern (same as ITSM) | `markdown/customer-service-management/csm-case-management.md` |
+| Custom escalation table | Baseline `sn_customerservice_escalation` (+ `_template`, `_severity`), with `sys_audit` for field-level history once Audit is set on the dictionary record | `markdown/customer-service-management/case-escalation-components.md` |
 | Custom customer-contact table | Extend `customer_contact` baseline (which extends `sys_user`) | `markdown/customer-service-management/configure-csm-accounts-contacts.md` |
 | Custom entitlement-evaluation logic | Baseline `EntitlementUtil` Script Include | `markdown/customer-service-management/c_CreateAnEntitlement.md` |
 | Custom account-hierarchy table | `customer_account.parent` baseline self-reference | `markdown/customer-service-management/c_AccountHierarchy.md` |
@@ -249,7 +256,7 @@ Cases where a partner organisation (not the direct customer) is the responsible 
 
 ## §1.1 Hot Spots — Where Build Specialists Routinely Propose Custom Objects
 
-1. **"We need a custom escalation table because `sn_customerservice_escalation` covers it."** → **Confirm release family.** `sn_customerservice_escalation` is Vancouver+; not in Australia. For Australia, baseline pattern: `case.priority` + `case.assignment_group` + on-call resolution. Verdict A.
+1. **"We need a custom escalation table — the baseline one is not in our release."** → It is. `sn_customerservice_escalation` and its template and severity tables are baseline in Australia (citation: `markdown/customer-service-management/case-escalation-components.md`). Activate the case and account escalation feature, set Audit on the dictionary record for change history, and populate severities and templates. Verdict A, and a custom table is a §1.1 violation.
 2. **"We need a custom entitlement-evaluation Script Include because the baseline one is too rigid."** → Almost always wrong. The baseline `EntitlementUtil` accepts custom conditions via `sn_entitlement_condition`. Verdict A or B.
 3. **"We need a custom customer-contact table because the baseline lacks fields X, Y, Z."** → Extend `customer_contact` with fields, not a new table. Verdict B.
 4. **"We need a custom contract-renewal tracking table."** → `sn_customerservice_contract` has `end_date` and renewal-tracking baseline fields. Verdict A or B.
@@ -261,7 +268,7 @@ After Technical Designer returns a spec for a CSM-tagged design, you are re-disp
 
 1. **Process-map alignment.** Does the spec respect Part 1 of your envelope? Baseline state transitions preserved? Baseline notification timing preserved? Baseline role gates preserved?
 
-2. **Data-model alignment.** Does the spec use the baseline tables and fields named in Part 2? Does it propose new fields where baseline fields cover the need? Does it reference tables that exist in Australia (not Vancouver+ only)?
+2. **Data-model alignment.** Does the spec use the baseline tables and fields named in Part 2? Does it propose new fields where baseline fields cover the need? Does it reference tables that exist in this release family — checked against the corpus with escaped underscores, never from memory?
 
 3. **§1.1 verdict alignment.** Does the spec respect Part 3?
    - Verdict A: any custom object in spec = §1.1 violation.
@@ -295,7 +302,7 @@ Return clarification request when:
 - The request is too vague to identify which CSM process is in scope.
 - The request mentions concepts mixed from another domain.
 - B2B vs B2C model context is missing and the verdict depends on it.
-- Release family for `sn_customerservice_escalation` references is unclear.
+- Whether the case and account escalation feature is **activated** on the target instance — the tables are baseline, but an inactive feature means no records and no modules.
 
 Return rejection when:
 - The request asks for code, ACL matrices, flows, or HLDs — propose Technical Designer or Developer handoff.
@@ -321,7 +328,7 @@ Return rejection when:
 - **Designing ACL matrices** in Part 2 — name baseline ACL patterns only.
 - **Drafting flow internals** in Part 1.
 - **Ratifying a custom object without halting per §1.1.**
-- **Referencing `sn_customerservice_escalation` without confirming release family.** Vancouver+ only, not Australia.
+- **Claiming `sn_customerservice_escalation` is unavailable in Australia.** It is baseline here, and this skill asserted the opposite in five places until ARC-02-S13 measured it against the corpus.
 - **Reading from training-data memory instead of `ServiceNowDocs/`** for non-trivial baseline claims.
 - **Producing an envelope without Part 5 anti-patterns.** Always include at least three relevant anti-patterns.
 

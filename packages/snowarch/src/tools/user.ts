@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function userToolManifest() {
+export function userToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_usr_users_index',
@@ -19,6 +20,8 @@ export function userToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_usr_user_add',
@@ -35,6 +38,9 @@ export function userToolManifest() {
         },
         required: ['user_name', 'email', 'first_name', 'last_name'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'sys_user',
     },
     {
       name: 'snow_usr_user_modify',
@@ -47,6 +53,9 @@ export function userToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'sys_user',
     },
     {
       name: 'snow_usr_groups_index',
@@ -59,6 +68,8 @@ export function userToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_usr_group_add',
@@ -72,6 +83,9 @@ export function userToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'sys_user_group',
     },
     {
       name: 'snow_usr_group_modify',
@@ -84,6 +98,9 @@ export function userToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
+      table: 'sys_user_group',
     },
     {
       name: 'snow_usr_user_group_assign',
@@ -96,6 +113,8 @@ export function userToolManifest() {
         },
         required: ['user_sys_id', 'group_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_usr_user_group_unassign',
@@ -107,6 +126,8 @@ export function userToolManifest() {
         },
         required: ['member_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
   ];
 }

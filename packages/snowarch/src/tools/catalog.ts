@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function catalogToolManifest() {
+export function catalogToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_cat_catalog_items_index',
@@ -19,6 +20,8 @@ export function catalogToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cat_catalog_query',
@@ -31,6 +34,8 @@ export function catalogToolManifest() {
         },
         required: ['query'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cat_catalog_item_read',
@@ -42,6 +47,8 @@ export function catalogToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cat_catalog_item_add',
@@ -63,6 +70,8 @@ export function catalogToolManifest() {
         },
         required: ['name', 'short_description'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_cat_catalog_item_modify',
@@ -78,6 +87,8 @@ export function catalogToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_cat_catalog_item_order',
@@ -91,6 +102,8 @@ export function catalogToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     // Approval tools
     {
@@ -123,6 +136,8 @@ export function catalogToolManifest() {
         },
         required: ['name', 'table', 'approver_type', 'approver'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_cat_my_approvals_read',
@@ -134,6 +149,8 @@ export function catalogToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cat_approvals_index',
@@ -147,6 +164,8 @@ export function catalogToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cat_request_approve',
@@ -159,6 +178,8 @@ export function catalogToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_cat_request_reject',
@@ -171,6 +192,8 @@ export function catalogToolManifest() {
         },
         required: ['sys_id', 'comments'],
       },
+      gate: 'write',
+      mutates: true,
     },
     // SLA tools
     {
@@ -183,6 +206,8 @@ export function catalogToolManifest() {
         },
         required: ['task_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cat_active_slas_index',
@@ -195,6 +220,8 @@ export function catalogToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_cat_catalog_variable_add',
@@ -211,6 +238,8 @@ export function catalogToolManifest() {
         },
         required: ['cat_item_id', 'name', 'question_text', 'type'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_cat_catalog_ui_policy_add',
@@ -225,6 +254,8 @@ export function catalogToolManifest() {
         },
         required: ['cat_item_id', 'short_description'],
       },
+      gate: 'write',
+      mutates: true,
     },
   ];
 }

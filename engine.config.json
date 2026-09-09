@@ -6,7 +6,11 @@
   "mcp": {
     "serverKey": "servicenow",
     "package": "@farstic/snowarch",
-    "packageDir": "packages/snowarch"
+    "packageDir": "packages/snowarch",
+    "permissions": {
+      "allowStyle": "explicit",
+      "askStyle": "ask"
+    }
   },
   "floors": {
     "claudeCode": "2.1.214",
@@ -21,6 +25,9 @@
   },
   "roster": {
     "skills": 28,
-    "agents": 9
+    "agents": 9,
+    "utility": [
+      "snowarch"
+    ]
   }
 }

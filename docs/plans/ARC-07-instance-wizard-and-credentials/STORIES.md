@@ -98,6 +98,14 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ### ARC-07-S02 — URL normalisation and validation; environment proposal; reachability probe with DNS / TLS-CA / proxy diagnosis (R-3)
 
+> **Amendment 2026-09-08 (from ARC-05-S06).** **`PROXY_CONNECT_FAILED` is not a registry key —
+> the condition is `PROXY_UNREACHABLE`** (ARC-04-S11 emits it, and the registry carries its meaning
+> and remedy). `ServiceNowError` now takes the registry's union as its code type, so the old literal
+> will not compile. The wizard's own codes — `URL_REQUIRED`, `URL_INVALID`, `URL_NOT_HTTPS`,
+> `URL_HAS_PATH`, `URL_HAS_CREDENTIALS`, `OAUTH_ROPC_DISABLED`, `OAUTH_CLIENT_INVALID`,
+> `TLS_CERT_INVALID` — are registered with `showInRule: false` and already have their meanings and
+> remedies in `docs/TROUBLESHOOTING.md`; render them, do not restate them.
+
 **As** an individual practitioner **I want** the wizard to accept my instance address in any reasonable form, correct what can be corrected with my consent, refuse what cannot, and — when the host is unreachable — tell me *which* of DNS, a TLS-intercepting gateway or a proxy is in the way and what to set **so that** a corporate laptop is not stuck at "unreachable".
 
 **Context.** P-23 (the `/api` auto-fix at `setup.ts:441-449,597-608` builds `https://host/api` and saves it as the base URL, which then breaks every REST path; "continue anyway" at 437–439). `01` §6.2 step 5: "validated as a bare `https://` origin — vanity hostnames allowed, trailing slash stripped, `/api` rejected with the reason"; step 7: "10 s HEAD reachability first, with DNS / TLS / proxy diagnosis". D-05: "`^https://dev\d+\.service-now\.com` → proposed `pdi`; everything else is asked, never guessed". R-3 (`02` post-decision rulings; `03` R-15): "the ARC-07 wizard reachability probe distinguishes DNS / TLS-CA / proxy failures and prints the exact remedy"; the server's HTTP layer honours `HTTPS_PROXY` / `NO_PROXY` / `NODE_EXTRA_CA_CERTS` per ARC-04-S11 (`src/servicenow/http.ts` `snFetch()` with an `EnvHttpProxyAgent`; `src/servicenow/net-errors.ts` `classifyNetworkError()`) — this story consumes both, it adds neither a proxy agent nor a second error classifier.
@@ -286,6 +294,11 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 ---
 
 ### ARC-07-S05 — `instance add` end to end: bounded credential re-entry, atomic 0600 save, secret-free summary, the `./snowarch instance` forwarder, exit codes
+
+> **Amendment 2026-09-08 (from ARC-05-S06).** **`STORE_MODE_UNSAFE` is not a registry key — the
+> condition is `STORE_PERMISSIONS_TOO_OPEN`** (ARC-04-S02's name, already carrying the exact `chmod`
+> in its message). `STORE_IN_CLOUD_SYNC_FOLDER` is registered for the D-04 warning. Both are typed,
+> so a literal that is not a registry key will not compile.
 
 **As** an individual practitioner with a PDI **I want** `./snowarch instance add pdi --url https://devNNNNN.service-now.com --env pdi --auth basic --preset pdi-developer --default` to ask for my username and password, prove the instance, let me review the flags, and save one 0600 file — or save nothing at all **so that** the instance is usable "with the right permissions" after one command (README goal; `01` §6.2 steps 6–7).
 
@@ -582,6 +595,26 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 ---
 
 ### ARC-07-S10 — `docs/MODES-AND-PRESETS.md` final text; error-registry entries; runtime rule text for `AUTHENTICATION_FAILED` / `INSUFFICIENT_PRIVILEGES` / `PROD_WRITE_NOT_ACKNOWLEDGED`
+
+> **Amendment 2026-09-08 (from ARC-05-S07). First item of this story's list: the permission-modes
+> paragraph, which did not fit ARC-02-S09's 160-line budget** (the page is at 159). Drafted, to be
+> placed after section 3:
+>
+> > **Permission modes.** `disabledMcpjsonServers` removes the server, so no tool exists and the
+> > generated `allow`/`ask` lists are inert. `dontAsk` denies what `ask` would have prompted for,
+> > which is safe. `bypassPermissions` skips both — never with a live write preset.
+>
+> Adding it means the budget moves again, or something else in the page goes; say which.
+
+> **Amendment 2026-09-08 (from the ARC-02-S09 delivery).** **`docs/MODES-AND-PRESETS.md` exists with
+> the v1 text; this story replaces the probe wording, not the page.** Section 3 carries a review
+> screen with placeholder probe strings (`probe: ok`, `probe: no Now Assist licence detected …`,
+> `probe: @servicenow/sdk not on PATH …`) — replace those with what the wizard actually prints. Two
+> things in that section are load-bearing and asserted by `tests/no-legacy-surfaces.test.mjs`: the
+> line `Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset`, and
+> the D-05 sentence *"A probe that fails downgrades the recommendation shown on that line; it never
+> flips the toggle by itself"*, which must survive verbatim — a paraphrase is how that guarantee gets
+> softened. The preset table between the `PRESETS:` markers belongs to ARC-05-S05, not to this story.
 
 **As** an individual practitioner (and the engine reading the generated rule file) **I want** one page that explains Mode, the four presets, the six flags, the review screen, production rules, where credentials live and how to use a password manager, plus a troubleshooting entry for every error the wizard can print, and a runtime rule that makes the engine stop on `AUTHENTICATION_FAILED` **so that** nobody has to read source code or a transcript to recover.
 

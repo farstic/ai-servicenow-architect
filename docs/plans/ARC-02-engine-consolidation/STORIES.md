@@ -365,6 +365,28 @@ Story order differs from the README's title list (which was written before the d
 **Definition of done.** Merged; `tests/claude-md.test.mjs` green on the matrix; CONTRIBUTING budget table; `docs/CHANGELOG.md` "Before 2.0.0" receives the two removed footers.
 
 ### ARC-02-S09 — `docs/MODES-AND-PRESETS.md` — Mode semantics, the preset table and plain-language flags of `01` §6.3, principle 10
+
+> **Amendment 2026-09-08 (from the S09 delivery).**
+> - **The SCRIPTING risk note is spent.** ARC-04-S05 merged on 2026-09-08, so "reading is always
+>   allowed" is current fact and the page states it as one. The story's "the page states *from
+>   2.0.0*" instruction no longer applies; a forward-looking hedge on shipped behaviour would now be
+>   wrong in the other direction.
+> - **Criterion 4 is half-deliverable here.** `docs/ARCHITECTURE.md` links to the page in this
+>   story. `CLAUDE.md` links to it in **S08**, which owns that file's structure — S09 must not add a
+>   link to a document S08 is rewriting around it. Verify criterion 4's `CLAUDE.md` half at S08.
+> - **Criterion 1's line budget is amended from ≤ 150 to ≤ 160 (ruled 2026-09-08).** 150 was set for
+>   a page written from scratch; the merge ruling instead keeps ARC-04-S02/S03/S05's store
+>   precedence, permission and refusal claims (they are tested) and wraps the story's seven sections
+>   around them, and ARC-07-S10 still has probe strings to add. Prose was compressed hard first —
+>   184 → 158 across four passes, paragraphs reflowed to the width the rest of `docs/` uses and the
+>   two production code blocks merged into one — and what remained was claims and their exact
+>   strings, so the last eight lines could only have come from dropping a tested claim or running
+>   unrelated paragraphs together. The page is 159 lines; `tests/no-legacy-surfaces.test.mjs` prints
+>   the count and asserts the 160 ceiling.
+> - **`servicenow-mcp` cannot appear here.** Criterion 2 forbids it and the upgrade note used it to
+>   name the package people upgrade *from*. The note now names the behaviour instead — "Upgrading
+>   from the 1.0.0 server" — which keeps the claim and satisfies the criterion. `docs/CONTRIBUTING.md`
+>   still records that the bare name is deliberately not retired repo-wide (D-01's npm record).
 **As** an individual practitioner **I want** one page that explains what `design-only` and `live` mean, what each preset turns on, what each flag does in plain words, and how production is protected **so that** I can decide on the per-flag review screen without reading the server source.
 **Context.** P-06, D-05 (owner-modified posture: `full` proposed for `pdi`/`dev`/`test`; `read-only` for `prod`, capped; `--ack-prod`), principle 10 ("Propose, don't impose"), `01` §6.3 (the table, the review screen, the flag meanings, the safety rules), `01` §9 (design-only), ARC README deliverable (`docs/MODES-AND-PRESETS.md`). ARC-07-S10 delivers the *final* text (probe wording, troubleshooting cross-links) and ARC-05-S05 generates the preset table from the contract — this story writes v1 with splice markers so both can land without rewriting.
 **Scope.** In: the page as specified below; cross-links from `CLAUDE.md` section 4 (S08) and `docs/ARCHITECTURE.md`. Out: probe result strings (ARC-07), `TROUBLESHOOTING.md` entries (ARC-05/ARC-07), any server behaviour claims not already in `01` §6.3.
@@ -391,6 +413,36 @@ No "Tier", no old server key, no price or licence claims beyond "NOW_ASSIST need
 **Definition of done.** Merged; links in place; ARC-05/ARC-07 informed of the markers.
 
 ### ARC-02-S10 — `docs/PLATFORM-NOTES.md` from the field notes; server-behaviour sections handed to ARC-04 as regression-test titles
+
+> **Amendment 2026-09-08 (from the S10 delivery).**
+> - **Criterion 4 is recorded, not re-opened (ruled).** Four of the seven handover items were already
+>   delivered by ARC-04 and have tests: 1 `tests/tools/update-set-capture.test.ts`, 2
+>   `tests/tools/unsupported-stubs.test.ts`, 3 `tests/tools/integration-event.test.ts`, 4
+>   `tests/tools/script-business-rule.test.ts`. Item 6 is verify-only against a live instance and now
+>   has a written procedure in `packages/snowarch/tests/live/README.md` — the CHANGELOG pointed at
+>   that file, so the procedure had to exist for the pointer to be true. Items 5 and 7 are open. The
+>   whole mapping is the "Known limitations carried from snow-mcp 1.0.0" table in
+>   `packages/snowarch/CHANGELOG.md`; no checklist comment was opened on closed ARC-04 tickets.
+> - **Classification of the mixed section (task 1), decided without an owner round-trip:** field-notes
+>   §1's platform half — REST capture follows the user's `sys_user_preference` — is PN-01; its server
+>   half — `switch` only set `is_default` — is row 1 of the CHANGELOG table. §14's docx/diagram rule
+>   is present in `scripts/README.md` and was dropped. §8 named a config file this product no longer
+>   uses and was dropped.
+> - **The §11 observation about the error CODE was dropped from both destinations.** The note said the
+>   1.0.0 tool reported an invalid `close_code` as `INSUFFICIENT_PRIVILEGES`, making a validation
+>   failure look like an ACL problem. That is a server claim, so it does not belong in PN-04; but it
+>   is about a tool that no longer exists in that form, and whether the current server maps it
+>   correctly cannot be settled without a live instance. Adding it to the limitations table would
+>   assert a defect nobody has observed in 2.0.0. Recorded here instead: **worth a live check when
+>   the owner next has an instance open.**
+> - **SK-09 flipped from counting to enforcing.** The rule had a test asserting the governing
+>   documents were still dirty, so that "not yet swept" could not be mistaken for "swept". S06 took
+>   it to one hit; this story's Standing Rule rewrite took the last one, so the test now asserts the
+>   surface is clean.
+> - **Criterion 5 needed more than a path swap.** The Standing Rule routed MCP findings *out* of the
+>   repository (DR-16, from when the server lived elsewhere). It now names both destinations by kind
+>   of finding — platform to `docs/PLATFORM-NOTES.md`, server to a test plus the CHANGELOG. S08 still
+>   owns the section's structure.
 **As** the engine (Claude) **I want** the platform facts learned on real instances kept as product documentation with their ServiceNowDocs grounding, and the MCP-tool bugs turned into server tests **so that** an engagement journal stops being a product document (P-13) and the knowledge survives in the place that can enforce it.
 **Context.** P-13 (`00` §3.11: `docs/nowaikit-field-notes.md` — 15 PDI findings, section numbering 1-7,10,9,8,13,14,11,15, §8 still says `claude_desktop_config.json`), DR-16 (`01` §18: field-notes split; the "MCP findings excluded from this repo" standing rule lapses with the merge), `00` §8 field-notes classification (platform facts: §1-platform, §3, §7, §10, §11, §13, §15; server behaviours: §1-`switch_update_set`, §2, §4, §5, §6, §9a, §9b; obsolete: §8; engine tooling: §14), ARC README deliverable 4 ("each with the ServiceNowDocs citation it relies on"), `CLAUDE.md` Standing Rule (rewritten in S08).
 **Scope.** In: `docs/PLATFORM-NOTES.md`; the handover list for ARC-04; deletion of `docs/nowaikit-field-notes.md`; §14's docx/diagram rule confirmed present in `scripts/README.md` (it is — "Golden rule" section) and dropped from the notes. Out: writing the ARC-04 tests; new platform findings.
@@ -456,7 +508,7 @@ No "Tier", no old server key, no price or licence claims beyond "NOW_ASSIST need
 - `status` body:
   1. Run `./snowarch doctor --quick --json` (Windows Git Bash: same command; if `./snowarch` is not executable, run `node tools/snowarch/bin/snowarch.mjs doctor --quick --json`).
   2. If it succeeds: print the `mode` line **verbatim** as `Mode: …` (the doctor prints it as `report.modeLine` — ARC-08-S01 defines the JSON; until then the fixture defines the same key), then engine version, docs pin, roster (`28 skills / 9 agents`), capability packs — one line each (ARC-08-S09 owns the final layout; this story prints the Mode line plus whatever keys exist).
-  3. If `node` is absent or the command fails with "not found": read `.local/bootstrap-state.json` and print `Mode: <mode> — from bootstrap state; doctor unavailable until Node 20+ is installed` (`01` §8).
+  3. If the doctor cannot run: read `.local/bootstrap-state.json` and print `Mode: <mode> — from bootstrap state; doctor unavailable, <cause>`, naming the cause actually observed and no other — Node absent or below 20 → `until Node 20+ is installed`; Node fine but `./snowarch` absent → `the launcher is not installed — run ./bootstrap.sh (Windows: bootstrap.cmd)`; it ran and failed → `the doctor exited <code>` (`01` §8). *Amended at S11 (2026-09-09): the original text printed the Node remedy for every failure, and a session with Node 24 and no launcher correctly refused to state a cause it had not observed.*
   4. If neither exists: print `Mode: unknown — this checkout has not been bootstrapped; run ./bootstrap.sh (Windows: bootstrap.cmd)`.
   5. Never infer the mode from `~/.claude.json`, `/mcp`, or memory (R-14).
 - `setup-instance` body (skeleton; ARC-07 completes steps 2–5, 8):
@@ -483,7 +535,7 @@ No "Tier", no old server key, no price or licence claims beyond "NOW_ASSIST need
 1. `node --test tests/` passes with the new skill (SK rules; name not in the built-in list; description ≤ 500; utility exemption for EXAMPLES.md); `scripts/gen-roster.mjs --check` passes with the utility table showing `snowarch`.
 2. In a fresh session with the doctor stub at the root, `/snowarch status` prints exactly the stub's Mode line as the first line of its answer (ARC README acceptance criterion 2, second half, against the stub; ARC-08's CI run repeats it against the real doctor).
 3. Typing `Status` (plain text) produces the same Mode line (CLAUDE.md section 3 trigger).
-4. With the stub removed and `.local/bootstrap-state.json` = `{"mode":"design-only","docsPin":"ba513f2","at":"…"}`, `/snowarch status` prints `Mode: design-only — from bootstrap state; doctor unavailable until Node 20+ is installed`.
+4. With the stub removed and `.local/bootstrap-state.json` = `{"mode":"design-only","docsPin":"ba513f2","at":"…"}`, `/snowarch status` prints `Mode: design-only — from bootstrap state; doctor unavailable, <cause>` with the cause actually observed (on a machine with Node 20+ and no launcher: `the launcher is not installed — run ./bootstrap.sh (Windows: bootstrap.cmd)`). *Amended at S11 (2026-09-09) — see design note `status` step 3.*
 5. With neither present, it prints the `Mode: unknown — … run ./bootstrap.sh` line and nothing else about mode.
 6. `/snowarch setup-instance` in the same session prints the hand-off block with the label and URL substituted, contains the literal `/snowarch setup-instance --resume`, and the transcript contains no `AskUserQuestion` whose text mentions password/secret/token; `grep -ci "password" .claude/skills/snowarch/SKILL.md` counts only the two "never asks"/"masked" sentences.
 7. `/snowarch doctor` relays the `DOCTOR:` summary line from the stub.

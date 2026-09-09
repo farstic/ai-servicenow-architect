@@ -9,6 +9,284 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ---
 
+## Unreleased
+
+### Added
+
+- **The recipe, proved against the real corpus on three operating systems — and ARC-03 is complete.**
+  `.github/workflows/docs-real.yml` fetches the actual 300 MB corpus on Ubuntu, macOS and Windows,
+  weekly and whenever the code that decides the checkout changes. Measured on its first green run:
+  **179 MB tree / 34,360 files** (183 MB on Windows), **25.3 s Ubuntu · 27.5 s macOS · 35.1 s
+  Windows**, `dead: 0` everywhere, `core.longpaths true` on Windows.
+  - **The longest path is 197 characters inside the corpus and 272–286 on disk.** Both are printed,
+    because they answer different questions — and the second is already over `MAX_PATH`, which is
+    the S-07 margin argument as a measurement rather than a prediction.
+  - A second Windows cell keeps Git Bash on PATH. **Acceptance criterion 5 was vacuous until this
+    story's fourth fixup**: every step said `shell: bash`, which on Windows *is* Git Bash, so the
+    cell meant to prove independence from bash was running under it. The job is now one Node entry
+    point under the platform's default shell, and the log distinguishes "bash reachable" (True — the
+    image carries one in System32) from "git bash reachable" (False after the strip).
+  - `E12_ABSENT(mode)` in `status.mjs` is the doctor's absent-corpus line, printed by `docs status`
+    and imported by ARC-08 rather than retyped: **FAIL, never WARN or SKIP.** With no corpus and no
+    state file the mode is `skip` — an absent checkout has no shape to infer from — while a recorded
+    mode still wins, because an operator who asked for `sparse` and has none has a broken install.
+  - The recipe-parity negative now changes **one character** (`--depth 1` → `--depth 2`): a lost line
+    is the easy case, and a single byte is what ships a different checkout while looking identical.
+
+- **Attribution, the measured figures, and one corpus section instead of six.**
+  - Every successful `docs sync` now ends with
+    `docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE`
+    — suppressed by `--quiet`, never inside `--json`, and the same constant closes the launcher
+    recipe and appears in `README.md`. Three copies of a licence line is three chances for one to be
+    wrong, so a test compares them.
+  - `NOTICE` gains the corpus paragraph. Its claim that the corpus's `LICENSE` **and `legal/`** are
+    "preserved in every checkout, sparse or full" was **not true when written**: `legal/` is a root
+    DIRECTORY and cone mode materialises root files only. The recipe now carries it by name and the
+    completeness check fails without it — the claim is enforced rather than softened.
+  - `README.md` carries the install figures: **302 MB and about 35 s** sparse (measured 2026-09-06,
+    ARC-00 S-07), and **447 MB / 48,997 files** for `--mode full` (measured 2026-09-09 — S-07 never
+    measured full mode, and the README says so rather than borrowing a number).
+  - `docs/ARCHITECTURE.md`: the six corpus sections S05–S09 each added are folded into one —
+    "Docs corpus: how the pin, the areas file and the gate relate" — three artefacts, who writes and
+    reads each, four invariants, then the commands, the exit table and the recipe block.
+
+### Fixed
+
+- **`sync` reported "up to date" over a checkout missing a directory it required.** Adding `legal/`
+  to the cone changed what the recipe WRITES but not what `inspect` COMPARED, so the two disagreed
+  and the comparison won. One definition of the cone now, used by both.
+- **The `ai-gateway-overview.md` citation, remapped in three places.** Upstream withdrew the AI
+  Gateway surface between `ba513f2` and `11b39be` — at the tip there is no `ai-gateway*` page and no
+  MCP page in `ai-control-tower/` at all, so this was a withdrawal, not a rename. The rows now cite
+  `configure-third-party-llms-using-ai-control-tower.md` and `ai-model-providers.md`, which resolve
+  at **both** pins. The bump report named one dead path; there were **three citation sites**, because
+  the report groups by path, and a remap has to fix every site.
+
+- **The weekly docs bump, as a schedule rather than an intention.** P-11 records a monthly refresh
+  ritual that was never executed; `.github/workflows/docs-bump.yml` runs it on Mondays at 05:17 UTC
+  and opens one pull request. **It never merges.**
+  - `scripts/docs-bump.mjs` is a thin wrapper. Everything that decides anything stays in the
+    upstream refresh; this renders the pull-request body — a three-item checklist, then S07's report
+    **verbatim inside a fence**, so a reviewer comparing it against a local run finds the same bytes.
+  - One bump at a time: the branch is named for the target SHA, so a re-run updates the PR instead
+    of opening a second, and a newer tip closes the older one as `superseded by #<n>`.
+  - A **dry run** exits 0 with the body in the log and a `::warning::` annotation for newly dead
+    citations — reporting is its job, and the red build belongs on the pull request where someone
+    can act on it. Exit 6 fails the job loudly; exit 4 cannot happen on a fresh checkout and is
+    treated as a bug in the recipe if it ever does.
+  - `actionlint` joins CI. The workflows are code, this one has a multi-line shell step with `gh`
+    calls and expression interpolation, and nothing else was checking them.
+  - Tests stub `gh` with a script on PATH that records its argv — never the real one. A test that
+    could open a pull request would defeat the point of a workflow that never merges.
+
+- **`docs family <name>` — the release-family switch, proposed before it is applied.** The dry run
+  is the proposal and `--yes` applies exactly what it printed; no line is edited that was not shown.
+  - **EDIT only when the matched phrase is the line's ONLY family mention.** Anything else —
+    "NOT available in the Australia release family, unlike Vancouver" — is listed under REVIEW
+    whole, because half a sentence about the new family and half about the old is worse than a line
+    nobody touched. On the real tree that is **53 EDIT and 69 REVIEW** lines, every gateway skill
+    carrying at least one of each.
+  - **The pin moves first, while the tree is still clean**, so S07's dirty-tree refusal guards the
+    whole operation instead of tripping on this command's own edits. A tree dirtied between the dry
+    run and the apply is refused before anything is written.
+  - A failing lint exits 1 with everything staged — the maintainer needs the edits to fix what the
+    lint caught — and the output ends with how to finish and how to abandon.
+  - History (`docs/plans`, `docs/spikes`, `docs/decisions`, the changelog, RELICENSING) is never
+    scanned, listed or edited: it records what was true when it was written.
+  - The stored transcript is `docs/validation/ARC-03-S08-family-dry-run.md`.
+
+- **`docs sync --upstream` — the maintainer refresh.** Fetches the family tip (or a named SHA),
+  moves the pin and the gitlink, re-runs the citation gate and prints which citations *became* dead.
+  It stages both paths and **commits nothing**: a human reads the diff and decides.
+  - The baseline verify runs **before** the move, because "newly dead" is a difference between two
+    states and the first stops existing the moment the corpus moves.
+  - The pin write replaces one 40-hex string rather than reparsing the file, so the reviewer's diff
+    is one token and not a reformat; it refuses outright if the file does not hold the pin it was
+    told to replace.
+  - Exit **1** means the pin moved *and* citations broke — both true, and the pin is staged because
+    you need the new corpus to repair the citations against it. Exit **6** is new: the upstream does
+    not have what was asked for (renamed family branch, unreachable SHA), and nothing moved.
+  - An upstream history rewrite that leaves the tip *behind* the pin is followed, not refused, and
+    the report says `(older than the current pin)` — staying put would hide the rewrite.
+  - `docs status` now reads the gitlink from the **index**, so a staged bump reads as `ok` with
+    `(staged)` rather than as a mismatch against a pin the maintainer just moved.
+  - `docs/CONTRIBUTING.md` gains "Refreshing the corpus"; `docs/ARCHITECTURE.md` gains the sequence
+    and one exit-code table for every `docs` sub-command.
+
+- **`docs status`, `docs verify --json`, and one description of the corpus.**
+  `tools/snowarch/lib/docs/status.mjs` computes what the doctor and `/snowarch status` will both
+  quote — present, pinned, right family, correctly sparse, fully cited — instead of each re-deriving
+  it. Twenty keys, `schema: 1`, never a network call.
+  - Two distinctions the shape is built around. `mode` is what was **asked for** (ARC-06's state
+    file) and `sparse` is what is **on disk**; they can disagree, both are reported, and the
+    disagreement is the finding. `citations` is `null` under `verify: false` but **the key is always
+    present**, so a consumer can tell "not asked" from "asked and empty" — the doctor's `--quick`
+    path and the SessionStart banner depend on that difference.
+  - `familyMatches` comes from the tracked branch, not from HEAD: recipe C leaves a detached HEAD at
+    the pin, so HEAD says nothing about the family.
+  - `sync --json` now prints this object; S05's placeholder and its "replaced by S06" comment are
+    gone.
+  - `LEGACY_ROOTS` and `scanRepo`'s `legacy` flag are retired — ARC-02 deleted the root mirrors, and
+    a flag whose only value pointed at directories that no longer exist is a way to scan nothing and
+    report success.
+
+- **`docs sync` completed: modes, reconcile, refusal, failure mapping and a printable recipe.** S03
+  delivered the checkout; this is the rest of it, in the same module rather than a second one.
+  - `--mode sparse|full`, defaulting to `docs.mode` in `.local/bootstrap-state.json` when ARC-06 has
+    written one. `skip` is a bootstrap flag, not a mode: it means *do not call sync*, so it is
+    refused rather than quietly treated as sparse. Switching either way is a config change on the
+    existing checkout — no re-clone, `.git` unchanged.
+  - **Reconcile**, each step idempotent and in order: dirty tree refused first, then clone, mode,
+    pin (fetch by hash only when the object is absent), gitlink, and ADR-0008's root-file repair. A
+    second run on a clean checkout issues no git write at all and says `[docs] up to date (…)`.
+  - A dirty working tree inside the submodule exits **4** with one sentence and touches nothing;
+    `--force` is never reached for. Every other git failure exits **5** with the sentence the
+    operator needs — DNS, proxy (address printed, credentials masked), TLS interception, an
+    unfetchable pin, no disk space, or git's own first stderr line, never swallowed. The classifier
+    is unit-tested against canned stderr because a `file://` fixture cannot produce any of it.
+  - `--print-recipe` prints the git commands for the caller's actual state, and
+    `docs/ARCHITECTURE.md` gains the git-only launcher recipe that ARC-06 executes when Node is
+    absent. `tests/docs-recipe.test.mjs` asserts the two are byte-identical, so the block cannot
+    drift from the module.
+  - `--json` prints a minimal `{ pin, mode, areas, files, bytes, complete }` object. **Temporary:**
+    ARC-03-S06's `docsStatus()` replaces this shape; nothing should be built on these keys.
+  - `tests/docs-sync.test.mjs` builds a fixture corpus and serves it over `file://` — no network.
+    Two states it goes out of its way to produce, because they are the ones that break the recipe:
+    a pin that is not the branch tip (so fetch-by-hash is genuinely exercised) and a submodule whose
+    `.git` is a file rather than a directory.
+
+- **The eighteen behavioural tests move to `tests/VALIDATION-TESTS.md`, and describe the product as
+  it now is.** They still described a two-surface product that D-03 cut, carried a per-test line
+  naming those surfaces, cited tool names retired at S12, and reserved T-07 for a pre-commit sync
+  hook deleted at S01. (The retired words are not quoted here: `tests/no-legacy-surfaces.test.mjs`
+  scans this file, and quoting them to explain their removal is how they come back.)
+  - `**Modes:**` replaces `**Tiers:**` on every test. T-05 and T-06 declare a **dormant** design-only
+    variant — the engine states that no live instance is configured and makes no tool call — and say
+    what a dormant PASS proves: that the gate holds when there is nothing to write to.
+  - T-05's expected behaviour is keyed on "a tool marked `mutates: true`" rather than a tool name.
+    The always-loaded rule file owns the names; a test that spelled one would need editing at every
+    rename, which is how the old names survived there in the first place.
+  - **New T-07 — Mode reporting and `/snowarch` in design-only**, in numeric position.
+  - T-06 and T-13 gain a runnable `### Prompt`. Both described their scenario in `### Setup` and left
+    the tester to invent the wording, which is not a repeatable test.
+  - The dated regression baseline and the pointers to the removed run-history tables are gone;
+    results belong in the pull request or under `docs/spikes/validation-runs/`.
+  - `tests/validation-tests-shape.test.mjs` makes criteria 1–4 permanent, with four fixture-negatives.
+    It reads the forbidden-name list out of the story's own grep expression rather than spelling it —
+    written inline, the list made the test file fail the engine lint on itself.
+  - `docs/CONTRIBUTING.md` gains "When to run the validation tests".
+  - **Executed once, in design-only, on a clean clone — 18 of 18.** The first pass was 16 of 18, and
+    both failures were real:
+    - The CSM Specialist skill claimed in five places that the baseline case-escalation tables are
+      absent from this release family. Ten corpus files name them. The published markdown escapes
+      the underscores, so the grep that would have caught it returned nothing — the skill now says
+      so, in its citation-discipline section, as a rule rather than a footnote. T-02's example rested
+      on that claim and is replaced by one verified against the corpus first; its pass criteria, fail
+      signals and bypass block are unchanged, because those are the test.
+    - The Operational Documentation consult did not survive a refused deployment. `CLAUDE.md` §8 now
+      says the go-live proposal fires even when the deployment is declined or deferred — a refusal is
+      exactly when the runbook is still outstanding. Line count unchanged at 125.
+    Both fixes were re-run twice each; the run record keeps the first tally and its analysis beneath
+    the final one.
+
+- **`/snowarch` — the first utility skill** (`.claude/skills/snowarch/SKILL.md`): `status` (and the
+  plain word `Status`, which `CLAUDE.md` §2 routes here), `setup-instance` with its `--resume` half,
+  and `doctor`. One skill with three branches, because `$ARGUMENTS` substitution is confirmed on CLI
+  2.1.258 — the three-skill fallback was not needed. It reports and configures; it never designs,
+  never calls an MCP tool, and never asks for a credential: `setup-instance` collects a label and a
+  URL in chat and hands the rest to the user's own terminal.
+  - `engine.config.json` gains `roster.utility`, the single source that keeps a utility skill out of
+    the persona count in the roster generator, the skills lint, `tests/engine-config.test.mjs` and
+    `tests/skill-listing.test.mjs`. A name there that has no directory now fails.
+  - `tests/snowarch-skill.test.mjs` holds the shapes that carry the guarantee — the tool grant, the
+    Mode-line shapes, the five-step hand-off with its Windows line, and the count of sentences
+    mentioning a password — each proved against a deliberately broken copy.
+  - `tests/fixtures/snowarch-doctor-stub.sh` stands in for the doctor until ARC-06/ARC-08 build it.
+  - Two defects found by running it rather than reading it, both in the file and both fixed: the
+    Mode line was being decorated, and the "doctor unavailable" fallback named a cause it had not
+    checked. Evidence: `docs/spikes/validation-runs/ARC-02-S11-snowarch-skill.md`.
+- `docs/USER-GUIDE.md` gains a "`/snowarch` commands" section — the three sub-commands, how to read
+  the four `Mode:` shapes, and why setup hands off to the terminal.
+
+### Fixed
+
+- **Preconditions in tests are now asserted, and one guard could never have worked.** A sweep of all
+  75 test files after ARC-03-S06 found a vacuous test — a `git config` the worktree config outranked,
+  so the state it "broke" was never broken and the repair it claimed to exercise never ran. Three
+  fixes and a standing check:
+  - `tests/docs-status.test.mjs` — the HEAD-off-the-pin and narrowed-sparse-set cases assert the
+    fixture actually moved before asking the subject about it, so a fixture failure no longer reads
+    as a module failure.
+  - `packages/snowarch/tests/tools/parity.test.ts` — its `beforeEach`/`afterEach` deleted and
+    restored `MCP_TOOL_PACKAGE`, **which cannot work**: `src/tools/index.ts` builds the catalogue at
+    module scope, so the variable was read at import, long before either hook ran. Replaced by an
+    import-time assertion that names the variable and says a different package needs a different
+    process. No change to the code under test.
+  - `tests/precondition-asserts.test.mjs` — the rule as a test. Mutating state that already exists
+    (git config, checkout, sparse set, index) must be followed within two lines by an assertion that
+    it took. Building a fixture from nothing is deliberately not covered: there the write is the
+    input, and a failed write fails the test on its own.
+
+### Changed
+
+- `CLAUDE.md` rewritten to a line budget: **425 lines → 125**, 57,688 bytes → 10,997, against a cap
+  of 200 and 20,000. It is loaded before every turn, so its length is a cost paid on every request.
+  Nothing was deleted without a home: the repo map and the roster registry are now the generated
+  sections of `docs/ARCHITECTURE.md`, the write gate and capture protocol are the generated rule
+  file and `governance/mcp-protocols.md`, the worked example and the two embedded validation tests
+  are `tests/VALIDATION-TESTS.md` T-01/T-02/T-03, and the two engine-version footers (v2.7.7–v2.8.0) are
+  the two newest entries under "Before 2.0.0" below, verbatim. The
+  five-row gateway table and the Code Reviewer proposal sentence are copied byte-for-byte, because
+  they are what the behavioural tests assert.
+
+### Fixed
+
+- **A spawned child is reaped before its temp directory is removed.** Three suites drive the built
+  server over stdio into a `mkdtemp` directory and remove it in `afterEach`. `client.close()` is a
+  graceful shutdown, not a join — the SDK transport races the child's exit against a 2 s timer and
+  returns either way — so on a loaded runner the removal walked a directory the child was still
+  writing into and threw `ENOTEMPTY`, failing the build on the teardown of a test that had passed
+  (`macos-latest` / node 24, one job of 25). `tests/helpers/server-child.ts` now tracks each child by
+  the pid captured at spawn time, waits for it to be gone (`SIGKILL` after 500 ms, since a child that
+  ignores `SIGTERM` cannot be waited out) and only then removes the directory, with `maxRetries` to
+  absorb a write already in flight. Proved against a fixture child that ignores `SIGTERM` and writes
+  every 2 ms: the old teardown gives `ENOTEMPTY`, the new one removes the directory.
+- **CI ran twice per commit on a work branch.** `on.push.branches` included `arc-*/**` and `chore/**`
+  as well as the branches a merge lands on, so a push to a branch with an open pull request started
+  two full 25-job matrices for the same SHA. They shared a runner pool, and that contention is what
+  surfaced the teardown race above. Push now triggers on `main` and `develop` only; work branches
+  reach CI through `pull_request`, which is where their result is read. `docs/CONTRIBUTING.md` carries
+  the process rule that makes this reliable — a story branch gets its draft pull request at first push.
+- `snow_us_active_update_set_ensure` advertised the input shape it had *before* the update-set
+  capture rework: `default_name`, and nothing required. The handler has required `name` since that
+  rework, so a caller following the published schema passed `default_name` and got
+  `INVALID_REQUEST` for a field it had been told was optional. The schema now says what the handler
+  enforces — `name` required, `description` optional, `default_name` gone — and the tool's own
+  description no longer promises to "create one automatically if none is in progress", which was
+  the same stale behaviour. `dist/contract.json` is unchanged (it carries no schemas), so the
+  engine pin and its sha are untouched.
+
+---
+
+## Before 2.0.0
+
+Everything below is the imported engine's history, kept as written. **The term "Tier" below is
+historical** — it is the retired permission and surface vocabulary that ARC-02-S06 replaced with
+Mode (`design-only` | `live`) and Preset (`read-only` | `pdi-developer` | `full` | `custom`), and the
+file paths are the ones those entries were written against. Rewriting them would falsify the record
+of what was decided and when. ARC-09-S02 regenerates this file from conventional commits.
+
+The two entries that follow (v2.8.0 and v2.7.7–v2.7.8) are the engine's version footers, moved here
+verbatim from the imported `CLAUDE.md` by ARC-02-S08; the imported changelog itself ended at v2.7.6.
+
+## v2.8.0 — Phase 2.8 (Delivery Governance) opens
+
+*v2.8.0 — Phase 2.8 (Delivery Governance) opens. Two skill-only cross-cutting advisory consults added, taking the roster to 27 (corrected from "25" — see the authoritative roster-count note): **Licensing & Entitlement Specialist** (`skills/licensing-specialist/`) — what a design costs to license (subscription/fulfiller, SKU/tier, App Engine units, Now Assist Assists, third-party SaaS), §3.1 consult + post-build review; and **Estimation & Sizing Specialist** (`skills/estimation-specialist/`) — the sizing methodology and the number (ranges, ServiceNow complexity rubric, contingency, baseline-vs-custom §1.1 delta), recorded into baseline SPM. New governance family **§4 Delivery Artefact Governance** in `governance/governance-rules.md` — ADR (§4.1), Requirements Traceability / RTM (§4.2), RAID & NFR (§4.3) — seeded from new engine-level `templates/` (adr / traceability-matrix / raid-log / nfr-checklist). Wiring: taxonomy v1.5 (roster 25, §3.1 consults, §2.4 boundaries, §4.5 triggers), prompt-patterns v1.2 (PP-20 estimation, PP-21 licensing, PP-22 ADR, PP-23 RTM, PP-24 RAID/NFR), CLAUDE.md repo map + roster + §3.1 table + Artefact standards + Phase delivery-governance touchpoints. Carries forward v2.6: docs/ knowledge base, Standing Rule, repo map.*
+
+## v2.7.7 – v2.7.8 — Diagramming Specialist; the document-gateway rule
+
+*CLAUDE.md v2.7.8 — Phase 2.7 arc: CMDB & CSDM Specialist promoted to 5th v2.0 Domain Expert gateway with Phase 1 Step 5 wiring + multi-gateway co-fire rule (v2.7); Security & GRC consult/review skill (v2.7.1); repo-wide ServiceNowDocs citation-path audit, ~50 dead paths remapped (v2.7.2); ATF Author skill + batch sub-agent (v2.7.3); Operational Documentation skill, completing the §6.2 consult chain (v2.7.4); Discovery Specialist + UI/UX Specialist skills (v2.7.5); the final six specialist skills — Performance & Scale, SPM, App Engine, Migration, Reporting & Analytics, DevOps / Release Manager (v2.7.6), completing the 22-specialist roster (every specialist now has a SKILL.md). Diagramming Specialist added as the 23rd specialist and 9th sub-agent — skill + batch diagram-pack sub-agent, wired as a §6.2 post-build consult plus HLD/LLD Writer and Technical Designer downstream handoff; depicts architecture (Mermaid/draw.io/PlantUML/SVG), never decides it, and flags unapproved custom objects PENDING per §1.1 (v2.7.7). Merged with the RobertBH17 line (field notes, F-0xx fixes, T-11/12/13; this session's tests renumbered T-14/15/16). Document-gateway rule — Domain Expert gateways now also fire before finalizing a domain-scoped document deliverable (proposal / scoping doc / HLD / LLD / PDD), not only before builder dispatch; Phase 1 Step 5 intro + new "Document deliverables fire the gateway too" note, and taxonomy §6.1 Step 7, updated accordingly (v2.7.8).*
+
 ## v2.7.6 — Final six specialist skills — roster is now 100% skill-backed
 
 **Released:** June 2026

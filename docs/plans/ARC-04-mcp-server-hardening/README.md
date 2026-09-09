@@ -38,22 +38,37 @@ Closes P-03 (absent flags fail mid-task), P-18 (identity), P-19 (version drift),
 
 ARC-01. D-02 (relicensing) is a hard gate; D-03 fixes the cut list; D-05 fixes the prod rule; D-01/R-1 fix names and version. ARC-00 verdicts for S-02 (`list_changed`), S-17 (unconfigured server accepted) and S-10 (read-only sufficient after the gate split) are consumed by the ARCs downstream of this one; the stories ship the behaviour and its fallbacks either way. This ARC does not wait for the S-14 plugin spikes (D-06 hedge gates ARC-06).
 
-## Acceptance criteria
+## Acceptance criteria — ARC-04 exit evidence, recorded 2026-09-08
 
-- [ ] `node packages/snowarch/dist/server.js` with no store and no env starts, answers `initialize` (`serverInfo.name == "snowarch"`, version `2.0.0`), lists exactly the five core tools, and returns `NO_INSTANCE_CONFIGURED` for any other tool.
-- [ ] With a store containing `pdi` (`pdi-developer`) and `prod` (`read-only`), `snow_core_instance_switch prod` followed by `snow_core_record_add` returns `WRITE_NOT_ENABLED`, while the same call on `pdi` succeeds against a PDI.
-- [ ] With `read-only`, `snow_scr_script_includes_index` and `snow_scr_script_include_read` succeed; `snow_scr_script_include_add` returns `SCRIPTING_NOT_ENABLED`.
-- [ ] A store entry `environment: prod`, `preset: full`, `prodWriteAck: false` makes the server log `PROD_WRITE_NOT_ACKNOWLEDGED` and keep the instance unloaded; with `true` it loads.
-- [ ] `snow_core_records_query` with `orderBy: "-sys_created_on"` returns the newest record first (unit test with a captured encoded query, plus a live test behind `RUN_LIVE_E2E=1`).
-- [ ] `snow_us_capture_target_set` followed by `snow_scr_script_include_add` produces a `sys_update_xml` row in the named update set on a PDI (live E2E).
-- [ ] `npm test` green on the three CI OSes × Node 20/22/24; zero `desktop/` tests; coverage of `permissions.ts` 100 %.
-- [ ] `dist/contract.json` exists, lists 398 tools with `gate` and `mutates` for each, and its sha256 is printed by `snowarch contract --sha`.
-- [ ] A world-readable store makes the server refuse to load it and print the chmod remedy; `.local/audit.jsonl` receives one line per mutating call and never contains a password or the Authorization header (test greps).
-- [ ] `grep -rn "cwd\|dotenv.config()" packages/snowarch/src/server.ts` shows only the `SNOW_ENV_FILE` branch.
-- [ ] Behind a local CONNECT-proxy fixture with `HTTPS_PROXY` set, the client tunnels through it and `NO_PROXY` bypasses it; a self-signed TLS fixture yields `TLS_CA_UNTRUSTED` naming `NODE_EXTRA_CA_CERTS`, and succeeds once the variable points at the fixture CA (R-3).
-- [ ] `snowarch doctor --no-network --json` on a valid store reports `summary.fail == 0` and contains no secret or clear username; on a 0644 store it fails with the `chmod 600` remedy.
-- [ ] On a fresh clone without a build step, `node packages/snowarch/dist/server.js` answers `initialize` on all three OSes; `node scripts/build-dist.mjs` produces no diff.
-- [ ] `tests/legacy-names.allowlist.json` (ARC-01-S10) contains no row owned by `ARC-04` and `node --test tests/no-legacy-names.test.mjs` passes — the "allow-list empty for my files" criterion ARC-01-S10 asks every consuming ARC to carry (S01, S14).
+Every criterion with what was measured, not what was intended. "Deferred" means the check needs a
+real instance and no agent in this arc holds credentials; each has a written, runnable procedure in
+`packages/snowarch/tests/live/README.md`.
+
+| # | Criterion | Status | Evidence |
+|---|---|---|---|
+| 1 | Unconfigured start: `initialize`, five core tools, `NO_INSTANCE_CONFIGURED` elsewhere, clean exit on stdin close | **Met** | `tests/server/unconfigured.test.ts` (real MCP client over stdio); the `no-build handshake` CI job runs it against the committed `dist/` on three OSes. *Version reads `2.0.0-dev`, not `2.0.0` — the release is ARC-09's.* |
+| 2 | Per-instance flags: `switch prod` then a write → `WRITE_NOT_ENABLED`, `pdi` unaffected | **Met** | `tests/tools/gate-split.test.ts`, `tests/servicenow/context.test.ts`; S03 criterion 1's live half **deferred**. |
+| 3 | `read-only` reads scripting objects; `..._add` → `SCRIPTING_NOT_ENABLED` | **Met** | `tests/tools/gate-split.test.ts` — the split is derived from the registered catalogue, so a new `snow_scr_*` tool cannot escape it. S-10 recorded in `docs/spikes/S-10-read-only-sufficiency/`. |
+| 4 | `prod` + `full` + `prodWriteAck: false` → not loaded; `true` → loads | **Met** | `tests/servicenow/prod-ack.test.ts`; end to end via `SV-03` in `tests/doctor/doctor.test.ts` with both postures. |
+| 5 | `orderBy: "-sys_created_on"` sorts descending | **Met (unit)** | `tests/servicenow/client-orderby.test.ts` asserts the captured URL: `active=true^ORDERBYDESCsys_created_on`. **Live half deferred** (S09 criterion 2), with an ascending negative control in the procedure. |
+| 6 | `capture_target_set` then a write produces a `sys_update_xml` row in the named set | **Deferred** | S07 criterion 4. Unit gate: `tests/tools/update-set-capture.test.ts` asserts the four-call sequence and the `sys_user_preference` write. Procedure includes a negative control. |
+| 7 | `npm test` green on 3 OS × Node 20/22/24; no `desktop/` tests; `permissions.ts` 100 % | **Met** | 9 green cells per run; `permissions.ts` held at 100 % by the per-file coverage threshold — which itself only started running when S03 changed `npm test` to `vitest run --coverage`. |
+| 8 | `dist/contract.json` lists every tool with `gate` and `mutates`; sha printed by `contract --sha` | **Met** | 397 tools, not 398 — S08 removed `snow_rpt_report_generate` (D-03 item 5). Committed sha `b7ffa16862059fef0db0e6a167a0ad9d427e65d433fb407492363813f6f3fc60`. `tests/contract.test.ts`. |
+| 9 | World-readable store refused with the `chmod` remedy; audit line per mutating call, no secrets | **Met** | `tests/store/*`, `tests/doctor/doctor.test.ts` (0644 → `SV-02 fail`, exit 1), `tests/audit/no-secrets.test.ts` (every mutating tool under `full`, fixture credentials, audit **and** stderr). |
+| 10 | `grep -rn "cwd\|dotenv.config()" src/server.ts` shows only the `SNOW_ENV_FILE` branch | **Met** | S02; the guard is that `dotenv.config()` is called only for a file that exists and was named. |
+| 11 | CONNECT proxy honoured, `NO_PROXY` bypasses, self-signed TLS → `TLS_CA_UNTRUSTED` naming `NODE_EXTRA_CA_CERTS` | **Met** | `tests/servicenow/proxy.test.ts` (in-process CONNECT fixture, asserted on the recorded `CONNECT host:443`) and `tests/servicenow/tls.test.ts` (generated certificate, child process for the CA variable). Three OSes; no test reaches the public internet. |
+| 12 | `doctor --no-network --json` clean on a valid store, no secrets; 0644 → fail with the remedy | **Met** | `tests/doctor/doctor.test.ts`, criteria 1/3/6. |
+| 13 | Fresh clone, no build: `initialize` answers on three OSes; `build-dist.mjs` produces no diff | **Met** | `no-build handshake` and `dist-check` CI jobs, three OSes each; the architect re-verified on a new clone. |
+| 14 | ARC-04 owns no row in `tests/legacy-names.allowlist.json` | **Met** | ARC-04's row left with `docs/INSTALLATION.md` in S14. |
+
+**Deferred to the owner's live sitting**, each with a runnable procedure in
+`packages/snowarch/tests/live/README.md`: S03 criterion 1 (live flag behaviour), S05's S-10
+observation, S07 criterion 4 (update-set capture), S08 criterion 3's live half (byte-identical
+`tools/list`), S09 criteria 2/3/4 (sort order, `event_name`, `action_insert`), S10's literal
+`result: "ok"` (needs a reachable instance). **S-26** — whether any MCP client actually sends
+`_meta["anthropic/maxResultSizeChars"]` — is unverified and recorded as a candidate in `03` §F, not
+asserted anywhere.
+
 
 ## Risks
 
@@ -71,21 +86,21 @@ ARC-01. D-02 (relicensing) is a hard gate; D-03 fixes the cut list; D-05 fixes t
 
 Full write-ups (persona, context, scope, design notes, acceptance criteria, tasks, test strategy, dependencies, size, risks, definition of done) are in [`STORIES.md`](STORIES.md).
 
-| ID | Title | Size |
-|---|---|---|
-| ARC-04-S01 | D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI | L |
-| ARC-04-S02 | Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed | L |
-| ARC-04-S03 | Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage | L |
-| ARC-04-S04 | Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed` | L |
-| ARC-04-S05 | SCRIPTING / update-set read-gate split | M |
-| ARC-04-S06 | `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract` | L |
-| ARC-04-S07 | `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter | M |
-| ARC-04-S08 | Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap | M |
-| ARC-04-S09 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert` / `action_update` | M |
-| ARC-04-S10 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M |
-| ARC-04-S11 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M |
-| ARC-04-S12 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M |
-| ARC-04-S13 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M |
-| ARC-04-S14 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M |
+| ID | Title | Size | Status |
+|---|---|---|---|
+| ARC-04-S01 | D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI | L | Done (2026-09-08) |
+| ARC-04-S02 | Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed | L | Done (2026-09-08) |
+| ARC-04-S03 | Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage | L | Done (2026-09-08) |
+| ARC-04-S04 | Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed` | L | Done (2026-09-08) |
+| ARC-04-S05 | SCRIPTING / update-set read-gate split | M | Done (2026-09-08) |
+| ARC-04-S06 | `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract` | L | Done (2026-09-08) |
+| ARC-04-S07 | `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter | M | Done (2026-09-08) |
+| ARC-04-S08 | Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap | M | Done (2026-09-08) |
+| ARC-04-S09 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert` / `action_update` | M | Done (2026-09-08) |
+| ARC-04-S10 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | Done (2026-09-08) |
+| ARC-04-S11 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M | Done (2026-09-08) |
+| ARC-04-S12 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | Done (2026-09-08) |
+| ARC-04-S13 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | Done (2026-09-08) |
+| ARC-04-S14 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M | Done (2026-09-08) |
 
 Mapping to the earlier titles-only list: former stories 2 and 7 merged into S04; former story 12 split into S01 (harness, CI) and S03 (coverage); S11 added per R-3; S12 added to carry the server doctor module ARC-08 depends on. Total 31–32 engineer-days. The full former-number → story-ID table is at the top of `STORIES.md`; ARC-05/06/07 still cite this ARC by the former numbers.

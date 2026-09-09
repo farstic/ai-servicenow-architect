@@ -1,4 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  resetFetchMock, respond, snFetchMockModule, type SnFetchState,
+} from '../helpers/fetch-mock.js';
+
+/**
+ * The HTTP seam, not `global.fetch` — see `tests/helpers/fetch-mock.ts`. ARC-04-S11 routed every
+ * request through `src/servicenow/http.ts` for proxy support, so a stub on the global sits
+ * unused while a real request goes out.
+ */
+const http = vi.hoisted<SnFetchState>(() => ({ calls: [], queue: [] }));
+vi.mock('../../src/servicenow/http.js', async () => snFetchMockModule(http));
 
 // Regression: a successful DELETE returns 204 No Content. The client must NOT JSON-parse the
 // empty body (which threw -> spurious retry -> second DELETE 404s -> a successful delete was
@@ -12,29 +23,31 @@ function setEnv() {
 }
 
 describe('ServiceNowClient.deleteRecord — 204 No Content', () => {
-  beforeEach(() => setEnv());
+  beforeEach(() => { setEnv(); resetFetchMock(http); });
   afterEach(() => vi.restoreAllMocks());
 
   it('resolves without throwing and does not retry on a 204 delete', async () => {
     setEnv();
     const { instanceManager } = await import('../../src/servicenow/instances.js');
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+    respond(http, {
       ok: true, status: 204,
       json: async () => { throw new Error('Unexpected end of JSON input'); },
       text: async () => '',
-    } as unknown as Response);
+      headers: { get: () => null },
+    });
     const client = instanceManager.getClient();
     await expect(client.deleteRecord('incident', '0'.repeat(32))).resolves.toBeUndefined();
-    expect(fetchSpy).toHaveBeenCalledTimes(1); // single DELETE, no spurious retry
+    expect(http.calls).toHaveLength(1); // single DELETE, no spurious retry
   });
 
   it('classifies a real 404 as DELETE_NOT_FOUND', async () => {
     setEnv();
     const { instanceManager } = await import('../../src/servicenow/instances.js');
-    vi.spyOn(global, 'fetch').mockResolvedValue({
+    respond(http, {
       ok: false, status: 404, statusText: 'Not Found',
+      headers: { get: () => null },
       text: async () => JSON.stringify({ error: { message: 'No Record found', detail: "Record doesn't exist" } }),
-    } as unknown as Response);
+    });
     const client = instanceManager.getClient();
     await expect(client.deleteRecord('incident', '0'.repeat(32))).rejects.toMatchObject({ code: 'DELETE_NOT_FOUND' });
   });

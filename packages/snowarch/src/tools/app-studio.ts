@@ -6,8 +6,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function appStudioToolManifest() {
+export function appStudioToolManifest(): ToolDefinition[] {
   return [
     // ── Scoped Applications ─────────────────────────────────────────────────
     {
@@ -22,6 +23,8 @@ export function appStudioToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_studio_scoped_app_read',
@@ -33,6 +36,8 @@ export function appStudioToolManifest() {
         },
         required: ['id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_studio_scoped_app_add',
@@ -59,6 +64,8 @@ export function appStudioToolManifest() {
         },
         required: ['name', 'scope'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_studio_scoped_app_modify',
@@ -75,6 +82,8 @@ export function appStudioToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
   ];
 }

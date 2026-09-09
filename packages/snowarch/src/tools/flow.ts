@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite, requireScripting } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function flowToolManifest() {
+export function flowToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_flow_flows_index',
@@ -21,6 +22,8 @@ export function flowToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_flow_flow_read',
@@ -32,6 +35,8 @@ export function flowToolManifest() {
         },
         required: ['name_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_flow_flow_trigger',
@@ -44,6 +49,8 @@ export function flowToolManifest() {
         },
         required: ['flow_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_flow_flow_execution_read',
@@ -55,6 +62,8 @@ export function flowToolManifest() {
         },
         required: ['execution_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_flow_flow_executions_index',
@@ -68,6 +77,8 @@ export function flowToolManifest() {
         },
         required: ['flow_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_flow_subflows_index',
@@ -81,6 +92,8 @@ export function flowToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_flow_subflow_read',
@@ -92,6 +105,8 @@ export function flowToolManifest() {
         },
         required: ['name_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_flow_action_instances_index',
@@ -105,6 +120,8 @@ export function flowToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_flow_process_automation_read',
@@ -116,6 +133,8 @@ export function flowToolManifest() {
         },
         required: ['name_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_flow_process_automations_index',
@@ -129,6 +148,8 @@ export function flowToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ─── Flow Authoring ───────────────────────────────────────────────
     {
@@ -145,6 +166,8 @@ export function flowToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_flow_subflow_add',
@@ -159,6 +182,8 @@ export function flowToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_flow_flow_action_add',
@@ -174,6 +199,8 @@ export function flowToolManifest() {
         },
         required: ['name'],
       },
+      gate: 'scripting',
+      mutates: true,
     },
     {
       name: 'snow_flow_flow_publish',
@@ -186,6 +213,8 @@ export function flowToolManifest() {
         },
         required: ['flow_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_flow_flow_test',
@@ -198,6 +227,10 @@ export function flowToolManifest() {
         },
         required: ['flow_sys_id'],
       },
+      gate: 'write',
+      // It calls createRecord on sys_hub_flow_trigger. Declared `false` until ARC-04-S09, which kept it out of the
+      // generated §2.1 ask-list — a write that never prompted.
+      mutates: true,
     },
     {
       name: 'snow_flow_flow_error_log_read',
@@ -211,6 +244,8 @@ export function flowToolManifest() {
         },
         required: ['flow_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

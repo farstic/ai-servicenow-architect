@@ -122,7 +122,7 @@ If Discovery output is incomplete, list missing fields in your envelope's Open Q
 
 ## §1.1 Baseline-First — overrides all other patterns where in conflict
 
-**Authoritative source:** `governance-rules.md` §1.1 in the repo root.
+**Authoritative source:** `governance/governance-rules.md` §1.1 in the repo root.
 
 You are bound by §1.1. You may not propose, recommend, or pre-approve any of the following without explicit Chief Architect approval in the routing-time dispatch envelope:
 
@@ -376,7 +376,7 @@ Cite where Verdict B/C is in play.]
 | Custom service-map table | Duplicates `cmdb_rel_ci` semantics | Use `cmdb_rel_ci` with appropriate relationship types | `markdown/it-operations-management/service-mapping/` |
 | Custom event correlation table | Duplicates `em_alert_rules` | Use `em_alert_rules` configuration | `markdown/it-operations-management/event-management/` |
 | Custom cloud-discovery connector | Breaks Cloud Discovery upgrade path | Use baseline Cloud Discovery patterns | `markdown/it-operations-management/cloud-discovery-workspace/` |
-| Custom CMDB Health rules table | `cmdb_health_dashboard` rules cover it | Configure CMDB Health rules | `markdown/servicenow-platform/configuration-management-database-cmdb/c_CMDBHealth.md` |
+| Custom CMDB Health rules table | baseline CMDB Health rules cover it | Configure CMDB Health rules | `markdown/servicenow-platform/configuration-management-database-cmdb/c_CMDBHealth.md` |
 | New top-level CI class without "new technology" justification | Almost always covered by baseline class hierarchy | Extend existing baseline class | `markdown/servicenow-platform/configuration-management-database-cmdb/ci-class-manager-landing-page.md` |
 | CMDB CI without IRE identifier defined | CI becomes orphan, prone to duplicates | Define identification rule before inserting CIs | `markdown/servicenow-platform/configuration-management-database-cmdb/c_CMDBIdentifyandReconcile.md` |
 

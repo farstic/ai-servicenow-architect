@@ -5,8 +5,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function securityToolManifest() {
+export function securityToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_sec_security_incident_add',
@@ -24,6 +25,8 @@ export function securityToolManifest() {
         },
         required: ['short_description', 'category'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_sec_security_incident_read',
@@ -35,6 +38,8 @@ export function securityToolManifest() {
         },
         required: ['number_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_security_incident_modify',
@@ -47,6 +52,8 @@ export function securityToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_sec_security_incidents_index',
@@ -62,6 +69,8 @@ export function securityToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_vulnerabilities_index',
@@ -77,6 +86,8 @@ export function securityToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_vulnerability_read',
@@ -88,6 +99,8 @@ export function securityToolManifest() {
         },
         required: ['number_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_vulnerability_modify',
@@ -100,6 +113,8 @@ export function securityToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_sec_grc_risks_index',
@@ -113,6 +128,8 @@ export function securityToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_grc_risk_read',
@@ -124,6 +141,8 @@ export function securityToolManifest() {
         },
         required: ['number_or_sysid'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_grc_controls_index',
@@ -137,6 +156,8 @@ export function securityToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_threat_intelligence_read',
@@ -150,6 +171,8 @@ export function securityToolManifest() {
         },
         required: ['query'],
       },
+      gate: 'none',
+      mutates: false,
     },
     // ─── Security Playbooks ───────────────────────────────────────────
     {
@@ -164,6 +187,8 @@ export function securityToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_security_playbook_exec',
@@ -177,6 +202,8 @@ export function securityToolManifest() {
         },
         required: ['playbook_sys_id', 'incident_sys_id'],
       },
+      gate: 'write',
+      mutates: true,
     },
     // ─── Security Dashboard & Posture ─────────────────────────────────
     {
@@ -189,6 +216,8 @@ export function securityToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_vulnerabilities_scan',
@@ -202,6 +231,10 @@ export function securityToolManifest() {
         },
         required: [],
       },
+      gate: 'write',
+      // It calls createRecord on sn_vul_scan_request. Declared `false` until ARC-04-S09, which kept it out of the
+      // generated §2.1 ask-list — a write that never prompted.
+      mutates: true,
     },
     // ─── GRC Compliance ───────────────────────────────────────────────
     {
@@ -219,6 +252,8 @@ export function securityToolManifest() {
         },
         required: ['name', 'category'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_sec_compliance_policies_index',
@@ -231,6 +266,8 @@ export function securityToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_compliance_assessment_read',
@@ -243,6 +280,8 @@ export function securityToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_sec_audit_results_index',
@@ -256,6 +295,8 @@ export function securityToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

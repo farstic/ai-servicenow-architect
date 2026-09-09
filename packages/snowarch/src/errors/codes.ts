@@ -1,0 +1,433 @@
+/**
+ * Every error code the server throws: one meaning, one remedy, one command.
+ *
+ * The rule file, `docs/TROUBLESHOOTING.md`, `governance/mcp-protocols.md`, the wizard and the doctor
+ * all render from this table. There is no second remedy text anywhere, which is the point: a remedy
+ * repeated in five documents is five things to correct and four that will not be.
+ *
+ * `ServiceNowError` takes `ErrorCodeName`, so an unregistered literal is a compile error rather than
+ * a string that reaches a user with no remedy attached. `tests/errors/codes.test.ts` scans `src/`
+ * for thrown literals as the second, independent check — a type can be widened by accident, and the
+ * scan notices when it has been.
+ *
+ * Four fields carry the load:
+ *   meaning      what happened, in the reader's terms, not the thrower's
+ *   remedy       what to do; prose, because most remedies are a judgement rather than a command
+ *   command      set ONLY when there is something runnable; renderers set it as code, and they
+ *                never parse `remedy` looking for one
+ *   showInRule   the code appears in the always-loaded rule file. Twelve do: the six flag gates as
+ *                one wildcard line, plus the six a session can actually act on mid-task
+ *   httpStatus   the status the instance returned, where the code maps to one
+ */
+export interface ErrorCode {
+  code: string;
+  /** What happened, in the reader's terms. */
+  meaning: string;
+  /** What the caller does next. Prose; empty only where nothing they could do would help. */
+  remedy: string;
+  /** A runnable command, when one exists. Rendered as code; never parsed out of `remedy`. */
+  command?: string;
+  /** Shown in `.claude/rules/00-mode-and-mcp-gate.md`, which is always loaded and must stay short. */
+  showInRule: boolean;
+  /** The HTTP status the instance returned, where this code maps to one. */
+  httpStatus?: number;
+}
+
+// `as const satisfies` and not `: ErrorCode[]`. The annotation would widen every `code` to
+// `string`, and `ErrorCodeName` — the whole point of the narrowing — would come out as `string`
+// too: a union that accepts everything, compiling happily over a typo. `satisfies` keeps the
+// shape checked while the literals survive.
+export const ERROR_CODES = [
+  {
+    code: 'WRITE_NOT_ENABLED',
+    meaning: "The instance's preset does not enable WRITE_ENABLED.",
+    remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
+    command: "./snowarch instance set-preset <label> pdi-developer",
+    showInRule: true,
+  },
+  {
+    code: 'CMDB_WRITE_NOT_ENABLED',
+    meaning: "The instance's preset does not enable CMDB_WRITE_ENABLED.",
+    remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
+    command: "./snowarch instance set-preset <label> pdi-developer",
+    showInRule: true,
+  },
+  {
+    code: 'SCRIPTING_NOT_ENABLED',
+    meaning: "The instance's preset does not enable SCRIPTING_ENABLED.",
+    remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
+    command: "./snowarch instance set-preset <label> pdi-developer",
+    showInRule: true,
+  },
+  {
+    code: 'ATF_NOT_ENABLED',
+    meaning: "The instance's preset does not enable ATF_ENABLED.",
+    remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
+    command: "./snowarch instance set-preset <label> pdi-developer",
+    showInRule: true,
+  },
+  {
+    code: 'NOW_ASSIST_NOT_ENABLED',
+    meaning: "The instance's preset does not enable NOW_ASSIST_ENABLED.",
+    remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
+    command: "./snowarch instance set-preset <label> full",
+    showInRule: true,
+  },
+  {
+    code: 'FLUENT_NOT_ENABLED',
+    meaning: "The instance's preset does not enable FLUENT_ENABLED.",
+    remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
+    command: "./snowarch instance set-preset <label> full",
+    showInRule: true,
+  },
+  {
+    code: 'NO_INSTANCE_CONFIGURED',
+    meaning: "The server is running and healthy; it has no instance to talk to. It stays up on purpose — an unconfigured checkout used to exit at start-up, so the moment you most needed the server to explain itself was the moment it was gone. Five tools still work: status, capabilities, reload, the instance listing and the current instance.",
+    remedy: "add an instance, then call the reload tool — Claude Code does not need restarting, the server re-advertises its catalogue in the same session",
+    command: "/snowarch setup-instance",
+    showInRule: true,
+  },
+  {
+    code: 'INSTANCE_NOT_LOADED',
+    meaning: "The instance is in the store but was not loaded, and the store carries the reason.",
+    remedy: "read the reason in the instance listing; a `prod` instance without `prodWriteAck` needs the acknowledgement",
+    command: "./snowarch instance list",
+    showInRule: false,
+  },
+  {
+    code: 'UNKNOWN_INSTANCE',
+    meaning: "No instance in the store carries that label.",
+    remedy: "the listing prints the labels that exist",
+    command: "./snowarch instance list",
+    showInRule: false,
+  },
+  {
+    code: 'PROD_WRITE_NOT_ACKNOWLEDGED',
+    meaning: "The instance is tagged `environment: prod` and holds a write preset without `prodWriteAck: true`.",
+    remedy: "raise it deliberately, typing the label",
+    command: "./snowarch instance set-preset <label> <preset> --ack-prod",
+    showInRule: true,
+  },
+  {
+    code: 'STORE_NOT_FOUND',
+    meaning: "`SNOW_STORE` names a file that is not there — an explicit override is never a fallback.",
+    remedy: "correct the variable, unset it, or create the store",
+    command: "/snowarch setup-instance",
+    showInRule: false,
+  },
+  {
+    code: 'STORE_UNREADABLE',
+    meaning: "The store exists but is not valid JSON.",
+    remedy: "repair or recreate it; the message names the parse error",
+    showInRule: false,
+  },
+  {
+    code: 'STORE_SCHEMA_INVALID',
+    meaning: "The store parsed but a field is wrong; the message names its path, for example `instances.pdi.flags.WRITE_ENABLED`.",
+    remedy: "the message names the field path; correct it in the store",
+    showInRule: false,
+  },
+  {
+    code: 'STORE_SCHEMA_UNSUPPORTED',
+    meaning: "The store was written by a newer server than this one.",
+    remedy: "upgrade this checkout, rather than editing the store down",
+    command: "./snowarch upgrade",
+    showInRule: false,
+  },
+  {
+    code: 'STORE_PERMISSIONS_TOO_OPEN',
+    meaning: "The store holds a password and is group/world-readable, or sits in a group/world-writable directory (D-04).",
+    remedy: "tighten the mode; on Windows the check is skipped and the doctor notes it instead",
+    command: "chmod 600 .local/instances.json",
+    showInRule: false,
+  },
+  {
+    code: 'AUTHENTICATION_FAILED',
+    meaning: "The instance rejected the credentials — wrong, expired, or the account is locked.",
+    remedy: "stop and re-enter them; do not retry, repeated failures lock the account",
+    command: "./snowarch instance set-credentials <label>",
+    showInRule: true,
+    httpStatus: 401,
+  },
+  {
+    code: 'INSUFFICIENT_PRIVILEGES',
+    meaning: "The account is authenticated but lacks a ServiceNow role for that table or operation. This is not a flag.",
+    remedy: "grant the role, or use an account that has it; the message names the table",
+    showInRule: true,
+    httpStatus: 403,
+  },
+  {
+    code: 'NOT_FOUND',
+    meaning: "The record or table does not exist on this instance.",
+    remedy: "check the sys_id and the table name",
+    showInRule: false,
+    httpStatus: 404,
+  },
+  {
+    code: 'RATE_LIMITED',
+    meaning: "The instance is throttling this account.",
+    remedy: "retry later; reduce `maxRecords` or the call rate",
+    showInRule: false,
+    httpStatus: 429,
+  },
+  {
+    code: 'DNS_FAILURE',
+    meaning: "The instance host name did not resolve (`ENOTFOUND`, `EAI_AGAIN`).",
+    remedy: "check the spelling first; on a VPN-only instance connect first; on a corporate network set `HTTPS_PROXY`. A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong",
+    showInRule: false,
+  },
+  {
+    code: 'TLS_CA_UNTRUSTED',
+    meaning: "The certificate was not signed by a CA this machine trusts — normal on a network that intercepts TLS.",
+    remedy: "export your organisation root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it",
+    command: "export NODE_EXTRA_CA_CERTS=<path to the PEM>",
+    showInRule: false,
+  },
+  {
+    code: 'PROXY_UNREACHABLE',
+    meaning: "A proxy variable is set and nothing is listening there, or the connection to it timed out.",
+    remedy: "the message names the proxy with any credentials masked; correct the host and port, or unset the variable if you are not behind a proxy. `NO_PROXY` exempts internal hosts",
+    showInRule: false,
+  },
+  {
+    code: 'CONNECTION_REFUSED',
+    meaning: "The instance refused the connection and no proxy is configured.",
+    remedy: "check the URL and its port, and whether the instance is awake — a hibernating PDI refuses",
+    showInRule: false,
+  },
+  {
+    code: 'CONNECTION_TIMEOUT',
+    meaning: "The connection timed out with no proxy configured.",
+    remedy: "on a corporate network set `HTTPS_PROXY`; otherwise check connectivity and the firewall",
+    showInRule: false,
+  },
+  {
+    code: 'NETWORK_ERROR',
+    meaning: "The instance was unreachable and the cause did not match a more specific classification.",
+    remedy: "the message carries the underlying cause",
+    showInRule: false,
+  },
+  {
+    code: 'UNSUPPORTED_ON_THIS_INSTANCE',
+    meaning: "The tool is registered, the preset let it through, and the server refused without contacting the instance: the operation has no REST endpoint on any instance. The two script-execution stubs stay registered because removing the names would turn a clear refusal into UNKNOWN_TOOL, which reads as \"you spelled it wrong\" and sends you hunting a typo that is not there. They fail before any HTTP request, so nothing reaches the instance and nothing is half-done.",
+    remedy: "take the other route: run the script in System Definition > Scripts - Background, or author a Fix Script and run it from the UI. Keep `sys_script_fix.name` to 40 characters — it truncates silently over REST (see `docs/PLATFORM-NOTES.md` PN-07)",
+    showInRule: false,
+  },
+  {
+    code: 'UNKNOWN_TOOL',
+    meaning: "A retired or misspelled tool name.",
+    remedy: "use the `snow_*` name from `governance/mcp-protocols.md`; maintainers: `npm run lint:contract`",
+    showInRule: true,
+  },
+  {
+    code: 'INVALID_REQUEST',
+    meaning: "An argument is missing or malformed.",
+    remedy: "the message names the argument",
+    showInRule: false,
+  },
+  {
+    code: 'VALIDATION_ERROR',
+    meaning: "An argument is present but not the expected shape.",
+    remedy: "the message names the argument and the shape",
+    showInRule: false,
+  },
+  {
+    code: 'NOT_IMPLEMENTED',
+    meaning: "The surface was removed.",
+    remedy: "the message names what replaced it",
+    showInRule: false,
+  },
+  {
+    code: 'ENOTFOUND',
+    meaning: "A DNS failure surfaced with the Node identifier rather than the classified code.",
+    remedy: "as `DNS_FAILURE`: check the host in the store",
+    showInRule: false,
+  },
+  {
+    code: 'ECONNREFUSED',
+    meaning: "A refused connection surfaced with the Node identifier.",
+    remedy: "as `CONNECTION_REFUSED`: check the URL, the port and any proxy",
+    showInRule: false,
+  },
+  {
+    code: 'ETIMEDOUT',
+    meaning: "A timeout surfaced with the Node identifier.",
+    remedy: "as `CONNECTION_TIMEOUT`",
+    showInRule: false,
+  },
+  {
+    code: 'REQUEST_FAILED',
+    meaning: "The request failed and the instance response is the only information there is.",
+    remedy: "the message carries that response",
+    showInRule: false,
+  },
+  {
+    code: 'CREATE_FAILED',
+    meaning: "The instance refused the create.",
+    remedy: "the message carries the instance response",
+    showInRule: false,
+  },
+  {
+    code: 'UPDATE_FAILED',
+    meaning: "The instance refused the update.",
+    remedy: "the message carries the instance response",
+    showInRule: false,
+  },
+  {
+    code: 'QUERY_FAILED',
+    meaning: "The instance refused the query.",
+    remedy: "the message carries the instance response",
+    showInRule: false,
+  },
+  {
+    code: 'DELETE_FAILED',
+    meaning: "The instance refused the delete.",
+    remedy: "the message carries the instance response",
+    showInRule: false,
+  },
+  {
+    code: 'BATCH_FAILED',
+    meaning: "One or more requests in the batch failed.",
+    remedy: "the message lists which",
+    showInRule: false,
+  },
+  {
+    code: 'ATTACHMENT_UPLOAD_FAILED',
+    meaning: "The attachment was not stored.",
+    remedy: "check the file size and that the target record exists",
+    showInRule: false,
+  },
+  {
+    code: 'SCRIPT_FAILED',
+    meaning: "The script ran and errored.",
+    remedy: "the message carries the instance output",
+    showInRule: false,
+  },
+  {
+    code: 'DELETE_ACL_DENIED',
+    meaning: "The account lacks delete access to that table. This is not a flag.",
+    remedy: "use an account with the role",
+    showInRule: false,
+  },
+  {
+    code: 'DELETE_CONSTRAINT',
+    meaning: "Another record references it.",
+    remedy: "remove the reference first",
+    showInRule: false,
+  },
+  {
+    code: 'DELETE_NOT_FOUND',
+    meaning: "Nothing exists at that sys_id to delete.",
+    remedy: "check the sys_id",
+    showInRule: false,
+  },
+  {
+    code: 'FLUENT_NOT_INSTALLED',
+    meaning: "The ServiceNow SDK is not on `PATH`.",
+    remedy: "install it globally — the doctor checks `PATH`, so a checkout-local install would pass here and fail there",
+    command: "npm i -g @servicenow/sdk",
+    showInRule: true,
+  },
+  {
+    code: 'FLUENT_ERROR',
+    meaning: "The SDK ran and failed.",
+    remedy: "the message carries the SDK output",
+    showInRule: false,
+  },
+  {
+    code: 'NOW_ASSIST_ERROR',
+    meaning: "A Now Assist call failed.",
+    remedy: "the message carries the instance response; check the Now Assist licence on the instance",
+    showInRule: false,
+  },
+  {
+    code: 'SCHEMA_NOT_CACHED',
+    meaning: "A tool needed a table schema that has not been read this session.",
+    remedy: "call the schema read tool for that table first",
+    showInRule: false,
+  },
+  {
+    code: 'INSTANCE_UNUSABLE',
+    meaning: "The store entry parsed but no client could be built from it.",
+    remedy: "the message says which field is impossible",
+    showInRule: false,
+  },
+  {
+    code: 'UNKNOWN_GATE',
+    meaning: "Server defect: a tool declares a gate the evaluator does not know.",
+    remedy: "report it; no user action can help",
+    showInRule: false,
+  },
+  {
+    code: 'URL_REQUIRED',
+    meaning: "The wizard needs an instance URL and none was given.",
+    remedy: "enter the full https URL of the instance",
+    showInRule: false,
+  },
+  {
+    code: 'URL_INVALID',
+    meaning: "The value is not a URL the server can parse.",
+    remedy: "enter it as `https://<host>.service-now.com`",
+    showInRule: false,
+  },
+  {
+    code: 'URL_NOT_HTTPS',
+    meaning: "The URL is not https. Credentials would cross the network in clear.",
+    remedy: "use the https form of the same host",
+    showInRule: false,
+  },
+  {
+    code: 'URL_HAS_PATH',
+    meaning: "The URL carries a path; only the origin is stored.",
+    remedy: "drop everything after the host",
+    showInRule: false,
+  },
+  {
+    code: 'URL_HAS_CREDENTIALS',
+    meaning: "The URL embeds a user name or password, which would put a secret in the store URL and in logs.",
+    remedy: "remove them; the wizard asks for credentials separately",
+    showInRule: false,
+  },
+  {
+    code: 'OAUTH_ROPC_DISABLED',
+    meaning: "The instance has the OAuth password grant disabled.",
+    remedy: "use basic authentication, or have an administrator enable the grant type",
+    showInRule: false,
+  },
+  {
+    code: 'OAUTH_CLIENT_INVALID',
+    meaning: "The OAuth client id or secret was rejected.",
+    remedy: "check them against the Application Registry entry on the instance",
+    showInRule: false,
+  },
+  {
+    code: 'STORE_IN_CLOUD_SYNC_FOLDER',
+    meaning: "The store is inside a cloud-sync folder, so `0600` does not stop the file leaving the machine (D-04).",
+    remedy: "move the checkout, or accept it deliberately",
+    showInRule: false,
+  },
+  {
+    code: 'TLS_CERT_INVALID',
+    meaning: "The certificate is invalid for reasons other than an untrusted root — expired, or the wrong host.",
+    remedy: "check the instance URL and the certificate; this is not a CA-trust problem",
+    showInRule: false,
+  },
+] as const satisfies readonly ErrorCode[];
+
+export const ERROR_CODE_NAMES: ReadonlySet<string> = new Set(ERROR_CODES.map((e) => e.code));
+
+/**
+ * The union of registered codes.
+ *
+ * `ServiceNowError` narrows its `code` to this, so an unregistered literal at a throw site is a
+ * compile error. Derived from the array rather than declared beside it: two lists would
+ * disagree. (Stated without writing out an example call — the completeness scan greps source
+ * for thrown literals and cannot tell a comment from code, so an illustration here would
+ * register as an unregistered code.)
+ */
+export type ErrorCodeName = (typeof ERROR_CODES)[number]['code'];
+
+/** The remedy for a code, for anything that shows one. There is no other source. */
+export function remedyFor(code: string): ErrorCode | undefined {
+  return ERROR_CODES.find((e) => e.code === code);
+}

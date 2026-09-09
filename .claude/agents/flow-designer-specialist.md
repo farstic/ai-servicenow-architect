@@ -68,7 +68,7 @@ You stop and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the
 - Producing the artefact would require a custom scoped application not approved in the dispatch envelope.
 - Producing the artefact would require a custom state-model extension, custom Connection & Credential Alias, or other major custom architectural object not approved in the dispatch envelope.
 
-The proposal must contain the four-part structure from `governance-rules.md` §1.1: baseline option evaluated, custom object proposed (smallest scope), consequences of approval, alternatives if rejected.
+The proposal must contain the four-part structure from `governance/governance-rules.md` §1.1: baseline option evaluated, custom object proposed (smallest scope), consequences of approval, alternatives if rejected.
 
 You do not design the custom object speculatively while waiting for approval. You return the proposal and terminate. The orchestrator decides; on approval, the orchestrator re-dispatches you with the approved custom-object proposal in the new envelope.
 

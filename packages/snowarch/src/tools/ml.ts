@@ -11,8 +11,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function mlToolManifest() {
+export function mlToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_ml_change_risk_predict',
@@ -26,6 +27,8 @@ export function mlToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ml_anomalies_detect',
@@ -40,6 +43,8 @@ export function mlToolManifest() {
         },
         required: ['table', 'field'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ml_incidents_forecast',
@@ -53,6 +58,8 @@ export function mlToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ml_incident_classifier_train',
@@ -64,6 +71,8 @@ export function mlToolManifest() {
         },
         required: [],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_ml_change_risk_train',
@@ -75,6 +84,8 @@ export function mlToolManifest() {
         },
         required: [],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_ml_anomaly_detector_train',
@@ -87,6 +98,8 @@ export function mlToolManifest() {
         },
         required: ['table', 'field'],
       },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_ml_model_evaluate',
@@ -98,6 +111,8 @@ export function mlToolManifest() {
         },
         required: ['model_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ml_model_training_history_read',
@@ -110,6 +125,8 @@ export function mlToolManifest() {
         },
         required: ['model_sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ml_virtual_agent_nlu_exec',
@@ -122,6 +139,8 @@ export function mlToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ml_process_optimization_read',
@@ -134,6 +153,8 @@ export function mlToolManifest() {
         },
         required: ['table'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ml_similar_incidents_query',
@@ -150,6 +171,8 @@ export function mlToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_ml_auto_categorize',
@@ -165,6 +188,8 @@ export function mlToolManifest() {
         },
         required: ['short_description'],
       },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }

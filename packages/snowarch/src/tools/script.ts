@@ -7,8 +7,9 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireScripting } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function scriptToolManifest() {
+export function scriptToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_scr_business_rules_index',
@@ -22,6 +23,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_business_rule_read',
@@ -33,10 +36,12 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_business_rule_add',
-      description: 'Create a new business rule (requires SCRIPTING_ENABLED=true). ServiceNow supports ES2021 async/await in scripts.',
+      description: '[Scripting] Create a new business rule (requires SCRIPTING_ENABLED=true). ServiceNow supports ES2021 async/await in scripts. Defaults: action_insert true, action_update true, action_delete false, action_query false.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -47,13 +52,20 @@ export function scriptToolManifest() {
           condition: { type: 'string', description: 'Optional condition script' },
           active: { type: 'boolean', description: 'Whether to activate the rule (default: true)' },
           order: { type: 'number', description: 'Execution order (default: 100)' },
+          action_insert: { type: 'boolean', description: 'Run on insert (default: true)' },
+          action_update: { type: 'boolean', description: 'Run on update (default: true)' },
+          action_delete: { type: 'boolean', description: 'Run on delete (default: false)' },
+          action_query: { type: 'boolean', description: 'Run on query (default: false)' },
         },
         required: ['name', 'table', 'when', 'script'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script',
     },
     {
       name: 'snow_scr_business_rule_modify',
-      description: 'Update a business rule (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Update a business rule (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -62,6 +74,9 @@ export function scriptToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script',
     },
     {
       name: 'snow_scr_script_includes_index',
@@ -75,6 +90,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_script_include_read',
@@ -86,10 +103,12 @@ export function scriptToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_script_include_add',
-      description: 'Create a new script include (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Create a new script include (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -101,10 +120,13 @@ export function scriptToolManifest() {
         },
         required: ['name', 'script'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script_include',
     },
     {
       name: 'snow_scr_script_include_modify',
-      description: 'Update a script include (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Update a script include (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -113,6 +135,9 @@ export function scriptToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script_include',
     },
     {
       name: 'snow_scr_client_scripts_index',
@@ -127,6 +152,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_client_script_read',
@@ -138,6 +165,8 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_changesets_index',
@@ -150,6 +179,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_changeset_read',
@@ -161,10 +192,12 @@ export function scriptToolManifest() {
         },
         required: ['sys_id_or_name'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_changeset_commit',
-      description: 'Commit an update set (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Commit an update set (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -172,10 +205,12 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'scripting',
+      mutates: true,
     },
     {
       name: 'snow_scr_changeset_publish',
-      description: 'Publish/export an update set to XML for deployment (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Publish/export an update set to XML for deployment (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -183,11 +218,13 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'scripting',
+      mutates: true,
     },
     // ── Client Script CRUD ───────────────────────────────────────────────────
     {
       name: 'snow_scr_client_script_add',
-      description: 'Create a new client script (onLoad, onChange, onSubmit, onCellEdit) (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Create a new client script (onLoad, onChange, onSubmit, onCellEdit) (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -201,10 +238,13 @@ export function scriptToolManifest() {
         },
         required: ['name', 'table', 'type', 'script'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script_client',
     },
     {
       name: 'snow_scr_client_script_modify',
-      description: 'Update an existing client script (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Update an existing client script (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -213,6 +253,9 @@ export function scriptToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_script_client',
     },
     // ── UI Policies ──────────────────────────────────────────────────────────
     {
@@ -227,6 +270,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_ui_policy_read',
@@ -238,10 +283,12 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_ui_policy_add',
-      description: 'Create a new UI Policy to control field behavior dynamically (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Create a new UI Policy to control field behavior dynamically (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -254,6 +301,9 @@ export function scriptToolManifest() {
         },
         required: ['short_description', 'table'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_ui_policy',
     },
     // ── UI Actions ───────────────────────────────────────────────────────────
     {
@@ -269,6 +319,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_ui_action_read',
@@ -280,10 +332,12 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_ui_action_add',
-      description: 'Create a new UI Action (button or link) on a form (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Create a new UI Action (button or link) on a form (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -299,10 +353,13 @@ export function scriptToolManifest() {
         },
         required: ['name', 'table', 'action_name'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_ui_action',
     },
     {
       name: 'snow_scr_ui_action_modify',
-      description: 'Update an existing UI Action (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Update an existing UI Action (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -311,6 +368,9 @@ export function scriptToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_ui_action',
     },
     // ── ACL Management ───────────────────────────────────────────────────────
     {
@@ -326,6 +386,8 @@ export function scriptToolManifest() {
         },
         required: [],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_acl_read',
@@ -337,10 +399,12 @@ export function scriptToolManifest() {
         },
         required: ['sys_id'],
       },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_scr_acl_add',
-      description: 'Create a new ACL rule to control access to a table or field (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Create a new ACL rule to control access to a table or field (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -355,10 +419,13 @@ export function scriptToolManifest() {
         },
         required: ['name', 'operation'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_security_acl',
     },
     {
       name: 'snow_scr_acl_modify',
-      description: 'Update an existing ACL rule (requires SCRIPTING_ENABLED=true)',
+      description: '[Scripting] Update an existing ACL rule (requires SCRIPTING_ENABLED=true)',
       inputSchema: {
         type: 'object',
         properties: {
@@ -367,6 +434,9 @@ export function scriptToolManifest() {
         },
         required: ['sys_id', 'fields'],
       },
+      gate: 'scripting',
+      mutates: true,
+      table: 'sys_security_acl',
     },
   ];
 }
@@ -388,7 +458,11 @@ export async function dispatchScriptAction(
 ): Promise<any> {
   // Only gate scripting tools — return null for unrelated tools so dispatch continues
   if (!SCRIPT_TOOL_NAMES.has(name)) return null;
-  requireScripting();
+  // The gate is NOT here any more. It used to sit before the switch, so SCRIPTING gated
+  // reads as well as writes — listing a Script Include needed a write flag. SCRIPTING means
+  // *writing* those objects (01 §6.3); each mutating case now opens with the gate, and the
+  // reads have none. tests/tools/gate-split.test.ts derives both families from the
+  // registered catalogue, so a new tool cannot slip through unclassified.
 
   switch (name) {
     case 'snow_scr_business_rules_index': {
@@ -403,13 +477,27 @@ export async function dispatchScriptAction(
       return await client.getRecord('sys_script', args.sys_id);
     }
     case 'snow_scr_business_rule_add': {
+      requireScripting();
       if (!args.name || !args.table || !args.when || !args.script)
         throw new ServiceNowError('name, table, when, and script are required', 'INVALID_REQUEST');
-      const data = { name: args.name, collection: args.table, when: args.when, script: args.script, condition: args.condition, active: args.active !== false, order: args.order || 100 };
+      // All four action_* flags are ALWAYS sent, as booleans. The payload used to omit them
+      // entirely, and a sys_script row created with no action flags fires on nothing — the rule
+      // existed, looked correct in the UI list, and never ran (field-notes §5). Defaults match
+      // the platform's own form: insert and update on, delete and query off.
+      const flag = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : fallback);
+      const data = {
+        name: args.name, collection: args.table, when: args.when, script: args.script,
+        condition: args.condition, active: args.active !== false, order: args.order || 100,
+        action_insert: flag(args.action_insert, true),
+        action_update: flag(args.action_update, true),
+        action_delete: flag(args.action_delete, false),
+        action_query: flag(args.action_query, false),
+      };
       const result = await client.createRecord('sys_script', data);
       return { ...result, summary: `Created business rule ${args.name}`, note: 'GlideEncrypter is deprecated in recent releases; use new sn_si.Vault or keystore APIs instead' };
     }
     case 'snow_scr_business_rule_modify': {
+      requireScripting();
       if (!args.sys_id || !args.fields) throw new ServiceNowError('sys_id and fields are required', 'INVALID_REQUEST');
       const result = await client.updateRecord('sys_script', args.sys_id, args.fields);
       return { ...result, summary: `Updated business rule ${args.sys_id}` };
@@ -431,12 +519,14 @@ export async function dispatchScriptAction(
       return resp.records[0];
     }
     case 'snow_scr_script_include_add': {
+      requireScripting();
       if (!args.name || !args.script) throw new ServiceNowError('name and script are required', 'INVALID_REQUEST');
       const data = { name: args.name, script: args.script, api_name: args.api_name || args.name, access: args.access || 'public', active: args.active !== false };
       const result = await client.createRecord('sys_script_include', data);
       return { ...result, summary: `Created script include ${args.name}`, note: 'ES2021 (async/await, ?., ??) supported in the latest release' };
     }
     case 'snow_scr_script_include_modify': {
+      requireScripting();
       if (!args.sys_id || !args.fields) throw new ServiceNowError('sys_id and fields are required', 'INVALID_REQUEST');
       return await client.updateRecord('sys_script_include', args.sys_id, args.fields);
     }
@@ -468,17 +558,20 @@ export async function dispatchScriptAction(
       return resp.records[0];
     }
     case 'snow_scr_changeset_commit': {
+      requireScripting();
       if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
       const result = await client.updateRecord('sys_update_set', args.sys_id, { state: 'complete' });
       return { ...result, summary: `Committed changeset ${args.sys_id}` };
     }
     case 'snow_scr_changeset_publish': {
+      requireScripting();
       if (!args.sys_id) throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
       const result = await client.updateRecord('sys_update_set', args.sys_id, { state: 'complete' });
       return { ...result, summary: `Published changeset ${args.sys_id}` };
     }
     // ── Client Script CRUD ───────────────────────────────────────────────────
     case 'snow_scr_client_script_add': {
+      requireScripting();
       if (!args.name || !args.table || !args.type || !args.script)
         throw new ServiceNowError('name, table, type, and script are required', 'INVALID_REQUEST');
       const data: Record<string, any> = {
@@ -494,6 +587,7 @@ export async function dispatchScriptAction(
       return { ...result, summary: `Created client script "${args.name}" (${args.type}) on table "${args.table}"` };
     }
     case 'snow_scr_client_script_modify': {
+      requireScripting();
       if (!args.sys_id || !args.fields) throw new ServiceNowError('sys_id and fields are required', 'INVALID_REQUEST');
       const result = await client.updateRecord('sys_script_client', args.sys_id, args.fields);
       return { ...result, summary: `Updated client script ${args.sys_id}` };
@@ -516,6 +610,7 @@ export async function dispatchScriptAction(
       return await client.getRecord('sys_ui_policy', args.sys_id);
     }
     case 'snow_scr_ui_policy_add': {
+      requireScripting();
       if (!args.short_description || !args.table)
         throw new ServiceNowError('short_description and table are required', 'INVALID_REQUEST');
       const data: Record<string, any> = {
@@ -548,6 +643,7 @@ export async function dispatchScriptAction(
       return await client.getRecord('sys_ui_action', args.sys_id);
     }
     case 'snow_scr_ui_action_add': {
+      requireScripting();
       if (!args.name || !args.table || !args.action_name)
         throw new ServiceNowError('name, table, and action_name are required', 'INVALID_REQUEST');
       const data: Record<string, any> = {
@@ -565,6 +661,7 @@ export async function dispatchScriptAction(
       return { ...result, summary: `Created UI action "${args.name}" on table "${args.table}"` };
     }
     case 'snow_scr_ui_action_modify': {
+      requireScripting();
       if (!args.sys_id || !args.fields) throw new ServiceNowError('sys_id and fields are required', 'INVALID_REQUEST');
       const result = await client.updateRecord('sys_ui_action', args.sys_id, args.fields);
       return { ...result, summary: `Updated UI action ${args.sys_id}` };
@@ -588,6 +685,7 @@ export async function dispatchScriptAction(
       return await client.getRecord('sys_security_acl', args.sys_id);
     }
     case 'snow_scr_acl_add': {
+      requireScripting();
       if (!args.name || !args.operation) throw new ServiceNowError('name and operation are required', 'INVALID_REQUEST');
       const data: Record<string, any> = {
         name: args.name,
@@ -602,6 +700,7 @@ export async function dispatchScriptAction(
       return { ...result, summary: `Created ACL "${args.name}" for operation "${args.operation}"` };
     }
     case 'snow_scr_acl_modify': {
+      requireScripting();
       if (!args.sys_id || !args.fields) throw new ServiceNowError('sys_id and fields are required', 'INVALID_REQUEST');
       const result = await client.updateRecord('sys_security_acl', args.sys_id, args.fields);
       return { ...result, summary: `Updated ACL ${args.sys_id}` };

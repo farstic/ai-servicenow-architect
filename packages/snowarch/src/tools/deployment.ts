@@ -12,58 +12,82 @@
 import type { ServiceNowClient } from '../servicenow/client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { requireWrite, requireScripting } from '../utils/permissions.js';
+import type { ToolDefinition } from './types.js';
 
-export function deploymentToolManifest() {
+export function deploymentToolManifest(): ToolDefinition[] {
   return [
     {
       name: 'snow_deploy_artifact_query',
       description: 'Search for platform artifacts by name, type, or scope (business rules, scripts, widgets, etc.)',
       inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'Artifact name or pattern' }, type: { type: 'string', description: 'Artifact type: business_rule, script_include, client_script, ui_policy, ui_action, widget, flow, sys_properties' }, scope: { type: 'string', description: 'Application scope name' }, limit: { type: 'number' } }, required: ['name'] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_deploy_artifact_validate',
       description: 'Validate an artifact for best practices, security issues, and performance concerns',
       inputSchema: { type: 'object', properties: { table: { type: 'string', description: 'Artifact table (e.g. sys_script, sys_script_include)' }, sys_id: { type: 'string', description: 'Artifact sys_id' } }, required: ['table', 'sys_id'] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_deploy_artifact_clone',
       description: 'Clone a platform artifact to a new name/scope. **[Scripting]**',
       inputSchema: { type: 'object', properties: { table: { type: 'string', description: 'Source artifact table' }, sys_id: { type: 'string', description: 'Source artifact sys_id' }, new_name: { type: 'string', description: 'Name for the cloned artifact' }, target_scope: { type: 'string', description: 'Target application scope (optional)' } }, required: ['table', 'sys_id', 'new_name'] },
+      gate: 'scripting',
+      mutates: true,
     },
     {
       name: 'snow_deploy_deployment_validate',
       description: 'Pre-validate an update set or app before deployment — check for conflicts and missing dependencies',
       inputSchema: { type: 'object', properties: { update_set_sys_id: { type: 'string', description: 'Update set sys_id to validate' }, app_sys_id: { type: 'string', description: 'Scoped app sys_id (alternative to update set)' } }, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_deploy_deployment_rollback',
       description: 'Rollback a deployment by reverting an update set. **[Write]**',
       inputSchema: { type: 'object', properties: { update_set_sys_id: { type: 'string', description: 'Committed update set sys_id to rollback' }, reason: { type: 'string', description: 'Reason for rollback' } }, required: ['update_set_sys_id'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_deploy_deployment_history_index',
       description: 'List deployment history — committed update sets and app installs over time',
       inputSchema: { type: 'object', properties: { days: { type: 'number', description: 'Look-back period (default 30)' }, limit: { type: 'number' } }, required: [] },
+      gate: 'none',
+      mutates: false,
     },
     {
       name: 'snow_deploy_solution_package_add',
       description: 'Create a solution package from selected update sets for distribution. **[Write]**',
       inputSchema: { type: 'object', properties: { name: { type: 'string', description: 'Package name' }, description: { type: 'string' }, update_sets: { type: 'array', items: { type: 'string' }, description: 'Array of update set sys_ids to include' } }, required: ['name', 'update_sets'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_deploy_background_script_exec',
-      description: 'Execute a background script on the instance (server-side JavaScript). **[Scripting]**',
+      description: '[Unsupported] Execute a server-side script: no working endpoint exists on this instance. Run the script in System Definition > Scripts - Background, or author it as a Fix Script (sys_script_fix) and run it from the UI.',
       inputSchema: { type: 'object', properties: { script: { type: 'string', description: 'JavaScript code to execute' }, scope: { type: 'string', description: 'Application scope (default global)' } }, required: ['script'] },
+      gate: 'scripting',
+      mutates: true,
+      // Registered, and always refuses: no REST endpoint backs it. It stays registered so a
+      // caller reaching for a server-side script finds it and is told the route that works.
+      unsupported: true,
     },
     {
       name: 'snow_deploy_cmdb_data_import',
       description: 'Import CI data into CMDB via import set. **[Write]**',
       inputSchema: { type: 'object', properties: { table: { type: 'string', description: 'Target CMDB table (e.g. cmdb_ci_server)' }, data: { type: 'array', items: { type: 'object' }, description: 'Array of records to import' } }, required: ['table', 'data'] },
+      gate: 'write',
+      mutates: true,
     },
     {
       name: 'snow_deploy_data_quality_analyze',
       description: 'Analyse data quality for a table — completeness, duplicates, stale records',
       inputSchema: { type: 'object', properties: { table: { type: 'string', description: 'Table to analyse' }, required_fields: { type: 'string', description: 'Comma-separated fields that should be populated' }, days_stale: { type: 'number', description: 'Consider records stale after N days without update (default 180)' } }, required: ['table'] },
+      gate: 'none',
+      mutates: false,
     },
   ];
 }
@@ -142,13 +166,17 @@ export async function dispatchDeploymentAction(
 
     case 'snow_deploy_background_script_exec': {
       requireScripting();
-      if (!args.script) throw new ServiceNowError('script is required', 'INVALID_REQUEST');
-      try {
-        const resp = await client.callNowAssist('/api/now/sp/background_script', { script: args.script, scope: args.scope || 'global' });
-        return { action: 'executed', output: resp };
-      } catch (err) {
-        return { action: 'failed', error: err instanceof Error ? err.message : String(err) };
-      }
+      // Retired by ARC-04-S08. Every endpoint this tool tried — /api/now/sp/background_script
+      // among them — returns 400 or 404 on a PDI; there is no supported REST surface for
+      // server-side script execution. It stays REGISTERED because the engine cites it and
+      // ARC-05's required-tools.json lists it: a name that vanishes is a worse answer than a
+      // name that says why it cannot work. The throw happens BEFORE any HTTP, so a caller
+      // never waits on a request that was always going to fail.
+      throw new ServiceNowError(
+        'Server-side script execution has no supported REST endpoint on this instance. Run the '
+        + 'script in System Definition > Scripts - Background, or author it as a Fix Script '
+        + '(sys_script_fix) and run it from the UI.'
+        , 'UNSUPPORTED_ON_THIS_INSTANCE');
     }
 
     case 'snow_deploy_cmdb_data_import': {

@@ -10,20 +10,20 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 
 | ID | ARC | Title | Size | Depends on | Milestone | Status |
 |---|---|---|---|---|---|---|
-| ARC-00-S01 | ARC-00 | Spike workspace, stub MCP server and three clean test environments | L | — | M0 | Not started |
-| ARC-00-S02 | ARC-00 | Licence and relicensing statement (D-02): `LICENSE`, `NOTICE`, header sweep list | S | — | M0 | Not started |
-| ARC-00-S03 | ARC-00 | ADR-0001…ADR-0006 (+ ADR-0007 post-decision rulings) and the `engine.config.json` value set | M | S02 | M0 | Not started |
-| ARC-00-S04 | ARC-00 | First-session spikes: S-01 pre-seeded approval, S-16 project `permissions.allow`, S-17 unconfigured server | M | S01 | M0 | Not started |
-| ARC-00-S05 | ARC-00 | Permission-rule spikes: S-18 `permissions.ask` in auto mode, S-12 middle-wildcard globs | M | S01, S04 | M0 | Not started |
-| ARC-00-S06 | ARC-00 | Hook and path-expansion spikes: S-03 `${CLAUDE_PROJECT_DIR}` on native Windows, S-05 hook with Node absent, S-20 shell-env inheritance | M | S01 | M0 | Not started |
-| ARC-00-S07 | ARC-00 | Windows console spikes: S-04 raw-mode masked input, S-08 `bootstrap.cmd` under Restricted and GPO-locked policies | M | S01 | M0 | Not started |
-| ARC-00-S08 | ARC-00 | Server install and startup spikes: S-15 root `npm ci` footprint, S-06 `MCP_TIMEOUT` and 394-tool cold start | M | S01 | M0 | Not started |
-| ARC-00-S09 | ARC-00 | S-07 — ServiceNowDocs submodule recipes: size and time on three OSes | M | S01 | M0 | Not started |
-| ARC-00-S10 | ARC-00 | Session-dynamics spikes: S-09 Claude-first clone-into-cwd and restart, S-02 `list_changed` after reload | M | S01, S04 | M0 | Not started |
-| ARC-00-S11 | ARC-00 | S-11 — Claude Code 2.1.214 floor verdict over the spike matrix | S | S04, S10 | M0 | Not started |
-| ARC-00-S12 | ARC-00 | S-14a–g plugin channel spikes (D-06 hedge, one-week time-box) and S-19 `claude plugin validate` on headless CI | L | S01, S03 | M0 | Not started |
-| ARC-00-S13 | ARC-00 | Windows test recipe for ARC-06 / ARC-09 CI | S | S06, S07 | M0 | Not started |
-| ARC-00-S14 | ARC-00 | Close-out: `03` §A/§B Status column, deferred spikes S-10 / S-13, gate sign-off for ARC-01 and ARC-06 | M | S02, S13 | M0 | Not started |
+| ARC-00-S01 | ARC-00 | Spike workspace, stub MCP server and three clean test environments | L | — | M0 | Done (2026-09-07) |
+| ARC-00-S02 | ARC-00 | Licence and relicensing statement (D-02): `LICENSE`, `NOTICE`, header sweep list | S | — | M0 | Done (2026-09-07) |
+| ARC-00-S03 | ARC-00 | ADR-0001…ADR-0006 (+ ADR-0007 post-decision rulings) and the `engine.config.json` value set | M | S02 | M0 | Done (2026-09-07) |
+| ARC-00-S04 | ARC-00 | First-session spikes: S-01 pre-seeded approval, S-16 project `permissions.allow`, S-17 unconfigured server | M | S01 | M0 | Done (2026-09-07) |
+| ARC-00-S05 | ARC-00 | Permission-rule spikes: S-18 `permissions.ask` in auto mode, S-12 middle-wildcard globs | M | S01, S04 | M0 | Done (2026-09-07) |
+| ARC-00-S06 | ARC-00 | Hook and path-expansion spikes: S-03 `${CLAUDE_PROJECT_DIR}` on native Windows, S-05 hook with Node absent, S-20 shell-env inheritance | M | S01 | M0 | Done (2026-09-07) |
+| ARC-00-S07 | ARC-00 | Windows console spikes: S-04 raw-mode masked input, S-08 `bootstrap.cmd` under Restricted and GPO-locked policies | M | S01 | M0 | Done — parked items noted (2026-09-07) |
+| ARC-00-S08 | ARC-00 | Server install and startup spikes: S-15 root `npm ci` footprint, S-06 `MCP_TIMEOUT` and 394-tool cold start | M | S01 | M0 | Done (2026-09-07) |
+| ARC-00-S09 | ARC-00 | S-07 — ServiceNowDocs submodule recipes: size and time on three OSes | M | S01 | M0 | Done (2026-09-07) |
+| ARC-00-S10 | ARC-00 | Session-dynamics spikes: S-09 Claude-first clone-into-cwd and restart, S-02 `list_changed` after reload | M | S01, S04 | M0 | Done (2026-09-07) |
+| ARC-00-S11 | ARC-00 | S-11 — Claude Code 2.1.214 floor verdict over the spike matrix | S | S04, S10 | M0 | Done (2026-09-07) |
+| ARC-00-S12 | ARC-00 | S-14a–g plugin channel spikes (D-06 hedge, one-week time-box) and S-19 `claude plugin validate` on headless CI | L | S01, S03 | M0 | Done (2026-09-07) |
+| ARC-00-S13 | ARC-00 | Windows test recipe for ARC-06 / ARC-09 CI | S | S06, S07 | M0 | Done — parked items noted (2026-09-07) |
+| ARC-00-S14 | ARC-00 | Close-out: `03` §A/§B Status column, deferred spikes S-10 / S-13, gate sign-off for ARC-01 and ARC-06 | M | S02, S13 | M0 | Done (2026-09-07) |
 | ARC-01-S01 | ARC-01 | Found the repository: root commit with `LICENSE`/`NOTICE`, default branch, protection, skeleton | M | ARC-00-S02 | M1 | Done (2026-09-08) |
 | ARC-01-S02 | ARC-01 | Import the engine working tree with history (submodule dropped, legacy scripts parked) | M | S01; ARC-00-S02 | M1 | Done (2026-09-08) |
 | ARC-01-S03 | ARC-01 | Import the server into `packages/snowarch` with history; leaf-level D-03 cut; package rename | L | S01; ARC-00-S02/S03 | M1 | Done (2026-09-08) |
@@ -36,55 +36,55 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-01-S10 | ARC-01 | Purge engagement residue; legacy-name ratchet test | M | S02, S03, S05, S09 | M1 | Done (2026-09-08) |
 | ARC-01-S11 | ARC-01 | CI skeleton: three OSes × Node 20/22/24; footprint gate; `claude plugin validate` job | M | S05, S06, S07, S10 | M1 | Done (2026-09-08) |
 | ARC-01-S12 | ARC-01 | `docs/ARCHITECTURE.md` and `docs/CONTRIBUTING.md` first versions | M | S01, S11 | M1 | Done (2026-09-08) |
-| ARC-02-S01 | ARC-02 | Make `.claude/` canonical: delete root mirrors, sync script, structure gate and pre-commit chain; rewrite every path reference | M | ARC-01-S02/S09 | M1 | Not started |
-| ARC-02-S02 | ARC-02 | Skills lint and agents lint (`tests/skills-lint.test.mjs`), wired into CI | M | S01; ARC-00-S12; ARC-01-S05/S11; verdicts S-19 | M1 | Not started |
-| ARC-02-S03 | ARC-02 | Rewrite every skill description to ≤ 500 chars; triggers into bodies; `version:` → `metadata.version`; S-13 verification | L | S02 | M1 | Not started |
-| ARC-02-S04 | ARC-02 | Agent frontmatter: `model: inherit`, `skills:` preload, `tools:` unchanged; §6.2 regression run | M | S02 | M1 | Not started |
-| ARC-02-S05 | ARC-02 | Remove context-mode, the claude.ai surface, the settings example, the 9-step README manual; disposition of legacy docs | M | S01; ARC-01-S10 | M1 | Not started |
-| ARC-02-S06 | ARC-02 | Move governance texts to `governance/`; Mode/Preset vocabulary sweep across CLAUDE.md, governance, docs, skills, tests | M | S05; ARC-01-S04 | M2 | Not started |
-| ARC-02-S07 | ARC-02 | Roster generator: `scripts/gen-roster.mjs` writes the roster table into `docs/ARCHITECTURE.md`; `--check` in CI | S | S02; ARC-01-S12 | M2 | Not started |
-| ARC-02-S08 | ARC-02 | `CLAUDE.md` ≤ 200 lines rewrite; harness-neutral wording; `Status` → `/snowarch status`; version line owned by the release script | L | S06, S07; ARC-01-S06 | M2 | Not started |
-| ARC-02-S09 | ARC-02 | `docs/MODES-AND-PRESETS.md` — Mode semantics, the preset table and plain-language flags of `01` §6.3, principle 10 | S | S06 | M2 | Not started |
-| ARC-02-S10 | ARC-02 | `docs/PLATFORM-NOTES.md` from the field notes; server-behaviour sections handed to ARC-04 as regression-test titles | M | S05 | M2 | Not started |
-| ARC-02-S11 | ARC-02 | `/snowarch` project skill: `status` (delegates to the doctor), `setup-instance` skeleton with the terminal hand-off, `doctor` | M | S02, S08; ARC-00-S04; verdicts S-16 | M2 | Not started |
-| ARC-02-S12 | ARC-02 | Retired-name final sweep with ARC-05's `retired-names.json` and `engine-lint.mjs` (incl. ITOM SKILL/EXAMPLES) | S | S06; ARC-05-S02/S04 | M2 | Not started |
-| ARC-02-S13 | ARC-02 | Refresh `VALIDATION-TESTS.md` (T-01…T-18) to Mode/Preset and current tool names; replace T-07; strip run history; execute in design-only mode | M | S08, S11, S12 | M2 | Not started |
-| ARC-03-S01 | ARC-03 | Shallow submodule at `vendor/ServiceNowDocs`, pin re-seeded to `ba513f2`, pin recorded in `engine.config.json` with a pin-equals-gitlink lint | M | ARC-01 (all) | M1 | Not started |
-| ARC-03-S02 | ARC-03 | Citation scanner library, `scripts/gen-docs-areas.mjs` and generated `vendor/docs-areas.txt` with a CI staleness check | M | S01 | M1 | Not started |
-| ARC-03-S03 | ARC-03 | Port `verify-citations.sh` to `tools/snowarch/lib/docs/verify.mjs`; brace and directory forms; missing corpus = FAIL | M | S02 | M1 | Not started |
-| ARC-03-S04 | ARC-03 | Repair the dead citations (two in the licensing skill, one in the Now Assist agent) | S | S03; ARC-02 (all) | M1 | Not started |
-| ARC-03-S05 | ARC-03 | `snowarch docs sync` — the checkout/reconcile recipe (sparse · full · skip), pinned-SHA fetch, Windows long paths; the Node-free launcher recipe text | L | S01, S02; ARC-00-S09; verdicts S-07 | M2 | Not started |
-| ARC-03-S06 | ARC-03 | `snowarch docs verify` and `snowarch docs status`; the `docsStatus()` data shape consumed by the doctor and `/snowarch status` | M | S03, S05 | M2 | Not started |
-| ARC-03-S07 | ARC-03 | `snowarch docs sync --upstream` — move the pin to the upstream tip, verify, print the dead-citation diff (maintainer) | M | S05, S06 | M2 | Not started |
-| ARC-03-S08 | ARC-03 | `snowarch docs family <name> --dry-run\|--yes` — release-family switch with a printed edit plan and gateway-skill re-lint | M | S07 | M2 | Not started |
-| ARC-03-S09 | ARC-03 | `.github/workflows/docs-bump.yml` weekly PR with pin, verification output and newly dead citations | M | S07; ARC-01 (all) | M2 | Not started |
-| ARC-03-S10 | ARC-03 | `NOTICE` attribution, the B02/`docs sync` attribution line, install-page attribution and size/time statement, `docs/ARCHITECTURE.md` corpus section | S | S05; ARC-00-S09; ARC-01 (all); verdicts S-07 | M2 | Not started |
-| ARC-03-S11 | ARC-03 | Windows long-path CI proof and `--docs skip` → doctor FAIL wiring (three-OS real-corpus job) | M | S05, S06; ARC-00-S09/S13; ARC-01-S11; verdicts S-07 | M2 | Not started |
-| ARC-04-S01 | ARC-04 | D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI | L | ARC-01-S05/S06 | M2 | Not started |
-| ARC-04-S02 | ARC-04 | Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed | L | S01 | M2 | Not started |
-| ARC-04-S03 | ARC-04 | Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage | L | S02 | M2 | Not started |
-| ARC-04-S04 | ARC-04 | Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed` | L | S03 | M2 | Not started |
-| ARC-04-S05 | ARC-04 | SCRIPTING / update-set read-gate split | M | S03 | M2 | Not started |
-| ARC-04-S06 | ARC-04 | `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract` | L | S04, S05 | M2 | Not started |
-| ARC-04-S07 | ARC-04 | `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter | M | S05, S06 | M2 | Not started |
-| ARC-04-S08 | ARC-04 | Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap | M | S04, S06 | M2 | Not started |
-| ARC-04-S09 | ARC-04 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert`/`action_update` | M | S01 | M2 | Not started |
-| ARC-04-S10 | ARC-04 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | S02, S06 | M2 | Not started |
-| ARC-04-S11 | ARC-04 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M | S01 | M2 | Not started |
-| ARC-04-S12 | ARC-04 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | S04, S06 | M2 | Not started |
-| ARC-04-S13 | ARC-04 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | S06, S08 | M2 | Not started |
-| ARC-04-S14 | ARC-04 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M | S01, S13 | M2 | Not started |
-| ARC-05-S01 | ARC-05 | `required-tools.json`: engine pin with `used_by` and `contractSha256` | M | ARC-01-S04; ARC-04-S06/S13 | M2 | Not started |
-| ARC-05-S02 | ARC-05 | `retired-names.json` generated from the rename map | S | ARC-04-S01 | M2 | Not started |
-| ARC-05-S03 | ARC-05 | `engine-lint.mjs` core: tokens, prefix, retired names, pin | M | S01, S02 | M2 | Not started |
-| ARC-05-S04 | ARC-05 | `engine-lint.mjs` structural checks: descriptions, path references, `used_by`, generated-file byte check, plugin validate | M | S03, S05, S06, S07; ARC-00-S12; verdicts S-19 | M2 | Not started |
-| ARC-05-S05 | ARC-05 | `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md` | M | S01; ARC-02-S09; ARC-04-S03/S06/S07 | M2 | Not started |
-| ARC-05-S06 | ARC-05 | Error-code registry, `governance/mcp-protocols.md` and `docs/TROUBLESHOOTING.md` | M | S05; ARC-04-S02/S03/S04/S08/S11 | M2 | Not started |
-| ARC-05-S07 | ARC-05 | Generated `permissions.allow` / `permissions.ask` blocks in `.claude/settings.json` | M | S05; ARC-00-S05; ARC-06-S01; verdicts S-12 S-18 | M2 | Not started |
-| ARC-05-S08 | ARC-05 | Server `tests/contract.test.ts`: gates, presets, invariants, pin, dist parity | L | S01, S06; ARC-04-S01/S03/S05/S06/S13 | M2 | Not started |
-| ARC-05-S09 | ARC-05 | CI job `contract` and the release gate script | S | S03, S04, S08; ARC-01-S11 | M2 | Not started |
-| ARC-05-S10 | ARC-05 | Contract loader for engine tooling and the no-literal-names guard | M | S01, S06 | M2 | Not started |
-| ARC-05-S11 | ARC-05 | Drift drill and contributor documentation | M | S01, S10 | M2 | Not started |
+| ARC-02-S01 | ARC-02 | Make `.claude/` canonical: delete root mirrors, sync script, structure gate and pre-commit chain; rewrite every path reference | M | ARC-01-S02/S09 | M1 | Done (2026-09-08) |
+| ARC-02-S02 | ARC-02 | Skills lint and agents lint (`tests/skills-lint.test.mjs`), wired into CI | M | S01; ARC-00-S12; ARC-01-S05/S11; verdicts S-19 | M1 | Done (2026-09-08) |
+| ARC-02-S03 | ARC-02 | Rewrite every skill description to ≤ 500 chars; triggers into bodies; `version:` → `metadata.version`; S-13 verification | L | S02 | M1 | Done (2026-09-08) |
+| ARC-02-S04 | ARC-02 | Agent frontmatter: `model: inherit`, `skills:` preload, `tools:` unchanged; §6.2 regression run | M | S02 | M1 | Done (2026-09-08) |
+| ARC-02-S05 | ARC-02 | Remove context-mode, the claude.ai surface, the settings example, the 9-step README manual; disposition of legacy docs | M | S01; ARC-01-S10 | M1 | Done (2026-09-08) |
+| ARC-02-S06 | ARC-02 | Move governance texts to `governance/`; Mode/Preset vocabulary sweep across CLAUDE.md, governance, docs, skills, tests | M | S05; ARC-01-S04 | M2 | Done (2026-09-08) |
+| ARC-02-S07 | ARC-02 | Roster generator: `scripts/gen-roster.mjs` writes the roster table into `docs/ARCHITECTURE.md`; `--check` in CI | S | S02; ARC-01-S12 | M2 | Done (2026-09-08) |
+| ARC-02-S08 | ARC-02 | `CLAUDE.md` ≤ 200 lines rewrite; harness-neutral wording; `Status` → `/snowarch status`; version line owned by the release script | L | S06, S07; ARC-01-S06 | M2 | Done (2026-09-08) |
+| ARC-02-S09 | ARC-02 | `docs/MODES-AND-PRESETS.md` — Mode semantics, the preset table and plain-language flags of `01` §6.3, principle 10 | S | S06 | M2 | Done (2026-09-08) |
+| ARC-02-S10 | ARC-02 | `docs/PLATFORM-NOTES.md` from the field notes; server-behaviour sections handed to ARC-04 as regression-test titles | M | S05 | M2 | Done (2026-09-08) |
+| ARC-02-S11 | ARC-02 | `/snowarch` project skill: `status` (delegates to the doctor), `setup-instance` skeleton with the terminal hand-off, `doctor` | M | S02, S08; ARC-00-S04; verdicts S-16 | M2 | Done (2026-09-09) — criteria 2–7 verified in headless sessions against the doctor stub; criterion 9 (Windows run) deferred to the owner's sitting |
+| ARC-02-S12 | ARC-02 | Retired-name final sweep with ARC-05's `retired-names.json` and `engine-lint.mjs` (incl. ITOM SKILL/EXAMPLES) | S | S06; ARC-05-S02/S04 | M2 | Done (2026-09-08) |
+| ARC-02-S13 | ARC-02 | Refresh `VALIDATION-TESTS.md` (T-01…T-18) to Mode/Preset and current tool names; replace T-07; strip run history; execute in design-only mode | M | S08, S11, S12 | M2 | Done (2026-09-09) — all 18 executed in design-only on a clean clone; the Windows subset (criterion 6) deferred to the owner's sitting |
+| ARC-03-S01 | ARC-03 | Shallow submodule at `vendor/ServiceNowDocs`, pin re-seeded to `ba513f2`, pin recorded in `engine.config.json` with a pin-equals-gitlink lint | M | ARC-01 (all) | M1 | Done (2026-09-08) |
+| ARC-03-S02 | ARC-03 | Citation scanner library, `scripts/gen-docs-areas.mjs` and generated `vendor/docs-areas.txt` with a CI staleness check | M | S01 | M1 | Done (2026-09-08) |
+| ARC-03-S03 | ARC-03 | Port `verify-citations.sh` to `tools/snowarch/lib/docs/verify.mjs`; brace and directory forms; missing corpus = FAIL | M | S02 | M1 | Done (2026-09-08) |
+| ARC-03-S04 | ARC-03 | Repair the dead citations (two in the licensing skill, one in the Now Assist agent) | S | S03; ARC-02 (all) | M1 | Done (2026-09-08) |
+| ARC-03-S05 | ARC-03 | `snowarch docs sync` — the checkout/reconcile recipe (sparse · full · skip), pinned-SHA fetch, Windows long paths; the Node-free launcher recipe text | L | S01, S02; ARC-00-S09; verdicts S-07 | M2 | Done (2026-09-09) |
+| ARC-03-S06 | ARC-03 | `snowarch docs verify` and `snowarch docs status`; the `docsStatus()` data shape consumed by the doctor and `/snowarch status` | M | S03, S05 | M2 | Done (2026-09-09) |
+| ARC-03-S07 | ARC-03 | `snowarch docs sync --upstream` — move the pin to the upstream tip, verify, print the dead-citation diff (maintainer) | M | S05, S06 | M2 | Done (2026-09-09) |
+| ARC-03-S08 | ARC-03 | `snowarch docs family <name> --dry-run\|--yes` — release-family switch with a printed edit plan and gateway-skill re-lint | M | S07 | M2 | Done (2026-09-09) |
+| ARC-03-S09 | ARC-03 | `.github/workflows/docs-bump.yml` weekly PR with pin, verification output and newly dead citations | M | S07; ARC-01 (all) | M2 | Done (2026-09-09) |
+| ARC-03-S10 | ARC-03 | `NOTICE` attribution, the B02/`docs sync` attribution line, install-page attribution and size/time statement, `docs/ARCHITECTURE.md` corpus section | S | S05; ARC-00-S09; ARC-01 (all); verdicts S-07 | M2 | Done (2026-09-09) |
+| ARC-03-S11 | ARC-03 | Windows long-path CI proof and `--docs skip` → doctor FAIL wiring (three-OS real-corpus job) | M | S05, S06; ARC-00-S09/S13; ARC-01-S11; verdicts S-07 | M2 | Done (2026-09-09) |
+| ARC-04-S01 | ARC-04 | D-03 code cut, dependency prune, identity `@farstic/snowarch` 2.0.0, vitest scoping, `npm test` in CI | L | ARC-01-S05/S06 | M2 | Done (2026-09-08) |
+| ARC-04-S02 | ARC-04 | Store module v1: precedence, schema, file-mode check, atomic writes; legacy stores and cwd `dotenv` removed | L | S01 | M2 | Done (2026-09-08) |
+| ARC-04-S03 | ARC-04 | Per-instance flag evaluation, preset expansion, dependency rule, prod acknowledgement; `permissions.ts` at 100 % coverage | L | S02 | M2 | Done (2026-09-08) |
+| ARC-04-S04 | ARC-04 | Unconfigured start mode, `NO_INSTANCE_CONFIGURED`, `snow_core_status_read`, `snow_core_capabilities_read`, `snow_core_instances_reload` + `list_changed` | L | S03 | M2 | Done (2026-09-08) |
+| ARC-04-S05 | ARC-04 | SCRIPTING / update-set read-gate split | M | S03 | M2 | Done (2026-09-08) |
+| ARC-04-S06 | ARC-04 | `gate` / `mutates` on every registration; `extract-tools.mjs` emits manifest fields and `dist/contract.json`; `snowarch contract` | L | S04, S05 | M2 | Done (2026-09-08) |
+| ARC-04-S07 | ARC-04 | `snow_us_capture_target_set`; `snow_us_active_update_set_ensure` with mandatory name and current-user filter | M | S05, S06 | M2 | Done (2026-09-08) |
+| ARC-04-S08 | ARC-04 | Retire dead script-execution endpoints; remove undeclared per-call `instance` routing and runtime-generated tools; result-size cap | M | S04, S06 | M2 | Done (2026-09-08) |
+| ARC-04-S09 | ARC-04 | Defect fixes with regression tests: `ORDERBYDESC`, `event_name`, `action_insert`/`action_update` | M | S01 | M2 | Done (2026-09-08) |
+| ARC-04-S10 | ARC-04 | Audit trail writer with rotation; redaction defaults; Authorization header never logged | M | S02, S06 | M2 | Done (2026-09-08) |
+| ARC-04-S11 | ARC-04 | Proxy agent honouring `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY`; documented `NODE_EXTRA_CA_CERTS`; network-error classifier (R-3) | M | S01 | M2 | Done (2026-09-08) |
+| ARC-04-S12 | ARC-04 | Server doctor module (`src/doctor/`) and `snowarch doctor --json` | M | S04, S06 | M2 | Done (2026-09-08) |
+| ARC-04-S13 | ARC-04 | `scripts/build-dist.mjs`; committed `dist/`; CI rebuild-and-diff | M | S06, S08 | M2 | Done (2026-09-08) |
+| ARC-04-S14 | ARC-04 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M | S01, S13 | M2 | Done (2026-09-08) |
+| ARC-05-S01 | ARC-05 | `required-tools.json`: engine pin with `used_by` and `contractSha256` | M | ARC-01-S04; ARC-04-S06/S13 | M2 | Done (2026-09-08) |
+| ARC-05-S02 | ARC-05 | `retired-names.json` generated from the rename map | S | ARC-04-S01 | M2 | Done (2026-09-08) |
+| ARC-05-S03 | ARC-05 | `engine-lint.mjs` core: tokens, prefix, retired names, pin | M | S01, S02 | M2 | Done (2026-09-08) |
+| ARC-05-S04 | ARC-05 | `engine-lint.mjs` structural checks: descriptions, path references, `used_by`, generated-file byte check, plugin validate | M | S03, S05, S06, S07; ARC-00-S12; verdicts S-19 | M2 | Done (2026-09-08) |
+| ARC-05-S05 | ARC-05 | `gen-governance.mjs` framework, the rule file `.claude/rules/00-mode-and-mcp-gate.md` and the `PRESETS` block of `docs/MODES-AND-PRESETS.md` | M | S01; ARC-02-S09; ARC-04-S03/S06/S07 | M2 | Done (2026-09-08) |
+| ARC-05-S06 | ARC-05 | Error-code registry, `governance/mcp-protocols.md` and `docs/TROUBLESHOOTING.md` | M | S05; ARC-04-S02/S03/S04/S08/S11 | M2 | Done (2026-09-08) |
+| ARC-05-S07 | ARC-05 | Generated `permissions.allow` / `permissions.ask` blocks in `.claude/settings.json` | M | S05; ARC-00-S05; ARC-06-S01; verdicts S-12 S-18 | M2 | Done (2026-09-08) |
+| ARC-05-S08 | ARC-05 | Server `tests/contract.test.ts`: gates, presets, invariants, pin, dist parity | L | S01, S06; ARC-04-S01/S03/S05/S06/S13 | M2 | Done (2026-09-08) |
+| ARC-05-S09 | ARC-05 | CI job `contract` and the release gate script | S | S03, S04, S08; ARC-01-S11 | M2 | Done (2026-09-08) |
+| ARC-05-S10 | ARC-05 | Contract loader for engine tooling and the no-literal-names guard | M | S01, S06 | M2 | Done (2026-09-08) |
+| ARC-05-S11 | ARC-05 | Drift drill and contributor documentation | M | S01, S10 | M2 | Done (2026-09-08) |
 | ARC-06-S01 | ARC-06 | Committed `.mcp.json` and `.claude/settings.json`; placeholder and secret-shape tests | M | ARC-00-S06/S08; ARC-01 (all); verdicts S-05 S-06 S-20 | M3 | Not started |
 | ARC-06-S02 | ARC-06 | `snowarch` CLI skeleton (stdlib only): argument parsing, exit codes, secret-free logging, `version` | M | ARC-01 (all) | M3 | Not started |
 | ARC-06-S03 | ARC-06 | Bootstrap orchestrator: state file, step registry, resume, per-step input hashes, plan summary, `--yes` / `--from` / `--reset` | L | S02 | M3 | Not started |

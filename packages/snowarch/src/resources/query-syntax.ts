@@ -38,6 +38,14 @@ export const QUERY_SYNTAX_REFERENCE = `# ServiceNow Encoded Query Syntax Referen
 | Ascending | \`^ORDERBYfield\` | \`^ORDERBYnumber\` |
 | Descending | \`^ORDERBYDESCfield\` | \`^ORDERBYDESCsys_created_on\` |
 
+Descending is **one** term — \`ORDERBYDESC<field>\`, not \`ORDERBY<field>^ORDERBYDESC\`. The
+second form is accepted by the platform and sorts **ascending**, so a "newest first" query
+returns the oldest records with no error.
+
+The \`orderBy\` parameter on the query tools uses the same grammar: \`-field\` becomes
+\`ORDERBYDESCfield\`, \`field\` becomes \`ORDERBYfield\`, and a comma-separated list is joined
+one term per field (\`-priority,sys_created_on\` → \`ORDERBYDESCpriority^ORDERBYsys_created_on\`).
+
 ## Date Functions (JavaScript)
 Use these in query values for dynamic date ranges:
 | Function | Description | Example |

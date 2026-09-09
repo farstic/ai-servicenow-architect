@@ -1,0 +1,27 @@
+/** The five tools a session has when nothing is configured. `instance_switch` is NOT among
+ *  them: there is nothing to switch to, and offering it would invite an error instead of a
+ *  remedy. */
+export declare const CORE_TOOLS_UNCONFIGURED: readonly ["snow_core_instances_index", "snow_core_instances_reload", "snow_core_current_instance_read", "snow_core_capabilities_read", "snow_core_status_read"];
+export declare const NO_INSTANCE_MESSAGE: string;
+export declare function setAdvertisedCount(n: number): void;
+export declare function getAdvertisedCount(): number;
+export declare function setToolListChangedNotifier(fn: (() => void) | null): void;
+/** The precedence as a reader needs to see it: the override, then the two file locations. */
+export declare function storeCandidates(): Array<{
+    source: string;
+    path: string | null;
+    exists: boolean;
+}>;
+export declare function serverStatus(): Record<string, unknown>;
+export declare function currentCapabilities(): Record<string, unknown>;
+/**
+ * Re-read the store. The path is RE-RESOLVED, not remembered: the common case is a user who
+ * ran `./snowarch instance add` in another terminal, so the store often did not exist when
+ * the server started.
+ *
+ * `list_changed` is sent only when the advertised SET changed size (5 ↔ full). Sending it on
+ * every reload would make a client re-fetch the catalogue for nothing.
+ */
+export declare function reloadInstances(): Record<string, unknown>;
+export declare function setFullCatalogueSize(n: number): void;
+export declare function fullCatalogueSize(): number;
