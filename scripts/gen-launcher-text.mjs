@@ -48,11 +48,33 @@ const quote = (value, shell) => (shell === 'powershell'
 /** The remedy for a check, on the platform bash will detect at run time. */
 const remedy = (id, plat) => remedies[id][plat] ?? remedies[id].default;
 
+/**
+ * Which of these names a launcher actually mentions, outside the generated region.
+ *
+ * The region used to carry every sentence to both files, which meant `bootstrap.sh` declared the
+ * `winget` remedies it can never print and `bootstrap.ps1` declared the `brew` ones — and BOTH
+ * linters call an assigned-never-read variable a defect (SC2034, PSUseDeclaredVarsMoreThan-
+ * Assignments). Deriving the list from the file's own references fixes that at the source and
+ * cannot drift: a launcher that starts printing a sentence gets it on the next generate, and one
+ * that stops loses it. `$NAME` and `${NAME}` are spelled the same way in bash and in PowerShell,
+ * so one reader serves both.
+ */
+export function referencedNames(body) {
+  const found = new Set();
+  for (const m of body.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g)) found.add(m[1]);
+  return found;
+}
+
 export function region({ shell = 'bash', remedies: r = remedies, text: t = text,
-  sentences = SENTENCE, serverKey = config.mcp.serverKey } = {}) {
+  sentences = SENTENCE, serverKey = config.mcp.serverKey, used = null } = {}) {
   // PowerShell needs a `$` and spaces around `=`; bash must have neither.
   const q = (v) => quote(v, shell);
-  const set = (name, value) => (shell === 'powershell' ? `$${name} = ${q(value)}` : `${name}=${q(value)}`);
+  // `used === null` means "every sentence" — the shape the unit tests compare against. A caller
+  // that passes a set gets only what its file mentions, and `null` for anything it does not.
+  const set = (name, value) => {
+    if (used && !used.has(name)) return null;
+    return shell === 'powershell' ? `$${name} = ${q(value)}` : `${name}=${q(value)}`;
+  };
   // The Windows launcher prints the Windows spellings; the sentences are otherwise identical.
   const next = shell === 'powershell' ? t.windows.nextDesign : t.posix.nextDesign;
   const lines = [
@@ -74,8 +96,12 @@ export function region({ shell = 'bash', remedies: r = remedies, text: t = text,
     set('MSG_CITATIONS', 'citations: not verified until Node 20+ is installed'),
     END,
   ];
-  return lines.join('\n');
+  return lines.filter((line) => line !== null).join('\n');
 }
+
+/** Every name the region can define, in the order it defines them. */
+export const NAMES = Object.freeze(
+  region({ shell: 'bash' }).split('\n').slice(1, -1).map((line) => line.split('=')[0]));
 
 let stale = [];
 let checked = 0;
@@ -94,7 +120,19 @@ for (const target of TARGETS) {
   // arrives CRLF in every checkout and a generator splicing LF would report STALE for ever on a
   // clean tree — the lesson ARC-06-S06's recipe generator learned.
   const eol = doc.includes('\r\n') ? '\r\n' : '\n';
-  const body = region({ shell: target.shell }).split('\n').join(eol);
+  // Read the references from the file MINUS the region, so last generate's own assignments do not
+  // count as uses — otherwise the set could only ever grow, and a removed sentence would live for
+  // ever on the strength of the line that defines it.
+  const outside = doc.slice(0, start) + doc.slice(stop + END.length);
+  const used = referencedNames(outside);
+  const unknown = [...used].filter((n) => (n.startsWith('MSG_') || n === 'SERVER_KEY')
+    && !NAMES.includes(n));
+  if (unknown.length > 0) {
+    process.stderr.write(`gen-launcher-text: ${target.path} mentions ${unknown.join(', ')}, `
+      + 'which this generator does not define — a typo, or a sentence that needs adding here\n');
+    process.exit(2);
+  }
+  const body = region({ shell: target.shell, used }).split('\n').join(eol);
   const next = doc.slice(0, start) + body + doc.slice(stop + END.length);
   if (next === doc) continue;
   if (check) { stale.push(target.path); continue; }

@@ -238,7 +238,10 @@ jobs:
         shell: powershell
         run: |
           Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck
-          $r = Invoke-ScriptAnalyzer -Path .\bootstrap.ps1 -Severity Error,Warning
+          # Write-Host is excluded, and only that: a launcher's banner IS console text, and
+          # Write-Output would put it in the pipeline for a caller that captures the run.
+          $r = Invoke-ScriptAnalyzer -Path .\bootstrap.ps1 -Severity Error,Warning `
+                 -ExcludeRule PSAvoidUsingWriteHost
           $r | Format-Table -AutoSize
           if ($r.Count -gt 0) { exit 1 }
       - name: The launcher parses under Windows PowerShell 5.1

@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
+  from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -12,8 +14,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
  * be SOURCED rather than copied.
  */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const { BEGIN, END } = await import(
+  pathToFileURL(join(root, 'scripts/gen-launcher-text.mjs')).href);
 const launcher = readFileSync(join(root, 'bootstrap.sh'), 'utf8');
-const ps1 = readFileSync(join(root, 'bootstrap.ps1'), 'utf8');
+const ps1Raw = readFileSync(join(root, 'bootstrap.ps1'), 'utf8');
+// The BOM is a byte of the file, not of the text (see the BOM test below for why it is
+// there). Stripped once, here, so no other assertion has to know about it.
+const ps1 = ps1Raw.replace(/^\uFEFF/, '');
 const remedies = JSON.parse(readFileSync(join(root, 'tools/snowarch/lib/remedies.json'), 'utf8'));
 const text = JSON.parse(readFileSync(join(root, 'tools/snowarch/lib/text.json'), 'utf8'));
 const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
@@ -241,6 +248,70 @@ test('the Windows files arrive CRLF in every checkout', () => {
   // ...and bootstrap.sh is LF for the same reason, from the other side.
   const sh = execFileSync('git', ['ls-files', '--eol', 'bootstrap.sh'], { cwd: root, encoding: 'utf8' });
   assert.match(sh, /w\/lf/, 'the POSIX launcher must not arrive CRLF');
+});
+
+test('each launcher declares the sentences it uses, and only those', () => {
+  // Both linters call an assigned-never-read variable a defect — shellcheck SC2034 and
+  // PSScriptAnalyzer PSUseDeclaredVarsMoreThanAssignments — and the first version of this
+  // generator wrote every sentence into both files, so `bootstrap.sh` declared the `winget`
+  // remedies it can never print and `bootstrap.ps1` the `brew` ones. Six findings, one cause.
+  // The region is now derived from each file's own references, which is why this holds.
+  assert.ok(!/^MSG_NODE_WIN=/m.test(launcher), 'bootstrap.sh declares a Windows remedy it never prints');
+  assert.ok(!/^MSG_GIT_WIN=/m.test(launcher), 'bootstrap.sh declares a Windows remedy it never prints');
+  assert.ok(!/^\$MSG_NODE_DARWIN = /m.test(ps1), 'bootstrap.ps1 declares a macOS remedy it never prints');
+  assert.ok(!/^\$MSG_GIT_LINUX = /m.test(ps1), 'bootstrap.ps1 declares a Linux remedy it never prints');
+
+  // The other half, and the one that matters: everything a file DOES mention is defined. A
+  // generator that simply wrote fewer lines would pass the four assertions above.
+  for (const [name, doc, assign] of [['bash', launcher, (n) => new RegExp(`^${n}=`, 'm')],
+    ['powershell', ps1, (n) => new RegExp(`^\\$${n} = `, 'm')]]) {
+    const used = new Set([...doc.matchAll(/\$\{?(MSG_[A-Z_]+|SERVER_KEY)\}?/g)].map((m) => m[1]));
+    assert.ok(used.size >= 6, `${name}: only ${used.size} sentences referenced — is the regex right?`);
+    for (const n of used) assert.match(doc, assign(n), `${name}: ${n} is used but never assigned`);
+  }
+});
+
+test('a launcher that names a sentence the generator does not have is an error, not a silence', () => {
+  // The failure this guards: a typo'd `$MSG_NET_WORK` would simply not be written, and the
+  // launcher would print an empty remedy on the one machine that needed it.
+  const dir = mkdtempSync(join(tmpdir(), 'launcher-gen-'));
+  try {
+    mkdirSync(join(dir, 'tools/snowarch/lib'), { recursive: true });
+    for (const f of ['net-sentences.mjs', 'remedies.json', 'text.json']) {
+      copyFileSync(join(root, 'tools/snowarch/lib', f), join(dir, 'tools/snowarch/lib', f));
+    }
+    copyFileSync(join(root, 'engine.config.json'), join(dir, 'engine.config.json'));
+    writeFileSync(join(dir, 'bootstrap.sh'),
+      `#!/usr/bin/env bash\n${BEGIN}\n${END}\necho "$MSG_NET_WORK"\n`);
+    const r = spawnSync(process.execPath, [join(root, 'scripts/gen-launcher-text.mjs'), '--root', dir],
+      { encoding: 'utf8' });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    assert.match(r.stderr, /MSG_NET_WORK/);
+    // And the same tree without the typo generates cleanly — so the exit 2 was the typo.
+    writeFileSync(join(dir, 'bootstrap.sh'),
+      `#!/usr/bin/env bash\n${BEGIN}\n${END}\necho "$MSG_NET"\n`);
+    const ok = spawnSync(process.execPath, [join(root, 'scripts/gen-launcher-text.mjs'), '--root', dir],
+      { encoding: 'utf8' });
+    assert.equal(ok.status, 0, ok.stdout + ok.stderr);
+    assert.match(readFileSync(join(dir, 'bootstrap.sh'), 'utf8'), /^MSG_NET=/m);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('bootstrap.ps1 carries a UTF-8 BOM, because 5.1 reads a file without one as ANSI', () => {
+  const bytes = readFileSync(join(root, 'bootstrap.ps1'));
+  assert.deepEqual([...bytes.subarray(0, 3)], [0xEF, 0xBB, 0xBF],
+    'no BOM — PowerShell 5.1 would decode the non-ASCII sentences as the ANSI code page');
+  // Not a ritual: the file genuinely contains characters that mojibake without it. If this ever
+  // fails, the BOM is no longer needed and the assertion above should go with it.
+  assert.ok(/[^\u0000-\u007F]/.test(ps1), 'bootstrap.ps1 is pure ASCII — the BOM has no subject');
+  // ...and the console side of the same problem is handled too, with a catch that says something.
+  assert.match(ps1, /\[Console\]::OutputEncoding = \[Text\.Encoding\]::UTF8/);
+  assert.ok(!/catch \{ \}/.test(ps1), 'an empty catch block (PSAvoidUsingEmptyCatchBlock)');
+  // The BOM is declared where the tooling reads it, not just left in the bytes.
+  assert.match(readFileSync(join(root, '.editorconfig'), 'utf8'),
+    /\[bootstrap\.ps1\]\ncharset = utf-8-bom/);
 });
 
 test('the Windows launcher is a launcher too — the budget, with the region reported', () => {
