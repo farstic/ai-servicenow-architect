@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ATTRIBUTION, planRecipe, readAreas } from '../tools/snowarch/lib/docs/sync.mjs';
+import { recipeLines } from '../tools/snowarch/lib/docs/recipe-block.mjs';
 
 /**
  * The launcher recipe in `docs/ARCHITECTURE.md` and the module must be the same commands.
@@ -111,4 +112,151 @@ test('the Windows recipe adds the long-paths line, and only that', () => {
   const w2 = win.slice(0, -1);
   assert.deepEqual(w2.slice(0, p2.length), p2);
   assert.deepEqual(w2.slice(p2.length), ['git -C vendor/ServiceNowDocs config core.longpaths true']);
+});
+
+/**
+ * AC 5 — the recipe has ONE source, and three files repeat it.
+ *
+ * `docs/ARCHITECTURE.md` publishes it, `docs-recipe.sh` and `docs-recipe.ps1` are what the
+ * Node-free launchers will source, and `docs sync --print-recipe` is what the Node path prints.
+ * Four readers of one function. The whole point of generating them is that nobody types the
+ * commands twice; the whole point of this test is that nobody can.
+ */
+const LAUNCHERS = [
+  { id: 'sh', path: 'tools/snowarch/launcher/docs-recipe.sh', platform: 'linux' },
+  { id: 'ps1', path: 'tools/snowarch/launcher/docs-recipe.ps1', platform: 'win32' },
+];
+
+/** The lines between `# recipe-begin <mode>` and `# recipe-end`, unindented. */
+function launcherRecipe(text, mode) {
+  const begin = `# recipe-begin ${mode}`;
+  const start = text.indexOf(begin);
+  const stop = text.indexOf('# recipe-end', start);
+  assert.notEqual(start, -1, `no ${begin} marker`);
+  assert.notEqual(stop, -1, '# recipe-end marker missing');
+  // `\r` stripped: `.gitattributes` stores `*.ps1` as `eol=crlf`, so in a real checkout every line
+  // of the PowerShell launcher ends with one. Without this the parity test would fail on every
+  // machine that had actually cloned the repository — including, eventually, CI.
+  return text.slice(start + begin.length, stop).split('\n')
+    .map((l) => l.replace(/\r$/, '').replace(/^ {2}/, '')).filter((l) => l.trim() !== '');
+}
+
+/** A unified diff naming the target and the line, because "they differ" is not a bug report. */
+function unified(target, expected, actual) {
+  const out = [`--- expected (recipe-block.mjs)`, `+++ ${target}`];
+  const n = Math.max(expected.length, actual.length);
+  for (let i = 0; i < n; i += 1) {
+    if (expected[i] !== actual[i]) {
+      if (expected[i] !== undefined) out.push(`-${i + 1}: ${expected[i]}`);
+      if (actual[i] !== undefined) out.push(`+${i + 1}: ${actual[i]}`);
+    }
+  }
+  return out.join('\n');
+}
+
+test('AC 5 — all three targets carry the generated recipe, for both modes', () => {
+  const cfg = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  const areasList = readFileSync(join(root, cfg.docs.areasFile), 'utf8')
+    .split('\n').map((l) => l.trim()).filter(Boolean);
+
+  // The published block: sparse, POSIX.
+  const expectedBlock = recipeLines({ config: cfg, areas: areasList });
+  assert.deepEqual(blockOf(arch), expectedBlock,
+    unified('docs/ARCHITECTURE.md', expectedBlock, blockOf(arch)));
+
+  for (const launcher of LAUNCHERS) {
+    const text = readFileSync(join(root, launcher.path), 'utf8');
+    for (const mode of ['sparse', 'full']) {
+      const expected = recipeLines({ config: cfg, areas: areasList, mode, platform: launcher.platform });
+      const actual = launcherRecipe(text, mode);
+      assert.deepEqual(actual, expected, unified(`${launcher.path} (${mode})`, expected, actual));
+    }
+  }
+});
+
+test('AC 5 negative — one changed line in any target is caught, with the line named', () => {
+  // Proven per target rather than once: a diff that only checked the first file would let the two
+  // launchers drift silently, which is the exact failure this test exists to prevent.
+  const cfg = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  const areasList = readFileSync(join(root, cfg.docs.areasFile), 'utf8')
+    .split('\n').map((l) => l.trim()).filter(Boolean);
+
+  for (const launcher of LAUNCHERS) {
+    const text = readFileSync(join(root, launcher.path), 'utf8');
+    const expected = recipeLines({ config: cfg, areas: areasList, mode: 'sparse',
+      platform: launcher.platform });
+    const tampered = launcherRecipe(text, 'sparse').map((l, i) => (i === 2 ? `${l} --tampered` : l));
+    assert.notDeepEqual(tampered, expected, launcher.id);
+    const diff = unified(launcher.path, expected, tampered);
+    assert.match(diff, new RegExp(`\\+\\+\\+ ${launcher.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    assert.match(diff, /^\+3: .*--tampered$/m, 'the diff must name the LINE, not just the file');
+  }
+});
+
+test('the Windows launcher carries the long-paths line and the POSIX one does not', () => {
+  const cfg = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  const areasList = readFileSync(join(root, cfg.docs.areasFile), 'utf8')
+    .split('\n').map((l) => l.trim()).filter(Boolean);
+  const sh = launcherRecipe(readFileSync(join(root, LAUNCHERS[0].path), 'utf8'), 'sparse');
+  const ps1 = launcherRecipe(readFileSync(join(root, LAUNCHERS[1].path), 'utf8'), 'sparse');
+
+  assert.ok(ps1.some((l) => l.includes('core.longpaths')), 'a 197-character path needs it there');
+  assert.ok(!sh.some((l) => l.includes('core.longpaths')), 'and POSIX does not');
+  assert.equal(ps1.length, sh.length + 1, 'that line is the only difference');
+  assert.deepEqual(ps1.filter((l) => !l.includes('core.longpaths')), sh);
+  assert.ok(areasList.length > 0);
+});
+
+test('the CLI prints lines from the same recipe, for the state the tree is in', () => {
+  // `--print-recipe` renders for the state the checkout is ACTUALLY in: on a machine that already
+  // has the corpus at the pin it omits the clone, the fetch and the checkout, because those are
+  // done. So the claim is not equality — it is that every line it prints is a line of the generated
+  // fresh-checkout recipe, in order. That proves the command and the three files come out of one
+  // function without pretending a populated tree needs a clone.
+  const r = spawnSync(process.execPath,
+    [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'docs', 'sync', '--print-recipe', '--mode', 'sparse'],
+    { encoding: 'utf8', cwd: root });
+  assert.equal(r.status, 0, r.stderr);
+  const printed = r.stdout.split('\n').map((l) => l.trim())
+    .filter((l) => l.startsWith('git ') || l.startsWith('echo '));
+  assert.ok(printed.length > 0, 'the command printed no recipe at all');
+
+  const cfg = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  const areasList = readFileSync(join(root, cfg.docs.areasFile), 'utf8')
+    .split('\n').map((l) => l.trim()).filter(Boolean);
+  const fresh = recipeLines({ config: cfg, areas: areasList, mode: 'sparse',
+    platform: process.platform });
+
+  let at = 0;
+  for (const line of printed) {
+    const found = fresh.indexOf(line, at);
+    assert.notEqual(found, -1, unified('--print-recipe', fresh, printed)
+      + `\n(the line above is not in the generated recipe, or is out of order: ${line})`);
+    at = found + 1;
+  }
+  // Not vacuous: the last line is the attribution, which every rendering carries.
+  assert.equal(printed.at(-1), fresh.at(-1));
+});
+
+test('the generator respects the file\'s own line endings, so a CRLF checkout stays current', () => {
+  // `.gitattributes` stores `*.ps1` as `eol=crlf`, so `docs-recipe.ps1` arrives CRLF in EVERY
+  // checkout on every OS. A generator that spliced LF into it would report STALE for ever on a
+  // clean tree — `gen:check` red on a repository nobody had touched.
+  const target = join(root, 'tools/snowarch/launcher/docs-recipe.ps1');
+  const original = readFileSync(target);
+  try {
+    const lf = original.toString('utf8').replace(/\r\n/g, '\n');
+    const crlf = lf.replace(/\n/g, '\r\n');
+    assert.notEqual(lf, crlf, 'precondition: the two forms really differ');
+
+    for (const [name, content] of [['LF', lf], ['CRLF', crlf]]) {
+      writeFileSync(target, content);
+      const r = spawnSync(process.execPath, [join(root, 'scripts/gen-docs-recipe.mjs'), '--check'],
+        { encoding: 'utf8', cwd: root });
+      assert.equal(r.status, 0, `${name} checkout reported stale:\n${r.stderr}`);
+      assert.equal(readFileSync(target, 'utf8'), content, `--check wrote to the ${name} file`);
+    }
+  } finally {
+    writeFileSync(target, original);
+  }
 });

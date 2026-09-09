@@ -13,7 +13,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { CORPUS_DIR, EXIT, SyncError, classifyGitFailure } from './sync.mjs';
-import { applyRecipeBlock, RECIPE_TARGET } from './recipe-block.mjs';
+import { applyAllTargets } from './recipe-block.mjs';
 import { verifyCitations } from './verify.mjs';
 
 const raw = (args, cwd) => execFileSync('git', args, {
@@ -128,10 +128,14 @@ export function syncUpstream({ root = process.cwd(), config, to = null, verify =
   //    stage nothing — a fix that looks like it works. Reading back also parses what `writePin`
   //    produced, so a write that damaged the file fails here rather than in someone's CI.
   const pinned = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
-  const recipe = applyRecipeBlock({ root, config: pinned });
+  // THREE generated targets since ARC-06-S06 — the published block and the two launcher recipe
+  // files — so a bump stages up to five paths and exactly two when the pin does not move. Whatever
+  // came back `written` is staged; a target a fixture tree does not have reports `absent` and is
+  // simply not there to stage.
+  const recipe = applyAllTargets({ root, config: pinned });
 
-  const staged = ['engine.config.json', CORPUS_DIR];
-  if (recipe.status === 'written') staged.push(RECIPE_TARGET);
+  const staged = ['engine.config.json', CORPUS_DIR,
+    ...recipe.filter((r) => r.status === 'written').map((r) => r.path)];
   run(['add', '--', ...staged], root);
 
   const beforeDead = new Set((before?.dead ?? []).map(keyOf));
@@ -151,7 +155,7 @@ export function syncUpstream({ root = process.cwd(), config, to = null, verify =
     checkedBefore: before?.checked ?? null, checkedAfter: after?.checked ?? null,
     deadBefore: before?.dead.length ?? null, deadAfter: after?.dead.length ?? null,
     newlyDead, healed, olderThanPin, verified: verify,
-    recipe: recipe.status,
+    recipe: Object.fromEntries(recipe.map((r) => [r.target, r.status])),
     staged,
   };
   if (log) log(formatUpstream(result).text);
@@ -182,9 +186,11 @@ export function formatUpstream(r) {
   // as a third entry on `staged:`, the second as its absence — and a line that says "nothing was
   // wrong" on every run is a line reviewers stop reading. `no-markers` is the one case where the
   // block silently did NOT move with the pin, which is exactly what this must never do quietly.
-  if (r.recipe === 'no-markers') {
-    lines.push(`recipe: ${RECIPE_TARGET} has lost its DOCS-RECIPE markers — the block was NOT `
-      + 'regenerated and now contradicts the pin above');
+  for (const [target, status] of Object.entries(r.recipe ?? {})) {
+    if (status === 'no-markers') {
+      lines.push(`recipe: the ${target} target has lost its generator markers — it was NOT `
+        + 'regenerated and now contradicts the pin above');
+    }
   }
 
   lines.push(`staged: ${r.staged.join(', ')} — review, then: `

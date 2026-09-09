@@ -182,10 +182,17 @@ test('criterion 7 — the real tree completes quickly, and the budget is a CI ob
   // and inside a parallel test runner even the best of three swings between 872 ms and 3786 ms on
   // the same tree. Asserting 5 s here would be asserting how loaded the machine is.
   //
-  // So the assertion is a hang detector, not a budget: 15 s is roughly twenty times the unloaded
-  // cost and no amount of contention has reached it, while a lint that genuinely stopped
+  // So the assertion is a hang detector, not a budget, while a lint that genuinely stopped
   // terminating still fails. The budget itself is checked where it is measurable — CI — and the
   // numbers are in the ARC-05-S04 amendment.
+  //
+  // The ceiling was 15 s when this was written, with the note "no amount of contention has reached
+  // it". ARC-06-S06 reached it: best-of-three of 26.9 / 22.7 / 29.8 s in a full `npm test`, while
+  // the same lint alone still finishes in about a second. Two causes, both this story's — the lint
+  // now scans 58 files rather than 49, and the new B02 suite clones a fixture corpus repeatedly
+  // alongside it, so eighteen child processes contend where there used to be fewer. The number is
+  // raised to 45 s against that measurement rather than quietly nudged: it is still an order of
+  // magnitude short of "hung", and the claim it makes is only that the process terminates.
   const samples = [];
   for (let i = 0; i < 3; i += 1) {
     const started = Date.now();
@@ -196,7 +203,7 @@ test('criterion 7 — the real tree completes quickly, and the budget is a CI ob
   }
   const best = Math.min(...samples);
   console.log(`    engine-lint on the real tree: ${samples.join(' / ')} ms (best ${best})`);
-  assert.ok(best < 15_000, `engine-lint took ${best} ms on the real tree (samples ${samples.join(', ')})`);
+  assert.ok(best < 45_000, `engine-lint took ${best} ms on the real tree (samples ${samples.join(', ')})`);
 });
 
 // ---------------------------------------------------------------------------------------------

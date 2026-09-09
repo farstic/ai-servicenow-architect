@@ -786,6 +786,16 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## The recipe has one source
+
+The git-only corpus recipe lives in `tools/snowarch/lib/docs/recipe-block.mjs` and nowhere else.
+Three files are generated from it — the block in `docs/ARCHITECTURE.md` and the two launcher files
+under `tools/snowarch/launcher/` — and `docs sync --print-recipe` renders from the same function.
+Never edit between the `DOCS-RECIPE` or `# recipe-begin` markers: run
+`node scripts/gen-docs-recipe.mjs`, which `npm run gen:check` enforces. A hand-typed copy is a copy
+that drifts the first time the pin moves, and the launchers are exactly where that would go
+unnoticed — they run on the machines that have no Node to check them.
+
 ## Never overwrite `settings.local.json`
 
 `.claude/settings.local.json` belongs to the operator. Anything that writes it — B07, ARC-08's

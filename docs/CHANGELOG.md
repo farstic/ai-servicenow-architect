@@ -29,6 +29,20 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **B02 — the documentation corpus, as one step over ARC-03's recipe.** `--docs sparse|full` pass
+  the plan's mode through; `--docs skip` never reaches the step, so no code path can make a network
+  call the operator declined. The step maps the docs family's exit codes onto remedies and keeps
+  ARC-03's own sentences for the network and dirty-tree cases, because a second phrasing gives one
+  situation two descriptions. **A dead citation is a WARN, never a failure**: the corpus is present,
+  the fix belongs to a maintainer, and refusing to install over it would punish the wrong person.
+- **One recipe, four readers.** The git-only recipe is now generated into THREE files — the block in
+  `docs/ARCHITECTURE.md` and the two launcher files under `tools/snowarch/launcher/` that the
+  Node-free `bootstrap.sh` and `bootstrap.ps1` will source — from the one module `docs sync
+  --print-recipe` also renders from. The parity test diffs every target with a unified diff naming
+  the file and the line, and a pin bump stages five paths when the pin moves and two when it does
+  not. Each target declares the platform it is written for, and the generator writes with the
+  file's **own line endings**: `.gitattributes` stores `*.ps1` as `eol=crlf`, so a generator that
+  spliced LF would have reported STALE for ever on a clean checkout.
 - **B01 and B07 — the workspace, and two toggles merged into a file that is not ours.**
   `.claude/settings.local.json` belongs to the operator: B07 reads it, applies the server's entry to
   `disabledMcpjsonServers` (design) or `enabledMcpjsonServers` (live), and writes the same object

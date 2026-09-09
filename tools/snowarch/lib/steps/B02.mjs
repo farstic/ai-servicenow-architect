@@ -1,6 +1,17 @@
-// B02 docs — the corpus checkout and its citations. Body: ARC-06-S06.
+// B02 docs — the corpus, obtained by calling ARC-03's recipe rather than by having one of its own.
+//
+// This step is glue, deliberately. `syncCorpus` decides what git does; `verifyCitations` decides
+// what "the citations are fine" means; `docsStatus` measures. B02 maps their results onto a
+// StepResult and prints one step line. Every temptation to re-derive any of that here would end
+// with two answers to a question the operator asks once.
+//
+// The one judgement it does make is which failures stop an installation. A broken checkout does
+// (nothing downstream can be grounded); a dead CITATION does not — the corpus is present, the fix
+// belongs to a maintainer, and refusing to install over it would punish the wrong person.
 import { execFileSync } from 'node:child_process';
-import { CORPUS_DIR } from '../docs/sync.mjs';
+import { CORPUS_DIR, EXIT as DOCS_EXIT, MODE, SyncError, syncCorpus } from '../docs/sync.mjs';
+import { docsStatus } from '../docs/status.mjs';
+import { verifyCitations } from '../docs/verify.mjs';
 import { FILE, TEXT, ABSENT } from './inputs.mjs';
 
 export const id = 'B02';
@@ -10,12 +21,9 @@ export const runsWhen = (ctx) => ctx.docs !== 'skip';
 export const skipReason = '--docs skip';
 
 /**
- * The gitlink, not the corpus.
- *
- * Hashing the checkout itself would mean reading 35,000 files to decide whether to skip a step, and
- * would make an unrelated `touch` invalidate it. The gitlink is the one value that changes exactly
- * when the corpus is supposed to be different — and it is read from the INDEX, so a checkout that
- * has moved without the superproject knowing still hashes as the superproject sees it.
+ * The gitlink, from the INDEX — the one value that changes exactly when the corpus is supposed to
+ * be different. Hashing the checkout would mean reading 35,000 files to decide whether to skip a
+ * step, and an unrelated `touch` would invalidate it.
  */
 export function gitlink(root) {
   try {
@@ -24,8 +32,6 @@ export function gitlink(root) {
     const m = /^160000 commit ([0-9a-f]{40})/.exec(out.trim());
     return m ? m[1] : ABSENT;
   } catch {
-    // No git, no repository, no submodule entry — all of them mean "nothing to compare against"
-    // rather than a failure. B02's own body decides what to do about it; this only has to hash.
     return ABSENT;
   }
 }
@@ -35,4 +41,66 @@ export const inputs = (ctx) => [
   TEXT(`gitlink=${gitlink(ctx.root)}`),
   TEXT(`docs=${ctx.docs}`),
 ];
-export const run = async () => ({ status: 'ok', detail: 'placeholder until ARC-06-S06' });
+
+/** The docs family's exit codes → a StepResult, with the remedy each one actually needs. */
+export function mapSyncFailure(error) {
+  const message = error?.message ?? String(error);
+  switch (error?.code) {
+    case DOCS_EXIT.incomplete:
+      return { status: 'fail', detail: message, remedy: 'run ./snowarch docs sync' };
+    case DOCS_EXIT.dirty:
+      // ARC-03's own sentence, unaltered: it already says what to do, and re-phrasing it here
+      // would give the same situation two descriptions depending on which command hit it.
+      return { status: 'fail', detail: message, remedy: null };
+    case DOCS_EXIT.git:
+    case DOCS_EXIT.upstream:
+      return { status: 'fail', detail: message, remedy: null };
+    default:
+      return { status: 'fail', detail: message, remedy: 'run ./snowarch docs sync' };
+  }
+}
+
+export const run = async (ctx) => {
+  // `skip` cannot reach here — `runsWhen` is false for it and the runner prints the skip line — so
+  // `syncCorpus`'s own refusal of a "skip" mode is unreachable from this path. Asserted rather than
+  // assumed: if it ever became reachable, the operator would see a refusal about a mode they chose.
+  const mode = ctx.docs;
+  if (mode !== MODE.sparse && mode !== MODE.full) {
+    return { status: 'fail', detail: `B02 reached with docs mode "${mode}"`, remedy: null };
+  }
+
+  let result;
+  try {
+    result = syncCorpus({ root: ctx.root, config: ctx.config, mode, log: (l) => ctx.line?.(l) });
+  } catch (e) {
+    if (!(e instanceof SyncError)) throw e;
+    return mapSyncFailure(e);
+  }
+
+  if (!result.completeness.ok) {
+    return { status: 'fail',
+      detail: `${CORPUS_DIR} is incomplete after sync`, remedy: 'run ./snowarch docs sync' };
+  }
+
+  // The size line is `docsStatus`'s measurement, not a second walk of the tree.
+  const status = docsStatus({ root: ctx.root, verify: false, measure: true });
+  ctx.line?.(`[docs] ${status.fileCount.toLocaleString('en-US')} files · `
+    + `${Math.round(status.sizeBytes / (1024 * 1024))} MB working tree`);
+
+  const citations = verifyCitations({ root: ctx.root });
+  ctx.line?.(`citations: checked: ${citations.checked} | dead: ${citations.dead.length}`);
+
+  // Numbers only. The state is read by the doctor and the launchers, and a path or a family name
+  // in there would be a second source for something `engine.config.json` already owns.
+  const data = { mode: result.mode, pin: ctx.config.docs.pin.slice(0, 7),
+    files: status.fileCount, bytes: status.sizeBytes,
+    checked: citations.checked, dead: citations.dead.length };
+  ctx.state.docs = { mode: result.mode, pin: ctx.config.docs.pin };
+
+  if (citations.dead.length > 0) {
+    return { status: 'warn', data,
+      detail: `${citations.dead.length} dead citation(s) — see ./snowarch docs verify` };
+  }
+  return { status: 'ok', data,
+    detail: `${result.mode}, ${result.areas.length} areas` };
+};

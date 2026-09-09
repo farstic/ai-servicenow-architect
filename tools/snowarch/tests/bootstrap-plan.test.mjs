@@ -161,7 +161,8 @@ test('AC 1 — a design-only run writes the state the other consumers read', asy
   const s = loadState(root);
   assert.equal(s.mode, 'design-only');
   assert.equal(s.steps.B09.status, 'ok');
-  assert.equal(s.docs.mode, 'sparse', 'docsStatus() reads docs.mode');
+  assert.equal(s.docs.mode, 'skip', 'the accepted plan\'s docs mode reaches the state');
+  assert.ok('mode' in s.docs, 'docsStatus() reads docs.mode — the PATH is the claim here');
   assert.equal(s.docs.pin, 'a'.repeat(40), 'and /snowarch status reads a pin');
   assert.equal(Object.keys(s.steps).length, 10, 'ten steps recorded');
   for (const id of ['B04', 'B06', 'B08']) assert.equal(s.steps[id].status, 'skipped');
@@ -184,7 +185,9 @@ test('AC 1 — the second run caches and the summary counts it', async () => {
     out: sink(), err: sink() });
 
   const cached = second.lines.filter((l) => l.includes('ok (cached)')).map((l) => /\[(B\d\d)/.exec(l)[1]);
-  for (const id of ['B01', 'B02', 'B05', 'B07']) {
+  // B02 is `--docs skip` in this fixture (no upstream to clone from), so it is skipped rather than
+  // cached; `b02-docs.test.mjs` proves its caching against the fixture corpus.
+  for (const id of ['B01', 'B05', 'B07']) {
     assert.ok(cached.includes(id), `${id} should have been cached: ${cached.join(' ')}`);
   }
   assert.ok(!cached.includes('B00'), 'preflight re-runs every time');
@@ -204,7 +207,7 @@ test('--json puts the object on stdout and every human line on stderr', async ()
   const payload = JSON.parse(log.lines.at(-1));
   assert.deepEqual(Object.keys(payload), ['mode', 'docs', 'steps', 'summary', 'next']);
   assert.deepEqual(Object.keys(payload.summary), ['ok', 'warn', 'fail', 'skipped']);
-  assert.equal(payload.summary.skipped, 3);
+  assert.equal(payload.summary.skipped, 4, 'B04, B06, B08 for design-only and B02 for --docs skip');
   assert.equal(payload.summary.fail, 0);
   assert.match(payload.next, /design-only/);
 });

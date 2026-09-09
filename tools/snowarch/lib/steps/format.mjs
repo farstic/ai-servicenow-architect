@@ -62,3 +62,19 @@ export function failureBlock({ id, cause, remedy, launcher = './bootstrap.sh' })
     `Re-run ${launcher} to resume at ${id}.`,
   ];
 }
+
+/**
+ * The sentences the Node-FREE launchers print about the corpus.
+ *
+ * S10 and S11 have no Node and cannot run `verifyCitations`, so they check only that every area in
+ * `vendor/docs-areas.txt` exists as a directory and say so. Those exact bytes have to match what the
+ * Node path prints for the same situation, or an operator gets two vocabularies for one corpus
+ * depending on whether Node happened to be installed. They live here, beside the step-line wording,
+ * for the same reason that does: one table, three programs.
+ */
+export const CORPUS_TEXT = Object.freeze({
+  citationsUnverified: 'citations: not verified until Node 20+ is installed',
+  areasPresent: (present, total) => `areas: ${present}/${total} present`,
+  areaMissing: (area) => `area ${area} missing — run ./snowarch docs sync once Node is installed, `
+    + 'or re-run ./bootstrap.sh',
+});

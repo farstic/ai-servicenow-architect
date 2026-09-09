@@ -339,6 +339,34 @@ build answers *whether*; `lib/cloud-sync.mjs` adds *which*, and a test asserts t
 disagree. It is a WARN and not a FAIL: 0600 is a local permission and the sync client runs as the
 same user, but where someone keeps their code is their decision.
 
+### B02 docs — one step over ARC-03's recipe
+
+B02 is glue, deliberately: `syncCorpus` decides what git does, `verifyCitations` decides what the
+citations mean, `docsStatus` measures. The step maps their results onto one step line and records
+numbers only. `--docs sparse|full` pass the plan's mode through; `--docs skip` never reaches the
+step at all (`runsWhen` is false), so no code path can make a network call the operator declined.
+
+The one judgement it makes is which failures stop an installation. A broken checkout does — nothing
+downstream can be grounded. A **dead citation does not**: the corpus is present, the fix belongs to
+a maintainer, and refusing to install over it would punish the wrong person, so it is a WARN. The
+docs family's exit codes map to remedies: `1` incomplete → `run ./snowarch docs sync`; `4` dirty and
+`5`/`6` git and upstream keep ARC-03's own sentences unaltered, because a second phrasing gives one
+situation two descriptions depending on which command hit it.
+
+### One recipe, four readers
+
+`tools/snowarch/lib/docs/recipe-block.mjs` renders the git-only recipe, and **three files are
+generated from it**: the published block in this document, and `tools/snowarch/launcher/docs-recipe.sh`
+and `.ps1`, which the Node-free launchers source. `docs sync --print-recipe` is the fourth reader of
+the same function. Nobody types the commands twice, and `tests/docs-recipe.test.mjs` diffs every
+target against the renderer with a unified diff that names the file and the line.
+
+Each target declares the platform it is written FOR — the PowerShell launcher is a Windows file
+whether it was generated on a Mac or not — and the generator writes with the file's own line
+endings, because `.gitattributes` stores `*.ps1` as `eol=crlf` and a generator that spliced LF into
+it would report STALE for ever on a clean checkout. A pin bump regenerates all three, so its staged
+list is five paths when the pin moves and two when it does not.
+
 ### The resume rule
 
 For each step in order: `runsWhen` false → `skipped (<reason>)`; `--from BNN` and the step is at or
