@@ -44,6 +44,30 @@ Two findings from M1 that outlived their stories and are carried forward:
   filesystem root.** A checkout beneath a folder that already has one loads both rosters and spends the
   budget twice (S-13 addendum, `03` §F). ARC-04-S12's doctor warns on it.
 
+### M2 exit evidence — recorded 2026-09-09
+
+Every exit condition from the M2 row, with what was measured on `develop` @ `e48d983` (the ARC-03-S11 merge) rather than what was intended.
+
+| Exit condition | Evidence |
+|---|---|
+| server starts unconfigured with the five core tools and answers `initialize` on three OSes from a fresh clone | `packages/snowarch/tests/server/unconfigured.test.ts`; the `no-build handshake` job on ubuntu / macos / windows against the committed `dist/` — CI run 34317967180, 26 of 26 |
+| `dist/contract.json` pinned by `required-tools.json`, `contract.test.ts` and `engine-lint.mjs` green, generated texts byte-identical | 397 tools (`gate` / `mutates`); `required-tools.json` 42 tools, `contractSha256` `86b63770e08e…`; `L01 ok … L11 ok` with the name checks REQUIRED; `gen-all: 4 generator(s) current`; the drift drill PR #56 went red 18 of 25 and was closed unmerged (ARC-05-S11) |
+| S-10 verdict recorded (ARC-04-S05) | **Open — deferred, not measured.** ARC-04-S05 recorded the procedure (`docs/spikes/S-10-readonly-preset-sufficiency/PROCEDURE.md`); the run needs the owner's live instance and sits in `docs/spikes/OWNER-SITTING.md`. Carried into M3 as an owner-sitting item, not a blocker |
+| `CLAUDE.md` ≤ 200 lines | 125 lines / 11,216 bytes (`tests/claude-md.test.mjs`); was 425 / 57,688 |
+| Mode/Preset vocabulary everywhere | `tests/no-legacy-surfaces.test.mjs` (Tier 0 outside history); `docs/MODES-AND-PRESETS.md`; `.claude/rules/00-mode-and-mcp-gate.md` generated from the contract |
+| `/snowarch` skill skeleton | `.claude/skills/snowarch/SKILL.md` (`status` · `setup-instance` · `doctor`; `$ARGUMENTS` CONFIRMED on 2.1.258); `roster.utility` = `["snowarch"]`; 28 persona skills + 1 utility, 9 agents |
+| retired-name sweep complete | ARC-02 allow-list rows 0; `NAME_CHECKS_REQUIRED = true` (`L01 0 · L02 0 · L03 0`) since ARC-02-S12 |
+| VALIDATION-TESTS T-01…T-18 executed in design-only | `docs/spikes/validation-runs/2026-09-09-design-only.md` — **18 of 18 PASS** after two rulings (T-02 rewritten to a genuine Verdict-C case; T-12's go-live proposal fires even when deployment is declined); the 16-of-18 first tally kept beneath it |
+| `snowarch docs sync \| verify \| status \| sync --upstream \| family` working | `node scripts/docs.mjs …` (the launcher is ARC-06): sync reconcile 2 s on a current checkout, `docs status` four `ok` lines, `checked: 181 \| dead: 0`, `--upstream` real run moved to `11b39be` and was reverted, `family zurich --dry-run` 53 EDIT / 69 REVIEW, porcelain 0 after each |
+| `docs-bump.yml` working | committed with its dry-run record (`docs/validation/2026-09-09-docs-bump-dry-run.md`); `workflow_dispatch` resolves on the default branch, so the first real run follows the `main` merge |
+| proxy agent and network classifier in the server (R-3) | `packages/snowarch/tests/servicenow/proxy.test.ts`, `net-errors.test.ts` (31 tests); `docs-real.yml` proved the corpus recipe on three OSes — run 34317967230, 4 of 4 |
+
+Three findings from M2 that outlived their stories and are carried forward:
+
+- **A test that passes while asserting nothing looks exactly like a passing test.** Config precedence (`config.worktree` outranks the repository config), import-time captures and steps that log a state they have not yet produced each defeated a guard silently; `tests/precondition-asserts.test.mjs` now requires every mutation of pre-existing state to be followed by an assertion that it took.
+- **The corpus escapes underscores.** A plain `grep sn_customerservice_escalation` over `vendor/` returns nothing; the escaped form finds ten Australia pages. A five-paragraph claim in the CSM skill survived on that non-result until ARC-02-S13's run. Search the corpus with `\_` before asserting that a table does not exist.
+- **A clean validation run needs a separate OS user, not just a fresh clone** — an untrusted clone still loads the operator's global `CLAUDE.md`, from which one T-run quoted a real hostname (redacted). ARC-09's release gate inherits this.
+
 Story-to-milestone assignment is in `05-STORY-INDEX.md` (column *Milestone*). M1 and M2 split ARC-02 and ARC-03 because their first stories need only ARC-01 while their later stories need ARC-04/ARC-05 (the retired-name sweep, the generated governance texts) or the S-07 recipe verdict.
 
 ---
