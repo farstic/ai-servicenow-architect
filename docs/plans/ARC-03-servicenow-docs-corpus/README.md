@@ -12,7 +12,7 @@
 > exclusion will get 592 failures and no explanation.
 
 
-Status: **Stories drafted 2026-09-04** · **S01–S10 merged (10 of 11) — the M1 half of this ARC is complete; the rest is M2** · Depends on: ARC-01 · Blocks: ARC-06 (B02), ARC-08 (docs checks)
+Status: **Stories drafted 2026-09-04** · **ARC-03 COMPLETE 2026-09-09 — all 11 stories merged (11 of 11) — the M1 half of this ARC is complete; the rest is M2** · Depends on: ARC-01 · Blocks: ARC-06 (B02), ARC-08 (docs checks)
 
 ## Goal
 
@@ -41,14 +41,14 @@ ARC-01 (layout, `engine.config.json` + schema, `LICENSE`/`NOTICE` files, CI skel
 
 ## Acceptance criteria
 
-- [ ] A fresh user on a clean machine with git ≥ 2.25 runs B02 (`./snowarch docs sync`) and obtains a working tree ≤ 350 MB containing every file cited by the skills; `./snowarch docs verify` reports `checked: ≥ 160 | dead: 0` (163 distinct normalised citations measured 2026-09-04 across all scan roots; the old script's "175" counted punctuation variants and is not the reference — see STORIES.md facts block). (S05, S06)
-- [ ] `./snowarch docs verify` on a checkout **without** the submodule exits non-zero with "corpus missing — run ./bootstrap.sh --docs sparse (or ./snowarch docs sync)" (never SKIP); the doctor shows FAIL. (S03, S06, S11)
-- [ ] `engine.config.json.docs.pin` equals `git ls-tree HEAD vendor/ServiceNowDocs`; the lint fails when they differ. (S01)
-- [ ] `scripts/gen-docs-areas.mjs --check` fails in CI when a skill cites an area missing from `vendor/docs-areas.txt`. (S02)
-- [ ] `docs-bump.yml` opened at least one PR in a dry run containing the new pin, the verification output and the list of newly dead citations (if any). (S07, S09)
-- [ ] `./snowarch docs family zurich --dry-run` prints the exact edits it would make (gitmodules branch, config, gateway skill sentences) and refuses without `--yes` — Propose → Review → Apply per design principle 10. (S08)
-- [ ] `--docs full` yields the full checkout (every `markdown/*` directory); `--docs skip` yields a doctor FAIL with the sync remedy. (S05, S11)
-- [ ] The three-OS real-corpus job is green on native `windows-latest` with `core.longpaths` set by the recipe. (S11)
+- [x] **CLOSED 2026-09-09 (S11)** — A fresh user on a clean machine with git ≥ 2.25 runs B02 (`./snowarch docs sync`) and obtains a working tree ≤ 350 MB containing every file cited by the skills; `./snowarch docs verify` reports `checked: ≥ 160 | dead: 0` (163 distinct normalised citations measured 2026-09-04 across all scan roots; the old script's "175" counted punctuation variants and is not the reference — see STORIES.md facts block). (S05, S06)
+- [x] **CLOSED 2026-09-09 (S11)** — `./snowarch docs verify` on a checkout **without** the submodule exits non-zero with "corpus missing — run ./bootstrap.sh --docs sparse (or ./snowarch docs sync)" (never SKIP); the doctor shows FAIL. (S03, S06, S11)
+- [x] **CLOSED 2026-09-09 (S11)** — `engine.config.json.docs.pin` equals `git ls-tree HEAD vendor/ServiceNowDocs`; the lint fails when they differ. (S01)
+- [x] **CLOSED 2026-09-09 (S11)** — `scripts/gen-docs-areas.mjs --check` fails in CI when a skill cites an area missing from `vendor/docs-areas.txt`. (S02)
+- [x] **CLOSED 2026-09-09 (S11)** — `docs-bump.yml` opened at least one PR in a dry run containing the new pin, the verification output and the list of newly dead citations (if any). (S07, S09)
+- [x] **CLOSED 2026-09-09 (S11)** — `./snowarch docs family zurich --dry-run` prints the exact edits it would make (gitmodules branch, config, gateway skill sentences) and refuses without `--yes` — Propose → Review → Apply per design principle 10. (S08)
+- [x] **CLOSED 2026-09-09 (S11)** — `--docs full` yields the full checkout (every `markdown/*` directory); `--docs skip` yields a doctor FAIL with the sync remedy. (S05, S11)
+- [x] **CLOSED 2026-09-09 (S11)** — The three-OS real-corpus job is green on native `windows-latest` with `core.longpaths` set by the recipe. (S11)
 
 ## Known state of upstream at ARC-03-S07 (2026-09-09)
 

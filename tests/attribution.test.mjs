@@ -44,7 +44,11 @@ test('the README figures are attributed to a measurement, not asserted from nowh
   // Every number in the install sentences carries where it came from. S-07 measured sparse; it did
   // not measure full mode, and the README says so rather than borrowing the figure.
   assert.match(readme, /302 MB/);
-  assert.match(readme, /measured 2026-09-06, ARC-00 S-07/);
+  assert.match(readme, /measured\s+2026-09-06, ARC-00 S-07/);
+  // S11 added the job's own numbers beside S-07's, because they count different things — the tree
+  // you read against the tree plus `.git` the disk loses. Both carry their measurement.
+  assert.match(readme, /179 MB on Linux and macOS/);
+  assert.match(readme, /measured 2026-09-09 by `docs-real\.yml`/);
   assert.match(readme, /447 MB and 48,997 files/);
   assert.match(readme, /measured 2026-09-09 on the reference\s+macOS machine — ARC-00 S-07 did not measure full mode/);
 });

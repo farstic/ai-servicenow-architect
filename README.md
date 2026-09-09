@@ -40,9 +40,12 @@ ServiceNow platform documentation is vendored from **ServiceNowDocs**
 Inc., used under its own licence. This project is not affiliated with or endorsed by ServiceNow.
 
 <!-- ARC-06: move to docs/INSTALL.md under the B02 row -->
-**The corpus costs about 302 MB on disk and about 35 seconds to fetch** — a sparse, blobless
-checkout of 19 documentation areas out of 49,000 tracked paths (measured 2026-09-06, ARC-00 S-07:
-302 MB macOS / 305 MB Ubuntu / 315 MB Windows; 23.6 s Ubuntu to 37.6 s macOS). `--mode full`
+**The corpus costs about 302 MB on disk and about 30 seconds to fetch** — a sparse, blobless
+checkout of 19 documentation areas out of 49,000 tracked paths. Two measurements, because they count
+different things: the **working tree** is 179 MB on Linux and macOS, 183 MB on Windows, 34,360 files
+(measured 2026-09-09 by `docs-real.yml` on all three runners: 25.3 s Ubuntu · 27.5 s macOS · 35.1 s
+Windows), and **tree plus `.git`** is 302 MB macOS / 305 MB Ubuntu / 315 MB Windows (measured
+2026-09-06, ARC-00 S-07). The first is what you read; the second is what the disk loses. `--mode full`
 takes the whole corpus instead: **447 MB and 48,997 files** (measured 2026-09-09 on the reference
 macOS machine — ARC-00 S-07 did not measure full mode).
 

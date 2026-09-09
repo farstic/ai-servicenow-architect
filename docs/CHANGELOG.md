@@ -13,6 +13,26 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ### Added
 
+- **The recipe, proved against the real corpus on three operating systems — and ARC-03 is complete.**
+  `.github/workflows/docs-real.yml` fetches the actual 300 MB corpus on Ubuntu, macOS and Windows,
+  weekly and whenever the code that decides the checkout changes. Measured on its first green run:
+  **179 MB tree / 34,360 files** (183 MB on Windows), **25.3 s Ubuntu · 27.5 s macOS · 35.1 s
+  Windows**, `dead: 0` everywhere, `core.longpaths true` on Windows.
+  - **The longest path is 197 characters inside the corpus and 272–286 on disk.** Both are printed,
+    because they answer different questions — and the second is already over `MAX_PATH`, which is
+    the S-07 margin argument as a measurement rather than a prediction.
+  - A second Windows cell keeps Git Bash on PATH. **Acceptance criterion 5 was vacuous until this
+    story's fourth fixup**: every step said `shell: bash`, which on Windows *is* Git Bash, so the
+    cell meant to prove independence from bash was running under it. The job is now one Node entry
+    point under the platform's default shell, and the log distinguishes "bash reachable" (True — the
+    image carries one in System32) from "git bash reachable" (False after the strip).
+  - `E12_ABSENT(mode)` in `status.mjs` is the doctor's absent-corpus line, printed by `docs status`
+    and imported by ARC-08 rather than retyped: **FAIL, never WARN or SKIP.** With no corpus and no
+    state file the mode is `skip` — an absent checkout has no shape to infer from — while a recorded
+    mode still wins, because an operator who asked for `sparse` and has none has a broken install.
+  - The recipe-parity negative now changes **one character** (`--depth 1` → `--depth 2`): a lost line
+    is the easy case, and a single byte is what ships a different checkout while looking identical.
+
 - **Attribution, the measured figures, and one corpus section instead of six.**
   - Every successful `docs sync` now ends with
     `docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE`
