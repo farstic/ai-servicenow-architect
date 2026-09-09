@@ -323,6 +323,9 @@ jobs:
           Pop-Location
           Write-Host ("from a subdirectory: " + $rc)
           if ($rc -ne 3) { exit 1 }
+          # The runner appends `exit $LASTEXITCODE`, and the last thing this step ran on purpose
+          # exited 3. Saying so explicitly is the difference between "asserted 3" and "failed".
+          exit 0
       - name: With Node present the hand-over produces the Node CLI's JSON
         shell: powershell
         run: |
@@ -342,6 +345,8 @@ jobs:
           .\snowarch.cmd version
           echo without-node ERRORLEVEL=%ERRORLEVEL%
           if not "%ERRORLEVEL%"=="3" exit /b 1
+          rem Same reason as the step above: the expected code is 3, so the step has to say 0.
+          exit /b 0
 
   secrets:
     name: secret scan
