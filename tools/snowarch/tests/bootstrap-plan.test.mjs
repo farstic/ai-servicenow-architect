@@ -124,7 +124,7 @@ test('AC 2 — q exits 0 and leaves no .local/ at all', async () => {
   const log = recorder();
   const code = await bootstrapCommand({ ...commandArgs(root), log, asker: scripted(['q']),
     out: sink(), err: sink() });
-  assert.equal(code, 0);
+  assert.equal(code, 0, log.lines.join('\n'));
   assert.equal(existsSync(join(root, '.local')), false, 'quitting must write nothing');
 });
 

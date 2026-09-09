@@ -39,6 +39,11 @@ test('AC 1 — seven check lines, all ok, and the versions reach the state', asy
   const code = await bootstrapCommand({ ...a, cwd: root, ...noNetwork });
   const elapsed = Date.now() - started;
 
+  // The failing CHECK first, then the exit code. `3 !== 0` names nothing, and a preflight that
+  // fails on one runner and not another is precisely the case where the message has to carry the
+  // evidence — otherwise the only way to find out is another push.
+  assert.deepEqual(a.log.lines.filter((l) => l.startsWith('FAIL B00:')), [],
+    `a preflight check failed on ${process.platform}:\n${a.log.lines.join('\n')}`);
   assert.equal(code, 0);
   const checks = a.log.lines.filter((l) => /^(ok B00 |WARN B00: |FAIL B00: )/.test(l));
   assert.equal(checks.length, 7, `expected seven check lines, got:\n${checks.join('\n')}`);
