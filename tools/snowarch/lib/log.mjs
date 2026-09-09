@@ -22,11 +22,17 @@ function stamp(now = new Date()) {
  * still nobody else's business.
  */
 export function createLogger({ command, quiet = false, verbose = false, json = false,
-  logRoot = root, now = new Date(), out = process.stdout, err = process.stderr } = {}) {
+  defer = false, logRoot = root, now = new Date(), out = process.stdout, err = process.stderr } = {}) {
   let file = null;
+  let held = defer ? [] : null;
   const dir = join(logRoot, '.local', 'logs');
 
   const toFile = (line) => {
+    // `defer` holds the lines in memory instead of opening the file. ARC-06-S03's plan screen is
+    // shown BEFORE anything may be written, and quitting it must leave no `.local/` at all — so
+    // bootstrap defers, then calls `commit()` once the operator has accepted. Everything still goes
+    // through the same redaction and lands in the same file; only the moment of opening moves.
+    if (held !== null) { held.push(line); return; }
     if (file === null) {
       try {
         mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -56,6 +62,18 @@ export function createLogger({ command, quiet = false, verbose = false, json = f
   };
 
   return {
+    /**
+     * Stop deferring: open the log and flush what was held. Idempotent, and a no-op for a logger
+     * that was never deferring, so a caller does not have to know which kind it has.
+     */
+    commit: () => {
+      if (held === null) return;
+      const lines = held;
+      held = null;
+      for (const l of lines) toFile(l);
+    },
+    /** Throw away what was held without ever opening the file — the plan screen's `q`. */
+    discard: () => { held = null; file = false; },
     step: (m) => write(out, '', m),
     ok: (m) => write(out, '', m),
     warn: (m) => write(err, 'warning: ', m),
