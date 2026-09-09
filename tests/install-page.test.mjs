@@ -34,7 +34,8 @@ test('...and editing README.md by hand fails the check', () => {
   // against the real repository to prove that would leave the repository needing a regenerate.
   const dir = mkdtempSync(join(tmpdir(), 'install-page-'));
   try {
-    for (const rel of [INSTALL, README, 'docs/README-head.md', 'docs/snippets/terminal-handoff.md',
+    for (const rel of [INSTALL, README, 'docs/README-head.md', 'docs/README-tail.md',
+      'docs/snippets/terminal-handoff.md',
       'engine.config.json', 'tools/snowarch/lib/text.json', 'tools/snowarch/lib/remedies.json']) {
       mkdirSync(join(dir, dirname(rel)), { recursive: true });
       cpSync(join(root, rel), join(dir, rel));
@@ -48,7 +49,8 @@ test('...and editing README.md by hand fails the check', () => {
     assert.equal(after.status, 1);
     assert.match(after.stderr, /README\.md is STALE/);
     // ...and it says where the text actually lives, or the reader makes the same edit again.
-    assert.match(after.stderr, /composed from docs\/README-head\.md \+ docs\/INSTALL\.md/);
+    assert.match(after.stderr,
+      /composed from docs\/README-head\.md \+ docs\/INSTALL\.md \+ docs\/README-tail\.md/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -81,9 +83,12 @@ test('criterion 4 — none of P-02\'s words appear on either page', () => {
     'claude mcp remove appears outside Uninstall');
 });
 
-test('...and the two the page must contain', () => {
+test('...and the two the README must contain', () => {
   assert.match(read('docs/README-head.md'), /2\.0\.0/, 'the head carries no version');
-  assert.match(read(INSTALL), /Apache-2\.0/, 'D-02: the licence is named on the page');
+  // D-02. The licence line is the tail's — it is the README's statement, not an install step — and
+  // the head names it too, which is where a reader looks first.
+  assert.match(read('docs/README-tail.md'), /Apache-2\.0/);
+  assert.match(read(README), /Apache-2\.0/);
 });
 
 test('criterion 5 — "what you will see" is the tool\'s own text, not a copy of it', () => {
@@ -138,15 +143,21 @@ test('every repository path the page names exists', () => {
   }
 });
 
-test('the page stays a page — the budget, with both numbers reported', () => {
-  const lines = read(INSTALL).split('\n').filter((l, i, a) => !(i === a.length - 1 && l === '')).length;
-  const install = read(INSTALL);
-  // The install NARRATIVE ends at "What is here": that heading and "Licence and attribution" are
-  // README sections, and they live here only because README = head + this body and the head is
-  // capped at ten lines. Both numbers are asserted so neither can grow unnoticed.
-  const narrative = install.slice(0, install.indexOf('\n## What is here')).split('\n').length;
-  assert.ok(narrative <= 250, `${narrative} lines of install narrative (story target: 250)`);
-  assert.ok(lines <= 270, `${lines} lines total, ${lines - narrative} of them README sections`);
+test('the page stays a page, and the tail stays a tail', () => {
+  const count = (rel) => read(rel).split('\n')
+    .filter((l, i, a) => !(i === a.length - 1 && l === '')).length;
+  const install = count(INSTALL);
+  const tail = count('docs/README-tail.md');
+  // 250 is the story's criterion and it measures the INSTALL PAGE. "What is here" and the licence
+  // were on this page until S13's review, which is 34 lines the criterion was measuring by accident
+  // of composition; they are `docs/README-tail.md` now, with a budget of their own so that moving
+  // them out of one cap did not put them beyond any.
+  assert.ok(install <= 250, `${install} lines of install page (criterion: 250)`);
+  assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
+  // The corpus cost stays on the install page: what the install takes off the disk is an install
+  // fact, and every figure on it carries where it was measured.
+  assert.match(read(INSTALL), /### What the corpus costs/);
+  assert.match(read(INSTALL), /measured 2026-09-06, ARC-00 S-07/);
 });
 
 test('the server package\'s generated tables are current too', () => {

@@ -31,7 +31,11 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   `docsStatus()` and the `/snowarch status` skill already read them.
 - **One install page, and the README is a copy of it.** `docs/INSTALL.md` is the page —
   prerequisites, both paths, what you will see, live mode, operators, uninstall — and `README.md` is
-  `docs/README-head.md` + that page's body, composed by `scripts/gen-readme.mjs` and checked in CI.
+  `docs/README-head.md` + that page's body + `docs/README-tail.md`, composed by
+  `scripts/gen-readme.mjs` and checked in CI. Three parts rather than two because the page has a
+  250-line criterion and "What is here" and the licence are the README's sections, not install
+  steps: folding them in made the criterion measure 34 lines that were never instructions. Each part
+  has its own budget, so moving them out of one cap did not put them beyond any.
   P-02 is why: the package this replaces shipped a README naming an unpublished npm package and
   telling the reader to edit `claude_desktop_config.json`, every sentence true of an intention. So
   the parts of the page that are facts about the build are WRITTEN by the build — the closing block

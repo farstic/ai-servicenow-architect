@@ -223,6 +223,17 @@ Every preflight failure prints its own remedy. These are those sentences:
 The full catalogue is `docs/TROUBLESHOOTING.md`. Whatever went wrong, re-run the bootstrap — it
 resumes at the step that failed rather than starting over.
 
+### What the corpus costs
+
+**The corpus costs about 302 MB on disk and about 30 seconds to fetch** — a sparse, blobless
+checkout of 19 areas out of 49,000 tracked paths. Two measurements, because they count different
+things: the **working tree** is 179 MB on Linux and macOS, 183 MB on Windows, 34,360 files
+(measured 2026-09-09 by `docs-real.yml` on all three runners: 25.3 s Ubuntu · 27.5 s macOS · 35.1 s Windows),
+and **tree plus `.git`** is 302 MB macOS / 305 MB Ubuntu / 315 MB Windows
+(measured 2026-09-06, ARC-00 S-07). The first is what you read, the second is what the disk loses.
+`--docs full` takes the whole corpus instead: **447 MB and 48,997 files**
+(measured 2026-09-09 on the reference macOS machine — ARC-00 S-07 did not measure full mode).
+
 ### Uninstall
 
 Delete the checkout: it holds the only copy of anything you configured, in `.local/` — credentials
@@ -236,34 +247,3 @@ claude mcp remove servicenow -s local     # or -s user, whichever you chose
 
 Claude Code keeps its own record that you trusted the folder. It is harmless and refers to a path
 that no longer exists.
-
-## What is here
-
-| Path | What |
-|---|---|
-| `.claude/skills/`, `.claude/agents/` | the specialists — one skill each, nine of them also sub-agents |
-| `governance/` | the rules the architect reads at routing time |
-| `packages/snowarch/` | the MCP server that talks to a ServiceNow instance |
-| `docs/ARCHITECTURE.md` | how the repository is laid out and how the engine works |
-| `docs/PLATFORM-NOTES.md` | platform behaviour learned on real instances, and the Windows notes |
-| `docs/CONTRIBUTING.md` | how to change it |
-
-## Licence and attribution
-
-Licensed under **Apache-2.0** — see `LICENSE` and `NOTICE`.
-
-ServiceNow platform documentation is vendored from **ServiceNowDocs**
-(<https://github.com/ServiceNow/ServiceNowDocs>) at a pinned commit and is the property of ServiceNow,
-Inc., used under its own licence. This project is not affiliated with or endorsed by ServiceNow.
-Every `docs sync` ends with the line
-`docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE`,
-and the corpus's own `LICENSE` and `legal/` are present in every checkout, sparse or full.
-
-**The corpus costs about 302 MB on disk and about 30 seconds to fetch** — a sparse, blobless
-checkout of 19 areas out of 49,000 tracked paths. Two measurements, because they count different
-things: the **working tree** is 179 MB on Linux and macOS, 183 MB on Windows, 34,360 files
-(measured 2026-09-09 by `docs-real.yml` on all three runners: 25.3 s Ubuntu · 27.5 s macOS · 35.1 s Windows),
-and **tree plus `.git`** is 302 MB macOS / 305 MB Ubuntu / 315 MB Windows
-(measured 2026-09-06, ARC-00 S-07). The first is what you read, the second is what the disk loses.
-`--docs full` takes the whole corpus instead: **447 MB and 48,997 files**
-(measured 2026-09-09 on the reference macOS machine — ARC-00 S-07 did not measure full mode).

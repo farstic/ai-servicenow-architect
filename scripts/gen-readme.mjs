@@ -13,9 +13,14 @@
  *   terminal-handoff   `docs/snippets/terminal-handoff.md`, the fragment the skill also carries
  *   remedies           `tools/snowarch/lib/remedies.json` — one row per preflight check
  *
- * And then `README.md` = `docs/README-head.md` + this page's body, because P-02's other half was
- * two install narratives that disagreed. There is one page; the README is a copy of it that CI
- * keeps honest.
+ * And then `README.md` = `docs/README-head.md` + this page's body + `docs/README-tail.md`, because
+ * P-02's other half was two install narratives that disagreed. There is one page; the README is a
+ * copy of it that CI keeps honest.
+ *
+ * Three parts rather than two, ruled at S13's review: the head is what a reader meets first, the
+ * body is the install page, and the tail is the two sections that are the README's own — "What is
+ * here" and the licence. Folding the tail into the page made the page's 250-line criterion measure
+ * 34 lines that were never install instructions.
  *
  *   node scripts/gen-readme.mjs           # rewrite the regions and README.md
  *   node scripts/gen-readme.mjs --check   # exit 1 if either has drifted
@@ -33,6 +38,7 @@ const check = argv.includes('--check');
 
 export const INSTALL = 'docs/INSTALL.md';
 export const HEAD = 'docs/README-head.md';
+export const TAIL = 'docs/README-tail.md';
 export const README = 'README.md';
 export const HANDOFF = 'docs/snippets/terminal-handoff.md';
 
@@ -107,14 +113,16 @@ export function renderInstall({ doc, text, remedies, handoff, floor }) {
 }
 
 /**
- * README = head + the page from its first `## `.
+ * README = head + the page from its first `## ` + tail.
  *
- * The page's own leading comment block explains that it IS the README body; carrying that into the
- * README would be a note to maintainers in the middle of a user's first page.
+ * Each part's own leading comment block is stripped: they explain the composition to a maintainer,
+ * and a note about how the file is assembled has no business in the middle of a user's first page.
  */
-export function renderReadme(head, install) {
+const withoutNote = (text) => text.replace(/^<!--[\s\S]*?-->\n+/, '');
+
+export function renderReadme(head, install, tail) {
   const body = install.slice(install.indexOf('\n## ') + 1);
-  return `${head.trimEnd()}\n\n${body.trimEnd()}\n`;
+  return `${head.trimEnd()}\n\n${body.trimEnd()}\n\n${withoutNote(tail).trimEnd()}\n`;
 }
 
 /**
@@ -132,7 +140,7 @@ if (isMain) {
     handoff: read(HANDOFF),
     floor: config.floors.claudeCode,
   });
-  const readme = renderReadme(read(HEAD), install);
+  const readme = renderReadme(read(HEAD), install, read(TAIL));
 
   const stale = [];
   if (install !== read(INSTALL)) stale.push(INSTALL);
@@ -145,7 +153,8 @@ if (isMain) {
       }
       // Named on purpose: a reader who edited README.md by hand has to be told where the text
       // lives, or they will make the same edit again.
-      process.stderr.write(`gen-readme: ${README} is composed from ${HEAD} + ${INSTALL}; edit those\n`);
+      process.stderr.write(
+        `gen-readme: ${README} is composed from ${HEAD} + ${INSTALL} + ${TAIL}; edit those\n`);
       process.exit(1);
     }
     process.stdout.write('gen-readme: README.md and docs/INSTALL.md current\n');
@@ -169,5 +178,5 @@ export function compose(from = root) {
     handoff: at(HANDOFF),
     floor: config.floors.claudeCode,
   });
-  return { install, readme: renderReadme(at(HEAD), install) };
+  return { install, readme: renderReadme(at(HEAD), install, at(TAIL)) };
 }
