@@ -1,0 +1,18 @@
+<!-- ONE SOURCE. This fragment is the terminal hand-off, and it exists in exactly two places:
+     here, and inside `.claude/skills/snowarch/SKILL.md` (indented three spaces, inside its numbered
+     list). `tests/terminal-handoff.test.mjs` asserts they are the same text — the credential
+     procedure is the one thing in this repository that must never have two versions, because a
+     user following a stale copy types a password somewhere it was not meant to go.
+     `docs/INSTALL.md` includes this file through `scripts/gen-readme.mjs`; ARC-07-S09 keeps the
+     skill in step when it extends the skill body. -->
+
+```
+Next step happens in YOUR terminal (credentials never pass through this chat).
+1. Open a terminal at this checkout: <absolute path>
+2. Run:   ./snowarch instance add <label> --url <url> --default
+   (Windows PowerShell/cmd:  snowarch.cmd instance add <label> --url <url> --default)
+3. The wizard proposes the environment and preset and shows a per-flag review — press Enter to accept, or edit any line.
+4. Type your username and password when prompted (masked; nothing is echoed).
+5. When it prints "Saved instance …", come back here and type:  /snowarch setup-instance --resume
+I will wait. Nothing is written until you confirm in the terminal.
+```

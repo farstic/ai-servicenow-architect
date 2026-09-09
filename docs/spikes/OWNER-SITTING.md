@@ -24,6 +24,28 @@
 >
 > **Parts B, C and D are complete too (2026-09-07).** Nothing remains for this version.
 >
+> **Path B cannot be measured from this account (ARC-06-S13, 2026-09-10).** Criterion 2 asks
+> whether the pasted sentence leads Claude to the two documented commands. Two headless runs were
+> made with ONLY those two commands permitted (`--allowedTools "Bash(git clone:*)"
+> "Bash(./bootstrap.sh:*)"`, no skip-permissions). Run 1, default profile: the clone happened, the
+> session then reached for a user-level MCP tool that a new user does not have, cloned into
+> SUBDIRECTORIES rather than `.`, and never ran the bootstrap (31 turns, ~$0.57). Run 2, with an
+> isolated `CLAUDE_CONFIG_DIR` to model a new user: `Not logged in · Please run /login`.
+> The obstacle is structural, not incidental — every session on this machine inherits a user-level
+> `CLAUDE.md` instructing the model to route work through other tools, so the run measures the
+> maintainer's environment rather than the page. **Run it on a profile without a user-level
+> `CLAUDE.md` and without user-scope MCP servers**, empty folder and a folder containing
+> `notes.md`, and record whether the two commands are the ones chosen. Run 1 is already useful:
+> the story's own risk ("Claude may deviate") was observed, which is why the page prints the exact
+> commands and now names the subfolder variation.
+>
+> **The install page's second reader (ARC-06-S13, 2026-09-10).** Criterion 1 asks for two people
+> who did not write the page to follow Path A and reach `Mode: design-only` without opening any
+> other file. Reader one is the architect, on a fresh clone with Node hidden. **Reader two is the
+> owner**, on the Windows `clean` snapshot: open `docs/INSTALL.md`, follow it top to bottom, and
+> note every place you had to guess, look elsewhere, or scroll back. The page passes only if the
+> answer is "nowhere" — a page that needs its author present is not the page this story asked for.
+>
 > **A robustness CANDIDATE, not a change (ruling 3, ARC-06-S12, 2026-09-10).** `bootstrap.cmd`
 > invokes `powershell` by NAME, so a machine whose PATH has been rewritten (a GPO, a shell started
 > with a scrubbed environment) gets cmd's own `'powershell' is not recognized` instead of our

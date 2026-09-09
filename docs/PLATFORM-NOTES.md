@@ -117,3 +117,47 @@ baseline concept); observed behaviour
 **Engine consequence:** the Developer skill keeps `sys_script_fix.name` at 40 characters or fewer, and
 reads the stored `name` back from the create response instead of assuming what was sent was kept —
 the same check being worth applying to any short label field written over REST.
+
+---
+
+## Windows notes — this repository, not ServiceNow
+
+The notes above are ServiceNow behaviour. These are about the machine the engine runs on, and they
+are here because a Windows reader looking for "why is it different on my machine" looks in one
+place. Each says how it is known, because two of them are known differently.
+
+**Git Bash is needed for the skills, not for the install.** `bootstrap.cmd` → `bootstrap.ps1` →
+`node` uses no POSIX shell at all, and CI proves it by rebuilding PATH without Git Bash before every
+Windows launcher run. But Claude Code's own Bash tool *is* Git Bash, and the in-session skills
+(`/snowarch status`, `/snowarch setup-instance`) run `./snowarch …` through it — so **Git for
+Windows is required for the skills** even though the installer never touches it. It also satisfies
+the git ≥ 2.25 floor, which is why the prerequisites table asks for it once.
+
+**PowerShell 5.1, never 7.** 5.1 is what every Windows 10/11 has; requiring 7 would mean requiring
+an install before the installer runs. `bootstrap.ps1` is 5.1-clean (no `??`, no ternary, no
+`-AsHashtable`) with a test that greps for each and proves the grep is not vacuous, and it carries a
+**UTF-8 BOM** — 5.1 decodes a BOM-less file as the ANSI code page, which would turn every `—` and
+`·` in the shared sentences into mojibake before a line ran. For the same reason the launcher writes
+its JSON through .NET rather than `Set-Content -Encoding UTF8`, which on 5.1 means "UTF-8 *with* a
+BOM" and produces files `JSON.parse` refuses.
+
+**Line endings.** `.gitattributes` gives `*.ps1` and `*.cmd` `text eol=crlf`: the index keeps LF and
+every checkout converts. A lone LF in a `.cmd` is a batch file that stops at the first line.
+
+**Long paths.** The corpus checkout nests deeply. Windows' 260-character limit applies to the
+`MAX_PATH` API, not to git's own operations, and `core.longpaths` is set by Git for Windows'
+installer by default — no measured failure, and no action known to be needed. Recorded so that a
+future long-path failure is not investigated from scratch.
+
+**What is verified where.** Verified by CI on `windows-latest`, every run: `-ExecutionPolicy Bypass`
+working under a Restricted *process* policy; the design-only path with Node **and** Git Bash removed
+by rebuilding PATH; exit codes 0/2/3 from `cmd` and from `powershell.exe`; Node reading the state
+PowerShell wrote; `snowarch.cmd` with and without Node; and the POSIX launcher under Git Bash
+answering `MINGW64_NT` and printing the `winget` remedies rather than `apt`.
+
+Pending the owner's Windows sitting, and recorded in `docs/spikes/OWNER-SITTING.md` rather than
+assumed: the **double-click** experience (the `%CMDCMDLINE%` pause detection is a cmd convention,
+not a documented contract), **Ctrl-C** propagation through `cmd` → `powershell` → `node`, a
+**GPO-locked** `MachinePolicy` (which no runner can apply), and whether Claude Code expands
+`${CLAUDE_PROJECT_DIR}` in `.mcp.json` on native Windows (S-03) — the fallback for which is
+deliberately not built until that spike runs.

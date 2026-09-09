@@ -29,6 +29,22 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **One install page, and the README is a copy of it.** `docs/INSTALL.md` is the page —
+  prerequisites, both paths, what you will see, live mode, operators, uninstall — and `README.md` is
+  `docs/README-head.md` + that page's body, composed by `scripts/gen-readme.mjs` and checked in CI.
+  P-02 is why: the package this replaces shipped a README naming an unpublished npm package and
+  telling the reader to edit `claude_desktop_config.json`, every sentence true of an intention. So
+  the parts of the page that are facts about the build are WRITTEN by the build — the closing block
+  from `text.json`, the dialog count from `EXPECTED_DIALOGS` with the version it was measured on,
+  the preflight remedies from `remedies.json`, and the terminal hand-off from the same fragment the
+  `/snowarch setup-instance` skill carries. A test asserts the skill and the page still agree word
+  for word: a stale copy of THAT text is not a documentation defect, it is a user typing a password
+  somewhere it was not meant to go. Four words are forbidden on the page by test — `Tier N`,
+  `claude_desktop_config`, `1.0.0`, and `claude mcp add` (this project never runs it) — and
+  `claude mcp remove` is allowed exactly once, in Uninstall. `docs/USER-GUIDE.md` pointed at two
+  install guides that do not exist; it points at this one now.
+- **`docs/PLATFORM-NOTES.md` gained a Windows section** that separates what CI verifies every run
+  from what waits for the owner's sitting, rather than letting the two read alike.
 - **`snowarch mode live` / `mode design` — the switch, and the `--register local|user` fallback.**
   `mode live` runs B00 then the registry (B01–B03 cached); `mode design` runs B07 and B09 only and
   does NOT touch the credential store — the closing note names the instance it kept and the two
