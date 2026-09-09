@@ -27,7 +27,9 @@ test('sync prints it on success, --quiet suppresses it, --json never carries it'
   // Printed through `say`, which `--quiet` short-circuits: one mechanism, so the suppression cannot
   // be true of the phase lines and false of this one.
   assert.match(src, /const attribute = \(\) => say\(ATTRIBUTION\);/);
-  const cli = read('scripts/docs.mjs');
+  // The dispatch moved to the library at ARC-06-S02 when `./snowarch docs` mounted it;
+  // `scripts/docs.mjs` is a shim over the same function. Reading the shim would assert nothing.
+  const cli = read('tools/snowarch/lib/docs/cli.mjs');
   // `--json` runs the sync quiet, so the object a caller parses never has prose in front of it.
   assert.match(cli, /quiet: quiet \|\| asJson/);
 });
