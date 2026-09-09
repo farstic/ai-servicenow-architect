@@ -45,6 +45,12 @@ ARC-04-S02/S04/S11/S12 (store module, `snow_core_capabilities_read`, network cla
 - [ ] Runtime: when the server returns `AUTHENTICATION_FAILED`, the engine (per the generated rule file) stops and prints the `set-credentials` remedy; the VALIDATION-TESTS gain a test for this. (S10)
 - [ ] Design principle 10 ("Propose, don't impose") holds for `--fix`: the plan is shown and Enter applies; `--yes` accepts it for CI. (S06)
 
+> **Candidate check, recorded at the ARC-06 docs-sync fix (2026-09-09).** `docs-bump.yml` depends on
+> a repository setting no file in the tree can assert:
+> `gh api repos/<owner>/<repo>/actions/permissions/workflow` → `can_approve_pull_request_reviews`.
+> With it off, the weekly bump moves the pin, pushes its branch and fails at `gh pr create` — a
+> failure that looks like a workflow bug and is not one.
+
 ## Risks
 
 > **Amendment 2026-09-07 (from `03` §F "Pattern 4/4").** Design rationale of record: four independent Claude Code surfaces reported success or said nothing while the underlying work had failed (dead MCP server → exit 0; unspawnable hook → silence; plugin `npm ci` SIGTERM → "✔ Successfully installed"; scaffolded plugins → nothing). The doctor therefore performs its own handshake, its own hook probe, its own dependency-tree completeness check and its own registration read, and never treats a Claude Code message or exit code as evidence.

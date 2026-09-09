@@ -59,3 +59,24 @@ test('no workflow can merge, and none reads a repository secret', () => {
     assert.deepEqual([...new Set(secrets)], [], `${f} reads a repository secret`);
   }
 });
+
+test('docs-bump checks out the same branch it opens the pull request against', () => {
+  // The first real run was dispatched from `main` and computed its "from" pin against main's tree.
+  // Harmless while the two branches share a pin, and wrong the moment develop runs ahead — so the
+  // checkout ref and the `--base` are asserted to be one value rather than two that happen to match.
+  const text = wf('docs-bump.yml');
+  const checkoutRef = /^\s*ref: (\S+)$/m.exec(text);
+  const prBase = /gh pr create --base (\S+)/.exec(text);
+  assert.ok(checkoutRef, 'the checkout has no explicit ref — it would follow the dispatch');
+  assert.ok(prBase, 'no `gh pr create --base` found');
+  assert.equal(checkoutRef[1], prBase[1],
+    'the branch the run is built from is not the branch the pull request targets');
+});
+
+test('the workflows name the repository settings they depend on', () => {
+  // Settings are not in the tree, so nothing here can assert them. Naming them in the file is what
+  // stops the next person losing an afternoon to `gh pr create` failing with a permissions error.
+  const text = wf('docs-bump.yml');
+  assert.match(text, /Allow GitHub Actions to create and approve pull requests/);
+  assert.match(text, /Approve and run/);
+});

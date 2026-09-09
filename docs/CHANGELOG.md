@@ -11,6 +11,30 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ## Unreleased
 
+### Fixed
+
+- **A fresh install whose pin equals the branch tip produced an EMPTY corpus that called itself
+  complete.** Two defects, both mine, found by the first real bump:
+  - `syncCorpus` only ran `checkout --detach` when HEAD differed from the pin. A
+    `git clone --no-checkout` leaves an empty index and an empty working tree, so when the pin *is*
+    the branch tip its HEAD is already correct — "at the pin" was true and "there are files" was
+    false. Every run for seven weeks had a pin behind the tip, so the fetch-by-hash path always ran
+    and hid it. **Populated is now its own question**, checked from the index, and an unpopulated
+    checkout is *repaired* rather than refused as dirty: an empty index reads as staged deletions,
+    and telling someone they have local changes they never made is the wrong answer.
+  - `docs sync` printed `INCOMPLETE` in its summary and then `docs sync: complete`, exit 0. The gate
+    that stops that was deleted by accident at ARC-03-S06, when replacing the `--json` object
+    swallowed the block beside it. Restored, with the three tests that would have caught it.
+- **The recipe block in `docs/ARCHITECTURE.md` is now GENERATED.** It embeds the docs pin, so the
+  byte-for-byte parity test failed on every bump pull request by construction. `gen-docs-recipe.mjs`
+  joins the generator list and `--check` is the same guarantee without the built-in failure — *a
+  documentation block that embeds a moving value must be generated, not asserted.*
+- **`docs-bump.yml` builds from the pull request's base**, not the ref it was dispatched on. The
+  first real run was dispatched from `main` and computed its "from" pin against main's tree — right
+  only while the two branches share a pin. One value, used by the checkout and by `--base`, asserted
+  equal by test. The two repository settings the workflow depends on and cannot assert are named in
+  its header, in `CONTRIBUTING.md` and as an ARC-08 doctor candidate.
+
 ### Added
 
 - **The MCP registration travels with the clone.** `.mcp.json` and the non-permissions half of

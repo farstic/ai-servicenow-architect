@@ -281,6 +281,10 @@ export function inspect(root, config, areas) {
   const list = sparseOn ? probe(['sparse-checkout', 'list'], corpus) : { ok: false, out: '' };
   const sparseList = list.ok ? list.out.split('\n').map((l) => l.trim()).filter(Boolean) : [];
   const dirty = probe(['status', '--porcelain'], corpus).out !== '';
+  // POPULATED is a separate question from AT THE PIN, and conflating them is what let a fresh
+  // `--no-checkout` clone whose HEAD already equalled the pin report itself as up to date with an
+  // EMPTY working tree. The index is the tell: a clone that has never checked out has none.
+  const indexed = probe(['ls-files'], corpus).out !== '';
   const submodule = probe(['submodule', 'status', CORPUS_DIR], root).out;
   const pinPresent = probe(['cat-file', '-e', `${config.docs.pin}^{commit}`], corpus).ok;
 
@@ -293,7 +297,7 @@ export function inspect(root, config, areas) {
     && [...sparseList].sort().join('\0') === [...cone].sort().join('\0');
 
   return {
-    present: true, head, dirty, sparseOn, coneOn, sparseList, sameSet, pinPresent,
+    present: true, head, dirty, indexed, sparseOn, coneOn, sparseList, sameSet, pinPresent,
     submodule, initialised: submodule !== '' && !submodule.startsWith('-'),
     atPin: head === config.docs.pin,
   };
@@ -375,7 +379,12 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
 
   // 1. The refusal comes first and is absolute. Someone edited a doc; sync's job is to say so, not
   //    to decide their edit was unimportant. `--force` is never reached for from here.
-  if (state.present && state.dirty) {
+  // The refusal is for an operator's OWN edits. An unpopulated checkout also reads as dirty —
+  // measured: a `--no-checkout --sparse` clone leaves an empty index, so every tracked path shows
+  // as a staged deletion — and telling someone they have local changes they never made, about a
+  // corpus that was never checked out, would send them to `git stash` for a problem `sync` is
+  // supposed to fix. Populated is asked first.
+  if (state.present && state.dirty && state.indexed) {
     throw new SyncError(`${CORPUS_DIR} has local changes — commit, stash or discard them, `
       + 'then re-run', EXIT.dirty);
   }
@@ -407,7 +416,13 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   if (!state.pinPresent) {
     phase(`fetch pin ${docs.pin.slice(0, 7)}`, () => runMapped(['fetch', '--depth', '1', 'origin', docs.pin], corpus, ctx));
   }
-  if (!state.atPin) {
+  // ALWAYS after a fresh clone, and whenever the tree is not populated — never merely when HEAD
+  // differs. `git clone --no-checkout` leaves an empty index and an empty working tree, and when the
+  // pin happens to be the branch tip its HEAD is already correct: "at the pin" was true and "there
+  // are files" was false. Every run until 2026-09-09 had a pin seven weeks behind the tip, so the
+  // fetch-by-hash path always ran and hid this. The first bump made pin == tip and the install
+  // produced an empty corpus that called itself complete.
+  if (!state.atPin || !state.indexed) {
     phase(`checkout --detach ${docs.pin.slice(0, 7)}`, () => runMapped(['checkout', '--detach', docs.pin], corpus, ctx));
   }
 
@@ -433,7 +448,7 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   const completeness = checkCompleteness(root, CORPUS_DIR, areas, docs.pin);
   const after = inspect(root, config, areas);
   const elapsed = (Date.now() - t0) / 1000;
-  const changed = !state.present || !state.atPin || !state.sameSet || repaired > 0
+  const changed = !state.present || !state.atPin || !state.indexed || !state.sameSet || repaired > 0
     || (mode === MODE.full) !== !after.sparseOn;
 
   // Printed once, on success, and nowhere else: `--quiet` suppresses it and `--json` never carries

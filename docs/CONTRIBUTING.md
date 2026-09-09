@@ -836,6 +836,11 @@ upstream has moved. It never merges anything.
   you would get running it locally. `newly dead (n)` is the whole reason the PR exists.
 - **Remap the citations on the PR's branch**, then push. The `needs-remap` label and the red
   `docs-check` job both clear when `docs verify` reports `dead: 0`.
+- **Two repository settings this depends on.** Settings → Actions → General → **"Allow GitHub
+  Actions to create and approve pull requests"** must be on; without it the run moves the pin, pushes
+  the branch and then fails at `gh pr create`. And the first CI run on each bot-authored pull request
+  may need **"Approve and run"** — GitHub gates first-time-contributor workflows and `github-actions`
+  counts as one.
 - **One bump at a time.** The branch is named for the target SHA, so a re-run against the same tip
   updates the PR rather than opening another; a newer tip closes the older one with `superseded
   by #<n>`. If you see two open, something went wrong — say so rather than merging both.

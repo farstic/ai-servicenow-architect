@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +25,15 @@ const blockOf = (text) => {
   assert.ok(m, 'no git-only recipe block in docs/ARCHITECTURE.md');
   return m[1].trimEnd().split('\n');
 };
+
+test('the generated block is current — the generator is the parity guarantee now', () => {
+  // The block embeds the docs pin, so a byte-for-byte assertion against `--print-recipe` failed on
+  // every bump pull request by construction: the pin moved, the block did not. It is generated now,
+  // like the roster block, and `--check` is the same guarantee without the built-in failure.
+  const r = spawnSync(process.execPath, ['scripts/gen-docs-recipe.mjs', '--check'],
+    { cwd: root, encoding: 'utf8' });
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+});
 
 test('the ARCHITECTURE block equals the recipe for a fresh sparse checkout', () => {
   const areas = readAreas(root, config.docs.areasFile);
