@@ -83,9 +83,26 @@ test('--quiet silences the console and still writes the file', () => {
 });
 
 test('a read-only checkout logs to the console and does not fail the command', () => {
-  const log = createLogger({ command: 'ro', logRoot: '/nonexistent- -path', out: sink(), err: sink() });
-  log.step('still works');
-  assert.equal(log.logFile, null);
+  // The log root is an existing FILE, so `mkdir <file>/.local/logs` throws on every platform
+  // (ENOTDIR here, ENOENT on Windows) with no dependency on permissions. An unwritable *path*
+  // was the obvious fixture and the wrong one: `/nonexistent- -path` is only unwritable for an
+  // unprivileged user, and the Windows runner — Administrator, drive-relative — created
+  // `C:\nonexistent- -path` and logged into it happily. The fixture has to make the failure,
+  // not assume the environment supplies one.
+  const dir = mkdtempSync(join(tmpdir(), 'snowarch-ro-'));
+  try {
+    const notADir = join(dir, 'read-only-checkout');
+    writeFileSync(notADir, '');
+    const out = sink(); const err = sink();
+    const log = createLogger({ command: 'ro', logRoot: notADir, out, err });
+    log.step('still works');
+    assert.equal(log.logFile, null, 'a failed open must not leave a log file behind');
+    // The point of the story: the line still reached the operator, and nothing threw.
+    assert.match(out.lines.join(''), /still works/);
+    assert.equal(err.lines.join(''), '');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('AC 3 - the launcher refuses without Node, and with Node below the floor',
