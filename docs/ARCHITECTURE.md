@@ -296,6 +296,49 @@ failing tool's knob first (`GIT_SSL_CAINFO` or `NODE_EXTRA_CA_CERTS`) and the ot
 a corporate bundle is always needed by both. A proxy URL is masked to `***@host:port` where the
 sentence is built, not on the way to the terminal.
 
+### B01 workspace and B07 toggles — what the bootstrap writes
+
+Four files, all of them gitignored, and **nothing outside the checkout**: `~/.claude.json` and
+`~/.claude/settings.json` are never touched.
+
+| File | Written by | What goes in it |
+|---|---|---|
+| `.local/` (+ `logs/`) | B01 | 0700 on POSIX — an existing directory is chmodded, so a checkout bootstrapped before this rule stays private too. Windows records `fileModes: acl-inherited`. |
+| `.local/bootstrap-state.json` | the runner | S03's schema v1 |
+| `.claude/settings.local.json` | B07 | **two array members and one hook entry, merged** |
+| `.local/config.json` | B07 | `{ version, mode, defaultInstance, registration, updatedAt }` |
+
+**`settings.local.json` is never overwritten.** It belongs to the operator — their permission
+grants, their overrides, whatever Claude Code has written on their behalf. B07 reads it, applies its
+two changes and writes the same object back: other keys untouched, other array members preserved,
+existing key order kept, new keys appended. Design-only puts the server in `disabledMcpjsonServers`
+(which wins over the enable list in Claude Code); live puts it in `enabledMcpjsonServers` and
+removes the disable entry. A registration that is not `project` rejects the project entry whatever
+the mode says. **Invalid JSON is the only failure**, and the bytes are left exactly as found — a
+stray comma must not cost someone their settings. The file must be gitignored before anything is
+written, or Claude Code will not apply its approvals.
+
+**The SessionStart hook is S-05 variant B**: the committed `settings.json` is hook-free, and B07
+writes the hook into the *local* file only when Node ≥ 20 is present, removing it otherwise. A hook
+that runs `node` on a machine without Node is an error on every session start. There is no
+`disableAllHooks` branch — it would have silenced the operator's personal and plugin hooks too.
+
+**B01 verifies the registration files two ways**, because they catch different mistakes:
+`git diff --quiet HEAD` sees an uncommitted edit, and ARC-06-S01's rules — re-evaluated at run time
+from `lib/registration.mjs`, which the S01 test imports too — see one that was committed. A failure
+names the file and the `git checkout --` remedy, and `.local/` is still created so the next run
+starts from somewhere.
+
+**`config.json`'s `defaultInstance` is a mirror, never a second source.** The store is
+authoritative; ARC-07's `set-default` re-mirrors it. It is read through `readDefaultLabel`, a
+zod-free reader that returns exactly one key — so no URL, username or credential can reach a file
+that, unlike the store, is not 0600.
+
+**The cloud-sync warning names the provider.** `isUnderCloudSyncFolder` in the committed server
+build answers *whether*; `lib/cloud-sync.mjs` adds *which*, and a test asserts the two never
+disagree. It is a WARN and not a FAIL: 0600 is a local permission and the sync client runs as the
+same user, but where someone keeps their code is their decision.
+
 ### The resume rule
 
 For each step in order: `runsWhen` false → `skipped (<reason>)`; `--from BNN` and the step is at or

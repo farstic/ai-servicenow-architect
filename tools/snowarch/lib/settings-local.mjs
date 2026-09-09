@@ -1,0 +1,135 @@
+// ARC-06-S05 — the two toggles, merged into the operator's own file and never over it.
+//
+// `.claude/settings.local.json` belongs to the user. It carries their permission grants, their
+// personal overrides, whatever Claude Code has written there on their behalf — and the bootstrap's
+// business with it is exactly two array members and one hook entry. So this reads, computes a
+// target, and writes back the SAME OBJECT with those changes applied: other keys untouched, other
+// array members preserved, existing key order kept, new keys appended.
+//
+// Exported because ARC-08's `--fix` and ARC-06-S12's `mode` both need to write the same file the
+// same way. A second writer would be a second opinion about what "the toggles" are.
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+export const SETTINGS_LOCAL = join('.claude', 'settings.local.json');
+
+export const INVALID_JSON =
+  '.claude/settings.local.json is not valid JSON — fix or move the file, then re-run '
+  + '(nothing was changed)';
+export const NOT_IGNORED =
+  '.claude/settings.local.json is not gitignored — add it to .gitignore (it must stay untracked '
+  + 'so Claude Code applies its approvals)';
+
+/** The SessionStart hook, S-05 variant B: it lives in the LOCAL file, and only when Node can run it. */
+export const hookEntry = () => ({
+  SessionStart: [{
+    matcher: 'startup|resume',
+    hooks: [{
+      type: 'command',
+      command: 'node ${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs',
+      timeout: 10,
+    }],
+  }],
+});
+
+const without = (list, value) => (Array.isArray(list) ? list.filter((v) => v !== value) : []);
+const withValue = (list, value) => (Array.isArray(list) && list.includes(value)
+  ? list
+  : [...(Array.isArray(list) ? list : []), value]);
+
+/**
+ * The target object, computed from the current one.
+ *
+ * Pure, and exported for the tests: every merge case is a question about this function, and
+ * answering it through the filesystem would make the tests slower and the failures vaguer.
+ */
+export function computeSettings(current, { mode, nodePresent, registration, serverKey }) {
+  const next = { ...current };
+  const live = mode === 'live' && registration === 'project';
+
+  // `disabledMcpjsonServers` wins over `enabledMcpjsonServers` in Claude Code, so design-only is
+  // expressed by the disable list and live by its absence. A registration that is not `project`
+  // rejects the project entry regardless of mode: the local or user entry carries the same key,
+  // and S12 verifies that coexistence.
+  if (live) {
+    next.enabledMcpjsonServers = withValue(current.enabledMcpjsonServers, serverKey);
+    const disabled = without(current.disabledMcpjsonServers, serverKey);
+    if (disabled.length > 0) next.disabledMcpjsonServers = disabled;
+    else delete next.disabledMcpjsonServers;
+  } else {
+    next.disabledMcpjsonServers = withValue(current.disabledMcpjsonServers, serverKey);
+    const enabled = without(current.enabledMcpjsonServers, serverKey);
+    if (enabled.length > 0) next.enabledMcpjsonServers = enabled;
+    else if ('enabledMcpjsonServers' in current) delete next.enabledMcpjsonServers;
+  }
+
+  // Variant B, and the whole reason the committed `settings.json` is hook-free: a SessionStart hook
+  // that runs `node` on a machine without Node prints an error on every session start. Present iff
+  // Node is, and REMOVED when it is not — an installation that loses Node must not keep a hook that
+  // now fails.
+  const hooks = { ...(current.hooks ?? {}) };
+  if (nodePresent) Object.assign(hooks, hookEntry());
+  else delete hooks.SessionStart;
+  if (Object.keys(hooks).length > 0) next.hooks = hooks;
+  else if ('hooks' in current) delete next.hooks;
+
+  return next;
+}
+
+/** `git check-ignore -q` — the file must be untracked, or Claude Code will not apply its approvals. */
+export function isIgnored(root, relative = SETTINGS_LOCAL, env = process.env) {
+  try {
+    // The user's GLOBAL excludes count, deliberately: if their `~/.gitignore` covers this path then
+    // the file really is untracked and the guard has nothing to complain about. `env` is a seam so
+    // a test can neutralise that global file — otherwise the fixture's precondition depends on
+    // whose machine it runs on, which is not a precondition at all.
+    execFileSync('git', ['check-ignore', '-q', '--', relative],
+      { cwd: root, stdio: 'ignore', env });
+    return true;
+  } catch { return false; }
+}
+
+/** 2-space JSON with a trailing newline, written through a temp file so a crash cannot truncate it. */
+export function writeJsonAtomic(path, value) {
+  const tmp = `${path}.tmp-${process.pid}`;
+  try {
+    writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`);
+    renameSync(tmp, path);
+  } catch (e) {
+    rmSync(tmp, { force: true });
+    throw e;
+  }
+}
+
+/**
+ * Read, merge, write. Idempotent: the second run produces the same bytes as the first.
+ *
+ * Returns what happened rather than printing it — B07 owns the console, ARC-08's `--fix` owns its
+ * own report, and a function that printed would have to be silenced by one of them.
+ */
+export function applyToggles({ root, mode, nodePresent, registration = 'project', serverKey,
+  check = isIgnored }) {
+  const path = join(root, SETTINGS_LOCAL);
+  const before = existsSync(path) ? readFileSync(path, 'utf8') : null;
+
+  let current = {};
+  if (before !== null) {
+    try { current = JSON.parse(before); } catch {
+      // The bytes are not touched. This is the only failure mode, and the file is never
+      // overwritten wholesale — someone's permission grants are not collateral for a stray comma.
+      return { ok: false, reason: INVALID_JSON, changed: false };
+    }
+    if (current === null || typeof current !== 'object' || Array.isArray(current)) {
+      return { ok: false, reason: INVALID_JSON, changed: false };
+    }
+  }
+
+  if (!check(root)) return { ok: false, reason: NOT_IGNORED, changed: false };
+
+  const next = computeSettings(current, { mode, nodePresent, registration, serverKey });
+  const text = `${JSON.stringify(next, null, 2)}\n`;
+  if (before === text) return { ok: true, changed: false, settings: next };
+  writeJsonAtomic(path, next);
+  return { ok: true, changed: true, settings: next };
+}
