@@ -14,5 +14,10 @@ trim_trailing_whitespace = false
 [*.{ps1,cmd}]
 end_of_line = crlf
 
+# PowerShell 5.1 decodes a BOM-less file as the ANSI code page, so every non-ASCII character in the
+# shared sentences would arrive as mojibake. The BOM is the only thing that tells it UTF-8.
+[bootstrap.ps1]
+charset = utf-8-bom
+
 [Makefile]
 indent_style = tab

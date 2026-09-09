@@ -95,7 +95,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-06-S08 | ARC-06 | B08 MCP stdio handshake and live-probe invocation; `.local/doctor-last.json` v1 | M | S07; ARC-04-S04/S13; ARC-07-S06 | M3 | Done (2026-09-09) |
 | ARC-06-S09 | ARC-06 | B09 summary: `DOCTOR:` line, authoritative `Mode:` line, next-step text with the dialog budget | S | S05, S08; ARC-00-S04; verdicts S-01 | M3 | Done (2026-09-09) |
 | ARC-06-S10 | ARC-06 | `bootstrap.sh` (bash 3.2-clean) with the Node-free design-only path | L | S04, S05, S06, S09 | M3 | Done (2026-09-09) |
-| ARC-06-S11 | ARC-06 | `bootstrap.ps1` + `bootstrap.cmd` with the Node-free design-only path; `snowarch.cmd` | L | S10; ARC-00-S06/S07/S13; verdicts S-03 S-08 | M3 | Not started |
+| ARC-06-S11 | ARC-06 | `bootstrap.ps1` + `bootstrap.cmd` with the Node-free design-only path; `snowarch.cmd` | L | S10; ARC-00-S06/S07/S13; verdicts S-03 S-08 | M3 | Done (2026-09-09) — AC 1/4 + S-03/S-04 deferred to the Windows sitting |
 | ARC-06-S12 | ARC-06 | `snowarch mode live` / `mode design` post-install switches; `mode live --register local\|user` fallback | M | S07, S08, S09 | M3 | Not started |
 | ARC-06-S13 | ARC-06 | `docs/INSTALL.md` (= README body); Path B recipe sentence and non-empty-folder clone sequence; uninstall; start-at-root note | M | S09, S10, S11, S12; ARC-00-S10; ARC-03-S10; verdicts S-09 | M3 | Not started |
 | ARC-06-S14 | ARC-06 | CI: design-only bootstrap on three OSes with and without Node; Windows job without Git Bash; no-tracked-file-modified and secret-grep gates | M | S10, S11; ARC-00-S13; ARC-01-S11 | M3 | Not started |

@@ -29,6 +29,35 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **`bootstrap.cmd`, `bootstrap.ps1` and `snowarch.cmd` — native Windows, without Git Bash.** The
+  `.cmd` runs PowerShell with `-ExecutionPolicy Bypass`, which is what makes a double-click work
+  under the default Restricted policy, and pauses only when double-clicked with no arguments. The
+  `.ps1` mirrors `bootstrap.sh` step for step and shares its sentences through the same generated
+  region — in PowerShell syntax, with the **Windows spellings** — and is 5.1-clean (no `??`, no
+  ternary, no `-AsHashtable`, never `pwsh`), with a test that greps for each and proves the grep is
+  not vacuous. It records `writer: "powershell"` and `fileModes: "acl-inherited"`, because there is
+  no `chmod` to apply and implying one would be a lie in a file the doctor reads. **Written on a Mac
+  with no PowerShell to run them**, so a new Windows CI job proves what CI can reach — Bypass under
+  a Restricted process policy, the Node-free path with Node *and* Git Bash removed by rebuilding
+  PATH rather than filtering it, exit codes 0/2/3 from both cmd and `powershell.exe`, and Node
+  reading the state PowerShell wrote — and the double-click, Ctrl-C, GPO and Claude-Code-on-Windows
+  cases are recorded in `OWNER-SITTING.md` as deferred rather than quietly skipped. Two things that
+  job caught on its first run, both invisible from a Mac: the shared text region wrote every
+  sentence into both launchers, so each declared remedies for a platform it can never print — six
+  linter findings, one cause, fixed by deriving the region from each file's own references, which
+  is also why it can no longer drift; and PowerShell 5.1 decodes a BOM-less file as the ANSI code
+  page, so the `—` and `·` in the shared sentences would have arrived as mojibake before a line
+  ran. The `.ps1` now carries a UTF-8 BOM, `.editorconfig` declares it, and a test asserts both the
+  BOM and the non-ASCII that makes it necessary. Three more the job found once it could run: on
+  5.1 `Set-Content -Encoding UTF8` writes a BOM too, so every JSON file the launcher wrote came
+  back as `not valid JSON` from Node — one `Write-Json` helper now writes them all without one,
+  and `loadState` strips a leading BOM on read, since Notepad adds one to anything it saves;
+  PowerShell rewrites native-command arguments cmd-style, so `node -p '…split(".")[0]'` reached
+  node as `split(.)[0]` and the launcher concluded a machine with Node 24 had no usable Node; and
+  `git ls-remote --exit-code -h <url> HEAD` matches no head ref, so git exits 2 in silence — which
+  `bootstrap.sh` (reading stderr) called reachable and the port (reading the exit code) called
+  unreachable. `-h` is gone from both, and the rule is now the same on both sides: the exit code
+  decides, stderr chooses the sentence.
 - **`./bootstrap.sh` — the launcher, and the Node-free design-only path.** With Node ≥ 20 it
   `exec`s the Node CLI, forwarding every flag and exporting `CLAUDE_PROJECT_DIR` (the launcher's
   spawn is our spawn). Without Node it finishes design-only itself in bash 3.2 — the version macOS

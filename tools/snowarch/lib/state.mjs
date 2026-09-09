@@ -118,7 +118,9 @@ export function loadState(root) {
   if (!existsSync(p)) return null;
 
   let parsed;
-  try { parsed = JSON.parse(readFileSync(p, 'utf8')); } catch (e) {
+  // A leading BOM is stripped before parsing: Notepad adds one to anything it saves, and a
+  // user who opened this file to look at it should not be told it is corrupt.
+  try { parsed = JSON.parse(readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); } catch (e) {
     throw new StateError(`.local/bootstrap-state.json is not valid JSON (${e.message}) — `
       + 'run ./snowarch bootstrap --reset to start over');
   }

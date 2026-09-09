@@ -24,6 +24,19 @@
 >
 > **Parts B, C and D are complete too (2026-09-07).** Nothing remains for this version.
 >
+> **The Windows sitting, four rows (added by ARC-06-S11, 2026-09-09).** The Windows launchers ship
+> verified by CI for everything CI can reach; four things need a Windows console with a human:
+> **(1) AC 1** — double-click `bootstrap.cmd` on the `clean` snapshot: the plan appears, Enter runs
+> it, and `Press any key to continue` holds the window open (the `%CMDCMDLINE%` detection is a cmd
+> convention, not a documented contract; if it misfires the fallback is an unconditional `pause`
+> when `%~1` is empty). **(2) Ctrl-C** propagation through `bootstrap.cmd` → `powershell.exe` →
+> `node` — PowerShell has no `exec`, so the parent waits, and only a console can show whether the
+> signal reaches the child. **(3) S-03** — whether Claude Code expands `${CLAUDE_PROJECT_DIR}` in
+> `.mcp.json` on native Windows; if it does NOT, the fallback (`claude mcp add-json … -s local` with
+> a resolved absolute path, recorded as `mcpJsonOverrideSha`) gets built then. It is deliberately
+> not built now. **(4) S-04** — conhost raw-mode masked input, which ARC-07's wizard needs.
+> **(5) AC 4** — a GPO-locked `MachinePolicy`, which no runner can apply.
+>
 > **The floor row, and what turns on it (added by ARC-06-S09, 2026-09-09).** The dialog count is
 > measured on 2.1.258: `live` = 1, `design` = 1, `control` = 2. The engine's floor is **2.1.214**,
 > whose row is still pending, and the bootstrap's closing block promises the measured number.

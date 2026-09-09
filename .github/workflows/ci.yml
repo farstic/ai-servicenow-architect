@@ -221,6 +221,133 @@ jobs:
             console.log('state ok:', s.version, s.writer, Object.keys(s.steps).length, 'steps');
           "
 
+  windows-launcher:
+    # The Windows launchers can be verified nowhere else. They are written on macOS, where no
+    # PowerShell 5.1 exists to run them, so every claim about them is made here or not at all.
+    #
+    # What this job can prove: S-08 (a Bypass call works under Restricted), the Node-free path with
+    # Node and Git Bash both removed, exit-code propagation from cmd and from powershell.exe, and
+    # the root refusal. What it cannot: a double-click, a GPO-locked MachinePolicy, Ctrl-C, and
+    # anything needing Claude Code in a Windows console — those are the owner's sitting (S-03/S-04,
+    # AC 1 and AC 4), recorded as deferred rather than quietly skipped.
+    name: windows launcher
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PSScriptAnalyzer (5.1 compatibility)
+        shell: powershell
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck
+          # Write-Host is excluded, and only that: a launcher's banner IS console text, and
+          # Write-Output would put it in the pipeline for a caller that captures the run.
+          $r = Invoke-ScriptAnalyzer -Path .\bootstrap.ps1 -Severity Error,Warning `
+                 -ExcludeRule PSAvoidUsingWriteHost
+          $r | Format-Table -AutoSize
+          if ($r.Count -gt 0) { exit 1 }
+      - name: The launcher parses under Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # `[ref]$errors` needs the variable to EXIST — PowerShell will not create it for you,
+          # and Set-StrictMode is not what decides that.
+          $errors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path .\bootstrap.ps1), [ref]$null, [ref]$errors)
+          if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+          Write-Host ("PSVersion: " + $PSVersionTable.PSVersion)
+      - name: S-08 — Bypass works under a Restricted process policy, with no Node and no Git Bash
+        shell: cmd
+        # PATH is REBUILT, not filtered: a filter that missed one entry would test the hand-over
+        # instead, and pass. `Git\cmd` stays (git itself is a prerequisite); `Git\usr\bin`,
+        # `Git\bin` and `Git\mingw64\bin` — the Git Bash tools — do not.
+        run: |
+          rem WindowsPowerShell\v1.0 is part of the DEFAULT Windows PATH, which is what a
+          rem double-click gets, so a rebuild that omitted it was testing a machine nobody has —
+          rem `powershell` then fails 9009 before bootstrap.ps1 is ever read.
+          set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
+          rem `C:\Windows\System32\bash.exe` is the WSL stub and is on every Windows machine, so
+          rem "no bash at all" is not a state a Windows user is ever in. What must be gone is GIT
+          rem Bash — the interpreter bootstrap.sh needs — and it is the one under \Git\.
+          where bash 2>nul | find /i "\Git\" >nul && exit /b 1
+          where node && exit /b 1
+          powershell -NoProfile -Command "Set-ExecutionPolicy Restricted -Scope Process -Force; Get-ExecutionPolicy -Scope Process"
+          .\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check
+          echo ERRORLEVEL=%ERRORLEVEL%
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+      - name: The state it wrote says powershell, and Node reads it
+        shell: powershell
+        run: |
+          # The bug this pins: `Set-Content -Encoding UTF8` on 5.1 writes a BOM, and JSON.parse
+          # calls a BOM a syntax error rather than a hint. Every file the launcher writes here is
+          # read back by Node or by Claude Code.
+          foreach ($f in '.local\bootstrap-state.json', '.local\config.json', '.local\doctor-last.json') {
+            $b = [System.IO.File]::ReadAllBytes((Resolve-Path $f))
+            if ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) {
+              Write-Host ("BOM in " + $f); exit 1
+            }
+          }
+          $s = Get-Content .\.local\bootstrap-state.json -Raw | ConvertFrom-Json
+          Write-Host ("writer={0} mode={1} fileModes={2}" -f $s.writer, $s.mode, $s.fileModes)
+          if ($s.writer -ne 'powershell') { exit 1 }
+          if ($s.mode -ne 'design-only') { exit 1 }
+          node --input-type=module -e "
+            import { loadState, assertStorable } from './tools/snowarch/lib/state.mjs';
+            const s = loadState(process.cwd());
+            if (s.writer !== 'powershell') { console.error('writer', s.writer); process.exit(1); }
+            assertStorable(s);
+            console.log('node accepts the powershell-written state:', s.version, Object.keys(s.steps).length, 'steps');
+          "
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Nothing tracked was modified
+        shell: powershell
+        run: |
+          $p = (git status --porcelain --untracked-files=no)
+          if ($p) { Write-Host $p; exit 1 }
+          Write-Host 'porcelain clean'
+      - name: The same from powershell.exe, and $LASTEXITCODE propagates
+        shell: powershell
+        run: |
+          Remove-Item -Recurse -Force .\.local, .\.claude\settings.local.json -ErrorAction SilentlyContinue
+          .\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check
+          Write-Host ("LASTEXITCODE=" + $LASTEXITCODE)
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Exit codes 2 and 3 reach the caller
+        shell: powershell
+        run: |
+          .\bootstrap.cmd --mode live --yes
+          Write-Host ("live+yes without an instance file: " + $LASTEXITCODE)
+          if ($LASTEXITCODE -ne 2) { exit 1 }
+          Push-Location .\docs
+          ..\bootstrap.cmd --mode design --yes
+          $rc = $LASTEXITCODE
+          Pop-Location
+          Write-Host ("from a subdirectory: " + $rc)
+          if ($rc -ne 3) { exit 1 }
+          # The runner appends `exit $LASTEXITCODE`, and the last thing this step ran on purpose
+          # exited 3. Saying so explicitly is the difference between "asserted 3" and "failed".
+          exit 0
+      - name: With Node present the hand-over produces the Node CLI's JSON
+        shell: powershell
+        run: |
+          Remove-Item -Recurse -Force .\.local, .\.claude\settings.local.json -ErrorAction SilentlyContinue
+          $out = (.\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check --json | Out-String)
+          $json = $out | ConvertFrom-Json
+          Write-Host ("mode=" + $json.mode + " next-lines=" + ($json.next -split "`n").Length)
+          if ($json.mode -ne 'design-only') { exit 1 }
+          $s = Get-Content .\.local\bootstrap-state.json -Raw | ConvertFrom-Json
+          if ($s.writer -ne 'node') { Write-Host ("writer=" + $s.writer); exit 1 }
+      - name: snowarch.cmd, with Node and without
+        shell: cmd
+        run: |
+          .\snowarch.cmd version
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          set "PATH=C:\Windows\system32;C:\Windows"
+          .\snowarch.cmd version
+          echo without-node ERRORLEVEL=%ERRORLEVEL%
+          if not "%ERRORLEVEL%"=="3" exit /b 1
+          rem Same reason as the step above: the expected code is 3, so the step has to say 0.
+          exit /b 0
+
   secrets:
     name: secret scan
     runs-on: ubuntu-latest

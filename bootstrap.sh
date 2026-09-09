@@ -93,9 +93,13 @@ fi
 FREE_KB="$(df -Pk "$ROOT" | awk 'NR==2{print $4}')"
 [ "$FREE_KB" -ge 1048576 ] 2>/dev/null || die B00 "less than 1 GiB free" "free up space on $ROOT" 3
 say "ok B00 disk: $((FREE_KB/1048576)) GB free"
+# `-h` is deliberately absent: with it, the pattern `HEAD` matches no head ref, `--exit-code`
+# returns 2, and git says nothing — so a probe that reads only stderr called that "reachable"
+# and one that reads only the exit code called it "unreachable". Both were reading a flag bug.
+# The rule now: the EXIT CODE decides, stderr only chooses which sentence explains it.
 NET="$(GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 \
-  ls-remote --exit-code -h "https://github.com/$(sed -n 's/.*"repo": *"\([^"]*\)".*/\1/p' "$ROOT/engine.config.json").git" HEAD 2>&1 >/dev/null)"
-if [ -n "$NET" ] ; then
+  ls-remote --exit-code "https://github.com/$(sed -n 's/.*"repo": *"\([^"]*\)".*/\1/p' "$ROOT/engine.config.json").git" HEAD 2>&1 >/dev/null)" || NET_RC=$?
+if [ -n "${NET_RC:-}" ] ; then
   case "$NET" in
     *"ould not resolve host"*) die B00 "$MSG_DNS" "$MSG_NET" 3 ;;
     *"SSL certificate problem"*) die B00 "$MSG_TLS" "$MSG_NET" 3 ;;
