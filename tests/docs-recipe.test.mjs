@@ -56,6 +56,23 @@ test('the block carries the pin, the family and every area', () => {
   console.log(`    recipe: ${blockOf(arch).length} commands, ${areas.length} areas`);
 });
 
+test('AC 4 — one changed CHARACTER fails the parity check, with the diff', () => {
+  // A lost line is the easy case. The one that matters is a single byte: a launcher running
+  // `--depth 2` or a mistyped area name produces a different checkout and looks identical in review.
+  const areas = readAreas(root, config.docs.areasFile);
+  const planned = planRecipe({ config, areas, mode: 'sparse', state: { present: false }, platform: 'linux' });
+  const clone = blockOf(arch);
+  const i = clone.findIndex((l) => l.includes('--depth 1'));
+  assert.ok(i !== -1, 'the recipe no longer carries --depth 1 — this negative is testing nothing');
+  clone[i] = clone[i].replace('--depth 1', '--depth 2');
+
+  let message = '';
+  try { assert.deepEqual(clone, planned); }
+  catch (e) { message = e.message; }
+  assert.ok(message, 'a one-character change went unnoticed');
+  assert.match(message, /depth/, 'the failure does not show what differs');
+});
+
 test('negative — a block that lost a command fails', () => {
   const areas = readAreas(root, config.docs.areasFile);
   const planned = planRecipe({ config, areas, mode: 'sparse', state: { present: false }, platform: 'linux' });

@@ -66,6 +66,9 @@ test('the consolidated corpus section is one heading and stays under the cap', (
   const end = arch.findIndex((l, i) => i > start && l.startsWith('## '));
   const length = end - start;
   console.log(`    corpus section: ${length} lines`);
+  // 100, ruled at ARC-03-S11: the plan guessed 80 before the byte-identical recipe block and the
+  // shared exit table existed, and cutting either would hide what ARC-06 and the tests point at.
+  // The cap stays so the section cannot grow back silently.
   assert.ok(length <= 100, `${length} lines — the section is meant to be read, not skimmed past`);
 
   // And it is ONE section: the six that S05–S09 each added are folded in, not left beside it.

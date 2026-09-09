@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { docsStatus, formatStatus, SCHEMA, SPARSE } from '../tools/snowarch/lib/docs/status.mjs';
+import { docsStatus, E12_ABSENT, formatStatus, SCHEMA, SPARSE } from '../tools/snowarch/lib/docs/status.mjs';
 import { CORPUS_DIR, MODE, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
 import { AREAS, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
 
@@ -170,7 +170,11 @@ test('criterion 2 — an absent corpus is a valid object, one MISSING block, exi
   const f = formatStatus(s);
   assert.equal(f.code, 3);
   assert.match(f.text, /^docs corpus: MISSING/);
-  assert.equal(f.text.split('\n').length, 1, 'the missing case prints one block');
+  // Two lines now: the remedy, then the doctor's exact E-12 sentence, so `docs status` and ARC-08
+  // cannot disagree about what an absent corpus means.
+  const lines = f.text.split('\n');
+  assert.equal(lines.length, 2, 'the missing case prints the remedy and the E-check line');
+  assert.equal(lines[1], E12_ABSENT(s.mode));
 });
 
 test('verify:false leaves citations null — and the KEY is still there', () => {
@@ -227,4 +231,43 @@ test('the real repository: four ok lines, and the object every key', () => {
     assert.equal(s.sparse, SPARSE.cone);
     assert.deepEqual(s.areasMissing, []);
   }
+});
+
+test('AC 3 — docs mode "skip" with no corpus: exit 3, present false, mode skip, E-12 verbatim', () => {
+  const w = workspace();                       // never synced
+  mkdirSync(join(w.root, '.local'), { recursive: true });
+  writeFileSync(join(w.root, '.local/bootstrap-state.json'), JSON.stringify({ docs: { mode: 'skip' } }));
+  // Precondition: there really is no corpus, or "absent" proves nothing.
+  assert.ok(!existsSync(join(w.root, CORPUS_DIR, 'markdown')), 'the fixture has a corpus');
+
+  const s = docsStatus({ root: w.root, verify: false });
+  assert.equal(s.present, false);
+  assert.equal(s.mode, 'skip');
+
+  const f = formatStatus(s);
+  assert.equal(f.code, 3);
+  assert.equal(f.text.split('\n')[1],
+    'E-12 docs corpus: FAIL — corpus absent (docs mode "skip"); grounding and citations are unverified — run ./snowarch docs sync');
+  // FAIL, never WARN or SKIP: an absent corpus means every citation in every skill is unverified.
+  assert.ok(!/WARN|SKIP/.test(f.text), 'the absent corpus is reported as something softer than FAIL');
+});
+
+test('no corpus and no state file: the mode is skip, because there is nothing to infer from', () => {
+  // S06 infers the mode from the SHAPE of the checkout. An absent checkout has no shape, so the
+  // inference has no input — reported as `skip` rather than defaulting to `sparse`, which would
+  // claim an install had been attempted.
+  const w = workspace();
+  assert.ok(!existsSync(join(w.root, '.local/bootstrap-state.json')), 'precondition: no state file');
+  const s = docsStatus({ root: w.root, verify: false });
+  assert.equal(s.present, false);
+  assert.equal(s.mode, 'skip');
+});
+
+test('a recorded mode still wins over the inference — a broken install is not a skipped one', () => {
+  const w = workspace();
+  mkdirSync(join(w.root, '.local'), { recursive: true });
+  writeFileSync(join(w.root, '.local/bootstrap-state.json'), JSON.stringify({ docs: { mode: 'sparse' } }));
+  const s = docsStatus({ root: w.root, verify: false });
+  assert.equal(s.mode, 'sparse', 'an operator who asked for sparse and has no corpus is broken, not skipped');
+  assert.match(formatStatus(s).text, /docs mode "sparse"/);
 });

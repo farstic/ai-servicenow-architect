@@ -805,6 +805,15 @@ Exit 2 means you asked without `--yes` and got the plan. Exit 6 means the branch
 Exit 1 means a lint failed with the edits staged: fix what it named, or abandon with the two
 commands the output prints.
 
+## When the real-corpus job must run
+
+`docs-real.yml` fetches the actual 300 MB corpus on Ubuntu, macOS and Windows. It runs itself when
+you touch `tools/snowarch/lib/docs/**`, `scripts/docs.mjs`, `vendor/docs-areas.txt`, `.gitmodules` or
+`engine.config.json` — the things that decide what lands on disk. **Re-run it by hand** (Actions →
+docs-real → Run workflow) after a pin bump, after a family switch, and before a release tag. It is
+not a required check: it needs the network, and a red run means "the recipe or the corpus changed",
+which is a thing to read rather than a thing to retry.
+
 ## Reviewing a docs-bump PR
 
 `.github/workflows/docs-bump.yml` runs on Mondays at 05:17 UTC and opens one pull request when

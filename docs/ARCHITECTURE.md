@@ -136,6 +136,18 @@ named for the target SHA, so a re-run updates rather than duplicates and a newer
 older. **It never merges.** A dry run exits 0 with a `::warning::`; the red build belongs on the
 pull request, where someone can act on it.
 
+`.github/workflows/docs-real.yml` proves the recipe against the **real** corpus on all three
+operating systems — weekly, on demand, and whenever the code or configuration that decides the
+checkout changes. It is deliberately not one of `main`'s required contexts: it needs the network and
+about a minute per OS. Its Windows cell strips Git Bash from `PATH` and clears `core.longpaths`
+first, so what it measures is the recipe rather than the image; a second Windows cell leaves Git
+Bash in place, and the two passing identically is the proof that nothing here depends on bash.
+
+**The E-12 contract.** An absent corpus is `E12_ABSENT(mode)` from `status.mjs`, printed by
+`docs status` and imported by ARC-08's doctor — never retyped. It is a **FAIL**, never a WARN or a
+SKIP: every citation in every skill is unverified, and reporting the failure of the thing the engine
+is *for* as a warning would be reporting it in the margin.
+
 ### Exit codes — every `docs` sub-command shares one table
 
 | Code | Meaning |
