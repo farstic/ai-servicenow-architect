@@ -113,17 +113,15 @@ Three artefacts, and the design is which of them may disagree with which.
 ### The commands
 
 `docs sync` reconciles locally and is safe for anyone: clone if absent, mode, pin, gitlink, the
-ADR-0008 root repair. A clean second run issues no git write and prints `up to date`. Every
-successful run ends with the attribution line.
-
-`docs status` answers "is this corpus right" in four lines — pin/gitlink/HEAD, family/branch,
-checkout shape and areas, citations — each `ok` or `MISMATCH` with the remedy beneath. It is
-computed by `docsStatus()`, which ARC-08's doctor wraps rather than re-derives.
+ADR-0008 root repair. A clean second run issues no git write, prints `up to date`, and ends — as
+every successful run does — with the attribution line. `docs status` answers "is this corpus right"
+in four lines (pin/gitlink/HEAD · family/branch · shape and areas · citations), each `ok` or
+`MISMATCH` with its remedy beneath, computed by `docsStatus()` — which ARC-08's doctor wraps rather
+than re-derives.
 
 `docs sync --upstream` is the maintainer refresh: refuse a dirty tree, fetch, **verify at the old
-pin**, move, verify again, write the pin, stage. The baseline runs first because "newly dead" is a
-difference between two states and the first stops existing when the corpus moves. It stages and
-**never commits**.
+pin**, move, verify again, write the pin, stage — never commit. The baseline runs first because
+"newly dead" is a difference between two states and the first stops existing when the corpus moves.
 
 `docs family <name>` switches release family. The dry run **is** the proposal; `--yes` applies
 exactly what it printed. A prose line is edited only when the matched phrase is its *only* family
@@ -131,22 +129,19 @@ mention — anything else is REVIEW, because half a sentence about the new famil
 old is worse than an untouched line. The pin moves first, while the tree is still clean, so the
 dirty-tree refusal guards the whole operation rather than tripping on the command's own edits.
 
-`.github/workflows/docs-bump.yml` runs the refresh weekly and opens **one** pull request — branch
-named for the target SHA, so a re-run updates rather than duplicates and a newer tip supersedes the
-older. **It never merges.** A dry run exits 0 with a `::warning::`; the red build belongs on the
-pull request, where someone can act on it.
+`docs-bump.yml` runs the refresh weekly and opens **one** pull request — branch named for the
+target SHA, so a re-run updates rather than duplicates and a newer tip supersedes the older. **It
+never merges.** A dry run exits 0 with a `::warning::`; the red build belongs on the pull request.
 
-`.github/workflows/docs-real.yml` proves the recipe against the **real** corpus on all three
-operating systems — weekly, on demand, and whenever the code or configuration that decides the
-checkout changes. It is deliberately not one of `main`'s required contexts: it needs the network and
-about a minute per OS. Its Windows cell strips Git Bash from `PATH` and clears `core.longpaths`
-first, so what it measures is the recipe rather than the image; a second Windows cell leaves Git
-Bash in place, and the two passing identically is the proof that nothing here depends on bash.
+`docs-real.yml` runs the recipe against the **real** corpus on all three OSes — weekly, on demand,
+and when the code that decides the checkout changes; not a required context (network, a minute per
+OS). Its Windows cell strips Git Bash and clears `core.longpaths` first so it measures the recipe
+rather than the image, and a second cell keeps Git Bash: the two passing identically is the proof
+nothing here depends on bash.
 
-**The E-12 contract.** An absent corpus is `E12_ABSENT(mode)` from `status.mjs`, printed by
-`docs status` and imported by ARC-08's doctor — never retyped. It is a **FAIL**, never a WARN or a
-SKIP: every citation in every skill is unverified, and reporting the failure of the thing the engine
-is *for* as a warning would be reporting it in the margin.
+**E-12** is `E12_ABSENT(mode)` in `status.mjs`, printed by `docs status` and imported by the doctor,
+never retyped — **FAIL**, never WARN or SKIP, because an absent corpus leaves every citation in every
+skill unverified.
 
 ### Exit codes — every `docs` sub-command shares one table
 
@@ -165,11 +160,10 @@ three different remedies, and a caller that collapsed them would send someone to
 
 ### The git-only corpus recipe
 
-ARC-06's launchers run this when Node is absent. It is not a paraphrase of
-`tools/snowarch/lib/docs/sync.mjs`: `tests/docs-recipe.test.mjs` asserts this block is byte-identical
-to `--print-recipe` on a tree with no checkout. Edit the module, regenerate, paste — never the
-reverse. The area list is one long line on purpose; a wrapped or reordered list is a different
-checkout.
+ARC-06's launchers run this when Node is absent. Not a paraphrase of `sync.mjs`:
+`tests/docs-recipe.test.mjs` asserts the block is byte-identical to `--print-recipe` on a tree with
+no checkout, down to one character. Edit the module, regenerate, paste — never the reverse. The area
+list is one long line on purpose; wrapped or reordered is a different checkout.
 
 ```sh
 git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs
