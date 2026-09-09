@@ -499,6 +499,28 @@ bash is how someone's settings get destroyed.
 The state and the cache are written by heredoc in S03's and S08's schemas, `writer: "bash"`, and the
 Node readers accept them — asserted against a fixture captured from a real bash-3.2 run.
 
+### The Windows launchers
+
+`bootstrap.cmd` runs `powershell -NoProfile -ExecutionPolicy Bypass -File bootstrap.ps1` — the
+Bypass is what makes a double-click work under the default **Restricted** policy — and pauses only
+when double-clicked with no arguments, so the window does not close before the summary is read.
+`snowarch.cmd` is the CLI wrapper, and prints the Node sentence with exit 3 when Node is absent.
+Both are `powershell`, never `pwsh`: 5.1 is what every Windows 10/11 has.
+
+`bootstrap.ps1` mirrors `bootstrap.sh` step for step and shares its sentences through the same
+generated region, in PowerShell syntax with the **Windows spellings**. PowerShell 5.1-clean — no
+`??`, no ternary, no `-AsHashtable` — with a test that greps for each and proves the grep is not
+vacuous. It records `writer: "powershell"` and `fileModes: "acl-inherited"`, because there is no
+`chmod` to apply and implying one would be a lie in a file the doctor reads.
+
+`.gitattributes` gives these three `text eol=crlf`: the index keeps LF and every checkout gets CRLF,
+which is what matters — a lone LF in a `.cmd` is a batch file that stops at the first line.
+
+**The S-03 fallback does not exist.** If the spike shows that `${CLAUDE_PROJECT_DIR}` is not
+expanded by Claude Code on native Windows, a per-machine `claude mcp add-json … -s local` override
+appears here; until then there is nothing to maintain, and its absence is deliberate rather than
+forgotten.
+
 ### The resume rule
 
 For each step in order: `runsWhen` false → `skipped (<reason>)`; `--from BNN` and the step is at or

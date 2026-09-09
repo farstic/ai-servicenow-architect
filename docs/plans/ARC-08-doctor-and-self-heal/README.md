@@ -20,6 +20,11 @@ Closes P-16 (bash-only doctor that needs Node anyway and prints the username), P
 ## Deliverables
 
 - Engine checks E-00 … E-27 (each with id, title, severity, remedy, `fixable`): CLI floor and login; git floor; repo root; `.mcp.json` / `.claude/settings.json` hashes and placeholder defaults; credential-shaped keys absent; docs corpus present, pin, branch, sparse set, citations; roster from directory listing; description lengths; retired names; prefix consistency (`engine.config.json` ↔ `.mcp.json` ↔ rule file); generated files fresh; stale `~/.claude.json` entries for this folder (`servicenow-mcp`, `nowaikit`) → prints `claude mcp remove <name> -s local` and the `.bak-*` reminder; legacy `~/.config/servicenow-mcp/` present → prints `./snowarch instance import --from-legacy`; checkout under a cloud-sync folder (OneDrive/Dropbox/iCloud/Google Drive) → WARN (D-04); proxy/CA environment (`HTTPS_PROXY`, `NO_PROXY`, `NODE_EXTRA_CA_CERTS`) inspected with masked values and echo of the network classifier code (R-3); Claude Code registration status via `claude mcp get servicenow` compared with the recorded mode (`03` R-13; expected by ARC-06-S01/S05); capability packs (docx / PDF QA / draw.io / Mermaid) reported as capabilities; Windows notes (file modes ACL-inherited).
+- **The S-03 fallback does not exist yet (ARC-06-S11, 2026-09-09).** If the Windows sitting shows
+  that Claude Code does not expand `${CLAUDE_PROJECT_DIR}` in `.mcp.json` on native Windows, the
+  bootstrap will write a per-machine local override (`claude mcp add-json … -s local`) and record
+  `mcpJsonOverrideSha` in the state — and E-07 verifies that sha. Until the spike runs there is
+  nothing to check, and this line exists so its absence is a decision rather than an oversight.
 - **Doctor candidate raised by ARC-06-S05 (2026-09-09): `.claude/settings.local.json` unparsable.**
   B07 refuses invalid JSON and changes nothing — but its inputs hash (mode, Node presence, hooks
   branch, registration) deliberately does **not** include the file's content, so on a checkout that

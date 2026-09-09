@@ -13,6 +13,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
  */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const launcher = readFileSync(join(root, 'bootstrap.sh'), 'utf8');
+const ps1 = readFileSync(join(root, 'bootstrap.ps1'), 'utf8');
 const remedies = JSON.parse(readFileSync(join(root, 'tools/snowarch/lib/remedies.json'), 'utf8'));
 const text = JSON.parse(readFileSync(join(root, 'tools/snowarch/lib/text.json'), 'utf8'));
 const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
@@ -22,6 +23,16 @@ function shellVar(name) {
   const m = new RegExp(`^${name}='((?:[^']|'\\\\'')*)'$`, 'm').exec(launcher);
   assert.ok(m, `${name} is not assigned in bootstrap.sh`);
   return m[1].replace(/'\\''/g, "'");
+}
+
+/** The same, for PowerShell: `$Name = '…'`, where an embedded quote is doubled. */
+function psVar(name) {
+  const m = new RegExp(`^\\$${name} = '((?:[^']|'')*)'\\r?$`, 'm').exec(ps1);
+  assert.ok(m, `$${name} is not assigned in bootstrap.ps1`);
+  // CRLF → LF before comparing. The FILE is CRLF because `.gitattributes` says so, and a
+  // multi-line sentence inside it therefore carries CRLF too — that is the file's line endings,
+  // not a different sentence. What is compared is the text.
+  return m[1].replace(/''/g, "'").replace(/\r\n/g, '\n');
 }
 
 test('every embedded sentence equals the file it was generated from', async () => {
@@ -48,7 +59,7 @@ test('the generated region is current — the check the generator itself runs', 
   const r = spawnSync(process.execPath, [join(root, 'scripts/gen-launcher-text.mjs'), '--check'],
     { encoding: 'utf8', cwd: root });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /text region is current/);
+  assert.match(r.stdout, /region\(s\) current/);
 });
 
 test('the recipe is SOURCED, not copied — there is only one copy of those commands', () => {
@@ -127,4 +138,118 @@ test('the state and the cache bash writes are the ones Node reads', async () => 
   }
   assert.equal(fixture.cache.writer, 'bootstrap');
   assert.equal(typeof loadState, 'function');
+});
+
+test('the Windows launcher carries the same sentences, in PowerShell syntax', async () => {
+  const sentences = await import(
+    pathToFileURL(join(root, 'tools/snowarch/lib/net-sentences.mjs')).href);
+
+  assert.equal(psVar('SERVER_KEY'), config.mcp.serverKey);
+  assert.equal(psVar('MSG_NODE_WIN'), remedies.node.win32);
+  assert.equal(psVar('MSG_GIT_WIN'), remedies.git.win32);
+  assert.equal(psVar('MSG_CLAUDE'), remedies.claudeCode.default);
+  assert.equal(psVar('MSG_NET'), remedies.network.default);
+  assert.equal(psVar('MSG_DNS'), sentences.dnsFailure('github.com'));
+  assert.equal(psVar('MSG_TLS'), sentences.tlsIntercepted({ tool: sentences.TOOL.git }));
+  assert.equal(psVar('MSG_DOCTOR'), text.doctorUnavailable);
+  assert.equal(psVar('MSG_MODE'), text.modeDesign);
+  // The WINDOWS spellings, because this launcher runs where `.\bootstrap.cmd` is what works.
+  assert.equal(psVar('MSG_NEXT'), text.windows.nextDesign);
+  assert.match(psVar('MSG_NEXT'), /snowarch\.cmd mode live/);
+  // ...and the two launchers agree on everything that is not a spelling.
+  assert.equal(psVar('MSG_DOCTOR'), shellVar('MSG_DOCTOR'));
+  assert.equal(psVar('MSG_DNS'), shellVar('MSG_DNS'));
+});
+
+test('the PowerShell recipe is dot-sourced, not copied', () => {
+  assert.match(ps1, /^\. "\$Root\\tools\\snowarch\\launcher\\docs-recipe\.ps1"\r?$/m);
+  assert.equal((ps1.match(/sparse-checkout set/g) ?? []).length, 0,
+    'the Windows launcher carries its own copy of the recipe');
+  const recipe = readFileSync(join(root, 'tools/snowarch/launcher/docs-recipe.ps1'), 'utf8');
+  for (const fn of ['Invoke-DocsRecipeSparse', 'Invoke-DocsRecipeFull']) {
+    assert.ok(ps1.includes(fn), `${fn} is never called`);
+    assert.ok(recipe.includes(`function ${fn}`), `${fn} is not defined by the recipe file`);
+  }
+});
+
+test('PowerShell 5.1 — none of the 7-only constructs appears', () => {
+  // Every one of these is PowerShell 7 and would fail on the exact machine this file exists for:
+  // Windows 10/11 ships 5.1 and nothing else is guaranteed.
+  const body = ps1.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
+  const forbidden = [
+    [/\?\?/, 'the ?? operator'],
+    [/\)\s*\?\s*[^:\n]+:\s/, 'the ternary operator'],
+    [/-AsHashtable/, '-AsHashtable'],
+    [/\bpwsh\b/, 'pwsh (5.1 is what Windows has)'],
+    [/\bConvertFrom-Json\b[^\n]*-Depth/, 'ConvertFrom-Json -Depth (7 only)'],
+  ];
+  for (const [pattern, name] of forbidden) {
+    assert.ok(!pattern.test(body), `bootstrap.ps1 uses ${name}`);
+  }
+  // Not vacuous.
+  assert.ok(forbidden[0][0].test('$x = $a ?? $b'));
+  assert.ok(forbidden[3][0].test('pwsh -File x.ps1'));
+  // ...and it declares the mode it was written for.
+  assert.match(ps1, /Set-StrictMode -Version 2\.0/);
+  assert.match(ps1, /\$ErrorActionPreference = 'Stop'/);
+});
+
+test('the cmd wrappers are exactly the story\'s, and they call powershell not pwsh', () => {
+  const cmd = readFileSync(join(root, 'bootstrap.cmd'), 'utf8');
+  const sn = readFileSync(join(root, 'snowarch.cmd'), 'utf8');
+
+  assert.match(cmd, /powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0bootstrap\.ps1" %\*/);
+  // `-ExecutionPolicy Bypass` is what makes a double-click work under the default Restricted
+  // policy; without it the .ps1 cannot run at all on a stock Windows machine.
+  assert.match(cmd, /set "RC=%ERRORLEVEL%"/);
+  // The pause fires only on a double-click with no arguments — otherwise the window would close
+  // before anyone could read the summary.
+  assert.match(cmd, /echo %CMDCMDLINE% \| find \/i "%~nx0" >nul && if "%~1"=="" pause/);
+  assert.match(cmd, /endlocal & exit \/b %RC%/);
+
+  assert.match(sn, /where node >nul 2>nul \|\|/);
+  assert.match(sn, /exit \/b 3\)/, 'a missing Node must be exit 3, not a stack trace');
+  assert.match(sn, /node "%~dp0tools\\snowarch\\bin\\snowarch\.mjs" %\*/);
+  assert.match(sn, /exit \/b %ERRORLEVEL%/);
+
+  for (const [name, body] of [['bootstrap.cmd', cmd], ['snowarch.cmd', sn]]) {
+    assert.ok(!/\bpwsh\b/.test(body), `${name} reaches for pwsh`);
+  }
+});
+
+test('the Windows files arrive CRLF in every checkout', () => {
+  // `git ls-files --eol` is the authority, and what it must say is `w/crlf` — the WORKING TREE,
+  // which is what actually runs. A lone LF in a `.cmd` is a batch file that stops at the first
+  // line, on a machine with no other launcher to fall back to.
+  //
+  // The story's criterion 8 also expects `i/crlf`, and that one cannot hold: `text eol=crlf` — the
+  // attribute ARC-01-S07 chose — normalises to LF in the INDEX and converts on checkout, which is
+  // the whole point of it. `i/crlf` would require `-text`, which turns normalisation off entirely
+  // and is a worse choice for a repository three platforms clone. So the assertion is on the
+  // property that matters and on the attribute that produces it.
+  const out = execFileSync('git', ['ls-files', '--eol', 'bootstrap.ps1', 'bootstrap.cmd', 'snowarch.cmd'],
+    { cwd: root, encoding: 'utf8' });
+  const rows = out.split('\n').filter(Boolean);
+  assert.equal(rows.length, 3, out);
+  for (const row of rows) {
+    assert.match(row, /w\/crlf/, `${row} does not reach a checkout as CRLF`);
+    assert.match(row, /attr\/text eol=crlf/, `${row} is missing the attribute that makes it so`);
+  }
+  const attrs = readFileSync(join(root, '.gitattributes'), 'utf8');
+  assert.match(attrs, /\*\.ps1 text eol=crlf/);
+  assert.match(attrs, /\*\.cmd text eol=crlf/);
+  // ...and bootstrap.sh is LF for the same reason, from the other side.
+  const sh = execFileSync('git', ['ls-files', '--eol', 'bootstrap.sh'], { cwd: root, encoding: 'utf8' });
+  assert.match(sh, /w\/lf/, 'the POSIX launcher must not arrive CRLF');
+});
+
+test('the Windows launcher is a launcher too — the budget, with the region reported', () => {
+  const lines = ps1.replace(/\r/g, '').split('\n').filter((l, i, a) => !(i === a.length - 1 && l === '')).length;
+  const generated = ps1.replace(/\r/g, '').slice(ps1.replace(/\r/g, '').indexOf('# text-begin'),
+    ps1.replace(/\r/g, '').indexOf('# text-end')).split('\n').length + 1;
+  // PowerShell is wordier than bash for the same work — `[ordered]@{}` state, typed parameters, a
+  // `switch -Regex` — so the budget is its own rather than bash's 180. The total is reported so the
+  // number is a measurement rather than a target to game.
+  assert.ok(lines - generated <= 250,
+    `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
 });

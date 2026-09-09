@@ -29,6 +29,19 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **`bootstrap.cmd`, `bootstrap.ps1` and `snowarch.cmd` — native Windows, without Git Bash.** The
+  `.cmd` runs PowerShell with `-ExecutionPolicy Bypass`, which is what makes a double-click work
+  under the default Restricted policy, and pauses only when double-clicked with no arguments. The
+  `.ps1` mirrors `bootstrap.sh` step for step and shares its sentences through the same generated
+  region — in PowerShell syntax, with the **Windows spellings** — and is 5.1-clean (no `??`, no
+  ternary, no `-AsHashtable`, never `pwsh`), with a test that greps for each and proves the grep is
+  not vacuous. It records `writer: "powershell"` and `fileModes: "acl-inherited"`, because there is
+  no `chmod` to apply and implying one would be a lie in a file the doctor reads. **Written on a Mac
+  with no PowerShell to run them**, so a new Windows CI job proves what CI can reach — Bypass under
+  a Restricted process policy, the Node-free path with Node *and* Git Bash removed by rebuilding
+  PATH rather than filtering it, exit codes 0/2/3 from both cmd and `powershell.exe`, and Node
+  reading the state PowerShell wrote — and the double-click, Ctrl-C, GPO and Claude-Code-on-Windows
+  cases are recorded in `OWNER-SITTING.md` as deferred rather than quietly skipped.
 - **`./bootstrap.sh` — the launcher, and the Node-free design-only path.** With Node ≥ 20 it
   `exec`s the Node CLI, forwarding every flag and exporting `CLAUDE_PROJECT_DIR` (the launcher's
   spawn is our spawn). Without Node it finishes design-only itself in bash 3.2 — the version macOS
