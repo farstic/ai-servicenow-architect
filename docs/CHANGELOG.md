@@ -41,7 +41,14 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   a Restricted process policy, the Node-free path with Node *and* Git Bash removed by rebuilding
   PATH rather than filtering it, exit codes 0/2/3 from both cmd and `powershell.exe`, and Node
   reading the state PowerShell wrote — and the double-click, Ctrl-C, GPO and Claude-Code-on-Windows
-  cases are recorded in `OWNER-SITTING.md` as deferred rather than quietly skipped.
+  cases are recorded in `OWNER-SITTING.md` as deferred rather than quietly skipped. Two things that
+  job caught on its first run, both invisible from a Mac: the shared text region wrote every
+  sentence into both launchers, so each declared remedies for a platform it can never print — six
+  linter findings, one cause, fixed by deriving the region from each file's own references, which
+  is also why it can no longer drift; and PowerShell 5.1 decodes a BOM-less file as the ANSI code
+  page, so the `—` and `·` in the shared sentences would have arrived as mojibake before a line
+  ran. The `.ps1` now carries a UTF-8 BOM, `.editorconfig` declares it, and a test asserts both the
+  BOM and the non-ASCII that makes it necessary.
 - **`./bootstrap.sh` — the launcher, and the Node-free design-only path.** With Node ≥ 20 it
   `exec`s the Node CLI, forwarding every flag and exporting `CLAUDE_PROJECT_DIR` (the launcher's
   spawn is our spawn). Without Node it finishes design-only itself in bash 3.2 — the version macOS
