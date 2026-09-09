@@ -29,6 +29,32 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **B01 and B07 — the workspace, and two toggles merged into a file that is not ours.**
+  `.claude/settings.local.json` belongs to the operator: B07 reads it, applies the server's entry to
+  `disabledMcpjsonServers` (design) or `enabledMcpjsonServers` (live), and writes the same object
+  back — other keys untouched, other array members preserved, key order kept, new keys appended.
+  **Invalid JSON is the only failure mode and it changes nothing**, because a stray comma must not
+  cost someone their permission grants. The file must be gitignored before anything is written, or
+  Claude Code will not apply its approvals. `applyToggles()` is exported, so ARC-08's `--fix` and
+  `snowarch mode` write it the same way rather than each having an opinion.
+- **The SessionStart hook is S-05 variant B.** The committed `settings.json` stays hook-free and B07
+  writes the hook into the *local* file only when Node ≥ 20 is present, removing it otherwise — a
+  hook that runs `node` on a machine without Node is an error on every session start. No
+  `disableAllHooks` branch: it would have silenced the operator's personal and plugin hooks too.
+  `tools/snowarch/hooks/session-start.mjs` ships as a stub (ARC-08-S08 gives it a body), because a
+  hook entry naming a file that does not exist is worse than one that says "unknown".
+- **B01 verifies the registration files two ways.** `git diff --quiet HEAD` sees an uncommitted
+  edit; ARC-06-S01's rules — lifted into `lib/registration.mjs` and now imported by both B01 and the
+  S01 test — see one that was committed. One definition, so a rule tightened in the test is a rule
+  the bootstrap enforces.
+- **`.local/config.json` v1**, whose `defaultInstance` is a mirror and never a second source. It is
+  read through `readDefaultLabel` — a new zod-free store module that returns exactly one key — so no
+  URL, username or credential can reach a file that, unlike the store, is not 0600. Zod-free because
+  a design-only checkout never runs `npm ci`.
+- **The cloud-sync warning names the provider.** The committed server build already answered
+  *whether* a path is inside a synced folder; `lib/cloud-sync.mjs` adds *which*, and a test asserts
+  the two never disagree. WARN and not FAIL: 0600 is a local permission and the sync client runs as
+  the same user, but where someone keeps their code is their decision.
 - **B00 preflight — seven checks, one named remedy each, before anything is installed.** Root
   (compared through `realpath`, because `/tmp` and `/var` are symlinks on macOS and a checkout
   reached through a link used to be told to `cd` to where it already was), git, Claude Code, disk,

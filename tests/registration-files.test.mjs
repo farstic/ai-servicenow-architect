@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { checkMcpJson, checkSettingsJson, keys, strings } from '../tools/snowarch/lib/registration.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,23 +25,10 @@ const settingsText = read('.claude/settings.json');
 const settings = JSON.parse(settingsText);
 
 /** Every string value in an object, with the JSON path that reaches it. */
-function strings(value, path = '', out = []) {
-  if (typeof value === 'string') out.push({ path: path.replace(/^\./, ''), value });
-  else if (Array.isArray(value)) value.forEach((v, i) => strings(v, `${path}[${i}]`, out));
-  else if (value && typeof value === 'object') {
-    for (const [k, v] of Object.entries(value)) strings(v, `${path}.${k}`, out);
-  }
-  return out;
-}
-
-/** Every key at any depth. */
-function keys(value, out = []) {
-  if (Array.isArray(value)) value.forEach((v) => keys(v, out));
-  else if (value && typeof value === 'object') {
-    for (const [k, v] of Object.entries(value)) { out.push(k); keys(v, out); }
-  }
-  return out;
-}
+// The walkers and the rule functions moved to `tools/snowarch/lib/registration.mjs` at ARC-06-S05,
+// because B01 has to ask the same questions at RUN time — a user can edit `.mcp.json` before
+// running the bootstrap, or commit the edit, which no `git diff` will see. This file keeps what is
+// genuinely a test: the negatives, and the assertions about measured VALUES rather than shape.
 
 test('the server key comes from engine.config.json, not from a literal', () => {
   assert.deepEqual(Object.keys(mcp.mcpServers), [config.mcp.serverKey]);
@@ -159,4 +147,12 @@ test('the generator rewrites permissions and leaves env alone', () => {
     assert.ok(after.permissions.allow.length > 100, 'permissions is generated from the contract');
     assert.deepEqual(after.env, { MCP_TIMEOUT: '120000' }, 'env did not survive generation');
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('B01 asks these same questions at run time, and the committed files pass them', () => {
+  // One definition: the rules live in the module B01 imports, so a file that satisfies this test
+  // satisfies the bootstrap and vice versa. Before this, a rule could be tightened here and B01
+  // would go on accepting what it had always accepted.
+  assert.deepEqual(checkMcpJson(mcp, config), []);
+  assert.deepEqual(checkSettingsJson(settings), []);
 });
