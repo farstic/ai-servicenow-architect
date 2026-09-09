@@ -86,7 +86,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-05-S10 | ARC-05 | Contract loader for engine tooling and the no-literal-names guard | M | S01, S06 | M2 | Done (2026-09-08) |
 | ARC-05-S11 | ARC-05 | Drift drill and contributor documentation | M | S01, S10 | M2 | Done (2026-09-08) |
 | ARC-06-S01 | ARC-06 | Committed `.mcp.json` and `.claude/settings.json`; placeholder and secret-shape tests | M | ARC-00-S06/S08; ARC-01 (all); verdicts S-05 S-06 S-20 | M3 | Done (2026-09-09) |
-| ARC-06-S02 | ARC-06 | `snowarch` CLI skeleton (stdlib only): argument parsing, exit codes, secret-free logging, `version` | M | ARC-01 (all) | M3 | Not started |
+| ARC-06-S02 | ARC-06 | `snowarch` CLI skeleton (stdlib only): argument parsing, exit codes, secret-free logging, `version` | M | ARC-01 (all) | M3 | Done (2026-09-09) |
 | ARC-06-S03 | ARC-06 | Bootstrap orchestrator: state file, step registry, resume, per-step input hashes, plan summary, `--yes` / `--from` / `--reset` | L | S02 | M3 | Not started |
 | ARC-06-S04 | ARC-06 | B00 preflight (floors from `engine.config.json`, root check, disk, network, Node detection) with named remedies | M | S03; ARC-03-S05 | M3 | Not started |
 | ARC-06-S05 | ARC-06 | B01 workspace and B07 `settings.local.json` toggles (merge, never overwrite); cloud-sync WARN; `.local/config.json` | M | S03; ARC-00-S04/S06; verdicts S-01 S-05 | M3 | Not started |

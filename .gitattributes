@@ -16,3 +16,6 @@
 # `merge=ours` is deliberately NOT set: it would resolve every dist/ conflict silently in favour
 # of the current branch, which is how a stale artefact gets merged without anyone seeing it.
 packages/snowarch/dist/** linguist-generated=true text eol=lf
+# The launcher has no extension, so the `*.sh` rule does not reach it — and a CRLF here is a
+# `/bin/sh^M: bad interpreter` on every Unix machine that clones from a Windows checkout.
+snowarch text eol=lf

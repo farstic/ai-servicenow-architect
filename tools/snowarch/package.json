@@ -3,5 +3,8 @@
   "version": "2.0.0-dev",
   "private": true,
   "type": "module",
-  "description": "Zero-dependency bootstrap/doctor CLI; populated by ARC-06"
+  "description": "Zero-dependency bootstrap/doctor CLI; populated by ARC-06",
+  "engines": {
+    "node": ">=20"
+  }
 }
