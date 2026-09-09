@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -24,6 +24,8 @@ const EVERY_KEY = [
 ];
 
 let scratch, upstream, upstreamUrl;
+/** The pin the fixture was built at — named so the pre-assertions read as intent. */
+const upstreamPin = () => upstream.pin;
 
 /** A workspace that also carries an engine.config.json, which `docsStatus` reads. */
 function workspace({ pin = upstream.pin, family = 'australia' } = {}) {
@@ -72,7 +74,11 @@ test('criterion 3 — HEAD off the pin: flag, line and exit 1', () => {
   const w = workspace();
   syncCorpus({ ...w, log: () => {} });
   const corpus = join(w.root, CORPUS_DIR);
+  // The precondition is asserted on the very next line: a checkout that quietly did not move would
+  // make the assertions below fail as though `docsStatus` were wrong, when the fixture was.
   git(['checkout', '-q', '--detach', git(['rev-parse', 'HEAD~1'], corpus).trim()], corpus);
+  assert.notEqual(git(['rev-parse', 'HEAD'], corpus).trim(), upstreamPin(w),
+    'the fixture did not move off the pin');
 
   const s = docsStatus({ root: w.root });
   assert.equal(s.headMatchesPin, false);
@@ -118,6 +124,9 @@ test('criterion 5 — one area missing: n−1 of n, MISMATCH, and the area is na
   syncCorpus({ ...w, log: () => {} });
   const corpus = join(w.root, CORPUS_DIR);
   git(['sparse-checkout', 'set', '--cone', ...AREAS.slice(0, -1)], corpus);
+  // Same: a narrowing that did not take would fail the assertions below for the wrong reason.
+  assert.ok(!existsSync(join(corpus, ...AREAS[AREAS.length - 1].split('/'))),
+    'the fixture did not narrow the sparse set');
 
   const s = docsStatus({ root: w.root });
   assert.deepEqual(s.areasMissing, [AREAS[AREAS.length - 1]]);

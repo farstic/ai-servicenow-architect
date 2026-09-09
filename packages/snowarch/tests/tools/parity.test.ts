@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { collectToolCatalog, routeToolInvocation, ROLE_BUNDLE_MAP } from '../../src/tools/index.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
@@ -20,16 +20,27 @@ const throwingClient = new Proxy(
   { get: () => (..._args: unknown[]) => { throw new Error('MOCK_CLIENT_CALL'); } }
 ) as unknown as ServiceNowClient;
 
+/**
+ * The catalogue is fixed at IMPORT, so the environment has to be clean before this file loads.
+ *
+ * `src/tools/index.ts` builds `CATALOGUE` at module scope from `MCP_TOOL_PACKAGE`, and
+ * `collectToolCatalog()` returns that same array every time. This suite used to delete the variable
+ * in `beforeEach` and restore it in `afterEach` — a guard that CANNOT WORK, because both hooks run
+ * long after the import that read it. Under `MCP_TOOL_PACKAGE=read-only` the counts below would
+ * fail and the hooks would look like they had prevented exactly that.
+ *
+ * So the condition is asserted where it is still true or false — at load — and it says which
+ * variable and why, instead of leaving a count mismatch to be diagnosed. Running this suite against
+ * a package other than the default needs a separate process, not a hook.
+ */
+if (process.env.MCP_TOOL_PACKAGE !== undefined && process.env.MCP_TOOL_PACKAGE !== 'full') {
+  throw new Error(
+    `MCP_TOOL_PACKAGE=${process.env.MCP_TOOL_PACKAGE} was set before this file was imported, so the `
+    + 'tool catalogue is already filtered and the parity counts below cannot hold. Unset it and re-run.',
+  );
+}
+
 describe('tool catalog parity (migration guard)', () => {
-  let prevPackage: string | undefined;
-  beforeEach(() => {
-    prevPackage = process.env.MCP_TOOL_PACKAGE;
-    delete process.env.MCP_TOOL_PACKAGE;
-  });
-  afterEach(() => {
-    if (prevPackage === undefined) delete process.env.MCP_TOOL_PACKAGE;
-    else process.env.MCP_TOOL_PACKAGE = prevPackage;
-  });
 
   it('1. exposes exactly EXPECTED tools (count parity)', () => {
     expect(collectToolCatalog().length).toBe(EXPECTED);
