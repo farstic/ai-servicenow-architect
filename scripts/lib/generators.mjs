@@ -34,7 +34,13 @@ export const GENERATORS = [
     id: 'gen-docs-recipe',
     script: 'scripts/gen-docs-recipe.mjs',
     supportsRoot: true,
-    targets: ['docs/ARCHITECTURE.md'],
+    // Three since ARC-06-S06: the published block, and the two launcher files the Node-free
+    // bootstrap will source. One recipe, three readers, no hand-typed copy.
+    targets: [
+      'docs/ARCHITECTURE.md',
+      'tools/snowarch/launcher/docs-recipe.sh',
+      'tools/snowarch/launcher/docs-recipe.ps1',
+    ],
   },
   {
     id: 'gen-retired-names',

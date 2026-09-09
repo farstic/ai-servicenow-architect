@@ -252,13 +252,13 @@ test('the body a reviewer reads names the regenerated document among the staged 
   const report = syncUpstream({ ...w, log: silent });
   const fenced = prBody(report).split('```')[1].trim().split('\n');
 
-  assert.equal(report.recipe, 'written');
+  assert.equal(report.recipe.architecture, 'written');
   assert.match(fenced[fenced.length - 1],
     /^staged: engine\.config\.json, vendor\/ServiceNowDocs, docs\/ARCHITECTURE\.md — review, then: /);
   // The JSON the workflow writes carries it too, without a second place deciding what "staged" is.
   const out = JSON.parse(JSON.stringify({ ...report, prBody: prBody(report), dryRun: false }));
   assert.deepEqual(out.staged, ['engine.config.json', CORPUS_DIR, RECIPE_TARGET]);
-  assert.equal(out.recipe, 'written');
+  assert.equal(out.recipe.architecture, 'written');
 });
 
 test('a dry run restores the regenerated document too, not just the pin', () => {

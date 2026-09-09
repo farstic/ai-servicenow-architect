@@ -64,7 +64,10 @@ export const commandArgs = (root, flags = {}) => ({
   root,
   cwd: root,
   probe: async () => ({ ok: true, status: 200, proxy: null }),
-  flags: { 'skip-claude-check': true, ...flags },
+  // `--docs skip` because these fixtures have no upstream to clone from: ARC-06-S06's B02 really
+  // syncs now, and a command test about the plan, the state or the preflight should not be a
+  // corpus test as a side effect. `b02-docs.test.mjs` drives B02 against the fixture upstream.
+  flags: { 'skip-claude-check': true, docs: 'skip', ...flags },
 });
 
 /** A step whose behaviour the test dictates. The registry's shape, none of its work. */

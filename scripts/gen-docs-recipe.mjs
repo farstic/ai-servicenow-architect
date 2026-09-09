@@ -8,13 +8,18 @@
 // generated, not asserted: the parity guarantee is kept (the block IS the module's output) and the
 // bump regenerates it along with the pin.
 //
-// The rendering and the splice moved to `tools/snowarch/lib/docs/recipe-block.mjs` when the bump
-// became the second caller. This is the CLI over it: flags, exit codes, and the sentence a
-// maintainer reads. Nothing here decides what the block looks like.
+// The rendering and the splice live in `tools/snowarch/lib/docs/recipe-block.mjs`; this is the CLI
+// over it — flags, exit codes, and the sentence a maintainer reads. Nothing here decides what the
+// recipe looks like.
+//
+// THREE targets since ARC-06-S06: the published block in `docs/ARCHITECTURE.md`, and the two
+// launcher files the Node-free `bootstrap.sh` / `bootstrap.ps1` will source. Those launchers have
+// to run the same git commands as the Node path, and the only way that stays true is if nobody
+// types them twice.
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyRecipeBlock, RECIPE_TARGET } from '../tools/snowarch/lib/docs/recipe-block.mjs';
+import { applyAllTargets } from '../tools/snowarch/lib/docs/recipe-block.mjs';
 
 const argv = process.argv.slice(2);
 const rootArg = argv.indexOf('--root');
@@ -24,23 +29,36 @@ const root = rootArg === -1
 const check = argv.includes('--check');
 
 const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
-const { status, commands } = applyRecipeBlock({ root, config, write: !check });
+const results = applyAllTargets({ root, config, write: !check });
 
 // Exit 2 is "could not run", distinct from exit 1 "found it stale" — a caller that conflated them
-// would read a missing document as a passing check.
-if (status === 'absent' || status === 'no-markers') {
-  process.stderr.write(`gen-docs-recipe: ${status === 'absent'
-    ? `${RECIPE_TARGET} does not exist`
-    : `markers not found in ${RECIPE_TARGET}`}\n`);
+// would read a missing document as a passing check. `absent` is not an error for a target that a
+// fixture tree simply does not have; a MISSING MARKER in a file that does exist is.
+const broken = results.filter((r) => r.status === 'no-markers');
+if (broken.length > 0) {
+  for (const r of broken) process.stderr.write(`gen-docs-recipe: markers not found in ${r.path}\n`);
+  process.exit(2);
+}
+
+const stale = results.filter((r) => r.status === 'written');
+const present = results.filter((r) => r.status !== 'absent');
+if (present.length === 0) {
+  process.stderr.write(`gen-docs-recipe: none of the ${results.length} targets exist under ${root}\n`);
   process.exit(2);
 }
 
 if (check) {
-  if (status === 'written') {
-    process.stderr.write(`gen-docs-recipe: ${RECIPE_TARGET} recipe block is STALE — run node ${'scripts/gen-docs-recipe.mjs'} --write\n`);
+  if (stale.length > 0) {
+    for (const r of stale) {
+      process.stderr.write(`gen-docs-recipe: ${r.path} recipe is STALE — `
+        + 'run node scripts/gen-docs-recipe.mjs --write\n');
+    }
     process.exit(1);
   }
-  process.stdout.write(`gen-docs-recipe: ${RECIPE_TARGET} recipe block is current (${commands} commands)\n`);
+  process.stdout.write(`gen-docs-recipe: ${present.length} target(s) current `
+    + `(${present.map((r) => `${r.target} ${r.commands}`).join(', ')} commands)\n`);
   process.exit(0);
 }
-process.stdout.write(`gen-docs-recipe: ${status === 'written' ? 'wrote' : 'no change to'} ${RECIPE_TARGET} (${commands} commands)\n`);
+process.stdout.write(stale.length > 0
+  ? `gen-docs-recipe: wrote ${stale.map((r) => r.path).join(', ')}\n`
+  : `gen-docs-recipe: no change to ${present.length} target(s)\n`);
