@@ -48,7 +48,26 @@ const json = (rel) => JSON.parse(read(rel));
 // tracked file that changed means the install edited the repository, which is the one thing an
 // installer must never do to a checkout somebody else will commit from.
 const porcelain = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim();
-if (porcelain !== '') fail(2, `git status is not clean:\n${porcelain}`);
+if (porcelain !== '') {
+  // A dirty SUBMODULE is one line — ` M vendor/ServiceNowDocs` — and that line does not say
+  // whether it moved commits, changed content or gained untracked files. Without the detail the
+  // reader of a Windows-only failure has nothing to go on and no Windows machine to ask, so the
+  // assertion explains itself here rather than in the next person's afternoon.
+  let detail = porcelain;
+  for (const line of porcelain.split('\n')) {
+    const sub = /^.M (vendor\/\S+)/.exec(line);
+    if (!sub) continue;
+    const at = join(root, sub[1]);
+    const inner = execFileSync('git', ['-C', at, 'status', '--porcelain'], { encoding: 'utf8' })
+      .split('\n').filter(Boolean);
+    const pointer = execFileSync('git', ['diff', '--submodule=short', '--', sub[1]],
+      { cwd: root, encoding: 'utf8' }).split('\n').filter((l) => /^[+-]Subproject/.test(l));
+    detail += `\n    inside ${sub[1]}: ${inner.length} change(s)`
+      + (inner.length > 0 ? `, first: ${inner.slice(0, 3).join(' | ')}` : '')
+      + (pointer.length > 0 ? `\n    pointer: ${pointer.join(' ')}` : '\n    pointer: unchanged');
+  }
+  fail(2, `git status is not clean:\n${detail}`);
+}
 
 // ── 3. the state says what happened ──────────────────────────────────────────────────────────
 const statePath = '.local/bootstrap-state.json';
