@@ -8,7 +8,7 @@
 //
 // The report goes into the body VERBATIM, inside a fence. S07's headings are the contract; wrapping
 // them in prose here would let the two drift apart with nothing to notice.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -101,6 +101,23 @@ function main() {
   const body = prBody(report);
   const out = { ...report, prBody: body, dryRun };
   if (value('--body-out')) writeFileSync(value('--body-out'), `${body}\n`);
+  // The workflow's outputs, written by the thing that computed them. This used to be an inline
+  // `node -e` step in the YAML, which shellcheck flagged (SC2016) for the `${…}` inside single
+  // quotes — they are JavaScript template literals, not shell, and the honest answer to a linter
+  // confused by that is not a suppression comment but to stop writing a program inside a YAML
+  // string. One place computes; the workflow consumes.
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, [
+      `from=${report.from}`,
+      `to=${report.to}`,
+      `short=${report.to.slice(0, 7)}`,
+      `moved=${String(report.from !== report.to)}`,
+      `newly_dead=${report.newlyDead.length}`,
+      `date=${report.upstreamDate}`,
+      '',
+    ].join('\n'));
+  }
+
   if (flag('--json')) {
     const p = join(root, 'bump.json');
     writeFileSync(p, `${JSON.stringify(out, null, 2)}\n`);

@@ -170,7 +170,13 @@ test('AC 3 — the branch name is stable for the same target SHA', () => {
   assert.match(`chore/docs-bump-${a.to.slice(0, 7)}`, /^chore\/docs-bump-[0-9a-f]{7}$/);
 });
 
-test('the stubbed gh records the calls the workflow would make — and is never the real gh', () => {
+test('the stubbed gh records the calls the workflow would make — and is never the real gh', {
+  // POSIX-only, and the subject is too: this workflow runs on `ubuntu-latest` and nothing else, so
+  // a shell-script stub reached through a colon-separated PATH is exactly the shape under test. On
+  // Windows `command -v` finds no extensionless script and the test would be measuring the runner,
+  // not the workflow.
+  skip: process.platform === 'win32' ? 'the bump workflow is ubuntu-only; the stub is a POSIX script' : false,
+}, () => {
   // Guard on the stub itself: a test that silently fell through to a real `gh` would be a test that
   // could open a pull request.
   const which = execFileSync('sh', ['-c', 'command -v gh'],
@@ -205,4 +211,28 @@ test('the areas file is untouched by a bump', () => {
   syncUpstream({ ...w, log: silent });
   assert.equal(read(w.root, 'vendor/docs-areas.txt'), areas);
   assert.equal(AREAS.length, areas.split('\n').filter(Boolean).length);
+});
+
+test('the script writes the outputs the workflow reads', () => {
+  // The workflow keys every later step on these. They used to be produced by an inline `node -e`
+  // in the YAML; moving them here is what removed shellcheck's SC2016 finding, so the contract
+  // between script and workflow is asserted rather than assumed.
+  const w = ready();
+  const outFile = join(scratch, `gh-output-${Date.now()}`);
+  writeFileSync(outFile, '');
+  execFileSync(process.execPath, [join(repoRoot, 'scripts/docs-bump.mjs'), '--dry-run'],
+    { cwd: w.root, encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: outFile } });
+
+  const kv = Object.fromEntries(readFileSync(outFile, 'utf8').split('\n').filter(Boolean)
+    .map((l) => l.split('=')));
+  assert.deepEqual(Object.keys(kv).sort(), ['date', 'from', 'moved', 'newly_dead', 'short', 'to']);
+  assert.equal(kv.from, upstream.pin);
+  assert.equal(kv.to, upstream.tip);
+  assert.equal(kv.short, upstream.tip.slice(0, 7));
+  assert.equal(kv.moved, 'true');
+  assert.match(kv.date, /^\d{4}-\d\d-\d\d$/);
+
+  // The workflow interpolates `short` into a branch name and a commit message, so it must not
+  // carry anything a shell would treat as syntax.
+  assert.match(kv.short, /^[0-9a-f]{7}$/);
 });

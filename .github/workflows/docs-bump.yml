@@ -53,7 +53,7 @@ jobs:
         run: node scripts/docs.mjs sync
 
       - name: Refresh the pin and render the pull-request body
-        id: bump
+        id: plan
         run: |
           set +e
           node scripts/docs-bump.mjs \
@@ -73,19 +73,6 @@ jobs:
             exit 1
           fi
           if [ "$code" != "0" ] && [ "$code" != "1" ]; then exit "$code"; fi
-
-      - name: Read what the refresh decided
-        id: plan
-        run: |
-          node -e '
-            const b = JSON.parse(require("node:fs").readFileSync("bump.json", "utf8"));
-            const set = (k, v) => require("node:fs").appendFileSync(process.env.GITHUB_OUTPUT, `${k}=${v}\n`);
-            set("from", b.from); set("to", b.to);
-            set("short", b.to.slice(0, 7));
-            set("moved", String(b.from !== b.to));
-            set("newly_dead", String(b.newlyDead.length));
-            set("date", b.upstreamDate);
-          '
 
       - name: Nothing to do
         if: steps.plan.outputs.moved != 'true'
