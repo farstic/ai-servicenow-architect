@@ -141,7 +141,9 @@ Say ("ok B00 disk: {0} GB free" -f [int]($FreeBytes / 1073741824))
 $RepoLine = Select-String -Path "$Root\engine.config.json" -Pattern '"repo": *"([^"]*)"' | Select-Object -First 1
 $RepoUrl = 'https://github.com/' + $RepoLine.Matches[0].Groups[1].Value + '.git'
 $env:GIT_TERMINAL_PROMPT = '0'
-$NetErr = (& git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 ls-remote --exit-code -h $RepoUrl HEAD 2>&1 | Out-String)
+# `-h` is deliberately absent — see the note in bootstrap.sh: with it the pattern matches no head
+# ref and git exits 2 in silence, which each launcher read differently. Same command both sides.
+$NetErr = (& git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 ls-remote --exit-code $RepoUrl HEAD 2>&1 | Out-String)
 if ($LASTEXITCODE -ne 0) {
   if ($NetErr -match 'ould not resolve host') { Die 'B00' $MSG_DNS $MSG_NET 3 }
   if ($NetErr -match 'SSL certificate problem') { Die 'B00' $MSG_TLS $MSG_NET 3 }

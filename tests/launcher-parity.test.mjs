@@ -299,6 +299,61 @@ test('a launcher that names a sentence the generator does not have is an error, 
   }
 });
 
+test('the network probe believes git\'s exit code, and says which failure it was', () => {
+  // The bug this pins, found by the Windows job: `ls-remote --exit-code -h <url> HEAD` matches no
+  // HEAD ref, so git exits 2 and prints NOTHING. bash read only stderr and called that reachable;
+  // the PowerShell port read only the exit code and called a working network unreachable. Same
+  // command, two answers — which is exactly the drift a shared launcher is supposed to prevent.
+  // Run against a stubbed git, so the assertion is about the launcher and not about the network.
+  const dir = mkdtempSync(join(tmpdir(), 'launcher-net-'));
+  const run = (gitExit, gitStderr) => {
+    const bin = join(dir, 'bin');
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'git'), ['#!/bin/sh',
+      'case "$1" in --version) echo "git version 2.44.0" ; exit 0 ;; esac',
+      `[ -n "${gitStderr}" ] && echo "${gitStderr}" >&2`,
+      `exit ${gitExit}`].join('\n'), { mode: 0o755 });
+    return spawnSync('bash', [join(dir, 'bootstrap.sh'),
+      '--mode', 'design', '--yes', '--docs', 'skip', '--skip-claude-check'],
+    { cwd: dir, encoding: 'utf8', env: { PATH: `${bin}:/usr/bin:/bin`, HOME: dir, TERM: 'dumb' } });
+  };
+  try {
+    mkdirSync(join(dir, 'tools/snowarch/launcher'), { recursive: true });
+    for (const f of ['bootstrap.sh', 'engine.config.json']) copyFileSync(join(root, f), join(dir, f));
+    copyFileSync(join(root, 'tools/snowarch/launcher/docs-recipe.sh'),
+      join(dir, 'tools/snowarch/launcher/docs-recipe.sh'));
+
+    // Silent non-zero: the case the old `-n "$NET"` test could not see at all.
+    const silent = run(2, '');
+    assert.equal(silent.status, 3, silent.stdout + silent.stderr);
+    assert.match(silent.stdout + silent.stderr, /cannot reach github\.com/);
+    // The two classified failures still pick their own sentence, from stderr.
+    const dns = run(128, 'fatal: could not resolve host: github.com');
+    assert.match(dns.stdout + dns.stderr, /\(DNS\)/);
+    const tls = run(128, 'fatal: unable to access: SSL certificate problem: self signed certificate');
+    assert.match(tls.stdout + tls.stderr, /TLS interception detected/);
+    // ...and a reachable network is not reported as a failure — the half that proves the rest.
+    const ok = run(0, '');
+    assert.match(ok.stdout, /ok B00 network: github\.com reachable/, ok.stdout + ok.stderr);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('and the Windows launcher runs the same probe, with the same flags', () => {
+  // CI runs it; this is what stops the two from parting company between runs.
+  const flags = /ls-remote --exit-code (-h )?/;
+  const sh = flags.exec(launcher);
+  const ps = flags.exec(ps1);
+  assert.ok(sh && ps, 'one of the launchers no longer probes with ls-remote');
+  assert.equal(sh[1], undefined, 'bootstrap.sh passes -h, which makes --exit-code meaningless');
+  assert.equal(ps[1], undefined, 'bootstrap.ps1 passes -h, which makes --exit-code meaningless');
+  for (const doc of [launcher, ps1]) {
+    assert.match(doc, /http\.lowSpeedLimit=1000/);
+    assert.match(doc, /GIT_TERMINAL_PROMPT/);
+  }
+});
+
 test('the Windows path never reaches for bash', () => {
   // The CI job rebuilds PATH without Git Bash to prove this from the outside; this proves it from
   // the inside, where no runner is needed. `C:\\Windows\\System32\\bash.exe` (the WSL stub) is on every
