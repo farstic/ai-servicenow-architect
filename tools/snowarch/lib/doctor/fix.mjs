@@ -144,6 +144,12 @@ async function fixToggles({ root, ctx, kind, apply }) {
     // bootstrap set it. A key the user set is theirs.
     ...(kind === 'hooks-disabled-by-bootstrap' ? { removeDisableAllHooks: true } : {}),
   });
+  // A REFUSAL is not a noop. `applyToggles` declines when `.claude/settings.local.json` is not
+  // gitignored — the file holds a user's approvals and must stay untracked — and reporting that as
+  // "already correct" would tell somebody their toggles were fine while the check that sent them
+  // here keeps failing. It cost a CI run to find: locally the file was ignored, on the runner the
+  // fixture had no `.gitignore`.
+  if (r?.ok === false) return result('failed', r.reason ?? 'the toggle file could not be written');
   return r?.changed === false ? result('noop', 'already correct') : result('applied', `mode ${mode}`);
 }
 

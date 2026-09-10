@@ -21,6 +21,10 @@ export const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', 
 /** The committed files every repo check reads. Copied, never retyped. */
 export const WIRING = Object.freeze([
   'engine.config.json',
+  // The ignore rules. `.claude/settings.local.json` MUST stay untracked — it holds a user's
+  // approvals — and the toggle writer refuses to touch it when it is not ignored, so a fixture
+  // without this file is a fixture where F6 can only fail.
+  '.gitignore',
   // The version of record. A checkout without it is not a checkout, and the doctor reports the
   // version it finds — so a fixture without one would be asserting an absence nobody ships.
   'package.json',

@@ -127,6 +127,8 @@ test('the composite fixture: F4, F6 apply, .mcp.json is REFUSED with its own com
   assert.match(text, /E-07.*run: git checkout -- \.mcp\.json/);
   assert.match(text, /F4 {2}applied/);
   assert.match(text, /F6 {2}applied/);
+  // F2 is not asserted here: a runner without the docs submodule has no corpus to re-sparse, and
+  // this case is about the flags, the toggles and the refusal. F2 has its own test.
 
   // The repairs really happened, and the re-run says so.
   const after = readJson(root, '.local/instances.json');
