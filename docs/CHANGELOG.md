@@ -29,6 +29,27 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **`instance add`, end to end — and every way it ends without saving.** One command asks for a
+  username and password, proves the instance, shows the review screen and writes one 0600 file —
+  or writes nothing at all. **There is no "save anyway"**: P-23's wizard offered exactly that, and
+  an instance saved that way failed later inside a tool call with no memory of the moment somebody
+  clicked past a warning. Three credential attempts, ONE request each, and the counter is shared
+  between a wrong password and a role that cannot read `sys_user` — both mean "this account, as
+  given, cannot be used", and a fourth try of either is an account closer to a lockout on an
+  instance whose policy nobody here knows. With `--password-stdin` there is no re-entry at all:
+  nobody is there to correct it, and the same wrong credential sent again is noise in the
+  instance's audit log. A duplicate label is refused before anything is asked, so it costs nobody a
+  password; `--replace` overwrites, and a test asserts the OLD password is gone from the file
+  bytes. A policy refusal the arguments already decide now happens FIRST — `--env prod --preset
+  full --yes` cannot end any way but exit 3, so spending a password prompt and a login attempt at
+  a production instance on the way there was two costs for nothing.
+- **`./snowarch instance` forwards, and does nothing else.** It checks three preconditions (Node's
+  floor from `engine.config.json`, the built CLI, the server's dependencies), prints one sentence
+  if any fails, and otherwise hands the terminal over with `stdio: 'inherit'` so the masked prompt
+  works — pinning `CLAUDE_PROJECT_DIR` to this checkout, never an inherited session's. The argv it
+  builds is exactly what the user typed: a test greps the whole of `tools/snowarch/` for a
+  `--password` construction, because a secret cannot reach `ps` through a process that never
+  invents an argument.
 - **Propose, review, apply — and a probe never decides.** The wizard proposes a preset from the
   ENVIRONMENT ALONE (`full` for pdi/dev/test, `read-only` for prod), shows the six flags with what
   the probes found, and applies exactly what the screen showed. A probe that came back

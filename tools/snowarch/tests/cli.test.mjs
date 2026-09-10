@@ -117,7 +117,7 @@ test('the not-yet-built commands say which story adds them', () => {
   // `bootstrap` left this list at ARC-06-S03, which is the only way a placeholder should ever
   // leave it: the story that names it ships it. The assertion below that it is no longer a
   // placeholder is what stops it being quietly re-added.
-  for (const [name, story] of [['doctor', 'ARC-08'], ['instance', 'ARC-07']]) {
+  for (const [name, story] of [['doctor', 'ARC-08']]) {
     const r = run([name]);
     assert.equal(r.code, EXIT_USAGE, name);
     assert.match(r.stderr, new RegExp(`"${name}" is not available in this build — ${story} adds it`));
@@ -132,6 +132,11 @@ test('the not-yet-built commands say which story adds them', () => {
   assert.equal(m.code, EXIT_USAGE);
   assert.match(m.stderr, /mode takes live or design/);
   assert.ok(!m.stderr.includes('not available in this build'), 'mode is still a placeholder');
+  // Nor is `instance`, as of ARC-07-S05: it is a FORWARDER, and on a checkout whose server
+  // dependencies are missing it says so and exits 3 rather than pretending the story is unwritten.
+  const i = run(['instance', 'add']);
+  assert.ok(!i.stderr.includes('not available in this build'), 'instance is still a placeholder');
+  assert.ok([0, 1, 2, 3].includes(i.code), `unexpected exit ${i.code}`);
 });
 
 test('root discovery: from a nested directory the CLI finds the repository and says so', () => {

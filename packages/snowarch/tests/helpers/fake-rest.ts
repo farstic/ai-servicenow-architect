@@ -162,3 +162,77 @@ export function fakeRest(routes: Record<string, FakeRoute | FakeRoute[]>): FakeR
 /** undici's shape for a socket failure, for the `unreachable` path. */
 export const networkFailure = (code: string): Error =>
   Object.assign(new TypeError('fetch failed'), { cause: { code } });
+
+/**
+ * ARC-07-S05 — the same routes, over a real socket.
+ *
+ * The integration tests SPAWN the built CLI, so the fake has to be something a separate process
+ * can talk to. It binds `127.0.0.1` on a RANDOM port (`listen(0)`): a fixed port makes two test
+ * files on one machine fight, and a fixed port makes CI flaky in the way that gets blamed on the
+ * code under test.
+ *
+ * It counts requests for the same reason the in-process fake does: "never retries a 401" is a
+ * claim about a request that did not happen.
+ */
+export interface FakeRestServer {
+  /** `http://127.0.0.1:<port>` — pass this as the instance URL. */
+  readonly url: string;
+  /** Every path requested, in order. */
+  readonly requests: string[];
+  countOf(fragment: string): number;
+  close(): Promise<void>;
+}
+
+export interface ServerRoute {
+  status: number;
+  /** The `result` array a table request answers with. Default: one row. */
+  records?: unknown[];
+  /** A body for a non-table endpoint (the OAuth token, for instance). */
+  body?: unknown;
+}
+
+export async function fakeRestServer(
+  routes: Record<string, ServerRoute | ServerRoute[]>,
+): Promise<FakeRestServer> {
+  const { createServer } = await import('node:http');
+  const requests: string[] = [];
+  const queues = new Map<string, ServerRoute[]>(
+    Object.entries(routes).map(([k, v]) => [k, Array.isArray(v) ? [...v] : [v]]),
+  );
+
+  const pick = (path: string): ServerRoute | undefined => {
+    for (const [key, queue] of queues) {
+      if (!path.includes(key) || queue.length === 0) continue;
+      return queue.length > 1 ? (queue.shift() as ServerRoute) : queue[0];
+    }
+    return undefined;
+  };
+
+  const server = createServer((req, res) => {
+    const path = req.url ?? '';
+    requests.push(path);
+    const route = pick(path);
+    if (!route) {
+      res.writeHead(404, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: { message: 'no fake route' } }));
+      return;
+    }
+    res.writeHead(route.status, { 'content-type': 'application/json' });
+    if (route.body !== undefined) { res.end(JSON.stringify(route.body)); return; }
+    const records = route.records ?? [{ sys_id: '0'.repeat(32) }];
+    res.end(JSON.stringify(route.status >= 400
+      ? { error: { message: `HTTP ${route.status}` } }
+      : { result: records }));
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+
+  return {
+    url: `http://127.0.0.1:${port}`,
+    requests,
+    countOf: (fragment: string) => requests.filter((r) => r.includes(fragment)).length,
+    close: () => new Promise<void>((resolve) => { server.close(() => resolve()); }),
+  };
+}
