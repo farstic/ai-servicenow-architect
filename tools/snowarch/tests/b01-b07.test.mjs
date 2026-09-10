@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { run as runB01, ensureLocalDir, committedFilesUnchanged } from '../lib/steps/B01.mjs';
 import { run as runB07, writeConfig, CONFIG_FILE } from '../lib/steps/B07.mjs';
 import {
@@ -13,6 +14,11 @@ import { cloudSyncProvider, cloudSyncWarning, isUnderCloudSyncFolder } from '../
 import { checkMcpJson, checkSettingsJson } from '../lib/registration.mjs';
 import { readDefaultLabel } from '../../../packages/snowarch/dist/store/label.js';
 import { makeCheckout } from './helpers/workspace.mjs';
+
+// Four levels up: tests → snowarch → tools → the repository root. The shared cloud-sync fixture
+// lives under the SERVER package, because that is where the list is authored; this module is
+// one of the three implementations that must satisfy it.
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const isWindows = process.platform === 'win32';
 const KEY = 'servicenow';
@@ -237,26 +243,30 @@ test('the lifted rules catch what S01 asserts, and pass the real committed files
 });
 
 test('AC 5 — the cloud-sync warning names the provider, and quiet paths stay quiet', () => {
-  const cases = [
-    ['/Users/x/Library/Mobile Documents/com~apple~CloudDocs/repo', 'iCloud Drive'],
-    ['C:\\Users\\x\\OneDrive\\repo', 'OneDrive'],
-    ['C:\\Users\\x\\OneDrive - Contoso\\repo', 'OneDrive'],
-    ['/home/x/Dropbox/repo', 'Dropbox'],
-    ['/home/x/Google Drive/repo', 'Google Drive'],
-    ['/Users/x/Library/CloudStorage/GoogleDrive-a/repo', 'a cloud provider mounted under ~/Library/CloudStorage'],
-  ];
-  for (const [path, provider] of cases) {
-    assert.equal(cloudSyncProvider(path), provider, path);
-    assert.match(cloudSyncWarning(path), new RegExp(`\\(${provider.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`));
+  // THE CASES ARE NO LONGER WRITTEN HERE. ARC-07-S07 made
+  // `packages/snowarch/tests/fixtures/cloud-sync-paths.json` the single list that this module, the
+  // server's `detectCloudSync()` and ARC-08-S03's E-25 all answer to — three tables that merely
+  // looked alike would drift, and would disagree about a path exactly when it mattered. This test
+  // used to carry its own six rows; they are in the fixture now, beside the story's.
+  const fixture = JSON.parse(readFileSync(
+    join(repoRoot, 'packages/snowarch/tests/fixtures/cloud-sync-paths.json'), 'utf8'));
+
+  assert.ok(fixture.synced.length > 5, 'the fixture is not empty — every loop below depends on it');
+  for (const { path, provider, why } of fixture.synced) {
+    // The engine names the mount as the provider where the server names the vendor; both are
+    // "synced, and here is who" and the WARN reads correctly either way. What may NOT differ is
+    // WHETHER — that is the shared answer, and it is asserted exactly.
+    assert.ok(cloudSyncProvider(path), `${path} — ${why}`);
     assert.match(cloudSyncWarning(path), /synced even at mode 0600/);
-    // WHETHER is the store module's answer; this module only adds WHICH. They must agree, or one
-    // of them is warning about a path the other thinks is fine.
     assert.equal(isUnderCloudSyncFolder(path), true, `${path}: the two detectors disagree`);
+    if (provider !== 'CloudStorage (unknown provider)') {
+      assert.equal(cloudSyncProvider(path), provider, `${path} — ${why}`);
+    }
   }
-  for (const quiet of ['/Users/x/work/repo', '/home/x/src/repo', 'C:\\dev\\repo']) {
-    assert.equal(cloudSyncProvider(quiet), null, quiet);
-    assert.equal(cloudSyncWarning(quiet), null, quiet);
-    assert.equal(isUnderCloudSyncFolder(quiet), false, `${quiet}: the two detectors disagree`);
+  for (const { path, why } of fixture.quiet) {
+    assert.equal(cloudSyncProvider(path), null, `${path} — ${why}`);
+    assert.equal(cloudSyncWarning(path), null, path);
+    assert.equal(isUnderCloudSyncFolder(path), false, `${path}: the two detectors disagree`);
   }
 });
 

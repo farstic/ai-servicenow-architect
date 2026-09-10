@@ -39,7 +39,7 @@ export function instanceHelp() {
     for (const [name, meta] of Object.entries(SUB_COMMANDS)) {
         lines.push(`  ${name.padEnd(width)}  ${meta.summary}`);
     }
-    lines.push('', '  --json      machine-readable output (list, test)', '  --verbose   print which store is being read', '  --yes       accept every proposal; no questions', '', 'secrets are never accepted as arguments — the prompt or --password-stdin', '', 'exit codes:');
+    lines.push('', '  --json      machine-readable output (list, test)', '  --all       list BOTH stores, with a STORE column (list)', '  --global    act on the per-user store instead of this checkout\'s', '  --verbose   print which store is being read', '  --yes       accept every proposal; no questions', '', 'secrets are never accepted as arguments — the prompt or --password-stdin', '', 'exit codes:');
     for (const { code, meaning } of EXIT_CODES)
         lines.push(`  ${code}  ${meaning}`);
     return lines.join('\n');
@@ -81,6 +81,9 @@ export function parseManageArgs(sub, argv) {
                 break;
             case 'all':
                 options.all = true;
+                break;
+            case 'global':
+                options.global = true;
                 break;
             case 'verbose':
                 options.verbose = true;

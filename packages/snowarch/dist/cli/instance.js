@@ -24,12 +24,12 @@ export { EXIT_USAGE, EXIT_INTERRUPTED };
 import { ENVIRONMENTS, normalizeInstanceUrl, resolveEnvironment } from './url.js';
 import { remedyFor } from '../errors/codes.js';
 import { applyingLine, dependencyViolation, ENTRY_DEFAULTS, labelOf, prodRefusal, resolveFlags, toggleFlag, } from './preset-ui.js';
-import { listJson, listTable, probesJson } from './format.js';
+import { combinedListJson, listAllTable, listJson, listTable, otherStoreFooter, precedenceNote, probesJson, storeLabelFor, } from './format.js';
 import { appendAudit } from '../audit/writer.js';
 import { CORE_TOOLS_UNCONFIGURED } from '../tools/status.js';
-import { maskPath, maskUsername } from '../store/paths.js';
+import { detectCloudSync, globalStorePath, maskPath, maskUsername, } from '../store/paths.js';
 import { describeNetworkEnv, formatFailure, probeReachability, reachabilityMenu } from '../servicenow/reachability.js';
-import { fillRemedy } from '../servicenow/net-errors.js';
+import { fillMeaning, fillRemedy } from '../servicenow/net-errors.js';
 import { probeAll, toLastProbe } from '../servicenow/probes.js';
 import { ServiceNowClient } from '../servicenow/client.js';
 import { loadStore, projectStorePath, resolveStorePath, saveStore } from '../store/index.js';
@@ -192,6 +192,9 @@ export function parseAddArgs(argv) {
             case 'no-probes':
                 options.noProbes = true;
                 break;
+            case 'json':
+                options.json = true;
+                break;
             case 'yes':
                 options.yes = true;
                 break;
@@ -255,16 +258,61 @@ export const probeOptionsFor = (auth, env) => ({
     ...(auth.method === 'oauth_ropc' ? { tokenProbe: async () => ({ ok: true }) } : {}),
 });
 /**
+ * The cloud-sync warning, and the question that follows it (D-04, ARC-07-S07).
+ *
+ * 0600 is a LOCAL permission: the sync client runs as the same user, so the mode does not stop the
+ * file leaving the machine. This is a WARNING and a question rather than a refusal — where somebody
+ * keeps their code is theirs to decide — but the default is NO, because the cost of being wrong is
+ * a credential store on somebody else's servers and the cost of asking again is one command.
+ *
+ * The text is the REGISTRY's, filled with the provider and the folder; there is no second copy of
+ * this sentence anywhere. When the global store is itself synced, the alternative is dropped: the
+ * remedy's parenthetical would otherwise offer a place that has the same problem.
+ */
+export async function cloudSyncGate(storePath, options, io, env = process.env) {
+    const hit = detectCloudSync(dirname(storePath), { env });
+    if (!hit)
+        return { ok: true };
+    const globalPath = globalStorePath();
+    const globalSynced = detectCloudSync(dirname(globalPath), { env }) !== null;
+    const values = { provider: hit.provider, root: hit.root, global: maskPath(dirname(globalPath)) };
+    const meaning = fillMeaning('STORE_IN_CLOUD_SYNC_FOLDER', values);
+    const remedy = globalSynced || options.global
+        // Offering `--global` to somebody already using it, or pointing at a synced global store,
+        // would be advice that cannot be taken.
+        ? 'move the checkout outside the synced folder'
+        : fillRemedy('STORE_IN_CLOUD_SYNC_FOLDER', values);
+    const warning = `WARN STORE_IN_CLOUD_SYNC_FOLDER: ${meaning} Options: ${remedy}.`;
+    io.write(`${warning}\n`);
+    if (options.yes)
+        return { ok: true, warning };
+    // Default NO: Enter, end-of-input and anything but `y` all decline.
+    const answer = ((await io.ask('Continue and write the store here anyway? [y/N] ')) ?? '').trim().toLowerCase();
+    return answer === 'y' || answer === 'yes' ? { ok: true, warning } : { ok: false, warning };
+}
+/**
  * The whole command. Seven steps, and every one of them can end it.
  */
-export async function runAdd(options, io, deps = {}) {
+export async function runAdd(options, terminal, deps = {}) {
+    // `--json` means the OBJECT is the output. The step lines, the probe summary and the warning all
+    // still happen — they are just not printed, because a caller parsing stdout gets one object or
+    // it gets a parse error, and `test --json` already made that promise for this CLI.
+    const io = options.json
+        ? { ...terminal, write: () => { } }
+        : terminal;
     const env = deps.env ?? process.env;
     const platform = deps.platform ?? process.platform;
     // `resolveStorePath()` answers "which store would the SERVER read" and can legitimately say
     // "none" — a checkout with no store yet. Writing the per-checkout path in that case is the
     // whole point of `instance add`; using a second resolver would be how the wizard writes one
     // file and the server reads another.
-    const storePath = deps.storePath ?? resolveStorePath().path ?? projectStorePath();
+    // `--global` selects a candidate THROUGH the resolver the server uses; it never computes a path
+    // of its own. Without it the rule is unchanged: the store the server would read, or this
+    // checkout's, which is what `instance add` exists to create.
+    const storePath = deps.storePath
+        ?? (options.global
+            ? resolveStorePath({ global: true }).path
+            : resolveStorePath().path ?? projectStorePath());
     const label = options.label;
     // The store is read FIRST, so a duplicate label costs nobody a password.
     const existing = loadStore(storePath);
@@ -447,6 +495,17 @@ export async function runAdd(options, io, deps = {}) {
     }
     io.write(`${decision.applying}\n`);
     // ── the save ─────────────────────────────────────────────────────────────────────────────
+    //
+    // THE CLOUD-SYNC GATE COMES LAST AMONG THE QUESTIONS AND FIRST AMONG THE WRITES: everything above
+    // is questions and probes, and this is the point where a file appears on disk. Declining here
+    // costs the user the password they typed, which is why the warning is worded to be decided in
+    // one reading — and why exit 3 says POLICY rather than failure.
+    const gate = await cloudSyncGate(storePath, options, io, env);
+    if (!gate.ok) {
+        io.write(`${NOTHING_SAVED}\n`);
+        return { saved: false, exitCode: EXIT_POLICY, message: NOTHING_SAVED,
+            ...(gate.warning ? { warnings: [gate.warning] } : {}) };
+    }
     const firstEver = Object.keys(store.instances).length === 0;
     let isDefault = options.makeDefault === true || firstEver;
     if (!options.makeDefault && !firstEver && !options.yes) {
@@ -468,12 +527,32 @@ export async function runAdd(options, io, deps = {}) {
     };
     saveStore(storePath, next);
     const masked = maskEntry(entry);
+    const warnings = gate.warning ? [gate.warning] : [];
+    if (options.json) {
+        // The machine-readable summary. Never the entry as stored: `maskEntry` is what a caller may
+        // see, and `warnings` carries the CODE rather than the sentence, because a caller matching on
+        // prose is a caller that breaks when the prose improves.
+        terminal.write(`${JSON.stringify({
+            saved: true,
+            label,
+            store: maskPath(storePath),
+            default: isDefault,
+            instance: masked,
+            lastProbe: probeResult?.last ?? null,
+            warnings: warnings.map(() => 'STORE_IN_CLOUD_SYNC_FOLDER'),
+        }, null, 2)}\n`);
+        return { saved: true, exitCode: EXIT_OK, entry: masked, lastProbe: probeResult?.last ?? null, warnings };
+    }
     io.write(`${savedLine(label, masked, isDefault)} `
         + `${probeSummary(probeResult?.last ?? null, masked.flags, options.noProbes === true)}\n`);
     io.write(`${storeLine(storePath, platform)}\n`);
+    // The warning is REPEATED after the save, not only before it: the line that matters is the one
+    // still on screen when the command ends.
+    for (const w of warnings)
+        io.write(`${w}\n`);
     if (!options.fromBootstrap)
         io.write(`${NEXT_LINE}\n`);
-    return { saved: true, exitCode: EXIT_OK, entry: masked, lastProbe: probeResult?.last ?? null };
+    return { saved: true, exitCode: EXIT_OK, entry: masked, lastProbe: probeResult?.last ?? null, warnings };
 }
 /**
  * The programmatic entry ARC-06-S07's `--instance-file` path can call.
@@ -506,6 +585,8 @@ export function addHelp() {
         '  --default                 make this the default instance',
         '  --password-stdin          read the password (and client secret) from stdin',
         '  --no-probes               skip the capability probes (CI fixtures)',
+        '  --global                  write to the per-user store, not this checkout\'s',
+        '  --json                    print the summary as an object (with any warnings)',
         '  --yes                     accept every proposal; no questions',
         '  --replace                 overwrite an existing label',
         '',
@@ -625,16 +706,32 @@ const readProbe = (stored) => (stored ? stored : null);
  * 0. What is NOT allowed is inventing a path: a maintenance command that created a store would
  * make `set-default` on a typo produce a second, empty configuration.
  */
-function openStore(deps) {
-    const path = deps.storePath ?? resolveStorePath().path ?? projectStorePath();
+function openStore(deps, options = {}) {
+    // ONE resolution, carried whole. The path AND what selected it: `list --all` needs the second
+    // half to say which file the server reads, and computing it twice is how the two answers came
+    // apart — a run under `SNOW_STORE` listed the global store and left out the file in use.
+    // An injected `storePath` is an override in the same sense the environment variable is.
+    // An injected path is named by WHERE IT POINTS, not by the fact that it was injected: the same
+    // file is the project store whether the resolver found it or a caller handed it over, and
+    // calling it an override would put the wrong word in `list --all`'s STORE column.
+    const injected = deps.storePath;
+    const resolution = injected !== undefined
+        ? { path: injected,
+            source: (injected === projectStorePath() ? 'project'
+                : injected === globalStorePath() ? 'global' : 'env') }
+        : options.global
+            ? resolveStorePath({ global: true })
+            : resolveStorePath();
+    const path = resolution.path ?? projectStorePath();
+    const source = storeLabelFor(resolution.path === null ? 'project' : resolution.source);
     if (!existsSync(path)) {
-        return { ok: true, opened: { path, store: { version: 1, instances: {} } } };
+        return { ok: true, opened: { path, source, store: { version: 1, instances: {} } } };
     }
     const loaded = loadStore(path);
     if ('error' in loaded) {
         return { ok: false, message: `${loaded.error.code} — ${loaded.error.message}`, exitCode: EXIT_USAGE };
     }
-    return { ok: true, opened: { path, store: loaded.store } };
+    return { ok: true, opened: { path, source, store: loaded.store } };
 }
 const verboseStoreLine = (path) => `store: ${maskPath(path)}`;
 /** One instance, or the refusal naming the labels that do exist. */
@@ -656,16 +753,58 @@ function audit(entry) {
 }
 // ── list ──────────────────────────────────────────────────────────────────────────────────
 export function runList(options, io, deps = {}) {
-    const opened = openStore(deps);
+    const opened = openStore(deps, options);
     if (!opened.ok) {
         io.write(`${opened.message}\n`);
         return opened.exitCode;
     }
     if (options.verbose)
         io.write(`${verboseStoreLine(opened.opened.path)}\n`);
+    // `--all` reads BOTH stores and says which row came from which. They are never merged (`01` §7):
+    // a label in both appears TWICE, and the note says which one the server reads. A merge would
+    // make "which file set this value" unanswerable, which is the whole reason for the rule.
+    if (options.all) {
+        const sides = bothStores(opened.opened);
+        const combined = combinedListJson(sides.first, sides.global);
+        io.write(options.json
+            ? `${JSON.stringify(combined, null, 2)}\n`
+            : `${listAllTable(combined)}\n`);
+        return EXIT_OK;
+    }
     const json = listJson(opened.opened.path, opened.opened.store);
     io.write(options.json ? `${JSON.stringify(json, null, 2)}\n` : `${listTable(json)}\n`);
+    // The footer exists so nobody concludes an instance is gone when it is merely in the other
+    // store. Not printed in `--json`: a footer is prose, and the object already carries the truth.
+    if (!options.json) {
+        const sides = bothStores(opened.opened);
+        const count = Object.keys(sides.global.store?.instances ?? {}).length;
+        if (count > 0 && sides.global.path !== opened.opened.path)
+            io.write(`${otherStoreFooter(count)}\n`);
+    }
     return EXIT_OK;
+}
+/**
+ * The two stores as they are on disk right now — the project one and the global one.
+ *
+ * Read through the same loader the server uses, and a store that is absent or unreadable is
+ * `null` rather than an empty one: "there is no global store" and "the global store is empty" are
+ * different answers to `list`, and only one of them is worth a footer.
+ */
+function bothStores(opened) {
+    const globalPath = globalStorePath();
+    const load = (path) => {
+        if (!existsSync(path))
+            return null;
+        const loaded = loadStore(path);
+        return 'store' in loaded ? loaded.store : null;
+    };
+    return {
+        // THE FIRST STORE IS THE ONE THE RESOLVER RETURNED — the per-checkout file, the one
+        // `SNOW_STORE` names, or the global one when there is nothing else. Never re-derived here.
+        first: { path: opened.path, source: opened.source,
+            store: existsSync(opened.path) ? opened.store : null },
+        global: { path: globalPath, store: globalPath === opened.path ? opened.store : load(globalPath) },
+    };
 }
 // ── test ──────────────────────────────────────────────────────────────────────────────────
 /**
@@ -677,7 +816,7 @@ export function runList(options, io, deps = {}) {
  */
 export async function runTest(options, io, deps = {}) {
     const env = deps.env ?? process.env;
-    const opened = openStore(deps);
+    const opened = openStore(deps, options);
     if (!opened.ok) {
         io.write(`${opened.message}\n`);
         return opened.exitCode;
@@ -697,6 +836,17 @@ export async function runTest(options, io, deps = {}) {
         if (!found.ok) {
             io.write(`${found.message}\n`);
             return EXIT_USAGE;
+        }
+    }
+    // The note, when the label being probed exists in both stores: the user is about to read a
+    // result and needs to know which entry produced it.
+    if (!quiet) {
+        const sides = bothStores(opened.opened);
+        for (const label of labels) {
+            if (sides.first.store?.instances?.[label] && sides.global.store?.instances?.[label]
+                && sides.first.path !== sides.global.path) {
+                io.write(`${precedenceNote(label, sides.first.path, sides.global.path, sides.first.source)}\n`);
+            }
         }
     }
     const probes = {};
@@ -739,7 +889,7 @@ export async function runTest(options, io, deps = {}) {
  */
 export async function runSetCredentials(options, io, deps = {}) {
     const env = deps.env ?? process.env;
-    const opened = openStore(deps);
+    const opened = openStore(deps, options);
     if (!opened.ok) {
         io.write(`${opened.message}\n`);
         return opened.exitCode;
@@ -781,6 +931,12 @@ export async function runSetCredentials(options, io, deps = {}) {
         const client = (deps.makeClient ?? defaultClient)({ url: entry.url, auth });
         const all = await (deps.probe ?? probeAll)(client, probeOptionsFor(auth, env));
         if (all.auth.status === 'ok') {
+            // The same gate as `add`, in the same place — the last question before a file changes.
+            const gate = await cloudSyncGate(opened.opened.path, options, io, env);
+            if (!gate.ok) {
+                io.write(`${NOTHING_SAVED}\n`);
+                return EXIT_POLICY;
+            }
             const at = (deps.now ?? (() => new Date().toISOString()))();
             const last = toLastProbe({ ...all, at });
             // Changing the METHOD drops the other method's fields rather than leaving them beside the
@@ -838,7 +994,7 @@ async function prodGate(label, entry, raising, options, io) {
 }
 // ── set-preset ────────────────────────────────────────────────────────────────────────────
 export async function runSetPreset(options, io, deps = {}) {
-    const opened = openStore(deps);
+    const opened = openStore(deps, options);
     if (!opened.ok) {
         io.write(`${opened.message}\n`);
         return opened.exitCode;
@@ -910,7 +1066,7 @@ export function parseFlagPairs(pairs) {
  * it the wrong way and ask a question about a change nobody requested.
  */
 export async function runSetFlags(options, io, deps = {}) {
-    const opened = openStore(deps);
+    const opened = openStore(deps, options);
     if (!opened.ok) {
         io.write(`${opened.message}\n`);
         return opened.exitCode;
@@ -995,7 +1151,7 @@ export function mirrorDefault(configPath, label) {
 }
 const configFor = (storePath, deps) => deps.configPath ?? join(dirname(storePath), 'config.json');
 export function runSetDefault(options, io, deps = {}) {
-    const opened = openStore(deps);
+    const opened = openStore(deps, options);
     if (!opened.ok) {
         io.write(`${opened.message}\n`);
         return opened.exitCode;
@@ -1018,7 +1174,7 @@ export function runSetDefault(options, io, deps = {}) {
 }
 // ── remove ────────────────────────────────────────────────────────────────────────────────
 export async function runRemove(options, io, deps = {}) {
-    const opened = openStore(deps);
+    const opened = openStore(deps, options);
     if (!opened.ok) {
         io.write(`${opened.message}\n`);
         return opened.exitCode;

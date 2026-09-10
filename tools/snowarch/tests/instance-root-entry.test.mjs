@@ -12,7 +12,7 @@
 // therefore a witness that the arguments reached the right program unchanged.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -92,6 +92,63 @@ for (const entry of ENTRIES) {
       const parsed = JSON.parse(r.text);
       assert.deepEqual(parsed.instances, []);
       assert.equal(parsed.defaultInstance, null);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test(`${entry.name}: \`list --all\` reaches the server as two flags, not one`, () => {
+    // Two flags after a sub-command, which is the shape the frame used to eat. An empty store is
+    // the empty-store sentence, and `--json` parses as a whole.
+    const dir = mkdtempSync(join(tmpdir(), 'root-entry-all-'));
+    try {
+      const store = join(dir, 'instances.json');
+      const plain = run(entry, ['instance', 'list', '--all'], { SNOW_STORE: store });
+      assert.equal(plain.status, 0, plain.text);
+      assert.match(plain.text, /No instances configured/);
+
+      const json = run(entry, ['instance', 'list', '--all', '--json'], { SNOW_STORE: store });
+      assert.equal(json.status, 0, json.text);
+      const parsed = JSON.parse(json.text);
+      assert.deepEqual(parsed.instances, []);
+      assert.ok(Object.hasOwn(parsed, 'stores'), 'the --all shape carries both store paths');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test(`${entry.name}: \`list --all\` under SNOW_STORE lists the file the server READS`, () => {
+    // The reviewer's reproduction, from the entry a user types. Two stores, one selected by the
+    // override: `--all` used to show the global one alone, leaving out the very file in use.
+    const dir = mkdtempSync(join(tmpdir(), 'root-entry-two-'));
+    try {
+      const home = join(dir, 'home');
+      // WHERE THIS PLATFORM PUTS IT: `%APPDATA%\snowarch` on Windows, `$XDG_CONFIG_HOME/snowarch`
+      // elsewhere. Writing the POSIX path on a Windows runner leaves the global store absent, and
+      // the test then asserts three rows against a run that could only ever produce one — which is
+      // exactly what the Windows cells reported.
+      const globalStore = process.platform === 'win32'
+        ? join(home, 'AppData', 'Roaming', 'snowarch', 'instances.json')
+        : join(home, '.config', 'snowarch', 'instances.json');
+      const override = join(dir, 'project.json');
+      const account = { method: 'basic', username: 'u', password: ['pw', '-', 'fixture'].join('') };
+      const instance = (url) => ({ url, environment: 'pdi', auth: account, preset: 'read-only',
+        flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false });
+      mkdirSync(dirname(globalStore), { recursive: true });
+      writeFileSync(globalStore, JSON.stringify({ version: 1, defaultInstance: 'gl',
+        instances: { dev1: instance('https://dev11111.service-now.com'),
+          gl: instance('https://dev22222.service-now.com') } }, null, 2), { mode: 0o600 });
+      writeFileSync(override, JSON.stringify({ version: 1, defaultInstance: 'dev1',
+        instances: { dev1: instance('https://dev33333.service-now.com') } }, null, 2), { mode: 0o600 });
+      chmodSync(globalStore, 0o600);
+      chmodSync(override, 0o600);
+
+      const env = { SNOW_STORE: override, HOME: home, USERPROFILE: home,
+        XDG_CONFIG_HOME: join(home, '.config'), APPDATA: join(home, 'AppData', 'Roaming') };
+      const r = run(entry, ['instance', 'list', '--all'], env);
+      assert.equal(r.status, 0, r.text);
+      const rows = r.text.split('\n').filter((l) => /^(dev1|gl)\s/.test(l));
+      assert.equal(rows.length, 3, r.text);
+      assert.equal(rows.filter((l) => l.includes('SNOW_STORE')).length, 1, r.text);
+      assert.match(r.text, /Note: "dev1" exists in both/);
+      // Whatever else it prints, a password is never one of the bytes.
+      assert.doesNotMatch(r.text, /pw-fixture/);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

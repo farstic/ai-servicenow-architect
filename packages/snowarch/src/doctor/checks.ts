@@ -12,7 +12,7 @@ import { dirname, join, parse, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { instanceManager } from '../servicenow/instances.js';
-import { isUnderCloudSyncFolder } from '../store/index.js';
+import { detectCloudSync } from '../store/index.js';
 import { maskPath, resolveStorePath } from '../store/paths.js';
 import { FLAG_NAMES, checkProdPosture } from '../utils/permissions.js';
 import { resolveAuditPath } from '../audit/writer.js';
@@ -125,9 +125,13 @@ export const svStore: Check = {
       }
     }
 
-    if (isUnderCloudSyncFolder(res.path) && status === 'ok') {
+    // The PROVIDER, not just the fact: "a cloud-sync folder" tells a reader nothing they can act
+    // on, and the folder to move out of is the one piece of the answer they need (ARC-07-S07).
+    const synced = detectCloudSync(res.path);
+    if (synced && status === 'ok') {
       status = 'warn';
-      notes.push('the store is under a cloud-sync folder; 0600 does not prevent synchronisation');
+      notes.push(`the store is under ${synced.provider} (${maskPath(synced.root)}); `
+        + '0600 does not prevent synchronisation');
       remedy = 'move the store outside the synced folder, or use --global';
     }
 

@@ -50,6 +50,18 @@
 > at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
 > Nothing about a real instance goes into the repository: the record is the CODE and the timing.
 >
+> **Known Folder Move, on a real managed Windows machine (ARC-07-S07, 2026-09-10).** The one claim
+> in the cloud-sync detector that no test can make: that an enterprise-managed OneDrive client
+> actually sets `%OneDrive%` (or `%OneDriveCommercial%`) to the redirected root when policy moves
+> `Documents` or `Desktop` into the synced folder. The unit tests prove the DETECTOR reads those
+> variables — with a stubbed environment, from the shared fixture — and nothing more; the fixture's
+> `env` rows are written as if the client behaves that way. On a machine where the policy is in
+> force: `echo %OneDrive%`, then run `./snowarch instance add` from a checkout under the redirected
+> `Documents` and record whether the WARN appears and which folder it names. If the variable is
+> empty or points elsewhere, the KFM case is undetectable on Windows too, and the documented
+> limitation in the story grows by one sentence. Record the variable's value and the WARN line;
+> never the store's contents.
+>
 > **The OAuth ROPC token endpoint (ARC-07-S06, 2026-09-10).** One thing in this story cannot be
 > proven without an instance that HAS the grant enabled. `instance add --auth oauth_ropc` and
 > `instance set-credentials --auth oauth_ropc` now work — S05 could not succeed at all, see

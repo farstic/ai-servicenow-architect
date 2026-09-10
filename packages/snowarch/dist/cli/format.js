@@ -89,3 +89,80 @@ export function listTable(list) {
 export function probesJson(storePath, probes) {
     return { store: maskPath(storePath), instances: probes };
 }
+// ═══ ARC-07-S07 — two stores, and which one wins ═══════════════════════════════════════════
+/**
+ * The precedence sentence, spelled ONCE.
+ *
+ * `add --global`, `list --all` and `instance test` all say it, and the one thing a user needs from
+ * it is which file the server will actually read. Paths go through `maskPath` — the home directory
+ * becomes `~`, and an absolute path carries the account name into every screen share and ticket.
+ */
+export const precedenceNote = (label, firstPath, globalPath, source = 'project') => {
+    // The noun follows the SOURCE, because "the project store" is false when `SNOW_STORE` selected
+    // the file — and the whole point of the sentence is to name the file the server reads. The
+    // project wording is byte-for-byte the story's.
+    const noun = source === 'project' ? 'the project store' : `the store ${source} selects`;
+    const uses = source === 'project' ? 'the project store' : `the ${source} store`;
+    return `Note: "${label}" exists in both ${noun} (${maskPath(firstPath)}) and the global `
+        + `store (${maskPath(globalPath)}). The server uses ${uses} for this checkout; the `
+        + 'global entry is ignored here.';
+};
+/** The footer `list` prints when the OTHER store is not empty. */
+export const otherStoreFooter = (count) => `(+ ${count} instance${count === 1 ? '' : 's'} in the global store — ./snowarch instance list --all)`;
+export const storeLabelFor = (source) => (source === 'env' ? 'SNOW_STORE' : source === 'global' ? 'global' : 'project');
+/**
+ * Both stores, side by side, with every row saying where it came from.
+ *
+ * NEVER MERGED — `01` §7, and the reason is that a merge makes "which file set this value"
+ * unanswerable. The rows are concatenated, a duplicate label appears TWICE with different `store`
+ * values, and the note says which of the two the server reads.
+ */
+export function combinedListJson(first, globalStore) {
+    // The FIRST store is whatever the resolver selected — the per-checkout one, or the file
+    // `SNOW_STORE` names, or the global one when there is nothing else. It used to be computed
+    // separately as "the project path", so a run under `SNOW_STORE` listed only the global store
+    // and left out the file the server actually reads. Found in review.
+    const sameFile = first.path === globalStore.path;
+    const rows = [];
+    for (const [source, side] of [[first.source, first],
+        ...(sameFile ? [] : [['global', globalStore]])]) {
+        for (const [label, entry] of Object.entries(side.store?.instances ?? {})) {
+            // The default marker belongs to the ROW'S OWN store. Both files name a default, and marking
+            // a global row because the project store calls that label its default would claim a
+            // relationship between two files that are never read together.
+            rows.push({ ...maskedInstance(label, entry), store: source,
+                default: side.store?.defaultInstance === label });
+        }
+    }
+    const inBoth = sameFile ? [] : Object.keys(first.store?.instances ?? {})
+        .filter((label) => Boolean(globalStore.store?.instances?.[label]));
+    return {
+        store: maskPath(first.store ? first.path : globalStore.path),
+        defaultInstance: first.store?.defaultInstance ?? globalStore.store?.defaultInstance ?? null,
+        instances: rows,
+        stores: {
+            project: first.source === 'project' && first.store ? maskPath(first.path) : null,
+            SNOW_STORE: first.source === 'SNOW_STORE' && first.store ? maskPath(first.path) : null,
+            global: globalStore.store ? maskPath(globalStore.path) : null,
+        },
+        notes: inBoth.map((label) => precedenceNote(label, first.path, globalStore.path, first.source)),
+    };
+}
+const ALL_HEADERS = ['LABEL', 'STORE', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER'];
+/** `list --all`: the table with a STORE column, then the precedence note for anything in both. */
+export function listAllTable(list) {
+    if (list.instances.length === 0)
+        return NO_INSTANCES;
+    const rows = list.instances
+        .map((i) => [
+        i.label, i.store, i.environment, i.auth.method, i.preset,
+        i.default ? '*' : '', i.auth.username,
+    ]);
+    const width = ALL_HEADERS.map((h, c) => Math.max(h.length, ...rows.map((r) => r[c]?.length ?? 0)));
+    const line = (cells, last) => `${cells.map((cell, c) => cell.padEnd(width[c])).join('  ')}  ${last}`.trimEnd();
+    return [
+        line(ALL_HEADERS, 'LAST PROBE'),
+        ...rows.map((r, n) => line(r, probeCell(list.instances[n]?.lastProbe ?? null))),
+        ...(list.notes.length > 0 ? ['', ...list.notes] : []),
+    ].join('\n');
+}

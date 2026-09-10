@@ -42,12 +42,25 @@ export declare function maskProxyUrl(raw: string | undefined): string;
  * invites a reader to look for something that is not there — and `<host>` falls back to "the
  * instance" for a caller that has no URL to hand.
  */
-export declare function fillRemedy(code: string, { host, proxy, proxyVar, issuer, }?: {
+export interface RemedyValues {
     host?: string | undefined;
     proxy?: string | undefined;
     proxyVar?: string | undefined;
     issuer?: string | undefined;
-}): string;
+    /** ARC-07-S07's three, for `STORE_IN_CLOUD_SYNC_FOLDER`. */
+    provider?: string | undefined;
+    root?: string | undefined;
+    global?: string | undefined;
+}
+/**
+ * The registry's MEANING, instantiated the same way its remedy is.
+ *
+ * `STORE_IN_CLOUD_SYNC_FOLDER` is the first code whose meaning carries values — the provider and
+ * the folder — and a second filler for the other half of the same entry would be two places to
+ * change a placeholder's name. One substitution, both halves.
+ */
+export declare function fillMeaning(code: string, values?: RemedyValues): string;
+export declare function fillRemedy(code: string, values?: RemedyValues): string;
 /** The certificate issuer, when the error carried one. Best effort: a hint, not a claim. */
 export declare function issuerOf(err: unknown): string | undefined;
 export declare function classifyNetworkError(err: unknown, env?: NodeJS.ProcessEnv, { host }?: {
