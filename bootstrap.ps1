@@ -199,10 +199,12 @@ function Save-State {
   }
   Write-Json "$Root\.local\bootstrap-state.json" $state 5
 }
-function Record([string]$Id, [string]$Status) {
+# `$Ms` is the measured duration, when the step measured itself. `inputsHash` stays null on
+# purpose: this launcher TIMES a step, it never caches one.
+function Record([string]$Id, [string]$Status, [int]$Ms = 0) {
   $StepStates[$Id] = [ordered]@{
     status = $Status; inputsHash = $null
-    finishedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); durationMs = 0
+    finishedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'); durationMs = $Ms
   }
   Save-State
 }
@@ -219,7 +221,7 @@ if ($Docs -eq 'skip') {
   Step 'B02' 'docs' 'skipped (--docs skip) — the doctor will report the corpus as FAIL until you run ./snowarch docs sync'
   Record 'B02' 'skipped'
 } else {
-  $t0 = Get-Date
+  $watch = [System.Diagnostics.Stopwatch]::StartNew()
   if ($Docs -eq 'full') { Invoke-DocsRecipeFull } else { Invoke-DocsRecipeSparse }
   if ($LASTEXITCODE -ne 0) { Die 'B02' 'the corpus checkout failed' $MSG_NET 1 }
   # The recipe already carries -c core.longpaths=true; this makes it stick for later git calls in
@@ -233,8 +235,9 @@ if ($Docs -eq 'skip') {
   }
   Say ("areas: {0}/{0} present" -f $areas.Length)
   Say $MSG_CITATIONS
-  Step 'B02' 'docs' ("ok ({0} s)" -f [int]((Get-Date) - $t0).TotalSeconds)
-  Record 'B02' 'ok'
+  $watch.Stop()
+  Step 'B02' 'docs' ("ok ({0} s)" -f [int]$watch.Elapsed.TotalSeconds)
+  Record 'B02' 'ok' ([int]$watch.ElapsedMilliseconds)
 }
 
 $LocalSettings = "$Root\.claude\settings.local.json"

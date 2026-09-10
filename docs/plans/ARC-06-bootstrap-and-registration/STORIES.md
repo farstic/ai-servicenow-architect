@@ -799,7 +799,11 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
    all: the launchers record `"inputsHash": null` because bash cannot compute the repository's
    input hashes, and pretending it could would cache a step whose inputs had changed. So the
    launcher re-runs its steps by design, and what must hold is that nothing changed — `ok B07:
-   already set`, a byte-identical `settings.local.json`, and the same step outcomes.
+   already set`, a byte-identical `settings.local.json`, and the same step outcomes. **The
+   launchers time B02; they do not cache it** (ruled 2026-09-10): both record the measured
+   duration — `$SECONDS`-resolution in bash, a `Stopwatch` in PowerShell — so the CI summary's
+   seconds column is filled for a Node-free reader, who is exactly who reads those rows.
+   `inputsHash` stays `null`, because timing a step and caching it are different claims.
 6. The job summary table is present with a non-empty seconds/MB value for every cell.
 7. After ARC-08 S11, the same job additionally asserts `summary.fail == 0` from `./snowarch doctor --json` in the `node-cli` cells without restructuring.
 

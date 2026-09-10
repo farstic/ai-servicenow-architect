@@ -180,6 +180,17 @@ if (secondLog && existsSync(secondLog)) {
   const first = firstState && existsSync(firstState) ? JSON.parse(readFileSync(firstState, 'utf8')) : null;
 
   if (variant === 'no-node') {
+    // The launchers TIME B02 and never cache it, so what the first run must show is a measured
+    // duration and what the second must show is that nothing CHANGED. `finishedAt` moves here by
+    // design — the step really did run again — which is why the comparison below is of outcomes
+    // and of the toggle file, not of timestamps.
+    const firstB02 = first?.steps?.B02?.durationMs;
+    if (!(firstB02 > 0)) {
+      fail(8, `the launcher recorded B02 as ${firstB02} ms — a step it timed and then did not report`);
+    }
+    if (!(state?.steps?.B02?.durationMs > 0)) {
+      fail(8, 'the second run recorded no duration for B02 either');
+    }
     if (!/ok B07: already set/.test(log)) {
       fail(8, 'the second run did not report B07 as already set — it rewrote the toggle');
     }
@@ -195,7 +206,8 @@ if (secondLog && existsSync(secondLog)) {
         fail(8, `the second run changed a step's outcome:\n  before ${JSON.stringify(before)}\n  after  ${JSON.stringify(after)}`);
       }
     }
-    notes.push('second run: launcher re-ran its steps and changed nothing (no cache by design)');
+    notes.push(`second run: launcher re-ran its steps and changed nothing (B02 ${firstB02} ms `
+      + `then ${state?.steps?.B02?.durationMs} ms — timed, never cached)`);
   } else {
     for (const id of ['B01', 'B02', 'B07']) {
       if (!new RegExp(`\\[${id}/09\\][^\\n]*ok \\(cached\\)`).test(log)) {
