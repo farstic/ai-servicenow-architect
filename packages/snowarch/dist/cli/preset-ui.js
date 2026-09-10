@@ -12,7 +12,7 @@
  * the moment you can raise production inside a wizard, raising production becomes something that
  * happens while you are doing something else.
  */
-import { FLAG_NAMES, PRESETS, applyDependencyRule, expandPreset, matchPreset, } from '../utils/permissions.js';
+import { FLAG_NAMES, PRESETS, applyDependencyRule, dependentsOf, expandPreset, matchPreset, requiresOf, } from '../utils/permissions.js';
 /** Every line this screen prints fits here. A wrapped hint is indented under its annotation. */
 export const COLUMNS = 100;
 /** The short label a reader sees, derived from the flag key — never a second list to maintain. */
@@ -181,12 +181,19 @@ export function parseFlagsArg(raw) {
 }
 /** The dependency rule as a sentence, or null. The UI's copy of the server's own rule. */
 export function dependencyViolation(flags) {
-    const dependents = ['SCRIPTING_ENABLED', 'CMDB_WRITE_ENABLED']
-        .filter((f) => flags[f] === 'true');
-    if (flags.WRITE_ENABLED === 'true' || dependents.length === 0)
-        return null;
-    return `${dependents.map(labelOf).join(' and ')} requires WRITE — scripting and CMDB writes are `
-        + 'writes, so declaring one without WRITE is a contradiction';
+    // The graph is `permissions.ts`'s (ARC-07-S05 carry-over): this file used to re-encode "WRITE ←
+    // CMDB_WRITE, SCRIPTING" as literals, which is a second definition of a rule the server already
+    // owns — and the copy nobody would think to update when a third dependency appears.
+    for (const flag of FLAG_NAMES) {
+        if (flags[flag] !== 'true')
+            continue;
+        const unmet = requiresOf(flag).filter((needed) => flags[needed] !== 'true');
+        if (unmet.length > 0) {
+            return `${labelOf(flag)} requires ${unmet.map(labelOf).join(' and ')} — scripting and CMDB `
+                + 'writes are writes, so declaring one without WRITE is a contradiction';
+        }
+    }
+    return null;
 }
 /**
  * The screen, until Enter.
@@ -225,7 +232,9 @@ export async function runReviewScreen(input, io) {
                 continue;
             }
             if (prod && name !== 'read-only') {
-                io.write(`${PROD_LOCKED(input.label, 'WRITE_ENABLED')}\n`);
+                // Whichever flag the user reached for; the first is as good a stand-in as any when they
+                // asked for a preset rather than a flag.
+                io.write(`${PROD_LOCKED(input.label, FLAG_NAMES[0])}\n`);
                 continue;
             }
             preset = name;
@@ -255,23 +264,28 @@ export async function runReviewScreen(input, io) {
  */
 async function toggle(current, flag, io) {
     const next = { ...current, [flag]: current[flag] === 'true' ? 'false' : 'true' };
-    if (flag === 'WRITE_ENABLED' && next.WRITE_ENABLED === 'false') {
-        const dependents = ['CMDB_WRITE_ENABLED', 'SCRIPTING_ENABLED']
-            .filter((f) => next[f] === 'true');
-        if (dependents.length > 0) {
-            const answer = await io.ask(`${dependents.map(labelOf).join(' and ')} require WRITE — turn them off as well? [Y/n] `);
+    // Turning something OFF that others need.
+    if (next[flag] === 'false') {
+        const stranded = dependentsOf(flag).filter((f) => next[f] === 'true');
+        if (stranded.length > 0) {
+            const answer = await io.ask(`${stranded.map(labelOf).join(' and ')} require ${labelOf(flag)} — turn them off as well? [Y/n] `);
             if (isNo(answer))
-                return current; // WRITE stays on
-            for (const f of dependents)
+                return current; // the needed flag stays on
+            for (const f of stranded)
                 next[f] = 'false';
         }
     }
-    if ((flag === 'CMDB_WRITE_ENABLED' || flag === 'SCRIPTING_ENABLED')
-        && next[flag] === 'true' && next.WRITE_ENABLED === 'false') {
-        const answer = await io.ask(`${labelOf(flag)} requires WRITE — turn WRITE on too? [Y/n] `);
-        if (isNo(answer))
-            return current; // both stay off
-        next.WRITE_ENABLED = 'true';
+    // Turning something ON that needs others.
+    if (next[flag] === 'true') {
+        const unmet = requiresOf(flag).filter((needed) => next[needed] !== 'true');
+        if (unmet.length > 0) {
+            const answer = await io.ask(`${labelOf(flag)} requires ${unmet.map(labelOf).join(' and ')} — turn `
+                + `${unmet.length === 1 ? 'it' : 'them'} on too? [Y/n] `);
+            if (isNo(answer))
+                return current; // both stay off
+            for (const f of unmet)
+                next[f] = 'true';
+        }
     }
     // The server's rule, applied again here: the screen must never show a state the server would
     // refuse to honour.
