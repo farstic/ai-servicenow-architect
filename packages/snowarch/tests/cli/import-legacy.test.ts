@@ -44,6 +44,9 @@ const SECRETS = fixture.instances.flatMap((e) =>
 
 const everything: string[] = [];
 
+/** Separators normalised. A Windows path is a right answer, not a different plan. */
+const posix = (text: string): string => text.split('\\').join('/');
+
 const REAL = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE,
   CLAUDE_PROJECT_DIR: process.env.CLAUDE_PROJECT_DIR, SNOW_STORE: process.env.SNOW_STORE };
 
@@ -134,7 +137,10 @@ describe('AC 1 — the dry run', () => {
     expect(r.exitCode).toBe(EXIT_OK);
     expect(existsSync(store), 'a dry run writes nothing').toBe(false);
 
-    const out = terminal.written();
+    // Separators normalised: on Windows the plan prints `~\.config\servicenow-mcp\…`, which is
+    // the RIGHT answer there — the legacy store really is at `%USERPROFILE%\.config` — so the
+    // assertion is about the path, not about which slash the platform draws it with.
+    const out = posix(terminal.written());
     expect(out).toContain('Legacy store: ~/.config/servicenow-mcp/instances.json (2 instances)');
     expect(out).toContain('Target store: <checkout>/.local/instances.json (project)');
     expect(out).toContain('Each imported instance is probed before it is saved');
@@ -146,11 +152,14 @@ describe('AC 1 — the dry run', () => {
     const snippet = readFileSync(resolve(here, '../../../../docs/snippets/import-from-legacy.md'), 'utf8');
     const { terminal, result } = run({ path: legacy, dryRun: true });
     await result;
-    const plan = terminal.written().trimEnd();
+    const plan = posix(terminal.written().trimEnd());
     // The snippet quotes the plan inside its fenced block. One source: if the renderer changes,
     // this fails here rather than in a document nobody re-reads.
     expect(snippet, 'docs/snippets/import-from-legacy.md is stale — regenerate it from the dry run')
       .toContain(plan);
+    // The snippet is documentation for both platforms and is written in the POSIX form; the
+    // Windows command has its own block inside it, and the deletion advice renders per platform.
+    expect(snippet).toContain('Remove-Item -Recurse $HOME\\.config\\servicenow-mcp');
   });
 });
 
@@ -259,10 +268,12 @@ describe('AC 5 — running it twice', () => {
 
 describe('AC 6 — the advice, and the deletion this command never performs', () => {
   it('names the directory and tokens.json, per platform', () => {
-    const posix = deletionAdvice(1, 2, '/home/me', 'linux');
-    expect(posix).toContain('rm -r /home/me/.config/servicenow-mcp');
-    expect(posix).toContain('tokens.json');
-    expect(posix).toContain('Imported 1 of 2');
+    // Rendered for a named platform, on whichever platform the runner happens to be: the advice is
+    // a line the reader pastes, so its separators follow the system it describes.
+    const unix = deletionAdvice(1, 2, '/home/me', 'linux');
+    expect(unix).toContain('rm -r /home/me/.config/servicenow-mcp');
+    expect(unix).toContain('tokens.json');
+    expect(unix).toContain('Imported 1 of 2');
     const windows = deletionAdvice(2, 2, 'C:\\Users\\me', 'win32');
     expect(windows).toContain('Remove-Item -Recurse');
     expect(windows).toContain('\\.config\\servicenow-mcp');
@@ -274,10 +285,12 @@ describe('AC 6 — the advice, and the deletion this command never performs', ()
     for (const call of [['rm', 'Sync'].join(''), ['unlink', 'Sync'].join(''), ['rmdir', 'Sync'].join('')]) {
       expect(source, `the import must never call ${call}`).not.toContain(call);
     }
-    expect(legacyStoreDir('/home/me')).toBe('/home/me/.config/servicenow-mcp');
-    // The legacy path is the POSIX shape on EVERY OS — the old tool used homedir()/.config on
-    // Windows too, so a `%APPDATA%` guess here would look in a directory that never existed.
-    expect(legacyStorePath('/home/me')).toBe('/home/me/.config/servicenow-mcp/instances.json');
+    // `join()` draws the HOST's separator — these two functions open a file, so that is right —
+    // and the assertion is about WHERE, not about which slash. The legacy path is the same
+    // `.config` shape on every OS: the old tool used `homedir()/.config` on Windows too, so a
+    // `%APPDATA%` guess here would look in a directory that never existed.
+    expect(posix(legacyStoreDir('/home/me'))).toBe('/home/me/.config/servicenow-mcp');
+    expect(posix(legacyStorePath('/home/me'))).toBe('/home/me/.config/servicenow-mcp/instances.json');
   });
 });
 

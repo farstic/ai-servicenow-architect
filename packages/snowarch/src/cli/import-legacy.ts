@@ -357,10 +357,12 @@ export function renderPlan(plan: ImportPlan): string {
 /** The closing advice. It NAMES the files; it never removes one. */
 export function deletionAdvice(imported: number, total: number, home: string = homedir(),
   platform: NodeJS.Platform = process.platform): string {
-  const dir = maskPath(legacyStoreDir(home));
-  const remove = platform === 'win32'
-    ? `Remove-Item -Recurse ${dir.replace(/\//g, '\\')}`
-    : `rm -r ${dir}`;
+  // The separator follows the PLATFORM THIS ADVICE IS FOR, not the one the process happens to run
+  // on: `join()` uses the host's, so a Windows command rendered on a POSIX runner (and the reverse,
+  // which is how this was found) came out with the wrong slashes in a line the reader will paste.
+  const separator = platform === 'win32' ? '\\' : '/';
+  const dir = maskPath(legacyStoreDir(home)).split(/[\\/]/).join(separator);
+  const remove = platform === 'win32' ? `Remove-Item -Recurse ${dir}` : `rm -r ${dir}`;
   return `Imported ${imported} of ${total}. The legacy files were left in place. When you are `
     + `satisfied, delete them: ${remove}   (contains instances.json and tokens.json with plaintext `
     + 'secrets). Then remove stale Claude Code registrations: ./snowarch doctor lists the exact '

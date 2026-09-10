@@ -188,8 +188,14 @@ if (secondLog && existsSync(secondLog)) {
     if (!(firstB02 > 0)) {
       fail(8, `the launcher recorded B02 as ${firstB02} ms — a step it timed and then did not report`);
     }
-    if (!(state?.steps?.B02?.durationMs > 0)) {
-      fail(8, 'the second run recorded no duration for B02 either');
+    // A NUMBER, not a positive one. The claim is "B02 is timed and never cached", and the second
+    // run proves it by RUNNING — a docs sync with nothing to do can finish inside a millisecond and
+    // round to 0, which is a fact about the runner rather than about the launcher. Demanding `> 0`
+    // here made this cell fail on a fast machine while the first run's genuine 21 000 ms (checked
+    // just above) said everything the assertion is actually about. Seen once on ubuntu/no-node.
+    const secondB02 = state?.steps?.B02?.durationMs;
+    if (typeof secondB02 !== 'number') {
+      fail(8, `the second run recorded B02's duration as ${secondB02} — the step was cached, not timed`);
     }
     if (!/ok B07: already set/.test(log)) {
       fail(8, 'the second run did not report B07 as already set — it rewrote the toggle');
