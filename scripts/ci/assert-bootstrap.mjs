@@ -225,9 +225,12 @@ if (argv.includes('--summary') && process.env.GITHUB_STEP_SUMMARY) {
   // somewhere else would leave twelve tables with no columns. The run's summary page stacks them.
   // The column names are `docs-real.yml`'s, because `docs/INSTALL.md` quotes those numbers and a
   // reader comparing the two should not have to translate.
+  const row = `| ${process.platform} | ${variant} | ${writer} | ${b02Seconds} | ${mb} |`;
   appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-    ['| OS | variant | writer | B02 seconds | corpus MB |', '|---|---|---|---|---|',
-      `| ${process.platform} | ${variant} | ${writer} | ${b02Seconds} | ${mb} |`, ''].join('\n'));
+    ['| OS | variant | writer | B02 seconds | corpus MB |', '|---|---|---|---|---|', row, ''].join('\n'));
+  // ...and to stdout, because the summary page is per RUN and a person reading ONE cell's log
+  // should see that cell's numbers without leaving it.
+  notes.push(`summary row ${row}`);
 }
 
 /** Bytes under a directory. Small and synchronous: it runs once per cell, over one tree. */
