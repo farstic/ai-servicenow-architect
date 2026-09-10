@@ -7,8 +7,11 @@
 // wording: a wording nobody has seen degrades to a WARN that says so.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { chmodSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
+
+import { which } from '../../tools/snowarch/lib/which.mjs';
 
 import { classifyStatus, hostChecks, inspectCa, PEM_HEADER,
   readVar } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
@@ -40,7 +43,15 @@ function fakeClaude(t, statusLine, { scope = 'Project config (shared via .mcp.js
   return dir;
 }
 
-/** A context whose PATH holds the fake, with the mode the case is about recorded in the state. */
+/**
+ * A context whose PATH holds the fake, with the mode the case is about recorded in the state.
+ *
+ * Two twins, because `which` resolves by extension on Windows and by the execute bit everywhere
+ * else — and the one Windows finds is a `.cmd`, which Node refuses to spawn without a shell since
+ * the 2024 argument-injection mitigation. That refusal is Node's, not this product's, so the
+ * Windows arm passes the shell-using runner through the `exec` seam the check already has rather
+ * than asserting a spawn behaviour nobody here owns.
+ */
 function withClaude(t, { statusLine, mode = 'design', scope } = {}) {
   const root = greenTree(t, { mode });
   const dir = fakeClaude(t, statusLine, scope ? { scope } : {});
@@ -48,8 +59,29 @@ function withClaude(t, { statusLine, mode = 'design', scope } = {}) {
   // has no `cat` — the script then fails with 127 and the test proves the error path instead of
   // the case it is about. First on PATH is what makes the fake win.
   const PATH = `${dir}${delimiter}${process.env.PATH ?? ''}`;
-  return { root, over: { env: { ...process.env, PATH }, claudePath: join(dir, 'claude') } };
+  const windows = process.platform === 'win32';
+  const over = {
+    env: { ...process.env, PATH },
+    claudePath: join(dir, windows ? 'claude.cmd' : 'claude'),
+    ...(windows
+      ? { exec: (file, args, options) => spawnSync(`"${file}"`, args,
+        { encoding: 'utf8', shell: true, ...options }) }
+      : {}),
+  };
+  return { root, over };
 }
+
+test('the fake is what a PATH lookup would find on either platform', (t) => {
+  const dir = fakeClaude(t, REJECTED);
+  // Case-insensitively: `PATHEXT` is upper-case by default, Windows paths are case-insensitive,
+  // and the resolver returns the candidate it built rather than the name on disk.
+  assert.equal(String(which('claude', { env: { PATH: dir }, platform: 'win32' })).toLowerCase(),
+    join(dir, 'claude.cmd').toLowerCase());
+  if (process.platform !== 'win32') {
+    assert.equal(which('claude', { env: { PATH: dir }, platform: process.platform }),
+      join(dir, 'claude'));
+  }
+});
 
 // E-25 reads ONE thing — the path — so its cases are paths. A checkout is not built for them: a
 // directory that does not exist is exactly what a user's synced folder looks like to this check.
