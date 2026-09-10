@@ -5,10 +5,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { modeCommand } from '../lib/mode.mjs';
-import { CLAUDE_ABSENT, CREATED_BY_US, flagsChanged, get, parseGet, register, unregister }
-  from '../lib/registration-claude.mjs';
+import { CLAUDE_ABSENT, CREATED_BY_US, flagsChanged, get, isShim, parseGet, register, shimTarget,
+  unregister } from '../lib/registration-claude.mjs';
 import { EXIT_OK } from '../lib/exit.mjs';
 import { emptyState, loadState, saveState } from '../lib/state.mjs';
+import { tempDir } from './helpers/temp.mjs';
 import { makeCheckout, recorder } from './helpers/workspace.mjs';
 
 /**
@@ -256,6 +257,68 @@ test('an absent server is `found: false`, never an exception', () => {
   assert.equal(r.scope, null);
   assert.equal(parseGet('').found, false);
   assert.equal(parseGet(undefined).found, false);
+});
+
+/**
+ * ARC-08-S04 deliverable 0 — a `.cmd` shim is redirected, never spawned.
+ *
+ * `claude` installed from npm on Windows IS `claude.cmd`, and `child_process` has refused to spawn
+ * one without a shell since the CVE-2024-27980 fix. Every `claude mcp` call on such a machine
+ * failed with EINVAL: the S-03 fallback registration, `mode live`, and the doctor's E-27. The
+ * repository's rule for this is B04's — resolve the shim's own entry point and run it under this
+ * Node — and it is applied here rather than re-invented.
+ *
+ * The end-to-end case runs on EVERY platform on purpose: the redirect means the extension stops
+ * mattering, so what Windows exercises is the same code path this cell just proved.
+ */
+test('a .cmd shim is run through its own entry point, on every platform', (t) => {
+  const dir = tempDir('snowarch-shim-', t);
+  const modules = join(dir, 'node_modules', 'claude-code');
+  mkdirSync(modules, { recursive: true });
+  writeFileSync(join(modules, 'cli.js'),
+    "process.stdout.write('servicenow:\\n  Scope: Project config (shared via .mcp.json)\\n'\n"
+    + "  + '  Status: connected\\n');\n");
+  writeFileSync(join(dir, 'claude.cmd'),
+    '@ECHO off\r\nnode  "%~dp0\\node_modules\\claude-code\\cli.js" %*\r\n');
+
+  const entry = shimTarget(join(dir, 'claude.cmd'));
+  assert.equal(entry, join(modules, 'cli.js'), 'the shim\'s entry point was not resolved');
+
+  const shown = get('servicenow', { root: dir, claudePath: join(dir, 'claude.cmd') });
+  assert.equal(shown.found, true, `the shim did not run: ${shown.reason ?? ''}`);
+  assert.equal(shown.name, 'servicenow');
+  assert.equal(shown.scope, 'project');
+});
+
+test('a shim whose entry point cannot be read is refused with a sentence, not an errno', (t) => {
+  const dir = tempDir('snowarch-shim-', t);
+  writeFileSync(join(dir, 'claude.cmd'), '@ECHO off\r\nsomething-else %*\r\n');
+  const shown = get('servicenow', { root: dir, claudePath: join(dir, 'claude.cmd') });
+  assert.equal(shown.found, false);
+  assert.match(shown.reason, /command shim whose entry point could not be read/);
+  assert.equal(/EINVAL|spawnSync/.test(shown.reason), false, 'an errno reached the sentence');
+});
+
+test('shimTarget reads both slash styles, an absolute target, and refuses a guess', () => {
+  const exists = (p) => /cli\.js$/.test(p);
+  const posix = shimTarget('/x/claude.cmd',
+    { read: () => 'node "%~dp0/lib/cli.js" %*', exists });
+  assert.equal(posix, join('/x', 'lib', 'cli.js'));
+  const windows = shimTarget('/x/claude.cmd',
+    { read: () => 'node "%~dp0\\lib\\cli.js" %*', exists });
+  assert.equal(windows, join('/x', 'lib', 'cli.js'));
+  // A target that is not there is not a target: a shim naming a file that has been uninstalled
+  // must read as unresolved rather than as a path to spawn.
+  assert.equal(shimTarget('/x/claude.cmd', { read: () => 'node "%~dp0/lib/cli.js" %*',
+    exists: () => false }), null);
+  assert.equal(shimTarget('/x/claude.cmd', { read: () => { throw new Error('ENOENT'); } }), null);
+});
+
+test('an executable that is not a shim is spawned exactly as before', () => {
+  assert.equal(isShim('/usr/local/bin/claude'), false);
+  assert.equal(isShim('C:\\Program Files\\claude\\claude.exe'), false);
+  assert.equal(isShim('C:\\npm\\claude.CMD'), true);
+  assert.equal(isShim('C:\\npm\\claude.bat'), true);
 });
 
 test('nothing under lib/ opens ~/.claude.json, or anything else in the home directory', () => {

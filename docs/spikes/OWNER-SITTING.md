@@ -668,10 +668,15 @@ produce is a real `~/.claude.json` written by the old installers over two years,
 ```sh
 cd ~/snowarch-ref                     # or any checkout of this branch
 ./snowarch doctor --section legacy,host
+shasum -a 256 ~/.claude.json          # (1) before
 ./snowarch doctor --section legacy --json > /tmp/doctor-legacy.json
-shasum -a 256 ~/.claude.json          # before and after — they must match
-./snowarch doctor --section legacy --fix >/dev/null; shasum -a 256 ~/.claude.json
+./snowarch doctor --section legacy --fix >/dev/null
+shasum -a 256 ~/.claude.json          # (2) after — must equal (1)
 ```
+
+> The two `shasum` lines bracket `--section legacy` deliberately. A FULL run also runs E-27, which
+> asks the real `claude` for its registration status — and Claude Code maintains `~/.claude.json`
+> while answering, so the sha moves for a reason that is not this product writing anything.
 
 1. Paste the whole `legacy` and `host` block. It is redacted by the runner — no value, only key
    counts and `set (len n)` — but read it before pasting anyway.

@@ -224,6 +224,13 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 > record found `enabledMcpjsonServers` is not honoured before trust, so pending in design-only means
 > the disable toggle is not in force. (5) The recorded mode is `design`/`live` (`state.mjs`), not the
 > `design-only` this story's text quotes; anything that is not `live` is read as design-only.
+>
+> **Amendment 2026-09-10 (b), from the review.** Acceptance criterion 2 — "`sha256sum` of the
+> fixture `.claude.json` is identical before and after the run" — is a promise about THIS product,
+> and it holds for `--section legacy` and for `--quick` (which excludes E-27). It does not hold for
+> a full run against an INSTALLED Claude Code: `claude mcp get` makes Claude Code itself maintain
+> `~/.claude.json` while answering, measured on a redirected HOME. E-27's detail says so, and the
+> owner-sitting commands bracket `--section legacy`.
 
 **As** an individual practitioner migrating from the old install **I want** the doctor to find every leftover of the previous setup — stale `~/.claude.json` registrations that still hold plaintext secrets, the legacy wizard store, a checkout under a cloud-sync folder, proxy/CA variables that are set wrongly, and a Claude Code registration status that contradicts the recorded mode — and to print the exact command for each **so that** nothing with a credential in it is forgotten and the doctor never edits a file it does not own.
 **Context.** README deliverables "stale `~/.claude.json` entries for this folder … → prints `claude mcp remove <name> -s local` and the `.bak-*` reminder; legacy `~/.config/servicenow-mcp/` present → prints `./snowarch instance import --from-legacy`" and acceptance criterion 6 (a copied `~/.claude.json` fixture with stale `servicenow-mcp` and `nowaikit` entries produces the exact removal commands). `00` P-34 (six credential copies; `.bak-*` retain secrets), §5 (local scope keyed on the absolute path), `scripts/doctor.sh:405-466` (the read-only inspection this story ports to Node, minus the username print). `03` R-07. D-04 (WARN under OneDrive/Dropbox/iCloud/Google Drive — obligation shared by wizard and doctor). R-3 (doctor check for proxy and CA). ARC-04-S02 (`isUnderCloudSyncFolder`), ARC-04-S11 (`classifyNetworkError` codes and `NODE_EXTRA_CA_CERTS` semantics), ARC-10-S01 (`docs/MIGRATION.md` reuses these commands).
