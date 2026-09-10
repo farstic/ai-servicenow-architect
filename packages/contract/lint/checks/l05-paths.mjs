@@ -10,10 +10,77 @@
  * path that does not exist in a clone; anything with a glob or a `<placeholder>` is a shape rather
  * than a path; and fenced code is a transcript, where a path that does not exist is often the point.
  */
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { isHistory, readLines } from '../lib/scan.mjs';
+
+/**
+ * Paths that are real when the tool RUNS and are never in the repository.
+ *
+ * The list is explicit because the resolver below is otherwise absolute: anything not tracked is
+ * a dead citation. `~/` and the two Windows variables are here for completeness rather than
+ * effect — no scanned prefix begins with them today, so they cannot reach the resolver — and
+ * naming them means adding such a prefix later cannot quietly turn a correct citation red.
+ */
+const RUNTIME_PREFIXES = ['.local/', '~/', '%APPDATA%', '%USERPROFILE%'];
+
+/**
+ * What the repository CONTAINS, asked of git rather than of this machine's disk.
+ *
+ * ARC-07-S05 shipped two comments citing the nested `node_modules` tree under the server package
+ * while explaining that npm hoists it away — a dead citation that passed here (this working copy
+ * had that directory: two packages npm nested for a version conflict) and failed on all nine CI
+ * cells. `existsSync` answers with the state of one machine, so a check meant to say "a reader
+ * can follow this" said "the author could". Tracked files are the same set on every clone.
+ *
+ * A submodule gitlink is one entry with mode 160000; it is a DIRECTORY to anyone citing it, so it
+ * is registered with a trailing slash as well. Every parent directory of every tracked file is
+ * registered too — `docs/` is real, though nothing is tracked under that name alone.
+ *
+ * The index is what is read, not HEAD: a file created by the story in hand resolves as soon as it
+ * is `git add`ed, which is the point at which this repository's gates are run.
+ */
+function trackedPaths(root) {
+  const out = execFileSync('git', ['-C', root, 'ls-files', '-sz'],
+    { encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'] });
+  const tracked = new Set();
+  for (const record of out.split('\0')) {
+    if (!record) continue;
+    const tab = record.indexOf('\t');
+    const path = record.slice(tab + 1);
+    tracked.add(path);
+    if (record.slice(0, 6) === '160000') tracked.add(`${path}/`);
+    let parent = path;
+    let cut = parent.lastIndexOf('/');
+    while (cut !== -1) {
+      parent = parent.slice(0, cut);
+      tracked.add(parent);
+      tracked.add(`${parent}/`);
+      cut = parent.lastIndexOf('/');
+    }
+  }
+  return tracked;
+}
+
+/**
+ * The resolver, and the one case that still reads the disk.
+ *
+ * A fixture tree is not a git work tree — the lint's own suite builds one per case in a temp
+ * directory — and "tracked" has no meaning there: the tree contains exactly what the test wrote,
+ * with nothing ignored, so the disk IS the answer. The summary line says which rule ran, because
+ * a check that silently changed its mind about what it was checking is how the S05 case survived
+ * a green local run in the first place.
+ */
+function resolver(root) {
+  try {
+    const tracked = trackedPaths(root);
+    return { how: 'tracked', has: (p) => tracked.has(p) || tracked.has(p.replace(/\/$/, '')) };
+  } catch {
+    return { how: 'filesystem: not a git work tree', has: (p) => existsSync(join(root, p)) };
+  }
+}
 
 /**
  * A path a document names because it is COMING, not because it exists.
@@ -45,7 +112,8 @@ const isCandidate = (p) => PREFIXES.some((x) => p === x || p.startsWith(x));
 
 function skip(p) {
   return p.startsWith('vendor/ServiceNowDocs')      // ARC-03's gate checks these against the corpus
-    || p.includes('.local/') || /\.local\.json$/.test(p)   // per-checkout, absent from a clone
+    || RUNTIME_PREFIXES.some((x) => p.startsWith(x) || p.includes(x))   // real at run time, never here
+    || /\.local\.json$/.test(p)
     || /[*?{}]/.test(p)                             // a glob is a shape, not a path
     || /[<>]/.test(p)                               // `<label>`, `docs/<name>.md`
     || p.endsWith('/**')
@@ -85,6 +153,8 @@ const HISTORY_HEADING = /^#{2,3} (History|The D-03 cut ledger|Before \d)/;
 export function run(ctx) {
   const findings = [];
   const planned = forthcoming(ctx.root);
+  const resolve = resolver(ctx.root);
+  let checked = 0;
   for (const file of ctx.files) {
     // History is excluded, for the same reason the name checks exclude it: a plan that cites the
     // file it is about to create, and a changelog that names a file deleted two releases ago, are
@@ -112,12 +182,16 @@ export function run(ctx) {
           if (!path || seen.has(path) || !isCandidate(path) || skip(path)) continue;
           seen.add(path);
           if (planned.has(`${file}\u0000${path}`)) continue;
-          if (!existsSync(join(ctx.root, path))) {
+          checked += 1;
+          if (!resolve.has(path)) {
             findings.push({ file, line: i + 1, message: `dead path ${path}` });
           }
         }
       }
     });
   }
+  // What was CHECKED, on the status line: "L05 ok" alone cannot be told from "L05 read nothing",
+  // and this check's scope is a filter over a filter over a regex.
+  ctx.notes?.set(id, `${checked} citations, ${resolve.how}`);
   return findings;
 }
