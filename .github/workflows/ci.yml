@@ -377,6 +377,115 @@ jobs:
       # It goes through the doctor's `server` section (ARC-08-S05): the engine's own MCP client was
       # retired when B08 started asking the doctor, and this job must exercise the handshake the
       # product actually performs rather than a second one kept for testing.
+      # ── ARC-08-S11: the doctor, on the install this job just proved ─────────────────────────
+      # STEPS in these cells, not a job of their own. `main`'s protection requires 42 named
+      # contexts; a new job name would not be one of them, so it could go red for a week without
+      # blocking anything — which is the opposite of what a guard is for.
+      #
+      # BEFORE `npm ci` on purpose: a design-only install has no runtime dependencies, so every
+      # SV- check reports `skip`, and that is the state being snapshotted. Installing first would
+      # snapshot a machine no user is on.
+      - name: The doctor, on the design-only install (POSIX)
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: |
+          # Exit 1 means "a check FAILED", and one does here on purpose: a hosted runner has no
+          # Claude Code, so E-00 reports it missing. Which failures this environment explains is
+          # `assert-doctor.mjs`'s judgement, not this step's — but 2 (usage) and 3 (the doctor
+          # could not run at all) are fatal wherever they happen.
+          set +e
+          ./snowarch doctor --json --no-cache > doctor.json
+          code=$?
+          set -e
+          echo "doctor exit: $code"
+          if [ "$code" -ge 2 ]; then exit 1; fi
+          ./snowarch doctor --no-cache | tail -25 || true
+      - name: The doctor, on the design-only install (Windows)
+        if: (matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash') && matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          .\snowarch.cmd doctor --json --no-cache > doctor.json
+          if %ERRORLEVEL% GEQ 2 exit /b 1
+          .\snowarch.cmd doctor --no-cache
+          if %ERRORLEVEL% GEQ 2 exit /b 1
+          exit /b 0
+      # The no-gitbash cell runs it from PowerShell too: `snowarch.cmd` is the entry point on a
+      # machine with no POSIX shell, and "works from cmd" and "works from PowerShell" are two
+      # claims — the second is the one a user in a terminal actually makes.
+      - name: ...and the same doctor from powershell.exe
+        if: matrix.variant == 'no-gitbash'
+        shell: powershell
+        run: |
+          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
+          & cmd /c ".\snowarch.cmd doctor --json --no-cache > doctor-ps.json"
+          if ($LASTEXITCODE -ge 2) { exit 1 }
+          $r = Get-Content doctor-ps.json -Raw | ConvertFrom-Json
+          if ($r.mode -ne 'design-only') { Write-Host "mode: $($r.mode)"; exit 1 }
+          # E-00 is the one this environment explains — see assert-doctor.mjs.
+          $failed = @($r.checks | Where-Object { $_.status -eq 'fail' } | ForEach-Object { $_.id })
+          $unexpected = @($failed | Where-Object { $_ -ne 'E-00' })
+          if ($unexpected.Count -gt 0) { Write-Host "unexpected FAIL: $($unexpected -join ', ')"; exit 1 }
+          exit 0
+
+      # The assertions, and the snapshot. One implementation for every cell that has a report.
+      - name: Assert the report, and compare it with this platform's snapshot
+        if: matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash'
+        shell: bash
+        run: |
+          node scripts/ci/assert-doctor.mjs --in doctor.json --expect-fail E-00
+          node scripts/ci/doctor-snapshot.mjs --in doctor.json --out doctor-normalised.json --summary
+
+      # README criterion 5, measured where it is actually paid: five cold spawns, median under a
+      # second. The Windows cells run it through bash too — the hook is invoked as `node <path>` by
+      # Claude Code on every platform, so the shell it is measured from is not the variable.
+      - name: The SessionStart banner, timed
+        if: matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash'
+        shell: bash
+        run: node scripts/ci/banner-timing.mjs --runs 5 --budget-ms 1000 --summary
+
+      # ── the no-node cells: the fallback the /snowarch status skill reads ─────────────────────
+      # There is no doctor to run here, which IS the case being proved. What a session does instead
+      # is read the state file the launcher wrote — so that is what is asserted, with grep and with
+      # Node still off PATH, because a check that needed Node to prove the no-Node path would be
+      # proving something else.
+      - name: With no Node, the state file is what a session falls back to
+        if: matrix.variant == 'no-node' && matrix.os != 'windows-latest'
+        run: |
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          command -v node && exit 1
+          for key in mode docs pin updatedAt; do
+            grep -q "\"$key\"" .local/bootstrap-state.json || { echo "missing $key"; exit 1; }
+          done
+          grep -q '"mode": "design"' .local/bootstrap-state.json || { echo "not design-only"; exit 1; }
+          test ! -f .local/doctor-last.json || { echo "a doctor cache exists - the doctor ran?"; exit 1; }
+          echo "state file: $(wc -c < .local/bootstrap-state.json) bytes, no doctor cache"
+      - name: With no Node, the state file is what a session falls back to (Windows)
+        if: matrix.variant == 'no-node' && matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
+          if (Get-Command node -ErrorAction SilentlyContinue) { exit 1 }
+          $text = Get-Content .local\bootstrap-state.json -Raw
+          foreach ($key in @('"mode"', '"docs"', '"pin"', '"updatedAt"')) {
+            if (-not $text.Contains($key)) { Write-Host "missing $key"; exit 1 }
+          }
+          if (-not $text.Contains('"mode": "design"')) { Write-Host "not design-only"; exit 1 }
+          if (Test-Path .local\doctor-last.json) { Write-Host "a doctor cache exists"; exit 1 }
+          Write-Host "state file: $($text.Length) chars, no doctor cache"
+          exit 0
+
+      # Every run, pass or fail: a report you can only read when the job was green is a report you
+      # cannot use to find out why it was red.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: doctor-${{ matrix.label }}
+          path: |
+            doctor.json
+            doctor-ps.json
+            doctor-normalised.json
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: The committed dist/ answers a handshake on this OS
         if: matrix.variant == 'node-cli'
         run: |

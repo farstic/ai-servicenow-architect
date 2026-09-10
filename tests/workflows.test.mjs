@@ -119,6 +119,18 @@ test('the workflows name the repository settings they depend on', () => {
  * a broken install merges green. So the thirteen names are enumerated here, and changing one is a
  * two-file change with a comment pointing at the settings that have to change with it.
  */
+/**
+ * Every job in `ci.yml`, in order — the names branch protection lists.
+ *
+ * Here so that ADDING one is a deliberate edit to this list with the protection change beside it,
+ * rather than a silent new context nothing requires. ARC-08-S11 put the doctor into the bootstrap
+ * cells as steps for exactly this reason.
+ */
+const KNOWN_JOBS = [
+  'test', 'contract', 'no-build', 'docs-check', 'footprint', 'actionlint', 'bootstrap',
+  'launcher', 'windows-launcher', 'secrets', 'plugin-validate',
+];
+
 const BOOTSTRAP_CELLS = [
   'bootstrap (ubuntu-latest, node 20)',
   'bootstrap (ubuntu-latest, node 22)',
@@ -166,6 +178,41 @@ test('every bootstrap run skips the Claude Code check and fetches its own corpus
   assert.match(job, /submodules: false/);
   // No cell may reach for a secret, and none of them needs one.
   assert.equal(/secrets\./.test(job), false, 'a bootstrap cell reads a secret');
+});
+
+test('the doctor runs inside the bootstrap cells, and adds no job name (ARC-08-S11)', () => {
+  const ci = wf('ci.yml');
+  const job = ci.slice(ci.indexOf('\n  bootstrap:'), ci.indexOf('\n  launcher:'));
+
+  // STEPS, not a job. `main`'s protection lists 42 contexts by name; a new job would not be one of
+  // them and could go red for a week without blocking anything.
+  // From under `jobs:` only: `on.push` is a trigger key at the same indentation, and a regex over
+  // the whole file reads it as a job called "push".
+  const jobsBlock = ci.slice(ci.indexOf('\njobs:'));
+  const jobNames = [...jobsBlock.matchAll(/^  ([a-z][a-z0-9-]*):$/gm)].map((m) => m[1]);
+  assert.deepEqual(jobNames, KNOWN_JOBS, 'a job was added or renamed — protection lists 42 contexts');
+
+  // The report is produced without touching the cache — a doctor that answered from `.local` would
+  // be reporting on a run that happened before the install being tested.
+  const doctorRuns = job.split('\n').map((l) => l.trim())
+    .filter((l) => !l.startsWith('#') && /snowarch(\.cmd)? doctor/.test(l) && l.includes('--json'));
+  assert.ok(doctorRuns.length >= 3, `only ${doctorRuns.length} JSON doctor invocations`);
+  for (const r of doctorRuns) assert.match(r, /--no-cache/, `a cached doctor run: ${r}`);
+
+  // The three things the steps exist to do.
+  assert.match(job, /scripts\/ci\/assert-doctor\.mjs --in doctor\.json --expect-fail E-00/);
+  assert.match(job, /scripts\/ci\/doctor-snapshot\.mjs --in doctor\.json/);
+  assert.match(job, /scripts\/ci\/banner-timing\.mjs --runs 5 --budget-ms 1000 --summary/);
+
+  // The artifact, uploaded whether or not the job was green: a report you can only read when the
+  // run passed is a report you cannot use to find out why it failed.
+  assert.match(job, /uses: actions\/upload-artifact@v4\n\s+if: always\(\)/);
+  assert.match(job, /name: doctor-\$\{\{ matrix\.label \}\}/);
+
+  // The doctor runs BEFORE the dependencies are installed, which is what makes every SV- check
+  // skip — the state a design-only install is actually in.
+  assert.ok(job.indexOf('assert-doctor.mjs') < job.indexOf('npm ci --ignore-scripts'),
+    'the doctor now runs after npm ci — the snapshot would describe a machine no user is on');
 });
 
 test('the run is cancelled when superseded, so thirteen cells are not paid for twice', () => {
