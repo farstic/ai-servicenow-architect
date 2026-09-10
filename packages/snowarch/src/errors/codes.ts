@@ -102,6 +102,20 @@ export const ERROR_CODES = [
     showInRule: false,
   },
   {
+    code: 'FLAGS_INCOMPLETE',
+    meaning: "A store entry does not state all six capability flags. An absent flag is off, so the entry works — but nobody can tell an intended `false` from a forgotten one, and the next preset change starts from a guess.",
+    remedy: "state every flag explicitly by re-applying a preset — the review screen shows what changes before anything is written",
+    command: "./snowarch instance set-preset <label> <preset>",
+    showInRule: false,
+  },
+  {
+    code: 'FLAG_DEPENDENCY_VIOLATION',
+    meaning: "A flag that requires `WRITE_ENABLED` is on while `WRITE_ENABLED` is off. The tools gated on it are refused at run time and the refusal names WRITE first, so the entry promises a capability it cannot deliver.",
+    remedy: "decide which one was meant: turn WRITE on, or turn the dependent flag off. Neither is guessable from the store, so this is never repaired automatically",
+    command: "./snowarch instance set-preset <label> <preset>",
+    showInRule: false,
+  },
+  {
     code: 'PROD_WRITE_NOT_ACKNOWLEDGED',
     meaning: "The instance is tagged `environment: prod` and holds a write preset without `prodWriteAck: true`.",
     remedy: "A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal",

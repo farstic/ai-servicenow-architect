@@ -691,6 +691,25 @@ shasum -a 256 ~/.claude.json          # (2) after — must equal (1)
 document will tell every existing user to run, and nobody has yet seen them printed against a real
 two-year-old `~/.claude.json`.
 
+### D2b — the same sitting, one more command (ARC-08-S04)
+
+While you are there and the instance is configured, the doctor's SERVER half has a live half of its
+own — acceptance criteria 1 and 8. It runs behind the existing gate, so this is one command:
+
+```sh
+cd ~/snowarch-ref
+shasum -a 256 .local/instances.json                      # (1) before
+SNOW_STORE=$PWD/.local/instances.json RUN_LIVE_E2E=1 \
+  npx vitest run tests/live/live-e2e.test.ts -t "SV-04 probes a real instance" \
+  --root packages/snowarch
+shasum -a 256 .local/instances.json                      # (2) after — must equal (1)
+```
+
+1. Does `SV-04` report `auth ok` and the per-flag statuses for your preset?
+2. Are the two `shasum` lines identical? The wizard writes `lastProbe`; the doctor must not.
+3. Paste the `SV-04` line — the runner redacts it, and the test greps your own credentials out of
+   the report before it passes.
+
 ---
 
 ## Cleanup (please run this — it leaves no residue on your machine)

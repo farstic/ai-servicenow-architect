@@ -117,30 +117,11 @@ export interface AddDeps {
     platform?: NodeJS.Platform;
 }
 /**
- * What `probeAll` needs to know about one entry's credentials — including the ROPC seam.
- *
- * `probeAuth` refuses an `oauth_ropc` run with no `tokenProbe` ("no token probe supplied"), and
- * S05 never passed one: with probes on, `instance add --auth oauth_ropc` could not succeed at all,
- * because the error came back as neither `ok` nor `unreachable` and fell through to the wrong-
- * password branch. Found by S06's `set-credentials --auth oauth_ropc` test, which hit the same
- * seam.
- *
- * The probe supplied here says "the request that follows IS the token exchange", and that is the
- * truth of this client: `ServiceNowClient` acquires the ROPC token inside its first request, so a
- * separate token call would be a SECOND login attempt on an account this whole file is careful to
- * spend only three of — against S03's one-request-per-probe rule. A failed grant still lands as
- * `auth failed` through `fromClientError` on the `sys_user` query; what is lost is only the
- * four-way ROPC error table's extra specificity, which needs a real token endpoint to distinguish
- * and belongs with the live sitting.
+ * The probe client and its options live in `servicenow/probe-client.ts` (ARC-08-S04): the doctor
+ * needs both, and it must not import a CLI to ask a question about credentials. Re-exported here
+ * because `import --from-legacy` already names this module for them.
  */
-export declare const probeOptionsFor: (auth: StoreInstance["auth"], env: NodeJS.ProcessEnv) => {
-    username: string;
-    authMethod: "basic" | "oauth_ropc";
-    env: NodeJS.ProcessEnv;
-    tokenProbe?: () => Promise<{
-        ok: boolean;
-    }>;
-};
+export { probeOptionsFor } from '../servicenow/probe-client.js';
 /**
  * The cloud-sync warning, and the question that follows it (D-04, ARC-07-S07).
  *

@@ -58,6 +58,17 @@ export function summaryLine(summary) {
  * is what this story does — S05 owns assembling it, and a renderer that invented one meanwhile
  * would be a second answer to the question `/snowarch status` exists to answer.
  */
+/**
+ * The one section header that carries a reason: `server (skipped — design-only)`.
+ *
+ * Kept to that case on purpose. A generic "(all skipped)" would be true of `--section contract` on
+ * a run that asked for something else, where the reason is the flag the reader just typed.
+ */
+export const sectionNote = (section, reason) => (section === 'server'
+  && /dependencies not installed/.test(String(reason))
+  ? 'server (skipped — design-only)'
+  : null);
+
 export function renderText({ report, checks = [], colour = false }) {
   const byId = new Map(checks.map((c) => [c.id, c]));
   const idWidth = Math.max(0, ...report.checks.map((c) => String(c.id).length));
@@ -66,7 +77,13 @@ export function renderText({ report, checks = [], colour = false }) {
   for (const section of SECTIONS) {
     const inSection = report.checks.filter((c) => (c.section ?? byId.get(c.id)?.section) === section);
     if (inSection.length === 0) continue;
-    lines.push(section);
+    // A section every one of whose checks skipped for the SAME reason says the reason in its
+    // header. The one that matters is design-only: `npm ci` never runs there, so nine `skip` lines
+    // under a bare `server` heading read as nine things that went wrong (ARC-08-S04).
+    const reasons = new Set(inSection.map((c) => (c.status === 'skip' ? c.detail : null)));
+    lines.push(reasons.size === 1 && !reasons.has(null) && sectionNote(section, [...reasons][0])
+      ? sectionNote(section, [...reasons][0])
+      : section);
     for (const result of inSection) {
       const label = statusLabel(result.status);
       const title = result.title ?? byId.get(result.id)?.title ?? '';

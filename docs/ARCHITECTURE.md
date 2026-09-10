@@ -980,6 +980,15 @@ about one registry rather than several:
 | `E-25` | host | cloud-sync folder | yes | — |
 | `E-26` | host | proxy and CA environment | yes | — |
 | `E-27` | host | Claude Code registration status | — | — |
+| `SV-00` | server | Node version | yes | — |
+| `SV-01` | server | dist artefacts | yes | yes |
+| `SV-02` | server | store | yes | yes |
+| `SV-03` | server | instances | yes | yes |
+| `SV-04` | server | instance probes | — | — |
+| `SV-05` | server | stdio handshake | — | — |
+| `SV-06` | server | capabilities match the store | — | — |
+| `SV-07` | server | audit trail | yes | — |
+| `SV-08` | server | ancestor skill directories | yes | — |
 <!-- /generated:doctor-checks -->
 
 **The report, as a person reads it** — statuses are `ok`, `warn`, `FAIL`, `skip` (upper-case so

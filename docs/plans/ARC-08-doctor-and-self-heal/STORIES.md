@@ -276,6 +276,26 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S04 — Server checks SV-00…SV-07 integrated: module import, probe wiring (basic + ROPC), FLUENT SDK, capabilities equality, section `server`
+
+> **Amendment 2026-09-10 (from the delivery).** Six departures. (1) **ARC-07-S03 landed first**, so
+> the stub is gone for the configured case and the risk note ("the stub remains until then") is
+> moot: `src/doctor/probes-binding.ts` adapts `runAll(label)` to `probeAll(client, options)`, and
+> `stubProbes` stays as the answer to "no instance configured", which is a state rather than an
+> absence. (2) The engine registers **SV-00…SV-08**, not SV-00…SV-07: the server module has grown
+> SV-08 (ancestor skill directories), and dropping a check the server produces would be a silent
+> loss. (3) **SV-05/SV-06 are adopted, not re-run.** The story asks the engine to spawn the server
+> through `lib/mcp-handshake.mjs`; the server module already spawns it for those two checks, and it
+> cannot import engine code because it ships to npm on its own. Two handshake implementations exist
+> by packaging necessity — a third, in `server.mjs`, would be the one that drifts, and it would
+> cost a second cold start per run. (4) **FLAGS_INCOMPLETE is judged against the FILE**, through
+> `src/doctor/store-entry.ts`: `completeFlags` fills every absent flag from the preset, so the
+> loaded runtime always has six and "which did the user state?" has no answer there. (5) Two codes
+> were **added to the registry** (`FLAGS_INCOMPLETE`, `FLAG_DEPENDENCY_VIOLATION`, both
+> `showInRule: false`), which moved the contract sha — the pin was bumped deliberately with the
+> outputs quoted in the PR. (6) The probe client and `probeOptionsFor` moved from `cli/instance.ts`
+> to `servicenow/probe-client.ts`: the doctor needs both and must not import a CLI to ask a question
+> about credentials. `cli/instance.ts` re-exports `probeOptionsFor` for its existing callers.
+
 **As** the doctor **I want** to import the server package's doctor module and run its checks inside the merged report, with the live probes coming from the wizard's probe functions **so that** flag semantics, store rules and probes are implemented once in the server (never re-derived in engine code — `00` P-16, D25–D27) and a design-only checkout without server dependencies still gets a truthful report.
 **Context.** README deliverable "Server checks SV-00 … (from `packages/snowarch` `doctor`): Node floor; `dist/server.js` and module resolution; store presence, schema, modes; per instance: URL shape, auth probe (basic and ROPC), per-preset probes, six flags explicit and dependency-consistent, `toolPackage == full`, `@servicenow/sdk` when FLUENT; MCP stdio handshake …; `snow_core_capabilities_read` == store; audit log present and writable". ARC-04-S12 implements SV-00…SV-07 with a probe *stub*; ARC-07-S03 implements the probes (`sys_user` auth probe with 401/403 mapping, ROPC variant, per-preset probes on `sys_update_set`, `sys_script_include`, `cmdb_ci`, `sys_atf_test`, `sys_properties` `sn_generative_ai*`); this story replaces the stub, adds what ARC-04-S12 left out, and defines the engine-side import.
 **Scope.** In: `tools/snowarch/lib/doctor/checks/server.mjs` (import, availability handling, result adoption), the probe wiring in `packages/snowarch/src/doctor/` (`Probes` interface bound to ARC-07's implementation), SV-03's `@servicenow/sdk` sub-check and ROPC handling in SV-04, SV-06 equality semantics, the `server` block of the JSON. Out: the probes themselves (ARC-07), the handshake implementation (ARC-04-S12/ARC-06-S08 `lib/mcp-handshake.mjs` — SV-05 calls it), fixers (S06).

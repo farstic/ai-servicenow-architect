@@ -1,0 +1,156 @@
+// ARC-08-S04 — SV-00…SV-08: the server package's own checks, run inside the engine's report.
+//
+// THE ENGINE DOES NOT RE-IMPLEMENT ANY OF THEM. Flag rules, store schema, presets and the stdio
+// handshake are the server's subject, and a second implementation in engine JavaScript is `00`
+// P-16 exactly: two answers to one question, and the one users see is the one that is wrong. So
+// this file imports `runServerDoctor`, hands it the options it needs, and adopts its results into
+// the registry shape.
+//
+// The import is BY FILE PATH, never the bare specifier the package's `exports` map publishes:
+// `tools/snowarch` has no `node_modules` of its own, and the workspace symlink in the root's only
+// exists after `npm ci` — which a design-only checkout never runs. The specifier stays the public
+// API for other consumers, and a test asserts both resolve to the same module when it can.
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import { serverDepsInstalled } from '../../instance.mjs';
+import { defineCheck } from '../registry.mjs';
+
+import { fail, skip } from './result.mjs';
+
+/**
+ * The ids, in report order — and a SECOND declaration of the server module's `CHECK_IDS`.
+ *
+ * It has to be one: the checks are registered before anything is imported, and on a design-only
+ * checkout nothing ever will be. Two declarations that must agree is the repository's answer to
+ * that (the server key has four), so `tests/doctor/server.test.mjs` compares them whenever the
+ * module can be loaded and fails if they drift.
+ */
+export const SERVER_CHECK_IDS = Object.freeze([
+  'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-04', 'SV-05', 'SV-06', 'SV-07', 'SV-08',
+]);
+
+/** What each id is called before the module has answered — replaced by the module's own title. */
+const TITLES = Object.freeze({
+  'SV-00': 'Node version', 'SV-01': 'dist artefacts', 'SV-02': 'store', 'SV-03': 'instances',
+  'SV-04': 'instance probes', 'SV-05': 'stdio handshake', 'SV-06': 'capabilities match the store',
+  'SV-07': 'audit trail', 'SV-08': 'ancestor skill directories',
+});
+
+export const DOCTOR_ENTRY = ['dist', 'doctor', 'index.js'];
+
+export const DEPS_MISSING = 'server dependencies not installed';
+export const DIST_MISSING = 'prebuilt server missing';
+
+/**
+ * Can the server module be imported at all, and if not, which half is absent?
+ *
+ * Decided BEFORE importing, because an import that fails takes a stack trace and an errno with it
+ * and neither says which of the two states a user is in. `serverDepsInstalled` is the forwarder's
+ * own predicate — `createRequire` from the package's manifest, which asks the question Node will
+ * ask — rather than a second guess at what "installed" means.
+ */
+export function availability(root, config, { exists = existsSync, deps = serverDepsInstalled } = {}) {
+  const packageDir = config?.mcp?.packageDir ?? join('packages', 'snowarch');
+  const entry = join(root, packageDir, ...DOCTOR_ENTRY);
+  if (!exists(entry)) return { state: 'no-dist', entry, packageDir };
+  if (!deps(root)) return { state: 'no-deps', entry, packageDir };
+  return { state: 'ready', entry, packageDir };
+}
+
+/**
+ * The server's report, run once per doctor run and memoised on the context.
+ *
+ * Nine checks, one run: the module spawns a real server for SV-05/SV-06, and nine imports of the
+ * same module each doing that would cost nine cold starts to answer one question nine ways.
+ */
+export async function serverReport(ctx) {
+  if (ctx._server !== undefined) return ctx._server;
+  const state = ctx.serverAvailability ?? availability(ctx.root, ctx.config);
+  if (state.state !== 'ready') {
+    ctx._server = { ...state, report: null, error: null };
+    return ctx._server;
+  }
+  try {
+    const module = await (ctx.importServer ?? ((href) => import(href)))(
+      pathToFileURL(state.entry).href);
+    const report = await module.runServerDoctor({
+      noNetwork: ctx.flags?.noNetwork === true,
+      cwd: ctx.root,
+    });
+    ctx._server = { ...state, report, error: null };
+  } catch (e) {
+    // A dependency that is missing DEEPER than the SDK — the module imported, one of its imports
+    // did not. Same user-visible state as `no-deps`, and named as that rather than as a crash.
+    const message = String(e?.message ?? e);
+    ctx._server = {
+      ...state,
+      report: null,
+      state: /ERR_MODULE_NOT_FOUND|Cannot find (package|module)/.test(message) ? 'no-deps' : state.state,
+      error: message.split('\n')[0],
+    };
+  }
+  return ctx._server;
+}
+
+/** `live` when the recorded mode says so — design-only is the default, and its skips are expected. */
+const isLive = (ctx) => ctx.mode === 'live';
+
+/** One id's result, adopted from the server's report or explained by its absence. */
+export async function adopt(ctx, id) {
+  const answer = await serverReport(ctx);
+  const title = TITLES[id];
+  if (answer.report) {
+    const result = answer.report.checks.find((c) => c.id === id);
+    if (!result) {
+      // The module answered without this id: a version skew between a committed `dist/` and this
+      // engine. Reported as what it is rather than as a passing check nobody ran.
+      return skip(`${id} was not in the server's report (version skew)`, { adopted: false });
+    }
+    const { id: _id, title: _title, status, detail, ...rest } = result;
+    return { status, detail, ...rest, data: { adopted: true, title, ...(result.data ?? {}) } };
+  }
+  if (answer.state === 'no-dist') {
+    return id === 'SV-01'
+      ? fail(`${DIST_MISSING} — ${join(answer.packageDir, ...DOCTOR_ENTRY)} is not there`, {
+        remedy: 'git checkout -- packages/snowarch/dist, or ./snowarch upgrade',
+        command: 'git checkout -- packages/snowarch/dist',
+        data: { state: answer.state },
+      })
+      : skip(DIST_MISSING, { state: answer.state });
+  }
+  // Dependencies absent. In design-only that is the DESIGN — `npm ci` never runs there — so every
+  // check skips and nothing fails. In live mode the server cannot start, which is SV-01's to say.
+  if (id === 'SV-01' && isLive(ctx)) {
+    return fail(`${DEPS_MISSING}${answer.error ? ` (${answer.error})` : ''}`, {
+      remedy: './snowarch doctor --fix',
+      command: './snowarch doctor --fix',
+      data: { state: 'no-deps', fix: { kind: 'deps-missing' } },
+    });
+  }
+  return skip(DEPS_MISSING, { state: 'no-deps' });
+}
+
+/** The header the text report prints for the section when nothing could run by design. */
+export const DESIGN_ONLY_HEADER = 'server (skipped — design-only)';
+
+export function serverChecks() {
+  return SERVER_CHECK_IDS.map((id) => defineCheck({
+    id,
+    section: 'server',
+    title: TITLES[id],
+    // The server's own severities decide the STATUS; this is the severity a failure carries in the
+    // engine's registry, and only SV-04 is allowed to be less than a failure — a probe that could
+    // not run says so, and a machine offline is not a broken install.
+    severity: id === 'SV-04' ? 'warn' : 'fail',
+    // SV-04 is the network one; SV-05/SV-06 spawn a server. The rest read files.
+    quick: !['SV-04', 'SV-05', 'SV-06'].includes(id),
+    network: id === 'SV-04',
+    spawns: ['SV-05', 'SV-06'].includes(id),
+    // `fixable` comes from the ADOPTED result — the server marks SV-01/SV-02/SV-03 fixable when
+    // they are. A registry flag cannot: whether an entry can be repaired depends on the entry.
+    fixable: ['SV-01', 'SV-02', 'SV-03'].includes(id),
+    run: async (ctx) => adopt(ctx, id),
+  }));
+}

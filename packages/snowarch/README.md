@@ -327,7 +327,7 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (65), with what to do about it.
+Every code the server can throw (67), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
@@ -349,6 +349,8 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `ENOTFOUND` | as `DNS_FAILURE`: check the host in the store |
 | `ENV_REQUIRED` | pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do |
 | `ETIMEDOUT` | as `CONNECTION_TIMEOUT` |
+| `FLAG_DEPENDENCY_VIOLATION` | decide which one was meant: turn WRITE on, or turn the dependent flag off. Neither is guessable from the store, so this is never repaired automatically |
+| `FLAGS_INCOMPLETE` | state every flag explicitly by re-applying a preset — the review screen shows what changes before anything is written |
 | `FLUENT_ERROR` | the message carries the SDK output |
 | `FLUENT_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `FLUENT_NOT_INSTALLED` | install it globally — the doctor checks `PATH`, so a checkout-local install would pass here and fail there |

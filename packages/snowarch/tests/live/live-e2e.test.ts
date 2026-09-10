@@ -7,6 +7,7 @@
  * OAuth and impersonation cases are further gated by their own env vars and skip when absent.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { createHash } from 'crypto';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
@@ -104,6 +105,35 @@ describe.skipIf(!LIVE)('LIVE E2E against a real ServiceNow instance (opt-in: RUN
     const r = await oauthClient.queryRecords({ table: 'incident', limit: 1 });
     expect(Array.isArray(r.records)).toBe(true);
   });
+
+  /**
+   * ARC-08-S04 AC 1 (live half) and AC 8 — the doctor against a real instance.
+   *
+   * Behind the SAME gate and the same loader as everything else here: one gate, one `.env`. What
+   * only a live run can show is that the probes report `ok` rather than a shape, and that the store
+   * is byte-identical afterwards — the doctor reads `lastProbe`, the wizard writes it, and no unit
+   * test can prove that against an instance that answers.
+   */
+  it.skipIf(!process.env.SNOW_STORE)('SV-04 probes a real instance and the doctor writes nothing',
+    async () => {
+      const storePath = process.env.SNOW_STORE as string;
+      const before = createHash('sha256').update(readFileSync(storePath)).digest('hex');
+
+      const { runServerDoctor } = await import('../../src/doctor/index.js');
+      const report = await runServerDoctor({ noNetwork: false, cwd: process.cwd() });
+      const sv04 = report.checks.find((c) => c.id === 'SV-04');
+
+      expect(sv04?.status).toBe('ok');
+      expect(sv04?.detail).toMatch(/auth ok/);
+      // AC 8: the file the probe read is the file that is still there.
+      expect(createHash('sha256').update(readFileSync(storePath)).digest('hex')).toBe(before);
+      // AC 9, against real credentials rather than a fixture's.
+      const json = JSON.stringify(report);
+      for (const secret of [process.env.SERVICENOW_BASIC_PASSWORD,
+        process.env.SERVICENOW_OAUTH_PASSWORD, process.env.SERVICENOW_OAUTH_CLIENT_SECRET]) {
+        if (secret) expect(json).not.toContain(secret);
+      }
+    });
 
   // Requires impersonation rights + a target user sys_id — gated by SN_LIVE_IMPERSONATE_SYSID.
   it.skipIf(!process.env.SN_LIVE_IMPERSONATE_SYSID)('impersonation: query routed as the target user via X-Sn-Impersonate', async () => {
