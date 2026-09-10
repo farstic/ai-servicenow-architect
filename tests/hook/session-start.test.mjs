@@ -41,10 +41,16 @@ const isNudge = (line) => [
   BANNER.firstRun, BANNER.staleRegistration,
 ].includes(line) || /^A newer release is available \(/.test(line) || /^Doctor: \d+ FAIL /.test(line);
 
-/** A run that is slower than the watchdog and still finishes — see the watchdog cases. */
+/**
+ * A run that is slower than the watchdog and still finishes.
+ *
+ * REF'D on purpose. An unref'd timer does not keep the loop alive, so on a fast runner the loop
+ * drained before this settled and node:test reported "Promise resolution is still pending but the
+ * event loop has already resolved" — cancelling every case after it. The cost of the ref is that
+ * the file waits 300 ms once; the cost of the unref was six unrelated red cells.
+ */
 const hangs = (ms) => new Promise((resolve) => {
-  const t = setTimeout(() => resolve({ report: { modeLine: 'Mode: late' } }), ms);
-  if (typeof t?.unref === 'function') t.unref();
+  setTimeout(() => resolve({ report: { modeLine: 'Mode: late' } }), ms);
 });
 
 /** The hook as Claude Code runs it: a child, with the event JSON on stdin. */
@@ -110,7 +116,8 @@ test('AC 1 — the fast path reads two files and imports no part of the doctor',
   // the branch that never reaches the lazy import.
   const result = await banner({ root, run: () => { throw new Error('the doctor was imported'); } });
   assert.equal(result.path, 'cache');
-  assert.equal(result.lines.length, 1);
+  assert.match(result.lines[0], /^Mode: /);
+  for (const line of result.lines.slice(1)) assert.ok(isNudge(line), `unexpected: ${line}`);
 });
 
 // AC 2.
@@ -234,7 +241,7 @@ test('a doctor that hangs hits the watchdog, and the old line is marked old', as
   // on CI that took four unrelated tests down with it. The watchdog still wins by 350 ms, which
   // is the whole claim.
   const started = Date.now();
-  const r = await banner({ root, watchdogMs: 50, run: () => hangs(400) });
+  const r = await banner({ root, watchdogMs: 50, run: () => hangs(300) });
   assert.ok(Date.now() - started < 2000, 'the watchdog did not fire');
   assert.equal(r.path, 'timeout');
   assert.equal(r.lines[0], `${cache.modeLine}${BANNER.staleSuffix}`);
@@ -244,7 +251,7 @@ test('a hang with no cache at all still says something true', async (t) => {
   const root = await bootstrapped(t);
   rmSync(cachePath(root));
   rmSync(inputsPath(root));
-  const r = await banner({ root, watchdogMs: 50, run: () => hangs(400) });
+  const r = await banner({ root, watchdogMs: 50, run: () => hangs(300) });
   assert.equal(r.lines[0], BANNER.timedOut);
   assert.ok(WATCHDOG_MS < 10_000, 'the watchdog must fire before the hook timeout');
 });
