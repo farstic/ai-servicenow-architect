@@ -11,7 +11,7 @@
  * than a path; and fenced code is a transcript, where a path that does not exist is often the point.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { isHistory, readLines } from '../lib/scan.mjs';
@@ -65,20 +65,51 @@ function trackedPaths(root) {
 }
 
 /**
- * The resolver, and the one case that still reads the disk.
+ * Is the lint root ITSELF a git repository — not merely somewhere inside one?
  *
- * A fixture tree is not a git work tree — the lint's own suite builds one per case in a temp
+ * "Is there an enclosing git tree?" was the first answer and it is the wrong question. A fixture
+ * tree created under a `TMPDIR` that happens to sit inside an unrelated checkout is inside a work
+ * tree, so the check would switch to tracked mode and then ask THAT repository about paths it has
+ * never heard of — reporting every real path in the fixture as dead. It fails on the reviewer's
+ * machine and passes in CI, which is precisely the environment-dependence this rule was written to
+ * remove, arriving through the door the rewrite opened. (Found in review, one commit later.)
+ *
+ * `--show-toplevel` is run with the root as the working directory and compared against the root
+ * itself through `realpathSync.native`: `/var` is a symlink to `/private/var` on macOS, git answers
+ * with forward slashes on Windows, and a string compare of either pair says "different" about one
+ * directory. Anything but an exact match — no git, a foreign toplevel, an error — is the disk.
+ */
+function isGitToplevel(root) {
+  try {
+    const toplevel = execFileSync('git', ['-C', root, 'rev-parse', '--show-toplevel'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (!toplevel) return false;
+    return realpathSync.native(toplevel) === realpathSync.native(root);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The resolver, and the two cases that still read the disk.
+ *
+ * A fixture tree is not a repository — the lint's own suite builds one per case in a temp
  * directory — and "tracked" has no meaning there: the tree contains exactly what the test wrote,
- * with nothing ignored, so the disk IS the answer. The summary line says which rule ran, because
- * a check that silently changed its mind about what it was checking is how the S05 case survived
- * a green local run in the first place.
+ * with nothing ignored, so the disk IS the answer. A tree that merely SITS inside someone else's
+ * repository is the same case for a different reason: that repository's index describes a
+ * different project. The summary line says which rule ran and why, because a check that silently
+ * changed its mind about what it was checking is how the original defect survived a green local
+ * run in the first place.
  */
 function resolver(root) {
+  if (!isGitToplevel(root)) {
+    return { how: 'filesystem: the root is not a git toplevel', has: (p) => existsSync(join(root, p)) };
+  }
   try {
     const tracked = trackedPaths(root);
     return { how: 'tracked', has: (p) => tracked.has(p) || tracked.has(p.replace(/\/$/, '')) };
   } catch {
-    return { how: 'filesystem: not a git work tree', has: (p) => existsSync(join(root, p)) };
+    return { how: 'filesystem: git could not list the index', has: (p) => existsSync(join(root, p)) };
   }
 }
 

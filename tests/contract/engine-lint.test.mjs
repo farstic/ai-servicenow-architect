@@ -218,8 +218,12 @@ test('criterion 7 — the real tree completes quickly, and the budget is a CI ob
 const { mkdtempSync, mkdirSync, writeFileSync, readFileSync: readFile, rmSync } = await import('node:fs');
 const { tmpdir } = await import('node:os');
 
-function minimalTree(mutate = () => {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'engine-lint-'));
+/**
+ * A fixture tree. `parent` exists for the one case that needs the tree to sit somewhere
+ * specific — inside another repository — rather than wherever `TMPDIR` happens to point.
+ */
+function minimalTree(mutate = () => {}, parent = tmpdir()) {
+  const dir = mkdtempSync(join(parent, 'engine-lint-'));
   const write = (rel, body) => {
     mkdirSync(join(dir, dirname(rel)), { recursive: true });
     writeFileSync(join(dir, rel), body);
@@ -319,8 +323,8 @@ test('criterion 2 — L05 fails on a typo in a cited path and passes on the real
  * `git add` and no commit: L05 reads the INDEX, which is what makes a file created by the story
  * in hand resolve as soon as it is staged — the point at which this repository runs its gates.
  */
-function gitTree(mutate = () => {}) {
-  const dir = minimalTree(mutate);
+function gitTree(mutate = () => {}, parent = tmpdir()) {
+  const dir = minimalTree(mutate, parent);
   const git = (...args) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' });
   git('init', '-q');
   git('add', '-A');
@@ -360,6 +364,29 @@ test('L05 passes the same citation once the path is tracked, and counts what it 
     assert.equal(r.code, 0, r.stdout);
     assert.match(r.stdout, /L05 ok \[1 citations, tracked\]/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('L05 reads the DISK for a tree that merely sits inside somebody else\'s repository', (t) => {
+  // The reviewer's machine, reproduced. Their `TMPDIR` is inside an unrelated checkout, so every
+  // fixture tree this suite builds lands in a foreign work tree. "Is there an enclosing git tree?"
+  // answered yes, tracked mode asked THAT repository about `governance/real.md`, and a path that
+  // is right there on disk was reported dead — green in CI, red on their machine, which is the
+  // environment-dependence this check was rewritten to remove. The question is whether the lint
+  // ROOT is the toplevel, not whether one exists above it.
+  const foreign = mkdtempSync(join(tmpdir(), 'foreign-repo-'));
+  t.after(() => rmSync(foreign, { recursive: true, force: true }));
+  execFileSync('git', ['-C', foreign, 'init', '-q'], { stdio: 'ignore' });
+
+  const dir = minimalTree(({ write }) => {
+    write('governance/real.md', '# Real\n');
+    write('governance/governance-rules.md', '# Rules\n\nSee `governance/real.md` for the long form.\n');
+  }, foreign);
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const r = lintAt(dir, ['--only', 'L05']);
+  assert.equal(r.code, 0, r.stdout);
+  // And it SAYS which rule answered — the reason this line carries the mode at all.
+  assert.match(r.stdout, /L05 ok \[\d+ citations, filesystem: the root is not a git toplevel\]/);
 });
 
 test('L05 answers from git in THIS repository — the fallback is for fixture trees only', () => {

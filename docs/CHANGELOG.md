@@ -78,7 +78,11 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   as it is staged) plus an explicit allow-list of runtime prefixes; the status line says how many
   citations were checked and which rule answered. The defect it closes shipped in the previous
   release: two comments citing a `node_modules` path that npm hoists away passed on the author's
-  machine, where the directory happened to exist, and failed on all nine CI cells.
+  machine, where the directory happened to exist, and failed on all nine CI cells. Tracked mode
+  needs the lint ROOT to be the git toplevel, not merely to sit inside one: a fixture tree under a
+  `TMPDIR` that happens to be inside an unrelated checkout would otherwise be measured against
+  that repository's index, and every real path in it reported dead — the same
+  works-here-fails-there shape, arriving through the door the rewrite opened.
 - **One condition, one text — `URL_REQUIRED`.** There were three: the registry's remedy, the
   wizard's `--yes` sentence, and a third in the URL module for an empty answer at the prompt. The
   registry's is now the only one, rendered through the same path every other code uses.
