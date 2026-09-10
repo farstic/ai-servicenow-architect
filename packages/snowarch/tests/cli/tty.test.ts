@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   ARGV_SECRET, CANCELLED, EXIT_INTERRUPTED, EXIT_USAGE, argvCarriesSecret, knownBadConsole,
@@ -350,7 +350,10 @@ describe('the shape B06 will spawn it in', () => {
       // The result goes to a FILE, because the refusal itself is written to stdout — parsing
       // stdout would mean the test could only pass while the module printed nothing.
       writeFileSync(probe, [
-        `import { promptSecret } from ${JSON.stringify(resolve(here, '../../dist/cli/tty.js'))};`,
+        // `pathToFileURL`, never the bare path: on Windows `C:\\…` is not a valid ESM specifier
+        // (ERR_UNSUPPORTED_ESM_URL_SCHEME) — the same rule as `fileURLToPath` in the other
+        // direction, and the same one this repository keeps relearning.
+        `import { promptSecret } from ${JSON.stringify(pathToFileURL(resolve(here, '../../dist/cli/tty.js')).href)};`,
         "import { writeFileSync } from 'node:fs';",
         'const codes = [];',
         'await promptSecret("Password:", { exit: (c) => { codes.push(c); return undefined; },',
