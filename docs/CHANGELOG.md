@@ -50,6 +50,22 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   builds is exactly what the user typed: a test greps the whole of `tools/snowarch/` for a
   `--password` construction, because a secret cannot reach `ps` through a process that never
   invents an argument.
+- **The forwarder now actually forwards — and `LABEL_EXISTS` is a code with a remedy.** Two
+  defects the gates could not see, found in review. The engine frame parsed the arguments of a
+  command whose arguments belong to another program, so `./snowarch instance add … --env prod
+  --preset full --yes` answered `--yes needs a value` from the wrong parser and `instance add
+  --help` printed the wrong usage: the README's own command could not run through the launcher.
+  `instance` is a RAW command now — not parsed, not rejected, not answered by the frame, with only
+  a bare `instance --help` left to it — and root-entry tests spawn the real launchers (the engine
+  entry, `./snowarch`, `snowarch.cmd` through `cmd.exe` on Windows) with real options, asserting
+  whose answer arrived. The six existing tests were unit tests on the argv builder; a pass-through
+  cannot be proved by a test that never passes anything through. Separately, the wizard printed
+  `LABEL_EXISTS — …` for a code the registry never held, so `docs/TROUBLESHOOTING.md` documented
+  every other failure of `instance add` and not that one: it is registered, the sentence renders
+  the registry's remedy rather than a second copy, and the completeness scan — which read THROWN
+  codes only, and nothing throws this one — now also reads codes PRINTED in the house `CODE — …`
+  shape.
+
 - **Propose, review, apply — and a probe never decides.** The wizard proposes a preset from the
   ENVIRONMENT ALONE (`full` for pdi/dev/test, `read-only` for prod), shows the six flags with what
   the probes found, and applies exactly what the screen showed. A probe that came back
