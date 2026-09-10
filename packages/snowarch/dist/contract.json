@@ -117,7 +117,7 @@
       "code": "CONNECTION_TIMEOUT",
       "meaning": "The connection timed out with no proxy configured.",
       "remedy": "no answer from `<host>` in time. If this network needs a proxy, set `HTTPS_PROXY=http://proxy:port` (and `NO_PROXY` for internal hosts) and run again. An idle PDI may be hibernating — wake it at developer.servicenow.com",
-      "showInRule": false
+      "showInRule": true
     },
     {
       "code": "CREATE_FAILED",
@@ -152,8 +152,8 @@
     {
       "code": "DNS_FAILURE",
       "meaning": "The instance host name did not resolve (`ENOTFOUND`, `EAI_AGAIN`).",
-      "remedy": "the name `<host>` does not resolve. Check the instance name; on a corporate network the name may resolve only over VPN or through a proxy (set `HTTPS_PROXY`) (a proxy is configured — `<proxyVar>=<proxy>` — and a proxy does not resolve names for you unless the request goes through it, so this usually means the name is wrong)",
-      "showInRule": false
+      "remedy": "the name `<host>` does not resolve. Check the instance name first — a typo is the usual cause; on a corporate network the name may resolve only over VPN, or only through a proxy, so set `HTTPS_PROXY` if there is one (there is one — `<proxyVar>=<proxy>` — and a proxy does not resolve names for you unless the request goes through it, which makes a wrong name the likelier cause)",
+      "showInRule": true
     },
     {
       "code": "ECONNREFUSED",
@@ -219,7 +219,7 @@
       "meaning": "The instance is in the store but was not loaded, and the store carries the reason.",
       "remedy": "read the reason in the instance listing; a `prod` instance without `prodWriteAck` needs the acknowledgement",
       "command": "./snowarch instance list",
-      "showInRule": false
+      "showInRule": true
     },
     {
       "code": "INSTANCE_UNUSABLE",
@@ -327,15 +327,15 @@
     {
       "code": "PROXY_AUTH_REQUIRED",
       "meaning": "The proxy answered 407: it wants credentials before it will forward the request.",
-      "remedy": "put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials",
-      "showInRule": false,
+      "remedy": "the proxy is asking for credentials: put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials",
+      "showInRule": true,
       "httpStatus": 407
     },
     {
       "code": "PROXY_UNREACHABLE",
       "meaning": "A proxy variable is set and nothing is listening there, or the connection to it timed out.",
       "remedy": "the proxy `<proxyVar>=<proxy>` did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked",
-      "showInRule": false
+      "showInRule": true
     },
     {
       "code": "QUERY_FAILED",
@@ -419,7 +419,7 @@
       "meaning": "The certificate was not signed by a CA this machine trusts — normal on a network that intercepts TLS.",
       "remedy": "the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it",
       "command": "export NODE_EXTRA_CA_CERTS=<path to the PEM>",
-      "showInRule": false
+      "showInRule": true
     },
     {
       "code": "TLS_CERT_INVALID",

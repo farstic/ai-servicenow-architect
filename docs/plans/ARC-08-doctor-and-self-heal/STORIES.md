@@ -653,6 +653,43 @@ New checks with no old counterpart (listed under the table): E-06, E-09 (key sca
 ---
 
 ### ARC-08-S10 — Runtime error mapping in the generated rule file; VALIDATION-TESTS T-19 (`AUTHENTICATION_FAILED`) and T-20 (`*_NOT_ENABLED`)
+
+> **Amendment 2026-09-10 (from the delivery).** Six corrections, then two departures.
+>
+> *Corrections.* The registry file is `packages/snowarch/src/errors/codes.ts`, not
+> `src/utils/error-codes.ts`. The timeout code is `CONNECTION_TIMEOUT`; there is no
+> `NETWORK_TIMEOUT` (ARC-07-S02's amendment). The second test is **T-22**, not T-20: ARC-07-S09
+> took T-20 and T-21 and reserved T-19 for this story, and the Reserved-numbers section of
+> `tests/VALIDATION-TESTS.md` governs. The file's count after this story is **22** (T-01…T-22,
+> none reserved), not 20 — and the header now states it with a test asserting the statement.
+> `INSTANCE_NOT_LOADED` was already registered (ARC-04-S03) and keeps ITS remedy: "not loaded" has
+> more than one cause, and the story's proposed text named only the `prod` one, which would send a
+> reader to acknowledge a prod flag on an instance that is not prod. There is no `ruleText` field
+> and none was added — one text serves both audiences for all six codes.
+>
+> *Departure 1 — two remedies were reworded for the second audience.* `PROXY_AUTH_REQUIRED` opened
+> on "put them in the proxy URL", whose antecedent is in the MEANING — which the rule file does not
+> render. `DNS_FAILURE` ended in two adjacent parentheticals, so with a proxy configured it read
+> "…through a proxy (set `HTTPS_PROXY`) (a proxy is configured — …)": advice to set a variable
+> that is set, in the sentence saying it is set. Both now read as one instruction in the rule file
+> and as one paragraph in `docs/TROUBLESHOOTING.md`.
+>
+> *Departure 2 — the rule file's line budget moved from 45 to 55.* The finished section is 6 code
+> lines and 4 of prose longer than the one it replaces, and there is no version of it that is both
+> complete and shorter than the file was. The cap moved to the finished size plus a little (52
+> today), not to wherever the file happens to land, so prose creep still fails the test.
+>
+> *Open question for the story's owner.* AC 2 names four places the `AUTHENTICATION_FAILED` text
+> must be identical. Three are the documents, and the fourth is `./snowarch doctor` SV-04 — which
+> does hold, because the probe returns the CODE and `applyContractRemedy` fills the remedy from the
+> contract. The wizard's 401 re-entry line does NOT: it says "wrong username or password", where
+> the registry says "the instance rejected the credentials — wrong, expired, or the account is
+> locked". Narrower, and a second definition of the same condition, which is the defect the
+> registry exists to prevent — but it is ARC-07-S05's user-visible string and is not this story's
+> to rewrite. Recommended: render it from the registry's `meaning`, as `labelExists()` beside it
+> already renders from the registry. Pending that, the test asserts what is true and what must stay
+> true — the wizard names the code and never carries a remedy of its own.
+
 **As** the engine (Claude) **I want** the always-loaded rule file to tell me, for every runtime error code the server can return, to stop and print the exact remedy — never retry, never edit flags from inside a session — and I want two behavioural tests that prove it **so that** a wrong password or a disabled flag becomes a one-line hand-off to the terminal instead of a retry loop or an improvised fix (README acceptance criterion 7; `00` P-03 at runtime).
 **Context.** README deliverable 10 ("Runtime error mapping in the generated rule file; VALIDATION-TESTS addition for `AUTHENTICATION_FAILED`") and acceptance criterion 7. `01` §6.2 ("Wrong password at runtime: the server returns `AUTHENTICATION_FAILED`; the rule file tells the engine to stop (no retries) and point to `./snowarch instance set-credentials <label>`"). ARC-05-S05 renders the rule file's "Runtime errors" section from `contract.errorCodes[]` filtered to `showInRule: true`; ARC-05-S06 owns the registry and seeds `showInRule` for the six `*_NOT_ENABLED` codes, `AUTHENTICATION_FAILED`, `INSUFFICIENT_PRIVILEGES`, `NO_INSTANCE_CONFIGURED`, `PROD_WRITE_NOT_ACKNOWLEDGED`, `UNKNOWN_TOOL`, `FLUENT_NOT_INSTALLED`; ARC-04-S11 registers the network codes (`showInRule: false` by default). ARC-02-S13 moved the tests to `tests/VALIDATION-TESTS.md` (T-01…T-18) and added T-07 for Mode reporting.
 **Scope.** In: the registry review (which codes carry `showInRule` — a PR against `packages/snowarch/src/utils/error-codes.ts`, the registry file ARC-05-S06 creates in the unified repo; it has no counterpart in the old `snow-mcp/src/utils/`), the per-code `ruleText` for the codes ARC-07-S10 does not own (`*_NOT_ENABLED`, `NO_INSTANCE_CONFIGURED`, `UNKNOWN_TOOL`, `FLUENT_NOT_INSTALLED`, `INSTANCE_NOT_LOADED`, the five network codes), the rule-file section's header and three behavioural sentences (stop / no retry / remedy verbatim / suggest `./snowarch doctor` after two different errors in one session), the `docs/TROUBLESHOOTING.md` cross-reference sentence, T-19 and T-20 in `tests/VALIDATION-TESTS.md`, the T-07 wording update from S09. Out: the renderer (ARC-05-S05), the registry mechanism (ARC-05-S06), the `ruleText` of `AUTHENTICATION_FAILED` / `INSUFFICIENT_PRIVILEGES` / `PROD_WRITE_NOT_ACKNOWLEDGED` and the wizard's own remedies (ARC-07-S10 owns those strings; this story consumes them verbatim and tests them).

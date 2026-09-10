@@ -99,6 +99,19 @@ test('the skill quotes the snippet\'s template byte for byte', () => {
     'the skill and docs/snippets/status-template.md have drifted');
 });
 
+test('VALIDATION-TESTS T-07 quotes the same template (ARC-08-S10)', () => {
+  // The third copy, and the one most likely to rot: T-07 is run by hand, by a person comparing a
+  // session's answer against what is written there. If it drifts from the skill, the tester marks
+  // a correct session FAILED — or, worse, passes one that invented a line.
+  const doc = readFileSync(join(REAL_ROOT, 'tests/VALIDATION-TESTS.md'), 'utf8');
+  const block = templateBlock();
+  // Indented three spaces, because it sits inside a numbered step. Dedent and compare.
+  const indented = block.split('\n').map((l) => (l ? `   ${l}` : l)).join('\n');
+  assert.ok(doc.includes(indented), 'T-07 and docs/snippets/status-template.md have drifted');
+  // And the quick-run sentence, which is the half a tester would otherwise mark as a missing line.
+  assert.match(doc, /Capability packs and citation counts are not probed on a quick run/);
+});
+
 test('the skill names the fallbacks and forbids the inferences', () => {
   const skill = read(SKILL);
   // The four fallbacks, in the story's order.

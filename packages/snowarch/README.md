@@ -344,7 +344,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `DELETE_CONSTRAINT` | remove the reference first |
 | `DELETE_FAILED` | the message carries the instance response |
 | `DELETE_NOT_FOUND` | check the sys_id |
-| `DNS_FAILURE` | the name `<host>` does not resolve. Check the instance name; on a corporate network the name may resolve only over VPN or through a proxy (set `HTTPS_PROXY`) (a proxy is configured — `<proxyVar>=<proxy>` — and a proxy does not resolve names for you unless the request goes through it, so this usually means the name is wrong) |
+| `DNS_FAILURE` | the name `<host>` does not resolve. Check the instance name first — a typo is the usual cause; on a corporate network the name may resolve only over VPN, or only through a proxy, so set `HTTPS_PROXY` if there is one (there is one — `<proxyVar>=<proxy>` — and a proxy does not resolve names for you unless the request goes through it, which makes a wrong name the likelier cause) |
 | `ECONNREFUSED` | as `CONNECTION_REFUSED`: check the URL, the port and any proxy |
 | `ENOTFOUND` | as `DNS_FAILURE`: check the host in the store |
 | `ENV_REQUIRED` | pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do |
@@ -371,7 +371,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `OAUTH_CLIENT_INVALID` | check them against the Application Registry entry on the instance |
 | `OAUTH_ROPC_DISABLED` | use basic authentication, or have an administrator enable the grant type |
 | `PROD_WRITE_NOT_ACKNOWLEDGED` | A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal |
-| `PROXY_AUTH_REQUIRED` | put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials |
+| `PROXY_AUTH_REQUIRED` | the proxy is asking for credentials: put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials |
 | `PROXY_UNREACHABLE` | the proxy `<proxyVar>=<proxy>` did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked |
 | `QUERY_FAILED` | the message carries the instance response |
 | `RATE_LIMITED` | retry later; reduce `maxRecords` or the call rate |

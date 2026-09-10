@@ -121,6 +121,23 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   and Windows without Git for Windows, where the honest answer is that the session cannot run
   `./snowarch` from here at all.
 
+- **A runtime error is a hand-off, not a retry.** The always-loaded rule file now carries the
+  whole runtime family: when a tool result comes back with `(Code: …)`, the session stops the step,
+  prints the registry's remedy verbatim and waits — it does not call again with the same or
+  different credentials, and it does not offer to edit `.local/instances.json`, `.mcp.json` or any
+  settings file from inside the session. Six codes joined it: DNS, an untrusted TLS chain, both
+  proxy failures, the connection timeout and an instance the store declined to load. The network
+  five are there because retrying is precisely the wrong move when the machine cannot reach the
+  instance, and the wrong password is there because retrying it locks the account. Eighteen codes
+  are rule-visible now, the six flag gates still collapse into one line that names the flags from
+  the contract, and a server test pins the set with `deepEqual` — a code added to the file every
+  session loads should be a decision, not an accumulation. Two remedies were reworded to serve the
+  second audience they now have: one opened on a pronoun whose antecedent lives in the meaning,
+  which the rule file does not render, and one told you to set a proxy variable in the same
+  sentence that said it was set. And `tests/VALIDATION-TESTS.md` gained T-19 and T-22 — the wrong
+  password and the disabled flag, each with the design-only variant that proves the session calls
+  nothing when there is nothing to call.
+
 - **Every check the old doctor made is accounted for.** `scripts/legacy/doctor.sh` was 1,141 lines
   and 39 numbered checks written against a real machine over two years — the most precise existing
   specification of a correct install — and rewriting it would have lost intent nobody would notice
