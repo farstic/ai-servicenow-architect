@@ -9,8 +9,11 @@ import {
   runReviewScreen, wrapRow,
 } from '../../src/cli/preset-ui.js';
 import {
-  FLAG_NAMES, PRESETS, expandPreset, matchPreset, type Flags,
+  DEPENDENCIES, FLAG_NAMES, PRESETS, applyDependencyRule, dependentsOf, expandPreset, matchPreset,
+  requiresOf, type Flags,
 } from '../../src/utils/permissions.js';
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { instanceSchema } from '../../src/store/schema.js';
 import type { LastProbe } from '../../src/servicenow/probes.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
@@ -395,6 +398,46 @@ describe('criterion 8 and the cross-checks', () => {
     }
     expect(Object.keys(PROBE_FIELD).sort()).toEqual([...FLAG_NAMES].sort());
     expect(Object.keys(FLAG_MEANINGS).sort()).toEqual([...FLAG_NAMES].sort());
+  });
+
+  it('NO FLAG NAME IS SPELLED in src/cli — the graph lives in the preset module', () => {
+    // ARC-07-S05's carry-over. The UI used to re-encode "WRITE ← CMDB_WRITE, SCRIPTING" as
+    // literals: a second definition of a rule the server already owns, and the copy nobody would
+    // think to update when a third dependency appears.
+    const dir = resolve(here, '../../src/cli');
+    const files: string[] = [];
+    const walk = (d: string) => {
+      for (const name of readdirSync(d)) {
+        const p = join(d, name);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (name.endsWith('.ts')) files.push(p);
+      }
+    };
+    walk(dir);
+    expect(files.length).toBeGreaterThan(2);
+    const offenders: string[] = [];
+    for (const file of files) {
+      const text = readFileSync(file, 'utf8');
+      for (const [i, line] of text.split('\n').entries()) {
+        if (/'[A-Z][A-Z0-9_]*_ENABLED'/.test(line)) offenders.push(`${file}:${i + 1}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+    // Not vacuous: the pattern it looks for is the one that was there.
+    expect(/'[A-Z][A-Z0-9_]*_ENABLED'/.test("const x = 'WRITE_ENABLED';")).toBe(true);
+  });
+
+  it('the graph is one table, and the server rule reads it too', () => {
+    expect(Object.keys(DEPENDENCIES).sort()).toEqual([...FLAG_NAMES].sort());
+    expect(requiresOf('SCRIPTING_ENABLED' as never)).toEqual(['WRITE_ENABLED']);
+    expect([...dependentsOf('WRITE_ENABLED' as never)].sort())
+      .toEqual(['CMDB_WRITE_ENABLED', 'SCRIPTING_ENABLED']);
+    // The server's own rule, driven from the same table: a contradiction is resolved towards LESS
+    // access and reported, and the wizard's sentence names the same pair.
+    const contradiction = { ...expandPreset('read-only'), SCRIPTING_ENABLED: 'true' } as Flags;
+    const applied = applyDependencyRule(contradiction, 'fixture');
+    expect(applied.effective.SCRIPTING_ENABLED).toBe('false');
+    expect(applied.warnings[0]).toContain('requires WRITE_ENABLED=true');
   });
 
   it('the dependency rule reads the same from the UI as from the server', () => {

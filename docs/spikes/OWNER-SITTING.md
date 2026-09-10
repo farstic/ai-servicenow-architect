@@ -50,6 +50,20 @@
 > at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
 > Nothing about a real instance goes into the repository: the record is the CODE and the timing.
 >
+> **The wizard against a real instance (ARC-07-S05, 2026-09-10).** Everything that can be proven
+> without an instance is proven — every exit path, the store bytes, the argv. Three things need a
+> real one and a terminal. **(1) AC 1** — on a clean machine, run the README command against a PDI,
+> type a valid username and password, press Enter: the summary must read `Saved instance "pdi"
+> (pdi · basic · preset pdi-developer · default).` with the probe line, `stat -f %Lp
+> .local/instances.json` must print `600` and `.local` `700`, and the JSON must carry six flags as
+> strings, `toolPackage: "full"`, `maxRecords: 100`, `prodWriteAck: false`. **(2) AC 2** — during
+> that run, `ps -o args` in another terminal shows the command WITHOUT a password, and `history |
+> tail -1` afterwards contains none either; the terminal transcript shows no password characters.
+> **(3) AC 9's spawned form and AC 10** — `printf 'p\n' | … --password-stdin --yes` against a real
+> instance, and the same on Windows to see `file modes: ACL-inherited (Windows)` with the store
+> under `.local\`. Record the summary line verbatim, the two `stat` numbers, and — for AC 2 — that
+> the `ps` line is what you expected, never its contents.
+>
 > **S-04, the masked-input matrix (ARC-07-S01, 2026-09-10).** Criterion 6 is eight cells: Windows
 > Terminal and conhost × PowerShell 5.1 and cmd × with and without Git Bash on PATH. In each, run
 > the built CLI's masked prompt, type `abcd`, Backspace, `e`, Enter, and check three things — the

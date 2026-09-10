@@ -30,15 +30,8 @@ const __cliDir = path.dirname(fileURLToPath(import.meta.url));
 const __pkgJson = JSON.parse(readFileSync(path.resolve(__cliDir, '..', '..', 'package.json'), 'utf8'));
 const CLI_VERSION: string = __pkgJson.version;
 
-const NOT_IMPLEMENTED_EXIT = 2;
+const NOT_IMPLEMENTED_EXIT = 2;   // still used by `contract` when dist/ has not been built
 
-/** A sub-command whose implementation belongs to a later story. Exits 2, never 0. */
-function stub(name: string, owner: string): (this: Command) => void {
-  return function stubAction(this: Command) {
-    process.stderr.write(`snowarch ${name}: not implemented in this story (${owner})\n`);
-    process.exit(NOT_IMPLEMENTED_EXIT);
-  };
-}
 
 /**
  * THE ARGV GATE — before commander, before anything.
@@ -85,7 +78,16 @@ program
   .description('Manage configured ServiceNow instances')
   .allowUnknownOption()
   .allowExcessArguments()
-  .action(stub('instance', 'ARC-07'));
+  // `--help` belongs to the sub-command's own parser, which prints the exit-code table with it.
+  // Left to commander, `instance add --help` printed commander's options block — a help screen
+  // that describes a different program than the one that runs.
+  .helpOption(false)
+  .action(async (_options: unknown, command: Command) => {
+    // The ARGUMENTS commander collected, not a scan of `process.argv`: a label that happened to
+    // be the word `instance` would have made an index scan cut the line in the wrong place.
+    const { runInstance } = await import('./instance-command.js');
+    process.exit(await runInstance(command.args));
+  });
 
 program
   .command('doctor')

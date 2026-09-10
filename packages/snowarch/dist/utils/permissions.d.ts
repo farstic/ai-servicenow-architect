@@ -41,6 +41,27 @@ export declare function matchPreset(flags: Flags): PresetName;
  * read-only perform writes. The dependent flag is forced false and the contradiction is
  * reported; the store on disk is never modified by the server.
  */
+/**
+ * WHICH FLAG NEEDS WHICH, in one table.
+ *
+ * The graph was written twice — here, inside `applyDependencyRule`, and again in ARC-07-S04's
+ * review screen, which had to know that turning WRITE off means asking about SCRIPTING and
+ * CMDB_WRITE. Two encodings of one rule disagree the moment a third dependency appears, and the
+ * UI's copy is the one nobody would think to update. So the table is the definition, the server's
+ * rule reads it, and the wizard reads it: `requiresOf` for "what does this flag need", `dependentsOf`
+ * for "what needs this flag".
+ */
+export declare const DEPENDENCIES: Readonly<Record<FlagName, readonly FlagName[]>>;
+/**
+ * What `flag` needs turned on before it means anything.
+ *
+ * No `?? []` fallback: the table is typed `Record<FlagName, …>` and a test asserts its keys ARE
+ * `FLAG_NAMES`, so a missing entry cannot happen — and a fallback that cannot run is a branch the
+ * coverage gate correctly refuses to accept as tested.
+ */
+export declare const requiresOf: (flag: FlagName) => readonly FlagName[];
+/** What would become a contradiction if `flag` were turned off. In `FLAG_NAMES` order. */
+export declare const dependentsOf: (flag: FlagName) => readonly FlagName[];
 export declare function applyDependencyRule(flags: Flags, label?: string): {
     effective: Flags;
     warnings: string[];

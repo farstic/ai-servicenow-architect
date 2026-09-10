@@ -339,6 +339,38 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 > in its message). `STORE_IN_CLOUD_SYNC_FOLDER` is registered for the D-04 warning. Both are typed,
 > so a literal that is not a registry key will not compile.
 
+> **Amendment 2026-09-10 (ARC-07-S05).** Four departures, each with its reason.
+>
+> **(1) A policy refusal that the ARGUMENTS already decide happens FIRST.** `--env prod --preset
+> full --yes` cannot end any way but exit 3, so asking for a password and spending a network round
+> trip on the way there costs the user both for nothing — and sends one login attempt at a
+> production instance that was never going to be saved. The interactive path keeps the refusal at
+> the flags step, where there is somebody to offer the read-only save to.
+>
+> **(2) The server-dependency precondition RESOLVES the module rather than testing a fixed path.**
+> `npm ci` hoists `@modelcontextprotocol/sdk` to the repository root in this workspace, so
+> `packages/snowarch/node_modules/@modelcontextprotocol/sdk/package.json` does not exist on a
+> correctly installed checkout — the forwarder refused to run on a machine where everything was
+> fine. `createRequire(<package.json>).resolve(...)` asks the question Node will ask when the CLI
+> starts, and answers correctly for hoisted and nested trees alike.
+>
+> **(3) B06's `--instance-file` path does NOT call `addInstance()`.** There is no interface comment
+> naming it: ARC-06-S07 implemented that path directly (`probeAuth` + `completeFlags` +
+> `saveStore`), and it is merged, tested and working. `addInstance()` exists here with the story's
+> signature and is ready for it; rewiring a merged story's step is that story's change to make, not
+> this one's, and doing it silently would alter behaviour nobody asked to alter. No B06 test was
+> `todo` — none needed flipping.
+>
+> **(4) The spawned-CLI integration tests cannot reach a fake ServiceNow.** The URL rule is
+> https-only (correctly), and a TLS fixture would mean either a committed private key — which this
+> repository's own secret sweep would flag, rightly — or generating a certificate at test time on
+> three operating systems. So the composition is proven IN-PROCESS with injected dependencies
+> (24 tests, including every exit path and the store bytes), and the spawned CLI proves what only a
+> process can: commander handing the sub-command its arguments intact, `--help` being the
+> sub-command's, a secret on the command line refused before either parser sees it, and the policy
+> exit taking neither the network nor the store. AC 1, AC 2 and AC 9's spawned form are the owner's
+> sitting, beside AC 10.
+
 **As** an individual practitioner with a PDI **I want** `./snowarch instance add pdi --url https://devNNNNN.service-now.com --env pdi --auth basic --preset pdi-developer --default` to ask for my username and password, prove the instance, let me review the flags, and save one 0600 file — or save nothing at all **so that** the instance is usable "with the right permissions" after one command (README goal; `01` §6.2 steps 6–7).
 
 **Context.** README acceptance criteria 1, 2 and 5 (this story delivers 1 and 2 and the argv/history half of 5). P-23 ("Save anyway", default file mode, `npm link`), P-34 (no secret in argv/`~/.claude.json`), P-03 (six flags), D-04 (store location and modes), D-05 (proposal flow). `01` §6.2 step 7's exact strings: `AUTHENTICATION_FAILED — wrong username or password. Re-enter? (attempt 2 of 3)`; summary `Saved instance "pdi" (pdi · basic · preset pdi-developer · default). Probes: auth ok · write ok · scripting ok · cmdb ok · atf ok.` `01` §4.2 B06: the bootstrap invokes this command as its wizard step.

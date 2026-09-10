@@ -9,6 +9,7 @@ import { contractSha, cwdNote, loadConfig, root, version } from './config.mjs';
 import { createLogger } from './log.mjs';
 import { USAGE as BOOTSTRAP_USAGE } from './bootstrap.mjs';
 import { USAGE as MODE_USAGE } from './mode.mjs';
+import { USAGE as INSTANCE_USAGE } from './instance.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
 const UNIVERSAL = ['json', 'quiet', 'verbose', 'help'];
@@ -103,6 +104,11 @@ async function modeCommand(args) {
   return run(args);
 }
 
+async function instanceCommand(args) {
+  const { instanceCommand: run } = await import('./instance.mjs');
+  return run(args);
+}
+
 export const COMMANDS = {
   version: { summary: 'print versions, the contract sha and the floors', run: versionCommand,
     usage: 'usage: ./snowarch version [--json]' },
@@ -116,7 +122,8 @@ export const COMMANDS = {
     run: modeCommand, usage: MODE_USAGE,
     booleans: ['yes', 'ack-user-scope', 'skip-claude-check'] },
   doctor: PLACEHOLDER('doctor', 'ARC-08'),
-  instance: PLACEHOLDER('instance', 'ARC-07'),
+  instance: { summary: 'add and manage the ServiceNow instances this checkout can reach',
+    run: instanceCommand, usage: INSTANCE_USAGE, defersLog: false },
   upgrade: PLACEHOLDER('upgrade', 'ARC-09'),
 };
 
