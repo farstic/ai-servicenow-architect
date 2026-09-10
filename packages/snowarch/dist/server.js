@@ -1,3 +1,4 @@
+const drill = ;   // DRILL: ARC-06-S14 AC 4 — never merged
 #!/usr/bin/env node
 // FIRST, before anything that constructs the proxy agent. ESM evaluates every import before
 // the importing module's body, so this cannot be a call in main(): `EnvHttpProxyAgent` reads
