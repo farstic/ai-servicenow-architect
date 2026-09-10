@@ -34,6 +34,16 @@ export const GENERATORS = [
     targets: ['docs/MODES-AND-PRESETS.md'],
   },
   {
+    // ARC-08-S01: the ARCHITECTURE "Doctor" section's JSON shape and renderer sample, rendered from
+    // the real modules with a fixture registry. A documentation block that embeds a moving value
+    // goes stale the first time the value moves, and nobody re-reads a section they already
+    // believe.
+    id: 'gen-doctor-docs',
+    script: 'scripts/gen-doctor-docs.mjs',
+    supportsRoot: false,
+    targets: ['docs/ARCHITECTURE.md'],
+  },
+  {
     id: 'gen-roster',
     script: 'scripts/gen-roster.mjs',
     supportsRoot: true,

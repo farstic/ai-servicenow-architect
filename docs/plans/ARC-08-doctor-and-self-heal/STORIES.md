@@ -55,7 +55,7 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
     "summary": { "ok": 41, "warn": 0, "fail": 0, "skip": 0, "fixable": 0 } }
   ```
   `mode`, `modeLine`, `modeLineDetailed`, `engine`, `server`, `stale` are filled by S05/S03/S04; this story emits them as `null` with the keys present so the schema is stable from day one (ARC-02-S11's fixture stub already assumes `modeLine`).
-- **Redaction** (`redact.mjs`, applied by the runner to every `detail`, `remedy`, `command` and to every string leaf of `data` before rendering — the checks never redact themselves, so a forgotten mask cannot leak): usernames → first character + `***` + domain when present (`cvetomir@corp.com` → `c***@corp.com`, `admin` → `a***`); any value whose key matches `/PASSWORD|SECRET|TOKEN|_KEY$/i` → `set (len n)`; proxy URLs → `http://***@host:port`; absolute paths under `homedir` → `~/…`; the store path → `maskPath` semantics of ARC-04-S02 (`~/…/.local/instances.json`). The mask functions mirror `packages/snowarch/src/store/paths.ts` (`maskUsername`, `maskPath`) — `tests/doctor/redact.test.mjs` runs the same fixture table against both implementations so they cannot drift.
+- **Redaction** (`redact.mjs`, applied by the runner to every `detail`, `remedy`, `command` and to every string leaf of `data` before rendering — the checks never redact themselves, so a forgotten mask cannot leak): usernames → first character + `***` + domain when present (`someone@corp.example.com` → `s***@corp.example.com`, `admin` → `a***`); any value whose key matches `/PASSWORD|SECRET|TOKEN|_KEY$/i` → `set (len n)`; proxy URLs → `http://***@host:port`; absolute paths under `homedir` → `~/…`; the store path → `maskPath` semantics of ARC-04-S02 (`~/…/.local/instances.json`). The mask functions mirror `packages/snowarch/src/store/paths.ts` (`maskUsername`, `maskPath`) — `tests/doctor/redact.test.mjs` runs the same fixture table against both implementations so they cannot drift.
 - **Human renderer** (exact layout; the doctor prints the Mode line last so it is the final line of any transcript):
   ```
   snowarch doctor 2.0.0 — 2026-09-04 10:00:12 (quick: no · network: yes · section: all)
@@ -99,7 +99,7 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 2. Running `./snowarch doctor` from `clients/acme/` (a sub-directory) prints `DOCTOR: not at the repository root — run: cd <root>` and exits 3; running it with `NODE_VERSION` below `floors.node` (test spawns with a shimmed `process.versions.node`) exits 3 with the per-OS Node install command from `01` §6.2 step 1.
 3. A check that sets `code: 'AUTHENTICATION_FAILED'` renders exactly the registry's remedy and command (character-identical to `docs/TROUBLESHOOTING.md`'s `### AUTHENTICATION_FAILED` section — the test reads both); a check setting both `code` and a hand-written `remedy` fails the registry self-test.
 4. `--section docs,server` runs only those sections; `--section bogus` exits 2 printing `unknown section "bogus"; valid: prereqs, repo, docs, roster, contract, legacy, host, server`.
-5. Given a check whose `detail` contains the fixture username `cvetomir@corp.com`, a fixture password value and an absolute home path, the JSON and text outputs contain `c***@corp.com`, `set (len 12)` and `~/`, and `grep -c "cvetomir@corp.com\|<fixture password>"` on both outputs returns 0.
+5. Given a check whose `detail` contains the fixture username `someone@corp.example.com` (neutral and assembled — see the amendment), a fixture password value and an absolute home path, the JSON and text outputs contain `s***@corp.example.com`, `set (len 12)` and `~/`, and `grep -c "someone@corp.example.com\|<fixture password>"` on both outputs returns 0.
 6. `node --test tests/doctor/` passes on ubuntu, macOS and Windows before `npm ci` has been run (stdlib only; the contract loader is imported by relative path).
 7. `docs/ARCHITECTURE.md` "Doctor" section lists the sections, the id rule, the exit codes and the JSON shape above verbatim; `scripts/gen-roster.mjs --check`-style staleness is not required (hand-maintained section; S07 appends the mapping table).
 **Tasks.**
@@ -115,6 +115,37 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 **Definition of done.** Merged; tests green on nine cells; `docs/ARCHITECTURE.md` "Doctor" section committed; ARC-02-S11's fixture stub updated to emit schema v1 keys.
 
 ---
+
+> **Amendment 2026-09-10 (ARC-08-S01).** Five departures and findings.
+>
+> **(1) AC 5's fixture username is NEUTRAL.** The criterion spells a real person's address. The rule
+> of record is that no real name, email or account appears in this repository, its tests or its
+> transcripts — so the fixture is assembled from parts as `someone@corp.example.com`, and the
+> assertions are the same three: the masked form, `set (len n)`, and `~/`. A test about redaction is
+> the last place to make an exception to the rule it is testing.
+>
+> **(2) `homedir` is passed IN, never read under `lib/`.** `tools/snowarch/tests/mode-register.test.mjs`
+> forbids `homedir`/`USERPROFILE` anywhere in the engine's library — the rule that keeps the CLI out
+> of `~/.claude.json`. The doctor needs the home directory only to shorten a path to `~` in a report,
+> so `bin/snowarch.mjs` reads it and `main()` threads it through. Without one the rule simply does
+> not apply and a path prints as it is, rather than being half-masked against a guess.
+>
+> **(3) "Not at the repository root" means the ROOT, not "inside it".** The first implementation
+> walked up, found the checkout and ran — which is how the launcher behaves, and wrong here: every
+> path in the report resolves relative to the root, so a run from `clients/acme/` would describe a
+> directory the reader is not in. `realpath`-compared, because `/var` is a symlink to `/private/var`
+> on macOS and a temp checkout is reached through both names.
+>
+> **(4) The engine's registry REQUIRES the three booleans; the server's leaves them optional.** A
+> check written against the engine must declare `quick`, `network` and `spawns` — the failure mode
+> of an undeclared `network` is a doctor that touched the network on a machine that has none. The
+> server's `Check` keeps them optional so ARC-04-S12's own checks compile unchanged, and ARC-08-S04
+> supplies the defaults it knows when it adopts them.
+>
+> **(5) The ARCHITECTURE section's two blocks are GENERATED** (`scripts/gen-doctor-docs.mjs`, from
+> the real modules with a fixture registry) — the JSON shape and the renderer sample. A documentation
+> block that embeds a moving value goes stale the first time it moves, and nobody re-reads a section
+> they already believe. `gen-all` is **10 generators** now.
 
 ### ARC-08-S02 — Engine checks E-00…E-22: prerequisites, repo wiring, docs corpus, roster, contract
 

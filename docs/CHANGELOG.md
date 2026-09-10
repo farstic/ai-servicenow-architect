@@ -50,6 +50,19 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   builds is exactly what the user typed: a test greps the whole of `tools/snowarch/` for a
   `--password` construction, because a secret cannot reach `ps` through a process that never
   invents an argument.
+- **`./snowarch doctor` exists — the runner, not yet the checks.** One registry, one report shape,
+  and three promises that belong to the runner rather than to any check: every selected check RUNS
+  (one that throws becomes a failing result carrying its message, one that hangs becomes a failing
+  result after its timeout — a report that stopped at the first bad answer would describe a checkout
+  as healthy up to the point where it stopped looking); nothing reaches the output unredacted,
+  because the redaction pass is applied by the runner and a check cannot forget it; and a check that
+  names an error code gets its remedy from the contract, so the doctor and
+  `docs/TROUBLESHOOTING.md` cannot disagree — they are the same string. `--section`, `--quick`
+  (which implies `--no-network` and skips anything that spawns), `--json` against a documented
+  schema whose every key is present from the first commit, and the exit codes CI relies on: 0 no
+  FAIL, 1 at least one, 2 usage, 3 could not run. `--json --section prereqs` answers the six fields
+  `/snowarch setup-instance` was written to branch on.
+
 - **A nightly suite that proves the three things a simulation cannot.** `RUN_LIVE_E2E=1` runs the
   real CLI against a real instance: through a **pseudo-terminal**, so the masked prompt is actually
   exercised rather than injected around — nothing is echoed, and the transcript is searched for the
