@@ -121,6 +121,26 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   and Windows without Git for Windows, where the honest answer is that the session cannot run
   `./snowarch` from here at all.
 
+- **CI runs the doctor on the install it just proved — and the first run found three bugs.** The
+  bootstrap job builds a design-only install on thirteen cells; the doctor now runs in the same
+  cells, as steps rather than a new job, and its report is asserted, compared against a per-platform
+  snapshot, and uploaded whether the run was green or red. What may fail there is a closed list
+  (`E-00`, because a hosted runner has no Claude Code) and the assertion is two-way, so an allowance
+  cannot outlive the condition that justified it. The snapshot records id, status and fixable per
+  check and nothing that legitimately differs between two correct runs; a check added without a
+  snapshot row is red on every cell with the id named. Five cold spawns of the SessionStart banner
+  per cell, median under a second on all four — 330 ms on ubuntu, 614 on macOS, 910 on Windows —
+  with the number in the job summary.
+
+  Three things had been true for a while and nobody could have known. **The doctor could not check
+  npm on Windows at all**: `npm` there is `npm.CMD`, and Node has refused to exec a batch file
+  without a shell since CVE-2024-27980, so the check reported "found but did not answer" on every
+  Windows machine since it was written. **`--json` was not always JSON**: a note about an unwritable
+  cache was printed to stdout before the report, so any consumer's parse threw on the `n`. And **a
+  batch file invoked without `call` never comes back**, which had been quietly making the exit-code
+  check on the following line dead. The first two are fixed here; the third is reported where it
+  lives.
+
 - **A runtime error is a hand-off, not a retry.** The always-loaded rule file now carries the
   whole runtime family: when a tool result comes back with `(Code: …)`, the session stops the step,
   prints the registry's remedy verbatim and waits — it does not call again with the same or
