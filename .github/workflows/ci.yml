@@ -476,7 +476,9 @@ jobs:
           foreach ($key in @('"mode"', '"docs"', '"pin"', '"updatedAt"')) {
             if (-not $text.Contains($key)) { Write-Host "missing $key"; exit 1 }
           }
-          if (-not $text.Contains('"mode": "design-only"')) { Write-Host "not design-only"; exit 1 }
+          # `-match`, not `.Contains`: PowerShell 5.1's own JSON writer puts TWO spaces after the
+          # colon, so the exact-spelling test fails on the very file this platform wrote.
+          if ($text -notmatch '"mode"\s*:\s*"design-only"') { Write-Host "not design-only"; exit 1 }
           # The launcher seeds the banner's cache itself on the Node-free path — see the POSIX twin.
           # Matched loosely on purpose: this file is written by PowerShell's own JSON writer on
           # this platform and by a bash heredoc on the others, and their spacing is not the subject.
