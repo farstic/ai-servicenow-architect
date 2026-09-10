@@ -597,6 +597,21 @@ New checks with no old counterpart (listed under the table): E-06, E-09 (key sca
 ---
 
 ### ARC-08-S09 — `/snowarch status` skill body: doctor-JSON rendering and the no-Node fallback
+
+> **Amendment 2026-09-10 (from the delivery).** Four departures. (1) **The state file's keys are
+> `mode`, `docs.pin` and `updatedAt`** (`lib/state.mjs` v1) — the story's
+> `{"mode","docsPin","at"}` example was never the shape on disk. (2) **The three-cause fallback
+> stays.** The story's single sentence ("doctor unavailable until Node 20+ is installed") would
+> have replaced a rule ARC-02-S11 added for a reason recorded in its test: a session once refused
+> to blame Node 20 for a missing launcher, and was right to. The Node cause keeps the story's
+> wording; the other two — a missing launcher, a doctor that ran and failed — keep theirs, under
+> "never state a cause you did not check". (3) **`Capabilities:` and the citation counts are
+> routinely absent**, because E-04 spawns and E-16 walks the corpus, so neither is in the `--quick`
+> subset the skill is required to run (R-14). The template omits a null line and says so once,
+> rather than printing a line the model would fill from nowhere. (4) Line 1 is `modeLineDetailed`
+> as the story says, which changes ARC-02-S11's assertion from `report.modeLine`; the "verbatim,
+> first, undecorated" discipline it protects is unchanged.
+
 **As** an individual practitioner **I want** `/snowarch status` (or typing `Status`) to show the Mode line, engine version, docs pin and citation state, roster, capability packs and the doctor summary — from the doctor's JSON, or from the bootstrap state when the doctor cannot run **so that** the in-session view is the same truth as the terminal's, formatted for reading.
 **Context.** README deliverable "`/snowarch status` skill: runs `./snowarch doctor --quick --json` and prints Mode line, engine version, docs pin, roster, capability packs. When `node` is not on PATH (design-only install without Node) it reads `.local/bootstrap-state.json` instead and reports the mode with 'doctor unavailable until Node 20+ is installed'". R-2 (the skill is `/snowarch`, sub-command `status`). ARC-02-S11 created `.claude/skills/snowarch/SKILL.md` with the `status` branch printing `report.modeLine` plus "whatever keys exist" and named this story as the owner of the final layout; ARC-07-S09 edits the `setup-instance` branch (and owns the frontmatter's `allowed-tools` / `metadata.version` — its scope statement says the `status` section belongs to this story) — merge order ARC-07-S09 then this story; this story keeps the frontmatter and the hand-off block byte-identical. `01` §4.1 (the skill runs `./snowarch …` through Claude's Bash tool; on Windows that needs Git for Windows), `03` R-14 (`/snowarch status` always re-runs `--quick`).
 **Scope.** In: the `status` branch of `.claude/skills/snowarch/SKILL.md` (rendering instructions, fallbacks, the exact output template), a fixture JSON for the manual test, the T-07 update in `tests/VALIDATION-TESTS.md`. Out: the frontmatter, the `setup-instance` and `doctor` branches (ARC-07-S09 / ARC-02-S11), any new skill file (there is exactly one), any computation in the skill (it renders; it never derives).

@@ -746,6 +746,50 @@ the boundary can observe.
 
 ---
 
+## D4. ARC-08-S09 — `/snowarch status` in four real sessions
+
+*Twenty minutes across two machines. The template, the fixtures and the fallback wording are all
+proved here; what no test on this side can observe is whether a SESSION renders them — a model
+reading the skill is the component under test.*
+
+Each run is one fresh session, one question, one paste back.
+
+**1 — live (macOS).** In `~/snowarch-ref` with an instance configured:
+
+```sh
+./snowarch doctor --quick --json | head -3     # note modeLineDetailed
+claude
+```
+Ask: `/snowarch status`. Then check:
+- Is the FIRST line of the reply `modeLineDetailed` **character for character**, with no bold, no
+  heading, no code fence and no label?
+- Are the other lines the template's, in order, with no invented ones?
+- Does it say once that capability packs and citation counts are not probed on a quick run?
+
+**2 — the plain word.** In the same session, type `Status`. Same output?
+
+**3 — design-only (macOS).** On a design-only checkout: is line 1 the design-only variant, and is
+there **no** `Instances:` line?
+
+**4 — no Node.** With `node` off `PATH` (`PATH=/usr/bin:/bin claude`): does it read
+`.local/bootstrap-state.json` and say `— from bootstrap state (<time>); doctor unavailable, until
+Node 20+ is installed`, then the docs pin and the roster counts — and never a cause it did not
+check?
+
+**5 — Windows (Git Bash present).** Repeat run 1 in a Windows session.
+
+**Transcript hygiene, for every run:** search the transcript for your username and for any
+password. Neither should appear — the JSON masks the username to `s***@…` and the skill adds
+nothing.
+
+> *(lands in `tests/VALIDATION-TESTS.md` T-07 through ARC-08-S10's edit — the text is ready in
+> `docs/snippets/status-template.md`)*
+
+**Why it matters, in one line:** the rule file tells the engine that the Mode line is authoritative,
+and a skill that paraphrases it — however slightly — makes that instruction unfollowable.
+
+---
+
 ## Cleanup (please run this — it leaves no residue on your machine)
 
 ```sh

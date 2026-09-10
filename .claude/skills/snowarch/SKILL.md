@@ -25,27 +25,60 @@ The first word of the arguments selects the sub-command (`status` when none is g
 
 ## status
 
-Also runs when the user simply types `Status`.
+Also runs when the user simply types `Status` — the same branch, the same output.
 
 1. Run `./snowarch doctor --quick --json`. On Windows in Git Bash the command is the same; if
    `./snowarch` is not executable, run `node tools/snowarch/bin/snowarch.mjs doctor --quick --json`.
-2. **If it succeeds:** print `report.modeLine` **verbatim as the very first line of the reply** —
-   on its own, with nothing before it and no decoration of any kind: no bold, no heading, no code
-   fence, no "Mode line:" label. It is quoted, not presented. Then the engine
-   version, the docs pin, the roster (`28 skills / 9 agents`) and the capability flags in force.
-   After that, report the loaded engagement, the release family from `vendor/ServiceNowDocs`, and
-   any drift between recent work and the configured specialists.
-3. **If the doctor cannot run:** read `.local/bootstrap-state.json` and print
-   `Mode: <mode> — from bootstrap state; doctor unavailable, <cause>`, naming the cause you
-   actually observed and no other:
+   `--quick` every time: a session must never answer from the cache alone.
+2. **If it succeeds:** print these lines, in this order, filling each from the JSON key named in
+   brackets. Line 1 is `modeLineDetailed` **verbatim, as the very first line of the reply** — on
+   its own, with nothing before it and no decoration of any kind: no bold, no heading, no code
+   fence, no "Mode line:" label. It is quoted, not presented.
+
+```
+Mode: live — pdi (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 398 tools (contract)   [modeLineDetailed]
+Engine: snowarch 2.0.0 · tag v2.0.0 · contract a1b2c3d                                       [engine.version, engine.tag, engine.contractSha]
+Docs: vendor/ServiceNowDocs @ ba513f2 (australia) · sparse · citations checked: 181 | dead: 0 [engine.docs]
+Roster: 28 skills / 9 agents                                                                 [engine.roster]
+Capabilities: docx yes (python3) · PDF QA no · draw.io yes · Mermaid no                       [engine.capabilities]
+Instances: pdi (pdi, custom, default) · uat (test, read-only)                                 [server.instances]
+Doctor: 41 ok, 1 warn, 0 fail — quick run 2026-09-10 10:00 · full report: ./snowarch doctor   [summary, ranAt, options.quick]
+```
+
+   A line whose key is `null` is **omitted**, never guessed. Two are routinely null on a quick run,
+   because the checks that fill them spawn a process or walk the corpus and are outside the quick
+   subset: `engine.capabilities` and the citation counts in `engine.docs`. When either is missing,
+   say so once, at the end:
+
+   `Capability packs and citation counts are not probed on a quick run — ./snowarch doctor reports them.`
+
+   `Instances:` is omitted entirely in design-only.
+3. **When `summary.fail > 0`,** add one line per failing check after the seven — id, title and its
+   remedy — and then, when `summary.fixable > 0`:
+   `Run ./snowarch doctor --fix for the fixable ones (<summary.fixable>).`
+   Never list WARNs one by one; that is `/snowarch doctor`.
+4. **If the command exits 3** ("not at the repository root"), print the `cd` remedy from its own
+   output and nothing else about mode.
+5. **If the doctor cannot run at all,** read `.local/bootstrap-state.json` and print
+   `Mode: <mode> — from bootstrap state (<updatedAt>); doctor unavailable, <cause>`, naming the
+   cause you actually observed and no other:
    - Node is absent or below 20 → `until Node 20+ is installed`
    - Node is fine but `./snowarch` is not there → `the launcher is not installed — run ./bootstrap.sh (Windows: bootstrap.cmd)`
    - it ran and failed → `the doctor exited <code>`
+
    Never state a cause you did not check. A remedy for the wrong problem costs the user the time
    they spend following it.
-4. **If neither exists:** print
+
+   Then print `Docs: pin <docs.pin>` and `Roster: <n> skills / <n> agents`, counted by listing
+   `.claude/skills/*/SKILL.md` and `.claude/agents/*.md`. The roster is the ONE fact this skill may
+   derive, and only by listing directories.
+6. **If there is no state file either:** print
    `Mode: unknown — this checkout has not been bootstrapped; run ./bootstrap.sh (Windows: bootstrap.cmd)`.
-5. **Never infer the mode** from `~/.claude.json`, from `/mcp`, from memory, or from which tools
+7. **If the JSON does not parse:** print
+   `Mode: unknown — doctor output unreadable; run ./snowarch doctor in a terminal`.
+8. **On Windows without Git for Windows** the Bash tool is unavailable, so say:
+   `On Windows without Git for Windows I cannot run ./snowarch from here — run snowarch.cmd doctor in PowerShell and paste the Mode line.`
+9. **Never infer the mode** from `~/.claude.json`, from `/mcp`, from memory, or from which tools
    appear in the tool list. A disabled family is still advertised, so the tool list says nothing
    about mode. The doctor's line is the only answer; if it cannot run, say the mode is unverified
    rather than guessing.

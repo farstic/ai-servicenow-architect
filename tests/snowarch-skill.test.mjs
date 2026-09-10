@@ -112,10 +112,14 @@ const CHECKS = {
 
   'the four Mode shapes are all present': (t) => {
     // A session must have an answer in all four states, and each answer must say which it is.
-    assert.match(t, /`report\.modeLine` \*\*verbatim as the very first line of the reply\*\*/,
+    // ARC-08-S09 made line 1 `modeLineDetailed` — the same line with the flags and the tool count,
+    // which is what a session is asked for. Still verbatim, still first, still undecorated.
+    assert.match(t, /`modeLineDetailed` \*\*verbatim, as the very first line of the reply\*\*/,
       'the doctor line, printed as-is and first');
     assert.match(t, /no bold, no heading, no code\n\s*fence/, 'the decoration ban');
-    assert.match(t, /from bootstrap state; doctor unavailable, <cause>/);
+    // ARC-08-S09 added the RECORDED TIME to the sentence — "from bootstrap state" is only useful
+    // beside when that state was written. The three-cause discipline below is unchanged.
+    assert.match(t, /from bootstrap state \(<updatedAt>\); doctor unavailable, <cause>/);
     // The fallback names a cause, and all three causes it may name are spelled out. A template
     // with one hard-coded cause states a wrong remedy confidently — which is how this was found:
     // a session refused to blame Node 20 for a missing launcher, and it was right to.

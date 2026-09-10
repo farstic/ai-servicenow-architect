@@ -32,6 +32,27 @@ they walk you through connecting a ServiceNow instance.
 | `/snowarch setup-instance --resume` | Picks up after you have finished in the terminal, and confirms what is now configured. |
 | `/snowarch doctor` | The full health check: `DOCTOR: n ok, n warn, n fail`, then every failure with its remedy. |
 
+### What `/snowarch status` prints
+
+Seven lines, in this order, each filled from one key of the doctor's JSON — the same report the
+terminal prints, formatted for reading:
+
+```
+Mode: live — pdi (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 398 tools (contract)   [modeLineDetailed]
+Engine: snowarch 2.0.0 · tag v2.0.0 · contract a1b2c3d                                       [engine.version, engine.tag, engine.contractSha]
+Docs: vendor/ServiceNowDocs @ ba513f2 (australia) · sparse · citations checked: 181 | dead: 0 [engine.docs]
+Roster: 28 skills / 9 agents                                                                 [engine.roster]
+Capabilities: docx yes (python3) · PDF QA no · draw.io yes · Mermaid no                       [engine.capabilities]
+Instances: pdi (pdi, custom, default) · uat (test, read-only)                                 [server.instances]
+Doctor: 41 ok, 1 warn, 0 fail — quick run 2026-09-10 10:00 · full report: ./snowarch doctor   [summary, ranAt, options.quick]
+```
+
+A line whose key is empty is left out rather than guessed. Two usually are: capability packs and
+citation counts come from checks that spawn a process or walk the whole corpus, so a quick run —
+which is what a session always does — leaves them out and says so. `./snowarch doctor` reports
+them. `Instances:` is absent in design-only, and when anything failed, one line per failure follows
+with its remedy.
+
 ### Reading the Mode line
 
 `Mode:` is the answer to "can this session touch a real instance?", and it comes from the doctor —

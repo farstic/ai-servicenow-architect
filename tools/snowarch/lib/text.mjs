@@ -102,6 +102,16 @@ export const BANNER = Object.freeze({
   /** Anything unforeseen. The CLASS, never the message: a message can carry a path or a value. */
   failed: (errorClass) => `Mode: unknown — session banner failed (${errorClass}); run `
     + './snowarch doctor',
+  /**
+   * What `/snowarch status` says when the doctor cannot run at all (ARC-08-S09).
+   *
+   * The mode is READ from `.local/bootstrap-state.json` rather than derived, and the sentence says
+   * so — "from bootstrap state" is the difference between a fact the doctor established a moment
+   * ago and one the bootstrap recorded at install time, and a reader deciding whether to trust it
+   * needs to know which they have.
+   */
+  fromState: (mode, at) => `Mode: ${mode} — from bootstrap state (${at}); doctor unavailable `
+    + 'until Node 20+ is installed',
 });
 
 /**
@@ -216,6 +226,7 @@ export function exportable({ serverKey }) {
       staleSuffix: BANNER.staleSuffix,
       timedOut: BANNER.timedOut,
       failed: BANNER.failed('Error'),
+      fromState: BANNER.fromState('design-only', '2026-09-10T10:00:00.000Z'),
     },
     doctorUnavailable: doctorLine({ nodeUsable: false }),
     posix: forShell({ platform: 'linux', env: {} }),
