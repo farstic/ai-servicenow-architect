@@ -282,15 +282,17 @@ protocol is not exercised — the dormant PASS is that nothing was attempted.
 
 ### Setup
 
-A design-only checkout. Before ARC-06 exists the toggle is written by hand, and the doctor is the
-S11 fixture stub — the skill is under test here, not the doctor:
+A design-only checkout, and the REAL doctor — ARC-08-S05 replaced the stub this section used to
+copy in. `./bootstrap.sh` leaves the toggle and the state file behind; the Mode line the skill
+quotes is the one the doctor derives from them:
 
 ```bash
-mkdir -p .claude
-printf '{"disabledMcpjsonServers":["servicenow"]}\n' > .claude/settings.local.json
-cp tests/fixtures/snowarch-doctor-stub.sh ./snowarch && chmod +x ./snowarch
-export SNOWARCH_STUB_MODE=design-only
+./bootstrap.sh --mode design --yes      # or: ./snowarch mode design, on a bootstrapped checkout
+./snowarch doctor --quick               # the last line is the Mode line the skill must quote
 ```
+
+The stub (`tests/fixtures/snowarch-doctor-stub.sh`) stays for the ARC-02-S11 skill tests that run
+without a built server; it is no longer what this record exercises.
 
 Three prompts, each in its own fresh session.
 

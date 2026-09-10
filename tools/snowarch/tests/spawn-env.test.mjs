@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SESSION_VARIABLES, childEnv } from '../lib/spawn-env.mjs';
-import { serverCommand } from '../lib/mcp-handshake.mjs';
+import { serverCommand } from '../lib/server-command.mjs';
 import { runProbes } from '../lib/steps/B08.mjs';
 import { wizardAvailable } from '../lib/steps/B06.mjs';
 import { npmSpawnOptions } from '../lib/steps/B04.mjs';

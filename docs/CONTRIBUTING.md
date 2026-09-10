@@ -847,14 +847,18 @@ a bogus value and asserts every spawn's environment carries the checkout.
 The `${CLAUDE_PROJECT_DIR}` in `.mcp.json` and in the SessionStart hook command is a different
 thing: those are templates **Claude Code expands itself**, and they are correct as they stand.
 
-## B08 spawns the server; it never imports it
+## The server is SPAWNED, never imported — and only once
 
-The server package has an in-process doctor, and reusing it from B08 would prove that a library
-works when imported — which is not the thing that fails. What fails is the child process. So B08
-goes through `lib/mcp-handshake.mjs`, which spawns `dist/server.js` exactly as `.mcp.json` describes
-it, with the placeholders expanded the way Claude Code expands them. If you are tempted to import
-for speed, the failures you would stop catching are precisely the ones a first `claude` session
-hits.
+The server package has an in-process doctor, and verifying an install by importing it would prove
+that a library works when imported — which is not the thing that fails. What fails is the child
+process: a cold start over `MCP_TIMEOUT`, a `dist/` that does not match the contract, an
+`SNOW_STORE` in the operator's shell pointing somewhere else.
+
+There is exactly ONE place that spawns it: the doctor's `server` section (SV-05/SV-06), through the
+server package's own MCP client. B08 used to spawn a second one from `lib/mcp-handshake.mjs`;
+ARC-08-S05 retired that and made the step call `runDoctor({ sections: ['server'] })` instead. If you
+are tempted to add another handshake for speed or convenience, the cost is not the code — it is two
+answers to "does the installed server work", kept in step by nothing.
 
 ## Import the store modules lazily, and type-check before you push
 

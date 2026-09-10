@@ -280,9 +280,14 @@ async function handshake(serverPath) {
             stdio: ['pipe', 'pipe', 'ignore'],
             env: { ...process.env, SNOW_LOG_LEVEL: 'error' },
         });
+        const spawnedAt = Date.now();
+        let initializeMs;
         let buffer = '';
         const seen = {};
-        const finish = (h) => { child.kill(); done(h); };
+        const finish = (h) => {
+            child.kill();
+            done({ ...h, ...(initializeMs === undefined ? {} : { initializeMs }) });
+        };
         const timer = setTimeout(() => finish({ tools: [], capabilities: null, error: 'timed out after 20s' }), 20_000);
         const send = (id, method, params = {}) => {
             child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
@@ -308,6 +313,7 @@ async function handshake(serverPath) {
                     continue;
                 seen[msg.id] = msg.result;
                 if (msg.id === 1) {
+                    initializeMs = Date.now() - spawnedAt;
                     child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
                     send(2, 'tools/list');
                 }
@@ -337,6 +343,18 @@ async function handshake(serverPath) {
         });
     });
 }
+/**
+ * What SV-05 hands its consumers: the count and the cold start.
+ *
+ * ARC-08-S05's `modeLineDetailed` prints the count and says whether it came from a RUNNING server
+ * or from the contract, ARC-06's B08 reports the same two numbers as its own step result, and the
+ * `MCP_TIMEOUT` headroom warning is computed by whoever can read `.claude/settings.json` — which
+ * is the engine, not this package.
+ */
+const handshakeData = (h) => ({
+    toolCount: h.tools.length,
+    ...(h.initializeMs === undefined ? {} : { initializeMs: h.initializeMs }),
+});
 /** Cached across SV-05 and SV-06 so the server is spawned once, not twice. */
 let handshakeCache;
 const getHandshake = () => {
@@ -365,7 +383,8 @@ export const svHandshake = {
             // Unconfigured mode advertises five tools deliberately. Comparing against the full
             // contract here would report a 392-name difference for a server behaving correctly.
             return h.tools.length === 5
-                ? ok('SV-05', 'stdio handshake', `unconfigured: ${h.tools.length} core tools advertised`)
+                ? { ...ok('SV-05', 'stdio handshake', `unconfigured: ${h.tools.length} core tools advertised`),
+                    data: handshakeData(h) }
                 : fail('SV-05', 'stdio handshake', `unconfigured mode advertised ${h.tools.length} tools, expected 5: ${h.tools.join(', ')}`, 'run node packages/snowarch/dist/server.js and read its stderr');
         }
         const advertised = new Set(h.tools);
@@ -373,7 +392,7 @@ export const svHandshake = {
         const missing = declared.filter((n) => !advertised.has(n));
         const extra = h.tools.filter((n) => !declaredSet.has(n));
         if (missing.length === 0 && extra.length === 0) {
-            return ok('SV-05', 'stdio handshake', `${h.tools.length} tools advertised, matching the contract`);
+            return { ...ok('SV-05', 'stdio handshake', `${h.tools.length} tools advertised, matching the contract`), data: handshakeData(h) };
         }
         // The differing NAMES, not a count: "3 tools differ" tells nobody which build is stale.
         const parts = [

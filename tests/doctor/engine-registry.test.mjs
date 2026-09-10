@@ -126,3 +126,38 @@ test('the quick engine subset finishes inside its budget', { skip: !process.env.
   const elapsed = Date.now() - started;
   assert.ok(elapsed <= 3000, `--quick took ${elapsed} ms, over the 3 s CI budget`);
 });
+
+/**
+ * ARC-08-S05 fixes the `--quick` MEMBERSHIP — S01 defined the flags, S02 asserted them from the
+ * registry, and this asserts the same set from a REAL run's JSON. Two assertions, because they
+ * fail differently: the registry one catches a flag changed by hand, and this one catches a
+ * runner that stopped honouring them.
+ */
+test('--quick membership is the same set in the registry and in a real run', () => {
+  const r = cli(['--json', '--quick', '--no-cache']);
+  const report = JSON.parse(r.stdout);
+  const ran = report.checks.filter((c) => c.detail !== 'not in the --quick subset').map((c) => c.id);
+  const { selected } = planRun(checks, { quick: true });
+  assert.deepEqual(ran, selected.map((c) => c.id));
+  // The story's list, plus SV-08 — which post-dates it (the story predates ARC-08-S04's ninth
+  // server check) and belongs where its flags put it: it reads directories and spawns nothing.
+  assert.deepEqual(ran, [
+    'E-01', 'E-02',
+    'E-05', 'E-06', 'E-07', 'E-08', 'E-09', 'E-10', 'E-11',
+    'E-12', 'E-13', 'E-14', 'E-15',
+    'E-17', 'E-18', 'E-19', 'E-20', 'E-22',
+    'E-23', 'E-24', 'E-25', 'E-26',
+    'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-07', 'SV-08',
+  ]);
+  // And the ones the story leaves out, for the reasons it gives: they spawn, walk the corpus or
+  // use the network.
+  assert.deepEqual(report.checks.filter((c) => c.detail === 'not in the --quick subset')
+    .map((c) => c.id), ['E-00', 'E-03', 'E-04', 'E-16', 'E-21', 'E-27', 'SV-04', 'SV-05', 'SV-06']);
+});
+
+test('a quick run says so in the report a consumer reads', () => {
+  const report = JSON.parse(cli(['--json', '--quick', '--no-cache']).stdout);
+  assert.equal(report.options.quick, true);
+  assert.equal(report.options.noNetwork, true, '--quick must imply --no-network');
+  assert.match(report.modeLine, /^Mode: /);
+});

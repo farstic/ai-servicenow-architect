@@ -10,7 +10,7 @@
 // `tools/snowarch` has no `node_modules` of its own, and the workspace symlink in the root's only
 // exists after `npm ci` — which a design-only checkout never runs. The specifier stays the public
 // API for other consumers, and a test asserts both resolve to the same module when it can.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -97,6 +97,28 @@ export async function serverReport(ctx) {
 /** `live` when the recorded mode says so — design-only is the default, and its skips are expected. */
 const isLive = (ctx) => ctx.mode === 'live';
 
+/** `MCP_TIMEOUT` from the committed settings — never a literal (`01` §13, and S-06 measured it). */
+export function mcpTimeout(root, { read = readFileSync } = {}) {
+  try {
+    const value = Number(JSON.parse(read(join(root, '.claude', 'settings.json'), 'utf8'))
+      ?.env?.MCP_TIMEOUT);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** More than 60 % of the budget spent on a cold start is the S-06 warning, on an `ok` result. */
+export const HEADROOM = 0.6;
+
+export function headroomNote(initializeMs, timeoutMs) {
+  if (!initializeMs || !timeoutMs) return null;
+  return initializeMs > timeoutMs * HEADROOM
+    ? `cold start ${initializeMs} ms is over ${Math.round(HEADROOM * 100)} % of MCP_TIMEOUT `
+      + `(${timeoutMs} ms) — see docs/TROUBLESHOOTING.md "MCP_TIMEOUT"`
+    : null;
+}
+
 /** One id's result, adopted from the server's report or explained by its absence. */
 export async function adopt(ctx, id) {
   const answer = await serverReport(ctx);
@@ -109,7 +131,18 @@ export async function adopt(ctx, id) {
       return skip(`${id} was not in the server's report (version skew)`, { adopted: false });
     }
     const { id: _id, title: _title, status, detail, ...rest } = result;
-    return { status, detail, ...rest, data: { adopted: true, title, ...(result.data ?? {}) } };
+    const adopted = { status, detail, ...rest,
+      data: { adopted: true, title, ...(result.data ?? {}) } };
+    // The one thing the server module cannot judge: whether its cold start fits the budget
+    // `.claude/settings.json` sets. That file is the engine's, so the comparison is the engine's.
+    if (id === 'SV-05' && adopted.status === 'ok') {
+      const note = headroomNote(result.data?.initializeMs, ctx.mcpTimeout ?? mcpTimeout(ctx.root));
+      if (note) {
+        return { ...adopted, status: 'warn', detail: `${adopted.detail} — ${note}`,
+          remedy: 'raise MCP_TIMEOUT in .claude/settings.json, or find out why start-up is slow' };
+      }
+    }
+    return adopted;
   }
   if (answer.state === 'no-dist') {
     return id === 'SV-01'

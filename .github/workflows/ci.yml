@@ -366,11 +366,15 @@ jobs:
       # Assertion 9's second half: the committed dist/ answers a handshake. Needs the runtime
       # dependencies, which a design-only install deliberately does not fetch — so they are
       # installed HERE, after every assertion about the install itself has already passed.
+      #
+      # It goes through the doctor's `server` section (ARC-08-S05): the engine's own MCP client was
+      # retired when B08 started asking the doctor, and this job must exercise the handshake the
+      # product actually performs rather than a second one kept for testing.
       - name: The committed dist/ answers a handshake on this OS
         if: matrix.variant == 'node-cli'
         run: |
           npm ci --ignore-scripts
-          node tools/snowarch/tests/handshake-smoke.mjs
+          node tools/snowarch/tests/server-section-smoke.mjs
 
   launcher:
     # `bootstrap.sh` is the one file that runs on a machine with NO Node — which means none of the

@@ -426,17 +426,21 @@ credential is authenticated exactly **once**.
 B08 is the first moment the product is actually exercised, and it **spawns** rather than imports:
 the failures worth catching are the child's — a cold start slower than `MCP_TIMEOUT`, a `dist/`
 that does not match the pinned contract, an `SNOW_STORE` in the operator's shell pointing somewhere
-else — and none of them reproduce in-process. `lib/mcp-handshake.mjs` speaks newline-delimited
-JSON-RPC over the child's stdio, stdlib only: `initialize` → `notifications/initialized` →
-`tools/list` with cursor pagination → (live) one `tools/call`, then stdin closed and ≤ 5 s to exit.
-One retry on an EPIPE at spawn, because npm has just written `node_modules`; every other failure is
-a failure, and every exit goes through one settle under one deadline.
+else — and none of them reproduce in-process.
 
-Three comparisons, catching opposite mistakes: a tool the server advertises that the contract does
-not know means `dist/` is ahead of the pin; a **pinned** tool the server does not advertise means
-the governance texts cite something nobody can call, so that one names its `used_by` — those are
-the files that will break. Unconfigured is a different expectation rather than a relaxed one: S-17
-says exactly the core set, and the names come from the build that decides them.
+**ARC-08-S05 changed who spawns it.** The step used to speak newline-delimited JSON-RPC itself, from
+`lib/mcp-handshake.mjs`; the doctor's `server` section does that now, through the server package's
+own client (SV-05/SV-06), and B08 calls `runDoctor({ sections: ['server'], writeCache: true })` and
+reports its answer. That leaves ONE handshake in the product and one cache writer, and it means an
+install's verdict cannot disagree with the first `./snowarch doctor` the user runs. What survived
+the retirement is `lib/server-command.mjs` — reading `.mcp.json` into the exact command Claude Code
+would run, with the placeholders expanded the way Claude Code expands them and
+`CLAUDE_PROJECT_DIR` SET rather than inherited. That is not a handshake, it is still ours, and
+E-07 validates the same file statically.
+
+The pin-level comparisons went with it: a tool the server advertises that the contract does not
+know is SV-05's finding now, and the `used_by` reporting it used to print is covered statically by
+L01 and by B05's contract check at install time.
 
 #### `.local/doctor-last.json` v1 — what the banner reads
 
@@ -944,6 +948,28 @@ cannot disagree. A check that sets both a code and its own remedy is refused.
 **Exit codes.** `0` no FAIL (warnings allowed) · `1` at least one FAIL · `2` usage · `3` the doctor
 could not run at all — not at the repository root, an unparsable `engine.config.json`, or Node below
 the floor. Exit codes apply with `--json` too; CI relies on them.
+
+**One report, one Mode line** (ARC-08-S05). The sections print in a fixed order — prereqs, repo,
+docs, roster, contract, legacy, host, server — and the last line is always the Mode line, because
+the last line of a transcript is the one that survives a truncated paste. That line is DERIVED from
+four facts (the toggle file, the store's loaded instances, the recorded bootstrap state, and
+whether the server module could run) by a pure function, and from nothing else: never from
+`~/.claude.json`, which belongs to Claude Code and describes a registration rather than a
+configuration. A test points `HOME` at an empty directory and at a stale fixture and asserts the
+same line comes back.
+
+Two checks can report one condition — E-25 sees a cloud-synced CHECKOUT and SV-02 a cloud-synced
+STORE, which on the usual install is the same folder. **Both lines stay in `checks[]`** (each names
+a different path, and which one a reader needs depends on which they are moving) and the SUMMARY
+counts it once, through a `dedupeKey` that fires only when both are really describing that
+condition.
+
+**Deviations from `01` §8**, recorded rather than silently resolved: the design-only Mode line
+carries no doctor stamp (§8's example shows one on the live line only, and a date bolted onto a
+sentence that ends in a command reads as part of the command); the detailed line's flag labels come
+from `flagNames(contract)` rather than the six names §8 spells; and the tool count says
+`(contract)` when SV-05 did not run, because a number with no provenance is trusted and should not
+be.
 
 **The engine's twenty-three checks** (ARC-08-S02). The `legacy`/`host` detectors (S03) and the
 `SV-` server checks (S04) append to the same registry, because `--section` and `--quick` are answers

@@ -7,7 +7,7 @@
 // It goes through the same write-time secret guard as the bootstrap state, and for the same reason:
 // a step three stories from now will have a probe result it wants to keep, and the obvious place to
 // put a URL is a `detail` string.
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertStorable } from './state.mjs';
 import { writeJsonAtomic } from './settings-local.mjs';
@@ -15,6 +15,67 @@ import { writeJsonAtomic } from './settings-local.mjs';
 export const CACHE_VERSION = 1;
 export const CACHE_FILE = join('.local', 'doctor-last.json');
 export const cachePath = (root) => join(root, CACHE_FILE);
+
+/**
+ * The six files whose mtime decides whether the cache still describes this checkout.
+ *
+ * MTIMES, not hashes: the banner has ~300 ms and no Node on some machines, and six `stat` calls
+ * are the cheapest question that can be asked. They are the six inputs a doctor answer depends on
+ * — the registration, both settings files, the store, the config and the recorded mode — so a
+ * change to any of them is a reason to re-run rather than to read.
+ */
+export const INPUT_FILES = Object.freeze({
+  mcpJsonMtime: ['.mcp.json'],
+  settingsMtime: ['.claude', 'settings.json'],
+  settingsLocalMtime: ['.claude', 'settings.local.json'],
+  storeMtime: ['.local', 'instances.json'],
+  engineConfigMtime: ['engine.config.json'],
+  bootstrapStateMtime: ['.local', 'bootstrap-state.json'],
+});
+
+export const INPUTS_FILE = join('.local', 'doctor-last.inputs.json');
+export const inputsPath = (root) => join(root, INPUTS_FILE);
+
+/** `{ mcpJsonMtime: 1757…, … }` — `null` for a file that is not there, which is itself an input. */
+export function collectInputs(root, { stat = statSync, exists = existsSync } = {}) {
+  const out = {};
+  for (const [key, parts] of Object.entries(INPUT_FILES)) {
+    const p = join(root, ...parts);
+    out[key] = exists(p) ? Math.round(stat(p).mtimeMs) : null;
+  }
+  return out;
+}
+
+/**
+ * Is the cache still describing this checkout? ONE rule, for the banner (S08) and for `--fix` (F7).
+ *
+ * A missing inputs file is stale, not fresh: it means the cache was written by a build that did
+ * not record what it depended on, and "assume fine" is exactly the failure R-14 describes.
+ */
+export function cacheStale(root, { now = Date.now(), maxAgeMs = null, read = readFileSync,
+  exists = existsSync, inputs = null } = {}) {
+  if (!exists(cachePath(root))) return { stale: true, reason: 'no cache' };
+  if (!exists(inputsPath(root))) return { stale: true, reason: 'no inputs file' };
+  let recorded;
+  try {
+    recorded = JSON.parse(read(inputsPath(root), 'utf8'));
+  } catch {
+    return { stale: true, reason: 'inputs file is not valid JSON' };
+  }
+  const current = inputs ?? collectInputs(root);
+  for (const key of Object.keys(INPUT_FILES)) {
+    if (recorded[key] !== current[key]) return { stale: true, reason: `${key} changed` };
+  }
+  if (maxAgeMs !== null) {
+    try {
+      const at = Date.parse(JSON.parse(read(cachePath(root), 'utf8')).at);
+      if (Number.isFinite(at) && now - at > maxAgeMs) return { stale: true, reason: 'too old' };
+    } catch {
+      return { stale: true, reason: 'cache is not valid JSON' };
+    }
+  }
+  return { stale: false, reason: null };
+}
 
 /**
  * The keys ARC-08 may rely on. Named here rather than left implicit, so a rename is a visible
@@ -57,4 +118,38 @@ export function writeDoctorCache(root, { mode, checks, engineVersion = null, con
   // thing another account on a shared machine has any business reading either.
   writeJsonAtomic(cachePath(root), payload, { mode: 0o600 });
   return payload;
+}
+
+/**
+ * ARC-08's write: the doctor's own report, plus the inputs that justify reading it later.
+ *
+ * The SAME file and the same guard as the bootstrap's write — a second writer with its own shape
+ * is how a banner ends up reading a key nobody writes any more. What is added is the report
+ * itself (the doctor's JSON is the cache; there is nothing to summarise) and the inputs file.
+ *
+ * `--section` never gets here: a partial report cached as if it were a full one would tell the
+ * banner that checks which never ran had passed. That decision is the caller's, and it is stated
+ * where the caller makes it.
+ */
+export function writeReportCache(root, report, { writer = 'doctor', now = new Date() } = {}) {
+  const payload = {
+    version: CACHE_VERSION,
+    at: (now instanceof Date ? now : new Date(now)).toISOString(),
+    writer,
+    engineVersion: report.version ?? null,
+    contractSha: report.engine?.contractSha ?? null,
+    mode: report.mode ?? null,
+    modeLine: report.modeLine ?? null,
+    ...(report.server ? { server: report.server } : {}),
+    checks: (report.checks ?? []).map(({ id, status, detail, remedy = null }) =>
+      ({ id, status, detail, ...(remedy ? { remedy } : {}) })),
+    summary: report.summary ?? summarise(report.checks ?? []),
+    report,
+  };
+  assertStorable(payload, 'doctor-last');
+  mkdirSync(join(root, '.local'), { recursive: true, mode: 0o700 });
+  writeJsonAtomic(cachePath(root), payload, { mode: 0o600 });
+  const inputs = collectInputs(root);
+  writeJsonAtomic(inputsPath(root), inputs, { mode: 0o600 });
+  return { payload, inputs };
 }
