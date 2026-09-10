@@ -135,16 +135,32 @@ export function probesJson(storePath: string, probes: Record<string, LastProbe>)
  * it is which file the server will actually read. Paths go through `maskPath` — the home directory
  * becomes `~`, and an absolute path carries the account name into every screen share and ticket.
  */
-export const precedenceNote = (label: string, projectPath: string, globalPath: string): string =>
-  `Note: "${label}" exists in both the project store (${maskPath(projectPath)}) and the global `
-  + `store (${maskPath(globalPath)}). The server uses the project store for this checkout; the `
-  + 'global entry is ignored here.';
+export const precedenceNote = (label: string, firstPath: string, globalPath: string,
+  source: StoreLabel = 'project'): string => {
+  // The noun follows the SOURCE, because "the project store" is false when `SNOW_STORE` selected
+  // the file — and the whole point of the sentence is to name the file the server reads. The
+  // project wording is byte-for-byte the story's.
+  const noun = source === 'project' ? 'the project store' : `the store ${source} selects`;
+  const uses = source === 'project' ? 'the project store' : `the ${source} store`;
+  return `Note: "${label}" exists in both ${noun} (${maskPath(firstPath)}) and the global `
+    + `store (${maskPath(globalPath)}). The server uses ${uses} for this checkout; the `
+    + 'global entry is ignored here.';
+};
 
 /** The footer `list` prints when the OTHER store is not empty. */
 export const otherStoreFooter = (count: number): string =>
   `(+ ${count} instance${count === 1 ? '' : 's'} in the global store — ./snowarch instance list --all)`;
 
-export type StoreLabel = 'project' | 'global' | 'env';
+/**
+ * What the STORE column says — the thing that SELECTED the file, in the words a reader can check.
+ *
+ * `SNOW_STORE` rather than the resolver's internal `env`: a cell saying `env` sends somebody
+ * looking for an environment, and the variable's own name is both shorter and checkable.
+ */
+export type StoreLabel = 'project' | 'global' | 'SNOW_STORE';
+
+export const storeLabelFor = (source: string): StoreLabel =>
+  (source === 'env' ? 'SNOW_STORE' : source === 'global' ? 'global' : 'project');
 
 export interface CombinedListJson extends ListJson {
   /** `list --all`: which store each row came from, and the note when a label is in both. */
@@ -160,25 +176,37 @@ export interface CombinedListJson extends ListJson {
  * values, and the note says which of the two the server reads.
  */
 export function combinedListJson(
-  project: { path: string; store: Store | null },
+  first: { path: string; store: Store | null; source: StoreLabel },
   globalStore: { path: string; store: Store | null },
 ): CombinedListJson {
-  const rows: Array<MaskedInstance & { store: StoreLabel }> = [];
-  for (const [source, side] of [['project', project], ['global', globalStore]] as const) {
+  // The FIRST store is whatever the resolver selected — the per-checkout one, or the file
+  // `SNOW_STORE` names, or the global one when there is nothing else. It used to be computed
+  // separately as "the project path", so a run under `SNOW_STORE` listed only the global store
+  // and left out the file the server actually reads. Found in review.
+  const sameFile = first.path === globalStore.path;
+  const rows: Array<MaskedInstance & { store: StoreLabel; default: boolean }> = [];
+  for (const [source, side] of ([[first.source, first],
+    ...(sameFile ? [] : [['global', globalStore] as const])] as const)) {
     for (const [label, entry] of Object.entries(side.store?.instances ?? {})) {
-      rows.push({ ...maskedInstance(label, entry), store: source });
+      // The default marker belongs to the ROW'S OWN store. Both files name a default, and marking
+      // a global row because the project store calls that label its default would claim a
+      // relationship between two files that are never read together.
+      rows.push({ ...maskedInstance(label, entry), store: source as StoreLabel,
+        default: side.store?.defaultInstance === label });
     }
   }
-  const inBoth = Object.keys(project.store?.instances ?? {})
+  const inBoth = sameFile ? [] : Object.keys(first.store?.instances ?? {})
     .filter((label) => Boolean(globalStore.store?.instances?.[label]));
   return {
-    store: maskPath(project.store ? project.path : globalStore.path),
-    defaultInstance: project.store?.defaultInstance ?? globalStore.store?.defaultInstance ?? null,
+    store: maskPath(first.store ? first.path : globalStore.path),
+    defaultInstance: first.store?.defaultInstance ?? globalStore.store?.defaultInstance ?? null,
     instances: rows,
-    stores: { project: project.store ? maskPath(project.path) : null,
+    stores: {
+      project: first.source === 'project' && first.store ? maskPath(first.path) : null,
+      SNOW_STORE: first.source === 'SNOW_STORE' && first.store ? maskPath(first.path) : null,
       global: globalStore.store ? maskPath(globalStore.path) : null,
-      env: null },
-    notes: inBoth.map((label) => precedenceNote(label, project.path, globalStore.path)),
+    },
+    notes: inBoth.map((label) => precedenceNote(label, first.path, globalStore.path, first.source)),
   };
 }
 
@@ -187,10 +215,11 @@ const ALL_HEADERS = ['LABEL', 'STORE', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER
 /** `list --all`: the table with a STORE column, then the precedence note for anything in both. */
 export function listAllTable(list: CombinedListJson): string {
   if (list.instances.length === 0) return NO_INSTANCES;
-  const rows = (list.instances as Array<MaskedInstance & { store: StoreLabel }>).map((i) => [
-    i.label, i.store, i.environment, i.auth.method, i.preset,
-    list.defaultInstance === i.label ? '*' : '', i.auth.username,
-  ]);
+  const rows = (list.instances as Array<MaskedInstance & { store: StoreLabel; default: boolean }>)
+    .map((i) => [
+      i.label, i.store, i.environment, i.auth.method, i.preset,
+      i.default ? '*' : '', i.auth.username,
+    ]);
   const width = ALL_HEADERS.map((h, c) => Math.max(h.length, ...rows.map((r) => r[c]?.length ?? 0)));
   const line = (cells: readonly string[], last: string): string =>
     `${cells.map((cell, c) => cell.padEnd(width[c] as number)).join('  ')}  ${last}`.trimEnd();

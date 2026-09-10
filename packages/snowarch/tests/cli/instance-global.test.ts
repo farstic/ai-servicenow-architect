@@ -33,6 +33,7 @@ const REAL = {
   HOME: process.env.HOME, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
   APPDATA: process.env.APPDATA, USERPROFILE: process.env.USERPROFILE,
   CLAUDE_PROJECT_DIR: process.env.CLAUDE_PROJECT_DIR, OneDrive: process.env.OneDrive,
+  SNOW_STORE: process.env.SNOW_STORE,
 };
 const realGlobalStore = globalStorePath();
 const realGlobalStoreExisted = existsSync(realGlobalStore);
@@ -58,6 +59,7 @@ beforeEach(() => {
   process.env.APPDATA = join(home, 'AppData', 'Roaming');
   process.env.CLAUDE_PROJECT_DIR = checkout;
   delete process.env.OneDrive;
+  delete process.env.SNOW_STORE;
 });
 
 afterEach(() => {
@@ -188,6 +190,54 @@ describe('AC 2 and AC 5 — both stores, and which one wins', () => {
     expect(out).toContain('pdi-developer');       // the project entry, not the global read-only one
     expect(out).not.toContain('personal');
     expect(out).toContain(otherStoreFooter(2));
+  });
+
+  it('SNOW_STORE is the first store, and --all lists IT beside the global one', async () => {
+    // The shape the AC 2 cases never took: an override selects a file that is neither the
+    // checkout's nor the global one. `--all` used to re-derive "the project path" instead of using
+    // what the resolver returned, so it listed the global store alone and left out the very file
+    // the server reads — and `dev1`, present in both, got no note. Found in review.
+    const override = join(base, 'override.json');
+    writeStore(override, { dev1: entry({ preset: 'pdi-developer' }) }, 'dev1');
+    writeStore(expectedGlobal(), { dev1: entry(), gl: entry() }, 'gl');
+    process.env.SNOW_STORE = override;
+    try {
+      const terminal = io([]);
+      expect(runList({ all: true }, terminal, {})).toBe(EXIT_OK);
+      const out = terminal.written();
+
+      // THREE rows: the override's one and the global's two.
+      const rows = out.split('\n').filter((l) => /^(dev1|gl)\s/.test(l));
+      expect(rows).toHaveLength(3);
+      expect(rows.filter((r) => r.includes('SNOW_STORE'))).toHaveLength(1);
+      expect(rows.filter((r) => r.includes('global'))).toHaveLength(2);
+      // The STORE cell names what a reader can check, not the resolver's internal word.
+      expect(out).not.toMatch(/^dev1\s+env\s/m);
+      // The note names the file in use and the source that selected it.
+      expect(out).toContain(precedenceNote('dev1', override, expectedGlobal(), 'SNOW_STORE'));
+      // The default marker follows each row's OWN store: the override says dev1, the global says
+      // gl. Read from the COLUMN, not from the line — `s***` in the USER cell contains an asterisk
+      // too, which is how this assertion first passed for the wrong reason.
+      const columns = (row: string): string[] => row.trim().split(/\s{2,}/);
+      const marker = (row: string): string => columns(row)[5] ?? '';
+      expect(marker(rows.find((r) => r.startsWith('dev1') && r.includes('SNOW_STORE')) as string)).toBe('*');
+      expect(marker(rows.find((r) => r.startsWith('dev1') && r.includes('global')) as string)).not.toBe('*');
+      expect(marker(rows.find((r) => r.startsWith('gl')) as string)).toBe('*');
+    } finally { delete process.env.SNOW_STORE; }
+  });
+
+  it('and plain `list` under SNOW_STORE reads that file, with the footer for the other one', () => {
+    const override = join(base, 'override.json');
+    writeStore(override, { dev1: entry({ preset: 'pdi-developer' }) }, 'dev1');
+    writeStore(expectedGlobal(), { dev1: entry(), gl: entry() }, 'gl');
+    process.env.SNOW_STORE = override;
+    try {
+      const terminal = io([]);
+      expect(runList({}, terminal, {})).toBe(EXIT_OK);
+      expect(terminal.written()).toContain('pdi-developer');   // the override's entry
+      expect(terminal.written()).not.toContain('gl ');
+      expect(terminal.written()).toContain(otherStoreFooter(2));
+    } finally { delete process.env.SNOW_STORE; }
   });
 
   it('AC 5 — removing the project entry makes the global one the store the server reads', async () => {

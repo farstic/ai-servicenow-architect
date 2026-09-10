@@ -24,10 +24,10 @@ export { EXIT_USAGE, EXIT_INTERRUPTED };
 import { ENVIRONMENTS, normalizeInstanceUrl, resolveEnvironment } from './url.js';
 import { remedyFor } from '../errors/codes.js';
 import { applyingLine, dependencyViolation, ENTRY_DEFAULTS, labelOf, prodRefusal, resolveFlags, toggleFlag, } from './preset-ui.js';
-import { combinedListJson, listAllTable, listJson, listTable, otherStoreFooter, precedenceNote, probesJson, } from './format.js';
+import { combinedListJson, listAllTable, listJson, listTable, otherStoreFooter, precedenceNote, probesJson, storeLabelFor, } from './format.js';
 import { appendAudit } from '../audit/writer.js';
 import { CORE_TOOLS_UNCONFIGURED } from '../tools/status.js';
-import { detectCloudSync, globalStorePath, maskPath, maskUsername } from '../store/paths.js';
+import { detectCloudSync, globalStorePath, maskPath, maskUsername, } from '../store/paths.js';
 import { describeNetworkEnv, formatFailure, probeReachability, reachabilityMenu } from '../servicenow/reachability.js';
 import { fillMeaning, fillRemedy } from '../servicenow/net-errors.js';
 import { probeAll, toLastProbe } from '../servicenow/probes.js';
@@ -707,18 +707,31 @@ const readProbe = (stored) => (stored ? stored : null);
  * make `set-default` on a typo produce a second, empty configuration.
  */
 function openStore(deps, options = {}) {
-    const path = deps.storePath
-        ?? (options.global
-            ? resolveStorePath({ global: true }).path
-            : resolveStorePath().path ?? projectStorePath());
+    // ONE resolution, carried whole. The path AND what selected it: `list --all` needs the second
+    // half to say which file the server reads, and computing it twice is how the two answers came
+    // apart — a run under `SNOW_STORE` listed the global store and left out the file in use.
+    // An injected `storePath` is an override in the same sense the environment variable is.
+    // An injected path is named by WHERE IT POINTS, not by the fact that it was injected: the same
+    // file is the project store whether the resolver found it or a caller handed it over, and
+    // calling it an override would put the wrong word in `list --all`'s STORE column.
+    const injected = deps.storePath;
+    const resolution = injected !== undefined
+        ? { path: injected,
+            source: (injected === projectStorePath() ? 'project'
+                : injected === globalStorePath() ? 'global' : 'env') }
+        : options.global
+            ? resolveStorePath({ global: true })
+            : resolveStorePath();
+    const path = resolution.path ?? projectStorePath();
+    const source = storeLabelFor(resolution.path === null ? 'project' : resolution.source);
     if (!existsSync(path)) {
-        return { ok: true, opened: { path, store: { version: 1, instances: {} } } };
+        return { ok: true, opened: { path, source, store: { version: 1, instances: {} } } };
     }
     const loaded = loadStore(path);
     if ('error' in loaded) {
         return { ok: false, message: `${loaded.error.code} — ${loaded.error.message}`, exitCode: EXIT_USAGE };
     }
-    return { ok: true, opened: { path, store: loaded.store } };
+    return { ok: true, opened: { path, source, store: loaded.store } };
 }
 const verboseStoreLine = (path) => `store: ${maskPath(path)}`;
 /** One instance, or the refusal naming the labels that do exist. */
@@ -751,8 +764,8 @@ export function runList(options, io, deps = {}) {
     // a label in both appears TWICE, and the note says which one the server reads. A merge would
     // make "which file set this value" unanswerable, which is the whole reason for the rule.
     if (options.all) {
-        const sides = bothStores(deps, opened.opened);
-        const combined = combinedListJson(sides.project, sides.global);
+        const sides = bothStores(opened.opened);
+        const combined = combinedListJson(sides.first, sides.global);
         io.write(options.json
             ? `${JSON.stringify(combined, null, 2)}\n`
             : `${listAllTable(combined)}\n`);
@@ -763,10 +776,9 @@ export function runList(options, io, deps = {}) {
     // The footer exists so nobody concludes an instance is gone when it is merely in the other
     // store. Not printed in `--json`: a footer is prose, and the object already carries the truth.
     if (!options.json) {
-        const sides = bothStores(deps, opened.opened);
-        const other = opened.opened.path === sides.global.path ? sides.project : sides.global;
-        const count = Object.keys(other.store?.instances ?? {}).length;
-        if (count > 0 && other.path !== opened.opened.path)
+        const sides = bothStores(opened.opened);
+        const count = Object.keys(sides.global.store?.instances ?? {}).length;
+        if (count > 0 && sides.global.path !== opened.opened.path)
             io.write(`${otherStoreFooter(count)}\n`);
     }
     return EXIT_OK;
@@ -778,11 +790,8 @@ export function runList(options, io, deps = {}) {
  * `null` rather than an empty one: "there is no global store" and "the global store is empty" are
  * different answers to `list`, and only one of them is worth a footer.
  */
-function bothStores(deps, opened) {
+function bothStores(opened) {
     const globalPath = globalStorePath();
-    // A test that pointed `storePath` somewhere explicit is describing the PROJECT side; the global
-    // side is then whatever the environment says, which a test redirects with HOME/APPDATA.
-    const projectPath = deps.storePath ?? projectStorePath();
     const load = (path) => {
         if (!existsSync(path))
             return null;
@@ -790,7 +799,10 @@ function bothStores(deps, opened) {
         return 'store' in loaded ? loaded.store : null;
     };
     return {
-        project: { path: projectPath, store: projectPath === opened.path ? opened.store : load(projectPath) },
+        // THE FIRST STORE IS THE ONE THE RESOLVER RETURNED — the per-checkout file, the one
+        // `SNOW_STORE` names, or the global one when there is nothing else. Never re-derived here.
+        first: { path: opened.path, source: opened.source,
+            store: existsSync(opened.path) ? opened.store : null },
         global: { path: globalPath, store: globalPath === opened.path ? opened.store : load(globalPath) },
     };
 }
@@ -829,10 +841,11 @@ export async function runTest(options, io, deps = {}) {
     // The note, when the label being probed exists in both stores: the user is about to read a
     // result and needs to know which entry produced it.
     if (!quiet) {
-        const sides = bothStores(deps, opened.opened);
+        const sides = bothStores(opened.opened);
         for (const label of labels) {
-            if (sides.project.store?.instances?.[label] && sides.global.store?.instances?.[label]) {
-                io.write(`${precedenceNote(label, sides.project.path, sides.global.path)}\n`);
+            if (sides.first.store?.instances?.[label] && sides.global.store?.instances?.[label]
+                && sides.first.path !== sides.global.path) {
+                io.write(`${precedenceNote(label, sides.first.path, sides.global.path, sides.first.source)}\n`);
             }
         }
     }
