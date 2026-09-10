@@ -1041,6 +1041,31 @@ REFUSED with the check's own command, and a grep test proves the module cannot r
 | `F7` | `cache-stale` | clear the stale doctor cache | `.local/doctor-last.json` |
 <!-- /generated:doctor-fixes -->
 
+**The session banner** (ARC-08-S08). `tools/snowarch/hooks/session-start.mjs` runs at every
+SessionStart and prints ONE `Mode:` line plus at most four one-line nudges. Three promises shape
+it: it never fails a session (every path exits 0, nothing reaches stderr, and any exception becomes
+one honest line naming the error CLASS — never its message, which could carry a path or a value);
+it is fast (the fast path reads `.local/doctor-last.json` and `.local/doctor-last.inputs.json` and
+prints — it imports no part of the doctor, because importing the registry to decide whether it
+needs the registry would spend the budget before the decision); and it never guesses (the line was
+derived by the doctor and cached, and when the cache no longer describes this checkout the hook
+re-runs the offline `--quick` subset in-process under a 5 s watchdog — half the hook's own 10 s
+timeout, so the watchdog always fires first). On expiry it prints the cached line marked
+`(cache stale — run ./snowarch doctor)`: an old line marked old beats no line.
+
+The staleness rule is the doctor's own (`cacheStale()`, shared with `--fix`'s F7): older than 24
+hours, or any of the six recorded input mtimes changed. The four nudges — first run, upgrade
+available, stale registrations in `~/.claude.json` for THIS folder, doctor FAIL — have one
+definition each in `lib/text.mjs`, exported through `text.json`, so the banner and `/snowarch
+status` cannot describe the same condition in two ways. The upgrade nudge reads
+`.local/upgrade-check.json` — `{ behind: boolean, latestTag: string, checkedAt: string }`, written
+by ARC-09-S07's `upgrade --check`; an absent file is simply no nudge, and the hook never fetches
+anything itself.
+
+The root comes from the hook's own file location, never from `cwd` or `CLAUDE_PROJECT_DIR`: inside
+a session that variable is the SESSION's project, and a banner describing another checkout would be
+worse than none.
+
 **Every check the old `doctor.sh` made is accounted for** — see
 [Appendix: the old doctor's checks](#appendix-the-old-doctors-checks) at the end of this document.
 

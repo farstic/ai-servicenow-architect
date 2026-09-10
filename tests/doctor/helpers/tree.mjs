@@ -101,6 +101,9 @@ export const LINKED = Object.freeze([
   '.claude/skills',
   '.claude/agents',
   'scripts',
+  // The engine's own library. The hook and the launcher resolve the root from their file location,
+  // so a fixture that is to run either of them has to look like a checkout from the inside too.
+  'tools/snowarch/lib',
   'tests/lib',
   'tests/fixtures',
   // The corpus, so the docs checks answer about a real one rather than about its absence. Linked

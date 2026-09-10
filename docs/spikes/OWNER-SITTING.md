@@ -712,6 +712,40 @@ shasum -a 256 .local/instances.json                      # (2) after — must eq
 
 ---
 
+## D3. ARC-08-S08 — the session banner in a REAL Claude Code session
+
+*Ten minutes on the Mac, ten on Windows. Everything about the banner is proved by fixtures except
+the one thing that matters most: whether Claude Code actually puts the line into the session.*
+
+The plan set assumes plain stdout from a SessionStart hook reaches the session context, and never
+cites a document that says so. `03` S-14d found `additionalContext` to be the documented channel.
+The hook can switch to it by one constant — but only somebody with a real session can tell us
+which is needed.
+
+```sh
+cd ~/snowarch-ref                       # a bootstrapped checkout
+./snowarch doctor --quick               # leaves a fresh cache for the banner to read
+claude --debug
+```
+
+1. In the first turn, ask: **"what mode are you in?"** Does the answer quote the `Mode:` line
+   verbatim — the same words `./snowarch doctor` printed last?
+2. In the `--debug` output, does the SessionStart hook's stdout appear as session context, or only
+   as a hook log line? **Quote what you see.** This is the question: plain stdout, or
+   `additionalContext`.
+3. Repeat on Windows (`snowarch.cmd doctor --quick`, then `claude --debug`).
+4. While you are there: with Node temporarily off `PATH`, does starting `claude` show any hook
+   error at all? (S-05's snapshot — expected: no hook entry exists, so nothing to fail.)
+
+> *(lands in `tools/snowarch/hooks/session-start.mjs` — one constant — and in `tests/VALIDATION
+> -TESTS.md` T-07 through ARC-08-S10's edit)*
+
+**Why it matters, in one line:** the rule file tells the engine to quote the banner, and that
+instruction is only satisfiable if the banner reaches the session — which no test on this side of
+the boundary can observe.
+
+---
+
 ## Cleanup (please run this — it leaves no residue on your machine)
 
 ```sh

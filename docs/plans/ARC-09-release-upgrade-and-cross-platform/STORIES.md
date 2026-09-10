@@ -397,6 +397,13 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 ### ARC-09-S07 — `./snowarch upgrade [--to vX.Y.Z] [--check]`, the SessionStart "behind origin" nudge, and the upgrade fixture harness
 
+> **Amendment 2026-09-10 — the file's shape is fixed by ARC-08-S08.** `.local/upgrade-check.json`
+> is `{ behind: boolean, latestTag: string, checkedAt: string }`. The session banner reads it and
+> nothing else: an absent file is no nudge, a `behind: false` file is no nudge, and the hook never
+> fetches. The nudge wording is `lib/text.mjs`'s `BANNER.upgrade(tag)` — this story adopts it
+> rather than writing a second sentence.
+
+
 **As** an individual practitioner **I want** `./snowarch upgrade` to fetch the release tags, show me what will change, move my checkout to the target release, re-run only the bootstrap steps whose inputs changed, migrate the store if the release requires it, and finish with a doctor run — and I want the session banner to tell me when a newer release exists without ever fetching by itself **so that** upgrading is one command that never touches my credentials (README deliverable 3, acceptance 3–4; `01` §12; principle 10).
 
 **Context.** README deliverable "`./snowarch upgrade [--to vX.Y.Z]` (`git fetch --tags`, checkout or `pull --ff-only`, `bootstrap --resume`, doctor); the SessionStart banner's 'behind origin' nudge (reads a cached fetch, never fetches itself)"; `01` §8 (banner < 300 ms, adds "run ./snowarch upgrade" when behind); `03` R-15 / R-3 (proxies — `git fetch` must fail with a proxy-aware message). ARC-06-S03/S09 ship `--resume` and the summary; ARC-08-S08 ships the banner this story extends.

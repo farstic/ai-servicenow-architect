@@ -287,6 +287,13 @@ jobs:
           $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
           & powershell -NoProfile -ExecutionPolicy Bypass -File .\bootstrap.ps1 --mode design --yes --skip-claude-check
           if ($LASTEXITCODE -ne 0) { exit 1 }
+          # The SessionStart banner, under PowerShell, with no Git Bash to fall back on
+          # (ARC-08-S08). Claude Code runs it as `node <path>`; what is asserted is that the line
+          # arrives and the hook exits 0 — a hook that fails here is a session that starts with an
+          # error about the tool meant to help.
+          $out = & node tools/snowarch/hooks/session-start.mjs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if (-not ($out -match '^Mode: ')) { Write-Host $out; exit 1 }
           exit 0
 
       # ── the assertions, one implementation for every cell ────────────────────────────────────
