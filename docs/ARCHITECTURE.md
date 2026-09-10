@@ -499,6 +499,17 @@ bash is how someone's settings get destroyed.
 The state and the cache are written by heredoc in S03's and S08's schemas, `writer: "bash"`, and the
 Node readers accept them — asserted against a fixture captured from a real bash-3.2 run.
 
+### The credential boundary — where a secret can be typed
+
+One module: `packages/snowarch/src/cli/tty.ts`. A password is typed into an interactive terminal
+with echo off, or piped in with `--password-stdin`, and there is no third way — `--password`,
+`--client-secret` and `--secret` are refused BEFORE commander parses anything, because commander
+echoes an unknown option back and would print the value while rejecting it. A non-terminal stdin is
+refused rather than read, raw mode is restored on every exit path including a thrown error, and
+nothing is echoed: not the characters, not asterisks, which reveal the length
+(`SNOWARCH_MASK=asterisk` exists for users who need feedback and is off). No prompt library — the
+boundary does not live inside somebody else's package.
+
 ### The `bootstrap` job — the install promise, executed
 
 Thirteen cells on every commit. Nine `node-cli` (three operating systems × Node 20/22/24) install

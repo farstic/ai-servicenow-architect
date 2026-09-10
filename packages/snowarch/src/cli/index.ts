@@ -19,6 +19,7 @@
 // the unsanitised one. Same ordering rule that bit ARC-04-S02 with dotenv.
 import '../env-sanitise.js';
 import { Command } from 'commander';
+import { argvCarriesSecret, ARGV_SECRET, EXIT_USAGE } from './tty.js';
 import { spawn } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { createHash } from 'crypto';
@@ -37,6 +38,22 @@ function stub(name: string, owner: string): (this: Command) => void {
     process.stderr.write(`snowarch ${name}: not implemented in this story (${owner})\n`);
     process.exit(NOT_IMPLEMENTED_EXIT);
   };
+}
+
+/**
+ * THE ARGV GATE — before commander, before anything.
+ *
+ * P-34: a password on a command line is in `ps` output for every user on the machine and in the
+ * shell history for ever afterwards. Refusing it here rather than in an option handler is not
+ * fastidiousness about layering: commander echoes the offending argument back in its own
+ * "unknown option" error, so a `--password hunter2` that reached the parser would be printed to
+ * stderr — by the code refusing it.
+ *
+ * The value is never read, never quoted, never included in the message.
+ */
+if (argvCarriesSecret(process.argv.slice(2))) {
+  process.stderr.write(`${ARGV_SECRET}\n`);
+  process.exit(EXIT_USAGE);
 }
 
 const program = new Command();
