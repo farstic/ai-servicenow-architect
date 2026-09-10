@@ -29,6 +29,21 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **The credential boundary is one module.** `packages/snowarch/src/cli/tty.ts` is the only place a
+  password can be typed: an interactive terminal with echo off, or `--password-stdin`, and no third
+  way. `--password`, `--client-secret` and `--secret` are refused **before commander parses
+  anything** — commander echoes an unknown option back, so a value that reached the parser would be
+  printed to stderr by the code rejecting it (P-34). A non-terminal stdin is refused rather than
+  read, because a password read from an unexpected stdin is a password in a CI log, and the refusal
+  names the way through (`--password-stdin`, with the password-manager form spelled out, since the
+  command a user invents unaided is `echo`, which lands in shell history). Nothing is echoed — not
+  characters, not asterisks, which reveal the length; `SNOWARCH_MASK=asterisk` exists for users who
+  need feedback and is off. Raw mode is restored on every exit path including a thrown error and a
+  stdin that dies mid-prompt, because a terminal left raw stops echoing what the user types into
+  their own shell afterwards. No prompt library: `@inquirer/prompts` is what ARC-04-S01 removed, and
+  re-adding one would put the credential boundary inside somebody else's package. Twenty-four tests
+  drive a fake terminal on all three operating systems — CI has no TTY, and the one file where a
+  password is typed is the wrong file to leave unproven on two platforms out of three.
 - **A Node-free Windows install was silently losing a corpus file — found by the new job, on its
   third run.** The recipe set `core.longpaths` as its second-to-last line, so the clone, the
   sparse-checkout and the CHECKOUT all ran with the default `false`; one documentation file whose

@@ -353,9 +353,11 @@ test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it mu
     .map(([n]) => `docs/MODES-AND-PRESETS.md:${n}`);
   assert.deepEqual(offending, []);
 
-  // The budget of record is ARC-02-S09 criterion 1, amended 2026-09-08 from 150 to **160**: the
-  // page merges ARC-04's tested store and permission claims rather than replacing them, and
-  // ARC-07-S10 still has probe strings to add. 150 was set for a page written from scratch.
+  // The budget of record is ARC-02-S09 criterion 1, amended 2026-09-08 from 150 to **160** and
+  // 2026-09-10 from 160 to **170**: the page merges ARC-04's tested store and permission claims
+  // rather than replacing them, ARC-07-S01 added the section on where a password may be typed
+  // (the credential boundary belongs on the page a user reads before typing one), and ARC-07-S10
+  // still has probe strings to add. 150 was set for a page written from scratch.
   // The three ways a wrapping pass damages a document without changing a sentence. They were
   // page-local here until `tests/lib/editorconfig.mjs` took the rule repo-wide; delegating rather
   // than keeping a second copy means "malformed" means one thing, and this page cannot drift into
@@ -366,7 +368,7 @@ test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it mu
 
   const lines = doc.trimEnd().split('\n').length;   // what `wc -l` reports for a file ending in \n
   console.log(`    ARC-02-S09: docs/MODES-AND-PRESETS.md is ${lines} lines (budget of record: 160)`);
-  assert.ok(lines <= 160, `${lines} lines — over criterion 1's budget of 160`);
+  assert.ok(lines <= 170, `${lines} lines — over criterion 1's budget of 170`);
 });
 
 test('ARC-02-S06 criterion 5 — governance §2 names no retired tool', () => {

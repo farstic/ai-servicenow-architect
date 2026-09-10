@@ -39,6 +39,16 @@
 > the story's own risk ("Claude may deviate") was observed, which is why the page prints the exact
 > commands and now names the subfolder variation.
 >
+> **S-04, the masked-input matrix (ARC-07-S01, 2026-09-10).** Criterion 6 is eight cells: Windows
+> Terminal and conhost × PowerShell 5.1 and cmd × with and without Git Bash on PATH. In each, run
+> the built CLI's masked prompt, type `abcd`, Backspace, `e`, Enter, and check three things — the
+> value has four characters, NOTHING was echoed, and the shell still echoes normally afterwards
+> (raw mode restored). Record each cell CONFIRMED or FAILED in `docs/validation/`. **A FAILED cell
+> is one entry in `WINDOWS_KNOWN_BAD` in `packages/snowarch/src/cli/tty.ts`** — the table ships
+> empty, the fallback branch behind it is written and tested against a planted entry, so the change
+> is data rather than code. Until the matrix runs, native Windows masked input is unproven and the
+> `--password-stdin` line is what the page promises.
+>
 > **The install page's second reader (ARC-06-S13, 2026-09-10).** Criterion 1 asks for two people
 > who did not write the page to follow Path A and reach `Mode: design-only` without opening any
 > other file. Reader one is the architect, on a fresh clone with Node hidden. **Reader two is the

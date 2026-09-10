@@ -157,3 +157,14 @@ shares, bug reports and support tickets, and an absolute path carries the accoun
 
 A store inside a cloud-sync folder (OneDrive, Dropbox, Google Drive, iCloud Drive) is flagged: `0600` is a *local*
 permission and the sync client runs as the same user, so the mode does not stop the file leaving the machine (D-04).
+
+## 8. Where a password may be typed
+
+One place: an interactive terminal, where `snowarch instance add` reads it with echo off and it
+never reaches argv, the environment or a transcript. When stdin is not a terminal the command
+**refuses** rather than reading the pipe — a password read from an unexpected stdin is a password
+in a CI log — and prints the `NO_TTY:` line, which names `--password-stdin` and shows the password
+manager form (`op read "op://vault/item/password" | ./snowarch instance add …`). `--password`,
+`--client-secret` and `--secret` are rejected before the arguments are parsed at all. Should a
+Windows console turn out not to support masked input (spike S-04), that console gets the same
+`--password-stdin` line instead of a prompt that cannot work.
