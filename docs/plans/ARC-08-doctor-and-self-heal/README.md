@@ -1,6 +1,6 @@
 # ARC-08 — Doctor, self-heal and the session banner
 
-Status: **In progress — S01, S02, S03 merged (3 of 11), started 2026-09-10** · Depends on: ARC-04 (server doctor module), ARC-05 (data-driven names), ARC-06 (state file, toggles), ARC-07 (probes); ARC-00 S-05/S-06/S-13 · Blocks: ARC-09 (CI uses the doctor), ARC-10 (cutover checks)
+Status: **In progress — S01–S04 merged (4 of 11), started 2026-09-10** · Depends on: ARC-04 (server doctor module), ARC-05 (data-driven names), ARC-06 (state file, toggles), ARC-07 (probes); ARC-00 S-05/S-06/S-13 · Blocks: ARC-09 (CI uses the doctor), ARC-10 (cutover checks)
 
 Decisions applied: D-01…D-06, Q-A, Q-B, R-1…R-3 (see `02-DECISIONS-NEEDED.md`). Naming used here: server package `packages/snowarch` (`@farstic/snowarch`, first release `2.0.0`); MCP key `servicenow` → tools `mcp__servicenow__snow_*`; project skill `/snowarch` with sub-commands `status` · `setup-instance` · `doctor`; engine checks `E-xx`, server checks `SV-xx` (the `S-xx` prefix is reserved for the spikes in `03`); vocabulary Mode `design-only` | `live`, Preset `read-only` | `pdi-developer` | `full` | `custom`.
 

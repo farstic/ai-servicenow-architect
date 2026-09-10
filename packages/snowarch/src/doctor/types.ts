@@ -52,6 +52,17 @@ export interface CheckContext {
   /** The directory to walk up from for SV-08. Injected so tests need no real checkout. */
   cwd: string;
   probes: Probes;
+  /**
+   * The SDK resolver (ARC-07-S03's `checkFluent`), injected so a test never spawns `npm root -g`.
+   * Absent means the real one — a check that required its injection would be a check nobody could
+   * run in production.
+   */
+  fluent?: () => { installed: boolean; where?: string };
+  /**
+   * The store as the FILE holds it, injected for the same reason `fluent` is. SV-03 asks it which
+   * flags an entry actually states — the loaded runtime has had every absent one filled in.
+   */
+  storeEntry?: (label: string) => { flags?: Record<string, string | undefined> } | undefined;
 }
 
 export interface Check {
@@ -84,7 +95,19 @@ export interface Check {
  * passed.
  */
 export interface Probes {
-  runAll(instanceLabel: string): Promise<{ status: CheckStatus; detail: string; remedy?: string }>;
+  runAll(instanceLabel: string): Promise<{
+    status: CheckStatus;
+    detail: string;
+    remedy?: string;
+    /**
+     * A contract code, when the probe recognised one (`OAUTH_ROPC_DISABLED` and its family).
+     * Widened by ARC-08-S04: the remedy for a code is the REGISTRY's, and a probe that carried its
+     * own alongside would be a second answer to one question — so a result with a code carries no
+     * remedy, and the runner fills it.
+     */
+    code?: string;
+    data?: Record<string, unknown>;
+  }>;
 }
 
 /**
@@ -117,6 +140,10 @@ export interface DoctorReport {
     environment: string;
     preset: string;
     status: 'loaded' | 'not_loaded';
+    /** Masked at the source (ARC-08-S04) — `s***@corp.example.com`, never the account. */
+    username?: string;
+    /** The store's own record. STATUSES ONLY; the doctor reads it and never writes it. */
+    lastProbe?: unknown;
     reason?: string;
   }>;
 }

@@ -87,6 +87,18 @@ export declare const ERROR_CODES: readonly [{
     readonly command: "./snowarch instance list";
     readonly showInRule: false;
 }, {
+    readonly code: "FLAGS_INCOMPLETE";
+    readonly meaning: "A store entry does not state all six capability flags. An absent flag is off, so the entry works — but nobody can tell an intended `false` from a forgotten one, and the next preset change starts from a guess.";
+    readonly remedy: "state every flag explicitly by re-applying a preset — the review screen shows what changes before anything is written";
+    readonly command: "./snowarch instance set-preset <label> <preset>";
+    readonly showInRule: false;
+}, {
+    readonly code: "FLAG_DEPENDENCY_VIOLATION";
+    readonly meaning: "A flag that requires `WRITE_ENABLED` is on while `WRITE_ENABLED` is off. The tools gated on it are refused at run time and the refusal names WRITE first, so the entry promises a capability it cannot deliver.";
+    readonly remedy: "decide which one was meant: turn WRITE on, or turn the dependent flag off. Neither is guessable from the store, so this is never repaired automatically";
+    readonly command: "./snowarch instance set-preset <label> <preset>";
+    readonly showInRule: false;
+}, {
     readonly code: "PROD_WRITE_NOT_ACKNOWLEDGED";
     readonly meaning: "The instance is tagged `environment: prod` and holds a write preset without `prodWriteAck: true`.";
     readonly remedy: "A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal";

@@ -6,8 +6,10 @@
  * printing: a doctor that only prints has to be re-implemented to be composed.
  */
 import { instanceManager } from '../servicenow/instances.js';
+import { maskUsername } from '../store/paths.js';
 import { getPackageVersion } from '../utils/version.js';
 import { ALL_CHECKS, resetHandshakeCache } from './checks.js';
+import { makeProbes, storeEntry } from './probes-binding.js';
 import { stubProbes } from './types.js';
 export * from './types.js';
 export { ALL_CHECKS, pollutingAncestors, resetHandshakeCache } from './checks.js';
@@ -17,10 +19,15 @@ export async function runServerDoctor(opts = {}) {
     // would let a report contradict itself if a file changed mid-run — rare, but the resulting
     // "SV-02 ok, SV-03 fail" is the kind of output nobody can act on.
     instanceManager.reload();
+    // The real probes once there is something to probe; the stub is the answer to "no instance
+    // configured", which is a state rather than an absence — ARC-08-S04 is the story that chooses,
+    // because it is the story that owns what the doctor renders.
+    const configured = instanceManager.loadedCount() > 0;
     const ctx = {
         noNetwork: opts.noNetwork === true,
         cwd: opts.cwd ?? process.cwd(),
-        probes: opts.probes ?? stubProbes,
+        probes: opts.probes ?? (configured ? makeProbes() : stubProbes),
+        ...(opts.fluent ? { fluent: opts.fluent } : {}),
     };
     const checks = [];
     for (const check of ALL_CHECKS) {
@@ -50,13 +57,22 @@ export async function runServerDoctor(opts = {}) {
         mode: instanceManager.loadedCount() > 0 ? 'configured' : 'unconfigured',
         checks,
         summary,
-        instances: instanceManager.listAll().map((i) => ({
-            label: i.name,
-            environment: i.environment,
-            preset: i.preset,
-            status: i.status,
-            ...(i.reason ? { reason: i.reason } : {}),
-        })),
+        // `label · environment · preset · status`, plus the MASKED username and the store's own
+        // `lastProbe` — the four fields ARC-07-S09's `--resume` branches on. The username is masked
+        // HERE as well as by the engine's runner: this report is returned to callers that are not the
+        // engine, and a shape that is only safe downstream is not a safe shape.
+        instances: instanceManager.listAll().map((i) => {
+            const stored = storeEntry(i.name);
+            return {
+                label: i.name,
+                environment: i.environment,
+                preset: i.preset,
+                status: i.status,
+                ...(stored?.auth?.username ? { username: maskUsername(stored.auth.username) } : {}),
+                ...(stored?.lastProbe ? { lastProbe: stored.lastProbe } : {}),
+                ...(i.reason ? { reason: i.reason } : {}),
+            };
+        }),
     };
 }
 /** 0 = nothing failed, 1 = at least one FAIL, 3 = the run itself could not complete. */

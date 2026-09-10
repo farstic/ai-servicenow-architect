@@ -96,6 +96,27 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   sentence, and the fixture's `~/.claude.json` is asserted byte-identical after a run, including
   under `--fix`. The credential never appears: the report says `set (len 12)`, and the key count
   beside it.
+- **The server's own checks, inside the engine's report.** SV-00…SV-08 are imported from
+  `packages/snowarch` and adopted, never re-implemented: flag rules, store schema, presets and the
+  stdio handshake are the server's subject, and a second implementation in engine JavaScript is the
+  defect this whole architecture exists to prevent. The import is by FILE PATH, because a
+  design-only checkout has no `node_modules` for a bare specifier to resolve through — and that
+  checkout is exactly where the answer matters: every SV check skips with `server dependencies not
+  installed`, the section header reads `server (skipped — design-only)`, and nothing fails. In live
+  mode the same absence is SV-01's failure with `./snowarch doctor --fix`.
+- **The probes are real.** SV-04 runs the wizard's own probe functions through one binding — one
+  request per probe, `maxRetries: 0`, because a 401 retried is an account closer to a lockout on an
+  instance whose policy nobody here knows. The doctor reads the store and never writes it: the
+  wizard records `lastProbe`, and a test asserts the file's sha256 is unchanged after a probe run.
+- **Two new error codes, and a deliberate pin bump.** `FLAGS_INCOMPLETE` names the flags an entry
+  never stated — judged against the FILE, because the loader fills every absent flag from the
+  preset before any check can see it — and `FLAG_DEPENDENCY_VIOLATION` names a flag that is on
+  while the flag it requires is off. That one is never fixable: which of the two the user meant is
+  not in the store.
+- **`claude mcp` works on Windows.** A `.cmd` shim is redirected to its own entry point under this
+  Node instead of being spawned — `child_process` has refused to spawn one without a shell since
+  the CVE-2024-27980 fix, and `claude` installed from npm on Windows IS `claude.cmd`, so the S-03
+  fallback registration, `mode live` and the doctor's E-27 all failed there with an errno.
 - **A generator that could not run is never reported as a stale file.** `gen-readme-tables` used to
   import the server's built tool tree, which needs `npm ci`, so on a design-only install — where
   having no dependencies is the design — it crashed and the doctor said the README differed. The

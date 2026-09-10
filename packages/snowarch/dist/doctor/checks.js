@@ -15,8 +15,21 @@ import { instanceManager } from '../servicenow/instances.js';
 import { detectCloudSync } from '../store/index.js';
 import { maskPath, resolveStorePath } from '../store/paths.js';
 import { FLAG_NAMES, checkProdPosture } from '../utils/permissions.js';
+import { checkFluent } from '../servicenow/probes.js';
 import { resolveAuditPath } from '../audit/writer.js';
+import { storeEntry } from './store-entry.js';
 const isWindows = process.platform === 'win32';
+/**
+ * The flag names this check reasons ABOUT, taken from the contract's own list rather than typed.
+ *
+ * `FLAG_NAMES` is the declaration; the two constants below name positions within it — the flag
+ * every other one depends on, and the one that implies an external SDK. Deriving them by suffix
+ * keeps the rule true if a flag is renamed, and the assertions in `tests/tools/permissions.test.ts`
+ * fail loudly if the shape ever stops holding.
+ */
+const WRITE_FLAG = FLAG_NAMES.find((f) => f.startsWith('WRITE'));
+const FLUENT_FLAG = FLAG_NAMES.find((f) => f.startsWith('FLUENT'));
+const REQUIRES_WRITE = FLAG_NAMES.filter((f) => f !== WRITE_FLAG && f !== FLUENT_FLAG);
 /**
  * Where `dist/` is, relative to this module once built.
  *
@@ -135,7 +148,7 @@ export const svInstances = {
     title: 'instances',
     severity: 'fail',
     network: false,
-    async run() {
+    async run(ctx) {
         const report = instanceManager.getReport();
         const loaded = instanceManager.listAll().filter((i) => i.status === 'loaded');
         // A refusal recorded at load time is the authority here. `checkProdPosture` is re-run below
@@ -151,7 +164,10 @@ export const svInstances = {
         }
         const problems = [];
         const notes = [];
+        const fixes = [];
+        let fixable = false;
         let remedy;
+        const fluent = ctx.fluent ?? checkFluent;
         for (const i of loaded) {
             const entry = instanceManager.getEntry(i.name);
             if (!entry)
@@ -160,9 +176,38 @@ export const svInstances = {
                 problems.push(`${i.name}: url is not a bare https origin`);
                 remedy ??= `./snowarch instance set-url ${i.name} https://<host>`;
             }
-            const declared = FLAG_NAMES.filter((f) => entry.flags[f] !== undefined);
-            if (declared.length < FLAG_NAMES.length) {
-                notes.push(`${i.name}: FLAGS_INCOMPLETE (${declared.length}/${FLAG_NAMES.length} explicit)`);
+            // THE FILE's flags, not the loaded entry's: `completeFlags` fills every absent flag from the
+            // preset, so the runtime always has six and the question "which did the user state?" has no
+            // answer there. Asked of the file, it has one.
+            //
+            // NAMED, not counted. "4/6 explicit" tells a reader that something is missing and not which
+            // two, and the remedy they are about to run rewrites all six — so the two they never decided
+            // about are exactly the two they need to see first.
+            const stated = (ctx.storeEntry ?? storeEntry)(i.name)?.flags ?? entry.flags;
+            const absent = FLAG_NAMES.filter((f) => stated[f] === undefined);
+            if (absent.length > 0) {
+                notes.push(`${i.name}: FLAGS_INCOMPLETE — ${absent.join(', ')} not stated`);
+                fixable = true;
+                fixes.push({ kind: 'flags-incomplete', label: i.name, flags: absent });
+            }
+            // A flag that requires WRITE while WRITE is off: the tools gated on it are refused at run
+            // time and the refusal names WRITE first, so the entry promises what it cannot deliver.
+            // NEVER fixable — which of the two the user meant is not in the file.
+            const dependents = FLAG_NAMES.filter((f) => f !== WRITE_FLAG
+                && stated[f] === 'true' && stated[WRITE_FLAG] !== 'true'
+                && REQUIRES_WRITE.includes(f));
+            for (const f of dependents) {
+                notes.push(`${i.name}: FLAG_DEPENDENCY_VIOLATION — ${f} is on while ${WRITE_FLAG} is off`);
+            }
+            // The SDK, only when the entry says it uses it. `checkFluent` is ARC-07-S03's — including
+            // its `.cmd` rule — and a second resolver here would be a second answer to "is the SDK
+            // installed" on the one platform where that question is hard.
+            if (stated[FLUENT_FLAG] === 'true') {
+                const sdk = fluent();
+                notes.push(sdk.installed
+                    ? `${i.name}: ${FLUENT_FLAG} on, SDK present${sdk.where ? ` (${maskPath(sdk.where)})` : ''}`
+                    : `${i.name}: FLUENT_NOT_INSTALLED — ${FLUENT_FLAG} is on and @servicenow/sdk is not `
+                        + 'resolvable');
             }
             const posture = checkProdPosture(entry);
             if (!posture.ok) {
@@ -185,10 +230,15 @@ export const svInstances = {
         if (problems.length > 0) {
             return fail('SV-03', 'instances', problems.join('; '), remedy);
         }
-        const warnings = notes.filter((n) => /FLAGS_INCOMPLETE|toolPackage|dependency/i.test(n));
-        return warnings.length > 0
-            ? warn('SV-03', 'instances', notes.join('; '), 'set every flag explicitly: ./snowarch instance set-preset <label> <preset>')
-            : ok('SV-03', 'instances', notes.join('; '));
+        const warnings = notes.filter((n) => /FLAGS_INCOMPLETE|FLAG_DEPENDENCY_VIOLATION|toolPackage|FLUENT_NOT_INSTALLED/.test(n));
+        if (warnings.length === 0)
+            return ok('SV-03', 'instances', notes.join('; '));
+        const result = warn('SV-03', 'instances', notes.join('; '), 'set every flag explicitly: ./snowarch instance set-preset <label> <preset>');
+        // `fixable` is a FLAG here (ARC-08-S06 owns the repair); the hint says which entry and which
+        // flags, so the fixer never has to re-derive what this check already knew.
+        return fixable
+            ? { ...result, fixable: true, data: { fix: fixes[0], fixes } }
+            : result;
     },
 };
 // ─── SV-04 — network probes (stub until ARC-07-S03) ──────────────────────────
@@ -206,7 +256,10 @@ export const svProbes = {
             return skip('SV-04', 'instance probes', 'no instances configured');
         const r = await ctx.probes.runAll(labels[0]);
         return { id: 'SV-04', title: 'instance probes', status: r.status, detail: r.detail,
-            ...(r.remedy ? { remedy: r.remedy } : {}), fixable: false };
+            ...(r.code ? { code: r.code } : {}),
+            ...(r.remedy && !r.code ? { remedy: r.remedy } : {}),
+            ...(r.data ? { data: r.data } : {}),
+            fixable: false };
     },
 };
 /**

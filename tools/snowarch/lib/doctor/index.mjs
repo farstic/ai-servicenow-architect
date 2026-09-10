@@ -20,7 +20,7 @@ import { meetsFloor } from '../versions.mjs';
 import { childEnv } from '../spawn-env.mjs';
 
 import { SECTIONS } from './registry.mjs';
-import { engineRegistry, staleBlock } from './checks/index.mjs';
+import { engineRegistry, serverBlock, staleBlock } from './checks/index.mjs';
 import { collectPrereqs } from './prereqs.mjs';
 import { buildReport } from './report-json.mjs';
 import { renderText, useColour } from './report-text.mjs';
@@ -57,6 +57,15 @@ export const notAtRoot = (root) => `DOCTOR: not at the repository root — run: 
 /** `realpathSync.native` where it works, the path itself where it does not (a path not yet there). */
 function realpathOrSelf(p) {
   try { return realpathSync.native(p); } catch { return p; }
+}
+
+/** The recorded mode, or `null`. An unreadable state file is E-11's finding, not this one's. */
+export function readMode(root) {
+  try {
+    return JSON.parse(readFileSync(join(root, '.local', 'bootstrap-state.json'), 'utf8'))?.mode ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function findRoot(from) {
@@ -142,6 +151,9 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     root,
     config,
     contract,
+    // The recorded mode, read once: an absent server dependency is the DESIGN in design-only and a
+    // broken install in live, and the checks that say so must not each re-read the state file.
+    mode: readMode(root),
     flags: options,
     platform: process.platform,
     env: childEnv(root),
@@ -167,6 +179,9 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     stale: results.some((r) => ['E-23', 'E-24'].includes(r.id) && r.status !== 'skip')
       ? staleBlock(results)
       : null,
+    // Filled by ARC-08-S04 from the server module's own report — `null` when no SV check ran, so a
+    // `--section docs` run does not claim to know anything about the server.
+    server: ctx._server === undefined ? null : serverBlock(ctx._server),
   });
 
   if (flags.json) {

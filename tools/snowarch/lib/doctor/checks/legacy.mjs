@@ -2,10 +2,11 @@
 //
 // READ-ONLY BY CONSTRUCTION. `~/.claude.json` belongs to Claude Code and the legacy store belongs
 // to a product that is not this one; the doctor's job is to say what is there and print the exact
-// command, and the user's job is to run it. Nothing here writes, renames or deletes anything — not
-// under `--fix`, not ever — and `tests/doctor/legacy.test.mjs` greps this file for the three verbs
-// rather than trusting the sentence. `readFileSync`, `existsSync`, `statSync`, `readdirSync`: that
-// is the whole filesystem vocabulary of this module.
+// command, and the user's job is to run it. This module changes nothing on disk — not under
+// `--fix`, not ever — and `tests/doctor/legacy.test.mjs` greps it for the mutating verbs rather
+// than trusting the sentence. The grep is the story's literal one, so this comment states the rule
+// without spelling those verbs: a file whose prose names them fails its own check.
+// `readFileSync`, `existsSync`, `statSync`, `readdirSync`: the whole filesystem vocabulary here.
 //
 // Why it matters more here than anywhere else in the doctor: `00` P-34 counted SIX copies of one
 // credential across the old layout, and the `.bak-*` files Claude Code writes keep every secret the

@@ -172,6 +172,13 @@ export function hostChecks() {
       spawns: true,
       // Never fixable: the toggle is E-10's (and S06's), and the approval click is the user's.
       fixable: false,
+      // AND: this check makes Claude Code run. The doctor writes nothing itself, but `claude mcp
+      // get` is Claude Code touching its OWN configuration, and a real CLI rewrites `~/.claude.json`
+      // while answering — measured on a redirected HOME. So "the file is unchanged after a doctor
+      // run" is E-23's promise about THIS product, and it holds for `--section legacy` and for
+      // `--quick` (which excludes this check), not for a full run against an installed CLI. The
+      // detail says so rather than leaving a reader to discover a changed mtime and mistrust the
+      // report.
       run: async (ctx) => {
         const claudePath = ctx.claudePath === undefined
           ? resolveClaude({ env: ctx.env, platform: ctx.platform })
@@ -223,7 +230,8 @@ export function hostChecks() {
         const scopeNote = entry.scope === 'local'
           ? ` · scope local (${state?.registration ?? 'registration not recorded'})`
           : '';
-        return ok(`${statusLine}${scopeNote}`, data);
+        return ok(`${statusLine}${scopeNote} · read by running claude, which maintains its own `
+          + 'configuration file', data);
       },
     }),
   ];

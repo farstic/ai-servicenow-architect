@@ -41,7 +41,7 @@ import {
 import { describeNetworkEnv, formatFailure, probeReachability, reachabilityMenu } from '../servicenow/reachability.js';
 import { fillMeaning, fillRemedy } from '../servicenow/net-errors.js';
 import { probeAll, toLastProbe, type AuthProbe, type LastProbe, type ProbeClient } from '../servicenow/probes.js';
-import { ServiceNowClient } from '../servicenow/client.js';
+import { probeClientFor, probeOptionsFor } from '../servicenow/probe-client.js';
 import { loadStore, projectStorePath, resolveStorePath, saveStore } from '../store/index.js';
 import { completeFlags, type Store, type StoreInstance } from '../store/schema.js';
 import { FLAG_NAMES, matchPreset, type FlagName, type Flags } from '../utils/permissions.js';
@@ -258,46 +258,13 @@ export interface AddDeps {
   platform?: NodeJS.Platform;
 }
 
-const defaultClient = (entry: { url: string; auth: StoreInstance['auth'] }): ProbeClient =>
-  new ServiceNowClient({
-    instanceUrl: entry.url,
-    authMethod: entry.auth.method === 'basic' ? 'basic' : 'oauth',
-    // ONE request per probe, ever — S03's rule, restated at the construction site because this is
-    // where a future edit would be tempted to "just add a retry".
-    maxRetries: 0,
-    requestTimeoutMs: 15_000,
-    ...(entry.auth.method === 'basic'
-      ? { basic: { username: entry.auth.username, password: entry.auth.password } }
-      : { oauth: { username: entry.auth.username, password: entry.auth.password,
-        clientId: entry.auth.clientId, clientSecret: entry.auth.clientSecret } }),
-  }) as unknown as ProbeClient;
 
 /**
- * What `probeAll` needs to know about one entry's credentials — including the ROPC seam.
- *
- * `probeAuth` refuses an `oauth_ropc` run with no `tokenProbe` ("no token probe supplied"), and
- * S05 never passed one: with probes on, `instance add --auth oauth_ropc` could not succeed at all,
- * because the error came back as neither `ok` nor `unreachable` and fell through to the wrong-
- * password branch. Found by S06's `set-credentials --auth oauth_ropc` test, which hit the same
- * seam.
- *
- * The probe supplied here says "the request that follows IS the token exchange", and that is the
- * truth of this client: `ServiceNowClient` acquires the ROPC token inside its first request, so a
- * separate token call would be a SECOND login attempt on an account this whole file is careful to
- * spend only three of — against S03's one-request-per-probe rule. A failed grant still lands as
- * `auth failed` through `fromClientError` on the `sys_user` query; what is lost is only the
- * four-way ROPC error table's extra specificity, which needs a real token endpoint to distinguish
- * and belongs with the live sitting.
+ * The probe client and its options live in `servicenow/probe-client.ts` (ARC-08-S04): the doctor
+ * needs both, and it must not import a CLI to ask a question about credentials. Re-exported here
+ * because `import --from-legacy` already names this module for them.
  */
-export const probeOptionsFor = (auth: StoreInstance['auth'], env: NodeJS.ProcessEnv): {
-  username: string; authMethod: 'basic' | 'oauth_ropc'; env: NodeJS.ProcessEnv;
-  tokenProbe?: () => Promise<{ ok: boolean }>;
-} => ({
-  username: auth.username,
-  authMethod: auth.method,
-  env,
-  ...(auth.method === 'oauth_ropc' ? { tokenProbe: async () => ({ ok: true }) } : {}),
-});
+export { probeOptionsFor } from '../servicenow/probe-client.js';
 
 /**
  * The cloud-sync warning, and the question that follows it (D-04, ARC-07-S07).
@@ -482,7 +449,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     io.write('[5/6] Probing\n');
     if (options.noProbes) { probeResult = { auth: { status: 'ok' }, last: null }; break; }
 
-    const client = (deps.makeClient ?? defaultClient)({ url: instanceUrl, auth });
+    const client = (deps.makeClient ?? probeClientFor)({ url: instanceUrl, auth });
     const all = await (deps.probe ?? probeAll)(client, probeOptionsFor(auth, env));
     if (all.auth.status === 'ok') { probeResult = { auth: all.auth, last: toLastProbe(all) }; break; }
 
@@ -993,7 +960,7 @@ export async function runTest(options: ManageOptions, io: AddIo, deps: ManageDep
     const reach = await (deps.reachability ?? probeReachability)(entry.url, { env });
     if (!reach.ok && !quiet) for (const line of formatFailure(reach)) io.write(`${line}\n`);
 
-    const client = (deps.makeClient ?? defaultClient)({ url: entry.url, auth: entry.auth });
+    const client = (deps.makeClient ?? probeClientFor)({ url: entry.url, auth: entry.auth });
     const all = await (deps.probe ?? probeAll)(client, probeOptionsFor(entry.auth, env));
     const last = toLastProbe({ ...all, at: (deps.now ?? (() => new Date().toISOString()))() });
     probes[label] = last;
@@ -1058,7 +1025,7 @@ export async function runSetCredentials(options: ManageOptions, io: AddIo, deps:
       auth = { method, username, password, clientId, clientSecret };
     }
 
-    const client = (deps.makeClient ?? defaultClient)({ url: entry.url, auth });
+    const client = (deps.makeClient ?? probeClientFor)({ url: entry.url, auth });
     const all = await (deps.probe ?? probeAll)(client, probeOptionsFor(auth, env));
     if (all.auth.status === 'ok') {
       // The same gate as `add`, in the same place — the last question before a file changes.
