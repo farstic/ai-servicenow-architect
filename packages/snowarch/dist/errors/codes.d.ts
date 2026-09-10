@@ -148,7 +148,7 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "DNS_FAILURE";
     readonly meaning: "The instance host name did not resolve (`ENOTFOUND`, `EAI_AGAIN`).";
-    readonly remedy: "the name `<host>` does not resolve. Check the instance name; on a corporate network the name may resolve only over VPN or through the proxy (set `HTTPS_PROXY`). A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong";
+    readonly remedy: "the name `<host>` does not resolve. Check the instance name; on a corporate network the name may resolve only over VPN or through a proxy (set `HTTPS_PROXY`) (a proxy is configured — `<proxyVar>=<proxy>` — and a proxy does not resolve names for you unless the request goes through it, so this usually means the name is wrong)";
     readonly showInRule: false;
 }, {
     readonly code: "TLS_CA_UNTRUSTED";
@@ -159,7 +159,7 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "PROXY_UNREACHABLE";
     readonly meaning: "A proxy variable is set and nothing is listening there, or the connection to it timed out.";
-    readonly remedy: "the proxy `<proxy>` (from `HTTPS_PROXY`) did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked";
+    readonly remedy: "the proxy `<proxyVar>=<proxy>` did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked";
     readonly showInRule: false;
 }, {
     readonly code: "CONNECTION_REFUSED";

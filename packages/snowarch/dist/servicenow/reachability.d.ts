@@ -21,6 +21,7 @@
  *   too. Two remedy texts for one condition is how a user gets told two different things.
  */
 import { type ErrorCodeName } from '../errors/codes.js';
+import { fillRemedy, issuerOf } from './net-errors.js';
 import { snFetch } from './http.js';
 export interface ReachabilityOk {
     ok: true;
@@ -39,21 +40,8 @@ export interface ReachabilityFail {
 export type Reachability = ReachabilityOk | ReachabilityFail;
 /** HTTP 407 is a RESPONSE, so the network classifier never sees it. The probe maps it. */
 export declare const PROXY_AUTH_STATUS = 407;
-/**
- * The registry template, instantiated.
- *
- * The placeholders are deliberately visible in the registry: `docs/TROUBLESHOOTING.md` prints the
- * same string, and a reader looking up `DNS_FAILURE` there has no host to substitute. `<issuer>`
- * is dropped rather than left empty when the certificate did not say — a remedy that reads
- * "(issuer: )" invites the reader to look for something that is not there.
- */
-export declare function fillRemedy(code: ErrorCodeName, { host, proxy, issuer, }: {
-    host: string;
-    proxy?: string | undefined;
-    issuer?: string | undefined;
-}): string;
-/** The certificate issuer, when the error carried one. Best effort: it is a hint, not a claim. */
-export declare function issuerOf(err: unknown): string | undefined;
+/** Re-exported so the wizard's own callers have one import for the remedy rendering. */
+export { fillRemedy, issuerOf };
 /**
  * One `HEAD` against the origin.
  *
