@@ -19,7 +19,8 @@ import { EXIT_OK, EXIT_USAGE, EXIT_PREREQ } from '../exit.mjs';
 import { meetsFloor } from '../versions.mjs';
 import { childEnv } from '../spawn-env.mjs';
 
-import { createRegistry, SECTIONS } from './registry.mjs';
+import { SECTIONS } from './registry.mjs';
+import { engineRegistry } from './checks/index.mjs';
 import { collectPrereqs } from './prereqs.mjs';
 import { buildReport } from './report-json.mjs';
 import { renderText, useColour } from './report-text.mjs';
@@ -71,12 +72,12 @@ export function findRoot(from) {
 /**
  * The whole command.
  *
- * `registry` is injected so a test can register a check without a story having written one — this
- * story ships the registry EMPTY, and an empty run that reports zero checks and exits 0 is the
- * first thing the framework has to get right.
+ * `registry` is injected so a test can register exactly the checks its case needs — the default is
+ * the engine's twenty-three (ARC-08-S02), and a test that wants one check does not get the other
+ * twenty-two's answers in its assertions.
  */
 export async function doctorCommand({ flags = {}, log, out = process.stdout, env = process.env,
-  cwd = process.cwd(), registry = createRegistry(), now = () => Date.now(), home = '' } = {}) {
+  cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(), home = '' } = {}) {
   const started = now();
   const write = (text) => out.write(`${text}\n`);
 

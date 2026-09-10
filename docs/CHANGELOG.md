@@ -62,6 +62,29 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   schema whose every key is present from the first commit, and the exit codes CI relies on: 0 no
   FAIL, 1 at least one, 2 usage, 3 could not run. `--json --section prereqs` answers the six fields
   `/snowarch setup-instance` was written to branch on.
+- **The doctor's twenty-three engine checks — every one of them a call into code that already
+  existed.** E-00…E-22 answer whether the prerequisites are on the machine (Claude Code and its
+  login, git, Node, npm, and the four capability packs as information rather than faults), whether
+  the committed wiring is as committed (`.mcp.json`, `.claude/settings.json`, no credential-shaped
+  key anywhere, the mode toggles agreeing with the recorded mode, `.local/` at 0700 with a state
+  file that parses), whether the corpus is present, pinned, on the right family, correctly sparse
+  and fully cited, and whether the roster, the retired names, the registration prefix, the
+  generated files and the contract pin all still agree. Not one of them re-derives a fact: the
+  prerequisites are B00's own probes, the corpus is `docsStatus()`, the roster is the listing
+  `gen-roster.mjs` renders, the names and the prefix and the generated files are the lint's own
+  checks run from the lint's own context, and the pin is B05's check re-run. The bootstrap and the
+  doctor therefore cannot disagree about whether git is too old or a citation is dead — they are
+  the same sentence, printed twice. `--quick` is the eighteen that neither spawn nor walk the
+  corpus, read off the registry rather than listed anywhere; an absent corpus is a FAIL and never a
+  warning, because the engine's whole claim is that its ServiceNow facts are grounded.
+- **One description of what a credential looks like.** The commit-time sweep
+  (`tests/never-commit.test.mjs`) and the doctor's E-09 hunt the same tree for the same shapes, and
+  they had already drifted: the doctor's copy of the placeholder list was missing `<`, so
+  `"password": "<password>"` in `README.md` read as a leak to one sweep and as documentation to the
+  other. The shape now has one home and two callers.
+- **No real person's name or address anywhere in the repository, not even as a masking example.**
+  Every `maskUsername` example, fixture username and story-text address is now the neutral
+  `someone@corp.example.com` form.
 
 - **A nightly suite that proves the three things a simulation cannot.** `RUN_LIVE_E2E=1` runs the
   real CLI against a real instance: through a **pseudo-terminal**, so the masked prompt is actually

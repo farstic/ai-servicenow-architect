@@ -624,6 +624,37 @@ did nothing — which rules the hook out for anything the product needs to know 
 
 ---
 
+## D1. ARC-08-S02 — the doctor's engine checks on a BOOTSTRAPPED machine
+
+*Five minutes, no instance needed, design-only is enough. Everything else about these checks is
+proved by fixtures in CI; the one claim a fixture cannot make is acceptance criterion 1 — that a
+machine which has actually run `./bootstrap.sh` reports **0 FAIL**.*
+
+Why it needs you: a development clone has no `.local/` and no `.claude/settings.local.json`, so
+E-10 and E-11 correctly report "not bootstrapped". Only a real install has the files they check.
+
+```sh
+git clone https://github.com/farstic/ai-servicenow-architect.git ~/snowarch-ref
+cd ~/snowarch-ref
+./bootstrap.sh                      # design-only is fine — answer no to the live prompts
+./snowarch doctor --section prereqs,repo,docs,roster,contract
+echo "exit: $?"
+./snowarch doctor --json --quick > /tmp/doctor-ref.json; echo "quick exit: $?"
+```
+
+1. Does the last line of the first run say **`0 fail`**, and is the exit code **0**?
+2. If anything FAILs, paste the whole `E-nn FAIL …` line **and** its `→` remedy line.
+3. Roughly how long did the `--quick` run take? *(the budget is 1.5 s on a developer machine)*
+
+> *(lands in `docs/plans/ARC-08-doctor-and-self-heal/README.md` acceptance criterion 1, and in the
+> story index row for ARC-08-S02, which records this as your sitting until then)*
+
+**Why it matters, in one line:** every other engine check is proved against a fixture built from
+this repository's own committed files — this is the only run that proves the fixtures describe a
+real install.
+
+---
+
 ## Cleanup (please run this — it leaves no residue on your machine)
 
 ```sh

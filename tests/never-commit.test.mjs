@@ -9,36 +9,18 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
+import {
+  credentialLines, CREDENTIAL_EXT, ENVISH, isPlaceholder,
+} from '../tools/snowarch/lib/doctor/checks/credential-shape.mjs';
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const git = (args, cwd = root) => execFileSync('git', args, { cwd, encoding: 'utf8' });
 
-// What counts as documentation rather than a secret. Four rules, each with a reason, kept in one
-// place so the whole allowance is auditable instead of scattered through the regexes. The scan is
-// heuristic by design (01 section 7): D-04's store location is the structural defence, this is the
-// net under it, and a net with no holes at all would flag every example in the documentation.
-const PLACEHOLDER_PREFIXES = ['your', 'my_', '<', '${', '***', 'changeme', 'example', 'placeholder',
-  'dummy', 'test_', 'xxx', 'redacted', 'insert', 'replace'];
-// Named fixtures with recorded provenance. hunter2hunter2 is the dummy password used in ARC-01-S07's
-// own acceptance criterion and is on ADR-0007's recorded fixture list.
-const KNOWN_FIXTURES = new Set(['hunter2hunter2']);
-// A value that IS the generic word for the thing ("password": "password") is documentation.
-// Matched exactly rather than as a prefix, so a real value merely STARTING with one of these
-// ("passwordL33t...") is still flagged.
-const GENERIC_WORDS = new Set(['password', 'passwd', 'secret', 'token', 'apikey', 'api_key',
-  'changeme', 'letmein', 'credentials', 'username']);
-const ALL_CAPS_TOKEN = /^[A-Z][A-Z0-9_]*$/;            // ACME_SVC_PASSWORD, CPU_CRITICAL
-const LOWER_SNAKE_OR_KEBAB = /^[a-z][a-z0-9]*([_-][a-z0-9]+)+$/; // svc_password, your-oidc-client-secret
-const isPlaceholder = (v) => {
-  const s = v.trim();
-  if (KNOWN_FIXTURES.has(s)) return true;
-  if (GENERIC_WORDS.has(s.toLowerCase())) return true;
-  if (ALL_CAPS_TOKEN.test(s)) return true;
-  // Real credentials are essentially never snake_case or kebab-case words; documentation examples
-  // almost always are. A credential weak enough to look like this is a finding in its own right.
-  if (LOWER_SNAKE_OR_KEBAB.test(s)) return true;
-  return PLACEHOLDER_PREFIXES.some((p) => s.toLowerCase().startsWith(p));
-};
-
+// The credential SHAPE — the prefixes, the generic words, the two regexes — lives in
+// `tools/snowarch/lib/doctor/checks/credential-shape.mjs`, because the doctor's E-09 sweeps the
+// same tree on a user's machine (ARC-08-S02). It was two copies for one commit, and the copies had
+// already diverged: the doctor's list was missing `<`, so `"password": "<password>"` in README.md
+// read as a leak to one sweep and as documentation to the other. One definition, two callers.
 const FORBIDDEN_TRACKED = /^(\.local|clients|deliverables|memory)\/|(^|\/)\.env$|settings\.local\.json$|(^|\/)\.DS_Store$/;
 
 test('every per-checkout and engagement path is ignored', () => {
@@ -64,19 +46,11 @@ test('no forbidden path is tracked', () => {
 });
 
 test('no credential-shaped literal is tracked', () => {
-  const EXT = /\.(json|md|ts|mjs|sh|yml|yaml|ps1|cmd)$/;
-  const JSONISH = /"(password|passwd|secret|token|[a-z_]*_key)"\s*:\s*"([^"]{8,})"/gi;
-  const ENVISH = /^[A-Z0-9_]*(PASSWORD|SECRET|TOKEN)[A-Z0-9_]*=(.{8,})$/;
   const hits = [];
-  for (const f of git(['ls-files']).split('\n').filter((f) => f && EXT.test(f))) {
+  for (const f of git(['ls-files']).split('\n').filter((f) => f && CREDENTIAL_EXT.test(f))) {
     let text;
     try { text = readFileSync(join(root, f), 'utf8'); } catch { continue; }
-    text.split('\n').forEach((line, i) => {
-      if (line.trimStart().startsWith('#') || line.trimStart().startsWith('//')) return;
-      for (const m of line.matchAll(JSONISH)) if (!isPlaceholder(m[2])) hits.push(`${f}:${i + 1}`);
-      const e = line.match(ENVISH);
-      if (e && !isPlaceholder(e[2])) hits.push(`${f}:${i + 1}`);
-    });
+    for (const line of credentialLines(text)) hits.push(`${f}:${line}`);
   }
   assert.deepEqual(hits, [], `credential-shaped literal(s): ${hits.slice(0, 8).join(', ')}`);
 });
@@ -142,7 +116,6 @@ test('mutation: a force-added .local/instances.json is caught by the tracked-pat
 });
 
 test('mutation: a real-looking env literal fails, the same line with a placeholder passes', () => {
-  const ENVISH = /^[A-Z0-9_]*(PASSWORD|SECRET|TOKEN)[A-Z0-9_]*=(.{8,})$/;
   const real = 'SERVICENOW_BASIC_PASSWORD=RealLookingValue123'.match(ENVISH);
   assert.ok(real && !isPlaceholder(real[2]), 'a real-looking value was treated as a placeholder');
   const fake = 'SERVICENOW_BASIC_PASSWORD=your_password'.match(ENVISH);

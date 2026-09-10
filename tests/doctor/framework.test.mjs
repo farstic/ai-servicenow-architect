@@ -12,7 +12,7 @@ import {
   headerLine, renderText, statusLabel, summaryLine, useColour,
 } from '../../tools/snowarch/lib/doctor/report-text.mjs';
 import { collectPrereqs, guessShell, SHELLS } from '../../tools/snowarch/lib/doctor/prereqs.mjs';
-import { findRoot, notAtRoot } from '../../tools/snowarch/lib/doctor/index.mjs';
+import { doctorCommand, findRoot, notAtRoot } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
@@ -38,10 +38,15 @@ const check = (over = {}) => defineCheck({
 const run = (args, cwd = root, env = {}) => spawnSync(process.execPath, [CLI, 'doctor', ...args],
   { encoding: 'utf8', cwd, env: { ...process.env, ...env } });
 
-test('AC 1 — an empty registry is a valid report, zero checks, exit 0', () => {
-  const r = run(['--json', '--no-cache']);
-  assert.equal(r.status, 0, r.stdout + r.stderr);
-  const report = JSON.parse(r.stdout);
+// S02 filled the registry, so the empty case is now asked of the COMMAND with an empty one passed
+// in rather than of the CLI: "a run that reports zero checks and exits 0" is a statement about the
+// harness, and the harness is what stays true after twenty-three checks are registered.
+test('AC 1 — an empty registry is a valid report, zero checks, exit 0', async () => {
+  const out = { chunks: [], write(text) { this.chunks.push(text); } };
+  const code = await doctorCommand({ flags: { json: true, 'no-cache': true }, out,
+    cwd: root, registry: createRegistry() });
+  assert.equal(code, 0);
+  const report = JSON.parse(out.chunks.join(''));
   assert.deepEqual(validateReport(report), []);
   assert.equal(report.summary.ok, 0);
   assert.deepEqual(report.checks, []);

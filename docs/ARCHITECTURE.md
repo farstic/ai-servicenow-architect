@@ -945,6 +945,38 @@ cannot disagree. A check that sets both a code and its own remedy is refused.
 could not run at all — not at the repository root, an unparsable `engine.config.json`, or Node below
 the floor. Exit codes apply with `--json` too; CI relies on them.
 
+**The engine's twenty-three checks** (ARC-08-S02). The `legacy`/`host` detectors (S03) and the
+`SV-` server checks (S04) append to the same registry, because `--section` and `--quick` are answers
+about one registry rather than several:
+
+<!-- generated:doctor-checks -->
+| Check | Section | What it answers | `--quick` | `--fix` |
+|---|---|---|---|---|
+| `E-00` | prereqs | Claude Code CLI | — | — |
+| `E-01` | prereqs | git | yes | — |
+| `E-02` | prereqs | Node.js | yes | — |
+| `E-03` | prereqs | npm | — | — |
+| `E-04` | prereqs | capability packs | — | — |
+| `E-05` | repo | repository root | yes | — |
+| `E-06` | repo | engine.config.json | yes | — |
+| `E-07` | repo | .mcp.json committed and secret-free | yes | — |
+| `E-08` | repo | .claude/settings.json committed | yes | — |
+| `E-09` | repo | no credential-shaped keys | yes | — |
+| `E-10` | repo | settings.local toggles match the recorded mode | yes | yes |
+| `E-11` | repo | .local/ state | yes | yes |
+| `E-12` | docs | docs corpus present | yes | yes |
+| `E-13` | docs | docs pin | yes | yes |
+| `E-14` | docs | docs family | yes | — |
+| `E-15` | docs | sparse set | yes | yes |
+| `E-16` | docs | citations | — | — |
+| `E-17` | roster | roster from directory listing | yes | — |
+| `E-18` | roster | skill descriptions | yes | — |
+| `E-19` | contract | no retired tool names | yes | — |
+| `E-20` | contract | prefix consistency | yes | — |
+| `E-21` | contract | generated files fresh | — | — |
+| `E-22` | contract | contract pin | yes | — |
+<!-- /generated:doctor-checks -->
+
 **The report, as a person reads it** — statuses are `ok`, `warn`, `FAIL`, `skip` (upper-case so
 `grep FAIL` works), and the Mode line is last, because the last line of a transcript is the one that
 survives a truncated paste:
