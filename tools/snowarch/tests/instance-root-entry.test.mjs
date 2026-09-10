@@ -119,12 +119,18 @@ for (const entry of ENTRIES) {
     const dir = mkdtempSync(join(tmpdir(), 'root-entry-two-'));
     try {
       const home = join(dir, 'home');
-      const globalStore = join(home, '.config', 'snowarch', 'instances.json');
+      // WHERE THIS PLATFORM PUTS IT: `%APPDATA%\snowarch` on Windows, `$XDG_CONFIG_HOME/snowarch`
+      // elsewhere. Writing the POSIX path on a Windows runner leaves the global store absent, and
+      // the test then asserts three rows against a run that could only ever produce one — which is
+      // exactly what the Windows cells reported.
+      const globalStore = process.platform === 'win32'
+        ? join(home, 'AppData', 'Roaming', 'snowarch', 'instances.json')
+        : join(home, '.config', 'snowarch', 'instances.json');
       const override = join(dir, 'project.json');
       const account = { method: 'basic', username: 'u', password: ['pw', '-', 'fixture'].join('') };
       const instance = (url) => ({ url, environment: 'pdi', auth: account, preset: 'read-only',
         flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false });
-      mkdirSync(join(home, '.config', 'snowarch'), { recursive: true });
+      mkdirSync(dirname(globalStore), { recursive: true });
       writeFileSync(globalStore, JSON.stringify({ version: 1, defaultInstance: 'gl',
         instances: { dev1: instance('https://dev11111.service-now.com'),
           gl: instance('https://dev22222.service-now.com') } }, null, 2), { mode: 0o600 });
