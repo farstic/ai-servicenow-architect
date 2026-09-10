@@ -50,6 +50,32 @@
 > at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
 > Nothing about a real instance goes into the repository: the record is the CODE and the timing.
 >
+> **The live E2E suite (ARC-07-S11, 2026-09-10) — four items, in order.** Everything that runs
+> without an instance is written, green and nightly-ready; these four need you.
+>
+> **(a) A PDI and five repository secrets.** Create `SNOW_E2E_URL`, `SNOW_E2E_USERNAME`,
+> `SNOW_E2E_PASSWORD` (and, for case 5, `SNOW_E2E_OAUTH_CLIENT_ID` / `SNOW_E2E_OAUTH_CLIENT_SECRET`)
+> on the repository, default branch only — the names are in `docs/CONTRIBUTING.md` and nowhere else,
+> and no value belongs in a file, a pull request or a run record. Use a PDI account, never a
+> customer's. Locally the same values go in a `0600` file pointed at by `SNOW_ENV_FILE`.
+>
+> **(b) The first two nightly runs.** Dispatch `e2e-live.yml` once by hand, then let the schedule
+> run it. Copy `docs/validation/TEMPLATE-e2e-live.md` to
+> `docs/validation/<date>-e2e-live-<os>.md` and fill it in — the template records no URL and no
+> account by design. The first run also settles the one thing this story could not: the workflow's
+> first step prints `script(1)`'s version on each runner, and that line goes in the record.
+>
+> **(c) Case 5's instance WRITE — yours, not the agent's.** The ROPC case sets
+> `glide.oauth.inbound.ropc.grant_type.disabled` on a real instance and restores it in a `finally`.
+> That is a write, and §2.1 puts a write behind an explicit human approval — so the case is gated
+> behind `SNOW_E2E_ALLOW_WRITES=1` and is never run by me. Dispatch the workflow with
+> **Run case 5** ticked, on a PDI you own, and watch the property come back afterwards.
+>
+> **(d) The ROPC fixture.** With (c) done, the case captures the token endpoint's raw refusal body.
+> Review it, strip anything instance-specific, and commit it into
+> `packages/snowarch/tests/fixtures/oauth-ropc-errors.json` — today a valid empty placeholder, and
+> the reason S03's four-way error table is still unproven against a real instance.
+>
 > **The password managers, and one read-through (ARC-07-S10, 2026-09-10).** Two things this page
 > claims that a test can only half-check. **(1) The three examples in "Typing secrets safely" are
 > asserted to PARSE — `bash -n` for the two shell lines, PowerShell's own parser for the third on

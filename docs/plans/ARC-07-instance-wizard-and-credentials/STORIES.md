@@ -987,6 +987,37 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 - Workflow `e2e-live.yml`: `schedule` nightly + `workflow_dispatch`; jobs on `macos-latest`, `ubuntu-latest` (cases 1–7) and `windows-latest` (cases 2, 4, 6, 7); secrets only available on the default branch; the job uploads a redacted log (the test's own redactor replaces the secret values with `***` before writing artefacts). Pull-request CI never sets `RUN_LIVE_E2E`.
 - Run record: `docs/validation/<date>-e2e-live-<os>.md` without the instance URL (Q-A persona: the author's PDI is not a product fact).
 
+> **Amendment 2026-09-10 (ARC-07-S11).** Five departures and findings.
+>
+> **(1) `script(1)`'s presence is now MEASURED, not assumed.** The story names the two dialects and
+> takes the binary for granted. `e2e-live.yml`'s first step runs `command -v script` and prints the
+> version line on every non-Windows runner, so the first nightly run records which dialect each
+> image has — the citation this design note lacked. If a runner ever ships without it, the pty
+> cases fail on a step that says why rather than on a timeout.
+>
+> **(2) The suite lives at `tests/e2e/`, beside `tests/live/` rather than inside it.**
+> `tests/live/README.md` documents "the owner's sitting" — cases a person executes by hand. This
+> suite is executed by a scheduled workflow. Same gate (`RUN_LIVE_E2E=1`), same env loading, same
+> redactor; different thing, so a different directory.
+>
+> **(3) The "no workflow reads a secret" rule became an allow-list.** It was the right rule while
+> every job ran on a proposed change. `e2e-live.yml` needs five, on the default branch only, so the
+> test now asserts **exactly those five names in exactly that one workflow** — a sixth, or one of
+> them elsewhere, still fails. The regex widened with it: `[A-Z_]+` captured `SNOW_E`, a prefix
+> matching nothing, which would have made the allow-list a lie.
+>
+> **(4) Case 5's instance write is not mine to make.** Setting
+> `glide.oauth.inbound.ropc.grant_type.disabled` is a WRITE to a real instance, which this project's
+> §2.1 puts behind an explicit human approval. The case is written, gated behind
+> `SNOW_E2E_ALLOW_WRITES=1`, and restores the property in a `finally`; the run — and the fixture
+> capture that follows it — is the owner's, with the procedure in `OWNER-SITTING.md`.
+>
+> **(5) AC 1 is asserted from the REPORTER, not from a comment.** A nested `vitest run` of the live
+> file, with the gate off and `fetch` replaced through `--import`, must report `numPendingTests > 0`
+> and `numPassedTests === 0`, and the stub must never have been called. "Skipped" and "passed" look
+> identical in a summary line, which is how a suite that stopped running goes unnoticed for a
+> release. (`--setupFiles` is not a flag in this vitest; the stub arrives through `NODE_OPTIONS`.)
+
 **Acceptance criteria.**
 1. `npm test` without `RUN_LIVE_E2E=1` skips the suite (reported as skipped, not passed) and makes no network call (asserted by a test that stubs `fetch` to throw during the unit run).
 2. With `RUN_LIVE_E2E=1` and valid secrets, cases 1–4, 6, 7 pass on macOS and Ubuntu, and cases 2, 4, 6, 7 pass on Windows; case 5 passes when the OAuth variables are present and is skipped otherwise.

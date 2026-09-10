@@ -51,13 +51,42 @@ test('every workflow references actions by major-version tag, as the repository 
   }
 });
 
-test('no workflow can merge, and none reads a repository secret', () => {
+test('no workflow can merge, and only the live suite reads a repository secret', () => {
+  // ONE workflow may, and only these names. Until ARC-07-S11 the answer was "none", which was the
+  // right rule for a repository whose every job ran on a proposed change; the live E2E suite needs
+  // credentials for a real instance, runs on the default branch only, and never on a proposal. So
+  // the rule became an ALLOW-LIST rather than a prohibition — a secret appearing in any other
+  // workflow, or a NEW name appearing in this one, still fails here.
+  const ALLOWED = {
+    'e2e-live.yml': ['SNOW_E2E_URL', 'SNOW_E2E_USERNAME', 'SNOW_E2E_PASSWORD',
+      'SNOW_E2E_OAUTH_CLIENT_ID', 'SNOW_E2E_OAUTH_CLIENT_SECRET'],
+  };
   for (const f of readdirSync(join(root, '.github/workflows'))) {
     const text = wf(f);
     assert.ok(!/gh pr merge|--auto\b/.test(text), `${f} can merge`);
-    const secrets = [...text.matchAll(/secrets\.([A-Z_]+)/g)].map((m) => m[1]);
-    assert.deepEqual([...new Set(secrets)], [], `${f} reads a repository secret`);
+    // `[A-Z0-9_]`, not `[A-Z_]`: the live names carry a digit, and the narrower class captured
+    // `SNOW_E` — a prefix that matches nothing, which would have made the allow-list a lie.
+    const secrets = [...new Set([...text.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((m) => m[1]))].sort();
+    assert.deepEqual(secrets, (ALLOWED[f] ?? []).slice().sort(),
+      `${f} reads repository secrets this test does not allow`);
   }
+});
+
+test('the live suite never runs on a proposed change, and asks for the branch it needs', () => {
+  const text = wf('e2e-live.yml');
+  // The `on:` block only — the prose above it explains WHY there is no such trigger, and a grep
+  // over the whole file would read the explanation as the thing it forbids.
+  const on = /\non:\n([\s\S]*?)\nconcurrency:/.exec(text);
+  assert.ok(on, 'e2e-live.yml has no on: block before concurrency:');
+  assert.doesNotMatch(on[1], /pull_request/, 'the live suite would run on a proposed change');
+  assert.match(on[1], /schedule:/, 'the live suite is not scheduled');
+  assert.match(on[1], /workflow_dispatch:/, 'the live suite cannot be run on demand');
+  // Secrets exist on the default branch; a dispatch from a topic branch would run green and empty.
+  assert.match(text, /if: github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\)/);
+  // And the artefact is checked before it is published.
+  assert.match(text, /Refuse to publish a log that contains a secret/);
+  assert.ok(text.indexOf('Refuse to publish') < text.indexOf('upload-artifact'),
+    'the log is uploaded before it is checked');
 });
 
 test('docs-bump checks out the same branch it opens the pull request against', () => {
