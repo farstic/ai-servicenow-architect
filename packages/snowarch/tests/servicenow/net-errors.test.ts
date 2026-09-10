@@ -33,8 +33,11 @@ describe('DNS', () => {
     // not having noticed — and the real point (a proxy does not resolve names for you) is lost.
     const d = classifyNetworkError(fetchFailed('ENOTFOUND'), PROXY);
     expect(d.code).toBe('DNS_FAILURE');
+    // ARC-07-S03 collapsed the remedy onto the registry, so the words are the registry's — the
+    // PROPERTY is unchanged and is what this asserts: with a proxy set, the text names it and
+    // says what it does not do.
     expect(d.remedy).toContain('does not resolve names for you');
-    expect(d.remedy).toContain('127.0.0.1:49151');
+    expect(d.remedy).toContain('HTTPS_PROXY=http://127.0.0.1:49151');
   });
 });
 
@@ -53,8 +56,10 @@ describe('TLS', () => {
     // checking for the whole process — on an intercepting network, that means trusting the
     // interceptor and everything else. Asserted so nobody "helpfully" adds it later.
     const d = classifyNetworkError(fetchFailed('SELF_SIGNED_CERT_IN_CHAIN'), {});
-    expect(d.remedy).not.toContain('NODE_TLS_REJECT_UNAUTHORIZED');
-    expect(d.remedy).toContain('Do not disable certificate verification');
+    // The registry text NAMES the variable in order to forbid it, which is stronger than not
+    // mentioning it: a reader who has already found it on a search page needs to be told no.
+    expect(d.remedy).toContain('Never `NODE_TLS_REJECT_UNAUTHORIZED=0`');
+    expect(d.remedy).not.toMatch(/set\s+`?NODE_TLS_REJECT_UNAUTHORIZED/);
   });
 });
 
@@ -70,7 +75,8 @@ describe('refused and timed out - the proxy changes the meaning', () => {
     // send the user to check a host that was never contacted.
     const d = classifyNetworkError(fetchFailed('ECONNREFUSED'), PROXY);
     expect(d.code).toBe('PROXY_UNREACHABLE');
-    expect(d.remedy).toContain('HTTPS_PROXY=http://127.0.0.1:49151 is set but not reachable');
+    expect(d.remedy).toContain('HTTPS_PROXY=http://127.0.0.1:49151');
+    expect(d.remedy).toContain('did not connect');
   });
 
   it.each(['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT'])(

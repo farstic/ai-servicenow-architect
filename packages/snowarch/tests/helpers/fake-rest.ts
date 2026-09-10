@@ -1,4 +1,5 @@
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
+import { ServiceNowError } from '../../src/utils/errors.js';
 
 /**
  * A ServiceNow client that RECORDS what was asked of it and serves fixtures back.
@@ -92,3 +93,72 @@ export class FakeRestClient {
     }) as unknown as ServiceNowClient;
   }
 }
+
+/**
+ * ARC-07-S03's fake, beside ARC-04-S07's rather than instead of it.
+ *
+ * `FakeRestClient` above answers "which requests, in which order, with which query" and serves
+ * fixture ROWS. The probes need a different question answered: WHAT STATUS came back, and HOW
+ * MANY requests were made. "Never retries a 401" is the difference between a failed probe and an
+ * account three attempts closer to a lockout, and no returned value can express a request that
+ * did not happen — only a counter can.
+ *
+ * The error shape is the client's own — `ServiceNowError` with `details.status` — so a probe that
+ * reads it here reads exactly what it reads in production.
+ */
+export interface FakeRoute {
+  status: number;
+  /** Rows a 200 returns. Absent means one row; an empty array means a 200 with no rows. */
+  records?: unknown[];
+  /** Thrown instead of answering — a network failure, with `cause.code`. */
+  throws?: unknown;
+}
+
+export interface FakeRest {
+  queryRecords(params: { table: string; query?: string; fields?: string; limit?: number }):
+  Promise<{ count: number; records: unknown[] }>;
+  /** Every table asked for, in order. */
+  readonly calls: string[];
+  countOf(table: string): number;
+}
+
+const STATUS_CODE: Record<number, string> = {
+  401: 'AUTHENTICATION_FAILED',
+  403: 'INSUFFICIENT_PRIVILEGES',
+  404: 'NOT_FOUND',
+  429: 'RATE_LIMITED',
+};
+
+export function fakeRest(routes: Record<string, FakeRoute | FakeRoute[]>): FakeRest {
+  const calls: string[] = [];
+  // A route may be an ARRAY: successive answers for successive calls. That is how "would succeed
+  // on the second call" is expressed — the fixture for the test proving the second call is never
+  // made.
+  const queues = new Map<string, FakeRoute[]>(
+    Object.entries(routes).map(([k, v]) => [k, Array.isArray(v) ? [...v] : [v]]),
+  );
+
+  return {
+    calls,
+    countOf: (table: string) => calls.filter((c) => c === table).length,
+    async queryRecords({ table }: { table: string }) {
+      calls.push(table);
+      const queue = queues.get(table);
+      if (!queue || queue.length === 0) {
+        throw new ServiceNowError(`no fake route for ${table}`, 'NOT_FOUND', { status: 404 });
+      }
+      const route = queue.length > 1 ? (queue.shift() as FakeRoute) : queue[0];
+      if (route.throws) throw route.throws;
+      if (route.status >= 400) {
+        throw new ServiceNowError(`HTTP ${route.status}`,
+          (STATUS_CODE[route.status] ?? 'REQUEST_FAILED') as never, { status: route.status });
+      }
+      const records = route.records ?? [{ sys_id: '0'.repeat(32) }];
+      return { count: records.length, records };
+    },
+  };
+}
+
+/** undici's shape for a socket failure, for the `unreachable` path. */
+export const networkFailure = (code: string): Error =>
+  Object.assign(new TypeError('fetch failed'), { cause: { code } });

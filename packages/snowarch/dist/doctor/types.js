@@ -15,13 +15,20 @@
 export const CHECK_IDS = [
     'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-04', 'SV-05', 'SV-06', 'SV-07', 'SV-08',
 ];
-/** Returns `skip`, always, naming the story that will replace it. */
+/**
+ * Returns `skip`, always — the shape the doctor binds when no instance is configured.
+ *
+ * ARC-07-S03 supplies the real implementation (`probeAll`, exported as `@farstic/snowarch/probes`);
+ * ARC-08-S04 is where the doctor chooses to bind it, because that is the story that owns what the
+ * doctor RENDERS. This stub stays as the unconfigured answer rather than being deleted: "there is
+ * no instance to probe" is a real state, and `skip` is its honest report.
+ */
 export const stubProbes = {
     async runAll() {
         return {
             status: 'skip',
-            detail: 'network probes are not implemented yet',
-            remedy: 'ARC-07-S03 supplies the probes; until then run ./snowarch instance test',
+            detail: 'no instance configured, so there is nothing to probe',
+            remedy: 'add one with ./snowarch instance add, then run ./snowarch instance test',
         };
     },
 };

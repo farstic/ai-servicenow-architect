@@ -145,7 +145,11 @@ describe('criterion 2 - a proxy that is not listening', () => {
     const d = classifyNetworkError(err);
 
     expect(d.code).toBe('PROXY_UNREACHABLE');
-    expect(d.remedy).toContain(`HTTPS_PROXY=${dead} is set but not reachable`);
+    // ARC-07-S03 collapsed the wording onto the error registry; what this asserts is the
+    // PROPERTY, unchanged — the message names the PROXY as the thing that did not connect, so
+    // nobody goes checking an instance the client never reached.
+    expect(d.remedy).toContain(`HTTPS_PROXY=${dead}`);
+    expect(d.remedy).toContain('did not connect');
   });
 });
 

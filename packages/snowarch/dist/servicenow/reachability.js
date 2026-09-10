@@ -1,61 +1,9 @@
-/**
- * ARC-07-S02 — is the instance reachable, and if not, WHICH of DNS, TLS or a proxy is in the way.
- *
- * R-3: on a corporate laptop "unreachable" is not a diagnosis, it is the start of an afternoon.
- * The three failures that produce it look identical from the outside and need completely
- * different actions — a name that does not resolve, a gateway presenting its own certificate, a
- * proxy that is not there — so the probe names the one that happened and prints the remedy for
- * it, with the host and the (masked) proxy substituted in.
- *
- * Two things this file deliberately does NOT do:
- *
- *   IT OPENS NO HTTP CALL SITE OF ITS OWN. Everything goes through ARC-04-S11's `snFetch`, so the
- *   proxy agent and `NODE_EXTRA_CA_CERTS` apply — a probe that bypassed them would report a
- *   reachability the real client does not have, which is worse than no probe. (This sentence used
- *   to name the global function it avoids, which made this file a hit in the very sweep that
- *   enforces the rule: `tests/servicenow/proxy.test.ts` greps `src/` for the call, and a comment
- *   is text like any other. Eleventh time in this repository.)
- *
- *   IT ADDS NO SECOND ERROR CLASSIFIER. `classifyNetworkError` decides the code, and the REMEDY
- *   text comes from `ERROR_CODES` — the one table `docs/TROUBLESHOOTING.md` and the doctor render
- *   too. Two remedy texts for one condition is how a user gets told two different things.
- */
-import { ERROR_CODES } from '../errors/codes.js';
-import { classifyNetworkError, maskProxyUrl } from './net-errors.js';
+import { classifyNetworkError, fillRemedy, issuerOf, maskProxyUrl } from './net-errors.js';
 import { snFetch } from './http.js';
 /** HTTP 407 is a RESPONSE, so the network classifier never sees it. The probe maps it. */
 export const PROXY_AUTH_STATUS = 407;
-const registryRemedy = (code) => ERROR_CODES.find((e) => e.code === code)?.remedy ?? '';
-/**
- * The registry template, instantiated.
- *
- * The placeholders are deliberately visible in the registry: `docs/TROUBLESHOOTING.md` prints the
- * same string, and a reader looking up `DNS_FAILURE` there has no host to substitute. `<issuer>`
- * is dropped rather than left empty when the certificate did not say — a remedy that reads
- * "(issuer: )" invites the reader to look for something that is not there.
- */
-export function fillRemedy(code, { host, proxy, issuer, }) {
-    let text = registryRemedy(code)
-        .replaceAll('<host>', host)
-        .replaceAll('<proxy>', proxy ? maskProxyUrl(proxy) : 'the configured proxy');
-    text = issuer
-        ? text.replaceAll('<issuer>', issuer)
-        : text.replace(/\s*\(issuer: `<issuer>`\)/, '');
-    return text;
-}
-/** The certificate issuer, when the error carried one. Best effort: it is a hint, not a claim. */
-export function issuerOf(err) {
-    const seen = new Set();
-    let node = err;
-    while (node && typeof node === 'object' && !seen.has(node)) {
-        seen.add(node);
-        const cert = node.cert;
-        if (cert?.issuer?.CN)
-            return cert.issuer.CN;
-        node = node.cause;
-    }
-    return undefined;
-}
+/** Re-exported so the wizard's own callers have one import for the remedy rendering. */
+export { fillRemedy, issuerOf };
 const proxyOf = (env) => env.HTTPS_PROXY ?? env.https_proxy ?? env.HTTP_PROXY ?? env.http_proxy;
 /**
  * One `HEAD` against the origin.
@@ -97,12 +45,15 @@ export async function probeReachability(url, { timeoutMs = 10_000, env = process
                 latencyMs: elapsed(),
             };
         }
-        const diagnosis = classifyNetworkError(err, env);
+        // The classifier renders the registry itself now (ARC-07-S03's collapse), so the remedy is
+        // taken as it comes: filling it a second time here would be the second opinion this story
+        // removed.
+        const diagnosis = classifyNetworkError(err, env, { host });
         return {
             ok: false,
             code: diagnosis.code,
             cause: diagnosis.cause ?? null,
-            remedy: fillRemedy(diagnosis.code, { host, proxy: proxyOf(env), issuer: issuerOf(err) }),
+            remedy: diagnosis.remedy,
             latencyMs: elapsed(),
         };
     }

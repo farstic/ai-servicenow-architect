@@ -2,6 +2,13 @@ import { ServiceNowError } from '../utils/errors.js';
 import { logger } from '../utils/logging.js';
 import { snFetch } from './http.js';
 import { classifyNetworkError } from './net-errors.js';
+/** The host, for a message; the raw value when it cannot be parsed — this never throws. */
+const hostOfUrl = (url) => { try {
+    return new URL(url).host;
+}
+catch {
+    return url;
+} };
 import { currentInstanceOrNull } from './context.js';
 // ─── Input validation helpers ────────────────────────────────────────────────
 /** Validate and sanitize ServiceNow table names (alphanumeric + underscores only) */
@@ -295,7 +302,9 @@ export class ServiceNowClient {
         if (lastError) {
             const cause = lastError.cause;
             if (cause) {
-                const diagnosis = classifyNetworkError(lastError);
+                // The host is passed, so the server-facing message names the instance the request was
+                // for rather than the registry's `<host>` placeholder.
+                const diagnosis = classifyNetworkError(lastError, process.env, { host: hostOfUrl(this.baseUrl) });
                 throw new ServiceNowError(`Failed to query records: ${cause.message} — ${diagnosis.remedy}`, diagnosis.code);
             }
             throw lastError;

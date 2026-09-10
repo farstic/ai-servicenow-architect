@@ -29,6 +29,29 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **One probe library, and it can never lock an account out.** `probes.ts` proves the credentials
+  and reports, per flag, whether the account can reach the table family that flag unlocks — the
+  same answer for the wizard, `instance test` and the doctor, because three implementations of one
+  question disagree about the same instance on the same day. **One HTTP request per probe, ever:**
+  the client is constructed with `maxRetries: 0` even though it already excludes authentication
+  failures from its retry policy, since "excluded today" is a property of code somebody may change
+  and "no retries configured" is a property of this call. A retried 401 is an account three
+  attempts closer to a lockout on an instance whose policy nobody here knows — so the test that
+  proves it plants a fixture that WOULD succeed on the second call and asserts the second call is
+  never made. A 403 is its own status rather than a failure: on a hardened instance the login is
+  right and the REST ACL is not, and telling that user their password is wrong sends them to
+  change one that works. A failed login is followed by six `skipped` capability results and zero
+  capability requests. `sn_generative_ai` properties are reported as "properties found", never as
+  "Now Assist works" — a plugin can be installed without a licence. The ROPC error mapping is
+  DATA, carrying RFC 6749's names until ARC-07-S11 records what a real instance actually returns;
+  an unrecognised body falls through with the raw value rather than a guess dressed as a
+  diagnosis. And the record written to the store is statuses ONLY — no account name, no role list,
+  no hint text — because it is read by the banner, the doctor and `/snowarch status` alike.
+- **One condition, one remedy.** The network classifier carried its own remedy strings while the
+  error registry carried others, so the server said one thing and the wizard another about the
+  same failure — and the contract published the second. The classifier renders the registry now,
+  with the host substituted in, and a parenthetical whose subject is absent (`(a proxy is
+  configured — …)`, `(issuer: …)`) is removed with it rather than printed empty.
 - **"Unreachable" is not a diagnosis — the probe names which of DNS, TLS or a proxy is in the way.**
   `normalizeInstanceUrl` accepts an address in any reasonable form and REFUSES what it cannot fix
   with the reason: `/api` gets its own sentence (P-23's wizard silently turned that into a base URL

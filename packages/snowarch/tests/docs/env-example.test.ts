@@ -28,7 +28,11 @@ const ENV_EXAMPLE = resolve(HERE, '../../.env.example');
  */
 const NOT_OURS = new Set([
   // Set by the operating system or the host, never by a user configuring this server.
-  'HOME', 'USERPROFILE', 'APPDATA', 'PATH', 'NODE_ENV', 'NODE_EXTRA_CA_CERTS',
+  // `Path` and `PATHEXT` are Windows' own: `Path` is the casing Windows uses for `PATH`, and
+  // `PATHEXT` is how it decides what counts as executable — both are read when locating `npm`
+  // for the FLUENT check (ARC-07-S03), and documenting either in `.env.example` would invite a
+  // reader to set an operating-system variable in a project file.
+  'HOME', 'USERPROFILE', 'APPDATA', 'PATH', 'Path', 'PATHEXT', 'NODE_ENV', 'NODE_EXTRA_CA_CERTS',
   // Set by Claude Code for a project-scoped server.
   'CLAUDE_PROJECT_DIR',
   // Standard proxy variables. Documented in .env.example's prose (they are not `KEY=` lines
