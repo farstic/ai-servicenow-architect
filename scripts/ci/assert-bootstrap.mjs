@@ -215,10 +215,18 @@ if (secondLog && existsSync(secondLog)) {
 
 // ── the job summary row ──────────────────────────────────────────────────────────────────────
 if (argv.includes('--summary') && process.env.GITHUB_STEP_SUMMARY) {
+  // `—` in the no-node cells is honest rather than missing: the launchers record `durationMs: 0`
+  // (bash has no millisecond clock worth the name), and the seconds they DO measure go into the
+  // step line they print. Filling this column there would mean the launcher recording a number it
+  // does not have.
   const b02Seconds = state?.steps?.B02?.durationMs ? (state.steps.B02.durationMs / 1000).toFixed(1) : '—';
   let mb = '—';
   try {
-    // `du` is not on Windows; the directory walk is the portable answer and this is one directory.
+    // The SUM OF FILE SIZES, and the column says so, because it is not the same quantity as the
+    // `du -sm` figure `docs-real.yml` reports and `docs/INSTALL.md` quotes: `du` counts allocated
+    // blocks, which on these runners is ~3% more (174 here against the page's 179 on POSIX). `du`
+    // is also absent on Windows, so a walk is the only portable answer — a table whose column
+    // silently meant two things on three platforms would be worse than one that says which.
     mb = String(Math.round(directorySize(vendor) / (1024 * 1024)));
   } catch { /* the corpus assertion has already reported its absence */ }
   // Header and row together: `$GITHUB_STEP_SUMMARY` is per-CELL, so a header written once
@@ -227,7 +235,8 @@ if (argv.includes('--summary') && process.env.GITHUB_STEP_SUMMARY) {
   // reader comparing the two should not have to translate.
   const row = `| ${process.platform} | ${variant} | ${writer} | ${b02Seconds} | ${mb} |`;
   appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-    ['| OS | variant | writer | B02 seconds | corpus MB |', '|---|---|---|---|---|', row, ''].join('\n'));
+    ['| OS | variant | writer | B02 seconds | corpus MB (file bytes) |', '|---|---|---|---|---|',
+      row, ''].join('\n'));
   // ...and to stdout, because the summary page is per RUN and a person reading ONE cell's log
   // should see that cell's numbers without leaving it.
   notes.push(`summary row ${row}`);
