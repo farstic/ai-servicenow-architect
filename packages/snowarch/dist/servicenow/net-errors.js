@@ -48,6 +48,19 @@ export function maskProxyUrl(raw) {
     }
 }
 /** Walk `cause` to the deepest system code. undici nests the real reason two levels down. */
+/** A request that was aborted — by our own deadline, or by a caller's signal. */
+function isAbort(err) {
+    const seen = new Set();
+    let node = err;
+    while (node && typeof node === 'object' && !seen.has(node)) {
+        seen.add(node);
+        const name = node.name;
+        if (name === 'TimeoutError' || name === 'AbortError')
+            return true;
+        node = node.cause;
+    }
+    return false;
+}
 function deepestCode(err) {
     let current = err;
     let found = null;
@@ -113,7 +126,13 @@ export function classifyNetworkError(err, env = process.env) {
                     + 'instance is awake',
             };
     }
-    if (cause && TIMEOUT.has(cause)) {
+    // An ABORTED request is a timeout too, and it carries no `code` at all: `AbortSignal.timeout`
+    // rejects with a `TimeoutError` DOMException, so `deepestCode` finds nothing and the request
+    // would have been classified `NETWORK_ERROR` — "run the doctor" — for the one failure whose
+    // remedy is the most specific of the six. Added by ARC-07-S02, whose probe sets its own
+    // deadline; every other caller that passes a signal gets it as well.
+    const aborted = isAbort(err);
+    if (aborted || (cause && TIMEOUT.has(cause))) {
         return proxy
             ? {
                 code: 'PROXY_UNREACHABLE',

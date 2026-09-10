@@ -106,6 +106,31 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 > `TLS_CERT_INVALID` — are registered with `showInRule: false` and already have their meanings and
 > remedies in `docs/TROUBLESHOOTING.md`; render them, do not restate them.
 
+> **Amendment 2026-09-10 (ARC-07-S02, from the tree).** Three corrections, all of the same kind
+> as the `PROXY_CONNECT_FAILED` one above — the registry and the classifier are the source of
+> truth and the story text defers to them.
+> **(1) `NETWORK_TIMEOUT` is not a registry key; the condition is `CONNECTION_TIMEOUT`** (that is
+> what `classifyNetworkError` emits and what `ERROR_CODES` carries), so a timeout is reported and
+> documented under that name.
+> **(2) `PROXY_AUTH_REQUIRED` did not exist** — 407 is a RESPONSE, so the network classifier never
+> sees it. This story registers it (`showInRule: false`, `httpStatus: 407`) and `probeReachability`
+> maps 407 whether it arrives as a response or as a throw.
+> **(3) `ENV_REQUIRED` was likewise unregistered** and is added with the story's message.
+> Two more notes for whoever reads this next. The registry now also carries `<host>`, `<proxy>` and
+> `<issuer>` placeholders in the six network remedies: the wizard substitutes them, and
+> `docs/TROUBLESHOOTING.md` prints the template, which is the same one table ARC-05-S06 requires.
+> And an ABORTED request — our own 10 s deadline, which arrives as a `TimeoutError` carrying no
+> `code` at all — was falling through to `NETWORK_ERROR` ("run the doctor") for the one failure
+> whose remedy is the most specific of the six; `classifyNetworkError` recognises it now, which
+> every caller that passes a signal gets as well.
+>
+> **Task 4 (integration into the `instance add` / `instance test` step order) belongs to S05/S06**,
+> which is where those commands exist. This story ships the functions and proves AC 3, AC 5 and
+> AC 6 at FUNCTION level — `resolveEnvironment` (the `--yes` + non-PDI + no `--env` → `ENV_REQUIRED`
+> result the command maps to exit 2, and the interactive path), `describeNetworkEnv` (one line per
+> call; "once per run" is the command's) and `reachabilityMenu` (three options, no "continue
+> anyway", `abort` saving nothing). S05/S06 re-prove all three end to end.
+
 **As** an individual practitioner **I want** the wizard to accept my instance address in any reasonable form, correct what can be corrected with my consent, refuse what cannot, and — when the host is unreachable — tell me *which* of DNS, a TLS-intercepting gateway or a proxy is in the way and what to set **so that** a corporate laptop is not stuck at "unreachable".
 
 **Context.** P-23 (the `/api` auto-fix at `setup.ts:441-449,597-608` builds `https://host/api` and saves it as the base URL, which then breaks every REST path; "continue anyway" at 437–439). `01` §6.2 step 5: "validated as a bare `https://` origin — vanity hostnames allowed, trailing slash stripped, `/api` rejected with the reason"; step 7: "10 s HEAD reachability first, with DNS / TLS / proxy diagnosis". D-05: "`^https://dev\d+\.service-now\.com` → proposed `pdi`; everything else is asked, never guessed". R-3 (`02` post-decision rulings; `03` R-15): "the ARC-07 wizard reachability probe distinguishes DNS / TLS-CA / proxy failures and prints the exact remedy"; the server's HTTP layer honours `HTTPS_PROXY` / `NO_PROXY` / `NODE_EXTRA_CA_CERTS` per ARC-04-S11 (`src/servicenow/http.ts` `snFetch()` with an `EnvHttpProxyAgent`; `src/servicenow/net-errors.ts` `classifyNetworkError()`) — this story consumes both, it adds neither a proxy agent nor a second error classifier.

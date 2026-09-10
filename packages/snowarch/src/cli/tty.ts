@@ -267,11 +267,21 @@ export async function promptLine(text: string, {
 
 export interface Choice { key: string; text: string }
 
-/** A numbered list. Enter takes the default; anything else repeats rather than guessing. */
+/**
+ * A numbered list, in one of two modes.
+ *
+ * WITH a default (`fallback`, or the first choice), Enter accepts it — the common path costs one
+ * keystroke. WITH `required: true` there is NO default and Enter repeats the question, which is
+ * what ARC-07-S02's environment question needs: `pdi` is right often enough to be a tempting
+ * default and wrong in exactly the case that matters, because the environment decides which
+ * preset a write is checked against. A second prompt function would be a second set of key
+ * handling; this is one flag.
+ */
 export async function promptChoice(text: string, choices: readonly Choice[], {
   io = defaultIo(),
   fallback,
-}: Partial<{ io: Io; fallback: string }> = {}): Promise<string> {
+  required = false,
+}: Partial<{ io: Io; fallback: string; required: boolean }> = {}): Promise<string> {
   if (choices.length === 0) throw new Error('promptChoice needs at least one choice');
   const defaultKey = fallback ?? choices[0].key;
   const defaultIndex = choices.findIndex((c) => c.key === defaultKey) + 1;
@@ -279,15 +289,18 @@ export async function promptChoice(text: string, choices: readonly Choice[], {
   for (const [i, choice] of choices.entries()) {
     io.stdout.write(`  ${i + 1}  ${choice.key}  ${choice.text}\n`);
   }
+  const inRange = (value: string) => {
+    const n = Number(value);
+    return Number.isInteger(n) && n >= 1 && n <= choices.length;
+  };
   return promptLine('choice', {
     io,
-    fallback: String(defaultIndex),
-    validate: (value) => {
-      const n = Number(value);
-      return Number.isInteger(n) && n >= 1 && n <= choices.length
-        ? null
-        : `enter a number between 1 and ${choices.length}`;
-    },
+    ...(required ? {} : { fallback: String(defaultIndex) }),
+    validate: (value) => (inRange(value)
+      ? null
+      // An empty answer in required mode is not an error to scold — the question simply has not
+      // been answered — so the message names the range rather than the mistake.
+      : `enter a number between 1 and ${choices.length}`),
   }).then((value) => choices[Number(value) - 1].key);
 }
 
