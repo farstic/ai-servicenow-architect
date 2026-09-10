@@ -7,7 +7,6 @@
 // wording: a wording nobody has seen degrades to a WARN that says so.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { chmodSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 
@@ -27,6 +26,14 @@ const REJECTED = '✘ Rejected (see disabledMcpjsonServers in settings)';
 const PENDING = '⏸ Pending approval (run `claude` to approve)';
 const CONNECTED = '✔ Connected';
 
+/** The transcript a real `claude mcp get` prints, in the S-01 record's exact shape. */
+function transcript(statusLine, scope = 'Project config (shared via .mcp.json)') {
+  const word = /^local/i.test(scope) ? 'local' : 'project';
+  return ['servicenow:', `  Scope: ${scope}`, `  Status: ${statusLine}`, '  Type: stdio',
+    '  Command: node', '', `To remove this server, run: claude mcp remove servicenow -s ${word}`]
+    .join('\n');
+}
+
 /** A fake `claude` on PATH: the POSIX script and its `.cmd` twin, as a Windows install would have. */
 function fakeClaude(t, statusLine, { scope = 'Project config (shared via .mcp.json)' } = {}) {
   const dir = tempDir('snowarch-bin-', t);
@@ -44,44 +51,47 @@ function fakeClaude(t, statusLine, { scope = 'Project config (shared via .mcp.js
 }
 
 /**
- * A context whose PATH holds the fake, with the mode the case is about recorded in the state.
+ * The context for one E-27 case: the recorded mode, and the transcript the CLI would print.
  *
- * Two twins, because `which` resolves by extension on Windows and by the execute bit everywhere
- * else — and the one Windows finds is a `.cmd`, which Node refuses to spawn without a shell since
- * the 2024 argument-injection mitigation. That refusal is Node's, not this product's, so the
- * Windows arm passes the shell-using runner through the `exec` seam the check already has rather
- * than asserting a spawn behaviour nobody here owns.
+ * The transcript is returned through the `exec` seam rather than by executing a script, on EVERY
+ * platform. What this story owns is the RULE — which mode, against which status, produces which
+ * verdict — and driving it through a shell makes that rule's coverage depend on cmd.exe's echo
+ * semantics and its code page. The execution path itself belongs to `registration-claude.mjs`,
+ * which has its own tests, and one POSIX case below still runs the real script end to end.
  */
 function withClaude(t, { statusLine, mode = 'design', scope } = {}) {
   const root = greenTree(t, { mode });
-  const dir = fakeClaude(t, statusLine, scope ? { scope } : {});
-  // PREPENDED, not replaced: the fake shells out to `cat`, and a PATH holding only the fixture
-  // has no `cat` — the script then fails with 127 and the test proves the error path instead of
-  // the case it is about. First on PATH is what makes the fake win.
-  const PATH = `${dir}${delimiter}${process.env.PATH ?? ''}`;
-  const windows = process.platform === 'win32';
-  const over = {
-    env: { ...process.env, PATH },
-    claudePath: join(dir, windows ? 'claude.cmd' : 'claude'),
-    ...(windows
-      ? { exec: (file, args, options) => spawnSync(`"${file}"`, args,
-        { encoding: 'utf8', shell: true, ...options }) }
-      : {}),
-  };
-  return { root, over };
+  const out = transcript(statusLine, scope);
+  return { root, over: { env: {}, claudePath: '/fixture/claude',
+    exec: () => ({ status: 0, stdout: out, stderr: '' }) } };
 }
 
 test('the fake is what a PATH lookup would find on either platform', (t) => {
   const dir = fakeClaude(t, REJECTED);
-  // Case-insensitively: `PATHEXT` is upper-case by default, Windows paths are case-insensitive,
-  // and the resolver returns the candidate it built rather than the name on disk.
-  assert.equal(String(which('claude', { env: { PATH: dir }, platform: 'win32' })).toLowerCase(),
-    join(dir, 'claude.cmd').toLowerCase());
+  // `PATHEXT` is given rather than defaulted: the default list is upper-case, and a case-sensitive
+  // filesystem — every Linux cell — has no `claude.CMD`. What is being proved is that a Windows
+  // lookup finds the twin, not that a Linux disk is case-insensitive.
+  assert.equal(which('claude', { env: { PATH: dir, PATHEXT: '.cmd' }, platform: 'win32' }),
+    join(dir, 'claude.cmd'));
   if (process.platform !== 'win32') {
     assert.equal(which('claude', { env: { PATH: dir }, platform: process.platform }),
       join(dir, 'claude'));
   }
 });
+
+test('E-27 reads a real `claude` process end to end (POSIX)',
+  { skip: process.platform === 'win32' && 'the .cmd twin is covered by the PATH lookup above' },
+  async (t) => {
+    const root = greenTree(t, { mode: 'design' });
+    const dir = fakeClaude(t, REJECTED);
+    // PREPENDED, not replaced: the fake shells out to `cat`, and a PATH holding only the fixture
+    // has no `cat` — the script would then fail with 127 and the test would prove the error path.
+    const PATH = `${dir}${delimiter}${process.env.PATH ?? ''}`;
+    const r = await run('E-27', root, { env: { ...process.env, PATH } });
+    assert.equal(r.status, 'ok');
+    assert.match(r.data.statusLine, /Rejected/);
+    assert.equal(r.data.approved, false);
+  });
 
 // E-25 reads ONE thing — the path — so its cases are paths. A checkout is not built for them: a
 // directory that does not exist is exactly what a user's synced folder looks like to this check.
