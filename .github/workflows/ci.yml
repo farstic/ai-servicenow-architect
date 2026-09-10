@@ -428,7 +428,24 @@ jobs:
       - name: PSScriptAnalyzer (5.1 compatibility)
         shell: powershell
         run: |
-          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck
+          # PSGallery answered "No match was found for the specified search criteria" once
+          # (run 34424021998) after working on every run before it — a registration hiccup on the
+          # runner, not a finding. Registered explicitly and retried once, because a linter whose
+          # INSTALL is flaky makes every green run of this job slightly less believable.
+          $ErrorActionPreference = 'Continue'
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+            Register-PSRepository -Default
+          }
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck -Repository PSGallery
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Start-Sleep -Seconds 10
+            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck -Repository PSGallery
+          }
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Write-Host 'PSScriptAnalyzer could not be installed from PSGallery'
+            exit 1
+          }
+          $ErrorActionPreference = 'Stop'
           # Write-Host is excluded, and only that: a launcher's banner IS console text, and
           # Write-Output would put it in the pipeline for a caller that captures the run.
           $r = Invoke-ScriptAnalyzer -Path .\bootstrap.ps1 -Severity Error,Warning `

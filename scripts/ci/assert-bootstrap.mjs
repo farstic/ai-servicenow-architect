@@ -227,11 +227,15 @@ if (secondLog && existsSync(secondLog)) {
 
 // ── the job summary row ──────────────────────────────────────────────────────────────────────
 if (argv.includes('--summary') && process.env.GITHUB_STEP_SUMMARY) {
-  // `—` in the no-node cells is honest rather than missing: the launchers record `durationMs: 0`
-  // (bash has no millisecond clock worth the name), and the seconds they DO measure go into the
-  // step line they print. Filling this column there would mean the launcher recording a number it
-  // does not have.
-  const b02Seconds = state?.steps?.B02?.durationMs ? (state.steps.B02.durationMs / 1000).toFixed(1) : '—';
+  // THE FIRST RUN's B02, which is the install — not the state's, which after two runs means two
+  // different things by variant: a node-cli cell cached the step so its entry still holds the
+  // install, while a no-node cell re-ran it and its entry now holds the ~2-second reconcile. A
+  // column that meant "how long the corpus took" on three cells and "how long it took to notice
+  // the corpus was already there" on three others would be worse than no column.
+  const first = firstState && existsSync(firstState)
+    ? JSON.parse(readFileSync(firstState, 'utf8')) : null;
+  const ms = first?.steps?.B02?.durationMs ?? state?.steps?.B02?.durationMs;
+  const b02Seconds = ms ? (ms / 1000).toFixed(1) : '—';
   let mb = '—';
   try {
     // The SUM OF FILE SIZES, and the column says so, because it is not the same quantity as the
