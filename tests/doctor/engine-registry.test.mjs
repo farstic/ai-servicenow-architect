@@ -18,24 +18,28 @@ import { REAL_ROOT } from './helpers/tree.mjs';
 const checks = engineChecks();
 const ids = checks.map((c) => c.id);
 
-test('E-00 … E-22, once each, in section order', () => {
-  assert.equal(checks.length, 23);
-  assert.deepEqual(ids, Array.from({ length: 23 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
+test('E-00 … E-27, once each, in section order', () => {
+  assert.equal(checks.length, 28);
+  assert.deepEqual(ids, Array.from({ length: 28 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
   assert.equal(new Set(ids).size, ids.length);
   const order = engineRegistry().all().map((c) => c.section);
-  assert.deepEqual([...new Set(order)], ['prereqs', 'repo', 'docs', 'roster', 'contract']);
+  assert.deepEqual([...new Set(order)],
+    ['prereqs', 'repo', 'docs', 'roster', 'contract', 'legacy', 'host']);
   for (const s of new Set(order)) assert.ok(SECTIONS.includes(s));
 });
 
-// AC 8 — the subset, read from the flags.
-test('--quick is E-01, E-02, E-05…E-15, E-17…E-20 and E-22', () => {
+// S02's AC 8, extended by S03's detectors — the subset, still read from the flags.
+test('--quick is E-01, E-02, E-05…E-15, E-17…E-20, E-22 and the four quick detectors', () => {
   const { selected } = planRun(checks, { quick: true });
   assert.deepEqual(selected.map((c) => c.id), [
     'E-01', 'E-02',
     'E-05', 'E-06', 'E-07', 'E-08', 'E-09', 'E-10', 'E-11',
     'E-12', 'E-13', 'E-14', 'E-15',
     'E-17', 'E-18', 'E-19', 'E-20', 'E-22',
+    'E-23', 'E-24', 'E-25', 'E-26',
   ]);
+  // AC 8 of S03: `claude mcp get` is a process, so `--quick` never reaches it.
+  assert.equal(selected.some((c) => c.id === 'E-27'), false);
 });
 
 test('the four checks --quick leaves out say why in their own flags', () => {
@@ -61,8 +65,19 @@ test('--section selects exactly one section\'s checks', () => {
   assert.deepEqual(selected.map((c) => c.id), ['E-19', 'E-20', 'E-21', 'E-22']);
 });
 
-test('severity is fail everywhere except the capability packs, which are information', () => {
-  assert.deepEqual(checks.filter((c) => c.severity !== 'fail').map((c) => c.id), ['E-04']);
+test('the detectors warn and the capability packs inform — only the engine\'s own state fails', () => {
+  // A leftover, a synced folder, a proxy variable and an approval are things the USER chose. The
+  // doctor names them and prints the command; failing a run over one would be this tool deciding
+  // something that is theirs to decide.
+  assert.deepEqual(checks.filter((c) => c.severity === 'warn').map((c) => c.id),
+    ['E-23', 'E-24', 'E-25', 'E-26', 'E-27']);
+  assert.deepEqual(checks.filter((c) => c.severity === 'info').map((c) => c.id), ['E-04']);
+});
+
+test('nothing in the legacy or host sections offers itself to --fix', () => {
+  for (const c of checks.filter((x) => ['legacy', 'host'].includes(x.section))) {
+    assert.equal(c.fixable, false, `${c.id} is fixable — S03 removes nothing, not even under --fix`);
+  }
 });
 
 /**
@@ -75,7 +90,7 @@ const cli = (args) => spawnSync(process.execPath,
   [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', ...args],
   { cwd: REAL_ROOT, encoding: 'utf8' });
 
-test('--json reports all twenty-three ids with a status each', () => {
+test('--json reports all twenty-eight ids with a status each', () => {
   const r = cli(['--json', '--quick']);
   const report = JSON.parse(r.stdout);
   assert.deepEqual(report.checks.map((x) => x.id), ids);

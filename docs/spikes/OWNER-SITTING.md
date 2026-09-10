@@ -655,6 +655,39 @@ real install.
 
 ---
 
+## D2. ARC-08-S03 — the leftover detectors on a machine that HAS leftovers
+
+*Ten minutes. This one needs your machine specifically: it is the only one with real stale
+registrations from the previous install, and its output is the input to ARC-10's migration
+document.*
+
+Everything about these five detectors is proved against fixtures in CI. What a fixture cannot
+produce is a real `~/.claude.json` written by the old installers over two years, and a real
+`claude mcp get` on a real Claude Code.
+
+```sh
+cd ~/snowarch-ref                     # or any checkout of this branch
+./snowarch doctor --section legacy,host
+./snowarch doctor --section legacy --json > /tmp/doctor-legacy.json
+shasum -a 256 ~/.claude.json          # before and after — they must match
+./snowarch doctor --section legacy --fix >/dev/null; shasum -a 256 ~/.claude.json
+```
+
+1. Paste the whole `legacy` and `host` block. It is redacted by the runner — no value, only key
+   counts and `set (len n)` — but read it before pasting anyway.
+2. Are the two `shasum` lines identical? (If not, stop and say so: the detector must never write.)
+3. Does E-27's line match what `claude mcp get servicenow` prints for you?
+4. On Windows, the same three commands (`snowarch.cmd doctor …`).
+
+> *(lands in `docs/plans/ARC-08-doctor-and-self-heal/README.md`, and the paste is ARC-10-S01's
+> migration-step input)*
+
+**Why it matters, in one line:** the removal commands this prints are the ones the migration
+document will tell every existing user to run, and nobody has yet seen them printed against a real
+two-year-old `~/.claude.json`.
+
+---
+
 ## Cleanup (please run this — it leaves no residue on your machine)
 
 ```sh

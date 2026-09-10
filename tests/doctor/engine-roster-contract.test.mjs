@@ -166,15 +166,62 @@ test('E-21 does not claim a fixture tree is its own checkout', async (t) => {
   const root = lintTree(t);
   const ctx = contextFor(root);
   const r = await runById(contract, 'E-21', ctx);
-  // The fixture has no generated files, so the generators that CAN take a --root report it. What
-  // must not happen is the other four answering about THIS repository from inside a fixture run:
-  // they are skipped, out loud, and their pass never reaches the fixture's report.
-  assert.equal(r.status, 'fail');
+  // A bare fixture tree has no inputs for the generators that take a `--root`, so they exit 2 —
+  // their own "cannot run" — and the four that take none are skipped. Nothing was compared, so the
+  // honest answer is `skip` with the reason, NOT a pass and not a stale file. What must not happen
+  // either way is those four answering about THIS repository from inside a fixture run.
+  assert.equal(r.status, 'skip');
   assert.notEqual(SELF_ROOT, root);
   const notes = ctx._lint.ctx.skipNotes.join(' ');
   for (const id of ['gen-modes', 'gen-doctor-docs', 'gen-retired-names', 'gen-readme-tables']) {
     assert.match(notes, new RegExp(`${id} takes no --root`));
   }
+});
+
+/**
+ * A generator that dies, planted — because the real ones do not, and the arm that matters is the
+ * one nobody can reproduce on demand. `gen-readme-tables` really did crash on every fresh clone
+ * (fixed in this branch's first commit), and E-21 called it "the README differs from generator
+ * output". These two tests are what stop that from coming back.
+ */
+function plantedGenerator(t, body) {
+  const root = lintTree(t);
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  writeFileSync(join(root, 'scripts/gen-boom.mjs'), body);
+  return { root, generators: [{ id: 'gen-boom', script: 'scripts/gen-boom.mjs',
+    supportsRoot: true, targets: ['docs/BOOM.md'] }] };
+}
+
+test('E-21 reports a generator that crashed as could-not-run, never as a stale file', async (t) => {
+  const { root, generators } = plantedGenerator(t,
+    "throw new TypeError('the generator is broken');\n");
+  const ctx = contextFor(root, { generators });
+  const r = await runById(contract, 'E-21', ctx);
+  assert.equal(r.status, 'fail');
+  assert.match(r.detail, /generator could not run: TypeError: the generator is broken/);
+  assert.equal(/differs/.test(r.detail), false, 'a crash was reported as a difference');
+});
+
+test('E-21 skips when the crash is a missing dependency — a design-only install has none by design', async (t) => {
+  const { root, generators } = plantedGenerator(t,
+    "import 'a-package-that-is-not-installed';\n");
+  const ctx = contextFor(root, { generators });
+  const r = await runById(contract, 'E-21', ctx);
+  assert.equal(r.status, 'skip');
+  assert.match(r.detail, /gen-boom could not run here/);
+  assert.match(r.detail, /ERR_MODULE_NOT_FOUND|Cannot find package/);
+  assert.equal(r.data.ran, false);
+});
+
+test('E-21 still reports a real stale target as a difference', async (t) => {
+  const { root, generators } = plantedGenerator(t,
+    "process.stdout.write('--- a/docs/BOOM.md\\n+++ b/docs/BOOM.md\\n-old\\n+new\\n');\n"
+    + "process.exit(1);\n");
+  const ctx = contextFor(root, { generators });
+  const r = await runById(contract, 'E-21', ctx);
+  assert.equal(r.status, 'fail');
+  assert.match(r.detail, /docs\/BOOM\.md:1 differs from generator output \(gen-boom\)/);
+  assert.match(r.detail, /first change: -old/);
 });
 
 test('E-22 reports the pinned sha and the two counts', async () => {

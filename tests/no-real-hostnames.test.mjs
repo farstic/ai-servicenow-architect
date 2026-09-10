@@ -30,25 +30,49 @@ function treeHosts() {
 function localSources() {
   const home = homedir();
   const files = [];
-  const memDir = join(home, '.claude/projects/-Users-cvetomirgrigorov-work-AI-Architect-Claude/memory');
-  if (existsSync(memDir)) {
-    const walk = (d) => { for (const e of readdirSync(d)) {
-      const p = join(d, e);
-      if (statSync(p).isDirectory()) walk(p); else files.push(p);
-    } };
-    walk(memDir);
+  // EVERY project's memory directory, discovered — not one path with a person's home directory
+  // spelled into it. Claude Code names these directories after the absolute project path, so the
+  // old literal carried the author's own name in a committed file, which is the very shape of
+  // thing this test exists to keep out of the tree. Discovering them also widens the source of
+  // real fragments from one project to all of them.
+  const projects = join(home, '.claude', 'projects');
+  const walk = (d) => { for (const e of readdirSync(d)) {
+    const p = join(d, e);
+    if (statSync(p).isDirectory()) walk(p); else files.push(p);
+  } };
+  if (existsSync(projects)) {
+    for (const entry of readdirSync(projects)) {
+      const memDir = join(projects, entry, 'memory');
+      if (existsSync(memDir)) walk(memDir);
+    }
   }
   const globalMd = join(home, '.claude/CLAUDE.md');
   if (existsSync(globalMd)) files.push(globalMd);
   return files;
 }
 
+/**
+ * Host prefixes that are documentation by definition, and so are never evidence of a real instance.
+ *
+ * Widening the source from one project's memory directory to every project's (which is what
+ * removed a person's home-directory name from this file) also widened what counts as "real": a
+ * note in an unrelated project that says `test.service-now.com` is not a maintainer's instance,
+ * and it made this test fail against the tree's own placeholder. Only English words that cannot be
+ * an instance name are listed — every `devNNNNN` and every company-looking name stays checkable,
+ * because those are the shapes a real instance actually has.
+ */
+const GENERIC_HOSTS = new Set(['test', 'example', 'instance', 'myinstance', 'your-instance',
+  'dummy', 'placeholder', 'sample']);
+
 function realFragments(files) {
   const set = new Set();
   for (const f of files) {
     let t;
     try { t = readFileSync(f, 'utf8'); } catch { continue; }
-    for (const m of t.matchAll(HOST)) set.add(m[1].toLowerCase());
+    for (const m of t.matchAll(HOST)) {
+      const host = m[1].toLowerCase();
+      if (!GENERIC_HOSTS.has(host)) set.add(host);
+    }
   }
   return set;
 }

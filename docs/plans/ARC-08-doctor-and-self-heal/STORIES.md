@@ -208,6 +208,23 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S03 — Stale-registration, legacy-store, cloud-sync, proxy/CA and registration-status detectors (E-23…E-27) with exact commands
+
+> **Amendment 2026-09-10 (from the delivery).** Five departures, each because the tree said
+> otherwise. (1) The stale NAMES live in `tools/snowarch/lib/doctor/checks/stale-registrations.json`
+> rather than in `retired-names.json`: only one of the two is retired there, and the other is a
+> public repository identifier the provenance record names on purpose. That one path is listed in
+> the lint's `POLICY_FILES` and in `tests/no-legacy-names.test.mjs`, on the existing "being the list
+> is what the file is for" ground. (2) E-24's command is a literal in the check with a test
+> asserting it appears verbatim in `docs/snippets/import-from-legacy.md` — the L07 idiom of several
+> declarations that must agree — rather than a runtime read of a document that may not sit beside
+> the code. (3) ARC-06-S12's rule "nothing under `lib/` opens `~/.claude.json`" gains its one argued
+> exception: E-23 is a detector, and a detector that may not read what it detects cannot exist. The
+> ownership half of that rule is asserted MORE strictly for it — no write verb anywhere in the file.
+> (4) E-27 treats `⏸ Pending approval` in design-only as a WARN, not only `not rejected`: the S-01
+> record found `enabledMcpjsonServers` is not honoured before trust, so pending in design-only means
+> the disable toggle is not in force. (5) The recorded mode is `design`/`live` (`state.mjs`), not the
+> `design-only` this story's text quotes; anything that is not `live` is read as design-only.
+
 **As** an individual practitioner migrating from the old install **I want** the doctor to find every leftover of the previous setup — stale `~/.claude.json` registrations that still hold plaintext secrets, the legacy wizard store, a checkout under a cloud-sync folder, proxy/CA variables that are set wrongly, and a Claude Code registration status that contradicts the recorded mode — and to print the exact command for each **so that** nothing with a credential in it is forgotten and the doctor never edits a file it does not own.
 **Context.** README deliverables "stale `~/.claude.json` entries for this folder … → prints `claude mcp remove <name> -s local` and the `.bak-*` reminder; legacy `~/.config/servicenow-mcp/` present → prints `./snowarch instance import --from-legacy`" and acceptance criterion 6 (a copied `~/.claude.json` fixture with stale `servicenow-mcp` and `nowaikit` entries produces the exact removal commands). `00` P-34 (six credential copies; `.bak-*` retain secrets), §5 (local scope keyed on the absolute path), `scripts/doctor.sh:405-466` (the read-only inspection this story ports to Node, minus the username print). `03` R-07. D-04 (WARN under OneDrive/Dropbox/iCloud/Google Drive — obligation shared by wizard and doctor). R-3 (doctor check for proxy and CA). ARC-04-S02 (`isUnderCloudSyncFolder`), ARC-04-S11 (`classifyNetworkError` codes and `NODE_EXTRA_CA_CERTS` semantics), ARC-10-S01 (`docs/MIGRATION.md` reuses these commands).
 **Scope.** In: `tools/snowarch/lib/doctor/checks/legacy.mjs` (E-23, E-24), `host.mjs` (E-25, E-26, E-27), the `stale` block of the JSON, fixtures. Out: performing any removal (never; not even under `--fix`), the network probe itself (SV-04 in S04 surfaces the classifier result), `import --from-legacy` (ARC-07-S08), the toggle writer (ARC-06-S05 / F6 in S06).

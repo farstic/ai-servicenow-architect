@@ -20,7 +20,7 @@ import { meetsFloor } from '../versions.mjs';
 import { childEnv } from '../spawn-env.mjs';
 
 import { SECTIONS } from './registry.mjs';
-import { engineRegistry } from './checks/index.mjs';
+import { engineRegistry, staleBlock } from './checks/index.mjs';
 import { collectPrereqs } from './prereqs.mjs';
 import { buildReport } from './report-json.mjs';
 import { renderText, useColour } from './report-text.mjs';
@@ -162,6 +162,11 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     root,
     durationMs: now() - started,
     prereqs: collectPrereqs({ root, config, env }),
+    // Filled by ARC-08-S03's detectors, from their own results — `null` until one of them ran, so
+    // a `--section contract` run does not claim there are no leftovers.
+    stale: results.some((r) => ['E-23', 'E-24'].includes(r.id) && r.status !== 'skip')
+      ? staleBlock(results)
+      : null,
   });
 
   if (flags.json) {

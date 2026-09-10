@@ -975,6 +975,11 @@ about one registry rather than several:
 | `E-20` | contract | prefix consistency | yes | — |
 | `E-21` | contract | generated files fresh | — | — |
 | `E-22` | contract | contract pin | yes | — |
+| `E-23` | legacy | stale MCP registrations in ~/.claude.json | yes | — |
+| `E-24` | legacy | legacy wizard store | yes | — |
+| `E-25` | host | cloud-sync folder | yes | — |
+| `E-26` | host | proxy and CA environment | yes | — |
+| `E-27` | host | Claude Code registration status | — | — |
 <!-- /generated:doctor-checks -->
 
 **The report, as a person reads it** — statuses are `ok`, `warn`, `FAIL`, `skip` (upper-case so

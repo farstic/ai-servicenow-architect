@@ -85,6 +85,23 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 - **No real person's name or address anywhere in the repository, not even as a masking example.**
   Every `maskUsername` example, fixture username and story-text address is now the neutral
   `someone@corp.example.com` form.
+- **The doctor finds what the old install left behind, and never touches it.** Five detectors:
+  stale `~/.claude.json` registrations for this folder — with the exact `claude mcp remove <name>
+  -s local` for each, an `also registered under` line for every other project, and the reminder
+  that the `.bak-*` files retain the same secrets; the legacy wizard store under `~/.config`, with
+  the import command; a checkout inside a cloud-synced folder, named by provider; proxy and CA
+  variables, masked, with the certificate file actually opened to see whether it is one; and the
+  Claude Code registration status compared with the recorded mode. Everything is read-only BY
+  CONSTRUCTION — the two files contain no write verb, a test greps them rather than trusting the
+  sentence, and the fixture's `~/.claude.json` is asserted byte-identical after a run, including
+  under `--fix`. The credential never appears: the report says `set (len 12)`, and the key count
+  beside it.
+- **A generator that could not run is never reported as a stale file.** `gen-readme-tables` used to
+  import the server's built tool tree, which needs `npm ci`, so on a design-only install — where
+  having no dependencies is the design — it crashed and the doctor said the README differed. The
+  generator now reads the contract, and the crash-versus-stale distinction lives in one place that
+  both `gen-all --check` and the doctor's E-21 use: a missing dependency is a skip with the reason,
+  every other crash is a finding, and neither is a difference.
 
 - **A nightly suite that proves the three things a simulation cannot.** `RUN_LIVE_E2E=1` runs the
   real CLI against a real instance: through a **pseudo-terminal**, so the masked prompt is actually

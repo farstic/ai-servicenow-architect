@@ -90,6 +90,10 @@ export const POLICY_FILES = [
   'tests/contract/gen-governance.test.mjs',
   // The policy itself. It has to name the words to state which are retired and which are not.
   'docs/CONTRIBUTING.md',
+  // ARC-08-S03's E-23 data: the registration names the old installers wrote. A detector that
+  // cannot name what it detects cannot detect it, and keeping them in JSON rather than in the
+  // check body is what makes the exemption one file rather than a check.
+  'tools/snowarch/lib/doctor/checks/stale-registrations.json',
 ];
 
 /** True when a file's subject is the retirement policy — exempt from the name checks. */

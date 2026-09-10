@@ -20,7 +20,7 @@ import { prefix } from '../../../../../packages/contract/lib/contract.mjs';
 import { checkContract } from '../../steps/B05.mjs';
 import { defineCheck } from '../registry.mjs';
 
-import { fail, ok } from './result.mjs';
+import { fail, ok, skip } from './result.mjs';
 
 /**
  * This code's own checkout, for `isSelfRoot`.
@@ -38,8 +38,10 @@ export const SELF_ROOT = resolve(dirname(fileURLToPath(import.meta.url)),
 export function lintContextFor(ctx) {
   if (ctx._lint === undefined) {
     try {
-      ctx._lint = { ctx: buildLintContext({ root: ctx.root, selfRoot: ctx.selfRoot ?? SELF_ROOT }),
-        error: null };
+      const built = buildLintContext({ root: ctx.root, selfRoot: ctx.selfRoot ?? SELF_ROOT });
+      // A test plants a generator that crashes; the list has to reach the check that runs it.
+      if (ctx.generators) built.generators = ctx.generators;
+      ctx._lint = { ctx: built, error: null };
     } catch (e) {
       if (!(e instanceof LintInputError)) throw e;
       ctx._lint = { ctx: null, error: e.message };
@@ -140,11 +142,26 @@ export function engineContractChecks() {
       network: false,
       spawns: true,
       fixable: false,
-      run: async (ctx) => runLint(ctx, l06, {
-        remedy: 'maintainer: npm run gen && node scripts/gen-docs-areas.mjs',
-        command: 'npm run gen',
-        describe: () => 'every generated file matches its generator',
-      }),
+      run: async (ctx) => {
+        const result = runLint(ctx, l06, {
+          remedy: 'maintainer: npm run gen && node scripts/gen-docs-areas.mjs',
+          command: 'npm run gen',
+          describe: () => 'every generated file matches its generator',
+        });
+        // A generator that COULD NOT RUN is not a stale file. L06 says which, and a design-only
+        // install — no `npm ci` there by design — is the case that made this necessary: the doctor
+        // reported a crashing generator as "the README differs from generator output", which sent
+        // a reader to regenerate a file that was correct. `skip` with the reason is the honest
+        // answer; every other crash is already a finding, and stays a FAIL.
+        const lint = lintContextFor(ctx).ctx;
+        const notes = (lint?.skipNotes ?? []).filter((n) => n.startsWith('L06:'));
+        if (result.status === 'ok' && notes.length > 0) {
+          return skip(notes[0].replace(/^L06: /, ''), { ran: false, couldNotRun: notes.length });
+        }
+        return notes.length > 0
+          ? { ...result, data: { ...result.data, couldNotRun: notes.length } }
+          : result;
+      },
     }),
 
     defineCheck({
