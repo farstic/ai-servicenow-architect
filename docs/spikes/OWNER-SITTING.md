@@ -39,6 +39,17 @@
 > the story's own risk ("Claude may deviate") was observed, which is why the page prints the exact
 > commands and now names the subfolder variation.
 >
+> **The two network diagnoses that need a real network (ARC-07-S02, 2026-09-10).** Both paths are
+> unit-proven against injected failures; what no injection can prove is that the REAL stack
+> produces the error shape the classifier expects. **(1) `PROXY_UNREACHABLE`** — on the Windows
+> snapshot, `set HTTPS_PROXY=http://127.0.0.1:9` (nothing listens there), run the wizard's probe
+> against any host, and confirm the code is `PROXY_UNREACHABLE`, that the printed proxy is masked
+> (`http://***@…` when the URL carries credentials) and that the remedy names `NO_PROXY`.
+> **(2) `CONNECTION_REFUSED` vs `CONNECTION_TIMEOUT` on a hibernated PDI** — S11 records which of
+> the two a sleeping instance actually produces, and the remedy for both already mentions waking it
+> at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
+> Nothing about a real instance goes into the repository: the record is the CODE and the timing.
+>
 > **S-04, the masked-input matrix (ARC-07-S01, 2026-09-10).** Criterion 6 is eight cells: Windows
 > Terminal and conhost × PowerShell 5.1 and cmd × with and without Git Bash on PATH. In each, run
 > the built CLI's masked prompt, type `abcd`, Backspace, `e`, Enter, and check three things — the

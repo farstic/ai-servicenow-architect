@@ -148,28 +148,28 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "DNS_FAILURE";
     readonly meaning: "The instance host name did not resolve (`ENOTFOUND`, `EAI_AGAIN`).";
-    readonly remedy: "check the spelling first; on a VPN-only instance connect first; on a corporate network set `HTTPS_PROXY`. A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong";
+    readonly remedy: "the name `<host>` does not resolve. Check the instance name; on a corporate network the name may resolve only over VPN or through the proxy (set `HTTPS_PROXY`). A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong";
     readonly showInRule: false;
 }, {
     readonly code: "TLS_CA_UNTRUSTED";
     readonly meaning: "The certificate was not signed by a CA this machine trusts — normal on a network that intercepts TLS.";
-    readonly remedy: "export your organisation root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it";
+    readonly remedy: "the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it";
     readonly command: "export NODE_EXTRA_CA_CERTS=<path to the PEM>";
     readonly showInRule: false;
 }, {
     readonly code: "PROXY_UNREACHABLE";
     readonly meaning: "A proxy variable is set and nothing is listening there, or the connection to it timed out.";
-    readonly remedy: "the message names the proxy with any credentials masked; correct the host and port, or unset the variable if you are not behind a proxy. `NO_PROXY` exempts internal hosts";
+    readonly remedy: "the proxy `<proxy>` (from `HTTPS_PROXY`) did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked";
     readonly showInRule: false;
 }, {
     readonly code: "CONNECTION_REFUSED";
     readonly meaning: "The instance refused the connection and no proxy is configured.";
-    readonly remedy: "check the URL and its port, and whether the instance is awake — a hibernating PDI refuses";
+    readonly remedy: "`<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too";
     readonly showInRule: false;
 }, {
     readonly code: "CONNECTION_TIMEOUT";
     readonly meaning: "The connection timed out with no proxy configured.";
-    readonly remedy: "on a corporate network set `HTTPS_PROXY`; otherwise check connectivity and the firewall";
+    readonly remedy: "no answer from `<host>` in time. If this network needs a proxy, set `HTTPS_PROXY=http://proxy:port` (and `NO_PROXY` for internal hosts) and run again. An idle PDI may be hibernating — wake it at developer.servicenow.com";
     readonly showInRule: false;
 }, {
     readonly code: "NETWORK_ERROR";
@@ -301,6 +301,18 @@ export declare const ERROR_CODES: readonly [{
     readonly code: "UNKNOWN_GATE";
     readonly meaning: "Server defect: a tool declares a gate the evaluator does not know.";
     readonly remedy: "report it; no user action can help";
+    readonly showInRule: false;
+}, {
+    readonly code: "PROXY_AUTH_REQUIRED";
+    readonly meaning: "The proxy answered 407: it wants credentials before it will forward the request.";
+    readonly remedy: "put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials";
+    readonly showInRule: false;
+    readonly httpStatus: 407;
+}, {
+    readonly code: "ENV_REQUIRED";
+    readonly meaning: "The environment could not be proposed and none was given, in a run that cannot ask.";
+    readonly remedy: "pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do";
+    readonly command: "./snowarch instance add <label> --url <url> --env <pdi|dev|test|prod> --yes";
     readonly showInRule: false;
 }, {
     readonly code: "URL_REQUIRED";

@@ -29,6 +29,28 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **"Unreachable" is not a diagnosis — the probe names which of DNS, TLS or a proxy is in the way.**
+  `normalizeInstanceUrl` accepts an address in any reasonable form and REFUSES what it cannot fix
+  with the reason: `/api` gets its own sentence (P-23's wizard silently turned that into a base URL
+  and every REST path afterwards was `/api/api/now/table/…`), a URL carrying credentials is refused
+  outright and never echoed back, a bare word is PROPOSED rather than assumed, and a trailing slash
+  is removed with a note. The environment is proposed only for a real PDI: `dev12345.service-now
+  .com.evil.example` contains the pattern and belongs to somebody else, so the regex is anchored at
+  both ends — and with `--yes` on a non-PDI host, `ENV_REQUIRED` refuses rather than defaulting,
+  because the environment decides which preset a write is checked against. `probeReachability`
+  sends one `HEAD` through the existing HTTP layer — no new call site, so the proxy agent and
+  `NODE_EXTRA_CA_CERTS` apply — and any status but 407 counts as reached, a login redirect
+  included. The six failures are classified by the layer that already knows how, and the REMEDY
+  comes from the one error registry with `<host>`, the masked proxy and the certificate issuer
+  substituted in; `docs/TROUBLESHOOTING.md` prints the same template. The `network:` line is
+  printed whether the probe succeeds or not, because "it worked" and "it worked through a proxy
+  with a corporate CA" are different facts and only one explains why the same command fails for a
+  colleague. **No "continue anyway"**: P-23's wizard offered it, and an instance saved that way
+  failed later inside a tool call with no memory of this moment.
+- **A timeout of our own making was being reported as "run the doctor".** `AbortSignal.timeout`
+  rejects with a `TimeoutError` that carries no `code`, so the classifier fell through to
+  `NETWORK_ERROR` for the one failure whose remedy is the most specific of the six. It recognises
+  an abort now — every caller that passes a signal gets it.
 - **The credential boundary is one module.** `packages/snowarch/src/cli/tty.ts` is the only place a
   password can be typed: an interactive terminal with echo off, or `--password-stdin`, and no third
   way. `--password`, `--client-secret` and `--secret` are refused **before commander parses

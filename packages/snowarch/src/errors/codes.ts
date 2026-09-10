@@ -173,32 +173,32 @@ export const ERROR_CODES = [
   {
     code: 'DNS_FAILURE',
     meaning: "The instance host name did not resolve (`ENOTFOUND`, `EAI_AGAIN`).",
-    remedy: "check the spelling first; on a VPN-only instance connect first; on a corporate network set `HTTPS_PROXY`. A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong",
+    remedy: "the name `<host>` does not resolve. Check the instance name; on a corporate network the name may resolve only over VPN or through the proxy (set `HTTPS_PROXY`). A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong",
     showInRule: false,
   },
   {
     code: 'TLS_CA_UNTRUSTED',
     meaning: "The certificate was not signed by a CA this machine trusts — normal on a network that intercepts TLS.",
-    remedy: "export your organisation root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it",
+    remedy: "the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it",
     command: "export NODE_EXTRA_CA_CERTS=<path to the PEM>",
     showInRule: false,
   },
   {
     code: 'PROXY_UNREACHABLE',
     meaning: "A proxy variable is set and nothing is listening there, or the connection to it timed out.",
-    remedy: "the message names the proxy with any credentials masked; correct the host and port, or unset the variable if you are not behind a proxy. `NO_PROXY` exempts internal hosts",
+    remedy: "the proxy `<proxy>` (from `HTTPS_PROXY`) did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked",
     showInRule: false,
   },
   {
     code: 'CONNECTION_REFUSED',
     meaning: "The instance refused the connection and no proxy is configured.",
-    remedy: "check the URL and its port, and whether the instance is awake — a hibernating PDI refuses",
+    remedy: "`<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too",
     showInRule: false,
   },
   {
     code: 'CONNECTION_TIMEOUT',
     meaning: "The connection timed out with no proxy configured.",
-    remedy: "on a corporate network set `HTTPS_PROXY`; otherwise check connectivity and the firewall",
+    remedy: "no answer from `<host>` in time. If this network needs a proxy, set `HTTPS_PROXY=http://proxy:port` (and `NO_PROXY` for internal hosts) and run again. An idle PDI may be hibernating — wake it at developer.servicenow.com",
     showInRule: false,
   },
   {
@@ -356,6 +356,20 @@ export const ERROR_CODES = [
     code: 'UNKNOWN_GATE',
     meaning: "Server defect: a tool declares a gate the evaluator does not know.",
     remedy: "report it; no user action can help",
+    showInRule: false,
+  },
+  {
+    code: 'PROXY_AUTH_REQUIRED',
+    meaning: "The proxy answered 407: it wants credentials before it will forward the request.",
+    remedy: "put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials",
+    showInRule: false,
+    httpStatus: 407,
+  },
+  {
+    code: 'ENV_REQUIRED',
+    meaning: "The environment could not be proposed and none was given, in a run that cannot ask.",
+    remedy: "pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do",
+    command: "./snowarch instance add <label> --url <url> --env <pdi|dev|test|prod> --yes",
     showInRule: false,
   },
   {

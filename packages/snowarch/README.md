@@ -327,7 +327,7 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (59), with what to do about it.
+Every code the server can throw (61), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
@@ -337,16 +337,17 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `AUTHENTICATION_FAILED` | stop and re-enter them; do not retry, repeated failures lock the account |
 | `BATCH_FAILED` | the message lists which |
 | `CMDB_WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
-| `CONNECTION_REFUSED` | check the URL and its port, and whether the instance is awake — a hibernating PDI refuses |
-| `CONNECTION_TIMEOUT` | on a corporate network set `HTTPS_PROXY`; otherwise check connectivity and the firewall |
+| `CONNECTION_REFUSED` | `<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too |
+| `CONNECTION_TIMEOUT` | no answer from `<host>` in time. If this network needs a proxy, set `HTTPS_PROXY=http://proxy:port` (and `NO_PROXY` for internal hosts) and run again. An idle PDI may be hibernating — wake it at developer.servicenow.com |
 | `CREATE_FAILED` | the message carries the instance response |
 | `DELETE_ACL_DENIED` | use an account with the role |
 | `DELETE_CONSTRAINT` | remove the reference first |
 | `DELETE_FAILED` | the message carries the instance response |
 | `DELETE_NOT_FOUND` | check the sys_id |
-| `DNS_FAILURE` | check the spelling first; on a VPN-only instance connect first; on a corporate network set `HTTPS_PROXY`. A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong |
+| `DNS_FAILURE` | the name `<host>` does not resolve. Check the instance name; on a corporate network the name may resolve only over VPN or through the proxy (set `HTTPS_PROXY`). A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong |
 | `ECONNREFUSED` | as `CONNECTION_REFUSED`: check the URL, the port and any proxy |
 | `ENOTFOUND` | as `DNS_FAILURE`: check the host in the store |
+| `ENV_REQUIRED` | pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do |
 | `ETIMEDOUT` | as `CONNECTION_TIMEOUT` |
 | `FLUENT_ERROR` | the message carries the SDK output |
 | `FLUENT_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
@@ -364,7 +365,8 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `OAUTH_CLIENT_INVALID` | check them against the Application Registry entry on the instance |
 | `OAUTH_ROPC_DISABLED` | use basic authentication, or have an administrator enable the grant type |
 | `PROD_WRITE_NOT_ACKNOWLEDGED` | raise it deliberately, typing the label |
-| `PROXY_UNREACHABLE` | the message names the proxy with any credentials masked; correct the host and port, or unset the variable if you are not behind a proxy. `NO_PROXY` exempts internal hosts |
+| `PROXY_AUTH_REQUIRED` | put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials |
+| `PROXY_UNREACHABLE` | the proxy `<proxy>` (from `HTTPS_PROXY`) did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked |
 | `QUERY_FAILED` | the message carries the instance response |
 | `RATE_LIMITED` | retry later; reduce `maxRecords` or the call rate |
 | `REQUEST_FAILED` | the message carries that response |
@@ -377,7 +379,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `STORE_SCHEMA_INVALID` | the message names the field path; correct it in the store |
 | `STORE_SCHEMA_UNSUPPORTED` | upgrade this checkout, rather than editing the store down |
 | `STORE_UNREADABLE` | repair or recreate it; the message names the parse error |
-| `TLS_CA_UNTRUSTED` | export your organisation root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it |
+| `TLS_CA_UNTRUSTED` | the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it |
 | `TLS_CERT_INVALID` | check the instance URL and the certificate; this is not a CA-trust problem |
 | `UNKNOWN_GATE` | report it; no user action can help |
 | `UNKNOWN_INSTANCE` | the listing prints the labels that exist |
