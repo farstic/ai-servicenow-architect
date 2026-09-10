@@ -96,6 +96,27 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   sentence, and the fixture's `~/.claude.json` is asserted byte-identical after a run, including
   under `--fix`. The credential never appears: the report says `set (len 12)`, and the key count
   beside it.
+- **One report, and one `Mode:` line that is derived rather than remembered.** The line every
+  banner, skill and rule file quotes comes from four facts — the toggle file, the store's loaded
+  instances, the recorded bootstrap state and whether the server module could run — through a pure
+  function, and from nothing else. Not from `~/.claude.json`: that file belongs to Claude Code, it
+  describes a registration rather than a configuration, and a stale entry there outlived the
+  install it described. A test points `HOME` at an empty directory and at a stale fixture and
+  asserts the same line comes back. When the mode is design-only the line says WHICH half is
+  missing, because "design-only" alone sends a user looking for a problem that may be a choice.
+- **One handshake in the product.** B08 used to speak MCP itself to verify an install; the doctor's
+  server section already does that, with the same child and the same comparisons, so the step now
+  calls `runDoctor({ sections: ['server'] })` and reports its answer. An install's verdict and the
+  first `./snowarch doctor` cannot disagree, and the engine's second MCP client is gone — what
+  survives is the part that was never a handshake: reading `.mcp.json` into the command Claude Code
+  would run.
+- **One summary line, one cache writer.** The bootstrap's `DOCTOR: 41 ok, 0 warn, 0 fail` and the
+  doctor's are the same renderer now — they drifted the moment one of them learned to say
+  `(2 fixable — …)`. The cache is the doctor's own report plus the six mtimes the banner compares
+  against, written atomically at 0600 through the same secret guard; a `--section` run never writes
+  it, because a partial report in that file would tell the banner that checks which never ran had
+  passed.
+
 - **The server's own checks, inside the engine's report.** SV-00…SV-08 are imported from
   `packages/snowarch` and adopted, never re-implemented: flag rules, store schema, presets and the
   stdio handshake are the server's subject, and a second implementation in engine JavaScript is the

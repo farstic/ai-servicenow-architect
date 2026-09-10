@@ -71,7 +71,78 @@ export function serverBlock(answer) {
       ...(answer.error ? { error: answer.error } : {}) };
   }
   const { version, mode, instances, summary } = answer.report;
-  return { available: true, state: 'ready', version, mode, instances, summary };
+  // SV-05's two numbers ride on the block, not only inside its check result: the banner reads this
+  // file with 300 ms and no Node, and "how many tools, how slow to start" is what it shows.
+  const handshake = answer.report.checks.find((c) => c.id === 'SV-05')?.data ?? {};
+  return {
+    available: true, state: 'ready', version, mode, instances, summary,
+    ...(handshake.toolCount === undefined ? {} : { toolCount: handshake.toolCount }),
+    ...(handshake.initializeMs === undefined ? {} : { initializeMs: handshake.initializeMs }),
+  };
+}
+
+/**
+ * The `engine` block: facts the E-checks already established, keyed for a consumer.
+ *
+ * Assembled from their `data` rather than re-derived — E-02 read the Node version, E-04 resolved
+ * the capability packs, E-12…E-16 hold `docsStatus()`'s answer, E-17 counted the roster and E-22
+ * the contract. A block that computed any of them again would be a second answer that agrees today.
+ */
+export function engineBlock(results = [], { version = null, contractSha = null, tag = null } = {}) {
+  const data = (id) => results.find((r) => r.id === id)?.data ?? null;
+  const docs = data('E-12');
+  return {
+    version,
+    // ARC-09-S04 fills this from `./snowarch version --json`; until then it is honestly absent
+    // rather than a guess at what the tag would be.
+    tag,
+    contractSha,
+    node: data('E-02')?.version ?? null,
+    capabilities: data('E-04')?.packs ?? null,
+    docs: docs ? { present: docs.present, mode: docs.mode ?? null,
+      pin: data('E-13')?.pin ?? null, family: data('E-14')?.family ?? null,
+      citations: data('E-16')?.checked ?? null, dead: data('E-16')?.dead ?? null } : null,
+    roster: data('E-17') ? { skills: data('E-17').skills, agents: data('E-17').agents } : null,
+  };
+}
+
+/**
+ * Conditions two checks report from different angles, counted once.
+ *
+ * E-25 sees a cloud-synced CHECKOUT; SV-02 sees a cloud-synced STORE. On the usual install they
+ * are the same folder and the same problem, and a summary that counted it twice would tell a user
+ * to fix two things. Both lines stay in `checks[]` — each names a different path, and the one a
+ * reader needs depends on which they are moving.
+ */
+export const DEDUPE_KEYS = Object.freeze({ 'E-25': 'cloud-sync', 'SV-02': 'cloud-sync' });
+
+export function dedupeKeyFor(result) {
+  const key = DEDUPE_KEYS[result.id];
+  if (!key) return null;
+  // Only when the two are actually reporting the same thing: SV-02 warns about a dozen other
+  // conditions, and collapsing one of those into E-25's count would hide it.
+  if (key === 'cloud-sync') {
+    const says = /cloud-sync|cloud-synced/i.test(String(result.detail ?? ''));
+    return says && result.status === 'warn' ? key : null;
+  }
+  return key;
+}
+
+/** The summary, with each de-duplicated condition counted once. */
+export function summariseMerged(results, checks) {
+  const byId = new Map(checks.map((c) => [c.id, c]));
+  const summary = { ok: 0, warn: 0, fail: 0, skip: 0, fixable: 0 };
+  const seen = new Set();
+  for (const r of results) {
+    const key = dedupeKeyFor(r);
+    if (key) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    summary[r.status] = (summary[r.status] ?? 0) + 1;
+    if (byId.get(r.id)?.fixable && (r.status === 'fail' || r.status === 'warn')) summary.fixable += 1;
+  }
+  return summary;
 }
 
 /** The registry the `doctor` command builds when it is not given one. */

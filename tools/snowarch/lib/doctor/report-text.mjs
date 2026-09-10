@@ -42,6 +42,14 @@ export function headerLine({ version, ranAt, options = {} }) {
 }
 
 /** `DOCTOR: 41 ok, 1 warn, 1 fail (2 fixable — run ./snowarch doctor --fix)` */
+/**
+ * `DOCTOR: 41 ok, 0 warn, 0 fail` — ONE renderer, two callers.
+ *
+ * The bootstrap's B09 printed its own version of this line from `text.mjs`'s `doctorLine`, and the
+ * two drifted the moment this one learned to say `(2 fixable — …)`: an install summary and a
+ * doctor report that disagree about the same run are two numbers a reader has to reconcile.
+ * `renderSummaryLine` is the alias B09 imports, so the two names say who is calling.
+ */
 export function summaryLine(summary) {
   const parts = [`${summary.ok} ok`, `${summary.warn} warn`, `${summary.fail} fail`];
   if (summary.skip > 0) parts.push(`${summary.skip} skipped`);
@@ -49,6 +57,29 @@ export function summaryLine(summary) {
     ? ` (${summary.fixable} fixable — run ./snowarch doctor --fix)`
     : '';
   return `DOCTOR: ${parts.join(', ')}${fixable}`;
+}
+
+export { summaryLine as renderSummaryLine };
+
+/**
+ * The capability packs, on one line above the summary.
+ *
+ * E-04 already reports them as a check; this is the line a reader scans when they are about to
+ * author a deliverable rather than diagnose an install, and it names the PROVIDER because "docx
+ * yes" does not tell a Windows user whether it was PowerShell or a Python nobody installed.
+ */
+export function capabilitiesLine(packs) {
+  if (!packs) return null;
+  const LABELS = { docx: 'docx', pdf: 'PDF QA', drawio: 'draw.io', mermaid: 'Mermaid' };
+  const parts = Object.entries(LABELS).map(([key, label]) => {
+    const pack = packs[key];
+    if (!pack) return `${label} no`;
+    // The provider, not the path: `/opt/homebrew/bin/python3` is a path a reader has to parse to
+    // learn one word, and the word is the answer.
+    const how = pack.how ? String(pack.how).split(/[\\/]/).pop().replace(/\.(exe|cmd|app)$/i, '') : null;
+    return pack.present && how ? `${label} yes (${how})` : `${label} no`;
+  });
+  return `Capabilities: ${parts.join(' · ')}`;
 }
 
 /**
@@ -106,7 +137,10 @@ export function renderText({ report, checks = [], colour = false }) {
     }
   }
 
-  lines.push('', summaryLine(report.summary));
+  lines.push('');
+  const capabilities = capabilitiesLine(report.prereqs?.capabilities ?? null);
+  if (capabilities) lines.push(capabilities);
+  lines.push(summaryLine(report.summary));
   if (report.modeLine) lines.push(report.modeLine);
   return lines.join('\n');
 }

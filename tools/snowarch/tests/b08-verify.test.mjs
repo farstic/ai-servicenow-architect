@@ -4,10 +4,8 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import {
-  NO_INSTANCE, PROBES_UNAVAILABLE, compareCapabilities, compareTools, differentStore, runProbes,
-  timeoutSentence, run as runB08,
-} from '../lib/steps/B08.mjs';
+import { NO_INSTANCE, PROBES_UNAVAILABLE, SERVER_IDS, runProbes, run as runB08 }
+  from '../lib/steps/B08.mjs';
 import { CACHE_VERSION, COMPATIBILITY_KEYS, cachePath, summarise, writeDoctorCache } from '../lib/doctor-cache.mjs';
 import { register, reset } from '../lib/redact.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
@@ -18,6 +16,15 @@ const contract = JSON.parse(readFileSync(join(repoRoot, 'packages/snowarch/dist/
 const pin = JSON.parse(readFileSync(join(repoRoot, 'packages/contract/required-tools.json'), 'utf8'));
 const allNames = contract.tools.map((t) => t.name);
 
+/**
+ * ARC-08-S05 moved the comparisons out of this step.
+ *
+ * B08 used to speak MCP itself and compare the tool list and the capabilities against the pin;
+ * the doctor's `server` section now does both, with the same child. The six tests that asserted
+ * those comparisons moved to `tests/doctor/server.test.mjs`, where the code they describe lives.
+ * What stays here is what B08 still owns: the probes it runs through the CLI, the cache the
+ * install leaves for the banner, and the step's own verdict.
+ */
 test('the counts come from the files, never from this test', () => {
   // The story quotes 398 and the contract has 397 today. A test that hard-coded either would be
   // wrong on one side of the next regeneration, so both sides are read.
@@ -25,76 +32,6 @@ test('the counts come from the files, never from this test', () => {
   assert.ok(pin.tools.length > 0);
   assert.equal(contract.server.suggestedName, JSON.parse(
     readFileSync(join(repoRoot, 'engine.config.json'), 'utf8')).mcp.serverKey);
-});
-
-test('a tool the contract does not know means dist/ is ahead of the pin', () => {
-  // The name is DERIVED from a real one: written out, this file would carry a `snow_*` token the
-  // contract does not declare, which is exactly what the L01 lint exists to find.
-  const invented = `${allNames[0]}_${'invented'}`;
-  const problems = compareTools({ advertised: [...allNames, invented], contract, pin,
-    configured: true });
-  assert.match(problems[0], new RegExp(`server advertises "${invented}" which is not in the pinned contract`));
-  assert.match(problems[0], /dist\/ and contract out of sync/);
-});
-
-test('AC 5 — a pinned tool the server does not advertise names its used_by', () => {
-  const fictitious = `${allNames[0]}_${'pinned'}`;
-  const problems = compareTools({
-    advertised: allNames, contract,
-    pin: { tools: [...pin.tools, { name: fictitious, used_by: ['governance §2.1', 'developer'] }] },
-    configured: true,
-  });
-  assert.match(problems[0], new RegExp(`server does not advertise "${fictitious}"`));
-  // The `used_by` entries are the FILES that will break, which is what makes this actionable.
-  assert.match(problems[0], /governance §2\.1, developer/);
-
-  const noConsumer = compareTools({ advertised: allNames, contract,
-    pin: { tools: [{ name: fictitious }] }, configured: true });
-  assert.match(noConsumer[0], /an unrecorded consumer/);
-});
-
-test('a configured server must advertise the whole catalogue, gated or not', () => {
-  const short = compareTools({ advertised: allNames.slice(0, -1), contract,
-    pin: { tools: [] }, configured: true });
-  assert.match(short[0], new RegExp(`advertises ${allNames.length - 1} tools, the contract has ${allNames.length}`));
-  assert.deepEqual(compareTools({ advertised: allNames, contract, pin: { tools: [] }, configured: true }), []);
-});
-
-test('unconfigured is a different expectation, not a relaxed one', async () => {
-  // `pathToFileURL`: a dynamic import of an absolute path is a URL, and a Windows path is not one.
-  const { CORE_TOOLS_UNCONFIGURED } = await import(
-    pathToFileURL(join(repoRoot, 'packages/snowarch/dist/tools/status.js')).href);
-  const core = [...CORE_TOOLS_UNCONFIGURED];
-  assert.deepEqual(compareTools({ advertised: core, contract, pin, configured: false,
-    coreTools: core }), []);
-
-  // More than the core set without a store would be offering tools the server cannot serve.
-  const extra = compareTools({ advertised: [...core, allNames[0]], contract, pin, configured: false,
-    coreTools: core });
-  assert.match(extra[0], new RegExp(`unconfigured server advertises ${core.length + 1} tools, expected the ${core.length} core tools`));
-});
-
-test('AC 3 — capabilities that describe another store get the sentence naming SNOW_STORE', () => {
-  const entry = { environment: 'pdi', preset: 'full', flags: { WRITE_ENABLED: 'true' } };
-  assert.deepEqual(compareCapabilities({ label: 'pdi', environment: 'pdi', preset: 'full',
-    flags: { WRITE_ENABLED: 'true' } }, entry, 'pdi'), []);
-
-  const wrongLabel = compareCapabilities({ label: 'other' }, entry, 'pdi');
-  assert.match(wrongLabel[0], /server reports instance "other", the store's default is "pdi"/);
-
-  const wrongFlag = compareCapabilities({ label: 'pdi', flags: { WRITE_ENABLED: 'false' } }, entry, 'pdi');
-  assert.match(wrongFlag[0], /server reports WRITE_ENABLED=false, the store says true/);
-
-  assert.match(differentStore('~/elsewhere/instances.json'),
-    /^server sees a different store than the bootstrap wrote \(~\/elsewhere\/instances\.json\) — SNOW_STORE set in your shell\?$/);
-  // A server that answered nothing is not a mismatch — it is a server with no instance.
-  assert.deepEqual(compareCapabilities(null, entry, 'pdi'), []);
-});
-
-test('AC 4 — the timeout sentence names MCP_TIMEOUT and where to read about it', () => {
-  assert.equal(timeoutSentence(1),
-    'server did not answer initialize within 1 ms — cold start too slow for MCP_TIMEOUT; '
-    + 'see docs/TROUBLESHOOTING.md "MCP_TIMEOUT"');
 });
 
 test('the probes path RUNS now that ARC-07-S06 exists — and still degrades if it ever does not', () => {
@@ -193,5 +130,45 @@ test('AC 2 — B08 against the REAL server with no store: five tools, a WARN, ex
   const cache = JSON.parse(readFileSync(cachePath(root), 'utf8'));
   assert.equal(cache.summary.fail, 0);
   assert.equal(cache.server.toolCount, r.data.toolCount);
-  assert.equal(cache.mode, 'live');
+  // The cache's `mode` is the DERIVED mode now (ARC-08-S05), not the bootstrap's intent: this run
+  // asked for live and has no instance, and the banner must print what is true rather than what
+  // was requested. The Mode line it will print is in the file beside it.
+  assert.equal(cache.writer, 'doctor');
+  assert.match(cache.modeLine, /^Mode: /);
+  assert.equal(cache.mode, cache.modeLine.startsWith('Mode: live') ? 'live'
+    : cache.modeLine.startsWith('Mode: unknown') ? 'unknown' : 'design-only');
+});
+
+test('B08 and `doctor --section server` write the same shape', async () => {
+  // One writer, one shape: B08 IS the doctor's server section now, so a banner reading a cache
+  // written by an install and one written by a `--section server` run cannot meet two layouts.
+  const root = repoRoot;
+  await runB08({
+    root, mode: 'live', env: { ...process.env },
+    config: JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')),
+    state: { steps: {} }, line: () => {}, log: { debug: () => {} },
+    runCli: () => ({ stdout: 'Usage: instance list', stderr: '' }),
+  });
+  const fromB08 = JSON.parse(readFileSync(cachePath(root), 'utf8'));
+
+  // A `--section` run deliberately does NOT write the cache (a partial report must not look like
+  // a full one), so the comparison is against a `--quick` run — which does. Asserting the section
+  // rule here too, because without it this test would be comparing a file with itself.
+  const before = statSync(cachePath(root)).mtimeMs;
+  const sectioned = spawnSync(process.execPath,
+    [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--section', 'server', '--json'],
+    { cwd: root, encoding: 'utf8', env: { ...process.env } });
+  assert.ok([0, 1].includes(sectioned.status), sectioned.stderr);
+  assert.equal(statSync(cachePath(root)).mtimeMs, before, '--section wrote the cache');
+
+  const cli = spawnSync(process.execPath,
+    [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--quick', '--json'],
+    { cwd: root, encoding: 'utf8', env: { ...process.env } });
+  assert.ok([0, 1].includes(cli.status), cli.stderr);
+  const direct = JSON.parse(readFileSync(cachePath(root), 'utf8'));
+
+  assert.deepEqual(Object.keys(fromB08).sort(), Object.keys(direct).sort());
+  assert.deepEqual(SERVER_IDS.filter((id) => !fromB08.checks.some((c) => c.id === id)), [],
+    'the step reports on an id the cache does not carry');
+  assert.deepEqual(SERVER_IDS.filter((id) => !direct.checks.some((c) => c.id === id)), []);
 });

@@ -21,6 +21,9 @@ export const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', 
 /** The committed files every repo check reads. Copied, never retyped. */
 export const WIRING = Object.freeze([
   'engine.config.json',
+  // The version of record. A checkout without it is not a checkout, and the doctor reports the
+  // version it finds — so a fixture without one would be asserting an absence nobody ships.
+  'package.json',
   'CLAUDE.md',
   '.mcp.json',
   '.claude/settings.json',

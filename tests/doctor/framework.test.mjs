@@ -52,9 +52,15 @@ test('AC 1 — an empty registry is a valid report, zero checks, exit 0', async 
   assert.deepEqual(report.checks, []);
   // Every key of schema v1 exists on day one, `null` where a later story fills it.
   assert.deepEqual(Object.keys(report).sort(), [...SCHEMA_KEYS].sort());
-  for (const key of ['mode', 'modeLine', 'modeLineDetailed', 'server', 'stale']) {
-    assert.equal(report[key], null, `${key} must be null until its story fills it`);
+  // S05 fills `mode`, `modeLine` and `modeLineDetailed` — from the toggle file and the store, so
+  // an EMPTY registry still produces them (they are not check results). `server` and `stale` stay
+  // null until a check that knows about them has run.
+  for (const key of ['server', 'stale']) {
+    assert.equal(report[key], null, `${key} must be null until a check fills it`);
   }
+  assert.match(report.modeLine, /^Mode: /);
+  assert.equal(report.mode, report.modeLine.startsWith('Mode: live') ? 'live'
+    : report.modeLine.startsWith('Mode: unknown') ? 'unknown' : 'design-only');
 });
 
 test('AC 1 — a failing check exits 1, and one that THROWS is a result, not a stack trace', async () => {

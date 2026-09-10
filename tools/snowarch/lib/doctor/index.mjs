@@ -20,7 +20,11 @@ import { meetsFloor } from '../versions.mjs';
 import { childEnv } from '../spawn-env.mjs';
 
 import { SECTIONS } from './registry.mjs';
-import { engineRegistry, serverBlock, staleBlock } from './checks/index.mjs';
+import { engineBlock, engineRegistry, serverBlock, staleBlock,
+  summariseMerged } from './checks/index.mjs';
+import { deriveMode, modeLine, modeLineDetailed } from './mode.mjs';
+import { writeReportCache } from '../doctor-cache.mjs';
+import { contractSha, version as engineVersion } from '../config.mjs';
 import { collectPrereqs } from './prereqs.mjs';
 import { buildReport } from './report-json.mjs';
 import { renderText, useColour } from './report-text.mjs';
@@ -59,6 +63,40 @@ function realpathOrSelf(p) {
   try { return realpathSync.native(p); } catch { return p; }
 }
 
+/**
+ * The engine's version, or `null`.
+ *
+ * A checkout with no `package.json` is not one anybody should be running from — E-05 says so — but
+ * the doctor is the tool people run BECAUSE something is wrong, and dying while assembling a
+ * report about a broken checkout is the one failure mode it cannot have.
+ */
+function readVersion(root) {
+  try {
+    return engineVersion(root);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Is the server enabled for this checkout? The toggle file decides, and only the toggle file.
+ *
+ * `disabledMcpjsonServers` wins over `enabledMcpjsonServers` in Claude Code, so the question is
+ * "is the key on the disabled list", not "is it on the enabled one". An absent file means nothing
+ * has disabled it.
+ */
+export function serverEnabled(root, config) {
+  try {
+    const settings = JSON.parse(
+      readFileSync(join(root, '.claude', 'settings.local.json'), 'utf8'));
+    const disabled = Array.isArray(settings.disabledMcpjsonServers)
+      ? settings.disabledMcpjsonServers : [];
+    return !disabled.includes(config?.mcp?.serverKey);
+  } catch {
+    return true;
+  }
+}
+
 /** The recorded mode, or `null`. An unreadable state file is E-11's finding, not this one's. */
 export function readMode(root) {
   try {
@@ -85,6 +123,113 @@ export function findRoot(from) {
  * the engine's twenty-three (ARC-08-S02), and a test that wants one check does not get the other
  * twenty-two's answers in its assertions.
  */
+/**
+ * THE RUN, without a terminal: every caller that wants the REPORT rather than an exit code.
+ *
+ * ARC-06's B08 is the second caller (it verifies the server after an install), and before this it
+ * had its own handshake, its own comparisons and its own cache write — three implementations of
+ * what the doctor already does, kept in step by nothing. A step that wants "is the server right?"
+ * asks the thing whose job that is.
+ *
+ * `writeCache: true` overrides the section rule for exactly that caller: B08 runs `--section
+ * server` and its answer IS what the banner should hold after an install.
+ */
+export async function runDoctor({ root, config, registry = engineRegistry(), sections = null,
+  quick = false, noNetwork = false, fix = false, section = null, writeCache = 'auto',
+  env = process.env, home = '', now = () => Date.now(), started = null } = {}) {
+  const startedAt = started ?? now();
+  const options = { quick, noNetwork: noNetwork || quick, fix, section, sections };
+
+  let contract = null;
+  try {
+    contract = loadContract({ root, verifyPin: false });
+  } catch { contract = null; }
+
+  const ctx = {
+    root,
+    config,
+    contract,
+    // The recorded mode, read once: an absent server dependency is the DESIGN in design-only and a
+    // broken install in live, and the checks that say so must not each re-read the state file.
+    mode: readMode(root),
+    flags: options,
+    platform: process.platform,
+    env: childEnv(root),
+    // Supplied by the entry point. Nothing under `lib/` reads the home directory itself — the
+    // repo-wide rule — and the doctor needs it only to shorten a path to `~` in a report.
+    home,
+    now,
+  };
+
+  const checks = registry.all();
+  const { results } = await runChecks(checks, ctx, { ...options, home });
+  // The merged summary, not the runner's: one condition that two checks report from different
+  // angles (E-25's checkout and SV-02's store, both cloud-synced) is one thing to fix.
+  const summary = summariseMerged(results, checks);
+
+  const server = ctx._server === undefined ? null : serverBlock(ctx._server);
+  const instances = server?.instances ?? [];
+  // The mode: derived here, from the toggle file and the store, and from nothing else. Not from
+  // `~/.claude.json`, which belongs to Claude Code and describes a registration rather than a
+  // configuration (`00` P-05/P-21).
+  const derived = deriveMode({
+    toggles: { enabled: serverEnabled(root, config) },
+    instances,
+    bootstrapped: existsSync(join(root, '.local', 'bootstrap-state.json')),
+  });
+  const data = (id) => results.find((r) => r.id === id)?.data ?? null;
+  const toolCount = data('SV-05')?.toolCount ?? null;
+
+  const report = buildReport({
+    results,
+    checks,
+    summary,
+    options,
+    root,
+    durationMs: now() - startedAt,
+    mode: derived.mode,
+    modeLine: modeLine(derived, { summary, at: new Date(now()) }),
+    modeLineDetailed: modeLineDetailed(derived, {
+      contract,
+      instances,
+      flags: instances.find((i) => i.label === derived.instance?.label)?.effectiveFlags ?? null,
+      toolCount: toolCount === null
+        ? (contract ? { count: contract.tools.length, source: 'contract' } : null)
+        : { count: toolCount, source: 'server' },
+    }),
+    engine: engineBlock(results, { version: readVersion(root),
+      contractSha: contractSha(root) ?? null }),
+    prereqs: {
+      ...collectPrereqs({ root, config, env }),
+      // E-04 resolved these; the renderer's `Capabilities:` line reads them from here rather than
+      // resolving them again.
+      capabilities: data('E-04')?.packs ?? null,
+    },
+    // Filled by ARC-08-S03's detectors, from their own results — `null` until one of them ran, so
+    // a `--section contract` run does not claim there are no leftovers.
+    stale: results.some((r) => ['E-23', 'E-24'].includes(r.id) && r.status !== 'skip')
+      ? staleBlock(results)
+      : null,
+    // Filled by ARC-08-S04 from the server module's own report — `null` when no SV check ran, so a
+    // `--section docs` run does not claim to know anything about the server.
+    server,
+  });
+
+  // The cache is what the banner reads when it has 300 ms and no Node. A PARTIAL report must never
+  // land there: `--section docs` would tell the banner that thirty checks it never ran had passed.
+  // `--no-cache` is the same decision, made by the user.
+  const auto = writeCache === 'auto' ? sections === null : writeCache === true;
+  let cacheError = null;
+  if (auto) {
+    try {
+      writeReportCache(root, report, { now: new Date(now()) });
+    } catch (e) {
+      cacheError = e.message;
+    }
+  }
+  return { report, checks, summary, derived, cacheError };
+}
+
 export async function doctorCommand({ flags = {}, log, out = process.stdout, env = process.env,
   cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(), home = '' } = {}) {
   const started = now();
@@ -129,14 +274,6 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     return EXIT_USAGE;
   }
 
-  // `verifyPin: false`: a stale pin is a CHECK RESULT (E-22, ARC-08-S03), not a crash. A doctor
-  // that refused to start because the thing it diagnoses is broken would be useless exactly when
-  // it is needed (ARC-05-S10 criterion 2).
-  let contract = null;
-  try {
-    contract = loadContract({ root, verifyPin: false });
-  } catch { contract = null; }
-
   const options = {
     quick: flags.quick === true,
     // `--quick` implies `--no-network`: the subset exists to be fast, and a network round trip is
@@ -147,42 +284,25 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     sections: sections ? sections.names : null,
   };
 
-  const ctx = {
+  const { report, checks, cacheError } = await runDoctor({
     root,
     config,
-    contract,
-    // The recorded mode, read once: an absent server dependency is the DESIGN in design-only and a
-    // broken install in live, and the checks that say so must not each re-read the state file.
-    mode: readMode(root),
-    flags: options,
-    platform: process.platform,
-    env: childEnv(root),
-    // Supplied by the entry point. Nothing under `lib/` reads the home directory itself — the
-    // repo-wide rule — and the doctor needs it only to shorten a path to `~` in a report.
+    registry,
+    sections: options.sections,
+    quick: options.quick,
+    noNetwork: options.noNetwork,
+    fix: options.fix,
+    section: options.section,
+    writeCache: flags['no-cache'] === true ? false : 'auto',
+    env,
     home,
     now,
-  };
-
-  const checks = registry.all();
-  const { results, summary } = await runChecks(checks, ctx, { ...options, home });
-
-  const report = buildReport({
-    results,
-    checks,
-    summary,
-    options,
-    root,
-    durationMs: now() - started,
-    prereqs: collectPrereqs({ root, config, env }),
-    // Filled by ARC-08-S03's detectors, from their own results — `null` until one of them ran, so
-    // a `--section contract` run does not claim there are no leftovers.
-    stale: results.some((r) => ['E-23', 'E-24'].includes(r.id) && r.status !== 'skip')
-      ? staleBlock(results)
-      : null,
-    // Filled by ARC-08-S04 from the server module's own report — `null` when no SV check ran, so a
-    // `--section docs` run does not claim to know anything about the server.
-    server: ctx._server === undefined ? null : serverBlock(ctx._server),
+    started,
   });
+
+  // A cache that could not be written is not a failed run: the report is on the screen, and the
+  // banner's fallback is to re-run. Said out loud so a read-only checkout is explicable.
+  if (cacheError) write(`note: the doctor cache could not be written — ${cacheError}`);
 
   if (flags.json) {
     write(JSON.stringify(report, null, 2));
@@ -190,5 +310,5 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     write(renderText({ report, checks, colour: useColour({ stream: out, env }) }));
   }
   if (log?.commit) log.commit();
-  return summary.fail > 0 ? exitCodeFor(summary) : EXIT_OK;
+  return report.summary.fail > 0 ? exitCodeFor(report.summary) : EXIT_OK;
 }

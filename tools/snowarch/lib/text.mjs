@@ -8,6 +8,8 @@
 // So both live here, `text.json` is generated from this file, and the Node-free launchers read that
 // rather than repeating the strings.
 
+import { renderSummaryLine } from './doctor/report-text.mjs';
+
 /**
  * How many Claude Code dialogs a first `claude` will show.
  *
@@ -40,16 +42,41 @@ export function spellings(where = {}) {
 }
 
 /**
- * THE Mode line. One definition, four consumers.
+ * The four things a design-only or unknown checkout can BE, as sentences.
+ *
+ * They live here, with the Mode line itself, because they are the same sentence in four moods:
+ * a variant table inside the doctor would be a second place where "what mode is this?" is
+ * answered in words, and the rule file's promise — that the Mode line is authoritative — is only
+ * true while there is one of it. ARC-08-S05's derivation picks a key; this renders it.
+ */
+export const MODE_VARIANTS = Object.freeze({
+  unconfigured: 'no ServiceNow instance configured; run ./snowarch instance add or '
+    + '/snowarch setup-instance to add one',
+  serverDisabled: (label) => `server disabled in .claude/settings.local.json although instance `
+    + `"${label}" is configured; run ./snowarch mode live`,
+  noInstanceLoaded: 'server enabled but no instance is loaded (see SV-02/SV-03); run '
+    + '/snowarch setup-instance',
+  notBootstrapped: 'this checkout has not been bootstrapped; run ./bootstrap.sh '
+    + '(Windows: bootstrap.cmd)',
+});
+
+/**
+ * THE Mode line. One definition, five consumers.
  *
  * `instance` carries only a label, an environment and a preset — the three things that are not
  * secrets. A URL or a username here would end up in a banner, a status reply and a log at once.
+ *
+ * `qualifier` and `stamp` are ARC-08-S05's: the doctor knows WHY a checkout is design-only and
+ * when it last checked, and the bootstrap does not. Both are optional, so the launcher's
+ * `Mode: design-only` — which a Node-free shell prints from `text.json` — is unchanged.
  */
-export function modeLine({ mode, instance = null } = {}) {
-  if (mode !== 'live') return 'Mode: design-only';
-  if (!instance) return 'Mode: live';
+export function modeLine({ mode, instance = null, qualifier = null, stamp = null } = {}) {
+  const tail = stamp ? ` — ${stamp}` : '';
+  if (mode === 'unknown') return `Mode: unknown${qualifier ? ` — ${qualifier}` : ''}${tail}`;
+  if (mode !== 'live') return `Mode: design-only${qualifier ? ` — ${qualifier}` : ''}${tail}`;
+  if (!instance) return `Mode: live${qualifier ? ` — ${qualifier}` : ''}${tail}`;
   return `Mode: live — instance=${instance.label} (${instance.environment}) `
-    + `preset=${instance.preset}`;
+    + `preset=${instance.preset}${tail}`;
 }
 
 /**
@@ -92,10 +119,18 @@ export function instanceKeptNote({ label, platform, env } = {}) {
     + `it; ${s.cli} instance remove ${label} deletes it`;
 }
 
-/** `DOCTOR: 41 ok, 0 warn, 0 fail`, or the honest absence when Node cannot run one. */
-export function doctorLine({ ok = 0, warn = 0, fail = 0, nodeUsable = true } = {}) {
+/**
+ * `DOCTOR: 41 ok, 0 warn, 0 fail`, or the honest absence when Node cannot run one.
+ *
+ * The line itself is the DOCTOR's renderer (ARC-08-S05): the bootstrap's summary and the doctor's
+ * report describe the same run, and they drifted the moment the doctor learned to say
+ * `(2 fixable — …)`. What stays here is the sentence for a machine with no Node — which the
+ * doctor, by definition, cannot print.
+ */
+export function doctorLine({ ok = 0, warn = 0, fail = 0, skip = 0, fixable = 0,
+  nodeUsable = true } = {}) {
   return nodeUsable
-    ? `DOCTOR: ${ok} ok, ${warn} warn, ${fail} fail`
+    ? renderSummaryLine({ ok, warn, fail, skip, fixable })
     : 'DOCTOR: unavailable until Node 20+ is installed (design-only is complete)';
 }
 

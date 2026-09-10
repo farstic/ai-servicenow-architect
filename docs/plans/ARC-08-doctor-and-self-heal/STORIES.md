@@ -329,6 +329,23 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S05 — Merged report, the authoritative `Mode:` line, `--quick` / `--no-network` / `--section`, capability packs, `.local/doctor-last.json`
+
+> **Amendment 2026-09-10 (from the delivery).** Six departures. (1) **B08 now calls the doctor**
+> (`runDoctor({ sections: ['server'], writeCache: true })`) instead of speaking MCP itself: the
+> story's dependency note had it the other way round. Its own tool/capability comparisons went with
+> the handshake — SV-05 and SV-06 make them against the same child — and the pin-level `used_by`
+> reporting is covered statically by L01 and B05. (2) **`lib/mcp-handshake.mjs` is retired**; what
+> survives is `lib/server-command.mjs` (reading `.mcp.json` into the command Claude Code would run,
+> `CLAUDE_PROJECT_DIR` SET rather than inherited), which is not a handshake and still has callers.
+> One handshake in the product. (3) The **doctor stamp rides on the live line only** — criterion 2
+> calls the design-only sentence exact, and a date after an instruction reads as part of it.
+> (4) **SV-08 is in `--quick`**: the story's list predates ARC-08-S04's ninth server check, and its
+> flags put it there. (5) The cache's `mode` is the DERIVED mode, not the bootstrap's intent: a
+> banner must print what is true rather than what was asked for. (6) `text.mjs` gained the four
+> variant sentences and the `qualifier`/`stamp` parameters — the launcher's `Mode: design-only`
+> (which a Node-free shell prints from `text.json`) is unchanged, and `doctorLine` now delegates to
+> the doctor's `renderSummaryLine` so the install summary and the report cannot disagree.
+
 **As** an individual practitioner and as the engine (Claude) **I want** one command that prints one report and ends with one `Mode:` line derived from the store and the settings toggles — never from `~/.claude.json` or memory — and caches the result **so that** the banner, the `/snowarch` skill and the rule file all quote the same line.
 **Context.** README goal ("one command, one merged report, one authoritative `Mode:` line"), deliverable 5 (merged report, `--section`, capability packs), the P-05/P-21 mode-detection half ("the engine no longer parses `~/.claude.json`; it asks the server"). `01` §8 (Mode line texts), §6.2 step 8 (detailed line with flags and tool count), §9 (design-only definition), `03` R-14 (stale cache misreports the mode — banner re-runs, `/snowarch status` always re-runs `--quick`). ARC-05-S05 rule file: "The authoritative mode is the `Mode:` line printed at session start … never infer mode from any other file". ARC-06-S08 writes `.local/doctor-last.json` at B08 — this story owns its content (it is the doctor JSON).
 **Scope.** In: `tools/snowarch/lib/doctor/mode.mjs` (derivation), `cache.mjs` (read/write/staleness inputs), the merge of E- and SV- results into one report, section ordering and de-duplication rules, the `engine`/`server`/`mode*` blocks of the JSON, `--quick` definition, capability-pack summary line. Out: the banner process (S08), the skill rendering (S09), fixers (S06).
