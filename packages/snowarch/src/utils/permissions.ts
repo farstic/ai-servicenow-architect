@@ -45,6 +45,23 @@ export function expandPreset(preset: PresetName, custom?: Partial<Flags>): Flags
 }
 
 /**
+ * The named preset these six toggles ARE, or `custom`.
+ *
+ * The inverse of `expandPreset`, and it lives here for the same reason `expandPreset` does: the
+ * preset table is one definition, and a UI that decided "this looks like pdi-developer" by its own
+ * comparison would be a second one — wrong the moment a preset gains a flag.
+ *
+ * `custom` is not a failure. It is the honest name for a combination nobody named, and the wizard
+ * prints it as such.
+ */
+export function matchPreset(flags: Flags): PresetName {
+  for (const [name, preset] of Object.entries(PRESETS) as [Exclude<PresetName, 'custom'>, Flags][]) {
+    if (FLAG_NAMES.every((f) => flags[f] === preset[f])) return name;
+  }
+  return 'custom';
+}
+
+/**
  * Scripting and CMDB writes are writes. Declaring one without `WRITE_ENABLED` is a
  * contradiction, and resolving it towards "allowed" would let a store that reads as
  * read-only perform writes. The dependent flag is forced false and the contradiction is

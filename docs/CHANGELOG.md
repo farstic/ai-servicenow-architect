@@ -29,6 +29,23 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   or an address. Grepping the file afterwards proves today's steps are clean; the guard is what
   keeps a step written three stories from now clean too. `docs.mode` and `mode` sit exactly where
   `docsStatus()` and the `/snowarch status` skill already read them.
+- **Propose, review, apply — and a probe never decides.** The wizard proposes a preset from the
+  ENVIRONMENT ALONE (`full` for pdi/dev/test, `read-only` for prod), shows the six flags with what
+  the probes found, and applies exactly what the screen showed. A probe that came back
+  `not licensed` changes the RECOMMENDATION on that line and never the toggle — the box stays
+  `[x]` beside text advising the opposite, because a wizard that quietly turned a flag off on the
+  strength of one reading would produce an installation the user did not choose and cannot
+  explain. **Production is capped at read-only with no override in the wizard at all**: `--preset
+  full --env prod --yes` exits 3 with the D-05 refusal and writes nothing, and interactively the
+  wizard offers to save it read-only instead. Raising production is a separate named step in a
+  different command, which is the point — the moment you can raise production inside a wizard,
+  raising production becomes something that happens while you are doing something else. The
+  dependency rule is a conversation rather than a correction: turning WRITE off with dependents on
+  asks, and "no" keeps WRITE on rather than saving a contradiction. `--flags` needs all six or it
+  names the missing one — filling in the sixth would be the wizard choosing while claiming the
+  caller did. Both screens are rendered to `docs/snippets/` so the page S10 writes and the wizard
+  a user sees cannot drift, and every line fits 100 columns: a long hint WRAPS, because the part a
+  truncation removes is the part that says what to do about it.
 - **One probe library, and it can never lock an account out.** `probes.ts` proves the credentials
   and reports, per flag, whether the account can reach the table family that flag unlocks — the
   same answer for the wizard, `instance test` and the doctor, because three implementations of one

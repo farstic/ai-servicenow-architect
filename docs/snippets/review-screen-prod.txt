@@ -1,0 +1,9 @@
+Proposed preset for "prod-acme" (prod): read-only  — production is capped at read-only (D-05)
+  [ ] WRITE        locked on production
+  [ ] CMDB_WRITE   locked on production
+  [ ] SCRIPTING    locked on production
+  [ ] ATF          locked on production
+  [ ] NOW_ASSIST   locked on production
+  [ ] FLUENT       locked on production
+Enter = accept · to raise this instance later: ./snowarch instance set-preset prod-acme <preset>
+--ack-prod
