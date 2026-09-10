@@ -53,7 +53,7 @@ export function engineDocsChecks() {
           return fail(text.replace(/^E-12 docs corpus: FAIL — /, ''), {
             remedy: 'run ./snowarch docs sync',
             command: './snowarch docs sync',
-            data: { present: false, mode, fix: { kind: 'docs-sync' } },
+            data: { present: false, mode, fix: { kind: 'corpus-missing', mode } },
           });
         }
         if (mode === 'skip') {
@@ -63,7 +63,7 @@ export function engineDocsChecks() {
           return fail('the corpus is on disk but the recorded docs mode is "skip"', {
             remedy: 'run ./snowarch docs sync to record the corpus that is there',
             command: './snowarch docs sync',
-            data: { present: true, mode, fix: { kind: 'docs-sync' } },
+            data: { present: true, mode, fix: { kind: 'corpus-missing', mode } },
           });
         }
         return ok(`present (${mode})`, { present: true, mode, path: s.path });
@@ -98,7 +98,7 @@ export function engineDocsChecks() {
           return fail(`corpus HEAD ${short(s.head)} ≠ pin ${short(s.pin)}`, {
             remedy: 'run ./snowarch docs sync',
             command: './snowarch docs sync',
-            data: { ...data, fix: { kind: 'docs-sync' } },
+            data: { ...data, fix: { kind: 'head-off-pin' } },
           });
         }
         return ok(`${short(s.pin)} (HEAD, gitlink and pin agree)`, data);
@@ -153,7 +153,7 @@ export function engineDocsChecks() {
           problems.push(`${s.areasMissing.length} area(s) missing: ${s.areasMissing.slice(0, 6).join(', ')}`);
         }
         const data = { sparse: s.sparse, areas: s.areasPresent.length,
-          missing: s.areasMissing, fix: { kind: 'docs-sync' } };
+          missing: s.areasMissing, fix: { kind: 'sparse-mismatch' } };
         return problems.length === 0
           ? ok(`${s.sparse} · ${s.areasPresent.length} area(s)`, data)
           : fail(problems.join('; '), {

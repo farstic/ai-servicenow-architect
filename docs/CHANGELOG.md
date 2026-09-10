@@ -96,6 +96,20 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   sentence, and the fixture's `~/.claude.json` is asserted byte-identical after a run, including
   under `--fix`. The credential never appears: the report says `set (len 12)`, and the key count
   beside it.
+- **`./snowarch doctor --fix` repairs seven drifts, and the list is closed.** Dependencies, the
+  documentation corpus, the corpus's checkout onto its pin, the flags a store entry never stated,
+  the store directory's mode, the mode toggles, and a stale doctor cache — each with exactly one
+  correct resolution and no information in it a human would supply differently. It prints the plan
+  before touching anything, applies in an order where a later repair sees an earlier one, reports
+  every action as `applied`, `noop`, `refused` or `failed`, and re-runs the doctor afterwards: the
+  exit code you get is the RE-RUN's, because a repair that reported success and left a check
+  failing is the one outcome a plan cannot show you. Running it twice changes nothing.
+- **What it refuses is the point.** Credentials, `.mcp.json`, `.claude/settings.json`,
+  `engine.config.json` and everything under `~/.claude` are listed under REFUSED with the exact
+  command to run by hand — and the module is structurally unable to reach them, which a grep test
+  asserts rather than a sentence promising it. The store's own `updateInstance` refuses a patch
+  naming a credential at all, so the flag fixer could not touch one if it were asked to.
+
 - **One report, and one `Mode:` line that is derived rather than remembered.** The line every
   banner, skill and rule file quotes comes from four facts — the toggle file, the store's loaded
   instances, the recorded bootstrap state and whether the server module could run — through a pure

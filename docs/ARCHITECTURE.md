@@ -1017,6 +1017,30 @@ about one registry rather than several:
 | `SV-08` | server | ancestor skill directories | yes | — |
 <!-- /generated:doctor-checks -->
 
+**`--fix` repairs a closed list of seven drifts** (ARC-08-S06), and the list being closed is the
+feature: every entry is a class of drift with exactly one correct resolution and no information in
+it a human would supply differently. It prints the plan before it touches anything (principle 10),
+applies in the order below so a later repair sees an earlier one, reports each as `applied`,
+`noop`, `refused` or `failed`, and re-runs the doctor afterwards — the exit code and the report a
+user reads are the RE-RUN's, because a repair that reported `applied` and left a check failing is
+the one outcome a plan cannot show. It never edits credentials, `.mcp.json`,
+`.claude/settings.json`, `engine.config.json` or anything under `~/.claude`; those are listed under
+REFUSED with the check's own command, and a grep test proves the module cannot reach them.
+
+<!-- generated:doctor-fixes -->
+| Fix | Trigger (`data.fix.kind`) | What it does | Touches |
+|---|---|---|---|
+| `F1` | `deps-missing` | install the server dependencies | `node_modules/` |
+| `F2` | `corpus-missing` | sync the documentation corpus | `vendor/ServiceNowDocs` |
+| `F2` | `sparse-mismatch` | sync the documentation corpus | `vendor/ServiceNowDocs` |
+| `F3` | `head-off-pin` | check the corpus out onto the pin | `vendor/ServiceNowDocs` |
+| `F4` | `flags-incomplete` | state every flag explicitly | `.local/instances.json` |
+| `F5` | `store-mode` | restore the store directory mode | `.local/` |
+| `F6` | `toggles-mismatch` | rewrite the mode toggles | `.claude/settings.local.json` |
+| `F6` | `hooks-disabled-by-bootstrap` | remove the bootstrap's hook toggle | `.claude/settings.local.json` |
+| `F7` | `cache-stale` | clear the stale doctor cache | `.local/doctor-last.json` |
+<!-- /generated:doctor-fixes -->
+
 **The report, as a person reads it** — statuses are `ok`, `warn`, `FAIL`, `skip` (upper-case so
 `grep FAIL` works), and the Mode line is last, because the last line of a transcript is the one that
 survives a truncated paste:

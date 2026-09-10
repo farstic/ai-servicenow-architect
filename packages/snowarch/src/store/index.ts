@@ -115,6 +115,49 @@ export function loadStore(path: string): { store: Store; warning?: string } | { 
  * windows-latest cell in tests/store/atomic.test.ts is what proves that here rather than
  * on the documentation's word.
  */
+/** Keys a caller may never patch through `updateInstance`. Credentials are set, not edited. */
+export const CREDENTIAL_KEYS = Object.freeze(['auth', 'password', 'clientSecret', 'clientId']);
+
+export class CredentialPatchRefused extends Error {
+  constructor(key: string) {
+    super(`updateInstance refuses a patch containing "${key}" — credentials are written by `
+      + './snowarch instance set-credentials, never by a patch');
+    this.name = 'CredentialPatchRefused';
+  }
+}
+
+/**
+ * Change ONE entry's non-credential fields, atomically.
+ *
+ * Added by ARC-08-S06 for the doctor's `--fix`, which writes the flags a store entry never stated
+ * — and which must be unable to touch anything else. That is enforced here rather than promised by
+ * the caller: a patch naming `auth`, `password`, `clientSecret` or `clientId` is REFUSED, at any
+ * depth, so the whole class of "the fixer had a bug and rewrote a credential" cannot happen through
+ * this door. Credentials are written by `instance set-credentials`, which probes before it saves.
+ *
+ * The write is `saveStore`'s: same temp-file-then-rename, same 0600, same everything the wizard
+ * gets. A second writer with its own idea of atomicity is how a store ends up half-written.
+ */
+export function updateInstance(path: string, label: string, patch: Record<string, unknown>):
+{ store: Store } | { error: StoreError } | { unknownInstance: string } {
+  for (const key of Object.keys(patch)) {
+    if (CREDENTIAL_KEYS.includes(key)) throw new CredentialPatchRefused(key);
+  }
+  const loaded = loadStore(path);
+  if ('error' in loaded) return loaded;
+  const entry = loaded.store.instances?.[label];
+  // Not a `StoreError`: that type's codes are about the FILE, and "there is no entry called that"
+  // is about the request. Widening the file's error vocabulary for it would put a request-shaped
+  // code in front of every reader of a store failure.
+  if (!entry) return { unknownInstance: label };
+  const next: Store = {
+    ...loaded.store,
+    instances: { ...loaded.store.instances, [label]: { ...entry, ...patch } as typeof entry },
+  };
+  saveStore(path, next);
+  return { store: next };
+}
+
 export function saveStore(path: string, store: Store): void {
   const dir = dirname(path);
   mkdirSync(dir, { recursive: true, mode: 0o700 });

@@ -43,7 +43,10 @@ export function checkToJson(result, check) {
     remedy: result.remedy ?? null,
     command: result.command ?? null,
     code: result.code ?? null,
-    fixable: check?.fixable ?? false,
+    // The RESULT's answer wins when it has one. The registry flag says a check CAN be fixable;
+    // whether THIS finding is depends on the finding — an absent `.local/` is E-11's subject and
+    // no `--fix` repairs it, and an adopted server result carries the server's own verdict.
+    fixable: result.fixable ?? check?.fixable ?? false,
     quick: check?.quick ?? false,
     durationMs: result.durationMs ?? 0,
     ...(result.data === undefined ? {} : { data: result.data }),

@@ -72,6 +72,15 @@ export async function serverReport(ctx) {
     ctx._server = { ...state, report: null, error: null };
     return ctx._server;
   }
+  // The server module resolves ITS store from `CLAUDE_PROJECT_DIR` (or the cwd) — and this call
+  // is in-process, so it would otherwise read the environment of whatever spawned the doctor. In
+  // production that is the same directory (the command refuses to run anywhere but the root), so
+  // this changes nothing there; it makes a doctor run describe the root it was GIVEN, which is
+  // what B08, the CI smoke probe and every fixture-based test rely on.
+  const saved = { project: process.env.CLAUDE_PROJECT_DIR, store: process.env.SNOW_STORE };
+  process.env.CLAUDE_PROJECT_DIR = ctx.root;
+  if (ctx.storePath) process.env.SNOW_STORE = ctx.storePath;
+  else delete process.env.SNOW_STORE;
   try {
     const module = await (ctx.importServer ?? ((href) => import(href)))(
       pathToFileURL(state.entry).href);
@@ -90,6 +99,11 @@ export async function serverReport(ctx) {
       state: /ERR_MODULE_NOT_FOUND|Cannot find (package|module)/.test(message) ? 'no-deps' : state.state,
       error: message.split('\n')[0],
     };
+  } finally {
+    if (saved.project === undefined) delete process.env.CLAUDE_PROJECT_DIR;
+    else process.env.CLAUDE_PROJECT_DIR = saved.project;
+    if (saved.store === undefined) delete process.env.SNOW_STORE;
+    else process.env.SNOW_STORE = saved.store;
   }
   return ctx._server;
 }
@@ -146,9 +160,12 @@ export async function adopt(ctx, id) {
   }
   if (answer.state === 'no-dist') {
     return id === 'SV-01'
+      // `fixable: false` on the RESULT: `--fix` installs dependencies, it does not restore a
+      // committed artefact — that is one `git checkout` a human runs after looking at their diff.
       ? fail(`${DIST_MISSING} — ${join(answer.packageDir, ...DOCTOR_ENTRY)} is not there`, {
         remedy: 'git checkout -- packages/snowarch/dist, or ./snowarch upgrade',
         command: 'git checkout -- packages/snowarch/dist',
+        fixable: false,
         data: { state: answer.state },
       })
       : skip(DIST_MISSING, { state: answer.state });

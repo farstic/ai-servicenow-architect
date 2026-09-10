@@ -17,6 +17,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { engineChecks } from '../tools/snowarch/lib/doctor/checks/index.mjs';
+import { FIXERS, TARGETS } from '../tools/snowarch/lib/doctor/fix.mjs';
 import { createRegistry } from '../tools/snowarch/lib/doctor/registry.mjs';
 import { buildReport } from '../tools/snowarch/lib/doctor/report-json.mjs';
 import { renderText } from '../tools/snowarch/lib/doctor/report-text.mjs';
@@ -83,6 +84,20 @@ export function checkTable(checks = engineChecks()) {
   return rows.join('\n');
 }
 
+/**
+ * The `--fix` whitelist, from `FIXERS` itself.
+ *
+ * The list being CLOSED is the feature, so the page a user reads must be the list the code
+ * applies — not a copy of it that was true when somebody wrote the page.
+ */
+export function fixTable(fixers = FIXERS) {
+  const rows = ['| Fix | Trigger (`data.fix.kind`) | What it does | Touches |', '|---|---|---|---|'];
+  for (const f of fixers) {
+    rows.push(`| \`${f.id}\` | \`${f.kind}\` | ${f.title} | \`${TARGETS[f.kind] ?? '—'}\` |`);
+  }
+  return rows.join('\n');
+}
+
 function replaceRegion(doc, name, body) {
   const open = `<!-- generated:${name} -->`;
   const close = `<!-- /generated:${name} -->`;
@@ -99,14 +114,15 @@ if (isMain) {
   let next = replaceRegion(current, 'doctor-json', ['```json', json, '```'].join('\n'));
   next = replaceRegion(next, 'doctor-text', ['```', text, '```'].join('\n'));
   next = replaceRegion(next, 'doctor-checks', checkTable());
+  next = replaceRegion(next, 'doctor-fixes', fixTable());
 
   if (current.replace(/\r\n/g, '\n') === next) {
-    process.stdout.write(`gen-doctor-docs: ${TARGET} current (3 blocks).\n`);
+    process.stdout.write(`gen-doctor-docs: ${TARGET} current (4 blocks).\n`);
   } else if (CHECK) {
     process.stdout.write(`gen-doctor-docs: ${TARGET} is stale — run npm run gen and commit the result\n`);
     process.exit(1);
   } else {
     writeFileSync(join(root, TARGET), next);
-    process.stdout.write(`gen-doctor-docs: wrote ${TARGET} (3 blocks).\n`);
+    process.stdout.write(`gen-doctor-docs: wrote ${TARGET} (4 blocks).\n`);
   }
 }

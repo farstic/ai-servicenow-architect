@@ -124,7 +124,7 @@ test('E-10 fails when the server is in BOTH lists, and reports fixable', async (
   assert.equal(r.status, 'fail');
   assert.match(r.detail, /BOTH/);
   assert.equal(checks.find((c) => c.id === 'E-10').fixable, true);
-  assert.equal(r.data.fix.kind, 'toggles');
+  assert.equal(r.data.fix.kind, 'toggles-mismatch');
 });
 
 test('E-10 fails when the server is in NEITHER list', () => {
@@ -181,7 +181,7 @@ test('E-11 fails a world-readable .local/ on POSIX, and offers the chmod as the 
   const r = await run('E-11', root);
   assert.equal(r.status, 'fail');
   assert.match(r.detail, /mode 755, not 700/);
-  assert.deepEqual(r.data.fix, { kind: 'chmod', path: '.local', to: '700' });
+  assert.deepEqual(r.data.fix, { kind: 'store-mode', path: '.local', to: '700' });
 });
 
 test('E-11 turns an unparsable state file into one sentence, not a crash', async (t) => {

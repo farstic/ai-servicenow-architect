@@ -97,7 +97,7 @@ test('E-13 separates the user\'s mismatch from the maintainer\'s', async (t) => 
   const moved = await run(t, 'E-13', { status: { head: 'b'.repeat(40), headMatchesPin: false } });
   assert.equal(moved.status, 'fail');
   assert.equal(moved.command, './snowarch docs sync');
-  assert.equal(moved.data.fix.kind, 'docs-sync');
+  assert.equal(moved.data.fix.kind, 'head-off-pin');
 
   const repinned = await run(t, 'E-13', {
     status: { gitlink: 'c'.repeat(40), pinMatchesGitlink: false },

@@ -48,4 +48,28 @@ export declare function loadStore(path: string): {
  * windows-latest cell in tests/store/atomic.test.ts is what proves that here rather than
  * on the documentation's word.
  */
+/** Keys a caller may never patch through `updateInstance`. Credentials are set, not edited. */
+export declare const CREDENTIAL_KEYS: readonly string[];
+export declare class CredentialPatchRefused extends Error {
+    constructor(key: string);
+}
+/**
+ * Change ONE entry's non-credential fields, atomically.
+ *
+ * Added by ARC-08-S06 for the doctor's `--fix`, which writes the flags a store entry never stated
+ * — and which must be unable to touch anything else. That is enforced here rather than promised by
+ * the caller: a patch naming `auth`, `password`, `clientSecret` or `clientId` is REFUSED, at any
+ * depth, so the whole class of "the fixer had a bug and rewrote a credential" cannot happen through
+ * this door. Credentials are written by `instance set-credentials`, which probes before it saves.
+ *
+ * The write is `saveStore`'s: same temp-file-then-rename, same 0600, same everything the wizard
+ * gets. A second writer with its own idea of atomicity is how a store ends up half-written.
+ */
+export declare function updateInstance(path: string, label: string, patch: Record<string, unknown>): {
+    store: Store;
+} | {
+    error: StoreError;
+} | {
+    unknownInstance: string;
+};
 export declare function saveStore(path: string, store: Store): void;

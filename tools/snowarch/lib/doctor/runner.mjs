@@ -117,7 +117,8 @@ export function summarise(results, checks) {
   const summary = { ok: 0, warn: 0, fail: 0, skip: 0, fixable: 0 };
   for (const r of results) {
     summary[r.status] = (summary[r.status] ?? 0) + 1;
-    if (byId.get(r.id)?.fixable && (r.status === 'fail' || r.status === 'warn')) summary.fixable += 1;
+    const fixable = r.fixable ?? byId.get(r.id)?.fixable ?? false;
+    if (fixable && (r.status === 'fail' || r.status === 'warn')) summary.fixable += 1;
   }
   return summary;
 }

@@ -56,7 +56,8 @@ const withValue = (list, value) => (Array.isArray(list) && list.includes(value)
  * Pure, and exported for the tests: every merge case is a question about this function, and
  * answering it through the filesystem would make the tests slower and the failures vaguer.
  */
-export function computeSettings(current, { mode, nodePresent, registration, serverKey }) {
+export function computeSettings(current, { mode, nodePresent, registration, serverKey,
+  removeDisableAllHooks = false }) {
   const next = { ...current };
   const live = mode === 'live' && registration === 'project';
 
@@ -80,6 +81,13 @@ export function computeSettings(current, { mode, nodePresent, registration, serv
   // that runs `node` on a machine without Node prints an error on every session start. Present iff
   // Node is, and REMOVED when it is not — an installation that loses Node must not keep a hook that
   // now fails.
+  // ARC-08-S06's F6: the ONLY case in which this writer removes `disableAllHooks` is when the
+  // caller has read `bootstrap-state.hooksDisabledByBootstrap === true` — i.e. WE set it, on a
+  // machine that then had no Node. Variant B never sets it, so this arm is unreachable through
+  // our own writes and exists for a state file written by an older build. A key the user set is
+  // theirs, and is left alone.
+  if (removeDisableAllHooks) delete next.disableAllHooks;
+
   const hooks = { ...(current.hooks ?? {}) };
   if (nodePresent) Object.assign(hooks, hookEntry());
   else delete hooks.SessionStart;
@@ -128,7 +136,7 @@ export function writeJsonAtomic(path, value, { mode = null } = {}) {
  * own report, and a function that printed would have to be silenced by one of them.
  */
 export function applyToggles({ root, mode, nodePresent, registration = 'project', serverKey,
-  check = isIgnored }) {
+  removeDisableAllHooks = false, check = isIgnored }) {
   const path = join(root, SETTINGS_LOCAL);
   const before = existsSync(path) ? readFileSync(path, 'utf8') : null;
 
@@ -146,7 +154,8 @@ export function applyToggles({ root, mode, nodePresent, registration = 'project'
 
   if (!check(root)) return { ok: false, reason: NOT_IGNORED, changed: false };
 
-  const next = computeSettings(current, { mode, nodePresent, registration, serverKey });
+  const next = computeSettings(current, { mode, nodePresent, registration, serverKey,
+    removeDisableAllHooks });
   // Reported, never acted on. The caller prints the note; deciding here would make this function
   // both a writer and a narrator, and B07 already owns the console.
   const userDisabledHooks = current.disableAllHooks === true;

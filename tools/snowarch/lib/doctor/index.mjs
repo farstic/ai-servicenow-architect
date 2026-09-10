@@ -12,6 +12,7 @@
 // included; exit 2 is a usage error, which is a fact about the command line rather than the
 // checkout.
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { loadState } from '../state.mjs';
 import { dirname, join, resolve } from 'node:path';
 
 import { loadContract } from '../../../../packages/contract/lib/contract.mjs';
@@ -23,7 +24,8 @@ import { SECTIONS } from './registry.mjs';
 import { engineBlock, engineRegistry, serverBlock, staleBlock,
   summariseMerged } from './checks/index.mjs';
 import { deriveMode, modeLine, modeLineDetailed } from './mode.mjs';
-import { writeReportCache } from '../doctor-cache.mjs';
+import { applyPlan, buildPlan, fixesBlock, logFix, renderPlan } from './fix.mjs';
+import { cacheStale, writeReportCache } from '../doctor-cache.mjs';
 import { contractSha, version as engineVersion } from '../config.mjs';
 import { collectPrereqs } from './prereqs.mjs';
 import { buildReport } from './report-json.mjs';
@@ -227,11 +229,79 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
       cacheError = e.message;
     }
   }
-  return { report, checks, summary, derived, cacheError };
+  return { report, checks, summary, derived, cacheError, ctx };
+}
+
+/**
+ * `--fix`: run, propose, apply, run again.
+ *
+ * The second run is not a formality — it is the answer. A repair that reported `applied` and left
+ * a check failing is exactly the outcome a user cannot see from a plan, so the exit code and the
+ * report they read are the RE-RUN's, and the fixes are listed above it.
+ */
+export async function fixCommand({ root, config, registry, options, env, home, now, write, ask,
+  yes = false, deps = {} }) {
+  const first = await runDoctor({ root, config, registry, ...options, env, home, now,
+    // The first pass never writes the cache: it describes a checkout that is about to change.
+    writeCache: false });
+
+  const state = (() => { try { return loadState(root); } catch { return null; } })();
+  const plan = buildPlan(first.report, {
+    stale: options.sections === null ? cacheStale(root) : null,
+  });
+  write(renderPlan(plan));
+
+  if (plan.actions.length === 0) {
+    return { applied: [], report: first.report, checks: first.checks, skipped: true };
+  }
+  if (!yes) {
+    const answer = ask ? await ask() : null;
+    // Enter applies (principle 10: propose → review → apply); anything else, including a closed
+    // stdin, is a no. A non-interactive caller that means yes says `--yes`.
+    const said = String(answer ?? '').trim().toLowerCase();
+    if (answer === null || !(said === '' || said === 'y' || said === 'yes')) {
+      write('nothing applied.');
+      return { applied: [], report: first.report, checks: first.checks, declined: true };
+    }
+  }
+
+  const fixCtx = {
+    root,
+    config,
+    env,
+    platform: process.platform,
+    mode: state?.mode ?? null,
+    docsMode: state?.docs?.mode ?? 'sparse',
+    registration: state?.registration ?? 'project',
+    storePath: join(root, '.local', 'instances.json'),
+  };
+  const applied = await applyPlan(plan, fixCtx, deps);
+  for (const entry of applied) {
+    write(`  ${entry.id}  ${entry.result}${entry.detail ? ` — ${entry.detail}` : ''}`);
+  }
+  logFix(root, applied);
+
+  // The same options, so the second report is comparable with the first — and this one caches.
+  const second = await runDoctor({ root, config, registry: registry ?? engineRegistry(), ...options,
+    env, home, now });
+  return { applied, report: second.report, checks: second.checks, cacheError: second.cacheError };
+}
+
+/** One line from stdin, or `null` at end of input — the same reader the plan screen uses. */
+function defaultAsk(input) {
+  return async () => {
+    const { createInterface } = await import('node:readline');
+    const rl = createInterface({ input, terminal: false });
+    const it = rl[Symbol.asyncIterator]();
+    const { value, done } = await it.next();
+    rl.close();
+    return done ? null : value;
+  };
 }
 
 export async function doctorCommand({ flags = {}, log, out = process.stdout, env = process.env,
-  cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(), home = '' } = {}) {
+  cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(), home = '',
+  input = process.stdin, ask = null, fixDeps = {} } = {}) {
   const started = now();
   const write = (text) => out.write(`${text}\n`);
 
@@ -284,21 +354,47 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     sections: sections ? sections.names : null,
   };
 
-  const { report, checks, cacheError } = await runDoctor({
-    root,
-    config,
-    registry,
+  const runOptions = {
     sections: options.sections,
     quick: options.quick,
     noNetwork: options.noNetwork,
     fix: options.fix,
     section: options.section,
     writeCache: flags['no-cache'] === true ? false : 'auto',
-    env,
-    home,
-    now,
     started,
-  });
+  };
+
+  let report;
+  let checks;
+  let cacheError;
+  let fixes = [];
+  if (options.fix) {
+    // A plan a nobody can answer is a plan nobody asked for: without a TTY and without `--yes`,
+    // `--fix` prints what it would do and stops, which is the safe half of the interaction.
+    const interactive = Boolean(input?.isTTY) || Boolean(ask);
+    const outcome = await fixCommand({
+      root, config, registry, options: runOptions, env, home, now, write,
+      yes: flags.yes === true,
+      ask: ask ?? (interactive ? defaultAsk(input) : null),
+      deps: fixDeps,
+    });
+    report = outcome.report;
+    checks = outcome.checks;
+    cacheError = outcome.cacheError;
+    fixes = fixesBlock(outcome.applied ?? []);
+    if (fixes.length > 0) report.fixes = fixes;
+    // A plan the user declined is a successful run of `--fix`: they asked what it would do, and
+    // it told them. The findings are still on the screen and the next run still reports them.
+    if (outcome.declined) {
+      if (flags.json) write(JSON.stringify(report, null, 2));
+      if (log?.commit) log.commit();
+      return EXIT_OK;
+    }
+  } else {
+    ({ report, checks, cacheError } = await runDoctor({
+      root, config, registry, ...runOptions, env, home, now,
+    }));
+  }
 
   // A cache that could not be written is not a failed run: the report is on the screen, and the
   // banner's fallback is to re-run. Said out loud so a read-only checkout is explicable.

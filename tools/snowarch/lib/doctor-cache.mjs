@@ -121,6 +121,30 @@ export function writeDoctorCache(root, { mode, checks, engineVersion = null, con
 }
 
 /**
+ * The report as this FILE may hold it — which is less than the report as a caller may read it.
+ *
+ * `server.instances[].username` is masked (`s***@corp.example.com`) and is still an ADDRESS
+ * SHAPE, which the write-time guard refuses on sight — rightly: this file is read casually, pasted
+ * into issues and copied between machines, and the guard's value is that it has no exceptions. The
+ * banner does not need an account name to print a verdict, so the cache does not carry one. A live
+ * `--json` run still returns it; a stored answer does not.
+ *
+ * Found the first time a CONFIGURED store met the cache: every live install would otherwise have
+ * had no cache at all, and the banner no verdict to show.
+ */
+export function forStorage(report) {
+  const server = report.server;
+  if (!server?.instances?.length) return report;
+  return {
+    ...report,
+    server: {
+      ...server,
+      instances: server.instances.map(({ username: _username, ...rest }) => rest),
+    },
+  };
+}
+
+/**
  * ARC-08's write: the doctor's own report, plus the inputs that justify reading it later.
  *
  * The SAME file and the same guard as the bootstrap's write — a second writer with its own shape
@@ -132,6 +156,7 @@ export function writeDoctorCache(root, { mode, checks, engineVersion = null, con
  * where the caller makes it.
  */
 export function writeReportCache(root, report, { writer = 'doctor', now = new Date() } = {}) {
+  const stored = forStorage(report);
   const payload = {
     version: CACHE_VERSION,
     at: (now instanceof Date ? now : new Date(now)).toISOString(),
@@ -140,11 +165,11 @@ export function writeReportCache(root, report, { writer = 'doctor', now = new Da
     contractSha: report.engine?.contractSha ?? null,
     mode: report.mode ?? null,
     modeLine: report.modeLine ?? null,
-    ...(report.server ? { server: report.server } : {}),
-    checks: (report.checks ?? []).map(({ id, status, detail, remedy = null }) =>
+    ...(stored.server ? { server: stored.server } : {}),
+    checks: (stored.checks ?? []).map(({ id, status, detail, remedy = null }) =>
       ({ id, status, detail, ...(remedy ? { remedy } : {}) })),
-    summary: report.summary ?? summarise(report.checks ?? []),
-    report,
+    summary: stored.summary ?? summarise(stored.checks ?? []),
+    report: stored,
   };
   assertStorable(payload, 'doctor-last');
   mkdirSync(join(root, '.local'), { recursive: true, mode: 0o700 });

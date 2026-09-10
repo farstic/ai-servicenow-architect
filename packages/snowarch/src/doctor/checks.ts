@@ -120,12 +120,17 @@ export const svStore: Check = {
     const notes: string[] = [`source ${res.source}, ${maskPath(res.path)}`];
     let status: CheckResult['status'] = 'ok';
     let remedy: string | undefined;
+    let fix: Record<string, unknown> | null = null;
 
     if (isWindows) {
       notes.push('mode check skipped (Windows: permissions are ACL-inherited, not POSIX bits)');
     } else if (existsSync(res.path)) {
       const fileMode = statSync(res.path).mode & 0o777;
       const dirMode = statSync(dirname(res.path)).mode & 0o777;
+      // ARC-08-S06's F5 repairs exactly these two, and the hint says which path and which mode —
+      // so the fixer never has to re-derive what this check already measured.
+      if (fileMode !== 0o600) fix = { kind: 'store-mode', path: res.path, to: '600' };
+      else if ((dirMode & 0o077) !== 0) fix = { kind: 'store-mode', path: dirname(res.path), to: '700' };
       if ((fileMode & 0o077) !== 0) {
         status = 'fail';
         notes.push(`mode ${fileMode.toString(8).padStart(4, '0')} is group/world-readable`);
@@ -162,7 +167,8 @@ export const svStore: Check = {
     }
 
     return { id: 'SV-02', title: 'store', status, detail: notes.join('; '),
-      ...(remedy ? { remedy } : {}), fixable: false };
+      ...(remedy ? { remedy } : {}),
+      ...(fix ? { fixable: true, data: { fix } } : { fixable: false }) };
   },
 };
 
