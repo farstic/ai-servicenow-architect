@@ -273,8 +273,27 @@ test('nothing under lib/ opens ~/.claude.json, or anything else in the home dire
   assert.ok(files.length > 20, `only ${files.length} modules scanned — is the walk right?`);
 
   const FS_VERB = /readFileSync|writeFileSync|existsSync|openSync|rmSync|appendFileSync|join\(|resolve\(/;
+  const WRITE_VERB = /writeFileSync|appendFileSync|rmSync|unlinkSync|renameSync|openSync/;
+  /**
+   * The one file allowed to READ it, and never to write it.
+   *
+   * ARC-08-S03's E-23 is a detector: its whole subject is the stale registrations the old
+   * installers left in `~/.claude.json`, and a detector that may not read what it detects cannot
+   * exist. The rule this exception belongs to is about OWNERSHIP — the file is the claude CLI's,
+   * so nothing here may change it — and that half is asserted more strictly for this file than
+   * for the others: no write verb at all, anywhere in it.
+   */
+  const READ_ONLY_DETECTOR = 'doctor/checks/legacy.mjs';
+
   for (const file of files) {
     const text = readFileSync(file, 'utf8');
+    if (file.split('\\').join('/').endsWith(READ_ONLY_DETECTOR)) {
+      assert.equal(WRITE_VERB.test(text), false,
+        `${file} is the read-only detector and it writes something`);
+      assert.equal(/\bhomedir\b|USERPROFILE/.test(text), false,
+        `${file} reaches into the home directory instead of taking it from ctx`);
+      continue;
+    }
     assert.equal(/\bhomedir\b|USERPROFILE/.test(text), false, `${file} reaches into the home directory`);
     for (const [i, line] of text.split('\n').entries()) {
       if (!line.includes('.claude.json')) continue;
