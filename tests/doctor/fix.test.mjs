@@ -10,12 +10,14 @@ import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync,
   writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { applyPlan, buildPlan, FIXERS, fixesBlock, KINDS, logFix,
   renderPlan, TARGETS } from '../../tools/snowarch/lib/doctor/fix.mjs';
 import { doctorCommand, runDoctor } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { engineRegistry } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
 import { cachePath, inputsPath } from '../../tools/snowarch/lib/doctor-cache.mjs';
+import { buildUpstream, makeWorkspace } from '../helpers/docs-fixture.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { contextFor, greenTree, linkInstall, readJson, REAL_ROOT,
   writeJson } from './helpers/tree.mjs';
@@ -390,4 +392,116 @@ test('a configured store still gets a cache, and the cache holds no account name
     assert.equal('username' in instance, false);
     assert.ok(instance.label && instance.preset);
   }
+});
+
+/**
+ * F2 against the REAL `B02.run` — the case the injected runner could not fail.
+ *
+ * The first version of this suite drove F2 through an injected `run`, so it proved the mode
+ * arithmetic and nothing about the step's actual contract: B02 reads `ctx.config` and MUTATES
+ * `ctx.state.docs`, and F2 passed neither. Every real run died with `Cannot set properties of
+ * undefined (setting 'docs')` — a defect a review on a fresh clone found and this file could not.
+ *
+ * The git seam is the ARC-03 fixture's local upstream, so nothing here reaches a network.
+ */
+test('F2 runs the real B02, syncs the corpus, and records the mode it synced', async (t) => {
+  const scratch = tempDir('snowarch-f2-', t);
+  const upstream = buildUpstream(scratch);
+  const w = makeWorkspace({ scratch, pin: upstream.pin, upstreamUrl: pathToFileURL(upstream.bare).href });
+  writeFileSync(join(w.root, 'engine.config.json'), `${JSON.stringify({
+    docs: { family: 'australia', pin: upstream.pin, areasFile: 'vendor/docs-areas.txt',
+      upstream: pathToFileURL(upstream.bare).href },
+    mcp: { serverKey: 'servicenow', packageDir: 'packages/snowarch' },
+    floors: { node: '20.0.0', claudeCode: '2.1.214', git: '2.34.1' },
+  }, null, 2)}\n`);
+  const config = JSON.parse(readFileSync(join(w.root, 'engine.config.json'), 'utf8'));
+
+  // The recorded mode is `skip` — the case the story says must be rewritten AND said.
+  mkdirSync(join(w.root, '.local'), { recursive: true, mode: 0o700 });
+  writeFileSync(join(w.root, '.local', 'bootstrap-state.json'), `${JSON.stringify({
+    version: 1, product: 'snowarch', engineVersion: '0.0.0-test', mode: 'design',
+    docs: { mode: 'skip', pin: null }, node: { present: true, version: '22.0.0' },
+    writer: 'node', platform: process.platform, registration: 'project',
+    registrationReason: 'default', hooksDisabledByBootstrap: false,
+    startedAt: '2026-09-10T00:00:00.000Z', updatedAt: '2026-09-10T00:00:00.000Z', steps: {},
+  }, null, 2)}\n`, { mode: 0o600 });
+
+  assert.equal(existsSync(join(w.root, 'vendor/ServiceNowDocs/markdown')), false,
+    'precondition: the fixture has no corpus');
+
+  const action = { id: 'F2', check: 'E-12', kind: 'corpus-missing', title: 't',
+    target: 'vendor/ServiceNowDocs', detail: 'd', fix: {} };
+  const [applied] = await applyPlan({ actions: [action] },
+    { root: w.root, config, docsMode: 'skip', mode: 'design', platform: process.platform });
+
+  assert.equal(applied.result, 'applied', applied.detail);
+  assert.match(applied.detail, /recorded mode was "skip" — synced as "sparse"/);
+  assert.ok(existsSync(join(w.root, 'vendor/ServiceNowDocs/markdown')), 'no corpus after F2');
+
+  // The rewrite is in the STORE, not only on the screen: the next run must not offer it again.
+  const state = JSON.parse(readFileSync(join(w.root, '.local', 'bootstrap-state.json'), 'utf8'));
+  assert.equal(state.docs.mode, 'sparse', 'the recorded docs mode was not updated');
+  assert.equal(state.docs.pin, upstream.pin);
+});
+
+test('F2 reports a sync that could not complete, and never crashes', async (t) => {
+  const scratch = tempDir('snowarch-f2-', t);
+  const upstream = buildUpstream(scratch);
+  const w = makeWorkspace({ scratch, pin: upstream.pin, upstreamUrl: pathToFileURL(upstream.bare).href });
+  // An upstream that is not there: the fetch fails, and the fixer's job is to say so.
+  writeFileSync(join(w.root, 'engine.config.json'), `${JSON.stringify({
+    docs: { family: 'australia', pin: upstream.pin, areasFile: 'vendor/docs-areas.txt',
+      upstream: pathToFileURL(join(scratch, 'no-such-upstream.git')).href },
+    mcp: { serverKey: 'servicenow', packageDir: 'packages/snowarch' },
+    floors: { node: '20.0.0', claudeCode: '2.1.214', git: '2.34.1' },
+  }, null, 2)}\n`);
+  const config = JSON.parse(readFileSync(join(w.root, 'engine.config.json'), 'utf8'));
+
+  const action = { id: 'F2', check: 'E-12', kind: 'corpus-missing', title: 't',
+    target: 'vendor/ServiceNowDocs', detail: 'd', fix: {} };
+  const [applied] = await applyPlan({ actions: [action] },
+    { root: w.root, config, docsMode: 'sparse', mode: 'design', platform: process.platform });
+
+  assert.equal(applied.result, 'failed');
+  assert.ok(applied.detail && applied.detail.length > 0, 'a failure with no reason');
+  assert.equal(/Cannot set properties|undefined/.test(applied.detail), false,
+    `the step crashed rather than failing: ${applied.detail}`);
+});
+
+// The contract `--json` has with a script.
+test('--fix --json puts one object on stdout and the plan on stderr', async (t) => {
+  const { root } = driftedTree(t);
+  const stdout = [];
+  const stderr = [];
+  const code = await doctorCommand({
+    flags: { fix: true, yes: true, quick: true, json: true },
+    out: { write: (x) => stdout.push(x) },
+    err: { write: (x) => stderr.push(x) },
+    cwd: root,
+    input: { isTTY: false },
+  });
+  assert.ok([0, 1].includes(code));
+
+  // The assertion that would have caught it: parse the WHOLE of stdout, not a slice from `{`.
+  const report = JSON.parse(stdout.join(''));
+  assert.ok(Array.isArray(report.fixes) && report.fixes.length > 0);
+  assert.equal(/FIX PLAN|REFUSED/.test(stdout.join('')), false, 'the plan reached stdout');
+
+  const narration = stderr.join('');
+  assert.match(narration, /FIX PLAN \(\d+ actions?\)/);
+  assert.match(narration, /F4 {2}applied/);
+});
+
+// The line the reviewer asked to be held by a test rather than by observation.
+test('a cache written for a configured store carries no address-shaped string', async (t) => {
+  const { root } = driftedTree(t);
+  await doctorAt(root, {});                       // a --quick run, cache written
+  assert.ok(existsSync(cachePath(root)));
+  const text = readFileSync(cachePath(root), 'utf8');
+  // The instance IS in there — this is not a test that passes because nothing was cached.
+  const cache = JSON.parse(text);
+  assert.ok(cache.server.instances.some((i) => i.label === 'pdi'), 'the cache lost the instance');
+  assert.equal(/[A-Za-z0-9*][A-Za-z0-9.*-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(text), false,
+    'an address-shaped string survived in the cache');
+  assert.equal(/https?:\/\/[a-z0-9-]+\.service-now\.com/i.test(text), false);
 });

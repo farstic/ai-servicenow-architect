@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { cachePath, cacheStale, inputsPath } from '../doctor-cache.mjs';
+import { loadState, saveState } from '../state.mjs';
 
 /** The `data.fix.kind` vocabulary. A kind outside this table is never applied — it is reported. */
 export const KINDS = Object.freeze(['deps-missing', 'corpus-missing', 'sparse-mismatch',
@@ -38,6 +39,31 @@ export const TARGETS = Object.freeze({
 const result = (state, detail = null) => ({ result: state, ...(detail ? { detail } : {}) });
 
 /**
+ * The context a BOOTSTRAP STEP expects — all of it, not the half a caller happens to remember.
+ *
+ * A step is a `run(ctx)` over the same object the bootstrap driver builds, and two of its fields
+ * are easy to omit and fatal to omit: `config`, and `state`, which B02 MUTATES (`ctx.state.docs =
+ * …`). Passing neither made F2 die with `Cannot set properties of undefined (setting 'docs')` on
+ * every real run — invisible here because the test injected the runner and never exercised the
+ * step's actual contract. Built in one place now, so a future fixer that wires a step gets the
+ * whole object.
+ */
+function stepContext(root, ctx, { state = null, docs = null } = {}) {
+  return {
+    root,
+    config: ctx.config,
+    env: ctx.env ?? process.env,
+    plat: ctx.platform ?? process.platform,
+    mode: ctx.mode ?? 'design',
+    node: { present: true, version: process.versions.node },
+    state: state ?? { steps: {} },
+    ...(docs ? { docs } : {}),
+    log: { debug: () => {} },
+    line: () => {},
+  };
+}
+
+/**
  * F1 — the dependencies, through the bootstrap's own step.
  *
  * Live mode only: a design-only install deliberately has none, and "repairing" that would install
@@ -46,9 +72,17 @@ const result = (state, detail = null) => ({ result: state, ...(detail ? { detail
 async function fixDeps({ root, ctx, run }) {
   if (ctx.mode !== 'live') return result('noop', 'design-only installs have no dependencies');
   const B04 = await import('../steps/B04.mjs');
-  const r = await (run ?? B04.run)({ root, mode: 'live', env: ctx.env ?? process.env,
-    config: ctx.config, log: { debug: () => {} }, line: () => {} });
+  const r = await (run ?? B04.run)(stepContext(root, ctx, { state: readState(root) }));
   return r?.status === 'fail' ? result('failed', r.detail) : result('applied', r?.detail ?? null);
+}
+
+/** The recorded state, or an empty one. A step that mutates it gets something to mutate. */
+function readState(root) {
+  try {
+    return loadState(root) ?? { steps: {} };
+  } catch {
+    return { steps: {} };
+  }
 }
 
 /** F2 — the corpus, through the bootstrap's docs step. `skip` becomes `sparse`, and says so. */
@@ -57,9 +91,18 @@ async function fixDocs({ root, ctx, kind, run }) {
   const recorded = ctx.docsMode ?? 'sparse';
   const mode = recorded === 'skip' ? 'sparse' : recorded;
   const note = recorded === 'skip' ? 'recorded mode was "skip" — synced as "sparse"' : null;
-  const r = await (run ?? B02.run)({ root, docs: mode, env: ctx.env ?? process.env,
-    config: ctx.config, log: { debug: () => {} }, line: () => {} });
+  const state = readState(root);
+  const r = await (run ?? B02.run)(stepContext(root, ctx, { state, docs: mode }));
   if (r?.status === 'fail') return result('failed', r.detail);
+  // B02 records the mode it actually synced ON THE STATE. Persisting it is what makes the `skip`
+  // → `sparse` rewrite real: without this the sentence on screen would be the only trace, and the
+  // next run would read `skip` again and offer the same repair forever.
+  try {
+    if (state.docs) saveState(root, state);
+  } catch (e) {
+    return result('applied', [note, r?.detail, `state not updated: ${e.message}`]
+      .filter(Boolean).join(' · '));
+  }
   return result('applied', [note, r?.detail].filter(Boolean).join(' · ') || null);
 }
 

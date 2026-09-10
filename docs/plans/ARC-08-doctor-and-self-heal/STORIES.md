@@ -404,6 +404,17 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 > `chmod` → `store-mode`, `disableAllHooks` → `hooks-disabled-by-bootstrap`. (6) **The cache drops
 > `server.instances[].username`**: masked or not, it is an address shape, and the write-time guard
 > refuses those without exception — every live install would otherwise have had no cache at all.
+>
+> **Amendment 2026-09-10 (b), from the review on a fresh clone.** Two defects the suite could not
+> see. (1) **F2 never worked.** It called `B02.run` with `{root, docs, env, config}` and no
+> `state`, and B02 MUTATES `ctx.state.docs`, so every real run died with `Cannot set properties of
+> undefined`. The test had injected the runner, which proved the mode arithmetic and nothing about
+> the step's contract — the vacuous shape. F2 now builds the context the bootstrap driver builds
+> (through `stepContext`, shared with F1) and PERSISTS the state B02 mutates, so the `skip` →
+> `sparse` rewrite lands in the store rather than only on the screen; the test drives the real
+> `B02.run` against the ARC-03 fixture upstream. (2) **`--fix --json` was not JSON**: the plan and
+> the per-fix lines went to stdout above the object. Under `--json` they go to stderr and stdout
+> carries exactly one object, asserted by `JSON.parse` over the WHOLE of stdout.
 
 **As** an individual practitioner **I want** `./snowarch doctor --fix` to repair the seven classes of drift that are safe to repair, report each repair, and print the exact command for everything it refuses to touch **so that** an install that drifted after an upgrade, a moved checkout or a hand edit returns to 0 FAIL in one run without ever risking credentials or committed files.
 **Context.** README deliverable "`--fix` whitelist (idempotent, reported): deps → B04; docs missing/unsparse → B02; pin drift → `git submodule update --checkout`; flags < 6 → explicit `"false"`; store modes → chmod; toggles → rewrite for recorded mode; stale `doctor-last.json` → re-run. Never: credentials, `.mcp.json`, `~/.claude*`" and acceptance criterion 4 (repairs a four-flag store entry, a wrong sparse set and a missing settings.local toggle in one run; refuses `.mcp.json` and prints `git checkout -- .mcp.json`). `01` §8. Principle 10 applies in spirit: `--fix` shows its plan before applying unless `--yes`.

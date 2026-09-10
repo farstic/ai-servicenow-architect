@@ -241,6 +241,9 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
  */
 export async function fixCommand({ root, config, registry, options, env, home, now, write, ask,
   yes = false, deps = {} }) {
+  // `write` here is the NARRATION channel, not stdout. Under `--json` the caller hands us stderr:
+  // a plan printed above the object made `JSON.parse(stdout)` fail on the first character, which
+  // is the whole contract `--json` has with a script.
   const first = await runDoctor({ root, config, registry, ...options, env, home, now,
     // The first pass never writes the cache: it describes a checkout that is about to change.
     writeCache: false });
@@ -300,8 +303,8 @@ function defaultAsk(input) {
 }
 
 export async function doctorCommand({ flags = {}, log, out = process.stdout, env = process.env,
-  cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(), home = '',
-  input = process.stdin, ask = null, fixDeps = {} } = {}) {
+  err = process.stderr, cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(),
+  home = '', input = process.stdin, ask = null, fixDeps = {} } = {}) {
   const started = now();
   const write = (text) => out.write(`${text}\n`);
 
@@ -369,11 +372,15 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
   let cacheError;
   let fixes = [];
   if (options.fix) {
+    // Under `--json`, stdout carries ONE thing: the object. The plan, the prompt and the per-fix
+    // lines are prose, so they follow every other human line to stderr — a caller piping this into
+    // `jq` must not have to strip them, and `JSON.parse(stdout)` is the assertion that proves it.
+    const narrate = flags.json ? (text) => err.write(`${text}\n`) : write;
     // A plan a nobody can answer is a plan nobody asked for: without a TTY and without `--yes`,
     // `--fix` prints what it would do and stops, which is the safe half of the interaction.
     const interactive = Boolean(input?.isTTY) || Boolean(ask);
     const outcome = await fixCommand({
-      root, config, registry, options: runOptions, env, home, now, write,
+      root, config, registry, options: runOptions, env, home, now, write: narrate,
       yes: flags.yes === true,
       ask: ask ?? (interactive ? defaultAsk(input) : null),
       deps: fixDeps,

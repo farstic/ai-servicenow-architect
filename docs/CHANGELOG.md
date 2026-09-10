@@ -104,6 +104,8 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   every action as `applied`, `noop`, `refused` or `failed`, and re-runs the doctor afterwards: the
   exit code you get is the RE-RUN's, because a repair that reported success and left a check
   failing is the one outcome a plan cannot show you. Running it twice changes nothing.
+- **`--fix --json` is one JSON object on stdout.** The plan, the prompt and the per-fix lines are
+  prose and go to stderr, so a script can `JSON.parse` the output without stripping anything.
 - **What it refuses is the point.** Credentials, `.mcp.json`, `.claude/settings.json`,
   `engine.config.json` and everything under `~/.claude` are listed under REFUSED with the exact
   command to run by hand — and the module is structurally unable to reach them, which a grep test
