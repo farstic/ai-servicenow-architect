@@ -65,18 +65,39 @@ export function normalise(report) {
   };
 }
 
-/** The ids whose STATUS is allowed to differ between Windows and the POSIX platforms. */
-export const WINDOWS_DIFFERS = Object.freeze([
-  // E-04: the capability packs are probed by spawning `python3` / `soffice` / `drawio`, and a
-  // Windows runner has a different set of them on PATH.
-  'E-04',
-  // E-11: POSIX file modes. `.local` cannot be 0700 on a filesystem with no mode bits, so the check
-  // reports what Windows can answer instead of failing on a question that has no meaning there.
-  'E-11',
-  // SV-02: the launcher shim the server is started through is `snowarch.cmd`, a different file with
-  // a different set of things that can be wrong with it.
-  'SV-02',
-]);
+/**
+ * The checks a hosted runner is expected to FAIL, and therefore the only failures a snapshot taken
+ * on one may record.
+ *
+ * E-00 asks whether Claude Code is installed. A GitHub runner has no Claude Code, so the honest
+ * answer is `fail` — the doctor deliberately re-asks even when the install ran with
+ * `--skip-claude-check`, because that flag is about the install and the doctor's subject is the
+ * machine as it is now. Recording it as expected is not the same as excusing it: `assert-doctor.mjs`
+ * asserts the named ids DO fail, so the day a runner arrives with Claude Code installed this list
+ * goes red and someone removes the entry, instead of it covering nothing for a year.
+ */
+export const EXPECTED_FAIL_ON_RUNNERS = Object.freeze(['E-00']);
+
+/**
+ * The ids whose STATUS is allowed to differ between Windows and the POSIX platforms.
+ *
+ * EMPTY, and that is the finding. The story expected E-04, E-11 and SV-02 to differ; on a
+ * design-only install none of them does, because what a snapshot records is the STATUS and those
+ * three answer `ok`, `ok` and `skip` everywhere. Their DETAIL differs — E-04 finds a different set
+ * of capability packs, E-11 says "file modes: ACL-inherited" where POSIX says nothing, SV-02 names
+ * a different launcher — and detail is exactly what the normaliser drops, because it is the part
+ * that legitimately varies between two correct machines.
+ *
+ * The one row that did differ was E-03, and it was a BUG rather than a platform: `npm` on Windows
+ * is `npm.CMD`, and Node refuses to exec a batch file without a shell since CVE-2024-27980, so the
+ * doctor had been reporting "npm found but did not answer --version" on every Windows machine since
+ * the check was written. Fixed in `makeExec` rather than recorded here — an allowance would have
+ * made the bug the standard, which is what a snapshot of a broken install always does.
+ *
+ * A row belongs here when Windows legitimately answers a different STATUS, with the reason beside
+ * it. Nothing qualifies today.
+ */
+export const WINDOWS_DIFFERS = Object.freeze([]);
 
 const idsOf = (snapshot) => snapshot.checks.map((c) => c.id);
 

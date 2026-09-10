@@ -403,9 +403,12 @@ jobs:
         if: (matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash') && matrix.os == 'windows-latest'
         shell: cmd
         run: |
-          .\snowarch.cmd doctor --json --no-cache > doctor.json
+          rem CALL, not a bare invocation: cmd TRANSFERS control to another batch file and never
+          rem comes back, so every line after it — including the exit-code check it was written for
+          rem — is dead. The step's code becomes the callee's, which looks like it worked.
+          call .\snowarch.cmd doctor --json --no-cache > doctor.json
           if %ERRORLEVEL% GEQ 2 exit /b 1
-          .\snowarch.cmd doctor --no-cache
+          call .\snowarch.cmd doctor --no-cache
           if %ERRORLEVEL% GEQ 2 exit /b 1
           exit /b 0
       # The no-gitbash cell runs it from PowerShell too: `snowarch.cmd` is the entry point on a
@@ -455,7 +458,7 @@ jobs:
           for key in mode docs pin updatedAt; do
             grep -q "\"$key\"" .local/bootstrap-state.json || { echo "missing $key"; exit 1; }
           done
-          grep -q '"mode": "design"' .local/bootstrap-state.json || { echo "not design-only"; exit 1; }
+          grep -q '"mode": "design-only"' .local/bootstrap-state.json || { echo "not design-only"; exit 1; }
           test ! -f .local/doctor-last.json || { echo "a doctor cache exists - the doctor ran?"; exit 1; }
           echo "state file: $(wc -c < .local/bootstrap-state.json) bytes, no doctor cache"
       - name: With no Node, the state file is what a session falls back to (Windows)
@@ -468,7 +471,7 @@ jobs:
           foreach ($key in @('"mode"', '"docs"', '"pin"', '"updatedAt"')) {
             if (-not $text.Contains($key)) { Write-Host "missing $key"; exit 1 }
           }
-          if (-not $text.Contains('"mode": "design"')) { Write-Host "not design-only"; exit 1 }
+          if (-not $text.Contains('"mode": "design-only"')) { Write-Host "not design-only"; exit 1 }
           if (Test-Path .local\doctor-last.json) { Write-Host "a doctor cache exists"; exit 1 }
           Write-Host "state file: $($text.Length) chars, no doctor cache"
           exit 0

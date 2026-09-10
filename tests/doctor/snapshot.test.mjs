@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { diff, normalise, PLATFORMS, snapshotPath, WINDOWS_DIFFERS }
+import { diff, EXPECTED_FAIL_ON_RUNNERS, normalise, PLATFORMS, snapshotPath, WINDOWS_DIFFERS }
   from '../../scripts/ci/doctor-snapshot.mjs';
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
@@ -96,12 +96,20 @@ test('Windows differs from the POSIX platforms only in the documented rows', () 
   console.log(`    windows differs in: ${differing.length ? differing.join(', ') : '(nothing)'}`);
 });
 
-test('the snapshots are design-only, and green', () => {
+test('the snapshots are design-only, and fail only where the runner explains it', () => {
+  // A snapshot of a broken install makes the broken install the standard, so what may fail here is
+  // closed: exactly the checks a hosted runner is expected to fail, and nothing else. E-00 is the
+  // list — a runner has no Claude Code — and the snapshots were taken on runners, which is also
+  // why they are the honest record of what the platforms answer rather than of what I expected.
   for (const platform of present) {
     const s = load(platform);
     assert.equal(s.mode, 'design-only', `${platform}: the snapshot is not a design-only install`);
-    assert.equal(s.summary.fail, 0, `${platform}: the snapshot records ${s.summary.fail} FAIL — `
-      + 'a snapshot of a broken install makes the broken install the standard');
     assert.equal(s.schema, 1);
+    const failing = s.checks.filter((c) => c.status === 'fail').map((c) => c.id);
+    assert.deepEqual(failing, [...EXPECTED_FAIL_ON_RUNNERS],
+      `${platform}: the snapshot records failures the runner does not explain`);
+    assert.equal(s.summary.fail, EXPECTED_FAIL_ON_RUNNERS.length);
+    assert.equal(s.summary.warn, 0,
+      `${platform}: a WARN in the snapshot — a design-only install should have nothing to warn about`);
   }
 });

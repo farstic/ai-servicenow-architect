@@ -739,6 +739,32 @@ New checks with no old counterpart (listed under the table): E-06, E-09 (key sca
 ---
 
 ### ARC-08-S11 — CI: doctor after bootstrap on three OSes, JSON snapshot test, fixture-driven detector tests, banner timing
+
+> **Amendment 2026-09-11 (from the delivery).** Five departures.
+>
+> 1. **E-00 is a FAIL on a hosted runner, not a `skip`.** The story assumed `--skip-claude-check`
+>    at install time makes the doctor skip it. It does not, deliberately: the doctor's E-00 passes
+>    `skip: false` to `checkClaudeCode`, because the flag is about the install and the doctor's job
+>    is to re-ask on a machine that has since changed. With no `claude` on PATH the honest answer
+>    is `fail`, and the doctor exits 1. Rather than teach the doctor to hide a missing prerequisite,
+>    `scripts/ci/assert-doctor.mjs` takes `--expect-fail E-00` and asserts it BOTH ways — the named
+>    ids must fail and every other check must not — so the allowance cannot outlive the condition
+>    that justified it.
+> 2. **Steps, not a job.** `main`'s protection lists 42 contexts by name, so the doctor runs inside
+>    ARC-06-S14's thirteen `bootstrap` cells and `tests/workflows.test.mjs` now pins the job list.
+> 3. **The snapshots live at `tests/fixtures/doctor/snapshot-<platform>.json`**, not
+>    `tests/doctor/snapshots/design-only.<os>.json` — the repository keeps fixtures under
+>    `tests/fixtures/`, and the platform key is `process.platform` (`win32`, not `windows`) because
+>    that is what the code selecting the file has to hand. All three were produced from this PR's
+>    own CI artifacts, never written by hand.
+> 4. **The fixture username is `someone.fixture@corp.example.com`.** The story's example spelled a
+>    personal name; the rule of record is that no real person's name appears anywhere in this
+>    repository, not even as a masking example. The password is 24 random characters generated in
+>    the test, so a run that passed by not printing one particular string cannot keep passing.
+> 5. **`CI_DOCS=fixture` is not used.** The bootstrap cells fetch the real corpus — that is the
+>    thing ARC-06-S14 exists to prove — so E-12…E-16 answer against it and `assert-doctor.mjs`
+>    fails the job if every docs check skipped. The fixture corpus stays what the unit tests use.
+
 **As** CI **I want** the doctor to run after the design-only bootstrap on ubuntu, macOS and Windows on every commit, its JSON compared against a normalised snapshot, the stale-registration and redaction fixtures exercised, and the banner timed **so that** ARC-08's acceptance criteria are proven continuously and every other ARC can name a doctor check as its proof (README risk "doctor drift").
 **Context.** README deliverable 11 and acceptance criteria 1, 3, 5, 6; README risk mitigation "CI runs the doctor after the bootstrap". ARC-06-S14 (bootstrap CI job on three OSes; Windows without Git Bash), ARC-09-S08 (matrix completion — this story adds the doctor steps to the jobs ARC-06 created; ARC-09-S08 later places the `doctor` job on its final cells and names this story as its source), ARC-00-S13 (Windows PATH-stripping recipe), `01` §13 (CI runs bootstrap, lints, tests on three OSes).
 **Scope.** In: `.github/workflows/ci.yml` steps `doctor` (after `bootstrap --mode design --yes`): `./snowarch doctor --json --no-cache > doctor.json`, exit-code assertion, snapshot comparison, artifact upload of `doctor.json`; `tests/doctor/snapshot.test.mjs` (normaliser + per-OS expected status map); `tests/doctor/fixtures/claude-json-stale/` (S03 criterion 1 in CI with `HOME` redirected); `tests/doctor/redaction-e2e.test.mjs` (README criterion 3 against a fixture store with known credentials — `RUN_LIVE_E2E` not needed; the store is read, probes are skipped); banner timing job step (S08 criterion 1). Out: the live-mode CI job (needs a PDI secret — remains the opt-in `RUN_LIVE_E2E` job owned by ARC-07-S11/ARC-09), the Node-version matrix (ARC-09-S08).

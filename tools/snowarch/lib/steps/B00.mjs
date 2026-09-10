@@ -46,12 +46,26 @@ const gb = (bytes) => `${(bytes / GIB).toFixed(1)} GB`;
  * through a shell to resolve `.cmd`, and never `npx`, which would reach the network from the step
  * whose job is to find out whether the network works.
  */
-export function makeExec({ env = process.env, plat = process.platform } = {}) {
+export function makeExec({ env = process.env, plat = process.platform,
+  // The two seams, with the real implementations as defaults. `plat` alone is not enough to test
+  // the Windows branch below: proving it needs a `.cmd` to resolve to and a spawn to observe, and
+  // neither exists on the machines this suite mostly runs on.
+  resolve: resolveBin = which, exec: run = execFileSync } = {}) {
   return (name, args) => {
-    const bin = which(name, { env, platform: plat });
+    const bin = resolveBin(name, { env, platform: plat });
     if (!bin) return { found: false, ok: false, stdout: '', stderr: '' };
     try {
-      const stdout = execFileSync(bin, args, { encoding: 'utf8', stdio: 'pipe', timeout: 10_000 });
+      // WINDOWS: a `.cmd` / `.bat` cannot be spawned directly any more. Node closed
+      // CVE-2024-27980 by refusing to exec a batch file without a shell, and the refusal is an
+      // EINVAL from `spawnSync` — so `npm --version`, which resolves to `npm.CMD`, came back as
+      // "found but did not answer". The doctor reported a WARN about npm on every Windows machine
+      // and had done since the check was written; ARC-08-S11's first CI run is what showed it,
+      // because nothing else had ever run E-03 on Windows. `shell: true` only where it is needed:
+      // it re-introduces quoting rules, and `bin` is a path this process resolved rather than
+      // anything a user typed.
+      const batch = plat === 'win32' && /\.(cmd|bat)$/i.test(bin);
+      const stdout = run(bin, args,
+        { encoding: 'utf8', stdio: 'pipe', timeout: 10_000, ...(batch ? { shell: true } : {}) });
       return { found: true, ok: true, stdout, stderr: '', bin };
     } catch (e) {
       return { found: true, ok: false, stdout: String(e.stdout ?? ''),

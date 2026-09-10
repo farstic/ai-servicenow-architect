@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { EXPECTED_FAIL_ON_RUNNERS } from '../scripts/ci/doctor-snapshot.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -200,7 +201,12 @@ test('the doctor runs inside the bootstrap cells, and adds no job name (ARC-08-S
   for (const r of doctorRuns) assert.match(r, /--no-cache/, `a cached doctor run: ${r}`);
 
   // The three things the steps exist to do.
-  assert.match(job, /scripts\/ci\/assert-doctor\.mjs --in doctor\.json --expect-fail E-00/);
+  // The allowance in the workflow and the one the snapshots are held to are the same list.
+  // `includes`, not a regex: an escaped path in a pattern reads to the citation lint as a file
+  // that does not exist, and it is right to — `assert-doctor\.mjs` is not a path.
+  assert.ok(job.includes('scripts/ci/assert-doctor.mjs --in doctor.json '
+    + `--expect-fail ${EXPECTED_FAIL_ON_RUNNERS.join(',')}`),
+  'the workflow does not allow exactly the runner-expected failures');
   assert.match(job, /scripts\/ci\/doctor-snapshot\.mjs --in doctor\.json/);
   assert.match(job, /scripts\/ci\/banner-timing\.mjs --runs 5 --budget-ms 1000 --summary/);
 
