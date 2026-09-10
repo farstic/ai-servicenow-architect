@@ -59,7 +59,14 @@ export interface Probes {
         remedy?: string;
     }>;
 }
-/** Returns `skip`, always, naming the story that will replace it. */
+/**
+ * Returns `skip`, always — the shape the doctor binds when no instance is configured.
+ *
+ * ARC-07-S03 supplies the real implementation (`probeAll`, exported as `@farstic/snowarch/probes`);
+ * ARC-08-S04 is where the doctor chooses to bind it, because that is the story that owns what the
+ * doctor RENDERS. This stub stays as the unconfigured answer rather than being deleted: "there is
+ * no instance to probe" is a real state, and `skip` is its honest report.
+ */
 export declare const stubProbes: Probes;
 export interface DoctorReport {
     product: 'snowarch';

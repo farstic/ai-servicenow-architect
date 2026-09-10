@@ -1,0 +1,390 @@
+/**
+ * ARC-07-S03 — one library that proves an instance's credentials, and never locks an account out.
+ *
+ * Three callers need the same answer: the wizard while it is being set up, `instance test`
+ * afterwards, and the ARC-08 doctor later. If each asked in its own way they would disagree about
+ * the same instance on the same day, and the user would believe the last one they ran.
+ *
+ * The rule that shapes every function here: ONE HTTP REQUEST PER PROBE, EVER. The client is
+ * constructed with `maxRetries: 0` even though it already excludes authentication failures from
+ * its retry policy, because "excluded today" is a property of code somebody may reasonably change
+ * and "no retries configured" is a property of this call. A retried 401 is an account three
+ * attempts closer to a lockout, on an instance whose lockout policy we do not know.
+ *
+ * Nothing here writes. Every probe is a `GET` with `sysparm_limit=1`, and the one that is not a
+ * GET — the ROPC token request — asks for a token and discards it.
+ */
+import { existsSync } from 'node:fs';
+import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { delimiter, join } from 'node:path';
+
+import { FLAG_NAMES, type FlagName } from '../utils/permissions.js';
+import { classifyNetworkError } from './net-errors.js';
+
+/**
+ * The sentence every review screen prints ONCE, above the probe lines.
+ *
+ * A probe proves the account can READ the table family a flag unlocks. It does not prove a write
+ * will be allowed: ServiceNow evaluates write ACLs per call, per record, and a probe that implied
+ * otherwise would be the wizard promising something the instance has not agreed to.
+ */
+export const HONESTY_NOTE =
+  'Probes confirm the account can reach each table family; write ACLs are still evaluated per call.';
+
+export type ProbeStatus = 'ok' | 'auth failed' | 'role missing' | 'unreachable' | 'error'
+  | 'not licensed' | 'not installed' | 'skipped';
+
+export interface AuthProbe {
+  status: ProbeStatus;
+  code?: string;
+  httpStatus?: number;
+  roles?: string[];
+  hint?: string;
+  detail?: string;
+}
+
+export interface CapabilityProbe {
+  flag: FlagName;
+  status: ProbeStatus;
+  detail: string;
+}
+
+export interface LastProbe {
+  at: string;
+  auth: ProbeStatus;
+  write: ProbeStatus;
+  scripting: ProbeStatus;
+  cmdb: ProbeStatus;
+  atf: ProbeStatus;
+  nowAssist: ProbeStatus;
+  fluent: ProbeStatus;
+}
+
+/** What a probe needs of a client. `ServiceNowClient` satisfies it; a fake can too. */
+export interface ProbeClient {
+  queryRecords(params: { table: string; query?: string; fields?: string; limit?: number }):
+  Promise<{ count: number; records: unknown[] }>;
+}
+
+/** The 403 hint, spelled once: the account is real, the role is not. */
+export const ROLE_MISSING_HINT =
+  'The credentials are valid but the account cannot read sys_user over REST. On a PDI use the '
+  + 'admin account; elsewhere ask for a role that grants sys_user read (itil or admin).';
+
+export const ROLES_UNREADABLE_HINT = 'could not read roles';
+
+/**
+ * ServiceNow's OAuth error bodies, as DATA.
+ *
+ * RFC 6749 §5.2 names these; what a given instance actually returns is CAPTURED, not assumed —
+ * ARC-07-S11 records the real texts from a PDI with the hardening property toggled and fills
+ * `tests/fixtures/oauth-ropc-errors.json`. Until then this table is the RFC's names, and anything
+ * unrecognised falls through to `auth failed` with the raw value in `detail` rather than being
+ * guessed at.
+ */
+export const ROPC_ERROR_TABLE: ReadonlyArray<{
+  error: string;
+  status: ProbeStatus;
+  code?: string;
+  hint?: string;
+}> = Object.freeze([
+  {
+    error: 'unsupported_grant_type',
+    status: 'auth failed',
+    code: 'OAUTH_ROPC_DISABLED',
+    hint: 'This instance has disabled the OAuth password grant (system property '
+      + 'glide.oauth.inbound.ropc.grant_type.disabled = true — Security Center hardening). Use '
+      + 'basic authentication, or ask the instance admin; the client-credentials grant is on the '
+      + 'roadmap.',
+  },
+  {
+    error: 'invalid_client',
+    status: 'auth failed',
+    code: 'OAUTH_CLIENT_INVALID',
+    hint: 'Client ID or client secret rejected; the user password was not checked.',
+  },
+  { error: 'invalid_grant', status: 'auth failed' },
+  { error: 'access_denied', status: 'auth failed' },
+]);
+
+/** The token response this probe understands. Nothing is stored from it. */
+export interface TokenResult { ok: boolean; error?: string; httpStatus?: number }
+
+/**
+ * Prove the credentials. One request; on 401, never a second.
+ *
+ * The 403 path is its own status rather than a failure: on a hardened instance the login is
+ * correct and the REST ACL is not, and telling that user their password is wrong sends them to
+ * change a password that works.
+ */
+export async function probeAuth(client: ProbeClient, {
+  username,
+  authMethod = 'basic',
+  tokenProbe,
+  env = process.env,
+}: {
+  username?: string;
+  authMethod?: 'basic' | 'oauth_ropc';
+  tokenProbe?: () => Promise<TokenResult>;
+  env?: NodeJS.ProcessEnv;
+} = {}): Promise<AuthProbe> {
+  if (authMethod === 'oauth_ropc') {
+    if (!tokenProbe) return { status: 'error', detail: 'no token probe supplied' };
+    let token: TokenResult;
+    try {
+      token = await tokenProbe();
+    } catch (err) {
+      return unreachable(err, env);
+    }
+    if (!token.ok) {
+      const row = ROPC_ERROR_TABLE.find((r) => r.error === token.error);
+      return row
+        ? { status: row.status, ...(row.code ? { code: row.code } : {}), ...(row.hint ? { hint: row.hint } : {}),
+          ...(token.httpStatus ? { httpStatus: token.httpStatus } : {}) }
+        // Unrecognised: the raw value, said plainly, rather than a guess dressed as a diagnosis.
+        : { status: 'auth failed', code: 'AUTHENTICATION_FAILED',
+          detail: token.error ?? 'the token request failed with no error field' };
+    }
+  }
+
+  try {
+    await client.queryRecords({ table: 'sys_user', fields: 'sys_id', limit: 1 });
+  } catch (err) {
+    return fromClientError(err, env);
+  }
+
+  // Best effort, and after the login is already proven: a 403 here means the roles cannot be
+  // read, not that the account is unusable — the review screen simply annotates less.
+  if (!username) return { status: 'ok' };
+  try {
+    const result = await client.queryRecords({
+      table: 'sys_user_has_role',
+      query: `user.user_name=${username}`,
+      fields: 'role.name',
+      limit: 200,
+    });
+    const roles = result.records
+      .map((r) => (r as Record<string, unknown>)['role.name'])
+      .filter((r): r is string => typeof r === 'string' && r !== '');
+    return { status: 'ok', roles };
+  } catch {
+    return { status: 'ok', hint: ROLES_UNREADABLE_HINT };
+  }
+}
+
+/** The table each flag's probe reads, and what "ok" means for it. Keyed by `FLAG_NAMES`. */
+export const CAPABILITY_TABLE: Readonly<Record<FlagName, {
+  table?: string;
+  query?: string;
+  /** True when a 200 with zero rows is NOT ok — the rows are the evidence. */
+  needsRows?: boolean;
+  local?: 'fluent';
+  emptyStatus?: ProbeStatus;
+  emptyDetail?: string;
+}>> = Object.freeze({
+  WRITE_ENABLED: { table: 'sys_update_set' },
+  SCRIPTING_ENABLED: { table: 'sys_script_include' },
+  CMDB_WRITE_ENABLED: { table: 'cmdb_ci' },
+  ATF_ENABLED: { table: 'sys_atf_test' },
+  NOW_ASSIST_ENABLED: {
+    table: 'sys_properties',
+    query: 'nameSTARTSWITHsn_generative_ai',
+    needsRows: true,
+    emptyStatus: 'not licensed',
+    // "properties found", never "Now Assist works": a plugin can be installed without a licence,
+    // and the tools themselves report the licence error. Recorded as a limitation in S10.
+    emptyDetail: 'no Now Assist properties found — plugin absent or not licensed',
+  },
+  FLUENT_ENABLED: { local: 'fluent' },
+});
+
+export interface FluentCheck { installed: boolean; where?: string }
+
+/**
+ * Is `@servicenow/sdk` on this machine — in the checkout, or installed globally?
+ *
+ * The global lookup spawns `npm root -g`, and on Windows `npm` is a `.cmd`: since Node 20.12
+ * `child_process` refuses to spawn one without a shell, so the executable is LOCATED on PATH
+ * first and a `.cmd` is run through `cmd /c`. Bare `spawn('npm')` looked like it worked
+ * everywhere right up until it did not, on the one platform nobody develops on.
+ *
+ * The spawn is injected, so CI never runs the real `npm root -g` — which would be a network-shaped
+ * dependency in a unit test and slow on every cell.
+ */
+export function checkFluent({
+  from = import.meta.url,
+  runNpm = defaultNpmRoot,
+  exists = existsSync,
+}: Partial<{
+  from: string;
+  runNpm: () => string | null;
+  exists: (p: string) => boolean;
+}> = {}): FluentCheck {
+  try {
+    const resolved = createRequire(from).resolve('@servicenow/sdk/package.json');
+    return { installed: true, where: resolved };
+  } catch { /* not in the checkout; try the global root */ }
+
+  const root = runNpm();
+  if (!root) return { installed: false };
+  const candidate = join(root, '@servicenow', 'sdk', 'package.json');
+  return exists(candidate) ? { installed: true, where: candidate } : { installed: false };
+}
+
+/** `npm root -g`, with a 5 s deadline, or null. Never throws: this is a hint, not a dependency. */
+function defaultNpmRoot(): string | null {
+  const npm = locate('npm');
+  if (!npm) return null;
+  let result: SpawnSyncReturns<string>;
+  try {
+    result = npm.toLowerCase().endsWith('.cmd')
+      ? spawnSync('cmd', ['/c', npm, 'root', '-g'], { encoding: 'utf8', timeout: 5_000 })
+      : spawnSync(npm, ['root', '-g'], { encoding: 'utf8', timeout: 5_000 });
+  } catch { return null; }
+  const out = String(result.stdout ?? '').trim();
+  return result.status === 0 && out !== '' ? out : null;
+}
+
+/** The absolute path of an executable on PATH, or null. Windows decides by PATHEXT. */
+function locate(name: string, env: NodeJS.ProcessEnv = process.env): string | null {
+  const path = env.PATH ?? env.Path ?? '';
+  const exts = process.platform === 'win32'
+    ? (env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean)
+    : [''];
+  for (const dir of path.split(delimiter).filter(Boolean)) {
+    for (const ext of exts) {
+      const candidate = join(dir, `${name}${ext}`);
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+/** One capability. Read-only, one request, and `skipped` is never inferred here. */
+export async function probeCapability(client: ProbeClient, flag: FlagName, {
+  env = process.env,
+  fluent = checkFluent,
+}: Partial<{ env: NodeJS.ProcessEnv; fluent: typeof checkFluent }> = {}): Promise<CapabilityProbe> {
+  const row = CAPABILITY_TABLE[flag];
+  if (!row) return { flag, status: 'error', detail: `no probe defined for ${flag}` };
+
+  if (row.local === 'fluent') {
+    const found = fluent();
+    return found.installed
+      ? { flag, status: 'ok', detail: '@servicenow/sdk found' }
+      : { flag, status: 'not installed', detail: '@servicenow/sdk not found — npm i -g @servicenow/sdk' };
+  }
+
+  try {
+    const result = await client.queryRecords({
+      table: row.table as string,
+      ...(row.query ? { query: row.query } : {}),
+      fields: 'sys_id',
+      limit: 1,
+    });
+    if (row.needsRows && result.records.length === 0) {
+      return { flag, status: row.emptyStatus ?? 'error', detail: row.emptyDetail ?? 'no rows' };
+    }
+    return { flag, status: 'ok', detail: `${row.table} readable` };
+  } catch (err) {
+    const mapped = fromClientError(err, env);
+    return { flag, status: mapped.status,
+      detail: mapped.hint ?? mapped.detail ?? mapped.code ?? 'the request failed' };
+  }
+}
+
+export interface ProbeAll {
+  auth: AuthProbe;
+  capabilities: CapabilityProbe[];
+}
+
+/**
+ * Auth first; capabilities only if it passed.
+ *
+ * A capability probe against an instance that just refused the login tells you nothing you did not
+ * already know and spends five more requests finding it out — on the same account, moments after
+ * a failed authentication.
+ */
+export async function probeAll(client: ProbeClient, {
+  username,
+  authMethod = 'basic',
+  tokenProbe,
+  env = process.env,
+  fluent = checkFluent,
+  now = () => new Date(),
+}: Partial<{
+  username: string;
+  authMethod: 'basic' | 'oauth_ropc';
+  tokenProbe: () => Promise<TokenResult>;
+  env: NodeJS.ProcessEnv;
+  fluent: typeof checkFluent;
+  now: () => Date;
+}> = {}): Promise<ProbeAll & { at: string }> {
+  const auth = await probeAuth(client, {
+    ...(username ? { username } : {}), authMethod, ...(tokenProbe ? { tokenProbe } : {}), env,
+  });
+  if (auth.status !== 'ok') {
+    return {
+      at: now().toISOString(),
+      auth,
+      capabilities: FLAG_NAMES.map((flag) => ({
+        flag, status: 'skipped' as ProbeStatus, detail: `auth ${auth.status} — not attempted`,
+      })),
+    };
+  }
+  const capabilities = await Promise.all(
+    FLAG_NAMES.map((flag) => probeCapability(client, flag, { env, fluent })),
+  );
+  return { at: now().toISOString(), auth, capabilities };
+}
+
+/**
+ * The store shape.
+ *
+ * STATUSES ONLY. No username, no role list, no hint text — the store is read by the banner, the
+ * doctor and `/snowarch status`, and a probe record that carried an account name would put it in
+ * every one of them.
+ */
+export function toLastProbe(result: ProbeAll & { at: string }): LastProbe {
+  const status = (flag: FlagName): ProbeStatus =>
+    result.capabilities.find((c) => c.flag === flag)?.status ?? 'skipped';
+  return {
+    at: result.at,
+    auth: result.auth.status,
+    write: status('WRITE_ENABLED'),
+    scripting: status('SCRIPTING_ENABLED'),
+    cmdb: status('CMDB_WRITE_ENABLED'),
+    atf: status('ATF_ENABLED'),
+    nowAssist: status('NOW_ASSIST_ENABLED'),
+    fluent: status('FLUENT_ENABLED'),
+  };
+}
+
+/** A client error, mapped to a probe status — the client's own code, never re-derived. */
+function fromClientError(err: unknown, env: NodeJS.ProcessEnv): AuthProbe {
+  const e = err as { code?: string; details?: { status?: number }; cause?: unknown };
+  const httpStatus = e?.details?.status;
+  if (e?.code === 'AUTHENTICATION_FAILED' || httpStatus === 401) {
+    return { status: 'auth failed', code: 'AUTHENTICATION_FAILED', ...(httpStatus ? { httpStatus } : {}) };
+  }
+  if (e?.code === 'INSUFFICIENT_PRIVILEGES' || httpStatus === 403) {
+    return {
+      status: 'role missing',
+      code: 'INSUFFICIENT_PRIVILEGES',
+      ...(httpStatus ? { httpStatus } : {}),
+      hint: ROLE_MISSING_HINT,
+    };
+  }
+  if (httpStatus !== undefined) {
+    return { status: 'error', ...(e.code ? { code: e.code } : {}), httpStatus,
+      detail: `the instance answered ${httpStatus}` };
+  }
+  return unreachable(err, env);
+}
+
+/** A network failure: S02's classification, not a second opinion. */
+function unreachable(err: unknown, env: NodeJS.ProcessEnv): AuthProbe {
+  const diagnosis = classifyNetworkError(err, env);
+  return { status: 'unreachable', code: diagnosis.code, detail: diagnosis.remedy };
+}
