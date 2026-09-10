@@ -80,3 +80,66 @@ test('the workflows name the repository settings they depend on', () => {
   assert.match(text, /Allow GitHub Actions to create and approve pull requests/);
   assert.match(text, /Approve and run/);
 });
+
+/**
+ * ARC-06-S14 — the `bootstrap` job is the install promise, and its cell names are an interface.
+ *
+ * `main`'s branch protection lists required contexts BY NAME. A renamed cell is not a red build —
+ * it is a required check that silently stops being required, which is worse: protection keeps
+ * waiting for a context nobody produces any more, or (if the name simply vanished from the list)
+ * a broken install merges green. So the thirteen names are enumerated here, and changing one is a
+ * two-file change with a comment pointing at the settings that have to change with it.
+ */
+const BOOTSTRAP_CELLS = [
+  'bootstrap (ubuntu-latest, node 20)',
+  'bootstrap (ubuntu-latest, node 22)',
+  'bootstrap (ubuntu-latest, node 24)',
+  'bootstrap (macos-latest, node 20)',
+  'bootstrap (macos-latest, node 22)',
+  'bootstrap (macos-latest, node 24)',
+  'bootstrap (windows-latest, node 20)',
+  'bootstrap (windows-latest, node 22)',
+  'bootstrap (windows-latest, node 24)',
+  'bootstrap (no-node, ubuntu-latest)',
+  'bootstrap (no-node, macos-latest)',
+  'bootstrap (no-node, windows-latest)',
+  'bootstrap (no-gitbash, windows-latest)',
+];
+
+test('the bootstrap job has exactly the thirteen cells protection will require', () => {
+  const ci = wf('ci.yml');
+  const labels = [...ci.matchAll(/label: '([^']+)'/g)].map((m) => `bootstrap (${m[1]})`);
+  assert.deepEqual(labels, BOOTSTRAP_CELLS);
+  // 9 + 3 + 1, and each variant answers a different question — nine Node majors across three
+  // operating systems, three launchers finishing without Node, one Windows machine with no POSIX
+  // shell at all.
+  assert.equal(labels.filter((l) => /node \d\d\)/.test(l)).length, 9);
+  assert.equal(labels.filter((l) => l.includes('no-node')).length, 3);
+  assert.equal(labels.filter((l) => l.includes('no-gitbash')).length, 1);
+  assert.match(ci, /name: bootstrap \(\$\{\{ matrix\.label \}\}\)/);
+});
+
+test('every bootstrap run skips the Claude Code check and fetches its own corpus', () => {
+  const ci = wf('ci.yml');
+  const job = ci.slice(ci.indexOf('\n  bootstrap:'), ci.indexOf('\n  launcher:'));
+  // Invocation lines only — a comment that MENTIONS a launcher is prose, and matching it would
+  // make this test fail for a sentence rather than for a command.
+  const runs = job.split('\n')
+    .map((l) => l.trim())
+    .filter((l) => !l.startsWith('#') && !l.startsWith('rem '))
+    .filter((l) => /^(\.[\\/]|& powershell |[^#]*-File \.\\)bootstrap\.(sh|cmd|ps1)/.test(l));
+  assert.ok(runs.length >= 6, `only ${runs.length} launcher invocations found`);
+  for (const r of runs) {
+    assert.match(r, /--mode design --yes --skip-claude-check/,
+      `a bootstrap invocation without the runner's flags: ${r}`);
+  }
+  // The corpus must be fetched BY the bootstrap, or B02 is a no-op and assertion 6 a tautology.
+  assert.match(job, /submodules: false/);
+  // No cell may reach for a secret, and none of them needs one.
+  assert.equal(/secrets\./.test(job), false, 'a bootstrap cell reads a secret');
+});
+
+test('the run is cancelled when superseded, so thirteen cells are not paid for twice', () => {
+  const ci = wf('ci.yml');
+  assert.match(ci, /concurrency:\n\s+group: ci-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress: true/);
+});

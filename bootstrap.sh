@@ -142,8 +142,11 @@ STATE
 }
 STARTED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 STEPS=''
+# `$3` is the measured milliseconds, when the step measured itself. `inputsHash` stays null on
+# purpose — bash cannot compute the repository's input hashes, so the launcher TIMES a step but
+# never caches one.
 record() { STEPS="$STEPS${STEPS:+,}
-    \"$1\": { \"status\": \"$2\", \"inputsHash\": null, \"finishedAt\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"durationMs\": 0 }" ; write_state "$STEPS" ; }
+    \"$1\": { \"status\": \"$2\", \"inputsHash\": null, \"finishedAt\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"durationMs\": ${3:-0} }" ; write_state "$STEPS" ; }
 record B00 ok
 git diff --quiet HEAD -- .mcp.json .claude/settings.json 2>/dev/null || \
   die B01 ".mcp.json or .claude/settings.json differs from the committed version" \
@@ -166,7 +169,8 @@ else
   PRESENT="$(grep -c . "$ROOT/vendor/docs-areas.txt")"
   say "areas: $PRESENT/$PRESENT present"
   say "$MSG_CITATIONS"
-  step B02 docs "ok ($(( $(date +%s) - T0 )) s)" ; record B02 ok
+  B02_S=$(( $(date +%s) - T0 ))
+  step B02 docs "ok ($B02_S s)" ; record B02 ok $(( B02_S * 1000 ))
 fi
 LOCAL_SETTINGS="$ROOT/.claude/settings.local.json"
 if [ ! -f "$LOCAL_SETTINGS" ] ; then

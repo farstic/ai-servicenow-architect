@@ -1214,3 +1214,21 @@ If you need a new `claude mcp` call, add it there — not in the command that wa
 also owns two things that are easy to get wrong once and never notice: `-s <scope>` on every call
 (without it, `remove` deletes from whichever scope it finds, and ours is committed), and the
 `cwd: root` that local scope is keyed on.
+
+## What CI proves about the install
+
+The `bootstrap` job is the install promise, executed. **When it is red, the install is broken, not
+the test** — every one of its ten assertions is something a user would hit within a minute of
+cloning: an installer that edited a tracked file, a state file that does not say `design-only`, a
+toggle that is not S05's target, a credential-shaped key left in a config, a corpus that is not at
+the pin, a `.local` anyone can read, a second run that redid the work of the first.
+
+Thirteen cells, three questions. Nine ask whether the install works where Node is present (three
+operating systems × Node 20/22/24). Three ask whether the launcher finishes design-only ITSELF,
+with no Node to hand over to — in `sh` on macOS and Linux, in PowerShell on Windows. One asks
+whether the Windows path works on a machine with no POSIX shell at all.
+
+The negatives were proven once, by fixture pull requests that were opened red and closed unmerged:
+a root-file write fails assertion 2 with the file named, a `SNOW_PASSWORD` placeholder in
+`.mcp.json` fails assertion 5, and a broken `dist/server.js` fails the handshake smoke on every
+`node-cli` cell. Their logs are quoted in ARC-06-S14's pull request.

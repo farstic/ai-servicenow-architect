@@ -300,7 +300,16 @@ export function planRecipe({ config, areas, mode = MODE.sparse, state = { presen
   platform = process.platform } = {}) {
   const { docs } = config;
   const C = ['-C', CORPUS_DIR];
-  const g = (...a) => `git ${a.join(' ')}`;
+  // EVERY command carries `-c core.longpaths=true` on Windows, not just the last one.
+  //
+  // Found by ARC-06-S14's `no-node, windows-latest` cell, which is the only place a Node-free
+  // Windows install has ever run: the recipe set `core.longpaths` as its second-to-last line, so
+  // the clone, the sparse-checkout and the CHECKOUT all ran with the default `false` — and one
+  // corpus file whose path exceeds 260 characters was silently absent from the working tree
+  // afterwards (` D markdown/platform-security/…/sc-limit-attachme…`). The Node path never had the
+  // bug: `withLongPaths` has always wrapped every call there. The persistent `config` line stays,
+  // because a later plain `git -C vendor/ServiceNowDocs …` typed by a person needs it too.
+  const g = (...a) => `git ${[...(platform === 'win32' ? ['-c', 'core.longpaths=true'] : []), ...a].join(' ')}`;
   const lines = [];
 
   if (!state.present) {

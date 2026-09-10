@@ -122,9 +122,14 @@ test('the launcher is short — it is a launcher, not a second implementation', 
   // The story's budget is 180 and assumed the recipe was EMBEDDED; the ruling moved it out to a
   // sourced file, and added a generated region in its place. Hand-written lines are what a reader
   // has to hold in their head, so that is what is measured — with the total reported beside it.
-  assert.ok(lines - generated <= 180,
+  // Raised 180 → 185 (total 200 → 206) when the S14 ruling made the launcher RECORD the B02
+  // duration it already measured: three lines of comment saying that timing a step and caching one
+  // are different claims, and one more line to keep the elapsed seconds in a variable rather than
+  // calling `date` twice. Same trade as bootstrap.ps1's 250 → 265 — the budget exists to stop a
+  // launcher becoming an application, and the measured total is printed either way.
+  assert.ok(lines - generated <= 185,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
-  assert.ok(lines <= 200, `${lines} total lines`);
+  assert.ok(lines <= 206, `${lines} total lines`);
 });
 
 test('the state and the cache bash writes are the ones Node reads', async () => {

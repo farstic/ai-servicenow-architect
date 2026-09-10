@@ -181,6 +181,197 @@ jobs:
       - name: Lint every workflow
         run: /tmp/actionlint -color
 
+  bootstrap:
+    # THE INSTALL PROMISE, as a job. When this is red the install is broken, not the test: every
+    # assertion is something a user hits within a minute of cloning.
+    #
+    # Thirteen cells, and each variant answers a different question. `node-cli` — does the install
+    # work where Node is present, on three operating systems and three Node majors? `no-node` — does
+    # the launcher finish design-only ITSELF, in `sh` and in PowerShell, with no Node to hand over
+    # to? `no-gitbash` — does the Windows path work on a machine that has no POSIX shell at all?
+    #
+    # The corpus is fetched FOR REAL here. This is the only job that proves an end-to-end
+    # design-only install; `docs-real.yml` proves the recipe weekly, and the two measure the same
+    # thing from opposite ends.
+    name: bootstrap (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: 'ubuntu-latest, node 20',  os: ubuntu-latest,  variant: node-cli, node: '20', writer: node }
+          - { label: 'ubuntu-latest, node 22',  os: ubuntu-latest,  variant: node-cli, node: '22', writer: node }
+          - { label: 'ubuntu-latest, node 24',  os: ubuntu-latest,  variant: node-cli, node: '24', writer: node }
+          - { label: 'macos-latest, node 20',   os: macos-latest,   variant: node-cli, node: '20', writer: node }
+          - { label: 'macos-latest, node 22',   os: macos-latest,   variant: node-cli, node: '22', writer: node }
+          - { label: 'macos-latest, node 24',   os: macos-latest,   variant: node-cli, node: '24', writer: node }
+          - { label: 'windows-latest, node 20', os: windows-latest, variant: node-cli, node: '20', writer: node }
+          - { label: 'windows-latest, node 22', os: windows-latest, variant: node-cli, node: '22', writer: node }
+          - { label: 'windows-latest, node 24', os: windows-latest, variant: node-cli, node: '24', writer: node }
+          - { label: 'no-node, ubuntu-latest',  os: ubuntu-latest,  variant: no-node, writer: bash }
+          - { label: 'no-node, macos-latest',   os: macos-latest,   variant: no-node, writer: bash }
+          - { label: 'no-node, windows-latest', os: windows-latest, variant: no-node, writer: powershell }
+          - { label: 'no-gitbash, windows-latest', os: windows-latest, variant: no-gitbash, node: '22', writer: node }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      # WITHOUT submodules: the bootstrap has to fetch the corpus itself, which is the thing being
+      # proved. A checkout that brought `vendor/ServiceNowDocs` along would make B02 a no-op and
+      # assertion 6 a tautology.
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-node@v4
+        if: matrix.node != ''
+        with:
+          node-version: ${{ matrix.node }}
+      - name: git identity (some git operations need one)
+        run: |
+          git config --global user.name "ci"
+          git config --global user.email "ci@example.invalid"
+
+      # ── node-cli ────────────────────────────────────────────────────────────────────────────
+      - name: Design-only install through the Node CLI
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: ./bootstrap.sh --mode design --yes --skip-claude-check
+      - name: Design-only install through the Node CLI (Windows)
+        if: matrix.variant == 'node-cli' && matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # ── no-node ─────────────────────────────────────────────────────────────────────────────
+      # PATH is REBUILT from the system directories, never filtered: a filter that missed one entry
+      # would test the hand-over instead, and pass. The absence is asserted INSIDE the step, because
+      # a rebuild that silently kept Node is the one failure this variant cannot survive.
+      - name: Design-only install with no Node on PATH
+        if: matrix.variant == 'no-node' && matrix.os != 'windows-latest'
+        run: |
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          command -v node && exit 1
+          command -v git || exit 1
+          ./bootstrap.sh --mode design --yes --skip-claude-check
+      - name: Design-only install with no Node on PATH (Windows)
+        if: matrix.variant == 'no-node' && matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
+          where node && exit /b 1
+          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # ── no-gitbash ──────────────────────────────────────────────────────────────────────────
+      # Assertion 10. `C:\Windows\System32\bash.exe` is the WSL stub and is on every Windows
+      # machine, so "no bash at all" is not a state a Windows user is ever in; what must be gone is
+      # GIT Bash, the interpreter `bootstrap.sh` needs. `Git\cmd` stays, because git itself is a
+      # prerequisite.
+      - name: No Git Bash on PATH, and the whole Windows path without it
+        if: matrix.variant == 'no-gitbash'
+        shell: cmd
+        run: |
+          set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
+          where bash 2>nul | find /i "\Git\" >nul && exit /b 1
+          where node || exit /b 1
+          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          .\snowarch.cmd version
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          node tools\snowarch\hooks\session-start.mjs > hook.txt
+          type hook.txt | find "Mode:" >nul || exit /b 1
+          del hook.txt
+          exit /b 0
+      - name: ...and the same launcher run from powershell.exe directly
+        if: matrix.variant == 'no-gitbash'
+        shell: powershell
+        run: |
+          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
+          & powershell -NoProfile -ExecutionPolicy Bypass -File .\bootstrap.ps1 --mode design --yes --skip-claude-check
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          exit 0
+
+      # ── the assertions, one implementation for every cell ────────────────────────────────────
+      # Node is back on PATH here on purpose: it was removed for the RUN, which is the subject. A
+      # bash-and-PowerShell twin of the assertion script would be two opinions about what a correct
+      # install looks like.
+      # ── the second run, in the SAME environment as the first ────────────────────────────────
+      # It has to be. A `no-node` cell whose second run found Node would hand over to the Node CLI,
+      # flip `writer` to "node", add the SessionStart hook and re-run B01/B02 — and the first run's
+      # result would be gone. That is exactly what the first version of this job did, and all three
+      # no-node cells said so.
+      #
+      # The log and the first run's state go to RUNNER_TEMP, OUTSIDE the checkout: a file written
+      # into the repository to check that nothing was written into the repository fails assertion 2
+      # by existing. That was the other thing the first run found.
+      - name: Keep the first run's state, then run it again (POSIX)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cp .local/bootstrap-state.json "$RUNNER_TEMP/first-state.json"
+          cp .claude/settings.local.json "$RUNNER_TEMP/first-settings.json"
+          if [ "${{ matrix.variant }}" = "no-node" ]; then
+            export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+            command -v node && exit 1
+          fi
+          start=$(date +%s)
+          ./bootstrap.sh --mode design --yes --skip-claude-check > "$RUNNER_TEMP/second.log" 2>&1
+          echo "SECOND_SECONDS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/second.log"
+      # The Windows cells measure in PowerShell rather than Git Bash: using Git Bash here would put
+      # a POSIX shell into the one cell whose premise is that there is not one. The encoding matters
+      # too — `>` in 5.1 writes UTF-16LE — so the log goes through .NET as UTF-8 without a BOM, the
+      # lesson S12 learned about `Set-Content -Encoding UTF8`.
+      - name: Keep the first run's state, then run it again (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          Copy-Item .local\bootstrap-state.json "$env:RUNNER_TEMP\first-state.json" -Force
+          Copy-Item .claude\settings.local.json "$env:RUNNER_TEMP\first-settings.json" -Force
+          $bare = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
+          if ('${{ matrix.variant }}' -eq 'no-node') {
+            $env:PATH = $bare
+            if (Get-Command node -ErrorAction SilentlyContinue) { exit 1 }
+          }
+          # The no-gitbash cell keeps its premise on the second run too: Git Bash out, Node in.
+          if ('${{ matrix.variant }}' -eq 'no-gitbash') {
+            $env:PATH = "$bare;C:\Program Files\nodejs"
+            if (-not (Get-Command node -ErrorAction SilentlyContinue)) { exit 1 }
+          }
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
+          $start = Get-Date
+          $out = (& cmd /c ".\bootstrap.cmd --mode design --yes --skip-claude-check 2>&1") | Out-String
+          $rc = $LASTEXITCODE
+          $seconds = [int]((Get-Date) - $start).TotalSeconds
+          [System.IO.File]::WriteAllText("$env:RUNNER_TEMP\second.log", $out, $utf8)
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, "SECOND_SECONDS=$seconds`n", $utf8)
+          Write-Host $out
+          if ($rc -ne 0) { exit 1 }
+          exit 0
+
+      # ── the assertions, one implementation for every cell ────────────────────────────────────
+      # Node is back on PATH here on purpose: it was removed for the RUN, which is the subject. A
+      # bash-and-PowerShell twin of the assertion script would be two opinions about what a correct
+      # install looks like.
+      - name: Assert the install promise
+        shell: bash
+        run: >
+          node scripts/ci/assert-bootstrap.mjs
+          --variant ${{ matrix.variant }} --writer ${{ matrix.writer }}
+          --second-log "$RUNNER_TEMP/second.log"
+          --first-state "$RUNNER_TEMP/first-state.json"
+          --first-settings "$RUNNER_TEMP/first-settings.json"
+          --seconds "$SECOND_SECONDS" --summary
+      - name: ...and that two installs left nothing tracked behind
+        shell: bash
+        run: node scripts/ci/assert-clean.mjs
+
+      # Assertion 9's second half: the committed dist/ answers a handshake. Needs the runtime
+      # dependencies, which a design-only install deliberately does not fetch — so they are
+      # installed HERE, after every assertion about the install itself has already passed.
+      - name: The committed dist/ answers a handshake on this OS
+        if: matrix.variant == 'node-cli'
+        run: |
+          npm ci --ignore-scripts
+          node tools/snowarch/tests/handshake-smoke.mjs
+
   launcher:
     # `bootstrap.sh` is the one file that runs on a machine with NO Node — which means none of the
     # engine's own tooling can check it, and none of the other jobs would notice it broken. Two
@@ -237,7 +428,24 @@ jobs:
       - name: PSScriptAnalyzer (5.1 compatibility)
         shell: powershell
         run: |
-          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck
+          # PSGallery answered "No match was found for the specified search criteria" once
+          # (run 34424021998) after working on every run before it — a registration hiccup on the
+          # runner, not a finding. Registered explicitly and retried once, because a linter whose
+          # INSTALL is flaky makes every green run of this job slightly less believable.
+          $ErrorActionPreference = 'Continue'
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+            Register-PSRepository -Default
+          }
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck -Repository PSGallery
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Start-Sleep -Seconds 10
+            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck -Repository PSGallery
+          }
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Write-Host 'PSScriptAnalyzer could not be installed from PSGallery'
+            exit 1
+          }
+          $ErrorActionPreference = 'Stop'
           # Write-Host is excluded, and only that: a launcher's banner IS console text, and
           # Write-Output would put it in the pipeline for a caller that captures the run.
           $r = Invoke-ScriptAnalyzer -Path .\bootstrap.ps1 -Severity Error,Warning `
