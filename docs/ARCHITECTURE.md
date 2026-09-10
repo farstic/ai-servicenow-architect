@@ -1041,6 +1041,9 @@ REFUSED with the check's own command, and a grep test proves the module cannot r
 | `F7` | `cache-stale` | clear the stale doctor cache | `.local/doctor-last.json` |
 <!-- /generated:doctor-fixes -->
 
+**Every check the old `doctor.sh` made is accounted for** — see
+[Appendix: the old doctor's checks](#appendix-the-old-doctors-checks) at the end of this document.
+
 **The report, as a person reads it** — statuses are `ok`, `warn`, `FAIL`, `skip` (upper-case so
 `grep FAIL` works), and the Mode line is last, because the last line of a transcript is the one that
 survives a truncated paste:
@@ -1230,3 +1233,61 @@ Also deferred and named here so they are not lost: the dependency prune (`pdfmak
 `@inquirer/prompts`, `ora`, `chalk` — ARC-04-S01, taking the production tree from ~57 MB to ~27 MB), and
 the `registry.npmjs.org/servicenow-mcp` update check in `src/cli/index.ts`, which is code and is on
 ARC-01-S10's ratchet allow-list under ARC-04.
+
+## Appendix: the old doctor's checks
+
+`scripts/legacy/doctor.sh` was 1,141 lines and 39 numbered checks written against a real machine
+over two years, and `00` §3.9 calls it the most precise existing specification of a correct
+install. Rewriting the doctor without accounting for each one would have lost intent nobody would
+notice missing until an install broke in a way the old script would have caught. So every id below
+has a new home or a reason, and `tests/doctor/mapping.test.mjs` asserts both — including that the
+old script really contains the ids this table claims to account for.
+
+Rendered from `tools/snowarch/lib/doctor/mapping.mjs`; the "new checks" line is the registry minus
+the mapped ids, computed rather than typed.
+
+<!-- generated:doctor-mapping -->
+| Old | Intent (from `scripts/legacy/doctor.sh`) | New | Note |
+|---|---|---|---|
+| D00 | required host tooling missing → exit 3 | runner exit 3 (S01) | same semantics; the bash aggregator is retired |
+| D01 | `claude` CLI present | E-00 | plus the floor and the login |
+| D02 | node ≥ 20 | E-02 / SV-00 | floor from `engine.config.json` |
+| D03 | npm | E-03 | WARN in design-only, FAIL in live |
+| D04 | git | E-01 | floor from `engine.config.json` (ADR-0008) |
+| D05 | python3 | E-04 | capability pack "docx" |
+| D06 | draw.io / LibreOffice | E-04 | capability packs "draw.io" and "PDF QA"; Mermaid added |
+| D07 | engine repo root | E-05 | exit 3 when not AT the root |
+| D08 | roster counts, parsed from `CLAUDE.md` prose | E-17 | counted from the directory listing; the expected counts come from the roster block
+of `engine.config.json` |
+| D09 | every skill directory has a `SKILL.md` | E-17 | merged |
+| D10 | `verify-structure.sh` audit | retired | the structure gate was deleted in ARC-02-S01; the skills/agents lint runs in CI (ARC-02-S02), and E-18 keeps the description and frontmatter half |
+| D11 | `core.hooksPath=.githooks` | retired | the pre-commit chain was deleted with ARC-02-S01; CI replaces it (P-37, ARC-09) |
+| D12 | submodule populated | E-12 | FAIL, never SKIP |
+| D13 | pinned release branch | E-14 | family from `engine.config.json` |
+| D14 | checkout == pinned commit | E-13 | pin == gitlink == HEAD |
+| D15 | citation gate | E-16 | an absent corpus is a FAIL |
+| D16 | `settings.json` present / valid / placeholder / hook targets resolve (a–d) | E-08 / E-07 | committed-file comparison; the placeholder half is E-07; the personal hook tooling it also checked for is out of scope (D-03 item 9) |
+| D17 | `~/.claude.json` registration for this project | retired as a positive check; E-23 | ARC-06-S01 made the registration the committed `.mcp.json` (E-07), so there is nothing in `~/.claude.json` to confirm; it is inspected only for stale entries, and never written |
+| D18 | `disabledMcpjsonServers` / trust accepted | E-10 / E-27 | the toggles are ours (E-10); the status Claude Code reports is read by E-27 (`claude mcp get`); the trust dialog itself is not checkable (`03` §D) |
+| D19 | server entrypoint resolves | SV-01 | re-targeted to `packages/snowarch/dist/server.js` |
+| D20 | server `node_modules` | SV-01 | fixable → F1 runs B04 |
+| D21 | `dist/` older than `src/` | retired | `dist/` is committed and the contract gate rebuilds and diffs it on every cell (ARC-04-S13) |
+| D22 | tools manifest readable | SV-01 / SV-05 | `dist/contract.json` plus a real handshake |
+| D23 | instance URL absent | SV-02 / SV-03 | unconfigured is a supported mode, not a fault |
+| D24 | URL is a bare https origin | SV-03 |  |
+| D25 | flag absent | SV-03 | `FLAGS_INCOMPLETE`; fixable → F4 |
+| D26 | flag not a string | SV-02 | `STORE_SCHEMA_INVALID` |
+| D27 | SCRIPTING without WRITE | SV-03 | `FLAG_DEPENDENCY_VIOLATION`; never fixable — which one was meant is not in the store |
+| D28 | `MCP_TOOL_PACKAGE` | SV-03 | `toolPackage == full` |
+| D29 | `MAX_RECORDS` unset | SV-03 | `maxRecords`; the default is pinned |
+| D30 | wizard store overrides env | E-24 | the override itself was removed in ARC-04-S02; what remains is the legacy store detector |
+| D31 | `~/.claude.json` mode; other projects with credentials; tracked-file leak scan | E-23 / E-09 | the first two are E-23, the leak scan is E-09 |
+| D32 | live instance probes | SV-04 | the server module, over ARC-07-S03's probes |
+| D33 | per-preset role probes | SV-04 |  |
+| D34 | update-set readiness (§2.2) | SV-04 | the write probe; capture is the server's own tool (ARC-04-S07) |
+| D35 | descending-sort self-test | retired | `ORDERBYDESC` was fixed with a regression test in ARC-04-S09 — a self-test in the doctor was standing in for one in the suite |
+| D36 | `CLAUDE.md` gates on `mcp__<key>__` | E-20 | re-targeted to the generated rule file, the protocol page and both registrations |
+| D37 | tool-name currency against the rename map | E-19 | `retired-names.json` |
+
+**New checks with no old counterpart** (11): `E-06`, `E-11`, `E-15`, `E-18`, `E-21`, `E-22`, `E-25`, `E-26`, `SV-06`, `SV-07`, `SV-08`.
+<!-- /generated:doctor-mapping -->

@@ -1,6 +1,6 @@
 # ARC-08 — Doctor, self-heal and the session banner
 
-Status: **In progress — S01–S06 merged (6 of 11), started 2026-09-10** · Depends on: ARC-04 (server doctor module), ARC-05 (data-driven names), ARC-06 (state file, toggles), ARC-07 (probes); ARC-00 S-05/S-06/S-13 · Blocks: ARC-09 (CI uses the doctor), ARC-10 (cutover checks)
+Status: **In progress — S01–S07 merged (7 of 11), started 2026-09-10** · Depends on: ARC-04 (server doctor module), ARC-05 (data-driven names), ARC-06 (state file, toggles), ARC-07 (probes); ARC-00 S-05/S-06/S-13 · Blocks: ARC-09 (CI uses the doctor), ARC-10 (cutover checks)
 
 Decisions applied: D-01…D-06, Q-A, Q-B, R-1…R-3 (see `02-DECISIONS-NEEDED.md`). Naming used here: server package `packages/snowarch` (`@farstic/snowarch`, first release `2.0.0`); MCP key `servicenow` → tools `mcp__servicenow__snow_*`; project skill `/snowarch` with sub-commands `status` · `setup-instance` · `doctor`; engine checks `E-xx`, server checks `SV-xx` (the `S-xx` prefix is reserved for the spikes in `03`); vocabulary Mode `design-only` | `live`, Preset `read-only` | `pdi-developer` | `full` | `custom`.
 
@@ -49,7 +49,7 @@ ARC-04-S02/S04/S11/S12 (store module, `snow_core_capabilities_read`, network cla
 ## Acceptance criteria
 
 - [ ] On the reference machine after ARC-06/07, `./snowarch doctor` reports **0 FAIL**; the old `scripts/doctor.sh`'s four failures (dead citations, absent NOW_ASSIST/FLUENT, retired names) are impossible by construction and covered by E-checks that pass. (S02, S05, S11)
-- [ ] Every check id from the old doctor appears in the mapping table with its new id or an explicit "retired because …" reason. (S07)
+- [x] Every check id from the old doctor appears in the mapping table with its new id or an explicit "retired because …" reason. (S07 — `docs/ARCHITECTURE.md` appendix, rendered from `tools/snowarch/lib/doctor/mapping.mjs`; `tests/doctor/mapping.test.mjs` asserts all 38 ids both ways against `scripts/legacy/doctor.sh`, 2026-09-10)
 - [ ] `./snowarch doctor --json` output pasted into a chat contains no secret and no clear-text username (test greps the JSON for the fixture credentials). (S01, S03, S04, S11)
 - [ ] `--fix` repairs a store entry with four flags, a docs checkout with a wrong sparse set, and a missing `settings.local.json` toggle in one run, and reports each; it refuses to touch `.mcp.json` when its hash differs and prints the `git checkout -- .mcp.json` command instead. (S06)
 - [ ] The SessionStart banner appears within 1 s of session start on the CI machines and shows `Mode: design-only` or `Mode: live — …` matching the store; with Node absent the launcher's `disableAllHooks` fallback leaves the session clean (S-05). (S08, S11)

@@ -467,6 +467,16 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S07 — Old→new check mapping table (`D00–D37` → `E-xx` / `SV-xx` / retired) in `docs/ARCHITECTURE.md`
+
+> **Amendment 2026-09-10 (from the delivery).** Three departures. (1) The table is DATA
+> (`tools/snowarch/lib/doctor/mapping.mjs`) rendered into the appendix by `gen-doctor-docs` — the
+> fifth generated region on that page — because a table of ids maintained beside a registry of ids
+> is a table that disagrees with it. (2) **The "new checks" list is computed, and is 11, not the
+> story's 12.** The story listed `E-09` and `SV-05` as both mapped (D31, D22) and new; computing
+> the list as "registry minus mapped" removes that double count, and adds `SV-08`, which post-dates
+> the story. (3) `D00` is not retired: its intent — missing host tooling ends the run — is the
+> runner's exit 3, and the test requires a row with no new id to say which of the two it is.
+
 **As** a maintainer **I want** a table that accounts for every one of the 39 checks in the old `scripts/doctor.sh` — its new id, or the reason it is retired — **so that** no intent of the most precise existing install specification (`00` §3.9) is lost, and reviewers can audit the doctor by reading one table.
 **Context.** README deliverable "`docs/ARCHITECTURE.md` appendix: mapping table old `D00–D37` → new `E-xx`/`SV-xx` (every old intent accounted for; D19/D20 path checks and D36 prefix check re-targeted; D32/D33 probes moved to the server module)" and acceptance criterion 2. Source: `scripts/doctor.sh` (1,141 lines; 39 `CHECK_ID="D…"` assignments — `D00` at line 53, `D37` at line 1100, `D17` assigned twice; D16 at line 342 has four commented sub-checks (a)–(d); D31 at line 846 has three parts: `~/.claude.json` mode, other projects with credentials, tracked-file leak scan).
 **Scope.** In: the appendix table, a `tests/doctor/mapping.test.mjs` that asserts every `D00…D37` appears exactly once and every referenced new id exists in the registry, and a short "retired" rationale per retired row. Out: any check body.
