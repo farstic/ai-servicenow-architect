@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { runSetPreset, type AddIo, type ManageDeps } from '../../src/cli/instance.js';
-import { removeTempDir, reapServerChildren, trackServerChild } from '../helpers/server-child.js';
+import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
 
 /**
@@ -66,7 +66,7 @@ async function connect(): Promise<Client> {
 const text = (r: unknown): string => ((r as { content: Array<{ text: string }> }).content[0].text);
 
 beforeEach(() => {
-  base = mkdtempSync(join(tmpdir(), 'snowarch-ac5-'));
+  base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-ac5-')));
   home = join(base, 'home');
   checkout = join(base, 'volume', 'repo');
   mkdirSync(home, { recursive: true });
@@ -78,8 +78,12 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await reapServerChildren();
-  removeTempDir(base);
+  // In a `finally`: a reap that throws must not take the removal with it.
+  try {
+    await reapServerChildren();
+  } finally {
+    removeTempDir(base);
+  }
 });
 
 const raise = async (): Promise<void> => {
