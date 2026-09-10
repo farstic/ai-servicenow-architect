@@ -88,10 +88,27 @@ const CHECKS = {
     assert.deepEqual(found, []);
   },
 
-  'criterion 2a — eighteen tests, T-01 to T-18, in order': (t) => {
+  'criterion 2a — the tests ascend, never repeat, and every gap is a declared reservation': (t) => {
+    // Contiguity was the rule until ARC-07-S09, and it could not express a RESERVATION: T-19
+    // belongs to ARC-08-S10, which has not been written, so this file jumps 18 → 20. A gap that
+    // nobody declared is still a mistake — a renumbering that lost a test, or a heading typed
+    // wrong — so the rule became: ascending, unique, and every missing number named in the
+    // "Reserved numbers" section with the story that will fill it. That catches strictly more
+    // than counting did.
     const ids = testBlocks(t).map((b) => b.id);
-    const expected = Array.from({ length: 18 }, (_, i) => `T-${String(i + 1).padStart(2, '0')}`);
-    assert.deepEqual(ids, expected);
+    const numbers = ids.map((id) => Number(id.slice(2)));
+    assert.deepEqual(numbers, [...numbers].sort((a, b) => a - b), `out of order: ${ids.join(', ')}`);
+    assert.equal(new Set(ids).size, ids.length, `duplicate id in ${ids.join(', ')}`);
+    assert.equal(numbers[0], 1, 'the first test is not T-01');
+
+    const declared = new Set([...t.matchAll(/^- \*\*(T-\d\d) — reserved for (ARC-\d\d-S\d\d)\*\*/gm)]
+      .map((m) => m[1]));
+    const gaps = [];
+    for (let n = 1; n <= (numbers.at(-1) ?? 0); n += 1) {
+      const id = `T-${String(n).padStart(2, '0')}`;
+      if (!ids.includes(id) && !declared.has(id)) gaps.push(id);
+    }
+    assert.deepEqual(gaps, [], `undeclared gap(s): ${gaps.join(', ')} — add a Reserved numbers entry or renumber`);
   },
 
   'criterion 2b — every test carries Modes and the four sections': (t) => {
@@ -197,7 +214,7 @@ test('every reference to the file names its new path', () => {
  * The negatives — four shapes the file must not be able to take, and the check that catches each.
  */
 const NEGATIVES = [
-  ['a heading is out of order', 'criterion 2a — eighteen tests, T-01 to T-18, in order',
+  ['a heading is out of order', 'criterion 2a — the tests ascend, never repeat, and every gap is a declared reservation',
     (t) => t.replace('## T-09', '## T-19').replace('## T-10', '## T-09').replace('## T-19', '## T-10')],
   ['a test loses its Prompt section', 'criterion 2b — every test carries Modes and the four sections',
     (t) => t.replace(/^### Prompt$/m, '### Input')],

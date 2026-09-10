@@ -50,6 +50,22 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   builds is exactly what the user typed: a test greps the whole of `tools/snowarch/` for a
   `--password` construction, because a secret cannot reach `ps` through a process that never
   invents an argument.
+- **`/snowarch setup-instance` now walks the whole hand-off from inside Claude.** It checks the
+  prerequisites first and stops with the one remedy that fits — Node missing, a design-only
+  checkout (which sends you to `./snowarch mode live` and a restart, and asks nothing, because the
+  wizard asks the same questions in the terminal), or dependencies to install. Then three
+  questions — instance kind, authentication, preset — and three more in chat: the URL, a label, and
+  whether it becomes the default. It prints **one command**, in the spelling your shell can
+  actually run, and stops: no polling, no "did that work?". `--resume` reloads the store, reads the
+  capabilities and runs the full doctor, then prints the authoritative `Mode: live — …` line
+  **without a session restart**, with the `/mcp` reconnect line as the fallback and the write-gate
+  reminder to close.
+  **It cannot ask for your password even if it wanted to** — `./snowarch instance …` is not in its
+  `allowed-tools`, and the grant is now asserted as exactly eight entries rather than as a handful
+  of substrings, so a tool added by accident fails the test rather than passing unnoticed. The
+  command it prints is rendered from the SAME template the install page shows, so what it hands you
+  and what a reader types by hand cannot drift apart.
+
 - **One command migrates a snow-mcp 1.x store — and shows you the plan first.** `instance import
   --from-legacy` reads `~/.config/servicenow-mcp/instances.json` (the same path on every operating
   system, Windows included — the old tool used it there too), maps every entry, and prints what it

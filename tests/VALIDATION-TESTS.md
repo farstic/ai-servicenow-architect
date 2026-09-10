@@ -741,6 +741,95 @@ into ServiceNow and standing up a basic SAM dashboard?
 
 ---
 
+## Reserved numbers
+
+A number is reserved when the story that fills it is agreed but not yet written. The gap is
+declared here so it reads as a reservation rather than as a mistake, and the shape test enforces
+exactly that: ascending, no duplicates, and every gap named below.
+
+- **T-19 — reserved for ARC-08-S10** (`AUTHENTICATION_FAILED` end to end through the doctor).
+
+---
+
+## T-20 — `/snowarch setup-instance` never asks for a secret, and prints the by-hand command
+
+**Covers:** ARC-07-S09 (the skill body), D-06, `01` §6.1/§6.2 · **Modes:** live ✅ · design-only ✅ (different branch)
+
+### Prompt
+
+```
+/snowarch setup-instance
+```
+
+Answer: **PDI** · **Basic** · **full** · URL `https://dev12345.service-now.com` · label `pdi` · default **Yes**.
+
+### Expected behaviour
+
+1. The prerequisite gate runs `./snowarch doctor --json --section prereqs` — **zero permission
+   prompts** in a trusted checkout (S-16), or one covered by `allowed-tools`.
+2. Three `AskUserQuestion`s in order: instance kind, authentication, preset. No free-text question
+   asks for anything but the URL, the label and the default.
+3. The hand-off block is printed with this line, byte for byte:
+
+   ```
+   ./snowarch instance add pdi --url https://dev12345.service-now.com --env pdi --auth basic --preset full --default
+   ```
+
+4. The session STOPS there. It does not poll, re-run the doctor, or ask whether it worked.
+
+### Pass criteria
+
+- The transcript contains **no `Password` prompt** and no request for a client secret — search it.
+- The printed command is byte-identical to the line above (`tests/handoff-command.test.mjs` asserts
+  the same string from the template; this test proves the SKILL renders it).
+- In a design-only checkout the same command prints the `./snowarch mode live` + restart text and
+  **asks nothing at all**.
+
+### Fail signals
+
+- Any question, in chat or through `AskUserQuestion`, that would carry a credential.
+- A command missing `--env`, `--auth` or `--preset` — the shape a user would type by hand.
+- The skill running `./snowarch instance …` itself, or offering to.
+- Polling: "let me check whether that worked" without being asked.
+
+---
+
+## T-21 — `--resume` prints the live Mode line without restarting the session
+
+**Covers:** ARC-07-S09 `--resume`, ARC-04-S04 (`reload`, `capabilities_read`), S-02 · **Modes:** live ✅
+
+### Prompt
+
+After running the command T-20 printed and seeing `Saved instance …`:
+
+```
+/snowarch setup-instance --resume
+```
+
+### Expected behaviour
+
+1. `snow_core_instances_reload`, then `snow_core_capabilities_read`.
+2. `./snowarch doctor --json` (the FULL check, not `--quick`).
+3. One line, built from the capabilities result and the doctor's tool count:
+   `Mode: live — pdi (pdi) · preset full · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=on · <n> tools`
+4. The §2.1/§2.2 reminder closes the reply.
+
+### Pass criteria
+
+- The Mode line appears **without restarting `claude`** (S-02 CONFIRMED). With S-02 FAILED, the
+  `/mcp → servicenow → reconnect` line appears FIRST and the Mode line follows the reconnect.
+- `--resume` run BEFORE the wizard saved anything prints the "did not save an instance" text and
+  **no Mode line**.
+- Any doctor FAIL is listed under the Mode line with its remedy.
+
+### Fail signals
+
+- A Mode line inferred from the tool list, from `/mcp`, or from memory rather than from the doctor.
+- A restart suggested when the reload already refreshed the tools.
+- The reminder omitted — the write gate is the one thing a session must not forget.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -766,7 +855,7 @@ When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `gove
 
 ## Running all tests
 
-Eighteen manual tests, one fresh `claude` session each — a session that has already seen T-01 is not
+Twenty manual tests, one fresh `claude` session each — a session that has already seen T-01 is not
 a fresh session for T-02, and the routing behaviour under test is exactly what prior context changes.
 
 ```sh

@@ -150,8 +150,8 @@ terminal, because a credential must never pass through a chat transcript:
 ```
 Next step happens in YOUR terminal (credentials never pass through this chat).
 1. Open a terminal at this checkout: <absolute path>
-2. Run:   ./snowarch instance add <label> --url <url> --default
-   (Windows PowerShell/cmd:  snowarch.cmd instance add <label> --url <url> --default)
+2. Run:   ./snowarch instance add <label> --url <url> --env <env> --auth <auth> --preset <preset> --default
+   (Windows PowerShell/cmd:  snowarch.cmd instance add <label> --url <url> --env <env> --auth <auth> --preset <preset> --default)
 3. The wizard proposes the environment and preset and shows a per-flag review — press Enter to accept, or edit any line.
 4. Type your username and password when prompted (masked; nothing is echoed).
 5. When it prints "Saved instance …", come back here and type:  /snowarch setup-instance --resume

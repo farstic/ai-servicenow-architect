@@ -76,6 +76,23 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
   ```
   Statuses are printed as `ok`, `warn`, `FAIL`, `skip` (FAIL upper-case so `grep FAIL` works, as with the old doctor). Colour only when stdout is a TTY and `NO_COLOR` is unset.
 - **CLI** in `bin/snowarch.mjs`: `doctor [--json] [--quick] [--no-network] [--fix] [--section <a,b>] [--no-cache]`; `--quick` implies `--no-network`; `--fix` with `--json` is allowed (fix entries land in `fixes[]`). `--write-cache` is the default (S05 writes `.local/doctor-last.json`); `--no-cache` disables it (used by tests).
+- **The `prereqs` section has a CONSUMER, and its fields are fixed.** `/snowarch setup-instance`
+  (ARC-07-S09) is the only reader of `--json --section prereqs` and branches on it, so the shape is
+  agreed here rather than discovered later — **fixed 2026-09-10**:
+
+  | field | values | why the skill needs it |
+  |---|---|---|
+  | `os` | `darwin` \| `linux` \| `win32` | picks `./snowarch` or `snowarch.cmd` in the hand-off |
+  | `shell` | `bash` \| `zsh` \| `powershell` \| `cmd` \| `unknown` | the parent process; `unknown` makes the skill print BOTH spellings |
+  | `node.ok` / `node.version` | boolean / e.g. `22.14.0` | the "Node 20+ is required" stop |
+  | `deps.ok` | boolean | the "run `./snowarch doctor --fix`" stop |
+  | `mode.toggle` | `enabled` \| `disabled` \| `absent` | the design-only stop, which asks nothing |
+  | `store.exists` | boolean | whether to propose "make it the default" |
+
+  `shell` is the one field the doctor does not have today — S01 adds the parent-process guess, and
+  `unknown` is a first-class answer rather than a failure. Until this section exists the skill
+  degrades honestly (it reads `.local/bootstrap-state.json` and prints both command spellings);
+  ARC-07-S09's body carries that fallback and names this story as the thing that removes it.
 - **No literal names.** Flag names, preset names, tool names and error codes come from the ARC-05-S10 loader; `tests/contract/no-literals.test.mjs` scans `tools/snowarch/**` and fails on any literal (ARC-05 README criterion 7). Design notes in S02–S06 that show a literal (e.g. `WRITE_ENABLED`) describe output, not source.
 **Acceptance criteria.**
 1. Given a checkout with `engine.config.json` present, running `./snowarch doctor --json --no-cache` with an empty registry (test harness) prints a JSON object validating against schema v1 with `summary.ok == 0` and exits 0; the same with a registered check whose `run` returns `fail` exits 1; with a check that throws, the report shows `status: "fail"` with `detail` starting `check crashed:` and the process still exits 1 (not a stack trace).
