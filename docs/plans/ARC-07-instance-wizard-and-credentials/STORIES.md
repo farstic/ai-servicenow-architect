@@ -681,7 +681,7 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 **Test strategy.** Integration with the fixture and the fake REST layer on all OSes (Windows path form of the advice included). Live: S11 runs the import against the real PDI with a generated legacy file.
 
-**Dependencies.** S04, S05, S07; ARC-04-S02 (the server no longer reads the legacy path — otherwise the import would be redundant); ARC-08-S03 (E-24) prints this command (its text cites "ARC-07-S07" — it is this story, S08); ARC-10-S01 documents it.
+**Dependencies.** S04, S05, S07; ARC-04-S02 (the server no longer reads the legacy path — otherwise the import would be redundant); ARC-08-S03 (E-24) prints this command — its text cites ARC-07-S08 correctly today, so the correction this line called for was already made; ARC-10-S01 documents it.
 
 **Size.** M — 1.5 days.
 
@@ -690,6 +690,53 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 **Definition of done.** Merged; tests green; ARC-10's `docs/MIGRATION.md` step references the command; the ARC-08 legacy-store detector prints it verbatim.
 
 ---
+
+> **Amendment 2026-09-10 (ARC-07-S08).** Nine departures and findings.
+>
+> **(1) One `notes:` clause per entry, WRAPPED.** The story's plan sample joins an entry's notes
+> into a single clause, and the production entry's notes come to three hundred characters. They are
+> joined as written and wrapped at the review screen's own 100-column budget (S04's `wrapText`,
+> reused not retyped): the notes are the part a reader has to act on, and a terminal folding them
+> mid-word is where they stop reading.
+>
+> **(2) The committed fixture has TWO entries** — AC 2 and AC 3 count them ("writes both",
+> "Imported 1 of 2"). The `staging → test` case of AC 4 gets its own legacy file, written in the
+> test, rather than a third row that would change both those numbers.
+>
+> **(3) The reader accepts both container shapes.** The story documents an array of entries each
+> carrying `name`; some 1.x files hold a record keyed by label instead. Rejecting one of them would
+> send a user to a hand-edit for a difference the reader can absorb in three lines.
+>
+> **(4) The legacy field names are DERIVED, not listed.** `WRITE_ENABLED` → `writeEnabled`,
+> `NOW_ASSIST_ENABLED` → `nowAssistEnabled` — the old wizard's names are the lower-camel form of
+> the same words. Listing the five would have put flag literals in `src/cli/`, which the sweep
+> ARC-07-S04 left behind forbids; it caught exactly that, in this file, on the first run.
+>
+> **(5) Two registry codes, not three.** `LEGACY_STORE_NOT_FOUND` and `LEGACY_STORE_UNREADABLE`
+> are registered because the command prints them. `IMPORT_NOTHING_TO_DO` is not: nothing prints it
+> — a run with nothing to import prints the plan and `Imported 0 of N`, which says the same thing
+> in words the reader already has.
+>
+> **(6) `targetStore()` is now shared.** S06's `openStore` computed the path and the source
+> privately; `import` asks the same question, so the resolution moved out to one exported function
+> rather than being repeated. That is the same defect S07's review found, prevented rather than
+> repaired.
+>
+> **(7) The citation this story asked to correct was already correct.** ARC-08-S03's E-24 text
+> cites ARC-07-S08 today. What IS corrected in that story instead is E-25's pointer: it named
+> "ARC-04-S02's fixture list", which does not exist — the list is
+> `packages/snowarch/tests/fixtures/cloud-sync-paths.json`, created by ARC-07-S07, and it carries
+> the provider as well as the boolean.
+>
+> **(8) The snippet names ARC-10's migration document by its STORY, not by a path.**
+> `docs/MIGRATION.md` does not exist yet, and `tests/fixtures/forthcoming-paths.json` — the
+> allow-list for exactly that — records an empty list as its intended resting state and its SK-10
+> test requires an entry to suppress a hit in that check's own scan, which a `docs/snippets/` file
+> does not produce. Naming the story is both accurate and free.
+>
+> **(9) The "not available in this build" example is now `move`.** It was `list` until S06, then
+> `import` until this story. `move` is the one the story says is NOT in 2.0.0 — remove and add
+> instead — so the example cannot be overtaken by the next story.
 
 ### ARC-07-S09 — `/snowarch setup-instance` skill body: prerequisite check, three `AskUserQuestion`s, printed command per OS, `--resume` with reload + doctor, S-02 fallback
 

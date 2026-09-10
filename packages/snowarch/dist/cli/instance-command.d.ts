@@ -31,6 +31,10 @@ declare const SUB_COMMANDS: {
         readonly positionals: 1;
         readonly summary: "delete an instance and its stored credentials";
     };
+    readonly import: {
+        readonly positionals: 0;
+        readonly summary: "migrate a snow-mcp 1.x store (--from-legacy), plan first";
+    };
 };
 export type SubCommand = keyof typeof SUB_COMMANDS;
 /** `instance --help` — every sub-command, then the exit table. ARC-06-S08's B08 reads this. */

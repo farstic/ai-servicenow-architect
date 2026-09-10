@@ -331,6 +331,19 @@ export const ERROR_CODES = [
         httpStatus: 407,
     },
     {
+        code: 'LEGACY_STORE_NOT_FOUND',
+        meaning: "There is no snow-mcp 1.x store at the path the import was pointed at.",
+        remedy: "check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `./snowarch doctor` reports where it looked",
+        command: "./snowarch instance import --from-legacy --path <file> --dry-run",
+        showInRule: false,
+    },
+    {
+        code: 'LEGACY_STORE_UNREADABLE',
+        meaning: "The legacy store is not JSON this reader can parse.",
+        remedy: "open it and check it is a complete JSON object; a half-written file from an interrupted 1.x session cannot be migrated and its instances are re-added with `instance add`",
+        showInRule: false,
+    },
+    {
         code: 'LABEL_NOT_FOUND',
         meaning: "No instance with that label is in the store this checkout resolves.",
         remedy: "run `instance list` to see the labels this checkout has, or `instance add <label>` to add one",

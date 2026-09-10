@@ -50,6 +50,24 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   builds is exactly what the user typed: a test greps the whole of `tools/snowarch/` for a
   `--password` construction, because a secret cannot reach `ps` through a process that never
   invents an argument.
+- **One command migrates a snow-mcp 1.x store — and shows you the plan first.** `instance import
+  --from-legacy` reads `~/.config/servicenow-mcp/instances.json` (the same path on every operating
+  system, Windows included — the old tool used it there too), maps every entry, and prints what it
+  would create: the label, the URL with the old `/api` suffix removed, the environment, the auth
+  method, the preset it lands on, and every note that explains a difference. `--dry-run` stops
+  there. Nothing is written before that plan has been shown and accepted, because the legacy files
+  the old desktop app wrote default `writeEnabled` to `true`, and an import that saved silently
+  would hand somebody an all-write installation they never chose — so a non-production entry goes
+  through the review screen unless `--yes`, and **production is capped at read-only whatever the
+  legacy file said** (D-05). Every entry is probed once before it is saved; one whose credentials
+  no longer work is skipped with the command that adds it by hand, and the run says `Imported 1 of
+  2` rather than pretending. `FLUENT_ENABLED` is written explicitly off — the old wizard never had
+  it — and `aiApiKey` is listed as dropped **by name**: 2.0.0 has nowhere to put it, and its value
+  never reaches an output byte. **It deletes nothing.** The closing advice names
+  `~/.config/servicenow-mcp` and the `tokens.json` beside the store, tells you they hold plaintext
+  secrets, and leaves the deleting to you; a test greps the command's own source to prove there is
+  no removal call in it at all.
+
 - **A per-user store, and a plain answer to "which one wins".** `instance add --global` writes
   `~/.config/snowarch/instances.json` — `$XDG_CONFIG_HOME` honoured, because a machine that sets it
   does not keep configuration in `~/.config` — or `%APPDATA%\snowarch\instances.json` on Windows,

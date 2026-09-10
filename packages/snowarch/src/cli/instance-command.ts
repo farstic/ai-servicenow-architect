@@ -16,6 +16,7 @@ import {
   runSetFlags, runSetPreset, runTest, EXIT_CODES, EXIT_OK, EXIT_USAGE,
   type AddIo, type ManageOptions,
 } from './instance.js';
+import { runImport } from './import-legacy.js';
 
 /** The real terminal, wired to S01's prompts. Tests pass their own. */
 export const terminalIo = (): AddIo => ({
@@ -33,6 +34,7 @@ const SUB_COMMANDS = {
   'set-flags': { positionals: -1, summary: 'change individual flags: WRITE=on CMDB_WRITE=off …' },
   'set-default': { positionals: 1, summary: 'which instance the server starts with' },
   remove: { positionals: 1, summary: 'delete an instance and its stored credentials' },
+  import: { positionals: 0, summary: 'migrate a snow-mcp 1.x store (--from-legacy), plan first' },
 } as const;
 
 export type SubCommand = keyof typeof SUB_COMMANDS;
@@ -92,6 +94,18 @@ export function parseManageArgs(sub: SubCommand, argv: readonly string[]):
       case 'json': options.json = true; break;
       case 'all': options.all = true; break;
       case 'global': options.global = true; break;
+      case 'from-legacy': options.fromLegacy = true; break;
+      case 'dry-run': options.dryRun = true; break;
+      case 'path': {
+        const v = value();
+        if (!v) return { ok: false, message: '--path needs a file' };
+        options.path = v; break;
+      }
+      case 'only': {
+        const v = value();
+        if (!v) return { ok: false, message: '--only needs one or more labels' };
+        options.only = v.split(',').map((s) => s.trim()).filter(Boolean); break;
+      }
       case 'verbose': options.verbose = true; break;
       case 'yes': options.yes = true; break;
       case 'ack-prod': options.ackProd = true; break;
@@ -156,10 +170,7 @@ export async function runInstance(argv: readonly string[], io: AddIo = terminalI
   }
 
   if (!isSub(sub)) {
-    // Naming the story is not decoration: it tells a reader whether they have found a bug or a
-    // boundary. `import` is the one sub-command still to come.
-    const story = sub === 'import' ? 'ARC-07-S08 adds import --from-legacy' : 'no such sub-command';
-    io.write(`instance ${sub}: not available in this build (${story})\n`);
+    io.write(`instance ${sub}: not available in this build (no such sub-command)\n`);
     return EXIT_USAGE;
   }
 
@@ -177,6 +188,22 @@ export async function runInstance(argv: readonly string[], io: AddIo = terminalI
     case 'set-flags': return runSetFlags(options, io);
     case 'set-default': return runSetDefault(options, io);
     case 'remove': return runRemove(options, io);
+    case 'import': {
+      // `--from-legacy` is REQUIRED and named rather than assumed: `import` will mean more than
+      // one thing before 2.1, and a command that guessed which import you meant would be a
+      // migration nobody asked for.
+      if (!options.fromLegacy) {
+        io.write('instance import needs --from-legacy (the only import in this build)\n');
+        return EXIT_USAGE;
+      }
+      return (await runImport({
+        ...(options.path !== undefined ? { path: options.path } : {}),
+        ...(options.dryRun ? { dryRun: true } : {}),
+        ...(options.yes ? { yes: true } : {}),
+        ...(options.global ? { global: true } : {}),
+        ...(options.only ? { only: options.only } : {}),
+      }, io)).exitCode;
+    }
     default: return EXIT_USAGE;
   }
 }

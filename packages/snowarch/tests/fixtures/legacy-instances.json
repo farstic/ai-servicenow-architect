@@ -1,0 +1,52 @@
+{
+  "_rule": "ARC-07-S08. A snow-mcp 1.x store, in the legacy shape (src/cli/config-store.ts): { version, defaultInstance, instances[] } with each entry carrying `name`. Two entries, because AC 2 and AC 3 count them ('writes both', 'Imported 1 of 2'). Every value here is synthetic.",
+  "_secrets": "The credential-shaped values are placeholders by construction — `example-…` and `dummy-…`, the shapes tests/never-commit.test.mjs recognises as documentation. Nothing here has ever been a credential. The tests read them from THIS file rather than spelling them, so the sweep that proves no secret reaches stdout is checking the same bytes the import carries.",
+  "version": 1,
+  "defaultInstance": "pdi",
+  "instances": [
+    {
+      "name": "pdi",
+      "instanceUrl": "https://dev12345.service-now.com/api",
+      "authMethod": "basic",
+      "username": "svc.migration",
+      "password": "example-legacy-pdi-password",
+      "authMode": "service-account",
+      "writeEnabled": true,
+      "scriptingEnabled": true,
+      "cmdbWriteEnabled": true,
+      "atfEnabled": true,
+      "nowAssistEnabled": false,
+      "toolPackage": "full",
+      "environment": "pdi",
+      "group": "personal",
+      "addedAt": "2025-11-02T09:14:00.000Z"
+    },
+    {
+      "name": "prod",
+      "instanceUrl": "https://acme.service-now.com",
+      "authMethod": "oauth",
+      "username": "svc.integration",
+      "password": "example-legacy-prod-password",
+      "clientId": "dummy-client-id",
+      "clientSecret": "example-legacy-client-secret",
+      "authMode": "per-user",
+      "writeEnabled": true,
+      "scriptingEnabled": false,
+      "cmdbWriteEnabled": true,
+      "atfEnabled": false,
+      "nowAssistEnabled": false,
+      "toolPackage": "minimal",
+      "environment": "production",
+      "integrationMode": "rest",
+      "mcpEnabled": true,
+      "sdkEnabled": false,
+      "apexEnabled": false,
+      "aiProvider": "openai",
+      "aiModel": "gpt-4",
+      "aiApiKey": "example-legacy-ai-api-key",
+      "aiBaseUrl": "https://api.example.com/v1",
+      "group": "acme",
+      "addedAt": "2025-12-19T16:02:00.000Z"
+    }
+  ]
+}
