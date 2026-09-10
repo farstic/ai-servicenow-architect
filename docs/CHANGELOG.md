@@ -106,6 +106,21 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   `(cache stale — run ./snowarch doctor)` — an old line marked old beats no line. And it is fast,
   because the path that answers from the cache imports no part of the doctor at all.
 
+- **`/snowarch status` reads the doctor; it never estimates.** The skill now runs the same
+  `--quick --json` the banner runs and renders seven lines from named keys — the `Mode:` line
+  quoted character for character as the first line of the reply, then the engine version, the docs
+  pin, the roster, the contract, the instances and the check counts. A key that came back empty
+  leaves its line out rather than filling it: two usually do, because the capability probe spawns a
+  process and the citation count walks the whole corpus, so neither is in the quick subset — the
+  reply says so in one sentence and points at `./snowarch doctor`. The template lives once, in
+  `docs/snippets/status-template.md`, and a test holds the skill's copy to it byte for byte, the
+  bracketed keys to schema v1, and both to a report the doctor itself produced. When the doctor
+  cannot run there are four fallbacks and none of them guesses: the bootstrap state with the cause
+  actually observed (no Node 20, no launcher, or a doctor that ran and failed — "never state a
+  cause you did not check"), a checkout that was never bootstrapped, output that would not parse,
+  and Windows without Git for Windows, where the honest answer is that the session cannot run
+  `./snowarch` from here at all.
+
 - **Every check the old doctor made is accounted for.** `scripts/legacy/doctor.sh` was 1,141 lines
   and 39 numbered checks written against a real machine over two years — the most precise existing
   specification of a correct install — and rewriting it would have lost intent nobody would notice

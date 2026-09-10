@@ -9,7 +9,8 @@
     "doctorFail": "Doctor: 2 FAIL — run ./snowarch doctor for remedies.",
     "staleSuffix": " (cache stale — run ./snowarch doctor)",
     "timedOut": "Mode: unknown — doctor timed out; run ./snowarch doctor",
-    "failed": "Mode: unknown — session banner failed (Error); run ./snowarch doctor"
+    "failed": "Mode: unknown — session banner failed (Error); run ./snowarch doctor",
+    "fromState": "Mode: design-only — from bootstrap state (2026-09-10T10:00:00.000Z); doctor unavailable until Node 20+ is installed"
   },
   "doctorUnavailable": "DOCTOR: unavailable until Node 20+ is installed (design-only is complete)",
   "posix": {
