@@ -41,6 +41,36 @@ function runProbe(probe, sandbox) {
   return spawnSync(process.execPath, ['--test', probe], { encoding: 'utf8', env });
 }
 
+/**
+ * What the child left behind, once it has had a chance to finish leaving.
+ *
+ * `spawnSync` returns when the process is gone, but the DIRECTORY ENTRY it was removing is the
+ * kernel's business and a recursive removal of a tree on a loaded CI runner is not instantaneous.
+ * This cell failed twice on ubuntu/node 24 and nowhere else, both times reporting `status 1,
+ * signal null` — an ordinary exit, so both the after-hook and the exit handler had their turn.
+ * A short bounded wait turns that race into the pass it is; a fixture that is genuinely still
+ * there after half a second is still a failure, and the message now says whether the directory is
+ * EMPTY (removal started, entry lingering) or populated (removal never ran), because those are
+ * different bugs and the next occurrence should not need a third guess.
+ */
+function leftBehind(sandbox) {
+  let names = [];
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    names = readdirSync(sandbox).filter((name) => name.startsWith('snowarch-'));
+    if (names.length === 0) return { names, detail: '' };
+    // 50 ms × 10: long enough for a teardown that is merely slow, short enough that a real leak
+    // does not cost the suite half a second per case.
+    const until = Date.now() + 50;
+    while (Date.now() < until) { /* spin: the check is synchronous by necessity */ }
+  }
+  const detail = names.map((name) => {
+    const contents = readdirSync(join(sandbox, name));
+    return `${name} (${contents.length === 0 ? 'EMPTY — removal started, entry lingering'
+      : `${contents.length} entries — removal never ran`})`;
+  }).join(', ');
+  return { names, detail };
+}
+
 test('a fixture made by makeCheckout is gone once the run that made it ends', (t) => {
   const sandbox = mkdtempSync(join(tmpdir(), 'fixture-cleanup-'));
   t.after(() => rmSync(sandbox, { recursive: true, force: true }));
@@ -60,8 +90,8 @@ test('a fixture made by makeCheckout is gone once the run that made it ends', (t
   const child = runProbe(probe, sandbox);
   assert.equal(child.status, 0, `${child.stdout}${child.stderr}`);
 
-  const left = readdirSync(sandbox).filter((name) => name.startsWith('snowarch-'));
-  assert.deepEqual(left, [], `the child left ${left.length} fixture(s) behind: ${left.join(', ')}`);
+  const left = leftBehind(sandbox);
+  assert.deepEqual(left.names, [], `the child left ${left.names.length} fixture(s) behind: ${left.detail}`);
 });
 
 test('and a fixture whose test FAILS is removed too — the case a trailing rmSync misses', (t) => {
@@ -82,10 +112,12 @@ test('and a fixture whose test FAILS is removed too — the case a trailing rmSy
   const child = runProbe(probe, sandbox);
   // The child MUST fail — otherwise this is asserting cleanup on a path that was never taken.
   assert.notEqual(child.status, 0, 'the probe was supposed to fail');
-  const left = readdirSync(sandbox).filter((name) => name.startsWith('snowarch-'));
+  const left = leftBehind(sandbox);
   // HOW the child ended goes in the message: on the cells where this first failed, the answer
   // decided the fix — a runner that ends a failed child with a SIGNAL skips `exit` handlers, and
-  // no in-process sweep runs unless the signal itself is handled.
-  assert.deepEqual(left, [],
-    `a failing test left ${left.length} fixture(s) behind (status ${child.status}, signal ${child.signal})`);
+  // no in-process sweep runs unless the signal itself is handled. The second time it failed the
+  // answer was `signal null`, which is what sent the diagnosis to the race above instead.
+  assert.deepEqual(left.names, [],
+    `a failing test left ${left.names.length} fixture(s) behind (status ${child.status}, `
+    + `signal ${child.signal}): ${left.detail}`);
 });
