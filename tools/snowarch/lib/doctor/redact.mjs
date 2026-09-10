@@ -18,7 +18,7 @@ import { redact as redactText, register } from '../redact.mjs';
 export { register };
 
 /**
- * `cvetomir@corp.example.com` → `c***@corp.example.com`; `admin` → `a***`.
+ * `someone@corp.example.com` → `s***@corp.example.com`; `admin` → `a***`.
  *
  * The same rule as `packages/snowarch/src/store/paths.ts` — an address keeps its DOMAIN because an
  * operator needs to know which directory the account is in, and a bare handle keeps its first

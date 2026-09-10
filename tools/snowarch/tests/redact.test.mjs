@@ -50,9 +50,9 @@ test('(b) an Authorization header goes whole, whatever the scheme', () => {
 test('(c) a username keeps its domain and loses its letters', () => {
   // The domain matters operationally — WHICH directory the account is in — and the local part does
   // not. A `first.last` handle keeps its shape so a reader can tell it was one.
-  assert.equal(redact('user cvetomir.grigorov@corp.example.com signed in'),
-    'user c***@corp.example.com signed in');
-  assert.equal(redact('handle cvetomir.grigorov alone'), 'handle c***.g*** alone');
+  assert.equal(redact('user someone.else@corp.example.com signed in'),
+    'user s***@corp.example.com signed in');
+  assert.equal(redact('handle someone.else alone'), 'handle s***.e*** alone');
 });
 
 test('(c) a filename is not a username — the over-redaction that made logs unreadable', () => {

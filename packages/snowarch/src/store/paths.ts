@@ -156,7 +156,7 @@ export function shellRemedy(command: string, target: string): string {
   return `Run: ${command} ${maskPathForShell(target)}`;
 }
 
-/** `cvetomir@corp.com` → `c***@corp.com`; `admin` → `a***`. Never the whole name. */
+/** `someone@corp.example.com` → `s***@corp.example.com`; `admin` → `a***`. Never the whole name. */
 export function maskUsername(u: string): string {
   if (!u) return u;
   const at = u.indexOf('@');

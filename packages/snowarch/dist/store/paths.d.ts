@@ -65,7 +65,7 @@ export declare function maskPathForShell(p: string): string;
  *    and rewriting it would make the remedy point somewhere they did not name.
  */
 export declare function shellRemedy(command: string, target: string): string;
-/** `cvetomir@corp.com` → `c***@corp.com`; `admin` → `a***`. Never the whole name. */
+/** `someone@corp.example.com` → `s***@corp.example.com`; `admin` → `a***`. Never the whole name. */
 export declare function maskUsername(u: string): string;
 /**
  * The provider names this repository uses, in the words a user would recognise.
