@@ -168,6 +168,18 @@ export function toggleProblems({ mode, settings, serverKey }) {
 export function engineRepoChecks() {
   return [
     defineCheck({
+      id: 'E-98',
+      section: 'repo',
+      title: 'DRILL — a check nobody added to the snapshots',
+      severity: 'warn',
+      quick: true,
+      network: false,
+      spawns: false,
+      fixable: false,
+      run: async () => ({ status: 'ok', detail: 'drill' }),
+    }),
+
+    defineCheck({
       id: 'E-05',
       section: 'repo',
       title: 'repository root',
