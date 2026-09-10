@@ -122,8 +122,11 @@ export const COMMANDS = {
     run: modeCommand, usage: MODE_USAGE,
     booleans: ['yes', 'ack-user-scope', 'skip-claude-check'] },
   doctor: PLACEHOLDER('doctor', 'ARC-08'),
+  // `raw`: everything after `instance` is the server CLI's, unparsed and unanswered — including
+  // `--help` once a sub-command is named. Only a bare `./snowarch instance --help` is this
+  // frame's, and the forwarder itself answers that one.
   instance: { summary: 'add and manage the ServiceNow instances this checkout can reach',
-    run: instanceCommand, usage: INSTANCE_USAGE, defersLog: false },
+    run: instanceCommand, usage: INSTANCE_USAGE, defersLog: false, raw: true },
   upgrade: PLACEHOLDER('upgrade', 'ARC-09'),
 };
 
@@ -151,7 +154,15 @@ export async function main(argv, { out = process.stdout, err = process.stderr } 
     return EXIT_USAGE;
   }
 
-  const { flags, positional, errors } = parseArgs(rest, { booleans: command.booleans ?? [] });
+  // A RAW command's arguments belong to another program, so this frame must not read them at all.
+  // Parsing them was the bug: `instance add … --yes` ended in "--yes needs a value" — `--yes` is
+  // not in THIS table's booleans, so the last flag on the line looked like one awaiting a value —
+  // and `instance add --help` was answered with the forwarder's one-line usage instead of the
+  // server's. Both are the same mistake, that a pass-through may still be inspected on the way
+  // through. `docs` was the half-measure: it parses, then its errors are ignored below.
+  const { flags, positional, errors } = command.raw
+    ? { flags: Object.create(null), positional: [], errors: [] }
+    : parseArgs(rest, { booleans: command.booleans ?? [] });
   if (flags.help) { out.write(`${command.usage}\n`); return EXIT_OK; }
   if (errors.length > 0 && name !== 'docs') {
     // `docs` parses its own arguments — it has sub-commands of its own — so the frame does not

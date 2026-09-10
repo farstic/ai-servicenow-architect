@@ -331,6 +331,13 @@ export const ERROR_CODES = [
         httpStatus: 407,
     },
     {
+        code: 'LABEL_EXISTS',
+        meaning: "An instance with that label is already in the store.",
+        remedy: "use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it",
+        command: "./snowarch instance add <label> --url <url> --env <env> --replace",
+        showInRule: false,
+    },
+    {
         code: 'ENV_REQUIRED',
         meaning: "The environment could not be proposed and none was given, in a run that cannot ask.",
         remedy: "pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do",
@@ -393,7 +400,6 @@ export const ERROR_CODES = [
     },
 ];
 export const ERROR_CODE_NAMES = new Set(ERROR_CODES.map((e) => e.code));
-/** The remedy for a code, for anything that shows one. There is no other source. */
 export function remedyFor(code) {
     return ERROR_CODES.find((e) => e.code === code);
 }
