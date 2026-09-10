@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { modeCommand } from '../lib/mode.mjs';
@@ -301,12 +301,16 @@ test('a shim whose entry point cannot be read is refused with a sentence, not an
 
 test('shimTarget reads both slash styles, an absolute target, and refuses a guess', () => {
   const exists = (p) => /cli\.js$/.test(p);
+  // The expectation is RESOLVED the same way the function resolves it: on Windows `/x` is
+  // drive-relative, so `join('/x', …)` is `\\x\\lib\\cli.js` while the answer is `D:\\x\\lib\\cli.js`
+  // — a difference about the cell's drive letter rather than about the parser.
+  const expected = resolve('/x', 'lib', 'cli.js');
   const posix = shimTarget('/x/claude.cmd',
     { read: () => 'node "%~dp0/lib/cli.js" %*', exists });
-  assert.equal(posix, join('/x', 'lib', 'cli.js'));
+  assert.equal(posix, expected);
   const windows = shimTarget('/x/claude.cmd',
     { read: () => 'node "%~dp0\\lib\\cli.js" %*', exists });
-  assert.equal(windows, join('/x', 'lib', 'cli.js'));
+  assert.equal(windows, expected);
   // A target that is not there is not a target: a shim naming a file that has been uninstalled
   // must read as unresolved rather than as a path to spawn.
   assert.equal(shimTarget('/x/claude.cmd', { read: () => 'node "%~dp0/lib/cli.js" %*',
