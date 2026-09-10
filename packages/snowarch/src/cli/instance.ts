@@ -788,6 +788,11 @@ export interface ManageOptions {
   passwordStdin?: boolean;
   preset?: string;
   pairs?: readonly string[];
+  /** ARC-07-S08's `import --from-legacy`. */
+  fromLegacy?: boolean;
+  dryRun?: boolean;
+  path?: string;
+  only?: string[];
 }
 
 export interface ManageDeps extends AddDeps {
@@ -819,15 +824,20 @@ const readProbe = (stored: StoreInstance['lastProbe']): LastProbe | null =>
  * 0. What is NOT allowed is inventing a path: a maintenance command that created a store would
  * make `set-default` on a typo produce a second, empty configuration.
  */
-function openStore(deps: ManageDeps, options: ManageOptions = {}): { ok: true; opened: OpenStore }
-| { ok: false; message: string; exitCode: number } {
-  // ONE resolution, carried whole. The path AND what selected it: `list --all` needs the second
-  // half to say which file the server reads, and computing it twice is how the two answers came
-  // apart — a run under `SNOW_STORE` listed the global store and left out the file in use.
-  // An injected `storePath` is an override in the same sense the environment variable is.
-  // An injected path is named by WHERE IT POINTS, not by the fact that it was injected: the same
-  // file is the project store whether the resolver found it or a caller handed it over, and
-  // calling it an override would put the wrong word in `list --all`'s STORE column.
+/**
+ * WHICH FILE this command acts on, and what selected it. One resolution, shared.
+ *
+ * The path AND the source: `list --all` needs the second half to say which store the server reads,
+ * and computing the two separately is how they came apart — a run under `SNOW_STORE` once listed
+ * the global store and left out the file in use. `import` (ARC-07-S08) asks the same question, so
+ * it asks this function rather than repeating the precedence.
+ *
+ * An injected path is named by WHERE IT POINTS, not by the fact that it was injected: the same
+ * file is the project store whether the resolver found it or a caller handed it over, and calling
+ * it an override would put the wrong word in the STORE column.
+ */
+export function targetStore(deps: { storePath?: string }, options: { global?: boolean } = {}):
+{ path: string; source: StoreLabel } {
   const injected = deps.storePath;
   const resolution = injected !== undefined
     ? { path: injected,
@@ -836,8 +846,15 @@ function openStore(deps: ManageDeps, options: ManageOptions = {}): { ok: true; o
     : options.global
       ? resolveStorePath({ global: true })
       : resolveStorePath();
-  const path = resolution.path ?? projectStorePath();
-  const source = storeLabelFor(resolution.path === null ? 'project' : resolution.source);
+  return {
+    path: resolution.path ?? projectStorePath(),
+    source: storeLabelFor(resolution.path === null ? 'project' : resolution.source),
+  };
+}
+
+function openStore(deps: ManageDeps, options: ManageOptions = {}): { ok: true; opened: OpenStore }
+| { ok: false; message: string; exitCode: number } {
+  const { path, source } = targetStore(deps, options);
   if (!existsSync(path)) {
     return { ok: true, opened: { path, source, store: { version: 1, instances: {} } as Store } };
   }

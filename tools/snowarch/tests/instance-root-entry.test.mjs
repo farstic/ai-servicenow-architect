@@ -76,10 +76,12 @@ for (const entry of ENTRIES) {
   });
 
   test(`${entry.name}: an unknown sub-command is the server's refusal, not the frame's`, () => {
-    // `list` was the example until ARC-07-S06 implemented it; `import` is the one still to come.
-    const r = run(entry, ['instance', 'import', '--from-legacy']);
+    // `list` was the example until ARC-07-S06 implemented it, then `import` until S08 did.
+    // `move` is the one the story says is NOT in 2.0.0 — remove and add instead — so it is the
+    // example that cannot be overtaken by the next story.
+    const r = run(entry, ['instance', 'move', 'pdi', 'uat']);
     assert.equal(r.status, 2);
-    assert.match(r.text, /ARC-07-S08/);
+    assert.match(r.text, /no such sub-command/);
   });
 
   test(`${entry.name}: \`list --json\` reaches the server and prints only the object`, () => {
@@ -163,6 +165,26 @@ for (const entry of ENTRIES) {
       assert.equal(r.status, 2, r.text);
       assert.match(r.text, /LABEL_NOT_FOUND/);
       assert.match(r.text, /no-such-label/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test(`${entry.name}: \`import --from-legacy --path … --dry-run\` plans and writes nothing`, () => {
+    // Three flags and a path after a sub-command, through the launcher: the shape the frame used
+    // to eat. The fixture is the committed one, and the store must not exist afterwards.
+    const dir = mkdtempSync(join(tmpdir(), 'root-entry-import-'));
+    try {
+      const store = join(dir, 'instances.json');
+      const fixture = join(root, 'packages/snowarch/tests/fixtures/legacy-instances.json');
+      const r = run(entry, ['instance', 'import', '--from-legacy', '--path', fixture, '--dry-run'],
+        { SNOW_STORE: store });
+      assert.equal(r.status, 0, r.text);
+      assert.match(r.text, /Legacy store: .*legacy-instances\.json \(2 instances\)/);
+      assert.match(r.text, /preset pdi-developer/);
+      assert.match(r.text, /production capped at read-only \(D-05\)/);
+      assert.equal(existsSync(store), false, 'a dry run writes nothing');
+      // The one value in that fixture that must never be printed, assembled so this file is not
+      // itself a hit in the sweep it performs.
+      assert.doesNotMatch(r.text, new RegExp(['example', 'legacy', 'ai', 'api', 'key'].join('-')));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

@@ -75,12 +75,13 @@ describe('the built CLI', () => {
   });
 
   it('names an unknown sub-command\'s owning story rather than failing vaguely', () => {
-    // `list` was this test's example until ARC-07-S06 implemented it. `import` is the one
-    // sub-command still to come, and the assertion is the same: a reader is told whether they
-    // have found a bug or a boundary.
-    const r = run(['instance', 'import', '--from-legacy']);
+    // `list` was this test's example until ARC-07-S06 implemented it, then `import` until S08
+    // did. `move` is the one the story says is NOT in 2.0.0 — remove and add instead — so it
+    // cannot be overtaken by the next story, and the assertion is unchanged: a reader is told
+    // whether they have found a bug or a boundary.
+    const r = run(['instance', 'move', 'pdi', 'uat']);
     expect(r.status).toBe(2);
-    expect(r.stdout + r.stderr).toContain('ARC-07-S08');
+    expect(r.stdout + r.stderr).toContain('no such sub-command');
   });
 
   it('runs `list` now, and prints the empty-store sentence rather than a story name', () => {

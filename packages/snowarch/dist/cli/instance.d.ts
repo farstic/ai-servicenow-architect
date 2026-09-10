@@ -2,6 +2,7 @@ import { EXIT_INTERRUPTED, EXIT_USAGE, type Io } from './tty.js';
 export { EXIT_USAGE, EXIT_INTERRUPTED };
 import { type Environment } from './url.js';
 import { type ReviewIo } from './preset-ui.js';
+import { type StoreLabel } from './format.js';
 import { maskUsername } from '../store/paths.js';
 import { probeReachability } from '../servicenow/reachability.js';
 import { probeAll, type LastProbe, type ProbeClient } from '../servicenow/probes.js';
@@ -209,6 +210,11 @@ export interface ManageOptions {
     passwordStdin?: boolean;
     preset?: string;
     pairs?: readonly string[];
+    /** ARC-07-S08's `import --from-legacy`. */
+    fromLegacy?: boolean;
+    dryRun?: boolean;
+    path?: string;
+    only?: string[];
 }
 export interface ManageDeps extends AddDeps {
     /** The clock, injected so an audit line and a `lastProbe` are assertable to the character. */
@@ -216,6 +222,34 @@ export interface ManageDeps extends AddDeps {
     /** `.local/config.json`, so the mirror can be pointed somewhere else in a test. */
     configPath?: string;
 }
+/**
+ * The store as the SERVER would resolve it, or the sentence saying why not.
+ *
+ * `resolveStorePath()` answering "none" is not an error here the way it is for the server: it
+ * means this checkout has no instances yet, and `list` on such a checkout prints a line and exits
+ * 0. What is NOT allowed is inventing a path: a maintenance command that created a store would
+ * make `set-default` on a typo produce a second, empty configuration.
+ */
+/**
+ * WHICH FILE this command acts on, and what selected it. One resolution, shared.
+ *
+ * The path AND the source: `list --all` needs the second half to say which store the server reads,
+ * and computing the two separately is how they came apart — a run under `SNOW_STORE` once listed
+ * the global store and left out the file in use. `import` (ARC-07-S08) asks the same question, so
+ * it asks this function rather than repeating the precedence.
+ *
+ * An injected path is named by WHERE IT POINTS, not by the fact that it was injected: the same
+ * file is the project store whether the resolver found it or a caller handed it over, and calling
+ * it an override would put the wrong word in the STORE column.
+ */
+export declare function targetStore(deps: {
+    storePath?: string;
+}, options?: {
+    global?: boolean;
+}): {
+    path: string;
+    source: StoreLabel;
+};
 export declare function runList(options: ManageOptions, io: AddIo, deps?: ManageDeps): number;
 /**
  * Re-probe one instance or all of them. `lastProbe` is the only field this writes, ever.

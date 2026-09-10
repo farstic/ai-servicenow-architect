@@ -309,6 +309,17 @@ export declare const ERROR_CODES: readonly [{
     readonly showInRule: false;
     readonly httpStatus: 407;
 }, {
+    readonly code: "LEGACY_STORE_NOT_FOUND";
+    readonly meaning: "There is no snow-mcp 1.x store at the path the import was pointed at.";
+    readonly remedy: "check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `./snowarch doctor` reports where it looked";
+    readonly command: "./snowarch instance import --from-legacy --path <file> --dry-run";
+    readonly showInRule: false;
+}, {
+    readonly code: "LEGACY_STORE_UNREADABLE";
+    readonly meaning: "The legacy store is not JSON this reader can parse.";
+    readonly remedy: "open it and check it is a complete JSON object; a half-written file from an interrupted 1.x session cannot be migrated and its instances are re-added with `instance add`";
+    readonly showInRule: false;
+}, {
     readonly code: "LABEL_NOT_FOUND";
     readonly meaning: "No instance with that label is in the store this checkout resolves.";
     readonly remedy: "run `instance list` to see the labels this checkout has, or `instance add <label>` to add one";

@@ -50,6 +50,20 @@
 > at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
 > Nothing about a real instance goes into the repository: the record is the CODE and the timing.
 >
+> **A REAL legacy store (ARC-07-S08, 2026-09-10).** The tolerant reader has only ever met files
+> this repository wrote: the committed fixture and the ones the tests generate. What no fixture can
+> produce is a store an actual 1.x install left behind — a version of the shape nobody here
+> remembers, a field written by the Electron app, a half-finished entry from an interrupted wizard.
+> If you still have a `~/.config/servicenow-mcp/instances.json` from the old tool (or a colleague
+> does), run `./snowarch instance import --from-legacy --dry-run` against it and record THE PLAN
+> ONLY — the plan is redacted by construction: it prints labels, URLs, environments, presets and
+> notes, and no secret value of any kind, which is the same property the every-byte sweep asserts
+> in CI. What matters in the answer: whether any entry was skipped for a reason the notes do not
+> explain, and whether the "Unrecognised legacy keys" line appeared (it names fields this reader
+> has never seen — each one is either a mapping this story missed or a field that genuinely goes).
+> Do not paste the legacy file itself anywhere, and delete nothing until the import has run for
+> real.
+>
 > **Known Folder Move, on a real managed Windows machine (ARC-07-S07, 2026-09-10).** The one claim
 > in the cloud-sync detector that no test can make: that an enterprise-managed OneDrive client
 > actually sets `%OneDrive%` (or `%OneDriveCommercial%`) to the redirected root when policy moves
