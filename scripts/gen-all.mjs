@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { GENERATORS } from './lib/generators.mjs';
+import { classifyFailure, GENERATORS } from './lib/generators.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const check = process.argv.includes('--check');
@@ -29,8 +29,17 @@ for (const gen of GENERATORS) {
     process.stdout.write(`${e.stdout ?? ''}`);
     process.stderr.write(`${e.stderr ?? ''}`);
     // A generator's own exit codes are carried through unchanged: 1 is stale, 2 is cannot run, and
-    // collapsing them here would lose the distinction every caller of this script depends on.
-    if (e.status === 2) cannotRun += 1; else stale += 1;
+    // collapsing them here would lose the distinction every caller of this script depends on. A
+    // CRASH is neither of those on its own — it exits 1 like a stale target while having produced
+    // no output to compare — so it is classified rather than counted, and reported as what it is.
+    const verdict = classifyFailure({ status: e.status, out: `${e.stdout ?? ''}${e.stderr ?? ''}` });
+    if (verdict.kind === 'cannot-run') {
+      cannotRun += 1;
+      process.stderr.write(`gen-all: ${gen.id} could not run — ${verdict.reason}`
+        + `${verdict.dependency ? ' (a dependency is missing — run npm ci)' : ''}\n`);
+    } else {
+      stale += 1;
+    }
   }
 }
 

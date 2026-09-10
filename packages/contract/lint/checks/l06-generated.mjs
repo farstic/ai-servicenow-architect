@@ -13,16 +13,19 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
-import { GENERATORS } from '../../../../scripts/lib/generators.mjs';
+import { classifyFailure, GENERATORS } from '../../../../scripts/lib/generators.mjs';
 
 export const id = 'L06';
 export const title = 'every generated file matches what its generator produces';
 
 export function run(ctx) {
   const findings = [];
+  const couldNotRun = [];
   const selfRoot = ctx.root;
 
-  for (const gen of GENERATORS) {
+  // The list is a parameter so a test can plant a generator that CRASHES. Every real caller gets
+  // the one list; a test that pushed onto it would leave the plant behind for the next test.
+  for (const gen of (ctx.generators ?? GENERATORS)) {
     if (!gen.supportsRoot && !ctx.isSelfRoot) {
       // Said out loud rather than passed over: these two resolve from their own location, so
       // against a fixture tree they would check the real repository and report a reassuring pass
@@ -35,10 +38,24 @@ export function run(ctx) {
       execFileSync(process.execPath, args, { cwd: selfRoot, encoding: 'utf8', stdio: 'pipe' });
     } catch (e) {
       const out = `${e.stdout ?? ''}${e.stderr ?? ''}`;
-      // Exit 2 is the generators' "cannot run" — a missing input, not a stale output. Reporting it
-      // as a difference would tell a reader to regenerate a file whose source is not there.
-      if (e.status === 2) {
-        ctx.skipNotes?.push(`L06: ${gen.id} could not run here — ${out.trim().split('\n')[0]}`);
+      // "Could not run" is not "differs", and the difference matters more here than anywhere: a
+      // generator that crashed produced nothing to compare, so telling a reader their file is
+      // stale sends them to regenerate a file that is fine. Exit 2 is the generators' own
+      // convention for it; a crash exits 1 like a stale target and is recognised by its stack.
+      const verdict = classifyFailure({ status: e.status, out });
+      if (verdict.kind === 'cannot-run') {
+        couldNotRun.push({ id: gen.id, ...verdict });
+        ctx.skipNotes?.push(`L06: ${gen.id} could not run here — ${verdict.reason}`);
+        // A missing dependency on a design-only install is EXPECTED — no `npm ci` there by
+        // design — and is reported as a skip with the reason. Any other crash is a fault in the
+        // toolchain and is a finding, because nothing else in the repository would notice it.
+        if (!verdict.dependency) {
+          findings.push({
+            file: gen.script,
+            line: 1,
+            message: `generator could not run: ${verdict.reason} — run node ${gen.script}`,
+          });
+        }
         continue;
       }
       // The generator's own diff already names the target and the line. Carry the first changed
@@ -67,5 +84,8 @@ export function run(ctx) {
       }
     }
   }
+  // Nothing to compare and nothing wrong to report: the check did not run, and `statusOf` renders
+  // that as `skip`. A skip shown as a pass is the one outcome a reader must not see.
+  if (findings.length === 0 && couldNotRun.length > 0) ctx.skipped?.add(id);
   return findings;
 }

@@ -9,6 +9,42 @@
  * them against a fixture tree; the other two resolve from their own location and only ever act on
  * the real repository. L06 says so rather than pretending it checked them.
  */
+/**
+ * What a failed generator run MEANS: a stale target, or a generator that never ran at all.
+ *
+ * They arrive the same way — a non-zero exit — and telling them apart is not cosmetic. A
+ * generator that crashed produced no output to compare, so "the file differs" is a claim nobody
+ * made; it sends a reader to regenerate a file that is fine and, in the doctor, reported a broken
+ * toolchain as a stale document. That happened: `gen-readme-tables` imported the server's built
+ * tools module, which needs `npm ci`, and on a design-only install E-21 said the README differed.
+ *
+ * `2` is the generators' own "cannot run" convention. Above that, a crash is recognised by what
+ * Node prints when nothing caught the error — a stack, or an `ERR_*` module code — and a missing
+ * dependency is separated from every other crash because on a design-only install it is EXPECTED
+ * (no `npm ci` by design) and everywhere else it is a fault.
+ */
+export const MISSING_DEPENDENCY = /ERR_MODULE_NOT_FOUND|Cannot find (package|module)/;
+const CRASH = /\n\s+at\s|\b[A-Za-z]*Error\b|\bERR_[A-Z_]+\b/;
+
+export function classifyFailure({ status, out = '' }) {
+  const first = out.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? '';
+  if (status === 2) return { kind: 'cannot-run', dependency: false, reason: first };
+  if (CRASH.test(out) && !out.includes('--- a/')) {
+    const dependency = MISSING_DEPENDENCY.test(out);
+    // The reason is the line Node PRINTS THE ERROR ON, which is not the first line that mentions
+    // one: above the stack Node echoes the offending source, and `throw new TypeError('…')` is a
+    // line about an error rather than an error. So the match is anchored — a line that BEGINS with
+    // an error class, which is the shape of `TypeError: …` and of `Error [ERR_MODULE_NOT_FOUND]: …`.
+    // `TypeError: …` and `Error [ERR_MODULE_NOT_FOUND]: …` both match; `throw new TypeError('…');`
+    // does not (no colon after the identifier), and neither does `node:internal/…:301` (a colon
+    // with no space after it is a path, not a message).
+    const line = out.split('\n').map((l) => l.trim())
+      .find((l) => /^(?:Uncaught\s+)?[A-Za-z_$][\w$]*(?:\s*\[[^\]]+\])?:\s/.test(l)) ?? first;
+    return { kind: 'cannot-run', dependency, reason: line.slice(0, 160) };
+  }
+  return { kind: 'stale', dependency: false, reason: first };
+}
+
 export const GENERATORS = [
   {
     id: 'gen-governance',
