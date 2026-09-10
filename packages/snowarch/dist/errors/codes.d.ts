@@ -323,7 +323,7 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "URL_REQUIRED";
     readonly meaning: "The wizard needs an instance URL and none was given.";
-    readonly remedy: "enter the full https URL of the instance";
+    readonly remedy: "enter the full https URL of the instance; non-interactively pass `--url <origin>` (a URL cannot be proposed)";
     readonly showInRule: false;
 }, {
     readonly code: "URL_INVALID";

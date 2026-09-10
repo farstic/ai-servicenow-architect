@@ -391,7 +391,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `URL_HAS_PATH` | drop everything after the host |
 | `URL_INVALID` | enter it as `https://<host>.service-now.com` |
 | `URL_NOT_HTTPS` | use the https form of the same host |
-| `URL_REQUIRED` | enter the full https URL of the instance |
+| `URL_REQUIRED` | enter the full https URL of the instance; non-interactively pass `--url <origin>` (a URL cannot be proposed) |
 | `VALIDATION_ERROR` | the message names the argument and the shape |
 | `WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 

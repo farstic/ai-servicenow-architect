@@ -347,7 +347,7 @@ export const ERROR_CODES = [
     {
         code: 'URL_REQUIRED',
         meaning: "The wizard needs an instance URL and none was given.",
-        remedy: "enter the full https URL of the instance",
+        remedy: "enter the full https URL of the instance; non-interactively pass `--url <origin>` (a URL cannot be proposed)",
         showInRule: false,
     },
     {

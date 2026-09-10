@@ -15,6 +15,7 @@
  * owns.
  */
 import { ERROR_CODES, type ErrorCodeName } from '../errors/codes.js';
+import { fillRemedy } from '../servicenow/net-errors.js';
 
 export interface UrlOk {
   ok: true;
@@ -54,7 +55,10 @@ const bad = (code: ErrorCodeName, message: string): UrlBad => ({ ok: false, code
 export function normalizeInstanceUrl(input: string): UrlResult {
   const trimmed = String(input ?? '').trim();
   if (trimmed === '') {
-    return bad('URL_REQUIRED', 'Enter the instance URL, for example https://dev12345.service-now.com');
+    // The same sentence the non-interactive branch prints. An empty answer and a missing `--url`
+    // are ONE condition — the wizard has no URL — and this file used to carry a third text for it,
+    // beside the wizard's and the registry's.
+    return bad('URL_REQUIRED', `URL_REQUIRED — ${fillRemedy('URL_REQUIRED')}.`);
   }
 
   // A bare word is a PROPOSAL, not a decision: the caller shows it and Enter accepts.

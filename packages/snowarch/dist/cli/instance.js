@@ -24,6 +24,7 @@ import { ENVIRONMENTS, normalizeInstanceUrl, resolveEnvironment } from './url.js
 import { remedyFor } from '../errors/codes.js';
 import { ENTRY_DEFAULTS, prodRefusal, resolveFlags } from './preset-ui.js';
 import { describeNetworkEnv, formatFailure, probeReachability, reachabilityMenu } from '../servicenow/reachability.js';
+import { fillRemedy } from '../servicenow/net-errors.js';
 import { probeAll, toLastProbe } from '../servicenow/probes.js';
 import { ServiceNowClient } from '../servicenow/client.js';
 import { loadStore, projectStorePath, resolveStorePath, saveStore } from '../store/index.js';
@@ -270,7 +271,8 @@ export async function runAdd(options, io, deps = {}) {
     let url = options.url;
     if (url === undefined) {
         if (options.yes) {
-            const message = 'URL_REQUIRED — pass --url <origin> (a URL cannot be proposed).';
+            // The registry's sentence, not a second one written here: one condition, one text.
+            const message = `URL_REQUIRED — ${fillRemedy('URL_REQUIRED')}.`;
             io.write(`${message}\n`);
             return { saved: false, exitCode: EXIT_USAGE, message };
         }
