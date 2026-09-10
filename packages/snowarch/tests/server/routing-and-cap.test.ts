@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { removeTempDir, reapServerChildren, trackServerChild } from '../helpers/server-child.js';
+import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 
 const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/server.js');
 
@@ -75,7 +75,7 @@ async function connect(extraEnv: Record<string, string> = {}): Promise<Client> {
 const text = (r: unknown): string => ((r as { content: Array<{ text: string }> }).content[0].text);
 
 beforeEach(() => {
-  base = mkdtempSync(join(tmpdir(), 'snowarch-routing-'));
+  base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-routing-')));
   home = join(base, 'home');
   checkout = join(base, 'volume', 'repo');
   mkdirSync(home, { recursive: true });
@@ -84,9 +84,14 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  // Reap first: the removal is only safe once nothing can still write into the directory.
-  await reapServerChildren();
-  removeTempDir(base);
+  // Reap first: the removal is only safe once nothing can still write into the directory. In a
+  // `finally`, because a reap that throws must not take the removal with it — that is one of the
+  // two ways these trees survived a run.
+  try {
+    await reapServerChildren();
+  } finally {
+    removeTempDir(base);
+  }
 });
 
 describe('criterion 4 - a per-call `instance` argument does not route', () => {

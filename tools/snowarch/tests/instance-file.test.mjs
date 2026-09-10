@@ -12,6 +12,7 @@ import { redact, reset } from '../lib/redact.mjs';
 import { fileURLToPath } from 'node:url';
 import { startStub } from './fixtures/sn-stub.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
+import { tempDir } from './helpers/temp.mjs';
 
 const isWindows = process.platform === 'win32';
 // `fileURLToPath`, never `new URL(...).pathname`: on Windows the latter is `/D:/…`, a leading
@@ -25,9 +26,14 @@ const PASSWORD = `${'pw'}-${'Zq7'.repeat(4)}`;
 const USER = 'admin';
 const PDI_URL = 'https://dev123456.service-now.com';
 
-/** A 0600 instance file OUTSIDE any checkout — where the story says an operator should keep it. */
-function instanceFile(entry, { mode = 0o600 } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-if-'));
+/**
+ * A 0600 instance file OUTSIDE any checkout — where the story says an operator should keep it.
+ *
+ * `t` is not optional in spirit: this factory left 1,244 directories behind before it was tracked,
+ * one per call across the programme's runs.
+ */
+function instanceFile(entry, { mode = 0o600 } = {}, t) {
+  const dir = tempDir('snowarch-if-', t);
   const path = join(dir, 'pdi.json');
   writeFileSync(path, `${JSON.stringify({ version: 1, instances: { pdi: entry } }, null, 2)}\n`);
   if (!isWindows) chmodSync(path, mode);

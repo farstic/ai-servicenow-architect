@@ -50,6 +50,18 @@
 > at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
 > Nothing about a real instance goes into the repository: the record is the CODE and the timing.
 >
+> **The OAuth ROPC token endpoint (ARC-07-S06, 2026-09-10).** One thing in this story cannot be
+> proven without an instance that HAS the grant enabled. `instance add --auth oauth_ropc` and
+> `instance set-credentials --auth oauth_ropc` now work — S05 could not succeed at all, see
+> amendment (4) — but they prove the grant through the first REQUEST rather than through a separate
+> token call, so the four-way ROPC error table (`invalid_grant`, `invalid_client`, the disabled
+> grant, the unrecognised error) is exercised only by unit tests with an injected probe. With a PDI
+> that has the password grant enabled: add an instance with a WRONG client secret, then with a
+> wrong user password, then with the grant switched off in the instance, and record which sentence
+> each one produced. If any of the three reads as a plain wrong-password message where the table
+> has a better one, the remedy is a real token probe in `probeOptionsFor()` — the seam is already
+> there, and it is one function. Record the three sentences verbatim; never the secrets.
+>
 > **The wizard against a real instance (ARC-07-S05, 2026-09-10).** Everything that can be proven
 > without an instance is proven — every exit path, the store bytes, the argv. Three things need a
 > real one and a terminal. **(1) AC 1** — on a clean machine, run the README command against a PDI,

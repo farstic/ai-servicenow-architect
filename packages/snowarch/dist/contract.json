@@ -235,6 +235,13 @@
       "showInRule": false
     },
     {
+      "code": "LABEL_NOT_FOUND",
+      "meaning": "No instance with that label is in the store this checkout resolves.",
+      "remedy": "run `instance list` to see the labels this checkout has, or `instance add <label>` to add one",
+      "command": "./snowarch instance list",
+      "showInRule": false
+    },
+    {
       "code": "NETWORK_ERROR",
       "meaning": "The instance was unreachable and the cause did not match a more specific classification.",
       "remedy": "the message carries the underlying cause",
@@ -453,7 +460,7 @@
     {
       "code": "URL_REQUIRED",
       "meaning": "The wizard needs an instance URL and none was given.",
-      "remedy": "enter the full https URL of the instance",
+      "remedy": "enter the full https URL of the instance; non-interactively pass `--url <origin>` (a URL cannot be proposed)",
       "showInRule": false
     },
     {

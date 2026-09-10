@@ -119,16 +119,20 @@ export function wrapRow(prefix, note, columns = COLUMNS) {
 /** The screen, byte for byte. The snapshot files in `docs/snippets/` are this function's output. */
 export function renderReviewScreen(input) {
     const { label, environment, preset, flags, probes, hints } = input;
-    const prod = environment === 'prod';
+    // LOCKED, not "is production": an acknowledged raise is still production — the banner says so —
+    // and what the acknowledgement changes is whether the boxes may be touched.
+    const locked = environment === 'prod' && input.prodAcknowledged !== true;
     const lines = [];
-    lines.push(prod
+    lines.push(locked
         ? `Proposed preset for "${label}" (${environment}): ${preset}  — production is capped at `
             + 'read-only (D-05)'
-        : `Proposed preset for "${label}" (${environment}): ${preset}  — non-production: everything on`);
+        : environment === 'prod'
+            ? `Preset for "${label}" (${environment}): ${preset}  — PRODUCTION, raise acknowledged`
+            : `Proposed preset for "${label}" (${environment}): ${preset}  — non-production: everything on`);
     for (const flag of FLAG_NAMES) {
-        const box = !prod && flags[flag] === 'true' ? '[x]' : '[ ]';
+        const box = !locked && flags[flag] === 'true' ? '[x]' : '[ ]';
         const name = labelOf(flag).padEnd(LABEL_WIDTH + 2);
-        const note = prod
+        const note = locked
             ? 'locked on production'
             : annotate(probes?.[PROBE_FIELD[flag]], hints?.[flag]);
         lines.push(...wrapRow(`  ${box} ${name} `, note));
@@ -136,7 +140,7 @@ export function renderReviewScreen(input) {
     // The story's footer is 111 characters and the budget is 100, so it WRAPS — the same rule as a
     // long hint, and for the same reason: a terminal that folds it in the middle of a word is
     // harder to read than one continuation line.
-    const footer = prod
+    const footer = locked
         ? `Enter = accept · to raise this instance later: ./snowarch instance set-preset ${label} `
             + '<preset> --ack-prod'
         : 'Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset · '
@@ -203,7 +207,7 @@ export function dependencyViolation(flags) {
  * result says so rather than returning a preset the caller might write.
  */
 export async function runReviewScreen(input, io) {
-    const prod = input.environment === 'prod';
+    const prod = input.environment === 'prod' && input.prodAcknowledged !== true;
     let flags = { ...input.flags };
     let preset = input.preset;
     for (;;) {
@@ -251,7 +255,7 @@ export async function runReviewScreen(input, io) {
             io.write(`${PROD_LOCKED(input.label, flag)}\n`);
             continue;
         }
-        flags = await toggle(flags, flag, io);
+        flags = await toggleFlag(flags, flag, io);
         preset = matchPreset(flags);
     }
 }
@@ -262,7 +266,7 @@ export async function runReviewScreen(input, io) {
  * leaves WRITE ON (the alternative is a contradiction the server would resolve by force), and
  * turning a dependent on with WRITE off leaves BOTH OFF.
  */
-async function toggle(current, flag, io) {
+export async function toggleFlag(current, flag, io) {
     const next = { ...current, [flag]: current[flag] === 'true' ? 'false' : 'true' };
     // Turning something OFF that others need.
     if (next[flag] === 'false') {
@@ -300,7 +304,7 @@ const isNo = (answer) => ['n', 'no'].includes(String(answer ?? '').trim().toLowe
  */
 export async function resolveFlags(input) {
     const { label, environment, yes, io } = input;
-    const prod = environment === 'prod';
+    const prod = environment === 'prod' && input.prodAcknowledged !== true;
     let flags;
     let preset;
     if (input.flags !== undefined) {
@@ -350,6 +354,7 @@ export async function resolveFlags(input) {
         label, environment, preset, flags,
         ...(input.probes ? { probes: input.probes } : {}),
         ...(input.hints ? { hints: input.hints } : {}),
+        ...(input.prodAcknowledged ? { prodAcknowledged: true } : {}),
     }, io);
     if (reviewed.cancelled) {
         return { ok: false, exitCode: 130, message: 'Cancelled — nothing saved.' };

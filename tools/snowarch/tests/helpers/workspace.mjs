@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+import { tempDir } from './temp.mjs';
 
 /**
  * The smallest tree `bootstrap` will act on: a config, an areas file, a lockfile, a package.json.
@@ -11,8 +12,11 @@ import { join } from 'node:path';
  * resolves its root from the module's own location — a test that forgot would install into the
  * checkout it is running from and leave `.local/` behind.
  */
-export function makeCheckout({ pin = 'a'.repeat(40), family = 'australia' } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-bootstrap-'));
+export function makeCheckout({ pin = 'a'.repeat(40), family = 'australia' } = {}, t) {
+  // TRACKED. This factory removed nothing at all, and fifteen files call it: the pile it left in
+  // `TMPDIR` was five figures. Pass `t` and the tree goes when the test ends, pass or fail; without
+  // one it goes when the process does.
+  const root = tempDir('snowarch-bootstrap-', t);
   mkdirSync(join(root, 'vendor'), { recursive: true });
   mkdirSync(join(root, '.claude'), { recursive: true });
   writeFileSync(join(root, 'engine.config.json'), `${JSON.stringify({

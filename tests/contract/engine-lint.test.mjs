@@ -218,8 +218,12 @@ test('criterion 7 — the real tree completes quickly, and the budget is a CI ob
 const { mkdtempSync, mkdirSync, writeFileSync, readFileSync: readFile, rmSync } = await import('node:fs');
 const { tmpdir } = await import('node:os');
 
-function minimalTree(mutate = () => {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'engine-lint-'));
+/**
+ * A fixture tree. `parent` exists for the one case that needs the tree to sit somewhere
+ * specific — inside another repository — rather than wherever `TMPDIR` happens to point.
+ */
+function minimalTree(mutate = () => {}, parent = tmpdir()) {
+  const dir = mkdtempSync(join(parent, 'engine-lint-'));
   const write = (rel, body) => {
     mkdirSync(join(dir, dirname(rel)), { recursive: true });
     writeFileSync(join(dir, rel), body);
@@ -311,6 +315,88 @@ test('criterion 2 — L05 fails on a typo in a cited path and passes on the real
       }
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }
+});
+
+/**
+ * A fixture tree that is a real git work tree, because "tracked" only means something in one.
+ *
+ * `git add` and no commit: L05 reads the INDEX, which is what makes a file created by the story
+ * in hand resolve as soon as it is staged — the point at which this repository runs its gates.
+ */
+function gitTree(mutate = () => {}, parent = tmpdir()) {
+  const dir = minimalTree(mutate, parent);
+  const git = (...args) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' });
+  git('init', '-q');
+  git('add', '-A');
+  return dir;
+}
+
+test('L05 resolves against TRACKED files: the ARC-07-S05 case fails though the directory is there', () => {
+  // The defect, reproduced. Two comments cited the nested dependency tree under the server
+  // package while explaining that npm hoists it away. It passed on the author's machine — which
+  // had that directory, npm having nested two packages for a version conflict — and failed on
+  // all nine CI cells. Here the directory is created and left untracked, which is the same
+  // shape: real on this disk, absent from every clone.
+  const dir = gitTree(({ write }) => {
+    write('governance/x.md', '# X\n\nThe SDK lands in `packages/snowarch/node_modules/`.\n');
+  });
+  try {
+    mkdirSync(join(dir, 'packages/snowarch/node_modules/@x'), { recursive: true });
+    writeFileSync(join(dir, 'packages/snowarch/node_modules/@x/package.json'), '{}\n');
+    const r = lintAt(dir, ['--only', 'L05']);
+    assert.equal(r.code, 1, r.stdout);
+    assert.deepEqual(findings(r.stdout),
+      ['L05 FAIL governance/x.md:3 dead path packages/snowarch/node_modules/']);
+    // And the status line says which rule answered — a silent change of mind is how the original
+    // survived a green local run.
+    assert.match(r.stdout, /L05 fail \(1\) \[\d+ citations, tracked\]/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('L05 passes the same citation once the path is tracked, and counts what it checked', () => {
+  // The positive control for the case above: same tree, same sentence, path staged.
+  const dir = gitTree(({ write }) => {
+    write('governance/x.md', '# X\n\nThe generator writes `tools/snowarch/lib/text.json`.\n');
+    write('tools/snowarch/lib/text.json', '{}\n');
+  });
+  try {
+    const r = lintAt(dir, ['--only', 'L05']);
+    assert.equal(r.code, 0, r.stdout);
+    assert.match(r.stdout, /L05 ok \[1 citations, tracked\]/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('L05 reads the DISK for a tree that merely sits inside somebody else\'s repository', (t) => {
+  // The reviewer's machine, reproduced. Their `TMPDIR` is inside an unrelated checkout, so every
+  // fixture tree this suite builds lands in a foreign work tree. "Is there an enclosing git tree?"
+  // answered yes, tracked mode asked THAT repository about `governance/real.md`, and a path that
+  // is right there on disk was reported dead — green in CI, red on their machine, which is the
+  // environment-dependence this check was rewritten to remove. The question is whether the lint
+  // ROOT is the toplevel, not whether one exists above it.
+  const foreign = mkdtempSync(join(tmpdir(), 'foreign-repo-'));
+  t.after(() => rmSync(foreign, { recursive: true, force: true }));
+  execFileSync('git', ['-C', foreign, 'init', '-q'], { stdio: 'ignore' });
+
+  const dir = minimalTree(({ write }) => {
+    write('governance/real.md', '# Real\n');
+    write('governance/governance-rules.md', '# Rules\n\nSee `governance/real.md` for the long form.\n');
+  }, foreign);
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const r = lintAt(dir, ['--only', 'L05']);
+  assert.equal(r.code, 0, r.stdout);
+  // And it SAYS which rule answered — the reason this line carries the mode at all.
+  assert.match(r.stdout, /L05 ok \[\d+ citations, filesystem: the root is not a git toplevel\]/);
+});
+
+test('L05 answers from git in THIS repository — the fallback is for fixture trees only', () => {
+  // The filesystem fallback exists because a temp fixture is not a work tree. If it ever answered
+  // here, the check would be back to reporting one machine's disk, which is the whole defect.
+  const r = lintAt(root, ['--only', 'L05']);
+  assert.match(r.stdout, /L05 (ok|fail \(\d+\)) \[\d+ citations, tracked\]/);
+  // Non-vacuous: this repository cites hundreds of paths, not two.
+  const [, n] = /\[(\d+) citations/.exec(r.stdout);
+  assert.ok(Number(n) > 100, `only ${n} citations checked`);
 });
 
 test('L05 does not chase a path inside a fenced block, a glob, or a placeholder', () => {

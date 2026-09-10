@@ -15,7 +15,8 @@
  * password and a missing role. A fourth attempt is an account closer to a lockout on an instance
  * whose policy nobody here knows.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 import { EXIT_INTERRUPTED, EXIT_USAGE, readSecretFromStdin, type Io } from './tty.js';
 
@@ -24,13 +25,21 @@ import { EXIT_INTERRUPTED, EXIT_USAGE, readSecretFromStdin, type Io } from './tt
 export { EXIT_USAGE, EXIT_INTERRUPTED };
 import { ENVIRONMENTS, normalizeInstanceUrl, resolveEnvironment, type Environment } from './url.js';
 import { remedyFor } from '../errors/codes.js';
-import { ENTRY_DEFAULTS, prodRefusal, resolveFlags, type ReviewIo } from './preset-ui.js';
+import {
+  applyingLine, dependencyViolation, ENTRY_DEFAULTS, labelOf, prodRefusal, resolveFlags,
+  toggleFlag, type ReviewIo,
+} from './preset-ui.js';
+import { listJson, listTable, probesJson } from './format.js';
+import { appendAudit, type CliAuditEntry } from '../audit/writer.js';
+import { CORE_TOOLS_UNCONFIGURED } from '../tools/status.js';
+import { maskPath, maskUsername } from '../store/paths.js';
 import { describeNetworkEnv, formatFailure, probeReachability, reachabilityMenu } from '../servicenow/reachability.js';
+import { fillRemedy } from '../servicenow/net-errors.js';
 import { probeAll, toLastProbe, type AuthProbe, type LastProbe, type ProbeClient } from '../servicenow/probes.js';
 import { ServiceNowClient } from '../servicenow/client.js';
 import { loadStore, projectStorePath, resolveStorePath, saveStore } from '../store/index.js';
 import { completeFlags, type Store, type StoreInstance } from '../store/schema.js';
-import { FLAG_NAMES, type Flags } from '../utils/permissions.js';
+import { FLAG_NAMES, matchPreset, type FlagName, type Flags } from '../utils/permissions.js';
 
 export const EXIT_OK = 0;
 export const EXIT_FAILED = 1;
@@ -41,10 +50,10 @@ export const EXIT_POLICY = 3;
  * help and the behaviour cannot describe different programs.
  */
 export const EXIT_CODES: ReadonlyArray<{ code: number; meaning: string }> = Object.freeze([
-  { code: EXIT_OK, meaning: 'saved' },
-  { code: EXIT_FAILED, meaning: 'nothing saved — a refusal, an abort, or three failed attempts' },
-  { code: EXIT_USAGE, meaning: 'usage — a bad flag, LABEL_EXISTS, ENV_REQUIRED, URL_REQUIRED' },
-  { code: EXIT_POLICY, meaning: 'policy — PROD_WRITE_NOT_ACKNOWLEDGED, or live mode is not installed' },
+  { code: EXIT_OK, meaning: 'done — saved, listed, or every probe answered ok' },
+  { code: EXIT_FAILED, meaning: 'nothing saved — a refusal, an abort, three failed attempts, or a probe that failed' },
+  { code: EXIT_USAGE, meaning: 'usage — a bad flag, LABEL_EXISTS, LABEL_NOT_FOUND, ENV_REQUIRED, URL_REQUIRED' },
+  { code: EXIT_POLICY, meaning: 'policy — PROD_WRITE_NOT_ACKNOWLEDGED, a label that did not match, or live mode is not installed' },
   { code: EXIT_INTERRUPTED, meaning: 'interrupted — Ctrl-C at a prompt' },
 ]);
 
@@ -129,14 +138,14 @@ export interface MaskedEntry {
 }
 
 /**
- * `u` → `u***`. Enough to recognise the account, never enough to use it.
+ * ARC-04-S02's masker, re-exported rather than reimplemented.
  *
- * A username is not a secret — it may be typed on the command line — but a masked summary is what
- * gets pasted into a ticket, and the full account name there is one more thing an attacker does
- * not have to guess.
+ * S05 wrote a second one here that dropped the domain — `c***` where the store's own says
+ * `c***@corp.com` — so `list` and the wizard's summary would have masked the same account two
+ * ways. A username is not a secret, but the full account name in a pasted summary is one more
+ * thing an attacker does not have to guess, and one masker is what makes that claim checkable.
  */
-export const maskUsername = (username: string): string =>
-  (username.length === 0 ? '' : `${username.slice(0, 1)}***`);
+export { maskUsername };
 
 export function maskEntry(entry: StoreInstance): MaskedEntry {
   return {
@@ -255,6 +264,33 @@ const defaultClient = (entry: { url: string; auth: StoreInstance['auth'] }): Pro
   }) as unknown as ProbeClient;
 
 /**
+ * What `probeAll` needs to know about one entry's credentials — including the ROPC seam.
+ *
+ * `probeAuth` refuses an `oauth_ropc` run with no `tokenProbe` ("no token probe supplied"), and
+ * S05 never passed one: with probes on, `instance add --auth oauth_ropc` could not succeed at all,
+ * because the error came back as neither `ok` nor `unreachable` and fell through to the wrong-
+ * password branch. Found by S06's `set-credentials --auth oauth_ropc` test, which hit the same
+ * seam.
+ *
+ * The probe supplied here says "the request that follows IS the token exchange", and that is the
+ * truth of this client: `ServiceNowClient` acquires the ROPC token inside its first request, so a
+ * separate token call would be a SECOND login attempt on an account this whole file is careful to
+ * spend only three of — against S03's one-request-per-probe rule. A failed grant still lands as
+ * `auth failed` through `fromClientError` on the `sys_user` query; what is lost is only the
+ * four-way ROPC error table's extra specificity, which needs a real token endpoint to distinguish
+ * and belongs with the live sitting.
+ */
+export const probeOptionsFor = (auth: StoreInstance['auth'], env: NodeJS.ProcessEnv): {
+  username: string; authMethod: 'basic' | 'oauth_ropc'; env: NodeJS.ProcessEnv;
+  tokenProbe?: () => Promise<{ ok: boolean }>;
+} => ({
+  username: auth.username,
+  authMethod: auth.method,
+  env,
+  ...(auth.method === 'oauth_ropc' ? { tokenProbe: async () => ({ ok: true }) } : {}),
+});
+
+/**
  * The whole command. Seven steps, and every one of them can end it.
  */
 export async function runAdd(options: AddOptions, io: AddIo, deps: AddDeps = {}): Promise<AddResult> {
@@ -303,7 +339,8 @@ export async function runAdd(options: AddOptions, io: AddIo, deps: AddDeps = {})
   let url = options.url;
   if (url === undefined) {
     if (options.yes) {
-      const message = 'URL_REQUIRED — pass --url <origin> (a URL cannot be proposed).';
+      // The registry's sentence, not a second one written here: one condition, one text.
+      const message = `URL_REQUIRED — ${fillRemedy('URL_REQUIRED')}.`;
       io.write(`${message}\n`);
       return { saved: false, exitCode: EXIT_USAGE, message };
     }
@@ -389,7 +426,7 @@ export async function runAdd(options: AddOptions, io: AddIo, deps: AddDeps = {})
     if (options.noProbes) { probeResult = { auth: { status: 'ok' }, last: null }; break; }
 
     const client = (deps.makeClient ?? defaultClient)({ url: instanceUrl, auth });
-    const all = await (deps.probe ?? probeAll)(client, { username: auth.username, authMethod: method, env });
+    const all = await (deps.probe ?? probeAll)(client, probeOptionsFor(auth, env));
     if (all.auth.status === 'ok') { probeResult = { auth: all.auth, last: toLastProbe(all) }; break; }
 
     if (all.auth.status === 'unreachable') {
@@ -593,3 +630,510 @@ export const CLI_RELATIVE = 'packages/snowarch/dist/cli/index.js';
 /** True when the server's runtime dependencies are installed beside the built CLI. */
 export const serverDepsInstalled = (packageDir: string): boolean =>
   existsSync(`${packageDir}/node_modules/@modelcontextprotocol/sdk/package.json`);
+
+// ═══ ARC-07-S06 — the maintenance commands ═════════════════════════════════════════════════
+//
+// Seven sub-commands that all begin the same way: resolve the store THE WAY THE SERVER DOES, load
+// it, find the label. That preamble is `openStore` + `findInstance` below and exists once, because
+// a second resolver is how the wizard writes one file and the server reads another.
+//
+// What each of them may touch is deliberately narrow, and the narrowness is the feature:
+//   `test`             writes `lastProbe` and NOTHING else — never a credential.
+//   `set-credentials`  writes `auth` only, and only after the instance said `ok`.
+//   `set-preset` /
+//   `set-flags`        write `preset` + `flags` (+ `prodWriteAck`), never a credential.
+//   `set-default`      writes `defaultInstance`, and mirrors the LABEL into `.local/config.json`.
+//   `remove`           deletes one entry.
+// Every one of the last five appends an audit line through ARC-04-S10's writer, so a change made
+// from a terminal is as traceable as one made through a tool call.
+
+/** `LABEL_NOT_FOUND` — registered, so `docs/TROUBLESHOOTING.md` carries its remedy. */
+export const labelNotFound = (label: string, known: readonly string[]): string => {
+  const remedy = remedyFor('LABEL_NOT_FOUND').remedy;
+  const list = known.length > 0 ? ` Known: ${known.join(', ')}.` : '';
+  return `LABEL_NOT_FOUND — "${label}" is not in the store.${list} `
+    + `${remedy.charAt(0).toUpperCase()}${remedy.slice(1)}.`;
+};
+
+export const MISMATCH = 'Label mismatch — nothing changed.';
+
+export const prodRaiseWarning = (): string =>
+  `You are enabling ${FLAG_NAMES.map(labelOf).slice(0, 1).join('')} (and `
+  + `${FLAG_NAMES.map(labelOf).slice(1).join(', ')}) on a PRODUCTION instance. Every write still `
+  + 'needs an explicit "write approved" in Claude and is recorded in .local/audit.jsonl.';
+
+export const CONFIRM_PROMPT = 'Type the instance label to confirm: ';
+
+export const credentialsUpdated = (label: string): string => `Credentials updated for "${label}".`;
+
+export const removeQuestion = (label: string, storePath: string): string =>
+  `Remove instance "${label}"? This deletes its stored credentials from `
+  + `${maskPath(storePath)}. [y/N] `;
+
+export const WAS_DEFAULT = (label: string): string =>
+  `"${label}" was the default instance; the server will start unconfigured until you run set-default.`;
+
+/**
+ * The `set-default` sentence, with the reload tool named from the CONTRACT's own list.
+ *
+ * A retyped tool token is what L01 exists to catch: the name appears in the contract, in
+ * `governance/`, in the rule file and here, and four spellings of it is three chances to be
+ * wrong on the day a name changes.
+ */
+export const defaultChanged = (label: string): string =>
+  `Default instance is now "${label}". The running server picks it up after `
+  + `${CORE_TOOLS_UNCONFIGURED[1]} (or /snowarch setup-instance --resume).`;
+
+export interface ManageOptions {
+  label?: string;
+  json?: boolean;
+  all?: boolean;
+  verbose?: boolean;
+  yes?: boolean;
+  ackProd?: boolean;
+  confirmLabel?: string;
+  auth?: 'basic' | 'oauth_ropc';
+  username?: string;
+  passwordStdin?: boolean;
+  preset?: string;
+  pairs?: readonly string[];
+}
+
+export interface ManageDeps extends AddDeps {
+  /** The clock, injected so an audit line and a `lastProbe` are assertable to the character. */
+  now?: () => string;
+  /** `.local/config.json`, so the mirror can be pointed somewhere else in a test. */
+  configPath?: string;
+}
+
+interface OpenStore { path: string; store: Store; }
+
+/**
+ * The store schema types `lastProbe` as `{ at: string }` PLUS anything (ARC-07-S03 chose
+ * passthrough so probe keys could be added without a schema version bump). `LastProbe` is the
+ * shape the probes actually write. These two functions are the only place the two meet, so the
+ * assertion is made once, next to the reason for it, rather than at nine call sites.
+ */
+const storedProbe = (last: LastProbe): StoreInstance['lastProbe'] =>
+  last as unknown as StoreInstance['lastProbe'];
+
+const readProbe = (stored: StoreInstance['lastProbe']): LastProbe | null =>
+  (stored ? (stored as unknown as LastProbe) : null);
+
+/**
+ * The store as the SERVER would resolve it, or the sentence saying why not.
+ *
+ * `resolveStorePath()` answering "none" is not an error here the way it is for the server: it
+ * means this checkout has no instances yet, and `list` on such a checkout prints a line and exits
+ * 0. What is NOT allowed is inventing a path: a maintenance command that created a store would
+ * make `set-default` on a typo produce a second, empty configuration.
+ */
+function openStore(deps: ManageDeps): { ok: true; opened: OpenStore }
+| { ok: false; message: string; exitCode: number } {
+  const path = deps.storePath ?? resolveStorePath().path ?? projectStorePath();
+  if (!existsSync(path)) {
+    return { ok: true, opened: { path, store: { version: 1, instances: {} } as Store } };
+  }
+  const loaded = loadStore(path);
+  if ('error' in loaded) {
+    return { ok: false, message: `${loaded.error.code} — ${loaded.error.message}`, exitCode: EXIT_USAGE };
+  }
+  return { ok: true, opened: { path, store: loaded.store } };
+}
+
+const verboseStoreLine = (path: string): string => `store: ${maskPath(path)}`;
+
+/** One instance, or the refusal naming the labels that do exist. */
+function findInstance(opened: OpenStore, label: string):
+{ ok: true; entry: StoreInstance } | { ok: false; message: string } {
+  const entry = opened.store.instances[label];
+  if (!entry) return { ok: false, message: labelNotFound(label, Object.keys(opened.store.instances)) };
+  return { ok: true, entry };
+}
+
+/** Save one changed entry, leaving every other byte of the store as it was. */
+function writeEntry(opened: OpenStore, label: string, entry: StoreInstance): void {
+  saveStore(opened.path, {
+    ...opened.store,
+    instances: { ...opened.store.instances, [label]: entry },
+  } as Store);
+}
+
+function audit(entry: CliAuditEntry): void {
+  appendAudit(entry);
+}
+
+// ── list ──────────────────────────────────────────────────────────────────────────────────
+
+export function runList(options: ManageOptions, io: AddIo, deps: ManageDeps = {}): number {
+  const opened = openStore(deps);
+  if (!opened.ok) { io.write(`${opened.message}\n`); return opened.exitCode; }
+  if (options.verbose) io.write(`${verboseStoreLine(opened.opened.path)}\n`);
+
+  const json = listJson(opened.opened.path, opened.opened.store);
+  io.write(options.json ? `${JSON.stringify(json, null, 2)}\n` : `${listTable(json)}\n`);
+  return EXIT_OK;
+}
+
+// ── test ──────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Re-probe one instance or all of them. `lastProbe` is the only field this writes, ever.
+ *
+ * In `--json` the human lines are suppressed rather than interleaved: ARC-06-S08 parses this
+ * command's stdout, and a network note printed above the object turns a probe result into
+ * `unparsable`.
+ */
+export async function runTest(options: ManageOptions, io: AddIo, deps: ManageDeps = {}): Promise<number> {
+  const env = deps.env ?? process.env;
+  const opened = openStore(deps);
+  if (!opened.ok) { io.write(`${opened.message}\n`); return opened.exitCode; }
+  if (options.all && !options.json) {
+    io.write('instance test --all prints JSON only — add --json\n');
+    return EXIT_USAGE;
+  }
+  const quiet = options.json === true;
+  if (options.verbose && !quiet) io.write(`${verboseStoreLine(opened.opened.path)}\n`);
+
+  const labels = options.all
+    ? Object.keys(opened.opened.store.instances)
+    : [options.label as string];
+  for (const label of labels) {
+    const found = findInstance(opened.opened, label);
+    if (!found.ok) { io.write(`${found.message}\n`); return EXIT_USAGE; }
+  }
+
+  const probes: Record<string, LastProbe> = {};
+  let failed = false;
+  for (const label of labels) {
+    const entry = opened.opened.store.instances[label] as StoreInstance;
+    if (!quiet) io.write(`${describeNetworkEnv(env)}\n`);
+    const reach = await (deps.reachability ?? probeReachability)(entry.url, { env });
+    if (!reach.ok && !quiet) for (const line of formatFailure(reach)) io.write(`${line}\n`);
+
+    const client = (deps.makeClient ?? defaultClient)({ url: entry.url, auth: entry.auth });
+    const all = await (deps.probe ?? probeAll)(client, probeOptionsFor(entry.auth, env));
+    const last = toLastProbe({ ...all, at: (deps.now ?? (() => new Date().toISOString()))() });
+    probes[label] = last;
+    if (all.auth.status !== 'ok') failed = true;
+
+    // The probe result is recorded WHETHER OR NOT it passed — a failed probe is the fact the
+    // doctor needs, and a store that only remembers good news would report an instance as
+    // healthy for as long as it stays broken. Nothing else in the entry is touched: the
+    // credentials are the user's, and this command has no business rewriting them.
+    writeEntry(opened.opened, label, { ...entry, lastProbe: storedProbe(last) });
+    if (!quiet) {
+      io.write(`${probeSummary(last, completeFlags(entry.flags), false)}\n`);
+    }
+  }
+
+  if (quiet) io.write(`${JSON.stringify(probesJson(opened.opened.path, probes), null, 2)}\n`);
+  return failed ? EXIT_FAILED : EXIT_OK;
+}
+
+// ── set-credentials ───────────────────────────────────────────────────────────────────────
+
+/**
+ * New credentials for an existing instance — saved only when the instance says `ok`.
+ *
+ * The re-entry loop is S05's, called through the same helper, so "three attempts, one request
+ * each" is one rule in one place. A run that ends any other way leaves the OLD credentials
+ * exactly where they were: an entry whose password has been replaced by a wrong one is worse
+ * than an entry nobody touched, because the failure arrives later and somewhere else.
+ */
+export async function runSetCredentials(options: ManageOptions, io: AddIo, deps: ManageDeps = {}): Promise<number> {
+  const env = deps.env ?? process.env;
+  const opened = openStore(deps);
+  if (!opened.ok) { io.write(`${opened.message}\n`); return opened.exitCode; }
+  const label = options.label as string;
+  const found = findInstance(opened.opened, label);
+  if (!found.ok) { io.write(`${found.message}\n`); return EXIT_USAGE; }
+  if (options.verbose) io.write(`${verboseStoreLine(opened.opened.path)}\n`);
+
+  const entry = found.entry;
+  const method = options.auth ?? entry.auth.method;
+
+  let attempt = 1;
+  for (;;) {
+    // `Username [a***]:` — Enter keeps the current account. The mask is the store's, so what is
+    // shown here and what `list` shows cannot disagree.
+    const username = options.username
+      ?? (((await io.ask(`Username [${maskUsername(entry.auth.username)}]: `)) ?? '').trim()
+        || entry.auth.username);
+
+    const fromStdin = options.passwordStdin && attempt === 1
+      ? await readSecretFromStdin(io.io ? { io: io.io } : {})
+      : null;
+    const password = fromStdin ? (fromStdin[0] ?? '') : await io.secret('Password:');
+    if (!password) { io.write(`${NOTHING_SAVED}\n`); return EXIT_FAILED; }
+
+    let auth: StoreInstance['auth'];
+    if (method === 'basic') {
+      auth = { method, username, password };
+    } else {
+      const clientId = ((await io.ask('Client ID: ')) ?? '').trim();
+      const clientSecret = fromStdin ? (fromStdin[1] ?? '') : await io.secret('Client secret:');
+      auth = { method, username, password, clientId, clientSecret };
+    }
+
+    const client = (deps.makeClient ?? defaultClient)({ url: entry.url, auth });
+    const all = await (deps.probe ?? probeAll)(client, probeOptionsFor(auth, env));
+    if (all.auth.status === 'ok') {
+      const at = (deps.now ?? (() => new Date().toISOString()))();
+      const last = toLastProbe({ ...all, at });
+      // Changing the METHOD drops the other method's fields rather than leaving them beside the
+      // new ones: a `basic` entry carrying a stale `clientSecret` is a secret nobody will think
+      // to rotate.
+      writeEntry(opened.opened, label, { ...entry, auth, lastProbe: storedProbe(last) });
+      audit({ ts: at, instance: label, environment: entry.environment, tool: null, actor: 'cli',
+        action: 'set-credentials', result: 'ok' });
+      io.write(`${credentialsUpdated(label)} ${probeSummary(last, completeFlags(entry.flags), false)}\n`);
+      return EXIT_OK;
+    }
+
+    if (all.auth.status === 'unreachable') {
+      io.write(`${all.auth.detail ?? 'the instance could not be reached'}\n${NOTHING_SAVED}\n`);
+      return EXIT_FAILED;
+    }
+    if (options.passwordStdin || options.yes) {
+      io.write(`${all.auth.status === 'role missing' ? all.auth.hint : 'AUTHENTICATION_FAILED — wrong username or password.'}\n${NOTHING_SAVED}\n`);
+      return EXIT_FAILED;
+    }
+    if (attempt >= MAX_ATTEMPTS) { io.write(`${AUTH_EXHAUSTED}\n`); return EXIT_FAILED; }
+    if (isNo(await io.ask(authFailedRetry(attempt + 1)))) {
+      io.write(`${NOTHING_SAVED}\n`);
+      return EXIT_FAILED;
+    }
+    attempt += 1;
+  }
+}
+
+// ── the production gate, shared by set-preset and set-flags ───────────────────────────────
+
+type ProdGate =
+  | { ok: true; confirmedVia?: 'prompt' | 'flag' }
+  | { ok: false; message: string; exitCode: number };
+
+/**
+ * May this change raise a production instance? D-05, in one place.
+ *
+ * The label is TYPED BACK, and that is the whole mechanism: `--ack-prod` alone would be a flag
+ * somebody adds to a command line they are already running. `--confirm-label` is the CI form —
+ * the label is still typed, on the command line — and the audit line records which of the two it
+ * was, so "a person did this" and "a pipeline did this" stay distinguishable afterwards.
+ */
+async function prodGate(label: string, entry: StoreInstance, raising: boolean,
+  options: ManageOptions, io: AddIo): Promise<ProdGate> {
+  if (entry.environment !== 'prod' || !raising) return { ok: true };
+  if (!options.ackProd) {
+    return { ok: false, message: prodRefusal(label), exitCode: EXIT_POLICY };
+  }
+  io.write(`${prodRaiseWarning()}\n`);
+  if (options.confirmLabel !== undefined) {
+    return options.confirmLabel === label
+      ? { ok: true, confirmedVia: 'flag' }
+      : { ok: false, message: MISMATCH, exitCode: EXIT_POLICY };
+  }
+  const typed = ((await io.ask(CONFIRM_PROMPT)) ?? '').trim();
+  return typed === label
+    ? { ok: true, confirmedVia: 'prompt' }
+    : { ok: false, message: MISMATCH, exitCode: EXIT_POLICY };
+}
+
+// ── set-preset ────────────────────────────────────────────────────────────────────────────
+
+export async function runSetPreset(options: ManageOptions, io: AddIo, deps: ManageDeps = {}): Promise<number> {
+  const opened = openStore(deps);
+  if (!opened.ok) { io.write(`${opened.message}\n`); return opened.exitCode; }
+  const label = options.label as string;
+  const found = findInstance(opened.opened, label);
+  if (!found.ok) { io.write(`${found.message}\n`); return EXIT_USAGE; }
+  if (options.verbose) io.write(`${verboseStoreLine(opened.opened.path)}\n`);
+
+  const entry = found.entry;
+  const preset = String(options.preset);
+  const raising = preset !== 'read-only';
+  const gate = await prodGate(label, entry, raising, options, io);
+  if (!gate.ok) { io.write(`${gate.message}\n`); return gate.exitCode; }
+
+  const decision = await resolveFlags({
+    label,
+    environment: entry.environment,
+    preset,
+    ...(options.yes ? { yes: true } : { io }),
+    ...(readProbe(entry.lastProbe) ? { probes: readProbe(entry.lastProbe) as LastProbe } : {}),
+    ...(gate.confirmedVia ? { prodAcknowledged: true } : {}),
+  });
+  if (!decision.ok) {
+    io.write(`${decision.message}\n`);
+    return decision.exitCode ?? EXIT_FAILED;
+  }
+  io.write(`${decision.applying}\n`);
+  return applyPermissions(opened.opened, label, entry, decision.preset as StoreInstance['preset'],
+    decision.flags as Flags, 'set-preset', gate.confirmedVia, io, deps);
+}
+
+// ── set-flags ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * `WRITE=on` → the flag's own name mapped to the string `true`, or the sentence naming what was
+ * not understood. (Spelled that way round because writing the flag constant out here would make
+ * this comment a hit in the sweep that forbids flag literals in `src/cli/` — the thirteenth time
+ * that lesson has been learnt in this repository.)
+ */
+export function parseFlagPairs(pairs: readonly string[]):
+{ ok: true; changes: Map<FlagName, 'true' | 'false'> } | { ok: false; message: string } {
+  const changes = new Map<FlagName, 'true' | 'false'>();
+  for (const pair of pairs) {
+    const [key, value] = pair.split('=').map((s) => s.trim());
+    const flag = FLAG_NAMES.find((f) => labelOf(f).toLowerCase() === String(key).toLowerCase()
+      || f.toLowerCase() === String(key).toLowerCase());
+    if (!flag) {
+      return { ok: false,
+        message: `"${key}" is not a flag (expected ${FLAG_NAMES.map(labelOf).join(', ')})` };
+    }
+    const on = ['on', 'true'].includes(String(value).toLowerCase());
+    const off = ['off', 'false'].includes(String(value).toLowerCase());
+    if (!on && !off) return { ok: false, message: `${labelOf(flag)}=${value} — expected on or off` };
+    changes.set(flag, on ? 'true' : 'false');
+  }
+  if (changes.size === 0) return { ok: false, message: 'instance set-flags needs at least one FLAG=on|off' };
+  return { ok: true, changes };
+}
+
+/**
+ * A PARTIAL change to the six flags — the difference from `set-preset`, which replaces all of them.
+ *
+ * Each requested change goes through S04's own toggle, so the dependency conversation is the one
+ * the review screen has rather than a second implementation of the same rule. A change that is
+ * already the current value is skipped: toggling to the state something is already in would flip
+ * it the wrong way and ask a question about a change nobody requested.
+ */
+export async function runSetFlags(options: ManageOptions, io: AddIo, deps: ManageDeps = {}): Promise<number> {
+  const opened = openStore(deps);
+  if (!opened.ok) { io.write(`${opened.message}\n`); return opened.exitCode; }
+  const label = options.label as string;
+  const found = findInstance(opened.opened, label);
+  if (!found.ok) { io.write(`${found.message}\n`); return EXIT_USAGE; }
+  if (options.verbose) io.write(`${verboseStoreLine(opened.opened.path)}\n`);
+
+  const parsed = parseFlagPairs(options.pairs ?? []);
+  if (!parsed.ok) { io.write(`${parsed.message}\n`); return EXIT_USAGE; }
+
+  const entry = found.entry;
+  const raising = [...parsed.changes.values()].includes('true');
+  const gate = await prodGate(label, entry, raising, options, io);
+  if (!gate.ok) { io.write(`${gate.message}\n`); return gate.exitCode; }
+
+  let flags = completeFlags(entry.flags);
+  for (const [flag, value] of parsed.changes) {
+    if (flags[flag] === value) continue;
+    flags = options.yes
+      ? { ...flags, [flag]: value }
+      : await toggleFlag(flags, flag, io);
+  }
+
+  const violation = dependencyViolation(flags);
+  if (violation) { io.write(`${violation}\n`); return EXIT_USAGE; }
+
+  // Production without an acknowledgement cannot arrive here with a flag on — `prodGate` refused —
+  // but a `--yes` run that turned everything OFF is legitimate and lands as `read-only`.
+  const preset = matchPreset(flags);
+  io.write(`${applyingLine(preset, flags)}\n`);
+  return applyPermissions(opened.opened, label, entry, preset, flags, 'set-flags',
+    gate.confirmedVia, io, deps);
+}
+
+/** The save both permission commands end with: entry, ack, audit line, one sentence. */
+function applyPermissions(opened: OpenStore, label: string, entry: StoreInstance,
+  preset: StoreInstance['preset'], flags: Flags, action: 'set-preset' | 'set-flags',
+  confirmedVia: 'prompt' | 'flag' | undefined, io: AddIo, deps: ManageDeps): number {
+  const anyOn = FLAG_NAMES.some((f) => flags[f] === 'true');
+  // The acknowledgement follows the FLAGS, not the command: dropping a production instance back to
+  // read-only clears it, so the next raise has to be acknowledged again rather than inheriting a
+  // "yes" from a decision taken weeks ago.
+  const prodWriteAck = entry.environment === 'prod' && anyOn;
+  const at = (deps.now ?? (() => new Date().toISOString()))();
+  writeEntry(opened, label, { ...entry, preset, flags, prodWriteAck });
+  audit({ ts: at, instance: label, environment: entry.environment, tool: null, actor: 'cli',
+    action, result: 'ok', preset, prodWriteAck,
+    ...(confirmedVia ? { confirmedVia } : {}) });
+  io.write(`Saved "${label}" (preset ${preset}${prodWriteAck ? ' · prodWriteAck true' : ''}).\n`);
+  return EXIT_OK;
+}
+
+// ── set-default ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * `.local/config.json`'s `defaultInstance`, refreshed — a MIRROR, never a second source.
+ *
+ * Only when the file already exists (ARC-06-S05's ruling: the bootstrap owns creating it), only
+ * that one key, and every other key is left byte-for-byte as it was — including `updatedAt`, which
+ * belongs to the bootstrap step that writes the rest. The server package does not import the
+ * engine's `.mjs`, so this is the minimal JSON update rather than a call into B07's writer.
+ */
+export function mirrorDefault(configPath: string, label: string | null): boolean {
+  if (!existsSync(configPath)) return false;
+  try {
+    const raw = JSON.parse(readFileSync(configPath, 'utf8')) as Record<string, unknown>;
+    raw.defaultInstance = label;
+    writeFileSync(configPath, `${JSON.stringify(raw, null, 2)}\n`);
+    return true;
+  } catch {
+    // A config nobody can parse is not this command's failure: the store is authoritative and the
+    // mirror is a convenience. The bootstrap rewrites the file wholesale.
+    return false;
+  }
+}
+
+const configFor = (storePath: string, deps: ManageDeps): string =>
+  deps.configPath ?? join(dirname(storePath), 'config.json');
+
+export function runSetDefault(options: ManageOptions, io: AddIo, deps: ManageDeps = {}): number {
+  const opened = openStore(deps);
+  if (!opened.ok) { io.write(`${opened.message}\n`); return opened.exitCode; }
+  const label = options.label as string;
+  const found = findInstance(opened.opened, label);
+  if (!found.ok) { io.write(`${found.message}\n`); return EXIT_USAGE; }
+  if (options.verbose) io.write(`${verboseStoreLine(opened.opened.path)}\n`);
+
+  saveStore(opened.opened.path, { ...opened.opened.store, defaultInstance: label } as Store);
+  mirrorDefault(configFor(opened.opened.path, deps), label);
+  audit({ ts: (deps.now ?? (() => new Date().toISOString()))(), instance: label,
+    environment: found.entry.environment, tool: null, actor: 'cli', action: 'set-default',
+    result: 'ok' });
+  io.write(`${defaultChanged(label)}\n`);
+  return EXIT_OK;
+}
+
+// ── remove ────────────────────────────────────────────────────────────────────────────────
+
+export async function runRemove(options: ManageOptions, io: AddIo, deps: ManageDeps = {}): Promise<number> {
+  const opened = openStore(deps);
+  if (!opened.ok) { io.write(`${opened.message}\n`); return opened.exitCode; }
+  const label = options.label as string;
+  const found = findInstance(opened.opened, label);
+  if (!found.ok) { io.write(`${found.message}\n`); return EXIT_USAGE; }
+  if (options.verbose) io.write(`${verboseStoreLine(opened.opened.path)}\n`);
+
+  // Default N. Everything else in this file can be done again; this one deletes a credential
+  // somebody typed, and the wrong answer to a fast question is unrecoverable.
+  if (!options.yes) {
+    const answer = ((await io.ask(removeQuestion(label, opened.opened.path))) ?? '').trim().toLowerCase();
+    if (answer !== 'y' && answer !== 'yes') { io.write(`${NOTHING_SAVED}\n`); return EXIT_FAILED; }
+  }
+
+  const wasDefault = opened.opened.store.defaultInstance === label;
+  const instances = { ...opened.opened.store.instances };
+  delete instances[label];
+  const next = { ...opened.opened.store, instances } as Store;
+  if (wasDefault) delete (next as { defaultInstance?: string }).defaultInstance;
+  saveStore(opened.opened.path, next);
+  if (wasDefault) mirrorDefault(configFor(opened.opened.path, deps), null);
+
+  audit({ ts: (deps.now ?? (() => new Date().toISOString()))(), instance: label,
+    environment: found.entry.environment, tool: null, actor: 'cli', action: 'remove', result: 'ok' });
+  io.write(`Removed instance "${label}".\n`);
+  if (wasDefault) io.write(`${WAS_DEFAULT(label)}\n`);
+  return EXIT_OK;
+}

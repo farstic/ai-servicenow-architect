@@ -101,6 +101,10 @@ try {
     skipped: new Set(),
     mcpJson: existsSync(mcpPath) ? readJson(mcpPath) : null,
     skipNotes: [],
+    // What a check MEASURED, keyed by id, for its status line. A note is not a finding: it says
+    // how much was looked at, which is the difference between "nothing is wrong" and "nothing
+    // was read". Text output only — the JSON shape is ARC-08's contract.
+    notes: new Map(),
   };
 } catch (e) {
   cannotRun(`could not read an input: ${e.message}`);
@@ -117,6 +121,7 @@ const results = selected.map((check) => {
   return {
     id: check.id,
     findings,
+    note: ctx.notes.get(check.id),
     status: statusOf({ ...check, skipped: ctx.skipped.has(check.id) }, findings),
   };
 });

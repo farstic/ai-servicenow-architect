@@ -51,6 +51,17 @@ export interface ScreenInput {
     probes?: LastProbe;
     /** Per-flag hint text, for `role missing`. */
     hints?: Partial<Record<FlagName, string>>;
+    /**
+     * The production cap, lifted — and ONLY by ARC-07-S06's `set-preset --ack-prod` after the label
+     * has been typed back (D-05).
+     *
+     * The cap is not a rendering detail: a screen whose boxes can be toggled on a `prod` instance is
+     * the moment raising production becomes something that happens while you are doing something
+     * else, which is exactly what S04 refuses. So the wizard never sets this, there is no flag that
+     * reaches it from `instance add`, and the only caller is the branch that has already printed the
+     * warning and read the label back.
+     */
+    prodAcknowledged?: boolean;
 }
 /**
  * Wrap `text` to `width`, on word boundaries.
@@ -106,6 +117,14 @@ export interface ReviewResult {
  * result says so rather than returning a preset the caller might write.
  */
 export declare function runReviewScreen(input: ScreenInput, io: ReviewIo): Promise<ReviewResult>;
+/**
+ * One toggle, and the conversation the dependency rule needs.
+ *
+ * `n` keeps the state the story asks for in each direction: turning WRITE off with dependents on
+ * leaves WRITE ON (the alternative is a contradiction the server would resolve by force), and
+ * turning a dependent on with WRITE off leaves BOTH OFF.
+ */
+export declare function toggleFlag(current: Flags, flag: FlagName, io: ReviewIo): Promise<Flags>;
 export interface ResolveInput {
     label: string;
     environment: Environment;
@@ -115,6 +134,8 @@ export interface ResolveInput {
     probes?: LastProbe;
     hints?: Partial<Record<FlagName, string>>;
     io?: ReviewIo;
+    /** See `ScreenInput.prodAcknowledged` — S06's `--ack-prod`, after the label was typed back. */
+    prodAcknowledged?: boolean;
 }
 export interface ResolveResult {
     ok: boolean;

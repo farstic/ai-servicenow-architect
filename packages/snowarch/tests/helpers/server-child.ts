@@ -85,4 +85,28 @@ export async function reapServerChildren(): Promise<void> {
  */
 export function removeTempDir(path: string): void {
   rmSync(path, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  pending.delete(path);
+}
+
+/**
+ * The backstop for a run that never reaches its `afterEach`.
+ *
+ * `removeTempDir` is correct and was being called — after `await reapServerChildren()`, so a reap
+ * that threw took the removal with it, and a run interrupted between tests never got there at all.
+ * Five `snowarch-nosecrets-*` trees survived that way here and more on the reviewer's machine. An
+ * exit handler cannot await, so this is `rmSync`; a directory already removed by the normal path
+ * has been dropped from the set and is not touched again.
+ */
+const pending = new Set<string>();
+let armed = false;
+
+export function trackTempDir(path: string): string {
+  pending.add(path);
+  if (!armed) {
+    armed = true;
+    process.on('exit', () => {
+      for (const dir of pending) rmSync(dir, { recursive: true, force: true });
+    });
+  }
+  return path;
 }

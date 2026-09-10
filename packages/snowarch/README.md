@@ -327,7 +327,7 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (62), with what to do about it.
+Every code the server can throw (63), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
@@ -357,6 +357,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `INSUFFICIENT_PRIVILEGES` | grant the role, or use an account that has it; the message names the table |
 | `INVALID_REQUEST` | the message names the argument |
 | `LABEL_EXISTS` | use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it |
+| `LABEL_NOT_FOUND` | run `instance list` to see the labels this checkout has, or `instance add <label>` to add one |
 | `NETWORK_ERROR` | the message carries the underlying cause |
 | `NO_INSTANCE_CONFIGURED` | add an instance, then call the reload tool — Claude Code does not need restarting, the server re-advertises its catalogue in the same session |
 | `NOT_FOUND` | check the sys_id and the table name |
@@ -391,7 +392,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `URL_HAS_PATH` | drop everything after the host |
 | `URL_INVALID` | enter it as `https://<host>.service-now.com` |
 | `URL_NOT_HTTPS` | use the https form of the same host |
-| `URL_REQUIRED` | enter the full https URL of the instance |
+| `URL_REQUIRED` | enter the full https URL of the instance; non-interactively pass `--url <origin>` (a URL cannot be proposed) |
 | `VALIDATION_ERROR` | the message names the argument and the shape |
 | `WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 

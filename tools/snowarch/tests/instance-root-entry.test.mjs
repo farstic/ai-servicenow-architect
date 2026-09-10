@@ -76,9 +76,37 @@ for (const entry of ENTRIES) {
   });
 
   test(`${entry.name}: an unknown sub-command is the server's refusal, not the frame's`, () => {
-    const r = run(entry, ['instance', 'list']);
+    // `list` was the example until ARC-07-S06 implemented it; `import` is the one still to come.
+    const r = run(entry, ['instance', 'import', '--from-legacy']);
     assert.equal(r.status, 2);
-    assert.match(r.text, /ARC-07-S06/);
+    assert.match(r.text, /ARC-07-S08/);
+  });
+
+  test(`${entry.name}: \`list --json\` reaches the server and prints only the object`, () => {
+    const dir = mkdtempSync(join(tmpdir(), 'root-entry-list-'));
+    try {
+      const r = run(entry, ['instance', 'list', '--json'],
+        { SNOW_STORE: join(dir, 'instances.json') });
+      assert.equal(r.status, 0, r.text);
+      // The whole of stdout parses: ARC-06-S08 does exactly this to find the labels.
+      const parsed = JSON.parse(r.text);
+      assert.deepEqual(parsed.instances, []);
+      assert.equal(parsed.defaultInstance, null);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test(`${entry.name}: \`test <label>\` reaches the server with its label`, () => {
+    // The label is the proof: it is a POSITIONAL after a sub-command, which is exactly what the
+    // frame used to swallow. A label that is not in the store answers before any network call, so
+    // this asserts the routing without asserting the internet.
+    const dir = mkdtempSync(join(tmpdir(), 'root-entry-test-'));
+    try {
+      const r = run(entry, ['instance', 'test', 'no-such-label'],
+        { SNOW_STORE: join(dir, 'instances.json') });
+      assert.equal(r.status, 2, r.text);
+      assert.match(r.text, /LABEL_NOT_FOUND/);
+      assert.match(r.text, /no-such-label/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   test(`${entry.name}: a bare \`instance --help\` is still the frame's own`, () => {
