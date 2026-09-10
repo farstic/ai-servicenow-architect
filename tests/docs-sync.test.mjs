@@ -212,10 +212,16 @@ test('resolveMode: explicit wins, state file is read, skip is refused both ways'
 
 test('the recipe printed for an existing checkout is shorter than for a fresh one', () => {
   const w = workspace();
-  const fresh = planRecipe({ config: w.config, areas: AREAS, mode: 'sparse', state: { present: false } });
+  // The PLATFORM is pinned, because this test is about the plan's SHAPE — what a recipe contains
+  // when the corpus is already there — and not about how a command is spelled. Left to
+  // `process.platform` it read `git clone` on POSIX and `git -c core.longpaths=true clone` on
+  // Windows, so the assertions below passed on two runners and failed on the third the moment
+  // ARC-06-S14 put the flag on every Windows command.
+  const plan = (state) => planRecipe({ config: w.config, areas: AREAS, mode: 'sparse', state,
+    platform: 'linux' });
+  const fresh = plan({ present: false });
   syncCorpus({ ...w, log: silent });
-  const state = inspect(w.root, w.config, AREAS);
-  const existing = planRecipe({ config: w.config, areas: AREAS, mode: 'sparse', state });
+  const existing = plan(inspect(w.root, w.config, AREAS));
 
   assert.ok(fresh.some((l) => l.startsWith('git clone')), 'the fresh recipe does not clone');
   assert.ok(!existing.some((l) => l.startsWith('git clone')), 'the existing recipe clones again');
