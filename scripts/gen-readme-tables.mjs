@@ -6,8 +6,16 @@
  * `SNMCP_ORG_CONFIG`, `ALLOW_ANY_TABLE`, an `/auth/login` endpoint and an 11-step wizard
  * described as 5 — none of them implemented. Every one of those sentences was true of an
  * intention and false of the code, and prose has no way to notice. So the parts of the README
- * that are *facts about the build* are written by this script from `dist/contract.json` and
- * `dist/utils/permissions.js`, and `--check` fails CI when the committed text has drifted.
+ * that are *facts about the build* are written by this script from `dist/contract.json`, and
+ * `--check` fails CI when the committed text has drifted.
+ *
+ * STDLIB ONLY, AND NO `import()` OF THE SERVER'S CODE. This generator used to import
+ * `dist/utils/permissions.js` and `dist/tools/index.js`; the second pulls the whole tool tree and
+ * with it the server's runtime dependencies, so on any clone where `npm ci` had not run — every
+ * fresh clone, and every design-only install — it died with `ERR_MODULE_NOT_FOUND`, `gen-all
+ * --check` called it stale and the doctor's E-21 reported the crash as "the README differs". The
+ * presets and the flags are in the contract; the bundle map is read from the built module as DATA
+ * (`scripts/lib/bundles.mjs`), which needs no dependency at all.
  *
  * What is NOT generated: the explanations. A generator can say there are 397 tools in 37
  * families; it cannot say why the SCRIPTING gate covers writes and not reads. Only the marked
@@ -18,7 +26,9 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+
+import { readBundleMap } from './lib/bundles.mjs';
 
 // `fileURLToPath`, never `new URL(...).pathname` — the latter is `/C:/…` on Windows, which is
 // not a filesystem path (ARC-04-S12).
@@ -76,11 +86,12 @@ function familiesBlock() {
   ].join('\n');
 }
 
-async function presetsBlock() {
-  // Imported from the BUILT module, so this table is the one the server enforces rather than a
-  // second copy of it in prose. `01` §6.3 and this block cannot disagree without CI noticing.
-  const perms = await import(pathToFileURL(join(pkg, 'dist', 'utils', 'permissions.js')).href);
-  const { PRESETS, FLAG_NAMES } = perms;
+function presetsBlock() {
+  // From the CONTRACT, which is the same declaration the server enforces — `dist/contract.json` is
+  // built from `src/utils/permissions.ts`, so this table cannot disagree with the flag gate
+  // without CI noticing, and reading it costs no dependency.
+  const FLAG_NAMES = contract.flags.map((f) => f.name);
+  const PRESETS = contract.presets;
 
   const header = `| Preset | ${FLAG_NAMES.map((f) => `\`${f.replace('_ENABLED', '')}\``).join(' | ')} |`;
   const sep = `|---|${FLAG_NAMES.map(() => '---').join('|')}|`;
@@ -113,13 +124,12 @@ function errorCodesBlock() {
   ].join('\n');
 }
 
-async function bundlesBlock() {
+function bundlesBlock() {
   // From ROLE_BUNDLE_MAP, not from a table someone maintained. The doc this replaces listed
   // eight bundles where the code has thirteen, and gave every one a hand-counted tool count
   // that had drifted — "400+" for `full` among them. That is the defect this whole story
-  // closes, so the list is generated.
-  const tools = await import(pathToFileURL(join(pkg, 'dist', 'tools', 'index.js')).href);
-  const { ROLE_BUNDLE_MAP } = tools;
+  // closes, so the list is generated. Read as DATA rather than imported: see the header.
+  const ROLE_BUNDLE_MAP = readBundleMap(join(pkg, 'dist', 'tools', 'index.js'));
 
   const rows = Object.entries(ROLE_BUNDLE_MAP)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -163,7 +173,7 @@ const check = process.argv.includes('--check');
 const before = readFileSync(readmePath, 'utf8');
 let after = before;
 for (const [name, build] of Object.entries(BLOCKS)) {
-  after = apply(after, name, await build());
+  after = apply(after, name, build());
 }
 
 if (!check) {
