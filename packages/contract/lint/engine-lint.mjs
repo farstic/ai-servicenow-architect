@@ -21,11 +21,10 @@
  * has to finish in a couple of seconds on every CI cell — including Windows, where spawning a
  * process per file would dominate the runtime.
  */
-import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { scanFiles } from './lib/scan.mjs';
+import { buildLintContext } from './lib/context.mjs';
 import { renderJson, renderText, statusOf } from './lib/report.mjs';
 import * as l01 from './checks/l01-tokens.mjs';
 import * as l02 from './checks/l02-prefix.mjs';
@@ -54,61 +53,15 @@ const root = resolve(value('--root') ?? selfRoot);
 const asJson = flag('--json');
 const only = (value('--only') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
 
-const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const cannotRun = (message) => {
   process.stderr.write(`engine-lint: ${message}\n`);
   process.exit(2);
 };
 
-const contractPath = join(root, 'packages', 'snowarch', 'dist', 'contract.json');
-const pinPath = join(root, 'packages', 'contract', 'required-tools.json');
-const retiredPath = join(root, 'packages', 'contract', 'retired-names.json');
-const configPath = join(root, 'engine.config.json');
-const mcpPath = join(root, '.mcp.json');
-
-if (!existsSync(contractPath)) {
-  cannotRun(`${contractPath} is missing — the contract is a build artefact; run node scripts/build-dist.mjs`);
-}
-for (const p of [pinPath, retiredPath, configPath]) {
-  if (!existsSync(p)) cannotRun(`${p} is missing`);
-}
-
-let ctx;
-try {
-  const contractText = readFileSync(contractPath, 'utf8');
-  const config = readJson(configPath);
-  const serverKey = config?.mcp?.serverKey;
-  if (typeof serverKey !== 'string' || serverKey.length === 0) {
-    cannotRun('engine.config.json has no mcp.serverKey — L02 has no expected value to compare against');
-  }
-  ctx = {
-    root,
-    files: scanFiles(root),
-    contractText,
-    contract: JSON.parse(contractText),
-    requiredTools: readJson(pinPath),
-    retiredNames: readJson(retiredPath),
-    serverKey,
-    config,
-    // True when the lint is running against its own repository rather than a fixture tree.
-    // L06 needs it: two generators take no --root and would check the real repo from a fixture.
-    isSelfRoot: root === selfRoot,
-    requireClaude: flag('--require-claude'),
-    // A check that cannot run says so through the CLI rather than deciding an exit code itself.
-    cannotRun,
-    // A check that could not run adds its id here; `statusOf` already has the vocabulary
-    // for it, and a skip rendered as a pass is the one outcome a reader must not see.
-    skipped: new Set(),
-    mcpJson: existsSync(mcpPath) ? readJson(mcpPath) : null,
-    skipNotes: [],
-    // What a check MEASURED, keyed by id, for its status line. A note is not a finding: it says
-    // how much was looked at, which is the difference between "nothing is wrong" and "nothing
-    // was read". Text output only — the JSON shape is ARC-08's contract.
-    notes: new Map(),
-  };
-} catch (e) {
-  cannotRun(`could not read an input: ${e.message}`);
-}
+// The inputs are assembled by `lib/context.mjs`, which the doctor's E-18…E-21 call too: one
+// description of what a lint check reads, so the doctor cannot be linting a different object
+// from the one CI lints (ARC-08-S02).
+const ctx = buildLintContext({ root, selfRoot, requireClaude: flag('--require-claude'), cannotRun });
 
 const selected = only.length > 0 ? CHECKS.filter((c) => only.includes(c.id)) : CHECKS;
 if (only.length > 0) {

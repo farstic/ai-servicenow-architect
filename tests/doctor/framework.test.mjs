@@ -12,7 +12,7 @@ import {
   headerLine, renderText, statusLabel, summaryLine, useColour,
 } from '../../tools/snowarch/lib/doctor/report-text.mjs';
 import { collectPrereqs, guessShell, SHELLS } from '../../tools/snowarch/lib/doctor/prereqs.mjs';
-import { findRoot, notAtRoot } from '../../tools/snowarch/lib/doctor/index.mjs';
+import { doctorCommand, findRoot, notAtRoot } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
@@ -38,10 +38,15 @@ const check = (over = {}) => defineCheck({
 const run = (args, cwd = root, env = {}) => spawnSync(process.execPath, [CLI, 'doctor', ...args],
   { encoding: 'utf8', cwd, env: { ...process.env, ...env } });
 
-test('AC 1 — an empty registry is a valid report, zero checks, exit 0', () => {
-  const r = run(['--json', '--no-cache']);
-  assert.equal(r.status, 0, r.stdout + r.stderr);
-  const report = JSON.parse(r.stdout);
+// S02 filled the registry, so the empty case is now asked of the COMMAND with an empty one passed
+// in rather than of the CLI: "a run that reports zero checks and exits 0" is a statement about the
+// harness, and the harness is what stays true after twenty-three checks are registered.
+test('AC 1 — an empty registry is a valid report, zero checks, exit 0', async () => {
+  const out = { chunks: [], write(text) { this.chunks.push(text); } };
+  const code = await doctorCommand({ flags: { json: true, 'no-cache': true }, out,
+    cwd: root, registry: createRegistry() });
+  assert.equal(code, 0);
+  const report = JSON.parse(out.chunks.join(''));
   assert.deepEqual(validateReport(report), []);
   assert.equal(report.summary.ok, 0);
   assert.deepEqual(report.checks, []);
@@ -106,8 +111,19 @@ test('AC 4 — --section filters, and an unknown one is exit 2 with the list', (
   assert.equal(bogus.stdout.trim(), `unknown section "bogus"; valid: ${SECTIONS.join(', ')}`);
 
   const good = run(['--section', 'prereqs,docs', '--json', '--no-cache']);
-  assert.equal(good.status, 0);
-  assert.equal(JSON.parse(good.stdout).options.section, 'prereqs,docs');
+  // NOT `status === 0`. S02 filled the registry, so the exit code of a real run is a fact about the
+  // MACHINE — a CI cell has no `claude` on PATH and may have no corpus, and both are FAILs the
+  // doctor is right to report. What `--section` promises is which checks ran, and that the flag is
+  // echoed back; asserting a health verdict here made this test a check on the runner's laptop.
+  assert.ok([0, 1].includes(good.status), `unexpected exit ${good.status}`);
+  const report = JSON.parse(good.stdout);
+  assert.equal(report.options.section, 'prereqs,docs');
+  const ran = report.checks.filter((c) => c.status !== 'skip');
+  assert.ok(ran.length > 0, 'the section selected nothing at all');
+  assert.deepEqual([...new Set(ran.map((c) => c.section))].sort(), ['docs', 'prereqs']);
+  for (const c of report.checks.filter((c) => !['docs', 'prereqs'].includes(c.section))) {
+    assert.equal(c.detail, 'not in --section', `${c.id} ran outside the selected sections`);
+  }
 });
 
 test('the filtering rules: --quick excludes spawns and network, and implies --no-network', () => {

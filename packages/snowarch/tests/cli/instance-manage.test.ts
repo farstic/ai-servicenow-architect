@@ -37,7 +37,7 @@ import { scriptedTty } from '../helpers/scripted-tty.js';
 const URL_PDI = 'https://dev12345.service-now.com';
 const URL_PROD = 'https://acme.service-now.com';
 const USERNAME = 'svc.snowarch';
-const EMAIL_USER = 'cvetomir@corp.com';
+const EMAIL_USER = 'someone@corp.example.com';
 const PASSWORD = ['pw', '-', 'first'].join('');
 const NEW_PASSWORD = ['pw', '-', 'second'].join('');
 const CLIENT_SECRET = ['cs', '-', 'fixture'].join('');
@@ -145,7 +145,7 @@ describe('AC 1 — list', () => {
       const out = terminal.written();
       expect(out).toContain('LABEL  ENV');
       // The domain SURVIVES the mask — ARC-04-S02's rule — and the local part does not.
-      expect(out).toContain('c***@corp.com');
+      expect(out).toContain('s***@corp.example.com');
       expect(out).toContain('a***'.replace('a', USERNAME[0] as string));
       expect(out).not.toContain(USERNAME);
       expect(out).not.toContain(EMAIL_USER);

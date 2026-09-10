@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { engineChecks } from '../tools/snowarch/lib/doctor/checks/index.mjs';
 import { createRegistry } from '../tools/snowarch/lib/doctor/registry.mjs';
 import { buildReport } from '../tools/snowarch/lib/doctor/report-json.mjs';
 import { renderText } from '../tools/snowarch/lib/doctor/report-text.mjs';
@@ -65,6 +66,23 @@ export async function sample() {
   };
 }
 
+/**
+ * The check list, from the registry itself.
+ *
+ * ARC-08-S02's definition of done asks for "E-00…E-22 with one line each" on this page. Typed out,
+ * that list is stale the first time a check moves section or leaves `--quick` — the roster's own
+ * lesson (P-12), one directory further down. So it is rendered from the declarations, and the
+ * `--quick` column is computed the way the runner computes it rather than copied from the flag.
+ */
+export function checkTable(checks = engineChecks()) {
+  const rows = ['| Check | Section | What it answers | `--quick` | `--fix` |', '|---|---|---|---|---|'];
+  for (const c of checks) {
+    const quick = c.quick && !c.spawns && !c.network ? 'yes' : '—';
+    rows.push(`| \`${c.id}\` | ${c.section} | ${c.title} | ${quick} | ${c.fixable ? 'yes' : '—'} |`);
+  }
+  return rows.join('\n');
+}
+
 function replaceRegion(doc, name, body) {
   const open = `<!-- generated:${name} -->`;
   const close = `<!-- /generated:${name} -->`;
@@ -80,14 +98,15 @@ if (isMain) {
   const current = readFileSync(join(root, TARGET), 'utf8');
   let next = replaceRegion(current, 'doctor-json', ['```json', json, '```'].join('\n'));
   next = replaceRegion(next, 'doctor-text', ['```', text, '```'].join('\n'));
+  next = replaceRegion(next, 'doctor-checks', checkTable());
 
   if (current.replace(/\r\n/g, '\n') === next) {
-    process.stdout.write(`gen-doctor-docs: ${TARGET} current (2 blocks).\n`);
+    process.stdout.write(`gen-doctor-docs: ${TARGET} current (3 blocks).\n`);
   } else if (CHECK) {
     process.stdout.write(`gen-doctor-docs: ${TARGET} is stale — run npm run gen and commit the result\n`);
     process.exit(1);
   } else {
     writeFileSync(join(root, TARGET), next);
-    process.stdout.write(`gen-doctor-docs: wrote ${TARGET} (2 blocks).\n`);
+    process.stdout.write(`gen-doctor-docs: wrote ${TARGET} (3 blocks).\n`);
   }
 }
