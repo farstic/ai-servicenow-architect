@@ -583,6 +583,55 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ---
 
+> **Amendment 2026-09-10 (ARC-07-S07).** Eight departures and findings.
+>
+> **(1) A FIFTH provider value.** The story names four; `detectCloudSync` also returns
+> `CloudStorage (unknown provider)`. macOS mounts every vendor under
+> `~/Library/CloudStorage/<Provider>-<tenant>`, so a vendor the table does not name is still a
+> synced folder — and ARC-04-S02's boolean already answered `true` for exactly those paths.
+> Dropping the case would have made the rewrite less truthful than the function it replaced;
+> saying "synced, and I cannot tell you by whom" is more use than saying nothing.
+>
+> **(2) The engine and the server shared an ordering bug, found by the fixture's first row.**
+> `~/Library/CloudStorage/OneDrive-Corp/…` is both a CloudStorage mount and a OneDrive one, and
+> both implementations answered with the mount because `CloudStorage` sat above `OneDrive` in the
+> table and `Library` comes first in the path. Named vendors are matched across the whole path
+> FIRST in both now. ARC-06-S05's parity test reads
+> `packages/snowarch/tests/fixtures/cloud-sync-paths.json` and its six inline rows are gone into
+> it; it asserts WHETHER exactly and WHICH wherever a vendor is named, because the engine keeps
+> its own longer wording for an unnamed mount.
+>
+> **(3) `add --json` had no shape, so it has this one:** `{ saved, label, store, default,
+> instance, lastProbe, warnings }` — the same envelope discipline as `list --json` and `test
+> --json`, with the masked entry and never the stored one.
+>
+> **(4) `--json` suppresses the step lines.** `[1/6] Instance URL` printed above an object makes
+> the object unparseable, and `test --json` already promised a caller one object on stdout.
+>
+> **(5) `warnings[]` carries the CODE**, not the sentence: a caller matching on prose is a caller
+> that breaks when the prose improves. The sentence is on screen in the human form, before the
+> save AND after it.
+>
+> **(6) The WARN is the REGISTRY's text now.** `STORE_IN_CLOUD_SYNC_FOLDER`'s `meaning` and
+> `remedy` carry `<provider>`, `<root>` and `<global>`, and `fillMeaning()` joins `fillRemedy()` so
+> both halves of one entry are filled by one substitution. When the global store is itself synced,
+> or `--global` is already in use, the remedy's `--global` clause is dropped — offering somebody a
+> place with the same problem is advice that cannot be taken.
+>
+> **(7) The `.env.example` allow-list ceiling moved 20 → 24**, deliberately: `XDG_CONFIG_HOME` and
+> the three `OneDrive*` roots are operating-system variables this package reads and must not tell
+> a reader to set in a project `.env`. Each is spelled out with its reason, which is what the test
+> actually enforces; the ceiling is a brake, not a budget.
+>
+> **(8) A vitest worker does not run the pool's exit handler.** ARC-07-S06's fixture sweep covers
+> the engine's `node --test` processes; on the server side a file's fixtures must be removed in
+> its own `afterEach`, or they survive the run. Thirteen `instance-global-*` directories in a
+> private `TMPDIR` is how that was found.
+>
+> **On the documented limit:** a macOS `~/Documents` redirected into a sync client is still
+> undetectable — there is no environment variable to read, and the path says nothing. The story
+> already records it; nothing here improves it.
+
 ### ARC-07-S08 — `instance import --from-legacy`: dry-run plan, field and flag mapping, explicit `FLUENT_ENABLED`, prod cap, deletion advice
 
 **As** an existing snow-mcp user **I want** one command that reads my old `~/.config/servicenow-mcp/instances.json`, shows me what it will create, migrates the entries with their flags into the new store, and tells me what to delete **so that** the cutover (ARC-10) does not leave a plaintext copy behind or re-type anything.

@@ -110,12 +110,38 @@ function deepestCode(err: unknown): string | null {
  * invites a reader to look for something that is not there — and `<host>` falls back to "the
  * instance" for a caller that has no URL to hand.
  */
-export function fillRemedy(code: string, {
-  host, proxy, proxyVar, issuer,
-}: { host?: string | undefined; proxy?: string | undefined; proxyVar?: string | undefined;
-  issuer?: string | undefined } = {}): string {
+export interface RemedyValues {
+  host?: string | undefined;
+  proxy?: string | undefined;
+  proxyVar?: string | undefined;
+  issuer?: string | undefined;
+  /** ARC-07-S07's three, for `STORE_IN_CLOUD_SYNC_FOLDER`. */
+  provider?: string | undefined;
+  root?: string | undefined;
+  global?: string | undefined;
+}
+
+/**
+ * The registry's MEANING, instantiated the same way its remedy is.
+ *
+ * `STORE_IN_CLOUD_SYNC_FOLDER` is the first code whose meaning carries values — the provider and
+ * the folder — and a second filler for the other half of the same entry would be two places to
+ * change a placeholder's name. One substitution, both halves.
+ */
+export function fillMeaning(code: string, values: RemedyValues = {}): string {
   const entry = ERROR_CODES.find((e) => (e.code as string) === code);
-  let text = entry?.remedy ?? '';
+  return substitute(entry?.meaning ?? '', values);
+}
+
+const substitute = (text: string, { provider, root, global: globalStore }: RemedyValues): string =>
+  text.replaceAll('<provider>', provider ?? 'a cloud provider')
+    .replaceAll('<root>', root ?? 'the synced folder')
+    .replaceAll('<global>', globalStore ?? 'the global store');
+
+export function fillRemedy(code: string, values: RemedyValues = {}): string {
+  const { host, proxy, proxyVar, issuer } = values;
+  const entry = ERROR_CODES.find((e) => (e.code as string) === code);
+  let text = substitute(entry?.remedy ?? '', values);
 
   // A PARENTHETICAL whose subject is absent goes with it. `(a proxy is configured — …)` reads as
   // a fact when one is, and as noise when none is; `(issuer: )` invites a reader to look for

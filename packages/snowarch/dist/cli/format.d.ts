@@ -55,3 +55,35 @@ export interface ProbesJson {
  * consumer that will get it wrong once.
  */
 export declare function probesJson(storePath: string, probes: Record<string, LastProbe>): ProbesJson;
+/**
+ * The precedence sentence, spelled ONCE.
+ *
+ * `add --global`, `list --all` and `instance test` all say it, and the one thing a user needs from
+ * it is which file the server will actually read. Paths go through `maskPath` — the home directory
+ * becomes `~`, and an absolute path carries the account name into every screen share and ticket.
+ */
+export declare const precedenceNote: (label: string, projectPath: string, globalPath: string) => string;
+/** The footer `list` prints when the OTHER store is not empty. */
+export declare const otherStoreFooter: (count: number) => string;
+export type StoreLabel = 'project' | 'global' | 'env';
+export interface CombinedListJson extends ListJson {
+    /** `list --all`: which store each row came from, and the note when a label is in both. */
+    stores: Record<StoreLabel, string | null>;
+    notes: string[];
+}
+/**
+ * Both stores, side by side, with every row saying where it came from.
+ *
+ * NEVER MERGED — `01` §7, and the reason is that a merge makes "which file set this value"
+ * unanswerable. The rows are concatenated, a duplicate label appears TWICE with different `store`
+ * values, and the note says which of the two the server reads.
+ */
+export declare function combinedListJson(project: {
+    path: string;
+    store: Store | null;
+}, globalStore: {
+    path: string;
+    store: Store | null;
+}): CombinedListJson;
+/** `list --all`: the table with a STORE column, then the precedence note for anything in both. */
+export declare function listAllTable(list: CombinedListJson): string;

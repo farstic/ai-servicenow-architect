@@ -352,8 +352,8 @@
     },
     {
       "code": "STORE_IN_CLOUD_SYNC_FOLDER",
-      "meaning": "The store is inside a cloud-sync folder, so `0600` does not stop the file leaving the machine (D-04).",
-      "remedy": "move the checkout, or accept it deliberately",
+      "meaning": "this checkout is under <provider> (<root>). File mode 0600 does not stop synchronisation — the credential store would be uploaded to that service.",
+      "remedy": "move the checkout outside the synced folder, or keep credentials in the global store with `--global` (<global> is not synced by default)",
       "showInRule": false
     },
     {

@@ -363,8 +363,8 @@ export declare const ERROR_CODES: readonly [{
     readonly showInRule: false;
 }, {
     readonly code: "STORE_IN_CLOUD_SYNC_FOLDER";
-    readonly meaning: "The store is inside a cloud-sync folder, so `0600` does not stop the file leaving the machine (D-04).";
-    readonly remedy: "move the checkout, or accept it deliberately";
+    readonly meaning: "this checkout is under <provider> (<root>). File mode 0600 does not stop synchronisation — the credential store would be uploaded to that service.";
+    readonly remedy: "move the checkout outside the synced folder, or keep credentials in the global store with `--global` (<global> is not synced by default)";
     readonly showInRule: false;
 }, {
     readonly code: "TLS_CERT_INVALID";

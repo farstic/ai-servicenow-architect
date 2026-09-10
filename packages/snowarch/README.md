@@ -375,7 +375,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `SCHEMA_NOT_CACHED` | call the schema read tool for that table first |
 | `SCRIPT_FAILED` | the message carries the instance output |
 | `SCRIPTING_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
-| `STORE_IN_CLOUD_SYNC_FOLDER` | move the checkout, or accept it deliberately |
+| `STORE_IN_CLOUD_SYNC_FOLDER` | move the checkout outside the synced folder, or keep credentials in the global store with `--global` (<global> is not synced by default) |
 | `STORE_NOT_FOUND` | correct the variable, unset it, or create the store |
 | `STORE_PERMISSIONS_TOO_OPEN` | tighten the mode; on Windows the check is skipped and the doctor notes it instead |
 | `STORE_SCHEMA_INVALID` | the message names the field path; correct it in the store |

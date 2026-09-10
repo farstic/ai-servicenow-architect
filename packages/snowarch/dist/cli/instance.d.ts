@@ -49,6 +49,7 @@ export interface AddOptions {
     global?: boolean;
     passwordStdin?: boolean;
     noProbes?: boolean;
+    json?: boolean;
     yes?: boolean;
     replace?: boolean;
     fromBootstrap?: boolean;
@@ -64,6 +65,8 @@ export interface AddResult {
     entry?: MaskedEntry;
     lastProbe?: LastProbe | null;
     message?: string;
+    /** The cloud-sync WARN, when there was one — kept whether the run saved or declined. */
+    warnings?: string[];
 }
 /** What a caller may see of a saved entry: never the password, never the client secret. */
 export interface MaskedEntry {
@@ -138,9 +141,28 @@ export declare const probeOptionsFor: (auth: StoreInstance["auth"], env: NodeJS.
     }>;
 };
 /**
+ * The cloud-sync warning, and the question that follows it (D-04, ARC-07-S07).
+ *
+ * 0600 is a LOCAL permission: the sync client runs as the same user, so the mode does not stop the
+ * file leaving the machine. This is a WARNING and a question rather than a refusal — where somebody
+ * keeps their code is theirs to decide — but the default is NO, because the cost of being wrong is
+ * a credential store on somebody else's servers and the cost of asking again is one command.
+ *
+ * The text is the REGISTRY's, filled with the provider and the folder; there is no second copy of
+ * this sentence anywhere. When the global store is itself synced, the alternative is dropped: the
+ * remedy's parenthetical would otherwise offer a place that has the same problem.
+ */
+export declare function cloudSyncGate(storePath: string, options: {
+    yes?: boolean;
+    global?: boolean;
+}, io: AddIo, env?: NodeJS.ProcessEnv): Promise<{
+    ok: boolean;
+    warning?: string;
+}>;
+/**
  * The whole command. Seven steps, and every one of them can end it.
  */
-export declare function runAdd(options: AddOptions, io: AddIo, deps?: AddDeps): Promise<AddResult>;
+export declare function runAdd(options: AddOptions, terminal: AddIo, deps?: AddDeps): Promise<AddResult>;
 /**
  * The programmatic entry ARC-06-S07's `--instance-file` path can call.
  *
@@ -177,6 +199,7 @@ export interface ManageOptions {
     label?: string;
     json?: boolean;
     all?: boolean;
+    global?: boolean;
     verbose?: boolean;
     yes?: boolean;
     ackProd?: boolean;

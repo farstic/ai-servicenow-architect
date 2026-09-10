@@ -12,24 +12,42 @@
 import { isUnderCloudSyncFolder } from '../../../packages/snowarch/dist/store/paths.js';
 
 /**
- * Segment → provider name. Ordered, and `Mobile Documents` sits before the generic entries because
- * macOS spells iCloud as `Library/Mobile Documents/com~apple~CloudDocs`, which no user calls that.
+ * Segment → provider name. Ordered, and `Mobile Documents` sits first because macOS spells iCloud
+ * as `Library/Mobile Documents/com~apple~CloudDocs`, which no user calls either of those.
+ *
+ * The list is the one in `packages/snowarch/tests/fixtures/cloud-sync-paths.json` — the fixture
+ * this module, the server's `detectCloudSync()` and ARC-08-S03's E-25 all answer to (ARC-07-S07).
  */
 const PROVIDERS = [
   [/^Mobile Documents$/i, 'iCloud Drive'],
   [/^com~apple~CloudDocs$/i, 'iCloud Drive'],
-  [/^iCloud Drive$/i, 'iCloud Drive'],
-  [/^CloudStorage$/i, 'a cloud provider mounted under ~/Library/CloudStorage'],
+  [/^iCloud ?Drive([ _-]|$)/i, 'iCloud Drive'],
   [/^OneDrive([ _-]|$)/i, 'OneDrive'],
   [/^Dropbox([ _-]|$)/i, 'Dropbox'],
   [/^Google ?Drive([ _-]|$)/i, 'Google Drive'],
+  [/^My Drive$/i, 'Google Drive'],
 ];
 
-/** The provider's name, or null. Both separators, because a Windows path can reach a POSIX test. */
+/** The macOS mount point, which names no vendor: checked only after every NAMED one has missed. */
+const CLOUD_STORAGE = 'a cloud provider mounted under ~/Library/CloudStorage';
+
+/**
+ * The provider's name, or null. Both separators, because a Windows path can reach a POSIX test.
+ *
+ * NAMED VENDORS FIRST, across the whole path. `~/Library/CloudStorage/OneDrive-Corp/…` is both a
+ * CloudStorage mount and a OneDrive one, and this used to answer with the mount — because
+ * `CloudStorage` sat above `OneDrive` in the table and `Library` comes first in the path. Saying
+ * "a cloud provider" about a folder whose name says OneDrive is this function refusing to read.
+ * The server's detector had the same ordering bug, found by the same fixture row.
+ */
 export function cloudSyncProvider(p) {
   if (!p) return null;
-  for (const segment of String(p).split(/[\\/]/).filter(Boolean)) {
+  const segments = String(p).split(/[\\/]/).filter(Boolean);
+  for (const segment of segments) {
     for (const [pattern, name] of PROVIDERS) if (pattern.test(segment)) return name;
+  }
+  for (let i = 0; i < segments.length - 1; i += 1) {
+    if (/^Library$/i.test(segments[i]) && /^CloudStorage$/i.test(segments[i + 1])) return CLOUD_STORAGE;
   }
   return null;
 }

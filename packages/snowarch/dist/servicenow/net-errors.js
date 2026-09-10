@@ -75,25 +75,23 @@ function deepestCode(err) {
     return found;
 }
 /**
- * Classify a thrown fetch error.
+ * The registry's MEANING, instantiated the same way its remedy is.
  *
- * `env` is a parameter so the tests can classify against a chosen proxy setting without
- * mutating the process — and so the remedy names the variable the SERVER read, not whatever
- * the environment happens to hold when the message is finally rendered.
+ * `STORE_IN_CLOUD_SYNC_FOLDER` is the first code whose meaning carries values — the provider and
+ * the folder — and a second filler for the other half of the same entry would be two places to
+ * change a placeholder's name. One substitution, both halves.
  */
-/**
- * The registry template, instantiated — the ONE place a network remedy is written.
- *
- * Until ARC-07-S03 this file carried its own remedy strings and `ERROR_CODES` carried others, so
- * one condition had two texts: the server said one thing and the wizard another, and the contract
- * published the second. A remedy repeated in two places is one to correct and one that will not
- * be. `<issuer>` is dropped with its parenthesis when the certificate did not say — "(issuer: )"
- * invites a reader to look for something that is not there — and `<host>` falls back to "the
- * instance" for a caller that has no URL to hand.
- */
-export function fillRemedy(code, { host, proxy, proxyVar, issuer, } = {}) {
+export function fillMeaning(code, values = {}) {
     const entry = ERROR_CODES.find((e) => e.code === code);
-    let text = entry?.remedy ?? '';
+    return substitute(entry?.meaning ?? '', values);
+}
+const substitute = (text, { provider, root, global: globalStore }) => text.replaceAll('<provider>', provider ?? 'a cloud provider')
+    .replaceAll('<root>', root ?? 'the synced folder')
+    .replaceAll('<global>', globalStore ?? 'the global store');
+export function fillRemedy(code, values = {}) {
+    const { host, proxy, proxyVar, issuer } = values;
+    const entry = ERROR_CODES.find((e) => e.code === code);
+    let text = substitute(entry?.remedy ?? '', values);
     // A PARENTHETICAL whose subject is absent goes with it. `(a proxy is configured — …)` reads as
     // a fact when one is, and as noise when none is; `(issuer: )` invites a reader to look for
     // something that was never there. Dropping the whole clause is the only rendering of "we do not

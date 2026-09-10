@@ -49,6 +49,8 @@ export function instanceHelp(): string {
     lines.push(`  ${name.padEnd(width)}  ${meta.summary}`);
   }
   lines.push('', '  --json      machine-readable output (list, test)',
+    '  --all       list BOTH stores, with a STORE column (list)',
+    '  --global    act on the per-user store instead of this checkout\'s',
     '  --verbose   print which store is being read',
     '  --yes       accept every proposal; no questions',
     '', 'secrets are never accepted as arguments — the prompt or --password-stdin',
@@ -89,6 +91,7 @@ export function parseManageArgs(sub: SubCommand, argv: readonly string[]):
     switch (name) {
       case 'json': options.json = true; break;
       case 'all': options.all = true; break;
+      case 'global': options.global = true; break;
       case 'verbose': options.verbose = true; break;
       case 'yes': options.yes = true; break;
       case 'ack-prod': options.ackProd = true; break;

@@ -50,6 +50,27 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   builds is exactly what the user typed: a test greps the whole of `tools/snowarch/` for a
   `--password` construction, because a secret cannot reach `ps` through a process that never
   invents an argument.
+- **A per-user store, and a plain answer to "which one wins".** `instance add --global` writes
+  `~/.config/snowarch/instances.json` — `$XDG_CONFIG_HOME` honoured, because a machine that sets it
+  does not keep configuration in `~/.config` — or `%APPDATA%\snowarch\instances.json` on Windows,
+  through the SAME resolver the server uses rather than a second path calculation. The two stores
+  are **never merged** (`01` §7): `list --all` shows both with a `STORE` column, a label that is in
+  both appears twice, and one note says which of the two the server reads for this checkout.
+  Plain `list` shows the store the server would use and a footer naming what is in the other one,
+  so nobody concludes an instance is gone when it has merely moved house.
+- **A warning before the credential store lands in somebody else's cloud.** `0600` is a LOCAL
+  permission — the sync client runs as the same user — so `add` and `set-credentials` now detect a
+  checkout inside OneDrive, Dropbox, iCloud Drive or Google Drive and say so **before** anything is
+  written, naming the provider and the exact folder to move out of, and asking a question whose
+  default is No. `--yes` writes and keeps the warning in the output and in `--json`'s `warnings[]`;
+  the sentence comes from the error registry, filled with the provider and the folder, so there is
+  no second copy of it anywhere. Enterprise "Known Folder Move" — `Documents` redirected into
+  OneDrive with the word OneDrive nowhere in the path — is caught by the `%OneDrive%` variables,
+  which are the only detector that exists for it. The provider list is DATA, and the three
+  implementations that must agree about it (the server's, the bootstrap's stdlib one, and the
+  doctor's) answer to one fixture file rather than to three tables that look alike. Two of them
+  disagreed about `~/Library/CloudStorage/OneDrive-Corp` on the day the fixture was written.
+
 - **Seven maintenance commands, and what each of them may touch.** `instance list · test ·
   set-credentials · set-preset · set-flags · set-default · remove` — every one resolving the store
   exactly as the server does, because a second resolver is how a wizard writes one file while the

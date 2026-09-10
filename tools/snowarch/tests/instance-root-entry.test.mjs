@@ -95,6 +95,24 @@ for (const entry of ENTRIES) {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
+  test(`${entry.name}: \`list --all\` reaches the server as two flags, not one`, () => {
+    // Two flags after a sub-command, which is the shape the frame used to eat. An empty store is
+    // the empty-store sentence, and `--json` parses as a whole.
+    const dir = mkdtempSync(join(tmpdir(), 'root-entry-all-'));
+    try {
+      const store = join(dir, 'instances.json');
+      const plain = run(entry, ['instance', 'list', '--all'], { SNOW_STORE: store });
+      assert.equal(plain.status, 0, plain.text);
+      assert.match(plain.text, /No instances configured/);
+
+      const json = run(entry, ['instance', 'list', '--all', '--json'], { SNOW_STORE: store });
+      assert.equal(json.status, 0, json.text);
+      const parsed = JSON.parse(json.text);
+      assert.deepEqual(parsed.instances, []);
+      assert.ok(Object.hasOwn(parsed, 'stores'), 'the --all shape carries both store paths');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   test(`${entry.name}: \`test <label>\` reaches the server with its label`, () => {
     // The label is the proof: it is a POSITIONAL after a sub-command, which is exactly what the
     // frame used to swallow. A label that is not in the store answers before any network call, so
