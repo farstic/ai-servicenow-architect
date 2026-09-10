@@ -96,6 +96,13 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   sentence, and the fixture's `~/.claude.json` is asserted byte-identical after a run, including
   under `--fix`. The credential never appears: the report says `set (len 12)`, and the key count
   beside it.
+- **Every check the old doctor made is accounted for.** `scripts/legacy/doctor.sh` was 1,141 lines
+  and 39 numbered checks written against a real machine over two years — the most precise existing
+  specification of a correct install — and rewriting it would have lost intent nobody would notice
+  missing until an install broke in a way it would have caught. The appendix in
+  `docs/ARCHITECTURE.md` gives all 38 ids a new home or a reason, every retirement names the story
+  that made it unnecessary, and a test asserts both directions against the old script itself.
+
 - **`./snowarch doctor --fix` repairs seven drifts, and the list is closed.** Dependencies, the
   documentation corpus, the corpus's checkout onto its pin, the flags a store entry never stated,
   the store directory's mode, the mode toggles, and a stale doctor cache — each with exactly one

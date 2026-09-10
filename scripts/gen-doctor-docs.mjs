@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 import { engineChecks } from '../tools/snowarch/lib/doctor/checks/index.mjs';
 import { FIXERS, TARGETS } from '../tools/snowarch/lib/doctor/fix.mjs';
+import { labelFor, MAPPING, unmappedIds } from '../tools/snowarch/lib/doctor/mapping.mjs';
 import { createRegistry } from '../tools/snowarch/lib/doctor/registry.mjs';
 import { buildReport } from '../tools/snowarch/lib/doctor/report-json.mjs';
 import { renderText } from '../tools/snowarch/lib/doctor/report-text.mjs';
@@ -98,6 +99,25 @@ export function fixTable(fixers = FIXERS) {
   return rows.join('\n');
 }
 
+/**
+ * The appendix: every check the old `doctor.sh` made, and where it went.
+ *
+ * Rendered from `mapping.mjs` for the reason every other region here is rendered — a table of ids
+ * that a person maintains beside a registry of ids is a table that disagrees with it. The
+ * "new checks" list is COMPUTED (registry minus mapped), so a check added tomorrow appears without
+ * anybody remembering this page exists.
+ */
+export function mappingTable(rows = MAPPING, ids = engineChecks().map((c) => c.id)) {
+  const lines = ['| Old | Intent (from `scripts/legacy/doctor.sh`) | New | Note |', '|---|---|---|---|'];
+  for (const row of rows) {
+    lines.push(`| ${row.old} | ${row.intent} | ${labelFor(row)} | ${row.note} |`);
+  }
+  const fresh = unmappedIds(ids, rows);
+  lines.push('', `**New checks with no old counterpart** (${fresh.length}): `
+    + `${fresh.map((id) => `\`${id}\``).join(', ')}.`);
+  return lines.join('\n');
+}
+
 function replaceRegion(doc, name, body) {
   const open = `<!-- generated:${name} -->`;
   const close = `<!-- /generated:${name} -->`;
@@ -115,14 +135,15 @@ if (isMain) {
   next = replaceRegion(next, 'doctor-text', ['```', text, '```'].join('\n'));
   next = replaceRegion(next, 'doctor-checks', checkTable());
   next = replaceRegion(next, 'doctor-fixes', fixTable());
+  next = replaceRegion(next, 'doctor-mapping', mappingTable());
 
   if (current.replace(/\r\n/g, '\n') === next) {
-    process.stdout.write(`gen-doctor-docs: ${TARGET} current (4 blocks).\n`);
+    process.stdout.write(`gen-doctor-docs: ${TARGET} current (5 blocks).\n`);
   } else if (CHECK) {
     process.stdout.write(`gen-doctor-docs: ${TARGET} is stale — run npm run gen and commit the result\n`);
     process.exit(1);
   } else {
     writeFileSync(join(root, TARGET), next);
-    process.stdout.write(`gen-doctor-docs: wrote ${TARGET} (4 blocks).\n`);
+    process.stdout.write(`gen-doctor-docs: wrote ${TARGET} (5 blocks).\n`);
   }
 }
