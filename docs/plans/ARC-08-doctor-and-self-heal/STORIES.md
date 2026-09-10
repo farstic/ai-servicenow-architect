@@ -387,6 +387,35 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S06 — `--fix` whitelist with per-fix reporting and refusal rules
+
+> **Amendment 2026-09-10 (from the delivery).** Six departures. (1) **F4 goes through the store
+> module imported BY FILE PATH** (`dist/store/index.js`), the same seam `server.mjs` uses, rather
+> than through the CLI: the CLI route spawns a process and carries `instance set-flags`'s wider
+> semantics, and the guard belongs with the data. `updateInstance` did not exist — it was added
+> here, and it REFUSES a patch naming `auth`, `password`, `clientSecret` or `clientId` at all, so
+> the fixer cannot touch a credential even if asked. (2) **AC 1's F2 arm is covered separately.**
+> A sparse-set mutation needs a real 35,000-file submodule; the composite fixture links the corpus
+> so E-12/E-15 are green, and F2's own case drives the step runner injected, asserting the recorded
+> mode and the `skip` → `sparse` rewrite. (3) **SV-01's "prebuilt server missing" and E-11's "not
+> bootstrapped" results are `fixable: false`** — the check can be fixable in general, those
+> findings are not, and the JSON now prefers a RESULT's answer over the registry's flag. (4) **SV-02
+> gained the `store-mode` hint** (F5's trigger, which it lacked). (5) The kinds were renamed to one
+> table: `docs-sync` split into `corpus-missing` and `head-off-pin`, `toggles` → `toggles-mismatch`,
+> `chmod` → `store-mode`, `disableAllHooks` → `hooks-disabled-by-bootstrap`. (6) **The cache drops
+> `server.instances[].username`**: masked or not, it is an address shape, and the write-time guard
+> refuses those without exception — every live install would otherwise have had no cache at all.
+>
+> **Amendment 2026-09-10 (b), from the review on a fresh clone.** Two defects the suite could not
+> see. (1) **F2 never worked.** It called `B02.run` with `{root, docs, env, config}` and no
+> `state`, and B02 MUTATES `ctx.state.docs`, so every real run died with `Cannot set properties of
+> undefined`. The test had injected the runner, which proved the mode arithmetic and nothing about
+> the step's contract — the vacuous shape. F2 now builds the context the bootstrap driver builds
+> (through `stepContext`, shared with F1) and PERSISTS the state B02 mutates, so the `skip` →
+> `sparse` rewrite lands in the store rather than only on the screen; the test drives the real
+> `B02.run` against the ARC-03 fixture upstream. (2) **`--fix --json` was not JSON**: the plan and
+> the per-fix lines went to stdout above the object. Under `--json` they go to stderr and stdout
+> carries exactly one object, asserted by `JSON.parse` over the WHOLE of stdout.
+
 **As** an individual practitioner **I want** `./snowarch doctor --fix` to repair the seven classes of drift that are safe to repair, report each repair, and print the exact command for everything it refuses to touch **so that** an install that drifted after an upgrade, a moved checkout or a hand edit returns to 0 FAIL in one run without ever risking credentials or committed files.
 **Context.** README deliverable "`--fix` whitelist (idempotent, reported): deps → B04; docs missing/unsparse → B02; pin drift → `git submodule update --checkout`; flags < 6 → explicit `"false"`; store modes → chmod; toggles → rewrite for recorded mode; stale `doctor-last.json` → re-run. Never: credentials, `.mcp.json`, `~/.claude*`" and acceptance criterion 4 (repairs a four-flag store entry, a wrong sparse set and a missing settings.local toggle in one run; refuses `.mcp.json` and prints `git checkout -- .mcp.json`). `01` §8. Principle 10 applies in spirit: `--fix` shows its plan before applying unless `--yes`.
 **Scope.** In: `tools/snowarch/lib/doctor/fix.mjs` (whitelist registry, plan, apply, report), the `fixes[]` JSON block, `--fix [--yes]`, re-run after fixing. Out: any fixer not in the whitelist (adding one is a deliberate change to this file and its tests), edits to credentials, `.mcp.json`, `.claude/settings.json`, anything under `~/.claude*`, `engine.config.json`, the docs pin in `engine.config.json`.

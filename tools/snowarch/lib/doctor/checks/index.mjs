@@ -140,7 +140,10 @@ export function summariseMerged(results, checks) {
       seen.add(key);
     }
     summary[r.status] = (summary[r.status] ?? 0) + 1;
-    if (byId.get(r.id)?.fixable && (r.status === 'fail' || r.status === 'warn')) summary.fixable += 1;
+    // The result's own answer first — see `checkToJson`. A check that can be fixable in general
+    // still produces findings that are not.
+    const fixable = r.fixable ?? byId.get(r.id)?.fixable ?? false;
+    if (fixable && (r.status === 'fail' || r.status === 'warn')) summary.fixable += 1;
   }
   return summary;
 }

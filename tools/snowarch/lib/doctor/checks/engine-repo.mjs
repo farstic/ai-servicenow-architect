@@ -368,7 +368,8 @@ export function engineRepoChecks() {
           return fail('.claude/settings.local.json is absent — the mode toggle is unset', {
             remedy: './snowarch mode design (or ./snowarch mode live)',
             command: './snowarch mode design',
-            data: { mode: state?.mode ?? null, fix: { kind: 'toggles', mode: state?.mode ?? 'design' } },
+            data: { mode: state?.mode ?? null,
+              fix: { kind: 'toggles-mismatch', mode: state?.mode ?? 'design' } },
           });
         }
         let settings;
@@ -381,7 +382,8 @@ export function engineRepoChecks() {
         const serverKey = ctx.config.mcp.serverKey;
         const mode = state?.mode ?? null;
         const { problems, enabled, disabled } = toggleProblems({ mode, settings, serverKey });
-        const data = { mode, enabled, disabled, fix: { kind: 'toggles', mode: mode ?? 'design' } };
+        const data = { mode, enabled, disabled,
+          fix: { kind: 'toggles-mismatch', mode: mode ?? 'design' } };
         if (problems.length > 0) {
           return fail(problems.join('; '), {
             remedy: mode === 'live' ? './snowarch mode live' : './snowarch mode design',
@@ -397,7 +399,7 @@ export function engineRepoChecks() {
           return state?.hooksDisabledByBootstrap === true
             ? warn('hooks were disabled when Node was absent; Node is present now', {
               remedy: 'remove "disableAllHooks" from .claude/settings.local.json',
-              data: { ...data, fix: { kind: 'disableAllHooks' } },
+              data: { ...data, fix: { kind: 'hooks-disabled-by-bootstrap' } },
             })
             : ok(`${mode ?? 'design'} · hooks disabled by choice (disableAllHooks)`, data);
         }
@@ -417,9 +419,12 @@ export function engineRepoChecks() {
       run: async (ctx) => {
         const local = join(ctx.root, '.local');
         if (!existsSync(local)) {
+          // `fixable: false` on the RESULT: the check can be fixable (a wrong mode is one command),
+          // but an absent `.local/` is an install that never ran, and `--fix` does not install.
           return fail('.local/ is absent — not bootstrapped', {
             remedy: ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh',
             command: ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh',
+            fixable: false,
             data: { fix: null },
           });
         }
@@ -444,6 +449,7 @@ export function engineRepoChecks() {
           return fail(e.message, {
             remedy: './snowarch bootstrap --reset',
             command: './snowarch bootstrap --reset',
+            fixable: false,
             data: { mode, fix: null },
           });
         }
@@ -457,11 +463,12 @@ export function engineRepoChecks() {
           mode: mode === null ? 'acl-inherited' : mode.toString(8).padStart(3, '0'),
           schema: state?.version ?? null,
           recordedMode: state?.mode ?? null,
-          fix: mode !== null && mode !== 0o700 ? { kind: 'chmod', path: '.local', to: '700' } : null,
+          fix: mode !== null && mode !== 0o700 ? { kind: 'store-mode', path: '.local', to: '700' } : null,
         };
         if (problems.length > 0) {
           const fixable = data.fix !== null;
           return fail(problems.join('; '), {
+            fixable,
             remedy: fixable ? 'chmod 700 .local' : (ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh'),
             command: fixable ? 'chmod 700 .local' : (ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh'),
             data,

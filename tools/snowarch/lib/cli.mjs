@@ -126,7 +126,7 @@ export const COMMANDS = {
   // and the exit codes are the product here, and S02-S04 add checks to it. An empty run that says
   // "0 ok, 0 warn, 0 fail" and exits 0 is the first thing a check harness has to get right.
   doctor: { summary: 'check this checkout and report what to do about it', run: doctorCommand,
-    usage: DOCTOR_USAGE, booleans: ['quick', 'no-network', 'fix', 'no-cache', 'write-cache'] },
+    usage: DOCTOR_USAGE, booleans: ['quick', 'no-network', 'fix', 'yes', 'no-cache', 'write-cache'] },
   // `raw`: everything after `instance` is the server CLI's, unparsed and unanswered — including
   // `--help` once a sub-command is named. Only a bare `./snowarch instance --help` is this
   // frame's, and the forwarder itself answers that one.

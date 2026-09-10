@@ -17,6 +17,19 @@ wizard and the doctor render from. If a remedy is wrong, correct it there and ev
 terminal, from \`./snowarch instance …\` while configuring an instance. And from \`./snowarch doctor\`,
 which reports the same codes for the same conditions before you meet them in a call.
 
+## What \`--fix\` will and will not do
+
+\`./snowarch doctor --fix\` repairs a CLOSED list of seven drifts and prints a plan before it
+touches anything: install the server dependencies, sync or re-sparse the documentation corpus,
+check the corpus out onto its pin, write the flags a store entry never stated, restore the store
+directory's mode, rewrite the mode toggles, and clear a stale doctor cache. Each one reports
+\`applied\`, \`noop\` or \`failed\`, and running it twice changes nothing the second time.
+
+It never edits credentials, \`.mcp.json\`, \`.claude/settings.json\`, \`engine.config.json\` or
+anything under \`~/.claude\`. Those appear under REFUSED with the exact command to run by hand —
+which is the point: a repair that guessed at one of them would be guessing about a decision, and
+the four files it declines are the four where a wrong guess is expensive.
+
 ## Two things that are true of several codes at once
 
 **With no instance configured, the server stays up.** It does not exit — an unconfigured checkout

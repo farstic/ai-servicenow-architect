@@ -8,7 +8,7 @@
  * What the test then proves is the check, not the fixture.
  */
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,6 +21,10 @@ export const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', 
 /** The committed files every repo check reads. Copied, never retyped. */
 export const WIRING = Object.freeze([
   'engine.config.json',
+  // The ignore rules. `.claude/settings.local.json` MUST stay untracked — it holds a user's
+  // approvals — and the toggle writer refuses to touch it when it is not ignored, so a fixture
+  // without this file is a fixture where F6 can only fail.
+  '.gitignore',
   // The version of record. A checkout without it is not a checkout, and the doctor reports the
   // version it finds — so a fixture without one would be asserting an absence nobody ships.
   'package.json',
@@ -78,6 +82,49 @@ export function bootstrap(root, { mode = 'design', hooks = true, state: over = {
       : { disabledMcpjsonServers: [serverKey] }),
     ...(hooks ? { hooks: hookEntry() } : {}),
   });
+  return root;
+}
+
+/**
+ * The heavy parts of a real install, LINKED rather than copied.
+ *
+ * The server checks need a built `dist/`, the roster checks need `.claude/skills` and
+ * `.claude/agents`, and the contract checks need `packages/contract` — together tens of megabytes
+ * that no fixture should duplicate per test. They are all read-only to the code under test, so a
+ * junction (Windows) or a symlink (everywhere else) is the same thing to a reader and free to
+ * make. `vendor/docs-areas.txt` is a small file and is copied, because a fixer may write beside it.
+ */
+export const LINKED = Object.freeze([
+  'packages/snowarch/dist',
+  'packages/contract',
+  'node_modules',
+  '.claude/skills',
+  '.claude/agents',
+  'scripts',
+  'tests/lib',
+  'tests/fixtures',
+  // The corpus, so the docs checks answer about a real one rather than about its absence. Linked
+  // like the rest: 35,000 files that no fixture should copy.
+  'vendor/ServiceNowDocs',
+]);
+
+export function linkInstall(root, { from = REAL_ROOT, links = LINKED } = {}) {
+  for (const rel of links) {
+    const target = join(from, rel);
+    if (!existsSync(target)) continue;
+    const dest = join(root, rel);
+    if (existsSync(dest)) continue;
+    mkdirSync(dirname(dest), { recursive: true });
+    // `junction` on Windows: a directory symlink there needs a privilege a CI runner does not
+    // have, and a junction does not.
+    symlinkSync(target, dest, process.platform === 'win32' ? 'junction' : 'dir');
+  }
+  for (const rel of ['vendor/docs-areas.txt']) {
+    const target = join(from, rel);
+    if (!existsSync(target) || existsSync(join(root, rel))) continue;
+    mkdirSync(dirname(join(root, rel)), { recursive: true });
+    cpSync(target, join(root, rel));
+  }
   return root;
 }
 
