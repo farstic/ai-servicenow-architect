@@ -83,5 +83,9 @@ test('and a fixture whose test FAILS is removed too — the case a trailing rmSy
   // The child MUST fail — otherwise this is asserting cleanup on a path that was never taken.
   assert.notEqual(child.status, 0, 'the probe was supposed to fail');
   const left = readdirSync(sandbox).filter((name) => name.startsWith('snowarch-'));
-  assert.deepEqual(left, [], `a failing test left ${left.length} fixture(s) behind`);
+  // HOW the child ended goes in the message: on the cells where this first failed, the answer
+  // decided the fix — a runner that ends a failed child with a SIGNAL skips `exit` handlers, and
+  // no in-process sweep runs unless the signal itself is handled.
+  assert.deepEqual(left, [],
+    `a failing test left ${left.length} fixture(s) behind (status ${child.status}, signal ${child.signal})`);
 });

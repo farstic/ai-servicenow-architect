@@ -26,14 +26,32 @@ import { join } from 'node:path';
 const pending = new Set();
 let armed = false;
 
+const sweep = () => {
+  for (const dir of pending) rmSync(dir, { recursive: true, force: true });
+  pending.clear();
+};
+
 function arm() {
   if (armed) return;
   armed = true;
-  // `exit` only: `SIGINT` would need a handler that also re-raises, and a Ctrl-C during a test run
-  // is the one case where leaving the evidence on disk is defensible.
-  process.on('exit', () => {
-    for (const dir of pending) rmSync(dir, { recursive: true, force: true });
-  });
+  process.on('exit', sweep);
+
+  // AND on the signals a TEST RUNNER sends. `exit` alone was not enough: on ubuntu/node 24 and on
+  // every Windows cell, a fixture from a FAILING test survived while the same case passed on
+  // macOS — the runner ends a child that failed with a signal, and a signal's default action
+  // terminates without running `exit` handlers. Handling one means owning it, so each handler
+  // sweeps, removes itself and re-raises, leaving the exit code and the runner's own reporting
+  // exactly as they would have been.
+  //
+  // `SIGINT` is deliberately NOT here: a Ctrl-C during a test run is the one case where leaving
+  // the evidence on disk is defensible, and it is the user's interrupt rather than a runner's.
+  for (const signal of ['SIGTERM', 'SIGHUP']) {
+    process.on(signal, () => {
+      sweep();
+      process.removeAllListeners(signal);
+      process.kill(process.pid, signal);
+    });
+  }
 }
 
 /** Track a directory somebody else created. Returns it, so it can wrap an existing expression. */
