@@ -23,6 +23,7 @@ import { EXIT_INTERRUPTED, EXIT_USAGE, readSecretFromStdin, type Io } from './tt
 // same constants the behaviour uses, rather than importing 2 from one file and 0 from another.
 export { EXIT_USAGE, EXIT_INTERRUPTED };
 import { ENVIRONMENTS, normalizeInstanceUrl, resolveEnvironment, type Environment } from './url.js';
+import { remedyFor } from '../errors/codes.js';
 import { ENTRY_DEFAULTS, prodRefusal, resolveFlags, type ReviewIo } from './preset-ui.js';
 import { describeNetworkEnv, formatFailure, probeReachability, reachabilityMenu } from '../servicenow/reachability.js';
 import { probeAll, toLastProbe, type AuthProbe, type LastProbe, type ProbeClient } from '../servicenow/probes.js';
@@ -52,9 +53,17 @@ export const LABEL_RULE = /^[a-z][a-z0-9_-]{0,31}$/;
 
 export const NOTHING_SAVED = 'Nothing saved.';
 
-export const labelExists = (label: string): string =>
-  `LABEL_EXISTS — "${label}" already exists. Use instance set-credentials / set-preset to change `
-  + 'it, instance remove to delete it, or --replace.';
+/**
+ * The duplicate-label refusal, rendered FROM the registry.
+ *
+ * `LABEL_EXISTS` shipped as a bare literal: a code with no registry entry, so `docs/TROUBLESHOOTING.md`
+ * documented every other failure of this command and not this one, and the remedy lived only here.
+ * The registry is the single source; only the label, which no registry entry can hold, is added.
+ */
+export const labelExists = (label: string): string => {
+  const remedy = remedyFor('LABEL_EXISTS').remedy;
+  return `LABEL_EXISTS — "${label}" already exists. ${remedy.charAt(0).toUpperCase()}${remedy.slice(1)}.`;
+};
 
 export const authFailedRetry = (attempt: number): string =>
   `AUTHENTICATION_FAILED — wrong username or password. Re-enter? (attempt ${attempt} of `

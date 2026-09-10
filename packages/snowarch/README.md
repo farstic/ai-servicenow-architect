@@ -327,7 +327,7 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (61), with what to do about it.
+Every code the server can throw (62), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
@@ -356,6 +356,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `INSTANCE_UNUSABLE` | the message says which field is impossible |
 | `INSUFFICIENT_PRIVILEGES` | grant the role, or use an account that has it; the message names the table |
 | `INVALID_REQUEST` | the message names the argument |
+| `LABEL_EXISTS` | use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it |
 | `NETWORK_ERROR` | the message carries the underlying cause |
 | `NO_INSTANCE_CONFIGURED` | add an instance, then call the reload tool — Claude Code does not need restarting, the server re-advertises its catalogue in the same session |
 | `NOT_FOUND` | check the sys_id and the table name |

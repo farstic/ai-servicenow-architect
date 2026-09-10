@@ -20,6 +20,13 @@ export declare const EXIT_CODES: ReadonlyArray<{
 export declare const MAX_ATTEMPTS = 3;
 export declare const LABEL_RULE: RegExp;
 export declare const NOTHING_SAVED = "Nothing saved.";
+/**
+ * The duplicate-label refusal, rendered FROM the registry.
+ *
+ * `LABEL_EXISTS` shipped as a bare literal: a code with no registry entry, so `docs/TROUBLESHOOTING.md`
+ * documented every other failure of this command and not this one, and the remedy lived only here.
+ * The registry is the single source; only the label, which no registry entry can hold, is added.
+ */
 export declare const labelExists: (label: string) => string;
 export declare const authFailedRetry: (attempt: number) => string;
 export declare const AUTH_EXHAUSTED: string;

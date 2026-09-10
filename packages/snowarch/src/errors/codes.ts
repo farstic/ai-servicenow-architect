@@ -366,6 +366,13 @@ export const ERROR_CODES = [
     httpStatus: 407,
   },
   {
+    code: 'LABEL_EXISTS',
+    meaning: "An instance with that label is already in the store.",
+    remedy: "use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it",
+    command: "./snowarch instance add <label> --url <url> --env <env> --replace",
+    showInRule: false,
+  },
+  {
     code: 'ENV_REQUIRED',
     meaning: "The environment could not be proposed and none was given, in a run that cannot ask.",
     remedy: "pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do",
@@ -441,7 +448,17 @@ export const ERROR_CODE_NAMES: ReadonlySet<string> = new Set(ERROR_CODES.map((e)
  */
 export type ErrorCodeName = (typeof ERROR_CODES)[number]['code'];
 
-/** The remedy for a code, for anything that shows one. There is no other source. */
+/**
+ * The remedy for a code, for anything that shows one. There is no other source.
+ *
+ * Overloaded so a REGISTERED name resolves to an `ErrorCode` rather than `ErrorCode | undefined`:
+ * a caller passing a literal key would otherwise need a `??` fallback for an arm that cannot run,
+ * and an unreachable branch fails the 100% gate (ARC-07-S04 hit exactly that with `?? []`).
+ * `ErrorCodeName` makes a removed key a compile error at the call site first, which is what makes
+ * the narrower signature true rather than convenient.
+ */
+export function remedyFor(code: ErrorCodeName): ErrorCode;
+export function remedyFor(code: string): ErrorCode | undefined;
 export function remedyFor(code: string): ErrorCode | undefined {
   return ERROR_CODES.find((e) => e.code === code);
 }
