@@ -917,6 +917,142 @@ Two properties make it worth pinning:
 `./snowarch contract --sha` prints the sha256 and nothing else; ARC-05 pins against it and ARC-06's
 bootstrap compares it. ARC-05 completes this section with the generators that read the file.
 
+## Doctor
+
+One runner, two owners. The engine's checks are `E-nn` and live in `tools/snowarch/lib/doctor/`;
+the server's are `SV-nn` and live in `packages/snowarch/src/doctor/`, because the flag rules and the
+store schema belong to the code that enforces them — a second implementation in another language is
+how two answers to one question get shipped. ARC-08-S04 merges the two lists into one report.
+
+**Sections**, in report order: `prereqs · repo · docs · roster · contract · legacy · host · server`.
+`--section` takes a comma-separated list; `server` means every `SV-` check whatever section it
+declares; an unknown name is a usage error (exit 2) that prints the valid ones.
+
+**Every check declares** its section, the severity a failure carries, and three booleans: `quick`
+(in the `--quick` subset), `network` (skipped by `--no-network`) and `spawns` (never in `--quick`,
+whatever it costs). They are required rather than defaulted — the failure mode of an undeclared
+`network` is a doctor that touched the network on a machine that has none.
+
+**The runner owns three promises.** Every selected check runs: one that throws becomes a `fail`
+carrying its message, one that hangs becomes a `fail` after its timeout (15 s, 20 s for a network
+check), and a report that stopped at the first bad answer would describe a checkout as healthy up to
+the point where it stopped looking. Nothing reaches the output unredacted — the redaction pass is
+applied by the runner, so a check cannot forget it. And a check that names an error `code` gets its
+remedy from the contract: `docs/TROUBLESHOOTING.md` is generated from the same entries, so the two
+cannot disagree. A check that sets both a code and its own remedy is refused.
+
+**Exit codes.** `0` no FAIL (warnings allowed) · `1` at least one FAIL · `2` usage · `3` the doctor
+could not run at all — not at the repository root, an unparsable `engine.config.json`, or Node below
+the floor. Exit codes apply with `--json` too; CI relies on them.
+
+**The report, as a person reads it** — statuses are `ok`, `warn`, `FAIL`, `skip` (upper-case so
+`grep FAIL` works), and the Mode line is last, because the last line of a transcript is the one that
+survives a truncated paste:
+
+<!-- generated:doctor-text -->
+```
+snowarch doctor 2.0.0 — 2026-09-04 10:00:12 (quick: no · network: yes · section: all)
+
+prereqs
+  E-00  ok    Claude Code CLI: 2.1.258 >= 2.1.214, logged in
+docs
+  E-12  FAIL  docs corpus: corpus absent (docs mode "skip")
+             → run ./snowarch docs sync   [fixable: ./snowarch doctor --fix]
+server
+  SV-03 warn  instance flags: instance "pdi": 4/6 flags explicit
+             → the doctor writes the missing ones as "false"   [fixable: ./snowarch doctor --fix]
+
+DOCTOR: 1 ok, 1 warn, 1 fail (2 fixable — run ./snowarch doctor --fix)
+Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance to add one
+```
+<!-- /generated:doctor-text -->
+
+**Schema v1.** Every key is present from the first commit, `null` where a later story fills it: a
+consumer must not have to ask which version of the doctor produced its input.
+
+<!-- generated:doctor-json -->
+```json
+{
+  "schema": 1,
+  "product": "snowarch",
+  "version": "2.0.0",
+  "ranAt": "2026-09-04T10:00:12Z",
+  "durationMs": 1830,
+  "options": {
+    "quick": false,
+    "noNetwork": false,
+    "fix": false,
+    "section": null
+  },
+  "mode": null,
+  "modeLine": "Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance to add one",
+  "modeLineDetailed": null,
+  "engine": null,
+  "server": null,
+  "prereqs": null,
+  "checks": [
+    {
+      "id": "E-00",
+      "section": "prereqs",
+      "title": "Claude Code CLI",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "2.1.258 >= 2.1.214, logged in",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0
+    },
+    {
+      "id": "E-12",
+      "section": "docs",
+      "title": "docs corpus",
+      "status": "fail",
+      "severity": "fail",
+      "detail": "corpus absent (docs mode \"skip\")",
+      "remedy": "run ./snowarch docs sync",
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
+      "id": "SV-03",
+      "section": "server",
+      "title": "instance flags",
+      "status": "warn",
+      "severity": "warn",
+      "detail": "instance \"pdi\": 4/6 flags explicit",
+      "remedy": "the doctor writes the missing ones as \"false\"",
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": false,
+      "durationMs": 0
+    }
+  ],
+  "fixes": [],
+  "stale": null,
+  "summary": {
+    "ok": 1,
+    "warn": 1,
+    "fail": 1,
+    "skip": 0,
+    "fixable": 2
+  }
+}
+```
+<!-- /generated:doctor-json -->
+
+`prereqs` is the one object with a named consumer: `/snowarch setup-instance` (ARC-07-S09) branches
+on `os`, `shell`, `node.ok`, `deps.ok`, `mode.toggle` and `store.exists`, and the fields were fixed
+in both stories on 2026-09-10 rather than discovered later. `shell` is a GUESS at the parent process
+and `unknown` is a first-class answer — a wrong guess hands a reader a command their shell cannot
+run.
+
 ## History
 
 | Commit / tag | What |

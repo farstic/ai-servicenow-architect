@@ -114,14 +114,21 @@ test('help lists every command and the exit codes', () => {
 });
 
 test('the not-yet-built commands say which story adds them', () => {
-  // `bootstrap` left this list at ARC-06-S03, which is the only way a placeholder should ever
-  // leave it: the story that names it ships it. The assertion below that it is no longer a
-  // placeholder is what stops it being quietly re-added.
-  for (const [name, story] of [['doctor', 'ARC-08']]) {
+  // THE LIST IS EMPTY, and that is the point it was built to reach. `bootstrap` left it at
+  // ARC-06-S03 and `doctor` at ARC-08-S01 — the only way a placeholder should ever leave it is the
+  // story that names it shipping it. The two assertions below are what stop either being quietly
+  // re-added as a stub.
+  for (const [name, story] of []) {
     const r = run([name]);
     assert.equal(r.code, EXIT_USAGE, name);
     assert.match(r.stderr, new RegExp(`"${name}" is not available in this build — ${story} adds it`));
   }
+
+  // ...and `doctor` is not one of them any more: it runs, and an unknown section is a usage error
+  // rather than a "not available" sentence.
+  const doctor = run(['doctor', '--section', 'nonsense']);
+  assert.equal(doctor.code, EXIT_USAGE);
+  assert.match(doctor.stdout + doctor.stderr, /unknown section "nonsense"/);
   // ...and bootstrap is not one of them any more.
   const r = run(['bootstrap', '--mode', 'nonsense']);
   assert.equal(r.code, EXIT_USAGE);

@@ -10,6 +10,7 @@ import { createLogger } from './log.mjs';
 import { USAGE as BOOTSTRAP_USAGE } from './bootstrap.mjs';
 import { USAGE as MODE_USAGE } from './mode.mjs';
 import { USAGE as INSTANCE_USAGE } from './instance.mjs';
+import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
 const UNIVERSAL = ['json', 'quiet', 'verbose', 'help'];
@@ -121,7 +122,11 @@ export const COMMANDS = {
   mode: { summary: 'switch this checkout between design-only and live, or report which it is',
     run: modeCommand, usage: MODE_USAGE,
     booleans: ['yes', 'ack-user-scope', 'skip-claude-check'] },
-  doctor: PLACEHOLDER('doctor', 'ARC-08'),
+  // ARC-08-S01: the framework ships with an EMPTY registry — the runner, the schema, the renderer
+  // and the exit codes are the product here, and S02-S04 add checks to it. An empty run that says
+  // "0 ok, 0 warn, 0 fail" and exits 0 is the first thing a check harness has to get right.
+  doctor: { summary: 'check this checkout and report what to do about it', run: doctorCommand,
+    usage: DOCTOR_USAGE, booleans: ['quick', 'no-network', 'fix', 'no-cache', 'write-cache'] },
   // `raw`: everything after `instance` is the server CLI's, unparsed and unanswered — including
   // `--help` once a sub-command is named. Only a bare `./snowarch instance --help` is this
   // frame's, and the forwarder itself answers that one.
@@ -141,7 +146,7 @@ export function helpText() {
   return lines.join('\n');
 }
 
-export async function main(argv, { out = process.stdout, err = process.stderr } = {}) {
+export async function main(argv, { out = process.stdout, err = process.stderr, home = '' } = {}) {
   const [name, ...rest] = argv;
 
   if (name === undefined || name === 'help' || name === '--help') {
@@ -182,7 +187,9 @@ export async function main(argv, { out = process.stdout, err = process.stderr } 
   // `positional` is passed as well as `flags`: `mode live` is an argument, not a flag, and a
   // sub-command that had to re-parse `argv` to find it would be a second parser with a second
   // opinion about `--`.
-  const code = await command.run({ flags, positional, argv: rest, log, root, out, err });
+  // `home` comes from the ENTRY POINT: nothing under `lib/` reads the home directory itself
+  // (the repo-wide rule), and the doctor needs it only to shorten a path to `~` in a report.
+  const code = await command.run({ flags, positional, argv: rest, log, root, out, err, home });
   log.commit();          // a deferred logger that was never committed still gets its lines on disk
   return code;
 }
