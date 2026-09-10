@@ -334,7 +334,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 |---|---|
 | `ATF_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `ATTACHMENT_UPLOAD_FAILED` | check the file size and that the target record exists |
-| `AUTHENTICATION_FAILED` | stop and re-enter them; do not retry, repeated failures lock the account |
+| `AUTHENTICATION_FAILED` | If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed |
 | `BATCH_FAILED` | the message lists which |
 | `CMDB_WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `CONNECTION_REFUSED` | `<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too |
@@ -354,7 +354,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `FLUENT_NOT_INSTALLED` | install it globally — the doctor checks `PATH`, so a checkout-local install would pass here and fail there |
 | `INSTANCE_NOT_LOADED` | read the reason in the instance listing; a `prod` instance without `prodWriteAck` needs the acknowledgement |
 | `INSTANCE_UNUSABLE` | the message says which field is impossible |
-| `INSUFFICIENT_PRIVILEGES` | grant the role, or use an account that has it; the message names the table |
+| `INSUFFICIENT_PRIVILEGES` | The credentials are valid but the account lacks a role for this table. Report the tool, the table and the roles the preset needs (see docs/TROUBLESHOOTING.md); do not switch instances or retry with another tool to work around it |
 | `INVALID_REQUEST` | the message names the argument |
 | `LABEL_EXISTS` | use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it |
 | `LABEL_NOT_FOUND` | run `instance list` to see the labels this checkout has, or `instance add <label>` to add one |
@@ -368,7 +368,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `NOW_ASSIST_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `OAUTH_CLIENT_INVALID` | check them against the Application Registry entry on the instance |
 | `OAUTH_ROPC_DISABLED` | use basic authentication, or have an administrator enable the grant type |
-| `PROD_WRITE_NOT_ACKNOWLEDGED` | raise it deliberately, typing the label |
+| `PROD_WRITE_NOT_ACKNOWLEDGED` | A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal |
 | `PROXY_AUTH_REQUIRED` | put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials |
 | `PROXY_UNREACHABLE` | the proxy `<proxyVar>=<proxy>` did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked |
 | `QUERY_FAILED` | the message carries the instance response |

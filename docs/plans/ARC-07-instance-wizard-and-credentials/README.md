@@ -1,6 +1,6 @@
 # ARC-07 — Instance wizard, presets and credentials
 
-Status: **In progress — S01–S09 merged (9 of 11), started 2026-09-10** · Stories drafted 2026-09-04, verified 2026-09-04 · Depends on: ARC-04-S01/S02/S03/S04/S10/S11/S12 (dependency prune, store module, presets, reload, audit writer, R-3 HTTP layer, `Probes` interface), ARC-06-S02/S05/S07/S08 (CLI skeleton, `.local/config.json` mirror, B06 slot + `--instance-file`, handshake helper), ARC-02-S09/S11 (`docs/MODES-AND-PRESETS.md` page, `/snowarch` skill skeleton), ARC-05-S05/S06 (generators, error-code registry), ARC-08-S01 (doctor JSON); ARC-00 S-02/S-04/S-16/S-19 verdicts; owner decisions D-04, D-05, D-06, R-2, R-3 · Blocks: ARC-08 (live checks reuse the probes and the cloud-sync fixture), ARC-10 (`import --from-legacy`)
+Status: **In progress — S01–S10 merged (10 of 11), started 2026-09-10** · Stories drafted 2026-09-04, verified 2026-09-04 · Depends on: ARC-04-S01/S02/S03/S04/S10/S11/S12 (dependency prune, store module, presets, reload, audit writer, R-3 HTTP layer, `Probes` interface), ARC-06-S02/S05/S07/S08 (CLI skeleton, `.local/config.json` mirror, B06 slot + `--instance-file`, handshake helper), ARC-02-S09/S11 (`docs/MODES-AND-PRESETS.md` page, `/snowarch` skill skeleton), ARC-05-S05/S06 (generators, error-code registry), ARC-08-S01 (doctor JSON); ARC-00 S-02/S-04/S-16/S-19 verdicts; owner decisions D-04, D-05, D-06, R-2, R-3 · Blocks: ARC-08 (live checks reuse the probes and the cloud-sync fixture), ARC-10 (`import --from-legacy`)
 
 ## Goal
 

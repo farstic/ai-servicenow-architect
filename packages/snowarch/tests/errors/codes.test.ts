@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ERROR_CODES, ERROR_CODE_NAMES, remedyFor } from '../../src/errors/codes.js';
 import { labelExists } from '../../src/cli/instance.js';
@@ -67,6 +67,32 @@ describe('the error-code registry is complete and honest', () => {
 
   it('finds a plausible number of codes — the extractor is not silently matching nothing', () => {
     expect(producedCodes().size).toBeGreaterThan(30);
+  });
+
+  it('reaches the probe and reachability modules — AC 3 names them, so it says so', () => {
+    // The walk has always covered the whole of `src/`, these two included; ARC-07-S10's criterion
+    // asks for them by name, and an assertion that NAMES them is what keeps the scan from being
+    // narrowed later without anyone noticing which files stopped being read.
+    const scanned = new Set<string>();
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (e.name.endsWith('.ts')) scanned.add(p.slice(SRC.length + 1).split(sep).join('/'));
+      }
+    };
+    walk(SRC);
+    for (const file of ['servicenow/probes.ts', 'servicenow/reachability.ts', 'cli/instance.ts',
+      'cli/import-legacy.ts']) {
+      expect(scanned.has(file), `${file} is outside the registry scan`).toBe(true);
+    }
+  });
+
+  it('every code in the registry has a TROUBLESHOOTING entry with a remedy — AC 3', () => {
+    const page = readFileSync(resolve(SRC, '../../../docs/TROUBLESHOOTING.md'), 'utf8');
+    const missing = ERROR_CODES.filter((e) => !page.includes(`### ${e.code}`)).map((e) => e.code);
+    expect(missing, 'codes with no TROUBLESHOOTING section').toEqual([]);
+    for (const e of ERROR_CODES) expect(e.remedy.trim().length, `${e.code}`).toBeGreaterThan(0);
   });
 
   it('sees a code that is PRINTED rather than thrown — the gap this scan was widened to close', () => {

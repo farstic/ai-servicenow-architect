@@ -89,8 +89,7 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "PROD_WRITE_NOT_ACKNOWLEDGED";
     readonly meaning: "The instance is tagged `environment: prod` and holds a write preset without `prodWriteAck: true`.";
-    readonly remedy: "raise it deliberately, typing the label";
-    readonly command: "./snowarch instance set-preset <label> <preset> --ack-prod";
+    readonly remedy: "A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal";
     readonly showInRule: true;
 }, {
     readonly code: "STORE_NOT_FOUND";
@@ -123,14 +122,13 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "AUTHENTICATION_FAILED";
     readonly meaning: "The instance rejected the credentials — wrong, expired, or the account is locked.";
-    readonly remedy: "stop and re-enter them; do not retry, repeated failures lock the account";
-    readonly command: "./snowarch instance set-credentials <label>";
+    readonly remedy: "If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed";
     readonly showInRule: true;
     readonly httpStatus: 401;
 }, {
     readonly code: "INSUFFICIENT_PRIVILEGES";
     readonly meaning: "The account is authenticated but lacks a ServiceNow role for that table or operation. This is not a flag.";
-    readonly remedy: "grant the role, or use an account that has it; the message names the table";
+    readonly remedy: "The credentials are valid but the account lacks a role for this table. Report the tool, the table and the roles the preset needs (see docs/TROUBLESHOOTING.md); do not switch instances or retry with another tool to work around it";
     readonly showInRule: true;
     readonly httpStatus: 403;
 }, {
