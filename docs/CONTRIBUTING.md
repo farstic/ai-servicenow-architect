@@ -818,6 +818,32 @@ The launcher also has a line budget and a bash-3.2 constraint list, both enforce
 you are adding a step to it, ask first whether the step belongs on the Node path instead: this file
 exists for the machines that cannot run the other one, not as a second implementation.
 
+## Adding a doctor check: registry → snapshots → mapping table
+
+Three files, in this order, and the tests will tell you if you stop after the first.
+
+1. **The registry.** A check is `defineCheck({ id, section, title, severity, quick, network,
+   spawns, fixable, run })` in `tools/snowarch/lib/doctor/checks/`. The id is permanent: eleven ARCs
+   name a check id as their proof, and renaming one silently removes somebody else's evidence.
+2. **The three snapshots.** `tests/fixtures/doctor/snapshot-{linux,darwin,win32}.json` record what
+   a design-only install answers, per check. A new id is red in `tests/doctor/snapshot.test.mjs`
+   with the id named — on every cell, not only after a bootstrap. Produce the rows from a real run
+   rather than by hand: `node scripts/ci/doctor-snapshot.mjs --in doctor.json --write` on the
+   platform, or from that platform's `doctor-<label>` artifact on a green CI run. If Windows
+   answers differently, add the id to `WINDOWS_DIFFERS` in `scripts/ci/doctor-snapshot.mjs` **with
+   the reason** — an undocumented difference fails the test that compares the platforms.
+3. **The mapping table.** `docs/ARCHITECTURE.md`'s generated appendix maps every legacy check to
+   its replacement; `npm run gen` refreshes it and `npm run gen:check` proves it.
+
+What a check must never do: write anything outside `.local/`, read the real `~/.claude.json` in a
+test, or put a credential in a `detail`. `tests/doctor/redaction-e2e.test.mjs` reads the finished
+report — text, `--json` and `--fix` — looking for the fixture's username and password, because the
+mask functions being correct does not stop a check from printing the store itself.
+
+If the check can repair what it finds, it also needs a fixer in the `--fix` whitelist
+(`tools/snowarch/lib/doctor/fix.mjs`) and a `data.fix.kind` the whitelist knows — the whitelist is
+closed, and a `fixable` check with no fixer fails its own test.
+
 ## The Mode line has one definition
 
 `Mode:` is quoted by the bootstrap's summary, the SessionStart banner, `/snowarch status` and

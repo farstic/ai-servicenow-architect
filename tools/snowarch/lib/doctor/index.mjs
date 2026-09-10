@@ -404,8 +404,15 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
   }
 
   // A cache that could not be written is not a failed run: the report is on the screen, and the
-  // banner's fallback is to re-run. Said out loud so a read-only checkout is explicable.
-  if (cacheError) write(`note: the doctor cache could not be written — ${cacheError}`);
+  // banner's fallback is to re-run. Said out loud so a read-only checkout is explicable — but on
+  // STDERR under `--json`, the same rule the fix narration follows six lines up. It used to go to
+  // stdout in both modes, so on any machine where `.local` refuses the write, `--json` emitted
+  // `note: …` and then the object, and every consumer's `JSON.parse` threw on the `n`. ARC-08-S11
+  // found it on the CI runners; ARC-08-S06 had already ruled the same thing for `--fix --json`.
+  if (cacheError) {
+    const line = `note: the doctor cache could not be written — ${cacheError}`;
+    if (flags.json) err.write(`${line}\n`); else write(line);
+  }
 
   if (flags.json) {
     write(JSON.stringify(report, null, 2));

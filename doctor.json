@@ -1,0 +1,831 @@
+{
+  "schema": 1,
+  "product": "snowarch",
+  "version": "2.0.0-dev",
+  "ranAt": "2026-09-10T21:01:24.002Z",
+  "durationMs": 2738,
+  "options": {
+    "quick": false,
+    "noNetwork": false,
+    "fix": false,
+    "section": null
+  },
+  "mode": "design-only",
+  "modeLine": "Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance to add one",
+  "modeLineDetailed": "Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance to add one",
+  "engine": {
+    "version": "2.0.0-dev",
+    "tag": null,
+    "contractSha": "7f798598a38e4455acfca791276ed795f73bf8a23113af918cf335b2784e4676",
+    "node": "24.16.0",
+    "capabilities": {
+      "docx": {
+        "present": true,
+        "how": "/opt/homebrew/bin/python3",
+        "need": "python3"
+      },
+      "pdf": {
+        "present": true,
+        "how": "/opt/homebrew/bin/soffice",
+        "need": "LibreOffice (soffice)"
+      },
+      "drawio": {
+        "present": true,
+        "how": "/opt/homebrew/bin/drawio",
+        "need": "draw.io Desktop"
+      },
+      "mermaid": {
+        "present": false,
+        "how": null,
+        "need": "@mermaid-js/mermaid-cli (mmdc)"
+      }
+    },
+    "docs": {
+      "present": true,
+      "mode": "sparse",
+      "pin": "11b39be17307dd4b21df15a54e8011ae68f64dba",
+      "family": "australia",
+      "citations": 173,
+      "dead": 0
+    },
+    "roster": {
+      "skills": 28,
+      "agents": 9
+    }
+  },
+  "server": {
+    "available": false,
+    "state": "no-deps",
+    "version": null,
+    "mode": null,
+    "instances": []
+  },
+  "prereqs": {
+    "os": "darwin",
+    "shell": "zsh",
+    "node": {
+      "ok": true,
+      "version": "24.16.0"
+    },
+    "deps": {
+      "ok": false
+    },
+    "mode": {
+      "toggle": "disabled"
+    },
+    "store": {
+      "exists": false
+    },
+    "capabilities": {
+      "docx": {
+        "present": true,
+        "how": "/opt/homebrew/bin/python3",
+        "need": "python3"
+      },
+      "pdf": {
+        "present": true,
+        "how": "/opt/homebrew/bin/soffice",
+        "need": "LibreOffice (soffice)"
+      },
+      "drawio": {
+        "present": true,
+        "how": "/opt/homebrew/bin/drawio",
+        "need": "draw.io Desktop"
+      },
+      "mermaid": {
+        "present": false,
+        "how": null,
+        "need": "@mermaid-js/mermaid-cli (mmdc)"
+      }
+    }
+  },
+  "checks": [
+    {
+      "id": "E-00",
+      "section": "prereqs",
+      "title": "Claude Code CLI",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "2.1.258 · login: ok",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 731,
+      "data": {
+        "floor": "2.1.214"
+      }
+    },
+    {
+      "id": "E-01",
+      "section": "prereqs",
+      "title": "git",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "2.39.5",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 51,
+      "data": {
+        "floor": "2.34.1"
+      }
+    },
+    {
+      "id": "E-02",
+      "section": "prereqs",
+      "title": "Node.js",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "24.16.0 (floor 20.0.0)",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "version": "24.16.0",
+        "floor": "20.0.0"
+      }
+    },
+    {
+      "id": "E-03",
+      "section": "prereqs",
+      "title": "npm",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "11.13.0",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 204,
+      "data": {
+        "version": "11.13.0",
+        "mode": "design"
+      }
+    },
+    {
+      "id": "E-04",
+      "section": "prereqs",
+      "title": "capability packs",
+      "status": "ok",
+      "severity": "info",
+      "detail": "docx yes · pdf yes · drawio yes · mermaid no",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 1,
+      "data": {
+        "packs": {
+          "docx": {
+            "present": true,
+            "how": "/opt/homebrew/bin/python3",
+            "need": "python3"
+          },
+          "pdf": {
+            "present": true,
+            "how": "/opt/homebrew/bin/soffice",
+            "need": "LibreOffice (soffice)"
+          },
+          "drawio": {
+            "present": true,
+            "how": "/opt/homebrew/bin/drawio",
+            "need": "draw.io Desktop"
+          },
+          "mermaid": {
+            "present": false,
+            "how": null,
+            "need": "@mermaid-js/mermaid-cli (mmdc)"
+          }
+        },
+        "missing": [
+          "mermaid"
+        ],
+        "hint": "brew install --cask drawio libreoffice"
+      }
+    },
+    {
+      "id": "E-05",
+      "section": "repo",
+      "title": "repository root",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "/var/folders/m5/9kmcs00915j9_jrx_71z6wk40000gn/T/tmp.6jazecF2xq/snowarch-doctor-1MLla9",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 12,
+      "data": {
+        "root": "/var/folders/m5/9kmcs00915j9_jrx_71z6wk40000gn/T/tmp.6jazecF2xq/snowarch-doctor-1MLla9",
+        "toplevel": "/private/var/folders/m5/9kmcs00915j9_jrx_71z6wk40000gn/T/tmp.6jazecF2xq/snowarch-doctor-1MLla9"
+      }
+    },
+    {
+      "id": "E-06",
+      "section": "repo",
+      "title": "engine.config.json",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "snowarch servicenow · docs australia",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 1,
+      "data": {
+        "serverKey": "servicenow",
+        "family": "australia"
+      }
+    },
+    {
+      "id": "E-07",
+      "section": "repo",
+      "title": ".mcp.json committed and secret-free",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "one server \"servicenow\", command node, placeholders defaulted",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 13,
+      "data": {
+        "serverKey": "servicenow",
+        "unmodified": true
+      }
+    },
+    {
+      "id": "E-08",
+      "section": "repo",
+      "title": ".claude/settings.json committed",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "MCP_TIMEOUT 120000 · SessionStart hook present",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 79,
+      "data": {
+        "unmodified": true,
+        "mcpTimeout": "120000",
+        "hook": true
+      }
+    },
+    {
+      "id": "E-09",
+      "section": "repo",
+      "title": "no credential-shaped keys",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "no credential-shaped key or literal",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 13,
+      "data": {
+        "scanned": "tracked files"
+      }
+    },
+    {
+      "id": "E-10",
+      "section": "repo",
+      "title": "settings.local toggles match the recorded mode",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "design · disabled",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "mode": "design",
+        "enabled": false,
+        "disabled": true,
+        "fix": {
+          "kind": "toggles-mismatch",
+          "mode": "design"
+        }
+      }
+    },
+    {
+      "id": "E-11",
+      "section": "repo",
+      "title": ".local/ state",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "mode design",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "mode": "700",
+        "schema": 1,
+        "recordedMode": "design",
+        "fix": null
+      }
+    },
+    {
+      "id": "E-12",
+      "section": "docs",
+      "title": "docs corpus present",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "present (sparse)",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 164,
+      "data": {
+        "present": true,
+        "mode": "sparse",
+        "path": "vendor/ServiceNowDocs"
+      }
+    },
+    {
+      "id": "E-13",
+      "section": "docs",
+      "title": "docs pin",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "11b39be (HEAD, gitlink and pin agree)",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "pin": "11b39be17307dd4b21df15a54e8011ae68f64dba",
+        "gitlink": null,
+        "head": "11b39be17307dd4b21df15a54e8011ae68f64dba",
+        "staged": false
+      }
+    },
+    {
+      "id": "E-14",
+      "section": "docs",
+      "title": "docs family",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "australia",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "family": "australia",
+        "branch": "australia"
+      }
+    },
+    {
+      "id": "E-15",
+      "section": "docs",
+      "title": "sparse set",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "cone · 19 area(s)",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "sparse": "cone",
+        "areas": 19,
+        "missing": [],
+        "fix": {
+          "kind": "sparse-mismatch"
+        }
+      }
+    },
+    {
+      "id": "E-16",
+      "section": "docs",
+      "title": "citations",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "checked: 173 | dead: 0",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 187,
+      "data": {
+        "checked": 173,
+        "dead": 0
+      }
+    },
+    {
+      "id": "E-17",
+      "section": "roster",
+      "title": "roster from directory listing",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "28 skills · 9 sub-agents · 1 utility",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 3,
+      "data": {
+        "skills": 28,
+        "agents": 9,
+        "utility": [
+          "snowarch"
+        ],
+        "declared": {
+          "skills": 28,
+          "agents": 9
+        },
+        "problems": []
+      }
+    },
+    {
+      "id": "E-18",
+      "section": "roster",
+      "title": "skill descriptions",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "28 skills · 9 agents clean",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 4,
+      "data": {
+        "skills": 0,
+        "agents": 0,
+        "files": 9,
+        "problems": []
+      }
+    },
+    {
+      "id": "E-19",
+      "section": "contract",
+      "title": "no retired tool names",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "401 retired name(s), none in use",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 12,
+      "data": {
+        "ran": true,
+        "findings": 0
+      }
+    },
+    {
+      "id": "E-20",
+      "section": "contract",
+      "title": "prefix consistency",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "mcp__servicenow__",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 1,
+      "data": {
+        "ran": true,
+        "findings": 0,
+        "prefix": "mcp__servicenow__"
+      }
+    },
+    {
+      "id": "E-21",
+      "section": "contract",
+      "title": "generated files fresh",
+      "status": "fail",
+      "severity": "fail",
+      "detail": "scripts/gen-governance.mjs:1 generator could not run: gen-governance: presets: docs/MODES-AND-PRESETS.md does not exist — a block target edits a hand-written file — run node scripts/gen-governance.mjs; scripts/gen-roster.mjs:1 generator could not run: gen-roster: docs/ARCHITECTURE.md is missing — run node scripts/gen-roster.mjs; scripts/gen-docs-recipe.mjs:1 generator could not run: gen-docs-recipe: none of the 3 targets exist under /var/folders/m5/9kmcs00915j9_jrx_71z6wk40000gn/T/tmp.6jazecF2xq/snowarch-doctor-1MLla9 — run node scripts/gen-docs-recipe.mjs; scripts/gen-launcher-text.mjs:1 generator could not run: gen-launcher-text: no launcher found — run node scripts/gen-launcher-text.mjs",
+      "remedy": "maintainer: npm run gen && node scripts/gen-docs-areas.mjs",
+      "command": "npm run gen",
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 197,
+      "data": {
+        "ran": true,
+        "findings": 4,
+        "first": [
+          "scripts/gen-governance.mjs:1 generator could not run: gen-governance: presets: docs/MODES-AND-PRESETS.md does not exist — a block target edits a hand-written file — run node scripts/gen-governance.mjs",
+          "scripts/gen-roster.mjs:1 generator could not run: gen-roster: docs/ARCHITECTURE.md is missing — run node scripts/gen-roster.mjs",
+          "scripts/gen-docs-recipe.mjs:1 generator could not run: gen-docs-recipe: none of the 3 targets exist under /var/folders/m5/9kmcs00915j9_jrx_71z6wk40000gn/T/tmp.6jazecF2xq/snowarch-doctor-1MLla9 — run node scripts/gen-docs-recipe.mjs",
+          "scripts/gen-launcher-text.mjs:1 generator could not run: gen-launcher-text: no launcher found — run node scripts/gen-launcher-text.mjs"
+        ],
+        "couldNotRun": 8
+      }
+    },
+    {
+      "id": "E-22",
+      "section": "contract",
+      "title": "contract pin",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "7f798598a38e… · 42 required of 397 declared",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 1,
+      "data": {
+        "pinned": "7f798598a38e",
+        "required": 42,
+        "declared": 397
+      }
+    },
+    {
+      "id": "E-23",
+      "section": "legacy",
+      "title": "stale MCP registrations in ~/.claude.json",
+      "status": "ok",
+      "severity": "warn",
+      "detail": "no ~/.claude.json — nothing to clean",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "entries": [],
+        "present": false
+      }
+    },
+    {
+      "id": "E-24",
+      "section": "legacy",
+      "title": "legacy wizard store",
+      "status": "ok",
+      "severity": "warn",
+      "detail": "no legacy wizard store",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 1,
+      "data": {
+        "path": ".config/servicenow-mcp/instances.json",
+        "present": false,
+        "instances": null
+      }
+    },
+    {
+      "id": "E-25",
+      "section": "host",
+      "title": "cloud-sync folder",
+      "status": "ok",
+      "severity": "warn",
+      "detail": "not under a cloud-sync folder",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "provider": null
+      }
+    },
+    {
+      "id": "E-26",
+      "section": "host",
+      "title": "proxy and CA environment",
+      "status": "ok",
+      "severity": "warn",
+      "detail": "no proxy configured",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "vars": {},
+        "seenBy": "this shell"
+      }
+    },
+    {
+      "id": "E-27",
+      "section": "host",
+      "title": "Claude Code registration status",
+      "status": "ok",
+      "severity": "warn",
+      "detail": "✘ Rejected (see disabledMcpjsonServers in settings) · read by running claude, which maintains its own configuration file",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 1054,
+      "data": {
+        "statusLine": "✘ Rejected (see disabledMcpjsonServers in settings)",
+        "scope": "project",
+        "approved": false,
+        "registration": "project",
+        "mode": "design"
+      }
+    },
+    {
+      "id": "SV-00",
+      "section": "server",
+      "title": "Node version",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "server dependencies not installed",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 3,
+      "data": {
+        "state": "no-deps"
+      }
+    },
+    {
+      "id": "SV-01",
+      "section": "server",
+      "title": "dist artefacts",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "server dependencies not installed",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "state": "no-deps"
+      }
+    },
+    {
+      "id": "SV-02",
+      "section": "server",
+      "title": "store",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "server dependencies not installed",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "state": "no-deps"
+      }
+    },
+    {
+      "id": "SV-03",
+      "section": "server",
+      "title": "instances",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "server dependencies not installed",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "state": "no-deps"
+      }
+    },
+    {
+      "id": "SV-04",
+      "section": "server",
+      "title": "instance probes",
+      "status": "skip",
+      "severity": "warn",
+      "detail": "server dependencies not installed",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0,
+      "data": {
+        "state": "no-deps"
+      }
+    },
+    {
+      "id": "SV-05",
+      "section": "server",
+      "title": "stdio handshake",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "server dependencies not installed",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0,
+      "data": {
+        "state": "no-deps"
+      }
+    },
+    {
+      "id": "SV-06",
+      "section": "server",
+      "title": "capabilities match the store",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "server dependencies not installed",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0,
+      "data": {
+        "state": "no-deps"
+      }
+    },
+    {
+      "id": "SV-07",
+      "section": "server",
+      "title": "audit trail",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "server dependencies not installed",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "state": "no-deps"
+      }
+    },
+    {
+      "id": "SV-08",
+      "section": "server",
+      "title": "ancestor skill directories",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "server dependencies not installed",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "state": "no-deps"
+      }
+    }
+  ],
+  "fixes": [],
+  "stale": {
+    "claudeJsonEntries": [],
+    "legacyStore": null
+  },
+  "summary": {
+    "ok": 27,
+    "warn": 0,
+    "fail": 1,
+    "skip": 9,
+    "fixable": 0
+  }
+}

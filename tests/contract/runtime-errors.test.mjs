@@ -47,12 +47,14 @@ test('criterion 1 — one line per showInRule code, the six flag gates as one', 
 });
 
 test('criterion 1 — the network family and INSTANCE_NOT_LOADED are in it', () => {
-  // The six this story made rule-visible. Named here and nowhere in the renderer: this is the
-  // story's decision about which errors a session must hand over on, and it should fail loudly if
-  // someone quietly takes one back out.
+  // The seven this story made rule-visible — six in the story's list, and CONNECTION_REFUSED added
+  // by its review, because a hibernating PDI is the network error this product meets most and
+  // retrying wakes nothing. Named here and nowhere in the renderer: this is the story's decision
+  // about which errors a session must hand over on, and it should fail loudly if someone quietly
+  // takes one back out.
   const rendered = new Set(codeLines().map((l) => /^- `([^`]+)`/.exec(l)[1]));
   for (const code of ['DNS_FAILURE', 'TLS_CA_UNTRUSTED', 'PROXY_UNREACHABLE', 'PROXY_AUTH_REQUIRED',
-    'CONNECTION_TIMEOUT', 'INSTANCE_NOT_LOADED']) {
+    'CONNECTION_TIMEOUT', 'CONNECTION_REFUSED', 'INSTANCE_NOT_LOADED']) {
     assert.ok(rendered.has(code), `${code} is not in the runtime section`);
   }
 });

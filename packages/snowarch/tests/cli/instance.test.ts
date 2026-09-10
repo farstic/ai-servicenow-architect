@@ -10,6 +10,7 @@ import {
   parseAddArgs, probeSummary, runAdd, savedLine, storeLine, type AddIo,
 } from '../../src/cli/instance.js';
 import { EXIT_USAGE } from '../../src/cli/tty.js';
+import { remedyFor } from '../../src/errors/codes.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import { loadStore, saveStore } from '../../src/store/index.js';
 import type { Store } from '../../src/store/schema.js';
@@ -212,6 +213,12 @@ describe('criterion 3 — three attempts, then nothing', () => {
       // The exact strings the story fixes, in order.
       expect(terminal.asked()).toContain(authFailedRetry(2));
       expect(terminal.asked()).toContain(authFailedRetry(3));
+      // ...and the REASON inside them is the REGISTRY's sentence, not a second, narrower one
+      // written here (ruled by the ARC-08-S10 review). Read from the registry rather than pinned as
+      // a literal: the day the meaning is reworded this test follows it instead of holding the old
+      // words. The negative is the half that matters — the string it used to be is gone.
+      expect(authFailedRetry(2)).toContain(remedyFor('AUTHENTICATION_FAILED').meaning);
+      expect(authFailedRetry(2)).not.toContain('wrong username or password');
       expect(terminal.written()).toContain(AUTH_EXHAUSTED);
       // Three login attempts, and not one more: a fourth is an account closer to a lockout.
       expect(c.calls).toHaveLength(MAX_ATTEMPTS);

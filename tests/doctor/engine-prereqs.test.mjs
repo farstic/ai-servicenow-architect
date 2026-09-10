@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { makeExec } from '../../tools/snowarch/lib/steps/B00.mjs';
 import { capabilityPacks, DRAWIO_CANDIDATES, enginePrereqChecks,
   SOFFICE_CANDIDATES } from '../../tools/snowarch/lib/doctor/checks/engine-prereqs.mjs';
 import { contextFor, greenTree, runById } from './helpers/tree.mjs';
@@ -130,4 +131,33 @@ test('E-00, E-03 and E-04 declare that they spawn, so --quick never runs them', 
   for (const id of ['E-00', 'E-03', 'E-04']) {
     assert.equal(checks.find((c) => c.id === id).spawns, true, `${id} does not declare its spawn`);
   }
+});
+
+/**
+ * ARC-08-S11 — the Windows batch-file spawn, found by the first CI run of E-03 on Windows.
+ *
+ * Node closed CVE-2024-27980 by refusing to exec a `.cmd` or `.bat` without a shell, and the
+ * refusal arrives as EINVAL from `spawnSync`. `npm` on Windows IS `npm.CMD`, so E-03 reported "npm
+ * found but did not answer --version" on every Windows machine, and had since the check was
+ * written — nothing ran it there until the doctor joined the bootstrap cells.
+ *
+ * Asserted on the OPTIONS rather than by spawning: a real `.cmd` cannot be run on the POSIX
+ * machines where this suite mostly runs, and the property under test is which options `makeExec`
+ * chooses, which is knowable everywhere.
+ */
+test('makeExec spawns a Windows .cmd through a shell, and everything else directly', () => {
+  const seen = [];
+  const spy = (bin, args, options) => { seen.push({ bin, options }); return ''; };
+
+  const win = makeExec({ plat: 'win32', env: {}, resolve: () => 'C:\\x\\npm.CMD', exec: spy });
+  win('npm', ['--version']);
+  assert.equal(seen.at(-1).options.shell, true, 'a .cmd spawned without a shell is EINVAL on Windows');
+
+  const winExe = makeExec({ plat: 'win32', env: {}, resolve: () => 'C:\\x\\git.exe', exec: spy });
+  winExe('git', ['--version']);
+  assert.equal(seen.at(-1).options.shell, undefined, 'an .exe does not need the shell, and its quoting rules');
+
+  const posix = makeExec({ plat: 'linux', env: {}, resolve: () => '/usr/bin/npm', exec: spy });
+  posix('npm', ['--version']);
+  assert.equal(seen.at(-1).options.shell, undefined, 'nothing on POSIX is a batch file');
 });
