@@ -81,6 +81,39 @@ test('mutation: a version token smuggled back into the heading is caught', () =>
   assert.throws(() => checkMarker(lines.join('\n'), rootVersion), /version token outside the marker line/);
 });
 
+/**
+ * The FOURTH field, learned in ARC-09-S01.
+ *
+ * `docs/README-head.md` opens with `**v<x.y.z>** · Apache-2.0 · …`, and `README.md` is generated
+ * from it — so a release that moved the three manifests and the marker and left this behind would
+ * ship a README announcing the previous version, with nothing failing. The release script writes
+ * it; this is what makes that a requirement rather than a courtesy.
+ */
+const HEAD_VERSION = /^\*\*v(\S+)\*\* · /m;
+
+function checkHead(head, expected) {
+  const hits = head.split('\n').filter((l) => HEAD_VERSION.test(l));
+  if (hits.length !== 1) {
+    throw new Error(`docs/README-head.md: expected exactly one "**v<x.y.z>** ·" line, found ${hits.length}`);
+  }
+  const found = hits[0].match(HEAD_VERSION)[1];
+  if (found !== expected) throw new Error(`docs/README-head.md v${found} != root ${expected}`);
+}
+
+test('the README head carries the root version, and README.md renders it', () => {
+  checkHead(readText('docs/README-head.md'), rootVersion);
+  // The generated file, too: the head is the source, but the head being right while the rendered
+  // README is stale is exactly the state `gen-readme --check` exists to prevent — asserted here as
+  // well because this is the test a release runs after writing.
+  assert.ok(readText('README.md').includes(`**v${rootVersion}**`),
+    'README.md does not carry the root version — run npm run gen');
+});
+
+test('mutation: a head left behind at the previous version is caught, with both versions named', () => {
+  const stale = readText('docs/README-head.md').replace(HEAD_VERSION, '**v1.0.0** · ');
+  assert.throws(() => checkHead(stale, rootVersion), /docs\/README-head\.md v1\.0\.0 != root/);
+});
+
 test('docs/CHANGELOG.md top heading is not ahead of the root version', (t) => {
   if (!existsSync(join(root, 'docs/CHANGELOG.md'))) return t.skip('no docs/CHANGELOG.md');
   const text = readText('docs/CHANGELOG.md');

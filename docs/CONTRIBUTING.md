@@ -818,6 +818,50 @@ The launcher also has a line budget and a bash-3.2 constraint list, both enforce
 you are adding a step to it, ask first whether the step belongs on the Node path instead: this file
 exists for the machines that cannot run the other one, not as a second implementation.
 
+## Cutting a release
+
+`node scripts/release.mjs <x.y.z>` — preflight, gates, writes, one commit, one annotated tag. It
+refuses before it writes anything: a dirty tree, a branch that is not `main`, a tag that exists, a
+version that goes backwards, a corpus that does not match the pin. Nothing is pushed unless you ask.
+
+**`main` requires 42 status checks and is `strict`**, so a release commit pushed straight to it
+carries no checks and is refused. Four steps instead:
+
+```sh
+git switch -c release/v2.0.0 main
+node scripts/release.mjs 2.0.0 --yes --allow-branch release/v2.0.0   # writes + commit, NO tag
+# open a pull request to main; CI runs the required checks on the release commit itself
+# after it merges, on main, at the merge commit:
+node scripts/release.mjs 2.0.0 --tag-only
+git push origin v2.0.0
+```
+
+`--tag-only` verifies the tree already carries the version everywhere and that a
+`chore(release): v<x.y.z>` commit is in recent history before it makes the tag — so a tag can never
+name a tree that does not carry its own version.
+
+**What the tag records**, and why the trailers are not decoration: a release downloaded six months
+later is a tarball and a tag, and `./snowarch version`, `release.yml` and `./snowarch upgrade` all
+read these back through `parseTagMessage` in `scripts/lib/release/tag.mjs`.
+
+```
+snowarch v2.0.0
+
+contract: <sha256 of packages/snowarch/dist/contract.json>
+docs-pin: <40-hex gitlink of vendor/ServiceNowDocs>
+claude-floor: 2.1.214
+node-floor: 20.0.0
+git-floor: 2.34.1
+```
+
+**A stale `dist/` is a refusal, never a repair.** The script rebuilds and compares; if the result
+differs from what is committed it stops and leaves the rebuild in your tree to look at. Committing
+a rebuilt `dist/` on the maintainer's behalf would ship an artefact nobody reviewed — the reason
+`dist/` is committed at all is that a human sees its diff in a pull request.
+
+Use `--dry-run` freely: it runs the preflight and the gates, prints the exact tag message, and
+writes nothing. `--offline` skips the remote-ahead check; `--no-install` skips `npm ci`.
+
 ## Adding a doctor check: registry → snapshots → mapping table
 
 Three files, in this order, and the tests will tell you if you stop after the first.

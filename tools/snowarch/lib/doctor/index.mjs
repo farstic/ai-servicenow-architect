@@ -21,6 +21,7 @@ import { meetsFloor } from '../versions.mjs';
 import { childEnv } from '../spawn-env.mjs';
 
 import { SECTIONS } from './registry.mjs';
+import { askOnce } from '../ask.mjs';
 import { engineBlock, engineRegistry, serverBlock, staleBlock,
   summariseMerged } from './checks/index.mjs';
 import { deriveMode, modeLine, modeLineDetailed } from './mode.mjs';
@@ -290,17 +291,13 @@ export async function fixCommand({ root, config, registry, options, env, home, n
   return { applied, report: second.report, checks: second.checks, cacheError: second.cacheError };
 }
 
-/** One line from stdin, or `null` at end of input — the same reader the plan screen uses. */
-function defaultAsk(input) {
-  return async () => {
-    const { createInterface } = await import('node:readline');
-    const rl = createInterface({ input, terminal: false });
-    const it = rl[Symbol.asyncIterator]();
-    const { value, done } = await it.next();
-    rl.close();
-    return done ? null : value;
-  };
-}
+/**
+ * One line from stdin, or `null` at end of input.
+ *
+ * The comment here used to say "the same reader the plan screen uses", which was a claim about two
+ * copies rather than a shared one. ARC-09-S01 made it true: `lib/ask.mjs`.
+ */
+const defaultAsk = (input) => askOnce(input);
 
 export async function doctorCommand({ flags = {}, log, out = process.stdout, env = process.env,
   err = process.stderr, cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(),

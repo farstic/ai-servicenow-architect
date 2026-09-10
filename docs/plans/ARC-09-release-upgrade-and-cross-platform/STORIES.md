@@ -38,6 +38,48 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 ### ARC-09-S01 — `scripts/release.mjs`: preflight, gates, version writes, release commit, annotated tag with contract sha and docs pin
 
+> **Amendment 2026-09-11 (from the delivery).** Five departures, and one bug the fixture found.
+>
+> 1. **The supported flow is four steps, not one.** `main` requires 42 status checks with
+>    `strict: true`, so a release commit pushed straight to it carries no checks and is refused —
+>    the story's one-shot flow cannot land here. The flow of record:
+>    `release.mjs <x.y.z> --yes --allow-branch release/v<x.y.z>` on a branch cut from `main`
+>    (writes + commit, **no tag**) → pull request to `main`, CI runs the checks on the release
+>    commit itself → `release.mjs <x.y.z> --tag-only` on `main` at the merge commit → `git push
+>    origin v<x.y.z>`. `--allow-branch` therefore also suppresses the tag: a tag created on a
+>    release branch would name a commit that the merge is about to replace. Recorded in
+>    `docs/CONTRIBUTING.md`; S03's `release.yml` triggers on the tag.
+> 2. **The README is generated, so the writer edits the HEAD.** `README.md` = `docs/README-head.md`
+>    + `docs/INSTALL.md` body + `docs/README-tail.md`, byte-asserted by `gen-readme --check` inside
+>    the lint the release has just passed. The version line and the badge live in the head, and the
+>    README is regenerated afterwards. A writer that edited `README.md` directly would produce a
+>    tree whose own lint fails — after the gates had already passed, which is the worst moment to
+>    find out. `tests/version-consistency.test.mjs` learned the head's field: it is the **fourth**
+>    version counter, and a release that left it behind would ship a README announcing the previous
+>    version with nothing failing.
+> 3. **There was no `confirm` in `inputs.mjs`.** There were THREE line readers — `bootstrap.mjs`'s
+>    `stdinAsker`, `doctor/index.mjs`'s `defaultAsk` (whose comment already claimed it was "the same
+>    reader the plan screen uses", a claim nothing enforced) and the plan screen's injected `ask`.
+>    ARC-09-S01 made the claim true: `tools/snowarch/lib/ask.mjs`, used by all three and by the
+>    release prompt. `null` for end-of-input is the contract, and `isYes` treats it as a refusal —
+>    a closed stdin must never read as a yes.
+> 4. **A ninth preflight check, in effect: the pin and the artefact must already agree.** The tag
+>    records the contract sha; `packages/contract/required-tools.json` records the same value. A
+>    release whose two records disagreed would carry a sha nobody pinned, so the run refuses with
+>    both abbreviated shas and the `pin.mjs` command.
+> 5. **The message for check 8 is split in two.** "Node ≥ 20" and "npm resolvable" fail for
+>    different reasons and a maintainer can act on only one of them at a time:
+>    `release: Node <v> is below the floor of 20 — upgrade Node first` and `release: npm is not on
+>    PATH`.
+>
+> *The bug.* The first fixture run passed a release on a repository git could not describe. The git
+> helper returned `''` for a failed command, so a `git status --porcelain` that could not run — the
+> corpus gitlink pointed at a gitdir that was not there — came back as an empty string, which reads
+> as a CLEAN TREE. A refusal to answer and an answer of "nothing" must never be the same value; the
+> helper now throws unless the caller passed `allowFail`, and `release()` turns that into
+> `release: git <cmd> failed — <first line of stderr>` with exit 2.
+
+
 **As** a maintainer **I want** one command, `node scripts/release.mjs <x.y.z>`, that refuses to run on a dirty or stale tree, runs every gate, writes the version into every place that carries it, commits once and creates one annotated tag whose message records the contract sha and the docs pin **so that** the product has exactly one version counter and one tag per release (P-12, P-19) and a release can never be cut from a tree that CI would reject (P-29).
 
 **Context.** README deliverable 1 and acceptance criteria 1–2; `01` §12 (root `package.json.version` is the only counter; `CLAUDE.md` line, README badge and changelog written by the script; tag `v<x.y.z>` records contract sha and docs pin), §11 ("a release cannot be tagged unless all three pass"), `03` R-02 (stale `dist/`). R-1: the first version this script cuts is **2.0.0**. ARC-01 S06 already collapsed the counters to `2.0.0-dev` in root / `packages/snowarch` / `tools/snowarch` and the `CLAUDE.md` marker line `**Version:** 2.0.0-dev — …`; ARC-05 S09 provides `scripts/contract-gate.mjs --skip-build`; ARC-04 S13 provides `scripts/build-dist.mjs` and the rebuild-and-diff rule.
