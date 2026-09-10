@@ -50,6 +50,22 @@
 > at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
 > Nothing about a real instance goes into the repository: the record is the CODE and the timing.
 >
+> **T-20 and T-21, the four manual passes (ARC-07-S09, 2026-09-10).** Everything a file can prove
+> about the skill is proven — the grant is exactly eight entries, the hand-off block is byte-equal
+> to the fragment the install page shows, the command rendered from that template is byte-identical
+> to the story's line, `claude plugin validate` passes. What no test can run is the SKILL ITSELF:
+> it needs a session, a model, and `AskUserQuestion`. Four passes: **macOS and the Windows `gitbash`
+> snapshot, each on the floor CLI (2.1.214) and on current.** In each, run T-20 with the answers it
+> names, then T-21 after running the printed command against a real PDI. What to record: (1) that
+> the transcript contains **no** `Password` prompt — search it, do not skim; (2) the printed command
+> line, verbatim, so it can be compared to the story's; (3) whether the Mode line appeared on
+> `--resume` **without restarting** (that is S-02 CONFIRMED in practice, and the fallback text is
+> what appears if not); (4) on Windows, which spelling the block used and whether the doctor's
+> `shell` guess was right — until ARC-08-S01 ships there is no `--section prereqs`, so the skill
+> prints BOTH spellings, and seeing that fallback behave is half the value of the Windows pass.
+> Record in `docs/spikes/validation-runs/`; never paste a credential, and the plan output is safe
+> by construction.
+>
 > **A REAL legacy store (ARC-07-S08, 2026-09-10).** The tolerant reader has only ever met files
 > this repository wrote: the committed fixture and the ones the tests generate. What no fixture can
 > produce is a store an actual 1.x install left behind — a version of the shape nobody here

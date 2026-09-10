@@ -816,6 +816,50 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ---
 
+> **Amendment 2026-09-10 (ARC-07-S09).** Six departures and findings.
+>
+> **(1) The hand-off block is the FRAGMENT's, not the story's prose.** The story writes its own
+> wording around the command ("Run this in your own terminal — not here: …"); the skill includes
+> `docs/snippets/terminal-handoff.md` verbatim instead, because ARC-06-S13 made that fragment the
+> one definition and `tests/terminal-handoff.test.mjs` asserts the skill and the install page carry
+> it byte-for-byte. Two wordings of the credential procedure is precisely what that test exists to
+> prevent — so the fragment's command line was amended to the story's FULL form (`--env`, `--auth`,
+> `--preset`), and the install page changed with it. `docs/INSTALL.md` is **249 lines**, unchanged
+> (the budget is 250).
+>
+> **(2) The command shape has one definition and a renderer.**
+> `scripts/handoff-command.mjs` reads the template out of the fragment and fills it; the skill
+> quotes the template, and `tests/handoff-command.test.mjs` asserts that rendering AC 1's answers
+> produces the story's line byte for byte. The story's line is a literal in that test on purpose —
+> it is the acceptance criterion, and a test that derived it from the template it checks would
+> agree with itself about anything.
+>
+> **(3) The eight-entry assertion lives in `tests/snowarch-skill.test.mjs`, not in the tree-wide
+> skills lint.** `skills-lint.test.mjs` is the rule set every skill answers to; "these exact eight
+> tools" is true of one skill only, and putting it there would make the lint carry a per-skill
+> table. It sits beside the other frontmatter assertions for this file, and it is now an EQUALITY
+> rather than a set of `match` calls — a grant is a security surface, and an entry added by
+> accident is invisible to a handful of substring checks.
+>
+> **(4) The password-line count moved from two to four, deliberately.** The authentication question
+> has to say what each method needs ("username + password"; ROPC's "client id + secret AND a user
+> password"), or the choice is made blind. The test's own comment invited the number to move with a
+> reason; the reason is recorded there, and it still catches a fifth line — the softening
+> qualifier it was written to stop.
+>
+> **(5) VALIDATION-TESTS gained a "Reserved numbers" section, and the shape rule changed with it.**
+> T-19 belongs to ARC-08-S10, so this file jumps 18 → **T-20, T-21**. Contiguity could not express
+> a reservation, so the rule is now: ascending, unique, and every gap named with the story that
+> will fill it. That catches strictly more than counting did — an undeclared gap is still a
+> renumbering that lost a test.
+>
+> **(6) `--section prereqs` does not exist yet, and the skill says so.** The field contract is
+> written into the skill body as a comment AND into ARC-08-S01's story text (fixed 2026-09-10), so
+> the story that builds it has something to build to. Until then the skill reads
+> `.local/bootstrap-state.json` for the mode and prints BOTH command spellings rather than guessing
+> a shell it could not detect — stated in the body, in T-20's pass criteria and in the sitting row.
+> `claude plugin validate` passes locally (`✔ Validation passed`) as well as in CI.
+
 ### ARC-07-S10 — `docs/MODES-AND-PRESETS.md` final text; error-registry entries; runtime rule text for `AUTHENTICATION_FAILED` / `INSUFFICIENT_PRIVILEGES` / `PROD_WRITE_NOT_ACKNOWLEDGED`
 
 > **Amendment 2026-09-08 (from ARC-05-S07). First item of this story's list: the permission-modes
