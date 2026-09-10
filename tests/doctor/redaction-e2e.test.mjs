@@ -65,13 +65,17 @@ function liveTreeWithStore(t) {
 
 async function run(root, flags) {
   const chunks = [];
+  const errs = [];
   const code = await doctorCommand({
     flags: { 'no-network': true, ...flags },
     out: { write: (s) => chunks.push(s) },
+    // Captured, and checked too: stdout under `--json` must be the object and nothing else, but a
+    // credential is no more acceptable on stderr — a user pastes both.
+    err: { write: (s) => errs.push(s) },
     cwd: root,
     input: { isTTY: false },
   });
-  return { code, text: chunks.join('') };
+  return { code, text: chunks.join(''), errText: errs.join('') };
 }
 
 /** The assertion, in one place: three outputs, one rule. */
@@ -90,13 +94,17 @@ test('the text report carries neither the username nor the password', async (t) 
   assert.ok(text.length > 200, 'the report is too short to have reported anything');
 });
 
-test('--json carries the masked username and no password', async (t) => {
+test('--json is the object and nothing else, masked username, no password', async (t) => {
   const { root } = liveTreeWithStore(t);
   // NOT `--quick`: the instance listing comes from the SERVER's own doctor answer, and `--quick`
   // skips everything that spawns. This is the case that matters — the one output that carries an
   // account name at all — so it pays for the spawn. `--no-network` still keeps the probes off.
-  const { text } = await run(root, { json: true });
+  const { text, errText } = await run(root, { json: true });
   assertRedacted('json', text);
+  assertRedacted('json/stderr', errText);
+  // Not `.includes('{')` — the whole point is that nothing precedes it. A cache note used to be
+  // printed here on any machine where `.local` refused the write, and every consumer's parse threw.
+  assert.equal(text.trimStart()[0], '{', `--json did not start with the object:\n${text.slice(0, 120)}`);
   const report = JSON.parse(text);
   const entry = report.server?.instances?.[0];
   assert.ok(entry, 'the report lists no instance — then it is not exercising the store');

@@ -459,8 +459,13 @@ jobs:
             grep -q "\"$key\"" .local/bootstrap-state.json || { echo "missing $key"; exit 1; }
           done
           grep -q '"mode": "design-only"' .local/bootstrap-state.json || { echo "not design-only"; exit 1; }
-          test ! -f .local/doctor-last.json || { echo "a doctor cache exists - the doctor ran?"; exit 1; }
-          echo "state file: $(wc -c < .local/bootstrap-state.json) bytes, no doctor cache"
+          # And the seeded cache. The launcher writes one ITSELF on the Node-free path — three B
+          # steps and a design-only mode line — so that the SessionStart banner has something
+          # truthful to print on a machine that cannot run the doctor at all. Its absence would mean
+          # a first session on such a machine started with no Mode line.
+          grep -q '"writer": "bootstrap"' .local/doctor-last.json || { echo "no seeded cache"; exit 1; }
+          grep -q '"mode": "design-only"' .local/doctor-last.json || { echo "cache is not design-only"; exit 1; }
+          echo "state $(wc -c < .local/bootstrap-state.json) bytes, cache $(wc -c < .local/doctor-last.json) bytes"
       - name: With no Node, the state file is what a session falls back to (Windows)
         if: matrix.variant == 'no-node' && matrix.os == 'windows-latest'
         shell: powershell
@@ -472,8 +477,14 @@ jobs:
             if (-not $text.Contains($key)) { Write-Host "missing $key"; exit 1 }
           }
           if (-not $text.Contains('"mode": "design-only"')) { Write-Host "not design-only"; exit 1 }
-          if (Test-Path .local\doctor-last.json) { Write-Host "a doctor cache exists"; exit 1 }
-          Write-Host "state file: $($text.Length) chars, no doctor cache"
+          # The launcher seeds the banner's cache itself on the Node-free path — see the POSIX twin.
+          # Matched loosely on purpose: this file is written by PowerShell's own JSON writer on
+          # this platform and by a bash heredoc on the others, and their spacing is not the subject.
+          $cache = Get-Content .local\doctor-last.json -Raw
+          foreach ($needle in @('"writer"\s*:\s*"bootstrap"', '"mode"\s*:\s*"design-only"')) {
+            if ($cache -notmatch $needle) { Write-Host "cache missing $needle"; exit 1 }
+          }
+          Write-Host "state $($text.Length) chars, cache $($cache.Length) chars"
           exit 0
 
       # Every run, pass or fail: a report you can only read when the job was green is a report you
