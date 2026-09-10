@@ -15,10 +15,11 @@
  *   remedy       what to do; prose, because most remedies are a judgement rather than a command
  *   command      set ONLY when there is something runnable; renderers set it as code, and they
  *                never parse `remedy` looking for one
- *   showInRule   the code appears in the always-loaded rule file. Eighteen do: the six flag gates
- *                as one wildcard line, plus the twelve a session can act on mid-task — six of them
- *                the network family (ARC-08-S10), because a session that meets DNS or TLS mid-task
- *                must stop and hand over exactly like it does for a wrong password
+ *   showInRule   the code appears in the always-loaded rule file. Nineteen do: the six flag gates
+ *                as one wildcard line, plus the thirteen a session can act on mid-task — seven of
+ *                them the network family (ARC-08-S10), because a session that meets DNS, TLS or a
+ *                refused connection mid-task must stop and hand over exactly as it does for a
+ *                wrong password
  *   httpStatus   the status the instance returned, where the code maps to one
  */
 export interface ErrorCode {
@@ -177,7 +178,7 @@ export declare const ERROR_CODES: readonly [{
     readonly code: "CONNECTION_REFUSED";
     readonly meaning: "The instance refused the connection and no proxy is configured.";
     readonly remedy: "`<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too";
-    readonly showInRule: false;
+    readonly showInRule: true;
 }, {
     readonly code: "CONNECTION_TIMEOUT";
     readonly meaning: "The connection timed out with no proxy configured.";

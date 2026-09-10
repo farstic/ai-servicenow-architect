@@ -481,10 +481,11 @@ describe('11 — every code the server can throw has a meaning and a remedy', ()
     // Three groups, and each is here for a different reason:
     //   the six flag gates      a session can raise a preset for the user (one wildcard line)
     //   the six state codes     something about the instance or the call must change first
-    //   the six network codes   the machine cannot reach the instance; retrying is the wrong move
+    //   the seven network codes  the machine cannot reach the instance; retrying is the wrong move
     const expected = [
-      'ATF_NOT_ENABLED', 'AUTHENTICATION_FAILED', 'CMDB_WRITE_NOT_ENABLED', 'CONNECTION_TIMEOUT',
-      'DNS_FAILURE', 'FLUENT_NOT_ENABLED', 'FLUENT_NOT_INSTALLED', 'INSTANCE_NOT_LOADED',
+      'ATF_NOT_ENABLED', 'AUTHENTICATION_FAILED', 'CMDB_WRITE_NOT_ENABLED', 'CONNECTION_REFUSED',
+      'CONNECTION_TIMEOUT', 'DNS_FAILURE', 'FLUENT_NOT_ENABLED', 'FLUENT_NOT_INSTALLED',
+      'INSTANCE_NOT_LOADED',
       'INSUFFICIENT_PRIVILEGES', 'NOW_ASSIST_NOT_ENABLED', 'NO_INSTANCE_CONFIGURED',
       'PROD_WRITE_NOT_ACKNOWLEDGED', 'PROXY_AUTH_REQUIRED', 'PROXY_UNREACHABLE',
       'SCRIPTING_NOT_ENABLED', 'TLS_CA_UNTRUSTED', 'UNKNOWN_TOOL', 'WRITE_NOT_ENABLED',

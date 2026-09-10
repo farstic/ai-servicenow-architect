@@ -15,10 +15,11 @@
  *   remedy       what to do; prose, because most remedies are a judgement rather than a command
  *   command      set ONLY when there is something runnable; renderers set it as code, and they
  *                never parse `remedy` looking for one
- *   showInRule   the code appears in the always-loaded rule file. Eighteen do: the six flag gates
- *                as one wildcard line, plus the twelve a session can act on mid-task — six of them
- *                the network family (ARC-08-S10), because a session that meets DNS or TLS mid-task
- *                must stop and hand over exactly like it does for a wrong password
+ *   showInRule   the code appears in the always-loaded rule file. Nineteen do: the six flag gates
+ *                as one wildcard line, plus the thirteen a session can act on mid-task — seven of
+ *                them the network family (ARC-08-S10), because a session that meets DNS, TLS or a
+ *                refused connection mid-task must stop and hand over exactly as it does for a
+ *                wrong password
  *   httpStatus   the status the instance returned, where the code maps to one
  */
 export interface ErrorCode {
@@ -223,9 +224,13 @@ export const ERROR_CODES = [
   },
   {
     code: 'CONNECTION_REFUSED',
+    // ARC-08-S10's review added the seventh: a hibernating PDI is the network error this product
+    // meets most often, and the story's list had left it out. Retrying a refused connection wakes
+    // nothing — the user has to open developer.servicenow.com — so it belongs with the family that
+    // a session hands over rather than repeats.
     meaning: "The instance refused the connection and no proxy is configured.",
     remedy: "`<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too",
-    showInRule: false,
+    showInRule: true,
   },
   {
     code: 'CONNECTION_TIMEOUT',

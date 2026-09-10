@@ -679,6 +679,15 @@ New checks with no old counterpart (listed under the table): E-06, E-09 (key sca
 > complete and shorter than the file was. The cap moved to the finished size plus a little (52
 > today), not to wherever the file happens to land, so prose creep still fails the test.
 >
+> **Review ruling, 2026-09-10 (both closed in ARC-08-S11's first commit).** (a) The open question
+> below is ruled as recommended: the wizard's 401 re-entry line now renders the registry's `meaning`
+> followed by its own question, so the condition has one definition and the account-locked cause —
+> the one that matters most, because retrying makes it worse — is in both places. ARC-07-S05's test
+> reads the sentence from the registry rather than a literal. (b) `CONNECTION_REFUSED` joins the
+> family, making it **seven network codes** and nineteen rule-visible in all: the story's list left
+> out the network error this product meets most often, and retrying a refused connection wakes a
+> hibernating PDI no more than retrying a wrong password unlocks an account.
+>
 > *Open question for the story's owner.* AC 2 names four places the `AUTHENTICATION_FAILED` text
 > must be identical. Three are the documents, and the fourth is `./snowarch doctor` SV-04 — which
 > does hold, because the probe returns the CODE and `applyContractRemedy` fills the remedy from the

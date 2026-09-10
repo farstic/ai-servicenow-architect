@@ -30,7 +30,21 @@ export declare const NOTHING_SAVED = "Nothing saved.";
  * The registry is the single source; only the label, which no registry entry can hold, is added.
  */
 export declare const labelExists: (label: string) => string;
+/**
+ * The 401 re-entry question, with its REASON rendered from the registry.
+ *
+ * It used to say "wrong username or password" — narrower than the registry's "wrong, expired, or
+ * the account is locked", and a second definition of one condition, which is the thing the registry
+ * exists to prevent. A tester who read the wizard learned one set of causes and a tester who read
+ * `docs/TROUBLESHOOTING.md` learned another, and the account-locked case — the one that matters
+ * most, because retrying makes it worse — was only in the second. Ruled by the ARC-08-S10 review;
+ * the pattern is `labelExists()`'s, three lines up.
+ *
+ * The question is the wizard's own: only the terminal is in a position to offer another attempt.
+ */
 export declare const authFailedRetry: (attempt: number) => string;
+/** The registry's sentence, used by the re-entry question and by the nothing-saved line. */
+export declare const authFailedReason: () => string;
 export declare const AUTH_EXHAUSTED: string;
 export declare const NEXT_LINE = "Next: in Claude Code run  /snowarch setup-instance --resume  (or restart claude).";
 export declare const AUTH_QUESTION = "Authentication?";

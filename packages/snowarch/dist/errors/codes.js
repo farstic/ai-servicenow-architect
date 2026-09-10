@@ -186,9 +186,13 @@ export const ERROR_CODES = [
     },
     {
         code: 'CONNECTION_REFUSED',
+        // ARC-08-S10's review added the seventh: a hibernating PDI is the network error this product
+        // meets most often, and the story's list had left it out. Retrying a refused connection wakes
+        // nothing — the user has to open developer.servicenow.com — so it belongs with the family that
+        // a session hands over rather than repeats.
         meaning: "The instance refused the connection and no proxy is configured.",
         remedy: "`<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too",
-        showInRule: false,
+        showInRule: true,
     },
     {
         code: 'CONNECTION_TIMEOUT',
