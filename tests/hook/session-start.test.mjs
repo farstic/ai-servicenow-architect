@@ -36,6 +36,17 @@ const FIXTURE_PASS = ['hunter', '2', 'hunter', '2'].join('');
 /** Every invocation's stdout, for the one grep AC 8 asks for. */
 const seen = [];
 
+/** The only lines that may follow the Mode line. Anything else is the banner inventing prose. */
+const isNudge = (line) => [
+  BANNER.firstRun, BANNER.staleRegistration,
+].includes(line) || /^A newer release is available \(/.test(line) || /^Doctor: \d+ FAIL /.test(line);
+
+/** A run that is slower than the watchdog and still finishes — see the watchdog cases. */
+const hangs = (ms) => new Promise((resolve) => {
+  const t = setTimeout(() => resolve({ report: { modeLine: 'Mode: late' } }), ms);
+  if (typeof t?.unref === 'function') t.unref();
+});
+
 /** The hook as Claude Code runs it: a child, with the event JSON on stdin. */
 function runHook(root, { stdin = STDIN, env = {} } = {}) {
   const started = process.hrtime.bigint();
@@ -81,8 +92,11 @@ test('AC 1 — a fresh cache prints exactly one Mode line, fast', async (t) => {
   const r = runHook(root);
   assert.equal(r.status, 0);
   assert.equal(r.stderr, '', 'the hook wrote to stderr');
-  assert.equal(r.lines.length, 1, r.stdout);
+  // The FIRST line is the Mode line, and every other line is a known nudge. Asserting "exactly
+  // one" made this a test about the fixture's health: a runner without the docs submodule has a
+  // failing corpus check, and the doctor-FAIL nudge is then correct output.
   assert.match(r.lines[0], /^Mode: /);
+  for (const line of r.lines.slice(1)) assert.ok(isNudge(line), `unexpected banner line: ${line}`);
 
   // The budget, asserted where it is measurable: a developer laptop under a full suite is not the
   // machine the number describes.
@@ -215,8 +229,12 @@ test('a doctor that hangs hits the watchdog, and the old line is marked old', as
   writeJson(root, '.local/doctor-last.json',
     { ...cache, at: new Date(Date.now() - MAX_AGE_MS - 60_000).toISOString() });
 
+  // The hang SETTLES eventually — 400 ms against a 50 ms watchdog. A promise that never resolves
+  // leaves node:test with pending work when the file ends, and it cancels every case after it:
+  // on CI that took four unrelated tests down with it. The watchdog still wins by 350 ms, which
+  // is the whole claim.
   const started = Date.now();
-  const r = await banner({ root, watchdogMs: 200, run: () => new Promise(() => {}) });
+  const r = await banner({ root, watchdogMs: 50, run: () => hangs(400) });
   assert.ok(Date.now() - started < 2000, 'the watchdog did not fire');
   assert.equal(r.path, 'timeout');
   assert.equal(r.lines[0], `${cache.modeLine}${BANNER.staleSuffix}`);
@@ -226,7 +244,7 @@ test('a hang with no cache at all still says something true', async (t) => {
   const root = await bootstrapped(t);
   rmSync(cachePath(root));
   rmSync(inputsPath(root));
-  const r = await banner({ root, watchdogMs: 200, run: () => new Promise(() => {}) });
+  const r = await banner({ root, watchdogMs: 50, run: () => hangs(400) });
   assert.equal(r.lines[0], BANNER.timedOut);
   assert.ok(WATCHDOG_MS < 10_000, 'the watchdog must fire before the hook timeout');
 });
