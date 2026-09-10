@@ -111,8 +111,19 @@ test('AC 4 — --section filters, and an unknown one is exit 2 with the list', (
   assert.equal(bogus.stdout.trim(), `unknown section "bogus"; valid: ${SECTIONS.join(', ')}`);
 
   const good = run(['--section', 'prereqs,docs', '--json', '--no-cache']);
-  assert.equal(good.status, 0);
-  assert.equal(JSON.parse(good.stdout).options.section, 'prereqs,docs');
+  // NOT `status === 0`. S02 filled the registry, so the exit code of a real run is a fact about the
+  // MACHINE — a CI cell has no `claude` on PATH and may have no corpus, and both are FAILs the
+  // doctor is right to report. What `--section` promises is which checks ran, and that the flag is
+  // echoed back; asserting a health verdict here made this test a check on the runner's laptop.
+  assert.ok([0, 1].includes(good.status), `unexpected exit ${good.status}`);
+  const report = JSON.parse(good.stdout);
+  assert.equal(report.options.section, 'prereqs,docs');
+  const ran = report.checks.filter((c) => c.status !== 'skip');
+  assert.ok(ran.length > 0, 'the section selected nothing at all');
+  assert.deepEqual([...new Set(ran.map((c) => c.section))].sort(), ['docs', 'prereqs']);
+  for (const c of report.checks.filter((c) => !['docs', 'prereqs'].includes(c.section))) {
+    assert.equal(c.detail, 'not in --section', `${c.id} ran outside the selected sections`);
+  }
 });
 
 test('the filtering rules: --quick excludes spawns and network, and implies --no-network', () => {
