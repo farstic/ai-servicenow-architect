@@ -75,9 +75,21 @@ describe('the built CLI', () => {
   });
 
   it('names an unknown sub-command\'s owning story rather than failing vaguely', () => {
-    const r = run(['instance', 'list']);
+    // `list` was this test's example until ARC-07-S06 implemented it. `import` is the one
+    // sub-command still to come, and the assertion is the same: a reader is told whether they
+    // have found a bug or a boundary.
+    const r = run(['instance', 'import', '--from-legacy']);
     expect(r.status).toBe(2);
-    expect(r.stdout + r.stderr).toContain('ARC-07-S06');
+    expect(r.stdout + r.stderr).toContain('ARC-07-S08');
+  });
+
+  it('runs `list` now, and prints the empty-store sentence rather than a story name', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'spawn-list-'));
+    try {
+      const r = run(['instance', 'list'], { SNOW_STORE: join(dir, 'instances.json') });
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain('No instances configured');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('says LABEL_EXISTS in the words the story fixes', () => {

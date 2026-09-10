@@ -50,6 +50,39 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   builds is exactly what the user typed: a test greps the whole of `tools/snowarch/` for a
   `--password` construction, because a secret cannot reach `ps` through a process that never
   invents an argument.
+- **Seven maintenance commands, and what each of them may touch.** `instance list · test ·
+  set-credentials · set-preset · set-flags · set-default · remove` — every one resolving the store
+  exactly as the server does, because a second resolver is how a wizard writes one file while the
+  server reads another. What a command may write is deliberately narrower than the store, and the
+  tests compare the other fields byte for byte: `test` writes `lastProbe` and nothing else — a
+  `401` leaves the credentials and the preset exactly as they were — `set-credentials` writes the
+  credentials only after the instance said `ok` (three attempts, one request each, S05's loop
+  rather than a second one), and the permission commands never touch a credential at all. Masking
+  happens once, in a serializer (`src/cli/format.ts`): a secret becomes `set (len 12)` in the
+  shape, so no printer can leak one, and a test scans every byte every command in the suite wrote.
+  Production is raised only through `--ack-prod` with the label TYPED BACK — `--confirm-label` is
+  the CI form and the audit line records which of the two it was — and dropping back to
+  `read-only` clears the acknowledgement, so the next raise has to be made again rather than
+  inherited from a decision taken weeks ago. Every change from a terminal appends a line to the
+  same `audit.jsonl` a tool call writes to, with `actor: "cli"` and `tool: null`. The bootstrap's
+  `.local/config.json` is refreshed as a MIRROR — that one key, when the file already exists,
+  every other key byte for byte.
+- **`instance add --auth oauth_ropc` never worked, and does now.** The capability probe refuses an
+  OAuth run with no token probe, and nothing supplied one: the error was neither `ok` nor
+  `unreachable`, so it fell through to the wrong-password branch and spent three attempts proving
+  it. The request that follows IS the token exchange for this client — it acquires the ROPC token
+  inside its first request — so a separate token call would be a second login attempt against the
+  one-request-per-probe rule. Found by the new `set-credentials --auth oauth_ropc` test.
+- **`L05` — "every repository path cited in prose resolves" — now asks git, not this disk.**
+  Citations resolve against TRACKED files (`git ls-files`, the index, so a file resolves as soon
+  as it is staged) plus an explicit allow-list of runtime prefixes; the status line says how many
+  citations were checked and which rule answered. The defect it closes shipped in the previous
+  release: two comments citing a `node_modules` path that npm hoists away passed on the author's
+  machine, where the directory happened to exist, and failed on all nine CI cells.
+- **One condition, one text — `URL_REQUIRED`.** There were three: the registry's remedy, the
+  wizard's `--yes` sentence, and a third in the URL module for an empty answer at the prompt. The
+  registry's is now the only one, rendered through the same path every other code uses.
+
 - **The forwarder now actually forwards — and `LABEL_EXISTS` is a code with a remedy.** Two
   defects the gates could not see, found in review. The engine frame parsed the arguments of a
   command whose arguments belong to another program, so `./snowarch instance add … --env prod

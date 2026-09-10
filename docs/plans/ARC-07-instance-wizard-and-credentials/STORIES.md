@@ -493,6 +493,53 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ---
 
+> **Amendment 2026-09-10 (ARC-07-S06).** Eight departures and findings, each with its reason.
+>
+> **(1) `test --json` prints the SAME envelope as `test --all --json`** — `{ store, instances: {
+> "<label>": { … } } }` with one key. The story specifies the shape for `--all` only; giving the
+> single form a different one would make ARC-06-S08's merge (`probes[label] = JSON.parse(stdout)`)
+> depend on which flag produced the output, and a consumer that must ask "how many did I request?"
+> before reading a result is one that will get it wrong once.
+>
+> **(2) `test` records `lastProbe` even when the probe FAILED.** A failed probe is the fact the
+> doctor needs, and a store that only remembered good news would report a broken instance as
+> healthy for as long as it stayed broken. AC 2's requirement is met exactly as written: the
+> credentials and the preset are byte-identical after a 401, and the test asserts that field by
+> field rather than on the file as a whole.
+>
+> **(3) `test` requires a label or `--all`** — it does not fall back to `defaultInstance`. Every
+> other sub-command here names its instance, and a `test` that silently probed a different one
+> would be the only command in the set whose subject you cannot read off the command line.
+>
+> **(4) ROPC was unusable and is fixed here.** `probeAuth` refuses an `oauth_ropc` run with no
+> `tokenProbe`, and ARC-07-S05 never passed one — so with probes on, `instance add --auth
+> oauth_ropc` could not succeed AT ALL: the error was neither `ok` nor `unreachable`, so it fell
+> through to the wrong-password branch and exhausted three attempts. Found by this story's
+> `set-credentials --auth oauth_ropc` test. `probeOptionsFor()` now supplies a probe that says
+> "the request that follows IS the token exchange", which is the truth of this client — it
+> acquires the ROPC token inside its first request, so a separate token call would be a SECOND
+> login attempt against S03's one-request-per-probe rule. What is lost is the four-way ROPC error
+> table's extra specificity, which needs a real token endpoint to distinguish; it is on the
+> owner-sitting list.
+>
+> **(5) The production cap gained ONE door.** The S04 screen locks every box on a `prod` instance,
+> so "review screen (flags unlocked, all pre-set per the preset)" needed a way in:
+> `prodAcknowledged` on `ScreenInput`/`ResolveInput`, set by exactly one caller — the branch that
+> has already printed the warning and read the label back. The wizard never sets it and no flag
+> reaches it from `instance add`.
+>
+> **(6) The dependency dialogue is S04's, exported rather than copied.** `toggle` became
+> `toggleFlag` so `set-flags` asks the same question the review screen asks, in the same words.
+>
+> **(7) There were two username maskers, and now there is one.** ARC-04-S02's keeps the domain
+> (`c***@corp.com`); the copy S05 wrote in `instance.ts` dropped it. The store's own is
+> re-exported, so the wizard's summary and `list` cannot mask the same account two ways. The
+> visible change: an email-shaped username now keeps its domain in the wizard's summary too.
+>
+> **(8) ARC-06-S08 invokes `instance test <label> --json` per label**, not `--all --json` as the
+> brief describes; both forms work and both are tested. The `--all` form remains the one the story
+> specifies for the doctor cache.
+
 ### ARC-07-S07 — `--global` store, project-wins precedence messaging, cloud-sync-folder warning (D-04)
 
 **As** an individual practitioner with one personal PDI and several engagement checkouts **I want** to keep that PDI in a per-user store while engagement instances stay per checkout, be told plainly which store wins when both hold a label, and be warned when a checkout sits inside OneDrive/Dropbox/iCloud/Google Drive **so that** the D-04 at-rest policy and the confidentiality firewall are both respected.

@@ -106,6 +106,17 @@ export interface ScreenInput {
   probes?: LastProbe;
   /** Per-flag hint text, for `role missing`. */
   hints?: Partial<Record<FlagName, string>>;
+  /**
+   * The production cap, lifted — and ONLY by ARC-07-S06's `set-preset --ack-prod` after the label
+   * has been typed back (D-05).
+   *
+   * The cap is not a rendering detail: a screen whose boxes can be toggled on a `prod` instance is
+   * the moment raising production becomes something that happens while you are doing something
+   * else, which is exactly what S04 refuses. So the wizard never sets this, there is no flag that
+   * reaches it from `instance add`, and the only caller is the branch that has already printed the
+   * warning and read the label back.
+   */
+  prodAcknowledged?: boolean;
 }
 
 /**
@@ -149,18 +160,22 @@ export function wrapRow(prefix: string, note: string, columns = COLUMNS): string
 /** The screen, byte for byte. The snapshot files in `docs/snippets/` are this function's output. */
 export function renderReviewScreen(input: ScreenInput): string {
   const { label, environment, preset, flags, probes, hints } = input;
-  const prod = environment === 'prod';
+  // LOCKED, not "is production": an acknowledged raise is still production — the banner says so —
+  // and what the acknowledgement changes is whether the boxes may be touched.
+  const locked = environment === 'prod' && input.prodAcknowledged !== true;
   const lines: string[] = [];
 
-  lines.push(prod
+  lines.push(locked
     ? `Proposed preset for "${label}" (${environment}): ${preset}  — production is capped at `
       + 'read-only (D-05)'
-    : `Proposed preset for "${label}" (${environment}): ${preset}  — non-production: everything on`);
+    : environment === 'prod'
+      ? `Preset for "${label}" (${environment}): ${preset}  — PRODUCTION, raise acknowledged`
+      : `Proposed preset for "${label}" (${environment}): ${preset}  — non-production: everything on`);
 
   for (const flag of FLAG_NAMES) {
-    const box = !prod && flags[flag] === 'true' ? '[x]' : '[ ]';
+    const box = !locked && flags[flag] === 'true' ? '[x]' : '[ ]';
     const name = labelOf(flag).padEnd(LABEL_WIDTH + 2);
-    const note = prod
+    const note = locked
       ? 'locked on production'
       : annotate(probes?.[PROBE_FIELD[flag]], hints?.[flag]);
     lines.push(...wrapRow(`  ${box} ${name} `, note));
@@ -169,7 +184,7 @@ export function renderReviewScreen(input: ScreenInput): string {
   // The story's footer is 111 characters and the budget is 100, so it WRAPS — the same rule as a
   // long hint, and for the same reason: a terminal that folds it in the middle of a word is
   // harder to read than one continuation line.
-  const footer = prod
+  const footer = locked
     ? `Enter = accept · to raise this instance later: ./snowarch instance set-preset ${label} `
       + '<preset> --ack-prod'
     : 'Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset · '
@@ -257,7 +272,7 @@ export interface ReviewResult {
  * result says so rather than returning a preset the caller might write.
  */
 export async function runReviewScreen(input: ScreenInput, io: ReviewIo): Promise<ReviewResult> {
-  const prod = input.environment === 'prod';
+  const prod = input.environment === 'prod' && input.prodAcknowledged !== true;
   let flags: Flags = { ...input.flags };
   let preset = input.preset;
 
@@ -306,7 +321,7 @@ export async function runReviewScreen(input: ScreenInput, io: ReviewIo): Promise
       io.write(`${PROD_LOCKED(input.label, flag)}\n`);
       continue;
     }
-    flags = await toggle(flags, flag, io);
+    flags = await toggleFlag(flags, flag, io);
     preset = matchPreset(flags);
   }
 }
@@ -318,7 +333,7 @@ export async function runReviewScreen(input: ScreenInput, io: ReviewIo): Promise
  * leaves WRITE ON (the alternative is a contradiction the server would resolve by force), and
  * turning a dependent on with WRITE off leaves BOTH OFF.
  */
-async function toggle(current: Flags, flag: FlagName, io: ReviewIo): Promise<Flags> {
+export async function toggleFlag(current: Flags, flag: FlagName, io: ReviewIo): Promise<Flags> {
   const next: Flags = { ...current, [flag]: current[flag] === 'true' ? 'false' : 'true' };
 
   // Turning something OFF that others need.
@@ -361,6 +376,8 @@ export interface ResolveInput {
   probes?: LastProbe;
   hints?: Partial<Record<FlagName, string>>;
   io?: ReviewIo;
+  /** See `ScreenInput.prodAcknowledged` — S06's `--ack-prod`, after the label was typed back. */
+  prodAcknowledged?: boolean;
 }
 
 export interface ResolveResult {
@@ -381,7 +398,7 @@ export interface ResolveResult {
  */
 export async function resolveFlags(input: ResolveInput): Promise<ResolveResult> {
   const { label, environment, yes, io } = input;
-  const prod = environment === 'prod';
+  const prod = environment === 'prod' && input.prodAcknowledged !== true;
 
   let flags: Flags;
   let preset: PresetName;
@@ -428,6 +445,7 @@ export async function resolveFlags(input: ResolveInput): Promise<ResolveResult> 
     label, environment, preset, flags,
     ...(input.probes ? { probes: input.probes } : {}),
     ...(input.hints ? { hints: input.hints } : {}),
+    ...(input.prodAcknowledged ? { prodAcknowledged: true } : {}),
   }, io);
   if (reviewed.cancelled) {
     return { ok: false, exitCode: 130, message: 'Cancelled — nothing saved.' };

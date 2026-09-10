@@ -309,6 +309,12 @@ export declare const ERROR_CODES: readonly [{
     readonly showInRule: false;
     readonly httpStatus: 407;
 }, {
+    readonly code: "LABEL_NOT_FOUND";
+    readonly meaning: "No instance with that label is in the store this checkout resolves.";
+    readonly remedy: "run `instance list` to see the labels this checkout has, or `instance add <label>` to add one";
+    readonly command: "./snowarch instance list";
+    readonly showInRule: false;
+}, {
     readonly code: "LABEL_EXISTS";
     readonly meaning: "An instance with that label is already in the store.";
     readonly remedy: "use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it";

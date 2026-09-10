@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -96,7 +97,7 @@ test('AC 4 — the timeout sentence names MCP_TIMEOUT and where to read about it
     + 'see docs/TROUBLESHOOTING.md "MCP_TIMEOUT"');
 });
 
-test('the probes path degrades to a WARN while ARC-07-S06 is unwritten', () => {
+test('the probes path RUNS now that ARC-07-S06 exists — and still degrades if it ever does not', () => {
   const root = makeCheckout();
   mkdirSync(join(root, 'packages/snowarch/dist/cli'), { recursive: true });
   writeFileSync(join(root, 'packages/snowarch/dist/cli/index.js'), '// placeholder\n');
@@ -106,7 +107,16 @@ test('the probes path degrades to a WARN while ARC-07-S06 is unwritten', () => {
   assert.equal(withoutTest.probes, null);
   assert.equal(PROBES_UNAVAILABLE, 'probes: not available in this build');
 
-  // ...and runs them once the sub-command exists. This flips when ARC-07-S06 lands.
+  // THE FLIP (ARC-07-S06). The arm above is now hypothetical — the real built CLI lists `test`,
+  // so a real installation takes the arm below and B08 records probes instead of a WARN. The
+  // detection is a regex over `instance --help`, so the assertion is made against the help text
+  // the shipped CLI actually prints rather than against a fixture that agrees with itself.
+  const realHelp = spawnSync(process.execPath,
+    [join(repoRoot, 'packages/snowarch/dist/cli/index.js'), 'instance', '--help'],
+    { encoding: 'utf8' });
+  assert.match(`${realHelp.stdout ?? ''}`, /\btest\b/,
+    'the shipped CLI must list `test`, or B08 goes back to reporting probes as unavailable');
+
   const calls = [];
   const withTest = runProbes(root, { run: (exec, args) => {
     calls.push(args.slice(-3).join(' '));

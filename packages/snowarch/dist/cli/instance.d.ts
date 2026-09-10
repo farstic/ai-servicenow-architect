@@ -2,10 +2,11 @@ import { EXIT_INTERRUPTED, EXIT_USAGE, type Io } from './tty.js';
 export { EXIT_USAGE, EXIT_INTERRUPTED };
 import { type Environment } from './url.js';
 import { type ReviewIo } from './preset-ui.js';
+import { maskUsername } from '../store/paths.js';
 import { probeReachability } from '../servicenow/reachability.js';
 import { probeAll, type LastProbe, type ProbeClient } from '../servicenow/probes.js';
 import { type StoreInstance } from '../store/schema.js';
-import { type Flags } from '../utils/permissions.js';
+import { type FlagName, type Flags } from '../utils/permissions.js';
 export declare const EXIT_OK = 0;
 export declare const EXIT_FAILED = 1;
 export declare const EXIT_POLICY = 3;
@@ -79,13 +80,14 @@ export interface MaskedEntry {
     prodWriteAck: boolean;
 }
 /**
- * `u` → `u***`. Enough to recognise the account, never enough to use it.
+ * ARC-04-S02's masker, re-exported rather than reimplemented.
  *
- * A username is not a secret — it may be typed on the command line — but a masked summary is what
- * gets pasted into a ticket, and the full account name there is one more thing an attacker does
- * not have to guess.
+ * S05 wrote a second one here that dropped the domain — `c***` where the store's own says
+ * `c***@corp.com` — so `list` and the wizard's summary would have masked the same account two
+ * ways. A username is not a secret, but the full account name in a pasted summary is one more
+ * thing an attacker does not have to guess, and one masker is what makes that claim checkable.
  */
-export declare const maskUsername: (username: string) => string;
+export { maskUsername };
 export declare function maskEntry(entry: StoreInstance): MaskedEntry;
 /** The probe line of the summary: enabled flags report, disabled ones read `off`. */
 export declare function probeSummary(probe: LastProbe | null, flags: Flags, noProbes: boolean): string;
@@ -111,6 +113,31 @@ export interface AddDeps {
     platform?: NodeJS.Platform;
 }
 /**
+ * What `probeAll` needs to know about one entry's credentials — including the ROPC seam.
+ *
+ * `probeAuth` refuses an `oauth_ropc` run with no `tokenProbe` ("no token probe supplied"), and
+ * S05 never passed one: with probes on, `instance add --auth oauth_ropc` could not succeed at all,
+ * because the error came back as neither `ok` nor `unreachable` and fell through to the wrong-
+ * password branch. Found by S06's `set-credentials --auth oauth_ropc` test, which hit the same
+ * seam.
+ *
+ * The probe supplied here says "the request that follows IS the token exchange", and that is the
+ * truth of this client: `ServiceNowClient` acquires the ROPC token inside its first request, so a
+ * separate token call would be a SECOND login attempt on an account this whole file is careful to
+ * spend only three of — against S03's one-request-per-probe rule. A failed grant still lands as
+ * `auth failed` through `fromClientError` on the `sys_user` query; what is lost is only the
+ * four-way ROPC error table's extra specificity, which needs a real token endpoint to distinguish
+ * and belongs with the live sitting.
+ */
+export declare const probeOptionsFor: (auth: StoreInstance["auth"], env: NodeJS.ProcessEnv) => {
+    username: string;
+    authMethod: "basic" | "oauth_ropc";
+    env: NodeJS.ProcessEnv;
+    tokenProbe?: () => Promise<{
+        ok: boolean;
+    }>;
+};
+/**
  * The whole command. Seven steps, and every one of them can end it.
  */
 export declare function runAdd(options: AddOptions, io: AddIo, deps?: AddDeps): Promise<AddResult>;
@@ -130,3 +157,91 @@ export declare function addHelp(): string;
 export declare const CLI_RELATIVE = "packages/snowarch/dist/cli/index.js";
 /** True when the server's runtime dependencies are installed beside the built CLI. */
 export declare const serverDepsInstalled: (packageDir: string) => boolean;
+/** `LABEL_NOT_FOUND` — registered, so `docs/TROUBLESHOOTING.md` carries its remedy. */
+export declare const labelNotFound: (label: string, known: readonly string[]) => string;
+export declare const MISMATCH = "Label mismatch \u2014 nothing changed.";
+export declare const prodRaiseWarning: () => string;
+export declare const CONFIRM_PROMPT = "Type the instance label to confirm: ";
+export declare const credentialsUpdated: (label: string) => string;
+export declare const removeQuestion: (label: string, storePath: string) => string;
+export declare const WAS_DEFAULT: (label: string) => string;
+/**
+ * The `set-default` sentence, with the reload tool named from the CONTRACT's own list.
+ *
+ * A retyped tool token is what L01 exists to catch: the name appears in the contract, in
+ * `governance/`, in the rule file and here, and four spellings of it is three chances to be
+ * wrong on the day a name changes.
+ */
+export declare const defaultChanged: (label: string) => string;
+export interface ManageOptions {
+    label?: string;
+    json?: boolean;
+    all?: boolean;
+    verbose?: boolean;
+    yes?: boolean;
+    ackProd?: boolean;
+    confirmLabel?: string;
+    auth?: 'basic' | 'oauth_ropc';
+    username?: string;
+    passwordStdin?: boolean;
+    preset?: string;
+    pairs?: readonly string[];
+}
+export interface ManageDeps extends AddDeps {
+    /** The clock, injected so an audit line and a `lastProbe` are assertable to the character. */
+    now?: () => string;
+    /** `.local/config.json`, so the mirror can be pointed somewhere else in a test. */
+    configPath?: string;
+}
+export declare function runList(options: ManageOptions, io: AddIo, deps?: ManageDeps): number;
+/**
+ * Re-probe one instance or all of them. `lastProbe` is the only field this writes, ever.
+ *
+ * In `--json` the human lines are suppressed rather than interleaved: ARC-06-S08 parses this
+ * command's stdout, and a network note printed above the object turns a probe result into
+ * `unparsable`.
+ */
+export declare function runTest(options: ManageOptions, io: AddIo, deps?: ManageDeps): Promise<number>;
+/**
+ * New credentials for an existing instance — saved only when the instance says `ok`.
+ *
+ * The re-entry loop is S05's, called through the same helper, so "three attempts, one request
+ * each" is one rule in one place. A run that ends any other way leaves the OLD credentials
+ * exactly where they were: an entry whose password has been replaced by a wrong one is worse
+ * than an entry nobody touched, because the failure arrives later and somewhere else.
+ */
+export declare function runSetCredentials(options: ManageOptions, io: AddIo, deps?: ManageDeps): Promise<number>;
+export declare function runSetPreset(options: ManageOptions, io: AddIo, deps?: ManageDeps): Promise<number>;
+/**
+ * `WRITE=on` → the flag's own name mapped to the string `true`, or the sentence naming what was
+ * not understood. (Spelled that way round because writing the flag constant out here would make
+ * this comment a hit in the sweep that forbids flag literals in `src/cli/` — the thirteenth time
+ * that lesson has been learnt in this repository.)
+ */
+export declare function parseFlagPairs(pairs: readonly string[]): {
+    ok: true;
+    changes: Map<FlagName, 'true' | 'false'>;
+} | {
+    ok: false;
+    message: string;
+};
+/**
+ * A PARTIAL change to the six flags — the difference from `set-preset`, which replaces all of them.
+ *
+ * Each requested change goes through S04's own toggle, so the dependency conversation is the one
+ * the review screen has rather than a second implementation of the same rule. A change that is
+ * already the current value is skipped: toggling to the state something is already in would flip
+ * it the wrong way and ask a question about a change nobody requested.
+ */
+export declare function runSetFlags(options: ManageOptions, io: AddIo, deps?: ManageDeps): Promise<number>;
+/**
+ * `.local/config.json`'s `defaultInstance`, refreshed — a MIRROR, never a second source.
+ *
+ * Only when the file already exists (ARC-06-S05's ruling: the bootstrap owns creating it), only
+ * that one key, and every other key is left byte-for-byte as it was — including `updatedAt`, which
+ * belongs to the bootstrap step that writes the rest. The server package does not import the
+ * engine's `.mjs`, so this is the minimal JSON update rather than a call into B07's writer.
+ */
+export declare function mirrorDefault(configPath: string, label: string | null): boolean;
+export declare function runSetDefault(options: ManageOptions, io: AddIo, deps?: ManageDeps): number;
+export declare function runRemove(options: ManageOptions, io: AddIo, deps?: ManageDeps): Promise<number>;

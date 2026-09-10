@@ -366,6 +366,13 @@ export const ERROR_CODES = [
     httpStatus: 407,
   },
   {
+    code: 'LABEL_NOT_FOUND',
+    meaning: "No instance with that label is in the store this checkout resolves.",
+    remedy: "run `instance list` to see the labels this checkout has, or `instance add <label>` to add one",
+    command: "./snowarch instance list",
+    showInRule: false,
+  },
+  {
     code: 'LABEL_EXISTS',
     meaning: "An instance with that label is already in the store.",
     remedy: "use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it",
