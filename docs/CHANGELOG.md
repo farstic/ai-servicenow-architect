@@ -50,6 +50,19 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   builds is exactly what the user typed: a test greps the whole of `tools/snowarch/` for a
   `--password` construction, because a secret cannot reach `ps` through a process that never
   invents an argument.
+- **A nightly suite that proves the three things a simulation cannot.** `RUN_LIVE_E2E=1` runs the
+  real CLI against a real instance: through a **pseudo-terminal**, so the masked prompt is actually
+  exercised rather than injected around — nothing is echoed, and the transcript is searched for the
+  password and for the base64 of `user:pass` that basic auth puts on the wire. While the wizard
+  runs, its process arguments are read the way any other user on the machine would read them. And
+  after three deliberate failures the instance is asked whether the account is locked, because "one
+  request per attempt" is this code's promise while "three attempts do not lock you out" is
+  ServiceNow's. Seven cases automated, one (a hibernated PDI) documented; the workflow runs on the
+  default branch's schedule and on demand, **never on a proposed change**, and refuses to publish a
+  log artefact that contains a secret. Without the gate the suite is reported **skipped** — asserted
+  from the reporter's own numbers, with `fetch` stubbed to throw, because "skipped" and "passed"
+  look identical in a summary line.
+
 - **One page now answers "what will this be allowed to do, and where does my password go".**
   `docs/MODES-AND-PRESETS.md` is eleven sections: Mode, the presets, the six flags, the review
   screen, production rules, where credentials live, typing secrets safely, corporate networks, the

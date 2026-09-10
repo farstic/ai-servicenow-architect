@@ -1,0 +1,101 @@
+name: e2e-live
+
+# The wizard against a REAL instance, nightly.
+#
+# Everything the unit tests can simulate is already proven in `ci.yml` in seconds. This proves the
+# three things a simulation cannot: that nothing is echoed when a real terminal turns echo off, that
+# no password reaches the process arguments another user on the machine can read, and that three
+# failed attempts do not lock the account — which is a fact about ServiceNow, not about this code.
+#
+# It needs credentials, so it runs ONLY on the default branch's schedule and on demand. It has no
+# trigger for a proposed change and never will: a fork's proposal would otherwise ask for the
+# repository's secrets, and `RUN_LIVE_E2E` is never set in `ci.yml`.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'          # nightly, before the docs jobs, so a failure is the day's first news
+  workflow_dispatch:
+    inputs:
+      allow-writes:
+        description: 'Run case 5 (sets and restores the ROPC property — a WRITE to the instance)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: e2e-live-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read                  # it reads a repository and an instance; it writes neither
+
+jobs:
+  live:
+    # The secrets exist on the default branch only. A dispatch from a topic branch would otherwise
+    # start, find empty values and report a green run that tested nothing.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false            # one OS failing is a finding about that OS
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+
+      # The story ASSUMED `script(1)` is on the hosted images. This step is the citation it lacked:
+      # it prints which dialect the runner has, and the pty cases depend on it. On Windows there is
+      # no `script(1)` and none is wanted — that job runs the `--password-stdin` cases.
+      - name: Is script(1) here, and which one
+        if: runner.os != 'Windows'
+        run: |
+          command -v script
+          script --version 2>&1 | head -1 || echo "BSD script: no --version"
+
+      - name: The suite
+        env:
+          RUN_LIVE_E2E: '1'
+          SNOW_E2E_URL: ${{ secrets.SNOW_E2E_URL }}
+          SNOW_E2E_USERNAME: ${{ secrets.SNOW_E2E_USERNAME }}
+          SNOW_E2E_PASSWORD: ${{ secrets.SNOW_E2E_PASSWORD }}
+          SNOW_E2E_OAUTH_CLIENT_ID: ${{ secrets.SNOW_E2E_OAUTH_CLIENT_ID }}
+          SNOW_E2E_OAUTH_CLIENT_SECRET: ${{ secrets.SNOW_E2E_OAUTH_CLIENT_SECRET }}
+          # Case 5's instance WRITE is opt-in per run, and off by default.
+          SNOW_E2E_ALLOW_WRITES: ${{ inputs.allow-writes && '1' || '' }}
+        run: npm run test:e2e --workspace packages/snowarch
+
+      # The log is evidence, so it is uploaded — and the suite writes it through its own redactor.
+      # This step is the belt to that braces: it greps the artefact for every secret and fails the
+      # job rather than publishing one. A secret in an artefact is a secret in a public repository.
+      - name: Refuse to publish a log that contains a secret
+        if: always()
+        shell: bash
+        env:
+          SNOW_E2E_PASSWORD: ${{ secrets.SNOW_E2E_PASSWORD }}
+          SNOW_E2E_OAUTH_CLIENT_SECRET: ${{ secrets.SNOW_E2E_OAUTH_CLIENT_SECRET }}
+        run: |
+          shopt -s nullglob
+          files=(e2e-log-*.txt)
+          if [ ${#files[@]} -eq 0 ]; then echo "no log to check"; exit 0; fi
+          for secret in "$SNOW_E2E_PASSWORD" "$SNOW_E2E_OAUTH_CLIENT_SECRET"; do
+            [ -z "$secret" ] && continue
+            if grep -qF -- "$secret" "${files[@]}"; then
+              echo "::error::a secret reached the log artefact — not uploading"
+              exit 1
+            fi
+          done
+          echo "log checked: no secret present"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-live-${{ matrix.os }}
+          path: e2e-log-*.txt
+          if-no-files-found: ignore
+          retention-days: 7

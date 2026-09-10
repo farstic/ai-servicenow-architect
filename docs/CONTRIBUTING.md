@@ -118,6 +118,26 @@ Two mechanical notes worth knowing:
 
 ---
 
+## The live E2E secrets — names only
+
+`e2e-live.yml` runs the wizard against a real instance nightly, on the default branch only. It reads
+five repository secrets, and this list is the whole of what a maintainer has to create:
+
+| Secret | What it is |
+|---|---|
+| `SNOW_E2E_URL` | the instance origin, `https://<host>`, no path |
+| `SNOW_E2E_USERNAME` | an account on that instance — a PDI account, not a customer's |
+| `SNOW_E2E_PASSWORD` | its password |
+| `SNOW_E2E_OAUTH_CLIENT_ID` | optional; case 5 skips without the pair |
+| `SNOW_E2E_OAUTH_CLIENT_SECRET` | optional |
+
+**Names only, here and everywhere.** No value of any of these belongs in a file, a pull request, a
+transcript or a run record — `tests/workflows.test.mjs` allows exactly these five names in exactly
+that one workflow, and a sixth, or one of them elsewhere, fails the suite.
+
+Locally the same values come from a `0600` file pointed at by `SNOW_ENV_FILE`, never a `.env` in the
+working directory: a file the tools pick up by walking the tree is a file that ends up in a tarball.
+
 ## Secret scanning
 
 CI runs `gitleaks` over the **full history** on every push. Two allowances, and they are different kinds:
