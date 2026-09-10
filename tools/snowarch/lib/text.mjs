@@ -80,6 +80,31 @@ export function modeLine({ mode, instance = null, qualifier = null, stamp = null
 }
 
 /**
+ * The banner's four nudges — one definition each, for the hook and for `/snowarch status`.
+ *
+ * They are the only lines the SessionStart hook prints besides the Mode line, and two programs
+ * print them: the hook at the top of a session, and the status skill when somebody asks. A second
+ * wording in the second place is how a user comes to believe the two describe different things.
+ *
+ * Each is ONE line. The banner has a budget measured in milliseconds and a reader who has not
+ * asked for any of this yet; a nudge that wraps is a nudge that gets skipped.
+ */
+export const BANNER = Object.freeze({
+  firstRun: 'No ServiceNow instance configured — /snowarch setup-instance adds one '
+    + '(design-only works without it).',
+  upgrade: (tag) => `A newer release is available (${tag}) — run ./snowarch upgrade.`,
+  staleRegistration: 'Stale MCP registrations from the old setup found in ~/.claude.json — run '
+    + './snowarch doctor --section legacy for the removal commands.',
+  doctorFail: (n) => `Doctor: ${n} FAIL — run ./snowarch doctor for remedies.`,
+  /** The cache could not be refreshed in time: the line is still true, just old. */
+  staleSuffix: ' (cache stale — run ./snowarch doctor)',
+  timedOut: 'Mode: unknown — doctor timed out; run ./snowarch doctor',
+  /** Anything unforeseen. The CLASS, never the message: a message can carry a path or a value. */
+  failed: (errorClass) => `Mode: unknown — session banner failed (${errorClass}); run `
+    + './snowarch doctor',
+});
+
+/**
  * THE registration line. One definition, three consumers: `snowarch mode`, the doctor's report
  * (ARC-08) and the troubleshooting page's wording.
  *
@@ -180,6 +205,18 @@ export function exportable({ serverKey }) {
   return {
     expectedDialogs: EXPECTED_DIALOGS,
     modeDesign: modeLine({ mode: 'design-only' }),
+    // The banner's fixed strings, as data: the hook prints them and `/snowarch status` (S09) says
+    // the same words. The two that take an argument are rendered with an example one, so the file
+    // shows the shape rather than a placeholder nobody can compare against.
+    banner: {
+      firstRun: BANNER.firstRun,
+      upgrade: BANNER.upgrade('v2.1.0'),
+      staleRegistration: BANNER.staleRegistration,
+      doctorFail: BANNER.doctorFail(2),
+      staleSuffix: BANNER.staleSuffix,
+      timedOut: BANNER.timedOut,
+      failed: BANNER.failed('Error'),
+    },
     doctorUnavailable: doctorLine({ nodeUsable: false }),
     posix: forShell({ platform: 'linux', env: {} }),
     windows: forShell({ platform: 'win32', env: {} }),

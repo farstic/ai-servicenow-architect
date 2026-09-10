@@ -538,6 +538,21 @@ New checks with no old counterpart (listed under the table): E-06, E-09 (key sca
 ---
 
 ### ARC-08-S08 — `hooks/session-start.mjs` banner: cache, staleness re-run, nudges, hook timeout, S-05 handling
+
+> **Amendment 2026-09-10 (from the delivery).** Five departures. (1) **S-05 is variant B**: the
+> bootstrap NEVER writes `disableAllHooks`; with Node absent the hook entry is simply not written
+> (ARC-06-S05's toggle writer). The design note's "the bootstrap writes `disableAllHooks: true`"
+> is superseded, and AC 7 reads: E-10 asserts the key is ABSENT, and reports it once as a WARN if
+> an older build left one behind (F6 removes it). (2) **The hook entry is the single-`command`
+> form**, not the `command`/`args` exec pair `01` §5 describes: that is the shape Claude Code's
+> hook schema takes and the shape ARC-06-S05 writes and E-08 asserts. Matcher (`startup|resume`)
+> and `timeout: 10` are the story's, unchanged. (3) **The root is `../../..` from the hook file**,
+> not `../..` — `tools/snowarch/hooks/` is three levels down. (4) The `first-run` nudge fires when
+> THIS invocation created the cache, which is the story's rule, and is therefore silent on every
+> session after the first even though the checkout stays instance-less. (5) AC 6, AC 7's manual
+> half and task 5 (`claude --debug`, plain stdout vs `additionalContext`) are owner-sitting rows
+> (D3), not automated: they need a real Claude Code session on two operating systems.
+
 **As** the engine (Claude) **I want** every session to begin with one truthful `Mode:` line produced from the doctor cache — refreshed when the cache is stale or the inputs changed — plus at most three one-line nudges, within the hook budget and without ever blocking or printing a secret **so that** the rule file's "quote the banner" instruction is always satisfiable and the engine never infers its mode.
 **Context.** README deliverable "`hooks/session-start.mjs` (exec form, `timeout` 10 s, < 300 ms typical): reads `.local/doctor-last.json`, re-runs the offline `--quick` subset when older than 24 h or when `.mcp.json`/store mtime changed; prints one line (`Mode: …`), plus first-run nudge, upgrade nudge, stale-registration nudge; never prints secrets; never blocks" and acceptance criterion 5 (banner within 1 s on CI; with Node absent the launcher's `disableAllHooks` fallback leaves the session clean — S-05). `01` §5 (hook entry: `matcher: "startup|resume"`, exec form `command: "node"`, `args: ["${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs"]`, `timeout: 10`), §8, §13 (exec form on Windows — S-03), `03` R-14, S-05, S-14d (SessionStart `additionalContext` is the documented channel). ARC-00-S06 delivers the S-05 verdict; ARC-06-S05 implements the toggle it chose; ARC-09-S07 (`./snowarch upgrade --check`) writes the upgrade-check input `.local/upgrade-check.json` and lists this story as its dependency for the nudge line — the dependency is one-way (this hook only reads the file; absent file = no nudge).
 **Scope.** In: `tools/snowarch/hooks/session-start.mjs` (stdlib only; imports `lib/doctor/cache.mjs` and, for re-runs, the doctor runner in-process), the staleness rule, the three nudges, the watchdog, output format, `tests/hook/session-start.test.mjs` with timing. Out: the hook entry in `.claude/settings.json` (ARC-06-S01 — this story only specifies what it must say), the `disableAllHooks` writer (ARC-06-S05), the fetch that decides "behind origin" (ARC-09-S07 — this hook only reads `.local/upgrade-check.json`).

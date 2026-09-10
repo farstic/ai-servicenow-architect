@@ -96,6 +96,16 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   sentence, and the fixture's `~/.claude.json` is asserted byte-identical after a run, including
   under `--fix`. The credential never appears: the report says `set (len 12)`, and the key count
   beside it.
+- **Every session starts with one truthful line.** The SessionStart banner prints the `Mode:` line
+  the doctor derived — from the cache when it still describes the checkout, and by re-running the
+  offline subset when it does not — plus at most four one-line nudges: no instance yet, a newer
+  release, stale registrations from the old setup, or a failing check. It never fails a session:
+  every path exits 0, nothing reaches stderr, and an unforeseen error becomes one honest line
+  naming the error class rather than its message. It never blocks: the re-run runs under a
+  watchdog set to half the hook's own timeout, and on expiry the cached line is printed marked
+  `(cache stale — run ./snowarch doctor)` — an old line marked old beats no line. And it is fast,
+  because the path that answers from the cache imports no part of the doctor at all.
+
 - **Every check the old doctor made is accounted for.** `scripts/legacy/doctor.sh` was 1,141 lines
   and 39 numbered checks written against a real machine over two years — the most precise existing
   specification of a correct install — and rewriting it would have lost intent nobody would notice
