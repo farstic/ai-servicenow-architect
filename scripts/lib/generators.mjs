@@ -23,6 +23,17 @@ export const GENERATORS = [
     ],
   },
   {
+    // ARC-07-S10: the review screens, the migration plan and the terminal hand-off are included in
+    // `docs/MODES-AND-PRESETS.md` from the one definition of each. A separate generator from
+    // `gen-governance` on purpose — that one owns the PRESETS block in the same file, and two
+    // renderers inside one process would each compute their result from the pre-write text and
+    // clobber the other. Two processes, in order, each leaving the other's block alone.
+    id: 'gen-modes',
+    script: 'scripts/gen-modes.mjs',
+    supportsRoot: false,
+    targets: ['docs/MODES-AND-PRESETS.md'],
+  },
+  {
     id: 'gen-roster',
     script: 'scripts/gen-roster.mjs',
     supportsRoot: true,

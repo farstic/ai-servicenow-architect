@@ -50,6 +50,24 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   builds is exactly what the user typed: a test greps the whole of `tools/snowarch/` for a
   `--password` construction, because a secret cannot reach `ps` through a process that never
   invents an argument.
+- **One page now answers "what will this be allowed to do, and where does my password go".**
+  `docs/MODES-AND-PRESETS.md` is eleven sections: Mode, the presets, the six flags, the review
+  screen, production rules, where credentials live, typing secrets safely, corporate networks, the
+  maintenance commands, migrating from the old tool, and what this release does not do. Four of its
+  blocks are **included** rather than retyped — both review screens, the migration plan and the
+  terminal hand-off — so what the page shows and what the commands print cannot drift apart; a
+  generator fills them and CI fails when they disagree. The line budget that moved three times is
+  retired for a structural one: eleven sections, none over sixty lines.
+- **The runtime rule now tells a session what to do when a login fails.** `AUTHENTICATION_FAILED`,
+  `INSUFFICIENT_PRIVILEGES` and `PROD_WRITE_NOT_ACKNOWLEDGED` carry their instructions in the error
+  registry, and the always-loaded rule file renders them: stop on a failed login and do not retry —
+  repeated attempts lock the account — report a missing role rather than working around it with
+  another tool, and never suggest editing the store to get past a production cap. One registry, one
+  wording, three places it appears.
+- **Two platform notes.** ROPC can be switched off instance-wide, and then no client id is the
+  problem (cited); and a hibernating PDI refuses connections in a way that looks nothing like a bad
+  password (observed, marked as such).
+
 - **`/snowarch setup-instance` now walks the whole hand-off from inside Claude.** It checks the
   prerequisites first and stops with the one remedy that fits — Node missing, a design-only
   checkout (which sends you to `./snowarch mode live` and a restart, and asks nothing, because the

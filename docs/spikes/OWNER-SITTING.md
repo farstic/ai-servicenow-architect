@@ -50,6 +50,18 @@
 > at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
 > Nothing about a real instance goes into the repository: the record is the CODE and the timing.
 >
+> **The password managers, and one read-through (ARC-07-S10, 2026-09-10).** Two things this page
+> claims that a test can only half-check. **(1) The three examples in "Typing secrets safely" are
+> asserted to PARSE — `bash -n` for the two shell lines, PowerShell's own parser for the third on
+> windows-latest — and nothing more: running one would reach a real vault. On a machine where you
+> have them, run each once against a PDI and record whether the value arrived (the wizard prints
+> `Saved instance …`) and whether anything appeared in the shell history. If `op` or `pass` needs a
+> flag this page does not show, that is the finding. **(2) One read-through by somebody who did not
+> write the stories** — the story asks for it by name, and the reader is you. What to look for is
+> not typos: it is the question a new user would ask that the page does not answer, and the sentence
+> that assumes something only the author knows. Record both in `docs/spikes/validation-runs/`;
+> never paste a secret, and the page itself carries none.
+>
 > **T-20 and T-21, the four manual passes (ARC-07-S09, 2026-09-10).** Everything a file can prove
 > about the skill is proven — the grant is exactly eight entries, the hand-off block is byte-equal
 > to the fragment the install page shows, the command rendered from that template is byte-identical

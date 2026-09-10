@@ -69,8 +69,7 @@ export const ERROR_CODES = [
     {
         code: 'PROD_WRITE_NOT_ACKNOWLEDGED',
         meaning: "The instance is tagged `environment: prod` and holds a write preset without `prodWriteAck: true`.",
-        remedy: "raise it deliberately, typing the label",
-        command: "./snowarch instance set-preset <label> <preset> --ack-prod",
+        remedy: "A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal",
         showInRule: true,
     },
     {
@@ -109,15 +108,24 @@ export const ERROR_CODES = [
     {
         code: 'AUTHENTICATION_FAILED',
         meaning: "The instance rejected the credentials — wrong, expired, or the account is locked.",
-        remedy: "stop and re-enter them; do not retry, repeated failures lock the account",
-        command: "./snowarch instance set-credentials <label>",
+        // ARC-07-S10: the RUNTIME rule text. `showInRule: true` renders this remedy into
+        // `.claude/rules/00-mode-and-mcp-gate.md`, which a session always has loaded — so the words
+        // are addressed to the model that must stop, and they name the two commands inline rather
+        // than through the `command` field, because the renderer appends that AFTER the sentence and
+        // the paragraph has to read as one instruction. `01` §8's mapping, in the registry.
+        //
+        // "a ServiceNow tool", NOT the `mcp__…__` prefix the story's draft spelled: the rule file
+        // states that prefix exactly ONCE, rendered from `engine.config.json`'s server key, and
+        // ARC-05's own test asserts both the count and the absence of a literal. A second, hard-coded
+        // copy here would fail that test and would be wrong the day the key changes.
+        remedy: "If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed",
         showInRule: true,
         httpStatus: 401,
     },
     {
         code: 'INSUFFICIENT_PRIVILEGES',
         meaning: "The account is authenticated but lacks a ServiceNow role for that table or operation. This is not a flag.",
-        remedy: "grant the role, or use an account that has it; the message names the table",
+        remedy: "The credentials are valid but the account lacks a role for this table. Report the tool, the table and the roles the preset needs (see docs/TROUBLESHOOTING.md); do not switch instances or retry with another tool to work around it",
         showInRule: true,
         httpStatus: 403,
     },

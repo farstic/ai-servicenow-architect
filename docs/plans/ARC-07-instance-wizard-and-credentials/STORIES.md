@@ -923,6 +923,47 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ---
 
+> **Amendment 2026-09-10 (ARC-07-S10).** Six departures and findings.
+>
+> **(1) THE LINE BUDGET IS RETIRED, and replaced by a structural one.** It moved 150 → 160 → 170 as
+> the page absorbed ARC-04's store facts and S01's credential boundary; this story adds the five
+> sections the README always promised. A number that moves every time the page grows for a good
+> reason is a chore, not a budget. What it protected — a page nobody reads to the end — is
+> protected better by shape: **eleven sections in the story's order, none over sixty lines**, which
+> fails with the section named. The page is **335 lines, 11 sections, longest 60**.
+>
+> **(2) The runtime text does not spell the tool prefix.** The story's draft opens "If any
+> `mcp__servicenow__` tool returns…"; the rule file states that prefix exactly ONCE, rendered from
+> `engine.config.json`'s server key, and ARC-05's own test asserts both the count and the absence of
+> a literal copy. The paragraph therefore reads "If a ServiceNow tool returns AUTHENTICATION_FAILED"
+> — the same instruction, and one that stays right the day the key changes.
+>
+> **(3) Two entries lost their `command` field.** The renderer appends `— \`command\`.` AFTER the
+> remedy, and `AUTHENTICATION_FAILED` and `PROD_WRITE_NOT_ACKNOWLEDGED` now carry their commands
+> INSIDE the paragraph, where the sentence needs them. Keeping both would print each command twice
+> and would break the verbatim paragraph AC 4 asserts. The commands are still in the prose, in
+> `docs/TROUBLESHOOTING.md` and in the rule file.
+>
+> **(4) A remedy now serves two audiences, and that is worth naming.** `showInRule: true` renders
+> the remedy into the rule file for the MODEL, and `docs/TROUBLESHOOTING.md` renders the same field
+> under **Remedy.** for a HUMAN. The three runtime texts read as instructions to a session ("Tell
+> the user to run…"), which is slightly odd on the troubleshooting page. The brief ruled against
+> inventing a `ruleText` field; if that ever changes, these three entries are the reason.
+>
+> **(5) The page may name the legacy STORE PATH.** `tests/no-legacy-surfaces.test.mjs` forbids the
+> retired product name in this page, and the migration section has to name
+> `~/.config/servicenow-mcp/instances.json` — a path a reader types. The exemption is written as the
+> PATH, not as the word, with a planted negative proving the vocabulary ban still bites.
+>
+> **(6) Two blocks moved and one section did not survive as its own heading.** "Propose, don't
+> impose" is a principle about the review screen, so it is a paragraph at the end of section 4
+> rather than a section of its own, and the `/snowarch setup-instance` walkthrough sits inside
+> "Typing secrets safely", where the credential boundary it protects is. The eleven headings are
+> the story's list exactly. A new generator, `gen-modes`, includes the four owned blocks (the two
+> review screens, the migration plan, the terminal hand-off) — separate from `gen-governance`
+> because that one owns the PRESETS block in the same file, and two renderers in one process would
+> each compute from the pre-write text and clobber the other. **Nine generators** now.
+
 ### ARC-07-S11 — Live E2E suite behind `RUN_LIVE_E2E=1`: wizard end to end, three-failure exit with lockout check, prod cap, ROPC-disabled fixture, import
 
 **As** a maintainer **I want** a nightly suite that runs the real CLI against a real PDI and proves the promises the unit tests can only simulate — no echo, no secret in `ps`, no lockout after three failures, 0600/0700, prod cap, the exact ROPC-disabled error text **so that** a regression in the credential boundary is caught before a release, and never on a pull-request runner without secrets.
