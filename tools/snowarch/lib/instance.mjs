@@ -32,11 +32,11 @@ export const CLI_PATH = join('packages', 'snowarch', 'dist', 'cli', 'index.js');
  * Are the server's runtime dependencies reachable FROM the server package?
  *
  * RESOLVED, not looked for at a fixed path. `npm ci` in this workspace HOISTS
- * `@modelcontextprotocol/sdk` to the repository root, so the nested
- * `packages/snowarch/node_modules/...` the brief named does not exist on a correctly installed
- * checkout — the forwarder refused to run on a machine where everything was fine, which is how
- * this was found. `createRequire` from the package's own manifest asks the question Node will
- * ask when the CLI starts, so hoisted and nested trees both answer correctly.
+ * `@modelcontextprotocol/sdk` to the repository root, so the nested tree under the server
+ * package the brief named is absent on a correctly installed checkout (S-15 measured it absent
+ * on every runner) — the forwarder refused to run on a machine where everything was fine, which
+ * is how this was found. `createRequire` from the package's own manifest asks the question Node
+ * will ask when the CLI starts, so hoisted and nested trees both answer correctly.
  */
 export function serverDepsInstalled(root, { requireFrom = createRequire } = {}) {
   try {

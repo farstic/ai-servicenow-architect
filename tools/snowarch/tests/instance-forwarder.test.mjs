@@ -131,9 +131,9 @@ test('the hand-over keeps the terminal, the checkout and the exit code', async (
 
 test('the dependency check RESOLVES rather than guessing a path', () => {
   // npm hoists `@modelcontextprotocol/sdk` to the repository root in this workspace, so the
-  // nested `packages/snowarch/node_modules/...` path is absent on a correctly installed checkout
-  // — the forwarder refused to run on a machine where everything was fine. `createRequire` asks
-  // the question Node will ask when the CLI starts.
+  // nested tree under the server package is absent on a correctly installed checkout — the
+  // forwarder refused to run on a machine where everything was fine. `createRequire` asks the
+  // question Node will ask when the CLI starts.
   assert.equal(serverDepsInstalled(root), true);
   const empty = mkdtempSync(join(tmpdir(), 'no-deps-'));
   try {
