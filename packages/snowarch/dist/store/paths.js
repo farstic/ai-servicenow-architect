@@ -151,9 +151,12 @@ export function shellRemedy(command, target) {
 export function maskUsername(u) {
     if (!u)
         return u;
+    // DRILL (ARC-08-S11 proof b): the mask, broken the way a well-meaning change would break it —
+    // "keep the local part readable so support can tell the accounts apart". The redaction e2e must
+    // catch it in the FINISHED report, because that is the only place a broken mask is visible.
     const at = u.indexOf('@');
     if (at > 0)
-        return `${u[0]}***${u.slice(at)}`;
+        return u;
     return `${u[0]}***`;
 }
 /**
