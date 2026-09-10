@@ -247,6 +247,20 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ### ARC-07-S04 — Preset proposal and the per-flag review screen (Propose → Review → Apply); prod cap in the wizard; `--yes` / `--preset` / `--flags`
 
+> **Amendment 2026-09-10 (ARC-07-S04).** **Task 4 — wiring into the step order after `probeAll`
+> and before the save — belongs to S05**, where `instance add` exists. This story ships the
+> functions and proves AC 5, AC 7 and AC 8 at FUNCTION level: `resolveFlags()` returns the apply
+> decision or the refusal with its exit code and text, and "writes nothing" is proven by a store
+> spy whose emptiness is asserted as a precondition and again afterwards — S05 re-proves all three
+> end to end. AC 8's defaults live in one exported constant (`ENTRY_DEFAULTS`) that S05 consumes,
+> with a test that it matches ARC-04-S02's schema defaults rather than restating them.
+>
+> **The footer wraps.** The story's last screen line is 111 characters and the terminal budget is
+> 100, so it wraps like a long probe hint — same rule, same reason: a terminal that folds a line
+> mid-word is harder to read than one continuation. The two screens are rendered to
+> `docs/snippets/review-screen-nonprod.txt` and `review-screen-prod.txt` for S10 to include
+> byte-equal; the snapshot tests read those files, so the page and the wizard cannot drift.
+
 **As** an individual practitioner **I want** the wizard to *propose* a preset for my instance, show me the six flags with what the probes found, let me toggle any of them or switch preset, and apply exactly what I see **so that** nothing is imposed (D-05, principle 10) and production stays read-only unless I take a separate, explicit step.
 
 **Context.** D-05 as decided: for `pdi`/`dev`/`test` the proposal is `full`; "the user reviews a per-flag screen where each flag is pre-set ON and annotated with its live probe result, and may toggle any flag or switch preset before anything is saved. A failing probe changes only the recommendation text on that line, never the toggle. `read-only` remains the proposal for `prod`." `01` §6.3 gives the screen verbatim and the flag meanings; "for a `prod` instance the proposal is `read-only` and the review screen shows the write flags greyed out with the `--ack-prod` instruction". P-03 (all six flags always written), P-06 (one vocabulary), P-25 (`toolPackage` pinned `full`, `maxRecords` 100). README acceptance: "`--env prod --preset full` in the wizard is rejected with the D-05 explanation".
