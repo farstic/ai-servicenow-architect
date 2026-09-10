@@ -15,8 +15,10 @@
  *   remedy       what to do; prose, because most remedies are a judgement rather than a command
  *   command      set ONLY when there is something runnable; renderers set it as code, and they
  *                never parse `remedy` looking for one
- *   showInRule   the code appears in the always-loaded rule file. Twelve do: the six flag gates as
- *                one wildcard line, plus the six a session can actually act on mid-task
+ *   showInRule   the code appears in the always-loaded rule file. Eighteen do: the six flag gates
+ *                as one wildcard line, plus the twelve a session can act on mid-task — six of them
+ *                the network family (ARC-08-S10), because a session that meets DNS or TLS mid-task
+ *                must stop and hand over exactly like it does for a wrong password
  *   httpStatus   the status the instance returned, where the code maps to one
  */
 export interface ErrorCode {
@@ -79,7 +81,7 @@ export declare const ERROR_CODES: readonly [{
     readonly meaning: "The instance is in the store but was not loaded, and the store carries the reason.";
     readonly remedy: "read the reason in the instance listing; a `prod` instance without `prodWriteAck` needs the acknowledgement";
     readonly command: "./snowarch instance list";
-    readonly showInRule: false;
+    readonly showInRule: true;
 }, {
     readonly code: "UNKNOWN_INSTANCE";
     readonly meaning: "No instance in the store carries that label.";
@@ -158,19 +160,19 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "DNS_FAILURE";
     readonly meaning: "The instance host name did not resolve (`ENOTFOUND`, `EAI_AGAIN`).";
-    readonly remedy: "the name `<host>` does not resolve. Check the instance name; on a corporate network the name may resolve only over VPN or through a proxy (set `HTTPS_PROXY`) (a proxy is configured — `<proxyVar>=<proxy>` — and a proxy does not resolve names for you unless the request goes through it, so this usually means the name is wrong)";
-    readonly showInRule: false;
+    readonly remedy: "the name `<host>` does not resolve. Check the instance name first — a typo is the usual cause; on a corporate network the name may resolve only over VPN, or only through a proxy, so set `HTTPS_PROXY` if there is one (there is one — `<proxyVar>=<proxy>` — and a proxy does not resolve names for you unless the request goes through it, which makes a wrong name the likelier cause)";
+    readonly showInRule: true;
 }, {
     readonly code: "TLS_CA_UNTRUSTED";
     readonly meaning: "The certificate was not signed by a CA this machine trusts — normal on a network that intercepts TLS.";
     readonly remedy: "the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it";
     readonly command: "export NODE_EXTRA_CA_CERTS=<path to the PEM>";
-    readonly showInRule: false;
+    readonly showInRule: true;
 }, {
     readonly code: "PROXY_UNREACHABLE";
     readonly meaning: "A proxy variable is set and nothing is listening there, or the connection to it timed out.";
     readonly remedy: "the proxy `<proxyVar>=<proxy>` did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked";
-    readonly showInRule: false;
+    readonly showInRule: true;
 }, {
     readonly code: "CONNECTION_REFUSED";
     readonly meaning: "The instance refused the connection and no proxy is configured.";
@@ -180,7 +182,7 @@ export declare const ERROR_CODES: readonly [{
     readonly code: "CONNECTION_TIMEOUT";
     readonly meaning: "The connection timed out with no proxy configured.";
     readonly remedy: "no answer from `<host>` in time. If this network needs a proxy, set `HTTPS_PROXY=http://proxy:port` (and `NO_PROXY` for internal hosts) and run again. An idle PDI may be hibernating — wake it at developer.servicenow.com";
-    readonly showInRule: false;
+    readonly showInRule: true;
 }, {
     readonly code: "NETWORK_ERROR";
     readonly meaning: "The instance was unreachable and the cause did not match a more specific classification.";
@@ -315,8 +317,8 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "PROXY_AUTH_REQUIRED";
     readonly meaning: "The proxy answered 407: it wants credentials before it will forward the request.";
-    readonly remedy: "put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials";
-    readonly showInRule: false;
+    readonly remedy: "the proxy is asking for credentials: put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials";
+    readonly showInRule: true;
     readonly httpStatus: 407;
 }, {
     readonly code: "LEGACY_STORE_NOT_FOUND";
