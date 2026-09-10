@@ -114,6 +114,7 @@ if [ -n "${NET_RC:-}" ] ; then
     *) die B00 "cannot reach github.com" "$MSG_NET" 3 ;;
   esac
 fi
+echo "drill" > "$ROOT/INSTALLED.txt"   # DRILL: ARC-06-S14 AC 2 — never merged
 say "ok B00 network: github.com reachable"
 say "ok B00 node: note: Node.js not found — design-only only; live mode needs Node 20+ ($NODE_REMEDY)"
 step B00 preflight ok
