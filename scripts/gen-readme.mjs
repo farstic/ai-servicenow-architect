@@ -25,7 +25,7 @@
  *   node scripts/gen-readme.mjs           # rewrite the regions and README.md
  *   node scripts/gen-readme.mjs --check   # exit 1 if either has drifted
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -149,19 +149,19 @@ if (isMain) {
   if (check) {
     if (stale.length > 0) {
       for (const f of stale) {
-        process.stderr.write(`gen-readme: ${f} is STALE — run node scripts/gen-readme.mjs\n`);
+        writeSync(2, `gen-readme: ${f} is STALE — run node scripts/gen-readme.mjs\n`);
       }
       // Named on purpose: a reader who edited README.md by hand has to be told where the text
       // lives, or they will make the same edit again.
-      process.stderr.write(
+      writeSync(2, 
         `gen-readme: ${README} is composed from ${HEAD} + ${INSTALL} + ${TAIL}; edit those\n`);
       process.exit(1);
     }
-    process.stdout.write('gen-readme: README.md and docs/INSTALL.md current\n');
+    writeSync(1, 'gen-readme: README.md and docs/INSTALL.md current\n');
   } else {
     writeFileSync(join(root, INSTALL), install);
     writeFileSync(join(root, README), readme);
-    process.stdout.write(stale.length > 0
+    writeSync(1, stale.length > 0
       ? `gen-readme: wrote ${stale.join(', ')}\n`
       : 'gen-readme: no change\n');
   }

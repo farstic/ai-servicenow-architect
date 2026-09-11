@@ -45,7 +45,7 @@
  *        [--summary]
  * Exit 0 within budget · 1 over · 2 cannot run.
  */
-import { appendFileSync, existsSync, rmSync } from 'node:fs';
+import { appendFileSync, existsSync, rmSync, writeSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,7 +61,7 @@ const HOOK = join(ROOT, 'tools', 'snowarch', 'hooks', 'session-start.mjs');
 const CACHE = join(ROOT, '.local', 'doctor-last.json');
 
 if (!existsSync(HOOK)) {
-  process.stderr.write(`banner-timing: ${HOOK} is not there\n`);
+  writeSync(2, `banner-timing: ${HOOK} is not there\n`);
   process.exit(2);
 }
 
@@ -87,12 +87,12 @@ for (let i = 0; i < RUNS; i += 1) {
   // A hook that fails is not a slow hook — it is a session that starts with an error about the
   // tool meant to help, and S08's whole design is that every path exits 0.
   if (r.status !== 0) {
-    process.stderr.write(`banner-timing: run ${i + 1} exited ${r.status}\n${r.stderr ?? ''}\n`);
+    writeSync(2, `banner-timing: run ${i + 1} exited ${r.status}\n${r.stderr ?? ''}\n`);
     process.exit(1);
   }
   const out = (r.stdout ?? '').trim();
   if (!/Mode: /.test(out)) {
-    process.stderr.write(`banner-timing: run ${i + 1} printed no Mode line:\n${out}\n`);
+    writeSync(2, `banner-timing: run ${i + 1} printed no Mode line:\n${out}\n`);
     process.exit(1);
   }
   lastLine = out.split('\n').find((l) => l.startsWith('Mode: ')) ?? out.split('\n')[0];
@@ -102,7 +102,7 @@ for (let i = 0; i < RUNS; i += 1) {
   // the fast path, measured on the same machine in the same second as the cold run it follows.
   const warm = timed([HOOK]);
   if (warm.r.status !== 0) {
-    process.stderr.write(`banner-timing: warm run ${i + 1} exited ${warm.r.status}\n`);
+    writeSync(2, `banner-timing: warm run ${i + 1} exited ${warm.r.status}\n`);
     process.exit(1);
   }
   fast.push(warm.ms);
@@ -121,11 +121,11 @@ const fastMedian = medianOf(fast);
 const cost = Math.max(0, median - floor);
 const all = times.map((t) => Math.round(t)).join(', ');
 const allFast = fast.map((t) => Math.round(t)).join(', ');
-process.stdout.write(`banner-timing: re-run path median ${median} ms over ${RUNS} cold runs `
+writeSync(1, `banner-timing: re-run path median ${median} ms over ${RUNS} cold runs `
   + `(${all}); node floor ${floor} ms → banner ${cost} ms — budget ${BUDGET} ms\n`);
-process.stdout.write(`banner-timing: fast path median ${fastMedian} ms over ${RUNS} warm runs `
+writeSync(1, `banner-timing: fast path median ${fastMedian} ms over ${RUNS} warm runs `
   + `(${allFast}) — budget ${FAST_BUDGET} ms\n`);
-process.stdout.write(`banner-timing: ${lastLine}\n`);
+writeSync(1, `banner-timing: ${lastLine}\n`);
 
 if (argv.includes('--summary') && process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY,
@@ -139,13 +139,13 @@ if (argv.includes('--summary') && process.env.GITHUB_STEP_SUMMARY) {
 
 // The FAST path first, because a trip there is the one that means the product regressed.
 if (fastMedian > FAST_BUDGET) {
-  process.stderr.write(`banner-timing: the fast path cost ${fastMedian} ms, over the `
+  writeSync(2, `banner-timing: the fast path cost ${fastMedian} ms, over the `
     + `${FAST_BUDGET} ms budget — that path reads two JSON files and returns, so this is a `
     + 'regression rather than a slow machine\n');
   process.exit(1);
 }
 if (cost > BUDGET) {
-  process.stderr.write(`banner-timing: the re-run path cost ${cost} ms (median ${median} ms minus `
+  writeSync(2, `banner-timing: the re-run path cost ${cost} ms (median ${median} ms minus `
     + `a ${floor} ms node floor), over the ${BUDGET} ms budget — see ARC-09-C5 before moving it\n`);
   process.exit(1);
 }

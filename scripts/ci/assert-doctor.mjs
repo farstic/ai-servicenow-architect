@@ -17,7 +17,7 @@
  *
  * Stdlib only: this runs in a bootstrap cell, before anything is installed.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const argv = process.argv.slice(2);
@@ -26,13 +26,13 @@ const inPath = resolve(value('--in', 'doctor.json'));
 const expectFail = value('--expect-fail', '').split(',').map((x) => x.trim()).filter(Boolean);
 
 if (!existsSync(inPath)) {
-  process.stderr.write(`assert-doctor: ${inPath} is not there\n`);
+  writeSync(2, `assert-doctor: ${inPath} is not there\n`);
   process.exit(2);
 }
 
 let report;
 try { report = JSON.parse(readFileSync(inPath, 'utf8')); } catch (e) {
-  process.stderr.write(`assert-doctor: ${inPath} is not JSON: ${e.message}\n`);
+  writeSync(2, `assert-doctor: ${inPath} is not JSON: ${e.message}\n`);
   process.exit(2);
 }
 
@@ -78,12 +78,12 @@ else if (docs.every((c) => c.status === 'skip')) problems.push('every docs check
 if (!/^Mode: /.test(report.modeLine ?? '')) problems.push(`modeLine is ${JSON.stringify(report.modeLine)}`);
 
 if (problems.length) {
-  process.stderr.write('assert-doctor: this is not a green design-only install\n');
-  for (const p of problems) process.stderr.write(`  ${p}\n`);
+  writeSync(2, 'assert-doctor: this is not a green design-only install\n');
+  for (const p of problems) writeSync(2, `  ${p}\n`);
   process.exit(1);
 }
 
 const s = report.summary;
-process.stdout.write(`DOCTOR: ${s.ok} ok, ${s.warn} warn, ${s.fail} fail (${s.skip} skip)`
+writeSync(1, `DOCTOR: ${s.ok} ok, ${s.warn} warn, ${s.fail} fail (${s.skip} skip)`
   + `${expectFail.length ? ` — expected here: ${expectFail.join(', ')}` : ''}\n`);
-process.stdout.write(`${report.modeLine}\n`);
+writeSync(1, `${report.modeLine}\n`);

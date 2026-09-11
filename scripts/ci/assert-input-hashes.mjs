@@ -23,7 +23,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,7 +42,7 @@ const files = [...new Set(STEP_IDS.flatMap((id) => INPUTS[id].inputs
   .map((i) => (i.ref.startsWith('<') ? config.docs.areasFile : i.ref))))];
 
 if (files.length < 4) {
-  process.stderr.write('assert-input-hashes: the table named no files — nothing to compare\n');
+  writeSync(2, 'assert-input-hashes: the table named no files — nothing to compare\n');
   process.exit(2);
 }
 
@@ -81,10 +81,10 @@ if (process.env.GITHUB_STEP_SUMMARY) {
       + 'must match across all three._', ''].join('\n'));
 }
 
-process.stdout.write(`assert-input-hashes: ${files.length} file(s) checked against HEAD\n`);
-for (const line of steps) process.stdout.write(`${line}\n`);
+writeSync(1, `assert-input-hashes: ${files.length} file(s) checked against HEAD\n`);
+for (const line of steps) writeSync(1, `${line}\n`);
 if (problems.length) {
-  for (const p of problems) process.stderr.write(`assert-input-hashes: ${p}\n`);
+  for (const p of problems) writeSync(2, `assert-input-hashes: ${p}\n`);
   process.exit(1);
 }
-process.stdout.write('assert-input-hashes: the checkout matches the commit byte for byte\n');
+writeSync(1, 'assert-input-hashes: the checkout matches the commit byte for byte\n');

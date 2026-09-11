@@ -18,7 +18,7 @@
  * first: a cell that has to be re-run once per problem wastes ten minutes per problem).
  */
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync, statSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -293,11 +293,11 @@ function directorySize(dir) {
   return total;
 }
 
-for (const n of notes) process.stdout.write(`  · ${n}\n`);
+for (const n of notes) writeSync(1, `  · ${n}\n`);
 if (problems.length > 0) {
-  process.stderr.write(`\nassert-bootstrap: ${problems.length} failed assertion(s) in the `
+  writeSync(2, `\nassert-bootstrap: ${problems.length} failed assertion(s) in the `
     + `${variant} cell — the install is broken, not the test:\n`);
-  for (const p of problems) process.stderr.write(`  ✗ ${p}\n`);
+  for (const p of problems) writeSync(2, `  ✗ ${p}\n`);
   process.exit(1);
 }
-process.stdout.write(`assert-bootstrap: ${variant} (writer ${writer}) — all assertions passed\n`);
+writeSync(1, `assert-bootstrap: ${variant} (writer ${writer}) — all assertions passed\n`);

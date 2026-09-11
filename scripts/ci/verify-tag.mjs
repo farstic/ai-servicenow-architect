@@ -15,7 +15,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { parseTagMessage } from '../lib/release/tag.mjs';
@@ -25,8 +25,8 @@ const value = (n) => (argv.indexOf(n) === -1 ? undefined : argv[argv.indexOf(n) 
 const ROOT = resolve(value('--root') ?? process.cwd());
 const tag = argv.find((a) => !a.startsWith('--') && argv[argv.indexOf(a) - 1] !== '--root');
 
-const die = (m) => { process.stderr.write(`${m}\n`); process.exit(2); };
-const fail = (m) => { process.stderr.write(`${m}\n`); process.exit(1); };
+const die = (m) => { writeSync(2, `${m}\n`); process.exit(2); };
+const fail = (m) => { writeSync(2, `${m}\n`); process.exit(1); };
 
 if (!tag) die('verify-tag: usage: node scripts/ci/verify-tag.mjs <tag>');
 
@@ -93,7 +93,7 @@ if (marker !== rootVersion) problems.push(`${tag}: the CLAUDE.md marker says ${m
 if (parsed.version !== named) problems.push(`${tag}: the message names v${parsed.version}`);
 
 if (problems.length) {
-  for (const p of problems) process.stderr.write(`${p}\n`);
+  for (const p of problems) writeSync(2, `${p}\n`);
   process.exit(1);
 }
-process.stdout.write(`tag ${tag} verified\n`);
+writeSync(1, `tag ${tag} verified\n`);

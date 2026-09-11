@@ -823,15 +823,43 @@ exists for the machines that cannot run the other one, not as a second implement
 Two rules, one cause: **a write to a pipe past the buffer is asynchronous**, and a process that
 ends before it drains loses it. A terminal is not a pipe, so neither failure is visible by hand.
 
-- **Set `process.exitCode`; never call `process.exit()`** in an entry point that prints.
-  `scripts/docs.mjs` did, and its `--json` object reached callers cut in half at exactly 8192
-  bytes. `tests/entrypoint-exit.test.mjs` holds every entry point to this.
+- **A process that WRITES TO STDOUT must not call `process.exit()`.** Not "an entry point" — the
+  earlier wording invited the reading that a CI script is a different kind of thing, and it is not:
+  the pipe does not know what sort of program is on the other end. Set `process.exitCode` and let
+  the module end, or — where control flow genuinely needs an immediate stop — make every write in
+  the file `writeSync(1, …)` / `writeSync(2, …)`, which returns when the bytes are gone.
+  `scripts/docs.mjs` was the first casualty: its `--json` object reached callers cut in half at
+  exactly 8192 bytes.
 - **Nothing printed from an `exit` handler goes through `process.stderr.write`** — use
   `writeSync(2, …)`. The handler returns, the process ends, and the stream never flushes.
   `tools/snowarch/tests/helpers/temp.mjs` reports a fixture it could not remove from exactly there,
   and the message vanished the first time for this reason.
 
 Both were found by a test that read the finished output rather than the code that produced it.
+
+**And do not touch the streams at all in such a file — not even to read one.** The first reference
+to `process.stdout` makes libuv open fd 1 as a stream and set it **non-blocking**, and
+`fs.writeSync(1, …)` on a non-blocking pipe whose buffer is full does not wait: it throws `EAGAIN`.
+So a script that reads `process.stdout.isTTY` to decide about colour and then writes a large report
+synchronously can crash on a CI runner in exactly the place this rule is protecting. None of the
+swept files does it today, and the sweep is what keeps it that way.
+
+**Why size is the property, and "CI-only" is not.** Measured: `banner-timing.mjs` writes 223 bytes
+in a run and `assert-input-hashes.mjs` 429 — three orders of magnitude under a pipe buffer, so
+their exits could never have truncated anything. That is a fact about those two files on those two
+days, not a rule, and the arithmetic is exactly what an author should not have to do.
+
+**The near-miss that settles it.** `scripts/ci/release-notes.mjs` writes a whole CHANGELOG section
+to stdout — several KB for 2.0.0 and growing — and has three `process.exit` calls. It is safe today
+for a reason nobody wrote down: the big write is its LAST statement and none of the exits follow
+it. Add one `process.exit(0)` at the end, for tidiness, and the script that produces the text of a
+GitHub Release starts publishing half a section.
+
+`tests/entrypoint-exit.test.mjs` therefore sweeps by a SCAN — every `.mjs` under `scripts/`,
+`scripts/ci/`, `tools/snowarch/hooks/` and `tools/snowarch/bin/` that writes to fd 1 or 2 — rather
+than by a list, so a new printing script is covered the day it appears. `tools/snowarch/hooks/` is
+in the sweep as a guard over something already correct: the banner hook has never called
+`process.exit`, which is why a 12 KB `additionalContext` reaches the model whole.
 
 ## What to paste in a bug report
 

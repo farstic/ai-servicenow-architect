@@ -3,12 +3,12 @@
 // ARC-01-S05), so the gate sums file CONTENT with node:fs and is comparable across the matrix.
 // The du figure is printed alongside for context only; it is never the thing compared.
 import { readdirSync, statSync } from 'node:fs';
-import { existsSync } from 'node:fs';
+import { existsSync, writeSync } from 'node:fs';
 
 const limitMb = Number(process.argv[2] ?? 80);
 const dir = process.argv[3] ?? 'node_modules';
 if (!existsSync(dir)) {
-  console.error(`footprint: ${dir} does not exist — run npm ci --omit=dev --ignore-scripts first`);
+  writeSync(2, `footprint: ${dir} does not exist — run npm ci --omit=dev --ignore-scripts first\n`);
   process.exit(1);
 }
 let bytes = 0, files = 0;
@@ -21,8 +21,10 @@ let bytes = 0, files = 0;
   }
 })(dir);
 const mb = bytes / 1048576;
-console.log(`node_modules: ${mb.toFixed(1)} MB (limit ${limitMb}) — summed file content, ${files} files`);
+writeSync(1, `node_modules: ${mb.toFixed(1)} MB (limit ${limitMb}) — summed file content, `
+  + `${files} files\n`);
 if (mb > limitMb) {
-  console.error(`footprint: ${mb.toFixed(1)} MB exceeds the ${limitMb} MB limit`);
-  process.exit(1);
+  writeSync(2, `footprint: ${mb.toFixed(1)} MB exceeds the ${limitMb} MB limit\n`);
+  // The LAST statement, so `exitCode` is exact: nothing follows it to skip.
+  process.exitCode = 1;
 }

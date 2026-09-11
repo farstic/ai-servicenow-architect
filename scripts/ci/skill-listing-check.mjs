@@ -29,13 +29,13 @@
 // Exit 2 = could not measure (CLI absent, or no uncontaminated scratch parent).
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, cpSync, readFileSync, rmSync, existsSync, realpathSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve, parse } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const out = (s) => process.stdout.write(`${s}\n`);
+const out = (s) => writeSync(1, `${s}\n`);
 const roster = () => JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')).roster.skills;
 
 function cliVersion() {

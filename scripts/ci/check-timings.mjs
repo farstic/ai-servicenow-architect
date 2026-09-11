@@ -16,7 +16,7 @@
  *        [--summary]
  * Exit 0 always unless it cannot read the report (2) — this MEASURES, it does not judge.
  */
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeSync } from 'node:fs';
 
 const argv = process.argv.slice(2);
 const value = (n, d) => (argv.indexOf(n) === -1 ? d : argv[argv.indexOf(n) + 1]);
@@ -25,7 +25,7 @@ const TOP = Number(value('--top', '5'));
 const LABEL = value('--label', `${process.platform} node ${process.versions.node.split('.')[0]}`);
 
 if (!IN) {
-  process.stderr.write('check-timings: --in <doctor.json> is required\n');
+  writeSync(2, 'check-timings: --in <doctor.json> is required\n');
   process.exit(2);
 }
 
@@ -33,7 +33,7 @@ let report;
 try {
   report = JSON.parse(readFileSync(IN, 'utf8'));
 } catch (e) {
-  process.stderr.write(`check-timings: cannot read ${IN}: ${e.message}\n`);
+  writeSync(2, `check-timings: cannot read ${IN}: ${e.message}\n`);
   process.exit(2);
 }
 
@@ -58,7 +58,7 @@ const rows = [
 const head = `### quick doctor, per check — ${LABEL} (${checks.length} checks, `
   + `${Math.round(total)} ms of check time)`;
 
-process.stdout.write(`${head}\n${rows.join('\n')}\n`);
+writeSync(1, `${head}\n${rows.join('\n')}\n`);
 if (argv.includes('--summary') && process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${head}\n\n${rows.join('\n')}\n\n`);
 }
