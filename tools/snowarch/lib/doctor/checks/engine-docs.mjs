@@ -38,7 +38,11 @@ export function engineDocsChecks() {
       section: 'docs',
       title: 'docs corpus present',
       severity: 'fail',
-      quick: true,
+      // ARC-09-C8 — `quick` is a COST contract: no process, no tree walk, no network, under
+      // 50 ms on the slowest Windows cell. This one `docsStatus` spawns git three times (rev-parse, branch, sparse) — 83 ms locally, ~231 on Windows,
+      // and the banner's re-run path pays it before a user's first word. It still runs on
+      // every `./snowarch doctor`, and the cache the banner reads first is written by one.
+      quick: false,
       network: false,
       spawns: false,
       fixable: true,
@@ -75,7 +79,11 @@ export function engineDocsChecks() {
       section: 'docs',
       title: 'docs pin',
       severity: 'fail',
-      quick: true,
+      // ARC-09-C8. Not its own cost: `docsFor` shares ONE `docsStatus` across E-12…E-15, and
+      // that call spawns git three times (rev-parse, branch, sparse-checkout). Whichever of
+      // them runs first pays it — moving only E-12 out shifted 143 ms onto E-13, measured —
+      // so the contract applies to the GROUP that shares the cost, not to one member.
+      quick: false,
       network: false,
       spawns: false,
       fixable: true,
@@ -110,7 +118,11 @@ export function engineDocsChecks() {
       section: 'docs',
       title: 'docs family',
       severity: 'fail',
-      quick: true,
+      // ARC-09-C8. Not its own cost: `docsFor` shares ONE `docsStatus` across E-12…E-15, and
+      // that call spawns git three times (rev-parse, branch, sparse-checkout). Whichever of
+      // them runs first pays it — moving only E-12 out shifted 143 ms onto E-13, measured —
+      // so the contract applies to the GROUP that shares the cost, not to one member.
+      quick: false,
       network: false,
       spawns: false,
       fixable: false,
@@ -133,7 +145,11 @@ export function engineDocsChecks() {
       section: 'docs',
       title: 'sparse set',
       severity: 'fail',
-      quick: true,
+      // ARC-09-C8. Not its own cost: `docsFor` shares ONE `docsStatus` across E-12…E-15, and
+      // that call spawns git three times (rev-parse, branch, sparse-checkout). Whichever of
+      // them runs first pays it — moving only E-12 out shifted 143 ms onto E-13, measured —
+      // so the contract applies to the GROUP that shares the cost, not to one member.
+      quick: false,
       network: false,
       spawns: false,
       fixable: true,

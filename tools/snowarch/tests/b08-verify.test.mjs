@@ -152,8 +152,10 @@ test('B08 and `doctor --section server` write the same shape', async () => {
   const fromB08 = JSON.parse(readFileSync(cachePath(root), 'utf8'));
 
   // A `--section` run deliberately does NOT write the cache (a partial report must not look like
-  // a full one), so the comparison is against a `--quick` run — which does. Asserting the section
-  // rule here too, because without it this test would be comparing a file with itself.
+  // a full one), so the comparison is against a FULL run — which does. It was a `--quick` run
+  // until ARC-09-C8 took the server section out of that subset: a quick report cannot be compared
+  // on the server ids it no longer runs. Asserting the section rule here too, because without it
+  // this test would be comparing a file with itself.
   const before = statSync(cachePath(root)).mtimeMs;
   const sectioned = spawnSync(process.execPath,
     [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--section', 'server', '--json'],
@@ -162,7 +164,7 @@ test('B08 and `doctor --section server` write the same shape', async () => {
   assert.equal(statSync(cachePath(root)).mtimeMs, before, '--section wrote the cache');
 
   const cli = spawnSync(process.execPath,
-    [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--quick', '--json'],
+    [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--json', '--no-network'],
     { cwd: root, encoding: 'utf8', env: { ...process.env } });
   assert.ok([0, 1].includes(cli.status), cli.stderr);
   const direct = JSON.parse(readFileSync(cachePath(root), 'utf8'));

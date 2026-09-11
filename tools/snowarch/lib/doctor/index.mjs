@@ -171,6 +171,10 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
   // angles (E-25's checkout and SV-02's store, both cloud-synced) is one thing to fix.
   const summary = summariseMerged(results, checks);
 
+  // `null` when no server check ran, which since ARC-09-C8 includes every `--quick` run: the
+  // section left that subset because entering it costs one in-process run of the server's own
+  // doctor. Schema v1 already says what null means here — "no check filled it" — and every
+  // consumer reads it that way, so this needs no third state and gets none.
   const server = ctx._server === undefined ? null : serverBlock(ctx._server);
   const instances = server?.instances ?? [];
   // The mode: derived here, from the toggle file and the store, and from nothing else. Not from

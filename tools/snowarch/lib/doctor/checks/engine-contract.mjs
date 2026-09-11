@@ -93,7 +93,11 @@ export function engineContractChecks() {
       section: 'contract',
       title: 'no retired tool names',
       severity: 'fail',
-      quick: true,
+      // ARC-09-C8 — `quick` is a COST contract: no process, no tree walk, no network, under
+      // 50 ms on the slowest Windows cell. This one walks the tree for retired names — 137 ms locally, ~384 on Windows,
+      // and the banner's re-run path pays it before a user's first word. It still runs on
+      // every `./snowarch doctor`, and the cache the banner reads first is written by one.
+      quick: false,
       network: false,
       spawns: false,
       fixable: false,
@@ -108,7 +112,11 @@ export function engineContractChecks() {
       section: 'contract',
       title: 'prefix consistency',
       severity: 'fail',
-      quick: true,
+      // ARC-09-C8. The THIRD shared cost, and the same shape as the other two:
+      // `buildLintContext` is built once and cached on the ctx, so whichever of E-19, E-20,
+      // E-21 and E-22 runs first pays for all of them. Moving E-19 out put its 66 ms onto
+      // E-20, measured — so the group moves, not a member of it.
+      quick: false,
       network: false,
       spawns: false,
       fixable: false,
@@ -169,7 +177,11 @@ export function engineContractChecks() {
       section: 'contract',
       title: 'contract pin',
       severity: 'fail',
-      quick: true,
+      // ARC-09-C8. The THIRD shared cost, and the same shape as the other two:
+      // `buildLintContext` is built once and cached on the ctx, so whichever of E-19, E-20,
+      // E-21 and E-22 runs first pays for all of them. Moving E-19 out put its 66 ms onto
+      // E-20, measured — so the group moves, not a member of it.
+      quick: false,
       network: false,
       spawns: false,
       fixable: false,

@@ -1003,6 +1003,30 @@ Three files, in this order, and the tests will tell you if you stop after the fi
 1. **The registry.** A check is `defineCheck({ id, section, title, severity, quick, network,
    spawns, fixable, run })` in `tools/snowarch/lib/doctor/checks/`. The id is permanent: eleven ARCs
    name a check id as their proof, and renaming one silently removes somebody else's evidence.
+
+   **`quick: true` is a COST CONTRACT, not a label** (ARC-09-C8). The SessionStart banner's re-run
+   path is `doctor({ quick: true, noNetwork: true })`, paid before a user's first word of a
+   session, so a check that joins that subset is spending somebody else's time. To qualify:
+
+   - no process spawn beyond at most one bounded `git` call, and no tree walk — a bounded number
+     of `stat`/`readFile` on named paths is fine;
+   - no network;
+   - under **50 ms** on the slowest Windows cell;
+   - **and it must not reach for a shared context.** This is the one that is easy to miss.
+     `docsFor()`, `serverReport()` / `adopt()`, and `lintContextFor()` / `runLint()` each build
+     something expensive once and cache it on the run's ctx, so whichever check touches one FIRST
+     pays for all of them. Measured twice while writing this: moving E-12 out of `--quick` put its
+     143 ms onto E-13, and moving E-19 out put 66 ms onto E-20. The total did not change either
+     time. A check that needs a shared context is not quick, and neither is any other member of
+     its group.
+
+   `tests/doctor/engine-registry.test.mjs` enforces the shared-context half statically, with a
+   negative control. The rest is measured by `scripts/ci/check-timings.mjs` on five cells and read
+   from the job summary; the C5 chore row records the numbers.
+
+   Applying it took the quick doctor from 776 ms of check time to **89 ms** locally, slowest check
+   20 ms. The full `./snowarch doctor` is unchanged — every one of those checks still runs there,
+   and the cache the banner reads FIRST is written by a full run.
 2. **The three snapshots.** `tests/fixtures/doctor/snapshot-{linux,darwin,win32}.json` record what
    a design-only install answers, per check. A new id is red in `tests/doctor/snapshot.test.mjs`
    with the id named — on every cell, not only after a bootstrap. Produce the rows from a real run

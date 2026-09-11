@@ -465,15 +465,23 @@ jobs:
       #
       # The four Windows cells, because that is where the cost is, and ONE ubuntu cell for contrast:
       # a table with nothing to compare against cannot say whether 900 ms is a platform or a bug.
-      - name: C5 — where the quick doctor spends its time
+      - name: C5 — where the doctor spends its time, quick and full
         if: >
           (matrix.variant == 'node-cli' && matrix.os == 'windows-latest')
           || matrix.variant == 'no-gitbash'
           || (matrix.variant == 'node-cli' && matrix.os == 'ubuntu-latest' && matrix.node == '22')
         shell: bash
-        run: >
-          node scripts/ci/check-timings.mjs --in "$RUNNER_TEMP/doctor.json" --top 5 --summary
-          --label "${{ matrix.label }}"
+        run: |
+          # TWO tables, because only one of them is the banner's. `doctor.json` above is a FULL
+          # `--json --no-cache` run — 39 checks, including E-28's `git ls-remote` — and the banner
+          # runs `doctor({ quick: true, noNetwork: true })`. Labelling the full run "quick" is how
+          # a measurement ends up answering a question nobody asked, so the quick subset gets its
+          # own run into its own file.
+          ./snowarch doctor --quick --json --no-cache > "$RUNNER_TEMP/doctor-quick.json" || true
+          node scripts/ci/check-timings.mjs --in "$RUNNER_TEMP/doctor-quick.json" --top 8 \
+            --summary --label "quick · ${{ matrix.label }}"
+          node scripts/ci/check-timings.mjs --in "$RUNNER_TEMP/doctor.json" --top 5 \
+            --summary --label "full · ${{ matrix.label }}"
 
       - name: C5 — and where the banner's own phases go
         if: >

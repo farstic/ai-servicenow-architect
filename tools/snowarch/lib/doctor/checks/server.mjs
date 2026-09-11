@@ -194,8 +194,17 @@ export function serverChecks() {
     // engine's registry, and only SV-04 is allowed to be less than a failure — a probe that could
     // not run says so, and a machine offline is not a broken install.
     severity: id === 'SV-04' ? 'warn' : 'fail',
-    // SV-04 is the network one; SV-05/SV-06 spawn a server. The rest read files.
-    quick: !['SV-04', 'SV-05', 'SV-06'].includes(id),
+    // ARC-09-C8 — NONE of them is quick, and the reason is a shared cost rather than a per-check
+    // one. `serverReport` runs the server package's own doctor once and caches it on the ctx, so
+    // the FIRST SV check in a run pays for all of them: 222 ms locally, ~500 on a Windows cell,
+    // against a contract of 50. Marking only SV-00 `quick: false` would have moved that number
+    // onto SV-01 — the same shift that moving E-12 out put onto E-13, measured both times.
+    //
+    // What this costs a user: `--quick` no longer reports the server section. What it buys is the
+    // SessionStart banner, whose re-run path is a quick doctor and is paid before anyone's first
+    // word. The full `./snowarch doctor` is unchanged and is what writes the cache the banner
+    // reads first.
+    quick: false,
     network: id === 'SV-04',
     spawns: ['SV-05', 'SV-06'].includes(id),
     // `fixable` comes from the ADOPTED result — the server marks SV-01/SV-02/SV-03 fixable when
