@@ -761,10 +761,23 @@ jobs:
       - name: snowarch.cmd, with Node and without
         shell: cmd
         run: |
-          .\snowarch.cmd version
+          call .\snowarch.cmd version > version.txt
           if not "%ERRORLEVEL%"=="0" exit /b 1
+          type version.txt
+          rem ARC-09-S04: six lines, and each one names what it reports. The Windows path reaches
+          rem the same code as ./snowarch, and `git.exe` is on PATH here without Git Bash.
+          rem
+          rem Counted by node, not by `find /c /v ""`: cmd's count comes back padded, `set /p`
+          rem keeps the padding, and the comparison then fails on a correct six-line output. Node
+          rem is present in this half of the step and has no opinion about whitespace.
+          node -e "const l=require('fs').readFileSync('version.txt','utf8').split(/\r?\n/).filter(Boolean);const want=['snowarch ','tag:','commit:','contract:','docs-pin:','floors:'];if(l.length!==6){console.error('expected 6 lines, got '+l.length);process.exit(1)}want.forEach((w,i)=>{if(!l[i].startsWith(w)){console.error('line '+(i+1)+' is not '+w+': '+l[i]);process.exit(1)}});console.log('six lines, in order')"
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          del version.txt
           set "PATH=C:\Windows\system32;C:\Windows"
-          .\snowarch.cmd version
+          rem CALL here too. Without it cmd transferred control and this assertion never ran — which
+          rem is how `snowarch.cmd` shipped for three ARCs returning 9009 instead of 3 when Node is
+          rem absent, with the check that was written to catch it sitting one line below, unreachable.
+          call .\snowarch.cmd version
           echo without-node ERRORLEVEL=%ERRORLEVEL%
           if not "%ERRORLEVEL%"=="3" exit /b 1
           rem Same reason as the step above: the expected code is 3, so the step has to say 0.

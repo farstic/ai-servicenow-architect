@@ -818,6 +818,19 @@ The launcher also has a line budget and a bash-3.2 constraint list, both enforce
 you are adding a step to it, ask first whether the step belongs on the Node path instead: this file
 exists for the machines that cannot run the other one, not as a second implementation.
 
+## What to paste in a bug report
+
+```sh
+./snowarch version        # six lines: version, tag, commit, contract, docs pin, floors
+./snowarch doctor         # the full health check, with a remedy on every failure
+```
+
+`version` is offline and takes no arguments you have to remember. It names the release tag you are
+on (or how far past it), the commit and whether the tree is dirty, and whether the contract and the
+corpus pin match what the checkout says they should — which is most of what a support conversation
+spends its first exchange establishing. The same values fill the doctor's `engine` header, so
+`/snowarch status` quotes them too: one source, three surfaces.
+
 ## The release workflow, and the rehearsal
 
 `release.yml` runs on `v*` tags only. It re-runs every gate on ubuntu, macOS and Windows, verifies

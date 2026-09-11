@@ -357,6 +357,36 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 ### ARC-09-S04 — `./snowarch version` extended (tag, commit, tag-message comparison; `--json` superset of ARC-06-S02's shape; feeds the doctor's `engine` header)
 
+> **Amendment 2026-09-11 (from the delivery).** Four departures.
+>
+> 1. **The command lives in `tools/snowarch/lib/cli.mjs`**, not `lib/commands/version.mjs` — there is
+>    no `commands/` directory; ARC-06-S02 put every sub-command in the one CLI file. The FACTS moved
+>    to a new `lib/version-info.mjs` (`versionInfo`, `renderVersion`) so the doctor can import them
+>    without importing the CLI, and the git spawns to a new `lib/git.mjs`.
+> 2. **The git seam is `tools/snowarch/lib/git.mjs`, not S01's helper.** S01's lives in
+>    `scripts/lib/release/` and closes over the release script's own root and flags; the engine
+>    needs `describe`, `tagMessage`, `gitlink` and `branchState` against an arbitrary root, with
+>    `childEnv` and Windows `git.exe` resolution. What IS shared is the rule S01 paid for: a failed
+>    command throws, and only a caller that passed `allowFail` gets `null` — a refusal to answer and
+>    an answer of "nothing" are different values.
+> 3. **`--json`'s five original keys are asserted as a SUPERSET now.** ARC-06-S02's test used
+>    `deepEqual` over every key, which a superset cannot satisfy by definition; it asserts the five
+>    are present and unchanged in name, type and value. That is the property the story actually
+>    fixes, and a consumer written against the old object still reads the same values out of the new
+>    one.
+> 4. **The bug-report sentence is in `docs/CONTRIBUTING.md`, with a one-line pointer on the install
+>    page.** The page was at 252 of 252 after S03 and the full sentence cost two lines; CONTRIBUTING
+>    carries "What to paste in a bug report" and the page says "Reporting it? Paste
+>    `./snowarch version` and `./snowarch doctor`." Final count: **252**.
+>
+> *Also:* the shallow-clone case prints its own wording — `tag: none (shallow clone — tags
+> unreachable; git fetch --tags --unshallow)` — because "no release tag" without saying why sends a
+> reader looking for a bug in the product. And a mismatch cannot be shown through the real binary in
+> a test: the launcher resolves the checkout from its own location, not from `cwd`, so a subprocess
+> cannot be pointed at a fixture. The wording is asserted on the fixture through `versionInfo`, and
+> the exit-0 property through the real binary on the real tree.
+
+
 **As** an individual practitioner **I want** `./snowarch version` to print the product version, the release tag I am on (or how far past it), the commit, the contract sha, the docs pin and the version floors **so that** a support conversation or a bug report starts from the same facts the tag records (P-12, P-19) and the doctor — and through it `/snowarch status` — quotes one source.
 
 **Context.** README deliverable 3 (`./snowarch version` — version, tag, contract sha, docs pin, floors); `01` §12 second bullet; acceptance criterion 1 ("`./snowarch version` prints the same values" as `git show v2.0.0`). **ARC-06-S02 already ships a first `version`** (one line: `snowarch 2.0.0 · contract <12 hex> · docs pin <7> (<family>) · floors: …`; `--json` `{ version, contractSha, docsPin, docsFamily, floors }`, values from root `package.json`, `dist/contract.json`, `git ls-tree`, `engine.config.json`). This story **extends** it with the git facts (tag, distance, commit, dirty) and the tag-message comparison, without a network call; it does not create the command. The old server's CLI fetched `registry.npmjs.org/servicenow-mcp/latest` on every invocation and nagged about a stranger's package (`00` §2, `src/cli/index.ts:57-85`) — ARC-04 S01 removed that; `version` must remain **offline** and never contact a registry.

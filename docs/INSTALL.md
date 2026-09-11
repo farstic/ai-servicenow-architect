@@ -221,7 +221,8 @@ Every preflight failure prints its own remedy. These are those sentences:
 <!-- /generated:remedies -->
 
 The full catalogue is `docs/TROUBLESHOOTING.md`. Whatever went wrong, re-run the bootstrap — it
-resumes at the step that failed rather than starting over.
+resumes at the step that failed rather than starting over. Reporting it? Paste `./snowarch version`
+and `./snowarch doctor`.
 
 ### What the corpus costs
 
