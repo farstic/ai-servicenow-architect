@@ -149,6 +149,19 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   and Windows without Git for Windows, where the honest answer is that the session cannot run
   `./snowarch` from here at all.
 
+- **A tag is the whole release procedure.** `release.yml` runs on `v*` and nothing else: it verifies
+  that the tag's message describes the tree it sits on — before any gate, because a tag that does
+  not is a release to stop rather than to test — then re-runs every gate on ubuntu, macOS and
+  Windows, installs design-only on each, and publishes a Release with seven assets: three doctor
+  reports, three sets of install metrics, and the merged table. Nothing is published until every
+  asset has been read for credentials, a FAIL or a wrong schema; a report attached to a public
+  Release is permanent in a way a pasted one is not, so the check never prints what it finds.
+
+  And because a workflow that only runs on tags is broken by the time it runs, `release-dryrun`
+  runs the same release path on every commit on the same three platforms — the real gates, the real
+  tag message, nothing written. The install page now says that every release re-measures what the
+  corpus costs on all three, and links the table.
+
 - **The changelog generates itself from here on, and one block stays hand-written.** Every release
   section is built from the commit subjects since the previous tag — `feat` to Added, `fix` to
   Fixed, `perf`/`refactor` to Changed, the rest to Internal, a `!` or a `BREAKING CHANGE:` footer

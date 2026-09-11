@@ -227,12 +227,14 @@ resumes at the step that failed rather than starting over.
 
 **The corpus costs about 302 MB on disk and about 30 seconds to fetch** — a sparse, blobless
 checkout of 19 areas out of 49,000 tracked paths. Two measurements, because they count different
-things: the **working tree** is 179 MB on Linux and macOS, 183 MB on Windows, 34,360 files
-(measured 2026-09-09 by `docs-real.yml` on all three runners: 25.3 s Ubuntu · 27.5 s macOS · 35.1 s Windows),
-and **tree plus `.git`** is 302 MB macOS / 305 MB Ubuntu / 315 MB Windows
-(measured 2026-09-06, ARC-00 S-07). The first is what you read, the second is what the disk loses.
-`--docs full` takes the whole corpus instead: **447 MB and 48,997 files**
-(measured 2026-09-09 on the reference macOS machine — ARC-00 S-07 did not measure full mode).
+things: the **working tree** is 179 MB on Linux and macOS, 183 MB on Windows, 34,360 files (25.3 s
+Ubuntu · 27.5 s macOS · 35.1 s Windows, measured 2026-09-09 by `docs-real.yml`), and **tree plus
+`.git`** is 302 MB macOS / 305 MB Ubuntu / 315 MB Windows (measured 2026-09-06, ARC-00 S-07). The
+first is what you read, the second is what the disk loses. `--docs full` takes the whole corpus
+instead: **447 MB and 48,997 files** (measured 2026-09-09 on the reference
+macOS machine — ARC-00 S-07 did not measure full mode). Every release re-measures all three
+platforms and attaches the same table as `install-metrics.md` —
+[releases](https://github.com/farstic/ai-servicenow-architect/releases), the first one pending.
 
 ### Uninstall
 

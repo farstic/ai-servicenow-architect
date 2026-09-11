@@ -818,6 +818,34 @@ The launcher also has a line budget and a bash-3.2 constraint list, both enforce
 you are adding a step to it, ask first whether the step belongs on the Node path instead: this file
 exists for the machines that cannot run the other one, not as a second implementation.
 
+## The release workflow, and the rehearsal
+
+`release.yml` runs on `v*` tags only. It re-runs every gate on ubuntu, macOS and Windows, verifies
+that the tag's message describes the tree it is on, and publishes a GitHub Release with seven
+assets: three `doctor-<os>.json`, three `install-metrics-<os>.json`, and the merged
+`install-metrics.md`. Nothing is published until `assert-assets.mjs` has read every file — a doctor
+report attached to a public Release is permanent in a way a pasted one is not.
+
+`release-dryrun` in `ci.yml` runs the same release path on every commit with `--dry-run --offline
+--no-install`, on the same three OSes. It exists because `release.yml` only ever runs on a tag, and
+a path that runs once per release is broken by the time it runs.
+
+> **Cost lever.** `release-dryrun` is three OSes and macOS minutes bill at 10×. If it bites, drop
+> this job to ubuntu + windows (S11 records the choice); `verify` in `release.yml` keeps all three,
+> because a release is the one moment all three must be proven.
+
+### Rehearsal — not yet run
+
+The workflow has not been exercised end to end: doing so creates a **public** GitHub Release on a
+public repository, so it waits for the owner's approval. The procedure is in the ARC-09-S03 pull
+request, ready to run. When it has been:
+
+- **Run URL:** _(to be recorded after the rehearsal)_
+- **Assets observed:** _(seven, named)_
+- **Metrics measured:** _(the three rows of `install-metrics.md`)_
+- **`gh` present on the runner images:** _(confirmed / not — if not, the publish step becomes
+  `actions/github-script` calling `repos.createRelease`)_
+
 ## Commits
 
 `docs/CHANGELOG.md` is generated from commit subjects, so a subject is a changelog entry. The

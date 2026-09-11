@@ -246,6 +246,34 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 ### ARC-09-S03 — `.github/workflows/release.yml`: on `v*` tags re-run every gate on three OSes, create the GitHub Release with doctor JSON and install-metrics assets
 
+> **Amendment 2026-09-11 (from the delivery).** Five departures.
+>
+> 1. **`release.yml` is NOT the only workflow that may write.** `docs-bump.yml` has
+>    `contents: write` too — it pushes the branch it opens its pull request from. I wrote the claim
+>    into the workflow's own header and into a test, and the test caught it within the run. The
+>    assertion is a CLOSED SET now (`['docs-bump.yml', 'release.yml']`), which is the true and more
+>    useful statement: a third workflow asking for write is a decision somebody has to make in that
+>    test.
+> 2. **Two scripts the story did not name.** `scripts/ci/release-notes.mjs`, because the story spells
+>    the release body as `changelog.mjs --section`, which would put a CLI on a library S01 and S02
+>    both import — a module that is sometimes a program is a module whose imports have side effects.
+>    And `scripts/ci/assert-assets.mjs`, because criterion 2 requires the redaction check to run on
+>    the assets and nothing else in the workflow reads them: a doctor report attached to a public
+>    Release is permanent in a way a pasted one is not. It never prints what it finds — printing the
+>    secret to prove it was found publishes it in the job log.
+> 3. **`--allow-branch` reads the branch from the checkout**, not from `github.head_ref`, which is
+>    empty on a push. One expression that is right on both events.
+> 4. **The install page's budget moved 250 → 252.** The page gained a fact — every release
+>    re-measures the corpus on three platforms and attaches the table — and the page was at its cap.
+>    My first attempt paid for the two lines by trimming two provenance strings; `install-page` and
+>    `attribution` caught both and were right to. Every figure on that page names where it was
+>    measured, and a cap is worth moving for a fact but not for an unattributed number.
+> 5. **The rehearsal is not run.** Pushing `v2.0.0-rc.0` creates a PUBLIC Release on a public
+>    repository. The procedure is in the pull request, ready to run, and `docs/CONTRIBUTING.md`
+>    carries the placeholders for the run URL, the seven asset names, the measured rows and whether
+>    `gh` was present on the runner images.
+
+
 **As** a maintainer **I want** pushing a `v*` tag to re-run every gate on `ubuntu-latest`, `macos-latest` and `windows-latest`, verify that the tag message matches the tree, and publish a GitHub Release whose assets are the three doctor JSON reports and a size/time table of the install **so that** every release is proven on the three platforms after the fact (P-29 "release never fired"; `03` R-10) and the install page can quote measured numbers.
 
 **Context.** README deliverable 2 (`release.yml` on `v*` tags, gates on three OSes, doctor JSON and install-page size/time table as release assets); `01` §12/§13; the old server's `release.yml` built the Electron desktop app on tags (removed by D-03) and is replaced, not adapted. S01 defines the tag message; S02 provides `sectionFor(version)` for the release body.
