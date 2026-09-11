@@ -205,6 +205,15 @@ option, not a default.
 
 ## Tests
 
+
+**A test never re-implements a renderer's format — it imports it.** Three clocks in one arc say this
+is a real habit: ARC-09-C3 proved "no network code" with a wall-clock threshold, C4 judged a raw
+median against a budget, and C18 normalised step durations with a regex that knew one of the
+formatter's two shapes. The third stopped a release: the gate ran the suite on a loaded machine, a
+step that usually takes 200 ms took a second, `(1 s)` did not match `/\(\d+\.\d+ s\)/`, and a
+comparison failed on a clock rather than on the thing it was comparing. If a test needs to remove a
+rendered value before comparing, the pattern lives beside the code that renders it and the test
+imports it — `withoutDuration` in `tools/snowarch/lib/steps/format.mjs` is the shape to copy.
 `npm test` at the root runs `tests/run.mjs` (engine) and then each workspace's own suite.
 
 `tests/run.mjs` computes its file list **in Node rather than with a shell glob**: on Windows npm runs
