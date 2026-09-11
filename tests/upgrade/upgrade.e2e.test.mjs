@@ -146,13 +146,14 @@ test('AC 5 — --check says what is available, writes the cache, and the banner 
       input: '{"hook_event_name":"SessionStart","source":"startup"}',
       env: { ...process.env, CLAUDE_PROJECT_DIR: w.user } });
 
-  const started = Date.now();
   const lines = hook().trim().split('\n');
-  const ms = Date.now() - started;
   assert.match(lines[0], /^Mode: /);
   assert.ok(lines.includes('A newer release is available (v9.2.0) — run ./snowarch upgrade.'),
     lines.join('\n'));
-  if (process.env.CI) assert.ok(ms < 1000, `the banner took ${ms} ms`);
+  // NOT timed here. One cold invocation on a runner that has just compiled a server measures the
+  // runner, not the banner — it read 1320 ms on macOS while the median of five cold runs is 29 ms
+  // on the same code. `scripts/ci/banner-timing.mjs` owns that budget and takes a median; what
+  // this test owns is that the nudge appears at all, and disappears when the check goes stale.
 
   // …and eight days later it says nothing at all, rather than repeating a check nobody made.
   writeFileSync(join(w.user, '.local/upgrade-check.json'), `${JSON.stringify({

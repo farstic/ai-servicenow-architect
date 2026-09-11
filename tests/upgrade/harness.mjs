@@ -223,12 +223,19 @@ export async function buildWorld(t, { claudeFloor = null } = {}) {
 
 /** The user's clone, bootstrapped design-only, with a v1 store beside it. */
 export function bootstrapUser(user, { store = true } = {}) {
-  const r = execFileSync(process.execPath,
+  // `spawnSync` and an explicit throw, not `execFileSync`: its error message names the COMMAND and
+  // swallows the child's output, so a failure on a runner arrives as an unreadable command line
+  // and no reason at all. The whole transcript goes into the error instead.
+  const r = spawnSync(process.execPath,
     [join(user, 'tools/snowarch/bin/snowarch.mjs'), 'bootstrap',
       '--mode', 'design', '--yes', '--skip-claude-check', '--docs', 'sparse'],
-    { cwd: user, encoding: 'utf8', stdio: 'pipe', env: { ...process.env, CLAUDE_PROJECT_DIR: user } });
+    { cwd: user, encoding: 'utf8', env: { ...process.env, CLAUDE_PROJECT_DIR: user } });
+  if (r.status !== 0) {
+    throw new Error(`the fixture bootstrap exited ${r.status ?? r.signal ?? 'abnormally'}:\n`
+      + `${r.stdout ?? ''}${r.stderr ?? ''}`);
+  }
   if (store) writeStore(user);
-  return r;
+  return r.stdout ?? '';
 }
 
 /** Two instances, fixture credentials, schema v1 — the file the upgrade must not touch. */
