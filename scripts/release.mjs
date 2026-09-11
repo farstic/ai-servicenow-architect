@@ -36,7 +36,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { askOnce, isYes } from '../tools/snowarch/lib/ask.mjs';
-import { EXIT_GATE, gatePlan, runGates } from './lib/release/gates.mjs';
+import { EXIT_GATE, gatePlan, modulesAreLinked, runGates } from './lib/release/gates.mjs';
 import { EXIT_PREFLIGHT, preflight } from './lib/release/preflight.mjs';
 import { buildTagMessage } from './lib/release/tag.mjs';
 import { applyWrites, rollback, STAGED } from './lib/release/writers.mjs';
@@ -212,6 +212,7 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
     diffDist: () => gitRun(['diff', '--exit-code', '--quiet', '--', 'packages/snowarch/dist'],
       { allowFail: true }) === null,
     onStart: (name) => write(`  gate ${name}…`),
+    linked: () => modulesAreLinked(root),
   });
   if (!gated.ok) { fail(gated.message); return EXIT_GATE; }
 

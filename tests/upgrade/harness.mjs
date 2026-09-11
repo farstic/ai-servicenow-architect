@@ -122,7 +122,32 @@ async function tagRelease(root, version, { claudeFloor = null } = {}) {
  * `t` is not optional in spirit: this makes three git trees and a node_modules link, and an
  * untracked one per run is how a TMPDIR reaches five figures (ARC-08-S06's lesson, and C1's).
  */
-export async function buildWorld(t, { claudeFloor = null } = {}) {
+/**
+ * `node_modules` into a fixture tree: linked by default, copied on request.
+ *
+ * ARC-09-C11. A LINK is the fast path and what every test here wants — 400 MB per fixture would
+ * make the harness unusable, and a test that only reads its dependencies cannot tell the
+ * difference. But `npm ci` and `npm install` DELETE and recreate the directory, and they do it
+ * through the link: the ARC-09-S11 release walkthrough ran the install gate inside a fixture and
+ * emptied the developer's real checkout, 215 packages to 0. Nothing tracked was lost and `npm ci`
+ * put it back, but nothing warned either.
+ *
+ * So: if the fixture will run `release.mjs`, `npm ci`/`npm install` or `build-dist.mjs`, ask for
+ * `'copy'`. `cpSync` gets a copy-on-write clone where the filesystem offers one (APFS, btrfs, XFS
+ * with reflink) and a real copy everywhere else — that cost is the reason the default stays
+ * `'link'`, and it is also the reason `release.mjs` now REFUSES to install into a linked tree
+ * rather than trusting everyone to have read this.
+ */
+function placeModules(target, modules) {
+  const from = join(REAL_ROOT, 'node_modules');
+  if (modules === 'copy') {
+    cpSync(from, join(target, 'node_modules'), { recursive: true, dereference: false });
+    return;
+  }
+  symlinkSync(from, join(target, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
+}
+
+export async function buildWorld(t, { claudeFloor = null, modules = 'link' } = {}) {
   const scratch = tempDir('snowarch-upgrade-', t);
   const work = join(scratch, 'work');
   mkdirSync(work, { recursive: true });
@@ -155,12 +180,11 @@ export async function buildWorld(t, { claudeFloor = null } = {}) {
     `[submodule "vendor/ServiceNowDocs"]\n\tpath = vendor/ServiceNowDocs\n`
     + `\turl = ${pathToFileURL(upstream.bare).href}\n\tbranch = australia\n\tshallow = true\n`);
 
-  // `node_modules`, LINKED. Fixture release B rebuilds `dist/`, which needs TypeScript, and a
-  // fixture that copied 400 MB of dependencies per run would make this harness unusable. It is
-  // gitignored, so it never reaches a commit or a tag — the tree the releases carry is the same
-  // either way.
-  symlinkSync(join(REAL_ROOT, 'node_modules'), join(work, 'node_modules'),
-    process.platform === 'win32' ? 'junction' : 'dir');
+  // `node_modules` — see `placeModules`. Linked by default because fixture release B rebuilds
+  // `dist/`, which needs TypeScript, and copying 400 MB per run would make this harness unusable.
+  // It is gitignored, so it never reaches a commit or a tag: the tree the releases carry is the
+  // same either way. A caller that will INSTALL must pass `{ modules: 'copy' }`.
+  placeModules(work, modules);
 
   rewriteVersion(work, '9.0.0');
   git(work, ['init', '-q', '-b', 'main']);
@@ -211,11 +235,9 @@ export async function buildWorld(t, { claudeFloor = null } = {}) {
 
   const user = join(scratch, 'user');
   execFileSync('git', ['clone', '--quiet', pathToFileURL(origin).href, user], { stdio: 'pipe' });
-  // `node_modules`, linked here too: B06's migration runs the BUILT CLI, which imports commander,
-  // and a design-only bootstrap never installs dependencies. The story's own note says the harness
-  // installs them; a link is the same thing without a minute of `npm ci` and without the network.
-  symlinkSync(join(REAL_ROOT, 'node_modules'), join(user, 'node_modules'),
-    process.platform === 'win32' ? 'junction' : 'dir');
+  // The user's clone gets the same treatment: B06's migration runs the BUILT CLI, which imports
+  // commander, and a design-only bootstrap never installs dependencies.
+  placeModules(user, modules);
   git(user, ['checkout', '--quiet', 'v9.0.0']);
   git(user, ['config', 'user.email', 'f@example.com']);
   git(user, ['config', 'user.name', 'f']);
