@@ -55,6 +55,14 @@ export function git(cwd, args, { allowFail = false } = {}) {
  * movement is B02's business, which AC 1 exercises through the areas file instead.
  */
 const COPIED = Object.freeze([
+  // `.gitattributes` FIRST in spirit: it pins `* text=auto eol=lf`, and a fixture standing in for
+  // this repository must too. Without it the fixture inherits the machine's `core.autocrlf` — true
+  // on the Windows runner — so `dist/contract.json` is committed LF and checked out CRLF, its
+  // sha256 changes, and B05 fails the pin check with `ad124526e86b ≠ 4117dc73744e` on a fixture
+  // whose contract nobody touched. That is ARC-09-S05's own lesson (files are hashed as bytes, and
+  // `.gitattributes` is what makes that comparable between machines) landing on the fixture that
+  // exists to test it.
+  '.gitattributes',
   'engine.config.json', 'package.json', 'package-lock.json', '.gitignore', 'CLAUDE.md',
   '.mcp.json', '.claude/settings.json', 'vendor/docs-areas.txt',
   'snowarch', 'snowarch.cmd', 'bootstrap.sh', 'bootstrap.cmd',

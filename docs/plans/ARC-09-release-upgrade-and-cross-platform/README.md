@@ -45,8 +45,8 @@ ARC-01, ARC-02, ARC-03, ARC-04, ARC-05, ARC-06, ARC-07, ARC-08 (per-story detail
 
 - [ ] `node scripts/release.mjs 2.0.0` on a green tree produces one commit and one tag; `git show v2.0.0` displays the contract sha and docs pin; `./snowarch version` prints the same values; `tests/version-consistency.test.mjs` passes. (S01, S04)
 - [ ] The same command on a tree with a stale `dist/` or a failing lint exits non-zero without committing or tagging. (S01)
-- [ ] A user on `v2.0.0` runs `./snowarch upgrade --to v2.1.0` (fixture release changing only `vendor/docs-areas.txt`; the S07 harness uses `v9.0.0 → v9.1.0`): only B02 re-runs, credentials untouched (`sha256 .local/instances.json` unchanged), doctor 0 FAIL. (S05, S07)
-- [ ] A fixture release changing the store schema migrates the store, leaves a 0600 backup, and the server loads it. (S06, S07)
+- [x] A user on `v2.0.0` runs `./snowarch upgrade --to v2.1.0` (fixture release changing only `vendor/docs-areas.txt`; the S07 harness uses `v9.0.0 → v9.1.0`): only B02 re-runs, credentials untouched (`sha256 .local/instances.json` unchanged), doctor 0 FAIL. (S05, S07) **(S07, 2026-09-11, harness AC 1)**
+- [x] A fixture release changing the store schema migrates the store, leaves a 0600 backup, and the server loads it. (S06, S07) **(S07, 2026-09-11, harness AC 2)**
 - [ ] CI is green on all nine matrix cells; the Windows cell runs with Git Bash removed from PATH and passes the design-only bootstrap, the doctor and the MCP handshake. (S08)
 - [ ] `git ls-files --eol` shows the expected line endings; a Windows checkout of `bootstrap.ps1` runs without a line-ending error. (S09)
 - [ ] `docs/CHANGELOG.md` for 2.0.0 contains the "supersedes engine v2.8.0 and snow-mcp 1.0.0" note and the migration notes from ARC-04 (R-03). (S02)
