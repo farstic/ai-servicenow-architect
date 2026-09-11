@@ -14,10 +14,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+import { tempDir } from './helpers/temp.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspace = pathToFileURL(resolve(here, 'helpers/workspace.mjs')).href;
@@ -92,6 +94,65 @@ test('a fixture made by makeCheckout is gone once the run that made it ends', (t
 
   const left = leftBehind(sandbox);
   assert.deepEqual(left.names, [], `the child left ${left.names.length} fixture(s) behind: ${left.detail}`);
+});
+
+/**
+ * ARC-09-C1. One directory that will not go must not take the others with it.
+ *
+ * The sweep was `for (const dir of pending) rmSync(dir, …)` and then `pending.clear()`. A single
+ * throw aborted the loop AND skipped the line that records what was handled — so on a loaded runner
+ * one transient EBUSY left every remaining fixture on disk. That is what
+ * `fixture-cleanup` reported three times on ubuntu/node 24: a POPULATED directory after a normal
+ * exit. It did not reproduce on macOS/node 24 in 48 attempts, so this case proves the SHAPE rather
+ * than the platform — an undeletable entry stands in for the transient error.
+ */
+test('one fixture that will not go does not take the others with it', (t) => {
+  const sandbox = tempDir('fixture-cleanup-partial-', t);
+  const probe = join(sandbox, 'probe.test.mjs');
+  // Three fixtures; the middle one is made unremovable by holding an open handle to a file inside
+  // it on Windows, and on POSIX by clearing the write bit on its PARENT (unlink needs it).
+  writeFileSync(probe, [
+    "import { test } from 'node:test';",
+    "import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';",
+    "import { join } from 'node:path';",
+    `import { makeCheckout } from ${JSON.stringify(workspace)};`,
+    "test('three fixtures, one stuck', () => {",
+    '  makeCheckout();',
+    '  const stuck = makeCheckout();',
+    '  makeCheckout();',
+    "  const locked = join(stuck, 'locked');",
+    '  mkdirSync(locked, { recursive: true });',
+    "  writeFileSync(join(locked, 'f.txt'), 'x');",
+    "  if (process.platform !== 'win32') chmodSync(locked, 0o500);",
+    '});',
+    '',
+  ].join('\n'));
+
+  const child = runProbe(probe, sandbox);
+  assert.equal(child.status, 0, `${child.stdout}${child.stderr}`);
+
+  const left = readdirSync(sandbox).filter((n) => n.startsWith('snowarch-'));
+  // At most the stuck one. Before the fix this was two or three, because the loop stopped.
+  assert.ok(left.length <= 1,
+    `${left.length} fixtures survived — one stuck directory aborted the sweep: ${left.join(', ')}`);
+  // ...and if one did survive, the sweep said so, with the errno and the Node major.
+  if (left.length === 1) {
+    // BOTH streams: the sweep writes to fd 2 from an exit handler, and `node --test` owns the
+    // child's output — which stream a late write surfaces on is the runner's business, not this
+    // assertion's. What matters is that the diagnosis arrived at all.
+    assert.match(`${child.stdout}${child.stderr}`,
+      /temp\.mjs: 1 fixture\(s\) survived on node \d+\.\d+\.\d+:/,
+      'a fixture survived and nothing said why');
+    assert.match(`${child.stdout}${child.stderr}`, /ENOTEMPTY|EACCES|EBUSY|EPERM/,
+      'the message does not name the errno, which is the thing worth knowing');
+  }
+
+  // Leave nothing behind ourselves: the stuck directory needs its permission back first.
+  for (const name of left) {
+    const dir = join(sandbox, name);
+    try { chmodSync(join(dir, 'locked'), 0o700); } catch { /* windows, or already gone */ }
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+  }
 });
 
 test('and a fixture whose test FAILS is removed too — the case a trailing rmSync misses', (t) => {
