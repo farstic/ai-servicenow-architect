@@ -24,6 +24,7 @@ import { buildTagMessage, parseTagMessage, tagIsComplete } from '../scripts/lib/
 import { compareVersions, latestTag } from '../scripts/lib/release/preflight.mjs';
 import { badgeLine, writeHead, writeMarker } from '../scripts/lib/release/writers.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { STAGED } from '../scripts/lib/release/writers.mjs';
 import { writeGitattributes } from './helpers/gitattributes.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -86,7 +87,7 @@ function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
 }
 
 /** The default stub: every gate passes, npm/gen/test are no-ops that write what they must. */
-function runner(root, { fail = null, code = 1, skip = 0 } = {}) {
+function runner(root, { fail = null, code = 1, skip = 0, gen = false } = {}) {
   const calls = [];
   // `skip` lets the first N matching calls through (ARC-09-C12b). The contract gate runs TWICE in
   // a release — once before the writes and once after — so a matcher that failed the first
@@ -117,6 +118,11 @@ function runner(root, { fail = null, code = 1, skip = 0 } = {}) {
       // `gen-readme` renders the head into README.md — the fixture's version of the generator.
       if (name.includes('gen-readme') || name === 'npm run gen') {
         write(root, 'README.md', read(root, 'docs/README-head.md'));
+        // ARC-09-C12c: a generator that rewrites a file NO hand list knows about — the shape of
+        // the three the rehearsal left behind, whose headers carry the contract sha.
+        if (gen && name === 'npm run gen') {
+          write(root, 'docs/TROUBLESHOOTING.md', '# Troubleshooting\n\n<!-- GENERATED sha256 new -->\n');
+        }
         return 0;
       }
       // ARC-09-C12b. `build-dist` BAKES THE VERSION into the contract, so the stub does too: a
@@ -143,11 +149,12 @@ function runner(root, { fail = null, code = 1, skip = 0 } = {}) {
 
 const capture = () => { const lines = []; return { stream: { write: (s) => lines.push(s) }, text: () => lines.join('') }; };
 
-async function run(root, argv, { ask = null, fail = null, skip = 0 } = {}) {
+async function run(root, argv, { ask = null, fail = null, skip = 0, gen = false, unstage = [] } = {}) {
   const out = capture();
   const err = capture();
-  const r = runner(root, { fail, skip });
+  const r = runner(root, { fail, skip, gen });
   const code = await release({ argv, root, out: out.stream, err: err.stream, ask, run: r.run,
+    ...(unstage.length ? { staged: STAGED.filter((f) => !unstage.includes(f)) } : {}),
     now: () => new Date('2026-09-11T00:00:00Z') });
   return { code, out: out.text(), err: err.text(), calls: r.calls };
 }
@@ -516,4 +523,38 @@ test('C12b: the contract gate runs after the writes, and its failure rolls back 
   const gateAt = calls.lastIndexOf('node scripts/contract-gate.mjs --skip-build');
   assert.ok(versionAt > -1 && gateAt > versionAt, `order: ${calls.join(' | ')}`);
   assert.equal(git(root, ['status', '--porcelain']).trim(), '');
+});
+
+// ── ARC-09-C12c — the commit contains everything the writes produced ───────────────────────────
+
+test('C12c: a generated file the hand list never knew is staged by the release', async (t) => {
+  const root = fixture(t);
+  // A file only the GENERATORS know about — the shape of the three the rehearsal left behind.
+  // `STAGED` is derived from `scripts/lib/generators.mjs`, so this arrives without anyone editing
+  // a list, and the stub's `npm run gen` writes it the way `gen-governance` writes its targets.
+  write(root, 'docs/TROUBLESHOOTING.md', '# Troubleshooting\n\n<!-- GENERATED sha256 old -->\n');
+  git(root, ['add', 'docs/TROUBLESHOOTING.md']);
+  git(root, ['commit', '-qm', 'fixture: a generated file']);
+
+  const { code, out } = await run(root, ['2.0.0', '--yes', '--offline'], { gen: true });
+  assert.equal(code, 0, out);
+  const files = git(root, ['show', '--name-only', '--format=', 'HEAD']).split('\n').filter(Boolean);
+  assert.ok(files.includes('docs/TROUBLESHOOTING.md'),
+    `the generated file is not in the release commit: ${files.join(', ')}`);
+  assert.equal(git(root, ['status', '--porcelain']).trim(), '');
+});
+
+test('C12c: a release that leaves the tree dirty FAILS, naming the files', async (t) => {
+  const root = fixture(t);
+  write(root, 'docs/TROUBLESHOOTING.md', '# Troubleshooting\n\n<!-- GENERATED sha256 old -->\n');
+  git(root, ['add', 'docs/TROUBLESHOOTING.md']);
+  git(root, ['commit', '-qm', 'fixture: a generated file']);
+
+  // The negative control: the same run with that file taken OUT of what gets staged. Without the
+  // check, this is a green release that leaves a modified file behind — which is what happened.
+  const { code, err } = await run(root, ['2.0.0', '--yes', '--offline'],
+    { gen: true, unstage: ['docs/TROUBLESHOOTING.md'] });
+  assert.equal(code, 1);
+  assert.match(err, /the commit left the tree dirty/);
+  assert.match(err, /docs\/TROUBLESHOOTING\.md/);
 });

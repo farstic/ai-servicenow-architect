@@ -77,6 +77,9 @@ export async function release({
   ask = null,
   git = null,
   run = null,
+  // TESTS ONLY (ARC-09-C12c): the staged set, so a test can prove that a file written but NOT
+  // staged is caught. Production always uses the derived `STAGED`; there is no flag for it.
+  staged = STAGED,
   now = () => new Date(),
   platform = process.platform,
 } = {}) {
@@ -118,7 +121,7 @@ export async function release({
 
   try {
     return await runRelease({ version, flags, root, out, err, write, fail, git: gitRun,
-      run: runChild, config, ask, now, platform, injectedRun: run !== null });
+      run: runChild, config, ask, now, platform, staged, injectedRun: run !== null });
   } catch (e) {
     // A git command that could not run is a refusal, not a crash: the maintainer needs the sentence,
     // not the stack. Anything else is a bug and keeps its stack.
@@ -128,7 +131,7 @@ export async function release({
 }
 
 async function runRelease({ version, flags, root, out, err, write, fail, git: gitRun, run: runChild,
-  config, ask, now, platform, injectedRun }) {
+  config, ask, now, platform, injectedRun, staged = STAGED }) {
   // ── preflight ──────────────────────────────────────────────────────────────────────────────
   // The npm probe is skipped when the caller injected a runner: a test has no npm to find, and a
   // preflight that failed on the absence of a tool it was never going to spawn would be asserting
@@ -191,7 +194,7 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
     `release ${current} → ${version}`,
     `  branch   ${pre.branch}${pre.latest ? ` · ${commits} commits since ${pre.latest}` : ` · ${commits} commits, no previous tag`}`,
     `  gates    ${plan.map((g) => g.name).join(' → ')}`,
-    `  writes   ${STAGED.join(', ')}`,
+    `  writes   ${staged.join(', ')}`,
     `  tag      v${version} (annotated)`,
     `  push     ${flags.push ? 'yes — git push origin ' + pre.branch + ' --follow-tags' : 'no'}`,
   ].join('\n'));
@@ -252,10 +255,24 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
   const releaseTagMessage = tagMessageFor(written.contractSha ?? contractSha);
 
   // ── commit and tag ─────────────────────────────────────────────────────────────────────────
-  execFileSync('git', ['add', ...STAGED.filter((f) => existsSync(join(root, f)))],
+  execFileSync('git', ['add', ...staged.filter((f) => existsSync(join(root, f)))],
     { cwd: root, stdio: 'pipe' });
   execFileSync('git', ['commit', '-m', `chore(release): v${version}`], { cwd: root, stdio: 'pipe' });
   const short = gitRun(['rev-parse', '--short', 'HEAD']).trim();
+
+  // ARC-09-C12c — A RELEASE THAT LEAVES A DIRTY TREE HAS FAILED, and says so here rather than two
+  // steps later when `--tag-only` refuses with "working tree not clean" for a mess the release
+  // itself made. That is exactly how the v2.0.0-rc.0 rehearsal ended: `gen-all` had rewritten three
+  // generated files whose headers carry the contract sha, `STAGED` was a hand list that did not
+  // know them, and the commit went out without them. The list is derived now; this is the check
+  // that proves it on every release rather than on the next rehearsal.
+  const leftover = gitRun(['status', '--porcelain']).trim();
+  if (leftover) {
+    fail(`release: the commit left the tree dirty — these were written but not staged:\n${leftover}`
+      + '\n(STAGED in scripts/lib/release/writers.mjs is derived from the generators; a file here '
+      + 'means something wrote outside both that list and its own generator)');
+    return EXIT_GATE;
+  }
 
   // On a protected `main` the tag is cut in a second pass (`--tag-only`) after the pull request has
   // merged; on a release branch the commit is the deliverable and the tag would name the wrong sha.

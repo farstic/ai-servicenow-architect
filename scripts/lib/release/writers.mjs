@@ -15,6 +15,8 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+
+import { GENERATORS } from '../generators.mjs';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -81,7 +83,21 @@ import { writeChangelog as generateChangelog } from './changelog.mjs';
 export { generateChangelog };
 
 /** The files this script is allowed to stage. Explicit, never `git add -A`. */
-export const STAGED = Object.freeze([
+/**
+ * Everything a release commit must contain — DERIVED, never a hand list.
+ *
+ * ARC-09-C12c. It was a hand list, and the v2.0.0-rc.0 rehearsal showed what that costs: the
+ * writes run `gen-all`, `gen-governance` rewrote `.claude/rules/00-mode-and-mcp-gate.md`,
+ * `docs/TROUBLESHOOTING.md` and `governance/mcp-protocols.md` (their generated header carries the
+ * contract sha, which had just moved), the list did not know those files, and the release commit
+ * left three files modified in the tree. `--tag-only` then refused with "working tree not clean"
+ * — correctly, and for a mess the release itself had made.
+ *
+ * So the generators' own `targets` are the source: a generator added tomorrow is staged the day it
+ * exists, and nobody has to remember this file. The writers' own outputs are listed here because
+ * they are this module's business and nothing else declares them.
+ */
+const WRITTEN_HERE = Object.freeze([
   // ARC-09-C12b: the rebuilt artefact and its pin are part of the release commit. Without them
   // `git add` staged a version bump whose contract still said `-dev`, and the release commit
   // failed its own `dist ok` gate on its own pull request.
@@ -96,6 +112,11 @@ export const STAGED = Object.freeze([
   'docs/README-head.md',
   'docs/CHANGELOG.md',
 ]);
+
+export const STAGED = Object.freeze([...new Set([
+  ...WRITTEN_HERE,
+  ...GENERATORS.flatMap((g) => g.targets ?? []),
+])]);
 
 /**
  * Apply every write, or none of them.

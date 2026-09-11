@@ -14,7 +14,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildFile, classify, extractNotes, readCommits, renderGroups, sectionFor, trailerLine,
+import { buildFile, classify, extractNotes, extractUnreleased, readCommits, renderGroups, sectionFor, trailerLine,
   writeChangelog } from '../scripts/lib/release/changelog.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
@@ -299,4 +299,66 @@ test('readCommits carries the parents, which is how a merge is recognised', (t) 
   const merges = commits.filter((c) => c.parents.length > 1);
   assert.equal(merges.length, 1, 'the fixture merge is not visible to the reader');
   assert.ok(commits.every((c) => /^[0-9a-f]{40}$/.test(c.sha)), 'a sha came back malformed');
+});
+
+// ── ARC-09-C12c — the hand-written block survives a release, whole ─────────────────────────────
+//
+// S02's AC 2 says the block under `## Unreleased` appears byte-identical in the released section.
+// It did not. `extractNotes` stopped at the first `###` heading after `### Notes`, so every
+// hand-written `### Added` / `### Fixed` group a pull request had added was dropped when the
+// release emptied the section. The v2.0.0-rc.0 rehearsal measured it on the real file: 1,226 lines
+// under `## Unreleased` before, 423 in the released section after, 3 left under Unreleased.
+//
+// These tests use the REAL block, because the shape is the defect: a three-line stand-in has no
+// second heading and therefore cannot fail the way the repository did.
+
+test('C12c: the real Unreleased block survives a release byte-identical', () => {
+  const real = readFileSync(join(REAL_ROOT, "docs/CHANGELOG.md"), "utf8");
+  const carried = extractUnreleased(real);
+  assert.ok(carried.split('\n').length > 50,
+    `the real Unreleased block is ${carried.split('\n').length} lines — this test needs the real shape`);
+  // The thing that was lost: hand-written groups BELOW the Notes sub-block.
+  assert.match(carried, /^### (Added|Fixed|Changed)/m,
+    'the real block no longer carries a hand-written group — the regression this guards is unreachable');
+
+  const built = buildFile({ text: real, version: '9.9.9', date: '2026-01-01', carried,
+    body: '### Internal\n\n- something', trailer: '_trailer_' });
+  assert.ok(built.ok, built.message);
+  // BYTE-IDENTICAL, as one contiguous region, in the released section.
+  assert.ok(built.section.includes(carried), 'the carried block is not verbatim in the new section');
+  // And Unreleased is emptied rather than duplicated.
+  assert.equal(extractUnreleased(built.text).replace(/\s+/g, ' ').trim(), '### Notes');
+});
+
+test('C12c: nothing inside the block is treated as a boundary', () => {
+  // The negative control. `####`, a horizontal rule, a fenced block and a SECOND `### Notes` are
+  // all things a person writes inside a changelog entry, and none of them means "the hand-written
+  // part ends here" — which is exactly the assumption that lost eight hundred lines.
+  const block = [
+    '### Notes', '', 'first line', '',
+    '#### A fourth-level heading', '', 'under it', '',
+    '---', '',
+    '```md', '## not a heading, it is in a fence', '```', '',
+    '### Added', '', '- a hand-written entry', '',
+    '### Notes', '', 'a second Notes heading, deliberately',
+  ].join('\n');
+  const text = `# Changelog\n\n## Unreleased\n\n${block}\n\n## Before 2.0.0\n\n- old\n`;
+  assert.equal(extractUnreleased(text), block);
+
+  const built = buildFile({ text, version: '9.9.9', date: '2026-01-01',
+    carried: extractUnreleased(text), body: '', trailer: '_t_' });
+  assert.ok(built.section.includes(block), 'a boundary was invented inside the block');
+  // The frozen tail is untouched, as ever.
+  assert.match(built.text, /## Before 2\.0\.0\n\n- old\n$/);
+});
+
+test('C12c: the old narrow reader is what the defect was, kept only as the narrow question', () => {
+  // Proof that the two readers really differ on the real file — if they ever agree, the wider one
+  // is no longer doing anything and this whole fix has been undone by a refactor.
+  const real = readFileSync(join(REAL_ROOT, "docs/CHANGELOG.md"), "utf8");
+  const narrow = extractNotes(real);
+  const whole = extractUnreleased(real);
+  assert.ok(whole.length > narrow.length,
+    'extractUnreleased returned no more than extractNotes — the release is dropping content again');
+  assert.ok(whole.startsWith('### Notes'), 'the real block does not start with its Notes heading');
 });
