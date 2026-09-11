@@ -820,8 +820,13 @@ test('C19: the release judges its doctor report instead of letting -e decide', (
   assert.ok(wrote < judged && judged < uploaded,
     `order is wrong: wrote ${wrote}, judged ${judged}, uploaded ${uploaded}`);
 
-  // The sentence a reader of the Release needs, next to the numbers.
-  assert.match(code, /E-00 is expected there, and every other check must be ok/);
+  // The sentence a reader of the Release needs, next to the numbers — asserted where it LIVES.
+  // ARC-09-C21 moved it out of this workflow and into `release-notes.mjs`, because the body has one
+  // writer now; a workflow that still carried the sentence would be a second one.
+  const notesScript = readFileSync(join(root, 'scripts/ci/release-notes.mjs'), 'utf8');
+  assert.match(notesScript, /E-00 is expected there, and every other check must be ok/);
+  assert.equal(/E-00 is expected there/.test(code), false,
+    'the workflow writes the sentence itself — the body is composed in one place');
 
   // ARC-09-C20: this job installs before it runs the doctor, so it says which world it is in. The
   // bootstrap cells do NOT pass the flag and must not — the default is their shape, and a cell that

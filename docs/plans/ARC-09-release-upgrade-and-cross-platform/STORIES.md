@@ -365,6 +365,13 @@ before the writes, which is why `release-dryrun` was green for the whole arc.
 **Definition of done.** Merged; rehearsal Release created and deleted with the run URL recorded in `docs/CONTRIBUTING.md`; `release-dryrun` required on `main`.
 
 
+**Amendment after rehearsal run 9 (ARC-09-C21, 2026-09-12).** The release body is composed in ONE
+place — `release-notes.mjs`, metrics table and doctor sentence included — and bounded at the API's
+125,000-character limit. The workflow appends nothing after the script; a test asserts it. When the
+body must be cut, the generated groups and the trailer are kept and the hand-written Notes are
+replaced by a link to `docs/CHANGELOG.md` at the tag.
+
+
 **Amendment after rehearsal run 8 (ARC-09-C20, 2026-09-12).** The judge step passes `--deps
 installed`. This job runs `npm ci` before the doctor, for its lint and test gates, so its server
 checks legitimately answer; `assert-doctor.mjs` had encoded the bootstrap cells' shape — doctor

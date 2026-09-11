@@ -147,17 +147,16 @@ jobs:
       - name: The metrics table, from all three
         shell: bash
         run: node scripts/ci/install-metrics.mjs --table install-metrics-*.json > install-metrics.md
-      - name: The release notes are the changelog's own section
+      # ONE WRITER (ARC-09-C21). The metrics table and the doctor sentence used to be appended here
+      # with `cat`, so nothing knew the total size — and the API refused a 125,000-character body on
+      # rehearsal run 9, after everything else had passed. The script composes the whole body and
+      # bounds it; nothing is appended to `release-notes.md` after this line, and a test asserts it.
+      - name: The release notes are the changelog's own section, bounded
         shell: bash
         run: |
-          node scripts/ci/release-notes.mjs ${{ github.ref_name }} > release-notes.md
-          cat install-metrics.md >> release-notes.md
-          # ARC-09-C19. Said once, where a reader of the Release meets the numbers: the doctor
-          # JSONs attached here are honest reports from machines that have no Claude Code, so E-00
-          # fails on all three and nothing else may. Without this sentence a reader finds a FAIL in
-          # a published asset and has no way to know it was expected.
-          printf '\n_The attached doctor JSONs come from hosted runners without Claude Code — E-00 is expected there, and every other check must be ok._\n' \
-            >> release-notes.md
+          node scripts/ci/release-notes.mjs ${{ github.ref_name }} \
+            --metrics install-metrics.md > release-notes.md
+          wc -c release-notes.md
       - name: Nothing in the assets carries a credential
         run: node scripts/ci/assert-assets.mjs doctor-*.json install-metrics-*.json
 
