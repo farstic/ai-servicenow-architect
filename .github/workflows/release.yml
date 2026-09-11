@@ -92,7 +92,12 @@ jobs:
           if [ "$code" -ge 2 ]; then exit 1; fi
       - name: Judge the report — E-00 is this environment's, nothing else is
         shell: bash
-        run: node scripts/ci/assert-doctor.mjs --in doctor-${{ matrix.os }}.json --expect-fail E-00
+        # `--deps installed` (ARC-09-C20): this job runs `npm ci` before the doctor, for its lint
+        # and test gates, so the server checks legitimately answer here. The bootstrap cells keep
+        # the default, `absent`, where an answering SV check means something installed too early.
+        run: |
+          node scripts/ci/assert-doctor.mjs --in doctor-${{ matrix.os }}.json \
+            --expect-fail E-00 --deps installed
       - name: What the install cost here
         shell: bash
         run: node scripts/ci/install-metrics.mjs ${{ matrix.os }} > install-metrics-${{ matrix.os }}.json

@@ -143,6 +143,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The doctor's judgement knows which kind of install it is looking at.** The check that decides
+  whether a report describes a healthy design-only install assumed the dependencies were absent,
+  because that was true of its only caller. The release workflow installs first, so its server
+  checks answer — and now say so explicitly, with a failing server check still refused.
+
 - **A release is no longer blocked by the one check a hosted runner cannot pass.** The doctor
   reports attached to a Release come from machines without Claude Code, so that check fails on all
   three — expected, and now judged by the same rule the install cells have always used: that one
