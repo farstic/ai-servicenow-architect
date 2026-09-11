@@ -41,6 +41,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **The release, upgrade and CI procedures are written down where they are used.**
+  `docs/CONTRIBUTING.md` carries six sections — Commits, Releasing, Store migrations, Upgrading the
+  product, CI matrix, Line endings — each starting with the exact commands and ending with where it
+  is tested, so a document that drifts from the tree fails a test rather than misleading a reader.
+  The release checklist is the two-phase flow, because `main` requires status checks and a release
+  commit pushed straight to it carries none. `docs/INSTALL.md` gains *What to paste in a bug
+  report*; `docs/ARCHITECTURE.md` gains *Versioning, tags and upgrade*.
+
 - **The doctor now scans `.env` files for committed credentials.** `./snowarch doctor`'s E-09 check
   sweeps the tracked tree for credential-shaped literals, and until now the one kind of file named
   after the thing it hunts — `.env`, `.env.local`, `.env.example` — was the one kind it skipped. A

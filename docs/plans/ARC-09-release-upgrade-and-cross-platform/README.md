@@ -43,13 +43,28 @@ ARC-01, ARC-02, ARC-03, ARC-04, ARC-05, ARC-06, ARC-07, ARC-08 (per-story detail
 
 ## Acceptance criteria
 
-- [ ] `node scripts/release.mjs 2.0.0` on a green tree produces one commit and one tag; `git show v2.0.0` displays the contract sha and docs pin; `./snowarch version` prints the same values; `tests/version-consistency.test.mjs` passes. (S01, S04)
-- [ ] The same command on a tree with a stale `dist/` or a failing lint exits non-zero without committing or tagging. (S01)
+- [x] `node scripts/release.mjs 2.0.0` on a green tree produces one commit and one tag; `git show v2.0.0` displays the contract sha and docs pin; `./snowarch version` prints the same values; `tests/version-consistency.test.mjs` passes. (S01, S04) **(S01/S04; proven end-to-end on the S07 harness in S11's walkthrough — `release 9.2.0 → 9.3.0`, the plan printed, gates `dist → lint → test → contract → docs`. The real `v2.0.0` cut is the architect's after the M4 merge — OWNER-SITTING is not involved; it is a maintainer action, and its numbers go in the roadmap record PR.)**
+- [x] The same command on a tree with a stale `dist/` or a failing lint exits non-zero without committing or tagging. (S01) **(S11's walkthrough hit four refusals in a row, each naming its own remedy and each leaving the tree untouched: missing corpus → `working tree not clean`; stale `dist/` → *run `node scripts/build-dist.mjs` and commit it in a normal PR*; pin behind the contract → *run `node packages/contract/pin.mjs`*; stale `vendor/docs-areas.txt` → *run `node scripts/gen-docs-areas.mjs --write`*. `release: gate failed: lint (exit 2) — nothing was written`.)**
 - [x] A user on `v2.0.0` runs `./snowarch upgrade --to v2.1.0` (fixture release changing only `vendor/docs-areas.txt`; the S07 harness uses `v9.0.0 → v9.1.0`): only B02 re-runs, credentials untouched (`sha256 .local/instances.json` unchanged), doctor 0 FAIL. (S05, S07) **(S07, 2026-09-11, harness AC 1)**
 - [x] A fixture release changing the store schema migrates the store, leaves a 0600 backup, and the server loads it. (S06, S07) **(S07, 2026-09-11, harness AC 2)**
-- [ ] CI is green on all nine matrix cells; the Windows cell runs with Git Bash removed from PATH and passes the design-only bootstrap, the doctor and the MCP handshake. (S08)
-- [ ] `git ls-files --eol` shows the expected line endings; a Windows checkout of `bootstrap.ps1` runs without a line-ending error. (S09)
-- [ ] `docs/CHANGELOG.md` for 2.0.0 contains the "supersedes engine v2.8.0 and snow-mcp 1.0.0" note and the migration notes from ARC-04 (R-03). (S02)
+- [x] CI is green on all nine matrix cells; the Windows cell runs with Git Bash removed from PATH and passes the design-only bootstrap, the doctor and the MCP handshake. (S08) **(S08: 52 required contexts at the time, 54 after S09. `bootstrap (no-gitbash, windows-latest)` keeps its name and its context; `windows-native` adds three cells driven entirely through `.cmd` with Git Bash stripped from `PATH`, covering the wizard's `--password-stdin` door, the server handshake, the hook, `version`, a store migration plan and an upgrade check.)**
+- [x] `git ls-files --eol` shows the expected line endings; a Windows checkout of `bootstrap.ps1` runs without a line-ending error. (S09) **(From the `eol (windows-latest)` cell on a `core.autocrlf=true` clone: the three launchers `i/lf w/crlf attr/text eol=crlf`, `bootstrap.sh`/`snowarch`/`.mcp.json` `i/lf w/lf`, `assert-crlf: 3 file(s) are CRLF throughout`, `assert-lf: 4 file(s) contain no CR`, and all three `--help` runs exiting 0 under `cmd.exe`.)**
+- [x] `docs/CHANGELOG.md` for 2.0.0 contains the "supersedes engine v2.8.0 and snow-mcp 1.0.0" note and the migration notes from ARC-04 (R-03). (S02) **(In `## Unreleased` → `### Notes`, with the five-point migration for snow-mcp 1.0.0 users; `scripts/release.mjs` moves the block into the release section it belongs to.)**
+
+**ARC-09 COMPLETE — 2026-09-11.** Eleven stories (S01–S11) and ten chores (C1–C10), every chore a
+defect found while building a story and fixed in the same arc. Three things are deliberately NOT
+ticked here because a person has to do them, and each names where it waits:
+
+- **The real `v2.0.0` cut and the rehearsal Release.** S03's workflow and S01's script are proven —
+  in CI on three OSes every commit (`release-dryrun`), and end to end on the harness in S11's
+  walkthrough — but a tag that exists is a maintainer action on `main`. The architect cuts it after
+  the M4 merge; the numbers go in the roadmap record PR.
+- **The first `publish-npm` dispatch.** `docs/spikes/OWNER-SITTING.md` § Sitting E, steps E1–E5.
+  The secret is deferred to the acceptance phase by the owner's decision of 2026-09-11, and the
+  first dispatch is `dry_run: true` against `v2.0.0`.
+- **A real upgrade on a user's machine.** The harness proves the mechanism on three OSes in CI
+  (`upgrade-e2e`); what it cannot prove is a checkout someone has been living in. Sitting A's
+  install rows are where that lands.
 
 ## Risks
 

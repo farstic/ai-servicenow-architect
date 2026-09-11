@@ -161,9 +161,11 @@ in the initial commit.
 
 ---
 
-## CI
+## CI runners and the footprint gate
 
-`.github/workflows/ci.yml` — four jobs, no secrets, no step declaring a `shell:`.
+The job table lives in [CI matrix](#ci-matrix) — this section is the runners underneath it and the
+one gate whose number needs explaining. `.github/workflows/ci.yml` is the only workflow that gates a
+pull request; it reads no secret.
 
 | Job | What |
 |---|---|
@@ -189,9 +191,11 @@ The `-latest` aliases move without notice; these labels are recorded so a future
 attributed. **Note the Windows cell resolved Node 24 to 24.19.0 while the other two got 24.20.0** — the
 matrix is not as uniform as `[20, 22, 24]` suggests.
 
-**The Windows cell is not the "no Git Bash" proof.** The hosted image ships Git Bash. What that cell does
-prove is narrower: no step calls a POSIX shell (Q-B). The genuine no-Git-Bash test needs a machine where
-the shell is absent and belongs to ARC-09-S08.
+**The Windows cell is not the "no Git Bash" proof.** The hosted image ships Git Bash. What that cell
+proves is narrower: no step calls a POSIX shell (Q-B). The genuine no-Git-Bash test needs a machine
+where the shell is absent — ARC-09-S08 built it, and there are now two: `bootstrap (no-gitbash,
+windows-latest)` and the three `windows-native` cells, which strip Git Bash from `PATH` and drive
+the product entirely through `.cmd`.
 
 **If a macOS cell ever needs to be cheap:** the repository is public, so hosted runners cost nothing
 today. Should it ever become private, scheduling macOS on `main` only is the lever — recorded as an
@@ -948,18 +952,45 @@ your branch's upstream if it has one, otherwise `origin/develop`: **not** `origi
 `develop` by a whole milestone and would hand you thirty commits of somebody else's work, some
 written before this convention existed.
 
+**A subject or body can only be fixed by amending.** `commitlint` reads every commit a branch adds,
+so a malformed subject cannot be repaired by a later commit — there is nothing a fix-up can say
+about the one above it. A SUBJECT/BODY-only amend with `--force-with-lease`, on an unmerged draft
+branch, is therefore allowed, and the pull request records the before and after shas together with
+an empty `git diff <old> <new> --stat` as the proof the tree did not move. **Content rework is
+always a fix-up commit**, never an amend: the red round belongs in the branch's history where a
+reviewer can see what was wrong. (ARC-09-S10 is where this was settled, by a 101-character subject.)
+
 **The escape hatch is `### Notes`.** Everything else in a release section is generated; that block
 is hand-written, survives regeneration verbatim, and moves down into the release it belongs to. If
 a change needs a paragraph rather than a bullet, that is where it goes.
 
-## Cutting a release
+**Where this is tested.** `tests/commitlint.test.mjs` (the subject grammar, the scope vocabulary and the range it reads) and the `commitlint` CI job, which runs on pull requests only.
+
+## Releasing
+
+The checklist, verbatim — paste it into the release pull request's description and tick it:
+
+> 1. `git switch main && git pull --ff-only` · CI green on HEAD · the corpus present — `git submodule status vendor/ServiceNowDocs` shows no leading `-`; if it does, `git submodule update --init vendor/ServiceNowDocs`. A missing corpus is a **dirty tree** to the preflight (` D vendor/ServiceNowDocs`) and the release refuses before it writes anything.
+> 2. `git switch -c release/vX.Y.Z main` · `node scripts/release.mjs X.Y.Z --yes --allow-branch release/vX.Y.Z` (writes + commit, **no tag**) · open a pull request to `main` · merge it **without squashing** · then, on `main`, at the merge commit: `node scripts/release.mjs X.Y.Z --tag-only`.
+> 3. `git push origin main --follow-tags` (or pass `--push`).
+> 4. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
+> 5. Update the install page's metrics link if the numbers moved; announce.
+> 6. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
+
+**Step 2 is two-phase because it has to be.** `main` is protected by required status checks with
+`strict: true` — **54** of them after this milestone, generated into
+`tests/fixtures/required-contexts.json` — so a release commit pushed straight to `main` arrives
+carrying no checks and is refused by the branch, not by the script. The one-shot form
+(`node scripts/release.mjs X.Y.Z` on `main`, then push) is correct only where `main` has no required
+checks; it is kept because the script supports it and a fork may want it, not because it is the flow
+here.
 
 `node scripts/release.mjs <x.y.z>` — preflight, gates, writes, one commit, one annotated tag. It
 refuses before it writes anything: a dirty tree, a branch that is not `main`, a tag that exists, a
 version that goes backwards, a corpus that does not match the pin. Nothing is pushed unless you ask.
 
-**`main` requires 42 status checks and is `strict`**, so a release commit pushed straight to it
-carries no checks and is refused. Four steps instead:
+**The two-phase flow, in full.** `main` requires 54 status checks and is `strict`, so a release
+commit pushed straight to it carries no checks and is refused:
 
 ```sh
 git switch -c release/v2.0.0 main
@@ -995,6 +1026,16 @@ a rebuilt `dist/` on the maintainer's behalf would ship an artefact nobody revie
 
 Use `--dry-run` freely: it runs the preflight and the gates, prints the exact tag message, and
 writes nothing. `--offline` skips the remote-ahead check; `--no-install` skips `npm ci`.
+
+**Every refusal names its own remedy, and they come in a chain.** Walking this checklist on the
+upgrade harness produced four in a row, each printing what to do next: a missing corpus (`working
+tree not clean: D vendor/ServiceNowDocs`), a stale `dist/` (*run `node scripts/build-dist.mjs` and
+commit it in a normal PR, then release*), a pin behind the contract (*run `node
+packages/contract/pin.mjs`*), and a stale `vendor/docs-areas.txt` (*run `node
+scripts/gen-docs-areas.mjs --write`*). Each was fixed by doing what the line said. If a release
+refuses, read the line — it is the instruction, not a diagnosis to interpret.
+
+**Where this is tested.** `tests/release.test.mjs`, `tests/release-workflow.test.mjs` and `tests/version-tag.test.mjs` (the preflight refusals, the tag message and its trailers, `--tag-only`'s version check), the `release-dryrun` CI job on three OSes on every commit, and `.github/workflows/release.yml` for the tag path itself.
 
 ## The npm channel (optional)
 
@@ -1464,7 +1505,9 @@ upstream is the docs suite's own local bare repository.
 
 ---
 
-## Adding a store migration
+**Where this is tested.** `tests/upgrade/upgrade.e2e.test.mjs` against the two-release fixture harness, `tools/snowarch/tests/input-hash.test.mjs` for the input-hash table that decides which bootstrap steps go stale, and the `upgrade-e2e` CI job on three OSes.
+
+## Store migrations
 
 `.local/instances.json` carries a `version`, and `packages/snowarch/src/store/migrations/index.ts`
 is the only thing allowed to change it. The registry ships **empty** at v1 on purpose: the
@@ -1514,6 +1557,8 @@ whitelist never touches the credential file, so an outdated store appears under 
 command to run.
 
 ---
+
+**Where this is tested.** `tools/snowarch/tests/b06-migration.test.mjs` and the store migration suite under `packages/snowarch/tests/`; the schema stamp itself is one of the inputs in `tests/upgrade/upgrade-unit.test.mjs`.
 
 ## `.editorconfig` is enforced
 
@@ -1608,7 +1653,7 @@ also owns two things that are easy to get wrong once and never notice: `-s <scop
 (without it, `remove` deletes from whichever scope it finds, and ours is committed), and the
 `cwd: root` that local scope is keyed on.
 
-## The CI matrix — every job, every cell
+## CI matrix
 
 Generated names live in `tests/fixtures/required-contexts.json`, which is what `main`'s branch
 protection is set from; the table below is the human reading of it. Run `npm run gen` after any
@@ -1635,7 +1680,24 @@ not produce is a required check waiting for ever.
 | `eol` | ubuntu + windows | bash · **cmd** | the line-ending policy, on a Windows clone made with the Git-for-Windows default `core.autocrlf=true` — set BEFORE the checkout, because the setting decides what the clone writes. Runs `tests/eol.test.mjs`, asserts the launcher bytes are CRLF and the LF set has no `\r`, and runs `bootstrap.cmd --help`, `snowarch.cmd --help` and `bootstrap.ps1 --help` under `cmd.exe` |
 | `docs-real` | 3 OS + one | bash | **conditional — runs only when the corpus tooling changes; NOT required.** A PR that touches those paths produces four extra check runs and they must never become required contexts |
 
-**Line endings.** LF everywhere, except the two Windows launcher kinds (`*.cmd`, `*.ps1`), which are
+**The banner's two numbers, per cell.** `banner-timing.mjs` reports both paths: the FAST path (warm
+cache) against `01` §8's 300 ms, and the RE-RUN path (cold, a quick doctor) at 1000 ms on the
+difference between the run and an empty-Node floor measured interleaved. A fast-path trip is a
+product regression; a re-run-path trip is ARC-09-C5's territory, and the cap does not move until
+C5's tables say where the time goes.
+
+**The macOS-minutes lever, documented and not applied.** If the budget bites, narrow
+`release-dryrun` and `upgrade-e2e` to ubuntu + windows by deleting `macos-latest` from their two
+`os:` lists and running `npm run gen` — the required-contexts file and the protection list follow
+from it. `verify` in `release.yml` keeps all three whatever happens here: a release is the one
+moment all three must be proven. Do NOT narrow `test`, `contract` or `bootstrap`; those are where a
+platform-specific break is actually caught.
+
+**Where this is tested.** `tests/workflows.test.mjs` — the cells, the step order, the shells, the secret allow-list, and that every workflow is either the gating one or excluded with a reason — against `tests/fixtures/required-contexts.json`, which is generated from `.github/workflows/ci.yml` by `scripts/gen-required-contexts.mjs`.
+
+## Line endings
+
+LF everywhere, except the two Windows launcher kinds (`*.cmd`, `*.ps1`), which are
 CRLF. Never edit a line ending by hand and never "fix" one in an editor: `.gitattributes` decides,
 git applies it at `add` and at `checkout`, and a hand-edit only puts your working tree out of step
 with what everyone else receives. Two halves, and they fail differently — the INDEX is LF for every
@@ -1650,18 +1712,7 @@ type needs a rule in `.gitattributes` or an entry with a reason in `tests/eol.al
 `tests/eol.test.mjs` fails on an extension nobody has answered for, since `text=auto` is a guess and
 removing the guess is what the policy file is for.
 
-**The banner's two numbers, per cell.** `banner-timing.mjs` reports both paths: the FAST path (warm
-cache) against `01` §8's 300 ms, and the RE-RUN path (cold, a quick doctor) at 1000 ms on the
-difference between the run and an empty-Node floor measured interleaved. A fast-path trip is a
-product regression; a re-run-path trip is ARC-09-C5's territory, and the cap does not move until
-C5's tables say where the time goes.
-
-**The macOS-minutes lever, documented and not applied.** If the budget bites, narrow
-`release-dryrun` and `upgrade-e2e` to ubuntu + windows by deleting `macos-latest` from their two
-`os:` lists and running `npm run gen` — the required-contexts file and the protection list follow
-from it. `verify` in `release.yml` keeps all three whatever happens here: a release is the one
-moment all three must be proven. Do NOT narrow `test`, `contract` or `bootstrap`; those are where a
-platform-specific break is actually caught.
+**Where this is tested.** `tests/eol.test.mjs` on every cell, and the `eol (ubuntu-latest)` and `eol (windows-latest)` CI cells, which clone with `core.autocrlf=true` before asserting anything.
 
 ## What CI proves about the install
 

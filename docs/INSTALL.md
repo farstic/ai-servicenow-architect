@@ -221,8 +221,17 @@ Every preflight failure prints its own remedy. These are those sentences:
 <!-- /generated:remedies -->
 
 The full catalogue is `docs/TROUBLESHOOTING.md`. Whatever went wrong, re-run the bootstrap — it
-resumes at the step that failed rather than starting over. Reporting it? Paste `./snowarch version`
-and `./snowarch doctor`.
+resumes at the step that failed rather than starting over.
+
+### What to paste in a bug report
+
+```sh
+./snowarch version      # engine version, contract sha, docs pin, the floors
+./snowarch doctor       # every check, and the Mode line at the end
+```
+
+Those two answer almost every first question. Neither prints a credential: `version` reports what
+was built, the doctor reports what was configured — never a password, never an instance address.
 
 ### What the corpus costs
 
@@ -249,7 +258,7 @@ will re-run, whether the store's schema moves (a migration, with a 0600 backup, 
 and `credentials: untouched` — `.local/instances.json` is never read or written by an upgrade.
 Restart `claude` afterwards; the server binary changed. `--to vX.Y.Z` takes a specific release and
 prints the way back; a branch that has diverged from `origin` is reported, not guessed at; a failed
-fetch prints git's error and a [proxy](TROUBLESHOOTING.md#proxy) or [TLS](TROUBLESHOOTING.md#tls-ca)
+fetch prints git's error and a [proxy](TROUBLESHOOTING.md#proxy_unreachable) or [TLS](TROUBLESHOOTING.md#tls_ca_untrusted)
 remedy. The banner mentions a newer release only from a check you already ran — it never fetches.
 Full detail: [CONTRIBUTING.md](CONTRIBUTING.md#upgrading-the-product).
 
