@@ -7,8 +7,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync,
-  writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync,
+  statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -526,4 +526,40 @@ test('an outdated store schema is REFUSED with its command, never repaired', () 
   // And the whitelist has no fixer that could ever touch it: the kinds are a closed set, and
   // "store-schema" is deliberately not one of them.
   assert.equal(KINDS.includes('store-schema'), false);
+});
+
+// ARC-09-C2 — the fixtures leave the LIVE checkout alone.
+//
+// This suite ran a real corpus sync into `REAL_ROOT/vendor/ServiceNowDocs` for four stories.
+// `linkInstall` symlinked the corpus into every fixture, `existsSync` said yes to the empty
+// submodule mount point a checkout without content carries, and F2 — whose whole job is to repair
+// a missing corpus — repaired the live one: 305 MB, cloned from the real upstream, by a unit test.
+// Invisible on a machine whose corpus is already complete; on a CI cell with no submodule it built
+// the corpus while the rest of the suite ran, and `the two docs entry points are one
+// implementation` read 17 areas and then 19.
+test('a fixture never gets the live corpus mount point, and never writes the checkout', (t) => {
+  const corpus = join(REAL_ROOT, 'vendor', 'ServiceNowDocs');
+  const before = existsSync(corpus) ? readdirSync(corpus).length : null;
+
+  const root = greenTree(t);
+  linkInstall(root);
+  const linked = join(root, 'vendor', 'ServiceNowDocs');
+
+  if (before === null || !existsSync(join(corpus, 'markdown'))) {
+    // No corpus here: the fixture must NOT have been handed a path into the checkout. This is the
+    // CI shape, and the one that did the damage.
+    assert.equal(existsSync(linked) && lstatSync(linked).isSymbolicLink(), false,
+      'the empty mount point was linked into a fixture — a fixer would write the checkout');
+  } else {
+    assert.equal(lstatSync(linked).isSymbolicLink(), true, 'a real corpus is linked, not copied');
+  }
+
+  // And whatever the fixture's config says, it cannot reach the real upstream: a sync that should
+  // not be running fails in milliseconds instead of cloning the internet into a temp directory.
+  const upstream = readJson(root, 'engine.config.json').docs.upstream;
+  assert.equal(/^https?:|github\.com/.test(upstream), false,
+    `a fixture may not carry a network upstream: ${upstream}`);
+
+  assert.equal(existsSync(corpus) ? readdirSync(corpus).length : null, before,
+    'building a fixture changed the live corpus');
 });

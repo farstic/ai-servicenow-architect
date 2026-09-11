@@ -458,6 +458,22 @@ The pin-level comparisons went with it: a tool the server advertises that the co
 know is SV-05's finding now, and the `used_by` reporting it used to print is covered statically by
 L01 and by B05's contract check at install time.
 
+#### `.local/upgrade-check.json` v1 — the other thing the banner reads
+
+A second contract, for the same reason as the first: the SessionStart banner has a 300 ms budget on
+a machine that may have no Node, so it cannot fetch, and something else has to. Three keys are the
+hook's and may never be renamed — `behind`, `latestTag`, `checkedAt` — and the rest (`remote`,
+`localTag`, `localDistance`) is for a reader who runs `cat` on it. It is written by `./snowarch
+upgrade`, by `upgrade --check`, and by the doctor's **E-28**, which asks `git ls-remote` at most
+once a day and is excluded from `--quick` for both of that flag's reasons at once: it spawns git and
+it leaves the machine.
+
+The banner prints its one line only while the check is **less than seven days old**. An expired
+check produces SILENCE, never a hedged nudge: "a newer release is available (probably, a fortnight
+ago)" is a line a reader learns to skip, and then the one that matters is skipped too. `upgrade`
+writes `behind: false` when it finishes, so the nudge goes away the moment the thing it asks for is
+done.
+
 #### `.local/doctor-last.json` v1 — what the banner reads
 
 The SessionStart banner must print a verdict in under 300 ms on a machine that may have no Node, so
@@ -1116,6 +1132,7 @@ about one registry rather than several:
 | `E-25` | host | cloud-sync folder | yes | — |
 | `E-26` | host | proxy and CA environment | yes | — |
 | `E-27` | host | Claude Code registration status | — | — |
+| `E-28` | host | release currency | — | — |
 | `SV-00` | server | Node version | yes | — |
 | `SV-01` | server | dist artefacts | yes | yes |
 | `SV-02` | server | store | yes | yes |
@@ -1425,5 +1442,5 @@ of `engine.config.json` |
 | D36 | `CLAUDE.md` gates on `mcp__<key>__` | E-20 | re-targeted to the generated rule file, the protocol page and both registrations |
 | D37 | tool-name currency against the rename map | E-19 | `retired-names.json` |
 
-**New checks with no old counterpart** (12): `E-06`, `E-11`, `E-15`, `E-18`, `E-21`, `E-22`, `E-25`, `E-26`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
+**New checks with no old counterpart** (13): `E-06`, `E-11`, `E-15`, `E-18`, `E-21`, `E-22`, `E-25`, `E-26`, `E-28`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
 <!-- /generated:doctor-mapping -->

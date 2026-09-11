@@ -79,7 +79,9 @@ export function makeCheckout({ pin = 'a'.repeat(40), family = 'australia' } = {}
   // what the test is about.
   execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
   execFileSync('git', ['add', '-A'], { cwd: root, stdio: 'ignore' });
-  execFileSync('git', ['-c', 'user.email=f@example.invalid', '-c', 'user.name=f',
+  // `example.com` is RFC 2606's reserved name; `.invalid` is the rule of record's counter-example
+  // and has no grandfather clause (ARC-09-C2).
+  execFileSync('git', ['-c', 'user.email=f@example.com', '-c', 'user.name=f',
     'commit', '-qm', 'fixture'], { cwd: root, stdio: 'ignore' });
   return root;
 }

@@ -53,6 +53,30 @@ export const inputs = INPUTS.B06.resolve;
 
 // `root` guarded: `runsWhen` is called with whatever ctx a caller has, and a step selector that
 // threw on a ctx without a root would turn "which steps run" into a crash.
+/**
+ * Wait for a child, whatever shape the caller's `spawn` returns.
+ *
+ * The runner hands every step an ASYNCHRONOUS `spawn` (ARC-06-S03) so its interrupt handler can
+ * reach the child — and an async `ChildProcess` has no `.status`. Reading one gives `undefined`,
+ * which `!== 0`, so this step declared every spawn a failure the moment it started it: in
+ * production the wizard would run, the user would answer its prompts, and the bootstrap would
+ * already have printed "the instance wizard exited abnormally" over the top of them. Every test
+ * injected a synchronous fake returning `{ status: 0 }`, so nothing caught it; ARC-09-S07's
+ * migration branch is what walked into it.
+ *
+ * Both shapes are accepted on purpose — the fakes are sync, the real one is not — and the answer
+ * is always the same object: `{ status, signal }`, after the child has actually finished.
+ */
+export function awaitChild(child) {
+  if (!child || typeof child.on !== 'function') {
+    return Promise.resolve({ status: child?.status ?? null, signal: child?.signal ?? null });
+  }
+  return new Promise((resolve) => {
+    child.on('error', () => resolve({ status: null, signal: null }));
+    child.on('exit', (status, signal) => resolve({ status, signal }));
+  });
+}
+
 export const storeExists = (root) => Boolean(root) && existsSync(join(root, '.local', 'instances.json'));
 
 function shapeOf(root) {
@@ -159,9 +183,15 @@ export async function migrateIfBehind(ctx) {
   }
 
   const spawn = ctx.spawn ?? spawnSync;
-  const r = spawn(process.execPath, [join(ctx.root, CLI), 'store', 'migrate', '--yes'],
-    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) });
-  if (r.status !== 0) return { status: 'fail', detail: MIGRATION_FAILED, remedy: null };
+  const r = await awaitChild(spawn(process.execPath,
+    [join(ctx.root, CLI), 'store', 'migrate', '--yes'],
+    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) }));
+  if (r.status !== 0) {
+    // The child's own answer in the line: "exit 1" and "killed by SIGTERM" send a reader to
+    // different places, and a message that says neither sends them to guess.
+    const how = r.signal ? `killed by ${r.signal}` : `exit ${r.status ?? 'none'}`;
+    return { status: 'fail', detail: `${MIGRATION_FAILED} (${how})`, remedy: null };
+  }
   return { status: 'ok', detail: `store schema v${shape.version} → v${current} (migrated)`,
     data: { migratedFrom: shape.version, migratedTo: current } };
 }
@@ -203,9 +233,12 @@ export const run = async (ctx) => {
   // step deliberately learns nothing from it beyond the exit code and what the STORE says
   // afterwards — never a URL, a username or a credential.
   const spawn = ctx.spawn ?? spawnSync;
-  const r = spawn(process.execPath, [join(ctx.root, CLI), 'instance', 'add', '--from-bootstrap'],
+  // AWAITED (ARC-09-S07). The runner's `spawn` is asynchronous, so the old `r.status` read an
+  // undefined off a live ChildProcess and called a wizard that had not finished a failure.
+  const r = await awaitChild(spawn(process.execPath,
+    [join(ctx.root, CLI), 'instance', 'add', '--from-bootstrap'],
     // The wizard writes the store; it must write THIS checkout's.
-    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) });
+    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) }));
   if (r.status !== 0) {
     return { status: 'fail', remedy: null,
       detail: `the instance wizard exited ${r.status ?? 'abnormally'} — nothing was saved by B06` };

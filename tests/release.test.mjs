@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -350,7 +350,18 @@ test('a pin that disagrees with the artefact refuses before anything runs', asyn
 
 // ── the integration case: the real script, on the real tree ─────────────────────────────────────
 
-test('a real --dry-run on this checkout prints this checkout\'s tag message and writes nothing', async () => {
+test('a real --dry-run on this checkout prints this checkout\'s tag message and writes nothing', async (t) => {
+  // PRECONDITION, stated rather than assumed: gate 6 is `docs verify`, which needs the corpus, and
+  // a checkout without the submodule cannot run the real gates at all.
+  //
+  // This used to pass on a runner with no submodule, and for a bad reason (ARC-09-C2): the doctor's
+  // `--fix` fixtures were syncing a corpus into the live checkout through a symlink, so whichever
+  // test ran first left one behind for this one to find. With that writer gone, a cell without the
+  // corpus says so and skips — the `release-dryrun` job syncs one and is where this claim is
+  // actually proved on three OSes.
+  if (!existsSync(join(REAL_ROOT, 'vendor', 'ServiceNowDocs', 'markdown'))) {
+    return t.skip('no docs corpus in this checkout — release-dryrun covers this on three OSes');
+  }
   const before = execFileSync('git', ['status', '--porcelain'], { cwd: REAL_ROOT, encoding: 'utf8' });
   const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'],
     { cwd: REAL_ROOT, encoding: 'utf8' }).trim();

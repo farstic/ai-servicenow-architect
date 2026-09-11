@@ -32,6 +32,30 @@ export const WATCHDOG_MS = 5_000;
 /** How old a cache may be before it is re-derived, whatever the mtimes say. */
 export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * How old an upgrade check may be before the banner stops repeating it (ARC-09-S07).
+ *
+ * Inlined rather than imported from `lib/upgrade-check.mjs`, and that is the one duplication this
+ * file accepts on purpose: the hook's whole budget is 300 ms on a machine that may have no Node,
+ * and its rule is to read two JSON files and import nothing. A dynamic import here would put a
+ * module resolution on the critical path to save a constant. `tests/hook/session-start.test.mjs`
+ * asserts the two numbers agree.
+ */
+export const UPGRADE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * A check from the future is not fresh either: a clock that went backwards must not pin a nudge.
+ *
+ * `nowMs` is a NUMBER, because that is what this file's `now` has always been (`Date.now()`), and
+ * a second convention inside one module is how a `now()` gets called on a number.
+ */
+function freshUpgradeCheck(upgrade, nowMs) {
+  const at = Date.parse(upgrade?.checkedAt ?? '');
+  if (Number.isNaN(at)) return false;
+  const age = nowMs - at;
+  return age >= 0 && age < UPGRADE_MAX_AGE_MS;
+}
+
 /** Read a JSON file, or `null`. A malformed cache is a stale cache, never a crash. */
 function readJson(path) {
   try {
@@ -47,11 +71,16 @@ function readJson(path) {
  * `first` is only a first run when THIS invocation created the cache: a design-only checkout that
  * has been running for a month does not need to be told again every session.
  */
-function nudges({ report, cache, banner, firstRun, upgrade }) {
+function nudges({ report, cache, banner, firstRun, upgrade, now = Date.now() }) {
   const lines = [];
   const instances = report?.server?.instances ?? cache?.server?.instances ?? [];
   if (firstRun && report?.mode !== 'live' && instances.length === 0) lines.push(banner.firstRun);
-  if (upgrade?.behind === true && upgrade.latestTag) lines.push(banner.upgrade(upgrade.latestTag));
+  // FRESH, not merely present (ARC-09-S07). A `behind: true` from a fortnight ago is a claim
+  // nobody has checked since; printing it every session teaches a reader to skip the line, and
+  // then the one that matters is skipped too. Expired means SILENCE — never a hedged nudge.
+  if (upgrade?.behind === true && upgrade.latestTag && freshUpgradeCheck(upgrade, now)) {
+    lines.push(banner.upgrade(upgrade.latestTag));
+  }
   const stale = report?.stale?.claudeJsonEntries ?? cache?.report?.stale?.claudeJsonEntries ?? [];
   if (stale.some((e) => e.scope === 'this-folder')) lines.push(banner.staleRegistration);
   const fail = report?.summary?.fail ?? cache?.summary?.fail ?? 0;
@@ -101,7 +130,7 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   const staleness = cacheStale(root, { now, maxAgeMs: MAX_AGE_MS });
   if (cache && inputs && !staleness.stale && cache.modeLine) {
     say(cache.modeLine);
-    for (const line of nudges({ cache, banner: BANNER, firstRun: false, upgrade })) say(line);
+    for (const line of nudges({ cache, banner: BANNER, firstRun: false, upgrade, now })) say(line);
     return { path: 'cache', lines: out };
   }
 
@@ -127,7 +156,7 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   }
 
   say(report.modeLine);
-  for (const line of nudges({ report, banner: BANNER, firstRun: cache === null, upgrade })) say(line);
+  for (const line of nudges({ report, banner: BANNER, firstRun: cache === null, upgrade, now })) say(line);
   return { path: 'rerun', lines: out };
 }
 

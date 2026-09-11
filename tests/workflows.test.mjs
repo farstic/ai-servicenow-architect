@@ -135,6 +135,9 @@ const KNOWN_JOBS = [
   // ARC-09-S03, three more (44–46): the release path is exercised on every commit, because
   // `release.yml` only ever runs on a tag and a path that runs once per release is broken by then.
   'release-dryrun',
+  // ARC-09-S07, three more (47–49): the upgrade moves a tree, and a tree is the one thing a unit
+  // test cannot move. The three cells are three operating systems' git and filesystems.
+  'upgrade-e2e',
   'launcher', 'windows-launcher', 'secrets', 'plugin-validate',
 ];
 
@@ -143,6 +146,13 @@ const RELEASE_DRYRUN_CONTEXTS = [
   'release-dryrun (ubuntu-latest)',
   'release-dryrun (macos-latest)',
   'release-dryrun (windows-latest)',
+];
+
+/** And the three `upgrade-e2e` adds (ARC-09-S07), in the same form. */
+const UPGRADE_E2E_CONTEXTS = [
+  'upgrade-e2e (ubuntu-latest)',
+  'upgrade-e2e (macos-latest)',
+  'upgrade-e2e (windows-latest)',
 ];
 
 const BOOTSTRAP_CELLS = [
@@ -204,7 +214,7 @@ test('the doctor runs inside the bootstrap cells, and adds no job name (ARC-08-S
   // the whole file reads it as a job called "push".
   const jobsBlock = ci.slice(ci.indexOf('\njobs:'));
   const jobNames = [...jobsBlock.matchAll(/^  ([a-z][a-z0-9-]*):$/gm)].map((m) => m[1]);
-  assert.deepEqual(jobNames, KNOWN_JOBS, 'a job was added or renamed — protection lists 42 contexts');
+  assert.deepEqual(jobNames, KNOWN_JOBS, 'a job was added or renamed — protection lists its contexts by name');
 
   // The report is produced without touching the cache — a doctor that answered from `.local` would
   // be reporting on a run that happened before the install being tested.
@@ -249,9 +259,33 @@ test('commitlint runs on pull requests only, with the history it needs (ARC-09-S
   assert.match(job, /name: commitlint/);
 });
 
+test('upgrade-e2e runs the harness on three OSes, and adds three named contexts (ARC-09-S07)', () => {
+  const ci = wf('ci.yml');
+  const job = ci.slice(ci.indexOf('\n  upgrade-e2e:'), ci.indexOf('\n  launcher:'));
+
+  const list = /^\s*os: \[([^\]]+)\]$/m.exec(job);
+  assert.ok(list, 'the matrix is not one os list');
+  assert.deepEqual(list[1].split(',').map((o) => `upgrade-e2e (${o.trim()})`), UPGRADE_E2E_CONTEXTS);
+  assert.match(job, /name: upgrade-e2e \(\$\{\{ matrix\.os \}\}\)/);
+
+  // `fetch-depth: 0`: the harness tags fixture releases and reads their messages back, and a
+  // shallow clone has nothing to describe against.
+  assert.match(job, /fetch-depth: 0/);
+  // A git identity, because the harness COMMITS: a runner has no global one, and a fixture that
+  // depends on the machine having one fails only there (ARC-09-S05's lesson).
+  assert.match(job, /git config --global user\.email/);
+  // No secret, and no network beyond the harness's own local origin.
+  assert.equal(/secrets\./.test(job), false, 'an upgrade cell reads a secret');
+  assert.match(job, /node --test[^\n]*tests\/upgrade\/upgrade\.e2e\.test\.mjs/);
+  assert.match(job, /tests\/upgrade\/upgrade-unit\.test\.mjs/);
+  // The checkout under test must be exactly as it was: the harness builds its world in TMPDIR,
+  // and an upgrade test that moved this tree would be the worst possible kind of side effect.
+  assert.match(job, /assert-clean\.mjs/);
+});
+
 test('release-dryrun runs the real release on three OSes, every commit (ARC-09-S03)', () => {
   const ci = wf('ci.yml');
-  const job = ci.slice(ci.indexOf('\n  release-dryrun:'), ci.indexOf('\n  launcher:'));
+  const job = ci.slice(ci.indexOf('\n  release-dryrun:'), ci.indexOf('\n  upgrade-e2e:'));
 
   // The three contexts, in the form branch protection lists them.
   const list = /^\s*os: \[([^\]]+)\]$/m.exec(job);
@@ -328,4 +362,29 @@ test('release.yml runs on tags only, and is the one workflow that may write (ARC
 test('the run is cancelled when superseded, so thirteen cells are not paid for twice', () => {
   const ci = wf('ci.yml');
   assert.match(ci, /concurrency:\n\s+group: ci-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress: true/);
+});
+
+/**
+ * ARC-09-C4 — the banner budget is spent on the BANNER, not on the machine.
+ *
+ * `bootstrap (no-gitbash, windows-latest)` measured 728, 802, 944 and 1027 ms across four
+ * consecutive runs whose product code was byte-identical, and the fourth failed a 1000 ms budget
+ * the first three passed. Most of that is Node starting up on a cold Windows runner — something
+ * this product cannot make faster and should not be judged on. The harness measures that floor
+ * too, interleaved so both see the same weather, and the budget is spent on the difference.
+ */
+test('banner-timing measures a node floor and judges the difference (ARC-09-C4)', () => {
+  const src = readFileSync(join(root, 'scripts/ci/banner-timing.mjs'), 'utf8');
+
+  // The floor is a REAL empty node process, not a constant somebody measured once on a laptop.
+  assert.match(src, /timed\(\['-e', ''\]\)/);
+  // Interleaved: a floor taken in a block of its own describes a different machine.
+  assert.match(src, /floors\.push\(timed/);
+  // And the budget is applied to the difference, never to the raw median — which is the whole fix.
+  assert.match(src, /const cost = Math\.max\(0, median - floor\)/);
+  assert.match(src, /if \(cost > BUDGET\)/);
+  assert.equal(/if \(median > BUDGET\)/.test(src), false, 'the raw median is being judged again');
+  // Both numbers are still printed: "the banner cost 190 ms on a machine where starting node costs
+  // 840" is the sentence a reader needs; "1027 ms" is not.
+  assert.match(src, /node floor \$\{floor\} ms → banner \$\{cost\} ms/);
 });

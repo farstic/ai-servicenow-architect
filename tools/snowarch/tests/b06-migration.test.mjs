@@ -107,7 +107,9 @@ test('a migration that fails stops the step with a named remedy, not a stack', a
   putContract(root, 2);
   const result = await migrateIfBehind(ctxFor(root, { spawn: () => ({ status: 1 }) }));
   assert.equal(result.status, 'fail');
-  assert.equal(result.detail, MIGRATION_FAILED);
+  // The child's own answer is appended (ARC-09-S07): "exit 1" and "killed by SIGTERM" send a
+  // reader to different places, and a message saying neither sends them to guess.
+  assert.match(result.detail, new RegExp(`^${MIGRATION_FAILED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(exit 1\\)$`));
   assert.match(result.detail, /\.\/snowarch store migrate/);
 });
 

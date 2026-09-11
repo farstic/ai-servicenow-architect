@@ -41,6 +41,41 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **`./snowarch upgrade` — one command that plans first, moves second, and never touches your
+  credentials.** Seven numbered steps, and the first four are reads: the preflight refuses a dirty
+  tree, the fetch brings the release tags, the target is resolved (an annotated tag with a
+  `contract:` trailer, or the newest one), and the plan is computed FROM THE TAG before anything
+  moves — which files changed, which bootstrap steps that makes stale, whether the store's schema
+  moves, whether the installed Claude Code still clears the release's floor. Then `Proceed? [Y/n]`.
+  `--yes` skips the question, never the plan.
+
+  After the move the bootstrap runs again and does only what changed; a release that touches one
+  file re-runs one step. A release that changes the store's schema runs the MIGRATION, with its
+  0600 backup, announced in the plan before you agree — `.local/instances.json` is opened by
+  nothing else in the whole sequence. A failure leaves the tree at the new tag with the state file
+  recording which step stopped, and re-running continues from there rather than saying "up to
+  date": the tree being at the target and the upgrade having finished are two different claims.
+
+  `./snowarch upgrade --check` asks and changes nothing (exit 4 when a newer release exists). It —
+  and the doctor's new `E-28`, once a day — write `.local/upgrade-check.json`, which is the only
+  reason the session banner can mention a newer release: **the banner never fetches**. It prints
+  that line only while the check is less than seven days old, because a nudge from a check nobody
+  has made since is a line readers learn to skip, and then the one that matters is skipped too.
+
+  Behind a proxy, a failed fetch prints git's own error and then one remedy line naming
+  `docs/TROUBLESHOOTING.md#proxy` or `#tls-ca` — and only when the shape is recognised, because a
+  confident wrong remedy costs more than none.
+
+### Fixed
+
+- **The instance wizard was being declared failed the moment it started.** The bootstrap's runner
+  hands every step an asynchronous `spawn` so a Ctrl-C can reach the child; B06 read `.status` off
+  the returned `ChildProcess`, where it is `undefined`. In a live install the wizard would run, you
+  would answer its prompts, and the bootstrap would already have printed "the instance wizard
+  exited abnormally" over the top of them. Every test had injected a synchronous fake returning
+  `{ status: 0 }`, so nothing caught it until an upgrade walked into the same door. Both spawn
+  paths now wait for the child, and the failure line says how it ended.
+
 - **A store schema migration framework: explicit, versioned, backed up, and never near a
   credential.** `.local/instances.json` carries a `version`, and from 2.0.0 the only thing that
   changes it is `./snowarch store migrate` — a command a person runs, after reading a plan that

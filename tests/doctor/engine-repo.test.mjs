@@ -201,9 +201,26 @@ test('a bootstrapped live tree passes E-10 with the enabled toggle', async (t) =
 
 test('the fixture is built from the committed files, not from a copy in the test', async (t) => {
   const root = greenTree(t);
-  for (const rel of ['.mcp.json', '.claude/settings.json', 'engine.config.json']) {
+  for (const rel of ['.mcp.json', '.claude/settings.json']) {
     assert.equal(readFileSync(join(root, rel), 'utf8'),
       readFileSync(join(process.cwd(), rel), 'utf8'), `${rel} drifted from the real file`);
   }
+
+  // `engine.config.json` is the real file with ONE field overridden (ARC-09-C2): the docs upstream,
+  // so a fixer that decided to repair a corpus cannot clone 305 MB from github.com inside a unit
+  // test. Asserted field by field rather than as bytes, so the override stays the only difference —
+  // a second one would be a fixture drifting from the product again, which is what this test is for.
+  const real = JSON.parse(readFileSync(join(process.cwd(), 'engine.config.json'), 'utf8'));
+  const fixture = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  assert.deepEqual(Object.keys(fixture).sort(), Object.keys(real).sort());
+  for (const key of Object.keys(real)) {
+    if (key !== 'docs') assert.deepEqual(fixture[key], real[key], `${key} drifted from the real file`);
+  }
+  const { upstream: fixtureUpstream, ...fixtureDocs } = fixture.docs;
+  const { upstream: realUpstream, ...realDocs } = real.docs;
+  assert.deepEqual(fixtureDocs, realDocs, 'docs drifted beyond the upstream override');
+  assert.notEqual(fixtureUpstream, realUpstream);
+  assert.equal(/^https?:|github\.com/.test(fixtureUpstream), false,
+    `a fixture may not carry a network upstream: ${fixtureUpstream}`);
   assert.ok(bootstrap);
 });

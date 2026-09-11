@@ -18,10 +18,10 @@ import { REAL_ROOT } from './helpers/tree.mjs';
 const checks = engineChecks();
 const ids = checks.map((c) => c.id);
 
-test('E-00 … E-27 and SV-00 … SV-09, once each, in section order', () => {
-  assert.equal(checks.length, 38);
+test('E-00 … E-28 and SV-00 … SV-09, once each, in section order', () => {
+  assert.equal(checks.length, 39);
   assert.deepEqual(ids.filter((id) => id.startsWith('E-')),
-    Array.from({ length: 28 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
+    Array.from({ length: 29 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
   assert.deepEqual(ids.filter((id) => id.startsWith('SV-')),
     Array.from({ length: 10 }, (_, i) => `SV-${String(i).padStart(2, '0')}`));
   assert.equal(new Set(ids).size, ids.length);
@@ -56,9 +56,12 @@ test('the four checks --quick leaves out say why in their own flags', () => {
   assert.equal(by.get('E-16').quick, false);
 });
 
-test('only the server section touches the network, and only its probe check', () => {
-  assert.deepEqual(checks.filter((c) => c.network).map((c) => c.id), ['SV-04']);
-  assert.deepEqual(checks.filter((c) => c.network).map((c) => c.section), ['server']);
+test('two checks touch the network, and each says which question it is asking', () => {
+  // ARC-09-S07 added E-28: the release-currency check asks the git REMOTE what tags exist, which
+  // is a different network from SV-04's (the ServiceNow instance). Both are `network: true`, so
+  // `--no-network` covers both, and nothing else in the engine reaches off the machine.
+  assert.deepEqual(checks.filter((c) => c.network).map((c) => c.id), ['E-28', 'SV-04']);
+  assert.deepEqual(checks.filter((c) => c.network).map((c) => c.section), ['host', 'server']);
 });
 
 test('only the checks with a repair declare fixable, and each carries a fix hint or a null', () => {
@@ -82,8 +85,10 @@ test('the detectors warn and the capability packs inform — only the engine\'s 
   // A leftover, a synced folder, a proxy variable and an approval are things the USER chose. The
   // doctor names them and prints the command; failing a run over one would be this tool deciding
   // something that is theirs to decide.
+  // E-28 joins them (ARC-09-S07): a checkout one release behind is a checkout that works, and a
+  // doctor that FAILED over an available upgrade would be this tool deciding when a user upgrades.
   assert.deepEqual(checks.filter((c) => c.severity === 'warn').map((c) => c.id),
-    ['E-23', 'E-24', 'E-25', 'E-26', 'E-27', 'SV-04']);
+    ['E-23', 'E-24', 'E-25', 'E-26', 'E-27', 'E-28', 'SV-04']);
   assert.deepEqual(checks.filter((c) => c.severity === 'info').map((c) => c.id), ['E-04']);
 });
 
@@ -103,7 +108,7 @@ const cli = (args) => spawnSync(process.execPath,
   [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', ...args],
   { cwd: REAL_ROOT, encoding: 'utf8' });
 
-test('--json reports all thirty-seven ids with a status each', () => {
+test('--json reports every id with a status each', () => {
   const r = cli(['--json', '--quick']);
   const report = JSON.parse(r.stdout);
   assert.deepEqual(report.checks.map((x) => x.id), ids);
@@ -154,7 +159,10 @@ test('--quick membership is the same set in the registry and in a real run', () 
   // And the ones the story leaves out, for the reasons it gives: they spawn, walk the corpus or
   // use the network.
   assert.deepEqual(report.checks.filter((c) => c.detail === 'not in the --quick subset')
-    .map((c) => c.id), ['E-00', 'E-03', 'E-04', 'E-16', 'E-21', 'E-27', 'SV-04', 'SV-05', 'SV-06']);
+    // E-28 (ARC-09-S07) is out for BOTH of `--quick`'s reasons at once: it spawns git and it
+    // reaches the network.
+    .map((c) => c.id), ['E-00', 'E-03', 'E-04', 'E-16', 'E-21', 'E-27', 'E-28',
+    'SV-04', 'SV-05', 'SV-06']);
 });
 
 test('a quick run says so in the report a consumer reads', () => {

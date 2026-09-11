@@ -583,6 +583,56 @@ jobs:
       - name: ...and the tree is exactly as it was
         run: node scripts/ci/assert-clean.mjs
 
+  upgrade-e2e:
+    # ARC-09-S07. `./snowarch upgrade` moves a TREE, and nothing about that can be proved in
+    # process: what is under test is a fetch, a checkout, a second bootstrap run and a store
+    # migration, and every interesting failure is one where the tree ends up somewhere the user did
+    # not expect. So `tests/upgrade/harness.mjs` builds a real world — a bare origin at v9.0.0 and
+    # two fixture releases — and these cells run the acceptance criteria against it.
+    #
+    # No network: the origin is a path and the corpus upstream is a local bare repository. The one
+    # case that needs a proxy injects it into the child's environment and points at a CLOSED
+    # loopback port.
+    #
+    # THREE required contexts, exactly as a check run prints them:
+    #   upgrade-e2e (ubuntu-latest) · upgrade-e2e (macos-latest) · upgrade-e2e (windows-latest)
+    # `tests/workflows.test.mjs` enumerates them beside the other 46, because a renamed cell is a
+    # required check that silently stops being required.
+    #
+    # Node 22 only: the harness compiles a server for fixture B, and the question this job asks is
+    # about an operating system's git and filesystem rather than about a Node major. The Windows
+    # leg runs with Git Bash on PATH — the machine WITHOUT it is ARC-09-S08's proof.
+    name: upgrade-e2e (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          # The harness tags fixture releases and reads their messages back; a shallow clone has
+          # no tags to describe against and `git describe --exact-match` would find nothing.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - name: git identity (the harness commits fixture releases)
+        run: |
+          git config --global user.email "f@example.com"
+          git config --global user.name "f"
+      - name: The upgrade, end to end, on two fixture releases
+        shell: bash
+        # The files, not the directory: `node --test <dir>` resolves the path as a MODULE on
+        # this Node, and a directory is not one. The harness is not a test file, so it is
+        # named out rather than matched by a glob that would try to run it.
+        run: node --test --test-concurrency=2 tests/upgrade/upgrade.e2e.test.mjs tests/upgrade/upgrade-unit.test.mjs
+      - name: ...and the checkout under test is exactly as it was
+        run: node scripts/ci/assert-clean.mjs
+
   launcher:
     # `bootstrap.sh` is the one file that runs on a machine with NO Node — which means none of the
     # engine's own tooling can check it, and none of the other jobs would notice it broken. Two
