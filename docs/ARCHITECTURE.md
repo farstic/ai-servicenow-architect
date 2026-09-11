@@ -585,6 +585,91 @@ the step goes on to return, because the record of why a run stopped is what the 
 `.local/instances.json` (the credential store) and `.local/config.json` are never touched, and the
 command says so.
 
+#### Bootstrap input hashes and upgrade invalidation
+
+The whole rule turns on one word — **inputs** — and until ARC-09-S05 each step answered it in its
+own file. Ten answers, ten places to get the resume rule wrong, and no way to show anybody the set.
+There is now one table, `tools/snowarch/lib/inputs.mjs`, and three things read it: the runner (to
+decide what to skip), `staleSteps()` (to say what an `upgrade` will invalidate *before* it changes
+anything), and the table below, which is generated from it.
+
+<!-- generated:bootstrap-inputs -->
+| Step | Input | Kind | Why it is an input |
+|---|---|---|---|
+| `B00` preflight | — | — | runs every time: Asks the MACHINE — git, Node, Claude Code, disk — and a machine is not a committed input. |
+| `B01` workspace and registration files | `.mcp.json` | file | the server registration this checkout ships |
+|  | `.claude/settings.json` | file | the committed permissions |
+|  | `mode` | literal | design-only and live write different toggles |
+| `B02` the documentation corpus | `<config.docs.areasFile>` | file | which areas the sparse checkout takes |
+|  | `vendor/ServiceNowDocs` | gitlink | the pinned commit — NOT the 35,000 files |
+|  | `docs` | literal | sparse, full or skip |
+| `B03` the mode toggle | `mode` | literal | the only thing this step writes |
+| `B04` runtime dependencies | `package-lock.json` | file | the exact tree npm would install |
+|  | `node major` | literal | a different major is a different install |
+| `B05` the contract | `packages/snowarch/dist/contract.json` | file | bytes — a changed contract is a changed server |
+|  | `packages/contract/required-tools.json` | file | the pin it is checked against |
+| `B06` the instance store | `.local/instances.json#version` | json-path | the schema, which decides whether a migration is due |
+|  | `store present` | literal | absent and empty are different states |
+|  | `instance file given` | literal | an `--instance-file` run writes an entry |
+|  | `mode` | literal | design-only never touches the store |
+|  | `store schema version` | literal | the version this build migrates TO (ARC-09-S06 replaces the literal) |
+| `B07` the local toggles | `mode` | literal | which server list the toggle goes in |
+|  | `node present` | literal | no Node means the hook is disabled |
+|  | `hooks disabled` | literal | S-05: the launcher may have turned them off |
+|  | `registration` | literal | project or user changes what is written |
+| `B08` the doctor | `packages/snowarch/dist/contract.json` | file | by sha — a different server answers differently |
+|  | `store mtime+size` | literal | NEVER the content: see the credential rule above |
+|  | `mode` | literal | design-only skips the server section |
+| `B09` the summary | — | — | runs every time: Prints what the run did. |
+<!-- /generated:bootstrap-inputs -->
+
+Three decisions in that table are worth stating plainly, because each is a thing deliberately **not**
+hashed:
+
+- **The corpus is hashed by its gitlink, not its contents.** Reading 35,000 files to decide whether
+  to skip reading 35,000 files is the cost the row exists to avoid, and an unrelated `touch` would
+  invalidate it. The gitlink moves exactly when the corpus is meant to be different. It is read from
+  **HEAD**, because a submodule moved locally and not committed is a dirty checkout — B00's
+  business — rather than a different corpus.
+- **The store is hashed by mtime and size, never by content.** Credentials are never hashed, read or
+  rewritten by any step other than the wizard and the migration. The stamp is truncated to the
+  **second**, the granularity every tool that restores an mtime preserves (`utimesSync` rounds,
+  `cp -p` and tar keep whole seconds); finer, and a restored backup would read as changed. What that
+  costs is two writes of the same byte length inside one second — which for this file is the wizard
+  rewriting a credential in place, and re-running the doctor over that is the behaviour the row
+  exists to prevent.
+- **`dist/` is hashed as bytes.** A contract that changed is a server that behaves differently, and
+  that is exactly when B05 and B08 must run again.
+
+<!-- generated:bootstrap-input-notes -->
+- **`B06` the instance store.** MIGRATE, DON'T RE-WIZARD: a store whose schema is behind makes this step stale so the migration runs — and a store whose CONTENTS changed does not, because re-running the wizard over somebody's credentials is never the right answer to "something moved".
+- **`B08` the doctor.** B08 calls the doctor (ARC-08-S05). This row answers "must the bootstrap run it again"; the doctor CACHE answers "may the banner reuse the last report" (`cacheStale()`, six mtimes). Two mechanisms for two consumers — do not merge them.
+<!-- /generated:bootstrap-input-notes -->
+
+**Determinism across platforms** is the other requirement, and it is why files are hashed as raw
+bytes with no line-ending normalisation: `.gitattributes` keeps every hashed file LF in every
+checkout, and a test walks the table and asserts `git check-attr` agrees for each file it names. A
+file that arrived CRLF on Windows would hash differently there, and the same commit would resume
+differently per OS — in a way nobody would notice until a resume misbehaved on one platform. CI
+asserts the three `node-cli` cells compute the same hashes for the same commit.
+
+**`staleSteps(state, ctx, { hashFor, alwaysRuns })`** returns one entry per step that would run,
+with a reason: `never-run` (no record, or `runsWhen` skipped it last time, so there is no result to
+reuse), `failed` (it ran and did not succeed — a failure is never cached), `launcher-recorded`, or
+`inputs-changed`. `explainStale()` renders those as the sentences the bootstrap prints.
+
+The **`launcher-recorded`** reason is the one that surprises people. The Node-free launchers record
+`inputsHash: null` by design (ARC-06-S14): bash and PowerShell cannot compute the table, so a
+Node-free install leaves every step unverifiable, and the next Node run re-runs B01 and B02 as a
+reconcile. "No hash" and "a hash that matches" must never be the same answer — the same rule
+`lib/git.mjs` follows about a command that failed. B00 and B09 also record `null`, but for the
+opposite reason: they have no inputs and run unconditionally, so `alwaysRuns` excludes them before
+the launcher rule is reached, and they never appear in the list of what changed.
+
+Two caches, two consumers, and they are **not** the same mechanism: this table answers "must the
+bootstrap run B08 again"; the doctor's own cache (`cacheStale()`, six mtimes) answers "may the
+banner reuse the last report". Merging them would tie an install's decisions to a banner's budget.
+
 ### `.local/bootstrap-state.json` v1
 
 Atomic (temp file + `rename`), `0600` on POSIX, and on Windows it records `"fileModes":

@@ -818,6 +818,21 @@ The launcher also has a line budget and a bash-3.2 constraint list, both enforce
 you are adding a step to it, ask first whether the step belongs on the Node path instead: this file
 exists for the machines that cannot run the other one, not as a second implementation.
 
+## A process that prints must not end abruptly
+
+Two rules, one cause: **a write to a pipe past the buffer is asynchronous**, and a process that
+ends before it drains loses it. A terminal is not a pipe, so neither failure is visible by hand.
+
+- **Set `process.exitCode`; never call `process.exit()`** in an entry point that prints.
+  `scripts/docs.mjs` did, and its `--json` object reached callers cut in half at exactly 8192
+  bytes. `tests/entrypoint-exit.test.mjs` holds every entry point to this.
+- **Nothing printed from an `exit` handler goes through `process.stderr.write`** — use
+  `writeSync(2, …)`. The handler returns, the process ends, and the stream never flushes.
+  `tools/snowarch/tests/helpers/temp.mjs` reports a fixture it could not remove from exactly there,
+  and the message vanished the first time for this reason.
+
+Both were found by a test that read the finished output rather than the code that produced it.
+
 ## What to paste in a bug report
 
 ```sh

@@ -11,7 +11,12 @@ import { makeCheckout, stub } from './helpers/workspace.mjs';
 const base = (root) => ({ root, mode: 'design-only', docs: 'sparse', env: {},
   node: { present: true, version: '22.11.0', major: 22 } });
 const state = () => emptyState({ engineVersion: '2.0.0-test', platform: 'darwin' });
-const run = (opts) => runSteps({ save: () => {}, ...opts });
+// These tests drive FAKE steps with invented ids, which have no row in ARC-09-S05's INPUTS table.
+// The runner hashes from the table by id; a fixture that invents a step supplies its own hasher
+// through the same seam the product uses. That is a fixture, not a second source of truth — the
+// real steps are hashed by the table, and `input-hash.test.mjs` is what holds the table honest.
+const fakeHash = (step, ctx) => hashInputs(ctx.root, step.inputs(ctx));
+const run = (opts) => runSteps({ save: () => {}, hash: fakeHash, ...opts });
 
 test('the registry is ten steps in order, and every one honours the contract', () => {
   assert.deepEqual(STEPS.map((s) => s.id),
@@ -130,7 +135,7 @@ test('a fail stops the run, writes the state, and prints cause, remedy and how t
   const s = state();
   const lines = [];
   let saved = 0;
-  const r = await runSteps({ root, ctx: base(root), state: s, steps,
+  const r = await runSteps({ root, ctx: base(root), state: s, steps, hash: fakeHash,
     onLine: (l) => lines.push(l), save: () => { saved += 1; } });
 
   assert.equal(r.code, 1);
@@ -257,7 +262,7 @@ test('the state is written after every step, not only at the end', async () => {
   const root = makeCheckout();
   const s = state();
   const steps = [stub('B01'), stub('B02', { result: { status: 'fail', detail: 'x' } })];
-  await runSteps({ root, ctx: base(root), state: s, steps });
+  await runSteps({ root, ctx: base(root), state: s, steps, hash: fakeHash });
   const onDisk = loadState(root);
   assert.equal(onDisk.steps.B01.status, 'ok', 'B01 must survive a later failure');
   assert.equal(onDisk.steps.B02.status, 'fail');

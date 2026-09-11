@@ -7,12 +7,16 @@
 // that depend on it.
 import { TEXT } from './inputs.mjs';
 import { writeConfig } from './B07.mjs';
+import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B03';
 export const title = 'mode';
 export const needsNode = false;
 export const runsWhen = () => true;
-export const inputs = (ctx) => [TEXT(`mode=${ctx.mode}`)];
+// ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
+// inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
+// set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
+export const inputs = INPUTS.B03.resolve;
 
 export const run = async (ctx) => {
   ctx.state.mode = ctx.mode;

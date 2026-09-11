@@ -47,8 +47,13 @@ test('criterion 1 — a live switch caches B01–B03 and runs B04 onwards', asyn
   const registry = STEPS.map((s) => stub(s.id, {
     runsWhen: () => true, inputs: () => [], onRun: async () => { ran.push(s.id); return { status: 'ok' }; },
   }));
-  // B01–B03 have a recorded `ok` whose inputs hash matches an empty input list, so the runner
-  // stands on them. That is the runner's rule, exercised here rather than restated.
+  // B01–B03 have a recorded `ok` whose hash still matches, so the runner stands on them. That is
+  // the runner's rule, exercised here rather than restated.
+  //
+  // The hasher is injected with the stubs (ARC-09-S05): the runner hashes a step from the INPUTS
+  // table by id, and these stubs only borrow the real ids — asking the table about them would
+  // hash the real rows, which is a fact about the checkout rather than about the rule under test.
+  // One constant for every stub, so what decides the outcome is whether a step has a RECORD.
   const hash = hashInputs(root, []);          // computed, never typed — the runner's own function
   const cached = Object.fromEntries(['B01', 'B02', 'B03'].map((id) => [id,
     { status: 'ok', inputsHash: hash, finishedAt: new Date().toISOString(), durationMs: 1 }]));
@@ -57,7 +62,7 @@ test('criterion 1 — a live switch caches B01–B03 and runs B04 onwards', asyn
 
   const log = recorder();
   const code = await modeCommand({ root, positional: ['live'], flags: { yes: true }, log,
-    env: {}, cwd: root, registry });
+    env: {}, cwd: root, registry, hash: () => hash });
   assert.equal(code, EXIT_OK, log.lines.join('\n'));
   const text = log.lines.join('\n');
   for (const id of ['B01', 'B02', 'B03']) {

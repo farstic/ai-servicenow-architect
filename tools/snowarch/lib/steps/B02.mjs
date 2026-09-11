@@ -14,6 +14,7 @@ import { docsStatus } from '../docs/status.mjs';
 import { verifyCitations } from '../docs/verify.mjs';
 import { CORPUS_TEXT } from './format.mjs';
 import { FILE, TEXT, ABSENT } from './inputs.mjs';
+import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B02';
 export const title = 'docs';
@@ -39,11 +40,10 @@ export function gitlink(root) {
   }
 }
 
-export const inputs = (ctx) => [
-  FILE(ctx.config.docs.areasFile),
-  TEXT(`gitlink=${gitlink(ctx.root)}`),
-  TEXT(`docs=${ctx.docs}`),
-];
+// ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
+// inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
+// set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
+export const inputs = INPUTS.B02.resolve;
 
 /** The docs family's exit codes → a StepResult, with the remedy each one actually needs. */
 export function mapSyncFailure(error) {

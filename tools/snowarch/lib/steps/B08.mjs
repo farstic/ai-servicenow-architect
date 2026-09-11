@@ -17,6 +17,7 @@ import { contractSha } from '../config.mjs';
 import { runDoctor } from '../doctor/index.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
+import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B08';
 export const title = 'verify';
@@ -33,11 +34,10 @@ export function storeMtime(root) {
   return existsSync(p) ? String(statSync(p).mtimeMs) : 'none';
 }
 
-export const inputs = (ctx) => [
-  TEXT(`contract=${contractSha(ctx.root) ?? 'not-built'}`),
-  TEXT(`storeMtime=${storeMtime(ctx.root)}`),
-  TEXT(`mode=${ctx.mode}`),
-];
+// ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
+// inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
+// set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
+export const inputs = INPUTS.B08.resolve;
 
 
 
