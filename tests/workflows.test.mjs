@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { EXPECTED_FAIL_ON_RUNNERS } from '../scripts/ci/doctor-snapshot.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -140,7 +140,12 @@ const KNOWN_JOBS = [
   // ARC-09-S07, three more (47–49): the upgrade moves a tree, and a tree is the one thing a unit
   // test cannot move. The three cells are three operating systems' git and filesystems.
   'upgrade-e2e',
-  'launcher', 'windows-launcher', 'secrets', 'plugin-validate',
+  'launcher',
+  // ARC-09-S08, three more (50–52): a Windows machine driven entirely through `.cmd`, with no Git
+  // Bash on PATH, on three Node majors. ARC-06-S14's `no-gitbash` cell keeps its own name and its
+  // own required context; this adds what that cell does not run.
+  'windows-native',
+  'windows-launcher', 'secrets', 'plugin-validate',
 ];
 
 /** The three required contexts `release-dryrun` adds, exactly as a check-run prints them. */
@@ -458,4 +463,91 @@ test('the exit-code check after a .cmd is reachable, proven by running cmd (ARC-
     { cwd: dir, encoding: 'utf8' });
   assert.equal(withCall.status, 1, 'the exit-code check did not fire');
   assert.equal(/AFTER/.test(withCall.stdout ?? ''), false, 'the check let a failure through');
+});
+
+/**
+ * ARC-09-S08 — the required contexts, generated, and held to the workflow they come from.
+ *
+ * `main`'s branch protection lists its required checks BY NAME. A list typed into a settings page
+ * silently stops matching: a renamed cell is not a red build, it is a required check nobody
+ * produces any more — protection either waits for ever or quietly stops requiring the thing it was
+ * there for. So the list is generated from `ci.yml`, this test holds the two together, and the
+ * architect's protection call reads the file.
+ */
+test('required-contexts.json is exactly what ci.yml produces on a pull request (ARC-09-S08)', () => {
+  const fixture = JSON.parse(readFileSync(join(root, 'tests/fixtures/required-contexts.json'), 'utf8'));
+
+  // The generator is the one implementation; this runs it in `--check` mode rather than
+  // re-deriving the names here, because a second derivation is a second opinion and the day they
+  // disagree the test is as likely to be wrong as the file.
+  const check = spawnSync(process.execPath,
+    [join(root, 'scripts/gen-required-contexts.mjs'), '--check'], { encoding: 'utf8' });
+  assert.equal(check.status, 0,
+    `the fixture is stale or unreadable — run npm run gen\n${check.stdout}${check.stderr}`);
+
+  assert.equal(fixture.count, fixture.contexts.length);
+  assert.equal(new Set(fixture.contexts).size, fixture.contexts.length, 'a duplicated context');
+  assert.ok(fixture.count >= 50, `${fixture.count} contexts — the parser lost some`);
+
+  // Every job in the workflow is represented, and nothing else is.
+  const ci = wf('ci.yml');
+  const jobsBlock = ci.slice(ci.indexOf('\njobs:'));
+  const jobNames = [...jobsBlock.matchAll(/^ {2}([a-z][a-z0-9-]*):$/gm)].map((m) => m[1]);
+  // A job's CONTEXT is its `name:` when it has one, not its id — `no-build` prints as
+  // `no-build handshake (ubuntu-latest)`. Comparing against the id would have passed for twelve
+  // jobs and failed for the one that renames itself, which is the one worth catching.
+  const displayOf = (job) => {
+    // Sliced PAST the job's own header, or the split cuts at index 0 and the block is empty — the
+    // same trap the contexts generator hit reading `matrix:`.
+    const header = `\n  ${job}:`;
+    const after = jobsBlock.slice(jobsBlock.indexOf(header) + header.length);
+    const block = after.split(/\n {2}[a-z][a-z0-9-]*:\n/)[0];
+    const name = /^ {4}name:\s*(.+)$/m.exec(block);
+    return name ? name[1].trim().replace(/^['"]|['"]$/g, '').replace(/\s*\(.*$/, '') : job;
+  };
+  for (const job of jobNames) {
+    const display = displayOf(job);
+    assert.ok(fixture.contexts.some((c) => c === display || c.startsWith(`${display} (`)),
+      `${job} (printed as "${display}") produces no context in the fixture`);
+  }
+  const displays = jobNames.map(displayOf);
+  for (const context of fixture.contexts) {
+    assert.ok(displays.some((d) => context === d || context.startsWith(`${d} (`)),
+      `${context} names no job in ci.yml`);
+  }
+
+  // The three this story adds, in the form a check run prints them.
+  for (const node of ['20', '22', '24']) {
+    assert.ok(fixture.contexts.includes(`windows-native (node ${node}, no Git Bash)`),
+      `windows-native (node ${node}, no Git Bash) is missing`);
+  }
+
+  // The conditional workflows are excluded BY NAME with a reason, never by "it was not in the last
+  // run". `docs-real.yml` names its jobs after the OS and is path-filtered: a PR that touches its
+  // paths produces four extra check runs, and a generator that learned its list from a run would
+  // have made them required.
+  assert.ok(Object.keys(fixture._notRequired).includes('docs-real.yml'));
+  for (const [file, why] of Object.entries(fixture._notRequired)) {
+    assert.ok(existsSync(join(root, '.github/workflows', file)), `${file} is not there`);
+    assert.ok(why.length > 30, `${file}'s exclusion carries no reason`);
+  }
+
+  // S09 has not merged: `eol` is its two contexts and enters this file when its cells exist. A
+  // name here that CI does not produce is a required check waiting for ever.
+  assert.equal(fixture.contexts.some((c) => c.startsWith('eol')), false,
+    "eol is S09's; it belongs here when the job does");
+});
+
+test('the contexts generator fails LOUDLY on a job it cannot classify (ARC-09-S08)', () => {
+  // The property that makes the file trustworthy: an omission would be a context that never
+  // becomes required, found months later by a bad merge. The generator's contract is exit 2 with
+  // the job named, and both halves are asserted of the source rather than hoped for.
+  const src = readFileSync(join(root, 'scripts/gen-required-contexts.mjs'), 'utf8');
+  assert.match(src, /process\.exit\(2\)/, 'there is no hard-failure path');
+  assert.match(src, /const die = /, 'the failure is not in one place');
+  for (const shape of ['cannot read', 'which the matrix does not set', 'declares no matrix']) {
+    assert.ok(src.includes(shape), `no hard failure for: ${shape}`);
+  }
+  // …and it is a FAILURE, not a warning that carries on: every `die` ends the process.
+  assert.match(src, /writeSync\(2, `gen-required-contexts: \$\{why\}\\n`\); process\.exit\(2\); \};/);
 });

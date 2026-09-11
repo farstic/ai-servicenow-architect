@@ -265,11 +265,19 @@ jobs:
       # machine, so "no bash at all" is not a state a Windows user is ever in; what must be gone is
       # GIT Bash, the interpreter `bootstrap.sh` needs. `Git\cmd` stays, because git itself is a
       # prerequisite.
-      - name: No Git Bash on PATH, and the whole Windows path without it
+      # ONE implementation of the recipe, shared with `windows-native` (ARC-09-S08). It was a
+      # literal PATH in two `run:` blocks, and two copies of a machine's directory layout is one
+      # copy too many: the day a runner image moves `nodejs`, one gets corrected and the other
+      # silently starts testing a machine with no Node, which passes for the wrong reason.
+      - name: No Git Bash on PATH (the shared recipe)
+        if: matrix.variant == 'no-gitbash'
+        shell: bash
+        run: node scripts/ci/strip-git-bash.mjs --with-node
+
+      - name: ...and the whole Windows path without it
         if: matrix.variant == 'no-gitbash'
         shell: cmd
         run: |
-          set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
           where bash 2>nul | find /i "\Git\" >nul && exit /b 1
           where node || exit /b 1
           call .\bootstrap.cmd --mode design --yes --skip-claude-check
@@ -715,6 +723,110 @@ jobs:
             assertStorable(s);
             console.log('state ok:', s.version, s.writer, Object.keys(s.steps).length, 'steps');
           "
+
+  windows-native:
+    # ARC-09-S08. A Windows machine used the way a Windows user uses one: `cmd.exe` as the shell
+    # for every step, no Git Bash on PATH, and the product driven entirely through `.cmd`.
+    #
+    # This does NOT replace ARC-06-S14's `bootstrap (no-gitbash, windows-latest)` cell — that name
+    # is a required context on `main` and stays exactly as it is. What this ADDS is everything that
+    # cell does not run: three Node majors instead of one, and the commands a user reaches for after
+    # the install — the wizard's `--password-stdin` door, the server's own handshake, the hook, the
+    # version block, a store migration plan, and an upgrade check.
+    #
+    # `shell: cmd` as the job default, so a step that needs bash has to say so and none does. The
+    # PATH comes from `scripts/ci/strip-git-bash.mjs`, which S14's cell now calls too — two copies
+    # of a machine's directory layout is one copy too many, and the day an image moves `nodejs` one
+    # copy gets corrected while the other silently starts proving nothing.
+    name: windows-native (node ${{ matrix.node }}, no Git Bash)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22', '24']
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # BEFORE the PATH is stripped: `openssl.exe` lives in `Git\usr\bin`, the same directory as
+      # the `bash.exe` this cell exists to remove. Making a certificate is not what is under test.
+      - name: A throwaway certificate, while openssl is still reachable
+        run: node scripts/ci/make-fixture-cert.mjs
+
+      - name: A PATH with no Git Bash on it
+        run: node scripts/ci/strip-git-bash.mjs --with-node
+      - name: ...and it is really gone
+        run: |
+          where bash 2>nul | find /i "\Git\" >nul && exit /b 1
+          where node || exit /b 1
+          where git || exit /b 1
+          exit /b 0
+
+      - name: Install through the Windows launcher
+        run: |
+          call .\bootstrap.cmd --mode design --yes --skip-claude-check --docs skip
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # `version` through `snowarch.cmd` — six lines, ARC-09-S04's contract, counted by node rather
+      # than by `find /c /v ""`, whose padded output `set /p` keeps (S04's own lesson).
+      - name: version, six lines, through snowarch.cmd
+        run: |
+          call .\snowarch.cmd version > version.txt
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          node -e "const l=require('fs').readFileSync('version.txt','utf8').trim().split(/\r?\n/); if(l.length!==6){console.error('lines: '+l.length+String.fromCharCode(10)+l.join(String.fromCharCode(10)));process.exitCode=1}"
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # The wizard's non-interactive door (ARC-07): a password on STDIN, never in argv, against a
+      # store in the checkout. No network — `--no-probes` is what makes that true.
+      - name: instance add --password-stdin, through snowarch.cmd
+        run: |
+          npm ci --ignore-scripts
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          node scripts/ci/assert-password-stdin.mjs
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # The committed `dist/` answers a real handshake on this machine (ARC-08-S05's own client).
+      - name: The server answers a handshake here
+        run: |
+          node tools\snowarch\tests\server-section-smoke.mjs
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # The SessionStart hook in the form Claude Code runs it — `node <path>`, under cmd, with no
+      # POSIX shell anywhere (ARC-08-S08).
+      - name: The hook, under cmd, with no shell to fall back on
+        run: |
+          node tools\snowarch\hooks\session-start.mjs > hook.txt
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          type hook.txt | find "Mode:" >nul || exit /b 1
+          type hook.txt
+
+      # S06's store command and S07's upgrade check, both through the `.cmd` entry point. Neither
+      # writes: `--dry-run` and `--check` are the read-only halves, which is what makes them safe
+      # on a cell whose job is the entry point rather than the behaviour.
+      - name: store migrate --dry-run, through snowarch.cmd
+        run: |
+          call .\snowarch.cmd store migrate --dry-run
+          if %ERRORLEVEL% GEQ 2 exit /b 1
+
+      - name: upgrade --check, through snowarch.cmd
+        run: |
+          call .\snowarch.cmd upgrade --check
+          rem 0 = up to date, 4 = a newer release exists. Anything else is a broken command, and on
+          rem a fork or a fresh clone with no tags it is 1 — which this cell accepts, because what
+          rem is under test is the ENTRY POINT, not what the remote happens to carry today.
+          if %ERRORLEVEL% GEQ 5 exit /b 1
+          exit /b 0
+
+      - name: ...and the checkout is as CI found it
+        shell: bash
+        run: node scripts/ci/assert-clean.mjs
 
   windows-launcher:
     # The Windows launchers can be verified nowhere else. They are written on macOS, where no

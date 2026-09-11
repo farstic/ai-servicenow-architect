@@ -1544,6 +1544,46 @@ also owns two things that are easy to get wrong once and never notice: `-s <scop
 (without it, `remove` deletes from whichever scope it finds, and ours is committed), and the
 `cwd: root` that local scope is keyed on.
 
+## The CI matrix — every job, every cell
+
+Generated names live in `tests/fixtures/required-contexts.json`, which is what `main`'s branch
+protection is set from; the table below is the human reading of it. Run `npm run gen` after any
+change to `ci.yml` — `gen-all --check` fails on a stale file, and a name in that file that CI does
+not produce is a required check waiting for ever.
+
+| Job | Cells | Shell | What only this job can answer |
+|---|---|---|---|
+| `test` | 3 OS × node 20/22/24 | node/npm | the suites, the lint, the type-check |
+| `contract` | 3 OS × node 20/22/24 | node/npm | the contract gate, on every platform that ships it |
+| `no-build handshake` | 3 OS | node | the COMMITTED `dist/` answers, with no build step first |
+| `docs-check` | ubuntu | node | the corpus recipe and the citations |
+| `footprint` | ubuntu | node | `node_modules` stays under its limit |
+| `actionlint` | ubuntu | pinned binary | the workflows parse and their expressions type-check |
+| `bootstrap` | 13 (ARC-06-S14) | bash · cmd · powershell | the install promise, executed — including the doctor, the snapshot and the banner as STEPS (ARC-08-S11: steps, not a job, so the protection list did not grow) |
+| `commitlint` | ubuntu | node | the commit convention, which nothing else enforces |
+| `release-dryrun` | 3 OS | bash | the release path, on every commit — `release.yml` only ever runs on a tag |
+| `upgrade-e2e` | 3 OS × node 22 | bash | an upgrade moves a TREE, and a tree is what a unit test cannot move |
+| `windows-native` | windows × node 20/22/24 | **cmd** | a Windows machine used the way a Windows user uses one: `cmd.exe` throughout, no Git Bash, the product driven through `.cmd` |
+| `launcher` | ubuntu + macOS | bash | `bootstrap.sh` with Node stripped from PATH |
+| `windows-launcher` | windows | powershell · cmd | the `.cmd` and `.ps1` launchers, which exist nowhere else to be tested |
+| `secrets` | ubuntu | node | no credential-shaped string reached the tree |
+| `plugin-validate` | ubuntu | node | the plugin manifest is loadable |
+| `eol` | — | — | **ARC-09-S09's**, not yet merged. It enters `required-contexts.json` when its cells exist |
+| `docs-real` | 3 OS + one | bash | **conditional — runs only when the corpus tooling changes; NOT required.** A PR that touches those paths produces four extra check runs and they must never become required contexts |
+
+**The banner's two numbers, per cell.** `banner-timing.mjs` reports both paths: the FAST path (warm
+cache) against `01` §8's 300 ms, and the RE-RUN path (cold, a quick doctor) at 1000 ms on the
+difference between the run and an empty-Node floor measured interleaved. A fast-path trip is a
+product regression; a re-run-path trip is ARC-09-C5's territory, and the cap does not move until
+C5's tables say where the time goes.
+
+**The macOS-minutes lever, documented and not applied.** If the budget bites, narrow
+`release-dryrun` and `upgrade-e2e` to ubuntu + windows by deleting `macos-latest` from their two
+`os:` lists and running `npm run gen` — the required-contexts file and the protection list follow
+from it. `verify` in `release.yml` keeps all three whatever happens here: a release is the one
+moment all three must be proven. Do NOT narrow `test`, `contract` or `bootstrap`; those are where a
+platform-specific break is actually caught.
+
 ## What CI proves about the install
 
 The `bootstrap` job is the install promise, executed. **When it is red, the install is broken, not
