@@ -75,10 +75,19 @@ test('version --json is the shape the doctor will read', () => {
   const r = run(['version', '--json']);
   assert.equal(r.code, EXIT_OK);
   const o = JSON.parse(r.stdout);
-  assert.deepEqual(Object.keys(o).sort(), ['contractSha', 'docsFamily', 'docsPin', 'floors', 'version']);
+
+  // ARC-06-S02's FIVE KEYS, unchanged in name and in type. This was a `deepEqual` over every key
+  // until ARC-09-S04, which adds the git facts beside them — so the assertion became the one that
+  // was always meant: these five are present and are what they were. A consumer written against
+  // the old object still reads the same values out of the new one.
+  for (const key of ['version', 'contractSha', 'docsPin', 'docsFamily', 'floors']) {
+    assert.ok(key in o, `${key} is gone from version --json`);
+  }
   assert.equal(o.version, version());
   assert.equal(o.contractSha, contractSha());
   assert.deepEqual(o.floors, loadConfig().floors);
+  assert.equal(typeof o.docsPin, 'string');
+  assert.equal(typeof o.docsFamily, 'string');
 });
 
 test('an unbuilt checkout says so rather than printing a stale sha', () => {

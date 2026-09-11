@@ -149,6 +149,19 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   and Windows without Git for Windows, where the honest answer is that the session cannot run
   `./snowarch` from here at all.
 
+- **`./snowarch version` answers the first question a support conversation asks.** Six offline
+  lines: the version, the release tag you are on — or how far past it, or why there is none — the
+  commit and whether the tree is dirty, the contract sha with its verdict against the pin, the
+  corpus gitlink with its verdict against the config, and the floors. When the tag carries its own
+  record, a seventh line says what the tag claims and whether this checkout is still that release.
+  No network: the old server's CLI fetched a registry record on every invocation and nagged about a
+  stranger's package, and this is the command someone runs when something is already wrong.
+
+  The doctor's `engine` header is now the same call rather than a second reading of the same files
+  — two programs answering "what is this checkout" from two readers would eventually disagree, and
+  the day they did, `/snowarch status` would quote one while the tag said the other. `--json` keeps
+  ARC-06-S02's five keys exactly and adds the git facts beside them.
+
 - **A tag is the whole release procedure.** `release.yml` runs on `v*` and nothing else: it verifies
   that the tag's message describes the tree it sits on — before any gate, because a tag that does
   not is a release to stop rather than to test — then re-runs every gate on ubuntu, macOS and

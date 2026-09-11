@@ -22,6 +22,7 @@ import { childEnv } from '../spawn-env.mjs';
 
 import { SECTIONS } from './registry.mjs';
 import { askOnce } from '../ask.mjs';
+import { versionInfo } from '../version-info.mjs';
 import { engineBlock, engineRegistry, serverBlock, staleBlock,
   summariseMerged } from './checks/index.mjs';
 import { deriveMode, modeLine, modeLineDetailed } from './mode.mjs';
@@ -200,8 +201,10 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
         ? (contract ? { count: contract.tools.length, source: 'contract' } : null)
         : { count: toolCount, source: 'server' },
     }),
-    engine: engineBlock(results, { version: readVersion(root),
-      contractSha: contractSha(root) ?? null }),
+    // ONE source for the header (ARC-09-S04). It read the version and the sha for itself until
+    // then, which is two programs answering "what is this checkout" from two readers — and the day
+    // they disagreed, `/snowarch status` would quote one while the tag said the other.
+    engine: engineBlock(results, versionInfo(root)),
     prereqs: {
       ...collectPrereqs({ root, config, env }),
       // E-04 resolved these; the renderer's `Capabilities:` line reads them from here rather than

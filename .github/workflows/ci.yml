@@ -761,8 +761,21 @@ jobs:
       - name: snowarch.cmd, with Node and without
         shell: cmd
         run: |
-          .\snowarch.cmd version
+          call .\snowarch.cmd version > version.txt
           if not "%ERRORLEVEL%"=="0" exit /b 1
+          type version.txt
+          rem ARC-09-S04: six lines, and each one names what it reports. The Windows path reaches
+          rem the same code as ./snowarch, and `git.exe` is on PATH here without Git Bash.
+          type version.txt | find /c /v "" > count.txt
+          set /p LINES=<count.txt
+          if not "%LINES%"=="6" echo expected 6 lines, got %LINES% & exit /b 1
+          type version.txt | find "snowarch " >nul || exit /b 1
+          type version.txt | find "tag:" >nul || exit /b 1
+          type version.txt | find "commit:" >nul || exit /b 1
+          type version.txt | find "contract:" >nul || exit /b 1
+          type version.txt | find "docs-pin:" >nul || exit /b 1
+          type version.txt | find "floors:" >nul || exit /b 1
+          del version.txt count.txt
           set "PATH=C:\Windows\system32;C:\Windows"
           .\snowarch.cmd version
           echo without-node ERRORLEVEL=%ERRORLEVEL%

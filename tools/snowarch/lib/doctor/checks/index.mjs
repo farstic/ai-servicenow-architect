@@ -88,14 +88,23 @@ export function serverBlock(answer) {
  * the capability packs, E-12…E-16 hold `docsStatus()`'s answer, E-17 counted the roster and E-22
  * the contract. A block that computed any of them again would be a second answer that agrees today.
  */
-export function engineBlock(results = [], { version = null, contractSha = null, tag = null } = {}) {
+/**
+ * The report's `engine` header.
+ *
+ * `info` is `versionInfo()`'s object (ARC-09-S04) — the same one `./snowarch version --json` prints,
+ * so `engine.version`, `engine.tag` and `engine.contractSha` are that command's answers rather than
+ * a second reading of the same files. The rest of the header comes from the checks, which is where
+ * it is measured.
+ */
+export function engineBlock(results = [], info = {}) {
+  const { version = null, contractSha = null, tag = null } = info;
   const data = (id) => results.find((r) => r.id === id)?.data ?? null;
   const docs = data('E-12');
   return {
     version,
-    // ARC-09-S04 fills this from `./snowarch version --json`; until then it is honestly absent
-    // rather than a guess at what the tag would be.
-    tag,
+    // The tag NAME, which is what a reader quotes. `null` on a development checkout, honestly:
+    // there is no release to name, and inventing one would be worse than saying so.
+    tag: typeof tag === 'string' ? tag : (tag?.name ?? null),
     contractSha,
     node: data('E-02')?.version ?? null,
     capabilities: data('E-04')?.packs ?? null,
