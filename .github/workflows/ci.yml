@@ -269,15 +269,15 @@ jobs:
       # literal PATH in two `run:` blocks, and two copies of a machine's directory layout is one
       # copy too many: the day a runner image moves `nodejs`, one gets corrected and the other
       # silently starts testing a machine with no Node, which passes for the wrong reason.
-      - name: No Git Bash on PATH (the shared recipe)
-        if: matrix.variant == 'no-gitbash'
-        shell: bash
-        run: node scripts/ci/strip-git-bash.mjs --with-node
-
-      - name: ...and the whole Windows path without it
+      - name: No Git Bash on PATH, and the whole Windows path without it
         if: matrix.variant == 'no-gitbash'
         shell: cmd
         run: |
+          rem The shared recipe (ARC-09-S08), applied to THIS STEP only. Not `GITHUB_ENV`: that
+          rem would strip Git Bash from every later step in the job, and the ones that say
+          rem `shell: bash` would then resolve to C:\Windows\System32\bash.exe — the WSL stub —
+          rem and fail with "Windows Subsystem for Linux has no installed distributions". Measured.
+          for /f "delims=" %%p in ('node scripts\ci\strip-git-bash.mjs --with-node --print') do set "PATH=%%p"
           where bash 2>nul | find /i "\Git\" >nul && exit /b 1
           where node || exit /b 1
           call .\bootstrap.cmd --mode design --yes --skip-claude-check
@@ -760,8 +760,10 @@ jobs:
       - name: A throwaway certificate, while openssl is still reachable
         run: node scripts/ci/make-fixture-cert.mjs
 
+      # JOB-WIDE here, which is safe only because every step below runs under `cmd` — the job's
+      # default shell. A `shell: bash` step in this job would resolve to the WSL stub.
       - name: A PATH with no Git Bash on it
-        run: node scripts/ci/strip-git-bash.mjs --with-node
+        run: node scripts/ci/strip-git-bash.mjs --with-node --export
       - name: ...and it is really gone
         run: |
           where bash 2>nul | find /i "\Git\" >nul && exit /b 1
@@ -813,7 +815,13 @@ jobs:
       - name: store migrate --dry-run, through snowarch.cmd
         run: |
           call .\snowarch.cmd store migrate --dry-run
+          rem 0 = nothing to do, 1 = no store in this checkout (the wizard wrote its fixture store
+          rem to a temp SNOW_STORE, not here). Both are fine; 2 is a usage error and 3+ is broken.
+          rem The explicit `exit /b 0` is not decoration: a cmd step's code is the LAST command's,
+          rem and `if` does not reset ERRORLEVEL — so without it the step inherited the 1 and went
+          rem red while asserting nothing. All three cells failed exactly there.
           if %ERRORLEVEL% GEQ 2 exit /b 1
+          exit /b 0
 
       - name: upgrade --check, through snowarch.cmd
         run: |
@@ -824,9 +832,12 @@ jobs:
           if %ERRORLEVEL% GEQ 5 exit /b 1
           exit /b 0
 
+      # `cmd`, not bash: this job has no Git Bash by design, and a `shell: bash` step here would
+      # resolve to the WSL stub rather than to a shell.
       - name: ...and the checkout is as CI found it
-        shell: bash
-        run: node scripts/ci/assert-clean.mjs
+        run: |
+          node scripts\ci\assert-clean.mjs
+          if not "%ERRORLEVEL%"=="0" exit /b 1
 
   windows-launcher:
     # The Windows launchers can be verified nowhere else. They are written on macOS, where no

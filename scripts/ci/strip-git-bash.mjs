@@ -16,17 +16,32 @@
  * Bash and is not what `bootstrap.sh` needs. What must be gone is the `\\Git\\` one. `Git\\cmd`
  * stays, because git itself is a prerequisite of everything the cell does.
  *
- * Usage: node scripts/ci/strip-git-bash.mjs [--with-node] [--check]
- *   --with-node   include the Node directory (the `no-node` variants leave it out)
- *   --check       assert the result and print it, without writing GITHUB_PATH/GITHUB_ENV
- * Exit 0 written · 1 Git Bash still reachable · 2 not Windows.
+ * SCOPE IS THE CALLER'S CHOICE, and getting it wrong is not subtle. Writing `PATH` to
+ * `GITHUB_ENV` applies it to every LATER step in the job — including steps that say
+ * `shell: bash`, which then resolve to `C:\Windows\System32\bash.exe`, the WSL stub, and fail
+ * with "Windows Subsystem for Linux has no installed distributions". Measured exactly that way on
+ * ARC-06-S14's cell, whose later assertions legitimately want Git Bash. So:
+ *
+ *   --print    one line, the PATH, and nothing written. The caller applies it to ITS OWN step
+ *              (`for /f "delims=" %%p in ('node …--print') do set "PATH=%%p"`), which is what a
+ *              cell wants when only one step must be Git-Bash-free.
+ *   --export   write `GITHUB_ENV`, job-wide. Only for a job where EVERY later step is meant to
+ *              run without it — `windows-native`, whose default shell is `cmd`.
+ *
+ * `GITHUB_PATH` is deliberately not used at all: it PREPENDS, and nothing prepended can remove a
+ * directory already on the PATH. A recipe that cannot remove is no use to a cell whose whole
+ * subject is an absence.
+ *
+ * Usage: node scripts/ci/strip-git-bash.mjs [--with-node] (--print | --export)
+ * Exit 0 ok · 1 Git Bash still reachable · 2 not Windows.
  */
 import { appendFileSync, existsSync, writeSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const argv = process.argv.slice(2);
 const WITH_NODE = argv.includes('--with-node');
-const CHECK = argv.includes('--check');
+const EXPORT = argv.includes('--export');
+const PRINT_ONLY = argv.includes('--print') || !EXPORT;
 
 if (process.platform !== 'win32') {
   writeSync(2, 'strip-git-bash: Windows only — this recipe is about cmd.exe and Git for Windows\n');
@@ -74,19 +89,19 @@ if (found.length > 0) {
   process.exit(1);
 }
 
-writeSync(1, `strip-git-bash: ${present.length} director${present.length === 1 ? 'y' : 'ies'}, `
+// The DIAGNOSTIC goes to stderr, so `--print`'s stdout is one line a `for /f` can consume whole.
+writeSync(2, `strip-git-bash: ${present.length} director${present.length === 1 ? 'y' : 'ies'}, `
   + `no Git Bash${WITH_NODE ? ', Node included' : ', and no Node'}\n`);
-writeSync(1, `${PATH}\n`);
 
-if (!CHECK) {
-  // GITHUB_PATH prepends; the runner rebuilds PATH from it for every LATER step. `GITHUB_ENV` is
-  // what a step reads as `$env:PATH` in the same job, so both are written — a cell that set only
-  // one would behave differently depending on which shell the next step used.
-  const { GITHUB_PATH, GITHUB_ENV } = process.env;
-  if (GITHUB_PATH) for (const dir of present) appendFileSync(GITHUB_PATH, `${dir}\n`);
-  if (GITHUB_ENV) appendFileSync(GITHUB_ENV, `PATH=${PATH}\n`);
-  if (!GITHUB_PATH && !GITHUB_ENV) {
-    writeSync(2, 'strip-git-bash: no GITHUB_PATH or GITHUB_ENV — nothing was written\n');
+if (PRINT_ONLY) {
+  writeSync(1, `${PATH}\n`);
+} else {
+  const { GITHUB_ENV } = process.env;
+  if (!GITHUB_ENV) {
+    writeSync(2, 'strip-git-bash: --export outside a runner — there is no GITHUB_ENV to write\n');
     process.exit(1);
   }
+  appendFileSync(GITHUB_ENV, `PATH=${PATH}\n`);
+  writeSync(2, 'strip-git-bash: exported job-wide — every later step in this job loses Git Bash, '
+    + 'including any that says `shell: bash`\n');
 }

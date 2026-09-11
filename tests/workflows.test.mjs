@@ -551,3 +551,46 @@ test('the contexts generator fails LOUDLY on a job it cannot classify (ARC-09-S0
   // …and it is a FAILURE, not a warning that carries on: every `die` ends the process.
   assert.match(src, /writeSync\(2, `gen-required-contexts: \$\{why\}\\n`\); process\.exit\(2\); \};/);
 });
+
+/**
+ * ARC-09-S08 — a `shell: bash` step in a job that removed Git Bash resolves to the WSL stub.
+ *
+ * `C:\Windows\System32\bash.exe` is on every Windows machine and is not a shell — it is the WSL
+ * launcher, and on a runner with no distribution installed it prints "Windows Subsystem for Linux
+ * has no installed distributions" and exits 1. So a job that strips Git Bash JOB-WIDE has taken on
+ * a rule: nothing in it may ask for bash. Measured the hard way — `strip-git-bash.mjs` wrote
+ * `GITHUB_ENV` in ARC-06-S14's cell and the cell's own bash assertions started failing there.
+ */
+test('a job that exports the stripped PATH has no bash steps left in it (ARC-09-S08)', () => {
+  const ci = wf('ci.yml');
+  const jobsBlock = ci.slice(ci.indexOf('\njobs:'));
+  const names = [...jobsBlock.matchAll(/^ {2}([a-z][a-z0-9-]*):$/gm)];
+
+  for (const [i, m] of names.entries()) {
+    const body = jobsBlock.slice(m.index, i + 1 < names.length ? names[i + 1].index : undefined);
+    if (!/strip-git-bash\.mjs[^\n]*--export/.test(body)) continue;
+
+    // Every step after the export must be a shell this job still has. The job default counts too.
+    const usesBash = [...body.matchAll(/^\s+shell:\s*bash\s*$/gm)];
+    assert.deepEqual(usesBash.map((x) => x[0].trim()), [],
+      `${m[1]} strips Git Bash job-wide and still has a \`shell: bash\` step — that resolves to `
+      + 'C:\\Windows\\System32\\bash.exe, the WSL stub');
+    assert.match(body, /shell: cmd/, `${m[1]} exports a stripped PATH but declares no cmd default`);
+  }
+});
+
+test('every cmd step ends with an explicit exit code (ARC-09-S08)', () => {
+  // A cmd step's exit code is the LAST command's, and `if` does not reset ERRORLEVEL — so a step
+  // whose final line is `if %ERRORLEVEL% GEQ 2 exit /b 1` inherits whatever the command before it
+  // returned and goes red while asserting nothing. Three cells failed exactly there.
+  const ci = wf('ci.yml');
+  const offenders = [];
+  for (const [, block] of ci.matchAll(/^\s+run: \|\n((?:\s{10}.*\n)+)/gm)) {
+    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lines.some((l) => /^(call |rem |where |type |set )/.test(l))) continue;   // not a cmd step
+    const last = lines[lines.length - 1];
+    if (/^if %ERRORLEVEL% GEQ \d+ exit \/b \d+$/.test(last)) offenders.push(last);
+  }
+  assert.deepEqual(offenders, [],
+    'a cmd step ending in a GEQ guard inherits the previous command\'s code — add `exit /b 0`');
+});
