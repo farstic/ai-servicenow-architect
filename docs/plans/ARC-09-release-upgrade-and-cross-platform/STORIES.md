@@ -365,6 +365,14 @@ before the writes, which is why `release-dryrun` was green for the whole arc.
 **Definition of done.** Merged; rehearsal Release created and deleted with the run URL recorded in `docs/CONTRIBUTING.md`; `release-dryrun` required on `main`.
 
 
+**Amendment after rehearsal run 7 (ARC-09-C19, 2026-09-12).** The doctor step CAPTURES the report
+and a separate step JUDGES it with `assert-doctor.mjs --expect-fail E-00`, the same script and flag
+the bootstrap cells have used since ARC-08. A hosted runner has no Claude Code, so E-00 fails on
+every published report; letting `bash -e` decide cost all three `verify` jobs on a report that was
+correct. `assert-assets.mjs` carries the same rule at the publish gate — E-00 alone is explained,
+anything beside it refuses — and the Release notes say so where a reader meets the numbers.
+
+
 **Amendment after rehearsal run 3 (ARC-09-C16, 2026-09-11).** `release.yml` must RE-FETCH the tag
 object after checkout, in every job that reads it. `actions/checkout@v4` on a tag ref writes
 `refs/tags/<name>` pointing at the commit — it peels the tag — so this story's own first step

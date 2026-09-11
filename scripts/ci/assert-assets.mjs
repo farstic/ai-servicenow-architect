@@ -31,6 +31,12 @@ if (files.length === 0) {
  * form is `s***@host`. `@` after at least one character that is not `*` is the tell. The others are
  * the env var names the old installers left in `~/.claude.json`.
  */
+/**
+ * The one check a hosted runner explains: it has no Claude Code, so E-00 reports it missing. Named
+ * once here and asserted in both directions by the tests (ARC-09-C19).
+ */
+const EXPLAINED_FAIL = 'E-00';
+
 const FORBIDDEN = [
   [/[A-Za-z0-9._%+-]{2,}@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/, 'an unmasked e-mail address'],
   [/"password"\s*:\s*"(?!\s*")[^"]{3,}"/, 'a password field with a value'],
@@ -57,8 +63,20 @@ for (const file of files) {
   try { report = JSON.parse(text); } catch (e) { problems.push(`${file}: not JSON — ${e.message}`); continue; }
   if (report.schema !== 1) problems.push(`${file}: schema ${report.schema}, expected 1`);
   if (report.mode !== 'design-only') problems.push(`${file}: mode "${report.mode}", expected design-only`);
+  // ARC-09-C19. A published doctor report may carry E-00 as its ONLY failure, and no other.
+  //
+  // The reports come from hosted runners, which have no Claude Code — so E-00 fails on every one of
+  // them, for a reason about the runner rather than about the release. Refusing any FAIL at all
+  // would block every release for ever on a machine nobody ships from; the rule that says something
+  // is "E-00 alone is explained here, anything beside it is not". That is the same judgement
+  // `assert-doctor.mjs --expect-fail E-00` makes in the job that produces the file, and this is the
+  // gate that will not let it be published without it.
   const failing = (report.checks ?? []).filter((c) => c.status === 'fail').map((c) => c.id);
-  if (failing.length) problems.push(`${file}: ${failing.length} FAIL (${failing.join(', ')})`);
+  const unexplained = failing.filter((id) => id !== EXPLAINED_FAIL);
+  if (unexplained.length) {
+    problems.push(`${file}: ${unexplained.length} unexplained FAIL (${unexplained.join(', ')})`
+      + `${failing.length > unexplained.length ? ` — ${EXPLAINED_FAIL} is expected on a hosted runner, these are not` : ''}`);
+  }
 }
 
 if (problems.length) {

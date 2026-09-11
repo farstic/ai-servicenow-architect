@@ -789,3 +789,31 @@ test('publish-npm adds no required context, and is excluded with its reason (ARC
   // Unchanged by this story, and the number is the claim.
   assert.equal(fixture.count, 54, `${fixture.count} contexts — S10 adds none`);
 });
+
+
+test('C19: the release judges its doctor report instead of letting -e decide', () => {
+  const text = wf('release.yml');
+  const code = text.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+
+  // The capture must not be the judgement: `set +e` around the doctor, the exit code kept, and only
+  // 2-and-above fatal (usage, or the doctor could not run at all).
+  assert.match(code, /set \+e/);
+  assert.match(code, /if \[ "\$code" -ge 2 \]; then exit 1; fi/);
+
+  // The judgement is the SAME script and the same flag the bootstrap cells use — one implementation
+  // of "which failures does this environment explain", not a second opinion in YAML.
+  assert.match(code, /assert-doctor\.mjs --in doctor-\$\{\{ matrix\.os \}\}\.json --expect-fail E-00/);
+  const ci = wf('ci.yml');
+  assert.match(ci, /assert-doctor\.mjs --in "\$RUNNER_TEMP\/doctor\.json" --expect-fail E-00/);
+
+  // ...and it runs AFTER the report exists and BEFORE the upload, or a bad report reaches the
+  // artefact store and the judgement is decoration.
+  const wrote = code.indexOf('doctor-${{ matrix.os }}.json');
+  const judged = code.indexOf('assert-doctor.mjs');
+  const uploaded = code.indexOf('upload-artifact');
+  assert.ok(wrote < judged && judged < uploaded,
+    `order is wrong: wrote ${wrote}, judged ${judged}, uploaded ${uploaded}`);
+
+  // The sentence a reader of the Release needs, next to the numbers.
+  assert.match(code, /E-00 is expected there, and every other check must be ok/);
+});

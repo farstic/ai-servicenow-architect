@@ -68,9 +68,31 @@ jobs:
 
       # `--no-network --no-cache`: the report has to be about this checkout and nothing else, and it
       # is about to be published where anyone can read it.
+      # ARC-09-C19. Exit 1 means "a check FAILED", and one does here on purpose: a hosted runner has
+      # no Claude Code, so E-00 reports it missing. The step used to let `-e` decide, so rehearsal
+      # run 7 lost all three `verify` jobs on a report that was CORRECT — `{"ok":31,"warn":1,
+      # "fail":1,"skip":6}`, the one fail being E-00 (run 34653741578).
+      #
+      # Which failures an environment explains is `assert-doctor.mjs`'s judgement, not this step's —
+      # the same script and the same `--expect-fail E-00` the bootstrap cells have used since
+      # ARC-08. Exit 2 (usage) and 3 (the doctor could not run at all) stay fatal wherever they
+      # happen, because those are not a report about the tree.
+      #
+      # Nothing here fakes a Claude Code to make the number nicer: the asset is published where
+      # anyone can read it, and a lie in it would be worse than a FAIL that is explained.
       - name: The doctor, on the install just made
         shell: bash
-        run: node tools/snowarch/bin/snowarch.mjs doctor --json --no-network --no-cache > doctor-${{ matrix.os }}.json
+        run: |
+          set +e
+          node tools/snowarch/bin/snowarch.mjs doctor --json --no-network --no-cache \
+            > doctor-${{ matrix.os }}.json
+          code=$?
+          set -e
+          echo "doctor exit: $code"
+          if [ "$code" -ge 2 ]; then exit 1; fi
+      - name: Judge the report — E-00 is this environment's, nothing else is
+        shell: bash
+        run: node scripts/ci/assert-doctor.mjs --in doctor-${{ matrix.os }}.json --expect-fail E-00
       - name: What the install cost here
         shell: bash
         run: node scripts/ci/install-metrics.mjs ${{ matrix.os }} > install-metrics-${{ matrix.os }}.json
@@ -125,6 +147,12 @@ jobs:
         run: |
           node scripts/ci/release-notes.mjs ${{ github.ref_name }} > release-notes.md
           cat install-metrics.md >> release-notes.md
+          # ARC-09-C19. Said once, where a reader of the Release meets the numbers: the doctor
+          # JSONs attached here are honest reports from machines that have no Claude Code, so E-00
+          # fails on all three and nothing else may. Without this sentence a reader finds a FAIL in
+          # a published asset and has no way to know it was expected.
+          printf '\n_The attached doctor JSONs come from hosted runners without Claude Code — E-00 is expected there, and every other check must be ok._\n' \
+            >> release-notes.md
       - name: Nothing in the assets carries a credential
         run: node scripts/ci/assert-assets.mjs doctor-*.json install-metrics-*.json
 
