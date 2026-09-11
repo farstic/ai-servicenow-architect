@@ -68,23 +68,23 @@ export function classifyGitFetchError(stderr = '', { remote = 'origin' } = {}) {
   if (/could not resolve host/i.test(text)) {
     return { kind: 'dns', line: `upgrade: DNS failure for ${host} — check the network; if you are `
       + 'behind a corporate proxy, git reads HTTPS_PROXY / http.proxy '
-      + '(docs/TROUBLESHOOTING.md#proxy)' };
+      + '(docs/TROUBLESHOOTING.md#proxy_unreachable)' };
   }
   if (/SSL certificate problem|unable to get local issuer|self[- ]signed certificate/i.test(text)) {
     return { kind: 'tls', line: 'upgrade: TLS certificate not trusted — a TLS-intercepting proxy '
       + 'needs its CA in git (http.sslCAInfo) and in Node (NODE_EXTRA_CA_CERTS); see '
-      + 'docs/TROUBLESHOOTING.md#tls-ca' };
+      + 'docs/TROUBLESHOOTING.md#tls_ca_untrusted' };
   }
   if (/\b407\b|proxy authentication required/i.test(text)) {
     return { kind: 'proxy-auth', line: 'upgrade: the proxy demanded authentication (407) — put the '
       + 'credentials in HTTPS_PROXY, or ask for an exception for this host '
-      + '(docs/TROUBLESHOOTING.md#proxy)' };
+      + '(docs/TROUBLESHOOTING.md#proxy_auth_required)' };
   }
   // A refused connection is the shape a dead proxy makes, and it is the one AC 4 exercises.
   if (/connection refused|failed to connect|couldn't connect to server|unable to access/i.test(text)) {
     return { kind: 'proxy', line: 'upgrade: could not reach the remote — if you are behind a '
       + 'corporate proxy, git reads HTTPS_PROXY / http.proxy '
-      + '(docs/TROUBLESHOOTING.md#proxy)' };
+      + '(docs/TROUBLESHOOTING.md#proxy_unreachable)' };
   }
   return { kind: 'unknown', line: null };
 }

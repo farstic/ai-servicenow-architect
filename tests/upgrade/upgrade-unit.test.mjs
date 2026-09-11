@@ -27,11 +27,11 @@ test('the classifier names a remedy only for a shape it recognises', () => {
   // actionable line is added — and a confident wrong remedy costs more than none.
   assert.equal(classifyGitFetchError('fatal: could not resolve host: github.com').kind, 'dns');
   assert.match(classifyGitFetchError('fatal: could not resolve host: github.com').line,
-    /DNS failure for github\.com.*HTTPS_PROXY.*TROUBLESHOOTING\.md#proxy/);
+    /DNS failure for github\.com.*HTTPS_PROXY.*TROUBLESHOOTING\.md#proxy_unreachable/);
 
   assert.equal(classifyGitFetchError('SSL certificate problem: unable to get local issuer certificate').kind, 'tls');
   assert.match(classifyGitFetchError('SSL certificate problem: self signed certificate').line,
-    /http\.sslCAInfo.*NODE_EXTRA_CA_CERTS.*#tls-ca/);
+    /http\.sslCAInfo.*NODE_EXTRA_CA_CERTS.*#tls_ca_untrusted/);
 
   assert.equal(classifyGitFetchError('Received HTTP code 407 from proxy after CONNECT').kind, 'proxy-auth');
   assert.match(classifyGitFetchError('proxy authentication required').line, /\(407\)/);

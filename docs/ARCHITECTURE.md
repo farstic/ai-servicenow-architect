@@ -754,6 +754,45 @@ This is a **different table** from the `docs` one above, and the overlap is wort
 not present", which is why the two coexist — but a caller keying on a number must know which family
 it is reading. `lib/exit.mjs` holds these five and deliberately does not re-export the docs codes.
 
+## Versioning, tags and upgrade
+
+**One counter.** The engine, the server package and the tag all carry the same version, and exactly
+one thing writes it: `scripts/release.mjs`. Never edit a version by hand — not in
+`engine.config.json`, not in a `package.json`, not in a document. A version typed in one place and
+not another is the defect the single writer exists to prevent, and `--tag-only` refuses to tag a
+tree that does not already carry its own version everywhere.
+
+**The tag is the record, because a release outlives its repository state.** Six months later a
+release is a tarball and an annotated tag, so the tag message carries what the tree can no longer be
+asked: the contract sha, the docs pin, and the three floors (Claude Code, Node, git). Three
+different readers parse it back through `parseTagMessage` in `scripts/lib/release/tag.mjs` —
+`./snowarch version`, `release.yml`, and `./snowarch upgrade` when it resolves a target. A lightweight
+tag has no message and is refused for that reason.
+
+**`main` is protected with required status checks and `strict: true`**, so the release commit cannot
+be pushed to `main` directly — it arrives through a pull request and the tag is made afterwards on
+the merge commit. The procedure is in
+[CONTRIBUTING.md § Releasing](CONTRIBUTING.md#releasing); the one-shot form is correct only where
+`main` has no required checks.
+
+**An upgrade moves a checkout, and it plans before it moves.** What makes a plan possible is the
+input-hash table — one description of what each bootstrap step depends on, read by three things: the
+runner deciding what to skip, `staleSteps()` naming what an upgrade will invalidate *before*
+anything changes, and the generated table in
+[Bootstrap input hashes and upgrade invalidation](#bootstrap-input-hashes-and-upgrade-invalidation).
+A step whose inputs are unchanged does not re-run; a step whose inputs moved is named in the plan
+before the user accepts it.
+
+**The banner never fetches.** `.local/upgrade-check.json` is written only by a check the user ran
+themselves (`./snowarch upgrade --check`), and the SessionStart banner reads that file — so a
+session start costs no network, and a machine that has never run the check is simply never told
+about a release. The other thing the banner reads is the doctor cache; both are described in
+[`.local/upgrade-check.json` v1](#localupgrade-checkjson-v1--the-other-thing-the-banner-reads).
+
+**Credentials are never part of any of this.** An upgrade does not read or write
+`.local/instances.json`; a store whose schema moved is migrated explicitly, with a 0600 backup,
+announced in the plan first.
+
 ## Roster
 
 Generated from the directory listing by `scripts/gen-roster.mjs`, and checked by `npm run lint`.

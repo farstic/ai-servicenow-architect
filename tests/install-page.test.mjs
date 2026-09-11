@@ -166,7 +166,18 @@ test('the page stays a page, and the tail stays a tail', () => {
   // plan is accepted, that credentials are never read or written, that a schema change is a
   // migration with a backup, that the banner never fetches. The DETAIL is in CONTRIBUTING, linked
   // from here. Same rule as the last two moves: a cap is worth moving for a fact.
-  assert.ok(install <= 268, `${install} lines of install page (criterion: 268)`);
+  //
+  // 277 since ARC-09-S11, and this one is the smallest move yet for the most-used fact: "what do I
+  // paste when I report this". The sentence existed — buried at the end of the preflight-remedy
+  // paragraph, where nobody looking for it would find it — and a person writing an issue is not
+  // re-reading the section about what to do if the bootstrap failed. It is now a heading with the
+  // two commands under it, plus the sentence that neither prints a credential, which is what makes
+  // a stranger willing to paste the output into a public issue. NOTHING WAS DELETED to pay for it:
+  // ARC-07-S10's ruling is budget-neutral material to a linked page or a cap that moves for a
+  // fact, never a required sentence removed, and re-wrapping the page instead was tried and
+  // rejected — INSTALL.md is a generated SOURCE composed into README.md, so re-flowing its prose
+  // moves the composition and buys one line.
+  assert.ok(install <= 277, `${install} lines of install page (criterion: 277)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.

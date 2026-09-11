@@ -894,6 +894,15 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 **Risks / open points.** Documentation drift after this ARC — the tests bind commands and anchors, not prose; prose changes remain a review duty.
 
+**Amendments made during the build (ARC-09-S11).**
+
+1. **`tests/docs-links.test.mjs` is NEW, not extended.** The story says to extend it as though ARC-05-S04 had left one. S04's path-reference check is lint rule **L05**, which asks whether a PATH exists — a different question from whether an ANCHOR or a COMMAND does. The file's header says so, so the next reader does not go looking for the version that was extended.
+2. **THE LESSON THE TEST EXISTS FOR: a remedy pointed at a heading that never existed, pinned by a test that asserted the string rather than the target.** `./snowarch upgrade` printed `docs/TROUBLESHOOTING.md#proxy` and `#tls-ca` in four failure remedies; the headings are `PROXY_UNREACHABLE`, `PROXY_AUTH_REQUIRED` and `TLS_CA_UNTRUSTED`, so a user behind a corporate proxy followed the advice to the top of a 600-line page. `tests/upgrade/upgrade-unit.test.mjs` asserted the remedy's TEXT, which is why it stayed green for as long as the text stayed wrong. An assertion about a link that never resolves the link is an assertion about spelling.
+3. **My own anchor rule was wrong twice, and both were found by links that were about to be correct.** Collapsing a run of spaces gave one hyphen where GitHub gives two (`v1 — the other`), and stripping `_` with the emphasis markers turned `PROXY_UNREACHABLE` into `proxyunreachable`. Both corrections are written at the line that gets them right, because the next person will reach for the same two shortcuts.
+4. **`docs/INSTALL.md`'s budget moves 268 → 277**, under ARC-07-S10's ruling and with nothing deleted. Re-wrapping the page to pay for the lines was tried and rejected: INSTALL.md is a generated SOURCE composed into README.md, so re-flowing its prose moves the composition and buys one line.
+5. **Two checklist fixes from the AC 3 walkthrough**, per "fix the checklist, not the transcript": step 1 said "`vendor/ServiceNowDocs` present" without the command that makes it so — and a missing corpus reads to the preflight as a DIRTY TREE (` D vendor/ServiceNowDocs`), which is not what a reader would guess — and the refusal chain is now written under the flags, because the skill being taught is "read the line, it is the instruction".
+6. **The walkthrough emptied the real checkout's `node_modules` (215 entries → 0), and that is ARC-09-C11, the first commit of ARC-10-S01.** `buildWorld` links `node_modules` into the fixture, so the release script's install gate ran `npm install` through the symlink. No tracked file was touched; restored with `npm ci --ignore-scripts`; the walkthrough was re-run with a copy-on-write clone and the real tree was byte-identical before and after. The fix belongs to the harness, not here: M4 closes on this commit and the harness's own tests never install.
+
 **Definition of done.** Merged; docs test green; the release checklist walkthrough recorded; ARC-10 can point users at `docs/INSTALL.md#upgrading`.
 
 ---

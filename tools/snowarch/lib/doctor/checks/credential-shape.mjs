@@ -13,8 +13,20 @@
 /** A KEY that names a credential, at any depth of a settings file. */
 export const CREDENTIAL_KEY = /PASSWORD|SECRET|TOKEN|_KEY$/i;
 
-/** Files worth reading for a credential-shaped LITERAL. */
-export const CREDENTIAL_EXT = /\.(json|md|ts|mjs|sh|yml|yaml|ps1|cmd)$/;
+/**
+ * Files worth reading for a credential-shaped LITERAL.
+ *
+ * ARC-09-C10 added the `.env` family, and the gap it closed is the embarrassing kind: `ENVISH`
+ * below has always existed to match `SERVICENOW_BASIC_PASSWORD=…`, and until this change the only
+ * files it could ever see were `.sh` scripts. A committed `.env` with a real value is THE classic
+ * credential leak, E-09 exists to catch exactly that, and the one file type named after the thing
+ * being scanned for was the one type excluded. Found while asking whether `packages/snowarch/.env
+ * .example` — which SHIPS in the npm tarball — was covered by the scan. It was not.
+ *
+ * `.env`, and `.env.<anything>` (`.env.example`, `.env.local`, `.env.production`). Not `.envrc`:
+ * direnv's file is a shell script and is a different question.
+ */
+export const CREDENTIAL_EXT = /(\.(json|md|ts|mjs|sh|yml|yaml|ps1|cmd)$|(^|\/)\.env(\.[A-Za-z0-9_-]+)?$)/;
 
 /** `"password": "…"` with a value long enough to be real. */
 export const JSONISH = /"(password|passwd|secret|token|[a-z_]*_key)"\s*:\s*"([^"]{8,})"/gi;
