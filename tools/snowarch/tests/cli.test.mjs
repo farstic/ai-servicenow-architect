@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -192,9 +192,27 @@ test('AC 6 — the CLI package has no dependencies, and declares its floor', () 
 
 test('the two docs entry points are one implementation', () => {
   // They must not become two behaviours with one name. Compared on the richest thing both produce.
+  //
+  // Both entry points resolve the root from their own location, so both read THIS checkout — and
+  // that made this test a detector for anything else in a parallel run touching the corpus. It
+  // was one: ARC-09-C2 found `tests/doctor/fix.test.mjs` syncing a corpus into the live tree
+  // through `linkInstall`'s symlink, so two reads a moment apart saw 17 areas and then 19. Fixed
+  // at the cause; the corpus is sampled either side here so that if it ever happens again the
+  // failure says "the corpus moved", not "the two entry points disagree". Sampled, never retried:
+  // a retry would hide exactly the thing this notices.
+  const corpusAreas = () => {
+    const dir = join(repoRoot, 'vendor', 'ServiceNowDocs', 'markdown');
+    return existsSync(dir) ? readdirSync(dir).sort().join(',') : 'absent';
+  };
+  const corpusBefore = corpusAreas();
+
   const viaCli = run(['docs', 'status', '--json']);
   const viaScript = execFileSync(process.execPath, [join(repoRoot, 'scripts/docs.mjs'), 'status', '--json'],
     { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+
+  assert.equal(corpusAreas(), corpusBefore,
+    'the corpus moved between the two reads — something in this run is writing the live checkout, '
+    + 'which is ARC-09-C2 and is not what this test is about');
   assert.deepEqual(JSON.parse(viaCli.stdout), JSON.parse(viaScript));
 
   const cliUsage = run(['docs', 'nonsense-subcommand']);

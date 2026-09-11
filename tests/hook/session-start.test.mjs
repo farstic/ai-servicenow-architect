@@ -16,6 +16,7 @@ import { BANNER } from '../../tools/snowarch/lib/text.mjs';
 import { cachePath, inputsPath } from '../../tools/snowarch/lib/doctor-cache.mjs';
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { greenTree, linkInstall, readJson, REAL_ROOT, writeJson } from '../doctor/helpers/tree.mjs';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * The hook INSIDE the fixture, never the repository's own.
@@ -118,6 +119,37 @@ test('AC 1 — the fast path reads two files and imports no part of the doctor',
   assert.equal(result.path, 'cache');
   assert.match(result.lines[0], /^Mode: /);
   for (const line of result.lines.slice(1)) assert.ok(isNudge(line), `unexpected: ${line}`);
+});
+
+/**
+ * ARC-09-S04's carry-over, closed here: the fast path SPAWNS NOTHING.
+ *
+ * S04's first version put `versionInfo()` in the doctor's header, which asks git four questions —
+ * and one of them, `git status`, walks 35,000 corpus files. The banner went from 614 ms to 1188 ms
+ * on macOS and over budget on Windows before `{ full: false }` cut it to 122 ms. The structural
+ * rule that keeps it there: the cache path reads two JSON files and returns, and `versionInfo` is
+ * reached only from the doctor, which only the re-run path imports.
+ *
+ * Proved by taking git AWAY. A PATH with no git is a machine where any spawn of it fails, so a
+ * fast path that still prints its Mode line cannot have asked git anything — and a structural
+ * assertion (the branch returns `cache`) could not tell the difference between "no spawn" and "a
+ * spawn whose answer was ignored".
+ */
+test('AC 1 — the fast path spawns nothing: it prints from the cache with git off PATH', async (t) => {
+  const root = await bootstrapped(t);
+  assert.ok(existsSync(cachePath(root)), 'precondition: there is a cache to print from');
+
+  // Rebuilt, never filtered: a filter that missed one entry would test the ordinary path again
+  // and pass. `PATHEXT` stays so Windows can still find `node.exe` by the absolute path used.
+  const empty = tempDir('snowarch-no-git-', t);
+  const r = runHook(root, { env: { PATH: empty, Path: empty } });
+
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stderr, '');
+  assert.match(r.lines[0], /^Mode: /);
+  for (const line of r.lines.slice(1)) assert.ok(isNudge(line), `unexpected banner line: ${line}`);
+  // And the line is the CACHE's, not a fallback: a hook that had fallen back would say so.
+  assert.equal(r.lines[0], readJson(root, '.local/doctor-last.json').modeLine);
 });
 
 // AC 2.
