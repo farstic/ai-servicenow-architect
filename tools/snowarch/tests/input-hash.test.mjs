@@ -28,7 +28,10 @@ const putStore = (root, body) => {
 const linkCorpus = (root, sha) => {
   execFileSync('git', ['-C', root, 'update-index', '--add', '--cacheinfo',
     `160000,${sha},vendor/ServiceNowDocs`], { stdio: 'ignore' });
-  execFileSync('git', ['-C', root, 'commit', '-q', '-m', 'link'], { stdio: 'ignore' });
+  // The identity is passed per-command, the way `makeCheckout` does it: a hosted runner has no
+  // global `user.email`, and a fixture that depends on the machine having one fails only there.
+  execFileSync('git', ['-C', root, '-c', 'user.email=f@example.invalid', '-c', 'user.name=f',
+    'commit', '-q', '-m', 'link'], { stdio: 'ignore' });
 };
 
 const ctxFor = (root, over = {}) => ({

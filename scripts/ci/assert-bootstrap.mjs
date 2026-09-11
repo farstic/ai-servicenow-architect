@@ -176,7 +176,10 @@ if (process.platform === 'win32') {
 // input hashes, and pretending it could would cache a step whose inputs had changed). So a
 // Node-free second run RE-RUNS its steps by design; what must hold there is that nothing changed.
 if (secondLog && existsSync(secondLog)) {
-  const log = readFileSync(secondLog, 'utf8');
+  // NORMALISED. The Windows cells write this log through PowerShell, so its lines end `\r\n`, and
+  // a `$`-anchored assertion below would be testing whether the line ends in a carriage return
+  // rather than what it says. Every cell is compared as the same text.
+  const log = readFileSync(secondLog, 'utf8').replace(/\r\n/g, '\n');
   const first = firstState && existsSync(firstState) ? JSON.parse(readFileSync(firstState, 'utf8')) : null;
 
   if (variant === 'no-node') {
