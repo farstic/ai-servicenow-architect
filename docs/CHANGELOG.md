@@ -130,6 +130,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **Every release is rehearsed before it is cut.** A throwaway branch, a prerelease tag, the release
+  workflow green on three operating systems with all seven assets, then the tag and branch deleted —
+  written down in the contributing guide as a numbered step with per-release record fields. Five
+  rehearsal rounds during 2.0.0 each found a defect that a dry run could not reach and no test
+  fixture had ever produced; every one of them would otherwise have landed on a real release.
+
 - **The published package carries its NOTICE.** Apache-2.0 §4(d) asks a redistribution to carry the
   attribution notice, and npm includes a licence automatically but never a NOTICE — so the package
   ships its own copy, and a test compares it with the root file so the two cannot drift apart

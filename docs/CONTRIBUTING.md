@@ -894,17 +894,38 @@ a path that runs once per release is broken by the time it runs.
 > this job to ubuntu + windows (S11 records the choice); `verify` in `release.yml` keeps all three,
 > because a release is the one moment all three must be proven.
 
-### Rehearsal — not yet run
+### The rehearsal — a standing step before every release
 
-The workflow has not been exercised end to end: doing so creates a **public** GitHub Release on a
-public repository, so it waits for the owner's approval. The procedure is in the ARC-09-S03 pull
-request, ready to run. When it has been:
+**Owner decision, 2026-09-11: every release is rehearsed first.** Not once before 2.0.0 — every
+time. The reason is measured rather than cautious: five rehearsal rounds each found a defect that
+`--dry-run` could not reach and no fixture had ever produced — the post-write gates, a stale
+artefact, a hand list of staged files, eight hundred lines of changelog silently dropped, a tag that
+`actions/checkout` peels, and a handful of tests that encode "this is a development tree" and go red
+on the release commit's own pull request. Every one of them would have landed on the real release.
 
-- **Run URL:** _(to be recorded after the rehearsal)_
+How, in the order it is done:
+
+```sh
+git switch -c rehearsal/vX.Y.Z-rc.N <the release candidate>
+git push -u origin rehearsal/vX.Y.Z-rc.N        # BEFORE --tag-only: the preflight compares against origin
+node scripts/release.mjs X.Y.Z-rc.N --yes --allow-prerelease --allow-branch rehearsal/vX.Y.Z-rc.N
+node scripts/release.mjs X.Y.Z-rc.N --tag-only
+git push origin vX.Y.Z-rc.N
+```
+
+Then watch `release.yml`: green on all three OSes, seven assets on the Release (three
+`doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`), and the two
+negatives refused. Afterwards delete the Release, the tag and the branch — locally and on the
+remote — and record what the run showed in the fields below. They are per-release: a rehearsal that
+is not written down is a rehearsal nobody can compare the next one against.
+
+- **Run URL:** _(the `release.yml` run for this release's rehearsal)_
 - **Assets observed:** _(seven, named)_
 - **Metrics measured:** _(the three rows of `install-metrics.md`)_
+- **Negatives refused:** _(the two, with the line each printed)_
 - **`gh` present on the runner images:** _(confirmed / not — if not, the publish step becomes
   `actions/github-script` calling `repos.createRelease`)_
+
 
 ## Commits
 
@@ -970,12 +991,13 @@ a change needs a paragraph rather than a bullet, that is where it goes.
 
 The checklist, verbatim — paste it into the release pull request's description and tick it:
 
-> 1. `git switch main && git pull --ff-only` · CI green on HEAD · the corpus present — `git submodule status vendor/ServiceNowDocs` shows no leading `-`; if it does, `git submodule update --init vendor/ServiceNowDocs`. A missing corpus is a **dirty tree** to the preflight (` D vendor/ServiceNowDocs`) and the release refuses before it writes anything.
-> 2. `git switch -c release/vX.Y.Z main` · `node scripts/release.mjs X.Y.Z --yes --allow-branch release/vX.Y.Z` (writes + commit, **no tag**) · open a pull request to `main` · merge it **without squashing** · then, on `main`, at the merge commit: `node scripts/release.mjs X.Y.Z --tag-only`.
-> 3. `git push origin main --follow-tags` (or pass `--push`).
-> 4. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
-> 5. Update the install page's metrics link if the numbers moved; announce.
-> 6. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
+> 1. **Rehearse it first** — see [The rehearsal](#the-rehearsal--a-standing-step-before-every-release). A throwaway branch, a `X.Y.Z-rc.N` prerelease tag, `release.yml` green on three OSes with its seven assets, then the Release, tag and branch deleted. Every release, not only the first.
+> 2. `git switch main && git pull --ff-only` · CI green on HEAD · the corpus present — `git submodule status vendor/ServiceNowDocs` shows no leading `-`; if it does, `git submodule update --init vendor/ServiceNowDocs`. A missing corpus is a **dirty tree** to the preflight (` D vendor/ServiceNowDocs`) and the release refuses before it writes anything.
+> 3. `git switch -c release/vX.Y.Z main` · `node scripts/release.mjs X.Y.Z --yes --allow-branch release/vX.Y.Z` (writes + commit, **no tag**) · open a pull request to `main` · merge it **without squashing** · then, on `main`, at the merge commit: `node scripts/release.mjs X.Y.Z --tag-only`.
+> 4. `git push origin main --follow-tags` (or pass `--push`).
+> 5. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
+> 6. Update the install page's metrics link if the numbers moved; announce.
+> 7. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
 
 **Step 2 is two-phase because it has to be.** `main` is protected by required status checks with
 `strict: true` — **54** of them after this milestone, generated into
