@@ -24,6 +24,7 @@ import { buildTagMessage, parseTagMessage, tagIsComplete } from '../scripts/lib/
 import { compareVersions, latestTag } from '../scripts/lib/release/preflight.mjs';
 import { badgeLine, writeHead, writeMarker } from '../scripts/lib/release/writers.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { writeGitattributes } from './helpers/gitattributes.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
@@ -60,6 +61,10 @@ function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
   write(root, 'docs/CHANGELOG.md', '# Changelog\n\n## Unreleased\n\n- something\n');
   write(root, 'engine.config.json', `${JSON.stringify(CONFIG, null, 2)}\n`);
   write(root, 'packages/snowarch/dist/contract.json', contract);
+  // ARC-09-C12: the repository's own line-ending rules, or a CRLF-default checkout restores
+  // different bytes than this fixture wrote and the rollback's byte-equality assertions fail on
+  // Windows alone. Copied from the tracked file so it cannot drift.
+  writeGitattributes(root);
   write(root, 'packages/contract/required-tools.json', `${JSON.stringify({
     contractSha256: createHash('sha256').update(contract).digest('hex'), tools: [],
   }, null, 2)}\n`);
@@ -73,8 +78,8 @@ function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   git(root, ['config', 'user.name', 'fixture']);
-  git(root, ['add', 'package.json', 'package-lock.json', 'packages', 'tools', 'CLAUDE.md',
-    'docs', 'engine.config.json']);
+  git(root, ['add', '.gitattributes', 'package.json', 'package-lock.json', 'packages', 'tools',
+    'CLAUDE.md', 'docs', 'engine.config.json']);
   git(root, ['update-index', '--add', '--cacheinfo', `160000,${PIN},vendor/ServiceNowDocs`]);
   git(root, ['commit', '-qm', 'fixture']);
   return root;
