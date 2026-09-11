@@ -9,6 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,15 +23,25 @@ const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'ut
 const readReal = (p) => readFileSync(join(REAL_ROOT, p), 'utf8');
 
 /**
- * The baseline for AC 7.
+ * The baseline for AC 7, as a HASH rather than as a commit.
  *
  * The story names ARC-02-S05 as the commit that froze the imported history; it is not. S05 touched
  * one line of the file, S06 (`69d6efa`) added the `## Before 2.0.0` heading, and S08 (`bcd4dcd`)
- * moved the two engine version footers in — which is the last DELIBERATE change to the region and
- * therefore what "unchanged" has to mean. Recorded here rather than in prose so the next person
- * does not have to re-derive it.
+ * moved the two engine version footers in — the last DELIBERATE change to the region, and therefore
+ * what "unchanged" has to mean.
+ *
+ * The first version of this test compared against `git show bcd4dcd:docs/CHANGELOG.md`, and CI
+ * proved that wrong within a run: the `test` job clones SHALLOW, so the object is not there and the
+ * assertion failed on a repository where nothing was wrong — `fatal: invalid object name`. A test
+ * that needs history to say anything is a test that says nothing on most machines. So the region's
+ * sha256 is pinned here, computed from that commit, and the git comparison runs additionally
+ * wherever the object happens to be reachable.
+ *
+ * If this constant ever needs changing, the imported history has been edited, and that is the thing
+ * AC 7 exists to prevent.
  */
 const FROZEN_SINCE = 'bcd4dcd';
+const FROZEN_SHA256 = '3bb91be468e7d6677dc91e623308eeaed91bfc8f88baacb9f4aadc4c46a05eee';
 
 const HEADER = '# Changelog\n\nA rule.\n\n---\n\n';
 const FROZEN = '## Before 2.0.0\n\nimported history, untouched\n';
@@ -172,16 +183,24 @@ test('AC 7 — the frozen region is not touched, in the fixture and in this repo
   const after = f.read('docs/CHANGELOG.md');
   assert.ok(after.endsWith(FROZEN), 'the generator rewrote the imported history');
 
-  // The real file, against the last commit that deliberately changed the region.
-  const base = execFileSync('git', ['show', `${FROZEN_SINCE}:docs/CHANGELOG.md`],
-    { cwd: REAL_ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+  // The real file. By hash, because this runs on a shallow clone as often as not.
   const region = (text) => {
     const at = text.indexOf('\n## Before 2.0.0');
     assert.notEqual(at, -1, 'the "## Before 2.0.0" heading is gone');
     return text.slice(at);
   };
-  assert.equal(region(readReal('docs/CHANGELOG.md')), region(base),
-    `the imported history has changed since ${FROZEN_SINCE}`);
+  const current = region(readReal('docs/CHANGELOG.md'));
+  assert.equal(createHash('sha256').update(current).digest('hex'), FROZEN_SHA256,
+    `the imported history has changed since ${FROZEN_SINCE} — it is the one region nothing rewrites`);
+
+  // ...and against the commit itself where the object is reachable, which is a stronger statement
+  // and the one that proves the pinned hash is the hash of what that commit actually holds.
+  let base = null;
+  try {
+    base = execFileSync('git', ['show', `${FROZEN_SINCE}:docs/CHANGELOG.md`],
+      { cwd: REAL_ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch { /* shallow clone: the hash above is the whole assertion */ }
+  if (base !== null) assert.equal(current, region(base), `the region differs from ${FROZEN_SINCE}`);
 });
 
 // ── AC 4, on the committed file ────────────────────────────────────────────────────────────────
