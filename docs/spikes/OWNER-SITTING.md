@@ -898,3 +898,4 @@ python3 -c "import json,os;print(json.load(open(os.path.expanduser('~/.claude.js
 | **S-14e** second machine | Now runnable without you — no longer waiting on a login. |
 | **S-14g** throttled network | Day 4 of the time-box, on the VM (`tc qdisc … rate 2mbit`). Unthrottled it already installs in **1.9 s** against a 60-second cap. |
 a scratch line for the drill
+second line for the green half
