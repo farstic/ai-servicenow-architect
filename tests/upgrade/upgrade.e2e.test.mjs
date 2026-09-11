@@ -40,7 +40,7 @@ test('AC 1 — a release that moves one declared input re-runs exactly that step
   const storeBefore = sha256(storePath(w.user));
   assert.equal(JSON.parse(readFileSync(storePath(w.user), 'utf8')).version, 1);
 
-  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes']);
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.equal(r.status, 0, r.text);
 
   // The PLAN said which step, before the tree moved.
@@ -66,7 +66,7 @@ test('AC 1 — a release that moves one declared input re-runs exactly that step
   assert.deepEqual(backups(w.user), [], 'a backup was written by an upgrade with no migration');
   assert.equal(JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'))
     .summary.fail >= 0, true);
-  assert.match(snowarch(w.user, ['version']).stdout, /tag:\s+v9\.1\.0 \(exact\)/);
+  assert.match(snowarch(w.user, ['version'], { bin: w.bin }).stdout, /tag:\s+v9\.1\.0 \(exact\)/);
 }, MINUTES);
 
 test('AC 2 — a release that moves the store schema migrates it, with a backup', async (t) => {
@@ -75,7 +75,7 @@ test('AC 2 — a release that moves the store schema migrates it, with a backup'
   const storeBefore = readFileSync(storePath(w.user));
   const authBefore = JSON.parse(storeBefore.toString()).instances;
 
-  const r = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes']);
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
   assert.equal(r.status, 0, r.text);
   assert.match(r.text, /store: schema v1 → v2 \(1 migration; backup will be written\)/);
 
@@ -99,7 +99,7 @@ test('AC 3 — a modified tracked file stops the upgrade before anything moves',
   const head = git(w.user, ['rev-parse', 'HEAD']);
   writeFileSync(join(w.user, 'CLAUDE.md'), `${readFileSync(join(w.user, 'CLAUDE.md'), 'utf8')}\nedited\n`);
 
-  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes']);
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.equal(r.status, 2, r.text);
   assert.match(r.text, /tracked files are modified — commit or stash them first \(git stash\)/);
   assert.match(r.text, /nothing was changed/);
@@ -129,7 +129,7 @@ test('AC 5 — --check says what is available, writes the cache, and the banner 
   bootstrapUser(w.user);
   const head = git(w.user, ['rev-parse', 'HEAD']);
 
-  const r = snowarch(w.user, ['upgrade', '--check']);
+  const r = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
   assert.equal(r.status, EXIT_BEHIND, r.text);
   assert.match(r.text, /v9\.2\.0 available \(you are on v9\.0\.0\)/);
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, '--check moved the tree');
@@ -167,7 +167,7 @@ test('AC 6 — n at the prompt changes nothing', async (t) => {
   bootstrapUser(w.user);
   const head = git(w.user, ['rev-parse', 'HEAD']);
 
-  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n' });
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'n\n', bin: w.bin });
   assert.equal(r.status, 0, r.text);
   assert.match(r.text, /upgrade: nothing changed/);
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
@@ -180,6 +180,8 @@ test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --for
     const w = await buildWorld(t, { claudeFloor: '9.9.9' });
     bootstrapUser(w.user);
     const head = git(w.user, ['rev-parse', 'HEAD']);
+    // This world's own shim is NOT used: the point is a Claude Code below the floor, so the low
+    // one goes first on PATH and is the one B00 and U4 both find.
     const shim = fakeClaude(join(w.scratch, 'shim'), '2.1.100 (Claude Code)');
     const env = { PATH: `${shim}${isWindows ? ';' : ':'}${process.env.PATH}` };
 
@@ -208,7 +210,7 @@ test('a target that is not a release tag of this product is refused by name', as
   git(w.user, ['tag', 'v9.5.0']);            // lightweight: no message, no contract trailer
   const head = git(w.user, ['rev-parse', 'HEAD']);
 
-  const r = snowarch(w.user, ['upgrade', '--to', 'v9.5.0', '--yes']);
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.5.0', '--yes'], { bin: w.bin });
   assert.equal(r.status, 1, r.text);
   assert.match(r.text, /v9\.5\.0 is not a release tag of this product/);
   assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
@@ -217,13 +219,13 @@ test('a target that is not a release tag of this product is refused by name', as
 test('already on the newest release is a sentence, not a no-op that looks like a failure', async (t) => {
   const w = await buildWorld(t);
   bootstrapUser(w.user);
-  assert.equal(snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes']).status, 0);
+  assert.equal(snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin }).status, 0);
 
-  const again = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes']);
+  const again = snowarch(w.user, ['upgrade', '--to', 'v9.2.0', '--yes'], { bin: w.bin });
   assert.equal(again.status, 0, again.text);
   assert.match(again.text, /up to date \(v9\.2\.0\)/);
 
-  const check = snowarch(w.user, ['upgrade', '--check']);
+  const check = snowarch(w.user, ['upgrade', '--check'], { bin: w.bin });
   assert.equal(check.status, 0, 'exit 4 means BEHIND, and this checkout is not');
   assert.match(check.text, /up to date \(v9\.2\.0\)/);
 }, MINUTES);
@@ -252,7 +254,7 @@ test('AC 7 — an upgrade that stops mid-way resumes where it stopped', async (t
     rmSync(join(corpus, entry), { recursive: true, force: true });
   }
 
-  const broken = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes']);
+  const broken = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.notEqual(broken.status, 0, 'the fixture did not actually stop the run');
   assert.match(broken.text, /\[B02\/09\] docs … FAIL/);
 
@@ -266,7 +268,7 @@ test('AC 7 — an upgrade that stops mid-way resumes where it stopped', async (t
 
   // Fix the cause the way a user would, and run it again. B01 is still cached; B02 finishes.
   renameSync(parked, upstream);
-  const again = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes']);
+  const again = snowarch(w.user, ['upgrade', '--to', 'v9.1.0', '--yes'], { bin: w.bin });
   assert.equal(again.status, 0, again.text);
   assert.match(again.text, /\[B01\/09\][^\n]*ok \(cached\)/, 'the resume re-ran a step it had done');
   assert.match(again.text, /\[B02\/09\] docs … (ok|warn)/, 'the resume did not complete B02');

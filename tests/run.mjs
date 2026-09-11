@@ -6,7 +6,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -28,7 +28,26 @@ function walk(dir) {
 // repository and runs on all three OSes, so its tests belong in the same `npm test` — a suite that
 // only runs when someone remembers to point `node --test` at it is a suite that stops running.
 const cliTests = resolve(here, '..', 'tools', 'snowarch', 'tests');
-const files = [...walk(here), ...(existsSync(cliTests) ? walk(cliTests) : [])].sort();
+
+/**
+ * `tests/upgrade/` is NOT in `npm test`, and it is the one exclusion.
+ *
+ * ARC-09-S07's harness builds a bare origin, two fixture releases and a user's clone per case, and
+ * compiles a server for one of them — minutes, and it needs a full-depth checkout with tags and a
+ * git identity that the ordinary `test` job has neither of. It has a job of its own
+ * (`upgrade-e2e`, three OSes) for exactly that reason, and running it in both would pay for it
+ * nine times over to answer the same question.
+ *
+ * An exclusion is a thing that rots, so it is a LIST of one with the job that covers it named:
+ * anything added here that no job runs is documentation, which is what the recursive walk above
+ * exists to prevent.
+ */
+const RUN_ELSEWHERE = [resolve(here, 'upgrade')];
+const elsewhere = (f) => RUN_ELSEWHERE.some((dir) => f.startsWith(`${dir}${sep}`));
+
+const files = [...walk(here), ...(existsSync(cliTests) ? walk(cliTests) : [])]
+  .filter((f) => !elsewhere(f))
+  .sort();
 if (files.length === 0) {
   console.error('tests/run.mjs: no *.test.mjs found in', here);
   process.exit(1);

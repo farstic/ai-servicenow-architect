@@ -212,7 +212,13 @@ export async function buildWorld(t, { claudeFloor = null } = {}) {
   git(user, ['config', 'user.email', 'f@example.com']);
   git(user, ['config', 'user.name', 'f']);
 
-  return { scratch, work, origin, user };
+  // A `claude` on PATH, because the bootstrap's preflight requires one and a CI runner has none —
+  // the upgrade's U6 is a real bootstrap and refuses to run without it, exactly as it would on a
+  // user's machine. The FIXTURE supplies the prerequisite; the product does not skip the check.
+  // AC 8 overrides this with a version below a release's floor.
+  const bin = fakeClaude(join(scratch, 'bin'), '2.1.258 (Claude Code)');
+
+  return { scratch, work, origin, user, bin };
 }
 
 /** The user's clone, bootstrapped design-only, with a v1 store beside it. */
@@ -256,11 +262,16 @@ export function writeStore(user) {
  * Spawned, never imported: the command spawns `bootstrap` and `doctor` of its own, and a test that
  * called the function in-process would be exercising a different program from the one a user runs.
  */
-export function snowarch(user, args, { env = {}, input = '' } = {}) {
+export function snowarch(user, args, { env = {}, input = '', bin = null } = {}) {
+  // The shim goes FIRST on PATH unless the caller brought its own environment: U6 runs a real
+  // bootstrap, whose preflight wants Claude Code, and a hosted runner has none.
+  const path = bin && !env.PATH
+    ? { PATH: `${bin}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH}` }
+    : {};
   const r = spawnSync(process.execPath,
     [join(user, 'tools/snowarch/bin/snowarch.mjs'), ...args], {
       cwd: user, encoding: 'utf8', input,
-      env: { ...process.env, CLAUDE_PROJECT_DIR: user, ...env },
+      env: { ...process.env, CLAUDE_PROJECT_DIR: user, ...path, ...env },
     });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '',
     text: `${r.stdout ?? ''}${r.stderr ?? ''}` };
