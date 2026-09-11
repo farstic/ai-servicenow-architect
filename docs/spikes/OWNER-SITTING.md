@@ -10,6 +10,7 @@ is the only thing this page has done to it.
 | [B — Design-only in a real Claude session](#sitting-b--design-only-in-a-real-claude-session) | a Mac with Claude Code | every listed VALIDATION-TEST recorded PASS in `docs/validation/`, redaction lint green |
 | [C — Live with a PDI](#sitting-c--live-with-the-owners-pdi-a-test-only-account) | a PDI you own, on a test-only account | nightly `e2e-live` green twice; T-19 and T-22 PASS; the ROPC fixture committed |
 | [D — Windows](#sitting-d--windows-when-a-machine-exists) | a Windows machine, when one exists | each row CONFIRMED or FAILED in `docs/validation/` |
+| [E — The optional npm channel](#sitting-e--the-optional-npm-channel-when-the-owner-decides) | an npm account for `farstic`, and a decision | one green `dry_run: true` dispatch against `v2.0.0`; `npm view @farstic/snow-mcp` still 1.0.0 |
 | [Archive](#archive--answered-rows) | nothing — it is the record | none; it is what was already answered |
 
 ---
@@ -992,6 +993,39 @@ python3 -c "import json,os;print(json.load(open(os.path.expanduser('~/.claude.js
 > Cleanup verified: `plugin list` `[]`, only `claude-plugins-official` in the marketplace list,
 > `~/.claude/plugins/cache/snowarch-spikes` gone, `~/spike-runs` empty, `/tmp/s05` removed.
 > *(if it changed, two binaries were used in one sitting — note which)*
+
+---
+
+## Sitting E — The optional npm channel (when the owner decides)
+
+`publish-npm.yml` exists and is disabled by the only mechanism that cannot be forgotten: it has no
+trigger but a human's. Nothing in this repository depends on the package — the engine runs the
+server from the checkout — so this sitting can wait as long as the owner likes, and the product is
+complete without it.
+
+**Why it is a sitting and not a CI job.** A dispatch is outward-facing. Even `--dry-run` needs the
+repository secret and an existing release tag, and the run talks to the real registry. The
+developer's work stops at the workflow, the guard script, the tests and this row.
+
+**Prerequisites.** An npm account for `farstic`; the `v2.0.0` tag pushed (ARC-09-S03); and the
+secret created — **owner decision, 2026-09-11: `NPM_TOKEN` is deferred to the acceptance phase**,
+so it does not exist yet and the rehearsal tag is not used for this.
+
+| Step | Exactly what to do | What green looks like |
+|---|---|---|
+| E1 — the secret | On npmjs.com create a **granular** access token, **scoped to the single package `@farstic/snowarch`**, write-enabled, and save it as the repository secret `NPM_TOKEN`. Never paste it anywhere else; never into a terminal that logs. | The secret exists in Settings → Secrets and variables → Actions. The scope is what makes a leak survivable: a token that cannot name `@farstic/snow-mcp` cannot touch the 1.0.0 record even if it is stolen. |
+| E2 — the dry run | Actions → **publish-npm (optional)** → Run workflow → `tag: v2.0.0`, `dry_run: **true**` (the default — accept the dialog as it stands). | Green. The log shows `publish: @farstic/snowarch@2.0.0 is the publishable target for tag v2.0.0`, then `npm notice` listing the tarball with `dist/server.js`, `dist/cli/index.js` and `dist/contract.json`, and `Tarball Details … name: @farstic/snowarch`. Afterwards `npm view @farstic/snowarch` still says the version is not published. |
+| E3 — the real publish, only if you want the channel | The same dispatch with `dry_run: **false**`. | The version appears on npm with a provenance attestation linking it to this repository and that tag. |
+| E4 — the smoke, by hand | From a clean temp directory: `npx -y @farstic/snowarch@2 --version`. | It prints the version. This is deliberately NOT automated: it needs the real registry, and a test that mocks the registry proves nothing about it. |
+| E5 — the record that must not change | `npm view @farstic/snow-mcp` before and after. | `1.0.0`, both times. D-01: that record is never touched. |
+
+**One question for the owner, before E3 (not before E2 — a dry run publishes nothing).** This
+repository is Apache-2.0 and has a root `NOTICE`; `packages/snowarch/` has a `LICENSE` but no
+`NOTICE`, so the tarball ships the licence and not the attribution notice. Apache-2.0 §4(d) asks a
+redistribution to carry the NOTICE's attribution text. The developer did not invent an answer:
+copying the root `NOTICE` into `packages/snowarch/` and adding it to `files` is a two-line change
+and the recommendation, but it is a licensing decision and therefore yours. Nothing is blocked
+until a real publish.
 
 ---
 

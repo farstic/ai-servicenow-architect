@@ -63,6 +63,10 @@ test('no workflow can merge, and only the live suite reads a repository secret',
   const ALLOWED = {
     'e2e-live.yml': ['SNOW_E2E_URL', 'SNOW_E2E_USERNAME', 'SNOW_E2E_PASSWORD',
       'SNOW_E2E_OAUTH_CLIENT_ID', 'SNOW_E2E_OAUTH_CLIENT_SECRET'],
+    // ARC-09-S10. One name, in one workflow, and it is the owner's npm token — granular and
+    // scoped to `@farstic/snowarch` alone, so even a leak cannot reach the `@farstic/snow-mcp`
+    // record (D-01). It appearing anywhere else, or a second name appearing here, fails this test.
+    'publish-npm.yml': ['NPM_TOKEN'],
   };
   for (const f of readdirSync(join(root, '.github/workflows'))) {
     const text = wf(f);
@@ -537,6 +541,17 @@ test('required-contexts.json is exactly what ci.yml produces on a pull request (
     assert.ok(why.length > 30, `${file}'s exclusion carries no reason`);
   }
 
+  // ...AND THE REVERSE (ARC-09-S10). Until this story every workflow happened to be accounted for,
+  // and nothing said so: a new file could sit in `.github/workflows/` producing checks that were
+  // neither required nor deliberately excluded, and the generator — which reads only the gating
+  // workflow — would not have noticed. `publish-npm.yml` was the first file to test that, which is
+  // why the assertion arrives with it rather than as tidying.
+  const unaccounted = readdirSync(join(root, '.github/workflows'))
+    .filter((f) => f.endsWith('.yml'))
+    .filter((f) => f !== 'ci.yml' && !(f in fixture._notRequired));
+  assert.deepEqual(unaccounted, [], 'these workflows are neither the gating one nor excluded with '
+    + 'a reason — add them to NOT_REQUIRED in scripts/gen-required-contexts.mjs');
+
   // S09 merged and the job exists, so its two contexts are here — the inverse of what this
   // asserted while the job did not: a name CI does not produce is a required check waiting for
   // ever, and a job CI does produce that is NOT required is a red build nothing blocks on.
@@ -720,4 +735,57 @@ test('eol adds exactly two required contexts, by the names a check run prints (A
   }
   // 52 before this story. A generated file is not evidence on its own — the number is the claim.
   assert.equal(fixture.count, 54, `${fixture.count} contexts — S09 takes 52 to 54`);
+});
+
+test('publish-npm is dispatch-only, dry by default, and the only OIDC workflow (ARC-09-S10)', () => {
+  const text = wf('publish-npm.yml');
+  // COMMENTS OUT FIRST, for the same reason the `eol` test does it (ARC-09-S09): this workflow's
+  // header explains the guards and names both scripts and the forbidden package while doing so, so
+  // an assertion over the raw text is an assertion about where someone put a paragraph. In a
+  // comment it is the RULE; in a step it is the behaviour.
+  const code = text.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+
+  // AC 4, as the story spells it: one trigger, and it is a human's.
+  assert.equal((code.match(/workflow_dispatch/g) ?? []).length, 1);
+  for (const trigger of ['tags:', 'pull_request:', 'schedule:']) {
+    assert.equal(code.includes(`\n  ${trigger}`), false, `publish-npm triggers on ${trigger}`);
+  }
+  // `push:` deserves its own look: a `push` trigger here would publish on every merge to develop.
+  assert.equal(/^on:\n(?:\s+\S.*\n)*?\s{2}push:/m.test(code), false, 'publish-npm triggers on push');
+
+  // THE DEFAULT IS THE HARMLESS ONE. A dialog accepted as it stands must not publish.
+  assert.match(code, /dry_run:\n(?:.*\n)*?\s+default: true/);
+  assert.match(code, /--dry-run/);
+
+  // The provenance permission, and nowhere else. `id-token: write` is a credential in its own
+  // right: it mints an OIDC token any step in that workflow can present.
+  assert.match(code, /id-token: write/);
+  for (const f of readdirSync(join(root, '.github/workflows'))) {
+    if (f === 'publish-npm.yml') continue;
+    assert.equal(/id-token:\s*write/.test(wf(f)), false, `${f} also has id-token: write`);
+  }
+
+  // The two guards run BEFORE the install and before the token is anywhere near a command.
+  const order = ['verify-tag.mjs', 'assert-publish-target.mjs', 'npm ci', 'NODE_AUTH_TOKEN']
+    .map((needle) => code.indexOf(needle));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b),
+    'the publish steps are out of order — the target check must precede npm ci and the token');
+  assert.ok(order.every((i) => i > -1), 'a publish step went missing');
+
+  // The name that must never appear in a publish command, and the one that must.
+  assert.match(code, /npm publish --workspace packages\/snowarch/);
+  // In the STEPS. The header comment names it deliberately — that sentence is why the guard exists.
+  assert.equal(code.includes('snow-mcp'), false,
+    'the forbidden package name appears in a publish-npm step, not merely in its explanation');
+});
+
+test('publish-npm adds no required context, and is excluded with its reason (ARC-09-S10)', () => {
+  const fixture = JSON.parse(readFileSync(join(root, 'tests/fixtures/required-contexts.json'), 'utf8'));
+  assert.equal(fixture.contexts.some((c) => c.includes('publish')), false,
+    'a manual-dispatch workflow cannot be a required check: protection would wait for ever');
+  const why = fixture._notRequired['publish-npm.yml'];
+  assert.ok(why && why.length > 30, 'publish-npm.yml is excluded without a reason');
+  assert.match(why, /dispatch/);
+  // Unchanged by this story, and the number is the claim.
+  assert.equal(fixture.count, 54, `${fixture.count} contexts — S10 adds none`);
 });
