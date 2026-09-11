@@ -784,7 +784,8 @@ jobs:
           call .\bootstrap.cmd --mode design --yes --skip-claude-check --docs skip
           if not "%ERRORLEVEL%"=="0" exit /b 1
 
-      # `version` through `snowarch.cmd` — six lines, ARC-09-S04's contract, counted by node rather
+      # `version` through `snowarch.cmd` — six lines (SEVEN on a tagged checkout, where the seventh
+      # compares the tag's message with the tree — ARC-09-C17b), ARC-09-S04's contract, counted by node rather
       # than by `find /c /v ""`, whose padded output `set /p` keeps (S04's own lesson).
       - name: version, six lines, through snowarch.cmd
         run: |
@@ -794,7 +795,7 @@ jobs:
           rem which is the step doing exactly its job.
           call .\snowarch.cmd version > "%RUNNER_TEMP%\version.txt"
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          node -e "const l=require('fs').readFileSync(process.env.RUNNER_TEMP+'/version.txt','utf8').trim().split(/\r?\n/); if(l.length!==6){console.error('lines: '+l.length+String.fromCharCode(10)+l.join(String.fromCharCode(10)));process.exitCode=1}"
+          node -e "const l=require('fs').readFileSync(process.env.RUNNER_TEMP+'/version.txt','utf8').trim().split(/\r?\n/); if(l.length!==6&&l.length!==7){console.error('lines: '+l.length+String.fromCharCode(10)+l.join(String.fromCharCode(10)));process.exitCode=1}"
           if not "%ERRORLEVEL%"=="0" exit /b 1
 
       # The wizard's non-interactive door (ARC-07): a password on STDIN, never in argv, against a
@@ -1003,13 +1004,14 @@ jobs:
           call .\snowarch.cmd version > "%RUNNER_TEMP%\version.txt"
           if not "%ERRORLEVEL%"=="0" exit /b 1
           type "%RUNNER_TEMP%\version.txt"
-          rem ARC-09-S04: six lines, and each one names what it reports. The Windows path reaches
+          rem ARC-09-S04: six lines — seven when the checkout is TAGGED, the seventh comparing the
+          rem tag's message with the tree (ARC-09-C17b) — and each one names what it reports. The Windows path reaches
           rem the same code as ./snowarch, and `git.exe` is on PATH here without Git Bash.
           rem
           rem Counted by node, not by `find /c /v ""`: cmd's count comes back padded, `set /p`
           rem keeps the padding, and the comparison then fails on a correct six-line output. Node
           rem is present in this half of the step and has no opinion about whitespace.
-          node -e "const l=require('fs').readFileSync(process.env.RUNNER_TEMP+'/version.txt','utf8').split(/\r?\n/).filter(Boolean);const want=['snowarch ','tag:','commit:','contract:','docs-pin:','floors:'];if(l.length!==6){console.error('expected 6 lines, got '+l.length);process.exit(1)}want.forEach((w,i)=>{if(!l[i].startsWith(w)){console.error('line '+(i+1)+' is not '+w+': '+l[i]);process.exit(1)}});console.log('six lines, in order')"
+          node -e "const l=require('fs').readFileSync(process.env.RUNNER_TEMP+'/version.txt','utf8').split(/\r?\n/).filter(Boolean);const want=['snowarch ','tag:','commit:','contract:','docs-pin:','floors:'];if(l.length!==6&&l.length!==7){console.error('expected 6 lines (7 when tagged), got '+l.length);process.exit(1)}want.forEach((w,i)=>{if(!l[i].startsWith(w)){console.error('line '+(i+1)+' is not '+w+': '+l[i]);process.exit(1)}});console.log('six lines, in order')"
           if not "%ERRORLEVEL%"=="0" exit /b 1
           set "PATH=C:\Windows\system32;C:\Windows"
           rem CALL here too. Without it cmd transferred control and this assertion never ran — which

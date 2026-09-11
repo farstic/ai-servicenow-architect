@@ -869,6 +869,8 @@ in the sweep as a guard over something already correct: the banner hook has neve
 
 ```sh
 ./snowarch version        # six lines: version, tag, commit, contract, docs pin, floors
+                          # seven on a TAGGED checkout — the seventh compares the tag's
+                          # message with the tree (ARC-09-C17b)
 ./snowarch doctor         # the full health check, with a remedy on every failure
 ```
 
