@@ -1,0 +1,23 @@
+{
+  "_rule": "ARC-09-S09. An extension listed here is tracked but has NO explicit rule in .gitattributes and is deliberately left to `* text=auto eol=lf`. A reason per entry, because 'it was already like that' is how a policy file stops meaning anything. An entry is not permission to commit CRLF: `text=auto` still normalises the index to LF, and tests/eol.test.mjs still asserts it.",
+  "extensions": {
+    ".js": "the committed dist/ and the docs-spike fixtures; covered by `packages/snowarch/dist/** text eol=lf` where it matters, and by text=auto elsewhere",
+    ".map": "source maps beside the committed dist/; generated, never hand-edited",
+    ".ts": "the server package's sources; text=auto normalises them and no tool needs CRLF",
+    ".yml": "GitHub workflows; the runner reads them on Linux and Windows alike",
+    ".toml": "one config file; no platform reads it in a line-ending-sensitive way",
+    ".txt": "fixtures and notes",
+    ".py": "scripts/md-to-docx.py — a shebang script, so LF is the requirement text=auto already gives it",
+    ".example": "a committed sample env file"
+  },
+  "names": {
+    ".editorconfig": "dot-file, no extension",
+    ".gitattributes": "the policy file itself",
+    ".gitignore": "dot-file, no extension",
+    ".gitleaksignore": "dot-file, no extension",
+    ".gitmodules": "dot-file, no extension",
+    "LICENSE": "extensionless by convention",
+    "NOTICE": "extensionless by convention",
+    ".gitkeep": "an empty placeholder"
+  }
+}

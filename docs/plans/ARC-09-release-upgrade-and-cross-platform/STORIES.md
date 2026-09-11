@@ -780,6 +780,15 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 **Risks / open points.** `git ls-files --eol` output for files with `-text` attribute varies slightly across git versions (2.25 floor vs runner's 2.4x) — the parser tolerates both `i/-text` and `i/none`.
 
+**Amendments made during the build (ARC-09-S09).**
+
+1. **`sh -n bootstrap.sh` is dropped, and CI is what settled it.** The design note asks for it beside `bash -n`; the `eol (ubuntu-latest)` cell answered `bootstrap.sh: 34: Syntax error: "(" unexpected`, where `/bin/sh` is dash and line 34 is `ORIG=("$@")` — a bash array. The file's shebang is `#!/usr/bin/env bash` and the `launcher` job lints it with `shellcheck -s bash`, so POSIX-sh compatibility is a claim it has never made. Asserting it would either stay red for ever or force a rewrite nobody asked for. AC 6 names `bash -n` only, and that runs on ubuntu here and on ubuntu + macOS in `launcher`.
+2. **No tracked binary file exists.** The test-design note and AC list `*.png`/`*.docx`; `git ls-files '*.png'` is empty and there is no `.docx`. An assertion over an empty set proves nothing, so the `binary` rule in `.gitattributes` is asserted to exist and `git check-attr` is asked what it resolves to (`text: unset`), and the test fails the day a binary IS tracked, telling the next person to exercise the case rather than leave it empty.
+3. **Extensionless files are answered by NAME.** `snowarch`, `LICENSE`, `NOTICE` and the dot-files are not "an extension that is the empty string". `.gitattributes` already rules `snowarch` by name; the rest are allow-list entries with a reason.
+4. **AC 4 and AC 5 are fixture repositories, not throwaway pull requests.** A throwaway PR proves it once, on the day someone remembers to open it; a fixture proves it on every cell for ever. They are judged by the same functions the repository is judged by, never by a second copy of the rules.
+5. **The completeness check was vacuous until AC 5's fixture caught it.** Its escape hatch for path-scoped rules tested for `eol=lf` in git's resolved attributes — and the catch-all `* text=auto eol=lf` puts `eol=lf` on every file in the repository, so every file was cleared and the check passed without checking. The tell is `text` SET versus `text=auto`.
+6. **`GIT_CONFIG_GLOBAL` points at an empty FILE, not `os.devNull`.** On Windows `devNull` is `\\.\nul`, which git cannot open as a config path: `git init` failed outright on `eol (windows-latest)` while both fixtures passed on macOS. An empty file is a valid config file everywhere and says the same thing.
+
 **Definition of done.** Merged; `eol` required on `main`; `docs/CONTRIBUTING.md` paragraph; README acceptance 6 evidenced by the Windows `eol` run URL.
 
 ---

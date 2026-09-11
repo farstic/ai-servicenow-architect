@@ -41,6 +41,22 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **Line endings that survive a Windows clone.** LF everywhere except the two Windows launcher
+  kinds (`*.cmd`, `*.ps1`), which are CRLF — and the policy is now read from git rather than taken
+  on trust. `tests/eol.test.mjs` parses `git ls-files --eol` and separates the two halves that fail
+  differently: the INDEX is LF for every text file on every platform, because git normalises on
+  `add`, so a CRLF entry there means normalisation was disabled and every Unix clone receives a
+  file whose shell script fails with `/bin/bash^M: bad interpreter` — an error naming an
+  interpreter that plainly exists; the WORKING TREE is whatever the checkout wrote, which is only
+  meaningful on a tree that was just cloned.
+
+  So the `eol` job clones the way a consultant's machine does — `git config --global
+  core.autocrlf true` BEFORE `actions/checkout`, because the setting decides what the clone writes
+  — then runs the launchers under `cmd.exe`, and checks the BYTES rather than git's opinion of
+  them. Every tracked file must be answered by a rule in `.gitattributes` or an entry with a reason
+  in `tests/eol.allowlist.json`: `text=auto` is a guess, and removing the guess is what the policy
+  file is for.
+
 - **A Windows machine, used the way a Windows user uses one.** `windows-native` runs three Node
   majors with `cmd.exe` as the shell for every step and no Git Bash anywhere on PATH, driving the
   product entirely through `snowarch.cmd` and `bootstrap.cmd`: the install, `version`, the wizard's

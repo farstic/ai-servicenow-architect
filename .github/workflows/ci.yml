@@ -1093,3 +1093,79 @@ jobs:
       - name: engine lint L10 against the installed CLI
         if: steps.cli.outputs.available == 'true'
         run: node packages/contract/lint/engine-lint.mjs --only L10 --require-claude
+
+  eol:
+    # ARC-09-S09. The line-ending policy, proved where it can actually break: a Windows checkout
+    # made the way a consultant's is made. `core.autocrlf=true` is the Git-for-Windows installer's
+    # default ("Checkout Windows-style, commit Unix-style"), and it is the setting under which a
+    # tracked `bootstrap.sh` with a stray `\r` becomes `/bin/bash^M: bad interpreter` — an error
+    # that names an interpreter which plainly exists, on line 1, for a reason invisible in a diff.
+    #
+    # The config step runs BEFORE `actions/checkout@v4` on purpose: the setting decides what the
+    # clone WRITES, so setting it afterwards would test a tree that was already checked out under
+    # the runner's default and prove nothing.
+    #
+    # `tests/eol.test.mjs` also runs on all nine `test` cells as part of `npm test`. It is here as
+    # well because only here is the working tree a fresh clone under the consultant's setting —
+    # the index assertions hold anywhere, the worktree ones need this job.
+    name: eol
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - name: Check out Windows-style, as the Git for Windows installer does
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf true
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The evidence, quoted rather than summarised: what git says about the launchers and about a
+      # file held at LF, on this OS, after this clone. AC 2 is read from this output.
+      - name: git ls-files --eol for the launchers and one .sh
+        run: git ls-files --eol -- "*.ps1" "*.cmd" bootstrap.sh snowarch .mcp.json
+
+      - name: node --test tests/eol.test.mjs
+        run: node --test tests/eol.test.mjs
+
+      # The bytes, not git's opinion of them. On Windows this is the checkout under autocrlf=true;
+      # on ubuntu it is the committed bytes, and both answers matter for a different reason.
+      - name: The launchers are CRLF throughout
+        if: runner.os == 'Windows'
+        run: node scripts/ci/assert-crlf.mjs bootstrap.cmd bootstrap.ps1 snowarch.cmd
+      - name: The LF set has no carriage return anywhere
+        run: node scripts/ci/assert-lf.mjs bootstrap.sh snowarch tools/snowarch/bin/snowarch.mjs .mcp.json
+
+      # README acceptance 6, second half: they RUN after a real Windows clone. `call` because a
+      # `.cmd` invoked from `cmd` without it transfers control and never returns (ARC-09-C7), and
+      # an explicit exit code because a cmd step's status is its last command's (ARC-09-S08).
+      - name: The launchers run under cmd.exe
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call .\bootstrap.cmd --help
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          call .\snowarch.cmd --help
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File bootstrap.ps1 --help
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          exit /b 0
+
+      # `bash -n` is syntax only and says nothing about line endings — it catches the thing a CRLF
+      # file would otherwise be blamed for, which is the point of running it next to the `\r` check.
+      #
+      # AMENDMENT (ARC-09-S09): the story's design note also asks for `sh -n`. That assertion is
+      # wrong about this file and CI said so — `bootstrap.sh: 34: Syntax error: "(" unexpected` on
+      # ubuntu, where `/bin/sh` is dash and line 34 is `ORIG=("$@")`, a bash array. The file's
+      # shebang is `#!/usr/bin/env bash` and the `launcher` job lints it with `shellcheck -s bash`:
+      # POSIX-sh compatibility is a claim it has never made, so asserting it would either fail for
+      # ever or force a rewrite nobody asked for.
+      - name: bootstrap.sh parses under bash
+        if: runner.os == 'Linux'
+        run: bash -n bootstrap.sh
