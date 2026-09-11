@@ -11,10 +11,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -24,8 +25,11 @@ const ENTRY_POINTS = [
   'scripts/docs.mjs',
 ];
 
-test('the mechanism is real: process.exit() truncates a large write through a pipe', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-exit-'));
+test('the mechanism is real: process.exit() truncates a large write through a pipe', (t) => {
+  // Through the helper, so the directory goes with the run. A bare `mkdtempSync` leaves one behind
+  // per run — which is how a developer's TMPDIR reached 14,261 of them (ARC-08-S06), and what
+  // `tools/snowarch/tests/fixture-cleanup.test.mjs` exists to keep from happening again.
+  const dir = tempDir('snowarch-exit-', t);
   const body = 'x'.repeat(400_000);
   const write = `process.stdout.write(${JSON.stringify(body)});`;
   writeFileSync(join(dir, 'exits.mjs'), `${write}\nprocess.exit(0);\n`);
