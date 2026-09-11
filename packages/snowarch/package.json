@@ -18,7 +18,8 @@
   "type": "module",
   "files": [
     "dist/",
-    ".env.example"
+    ".env.example",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=20.0.0"

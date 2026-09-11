@@ -301,6 +301,9 @@ test('readCommits carries the parents, which is how a merge is recognised', (t) 
   assert.ok(commits.every((c) => /^[0-9a-f]{40}$/.test(c.sha)), 'a sha came back malformed');
 });
 
+/** What `extractUnreleased` returns on a tree a release has just emptied (ARC-09-C17). */
+const SKELETON_BODY = '### Notes';
+
 // ── ARC-09-C12c — the hand-written block survives a release, whole ─────────────────────────────
 //
 // S02's AC 2 says the block under `## Unreleased` appears byte-identical in the released section.
@@ -315,6 +318,27 @@ test('readCommits carries the parents, which is how a merge is recognised', (t) 
 test('C12c: the real Unreleased block survives a release byte-identical', () => {
   const real = readFileSync(join(REAL_ROOT, "docs/CHANGELOG.md"), "utf8");
   const carried = extractUnreleased(real);
+
+  // TWO TREES, and the test has to know which one it is on (ARC-09-C17). On a development tree the
+  // Unreleased block is full of hand-written notes and the round trip below is the claim. On a tree
+  // that has JUST BEEN RELEASED the block is the empty skeleton BY DESIGN — that is what a release
+  // leaves — and asserting "more than 50 lines" there fails the release commit's own pull request.
+  // Rehearsal run 4 reported exactly that (`the real Unreleased block is 1 lines`). Neither branch
+  // is a skip: each asserts the thing that is true of its tree.
+  if (carried === SKELETON_BODY) {
+    // The released shape: the skeleton, byte for byte...
+    assert.match(real, /\n## Unreleased\n\n### Notes\n\n## /,
+      'the emptied Unreleased section is not the exact skeleton');
+    // ...and the notes are in the newest release section, where the release put them.
+    const newest = /^## \d[^\n]*$/m.exec(real);
+    assert.ok(newest, 'no release section under an emptied Unreleased — where did the notes go?');
+    const section = real.slice(newest.index, real.indexOf('\n## ', newest.index + 1));
+    assert.match(section, /^### Notes$/m, 'the newest release section carries no Notes block');
+    assert.match(section, /^### (Added|Fixed|Changed)/m,
+      'the newest release section carries no hand-written group — the release dropped them');
+    return;
+  }
+
   assert.ok(carried.split('\n').length > 50,
     `the real Unreleased block is ${carried.split('\n').length} lines — this test needs the real shape`);
   // The thing that was lost: hand-written groups BELOW the Notes sub-block.
@@ -326,8 +350,28 @@ test('C12c: the real Unreleased block survives a release byte-identical', () => 
   assert.ok(built.ok, built.message);
   // BYTE-IDENTICAL, as one contiguous region, in the released section.
   assert.ok(built.section.includes(carried), 'the carried block is not verbatim in the new section');
-  // And Unreleased is emptied rather than duplicated.
-  assert.equal(extractUnreleased(built.text).replace(/\s+/g, ' ').trim(), '### Notes');
+  // And Unreleased is emptied rather than duplicated — the EXACT bytes (ARC-09-C13), not a
+  // whitespace-normalised shape. The normalised form proved "a Notes heading and nothing else",
+  // which is most of the claim and leaves the blank-line layout free to drift; the file is read by
+  // people and written by a generator, so the layout is part of the contract.
+  assert.match(built.text, /\n## Unreleased\n\n### Notes\n\n## /,
+    'the emptied Unreleased section is not the exact skeleton');
+});
+
+test('C17: the released-tree branch is reachable, and asserts the released shape', () => {
+  // The negative control for the branch above: a file in the released shape, put through the same
+  // reasoning. Without this, the branch is code nobody has run until the next release.
+  const released = ['# Changelog', '', '## Unreleased', '', '### Notes', '',
+    '## 2.0.0 — 2026-09-11', '', '### Notes', '', 'a note somebody wrote', '',
+    '### Added', '', '- a hand-written entry', '', '_trailer_', '',
+    '## Before 2.0.0', '', '- old', ''].join('\n');
+  assert.equal(extractUnreleased(released), SKELETON_BODY,
+    'the fixture is not in the released shape this branch is for');
+  assert.match(released, /\n## Unreleased\n\n### Notes\n\n## /);
+  const newest = /^## \d[^\n]*$/m.exec(released);
+  const section = released.slice(newest.index, released.indexOf('\n## ', newest.index + 1));
+  assert.match(section, /^### Notes$/m);
+  assert.match(section, /^### Added/m);
 });
 
 test('C12c: nothing inside the block is treated as a boundary', () => {

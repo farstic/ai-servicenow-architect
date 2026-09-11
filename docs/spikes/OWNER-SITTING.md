@@ -1019,13 +1019,12 @@ so it does not exist yet and the rehearsal tag is not used for this.
 | E4 — the smoke, by hand | From a clean temp directory: `npx -y @farstic/snowarch@2 --version`. | It prints the version. This is deliberately NOT automated: it needs the real registry, and a test that mocks the registry proves nothing about it. |
 | E5 — the record that must not change | `npm view @farstic/snow-mcp` before and after. | `1.0.0`, both times. D-01: that record is never touched. |
 
-**One question for the owner, before E3 (not before E2 — a dry run publishes nothing).** This
-repository is Apache-2.0 and has a root `NOTICE`; `packages/snowarch/` has a `LICENSE` but no
-`NOTICE`, so the tarball ships the licence and not the attribution notice. Apache-2.0 §4(d) asks a
-redistribution to carry the NOTICE's attribution text. The developer did not invent an answer:
-copying the root `NOTICE` into `packages/snowarch/` and adding it to `files` is a two-line change
-and the recommendation, but it is a licensing decision and therefore yours. Nothing is blocked
-until a real publish.
+**Answered — the owner decided on 2026-09-11: NOTICE ships.** This repository is Apache-2.0 with a
+root `NOTICE`, and §4(d) asks a redistribution to carry its attribution text; npm includes a
+`LICENSE` automatically and a `NOTICE` not at all. `packages/snowarch/NOTICE` is a byte-for-byte
+copy of the root file, listed in `files`, and `tests/publish-target.test.mjs` asserts both that the
+tarball carries it and that it still equals the root — a copy nothing compares is a copy that
+drifts. Nothing about E1–E5 changes.
 
 ---
 

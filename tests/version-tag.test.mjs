@@ -127,11 +127,30 @@ test('an import/* tag is not a release — the --match filter is the whole point
 
 // ── AC 3, and the shallow case ─────────────────────────────────────────────────────────────────
 
-test('AC 3 — an untagged checkout says so, and this repository is one', () => {
+test('AC 3 — a checkout says which of the two it is, and means it', () => {
   const info = versionInfo(REAL_ROOT);
-  assert.equal(info.tag, null, 'this checkout has a v* tag now — the case needs rewriting');
   const rendered = renderVersion(info);
   assert.equal(rendered.length, 6, 'the layout is not six lines');
+
+  // TWO TREES (ARC-09-C17). This used to assert `info.tag === null` — a property of the checkout
+  // that a RELEASE CHANGES, so it failed on the release commit's own pull request, which is the
+  // one place it must not. Rehearsal run 4: `this checkout has a v* tag now — the case needs
+  // rewriting`. It is rewritten: on a tagged tree the released shape is asserted, and that is the
+  // shape this test should be most interested in.
+  if (info.tag) {
+    assert.equal(info.tag.distance, 0,
+      `the tag is ${info.tag.distance} commits back — this is not the release commit`);
+    assert.equal(info.tag.exact, true, 'a tag is reachable but this commit is not it');
+    assert.match(rendered[1], /^tag: {8}v\d[^ ]* \(exact\)$/, rendered[1]);
+    // The message IS the release's record, so it is read rather than assumed present.
+    assert.ok(info.tag.message, 'the tag carries no parsable snowarch message');
+    for (const key of ['contract', 'docsPin']) {
+      assert.ok(info.tag.message[key], `the tag message has no ${key}`);
+    }
+    assert.ok(info.tag.message.floors && Object.keys(info.tag.message.floors).length >= 3,
+      'the tag message carries fewer than three floors');
+    return;
+  }
 
   // WHICH "none" depends on the clone, and the test must not decide that for it: CI's `test` job
   // clones shallow, where the honest answer is "tags unreachable" rather than "no release tag".
@@ -323,4 +342,25 @@ test('the git seam refuses to answer rather than answering nothing', (t) => {
   resetGitBinary();
   // Not a repository at all: `describe` is allowed to fail and returns null; the state is honest.
   assert.equal(gitDescribe(empty), null);
+});
+
+
+test('C17: the released-tree branch of AC 3 is reachable, and asserts the released shape', (t) => {
+  // The negative control for that branch. This checkout is untagged, so the code above would
+  // otherwise be unrun until the next release — which is precisely how the OLD assertion survived
+  // to fail on a release commit. A tagged fixture exercises it here instead.
+  const f = checkout(t);
+  tagAt(f.root, 'v2.0.0', buildTagMessage({
+    version: '2.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
+
+  const info = versionInfo(f.root);
+  assert.ok(info.tag, 'the fixture is not tagged — the control proves nothing');
+  assert.equal(info.tag.exact, true);
+  assert.equal(info.tag.distance, 0);
+  assert.match(renderVersion(info)[1], /^tag: {8}v2\.0\.0 \(exact\)$/);
+  assert.equal(info.tag.message.contract, f.sha);
+  assert.equal(info.tag.message.docsPin, PIN);
+
+  // And the OLD assertion — `info.tag === null` — would fail here, which is the defect.
+  assert.notEqual(info.tag, null, 'a released tree would still pass the assertion that was removed');
 });

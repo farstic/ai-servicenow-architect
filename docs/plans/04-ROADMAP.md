@@ -94,6 +94,15 @@ Story-to-milestone assignment is in `05-STORY-INDEX.md` (column *Milestone*). M1
 
 ### M4 exit evidence — recorded 2026-09-11
 
+**The rehearsal is a standing step (owner decision, 2026-09-11).** Every release is rehearsed
+before it is cut — a throwaway branch, an `X.Y.Z-rc.N` prerelease tag, `release.yml` green on three
+OSes with its seven assets, then the Release, tag and branch deleted. The reason is measured: five
+rehearsal rounds each found a defect that `--dry-run` could not reach and no fixture had produced —
+the post-write gates, a stale artefact, a hand list of staged files, eight hundred lines of
+changelog dropped, a tag `actions/checkout` peels, and tests that encode "this is a development
+tree" and go red on the release commit's own pull request. The procedure is in
+`docs/CONTRIBUTING.md` § The rehearsal, with per-release record fields.
+
 Every exit condition from the M4 row, with what was MEASURED on `arc-09/release` rather than what
 was intended. Fifty-four required contexts after ARC-09-S09, generated from `ci.yml` by
 `scripts/gen-required-contexts.mjs` into `tests/fixtures/required-contexts.json`.

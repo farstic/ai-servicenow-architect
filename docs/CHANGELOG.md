@@ -128,7 +128,26 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   `docs/TROUBLESHOOTING.md#proxy` or `#tls-ca` — and only when the shape is recognised, because a
   confident wrong remedy costs more than none.
 
+### Added
+
+- **Every release is rehearsed before it is cut.** A throwaway branch, a prerelease tag, the release
+  workflow green on three operating systems with all seven assets, then the tag and branch deleted —
+  written down in the contributing guide as a numbered step with per-release record fields. Five
+  rehearsal rounds during 2.0.0 each found a defect that a dry run could not reach and no test
+  fixture had ever produced; every one of them would otherwise have landed on a real release.
+
+- **The published package carries its NOTICE.** Apache-2.0 §4(d) asks a redistribution to carry the
+  attribution notice, and npm includes a licence automatically but never a NOTICE — so the package
+  ships its own copy, and a test compares it with the root file so the two cannot drift apart
+  unnoticed.
+
 ### Fixed
+
+- **The test suite no longer fails on the release commit.** Five checks asked whether this was a
+  development tree — is the changelog's Unreleased section full, is the checkout untagged, does a
+  fixture still spell the development version — and a release makes all of those false. They went
+  red on the one pull request that must merge. Each one now asks a question that is true of a
+  development tree and a released tree alike, and says which it is looking at.
 
 - **The release workflow no longer rejects its own tag.** Checking out a tag ref rewrites it to
   point at the commit, so an annotated tag arrived in CI looking like one that had never carried a
