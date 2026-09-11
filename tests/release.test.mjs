@@ -36,8 +36,16 @@ const write = (root, p, text) => {
   writeFileSync(join(root, p), text);
 };
 
+/** The contract `build-dist` would produce for a version — the fixture's whole point (C12b). */
+const contractFor = (version) => `${JSON.stringify({ schema: 1, version, tools: [] }, null, 2)}\n`;
+
 /** A checkout the release script would accept: clean, on `main`, pinned, with a contract. */
-function fixture(t, { version = '2.0.0-dev', contract = '{"schema":1,"tools":[]}' } = {}) {
+function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
+  // ARC-09-C12b: the contract EMBEDS the version, exactly as the real one does — `build-dist` bakes
+  // it in from `packages/snowarch/package.json`. A fixture whose contract was a constant could not
+  // see the defect this story exists for: a release rewrites the version, the committed contract
+  // goes stale, and the release commit fails its own `dist ok` gate on its own pull request.
+  contract = contract ?? contractFor(version);
   const root = tempDir('snowarch-release-', t);
   const manifest = (name) => `${JSON.stringify({ name, version, private: true }, null, 2)}\n`;
 
@@ -73,14 +81,22 @@ function fixture(t, { version = '2.0.0-dev', contract = '{"schema":1,"tools":[]}
 }
 
 /** The default stub: every gate passes, npm/gen/test are no-ops that write what they must. */
-function runner(root, { fail = null, code = 1 } = {}) {
+function runner(root, { fail = null, code = 1, skip = 0 } = {}) {
   const calls = [];
+  // `skip` lets the first N matching calls through (ARC-09-C12b). The contract gate runs TWICE in
+  // a release — once before the writes and once after — so a matcher that failed the first
+  // occurrence would stop the run at the pre-write gate and never exercise the post-write path,
+  // which is the path the rehearsal broke on.
+  let seen = 0;
   return {
     calls,
     run: (args) => {
       calls.push(args.join(' '));
       const name = args.join(' ');
-      if (fail && name.includes(fail)) return code;
+      if (fail && name.includes(fail)) {
+        seen += 1;
+        if (seen > skip) return code;
+      }
       // `npm version` really does rewrite the manifests, so the stub does the same thing: a test
       // whose npm wrote nothing would assert about a tree the real command never produces.
       if (args[0] === 'npm' && args[1] === 'version') {
@@ -94,8 +110,25 @@ function runner(root, { fail = null, code = 1 } = {}) {
         return 0;
       }
       // `gen-readme` renders the head into README.md — the fixture's version of the generator.
-      if (name.includes('gen-readme')) {
+      if (name.includes('gen-readme') || name === 'npm run gen') {
         write(root, 'README.md', read(root, 'docs/README-head.md'));
+        return 0;
+      }
+      // ARC-09-C12b. `build-dist` BAKES THE VERSION into the contract, so the stub does too: a
+      // stub that returned 0 and wrote nothing would make every assertion below pass on a tree the
+      // real command never produces — which is precisely the shape of the defect being fixed.
+      if (name.includes('build-dist')) {
+        const v = JSON.parse(read(root, 'packages/snowarch/package.json')).version;
+        write(root, 'packages/snowarch/dist/contract.json', contractFor(v));
+        return 0;
+      }
+      // `pin.mjs --yes` records the sha of whatever `dist/contract.json` now is.
+      if (name.includes('pin.mjs')) {
+        const sha = createHash('sha256')
+          .update(read(root, 'packages/snowarch/dist/contract.json')).digest('hex');
+        const pin = JSON.parse(read(root, 'packages/contract/required-tools.json'));
+        write(root, 'packages/contract/required-tools.json',
+          `${JSON.stringify({ ...pin, contractSha256: sha }, null, 2)}\n`);
         return 0;
       }
       return 0;
@@ -105,10 +138,10 @@ function runner(root, { fail = null, code = 1 } = {}) {
 
 const capture = () => { const lines = []; return { stream: { write: (s) => lines.push(s) }, text: () => lines.join('') }; };
 
-async function run(root, argv, { ask = null, fail = null } = {}) {
+async function run(root, argv, { ask = null, fail = null, skip = 0 } = {}) {
   const out = capture();
   const err = capture();
-  const r = runner(root, { fail });
+  const r = runner(root, { fail, skip });
   const code = await release({ argv, root, out: out.stream, err: err.stream, ask, run: r.run,
     now: () => new Date('2026-09-11T00:00:00Z') });
   return { code, out: out.text(), err: err.text(), calls: r.calls };
@@ -401,3 +434,81 @@ function execGit(root, args, { allowFail = false } = {}) {
     return allowFail ? null : '';
   }
 }
+
+// ── ARC-09-C12b — the release rebuilds the artefact it is about to tag ─────────────────────────
+//
+// `dist/contract.json` embeds the package version. Until C12b the release wrote the version and
+// stopped: the commit carried a contract that still said `-dev`, its own pull request would have
+// failed `dist ok`, and the tag's `contract:` trailer named a file that no longer existed in that
+// form. `--dry-run` could not see it — a dry run stops before the writes — so nothing had ever
+// exercised the post-write path until the v2.0.0-rc.0 rehearsal did.
+
+test('C12b: the release rebuilds dist, moves the pin, and tags the REBUILT sha', async (t) => {
+  const root = fixture(t);
+  const { code, out } = await run(root, ['2.0.0', '--yes', '--offline']);
+  assert.equal(code, 0, out);
+
+  const contract = read(root, 'packages/snowarch/dist/contract.json');
+  // The artefact carries the RELEASED version, not the one the tree started with.
+  assert.equal(JSON.parse(contract).version, '2.0.0');
+  // `build-dist` on the released tree is a no-op: what was committed is what the source builds.
+  assert.equal(contract, contractFor('2.0.0'), 'a second build would differ from what was committed');
+
+  const sha = createHash('sha256').update(contract).digest('hex');
+  assert.equal(JSON.parse(read(root, 'packages/contract/required-tools.json')).contractSha256, sha,
+    'the pin still names the pre-release contract');
+
+  // And the tag quotes the same sha — the trailer is what `./snowarch version`, `release.yml` and
+  // `./snowarch upgrade` all read back.
+  const message = git(root, ['tag', '-l', '--format=%(contents)', 'v2.0.0']);
+  assert.match(message, new RegExp(`contract: ${sha}`),
+    `the tag names a different contract:\n${message}`);
+});
+
+test('C12b: the release commit contains the rebuilt artefact and the moved pin', async (t) => {
+  const root = fixture(t);
+  await run(root, ['2.0.0', '--yes', '--offline']);
+  // Nothing left dirty: if `dist/` or the pin were written but not staged, the release commit would
+  // be a version bump whose artefact is still uncommitted in the maintainer's tree.
+  assert.equal(git(root, ['status', '--porcelain']).trim(), '');
+  const files = git(root, ['show', '--name-only', '--format=', 'HEAD']).split('\n').filter(Boolean);
+  for (const f of ['packages/snowarch/dist/contract.json', 'packages/contract/required-tools.json']) {
+    assert.ok(files.includes(f), `${f} is not in the release commit: ${files.join(', ')}`);
+  }
+});
+
+test('C12b: a post-write failure rolls back the rebuild and the pin too', async (t) => {
+  const root = fixture(t);
+  const before = {
+    contract: read(root, 'packages/snowarch/dist/contract.json'),
+    pin: read(root, 'packages/contract/required-tools.json'),
+    manifest: read(root, 'package.json'),
+  };
+  // The gate that caught the real rehearsal, made to fail here on purpose.
+  const { code, err } = await run(root, ['2.0.0', '--yes', '--offline'],
+    { fail: 'version-consistency' });
+  assert.equal(code, 1);
+  assert.match(err, /rolled back, nothing was committed/);
+
+  // BYTE-IDENTICAL, all three. A rollback that restored the manifests and left a rebuilt contract
+  // behind would leave the next attempt refusing on a dirty tree the maintainer did not cause.
+  assert.equal(read(root, 'packages/snowarch/dist/contract.json'), before.contract);
+  assert.equal(read(root, 'packages/contract/required-tools.json'), before.pin);
+  assert.equal(read(root, 'package.json'), before.manifest);
+  assert.equal(git(root, ['status', '--porcelain']).trim(), '', 'the rollback left the tree dirty');
+  assert.equal(git(root, ['tag', '-l']).trim(), '', 'a tag survived a rolled-back release');
+});
+
+test('C12b: the contract gate runs after the writes, and its failure rolls back too', async (t) => {
+  const root = fixture(t);
+  const { code, err, calls } = await run(root, ['2.0.0', '--yes', '--offline'],
+    { fail: 'contract-gate.mjs --skip-build', skip: 1 });   // let the PRE-write gate pass
+  assert.equal(code, 1);
+  assert.match(err, /the contract gate failed after the writes — rolled back/);
+  // It ran AFTER `npm version`, not as part of the pre-write gates — that is the whole point: the
+  // pre-write contract gate passed on a tree whose version had not moved yet.
+  const versionAt = calls.findIndex((c) => c.startsWith('npm version'));
+  const gateAt = calls.lastIndexOf('node scripts/contract-gate.mjs --skip-build');
+  assert.ok(versionAt > -1 && gateAt > versionAt, `order: ${calls.join(' | ')}`);
+  assert.equal(git(root, ['status', '--porcelain']).trim(), '');
+});

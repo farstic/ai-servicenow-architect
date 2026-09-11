@@ -57,9 +57,17 @@ test('CLAUDE.md carries exactly one marker line and it matches the root version'
 
 test('mutation: a workspace version that drifts is caught, with both versions named', () => {
   const versions = Object.fromEntries(MANIFESTS.map((m) => [m, readJson(m).version]));
-  versions['packages/snowarch/package.json'] = '2.0.1-dev';
+  // DERIVED, never typed (ARC-09-C12). This assertion used to spell `root 2.0.0-dev`, and the
+  // release script writes the new version BEFORE it runs this gate — so the first real release
+  // failed here, after the writes, on a test about somebody else's drift. The rehearsal for
+  // v2.0.0-rc.0 hit it exactly: `release: version-consistency failed after the writes — rolled
+  // back, nothing was committed`. A test that hard-codes the version of record is a test that
+  // fails on the one day it matters most.
+  const drifted = `${rootVersion}-drifted`;
+  versions['packages/snowarch/package.json'] = drifted;
   assert.throws(() => checkManifests(versions),
-    /packages\/snowarch\/package\.json version 2\.0\.1-dev != root 2\.0\.0-dev/);
+    new RegExp(`packages/snowarch/package\\.json version ${drifted.replace(/[.+]/g, '\\$&')}`
+      + ` != root ${rootVersion.replace(/[.+]/g, '\\$&')}`));
 });
 
 test('mutation: a deleted marker line is caught, and the message says how many were found', () => {

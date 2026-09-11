@@ -5,6 +5,10 @@ import { join } from 'node:path';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectToolCatalog, routeToolInvocation } from '../src/tools/index.js';
+
+/** The package's own version, from its manifest — the one thing `build-dist` bakes in. */
+const packageVersion = (): string => JSON.parse(readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')).version;
 import { CURRENT_SCHEMA_VERSION } from '../src/store/migrations/index.js';
 import { STORE_VERSION } from '../src/store/schema.js';
 import { runWithInstance, FLAG_NAMES, type Flags, type InstanceRuntime } from '../src/servicenow/context.js';
@@ -363,8 +367,11 @@ describe('(g) the contract mirrors permissions.ts, never a retyped copy', () => 
     expect(CONTRACT.server.suggestedName).toBe('servicenow');
     expect(CONTRACT.toolPackage).toBe('full');
     expect(CONTRACT.maxRecordsDefault).toBe(100);
-    // The package version of record — ARC-09 sets the release number.
-    expect(CONTRACT.version).toBe('2.0.0-dev');
+    // The package version of record, READ rather than typed (ARC-09-C12): `build-dist` bakes
+    // `packages/snowarch/package.json`'s version into the contract, and the release script rewrites
+    // that file. A literal here goes red on the release commit itself, which is when nobody wants
+    // to be debugging a test.
+    expect(CONTRACT.version).toBe(packageVersion());
   });
 
   it('the store schema version is the constant, not a number typed into the contract', () => {

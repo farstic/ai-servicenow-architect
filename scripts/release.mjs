@@ -138,10 +138,16 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
   const pre = preflight({ version, root, git: gitRun, config, flags, platform, hasNpm });
   if (!pre.ok) { fail(pre.message); return EXIT_PREFLIGHT; }
 
+  // The sha as the tree stands NOW. Two uses: the pin-agreement check just below, and the
+  // `--tag-only` path, where nothing is being written and the committed contract is the contract.
+  // For a full release it is NOT the sha that reaches the tag — `applyWrites` rebuilds the
+  // artefact (the contract embeds the version) and returns the sha of what it produced. See
+  // ARC-09-C12b; the v2.0.0-rc.0 rehearsal is why.
   const contractSha = createHash('sha256')
     .update(readFileSync(join(root, 'packages/snowarch/dist/contract.json'))).digest('hex');
-  const tagMessage = buildTagMessage({ version, contract: contractSha, docsPin: pre.docsPin,
+  const tagMessageFor = (contract) => buildTagMessage({ version, contract, docsPin: pre.docsPin,
     floors: config.floors });
+  const tagMessage = tagMessageFor(contractSha);
 
   // The pin file and the artefact must already agree. They are two records of one thing, and a
   // release that recorded a sha nobody pinned would be a release whose contract nothing verifies.
@@ -223,14 +229,27 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
     return EXIT_GATE;
   }
 
-  // The post-write check: the tree that was just produced must satisfy the one test that asserts
-  // the counters agree. A release whose own consistency test fails is rolled back rather than
-  // committed — the alternative is a tag on a tree nobody can reproduce.
-  if (runChild(['node', '--test', 'tests/version-consistency.test.mjs']) !== 0) {
-    rollback(root, written.touched);
-    fail('release: version-consistency failed after the writes — rolled back, nothing was committed');
-    return EXIT_GATE;
+  // THE POST-WRITE CHECKS. The tree that was just produced has to be one the release PR can pass,
+  // and these are the two gates it will meet there: the counters agree, and the artefact matches
+  // its pin. Both run AFTER the writes because both are about what the writes produced — and
+  // ARC-09-C12b added the second one, because until then a release could rebuild nothing and hand
+  // its own pull request a stale `dist/`. A failure rolls everything back, including the rebuild.
+  for (const [name, argv, why] of [
+    ['version-consistency', ['node', '--test', 'tests/version-consistency.test.mjs'],
+      'version-consistency failed after the writes'],
+    ['contract', ['node', 'scripts/contract-gate.mjs', '--skip-build'],
+      'the contract gate failed after the writes'],
+  ]) {
+    if (runChild(argv) !== 0) {
+      rollback(root, written.touched);
+      fail(`release: ${why} — rolled back, nothing was committed`);
+      return EXIT_GATE;
+    }
+    write(`  post ${name} ok`);
   }
+
+  // The tag quotes the REBUILT contract, never the one that was there when the script started.
+  const releaseTagMessage = tagMessageFor(written.contractSha ?? contractSha);
 
   // ── commit and tag ─────────────────────────────────────────────────────────────────────────
   execFileSync('git', ['add', ...STAGED.filter((f) => existsSync(join(root, f)))],
@@ -246,7 +265,7 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
     return 0;
   }
 
-  createTag({ root, version, tagMessage, sign: flags.sign });
+  createTag({ root, version, tagMessage: releaseTagMessage, sign: flags.sign });
   write(`Released v${version} (commit ${short}) — push with: git push origin ${pre.branch} --follow-tags`);
   if (flags.push) runChild(['git', 'push', 'origin', pre.branch, '--follow-tags']);
   return 0;

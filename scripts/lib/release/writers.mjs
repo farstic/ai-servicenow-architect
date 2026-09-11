@@ -14,7 +14,8 @@
  * worst moment to discover it.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 /** The `CLAUDE.md` marker (ARC-01-S06). Exactly one line matches, and the test proves it. */
@@ -81,6 +82,11 @@ export { generateChangelog };
 
 /** The files this script is allowed to stage. Explicit, never `git add -A`. */
 export const STAGED = Object.freeze([
+  // ARC-09-C12b: the rebuilt artefact and its pin are part of the release commit. Without them
+  // `git add` staged a version bump whose contract still said `-dev`, and the release commit
+  // failed its own `dist ok` gate on its own pull request.
+  'packages/snowarch/dist',
+  'packages/contract/required-tools.json',
   'package.json',
   'package-lock.json',
   'packages/snowarch/package.json',
@@ -102,14 +108,43 @@ export const STAGED = Object.freeze([
  */
 export function applyWrites({ root, version, date, run, from = null, tag = {}, git = undefined,
   read = (p) => readFileSync(join(root, p), 'utf8'),
-  write = (p, t) => writeFileSync(join(root, p), t) }) {
+  write = (p, t) => writeFileSync(join(root, p), t),
+  sha = (p) => createHash('sha256').update(readFileSync(join(root, p))).digest('hex') }) {
   const touched = [];
 
   const code = run(['npm', 'version', version, '--no-git-tag-version', '--workspaces',
     '--include-workspace-root']);
-  if (code !== 0) return { ok: false, message: `release: npm version exited ${code} — nothing else was written`, touched };
+  if (code !== 0) return { ok: false, message: `release: npm version exited ${code} — nothing else was written` };
   touched.push('package.json', 'package-lock.json',
     'packages/snowarch/package.json', 'tools/snowarch/package.json');
+
+  // ── THE ARTEFACT, REBUILT, BEFORE ANYTHING QUOTES ITS SHA (ARC-09-C12b) ────────────────────
+  //
+  // `dist/contract.json` EMBEDS the package version — `build-dist` bakes it in from
+  // `packages/snowarch/package.json`, and `contract.test.ts` asserts the committed file is
+  // byte-identical to an in-process build. So the moment `npm version` runs above, the committed
+  // contract is stale: the release commit would fail its own `dist ok` gate on its own pull
+  // request, and the tag would name a contract whose `version` still said `-dev`.
+  //
+  // This is a design gap in ARC-09-S01, not a test that needs relaxing, and `--dry-run` could
+  // never have found it — a dry run stops before the writes. The v2.0.0-rc.0 rehearsal reached
+  // this point and was rolled back by the post-write gate.
+  //
+  // Order matters and is the whole fix: version → rebuild → pin → generate → and only THEN the
+  // changelog and the tag message, both of which quote the contract sha.
+  const built = run(['node', 'scripts/build-dist.mjs']);
+  if (built !== 0) return { ok: false, message: `release: build-dist exited ${built}`, touched };
+  touched.push('packages/snowarch/dist');
+
+  // The pin is the second record of the same thing, and it must move with it or the contract gate
+  // fails on the release commit. `--yes` because there is nobody at a terminal inside a release.
+  const pinned = run(['node', 'packages/contract/pin.mjs', '--yes']);
+  if (pinned !== 0) return { ok: false, message: `release: pin.mjs exited ${pinned}`, touched };
+  touched.push('packages/contract/required-tools.json');
+
+  // The sha the rest of this release quotes: computed from the file that now exists, never from
+  // the one that existed when the script started.
+  const contractSha = sha('packages/snowarch/dist/contract.json');
 
   for (const [file, fn] of [
     ['CLAUDE.md', (t) => writeMarker(t, version)],
@@ -121,24 +156,49 @@ export function applyWrites({ root, version, date, run, from = null, tag = {}, g
     touched.push(file);
   }
 
-  // The changelog writes itself: it needs the repository (the commits since `from`) and the tag's
-  // two shas for the trailer, not just the text.
-  const log = generateChangelog({ root, version, date, from, tag, read, write,
-    ...(git ? { git } : {}) });
+  // Every generator, not only the README: a generated block that embeds the version or the
+  // contract sha is stale for the same reason `dist/` was, and `gen-all --check` runs inside the
+  // lint that the release PR will face.
+  const gen = run(['npm', 'run', 'gen']);
+  if (gen !== 0) return { ok: false, message: `release: gen-all exited ${gen}`, touched };
+  touched.push('README.md');
+
+  // The changelog LAST, because its trailer quotes the contract sha that only now exists.
+  const log = generateChangelog({ root, version, date, from,
+    tag: { ...tag, contract: contractSha }, read, write, ...(git ? { git } : {}) });
   if (!log.ok) return { ok: false, message: `release: ${log.message}`, touched };
   touched.push('docs/CHANGELOG.md');
 
-  // The README is a rendering of the head. Regenerated rather than edited, so `gen-readme --check`
-  // — which runs inside the lint this release has already passed — still holds afterwards.
-  const gen = run(['node', 'scripts/gen-readme.mjs']);
-  if (gen !== 0) return { ok: false, message: `release: gen-readme exited ${gen}`, touched };
-  touched.push('README.md');
-
-  return { ok: true, touched };
+  return { ok: true, touched, contractSha };
 }
 
-/** Undo everything this script wrote. Only the files it names — never the maintainer's other work. */
+/**
+ * Undo everything this script wrote. Only the paths it names — never the maintainer's other work.
+ *
+ * Two halves since ARC-09-C12b, because the writes now include a REBUILD. `git checkout --` restores
+ * a tracked file that changed; it does nothing about a file that did not exist before, and
+ * `build-dist` can add one. The preflight guarantees the tree was clean when the release started,
+ * so anything untracked under these paths afterwards was written by this script and is safe to
+ * remove — and leaving it behind is what makes the NEXT attempt refuse with "working tree not
+ * clean" for a reason the maintainer did not cause.
+ */
 export function rollback(root, files) {
   if (files.length === 0) return;
-  execFileSync('git', ['checkout', '--', ...files], { cwd: root, stdio: 'pipe' });
+  const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+
+  // Untracked FIRST, and identified before anything is restored: `git checkout --` cannot restore
+  // a path git has never seen, and handed one it fails outright — taking the whole rollback with
+  // it and leaving the tree in exactly the half-written state this function exists to prevent.
+  // (Found by C12b's own rollback test, where the fixture's generated README is untracked.)
+  const untracked = git(['status', '--porcelain', '--', ...files]).split('\n')
+    .filter((l) => l.startsWith('??')).map((l) => l.slice(3).trim()).filter(Boolean);
+
+  // What git actually tracks under these paths — a directory expands to its files.
+  const tracked = git(['ls-files', '--', ...files]).split('\n').map((l) => l.trim()).filter(Boolean);
+  if (tracked.length > 0) execFileSync('git', ['checkout', '--', ...tracked], { cwd: root, stdio: 'pipe' });
+
+  // The preflight guarantees the tree was clean when the release started, so anything untracked
+  // under these paths was written by this script: leaving it behind makes the NEXT attempt refuse
+  // on a dirty tree the maintainer did not cause.
+  for (const rel of untracked) rmSync(join(root, rel), { recursive: true, force: true });
 }
