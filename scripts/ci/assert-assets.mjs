@@ -15,12 +15,12 @@
  * Usage: node scripts/ci/assert-assets.mjs <file…>
  * Exit 0 · 1 something is wrong with an asset · 2 cannot run.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
 const files = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 if (files.length === 0) {
-  process.stderr.write('assert-assets: usage: node scripts/ci/assert-assets.mjs <file…>\n');
+  writeSync(2, 'assert-assets: usage: node scripts/ci/assert-assets.mjs <file…>\n');
   process.exit(2);
 }
 
@@ -62,8 +62,8 @@ for (const file of files) {
 }
 
 if (problems.length) {
-  process.stderr.write('assert-assets: these must not be published\n');
-  for (const p of problems) process.stderr.write(`  ${p}\n`);
+  writeSync(2, 'assert-assets: these must not be published\n');
+  for (const p of problems) writeSync(2, `  ${p}\n`);
   process.exit(1);
 }
-process.stdout.write(`assert-assets: ${files.length} asset(s) clean\n`);
+writeSync(1, `assert-assets: ${files.length} asset(s) clean\n`);

@@ -9,7 +9,7 @@
  * Usage: node scripts/ci/release-notes.mjs <tag> [--root <dir>]
  * Exit 0 · 1 the version has no section · 2 cannot run.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { sectionFor } from '../lib/release/changelog.mjs';
@@ -20,13 +20,13 @@ const root = resolve(value('--root') ?? process.cwd());
 const tag = argv.find((a) => !a.startsWith('--') && argv[argv.indexOf(a) - 1] !== '--root');
 
 if (!tag) {
-  process.stderr.write('release-notes: usage: node scripts/ci/release-notes.mjs <tag>\n');
+  writeSync(2, 'release-notes: usage: node scripts/ci/release-notes.mjs <tag>\n');
   process.exit(2);
 }
 
 const file = join(root, 'docs/CHANGELOG.md');
 if (!existsSync(file)) {
-  process.stderr.write(`release-notes: ${file} is not there\n`);
+  writeSync(2, `release-notes: ${file} is not there\n`);
   process.exit(2);
 }
 
@@ -35,8 +35,8 @@ const section = sectionFor(readFileSync(file, 'utf8'), version);
 if (section === null) {
   // Not a warning with an empty body: a Release whose notes are blank is worse than a release that
   // stopped, because it is published and looks finished.
-  process.stderr.write(`release-notes: docs/CHANGELOG.md has no section for ${version} — `
+  writeSync(2, `release-notes: docs/CHANGELOG.md has no section for ${version} — `
     + 'the release commit should have written it\n');
   process.exit(1);
 }
-process.stdout.write(`${section}\n\n`);
+writeSync(1, `${section}\n\n`);

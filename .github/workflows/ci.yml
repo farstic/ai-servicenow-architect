@@ -237,7 +237,7 @@ jobs:
         if: matrix.variant == 'node-cli' && matrix.os == 'windows-latest'
         shell: cmd
         run: |
-          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          call .\bootstrap.cmd --mode design --yes --skip-claude-check
           if not "%ERRORLEVEL%"=="0" exit /b 1
 
       # ── no-node ─────────────────────────────────────────────────────────────────────────────
@@ -257,7 +257,7 @@ jobs:
         run: |
           set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
           where node && exit /b 1
-          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          call .\bootstrap.cmd --mode design --yes --skip-claude-check
           if not "%ERRORLEVEL%"=="0" exit /b 1
 
       # ── no-gitbash ──────────────────────────────────────────────────────────────────────────
@@ -265,20 +265,27 @@ jobs:
       # machine, so "no bash at all" is not a state a Windows user is ever in; what must be gone is
       # GIT Bash, the interpreter `bootstrap.sh` needs. `Git\cmd` stays, because git itself is a
       # prerequisite.
+      # ONE implementation of the recipe, shared with `windows-native` (ARC-09-S08). It was a
+      # literal PATH in two `run:` blocks, and two copies of a machine's directory layout is one
+      # copy too many: the day a runner image moves `nodejs`, one gets corrected and the other
+      # silently starts testing a machine with no Node, which passes for the wrong reason.
       - name: No Git Bash on PATH, and the whole Windows path without it
         if: matrix.variant == 'no-gitbash'
         shell: cmd
         run: |
-          set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
+          rem The shared recipe (ARC-09-S08), applied to THIS STEP only. Not `GITHUB_ENV`: that
+          rem would strip Git Bash from every later step in the job, and the ones that say
+          rem `shell: bash` would then resolve to C:\Windows\System32\bash.exe — the WSL stub —
+          rem and fail with "Windows Subsystem for Linux has no installed distributions". Measured.
+          for /f "delims=" %%p in ('node scripts\ci\strip-git-bash.mjs --with-node --print') do set "PATH=%%p"
           where bash 2>nul | find /i "\Git\" >nul && exit /b 1
           where node || exit /b 1
-          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          call .\bootstrap.cmd --mode design --yes --skip-claude-check
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          .\snowarch.cmd version
+          call .\snowarch.cmd version
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          node tools\snowarch\hooks\session-start.mjs > hook.txt
-          type hook.txt | find "Mode:" >nul || exit /b 1
-          del hook.txt
+          node tools\snowarch\hooks\session-start.mjs > "%RUNNER_TEMP%\hook.txt"
+          type "%RUNNER_TEMP%\hook.txt" | find "Mode:" >nul || exit /b 1
           exit /b 0
       - name: ...and the same launcher run from powershell.exe directly
         if: matrix.variant == 'no-gitbash'
@@ -404,7 +411,7 @@ jobs:
           # `assert-doctor.mjs`'s judgement, not this step's — but 2 (usage) and 3 (the doctor
           # could not run at all) are fatal wherever they happen.
           set +e
-          ./snowarch doctor --json --no-cache > doctor.json
+          ./snowarch doctor --json --no-cache > "$RUNNER_TEMP/doctor.json"
           code=$?
           set -e
           echo "doctor exit: $code"
@@ -417,7 +424,7 @@ jobs:
           rem CALL, not a bare invocation: cmd TRANSFERS control to another batch file and never
           rem comes back, so every line after it — including the exit-code check it was written for
           rem — is dead. The step's code becomes the callee's, which looks like it worked.
-          call .\snowarch.cmd doctor --json --no-cache > doctor.json
+          call .\snowarch.cmd doctor --json --no-cache > "%RUNNER_TEMP%\doctor.json"
           if %ERRORLEVEL% GEQ 2 exit /b 1
           call .\snowarch.cmd doctor --no-cache
           if %ERRORLEVEL% GEQ 2 exit /b 1
@@ -430,9 +437,9 @@ jobs:
         shell: powershell
         run: |
           $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
-          & cmd /c ".\snowarch.cmd doctor --json --no-cache > doctor-ps.json"
+          & cmd /c ".\snowarch.cmd doctor --json --no-cache > $env:RUNNER_TEMP\doctor-ps.json"
           if ($LASTEXITCODE -ge 2) { exit 1 }
-          $r = Get-Content doctor-ps.json -Raw | ConvertFrom-Json
+          $r = Get-Content "$env:RUNNER_TEMP\doctor-ps.json" -Raw | ConvertFrom-Json
           if ($r.mode -ne 'design-only') { Write-Host "mode: $($r.mode)"; exit 1 }
           # E-00 is the one this environment explains — see assert-doctor.mjs.
           $failed = @($r.checks | Where-Object { $_.status -eq 'fail' } | ForEach-Object { $_.id })
@@ -445,8 +452,58 @@ jobs:
         if: matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash'
         shell: bash
         run: |
-          node scripts/ci/assert-doctor.mjs --in doctor.json --expect-fail E-00
-          node scripts/ci/doctor-snapshot.mjs --in doctor.json --out doctor-normalised.json --summary
+          node scripts/ci/assert-doctor.mjs --in "$RUNNER_TEMP/doctor.json" --expect-fail E-00
+          node scripts/ci/doctor-snapshot.mjs --in "$RUNNER_TEMP/doctor.json" \
+            --out "$RUNNER_TEMP/doctor-normalised.json" --summary
+
+      # ── ARC-09-C5: where the re-run path's time goes ────────────────────────────────────────
+      # MEASURE BEFORE ANY FIX. The Windows cells spend 690–920 ms of the product's own time on the
+      # banner's re-run path — a quick doctor plus rendering — and the cap does not move until
+      # somebody knows on what. Two tables: the doctor's own per-check durations (free: the report
+      # is already on disk), and the hook's phases from inside the hook, behind a flag whose absence
+      # is the tested default.
+      #
+      # The four Windows cells, because that is where the cost is, and ONE ubuntu cell for contrast:
+      # a table with nothing to compare against cannot say whether 900 ms is a platform or a bug.
+      - name: C5 — where the doctor spends its time, quick and full
+        if: >
+          (matrix.variant == 'node-cli' && matrix.os == 'windows-latest')
+          || matrix.variant == 'no-gitbash'
+          || (matrix.variant == 'node-cli' && matrix.os == 'ubuntu-latest' && matrix.node == '22')
+        shell: bash
+        run: |
+          # TWO tables, because only one of them is the banner's. `doctor.json` above is a FULL
+          # `--json --no-cache` run — 39 checks, including E-28's `git ls-remote` — and the banner
+          # runs `doctor({ quick: true, noNetwork: true })`. Labelling the full run "quick" is how
+          # a measurement ends up answering a question nobody asked, so the quick subset gets its
+          # own run into its own file.
+          ./snowarch doctor --quick --json --no-cache > "$RUNNER_TEMP/doctor-quick.json" || true
+          node scripts/ci/check-timings.mjs --in "$RUNNER_TEMP/doctor-quick.json" --top 8 \
+            --summary --label "quick · ${{ matrix.label }}"
+          node scripts/ci/check-timings.mjs --in "$RUNNER_TEMP/doctor.json" --top 5 \
+            --summary --label "full · ${{ matrix.label }}"
+
+      - name: C5 — and where the banner's own phases go
+        if: >
+          (matrix.variant == 'node-cli' && matrix.os == 'windows-latest')
+          || matrix.variant == 'no-gitbash'
+          || (matrix.variant == 'node-cli' && matrix.os == 'ubuntu-latest' && matrix.node == '22')
+        shell: bash
+        env:
+          SNOWARCH_BANNER_PHASES: '1'
+        run: |
+          # Cold and warm, one each, so both paths are in the record. The phases print to stderr;
+          # stdout is the banner's, and a diagnostic there would reach a user's session.
+          rm -f .local/doctor-last.json
+          node tools/snowarch/hooks/session-start.mjs > /dev/null 2> cold-phases.txt || true
+          node tools/snowarch/hooks/session-start.mjs > /dev/null 2> warm-phases.txt || true
+          {
+            echo "### banner phases — ${{ matrix.label }}"
+            echo '```'
+            cat cold-phases.txt warm-phases.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat cold-phases.txt warm-phases.txt
 
       # README criterion 5, measured where it is actually paid: five cold spawns, median under a
       # second. The Windows cells run it through bash too — the hook is invoked as `node <path>` by
@@ -454,7 +511,9 @@ jobs:
       - name: The SessionStart banner, timed
         if: matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash'
         shell: bash
-        run: node scripts/ci/banner-timing.mjs --runs 5 --budget-ms 1000 --summary
+        run: >
+          node scripts/ci/banner-timing.mjs --runs 5 --budget-ms 1000
+          --fast-budget-ms 300 --summary
 
       # ── the no-node cells: the fallback the /snowarch status skill reads ─────────────────────
       # There is no doctor to run here, which IS the case being proved. What a session does instead
@@ -507,9 +566,9 @@ jobs:
         with:
           name: doctor-${{ matrix.label }}
           path: |
-            doctor.json
-            doctor-ps.json
-            doctor-normalised.json
+            ${{ runner.temp }}/doctor.json
+            ${{ runner.temp }}/doctor-ps.json
+            ${{ runner.temp }}/doctor-normalised.json
           if-no-files-found: ignore
           retention-days: 7
 
@@ -673,6 +732,125 @@ jobs:
             console.log('state ok:', s.version, s.writer, Object.keys(s.steps).length, 'steps');
           "
 
+  windows-native:
+    # ARC-09-S08. A Windows machine used the way a Windows user uses one: `cmd.exe` as the shell
+    # for every step, no Git Bash on PATH, and the product driven entirely through `.cmd`.
+    #
+    # This does NOT replace ARC-06-S14's `bootstrap (no-gitbash, windows-latest)` cell — that name
+    # is a required context on `main` and stays exactly as it is. What this ADDS is everything that
+    # cell does not run: three Node majors instead of one, and the commands a user reaches for after
+    # the install — the wizard's `--password-stdin` door, the server's own handshake, the hook, the
+    # version block, a store migration plan, and an upgrade check.
+    #
+    # `shell: cmd` as the job default, so a step that needs bash has to say so and none does. The
+    # PATH comes from `scripts/ci/strip-git-bash.mjs`, which S14's cell now calls too — two copies
+    # of a machine's directory layout is one copy too many, and the day an image moves `nodejs` one
+    # copy gets corrected while the other silently starts proving nothing.
+    name: windows-native (node ${{ matrix.node }}, no Git Bash)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22', '24']
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # BEFORE the PATH is stripped: `openssl.exe` lives in `Git\usr\bin`, the same directory as
+      # the `bash.exe` this cell exists to remove. Making a certificate is not what is under test.
+      - name: A throwaway certificate, while openssl is still reachable
+        run: node scripts/ci/make-fixture-cert.mjs
+
+      # JOB-WIDE here, which is safe only because every step below runs under `cmd` — the job's
+      # default shell. A `shell: bash` step in this job would resolve to the WSL stub.
+      - name: A PATH with no Git Bash on it
+        run: node scripts/ci/strip-git-bash.mjs --with-node --export
+      - name: ...and it is really gone
+        run: |
+          where bash 2>nul | find /i "\Git\" >nul && exit /b 1
+          where node || exit /b 1
+          where git || exit /b 1
+          exit /b 0
+
+      - name: Install through the Windows launcher
+        run: |
+          call .\bootstrap.cmd --mode design --yes --skip-claude-check --docs skip
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # `version` through `snowarch.cmd` — six lines, ARC-09-S04's contract, counted by node rather
+      # than by `find /c /v ""`, whose padded output `set /p` keeps (S04's own lesson).
+      - name: version, six lines, through snowarch.cmd
+        run: |
+          rem RUNNER_TEMP, never the checkout: this job's last step claims the tree is as CI found
+          rem it, and a cell that writes its own scratch into the root makes that claim false. The
+          rem first run proved it — `assert-clean` reported `?? version.txt` and `?? hook.txt`,
+          rem which is the step doing exactly its job.
+          call .\snowarch.cmd version > "%RUNNER_TEMP%\version.txt"
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          node -e "const l=require('fs').readFileSync(process.env.RUNNER_TEMP+'/version.txt','utf8').trim().split(/\r?\n/); if(l.length!==6){console.error('lines: '+l.length+String.fromCharCode(10)+l.join(String.fromCharCode(10)));process.exitCode=1}"
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # The wizard's non-interactive door (ARC-07): a password on STDIN, never in argv, against a
+      # store in the checkout. No network — `--no-probes` is what makes that true.
+      - name: instance add --password-stdin, through snowarch.cmd
+        run: |
+          npm ci --ignore-scripts
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          node scripts/ci/assert-password-stdin.mjs
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # The committed `dist/` answers a real handshake on this machine (ARC-08-S05's own client).
+      - name: The server answers a handshake here
+        run: |
+          node tools\snowarch\tests\server-section-smoke.mjs
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # The SessionStart hook in the form Claude Code runs it — `node <path>`, under cmd, with no
+      # POSIX shell anywhere (ARC-08-S08).
+      - name: The hook, under cmd, with no shell to fall back on
+        run: |
+          node tools\snowarch\hooks\session-start.mjs > "%RUNNER_TEMP%\hook.txt"
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          type "%RUNNER_TEMP%\hook.txt" | find "Mode:" >nul || exit /b 1
+          type "%RUNNER_TEMP%\hook.txt"
+
+      # S06's store command and S07's upgrade check, both through the `.cmd` entry point. Neither
+      # writes: `--dry-run` and `--check` are the read-only halves, which is what makes them safe
+      # on a cell whose job is the entry point rather than the behaviour.
+      - name: store migrate --dry-run, through snowarch.cmd
+        run: |
+          call .\snowarch.cmd store migrate --dry-run
+          rem 0 = nothing to do, 1 = no store in this checkout (the wizard wrote its fixture store
+          rem to a temp SNOW_STORE, not here). Both are fine; 2 is a usage error and 3+ is broken.
+          rem The explicit `exit /b 0` is not decoration: a cmd step's code is the LAST command's,
+          rem and `if` does not reset ERRORLEVEL — so without it the step inherited the 1 and went
+          rem red while asserting nothing. All three cells failed exactly there.
+          if %ERRORLEVEL% GEQ 2 exit /b 1
+          exit /b 0
+
+      - name: upgrade --check, through snowarch.cmd
+        run: |
+          call .\snowarch.cmd upgrade --check
+          rem 0 = up to date, 4 = a newer release exists. Anything else is a broken command, and on
+          rem a fork or a fresh clone with no tags it is 1 — which this cell accepts, because what
+          rem is under test is the ENTRY POINT, not what the remote happens to carry today.
+          if %ERRORLEVEL% GEQ 5 exit /b 1
+          exit /b 0
+
+      # `cmd`, not bash: this job has no Git Bash by design, and a `shell: bash` step here would
+      # resolve to the WSL stub rather than to a shell.
+      - name: ...and the checkout is as CI found it
+        run: |
+          node scripts\ci\assert-clean.mjs
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
   windows-launcher:
     # The Windows launchers can be verified nowhere else. They are written on macOS, where no
     # PowerShell 5.1 exists to run them, so every claim about them is made here or not at all.
@@ -740,7 +918,7 @@ jobs:
           where bash 2>nul | find /i "\Git\" >nul && exit /b 1
           where node && exit /b 1
           powershell -NoProfile -Command "Set-ExecutionPolicy Restricted -Scope Process -Force; Get-ExecutionPolicy -Scope Process"
-          .\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check
+          call .\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check
           echo ERRORLEVEL=%ERRORLEVEL%
           if not "%ERRORLEVEL%"=="0" exit /b 1
       - name: The state it wrote says powershell, and Node reads it
@@ -822,18 +1000,17 @@ jobs:
       - name: snowarch.cmd, with Node and without
         shell: cmd
         run: |
-          call .\snowarch.cmd version > version.txt
+          call .\snowarch.cmd version > "%RUNNER_TEMP%\version.txt"
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          type version.txt
+          type "%RUNNER_TEMP%\version.txt"
           rem ARC-09-S04: six lines, and each one names what it reports. The Windows path reaches
           rem the same code as ./snowarch, and `git.exe` is on PATH here without Git Bash.
           rem
           rem Counted by node, not by `find /c /v ""`: cmd's count comes back padded, `set /p`
           rem keeps the padding, and the comparison then fails on a correct six-line output. Node
           rem is present in this half of the step and has no opinion about whitespace.
-          node -e "const l=require('fs').readFileSync('version.txt','utf8').split(/\r?\n/).filter(Boolean);const want=['snowarch ','tag:','commit:','contract:','docs-pin:','floors:'];if(l.length!==6){console.error('expected 6 lines, got '+l.length);process.exit(1)}want.forEach((w,i)=>{if(!l[i].startsWith(w)){console.error('line '+(i+1)+' is not '+w+': '+l[i]);process.exit(1)}});console.log('six lines, in order')"
+          node -e "const l=require('fs').readFileSync(process.env.RUNNER_TEMP+'/version.txt','utf8').split(/\r?\n/).filter(Boolean);const want=['snowarch ','tag:','commit:','contract:','docs-pin:','floors:'];if(l.length!==6){console.error('expected 6 lines, got '+l.length);process.exit(1)}want.forEach((w,i)=>{if(!l[i].startsWith(w)){console.error('line '+(i+1)+' is not '+w+': '+l[i]);process.exit(1)}});console.log('six lines, in order')"
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          del version.txt
           set "PATH=C:\Windows\system32;C:\Windows"
           rem CALL here too. Without it cmd transferred control and this assertion never ran — which
           rem is how `snowarch.cmd` shipped for three ARCs returning 9009 instead of 3 when Node is

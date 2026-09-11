@@ -16,7 +16,7 @@
 // launcher files the Node-free `bootstrap.sh` / `bootstrap.ps1` will source. Those launchers have
 // to run the same git commands as the Node path, and the only way that stays true is if nobody
 // types them twice.
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyAllTargets } from '../tools/snowarch/lib/docs/recipe-block.mjs';
@@ -36,29 +36,29 @@ const results = applyAllTargets({ root, config, write: !check });
 // fixture tree simply does not have; a MISSING MARKER in a file that does exist is.
 const broken = results.filter((r) => r.status === 'no-markers');
 if (broken.length > 0) {
-  for (const r of broken) process.stderr.write(`gen-docs-recipe: markers not found in ${r.path}\n`);
+  for (const r of broken) writeSync(2, `gen-docs-recipe: markers not found in ${r.path}\n`);
   process.exit(2);
 }
 
 const stale = results.filter((r) => r.status === 'written');
 const present = results.filter((r) => r.status !== 'absent');
 if (present.length === 0) {
-  process.stderr.write(`gen-docs-recipe: none of the ${results.length} targets exist under ${root}\n`);
+  writeSync(2, `gen-docs-recipe: none of the ${results.length} targets exist under ${root}\n`);
   process.exit(2);
 }
 
 if (check) {
   if (stale.length > 0) {
     for (const r of stale) {
-      process.stderr.write(`gen-docs-recipe: ${r.path} recipe is STALE — `
+      writeSync(2, `gen-docs-recipe: ${r.path} recipe is STALE — `
         + 'run node scripts/gen-docs-recipe.mjs --write\n');
     }
     process.exit(1);
   }
-  process.stdout.write(`gen-docs-recipe: ${present.length} target(s) current `
+  writeSync(1, `gen-docs-recipe: ${present.length} target(s) current `
     + `(${present.map((r) => `${r.target} ${r.commands}`).join(', ')} commands)\n`);
   process.exit(0);
 }
-process.stdout.write(stale.length > 0
+writeSync(1, stale.length > 0
   ? `gen-docs-recipe: wrote ${stale.map((r) => r.path).join(', ')}\n`
   : `gen-docs-recipe: no change to ${present.length} target(s)\n`);

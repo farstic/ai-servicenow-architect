@@ -23,7 +23,7 @@
  * Stdlib only: this runs in `npm run lint` on every cell, before anything is installed.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,7 +46,7 @@ const RENDERERS = ['rule-file', 'presets', 'protocols', 'troubleshooting', 'perm
 // `--only rule` reads better than `--only rule-file` and is what the story writes.
 const ALIAS = { rule: 'rule-file' };
 
-const cannotRun = (message) => { process.stderr.write(`gen-governance: ${message}\n`); process.exit(2); };
+const cannotRun = (message) => { writeSync(2, `gen-governance: ${message}\n`); process.exit(2); };
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
 
 const contractPath = 'packages/snowarch/dist/contract.json';
@@ -151,13 +151,13 @@ for (const name of selected) {
 if (CHECK) {
   const stale = results.filter((r) => r.stale);
   for (const r of stale) {
-    process.stdout.write(`${unifiedDiff((r.current ?? '').replace(/\r\n/g, '\n'), r.next, r.target)}\n`);
+    writeSync(1, `${unifiedDiff((r.current ?? '').replace(/\r\n/g, '\n'), r.next, r.target)}\n`);
   }
   if (stale.length > 0) {
-    process.stdout.write(`gen-governance: ${stale.length} target(s) stale — run npm run gen and commit the result\n`);
+    writeSync(1, `gen-governance: ${stale.length} target(s) stale — run npm run gen and commit the result\n`);
     process.exit(1);
   }
-  process.stdout.write(`gen-governance: ${results.length} target(s) current (contract ${ctx.sha.slice(0, 12)})\n`);
+  writeSync(1, `gen-governance: ${results.length} target(s) current (contract ${ctx.sha.slice(0, 12)})\n`);
   process.exit(0);
 }
 
@@ -167,6 +167,6 @@ for (const r of results) {
   writeFileSync(r.abs, r.next);
 }
 const written = results.filter((r) => r.stale).map((r) => r.target);
-process.stdout.write(written.length === 0
+writeSync(1, written.length === 0
   ? `gen-governance: ${results.length} target(s) already current\n`
   : `gen-governance: wrote ${written.join(', ')}\n`);

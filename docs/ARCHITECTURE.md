@@ -1113,36 +1113,36 @@ about one registry rather than several:
 | `E-06` | repo | engine.config.json | yes | — |
 | `E-07` | repo | .mcp.json committed and secret-free | yes | — |
 | `E-08` | repo | .claude/settings.json committed | yes | — |
-| `E-09` | repo | no credential-shaped keys | yes | — |
+| `E-09` | repo | no credential-shaped keys | — | — |
 | `E-10` | repo | settings.local toggles match the recorded mode | yes | yes |
 | `E-11` | repo | .local/ state | yes | yes |
-| `E-12` | docs | docs corpus present | yes | yes |
-| `E-13` | docs | docs pin | yes | yes |
-| `E-14` | docs | docs family | yes | — |
-| `E-15` | docs | sparse set | yes | yes |
+| `E-12` | docs | docs corpus present | — | yes |
+| `E-13` | docs | docs pin | — | yes |
+| `E-14` | docs | docs family | — | — |
+| `E-15` | docs | sparse set | — | yes |
 | `E-16` | docs | citations | — | — |
 | `E-17` | roster | roster from directory listing | yes | — |
 | `E-18` | roster | skill descriptions | yes | — |
-| `E-19` | contract | no retired tool names | yes | — |
-| `E-20` | contract | prefix consistency | yes | — |
+| `E-19` | contract | no retired tool names | — | — |
+| `E-20` | contract | prefix consistency | — | — |
 | `E-21` | contract | generated files fresh | — | — |
-| `E-22` | contract | contract pin | yes | — |
+| `E-22` | contract | contract pin | — | — |
 | `E-23` | legacy | stale MCP registrations in ~/.claude.json | yes | — |
 | `E-24` | legacy | legacy wizard store | yes | — |
 | `E-25` | host | cloud-sync folder | yes | — |
 | `E-26` | host | proxy and CA environment | yes | — |
 | `E-27` | host | Claude Code registration status | — | — |
 | `E-28` | host | release currency | — | — |
-| `SV-00` | server | Node version | yes | — |
-| `SV-01` | server | dist artefacts | yes | yes |
-| `SV-02` | server | store | yes | yes |
-| `SV-03` | server | instances | yes | yes |
+| `SV-00` | server | Node version | — | — |
+| `SV-01` | server | dist artefacts | — | yes |
+| `SV-02` | server | store | — | yes |
+| `SV-03` | server | instances | — | yes |
 | `SV-04` | server | instance probes | — | — |
 | `SV-05` | server | stdio handshake | — | — |
 | `SV-06` | server | capabilities match the store | — | — |
-| `SV-07` | server | audit trail | yes | — |
-| `SV-08` | server | ancestor skill directories | yes | — |
-| `SV-09` | server | store schema | yes | — |
+| `SV-07` | server | audit trail | — | — |
+| `SV-08` | server | ancestor skill directories | — | — |
+| `SV-09` | server | store schema | — | — |
 <!-- /generated:doctor-checks -->
 
 **`--fix` repairs a closed list of seven drifts** (ARC-08-S06), and the list being closed is the

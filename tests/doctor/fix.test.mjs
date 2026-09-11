@@ -27,14 +27,31 @@ const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 /** The doctor, in process, against a fixture — the launcher pins to its own checkout. */
 async function doctorAt(root, flags = {}, over = {}) {
   const chunks = [];
+  const errs = [];
   const code = await doctorCommand({
-    flags: { quick: true, 'no-network': true, ...flags },
+    // NOT `quick`. These tests were fast because they ran the quick subset, and ARC-09-C8 moved
+    // the whole server section out of it — so F4, which repairs what SV-03 finds, stopped being
+    // proposed and five cases went red. Production never had this problem: `--fix` does not imply
+    // `--quick` (`lib/doctor/index.mjs` reads the flag, it does not set it), so a user running
+    // `./snowarch doctor --fix` always saw the full set. The fixture was the thing taking the
+    // shortcut, and it is the fixture that changes.
+    flags: { 'no-network': true, ...flags },
     out: { write: (t) => chunks.push(t) },
+    err: { write: (t) => errs.push(t) },
     cwd: root,
     input: { isTTY: false },
     ...over,
   });
-  return { code, text: chunks.join('') };
+  // Every mutation asserted by its precondition. A doctor run that could not write its cache is
+  // not a failed run and says so only on stderr, so a fixture that ignores stderr reports the
+  // CONSEQUENCE ("expected F4 to be proposed") and hides the CAUSE. That is exactly how ARC-09-C9
+  // reached CI: the three red cases named a falsy value, and the reason — the cache write being
+  // refused because E-00's remedy quotes the install URL — was on a stream nobody read. The
+  // command's surface for it is this line plus the `--json` field; it has no return value to
+  // check, so the line is what gets checked, and the reason is what gets printed.
+  const note = errs.join('').split('\n').find((l) => l.startsWith('doctor: cache not written')) ?? null;
+  assert.equal(note, null, note ?? undefined);
+  return { code, text: chunks.join(''), err: errs.join('') };
 }
 
 /**
@@ -474,7 +491,9 @@ test('--fix --json puts one object on stdout and the plan on stderr', async (t) 
   const stdout = [];
   const stderr = [];
   const code = await doctorCommand({
-    flags: { fix: true, yes: true, quick: true, json: true },
+    // Not `quick`, for the reason `doctorAt` above gives: the server section left that subset
+    // in ARC-09-C8, and F4 repairs what SV-03 finds.
+    flags: { fix: true, yes: true, json: true },
     out: { write: (x) => stdout.push(x) },
     err: { write: (x) => stderr.push(x) },
     cwd: root,

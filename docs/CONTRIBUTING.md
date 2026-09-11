@@ -823,15 +823,43 @@ exists for the machines that cannot run the other one, not as a second implement
 Two rules, one cause: **a write to a pipe past the buffer is asynchronous**, and a process that
 ends before it drains loses it. A terminal is not a pipe, so neither failure is visible by hand.
 
-- **Set `process.exitCode`; never call `process.exit()`** in an entry point that prints.
-  `scripts/docs.mjs` did, and its `--json` object reached callers cut in half at exactly 8192
-  bytes. `tests/entrypoint-exit.test.mjs` holds every entry point to this.
+- **A process that WRITES TO STDOUT must not call `process.exit()`.** Not "an entry point" — the
+  earlier wording invited the reading that a CI script is a different kind of thing, and it is not:
+  the pipe does not know what sort of program is on the other end. Set `process.exitCode` and let
+  the module end, or — where control flow genuinely needs an immediate stop — make every write in
+  the file `writeSync(1, …)` / `writeSync(2, …)`, which returns when the bytes are gone.
+  `scripts/docs.mjs` was the first casualty: its `--json` object reached callers cut in half at
+  exactly 8192 bytes.
 - **Nothing printed from an `exit` handler goes through `process.stderr.write`** — use
   `writeSync(2, …)`. The handler returns, the process ends, and the stream never flushes.
   `tools/snowarch/tests/helpers/temp.mjs` reports a fixture it could not remove from exactly there,
   and the message vanished the first time for this reason.
 
 Both were found by a test that read the finished output rather than the code that produced it.
+
+**And do not touch the streams at all in such a file — not even to read one.** The first reference
+to `process.stdout` makes libuv open fd 1 as a stream and set it **non-blocking**, and
+`fs.writeSync(1, …)` on a non-blocking pipe whose buffer is full does not wait: it throws `EAGAIN`.
+So a script that reads `process.stdout.isTTY` to decide about colour and then writes a large report
+synchronously can crash on a CI runner in exactly the place this rule is protecting. None of the
+swept files does it today, and the sweep is what keeps it that way.
+
+**Why size is the property, and "CI-only" is not.** Measured: `banner-timing.mjs` writes 223 bytes
+in a run and `assert-input-hashes.mjs` 429 — three orders of magnitude under a pipe buffer, so
+their exits could never have truncated anything. That is a fact about those two files on those two
+days, not a rule, and the arithmetic is exactly what an author should not have to do.
+
+**The near-miss that settles it.** `scripts/ci/release-notes.mjs` writes a whole CHANGELOG section
+to stdout — several KB for 2.0.0 and growing — and has three `process.exit` calls. It is safe today
+for a reason nobody wrote down: the big write is its LAST statement and none of the exits follow
+it. Add one `process.exit(0)` at the end, for tidiness, and the script that produces the text of a
+GitHub Release starts publishing half a section.
+
+`tests/entrypoint-exit.test.mjs` therefore sweeps by a SCAN — every `.mjs` under `scripts/`,
+`scripts/ci/`, `tools/snowarch/hooks/` and `tools/snowarch/bin/` that writes to fd 1 or 2 — rather
+than by a list, so a new printing script is covered the day it appears. `tools/snowarch/hooks/` is
+in the sweep as a guard over something already correct: the banner hook has never called
+`process.exit`, which is why a 12 KB `additionalContext` reaches the model whole.
 
 ## What to paste in a bug report
 
@@ -975,6 +1003,30 @@ Three files, in this order, and the tests will tell you if you stop after the fi
 1. **The registry.** A check is `defineCheck({ id, section, title, severity, quick, network,
    spawns, fixable, run })` in `tools/snowarch/lib/doctor/checks/`. The id is permanent: eleven ARCs
    name a check id as their proof, and renaming one silently removes somebody else's evidence.
+
+   **`quick: true` is a COST CONTRACT, not a label** (ARC-09-C8). The SessionStart banner's re-run
+   path is `doctor({ quick: true, noNetwork: true })`, paid before a user's first word of a
+   session, so a check that joins that subset is spending somebody else's time. To qualify:
+
+   - no process spawn beyond at most one bounded `git` call, and no tree walk — a bounded number
+     of `stat`/`readFile` on named paths is fine;
+   - no network;
+   - under **50 ms** on the slowest Windows cell;
+   - **and it must not reach for a shared context.** This is the one that is easy to miss.
+     `docsFor()`, `serverReport()` / `adopt()`, and `lintContextFor()` / `runLint()` each build
+     something expensive once and cache it on the run's ctx, so whichever check touches one FIRST
+     pays for all of them. Measured twice while writing this: moving E-12 out of `--quick` put its
+     143 ms onto E-13, and moving E-19 out put 66 ms onto E-20. The total did not change either
+     time. A check that needs a shared context is not quick, and neither is any other member of
+     its group.
+
+   `tests/doctor/engine-registry.test.mjs` enforces the shared-context half statically, with a
+   negative control. The rest is measured by `scripts/ci/check-timings.mjs` on five cells and read
+   from the job summary; the C5 chore row records the numbers.
+
+   Applying it took the quick doctor from 776 ms of check time to **89 ms** locally, slowest check
+   20 ms. The full `./snowarch doctor` is unchanged — every one of those checks still runs there,
+   and the cache the banner reads FIRST is written by a full run.
 2. **The three snapshots.** `tests/fixtures/doctor/snapshot-{linux,darwin,win32}.json` record what
    a design-only install answers, per check. A new id is red in `tests/doctor/snapshot.test.mjs`
    with the id named — on every cell, not only after a bootstrap. Produce the rows from a real run
@@ -1515,6 +1567,46 @@ If you need a new `claude mcp` call, add it there — not in the command that wa
 also owns two things that are easy to get wrong once and never notice: `-s <scope>` on every call
 (without it, `remove` deletes from whichever scope it finds, and ours is committed), and the
 `cwd: root` that local scope is keyed on.
+
+## The CI matrix — every job, every cell
+
+Generated names live in `tests/fixtures/required-contexts.json`, which is what `main`'s branch
+protection is set from; the table below is the human reading of it. Run `npm run gen` after any
+change to `ci.yml` — `gen-all --check` fails on a stale file, and a name in that file that CI does
+not produce is a required check waiting for ever.
+
+| Job | Cells | Shell | What only this job can answer |
+|---|---|---|---|
+| `test` | 3 OS × node 20/22/24 | node/npm | the suites, the lint, the type-check |
+| `contract` | 3 OS × node 20/22/24 | node/npm | the contract gate, on every platform that ships it |
+| `no-build handshake` | 3 OS | node | the COMMITTED `dist/` answers, with no build step first |
+| `docs-check` | ubuntu | node | the corpus recipe and the citations |
+| `footprint` | ubuntu | node | `node_modules` stays under its limit |
+| `actionlint` | ubuntu | pinned binary | the workflows parse and their expressions type-check |
+| `bootstrap` | 13 (ARC-06-S14) | bash · cmd · powershell | the install promise, executed — including the doctor, the snapshot and the banner as STEPS (ARC-08-S11: steps, not a job, so the protection list did not grow) |
+| `commitlint` | ubuntu | node | the commit convention, which nothing else enforces |
+| `release-dryrun` | 3 OS | bash | the release path, on every commit — `release.yml` only ever runs on a tag |
+| `upgrade-e2e` | 3 OS × node 22 | bash | an upgrade moves a TREE, and a tree is what a unit test cannot move |
+| `windows-native` | windows × node 20/22/24 | **cmd** | a Windows machine used the way a Windows user uses one: `cmd.exe` throughout, no Git Bash, the product driven through `.cmd` |
+| `launcher` | ubuntu + macOS | bash | `bootstrap.sh` with Node stripped from PATH |
+| `windows-launcher` | windows | powershell · cmd | the `.cmd` and `.ps1` launchers, which exist nowhere else to be tested |
+| `secrets` | ubuntu | node | no credential-shaped string reached the tree |
+| `plugin-validate` | ubuntu | node | the plugin manifest is loadable |
+| `eol` | — | — | **ARC-09-S09's**, not yet merged. It enters `required-contexts.json` when its cells exist |
+| `docs-real` | 3 OS + one | bash | **conditional — runs only when the corpus tooling changes; NOT required.** A PR that touches those paths produces four extra check runs and they must never become required contexts |
+
+**The banner's two numbers, per cell.** `banner-timing.mjs` reports both paths: the FAST path (warm
+cache) against `01` §8's 300 ms, and the RE-RUN path (cold, a quick doctor) at 1000 ms on the
+difference between the run and an empty-Node floor measured interleaved. A fast-path trip is a
+product regression; a re-run-path trip is ARC-09-C5's territory, and the cap does not move until
+C5's tables say where the time goes.
+
+**The macOS-minutes lever, documented and not applied.** If the budget bites, narrow
+`release-dryrun` and `upgrade-e2e` to ubuntu + windows by deleting `macos-latest` from their two
+`os:` lists and running `npm run gen` — the required-contexts file and the protection list follow
+from it. `verify` in `release.yml` keeps all three whatever happens here: a release is the one
+moment all three must be proven. Do NOT narrow `test`, `contract` or `bootstrap`; those are where a
+platform-specific break is actually caught.
 
 ## What CI proves about the install
 

@@ -80,6 +80,14 @@ export const GENERATORS = [
     targets: ['docs/ARCHITECTURE.md'],
   },
   {
+    // ARC-09-S08. The list `main`'s branch protection is set from, generated from `ci.yml` so a
+    // renamed cell is a failing `gen-all --check` rather than a required context nobody produces.
+    id: 'gen-required-contexts',
+    script: 'scripts/gen-required-contexts.mjs',
+    supportsRoot: false,
+    targets: ['tests/fixtures/required-contexts.json'],
+  },
+  {
     // Same target as gen-doctor-docs, different regions: both edit `docs/ARCHITECTURE.md` and
     // neither reads the other's blocks, so the order they run in does not matter — each replaces
     // between its own markers and leaves the rest of the file byte-identical.

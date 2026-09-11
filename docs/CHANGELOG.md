@@ -41,6 +41,26 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **A Windows machine, used the way a Windows user uses one.** `windows-native` runs three Node
+  majors with `cmd.exe` as the shell for every step and no Git Bash anywhere on PATH, driving the
+  product entirely through `snowarch.cmd` and `bootstrap.cmd`: the install, `version`, the wizard's
+  `--password-stdin` door against a loopback endpoint, the server's own handshake, the SessionStart
+  hook, a store migration plan and an upgrade check. The existing no-Git-Bash cell keeps its name
+  and its job; this adds the commands a user reaches for after the install rather than repeating
+  the install.
+
+  The PATH recipe is now one implementation that both cells call. It was a literal list of
+  directories typed into two workflow steps, and two copies of a machine's directory layout is one
+  copy too many: the day a runner image moves `nodejs`, one copy is corrected and the other quietly
+  starts testing a machine with no Node at all — which passes, for the wrong reason.
+
+  **The list of checks a pull request must produce is generated from the workflow.** Branch
+  protection lists its required checks by name, and a list typed into a settings page silently
+  stops matching: a renamed cell is not a red build, it is a required check nobody produces any
+  more. `tests/fixtures/required-contexts.json` is derived from `ci.yml`, a job the generator
+  cannot classify stops the build rather than being quietly omitted, and conditional workflows are
+  excluded by name with the reason written beside them.
+
 - **`./snowarch upgrade` — one command that plans first, moves second, and never touches your
   credentials.** Seven numbered steps, and the first four are reads: the preflight refuses a dirty
   tree, the fetch brings the release tags, the target is resolved (an annotated tag with a

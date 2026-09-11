@@ -171,6 +171,10 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
   // angles (E-25's checkout and SV-02's store, both cloud-synced) is one thing to fix.
   const summary = summariseMerged(results, checks);
 
+  // `null` when no server check ran, which since ARC-09-C8 includes every `--quick` run: the
+  // section left that subset because entering it costs one in-process run of the server's own
+  // doctor. Schema v1 already says what null means here — "no check filled it" — and every
+  // consumer reads it that way, so this needs no third state and gets none.
   const server = ctx._server === undefined ? null : serverBlock(ctx._server);
   const instances = server?.instances ?? [];
   // The mode: derived here, from the toggle file and the store, and from nothing else. Not from
@@ -407,18 +411,21 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
   }
 
   // A cache that could not be written is not a failed run: the report is on the screen, and the
-  // banner's fallback is to re-run. Said out loud so a read-only checkout is explicable — but on
-  // STDERR under `--json`, the same rule the fix narration follows six lines up. It used to go to
-  // stdout in both modes, so on any machine where `.local` refuses the write, `--json` emitted
-  // `note: …` and then the object, and every consumer's `JSON.parse` threw on the `n`. ARC-08-S11
-  // found it on the CI runners; ARC-08-S06 had already ruled the same thing for `--fix --json`.
+  // banner's fallback is to re-run. Said out loud so a read-only checkout is explicable — and now
+  // on STDERR in BOTH modes (ARC-09-C9), because stdout carries the report and nothing else.
+  // S11 had already moved it off stdout under `--json`, where `note: …` before the object made
+  // every consumer's `JSON.parse` throw on the `n`; C9 finishes the job for the text path, where
+  // a diagnostic was interleaved with the report a human was reading.
   if (cacheError) {
-    const line = `note: the doctor cache could not be written — ${cacheError}`;
-    if (flags.json) err.write(`${line}\n`); else write(line);
+    err.write(`doctor: cache not written — ${cacheError}\n`);
   }
 
   if (flags.json) {
-    write(JSON.stringify(report, null, 2));
+    // ARC-09-C9: and in the object too. A script that reads `--json` never sees stderr, so without
+    // this the only signal that the banner will re-run every session was a line it cannot read.
+    // Present only when it happened — a `cacheError: null` on every healthy run would be noise in
+    // the shape every consumer already parses.
+    write(JSON.stringify(cacheError ? { ...report, cacheError } : report, null, 2));
   } else {
     write(renderText({ report, checks, colour: useColour({ stream: out, env }) }));
   }

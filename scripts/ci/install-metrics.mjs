@@ -18,14 +18,14 @@
  *
  * Exit 0 · 2 cannot run. Stdlib only; no `du`, no shell.
  */
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync, writeSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const argv = process.argv.slice(2);
 const value = (n) => (argv.indexOf(n) === -1 ? undefined : argv[argv.indexOf(n) + 1]);
 const ROOT = resolve(value('--root') ?? process.cwd());
 
-const die = (m) => { process.stderr.write(`install-metrics: ${m}\n`); process.exit(2); };
+const die = (m) => { writeSync(2, `install-metrics: ${m}\n`); process.exit(2); };
 
 /**
  * Bytes under a directory: the sum of file sizes, walked.
@@ -115,9 +115,9 @@ if (isMain) {
     const files = argv.filter((a) => a.endsWith('.json'));
     if (files.length === 0) die('--table needs the per-OS JSON files');
     const rows = files.map((f) => JSON.parse(readFileSync(resolve(f), 'utf8')));
-    process.stdout.write(table(rows));
+    writeSync(1, table(rows));
   } else {
     const os = argv.find((a) => !a.startsWith('--') && argv[argv.indexOf(a) - 1] !== '--root');
-    process.stdout.write(`${JSON.stringify(collect({ os }), null, 2)}\n`);
+    writeSync(1, `${JSON.stringify(collect({ os }), null, 2)}\n`);
   }
 }

@@ -358,3 +358,26 @@ test('the hook and the library agree on how old a check may be', async () => {
   assert.equal(UPGRADE_MAX_AGE_MS, LIB_MAX_AGE);
   assert.equal(UPGRADE_MAX_AGE_MS, 7 * 24 * 60 * 60 * 1000);
 });
+
+// ARC-09-C5 — the phase timing is OFF unless asked, and its absence is the tested default.
+test('the banner prints no diagnostics unless the flag is set, and then only to stderr', async (t) => {
+  const root = await bootstrapped(t);
+
+  const ordinary = runHook(root);
+  assert.equal(ordinary.stderr, '', 'an ordinary run wrote to stderr');
+  assert.equal(/banner-phases/.test(ordinary.stdout), false, 'a diagnostic reached stdout');
+
+  const measured = runHook(root, { env: { SNOWARCH_BANNER_PHASES: '1' } });
+  // STDERR, never stdout: stdout is the banner's, and a diagnostic on it reaches the session.
+  assert.match(measured.stderr, /^banner-phases: path=cache total=\d+ ms · /m, measured.stderr);
+  assert.match(measured.stderr, /cache-read\+decision \d+ · render \d+/);
+  assert.equal(/banner-phases/.test(measured.stdout), false);
+  assert.match(measured.lines[0], /^Mode: /, 'the banner itself is unchanged');
+
+  // And any value other than exactly "1" is off: a flag that accepts "0" or "false" as true is a
+  // flag somebody will leave on.
+  for (const value of ['0', 'false', 'yes', '']) {
+    assert.equal(/banner-phases/.test(runHook(root, { env: { SNOWARCH_BANNER_PHASES: value } }).stderr),
+      false, `SNOWARCH_BANNER_PHASES=${JSON.stringify(value)} turned it on`);
+  }
+});

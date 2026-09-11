@@ -172,8 +172,13 @@ test('the flags are declared as the runner reads them: SV-04 network, SV-05/06 s
   assert.equal(by.get('SV-04').network, true);
   assert.equal(by.get('SV-04').quick, false);
   for (const id of ['SV-05', 'SV-06']) assert.equal(by.get(id).spawns, true, `${id}`);
-  for (const id of ['SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-07', 'SV-08', 'SV-09']) {
-    assert.equal(by.get(id).quick, true, `${id} is not quick`);
+  // ARC-09-C8: NONE of them is quick any more, and the reason is a shared cost rather than a
+  // per-check one. `serverReport` runs the server package's own doctor once and caches it on the
+  // ctx, so the first SV check in a run pays for all of them — 222 ms locally, ~500 on a Windows
+  // cell, against a 50 ms contract. Marking only the first one out would move the number onto the
+  // second, which is what moving E-12 did to E-13.
+  for (const id of SERVER_CHECK_IDS) {
+    assert.equal(by.get(id).quick, false, `${id} is still in --quick`);
   }
   assert.deepEqual(checks.filter((c) => c.network).map((c) => c.id), ['SV-04']);
 });

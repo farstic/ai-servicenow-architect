@@ -316,7 +316,11 @@ export function engineRepoChecks() {
       section: 'repo',
       title: 'no credential-shaped keys',
       severity: 'fail',
-      quick: true,
+      // ARC-09-C8 — `quick` is a COST contract: no process, no tree walk, no network, under
+      // 50 ms on the slowest Windows cell. This one walks the whole tree looking for credential-shaped keys — 249 ms locally, ~320 on Windows,
+      // and the banner's re-run path pays it before a user's first word. It still runs on
+      // every `./snowarch doctor`, and the cache the banner reads first is written by one.
+      quick: false,
       network: false,
       spawns: false,
       fixable: false,

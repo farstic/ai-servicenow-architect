@@ -16,7 +16,7 @@
  * Exit 0 every subject conforms · 1 at least one does not · 2 the range could not be resolved.
  */
 import { execFileSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { readdirSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -120,9 +120,9 @@ if (isMain) {
     // `%P` so a merge is identified by its parents, not by its wording.
     out = git(['log', '--format=%H\x1f%s\x1f%P\x1e', `${range.base}..${range.head}`]);
   } catch (e) {
-    process.stderr.write(`commitlint: cannot resolve ${range.base}..${range.head} (${range.source}) — `
+    writeSync(2, `commitlint: cannot resolve ${range.base}..${range.head} (${range.source}) — `
       + 'the job needs fetch-depth: 0\n');
-    process.stderr.write(`${String(e.stderr ?? e.message).split('\n')[0]}\n`);
+    writeSync(2, `${String(e.stderr ?? e.message).split('\n')[0]}\n`);
     process.exit(2);
   }
 
@@ -132,7 +132,7 @@ if (isMain) {
   });
 
   const { checked, failures } = lint({ commits, scopes: allowedScopes() });
-  for (const line of failures) process.stderr.write(`${line}\n`);
+  for (const line of failures) writeSync(2, `${line}\n`);
   if (failures.length) process.exit(1);
-  process.stdout.write(`commitlint: ${checked} commits ok\n`);
+  writeSync(1, `commitlint: ${checked} commits ok\n`);
 }

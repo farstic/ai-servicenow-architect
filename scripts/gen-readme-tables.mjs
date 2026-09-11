@@ -24,7 +24,7 @@
  *   node scripts/gen-readme-tables.mjs           # rewrite the blocks in place
  *   node scripts/gen-readme-tables.mjs --check   # exit 1 if the committed text differs
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -72,7 +72,7 @@ function familiesBlock() {
   if (unlabelled.length > 0) {
     // Loud, not silent. A new family with no label would otherwise ship as an em dash, and the
     // table would look complete while telling the reader nothing about a whole family.
-    process.stderr.write(`gen-readme-tables: no label for family/families: ${unlabelled.join(', ')}\n`);
+    writeSync(2, `gen-readme-tables: no label for family/families: ${unlabelled.join(', ')}\n`);
     process.exitCode = 1;
   }
 
@@ -178,15 +178,15 @@ for (const [name, build] of Object.entries(BLOCKS)) {
 
 if (!check) {
   writeFileSync(readmePath, after);
-  process.stdout.write(`gen-readme-tables: wrote ${Object.keys(BLOCKS).length} blocks to README.md\n`);
+  writeSync(1, `gen-readme-tables: wrote ${Object.keys(BLOCKS).length} blocks to README.md\n`);
 } else if (after !== before) {
   // The message names the command, because "the README is stale" without it sends the reader
   // looking for which sentence to edit — and the answer is none of them.
-  process.stderr.write(
+  writeSync(2, 
     'gen-readme-tables: README.md generated blocks are stale.\n'
     + 'Run: node scripts/gen-readme-tables.mjs   and commit the result.\n'
     + 'Do not edit text between the <!-- generated:… --> markers by hand.\n');
   process.exit(1);
 } else {
-  process.stdout.write('gen-readme-tables: README.md generated blocks are current.\n');
+  writeSync(1, 'gen-readme-tables: README.md generated blocks are current.\n');
 }

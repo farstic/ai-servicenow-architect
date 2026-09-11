@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import { EXPECTED_FAIL_ON_RUNNERS } from '../scripts/ci/doctor-snapshot.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * What the workflows must be true about themselves.
@@ -138,7 +140,12 @@ const KNOWN_JOBS = [
   // ARC-09-S07, three more (47–49): the upgrade moves a tree, and a tree is the one thing a unit
   // test cannot move. The three cells are three operating systems' git and filesystems.
   'upgrade-e2e',
-  'launcher', 'windows-launcher', 'secrets', 'plugin-validate',
+  'launcher',
+  // ARC-09-S08, three more (50–52): a Windows machine driven entirely through `.cmd`, with no Git
+  // Bash on PATH, on three Node majors. ARC-06-S14's `no-gitbash` cell keeps its own name and its
+  // own required context; this adds what that cell does not run.
+  'windows-native',
+  'windows-launcher', 'secrets', 'plugin-validate',
 ];
 
 /** The three required contexts `release-dryrun` adds, exactly as a check-run prints them. */
@@ -192,7 +199,10 @@ test('every bootstrap run skips the Claude Code check and fetches its own corpus
   const runs = job.split('\n')
     .map((l) => l.trim())
     .filter((l) => !l.startsWith('#') && !l.startsWith('rem '))
-    .filter((l) => /^(\.[\\/]|& powershell |[^#]*-File \.\\)bootstrap\.(sh|cmd|ps1)/.test(l));
+    // `call ` is allowed at the front since ARC-09-S08: a `.cmd` invoked from `shell: cmd` without
+    // it never returns, so every cmd step now calls one. The test below enforces that; this one
+    // must simply still FIND them, or it would count three invocations and claim six were checked.
+    .filter((l) => /^(call )?(\.[\\/]|& powershell |[^#]*-File \.\\)bootstrap\.(sh|cmd|ps1)/.test(l));
   assert.ok(runs.length >= 6, `only ${runs.length} launcher invocations found`);
   for (const r of runs) {
     assert.match(r, /--mode design --yes --skip-claude-check/,
@@ -227,11 +237,16 @@ test('the doctor runs inside the bootstrap cells, and adds no job name (ARC-08-S
   // The allowance in the workflow and the one the snapshots are held to are the same list.
   // `includes`, not a regex: an escaped path in a pattern reads to the citation lint as a file
   // that does not exist, and it is right to — `assert-doctor\.mjs` is not a path.
-  assert.ok(job.includes('scripts/ci/assert-doctor.mjs --in doctor.json '
+  // The report is read from `$RUNNER_TEMP` since ARC-09-S08: a cmd step that wrote it into the
+  // checkout made `assert-clean` report the job's own artefacts as untracked files.
+  assert.ok(job.includes('scripts/ci/assert-doctor.mjs --in "$RUNNER_TEMP/doctor.json" '
     + `--expect-fail ${EXPECTED_FAIL_ON_RUNNERS.join(',')}`),
   'the workflow does not allow exactly the runner-expected failures');
-  assert.match(job, /scripts\/ci\/doctor-snapshot\.mjs --in doctor\.json/);
-  assert.match(job, /scripts\/ci\/banner-timing\.mjs --runs 5 --budget-ms 1000 --summary/);
+  assert.match(job, /scripts\/ci\/doctor-snapshot\.mjs --in "\$RUNNER_TEMP\/doctor\.json"/);
+  // Two paths since ARC-09-S08: the fast one under `01` §8's 300 ms (a trip there is a product
+  // regression) and the re-run one at 1000 ms on the difference (a trip there is C5's territory).
+  assert.match(job, /scripts\/ci\/banner-timing\.mjs --runs 5 --budget-ms 1000/);
+  assert.match(job, /--fast-budget-ms 300 --summary/);
 
   // The artifact, uploaded whether or not the job was green: a report you can only read when the
   // run passed is a report you cannot use to find out why it failed.
@@ -387,4 +402,266 @@ test('banner-timing measures a node floor and judges the difference (ARC-09-C4)'
   // Both numbers are still printed: "the banner cost 190 ms on a machine where starting node costs
   // 840" is the sentence a reader needs; "1027 ms" is not.
   assert.match(src, /node floor \$\{floor\} ms → banner \$\{cost\} ms/);
+});
+
+/**
+ * ARC-09-S08's first chore, carried from ARC-08-S11 — a `.cmd` invoked without `call` transfers
+ * control and never comes back.
+ *
+ * `cmd.exe` does not return from a batch file unless it was CALLED: `.\bootstrap.cmd …` ends the
+ * calling script, so every line after it is dead. ARC-06-S14's Windows cells were written that
+ * way, which made their `if not "%ERRORLEVEL%"=="0" exit /b 1` lines unreachable — a cell that
+ * could not go red for the thing it was there to check. ARC-09-S04 hit the same rule from the
+ * other side, where an `exit /b 3` sat inside an echoed string.
+ *
+ * `call` is a `cmd` builtin and only that: the two PowerShell steps that run `.\bootstrap.cmd`
+ * must NOT have it, and a regex that added it everywhere put it in both. Hence the pairing below —
+ * the shell decides.
+ */
+test('every cmd step CALLs a .cmd, and no powershell step does (ARC-09-S08)', () => {
+  const ci = wf('ci.yml');
+  const lines = ci.split('\n');
+  let shell = null;
+  const bare = [];
+  const wrongShell = [];
+  for (const [i, line] of lines.entries()) {
+    const m = /^\s+shell:\s*(\S+)/.exec(line);
+    if (m) shell = m[1];
+    if (/^\s+(call )?\.?\.?[\\/]?[a-z]*\\?(bootstrap|snowarch)\.cmd /.test(line)) {
+      const called = /^\s+call /.test(line);
+      // `& cmd /c "…"` inside PowerShell is a new cmd process whose only job is that line: it
+      // returns whatever the batch file exits with, so `call` is neither needed nor allowed there.
+      if (/cmd \/c/.test(line)) continue;
+      if (shell === 'cmd' && !called) bare.push(`${i + 1}: ${line.trim()}`);
+      if (shell !== 'cmd' && called) wrongShell.push(`${i + 1}: ${line.trim()}`);
+    }
+  }
+  assert.deepEqual(bare, [],
+    'a .cmd invoked from `shell: cmd` without `call` never returns — the lines after it are dead');
+  assert.deepEqual(wrongShell, [],
+    '`call` is a cmd builtin; in PowerShell it is not a command at all');
+});
+
+test('the exit-code check after a .cmd is reachable, proven by running cmd (ARC-09-S08)', (t) => {
+  // The claim is about `cmd.exe`, so on anything else this is honest about not having run.
+  if (process.platform !== 'win32') {
+    return t.skip('cmd.exe is the subject; the drill runs on the Windows cells');
+  }
+  const dir = tempDir('snowarch-call-drill-', t);
+  writeFileSync(join(dir, 'fails.cmd'), '@echo off\r\nexit /b 7\r\n');
+
+  // WITHOUT `call`: control never returns, so the marker after it never prints and the step's own
+  // exit check cannot run. That is the bug, reproduced rather than described.
+  writeFileSync(join(dir, 'without.cmd'), '@echo off\r\n.\\fails.cmd\r\necho AFTER\r\nexit /b 0\r\n');
+  const without = spawnSync(process.env.COMSPEC || 'cmd.exe', ['/c', join(dir, 'without.cmd')],
+    { cwd: dir, encoding: 'utf8' });
+  assert.equal(/AFTER/.test(without.stdout ?? ''), false, 'control returned without `call`');
+  assert.equal(without.status, 7, 'the caller exited with the callee\'s code, having never resumed');
+
+  // WITH `call`: control returns, the check runs, and the planted failure turns the step red.
+  writeFileSync(join(dir, 'with.cmd'),
+    '@echo off\r\ncall .\\fails.cmd\r\nif not "%ERRORLEVEL%"=="0" exit /b 1\r\necho AFTER\r\n');
+  const withCall = spawnSync(process.env.COMSPEC || 'cmd.exe', ['/c', join(dir, 'with.cmd')],
+    { cwd: dir, encoding: 'utf8' });
+  assert.equal(withCall.status, 1, 'the exit-code check did not fire');
+  assert.equal(/AFTER/.test(withCall.stdout ?? ''), false, 'the check let a failure through');
+});
+
+/**
+ * ARC-09-S08 — the required contexts, generated, and held to the workflow they come from.
+ *
+ * `main`'s branch protection lists its required checks BY NAME. A list typed into a settings page
+ * silently stops matching: a renamed cell is not a red build, it is a required check nobody
+ * produces any more — protection either waits for ever or quietly stops requiring the thing it was
+ * there for. So the list is generated from `ci.yml`, this test holds the two together, and the
+ * architect's protection call reads the file.
+ */
+test('required-contexts.json is exactly what ci.yml produces on a pull request (ARC-09-S08)', () => {
+  const fixture = JSON.parse(readFileSync(join(root, 'tests/fixtures/required-contexts.json'), 'utf8'));
+
+  // The generator is the one implementation; this runs it in `--check` mode rather than
+  // re-deriving the names here, because a second derivation is a second opinion and the day they
+  // disagree the test is as likely to be wrong as the file.
+  const check = spawnSync(process.execPath,
+    [join(root, 'scripts/gen-required-contexts.mjs'), '--check'], { encoding: 'utf8' });
+  assert.equal(check.status, 0,
+    `the fixture is stale or unreadable — run npm run gen\n${check.stdout}${check.stderr}`);
+
+  assert.equal(fixture.count, fixture.contexts.length);
+  assert.equal(new Set(fixture.contexts).size, fixture.contexts.length, 'a duplicated context');
+  assert.ok(fixture.count >= 50, `${fixture.count} contexts — the parser lost some`);
+
+  // Every job in the workflow is represented, and nothing else is.
+  const ci = wf('ci.yml');
+  const jobsBlock = ci.slice(ci.indexOf('\njobs:'));
+  const jobNames = [...jobsBlock.matchAll(/^ {2}([a-z][a-z0-9-]*):$/gm)].map((m) => m[1]);
+  // A job's CONTEXT is its `name:` when it has one, not its id — `no-build` prints as
+  // `no-build handshake (ubuntu-latest)`. Comparing against the id would have passed for twelve
+  // jobs and failed for the one that renames itself, which is the one worth catching.
+  const displayOf = (job) => {
+    // Sliced PAST the job's own header, or the split cuts at index 0 and the block is empty — the
+    // same trap the contexts generator hit reading `matrix:`.
+    const header = `\n  ${job}:`;
+    const after = jobsBlock.slice(jobsBlock.indexOf(header) + header.length);
+    const block = after.split(/\n {2}[a-z][a-z0-9-]*:\n/)[0];
+    const name = /^ {4}name:\s*(.+)$/m.exec(block);
+    return name ? name[1].trim().replace(/^['"]|['"]$/g, '').replace(/\s*\(.*$/, '') : job;
+  };
+  for (const job of jobNames) {
+    const display = displayOf(job);
+    assert.ok(fixture.contexts.some((c) => c === display || c.startsWith(`${display} (`)),
+      `${job} (printed as "${display}") produces no context in the fixture`);
+  }
+  const displays = jobNames.map(displayOf);
+  for (const context of fixture.contexts) {
+    assert.ok(displays.some((d) => context === d || context.startsWith(`${d} (`)),
+      `${context} names no job in ci.yml`);
+  }
+
+  // The three this story adds, in the form a check run prints them.
+  for (const node of ['20', '22', '24']) {
+    assert.ok(fixture.contexts.includes(`windows-native (node ${node}, no Git Bash)`),
+      `windows-native (node ${node}, no Git Bash) is missing`);
+  }
+
+  // The conditional workflows are excluded BY NAME with a reason, never by "it was not in the last
+  // run". `docs-real.yml` names its jobs after the OS and is path-filtered: a PR that touches its
+  // paths produces four extra check runs, and a generator that learned its list from a run would
+  // have made them required.
+  assert.ok(Object.keys(fixture._notRequired).includes('docs-real.yml'));
+  for (const [file, why] of Object.entries(fixture._notRequired)) {
+    assert.ok(existsSync(join(root, '.github/workflows', file)), `${file} is not there`);
+    assert.ok(why.length > 30, `${file}'s exclusion carries no reason`);
+  }
+
+  // S09 has not merged: `eol` is its two contexts and enters this file when its cells exist. A
+  // name here that CI does not produce is a required check waiting for ever.
+  assert.equal(fixture.contexts.some((c) => c.startsWith('eol')), false,
+    "eol is S09's; it belongs here when the job does");
+});
+
+test('the contexts generator fails LOUDLY on a job it cannot classify (ARC-09-S08)', () => {
+  // The property that makes the file trustworthy: an omission would be a context that never
+  // becomes required, found months later by a bad merge. The generator's contract is exit 2 with
+  // the job named, and both halves are asserted of the source rather than hoped for.
+  const src = readFileSync(join(root, 'scripts/gen-required-contexts.mjs'), 'utf8');
+  assert.match(src, /process\.exit\(2\)/, 'there is no hard-failure path');
+  assert.match(src, /const die = /, 'the failure is not in one place');
+  for (const shape of ['cannot read', 'which the matrix does not set', 'declares no matrix']) {
+    assert.ok(src.includes(shape), `no hard failure for: ${shape}`);
+  }
+  // …and it is a FAILURE, not a warning that carries on: every `die` ends the process.
+  assert.match(src, /writeSync\(2, `gen-required-contexts: \$\{why\}\\n`\); process\.exit\(2\); \};/);
+});
+
+/**
+ * ARC-09-S08 — a `shell: bash` step in a job that removed Git Bash resolves to the WSL stub.
+ *
+ * `C:\Windows\System32\bash.exe` is on every Windows machine and is not a shell — it is the WSL
+ * launcher, and on a runner with no distribution installed it prints "Windows Subsystem for Linux
+ * has no installed distributions" and exits 1. So a job that strips Git Bash JOB-WIDE has taken on
+ * a rule: nothing in it may ask for bash. Measured the hard way — `strip-git-bash.mjs` wrote
+ * `GITHUB_ENV` in ARC-06-S14's cell and the cell's own bash assertions started failing there.
+ */
+test('a job that exports the stripped PATH has no bash steps left in it (ARC-09-S08)', () => {
+  const ci = wf('ci.yml');
+  const jobsBlock = ci.slice(ci.indexOf('\njobs:'));
+  const names = [...jobsBlock.matchAll(/^ {2}([a-z][a-z0-9-]*):$/gm)];
+
+  for (const [i, m] of names.entries()) {
+    const body = jobsBlock.slice(m.index, i + 1 < names.length ? names[i + 1].index : undefined);
+    if (!/strip-git-bash\.mjs[^\n]*--export/.test(body)) continue;
+
+    // Every step after the export must be a shell this job still has. The job default counts too.
+    const usesBash = [...body.matchAll(/^\s+shell:\s*bash\s*$/gm)];
+    assert.deepEqual(usesBash.map((x) => x[0].trim()), [],
+      `${m[1]} strips Git Bash job-wide and still has a \`shell: bash\` step — that resolves to `
+      + 'C:\\Windows\\System32\\bash.exe, the WSL stub');
+    assert.match(body, /shell: cmd/, `${m[1]} exports a stripped PATH but declares no cmd default`);
+  }
+});
+
+test('every cmd step ends with an explicit exit code (ARC-09-S08)', () => {
+  // A cmd step's exit code is the LAST command's, and `if` does not reset ERRORLEVEL — so a step
+  // whose final line is `if %ERRORLEVEL% GEQ 2 exit /b 1` inherits whatever the command before it
+  // returned and goes red while asserting nothing. Three cells failed exactly there.
+  const ci = wf('ci.yml');
+  const offenders = [];
+  for (const [, block] of ci.matchAll(/^\s+run: \|\n((?:\s{10}.*\n)+)/gm)) {
+    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lines.some((l) => /^(call |rem |where |type |set )/.test(l))) continue;   // not a cmd step
+    const last = lines[lines.length - 1];
+    if (/^if %ERRORLEVEL% GEQ \d+ exit \/b \d+$/.test(last)) offenders.push(last);
+  }
+  assert.deepEqual(offenders, [],
+    'a cmd step ending in a GEQ guard inherits the previous command\'s code — add `exit /b 0`');
+});
+
+/**
+ * ARC-09-S08 — a cmd step writes its scratch to `%RUNNER_TEMP%`, never into the checkout.
+ *
+ * `windows-native`'s last step claims "the checkout is as CI found it", and on its first run
+ * `assert-clean` reported `?? version.txt` and `?? hook.txt` — written by two of the job's own
+ * earlier steps. That is the assertion doing exactly its job, and the reason this is now a rule
+ * rather than a habit: the older cell had the same `version.txt` and remembered to `del` it, which
+ * works until somebody adds a step and does not.
+ *
+ * `%RUNNER_TEMP%` needs no cleanup, cannot be seen by `git status`, and survives between steps of
+ * the same job — which a `del` at the end of one step does not give you anyway.
+ */
+test('no cmd step redirects into the checkout (ARC-09-S08)', () => {
+  const ci = wf('ci.yml');
+  const lines = ci.split('\n');
+
+  // The steps, with the shell each actually runs under: a step's own `shell:` when it has one,
+  // otherwise its JOB's `defaults.run.shell`. A regex over the whole file cannot know that, and the
+  // first version of this test flagged bash redirects, a PowerShell line and a `>` inside a
+  // JavaScript string — three false findings that would have taught a reader to distrust it.
+  const cmdLines = [];
+  let jobDefault = null;
+  let stepShell = null;
+  let inRun = false;
+  let runIndent = 0;
+
+  for (const [i, line] of lines.entries()) {
+    if (/^ {2}[a-z][a-z0-9-]*:$/.test(line)) { jobDefault = null; stepShell = null; inRun = false; }
+    const def = /^ {8}shell:\s*(\S+)/.exec(line);          // defaults.run.shell, at job level
+    if (def) jobDefault = def[1];
+    if (/^ {6}- /.test(line)) { stepShell = null; inRun = false; }
+    const own = /^ {8}shell:\s*(\S+)/.exec(line) ?? /^ {6}shell:\s*(\S+)/.exec(line);
+    if (own && /^ {6,8}shell:/.test(line) && !/^ {8}shell:/.test(line)) stepShell = own[1];
+    else if (own && inRun === false && /^ {8}shell:/.test(line) && jobDefault === own[1]) {
+      // ambiguous at this indentation; the job default already captured it
+    } else if (own) stepShell = own[1];
+
+    const runStart = /^(\s+)run: \|/.exec(line);
+    if (runStart) { inRun = true; runIndent = runStart[1].length; continue; }
+    if (inRun) {
+      if (line.trim() === '') continue;
+      const indent = line.length - line.trimStart().length;
+      if (indent <= runIndent) { inRun = false; continue; }
+      if ((stepShell ?? jobDefault) === 'cmd') cmdLines.push([i + 1, line.trim()]);
+    }
+  }
+
+  assert.ok(cmdLines.length > 20, `only ${cmdLines.length} cmd lines found — the parser is wrong`);
+
+  // `%RUNNER_TEMP%` needs no cleanup, is invisible to `git status`, and survives between steps of
+  // the same job — which a `del` at the end of one step does not give you anyway.
+  const allowed = /^("%RUNNER_TEMP%[^"]*"|"?%GITHUB_STEP_SUMMARY%"?|"?%GITHUB_OUTPUT%"?|nul|&1)$/;
+  const offenders = [];
+  for (const [n, text] of cmdLines) {
+    if (text.startsWith('rem ')) continue;
+    // `(?<![=<])` because `=>` is an arrow function, not a redirect: a `node -e "…"` one-liner
+    // full of them read as five writes into the checkout on the first attempt.
+    for (const [, target] of text.matchAll(/(?<![=<])\d?>>?\s*("[^"]*"|\S+)/g)) {
+      if (!allowed.test(target)) offenders.push(`${n}: ${text}`);
+    }
+  }
+
+  assert.deepEqual(offenders, [],
+    'a cmd step writes into the checkout — use %RUNNER_TEMP%, so no step has to remember a `del`');
+  // …and the rule has no exception left: the `del`s that used to clean up after such writes are
+  // gone with the writes they cleaned up after.
+  assert.equal(/^\s+del (version|hook)\.txt\s*$/m.test(ci), false, 'a `del` survived its write');
 });

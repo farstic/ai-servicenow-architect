@@ -26,7 +26,7 @@
  *
  * Stdlib only: it runs in a bootstrap cell, where nothing has been installed.
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -35,7 +35,7 @@ const flag = (n) => argv.includes(n);
 const value = (n) => (argv.indexOf(n) === -1 ? undefined : argv[argv.indexOf(n) + 1]);
 
 const ROOT = resolve(value('--root') ?? resolve(dirname(fileURLToPath(import.meta.url)), '..', '..'));
-const die = (m) => { process.stderr.write(`doctor-snapshot: ${m}\n`); process.exit(2); };
+const die = (m) => { writeSync(2, `doctor-snapshot: ${m}\n`); process.exit(2); };
 
 /** `linux` · `darwin` · `win32` — the three the matrix runs, and the three snapshots. */
 export const PLATFORMS = Object.freeze(['linux', 'darwin', 'win32']);
@@ -152,7 +152,7 @@ if (isMain) {
   if (flag('--write')) {
     mkdirSync(dirname(expectedPath), { recursive: true });
     writeFileSync(expectedPath, body);
-    process.stdout.write(`doctor-snapshot: wrote ${expectedPath} (${actual.checks.length} checks)\n`);
+    writeSync(1, `doctor-snapshot: wrote ${expectedPath} (${actual.checks.length} checks)\n`);
   }
 
   // The out-of-tree copy is written EVERY run and uploaded, so a difference can be inspected rather
@@ -166,17 +166,17 @@ if (isMain) {
       // NOT a failure: this is how a new platform gets its first snapshot. The strictness lives in
       // `tests/doctor/snapshot.test.mjs`, which fails everywhere when one of the three is missing —
       // so a snapshot cannot be quietly dropped, only deliberately bootstrapped.
-      process.stdout.write(`doctor-snapshot: no snapshot for ${platform} yet — `
+      writeSync(1, `doctor-snapshot: no snapshot for ${platform} yet — `
         + `the normalised report is in the artifact; commit it as ${expectedPath}\n`);
     } else {
       const expected = JSON.parse(readFileSync(expectedPath, 'utf8'));
       const lines = diff(expected, actual);
       if (lines.length) {
-        process.stderr.write(`doctor-snapshot: ${platform} differs from ${expectedPath}\n`);
-        for (const l of lines) process.stderr.write(`  ${l}\n`);
+        writeSync(2, `doctor-snapshot: ${platform} differs from ${expectedPath}\n`);
+        for (const l of lines) writeSync(2, `  ${l}\n`);
         status = 1;
       } else {
-        process.stdout.write(`doctor-snapshot: ${platform} matches (${actual.checks.length} checks, `
+        writeSync(1, `doctor-snapshot: ${platform} matches (${actual.checks.length} checks, `
           + `${actual.summary.ok} ok, ${actual.summary.warn} warn, ${actual.summary.fail} fail)\n`);
       }
     }

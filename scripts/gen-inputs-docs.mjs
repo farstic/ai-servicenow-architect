@@ -11,7 +11,7 @@
  *
  * Stdlib only — it runs inside `npm run lint`.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,12 +60,12 @@ if (isMain) {
   next = replaceRegion(next, 'bootstrap-input-notes', inputsNotes());
 
   if (current.replace(/\r\n/g, '\n') === next) {
-    process.stdout.write(`gen-inputs-docs: ${TARGET} current (2 blocks).\n`);
+    writeSync(1, `gen-inputs-docs: ${TARGET} current (2 blocks).\n`);
   } else if (CHECK) {
-    process.stdout.write(`gen-inputs-docs: ${TARGET} is stale — run npm run gen and commit the result\n`);
+    writeSync(1, `gen-inputs-docs: ${TARGET} is stale — run npm run gen and commit the result\n`);
     process.exit(1);
   } else {
     writeFileSync(join(root, TARGET), next);
-    process.stdout.write(`gen-inputs-docs: wrote ${TARGET} (2 blocks).\n`);
+    writeSync(1, `gen-inputs-docs: wrote ${TARGET} (2 blocks).\n`);
   }
 }
