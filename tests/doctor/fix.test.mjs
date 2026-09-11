@@ -27,6 +27,7 @@ const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 /** The doctor, in process, against a fixture — the launcher pins to its own checkout. */
 async function doctorAt(root, flags = {}, over = {}) {
   const chunks = [];
+  const errs = [];
   const code = await doctorCommand({
     // NOT `quick`. These tests were fast because they ran the quick subset, and ARC-09-C8 moved
     // the whole server section out of it — so F4, which repairs what SV-03 finds, stopped being
@@ -36,11 +37,21 @@ async function doctorAt(root, flags = {}, over = {}) {
     // shortcut, and it is the fixture that changes.
     flags: { 'no-network': true, ...flags },
     out: { write: (t) => chunks.push(t) },
+    err: { write: (t) => errs.push(t) },
     cwd: root,
     input: { isTTY: false },
     ...over,
   });
-  return { code, text: chunks.join('') };
+  // Every mutation asserted by its precondition. A doctor run that could not write its cache is
+  // not a failed run and says so only on stderr, so a fixture that ignores stderr reports the
+  // CONSEQUENCE ("expected F4 to be proposed") and hides the CAUSE. That is exactly how ARC-09-C9
+  // reached CI: the three red cases named a falsy value, and the reason — the cache write being
+  // refused because E-00's remedy quotes the install URL — was on a stream nobody read. The
+  // command's surface for it is this line plus the `--json` field; it has no return value to
+  // check, so the line is what gets checked, and the reason is what gets printed.
+  const note = errs.join('').split('\n').find((l) => l.startsWith('doctor: cache not written')) ?? null;
+  assert.equal(note, null, note ?? undefined);
+  return { code, text: chunks.join(''), err: errs.join('') };
 }
 
 /**
