@@ -157,6 +157,17 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 **Definition of done.** Merged; `tests/release.test.mjs` green on all cells; `docs/CONTRIBUTING.md` release stub present; `npm run release` wired; the `release-dryrun` job (S03) green on three OSes.
 
+
+**Amendment after the rehearsal (ARC-09-C12, 2026-09-11).** The writes in this story stopped at the
+version. They now run **version → `build-dist` → `pin --yes` → `gen-all` → changelog**, because
+`dist/contract.json` EMBEDS the package version: writing the version and stopping left the artefact
+stale, so the release commit would have failed its own `dist ok` gate on its own pull request and
+the tag's `contract:` trailer named a contract that no longer existed in that form. The post-write
+checks are version-consistency AND the contract gate; the tag quotes the REBUILT sha; `STAGED`
+carries `packages/snowarch/dist` and the pin; and the rollback deletes what the rebuild created as
+well as restoring what it changed. `--dry-run` could not have found any of this — a dry run stops
+before the writes, which is why `release-dryrun` was green for the whole arc.
+
 ---
 
 ### ARC-09-S02 — `docs/CHANGELOG.md` generation from conventional commits; commit-message lint in CI; the 2.0.0 "supersedes" and migration notes

@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
+/** The package's own version, read rather than typed — see the initialize test (ARC-09-C12). */
+const packageVersion = (): string =>
+  JSON.parse(readFileSync(resolve(here, '../../package.json'), 'utf8')).version;
 
 /**
  * Criterion 7: the MCP handshake against the BUILT server, over stdio, as a client sees it.
@@ -57,8 +60,10 @@ describe('MCP handshake over stdio', () => {
     expect(msg.error).toBeUndefined();
     expect(msg.result.serverInfo.name).toBe('snowarch');
     // The version comes from package.json via getPackageVersion(), so this also fails if the
-    // package version drifts from the root version of record (tests/version-consistency.test.mjs).
-    expect(msg.result.serverInfo.version).toBe('2.0.0-dev');
+    // package version drifts from the root version of record (tests/version-consistency.test.mjs)
+    // — and it is READ from that manifest rather than typed (ARC-09-C12), because the release
+    // script rewrites the manifest before this test runs on the release commit.
+    expect(msg.result.serverInfo.version).toBe(packageVersion());
   }, 40_000);
 
   it('advertises tools and resources, and no longer advertises prompts', async () => {
