@@ -15,6 +15,15 @@
  * on hardware nobody shares; a hosted runner shares a disk with whoever else is on the box, and a
  * bound that fails on their noise would train everyone to re-run the job.
  *
+ * ARC-09-C4 — and the bound is applied to the BANNER, not to the machine. The same cell
+ * (`bootstrap (no-gitbash, windows-latest)`) measured 728, 802, 944 and 1027 ms across four
+ * consecutive runs whose product code was byte-identical, and the fourth failed a 1000 ms budget
+ * that the first three passed. Most of that number is Node starting up on a cold Windows runner,
+ * which this product cannot make faster and should not be judged on. So the floor is measured too
+ * — an empty Node process, INTERLEAVED with the real runs so both see the same weather — and the
+ * budget is spent on the difference. Both numbers are printed, because "the banner cost 190 ms on
+ * a machine where starting Node costs 840" is the sentence a reader needs; "1027 ms" is not.
+ *
  * Usage: node scripts/ci/banner-timing.mjs [--runs 5] [--budget-ms 1000] [--summary]
  * Exit 0 within budget · 1 over · 2 cannot run.
  */
@@ -37,13 +46,24 @@ if (!existsSync(HOOK)) {
   process.exit(2);
 }
 
+/** One spawn, timed. */
+function timed(args) {
+  const started = process.hrtime.bigint();
+  const r = spawnSync(process.execPath, args, { cwd: ROOT, encoding: 'utf8' });
+  return { ms: Number(process.hrtime.bigint() - started) / 1e6, r };
+}
+
 const times = [];
+const floors = [];
 let lastLine = '';
 for (let i = 0; i < RUNS; i += 1) {
+  // INTERLEAVED, not measured in a block of its own: a runner's load moves over seconds, and a
+  // floor taken five times before the banner would be describing a different machine from the one
+  // the banner ran on.
+  floors.push(timed(['-e', '']).ms);
+
   rmSync(CACHE, { force: true });              // cold, every time
-  const started = process.hrtime.bigint();
-  const r = spawnSync(process.execPath, [HOOK], { cwd: ROOT, encoding: 'utf8' });
-  const ms = Number(process.hrtime.bigint() - started) / 1e6;
+  const { ms, r } = timed([HOOK]);
   // A hook that fails is not a slow hook — it is a session that starts with an error about the
   // tool meant to help, and S08's whole design is that every path exits 0.
   if (r.status !== 0) {
@@ -59,19 +79,30 @@ for (let i = 0; i < RUNS; i += 1) {
   times.push(ms);
 }
 
-const sorted = [...times].sort((a, b) => a - b);
-const median = Math.round(sorted[Math.floor(sorted.length / 2)]);
+const medianOf = (xs) => {
+  const sorted = [...xs].sort((a, b) => a - b);
+  return Math.round(sorted[Math.floor(sorted.length / 2)]);
+};
+const median = medianOf(times);
+const floor = medianOf(floors);
+// The product's own cost, which is what the budget is about. Never below zero: on a very quiet
+// machine an empty Node can measure slower than one of the banner runs, and a negative "cost"
+// would be a number nobody could act on.
+const cost = Math.max(0, median - floor);
 const all = times.map((t) => Math.round(t)).join(', ');
-process.stdout.write(`banner-timing: median ${median} ms over ${RUNS} cold runs (${all}) — budget ${BUDGET} ms\n`);
+process.stdout.write(`banner-timing: median ${median} ms over ${RUNS} cold runs (${all}); `
+  + `node floor ${floor} ms → banner ${cost} ms — budget ${BUDGET} ms\n`);
 process.stdout.write(`banner-timing: ${lastLine}\n`);
 
 if (argv.includes('--summary') && process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-    [`**banner (${process.platform})** — median **${median} ms** over ${RUNS} cold runs `
-      + `(${all}); budget ${BUDGET} ms`, '', '```', lastLine, '```', ''].join('\n'));
+    [`**banner (${process.platform})** — **${cost} ms** of banner: median ${median} ms over `
+      + `${RUNS} cold runs (${all}) minus a ${floor} ms node floor; budget ${BUDGET} ms`,
+    '', '```', lastLine, '```', ''].join('\n'));
 }
 
-if (median > BUDGET) {
-  process.stderr.write(`banner-timing: ${median} ms is over the ${BUDGET} ms budget\n`);
+if (cost > BUDGET) {
+  process.stderr.write(`banner-timing: the banner cost ${cost} ms (median ${median} ms minus a `
+    + `${floor} ms node floor), over the ${BUDGET} ms budget\n`);
   process.exit(1);
 }

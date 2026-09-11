@@ -363,3 +363,28 @@ test('the run is cancelled when superseded, so thirteen cells are not paid for t
   const ci = wf('ci.yml');
   assert.match(ci, /concurrency:\n\s+group: ci-\$\{\{ github\.ref \}\}\n\s+cancel-in-progress: true/);
 });
+
+/**
+ * ARC-09-C4 — the banner budget is spent on the BANNER, not on the machine.
+ *
+ * `bootstrap (no-gitbash, windows-latest)` measured 728, 802, 944 and 1027 ms across four
+ * consecutive runs whose product code was byte-identical, and the fourth failed a 1000 ms budget
+ * the first three passed. Most of that is Node starting up on a cold Windows runner — something
+ * this product cannot make faster and should not be judged on. The harness measures that floor
+ * too, interleaved so both see the same weather, and the budget is spent on the difference.
+ */
+test('banner-timing measures a node floor and judges the difference (ARC-09-C4)', () => {
+  const src = readFileSync(join(root, 'scripts/ci/banner-timing.mjs'), 'utf8');
+
+  // The floor is a REAL empty node process, not a constant somebody measured once on a laptop.
+  assert.match(src, /timed\(\['-e', ''\]\)/);
+  // Interleaved: a floor taken in a block of its own describes a different machine.
+  assert.match(src, /floors\.push\(timed/);
+  // And the budget is applied to the difference, never to the raw median — which is the whole fix.
+  assert.match(src, /const cost = Math\.max\(0, median - floor\)/);
+  assert.match(src, /if \(cost > BUDGET\)/);
+  assert.equal(/if \(median > BUDGET\)/.test(src), false, 'the raw median is being judged again');
+  // Both numbers are still printed: "the banner cost 190 ms on a machine where starting node costs
+  // 840" is the sentence a reader needs; "1027 ms" is not.
+  assert.match(src, /node floor \$\{floor\} ms → banner \$\{cost\} ms/);
+});
