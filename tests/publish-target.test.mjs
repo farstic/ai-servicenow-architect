@@ -122,9 +122,18 @@ test('the published tarball carries dist/ and no sources or tests (ARC-09-S10)',
   const files = JSON.parse(r.stdout)[0].files.map((f) => f.path);
 
   for (const want of ['dist/server.js', 'dist/cli/index.js', 'dist/contract.json', 'package.json',
-    'README.md', 'LICENSE']) {
+    'README.md', 'LICENSE', 'NOTICE']) {
     assert.ok(files.includes(want), `${want} is missing from the tarball`);
   }
+
+  // ARC-09-C17, owner decision 2026-09-11: NOTICE SHIPS. This repository is Apache-2.0 and has a
+  // root NOTICE, and §4(d) asks a redistribution to carry its attribution text — npm includes a
+  // LICENSE automatically and a NOTICE not at all, so the package needs its own copy. A copy is a
+  // thing that drifts, so the test compares it with the root file rather than trusting the two to
+  // stay equal: caught here, not shipped quietly.
+  assert.equal(readFileSync(join(root, 'packages/snowarch/NOTICE'), 'utf8'),
+    readFileSync(join(root, 'NOTICE'), 'utf8'),
+    'packages/snowarch/NOTICE has drifted from the root NOTICE');
   // `bin` points into the tarball, so this is the difference between `npx @farstic/snowarch`
   // working and a 404 from the user's shell.
   assert.ok(files.includes(manifest.bin.snowarch), 'bin points at a file the tarball does not carry');

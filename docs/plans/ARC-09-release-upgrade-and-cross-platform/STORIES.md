@@ -871,6 +871,13 @@ remote still has the object.
 
 **Definition of done.** Merged; one green dry run recorded; CONTRIBUTING paragraph; `npm view @farstic/snow-mcp` unchanged (1.0.0).
 
+
+**Amendment (ARC-09-C17, owner decision 2026-09-11).** The tarball carries `NOTICE`. This repository
+is Apache-2.0 with a root `NOTICE`, and §4(d) asks a redistribution to carry its attribution text —
+npm includes a `LICENSE` automatically and a `NOTICE` not at all, so `packages/snowarch/NOTICE` is a
+byte-for-byte copy listed in `files`. The `npm pack --dry-run` test requires it AND asserts it still
+equals the root file, because a copy nothing compares is a copy that drifts.
+
 ---
 
 ### ARC-09-S11 — `docs/CONTRIBUTING.md` release / upgrade / CI-matrix sections; `docs/INSTALL.md` "Upgrading" section; `docs/ARCHITECTURE.md` versioning section

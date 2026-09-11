@@ -128,6 +128,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   `docs/TROUBLESHOOTING.md#proxy` or `#tls-ca` — and only when the shape is recognised, because a
   confident wrong remedy costs more than none.
 
+### Added
+
+- **The published package carries its NOTICE.** Apache-2.0 §4(d) asks a redistribution to carry the
+  attribution notice, and npm includes a licence automatically but never a NOTICE — so the package
+  ships its own copy, and a test compares it with the root file so the two cannot drift apart
+  unnoticed.
+
 ### Fixed
 
 - **The test suite no longer fails on the release commit.** Five checks asked whether this was a
