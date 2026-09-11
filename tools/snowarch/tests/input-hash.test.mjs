@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { humanDuration, withoutDuration } from '../lib/steps/format.mjs';
 import { INPUTS, KINDS, STEP_IDS, alwaysRuns, hashFor, storeStamp, storeVersion } from '../lib/inputs.mjs';
 import { staleSteps, explainStale, emptyState } from '../lib/state.mjs';
 import { STEPS, runSteps } from '../lib/steps/index.mjs';
@@ -369,7 +370,10 @@ test('AC 3 — a second run on an unchanged checkout does only B00 and B09', asy
   // the second of those. Merging the wording would also merge two summary counters that a reader
   // uses to tell "nothing changed" from "not applicable here".
   assert.deepEqual(
-    lines.filter((l) => /^\[B/.test(l)).map((l) => l.replace(/\(\d+\.\d+ s\)/, '(time)')),
+    // The renderer's OWN grammar, imported (ARC-09-C18). This was a second regex written here,
+    // and it knew `(0.2 s)` but not `(1 s)` — so a slow B00 printed a duration the normaliser left
+    // alone and the comparison failed on a clock. A test never re-implements a renderer's format.
+    lines.filter((l) => /^\[B/.test(l)).map((l) => withoutDuration(l)),
     [
       '[B00/09] preflight … warn (time)',
       '[B01/09] workspace … ok (cached)',
@@ -418,4 +422,35 @@ test('the ARCHITECTURE table is rendered from the table, and is committed curren
   assert.equal(region('bootstrap-input-notes'), inputsNotes().trim());
   // Every step appears, so a step added without a row cannot pass unnoticed.
   for (const id of STEP_IDS) assert.ok(region('bootstrap-inputs').includes(`\`${id}\``), id);
+});
+
+
+// ── ARC-09-C18 — the normaliser knows every duration the renderer can print ────────────────────
+//
+// Rehearsal run 6 stopped the release before the writes: `release: gate failed: test (exit 1)`, on
+// this file's AC 3, with `+ '[B00/09] preflight … warn (1 s)'` against `- '… warn (time)'`. The
+// normaliser was a second regex written in this test, and it matched only the sub-second form. A
+// step that takes a full second — a loaded machine, or the release gate running the suite while
+// everything else runs — printed `(1 s)` and slipped through. Deterministic given a slow step;
+// invisible in isolation, where nothing here is slow.
+
+test('C18: every duration the formatter can print is normalised, and only durations', () => {
+  // EVERY shape, generated from the formatter rather than listed by hand — a list would be a third
+  // description of the same grammar, which is the mistake this chore is about.
+  for (const ms of [0, 1, 99, 499, 949, 950, 951, 1000, 1499, 1500, 12_000, 59_999, 3_600_000]) {
+    const d = humanDuration(ms);
+    const line = `[B00/09] preflight … ok (${d})`;
+    assert.equal(withoutDuration(line), '[B00/09] preflight … ok (time)',
+      `${ms} ms renders as (${d}) and was not normalised`);
+  }
+  // Both forms really are produced, or the loop above proves one case twice.
+  assert.equal(humanDuration(400), '0.4 s');
+  assert.equal(humanDuration(1000), '1 s');
+
+  // ...and ONLY durations. `(cached)` and a skip's reason are parenthesised STATUS: normalising
+  // them would erase the difference between a step that ran and one that did not, which is the
+  // distinction this file exists to assert.
+  assert.equal(withoutDuration('[B05/09] server … ok (cached)'), '[B05/09] server … ok (cached)');
+  assert.equal(withoutDuration('[B02/09] docs … skipped (--docs skip)'),
+    '[B02/09] docs … skipped (--docs skip)');
 });

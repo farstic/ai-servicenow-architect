@@ -27,6 +27,30 @@ export function humanDuration(ms) {
 }
 
 /**
+ * Every shape `humanDuration` can produce, in the position a step line carries it.
+ *
+ * ARC-09-C18. A test that compares step lines has to remove the clock first, and
+ * `input-hash.test.mjs` did it with its own regex — `/\(\d+\.\d+ s\)/`, which knows the
+ * SUB-SECOND form and not the whole-second one. So a run where B00 took a second or more printed
+ * `(1 s)`, the normaliser left it alone, and the comparison failed on a duration. It read as a
+ * flake because it needs a slow step to appear; it is deterministic given one, and the release
+ * gate — running the suite while everything else runs — is exactly where a step gets slow. That is
+ * where it bit, in rehearsal run 6, stopping the release before the writes.
+ *
+ * So the grammar lives HERE, next to the thing that produces it, and a test imports it. Both forms,
+ * because `humanDuration` has two.
+ *
+ * NOT `(cached)`, and not a skip's `(reason)`: those are parenthesised STATUS, not a clock, and a
+ * normaliser that erased them would hide the difference between a step that ran and one that did
+ * not — which is the very thing `input-hash.test.mjs` exists to assert.
+ */
+export const DURATION_IN_LINE = /\((?:\d+\.\d+|\d+) s\)/g;
+
+/** A step line with its duration replaced, for comparing lines without comparing clocks. */
+export const withoutDuration = (line, placeholder = '(time)') =>
+  line.replace(DURATION_IN_LINE, placeholder);
+
+/**
  * `[B02/09] docs … ok (48 s)`
  *
  * The denominator is derived from the last step's id, never typed: a tenth step would otherwise

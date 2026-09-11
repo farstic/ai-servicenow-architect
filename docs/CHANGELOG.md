@@ -143,6 +143,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A test no longer fails because a step was slow.** The bootstrap's step lines carry a duration,
+  and a test that compares them removes it first — with its own pattern, which knew `0.4 s` but not
+  `1 s`. On a loaded machine the comparison failed on the clock rather than on what it was
+  comparing, and it stopped a release. The pattern now lives beside the code that prints it.
+
 - **`snowarch version` prints seven lines on a tagged checkout, and everything that counts them
   knows it.** The seventh compares the tag's message with the tree and exists only when a tag is
   exact — but a test, two CI steps and two documents had "six lines" written into them, none of
