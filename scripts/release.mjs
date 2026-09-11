@@ -215,7 +215,8 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
 
   // ── writes ─────────────────────────────────────────────────────────────────────────────────
   const date = now().toISOString().slice(0, 10);
-  const written = applyWrites({ root, version, date, run: runChild });
+  const written = applyWrites({ root, version, date, run: runChild,
+    from: pre.latest, tag: { contract: contractSha, docsPin: pre.docsPin } });
   if (!written.ok) {
     rollback(root, written.touched);
     fail(written.message);

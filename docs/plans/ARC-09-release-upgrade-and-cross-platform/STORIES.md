@@ -161,6 +161,48 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 ### ARC-09-S02 — `docs/CHANGELOG.md` generation from conventional commits; commit-message lint in CI; the 2.0.0 "supersedes" and migration notes
 
+> **Amendment 2026-09-11 (from the delivery).** Four departures.
+>
+> 1. **The Notes ruling.** The existing `## Unreleased` block held the per-story entries every PR of
+>    this programme added — the human record of how the product was built. They moved into
+>    `### Notes` **verbatim**, with the seeded 2.0.0 sentence and the migration heading above them.
+>    The generator's groups are for commits from here on; the Notes are what carries a paragraph
+>    somebody needed to write, and they survive regeneration by design.
+> 2. **The frozen heading is `## Before 2.0.0`**, not `## Before 2.0.0 (engine v2.x line)`, and the
+>    baseline for AC 7 is **`bcd4dcd`**, not ARC-02-S05. S05 changed one line of the file; S06
+>    (`69d6efa`) added the heading; S08 (`bcd4dcd`) moved the two engine version footers in, which is
+>    the last DELIBERATE change to the region and therefore what "unchanged" has to mean.
+>    `tests/changelog.test.mjs` compares against `git show bcd4dcd:docs/CHANGELOG.md`.
+> 3. **The retired-name sweep is satisfied by assembling the identifiers, not by allow-listing the
+>    test.** A test asserting the historical "supersedes" sentence would contain the old repository
+>    names forever, so an allow-list entry for it could never go stale — and the ratchet only works
+>    because every entry eventually does. The test builds the two identifiers from parts, the idiom
+>    `tests/doctor/redact.test.mjs` already uses for addresses. `docs/CHANGELOG.md` keeps its
+>    existing ARC-09 allow-list entry; the marker mechanism the story describes
+>    (`<!-- retired-name: historical -->`) does not exist in this tree — the allow-list is by FILE.
+> 4. **`commitlint.mjs` lints the repository it was RUN in**, not the one it lives in. The story's
+>    shape would have made the test spawn it against a fixture and silently lint this checkout
+>    instead — passing while proving nothing. `--root` defaults to `process.cwd()`, which is the
+>    checkout in CI and the fixture in a test.
+>
+> 5. **AC 7 cannot be a history comparison.** The first version read
+>    `git show bcd4dcd:docs/CHANGELOG.md`; the `test` job clones SHALLOW, so the object is absent and
+>    the assertion failed on nine cells where nothing was wrong. The frozen region is a COMMITTED
+>    FIXTURE now — `tests/fixtures/changelog-before-2.0.0.md`, written once from that commit — so the
+>    comparison works at any depth and a failure prints the lines that moved. The history comparison
+>    survives as its own test, named for what it needs and skipping with a reason on a shallow clone.
+> 6. **The local base was wrong, and only the local one.** The CI job was always right — drill PR
+>    #126 produced exactly one line, the drill's own commit. But `commitlint` run BY HAND defaulted
+>    to `origin/main..HEAD`, and `main` lags `develop` by a milestone: on a develop-based branch that
+>    is every commit merged since the last release, including subjects written before the convention
+>    (ARC-09-S01's own, for one). The local base is now the branch's upstream, or `origin/develop`.
+>    Two-dot throughout — `A...B` is the symmetric difference and would pull the base's commits in,
+>    which is the opposite of what a lint of "your commits" means.
+>
+> *The new required context is `commitlint`* — one cell, `pull_request` only, so the check-run name
+> is the bare job name. 42 → 43 at the M4 merge.
+
+
 **As** a maintainer **I want** the changelog section for a version generated from the conventional-commit history since the previous tag, with a hand-written notes block that survives regeneration, and a CI check that every commit on a pull request follows the convention **so that** the changelog is never hand-maintained (P-12 "hand-maintained counts drift") and the 2.0.0 section carries the "supersedes engine v2.8.0 and snow-mcp 1.0.0" statement and the server migration notes (`03` R-03) that existing users need.
 
 **Context.** README deliverable "`docs/CHANGELOG.md` generation (conventional commits)", acceptance criterion 7, risk "conventional-commit discipline slips → commitlint in CI; fallback manually edited section". `01` §3 marks `docs/CHANGELOG.md` GENERATED; ARC-01 S06 imported the old engine changelog (stops at 2.7.6) as-is and left regeneration to this ARC; ARC-02 S05 adds the heading `## Before 2.0.0 (engine v2.x line)` above the imported text and ARC-02 S06 tolerates historical wording ("Tier") only below it; ARC-04 S14 writes `packages/snowarch/CHANGELOG.md` with the 2.0.0 migration note (heading `Migration from snow-mcp 1.0.0`).

@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { release } from '../scripts/release.mjs';
 import { buildTagMessage, parseTagMessage, tagIsComplete } from '../scripts/lib/release/tag.mjs';
 import { compareVersions, latestTag } from '../scripts/lib/release/preflight.mjs';
-import { badgeLine, writeChangelog, writeHead, writeMarker } from '../scripts/lib/release/writers.mjs';
+import { badgeLine, writeHead, writeMarker } from '../scripts/lib/release/writers.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -182,9 +182,8 @@ test('the writers replace exactly one thing each, and refuse what they cannot pl
   // shields.io eats a single dash; a prerelease has to escape it or the badge reads "version-2.1.0".
   assert.ok(writeHead(head.text, '2.1.0-rc.1').text.includes('version-2.1.0--rc.1-blue'));
 
-  const log = writeChangelog('# C\n\n## Unreleased\n\n- a\n', '2.0.0', '2026-09-11');
-  assert.match(log.text, /## Unreleased\n\n## 2\.0\.0 — 2026-09-11/);
-  assert.equal(writeChangelog('# C\n\nnothing\n', '2.0.0', '2026-09-11').ok, false);
+  // The changelog is ARC-09-S02's, and `tests/changelog.test.mjs` owns it: it needs a repository,
+  // not a string, because the groups come from the commits since the previous tag.
 });
 
 // ── the acceptance criteria, on the fixture ────────────────────────────────────────────────────

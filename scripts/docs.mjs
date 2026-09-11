@@ -7,4 +7,10 @@
 // two entry points agree, so they cannot drift into two behaviours with one name.
 import { runDocs } from '../tools/snowarch/lib/docs/cli.mjs';
 
-process.exit(runDocs(process.argv.slice(2)));
+// `process.exitCode`, not `process.exit()` — the same rule the launcher states three files away
+// and the reason it states it: an explicit exit truncates stdout when it is a PIPE, because a write
+// past the pipe buffer is asynchronous and the process is gone before it drains. This shim carried
+// the old form, so `node scripts/docs.mjs status --json` handed a caller its object cut in half at
+// a buffer boundary — found by the test that compares the two entry points, failing with
+// `Unterminated string in JSON at position 8192`, which is 8 KiB exactly.
+process.exitCode = runDocs(process.argv.slice(2));

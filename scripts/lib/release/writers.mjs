@@ -72,20 +72,12 @@ export function writeHead(text, version) {
   return { ok: true, text: out };
 }
 
-/**
- * The changelog heading. S02 replaces the body generation; this is the heading move only.
- *
- * `## Unreleased` becomes `## <x.y.z> — <date>` and an empty `## Unreleased` is re-created above
- * it, so the next change has somewhere to go and nobody has to remember to add it.
- */
-export function writeChangelog(text, version, date) {
-  const heading = /^## Unreleased\s*$/m;
-  if (!heading.test(text)) {
-    return { ok: false, message: 'release: docs/CHANGELOG.md has no "## Unreleased" heading' };
-  }
-  return { ok: true,
-    text: text.replace(heading, `## Unreleased\n\n## ${version} — ${date}`) };
-}
+// The changelog is ARC-09-S02's: it moves the hand-written Notes down into the release and
+// generates the groups from the commit subjects since the previous tag. S01 shipped a stub that
+// moved the heading and nothing else; this is the real one, imported rather than re-implemented.
+import { writeChangelog as generateChangelog } from './changelog.mjs';
+
+export { generateChangelog };
 
 /** The files this script is allowed to stage. Explicit, never `git add -A`. */
 export const STAGED = Object.freeze([
@@ -108,7 +100,7 @@ export const STAGED = Object.freeze([
  *
  * `run` and the file accessors are injected so the whole sequence is testable without an npm.
  */
-export function applyWrites({ root, version, date, run,
+export function applyWrites({ root, version, date, run, from = null, tag = {}, git = undefined,
   read = (p) => readFileSync(join(root, p), 'utf8'),
   write = (p, t) => writeFileSync(join(root, p), t) }) {
   const touched = [];
@@ -122,13 +114,19 @@ export function applyWrites({ root, version, date, run,
   for (const [file, fn] of [
     ['CLAUDE.md', (t) => writeMarker(t, version)],
     ['docs/README-head.md', (t) => writeHead(t, version)],
-    ['docs/CHANGELOG.md', (t) => writeChangelog(t, version, date)],
   ]) {
     const result = fn(read(file));
     if (!result.ok) return { ok: false, message: result.message, touched };
     write(file, result.text);
     touched.push(file);
   }
+
+  // The changelog writes itself: it needs the repository (the commits since `from`) and the tag's
+  // two shas for the trailer, not just the text.
+  const log = generateChangelog({ root, version, date, from, tag, read, write,
+    ...(git ? { git } : {}) });
+  if (!log.ok) return { ok: false, message: `release: ${log.message}`, touched };
+  touched.push('docs/CHANGELOG.md');
 
   // The README is a rendering of the head. Regenerated rather than edited, so `gen-readme --check`
   // — which runs inside the lint this release has already passed — still holds afterwards.
