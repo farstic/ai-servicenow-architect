@@ -59,16 +59,28 @@ describe('criterion 4 — the two shapes that look right and behave wrong', () =
 });
 
 describe('version', () => {
-  it('a newer version is STORE_SCHEMA_UNSUPPORTED and says to upgrade, not to edit', () => {
+  // ARC-09-S06 split the one `STORE_SCHEMA_UNSUPPORTED` in two. The remedy is what differs, and
+  // it is the whole reason: a store from the FUTURE needs a newer checkout, a store from the PAST
+  // needs migrating — and telling the second reader to upgrade sends them to a command that
+  // changes nothing while their file sits there.
+  it('a NEWER version says to upgrade the checkout, not to edit the store', () => {
     const s = clone(); s.version = 2;
     const e = err(s);
-    expect(e.code).toBe('STORE_SCHEMA_UNSUPPORTED');
-    expect(e.message).toContain(`newer than this server (supports ${STORE_VERSION})`);
+    expect(e.code).toBe('STORE_SCHEMA_NEWER');
+    expect(e.message).toContain(`newer than this server supports (${STORE_VERSION})`);
     expect(e.message).toContain('./snowarch upgrade');
+  });
+  it('an OLDER version says to migrate, and never mentions upgrading', () => {
+    const s = clone(); s.version = 0;
+    const e = err(s);
+    expect(e.code).toBe('STORE_SCHEMA_OUTDATED');
+    expect(e.message).toContain(`older than this server (${STORE_VERSION})`);
+    expect(e.message).toContain('./snowarch store migrate');
+    expect(e.message).not.toContain('upgrade');
   });
   it('an unsupported version is not reported as a malformed store', () => {
     const s = clone(); s.version = 2; s.instances = 'nonsense';
-    expect(err(s).code).toBe('STORE_SCHEMA_UNSUPPORTED');
+    expect(err(s).code).toBe('STORE_SCHEMA_NEWER');
   });
 });
 

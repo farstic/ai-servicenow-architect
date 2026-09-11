@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 /**
- * snowarch CLI — four sub-commands.
+ * snowarch CLI — five sub-commands.
  *
- * `start` is the only one implemented here. `instance`, `doctor` and `contract` are
- * stubs that exit 2: they are filled by ARC-07 (on the store module), ARC-04-S12 and
- * ARC-04-S06 respectively. They exist now so the command surface is stable for the
- * `tools/snowarch` launcher, which forwards to `dist/cli/index.js` — that path is a
- * contract with ARC-06/ARC-07 and must not move.
+ * `start` is the only one implemented here; `instance`, `store`, `doctor` and `contract` each
+ * hand off to their own module (ARC-07, ARC-09-S06, ARC-04-S12 and ARC-04-S06 respectively).
+ * The command surface is what the `tools/snowarch` launcher forwards to — `dist/cli/index.js` is
+ * a contract with ARC-06/ARC-07/ARC-09 and must not move.
  *
  * What is deliberately absent: the npm update check (it fetched a third party's
  * package record — P-18), the `setup`, `auth`, `instances`, `web`, `shortcuts`,
  * `capabilities`, `run` and `report` commands (D-03), and any coloured output — a
- * CLI that may be piped should not depend on a TTY library for four sub-commands.
+ * CLI that may be piped should not depend on a TTY library for five sub-commands.
  */
 // FIRST, before anything that constructs the proxy agent. ESM evaluates every import before
 // the importing module's body, so this cannot be a call in main(): `EnvHttpProxyAgent` reads
@@ -87,6 +86,19 @@ program
     // be the word `instance` would have made an index scan cut the line in the wrong place.
     const { runInstance } = await import('./instance-command.js');
     process.exit(await runInstance(command.args));
+  });
+
+program
+  .command('store')
+  .description('Migrate, back up and restore the instance store')
+  .allowUnknownOption()
+  .allowExcessArguments()
+  // The sub-command's own help, for the reason `instance` has one: commander's options block
+  // describes commander's idea of the command, and this one's exit codes are the useful part.
+  .helpOption(false)
+  .action(async (_options: unknown, command: Command) => {
+    const { runStore } = await import('./store-command.js');
+    process.exit(await runStore(command.args));
   });
 
 program

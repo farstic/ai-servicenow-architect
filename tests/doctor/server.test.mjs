@@ -172,7 +172,7 @@ test('the flags are declared as the runner reads them: SV-04 network, SV-05/06 s
   assert.equal(by.get('SV-04').network, true);
   assert.equal(by.get('SV-04').quick, false);
   for (const id of ['SV-05', 'SV-06']) assert.equal(by.get(id).spawns, true, `${id}`);
-  for (const id of ['SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-07', 'SV-08']) {
+  for (const id of ['SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-07', 'SV-08', 'SV-09']) {
     assert.equal(by.get(id).quick, true, `${id} is not quick`);
   }
   assert.deepEqual(checks.filter((c) => c.network).map((c) => c.id), ['SV-04']);

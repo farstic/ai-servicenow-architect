@@ -28,14 +28,14 @@ import { fail, skip } from './result.mjs';
  * module can be loaded and fails if they drift.
  */
 export const SERVER_CHECK_IDS = Object.freeze([
-  'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-04', 'SV-05', 'SV-06', 'SV-07', 'SV-08',
+  'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-04', 'SV-05', 'SV-06', 'SV-07', 'SV-08', 'SV-09',
 ]);
 
 /** What each id is called before the module has answered — replaced by the module's own title. */
 const TITLES = Object.freeze({
   'SV-00': 'Node version', 'SV-01': 'dist artefacts', 'SV-02': 'store', 'SV-03': 'instances',
   'SV-04': 'instance probes', 'SV-05': 'stdio handshake', 'SV-06': 'capabilities match the store',
-  'SV-07': 'audit trail', 'SV-08': 'ancestor skill directories',
+  'SV-07': 'audit trail', 'SV-08': 'ancestor skill directories', 'SV-09': 'store schema',
 });
 
 export const DOCTOR_ENTRY = ['dist', 'doctor', 'index.js'];

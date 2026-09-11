@@ -327,7 +327,7 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (67), with what to do about it.
+Every code the server can throw (68), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
@@ -383,7 +383,8 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `STORE_NOT_FOUND` | correct the variable, unset it, or create the store |
 | `STORE_PERMISSIONS_TOO_OPEN` | tighten the mode; on Windows the check is skipped and the doctor notes it instead |
 | `STORE_SCHEMA_INVALID` | the message names the field path; correct it in the store |
-| `STORE_SCHEMA_UNSUPPORTED` | upgrade this checkout, rather than editing the store down |
+| `STORE_SCHEMA_NEWER` | upgrade this checkout, rather than editing the store down; a backup can be restored if the newer server wrote one |
+| `STORE_SCHEMA_OUTDATED` | migrate it; a 0600 backup is written first and credential values are never touched |
 | `STORE_UNREADABLE` | repair or recreate it; the message names the parse error |
 | `TLS_CA_UNTRUSTED` | the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it |
 | `TLS_CERT_INVALID` | check the instance URL and the certificate; this is not a CA-trust problem |

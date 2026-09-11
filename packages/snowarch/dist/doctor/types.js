@@ -13,7 +13,7 @@
  * a future re-home is a single line.
  */
 export const CHECK_IDS = [
-    'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-04', 'SV-05', 'SV-06', 'SV-07', 'SV-08',
+    'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-04', 'SV-05', 'SV-06', 'SV-07', 'SV-08', 'SV-09',
 ];
 /**
  * Returns `skip`, always — the shape the doctor binds when no instance is configured.

@@ -16,6 +16,7 @@ import {
   envPath, globalStorePath, maskPath, projectStorePath, resolveStorePath,
 } from '../store/index.js';
 import { getPackageVersion } from '../utils/version.js';
+import type { ErrorCodeName } from '../errors/codes.js';
 
 /** The five tools a session has when nothing is configured. `instance_switch` is NOT among
  *  them: there is nothing to switch to, and offering it would invite an error instead of a
@@ -31,6 +32,26 @@ export const CORE_TOOLS_UNCONFIGURED = [
 export const NO_INSTANCE_MESSAGE =
   'No ServiceNow instance is configured for this checkout. Inside Claude Code run '
   + '/snowarch setup-instance; in a terminal run ./snowarch instance add <label>.';
+
+/**
+ * Why an instance tool is refusing, in the words of the ACTUAL reason.
+ *
+ * ARC-09-S06. "No instance is configured" is true whenever nothing loaded, and for a store whose
+ * schema this build does not read it is the least useful true thing that can be said: the user has
+ * instances, they are in the file, and the remedy is one command that the generic sentence does not
+ * name. A schema `configError` therefore speaks for itself — its own code, its own message — and
+ * everything else keeps the sentence it always had.
+ */
+export const SCHEMA_CONFIG_ERRORS = ['STORE_SCHEMA_OUTDATED', 'STORE_SCHEMA_NEWER'] as const;
+
+export function unconfiguredRefusal(configErrors: readonly { code: string; message: string }[]):
+{ code: ErrorCodeName; message: string } {
+  const schema = configErrors.find((e) =>
+    (SCHEMA_CONFIG_ERRORS as readonly string[]).includes(e.code));
+  return schema
+    ? { code: schema.code as ErrorCodeName, message: schema.message }
+    : { code: 'NO_INSTANCE_CONFIGURED', message: NO_INSTANCE_MESSAGE };
+}
 
 /** Set by the server so the status tool can report the real number without importing it. */
 let advertisedCount: number = CORE_TOOLS_UNCONFIGURED.length;
