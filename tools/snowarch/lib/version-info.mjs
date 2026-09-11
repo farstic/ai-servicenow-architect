@@ -48,7 +48,7 @@ function builtContract(root) {
  * what turns a mismatch into a FAIL.
  */
 export function versionInfo(root, { env = process.env, platform = process.platform,
-  commitState = true } = {}) {
+  full = true } = {}) {
   const config = loadConfig(root);
   const opts = { env, platform };
 
@@ -57,8 +57,14 @@ export function versionInfo(root, { env = process.env, platform = process.platfo
   const docsPinConfig = config.docs.pin;
   const link = gitlink(root, DOCS_PATH, opts);
 
+  // `full: false` is the DOCTOR's call, and it is about spawns rather than tidiness. The header
+  // takes `version`, `tag.name` and `contractSha`; the tag's MESSAGE, the shallow hint and the
+  // commit state are for the human lines, and each costs a `git` process. The doctor is what the
+  // SessionStart banner runs before a session's first word, and a process spawn on Windows is not
+  // cheap: five of them took the banner's median from 910 ms to 1188 ms, then to 1010 ms against a
+  // 1000 ms budget. Two remain on this path — `describe` and `ls-tree`.
   const found = describe(root, opts);
-  const raw = found ? tagMessage(root, found.name, opts) : null;
+  const raw = found && full ? tagMessage(root, found.name, opts) : null;
   const parsed = raw ? parseTagMessage(raw) : null;
 
   return {
@@ -82,14 +88,10 @@ export function versionInfo(root, { env = process.env, platform = process.platfo
       : null,
     // A shallow clone has no tags to describe; saying "no release tag" without saying why sends a
     // reader looking for a bug in the product.
-    shallow: found ? false : isShallow(root, opts),
+    shallow: found ? false : (full ? isShallow(root, opts) : false),
     // `git status --porcelain` walks the WORKING TREE, and this one has 35,000 corpus files in it:
-    // 300 ms on a warm index, more on a cold one. The doctor's `engine` header does not use it —
-    // it takes `version`, `tag` and `contractSha` — and the doctor is what the SessionStart banner
-    // runs before a session's first word. Measured: the banner's median went 614 ms → 1188 ms on a
-    // macOS runner and failed its own budget, which is how this was found. The command still asks;
-    // the header does not.
-    commit: commitState ? branchState(root, opts) : null,
+    // 300 ms on a warm index, more on a cold one. The command asks; the header does not.
+    commit: full ? branchState(root, opts) : null,
     contractPinned,
     contractMatches: Boolean(contractSha && contractPinned && contractSha === contractPinned),
     docsPinConfig,

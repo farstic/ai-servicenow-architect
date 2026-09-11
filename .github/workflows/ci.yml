@@ -774,7 +774,10 @@ jobs:
           if not "%ERRORLEVEL%"=="0" exit /b 1
           del version.txt
           set "PATH=C:\Windows\system32;C:\Windows"
-          .\snowarch.cmd version
+          rem CALL here too. Without it cmd transferred control and this assertion never ran — which
+          rem is how `snowarch.cmd` shipped for three ARCs returning 9009 instead of 3 when Node is
+          rem absent, with the check that was written to catch it sitting one line below, unreachable.
+          call .\snowarch.cmd version
           echo without-node ERRORLEVEL=%ERRORLEVEL%
           if not "%ERRORLEVEL%"=="3" exit /b 1
           rem Same reason as the step above: the expected code is 3, so the step has to say 0.

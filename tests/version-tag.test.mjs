@@ -243,8 +243,10 @@ test('AC 4a — the doctor\'s engine header is this command\'s answer, not a sec
 
 test('the header costs less than the command — and says the same thing', (t) => {
   const f = checkout(t);
+  tagAt(f.root, 'v2.0.0', buildTagMessage({
+    version: '2.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
   const full = versionInfo(f.root);
-  const header = versionInfo(f.root, { commitState: false });
+  const header = versionInfo(f.root, { full: false });
 
   // The three fields the doctor's header takes are identical: that is what "one source" means, and
   // AC 4a asserts it end to end through the two commands.
@@ -258,6 +260,11 @@ test('the header costs less than the command — and says the same thing', (t) =
   // runner and failed its own 1 s budget, which is how this was found.
   assert.notEqual(full.commit, null);
   assert.equal(header.commit, null, 'the header asked for the commit state it does not use');
+  // ...and neither the tag's message nor the shallow hint, which are two more spawns each on the
+  // path the banner runs. The tag NAME — which the header does use — is there either way.
+  assert.notEqual(full.tag.message, null, 'the fixture tag has no message — the case is vacuous');
+  assert.equal(header.tag.message, null, 'the header read the tag message it does not render');
+  assert.equal(header.tag.name, full.tag.name);
 
   // The renderer tolerates it, because a null here must never become a crash in the one command a
   // person runs when something is already wrong.
