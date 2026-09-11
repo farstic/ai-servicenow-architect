@@ -1592,8 +1592,23 @@ not produce is a required check waiting for ever.
 | `windows-launcher` | windows | powershell · cmd | the `.cmd` and `.ps1` launchers, which exist nowhere else to be tested |
 | `secrets` | ubuntu | node | no credential-shaped string reached the tree |
 | `plugin-validate` | ubuntu | node | the plugin manifest is loadable |
-| `eol` | — | — | **ARC-09-S09's**, not yet merged. It enters `required-contexts.json` when its cells exist |
+| `eol` | ubuntu + windows | bash · **cmd** | the line-ending policy, on a Windows clone made with the Git-for-Windows default `core.autocrlf=true` — set BEFORE the checkout, because the setting decides what the clone writes. Runs `tests/eol.test.mjs`, asserts the launcher bytes are CRLF and the LF set has no `\r`, and runs `bootstrap.cmd --help`, `snowarch.cmd --help` and `bootstrap.ps1 --help` under `cmd.exe` |
 | `docs-real` | 3 OS + one | bash | **conditional — runs only when the corpus tooling changes; NOT required.** A PR that touches those paths produces four extra check runs and they must never become required contexts |
+
+**Line endings.** LF everywhere, except the two Windows launcher kinds (`*.cmd`, `*.ps1`), which are
+CRLF. Never edit a line ending by hand and never "fix" one in an editor: `.gitattributes` decides,
+git applies it at `add` and at `checkout`, and a hand-edit only puts your working tree out of step
+with what everyone else receives. Two halves, and they fail differently — the INDEX is LF for every
+text file on every platform (git normalises on `add`, so a `.cmd` is LF in the object database and
+CRLF only on disk), and the WORKING TREE is whatever your checkout wrote, which is why the `eol` job
+clones with `core.autocrlf=true` before asserting anything. A `\r` that reaches a tracked
+`bootstrap.sh` is `/bin/bash^M: bad interpreter` on every Unix machine that clones it — an error
+naming an interpreter that plainly exists. The launcher files are GENERATED
+(`scripts/gen-launcher-text.mjs`): if `assert-crlf` fails on one, the generator is the fix, because
+editing the file leaves the two out of step and the next `npm run gen` reverts the repair. A new file
+type needs a rule in `.gitattributes` or an entry with a reason in `tests/eol.allowlist.json` —
+`tests/eol.test.mjs` fails on an extension nobody has answered for, since `text=auto` is a guess and
+removing the guess is what the policy file is for.
 
 **The banner's two numbers, per cell.** `banner-timing.mjs` reports both paths: the FAST path (warm
 cache) against `01` §8's 300 ms, and the RE-RUN path (cold, a quick doctor) at 1000 ms on the

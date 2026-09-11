@@ -6,7 +6,7 @@
     "release.yml": "tags only (`v*`), never a pull request",
     "e2e-live.yml": "manual, and it needs a real instance and a credential"
   },
-  "count": 52,
+  "count": 54,
   "contexts": [
     "actionlint",
     "bootstrap (macos-latest, node 20)",
@@ -33,6 +33,8 @@
     "contract (windows-latest, node 22)",
     "contract (windows-latest, node 24)",
     "docs-check",
+    "eol (ubuntu-latest)",
+    "eol (windows-latest)",
     "footprint (production install)",
     "launcher (macos-latest)",
     "launcher (ubuntu-latest)",

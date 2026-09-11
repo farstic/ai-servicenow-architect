@@ -146,6 +146,9 @@ const KNOWN_JOBS = [
   // own required context; this adds what that cell does not run.
   'windows-native',
   'windows-launcher', 'secrets', 'plugin-validate',
+  // ARC-09-S09, two more (53–54): the line-ending policy proved on a Windows checkout made with
+  // the Git-for-Windows default, which is the only place it can actually break.
+  'eol',
 ];
 
 /** The three required contexts `release-dryrun` adds, exactly as a check-run prints them. */
@@ -534,10 +537,11 @@ test('required-contexts.json is exactly what ci.yml produces on a pull request (
     assert.ok(why.length > 30, `${file}'s exclusion carries no reason`);
   }
 
-  // S09 has not merged: `eol` is its two contexts and enters this file when its cells exist. A
-  // name here that CI does not produce is a required check waiting for ever.
-  assert.equal(fixture.contexts.some((c) => c.startsWith('eol')), false,
-    "eol is S09's; it belongs here when the job does");
+  // S09 merged and the job exists, so its two contexts are here — the inverse of what this
+  // asserted while the job did not: a name CI does not produce is a required check waiting for
+  // ever, and a job CI does produce that is NOT required is a red build nothing blocks on.
+  assert.deepEqual(fixture.contexts.filter((c) => c.startsWith('eol')),
+    ['eol (ubuntu-latest)', 'eol (windows-latest)']);
 });
 
 test('the contexts generator fails LOUDLY on a job it cannot classify (ARC-09-S08)', () => {
@@ -664,4 +668,56 @@ test('no cmd step redirects into the checkout (ARC-09-S08)', () => {
   // …and the rule has no exception left: the `del`s that used to clean up after such writes are
   // gone with the writes they cleaned up after.
   assert.equal(/^\s+del (version|hook)\.txt\s*$/m.test(ci), false, 'a `del` survived its write');
+});
+
+
+/** The two required contexts `eol` adds, exactly as a check run prints them. */
+const EOL_CONTEXTS = ['eol (ubuntu-latest)', 'eol (windows-latest)'];
+
+test('eol sets autocrlf BEFORE the checkout, on Windows only (ARC-09-S09)', () => {
+  const ci = wf('ci.yml');
+  // The job block: from its key to the next top-level job key, or the end of the file.
+  const from = ci.indexOf('\n  eol:');
+  assert.ok(from > -1, 'the eol job is gone from ci.yml');
+  const next = ci.slice(from + 1).search(/\n {2}[a-z][a-z0-9-]*:\n/);
+  const body = next === -1 ? ci.slice(from) : ci.slice(from, from + 1 + next);
+
+  // COMMENT LINES OUT FIRST. This job's comment explains the ordering and names
+  // `actions/checkout@v4` while doing so, so the naive index of that string is in the PROSE, three
+  // steps above the step — and the assertion passed or failed on where someone put a paragraph.
+  const code = body.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  const configAt = code.indexOf('core.autocrlf true');
+  const checkoutAt = code.indexOf('actions/checkout@v4');
+  assert.ok(configAt > -1, 'the autocrlf step is gone — the job then tests the runner default');
+  // THE ordering assertion. The setting decides what the clone writes, so afterwards is a tree
+  // already written under the default: the job would still be green and would prove nothing.
+  assert.ok(configAt < checkoutAt,
+    'core.autocrlf is set AFTER the checkout, so the checkout it governs already happened');
+
+  // And only on Windows: on ubuntu the same setting would rewrite the tree in the other direction
+  // and the LF assertions would be testing the runner's config rather than the repository.
+  const configStep = code.slice(code.lastIndexOf('- name:', configAt), configAt);
+  assert.match(configStep, /if: runner\.os == 'Windows'/);
+
+  // The `--help` step is cmd, because `cmd.exe` is what a Windows user's shell actually is, and
+  // the `.cmd` launchers are the files under test.
+  assert.match(code, /shell: cmd/);
+  assert.match(code, /call \.\\bootstrap\.cmd --help/);
+  assert.match(code, /call \.\\snowarch\.cmd --help/);
+  assert.match(code, /powershell -NoProfile -ExecutionPolicy Bypass -File bootstrap\.ps1 --help/);
+
+  // Both byte assertions present, and the LF one on BOTH cells: a `\r` committed to bootstrap.sh
+  // is a Unix failure, so ubuntu is where it must be caught, not only Windows.
+  assert.match(code, /assert-crlf\.mjs bootstrap\.cmd bootstrap\.ps1 snowarch\.cmd/);
+  const lfStep = code.slice(code.lastIndexOf('- name:', code.indexOf('assert-lf.mjs')), code.indexOf('assert-lf.mjs'));
+  assert.equal(/if:/.test(lfStep), false, 'the LF assertion was made conditional — it must run on both');
+});
+
+test('eol adds exactly two required contexts, by the names a check run prints (ARC-09-S09)', () => {
+  const fixture = JSON.parse(readFileSync(join(root, 'tests/fixtures/required-contexts.json'), 'utf8'));
+  for (const name of EOL_CONTEXTS) {
+    assert.ok(fixture.contexts.includes(name), `${name} is not in required-contexts.json`);
+  }
+  // 52 before this story. A generated file is not evidence on its own — the number is the claim.
+  assert.equal(fixture.count, 54, `${fixture.count} contexts — S09 takes 52 to 54`);
 });
