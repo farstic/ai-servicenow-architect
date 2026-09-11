@@ -138,7 +138,9 @@ const isExemptVocabLine = (file, line) =>
 function currentLines(rel) {
   const out = [];
   for (const line of read(rel).split('\n')) {
-    if (/^## Before 2\.0\.0/.test(line)) break;
+    // ARC-09-C17: history starts at the NEWEST release heading, not at the frozen one — a release
+    // creates a `## <version>` section above it, and its contents are a record, not live text.
+    if (/^## (\d|Before )/.test(line)) break;
     out.push(line);
   }
   return out;

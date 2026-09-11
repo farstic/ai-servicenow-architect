@@ -130,6 +130,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The test suite no longer fails on the release commit.** Five checks asked whether this was a
+  development tree — is the changelog's Unreleased section full, is the checkout untagged, does a
+  fixture still spell the development version — and a release makes all of those false. They went
+  red on the one pull request that must merge. Each one now asks a question that is true of a
+  development tree and a released tree alike, and says which it is looking at.
+
 - **The release workflow no longer rejects its own tag.** Checking out a tag ref rewrites it to
   point at the commit, so an annotated tag arrived in CI looking like one that had never carried a
   message, and every verification job refused a release that was perfectly well formed. The
