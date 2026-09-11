@@ -31,31 +31,7 @@ Every preset writes **all six** flags as the byte-exact strings the server compa
 plus `toolPackage: "full"` and `maxRecords: 100`. Stored `flags` disagreeing with the table are reported as
 `PRESET_FLAGS_MISMATCH` and **the preset wins**; omitting `flags` is not a disagreement — it takes the preset.
 
-## 3. What the system proposes
-
-The wizard never silently applies a preset. For a `pdi` / `dev` / `test` instance it *proposes* `full` —
-non-production environments start with every capability available (D-05) — then shows a per-flag review screen, each
-flag pre-set ON and annotated with its live probe result:
-
-```
-Proposed preset for "pdi" (pdi): full  — non-production: everything on
-  [x] WRITE        probe: ok
-  [x] CMDB_WRITE   probe: ok
-  [x] SCRIPTING    probe: ok
-  [x] ATF          probe: ok
-  [x] NOW_ASSIST   probe: no Now Assist licence detected — tools will fail until licensed; keep on? (recommend: off)
-  [x] FLUENT       probe: @servicenow/sdk not on PATH — keep on? (recommend: off)
-Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset
-```
-
-A probe that fails downgrades the recommendation shown on that line; it never flips the toggle by itself.
-
-For a `prod` instance the proposal is `read-only`, with the write flags greyed out and the `--ack-prod` instruction
-shown. **Environment detection:** a URL matching `^https://dev\d+\.service-now\.com` is proposed as `pdi`; any other
-host is *asked* — "What is this instance? pdi / dev / test / prod" — never guessed. All of it is re-editable later:
-`./snowarch instance set-preset <label> <preset>`, `set-flags`, or `/snowarch setup-instance`.
-
-## 4. The six flags in plain language (in brackets, the key as written in the store and the environment)
+## 3. The six flags in plain language (in brackets, the key as written in the store and the environment)
 
 - **WRITE** (`WRITE_ENABLED`) — create, update and delete records (incidents, catalog items, users, agile work, update
   sets). Without it everything is read-only.
@@ -77,7 +53,66 @@ Upgrading from the 1.0.0 server: SCRIPTING used to gate *reads* too, so listing 
 It no longer does. If you relied on that to keep script bodies out of a session, the control you want is a
 role-restricted ServiceNow account — the flag was never a confidentiality boundary, and treating it as one hid that.
 
-## 5. Production safeguards
+**Permission modes.** `disabledMcpjsonServers` removes the server, so no tool exists and the
+generated `allow`/`ask` lists are inert. `dontAsk` denies what `ask` would have prompted for,
+which is safe. `bypassPermissions` skips both — never with a live write preset.
+
+## 4. The review screen
+
+The wizard never silently applies a preset. For a `pdi` / `dev` / `test` instance it *proposes*
+`full` — non-production environments start with every capability available (D-05) — then shows a
+per-flag review screen, each flag pre-set ON and annotated with its live probe result:
+
+<!-- generated:review-screen-nonprod -->
+```
+Proposed preset for "pdi" (pdi): full  — non-production: everything on
+  [x] WRITE        probe: ok
+  [x] CMDB_WRITE   probe: ok
+  [x] SCRIPTING    probe: ok
+  [x] ATF          probe: ok
+  [x] NOW_ASSIST   probe: no Now Assist licence detected — tools will fail until licensed; keep on?
+                   (recommend: off)
+  [x] FLUENT       probe: @servicenow/sdk not on PATH — keep on? (recommend: off)
+Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset · "?"
+explains the flags
+```
+<!-- /generated:review-screen-nonprod -->
+
+A probe that fails downgrades the recommendation shown on that line; it never flips the toggle by itself.
+
+Typing a flag name toggles it, and the **dependency rule** answers for the consequences: turning
+`SCRIPTING` or `CMDB_WRITE` on with `WRITE` off asks whether to turn `WRITE` on as well (`n` leaves
+both off — a contradiction the server would resolve by force is not a state to save), and turning
+`WRITE` off with either of them on asks whether to turn those off too (`n` leaves `WRITE` on).
+
+For a `prod` instance the proposal is `read-only`, every box locked, and the footer names the one
+command that raises it:
+
+<!-- generated:review-screen-prod -->
+```
+Proposed preset for "prod-acme" (prod): read-only  — production is capped at read-only (D-05)
+  [ ] WRITE        locked on production
+  [ ] CMDB_WRITE   locked on production
+  [ ] SCRIPTING    locked on production
+  [ ] ATF          locked on production
+  [ ] NOW_ASSIST   locked on production
+  [ ] FLUENT       locked on production
+Enter = accept · to raise this instance later: ./snowarch instance set-preset prod-acme <preset>
+--ack-prod
+```
+<!-- /generated:review-screen-prod -->
+
+**Propose, don't impose.** Design principle 10. The system proposes at every step; the user reviews and can change any single value at any level;
+only then is anything applied. Enter accepts as shown, so the common path costs one keystroke and nothing is written
+that the user has not seen. `--yes` accepts every proposal without the review screen — for CI, where nobody is there
+to review.
+
+**Environment detection:** a URL matching `^https://dev\d+\.service-now\.com` is proposed as `pdi`;
+any other host is *asked* — never guessed, because the environment is what decides whether a write
+needs `--ack-prod`. All of it is re-editable later: `./snowarch instance set-preset <label>
+<preset>`, `set-flags`, or `/snowarch setup-instance`.
+
+## 5. Production rules
 
 An instance tagged `environment: prod` is capped at `read-only` unless the store carries `prodWriteAck: true`. The
 threshold is **any** flag raised, not just `WRITE_ENABLED` — a `custom` prod instance with only `ATF_ENABLED` still
@@ -100,14 +135,7 @@ Raising it requires: ./snowarch instance set-preset prod <preset> --ack-prod
 
 Every mutating call is recorded in the audit log, `.local/audit.jsonl`.
 
-## 6. Propose, don't impose
-
-Design principle 10. The system proposes at every step; the user reviews and can change any single value at any level;
-only then is anything applied. Enter accepts as shown, so the common path costs one keystroke and nothing is written
-that the user has not seen. `--yes` accepts every proposal without the review screen — for CI, where nobody is there
-to review.
-
-## 7. Where the values live
+## 6. Where credentials live
 
 One store. The first path that exists wins, and they are **never merged** — a merge makes "which file set this value"
 unanswerable.
@@ -120,12 +148,8 @@ unanswerable.
 
 `SNOW_STORE` pointing at a missing file is an **error, not a fallback**: silently loading an instance other than the
 one named is the failure an explicit override has to avoid. **Env-defined instances win over all three** — with
-`SERVICENOW_INSTANCE_URL` or any `SN_INSTANCE_<NAME>_URL` set, those are the instances, no store is read, and the six
-`*_ENABLED` variables in the server's environment apply to them and to nothing from the store. That is the CI path:
-
-```
-[INFO] instance source: env (SERVICENOW_*/SN_INSTANCE_*); store ignored: <checkout>/.local/instances.json
-```
+`SERVICENOW_INSTANCE_URL` or any `SN_INSTANCE_<NAME>_URL` set, those are the instances and no store is read. That is
+the CI path, and the server says so: `instance source: env (SERVICENOW_*/SN_INSTANCE_*); store ignored: …`.
 
 **What protects the file.** It holds a password, so on macOS and Linux the *file* is refused — not warned about — if
 it carries any group or world bit, and the message names the exact remedy:
@@ -135,25 +159,177 @@ Refusing to load <checkout>/.local/instances.json: file mode 0644 is group/world
 Run, from the checkout: chmod 600 .local/instances.json
 ```
 
-That remedy never carries an absolute path: checkout-relative inside the checkout, `~` under your home directory, and
-anywhere else — a path you named with `SNOW_STORE` — exactly as you typed it, because rewriting it would point the
-command somewhere you did not choose. The *directory* is a different risk: a 0600 file is unreadable by others
-wherever it sits, so 0755 is no reason to refuse a protected store, and what a directory bit actually buys an attacker
-is group or world **write** — replacing the file, or planting a symlink where it was.
+The remedy is checkout-relative inside the checkout, `~` under your home directory, and otherwise exactly as you typed
+it — rewriting a path you named would point the command somewhere you did not choose. The *directory* is a different
+risk: a 0600 file is unreadable wherever it sits, so what a directory bit buys an attacker is group or world **write**
+— replacing the file, or planting a symlink where it was. So group/world writable **without** the sticky bit is
+refused; with it (1777, as `/tmp` is) or with any other group/world bit the store loads with a warning; 0700 is
+silent. On Windows the check is skipped (`file modes: ACL-inherited (Windows)`): the POSIX bits Node reports there are
+synthetic, and asserting on them would fail for a protected file.
 
-| Directory | Result |
-|---|---|
-| group/world writable, **no sticky bit** (e.g. 0777) | **refused** — the file can be replaced |
-| group/world writable **with** the sticky bit (1777, as `/tmp` is) | loads, with a warning |
-| any other group/world bit (e.g. 0755) | loads, with a warning |
-| 0700 | silent |
+Writes are atomic — temp file, `fsync`, `rename` — so a reader never sees a half-written store, and paths in logs are
+masked (home to `~`, the checkout to `<checkout>`) because a log line reaches screen shares and support tickets.
 
-On Windows the check is skipped and the log says `file modes: ACL-inherited (Windows)`: permissions there are
-ACL-inherited and the POSIX bits Node reports are synthetic, so asserting on them would fail for a protected file.
+**A per-user store.** `instance add --global` writes `~/.config/snowarch/instances.json`
+(`$XDG_CONFIG_HOME` honoured) or `%APPDATA%\snowarch\instances.json`, for the PDI you use from
+every checkout. The two stores are **never merged**: `instance list --all` shows both with a
+`STORE` column, a label in both appears twice, and one note says which the server reads here. Plain
+`list` shows the store in use and a footer naming what is in the other one.
 
-Writes are atomic — temp file in the same directory, `fsync`, `rename` over the target — so a reader never sees a
-half-written store. Paths in logs are masked, home to `~` and the checkout to `<checkout>`: a log line reaches screen
-shares, bug reports and support tickets, and an absolute path carries the account name.
+**A store inside a cloud-sync folder** (OneDrive, Dropbox, Google Drive, iCloud Drive) is warned
+about BEFORE anything is written: `0600` is a *local* permission and the sync client runs as the
+same user, so the mode does not stop the file leaving the machine (D-04). The warning names the
+provider and the exact folder, and the question defaults to **No**:
 
-A store inside a cloud-sync folder (OneDrive, Dropbox, Google Drive, iCloud Drive) is flagged: `0600` is a *local*
-permission and the sync client runs as the same user, so the mode does not stop the file leaving the machine (D-04).
+```
+WARN STORE_IN_CLOUD_SYNC_FOLDER: this checkout is under Dropbox (~/Dropbox/work/repo). File mode 0600
+does not stop synchronisation — the credential store would be uploaded to that service. Options: move
+the checkout outside the synced folder, or keep credentials in the global store with `--global`
+(~/.config/snowarch is not synced by default).
+Continue and write the store here anyway? [y/N]
+```
+
+Enterprise "Known Folder Move" — `Documents` redirected into OneDrive with the word OneDrive
+nowhere in the path — is caught by the `%OneDrive%` variables, the only detector that exists for it.
+
+**What is never done:** credentials are never written to `~/.claude.json`, never passed in argv
+(`--password`, `--client-secret` and `--secret` are refused before the arguments are parsed), and
+never echoed into a transcript.
+
+## 7. Typing secrets safely
+
+One place: an interactive terminal, where `snowarch instance add` reads it with echo off and it
+never reaches argv, the environment or a transcript. When stdin is not a terminal the command
+**refuses** rather than reading the pipe — a password read from an unexpected stdin is a password
+in a CI log — and prints the `NO_TTY:` line, which names `--password-stdin` and shows the password
+manager form (`op read "op://vault/item/password" | ./snowarch instance add …`). `--password`,
+`--client-secret` and `--secret` are rejected before the arguments are parsed at all. Should a
+Windows console turn out not to support masked input (spike S-04), that console gets the same
+`--password-stdin` line instead of a prompt that cannot work.
+
+**A password manager, if you use one.** Each of these is optional and none of them is required to
+use the wizard; the point is that the secret goes from the manager to the command's stdin without
+passing through a shell history, a transcript or a file:
+
+```sh
+op read "op://Vault/PDI/password" | ./snowarch instance add pdi --url https://dev12345.service-now.com --env pdi --auth basic --username admin --preset full --password-stdin
+pass show snow/pdi | ./snowarch instance add pdi --url https://dev12345.service-now.com --env pdi --auth basic --username admin --preset full --password-stdin
+```
+
+```powershell
+Get-Secret -Name snow-pdi -AsPlainText | snowarch.cmd instance add pdi --url https://dev12345.service-now.com --env pdi --auth basic --username admin --preset full --password-stdin
+```
+
+`SNOWARCH_MASK=asterisk` prints one `*` per character instead of nothing, for a console where an
+invisible prompt looks like a hang. It changes the display and nothing else — the value still never
+reaches argv, the environment or a log.
+
+**From inside Claude.** `/snowarch setup-instance` collects every non-secret choice in chat —
+instance kind, authentication, preset, URL, label, default — and then hands over. It cannot type
+the credential: the wizard needs a terminal that can mask what you type, and `./snowarch instance
+…` is deliberately absent from the skill's `allowed-tools`.
+
+<!-- generated:terminal-handoff -->
+```
+Next step happens in YOUR terminal (credentials never pass through this chat).
+1. Open a terminal at this checkout: <absolute path>
+2. Run:   ./snowarch instance add <label> --url <url> --env <env> --auth <auth> --preset <preset> --default
+   (Windows PowerShell/cmd:  snowarch.cmd instance add <label> --url <url> --env <env> --auth <auth> --preset <preset> --default)
+3. The wizard proposes the environment and preset and shows a per-flag review — press Enter to accept, or edit any line.
+4. Type your username and password when prompted (masked; nothing is echoed).
+5. When it prints "Saved instance …", come back here and type:  /snowarch setup-instance --resume
+I will wait. Nothing is written until you confirm in the terminal.
+```
+<!-- /generated:terminal-handoff -->
+
+`/snowarch setup-instance --resume` (or saying "done") reloads the store, reads the capabilities and
+runs the full doctor, then prints the authoritative line — `Mode: live — pdi (pdi) · preset
+pdi-developer · WRITE=on … · <n> tools` — **without restarting the session**, and closes with the
+write-gate reminder. If the tool list did not refresh, it says so and names `/mcp → servicenow →
+reconnect` rather than leaving you guessing.
+
+## 8. Corporate networks
+
+The wizard prints one line per run naming what it found, whether or not the probe succeeded, because
+"it worked" and "it worked through a proxy with a corporate CA" are different facts and only one of
+them explains a colleague's failure:
+
+```
+network: HTTPS_PROXY=set · NO_PROXY=unset · NODE_EXTRA_CA_CERTS=set
+```
+
+`HTTPS_PROXY` / `HTTP_PROXY` and `NO_PROXY` are honoured with the rules every other tool uses;
+`NODE_EXTRA_CA_CERTS` points Node at a corporate root so an intercepting proxy's certificate
+validates. A failure is classified rather than guessed: DNS, TLS trust, a proxy that refused, a
+proxy that wants credentials, a timeout, a refused connection — each with its own remedy in
+`docs/TROUBLESHOOTING.md`. **Never** `NODE_TLS_REJECT_UNAUTHORIZED=0`: that trusts the interceptor
+and everything else besides. NTLM and Kerberos proxies are out of scope.
+
+## 9. Maintenance commands
+
+Everything the wizard sets can be changed later, one command per thing, and what each may touch is
+narrower than the store:
+
+| Command | Writes | Asks |
+|---|---|---|
+| `instance list [--all] [--json]` | nothing | nothing |
+| `instance test <label>` \| `--all --json` | `lastProbe` only | nothing |
+| `instance set-credentials <label>` | `auth`, and only after the instance says ok | `Username [a***]:` then the masked secret |
+| `instance set-preset <label> <preset>` | `preset`, `flags`, `prodWriteAck` | the review screen, unless `--yes` |
+| `instance set-flags <label> FLAG=on\|off …` | the same three | the dependency question, unless `--yes` |
+| `instance set-default <label>` | `defaultInstance`, and the `.local/config.json` mirror | nothing |
+| `instance remove <label>` | deletes one entry | `Remove instance "pdi"? This deletes its stored credentials from …local/instances.json. [y/N]` |
+
+Raising a production instance asks for the label to be typed back:
+
+```
+You are enabling WRITE (and CMDB_WRITE, SCRIPTING, ATF, NOW_ASSIST, FLUENT) on a PRODUCTION instance.
+Every write still needs an explicit "write approved" in Claude and is recorded in .local/audit.jsonl.
+Type the instance label to confirm:
+```
+
+A mismatch changes nothing (`Label mismatch — nothing changed.`). `--confirm-label <label>` is the
+CI form — the label is still typed, on the command line — and the audit line records which of the
+two it was. Dropping a production instance back to `read-only` clears the acknowledgement, so the
+next raise is made again rather than inherited.
+
+## 10. Migrating from snow-mcp
+
+`instance import --from-legacy` reads the old `~/.config/servicenow-mcp/instances.json` — the same
+path on every operating system — maps each entry and **shows the plan before writing anything**:
+
+<!-- generated:import-plan -->
+```
+$ ./snowarch instance import --from-legacy --dry-run
+Legacy store: ~/.config/servicenow-mcp/instances.json (2 instances)
+Target store: <checkout>/.local/instances.json (project)
+  pdi   https://dev12345.service-now.com  pdi   basic       → preset pdi-developer
+        notes: "/api" removed from URL; FLUENT set to off; dropped: addedAt, group
+  prod  https://acme.service-now.com      prod  oauth_ropc  → preset read-only
+        notes: per-user/impersonation mode is not carried (removed in 2.0.0); FLUENT set to off;
+        production capped at read-only (D-05) — raise with: ./snowarch instance set-preset prod
+        <preset> --ack-prod; tool package "minimal" not carried — 2.0.0 uses full (P-25); dropped:
+        addedAt, aiBaseUrl, aiModel, aiProvider, apexEnabled, group, integrationMode, mcpEnabled,
+        sdkEnabled; dropped: aiApiKey (a secret — not carried; delete the legacy file)
+Each imported instance is probed before it is saved; an entry whose credentials fail is not saved.
+```
+<!-- /generated:import-plan -->
+
+`--dry-run` stops there. Each entry is probed once before it is saved, `FLUENT_ENABLED` is written
+explicitly off (the old wizard never had it), production is capped whatever the legacy file said,
+and `aiApiKey` is listed as dropped **by name** — its value is never printed. **It deletes nothing:**
+the closing advice names the directory and the `tokens.json` beside the store, and the deleting is
+yours. The full walkthrough is `docs/snippets/import-from-legacy.md`, which ARC-10-S01's migration document
+will include (it is named by its story rather than by a path, because a citation of a file nobody
+has written yet is a dead path).
+
+## 11. Known limitations
+
+- **The `NOW_ASSIST` probe is not a licence check.** It reads a property; an instance can answer
+  and still refuse the tools. The screen recommends, and you decide (D-05).
+- **A macOS `~/Documents` redirected into a sync client is not detectable.** There is no environment
+  variable to read and the path says nothing. Windows has `%OneDrive%`; macOS has nothing equivalent.
+- **Team stores are a roadmap item.** `--global` is per user, not per team; a shared store is a
+  different security question and is not answered here.
+- **`client_credentials` is not supported.** The wizard offers Basic and the OAuth password grant
+  (ROPC); anything else is re-entered when it arrives.

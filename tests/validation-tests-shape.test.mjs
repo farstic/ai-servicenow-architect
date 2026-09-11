@@ -75,10 +75,41 @@ const CHECKS = {
     assert.match(t, /docs\/spikes\/validation-runs/, 'the file does not say where runs are recorded');
   },
 
-  'criterion 1d — a date appears only on the Last updated line': (t) => {
-    const dated = t.split('\n').filter((l) => DATE.test(l));
-    assert.equal(dated.length, 1, `${dated.length} dated lines:\n${dated.join('\n')}`);
-    assert.match(dated[0], LAST_UPDATED, 'the one dated line is not the header');
+  'criterion 1d — a date appears only on the Last updated line, or in a sample': (t) => {
+    // The rule is about RUN HISTORY: a "last verified 2026-01-01" in a test body is how this file
+    // stopped being a specification the first time. It was absolute until ARC-08-S10, when T-07
+    // began quoting `docs/snippets/status-template.md` byte for byte — and that template is a
+    // sample of the doctor's own output, whose last line carries the timestamp of the run. A
+    // rendered sample is not a run record, so fenced lines are exempt; everything outside a fence
+    // still is not, which is where a smuggled date would go.
+    //
+    // The exemption is COUNTED, not open: exactly one dated line inside a fence today. A second
+    // one is a decision someone has to make deliberately, here, rather than a habit forming.
+    const lines = t.split('\n');
+    const inFence = [];
+    let fenced = false;
+    for (const l of lines) {
+      if (/^\s*```/.test(l)) { fenced = !fenced; continue; }
+      inFence.push(fenced);
+    }
+    const dated = lines.filter((l) => !/^\s*```/.test(l)).map((l, i) => [l, inFence[i]])
+      .filter(([l]) => DATE.test(l));
+    const prose = dated.filter(([, f]) => !f).map(([l]) => l);
+    assert.equal(prose.length, 1, `${prose.length} dated lines outside a fence:\n${prose.join('\n')}`);
+    assert.match(prose[0], LAST_UPDATED, 'the one dated prose line is not the header');
+    assert.equal(dated.filter(([, f]) => f).length, 1,
+      'more than one dated sample line — is one of them a run record?');
+  },
+
+  'the stated test count is the number of tests': (t) => {
+    // The header says how many there are, because a reader wants to know without counting, and a
+    // sentence nobody checks is a sentence that goes stale — this file jumped 18 → 20 → 22 in
+    // three stories.
+    const stated = /^> \*\*How many\.\*\* (\d+) tests, T-01 through (T-\d\d)/m.exec(t);
+    assert.ok(stated, 'the header does not state the count');
+    const ids = testBlocks(t).map((b) => b.id);
+    assert.equal(Number(stated[1]), ids.length, `the header says ${stated[1]}, the file has ${ids.length}`);
+    assert.equal(stated[2], ids.at(-1), `the header says it ends at ${stated[2]}, the last is ${ids.at(-1)}`);
   },
 
   'criterion 3 — no retired tool or script name, in prose or in a fence': (t) => {
@@ -88,10 +119,27 @@ const CHECKS = {
     assert.deepEqual(found, []);
   },
 
-  'criterion 2a — eighteen tests, T-01 to T-18, in order': (t) => {
+  'criterion 2a — the tests ascend, never repeat, and every gap is a declared reservation': (t) => {
+    // Contiguity was the rule until ARC-07-S09, and it could not express a RESERVATION: T-19
+    // belongs to ARC-08-S10, which has not been written, so this file jumps 18 → 20. A gap that
+    // nobody declared is still a mistake — a renumbering that lost a test, or a heading typed
+    // wrong — so the rule became: ascending, unique, and every missing number named in the
+    // "Reserved numbers" section with the story that will fill it. That catches strictly more
+    // than counting did.
     const ids = testBlocks(t).map((b) => b.id);
-    const expected = Array.from({ length: 18 }, (_, i) => `T-${String(i + 1).padStart(2, '0')}`);
-    assert.deepEqual(ids, expected);
+    const numbers = ids.map((id) => Number(id.slice(2)));
+    assert.deepEqual(numbers, [...numbers].sort((a, b) => a - b), `out of order: ${ids.join(', ')}`);
+    assert.equal(new Set(ids).size, ids.length, `duplicate id in ${ids.join(', ')}`);
+    assert.equal(numbers[0], 1, 'the first test is not T-01');
+
+    const declared = new Set([...t.matchAll(/^- \*\*(T-\d\d) — reserved for (ARC-\d\d-S\d\d)\*\*/gm)]
+      .map((m) => m[1]));
+    const gaps = [];
+    for (let n = 1; n <= (numbers.at(-1) ?? 0); n += 1) {
+      const id = `T-${String(n).padStart(2, '0')}`;
+      if (!ids.includes(id) && !declared.has(id)) gaps.push(id);
+    }
+    assert.deepEqual(gaps, [], `undeclared gap(s): ${gaps.join(', ')} — add a Reserved numbers entry or renumber`);
   },
 
   'criterion 2b — every test carries Modes and the four sections': (t) => {
@@ -106,8 +154,12 @@ const CHECKS = {
     assert.deepEqual(missing, []);
   },
 
-  'the two MCP tests declare their dormant variant': (t) => {
-    for (const id of ['T-05', 'T-06']) {
+  'every MCP test declares its dormant variant': (t) => {
+    // T-19 and T-22 joined the list in ARC-08-S10. Both are LIVE tests — a wrong password and a
+    // disabled flag need an instance to refuse — which is exactly why the dormant half matters:
+    // the behaviour being proved is that the session does not call anything, and a test that only
+    // ever runs against a real instance never checks the case where there is nothing to call.
+    for (const id of ['T-05', 'T-06', 'T-19', 'T-22']) {
       const block = testBlocks(t).find((b) => b.id === id);
       assert.match(block.body, /design-only: dormant variant/, `${id} has no dormant variant`);
       assert.match(block.body, /no MCP call/, `${id} does not say what dormant proves`);
@@ -197,14 +249,16 @@ test('every reference to the file names its new path', () => {
  * The negatives — four shapes the file must not be able to take, and the check that catches each.
  */
 const NEGATIVES = [
-  ['a heading is out of order', 'criterion 2a — eighteen tests, T-01 to T-18, in order',
+  ['a heading is out of order', 'criterion 2a — the tests ascend, never repeat, and every gap is a declared reservation',
     (t) => t.replace('## T-09', '## T-19').replace('## T-10', '## T-09').replace('## T-19', '## T-10')],
   ['a test loses its Prompt section', 'criterion 2b — every test carries Modes and the four sections',
     (t) => t.replace(/^### Prompt$/m, '### Input')],
-  ['a date is smuggled into a test body', 'criterion 1d — a date appears only on the Last updated line',
+  ['a date is smuggled into a test body', 'criterion 1d — a date appears only on the Last updated line, or in a sample',
     (t) => t.replace('### Fail signals', 'Last verified 2026-01-01.\n\n### Fail signals')],
   ['a retired name reappears inside a code fence', 'criterion 3 — no retired tool or script name, in prose or in a fence',
     (t) => t.replace('```\nStatus\n```', '```\nquery_records(sys_user)\n```')],
+  ['a test is added without updating the header count', 'the stated test count is the number of tests',
+    (t) => `${t}\n## T-23 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
 ];
 
 for (const [title, checkName, breakIt] of NEGATIVES) {

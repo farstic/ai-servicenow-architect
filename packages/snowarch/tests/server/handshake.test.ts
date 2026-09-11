@@ -18,7 +18,12 @@ const SERVER = resolve(here, '../../dist/server.js');
 function initialize(): Promise<any> {
   return new Promise((ok, fail) => {
     const child = spawn(process.execPath, [SERVER], {
-      env: { ...process.env, SERVICENOW_INSTANCE_URL: 'https://placeholder.invalid' },
+      // A loopback URL, not a reserved-TLD hostname. The unconfigured handshake never contacts
+      // it — the variable exists only so `instances.ts` sees one configured instance — but the
+      // legacy env path DOES still read this variable, so it cannot simply be dropped, and a
+      // hostname whose non-resolution is a promise the network keeps only usually has no place in
+      // a suite that touches no network.
+      env: { ...process.env, SERVICENOW_INSTANCE_URL: 'https://127.0.0.1:9' },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let out = '';

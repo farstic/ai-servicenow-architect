@@ -10,12 +10,16 @@ MODE="${SNOWARCH_STUB_MODE:-live}"
 
 case "$MODE" in
   live)
-    MODE_LINE='Mode: live — instance=pdi (pdi) preset=pdi-developer — doctor 2026-09-08 41 ok'
+    # ARC-06-S09 reconciliation: the BASE Mode line is `modeLine()`'s output and nothing else.
+    # The ` — doctor <date> <n> ok` suffix belongs to ARC-08's `modeLineDetailed`, which is the
+    # line below; a base line carrying a doctor's date made the two indistinguishable, and four
+    # programs quote the base one.
+    MODE_LINE='Mode: live — instance=pdi (pdi) preset=pdi-developer'
     DETAILED='Mode: live — pdi (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 398 tools'
     SUMMARY='DOCTOR: 41 ok, 0 warn, 0 fail' ;;
   design-only)
-    MODE_LINE='Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance'
-    DETAILED="$MODE_LINE"
+    MODE_LINE='Mode: design-only'
+    DETAILED='Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance'
     SUMMARY='DOCTOR: 38 ok, 1 warn, 0 fail' ;;
   unbootstrapped)
     MODE_LINE='Mode: unknown — this checkout has not been bootstrapped; run ./bootstrap.sh (Windows: bootstrap.cmd)'

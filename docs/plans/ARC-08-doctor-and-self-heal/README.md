@@ -1,6 +1,6 @@
 # ARC-08 — Doctor, self-heal and the session banner
 
-Status: **Stories drafted 2026-09-04** · Depends on: ARC-04 (server doctor module), ARC-05 (data-driven names), ARC-06 (state file, toggles), ARC-07 (probes); ARC-00 S-05/S-06/S-13 · Blocks: ARC-09 (CI uses the doctor), ARC-10 (cutover checks)
+Status: **COMPLETE 2026-09-11 — all 11 stories (S01–S11), started 2026-09-10** · Depends on: ARC-04 (server doctor module), ARC-05 (data-driven names), ARC-06 (state file, toggles), ARC-07 (probes); ARC-00 S-05/S-06/S-13 · Blocks: ARC-09 (CI uses the doctor), ARC-10 (cutover checks)
 
 Decisions applied: D-01…D-06, Q-A, Q-B, R-1…R-3 (see `02-DECISIONS-NEEDED.md`). Naming used here: server package `packages/snowarch` (`@farstic/snowarch`, first release `2.0.0`); MCP key `servicenow` → tools `mcp__servicenow__snow_*`; project skill `/snowarch` with sub-commands `status` · `setup-instance` · `doctor`; engine checks `E-xx`, server checks `SV-xx` (the `S-xx` prefix is reserved for the spikes in `03`); vocabulary Mode `design-only` | `live`, Preset `read-only` | `pdi-developer` | `full` | `custom`.
 
@@ -20,6 +20,19 @@ Closes P-16 (bash-only doctor that needs Node anyway and prints the username), P
 ## Deliverables
 
 - Engine checks E-00 … E-27 (each with id, title, severity, remedy, `fixable`): CLI floor and login; git floor; repo root; `.mcp.json` / `.claude/settings.json` hashes and placeholder defaults; credential-shaped keys absent; docs corpus present, pin, branch, sparse set, citations; roster from directory listing; description lengths; retired names; prefix consistency (`engine.config.json` ↔ `.mcp.json` ↔ rule file); generated files fresh; stale `~/.claude.json` entries for this folder (`servicenow-mcp`, `nowaikit`) → prints `claude mcp remove <name> -s local` and the `.bak-*` reminder; legacy `~/.config/servicenow-mcp/` present → prints `./snowarch instance import --from-legacy`; checkout under a cloud-sync folder (OneDrive/Dropbox/iCloud/Google Drive) → WARN (D-04); proxy/CA environment (`HTTPS_PROXY`, `NO_PROXY`, `NODE_EXTRA_CA_CERTS`) inspected with masked values and echo of the network classifier code (R-3); Claude Code registration status via `claude mcp get servicenow` compared with the recorded mode (`03` R-13; expected by ARC-06-S01/S05); capability packs (docx / PDF QA / draw.io / Mermaid) reported as capabilities; Windows notes (file modes ACL-inherited).
+- **The S-03 fallback does not exist yet (ARC-06-S11, 2026-09-09).** If the Windows sitting shows
+  that Claude Code does not expand `${CLAUDE_PROJECT_DIR}` in `.mcp.json` on native Windows, the
+  bootstrap will write a per-machine local override (`claude mcp add-json … -s local`) and record
+  `mcpJsonOverrideSha` in the state — and E-07 verifies that sha. Until the spike runs there is
+  nothing to check, and this line exists so its absence is a decision rather than an oversight.
+- **Doctor candidate raised by ARC-06-S05 (2026-09-09): `.claude/settings.local.json` unparsable.**
+  B07 refuses invalid JSON and changes nothing — but its inputs hash (mode, Node presence, hooks
+  branch, registration) deliberately does **not** include the file's content, so on a checkout that
+  has already bootstrapped once the step reports `ok (cached)` and never re-reads it. That is the
+  hash table behaving as ARC-06-S03 specifies; it means the bootstrap is the wrong place to notice
+  a file that became unparsable afterwards, and the doctor is the right one. Add it as an E-check
+  with the same sentence B07 prints, and `--fix` must NOT rewrite it — the file belongs to the
+  operator.
 - Server checks SV-00 … SV-07 (from `packages/snowarch` `doctor`): Node floor; `dist/server.js` and module resolution; store presence, schema, modes; per instance: URL shape, auth probe (basic and ROPC), per-preset probes, six flags explicit and dependency-consistent, `toolPackage == full`, `@servicenow/sdk` when FLUENT; MCP stdio handshake against the real `dist/server.js` with tool set == contract; `snow_core_capabilities_read` == store; audit log present and writable.
 - `docs/ARCHITECTURE.md` appendix: mapping table old `D00–D37` → new `E-xx`/`SV-xx` (every old intent accounted for; D19/D20 path checks and D36 prefix check re-targeted; D32/D33 probes moved to the server module).
 - `--fix` whitelist (idempotent, reported): deps → B04; docs missing/unsparse → B02; pin drift → `git submodule update --checkout`; flags < 6 → explicit `"false"`; store modes → chmod; toggles → rewrite for recorded mode; stale `doctor-last.json` → re-run. Never: credentials, `.mcp.json`, `~/.claude*`.
@@ -35,15 +48,23 @@ ARC-04-S02/S04/S11/S12 (store module, `snow_core_capabilities_read`, network cla
 
 ## Acceptance criteria
 
-- [ ] On the reference machine after ARC-06/07, `./snowarch doctor` reports **0 FAIL**; the old `scripts/doctor.sh`'s four failures (dead citations, absent NOW_ASSIST/FLUENT, retired names) are impossible by construction and covered by E-checks that pass. (S02, S05, S11)
-- [ ] Every check id from the old doctor appears in the mapping table with its new id or an explicit "retired because …" reason. (S07)
-- [ ] `./snowarch doctor --json` output pasted into a chat contains no secret and no clear-text username (test greps the JSON for the fixture credentials). (S01, S03, S04, S11)
-- [ ] `--fix` repairs a store entry with four flags, a docs checkout with a wrong sparse set, and a missing `settings.local.json` toggle in one run, and reports each; it refuses to touch `.mcp.json` when its hash differs and prints the `git checkout -- .mcp.json` command instead. (S06)
-- [ ] The SessionStart banner appears within 1 s of session start on the CI machines and shows `Mode: design-only` or `Mode: live — …` matching the store; with Node absent the launcher's `disableAllHooks` fallback leaves the session clean (S-05). (S08, S11)
-- [ ] A copied `~/.claude.json` fixture with stale `servicenow-mcp` and `nowaikit` entries produces the exact removal commands in the report. (S03, S11)
-- [ ] With a fake `claude` on PATH printing `✘ Rejected (see disabledMcpjsonServers in settings)` and `bootstrap-state.mode == "live"`, E-27 WARNs with the `run ./snowarch mode live` remedy; with `claude` absent it is `skip`; `--quick` never runs it (`03` R-13). (S03)
-- [ ] Runtime: when the server returns `AUTHENTICATION_FAILED`, the engine (per the generated rule file) stops and prints the `set-credentials` remedy; the VALIDATION-TESTS gain a test for this. (S10)
-- [ ] Design principle 10 ("Propose, don't impose") holds for `--fix`: the plan is shown and Enter applies; `--yes` accepts it for CI. (S06)
+- [x] On the reference machine after ARC-06/07, `./snowarch doctor` reports **0 FAIL**; the old `scripts/doctor.sh`'s four failures (dead citations, absent NOW_ASSIST/FLUENT, retired names) are impossible by construction and covered by E-checks that pass. (S02, S05, S11) — *in CI, on all nine `node-cli` cells: `DOCTOR: 26 ok, 0 warn, 1 fail (10 skip) — expected here: E-00`, the one failure being that a hosted runner has no Claude Code, asserted BOTH ways by `scripts/ci/assert-doctor.mjs --expect-fail E-00`. The **reference machine** run (where `claude` is installed, so 0 FAIL outright) is the owner's sitting D1.*
+- [x] Every check id from the old doctor appears in the mapping table with its new id or an explicit "retired because …" reason. (S07 — `docs/ARCHITECTURE.md` appendix, rendered from `tools/snowarch/lib/doctor/mapping.mjs`; `tests/doctor/mapping.test.mjs` asserts all 38 ids both ways against `scripts/legacy/doctor.sh`, 2026-09-10)
+- [x] `./snowarch doctor --json` output pasted into a chat contains no secret and no clear-text username (test greps the JSON for the fixture credentials). (S01, S03, S04, S11) — *`tests/doctor/redaction-e2e.test.mjs`: a fixture store with `someone.fixture@corp.example.com` and a random 24-character password, read by the real command, searched in the text report, `--json`, `--fix` and `--fix --json`, on three OSes. Proved to bite: drill PR #121 broke `maskUsername` and CI went red with `json: the username reached the output unmasked`.*
+- [x] `--fix` repairs a store entry with four flags, a docs checkout with a wrong sparse set, and a missing `settings.local.json` toggle in one run, and reports each; it refuses to touch `.mcp.json` when its hash differs and prints the `git checkout -- .mcp.json` command instead. (S06) — *`tests/doctor/fix.test.mjs`, the composite fixture.*
+- [x] The SessionStart banner appears within 1 s of session start on the CI machines and shows `Mode: design-only` or `Mode: live — …` matching the store; with Node absent the launcher's `disableAllHooks` fallback leaves the session clean (S-05). (S08, S11) — *five cold spawns per cell, medians:* **ubuntu 330 ms · macOS 614 ms · Windows 910 ms · Windows-without-Git-Bash 895 ms**, *budget 1000 ms, in each cell's step summary. The `no-node` cells assert the other half: the launcher seeds `doctor-last.json` itself so the banner has a truthful line on a machine that cannot run the doctor.*
+- [x] A copied `~/.claude.json` fixture with stale `servicenow-mcp` and `nowaikit` entries produces the exact removal commands in the report. (S03, S11) — *`tests/doctor/stale-registration-e2e.test.mjs`, through the real command with `HOME` and `USERPROFILE` redirected: both `claude mcp remove` lines verbatim, no fixture credential in the output, and `~/.claude.json` byte-identical after a plain run, `--json` and `--fix`.*
+- [x] With a fake `claude` on PATH printing `✘ Rejected (see disabledMcpjsonServers in settings)` and `bootstrap-state.mode == "live"`, E-27 WARNs with the `run ./snowarch mode live` remedy; with `claude` absent it is `skip`; `--quick` never runs it (`03` R-13). (S03) — *`tests/doctor/legacy.test.mjs`; `skip` confirmed on every CI cell, where `claude` is absent.*
+- [x] Runtime: when the server returns `AUTHENTICATION_FAILED`, the engine (per the generated rule file) stops and prints the `set-credentials` remedy; the VALIDATION-TESTS gain a test for this. (S10) — *the rule file's "Runtime errors" section, nineteen rule-visible codes; `tests/VALIDATION-TESTS.md` **T-19**. The behavioural run against a PDI is the owner's sitting D5.*
+- [x] Design principle 10 ("Propose, don't impose") holds for `--fix`: the plan is shown and Enter applies; `--yes` accepts it for CI. (S06)
+
+**Deferred to the owner's sitting, each with its row in `docs/spikes/OWNER-SITTING.md`:** D1 (the reference-machine doctor run, and S02's floors on a machine that is not a runner) · D2 / D2b (S03's leftover detectors against a real previous install; S04's live probes) · D3 (S08's banner in a real Claude Code session — plain stdout vs `additionalContext`) · D4 (S09's `/snowarch status` in four sessions) · D5 (S10's T-19 and T-22 live, and their dormant variants). Every one of them needs a session or a live instance; none is a code path this repository can reach.
+
+> **Candidate check, recorded at the ARC-06 docs-sync fix (2026-09-09).** `docs-bump.yml` depends on
+> a repository setting no file in the tree can assert:
+> `gh api repos/<owner>/<repo>/actions/permissions/workflow` → `can_approve_pull_request_reviews`.
+> With it off, the weekly bump moves the pin, pushes its branch and fails at `gh pr create` — a
+> failure that looks like a workflow bug and is not one.
 
 ## Risks
 

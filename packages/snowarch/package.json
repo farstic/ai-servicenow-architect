@@ -9,7 +9,8 @@
     "./sdk": "./dist/sdk/index.js",
     "./client": "./dist/servicenow/client.js",
     "./audit": "./dist/audit/writer.js",
-    "./doctor": "./dist/doctor/index.js"
+    "./doctor": "./dist/doctor/index.js",
+    "./probes": "./dist/servicenow/probes.js"
   },
   "bin": {
     "snowarch": "dist/cli/index.js"
@@ -31,6 +32,7 @@
     "start": "node dist/server.js",
     "test": "vitest run --coverage",
     "test:nocov": "vitest run",
+  "test:e2e": "vitest run tests/e2e/instance-wizard.e2e.test.ts --reporter=default",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.tests.json"
   },

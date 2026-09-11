@@ -1,0 +1,37 @@
+{
+  "_rule": "ARC-07-S07. THE list of cloud-sync paths, satisfied by three implementations: the server's detectCloudSync() in src/store/paths.ts, the bootstrap's stdlib re-implementation in tools/snowarch/lib/cloud-sync.mjs (ARC-06-S05, for a checkout that has never run npm ci), and the doctor's E-25 (ARC-08-S03). Three tables that merely look alike would drift; one fixture cannot.",
+  "_shape": "synced[]: { path, provider, root, why } — every one of these MUST be detected, with that provider. quiet[]: { path, why } — every one of these MUST be null. env[]: { path, set: {VAR: value}, provider, root, why } — the Windows environment roots, which no path pattern can catch.",
+  "_paths": "Synthetic. No path here exists on any machine, and none is derived from a real user's home directory.",
+  "synced": [
+    { "path": "/Users/me/Library/CloudStorage/OneDrive-Corp/work/x", "provider": "OneDrive", "root": "/Users/me/Library/CloudStorage/OneDrive-Corp",
+      "why": "AC 3. macOS mounts every vendor under ~/Library/CloudStorage/<Provider>-<tenant>." },
+    { "path": "/Users/me/Library/Mobile Documents/com~apple~CloudDocs/x", "provider": "iCloud Drive", "root": "/Users/me/Library/Mobile Documents",
+      "why": "AC 3. How macOS spells iCloud on disk, and no user calls it that." },
+    { "path": "C:\\Users\\me\\OneDrive - Corp\\x", "provider": "OneDrive", "root": "C:/Users/me/OneDrive - Corp",
+      "why": "AC 3. The tenant is suffixed onto the folder name with a spaced hyphen." },
+    { "path": "/home/me/Dropbox/x", "provider": "Dropbox", "root": "/home/me/Dropbox", "why": "AC 3." },
+    { "path": "/home/me/Google Drive/My Drive/x", "provider": "Google Drive", "root": "/home/me/Google Drive", "why": "AC 3. The outer folder matches first." },
+    { "path": "/Users/me/Library/CloudStorage/Acme-tenant/x", "provider": "CloudStorage (unknown provider)", "root": "/Users/me/Library/CloudStorage/Acme-tenant",
+      "why": "A vendor the table does not name is still synchronised; the honest answer names the mount." },
+    { "path": "C:\\Users\\me\\OneDrive\\repo\\.local\\instances.json", "provider": "OneDrive", "root": "C:/Users/me/OneDrive",
+      "why": "ARC-04-S02 criterion 8, kept: the plain consumer folder." },
+    { "path": "/Users/me/Library/CloudStorage/GoogleDrive-me/repo", "provider": "Google Drive", "root": "/Users/me/Library/CloudStorage/GoogleDrive-me",
+      "why": "ARC-06-S05's case: the vendor IS named, so the mount is not the answer." }
+  ],
+  "quiet": [
+    { "path": "/home/me/work/x", "why": "AC 3. An ordinary working directory." },
+    { "path": "C:\\Users\\me\\AppData\\Roaming\\snowarch", "why": "AC 3. The Windows global store is not synced by default — the WARN offers it as the alternative." },
+    { "path": "/Users/me/my-onedrive-notes/instances.json", "why": "ARC-04-S02 criterion 8: the word inside a longer name is not a folder boundary." },
+    { "path": "/Users/me/.config/snowarch/instances.json", "why": "The POSIX global store." },
+    { "path": "/home/me/src/repo", "why": "ARC-06-S05." },
+    { "path": "C:\\dev\\repo", "why": "ARC-06-S05." }
+  ],
+  "env": [
+    { "path": "C:\\Users\\me\\Documents\\work\\x", "set": { "OneDrive": "C:\\Users\\me\\Documents" }, "provider": "OneDrive", "root": "C:\\Users\\me\\Documents",
+      "why": "Known Folder Move: the enterprise policy redirects Documents into OneDrive and the word OneDrive appears nowhere in the path. %OneDrive% is the only detector there is." },
+    { "path": "C:\\Users\\me\\Desktop\\x", "set": { "OneDriveCommercial": "C:\\Users\\me\\Desktop" }, "provider": "OneDrive", "root": "C:\\Users\\me\\Desktop",
+      "why": "The commercial client sets its own variable." },
+    { "path": "C:\\Users\\me\\work\\x", "set": { "OneDrive": "C:\\Users\\me\\Documents" }, "provider": null, "root": null,
+      "why": "The variable is set but this path is not under it — a set variable is not a blanket yes." }
+  ]
+}

@@ -46,6 +46,8 @@ ai-servicenow-architect/                      farstic/ai-servicenow-architect ·
 ├── tools/snowarch/                           ZERO-DEPENDENCY Node ESM CLI (node:fs, child_process, readline, https, crypto)
 │   ├── bin/snowarch.mjs                      bootstrap | doctor | instance … | docs … | mode … | upgrade | version
 │   ├── lib/steps/B00…B09.mjs                 one file per bootstrap step (idempotent; declares an inputs hash)
+│   ├── lib/steps/index.mjs                   the registry and the runner: order, cache decision, interrupt
+│   ├── lib/plan.mjs                          the one amendable plan screen (principle 10)
 │   ├── lib/state.mjs                         .local/bootstrap-state.json read/write/resume
 │   ├── lib/doctor/                           engine-side checks E-xx; merges server checks SV-xx from packages/snowarch
 │   └── hooks/session-start.mjs               prints the Mode banner (<300 ms; reads .local/doctor-last.json)
@@ -88,6 +90,30 @@ no empty directories, so a path appears in the repository only when its owner pu
 | `docs/MIGRATION.md` | **ARC-10** | migration and cutover |
 | `.local/` · `clients/` | — | **gitignored, per checkout**; never committed |
 
+## Registration files
+
+Two files travel with the clone and one never does.
+
+**`.mcp.json`** registers the server: `stdio`, `node`, and
+`${CLAUDE_PROJECT_DIR:-.}/packages/snowarch/dist/server.js` — forward slashes, because Node accepts
+them on Windows and a backslash in JSON is an escape waiting to be got wrong. Every `${…}` carries a
+`:-` default, since an unset variable without one is passed through as the literal text. The `env`
+block holds `SNOW_STORE` and `SNOW_LOG_LEVEL` and nothing else: ARC-00 S-20 confirmed the spawned
+server **inherits** the launching shell's environment, so proxy and CA variables need no repeating
+(the story's other branch, listing them, belongs to the "forward" verdict we did not get).
+
+**`.claude/settings.json`** holds `permissions` — **generated** from the contract by
+`gen-governance.mjs`, never hand-written — and `env.MCP_TIMEOUT: "120000"`, which is ARC-00 S-06's
+measurement: about 160× the worst handshake observed over 27 runs on nine CI cells. It is
+**hook-free** by ARC-00 S-05: a `SessionStart` hook in the committed file would run before Node is
+known to exist, so the bootstrap writes it into the gitignored `settings.local.json` once Node ≥ 20
+is confirmed.
+
+**`~/.claude.json` is never written by anything here.** That file is why P-01 exists — the previous
+engine was registered by hand-editing it and ended up holding a plaintext password keyed on an
+absolute path. Measured on this checkout: starting a session changes exactly one top-level key,
+`cachedGrowthBookFeaturesAt`, the CLI's own feature-flag cache.
+
 ## Docs corpus: how the pin, the areas file and the gate relate
 
 Three artefacts, and the design is which of them may disagree with which.
@@ -95,8 +121,8 @@ Three artefacts, and the design is which of them may disagree with which.
 | Artefact | Written by | Read by |
 |---|---|---|
 | **the commit** — the gitlink and `docs.pin`, the same SHA | the seed commit, then only `docs sync --upstream` — never by hand | the recipe, the launchers, the doctor's E-checks, `docs-bump.yml`, ARC-09's release tag |
-| **`vendor/docs-areas.txt`** — which areas materialise | `scripts/gen-docs-areas.mjs`, from the areas actually cited; CI fails when stale | the cone, the completeness check, the launcher recipe |
-| **the citation gate** — every `markdown/…` path cited in the engine | nobody: a property of the skills | `docs verify`, `docs status`, the bump workflow, CI |
+| **`vendor/docs-areas.txt`** — which areas materialise | `gen-docs-areas.mjs`, from the areas cited; CI fails when stale | the cone, the completeness check, the recipe |
+| **the citation gate** — every `markdown/…` path cited | nobody: a property of the skills | `docs verify`, `docs status`, the bump workflow, CI |
 
 **The invariants**, in the order they are checked:
 
@@ -105,8 +131,8 @@ Three artefacts, and the design is which of them may disagree with which.
 - the cone **==** the areas file **plus `legal/`**. `legal/` is neither an area nor a root file, so
   cone mode leaves it out — the recipe names it and the completeness check enforces it, because
   NOTICE claims it is in every checkout and a claim nothing checks is a claim that decays.
-- **dead citations == 0.** A citation upstream removed is the corpus saying a skill is now wrong
-  about the platform. Never fixed by deleting the citation.
+- **dead citations == 0.** A citation upstream removed is the corpus saying a skill is now wrong about
+  the platform. Never fixed by deleting the citation.
 - **an absent corpus is a FAIL, never a skip** — the script this replaced exited 0 with the corpus
   missing, so a fresh clone passed with every citation unverified.
 
@@ -114,24 +140,27 @@ Three artefacts, and the design is which of them may disagree with which.
 
 `docs sync` reconciles locally and is safe for anyone: clone if absent, mode, pin, gitlink, the
 ADR-0008 root repair. A clean second run issues no git write, prints `up to date`, and ends — as
-every successful run does — with the attribution line. `docs status` answers "is this corpus right"
-in four lines (pin/gitlink/HEAD · family/branch · shape and areas · citations), each `ok` or
-`MISMATCH` with its remedy beneath, computed by `docsStatus()` — which ARC-08's doctor wraps rather
-than re-derives.
+every run does — with the attribution line. **Populated is checked separately from at-the-pin**: a
+`--no-checkout` clone whose pin is the branch tip has correct HEAD and an empty tree. `docs status` answers "is this corpus right" in four
+lines (pin/gitlink/HEAD · family/branch · shape and areas · citations), each `ok` or `MISMATCH` with
+its remedy, computed by `docsStatus()` — which ARC-08's doctor wraps rather than re-derives.
 
 `docs sync --upstream` is the maintainer refresh: refuse a dirty tree, fetch, **verify at the old
 pin**, move, verify again, write the pin, stage — never commit. The baseline runs first because
-"newly dead" is a difference between two states and the first stops existing when the corpus moves.
+"newly dead" is a difference between two states, and the first stops existing when the corpus moves.
 
-`docs family <name>` switches release family. The dry run **is** the proposal; `--yes` applies
+`docs family <name>` switches release family: the dry run **is** the proposal and `--yes` applies
 exactly what it printed. A prose line is edited only when the matched phrase is its *only* family
-mention — anything else is REVIEW, because half a sentence about the new family and half about the
-old is worse than an untouched line. The pin moves first, while the tree is still clean, so the
-dirty-tree refusal guards the whole operation rather than tripping on the command's own edits.
+mention — anything else is REVIEW, because half a sentence about each family is worse than an
+untouched line. The pin moves first, while the tree is still clean, so the dirty-tree refusal guards
+the whole operation instead of tripping on the command's own edits.
 
 `docs-bump.yml` runs the refresh weekly and opens **one** pull request — branch named for the
 target SHA, so a re-run updates rather than duplicates and a newer tip supersedes the older. **It
-never merges.** A dry run exits 0 with a `::warning::`; the red build belongs on the pull request.
+never merges.** A dry run exits 0 with a `::warning::`; the red build belongs on the pull request. It
+builds from the PR's **base**, not the dispatch ref, and needs two repository settings it cannot
+assert: "Allow GitHub Actions to create and approve pull requests", and "Approve and run" on a
+bot-authored PR's first CI run.
 
 `docs-real.yml` runs the recipe against the **real** corpus on all three OSes — weekly, on demand,
 and when the code that decides the checkout changes; not a required context (network, a minute per
@@ -143,7 +172,41 @@ nothing here depends on bash.
 never retyped — **FAIL**, never WARN or SKIP, because an absent corpus leaves every citation in every
 skill unverified.
 
-### Exit codes — every `docs` sub-command shares one table
+### The git-only corpus recipe
+
+ARC-06's launchers run this when Node is absent. Not a paraphrase of `sync.mjs`:
+`tests/docs-recipe.test.mjs` asserts the block is byte-identical to `--print-recipe` on a tree with
+no checkout, down to one character. Edit the module, regenerate, paste — never the reverse. The area
+list is one long line on purpose; wrapped or reordered is a different checkout.
+
+<!-- DOCS-RECIPE:BEGIN (generated by scripts/gen-docs-recipe.mjs — do not edit) -->
+
+```sh
+git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs
+git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform legal
+git -C vendor/ServiceNowDocs fetch --depth 1 origin 11b39be17307dd4b21df15a54e8011ae68f64dba
+git -C vendor/ServiceNowDocs checkout --detach 11b39be17307dd4b21df15a54e8011ae68f64dba
+git submodule absorbgitdirs vendor/ServiceNowDocs
+git submodule init -- vendor/ServiceNowDocs
+echo "docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE"
+```
+
+<!-- DOCS-RECIPE:END -->
+
+**On Windows the sequence gains one line** — a single block cannot be byte-identical on both
+platforms, so this one is the POSIX form:
+
+```powershell
+git -C vendor/ServiceNowDocs config core.longpaths true
+```
+
+The launcher then checks each line of `vendor/docs-areas.txt` exists under
+`vendor/ServiceNowDocs/markdown/` and prints `citations: not verified until Node 20+ is installed`.
+S-07's criterion 2 was refuted — the corpus fits in 260 characters under a *short* prefix — but a CI
+temp directory ate that margin at ARC-03-S05, so `core.longpaths` stays.
+
+
+## Exit codes — every `docs` sub-command shares one table
 
 | Code | Meaning |
 |---|---|
@@ -158,35 +221,413 @@ skill unverified.
 4, 5 and 6 stay distinct: "you have unsaved work", "the transport failed" and "it is not there" have
 three different remedies, and a caller that collapsed them would send someone to the wrong one.
 
-### The git-only corpus recipe
+## Bootstrap steps and state file
 
-ARC-06's launchers run this when Node is absent. Not a paraphrase of `sync.mjs`:
-`tests/docs-recipe.test.mjs` asserts the block is byte-identical to `--print-recipe` on a tree with
-no checkout, down to one character. Edit the module, regenerate, paste — never the reverse. The area
-list is one long line on purpose; wrapped or reordered is a different checkout.
+`./snowarch bootstrap` shows one amendable plan, then runs ten numbered steps uninterrupted,
+recording each one so a failure, a Ctrl-C or an upgrade never means starting over.
 
-```sh
-git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs
-git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform legal
-git -C vendor/ServiceNowDocs fetch --depth 1 origin ba513f2c62d3698ef5bfdd8044110226b8419689
-git -C vendor/ServiceNowDocs checkout --detach ba513f2c62d3698ef5bfdd8044110226b8419689
-git submodule absorbgitdirs vendor/ServiceNowDocs
-git submodule init -- vendor/ServiceNowDocs
-echo "docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2.0 — vendor/ServiceNowDocs/LICENSE"
+### The steps
+
+Each step module in `tools/snowarch/lib/steps/` — `B00.mjs` through `B09.mjs` — exports
+`{ id, title, needsNode, runsWhen, inputs, run }`
+and, when it can be skipped, a `skipReason`. Every module is importable and its `run(ctx)` callable
+on its own, so ARC-08's `--fix` can invoke one without the runner.
+
+| Step | Title | Needs Node | Runs when | Inputs hashed |
+|---|---|---|---|---|
+| B00 | preflight | no | always (never cached) | — |
+| B01 | workspace | no | always | `.mcp.json`, `.claude/settings.json`, mode |
+| B02 | docs | no (checkout) / yes (citations) | docs mode ≠ skip | the areas file, the corpus gitlink from the index, docs mode |
+| B03 | mode | no | always | the accepted mode |
+| B04 | deps | yes | mode = live | `package-lock.json`, Node **major** |
+| B05 | contract | yes | Node present | `dist/contract.json`, `required-tools.json` |
+| B06 | instance | yes | mode = live | store schema version, store presence, whether `--instance-file` was given |
+| B07 | toggles | no | always | mode, Node present, the hook branch, registration kind |
+| B08 | verify | yes | mode = live | contract sha, store mtime |
+| B09 | summary | no | always (never cached) | — |
+
+B00 and B09 are never cached, and each says so on the step rather than in the runner: B00 decides
+whether the machine can run the others, and B09 describes the run that just happened.
+
+### The hash, and what it is allowed to read
+
+Every input is TAGGED — `file:<path>` or `text:<value>` — and `sha256` runs over the tag, the key
+and the content of each, NUL-separated, in the order the step declared them. A missing file hashes
+as the literal `<absent>`, so "not installed yet" and "installed nothing" are different digests. An
+untagged entry is an error rather than a guess: read as a path, `design-only` would be found missing
+and hashed as `<absent>`, which would give live and design-only the same digest.
+
+Two inputs are deliberately narrow. B02 hashes the **gitlink**, not the corpus — reading 35,000
+files to decide whether to skip a step would cost more than the step, and an unrelated `touch` would
+invalidate it. B06 hashes only the store's schema version and whether it exists: `.local/instances.json`
+holds credentials, and a hash that read further would put one a careless line away from the log.
+
+### B00 preflight — the seven checks
+
+Every prerequisite is checked before anything is installed, and **every check runs even after one
+has failed**: an operator missing git *and* behind a TLS-intercepting proxy learns both in one pass
+rather than discovering the second after fixing the first. Any FAIL ends the run with
+`FAIL B00: <n> prerequisite(s) missing` and **exit 3** — before the plan screen, and before
+`.local/` exists.
+
+| # | Check | Fails when | Remedy comes from |
+|---|---|---|---|
+| 1 | root | `cwd` is not the checkout, or git reports a different toplevel (both compared through `realpath`) | `remedies.json` → the platform's own `cd` |
+| 2 | git | absent, or below `floors.git` | `xcode-select` · `winget` · the distribution package |
+| 3 | Claude Code | absent, or below `floors.claudeCode`. Not logged in is a **WARN**, never a FAIL — signing in is Claude Code's own first-run flow | the install page |
+| 4 | disk | less than 1 GiB free (1.5 GiB for the full corpus). Unmeasurable is a WARN, not a FAIL | `free up <n> MB on <mount>` |
+| 5 | network | `HEAD https://github.com/` fails — through `HTTPS_PROXY` by CONNECT tunnel, honouring `NO_PROXY` | the shared network vocabulary (below) |
+| 6 | Node | absent or below `floors.node` — a `note:` in design-only, a FAIL only for live | `brew` · `winget` · nvm |
+| 7 | platform | never; 32-bit is a WARN | — |
+
+The floors are read from `engine.config.json` and **never typed into the code**; a test strips
+comments from every module under `tools/snowarch/lib/` and asserts none of them spells a configured
+floor, so lowering a floor in the config genuinely lowers the threshold.
+
+Remedies live in `tools/snowarch/lib/remedies.json` as `{ checkId: { darwin, win32, linux, default } }`
+because the Node-free launchers (S10/S11) print the same sentences with no Node to read them, and
+the doctor quotes the same table. One wording, three programs.
+
+**One network vocabulary.** `lib/net-sentences.mjs` owns the DNS, proxy, TLS and disk sentences;
+`classifyGitFailure` (git's stderr) and `probe-net.mjs` (Node's HTTPS) both import them, so an
+operator behind a corporate proxy does not learn two vocabularies for one problem depending on which
+half of the tool noticed first. The single parameterised difference is the CA sentence: it names the
+failing tool's knob first (`GIT_SSL_CAINFO` or `NODE_EXTRA_CA_CERTS`) and the other second, because
+a corporate bundle is always needed by both. A proxy URL is masked to `***@host:port` where the
+sentence is built, not on the way to the terminal.
+
+### B01 workspace and B07 toggles — what the bootstrap writes
+
+Four files, all of them gitignored, and **nothing outside the checkout**: `~/.claude.json` and
+`~/.claude/settings.json` are never touched.
+
+| File | Written by | What goes in it |
+|---|---|---|
+| `.local/` (+ `logs/`) | B01 | 0700 on POSIX — an existing directory is chmodded, so a checkout bootstrapped before this rule stays private too. Windows records `fileModes: acl-inherited`. |
+| `.local/bootstrap-state.json` | the runner | S03's schema v1 |
+| `.claude/settings.local.json` | B07 | **two array members and one hook entry, merged** |
+| `.local/config.json` | B07 | `{ version, mode, defaultInstance, registration, updatedAt }` |
+
+**`settings.local.json` is never overwritten.** It belongs to the operator — their permission
+grants, their overrides, whatever Claude Code has written on their behalf. B07 reads it, applies its
+two changes and writes the same object back: other keys untouched, other array members preserved,
+existing key order kept, new keys appended. Design-only puts the server in `disabledMcpjsonServers`
+(which wins over the enable list in Claude Code); live puts it in `enabledMcpjsonServers` and
+removes the disable entry. A registration that is not `project` rejects the project entry whatever
+the mode says. **Invalid JSON is the only failure**, and the bytes are left exactly as found — a
+stray comma must not cost someone their settings. The file must be gitignored before anything is
+written, or Claude Code will not apply its approvals.
+
+**The SessionStart hook is S-05 variant B**: the committed `settings.json` is hook-free, and B07
+writes the hook into the *local* file only when Node ≥ 20 is present, removing it otherwise. A hook
+that runs `node` on a machine without Node is an error on every session start. There is no
+`disableAllHooks` branch — it would have silenced the operator's personal and plugin hooks too.
+
+**B01 verifies the registration files two ways**, because they catch different mistakes:
+`git diff --quiet HEAD` sees an uncommitted edit, and ARC-06-S01's rules — re-evaluated at run time
+from `lib/registration.mjs`, which the S01 test imports too — see one that was committed. A failure
+names the file and the `git checkout --` remedy, and `.local/` is still created so the next run
+starts from somewhere.
+
+**`config.json`'s `defaultInstance` is a mirror, never a second source.** The store is
+authoritative; ARC-07's `set-default` re-mirrors it. It is read through `readDefaultLabel`, a
+zod-free reader that returns exactly one key — so no URL, username or credential can reach a file
+that, unlike the store, is not 0600.
+
+**The cloud-sync warning names the provider.** `isUnderCloudSyncFolder` in the committed server
+build answers *whether*; `lib/cloud-sync.mjs` adds *which*, and a test asserts the two never
+disagree. It is a WARN and not a FAIL: 0600 is a local permission and the sync client runs as the
+same user, but where someone keeps their code is their decision.
+
+### B02 docs — one step over ARC-03's recipe
+
+B02 is glue, deliberately: `syncCorpus` decides what git does, `verifyCitations` decides what the
+citations mean, `docsStatus` measures. The step maps their results onto one step line and records
+numbers only. `--docs sparse|full` pass the plan's mode through; `--docs skip` never reaches the
+step at all (`runsWhen` is false), so no code path can make a network call the operator declined.
+
+The one judgement it makes is which failures stop an installation. A broken checkout does — nothing
+downstream can be grounded. A **dead citation does not**: the corpus is present, the fix belongs to
+a maintainer, and refusing to install over it would punish the wrong person, so it is a WARN. The
+docs family's exit codes map to remedies: `1` incomplete → `run ./snowarch docs sync`; `4` dirty and
+`5`/`6` git and upstream keep ARC-03's own sentences unaltered, because a second phrasing gives one
+situation two descriptions depending on which command hit it.
+
+### One recipe, four readers
+
+`tools/snowarch/lib/docs/recipe-block.mjs` renders the git-only recipe, and **three files are
+generated from it**: the published block in this document, and `tools/snowarch/launcher/docs-recipe.sh`
+and `.ps1`, which the Node-free launchers source. `docs sync --print-recipe` is the fourth reader of
+the same function. Nobody types the commands twice, and `tests/docs-recipe.test.mjs` diffs every
+target against the renderer with a unified diff that names the file and the line.
+
+Each target declares the platform it is written FOR — the PowerShell launcher is a Windows file
+whether it was generated on a Mac or not — and the generator writes with the file's own line
+endings, because `.gitattributes` stores `*.ps1` as `eol=crlf` and a generator that spliced LF into
+it would report STALE for ever on a clean checkout. A pin bump regenerates all three, so its staged
+list is five paths when the pin moves and two when it does not.
+
+### B03–B06 — mode, dependencies, contract, instance
+
+**B03** writes down the answer the plan screen already collected — into the state and
+`.local/config.json`, through B07's writer — and asks nothing. Because the mode is a hashed input of
+B06, B07 and B08, changing it re-runs exactly those three; that is a property of the inputs, not a
+rule somewhere.
+
+**B04** runs `npm ci --omit=dev --ignore-scripts --no-audit --no-fund` at the root (the S-15
+verdict), as a script under the running Node rather than through the `npm` shim — `child_process`
+refuses a `.cmd` without a shell, and a shell is what the bootstrap does not use. `--ignore-scripts`
+is the difference between installing packages and running whatever their authors put in
+`postinstall`, on a machine that has just cloned a repository. The post-check asks whether every
+dependency the server *declares* resolves *from `dist/server.js`* — hoisting-safe, no names typed —
+and treats `ERR_PACKAGE_PATH_NOT_EXPORTED` as present, because only an installed package can refuse
+a subpath. npm's failures map to remedies that fit them: registry DNS, TLS interception, lockfile
+integrity, `EACCES`, disk; anything else shows the last twenty log lines and the log's path.
+
+**B05** asks three questions about the checkout's own consistency — the contract's sha against the
+engine's pin, every pinned tool present in the contract, and the server's suggested registration key
+against `engine.config.json`. It runs in **both** modes: design-only grounds its rules in the same
+contract. ARC-05's CI proves this on every commit; B05 proves it on the machine about to run.
+
+#### The B06 slot
+
+Two ways in, and they are different jobs.
+
+```js
+// Interactive — SPAWN, never import: the wizard reads raw-mode keystrokes and masks a password,
+// and a library called in-process cannot own a TTY the bootstrap is also using.
+spawnSync(process.execPath,
+  [root + '/packages/snowarch/dist/cli/index.js', 'instance', 'add', '--from-bootstrap'],
+  { stdio: 'inherit', cwd: root })
+// exit 0 → the wizard printed its own secret-free summary; B06 then reads the label back through
+//          the store module, and learns nothing else — never a URL, a username or a credential.
+
+// Non-interactive — ARC-07-S05's addInstance(); until it lands, the store module directly:
+addInstance({ label, url, environment, auth, preset | flags, makeDefault, global: false, yes: true },
+            io) → { saved, entry /* masked */, lastProbe, exitCode }
 ```
 
-**On Windows the sequence gains one line** — a single block cannot be byte-identical on both
-platforms, so this one is the POSIX form:
+`dist/cli/index.js` exists only after B04, so both are reached lazily; the CLI is probed for
+`instance add` **before** it is spawned, so a build that does not have it yet is named rather than
+spawned into. No terminal and no `--instance-file` is a named failure, not a hang.
 
-```powershell
-git -C vendor/ServiceNowDocs config core.longpaths true
+**`--instance-file`** is the operator's path (README, "Operators and CI"). The file is a store
+document, checked for mode 0600 *before it is read* — a file the group can read has already leaked —
+and refused if git could commit it. **The D-05 proposals are applied before validation**, and that
+order is forced rather than chosen: the store schema is strict and requires `environment` and
+`preset`, so a file that omits them — exactly the file D-05 says to accept — cannot be parsed until
+they are filled in. The presets are chosen by **shape**, not by name: "most permissive" and "most
+restrictive" are roles the contract expresses as how many flags each raises. Passwords are
+registered with the redactor the moment they are parsed, before any line is logged, and the
+credential is authenticated exactly **once**.
+
+### B08 verify — the server, spawned the way Claude Code will spawn it
+
+B08 is the first moment the product is actually exercised, and it **spawns** rather than imports:
+the failures worth catching are the child's — a cold start slower than `MCP_TIMEOUT`, a `dist/`
+that does not match the pinned contract, an `SNOW_STORE` in the operator's shell pointing somewhere
+else — and none of them reproduce in-process.
+
+**ARC-08-S05 changed who spawns it.** The step used to speak newline-delimited JSON-RPC itself, from
+`lib/mcp-handshake.mjs`; the doctor's `server` section does that now, through the server package's
+own client (SV-05/SV-06), and B08 calls `runDoctor({ sections: ['server'], writeCache: true })` and
+reports its answer. That leaves ONE handshake in the product and one cache writer, and it means an
+install's verdict cannot disagree with the first `./snowarch doctor` the user runs. What survived
+the retirement is `lib/server-command.mjs` — reading `.mcp.json` into the exact command Claude Code
+would run, with the placeholders expanded the way Claude Code expands them and
+`CLAUDE_PROJECT_DIR` SET rather than inherited. That is not a handshake, it is still ours, and
+E-07 validates the same file statically.
+
+The pin-level comparisons went with it: a tool the server advertises that the contract does not
+know is SV-05's finding now, and the `used_by` reporting it used to print is covered statically by
+L01 and by B05's contract check at install time.
+
+#### `.local/doctor-last.json` v1 — what the banner reads
+
+The SessionStart banner must print a verdict in under 300 ms on a machine that may have no Node, so
+it cannot run checks; it reads the last ones. That makes this file a **contract**: ARC-08-S01's
+schema may add keys, never rename `version`, `at`, `writer`, `mode`, `checks[]{id,status,detail,remedy?}`
+or `summary`. `writer` says who produced it — `bootstrap` here, `doctor` in ARC-08 — so a banner
+reading a cache from a run that skipped half the checks can tell. It is 0600 and atomic, with the
+mode applied to the temp file **before** the rename so the finished file is never briefly
+world-readable, and it goes through the same write-time secret guard as the bootstrap state: a URL,
+an address or a registered secret fails the write rather than reaching a file things read casually.
+
+### B09 summary — one verdict, one Mode line, and what to type next
+
+The last five lines are the only part of the installation most people read twice, and two of them
+are **promises**. The `Mode:` line is quoted verbatim by four programs — the bootstrap's summary,
+the SessionStart banner, `/snowarch status` and `snowarch mode` — so it has **one definition**, in
+`tools/snowarch/lib/text.mjs`. The doctor additionally prints a *detailed* variant that appends its
+own findings; that is a longer line for a longer report, not a second Mode line.
+
+The dialog count is the other promise: one sentence per dialog, never a hedge, because "you may see
+one or two" makes a reader distrust every other line in the summary. `EXPECTED_DIALOGS` is 1, from
+the owner's 2.1.258 sitting recorded in `docs/plans/03-RISKS-AND-UNKNOWNS.md` §F, and a test reads
+that row rather than another copy of the number.
+
+The command spellings follow the **shell**, not only the platform: Git Bash on Windows runs
+`./bootstrap.sh` perfectly well, so `.\bootstrap.cmd` is printed only when `SHELL` and `MSYSTEM`
+are both unset. `text.json` is generated from the same module, and the Node-free launchers read it
+— one definition, three programs, the same shape as `remedies.json`.
+
+B09 **returns** its block rather than printing it: the runner prints a step's line after `run()`
+returns, so a block written from inside would be followed by `[B09/09] summary … ok` and the closing
+five lines would not be the last five. `--json`'s `next` carries that same string, so the two cannot
+drift. Design-only runs also write the banner's cache here, since they never reach B08 — and a live
+run's cache is left alone, because a handshake's findings should not be replaced by a summary's.
+
+### `bootstrap.sh` — the launcher
+
+Two jobs. When Node ≥ 20 is present it **`exec`s** the Node CLI, forwarding every flag, with
+`CLAUDE_PROJECT_DIR` exported — the launcher's spawn is our spawn, so the session variable is set
+rather than inherited. When Node is absent it finishes **design-only itself**: B00 (git, Claude
+Code, disk, and a network probe through `git ls-remote`), a two-line plan, B01, B02 through the
+generated recipe, a restricted B07, and B09's block.
+
+bash 3.2, because macOS ships it and always will: no associative arrays, no `mapfile`, no
+`${var,,}`, no `[[ =~ ]]` captures, and none of `curl`/`jq`/`python`/`timeout`. A test greps for
+every one of those and proves the grep is not vacuous.
+
+**Nothing is written twice.** The recipe is *sourced* from `tools/snowarch/launcher/docs-recipe.sh`;
+the sentences — remedies, the network vocabulary, the closing block — are generated into a marked
+region from `remedies.json`, `net-sentences.mjs` and `text.json`. `tests/launcher-parity.test.mjs`
+compares every one against its source, because this is the file that runs on machines with no Node
+to check it, and a drifted copy there would go unnoticed for a release.
+
+**B07 without Node writes the disable toggle and nothing else** — no hook, because nothing could run
+it — and it **never merges**: an existing `settings.local.json` that already carries the toggle is
+`ok (already set)`, and any other one is a hand-edit FAIL with the exact key to add. Merging JSON in
+bash is how someone's settings get destroyed.
+
+The state and the cache are written by heredoc in S03's and S08's schemas, `writer: "bash"`, and the
+Node readers accept them — asserted against a fixture captured from a real bash-3.2 run.
+
+### The credential boundary — where a secret can be typed
+
+One module: `packages/snowarch/src/cli/tty.ts`. A password is typed into an interactive terminal
+with echo off, or piped in with `--password-stdin`, and there is no third way — `--password`,
+`--client-secret` and `--secret` are refused BEFORE commander parses anything, because commander
+echoes an unknown option back and would print the value while rejecting it. A non-terminal stdin is
+refused rather than read, raw mode is restored on every exit path including a thrown error, and
+nothing is echoed: not the characters, not asterisks, which reveal the length
+(`SNOWARCH_MASK=asterisk` exists for users who need feedback and is off). No prompt library — the
+boundary does not live inside somebody else's package.
+
+### The `bootstrap` job — the install promise, executed
+
+Thirteen cells on every commit. Nine `node-cli` (three operating systems × Node 20/22/24) install
+through the Node CLI; three `no-node` rebuild PATH from the system directories, assert `node` is
+gone, and let the launcher finish design-only itself; one `no-gitbash` does the whole Windows path
+on a machine with Git Bash stripped from PATH. Each cell runs the install twice — the second run
+must report `ok (cached)` for B01/B02/B07, enter no docs phase and finish in under 30 seconds — then
+`scripts/ci/assert-bootstrap.mjs` checks the ten assertions with ONE implementation for every OS,
+and the `node-cli` cells hand the committed `dist/server.js` a real handshake. The corpus is fetched
+for real: this is the only job that proves an end-to-end design-only install.
+
+### `mode` — the switch, and where the server is registered
+
+`snowarch mode` reports: the S09 Mode line and the registration kind, nothing written. `mode live`
+runs B00 as a preflight and then the registry — B01–B03 stand on their cached results, B04–B09 run.
+`mode design` runs B07 and B09 only, and does NOT touch `.local/instances.json`: the instance is
+kept, and the closing note says so with the two commands that undo it either way. Both forms end
+with `Restart claude (or /mcp → <key> → reconnect)`, because a session that is already open has read
+its MCP configuration and nothing this command does reaches it. `mode live` is not a second
+bootstrap: same registry, same runner, same state file, same closing block — the only thing it
+decides is which steps are in the list.
+
+| Registration | Who writes it | Who verifies it | When |
+|---|---|---|---|
+| `project` | the repository — `.mcp.json` is committed | B01, against ARC-06-S01's rules | the default, always |
+| `local` | `claude mcp add-json … -s local`, keyed on the CHECKOUT | `claude mcp get`, immediately after | a policy that blocks project servers |
+| `user` | `claude mcp add-json … -s user`, every project on the machine | the same, plus a doctor WARN every run | last resort, and only with `--ack-user-scope` |
+
+`~/.claude.json` is never opened by this project. Every read and write goes through the CLI that
+owns it, in `lib/registration-claude.mjs`, and a test asserts that nothing under `lib/` builds a
+path to that file or reaches into the home directory at all. Two consequences worth knowing: a
+`remove` WITHOUT `-s` deletes from whichever scope the CLI finds it in — which for our key would be
+the committed project entry, so every call passes the flag — and an entry this tool did not create
+is never removed, only reported (ARC-08-S03 prints the command for the user to run).
+
+When the registration is not `project`, B07 writes `disabledMcpjsonServers: ["servicenow"]` so the
+project entry is rejected and only the local or user one loads. Otherwise both carry the same key.
+
+### The Windows launchers
+
+`bootstrap.cmd` runs `powershell -NoProfile -ExecutionPolicy Bypass -File bootstrap.ps1` — the
+Bypass is what makes a double-click work under the default **Restricted** policy — and pauses only
+when double-clicked with no arguments, so the window does not close before the summary is read.
+`snowarch.cmd` is the CLI wrapper, and prints the Node sentence with exit 3 when Node is absent.
+Both are `powershell`, never `pwsh`: 5.1 is what every Windows 10/11 has.
+
+`bootstrap.ps1` mirrors `bootstrap.sh` step for step and shares its sentences through the same
+generated region, in PowerShell syntax with the **Windows spellings**. PowerShell 5.1-clean — no
+`??`, no ternary, no `-AsHashtable` — with a test that greps for each and proves the grep is not
+vacuous. It records `writer: "powershell"` and `fileModes: "acl-inherited"`, because there is no
+`chmod` to apply and implying one would be a lie in a file the doctor reads.
+
+`.gitattributes` gives these three `text eol=crlf`: the index keeps LF and every checkout gets CRLF,
+which is what matters — a lone LF in a `.cmd` is a batch file that stops at the first line.
+
+**The S-03 fallback does not exist.** If the spike shows that `${CLAUDE_PROJECT_DIR}` is not
+expanded by Claude Code on native Windows, a per-machine `claude mcp add-json … -s local` override
+appears here; until then there is nothing to maintain, and its absence is deliberate rather than
+forgotten.
+
+### The resume rule
+
+For each step in order: `runsWhen` false → `skipped (<reason>)`; `--from BNN` and the step is at or
+after `BNN` → run; recorded `ok` and `sha256(inputs)` unchanged → `ok (cached)`; otherwise run. A
+`fail` stops the run after the state is written; a `warn` continues. An interrupt outranks whatever
+the step goes on to return, because the record of why a run stopped is what the next one reads.
+
+`--reset` removes `.local/bootstrap-state.json` and `.local/doctor-last.json` and nothing else —
+`.local/instances.json` (the credential store) and `.local/config.json` are never touched, and the
+command says so.
+
+### `.local/bootstrap-state.json` v1
+
+Atomic (temp file + `rename`), `0600` on POSIX, and on Windows it records `"fileModes":
+"acl-inherited"` rather than implying a mode nobody applied.
+
+```json
+{ "version": 1, "product": "snowarch", "engineVersion": "2.0.0",
+  "mode": "design-only", "docs": { "mode": "sparse", "pin": "ba513f2c…" },
+  "node": { "present": true, "version": "22.11.0" },
+  "writer": "node", "platform": "darwin",
+  "registration": "project", "registrationReason": "default",
+  "hooksDisabledByBootstrap": false,
+  "startedAt": "…", "updatedAt": "…",
+  "steps": { "B00": { "status": "ok", "inputsHash": null, "finishedAt": "…", "durationMs": 812 },
+             "B04": { "status": "failed", "inputsHash": "sha256:…", "reason": "interrupted" } } }
 ```
 
-The launcher then checks that each line of `vendor/docs-areas.txt` exists under
-`vendor/ServiceNowDocs/markdown/` and prints `citations: not verified until Node 20+ is installed`.
-ARC-00 S-07 acceptance criterion 2 was refuted — the corpus fits inside 260 characters under a
-*short* prefix — but a CI temp directory ate that margin in ARC-03-S05, so `core.longpaths` stays.
+`mode` is `null` until the plan is accepted. `writer` is `node`, `bash` or `powershell` — the
+Node-free launchers write the same schema. `docs.mode` sits exactly where `docsStatus()` reads it,
+and `mode` where the `/snowarch status` skill reads it when the doctor cannot run; both are why the
+shape is versioned, and why a `version` this build does not know is refused rather than migrated on
+the fly.
 
+**Nothing sensitive may be stored, and that is enforced at write time**, not by a grep afterwards:
+`saveState` walks the whole object and refuses any key that names a secret — the same rule the
+redactor uses, imported rather than restated — and any value that looks like a URL or an address, or
+that the redactor would rewrite. A step three stories from now that puts an instance URL in its
+`data` blob fails on the write, not in review.
+
+### Exit codes — the CLI family
+
+| Code | Meaning |
+|---|---|
+| **0** | ok |
+| **1** | a step or command failed; the cause and a remedy were printed |
+| **2** | usage error |
+| **3** | a prerequisite is missing |
+| **130** | interrupted (Ctrl-C); the state was flushed first |
+
+This is a **different table** from the `docs` one above, and the overlap is worth naming: `3` means
+"the corpus is missing" there and "a prerequisite is missing" here. Both are "the thing you need is
+not present", which is why the two coexist — but a caller keying on a number must know which family
+it is reading. `lib/exit.mjs` holds these five and deliberately does not re-export the docs codes.
 
 ## Roster
 
@@ -480,6 +921,262 @@ Two properties make it worth pinning:
 `./snowarch contract --sha` prints the sha256 and nothing else; ARC-05 pins against it and ARC-06's
 bootstrap compares it. ARC-05 completes this section with the generators that read the file.
 
+## Doctor
+
+One runner, two owners. The engine's checks are `E-nn` and live in `tools/snowarch/lib/doctor/`;
+the server's are `SV-nn` and live in `packages/snowarch/src/doctor/`, because the flag rules and the
+store schema belong to the code that enforces them — a second implementation in another language is
+how two answers to one question get shipped. ARC-08-S04 merges the two lists into one report.
+
+**Sections**, in report order: `prereqs · repo · docs · roster · contract · legacy · host · server`.
+`--section` takes a comma-separated list; `server` means every `SV-` check whatever section it
+declares; an unknown name is a usage error (exit 2) that prints the valid ones.
+
+**Every check declares** its section, the severity a failure carries, and three booleans: `quick`
+(in the `--quick` subset), `network` (skipped by `--no-network`) and `spawns` (never in `--quick`,
+whatever it costs). They are required rather than defaulted — the failure mode of an undeclared
+`network` is a doctor that touched the network on a machine that has none.
+
+**The runner owns three promises.** Every selected check runs: one that throws becomes a `fail`
+carrying its message, one that hangs becomes a `fail` after its timeout (15 s, 20 s for a network
+check), and a report that stopped at the first bad answer would describe a checkout as healthy up to
+the point where it stopped looking. Nothing reaches the output unredacted — the redaction pass is
+applied by the runner, so a check cannot forget it. And a check that names an error `code` gets its
+remedy from the contract: `docs/TROUBLESHOOTING.md` is generated from the same entries, so the two
+cannot disagree. A check that sets both a code and its own remedy is refused.
+
+**Exit codes.** `0` no FAIL (warnings allowed) · `1` at least one FAIL · `2` usage · `3` the doctor
+could not run at all — not at the repository root, an unparsable `engine.config.json`, or Node below
+the floor. Exit codes apply with `--json` too; CI relies on them.
+
+**One report, one Mode line** (ARC-08-S05). The sections print in a fixed order — prereqs, repo,
+docs, roster, contract, legacy, host, server — and the last line is always the Mode line, because
+the last line of a transcript is the one that survives a truncated paste. That line is DERIVED from
+four facts (the toggle file, the store's loaded instances, the recorded bootstrap state, and
+whether the server module could run) by a pure function, and from nothing else: never from
+`~/.claude.json`, which belongs to Claude Code and describes a registration rather than a
+configuration. A test points `HOME` at an empty directory and at a stale fixture and asserts the
+same line comes back.
+
+Two checks can report one condition — E-25 sees a cloud-synced CHECKOUT and SV-02 a cloud-synced
+STORE, which on the usual install is the same folder. **Both lines stay in `checks[]`** (each names
+a different path, and which one a reader needs depends on which they are moving) and the SUMMARY
+counts it once, through a `dedupeKey` that fires only when both are really describing that
+condition.
+
+**Deviations from `01` §8**, recorded rather than silently resolved: the design-only Mode line
+carries no doctor stamp (§8's example shows one on the live line only, and a date bolted onto a
+sentence that ends in a command reads as part of the command); the detailed line's flag labels come
+from `flagNames(contract)` rather than the six names §8 spells; and the tool count says
+`(contract)` when SV-05 did not run, because a number with no provenance is trusted and should not
+be.
+
+**The engine's twenty-three checks** (ARC-08-S02). The `legacy`/`host` detectors (S03) and the
+`SV-` server checks (S04) append to the same registry, because `--section` and `--quick` are answers
+about one registry rather than several:
+
+<!-- generated:doctor-checks -->
+| Check | Section | What it answers | `--quick` | `--fix` |
+|---|---|---|---|---|
+| `E-00` | prereqs | Claude Code CLI | — | — |
+| `E-01` | prereqs | git | yes | — |
+| `E-02` | prereqs | Node.js | yes | — |
+| `E-03` | prereqs | npm | — | — |
+| `E-04` | prereqs | capability packs | — | — |
+| `E-05` | repo | repository root | yes | — |
+| `E-06` | repo | engine.config.json | yes | — |
+| `E-07` | repo | .mcp.json committed and secret-free | yes | — |
+| `E-08` | repo | .claude/settings.json committed | yes | — |
+| `E-09` | repo | no credential-shaped keys | yes | — |
+| `E-10` | repo | settings.local toggles match the recorded mode | yes | yes |
+| `E-11` | repo | .local/ state | yes | yes |
+| `E-12` | docs | docs corpus present | yes | yes |
+| `E-13` | docs | docs pin | yes | yes |
+| `E-14` | docs | docs family | yes | — |
+| `E-15` | docs | sparse set | yes | yes |
+| `E-16` | docs | citations | — | — |
+| `E-17` | roster | roster from directory listing | yes | — |
+| `E-18` | roster | skill descriptions | yes | — |
+| `E-19` | contract | no retired tool names | yes | — |
+| `E-20` | contract | prefix consistency | yes | — |
+| `E-21` | contract | generated files fresh | — | — |
+| `E-22` | contract | contract pin | yes | — |
+| `E-23` | legacy | stale MCP registrations in ~/.claude.json | yes | — |
+| `E-24` | legacy | legacy wizard store | yes | — |
+| `E-25` | host | cloud-sync folder | yes | — |
+| `E-26` | host | proxy and CA environment | yes | — |
+| `E-27` | host | Claude Code registration status | — | — |
+| `SV-00` | server | Node version | yes | — |
+| `SV-01` | server | dist artefacts | yes | yes |
+| `SV-02` | server | store | yes | yes |
+| `SV-03` | server | instances | yes | yes |
+| `SV-04` | server | instance probes | — | — |
+| `SV-05` | server | stdio handshake | — | — |
+| `SV-06` | server | capabilities match the store | — | — |
+| `SV-07` | server | audit trail | yes | — |
+| `SV-08` | server | ancestor skill directories | yes | — |
+<!-- /generated:doctor-checks -->
+
+**`--fix` repairs a closed list of seven drifts** (ARC-08-S06), and the list being closed is the
+feature: every entry is a class of drift with exactly one correct resolution and no information in
+it a human would supply differently. It prints the plan before it touches anything (principle 10),
+applies in the order below so a later repair sees an earlier one, reports each as `applied`,
+`noop`, `refused` or `failed`, and re-runs the doctor afterwards — the exit code and the report a
+user reads are the RE-RUN's, because a repair that reported `applied` and left a check failing is
+the one outcome a plan cannot show. It never edits credentials, `.mcp.json`,
+`.claude/settings.json`, `engine.config.json` or anything under `~/.claude`; those are listed under
+REFUSED with the check's own command, and a grep test proves the module cannot reach them.
+
+<!-- generated:doctor-fixes -->
+| Fix | Trigger (`data.fix.kind`) | What it does | Touches |
+|---|---|---|---|
+| `F1` | `deps-missing` | install the server dependencies | `node_modules/` |
+| `F2` | `corpus-missing` | sync the documentation corpus | `vendor/ServiceNowDocs` |
+| `F2` | `sparse-mismatch` | sync the documentation corpus | `vendor/ServiceNowDocs` |
+| `F3` | `head-off-pin` | check the corpus out onto the pin | `vendor/ServiceNowDocs` |
+| `F4` | `flags-incomplete` | state every flag explicitly | `.local/instances.json` |
+| `F5` | `store-mode` | restore the store directory mode | `.local/` |
+| `F6` | `toggles-mismatch` | rewrite the mode toggles | `.claude/settings.local.json` |
+| `F6` | `hooks-disabled-by-bootstrap` | remove the bootstrap's hook toggle | `.claude/settings.local.json` |
+| `F7` | `cache-stale` | clear the stale doctor cache | `.local/doctor-last.json` |
+<!-- /generated:doctor-fixes -->
+
+**The session banner** (ARC-08-S08). `tools/snowarch/hooks/session-start.mjs` runs at every
+SessionStart and prints ONE `Mode:` line plus at most four one-line nudges. Three promises shape
+it: it never fails a session (every path exits 0, nothing reaches stderr, and any exception becomes
+one honest line naming the error CLASS — never its message, which could carry a path or a value);
+it is fast (the fast path reads `.local/doctor-last.json` and `.local/doctor-last.inputs.json` and
+prints — it imports no part of the doctor, because importing the registry to decide whether it
+needs the registry would spend the budget before the decision); and it never guesses (the line was
+derived by the doctor and cached, and when the cache no longer describes this checkout the hook
+re-runs the offline `--quick` subset in-process under a 5 s watchdog — half the hook's own 10 s
+timeout, so the watchdog always fires first). On expiry it prints the cached line marked
+`(cache stale — run ./snowarch doctor)`: an old line marked old beats no line.
+
+The staleness rule is the doctor's own (`cacheStale()`, shared with `--fix`'s F7): older than 24
+hours, or any of the six recorded input mtimes changed. The four nudges — first run, upgrade
+available, stale registrations in `~/.claude.json` for THIS folder, doctor FAIL — have one
+definition each in `lib/text.mjs`, exported through `text.json`, so the banner and `/snowarch
+status` cannot describe the same condition in two ways. The upgrade nudge reads
+`.local/upgrade-check.json` — `{ behind: boolean, latestTag: string, checkedAt: string }`, written
+by ARC-09-S07's `upgrade --check`; an absent file is simply no nudge, and the hook never fetches
+anything itself.
+
+The root comes from the hook's own file location, never from `cwd` or `CLAUDE_PROJECT_DIR`: inside
+a session that variable is the SESSION's project, and a banner describing another checkout would be
+worse than none.
+
+**Every check the old `doctor.sh` made is accounted for** — see
+[Appendix: the old doctor's checks](#appendix-the-old-doctors-checks) at the end of this document.
+
+**The report, as a person reads it** — statuses are `ok`, `warn`, `FAIL`, `skip` (upper-case so
+`grep FAIL` works), and the Mode line is last, because the last line of a transcript is the one that
+survives a truncated paste:
+
+<!-- generated:doctor-text -->
+```
+snowarch doctor 2.0.0 — 2026-09-04 10:00:12 (quick: no · network: yes · section: all)
+
+prereqs
+  E-00  ok    Claude Code CLI: 2.1.258 >= 2.1.214, logged in
+docs
+  E-12  FAIL  docs corpus: corpus absent (docs mode "skip")
+             → run ./snowarch docs sync   [fixable: ./snowarch doctor --fix]
+server
+  SV-03 warn  instance flags: instance "pdi": 4/6 flags explicit
+             → the doctor writes the missing ones as "false"   [fixable: ./snowarch doctor --fix]
+
+DOCTOR: 1 ok, 1 warn, 1 fail (2 fixable — run ./snowarch doctor --fix)
+Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance to add one
+```
+<!-- /generated:doctor-text -->
+
+**Schema v1.** Every key is present from the first commit, `null` where a later story fills it: a
+consumer must not have to ask which version of the doctor produced its input.
+
+<!-- generated:doctor-json -->
+```json
+{
+  "schema": 1,
+  "product": "snowarch",
+  "version": "2.0.0",
+  "ranAt": "2026-09-04T10:00:12Z",
+  "durationMs": 1830,
+  "options": {
+    "quick": false,
+    "noNetwork": false,
+    "fix": false,
+    "section": null
+  },
+  "mode": null,
+  "modeLine": "Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance to add one",
+  "modeLineDetailed": null,
+  "engine": null,
+  "server": null,
+  "prereqs": null,
+  "checks": [
+    {
+      "id": "E-00",
+      "section": "prereqs",
+      "title": "Claude Code CLI",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "2.1.258 >= 2.1.214, logged in",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0
+    },
+    {
+      "id": "E-12",
+      "section": "docs",
+      "title": "docs corpus",
+      "status": "fail",
+      "severity": "fail",
+      "detail": "corpus absent (docs mode \"skip\")",
+      "remedy": "run ./snowarch docs sync",
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
+      "id": "SV-03",
+      "section": "server",
+      "title": "instance flags",
+      "status": "warn",
+      "severity": "warn",
+      "detail": "instance \"pdi\": 4/6 flags explicit",
+      "remedy": "the doctor writes the missing ones as \"false\"",
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": false,
+      "durationMs": 0
+    }
+  ],
+  "fixes": [],
+  "stale": null,
+  "summary": {
+    "ok": 1,
+    "warn": 1,
+    "fail": 1,
+    "skip": 0,
+    "fixable": 2
+  }
+}
+```
+<!-- /generated:doctor-json -->
+
+`prereqs` is the one object with a named consumer: `/snowarch setup-instance` (ARC-07-S09) branches
+on `os`, `shell`, `node.ok`, `deps.ok`, `mode.toggle` and `store.exists`, and the fields were fixed
+in both stories on 2026-09-10 rather than discovered later. `shell` is a GUESS at the parent process
+and `unknown` is a first-class answer — a wrong guess hands a reader a command their shell cannot
+run.
+
 ## History
 
 | Commit / tag | What |
@@ -561,3 +1258,61 @@ Also deferred and named here so they are not lost: the dependency prune (`pdfmak
 `@inquirer/prompts`, `ora`, `chalk` — ARC-04-S01, taking the production tree from ~57 MB to ~27 MB), and
 the `registry.npmjs.org/servicenow-mcp` update check in `src/cli/index.ts`, which is code and is on
 ARC-01-S10's ratchet allow-list under ARC-04.
+
+## Appendix: the old doctor's checks
+
+`scripts/legacy/doctor.sh` was 1,141 lines and 39 numbered checks written against a real machine
+over two years, and `00` §3.9 calls it the most precise existing specification of a correct
+install. Rewriting the doctor without accounting for each one would have lost intent nobody would
+notice missing until an install broke in a way the old script would have caught. So every id below
+has a new home or a reason, and `tests/doctor/mapping.test.mjs` asserts both — including that the
+old script really contains the ids this table claims to account for.
+
+Rendered from `tools/snowarch/lib/doctor/mapping.mjs`; the "new checks" line is the registry minus
+the mapped ids, computed rather than typed.
+
+<!-- generated:doctor-mapping -->
+| Old | Intent (from `scripts/legacy/doctor.sh`) | New | Note |
+|---|---|---|---|
+| D00 | required host tooling missing → exit 3 | runner exit 3 (S01) | same semantics; the bash aggregator is retired |
+| D01 | `claude` CLI present | E-00 | plus the floor and the login |
+| D02 | node ≥ 20 | E-02 / SV-00 | floor from `engine.config.json` |
+| D03 | npm | E-03 | WARN in design-only, FAIL in live |
+| D04 | git | E-01 | floor from `engine.config.json` (ADR-0008) |
+| D05 | python3 | E-04 | capability pack "docx" |
+| D06 | draw.io / LibreOffice | E-04 | capability packs "draw.io" and "PDF QA"; Mermaid added |
+| D07 | engine repo root | E-05 | exit 3 when not AT the root |
+| D08 | roster counts, parsed from `CLAUDE.md` prose | E-17 | counted from the directory listing; the expected counts come from the roster block
+of `engine.config.json` |
+| D09 | every skill directory has a `SKILL.md` | E-17 | merged |
+| D10 | `verify-structure.sh` audit | retired | the structure gate was deleted in ARC-02-S01; the skills/agents lint runs in CI (ARC-02-S02), and E-18 keeps the description and frontmatter half |
+| D11 | `core.hooksPath=.githooks` | retired | the pre-commit chain was deleted with ARC-02-S01; CI replaces it (P-37, ARC-09) |
+| D12 | submodule populated | E-12 | FAIL, never SKIP |
+| D13 | pinned release branch | E-14 | family from `engine.config.json` |
+| D14 | checkout == pinned commit | E-13 | pin == gitlink == HEAD |
+| D15 | citation gate | E-16 | an absent corpus is a FAIL |
+| D16 | `settings.json` present / valid / placeholder / hook targets resolve (a–d) | E-08 / E-07 | committed-file comparison; the placeholder half is E-07; the personal hook tooling it also checked for is out of scope (D-03 item 9) |
+| D17 | `~/.claude.json` registration for this project | retired as a positive check; E-23 | ARC-06-S01 made the registration the committed `.mcp.json` (E-07), so there is nothing in `~/.claude.json` to confirm; it is inspected only for stale entries, and never written |
+| D18 | `disabledMcpjsonServers` / trust accepted | E-10 / E-27 | the toggles are ours (E-10); the status Claude Code reports is read by E-27 (`claude mcp get`); the trust dialog itself is not checkable (`03` §D) |
+| D19 | server entrypoint resolves | SV-01 | re-targeted to `packages/snowarch/dist/server.js` |
+| D20 | server `node_modules` | SV-01 | fixable → F1 runs B04 |
+| D21 | `dist/` older than `src/` | retired | `dist/` is committed and the contract gate rebuilds and diffs it on every cell (ARC-04-S13) |
+| D22 | tools manifest readable | SV-01 / SV-05 | `dist/contract.json` plus a real handshake |
+| D23 | instance URL absent | SV-02 / SV-03 | unconfigured is a supported mode, not a fault |
+| D24 | URL is a bare https origin | SV-03 |  |
+| D25 | flag absent | SV-03 | `FLAGS_INCOMPLETE`; fixable → F4 |
+| D26 | flag not a string | SV-02 | `STORE_SCHEMA_INVALID` |
+| D27 | SCRIPTING without WRITE | SV-03 | `FLAG_DEPENDENCY_VIOLATION`; never fixable — which one was meant is not in the store |
+| D28 | `MCP_TOOL_PACKAGE` | SV-03 | `toolPackage == full` |
+| D29 | `MAX_RECORDS` unset | SV-03 | `maxRecords`; the default is pinned |
+| D30 | wizard store overrides env | E-24 | the override itself was removed in ARC-04-S02; what remains is the legacy store detector |
+| D31 | `~/.claude.json` mode; other projects with credentials; tracked-file leak scan | E-23 / E-09 | the first two are E-23, the leak scan is E-09 |
+| D32 | live instance probes | SV-04 | the server module, over ARC-07-S03's probes |
+| D33 | per-preset role probes | SV-04 |  |
+| D34 | update-set readiness (§2.2) | SV-04 | the write probe; capture is the server's own tool (ARC-04-S07) |
+| D35 | descending-sort self-test | retired | `ORDERBYDESC` was fixed with a regression test in ARC-04-S09 — a self-test in the doctor was standing in for one in the suite |
+| D36 | `CLAUDE.md` gates on `mcp__<key>__` | E-20 | re-targeted to the generated rule file, the protocol page and both registrations |
+| D37 | tool-name currency against the rename map | E-19 | `retired-names.json` |
+
+**New checks with no old counterpart** (11): `E-06`, `E-11`, `E-15`, `E-18`, `E-21`, `E-22`, `E-25`, `E-26`, `SV-06`, `SV-07`, `SV-08`.
+<!-- /generated:doctor-mapping -->

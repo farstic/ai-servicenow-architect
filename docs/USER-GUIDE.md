@@ -12,7 +12,7 @@ For each scenario: what you type, what the engine does, what you receive, and wh
 
 ## How to send a prompt
 
-Open Claude Code (`claude` from the repo root) and type your request at the `❯` prompt. If you prefer the browser, the same prompts work in the Master Project chat on Claude.ai — with one difference: **live deployment to an instance (Scenario 4) is CLI-only**, because the MCP connection runs through Claude Code. See [`INSTALLATION-GUIDE.md`](./INSTALLATION-GUIDE.md) or [`ADVANCED-WEB-SETUP.md`](./ADVANCED-WEB-SETUP.md) if you haven't set up yet.
+Open Claude Code (`claude` from the repo root) and type your request at the `❯` prompt. If you prefer the browser, the same prompts work in the Master Project chat on Claude.ai — with one difference: **live deployment to an instance (Scenario 4) is CLI-only**, because the MCP connection runs through Claude Code. See [`INSTALL.md`](./INSTALL.md) if you haven't set up yet.
 
 Describe what you need in plain English — that is the whole interface for design work. There is one
 exception, the `/snowarch` command below, which configures and reports on the engine itself rather
@@ -32,17 +32,45 @@ they walk you through connecting a ServiceNow instance.
 | `/snowarch setup-instance --resume` | Picks up after you have finished in the terminal, and confirms what is now configured. |
 | `/snowarch doctor` | The full health check: `DOCTOR: n ok, n warn, n fail`, then every failure with its remedy. |
 
+### What `/snowarch status` prints
+
+Seven lines, in this order, each filled from one key of the doctor's JSON — the same report the
+terminal prints, formatted for reading:
+
+```
+Mode: live — pdi (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 398 tools (contract)   [modeLineDetailed]
+Engine: snowarch 2.0.0 · tag v2.0.0 · contract a1b2c3d                                       [engine.version, engine.tag, engine.contractSha]
+Docs: vendor/ServiceNowDocs @ ba513f2 (australia) · sparse · citations checked: 181 | dead: 0 [engine.docs]
+Roster: 28 skills / 9 agents                                                                 [engine.roster]
+Capabilities: docx yes (python3) · PDF QA no · draw.io yes · Mermaid no                       [engine.capabilities]
+Instances: pdi (pdi, custom, default) · uat (test, read-only)                                 [server.instances]
+Doctor: 41 ok, 1 warn, 0 fail — quick run 2026-09-10 10:00 · full report: ./snowarch doctor   [summary, ranAt, options.quick]
+```
+
+A line whose key is empty is left out rather than guessed. Two usually are: capability packs and
+citation counts come from checks that spawn a process or walk the whole corpus, so a quick run —
+which is what a session always does — leaves them out and says so. `./snowarch doctor` reports
+them. `Instances:` is absent in design-only, and when anything failed, one line per failure follows
+with its remedy.
+
 ### Reading the Mode line
 
 `Mode:` is the answer to "can this session touch a real instance?", and it comes from the doctor —
 never from what the session infers. Four shapes:
 
 ```
-Mode: live — instance=pdi (pdi) preset=pdi-developer — doctor 2026-09-08 41 ok
-Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance
+Mode: live — instance=pdi (pdi) preset=pdi-developer
+Mode: design-only
 Mode: unknown — this checkout has not been bootstrapped; run ./bootstrap.sh (Windows: bootstrap.cmd)
 Mode: <mode> — from bootstrap state; doctor unavailable until Node 20+ is installed
 ```
+
+The first two are the **base** line, produced by one function (`tools/snowarch/lib/text.mjs`
+`modeLine()`) and quoted verbatim by the bootstrap's summary, the SessionStart banner,
+`/snowarch status` and `snowarch mode` — four programs, one string, so they cannot answer "what am
+I in" three different ways. The doctor additionally prints a **detailed** variant that appends its
+own findings (` — doctor <date> <n> ok`, flags, tool count); that is a longer line for a longer
+report, not a second definition of the Mode line.
 
 If you ever see a mode stated without one of these shapes, the session has guessed and you should
 ask it to run `/snowarch status` again. **Live mode is not the same as permission to write** — every
@@ -321,7 +349,7 @@ Type `Status` any time to see the loaded engagement, the locked release family, 
 - For the team metaphor and value proposition: [`BUSINESS-OVERVIEW.md`](./BUSINESS-OVERVIEW.md).
 - For the protocol mechanics: [`TECHNICAL-ARCHITECTURE.md`](./TECHNICAL-ARCHITECTURE.md).
 - For live-instance operations: [`MCP-OPERATIONS-GUIDE.md`](./MCP-OPERATIONS-GUIDE.md).
-- For setup: [`INSTALLATION-GUIDE.md`](./INSTALLATION-GUIDE.md) · browser: [`ADVANCED-WEB-SETUP.md`](./ADVANCED-WEB-SETUP.md).
+- For setup: [`INSTALL.md`](./INSTALL.md) — the one install page.
 
 ---
 

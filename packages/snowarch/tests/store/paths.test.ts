@@ -113,7 +113,7 @@ describe('masking — criterion 6 of the architect ruling', () => {
   });
 
   it('maskUsername keeps only the first character, and the domain when there is one', () => {
-    expect(maskUsername('cvetomir@corp.com')).toBe('c***@corp.com');
+    expect(maskUsername('someone@corp.example.com')).toBe('s***@corp.example.com');
     expect(maskUsername('admin')).toBe('a***');
     expect(maskUsername('')).toBe('');
   });

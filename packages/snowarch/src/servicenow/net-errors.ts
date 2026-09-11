@@ -10,6 +10,8 @@
  */
 
 /** The six codes this classifier can produce. Registered in `src/errors/codes.ts`. */
+import { ERROR_CODES } from '../errors/codes.js';
+
 export type NetworkErrorCode =
   | 'DNS_FAILURE'
   | 'TLS_CA_UNTRUSTED'
@@ -67,6 +69,19 @@ export function maskProxyUrl(raw: string | undefined): string {
 }
 
 /** Walk `cause` to the deepest system code. undici nests the real reason two levels down. */
+/** A request that was aborted — by our own deadline, or by a caller's signal. */
+function isAbort(err: unknown): boolean {
+  const seen = new Set<unknown>();
+  let node: unknown = err;
+  while (node && typeof node === 'object' && !seen.has(node)) {
+    seen.add(node);
+    const name = (node as { name?: unknown }).name;
+    if (name === 'TimeoutError' || name === 'AbortError') return true;
+    node = (node as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 function deepestCode(err: unknown): string | null {
   let current: unknown = err;
   let found: string | null = null;
@@ -85,38 +100,109 @@ function deepestCode(err: unknown): string | null {
  * mutating the process — and so the remedy names the variable the SERVER read, not whatever
  * the environment happens to hold when the message is finally rendered.
  */
+/**
+ * The registry template, instantiated — the ONE place a network remedy is written.
+ *
+ * Until ARC-07-S03 this file carried its own remedy strings and `ERROR_CODES` carried others, so
+ * one condition had two texts: the server said one thing and the wizard another, and the contract
+ * published the second. A remedy repeated in two places is one to correct and one that will not
+ * be. `<issuer>` is dropped with its parenthesis when the certificate did not say — "(issuer: )"
+ * invites a reader to look for something that is not there — and `<host>` falls back to "the
+ * instance" for a caller that has no URL to hand.
+ */
+export interface RemedyValues {
+  host?: string | undefined;
+  proxy?: string | undefined;
+  proxyVar?: string | undefined;
+  issuer?: string | undefined;
+  /** ARC-07-S07's three, for `STORE_IN_CLOUD_SYNC_FOLDER`. */
+  provider?: string | undefined;
+  root?: string | undefined;
+  global?: string | undefined;
+}
+
+/**
+ * The registry's MEANING, instantiated the same way its remedy is.
+ *
+ * `STORE_IN_CLOUD_SYNC_FOLDER` is the first code whose meaning carries values — the provider and
+ * the folder — and a second filler for the other half of the same entry would be two places to
+ * change a placeholder's name. One substitution, both halves.
+ */
+export function fillMeaning(code: string, values: RemedyValues = {}): string {
+  const entry = ERROR_CODES.find((e) => (e.code as string) === code);
+  return substitute(entry?.meaning ?? '', values);
+}
+
+const substitute = (text: string, { provider, root, global: globalStore }: RemedyValues): string =>
+  text.replaceAll('<provider>', provider ?? 'a cloud provider')
+    .replaceAll('<root>', root ?? 'the synced folder')
+    .replaceAll('<global>', globalStore ?? 'the global store');
+
+export function fillRemedy(code: string, values: RemedyValues = {}): string {
+  const { host, proxy, proxyVar, issuer } = values;
+  const entry = ERROR_CODES.find((e) => (e.code as string) === code);
+  let text = substitute(entry?.remedy ?? '', values);
+
+  // A PARENTHETICAL whose subject is absent goes with it. `(a proxy is configured — …)` reads as
+  // a fact when one is, and as noise when none is; `(issuer: )` invites a reader to look for
+  // something that was never there. Dropping the whole clause is the only rendering of "we do not
+  // know this" that a sentence survives.
+  text = proxy
+    ? text.replaceAll('<proxyVar>', proxyVar ?? 'HTTPS_PROXY')
+      .replaceAll('<proxy>', maskProxyUrl(proxy))
+    : dropParenthetical(text, '<proxy>')
+      .replaceAll('<proxyVar>', proxyVar ?? 'HTTPS_PROXY')
+      .replaceAll('<proxy>', 'the configured proxy');
+  text = issuer ? text.replaceAll('<issuer>', issuer) : dropParenthetical(text, '<issuer>');
+  return text.replaceAll('<host>', host ?? 'the instance');
+}
+
+/** Remove the `(…)` clause containing `token`, and the space before it. */
+function dropParenthetical(text: string, token: string): string {
+  const at = text.indexOf(token);
+  if (at === -1) return text;
+  const open = text.lastIndexOf('(', at);
+  const close = text.indexOf(')', at);
+  if (open === -1 || close === -1) return text;
+  return `${text.slice(0, open).replace(/\s+$/, '')}${text.slice(close + 1)}`;
+}
+
+/** The certificate issuer, when the error carried one. Best effort: a hint, not a claim. */
+export function issuerOf(err: unknown): string | undefined {
+  const seen = new Set<unknown>();
+  let node: unknown = err;
+  while (node && typeof node === 'object' && !seen.has(node)) {
+    seen.add(node);
+    const cert = (node as { cert?: { issuer?: { CN?: string } } }).cert;
+    if (cert?.issuer?.CN) return cert.issuer.CN;
+    node = (node as { cause?: unknown }).cause;
+  }
+  return undefined;
+}
+
 export function classifyNetworkError(
   err: unknown,
   env: NodeJS.ProcessEnv = process.env,
+  { host }: { host?: string } = {},
 ): NetworkDiagnosis {
   const cause = deepestCode(err);
   const proxy = env.HTTPS_PROXY ?? env.https_proxy ?? env.HTTP_PROXY ?? env.http_proxy;
   const proxyVar = (env.HTTPS_PROXY ?? env.https_proxy) ? 'HTTPS_PROXY' : 'HTTP_PROXY';
 
+  const remedyFor = (code: string, issuer?: string) =>
+    fillRemedy(code, { host, proxy, proxyVar, issuer });
+
   if (cause && DNS.has(cause)) {
-    return {
-      code: 'DNS_FAILURE',
-      cause,
-      remedy: proxy
-        ? 'the instance host name did not resolve; check the spelling, and note that a proxy is '
-          + `configured (${proxyVar}=${maskProxyUrl(proxy)}) — a proxy does not resolve names for you `
-          + 'unless the request goes through it'
-        : 'the instance host name did not resolve; check the spelling. On a corporate network, set '
-          + 'HTTPS_PROXY to your proxy',
-    };
+    return { code: 'DNS_FAILURE', cause, remedy: remedyFor('DNS_FAILURE') };
   }
 
   if (cause && TLS_UNTRUSTED.has(cause)) {
+    // The registry text is the one that says never `NODE_TLS_REJECT_UNAUTHORIZED=0` — the first
+    // thing people reach for, and the one that means trusting the interceptor and everything else.
     return {
       code: 'TLS_CA_UNTRUSTED',
       cause,
-      // Never NODE_TLS_REJECT_UNAUTHORIZED=0. It is the first hit for this error and it disables
-      // certificate checking for the whole process, which on a TLS-intercepting network means
-      // trusting the interceptor and everything else too.
-      remedy: 'the TLS certificate was not signed by a CA this machine trusts, which is normal on a '
-        + 'network that intercepts TLS. Export your organisation root CA as PEM and set '
-        + 'NODE_EXTRA_CA_CERTS to its path, then restart the server. Do not disable certificate '
-        + 'verification',
+      remedy: remedyFor('TLS_CA_UNTRUSTED', issuerOf(err)),
     };
   }
 
@@ -125,42 +211,29 @@ export function classifyNetworkError(
     // instance: the client never opens a socket to the instance at all. Reporting
     // CONNECTION_REFUSED there would send the user to check a host that was never contacted.
     return proxy
-      ? {
-        code: 'PROXY_UNREACHABLE',
-        cause,
-        remedy: `${proxyVar}=${maskProxyUrl(proxy)} is set but not reachable — nothing is listening `
-          + 'there. Check the proxy host and port, or unset the variable if you are not behind a proxy',
-      }
-      : {
-        code: 'CONNECTION_REFUSED',
-        cause,
-        remedy: 'the instance refused the connection; check the URL, its port, and whether the '
-          + 'instance is awake',
-      };
+      ? { code: 'PROXY_UNREACHABLE', cause, remedy: remedyFor('PROXY_UNREACHABLE') }
+      : { code: 'CONNECTION_REFUSED', cause, remedy: remedyFor('CONNECTION_REFUSED') };
   }
 
-  if (cause && TIMEOUT.has(cause)) {
+  // An ABORTED request is a timeout too, and it carries no `code` at all: `AbortSignal.timeout`
+  // rejects with a `TimeoutError` DOMException, so `deepestCode` finds nothing and the request
+  // would have been classified `NETWORK_ERROR` — "run the doctor" — for the one failure whose
+  // remedy is the most specific of the six. Added by ARC-07-S02, whose probe sets its own
+  // deadline; every other caller that passes a signal gets it as well.
+  const aborted = isAbort(err);
+
+  if (aborted || (cause && TIMEOUT.has(cause))) {
     return proxy
-      ? {
-        code: 'PROXY_UNREACHABLE',
-        cause,
-        remedy: `${proxyVar}=${maskProxyUrl(proxy)} is set but not reachable — the connection timed `
-          + 'out. Check the proxy host and port, or unset the variable if you are not behind a proxy',
-      }
-      : {
-        code: 'CONNECTION_TIMEOUT',
-        cause,
-        remedy: 'the connection timed out. If you are on a corporate network, set HTTPS_PROXY; '
-          + 'otherwise check connectivity to the instance',
-      };
+      ? { code: 'PROXY_UNREACHABLE', cause, remedy: remedyFor('PROXY_UNREACHABLE') }
+      : { code: 'CONNECTION_TIMEOUT', cause, remedy: remedyFor('CONNECTION_TIMEOUT') };
   }
 
+  // The unclassified case keeps the raw code in the text, because "the request failed" with no
+  // system code is a sentence nobody can act on — and the registry entry cannot know it.
   return {
     code: 'NETWORK_ERROR',
     cause,
-    remedy: cause
-      ? `the request failed with ${cause}. Run ./snowarch doctor for a fuller diagnosis`
-      : 'the request failed before a response was received. Run ./snowarch doctor for a fuller '
-        + 'diagnosis',
+    remedy: cause ? `${remedyFor('NETWORK_ERROR')} (the system code was ${cause})`
+      : remedyFor('NETWORK_ERROR'),
   };
 }

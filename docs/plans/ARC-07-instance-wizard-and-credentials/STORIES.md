@@ -106,6 +106,31 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 > `TLS_CERT_INVALID` — are registered with `showInRule: false` and already have their meanings and
 > remedies in `docs/TROUBLESHOOTING.md`; render them, do not restate them.
 
+> **Amendment 2026-09-10 (ARC-07-S02, from the tree).** Three corrections, all of the same kind
+> as the `PROXY_CONNECT_FAILED` one above — the registry and the classifier are the source of
+> truth and the story text defers to them.
+> **(1) `NETWORK_TIMEOUT` is not a registry key; the condition is `CONNECTION_TIMEOUT`** (that is
+> what `classifyNetworkError` emits and what `ERROR_CODES` carries), so a timeout is reported and
+> documented under that name.
+> **(2) `PROXY_AUTH_REQUIRED` did not exist** — 407 is a RESPONSE, so the network classifier never
+> sees it. This story registers it (`showInRule: false`, `httpStatus: 407`) and `probeReachability`
+> maps 407 whether it arrives as a response or as a throw.
+> **(3) `ENV_REQUIRED` was likewise unregistered** and is added with the story's message.
+> Two more notes for whoever reads this next. The registry now also carries `<host>`, `<proxy>` and
+> `<issuer>` placeholders in the six network remedies: the wizard substitutes them, and
+> `docs/TROUBLESHOOTING.md` prints the template, which is the same one table ARC-05-S06 requires.
+> And an ABORTED request — our own 10 s deadline, which arrives as a `TimeoutError` carrying no
+> `code` at all — was falling through to `NETWORK_ERROR` ("run the doctor") for the one failure
+> whose remedy is the most specific of the six; `classifyNetworkError` recognises it now, which
+> every caller that passes a signal gets as well.
+>
+> **Task 4 (integration into the `instance add` / `instance test` step order) belongs to S05/S06**,
+> which is where those commands exist. This story ships the functions and proves AC 3, AC 5 and
+> AC 6 at FUNCTION level — `resolveEnvironment` (the `--yes` + non-PDI + no `--env` → `ENV_REQUIRED`
+> result the command maps to exit 2, and the interactive path), `describeNetworkEnv` (one line per
+> call; "once per run" is the command's) and `reachabilityMenu` (three options, no "continue
+> anyway", `abort` saving nothing). S05/S06 re-prove all three end to end.
+
 **As** an individual practitioner **I want** the wizard to accept my instance address in any reasonable form, correct what can be corrected with my consent, refuse what cannot, and — when the host is unreachable — tell me *which* of DNS, a TLS-intercepting gateway or a proxy is in the way and what to set **so that** a corporate laptop is not stuck at "unreachable".
 
 **Context.** P-23 (the `/api` auto-fix at `setup.ts:441-449,597-608` builds `https://host/api` and saves it as the base URL, which then breaks every REST path; "continue anyway" at 437–439). `01` §6.2 step 5: "validated as a bare `https://` origin — vanity hostnames allowed, trailing slash stripped, `/api` rejected with the reason"; step 7: "10 s HEAD reachability first, with DNS / TLS / proxy diagnosis". D-05: "`^https://dev\d+\.service-now\.com` → proposed `pdi`; everything else is asked, never guessed". R-3 (`02` post-decision rulings; `03` R-15): "the ARC-07 wizard reachability probe distinguishes DNS / TLS-CA / proxy failures and prints the exact remedy"; the server's HTTP layer honours `HTTPS_PROXY` / `NO_PROXY` / `NODE_EXTRA_CA_CERTS` per ARC-04-S11 (`src/servicenow/http.ts` `snFetch()` with an `EnvHttpProxyAgent`; `src/servicenow/net-errors.ts` `classifyNetworkError()`) — this story consumes both, it adds neither a proxy agent nor a second error classifier.
@@ -222,6 +247,20 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ### ARC-07-S04 — Preset proposal and the per-flag review screen (Propose → Review → Apply); prod cap in the wizard; `--yes` / `--preset` / `--flags`
 
+> **Amendment 2026-09-10 (ARC-07-S04).** **Task 4 — wiring into the step order after `probeAll`
+> and before the save — belongs to S05**, where `instance add` exists. This story ships the
+> functions and proves AC 5, AC 7 and AC 8 at FUNCTION level: `resolveFlags()` returns the apply
+> decision or the refusal with its exit code and text, and "writes nothing" is proven by a store
+> spy whose emptiness is asserted as a precondition and again afterwards — S05 re-proves all three
+> end to end. AC 8's defaults live in one exported constant (`ENTRY_DEFAULTS`) that S05 consumes,
+> with a test that it matches ARC-04-S02's schema defaults rather than restating them.
+>
+> **The footer wraps.** The story's last screen line is 111 characters and the terminal budget is
+> 100, so it wraps like a long probe hint — same rule, same reason: a terminal that folds a line
+> mid-word is harder to read than one continuation. The two screens are rendered to
+> `docs/snippets/review-screen-nonprod.txt` and `review-screen-prod.txt` for S10 to include
+> byte-equal; the snapshot tests read those files, so the page and the wizard cannot drift.
+
 **As** an individual practitioner **I want** the wizard to *propose* a preset for my instance, show me the six flags with what the probes found, let me toggle any of them or switch preset, and apply exactly what I see **so that** nothing is imposed (D-05, principle 10) and production stays read-only unless I take a separate, explicit step.
 
 **Context.** D-05 as decided: for `pdi`/`dev`/`test` the proposal is `full`; "the user reviews a per-flag screen where each flag is pre-set ON and annotated with its live probe result, and may toggle any flag or switch preset before anything is saved. A failing probe changes only the recommendation text on that line, never the toggle. `read-only` remains the proposal for `prod`." `01` §6.3 gives the screen verbatim and the flag meanings; "for a `prod` instance the proposal is `read-only` and the review screen shows the write flags greyed out with the `--ack-prod` instruction". P-03 (all six flags always written), P-06 (one vocabulary), P-25 (`toolPackage` pinned `full`, `maxRecords` 100). README acceptance: "`--env prod --preset full` in the wizard is rejected with the D-05 explanation".
@@ -300,6 +339,45 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 > in its message). `STORE_IN_CLOUD_SYNC_FOLDER` is registered for the D-04 warning. Both are typed,
 > so a literal that is not a registry key will not compile.
 
+> **Amendment 2026-09-10 (ARC-07-S05).** Four departures, each with its reason.
+>
+> **(1) A policy refusal that the ARGUMENTS already decide happens FIRST.** `--env prod --preset
+> full --yes` cannot end any way but exit 3, so asking for a password and spending a network round
+> trip on the way there costs the user both for nothing — and sends one login attempt at a
+> production instance that was never going to be saved. The interactive path keeps the refusal at
+> the flags step, where there is somebody to offer the read-only save to.
+>
+> **(2) The server-dependency precondition RESOLVES the module rather than testing a fixed path.**
+> `npm ci` hoists `@modelcontextprotocol/sdk` to the repository root in this workspace, so
+> `packages/snowarch/node_modules/@modelcontextprotocol/sdk/package.json` does not exist on a
+> correctly installed checkout — the forwarder refused to run on a machine where everything was
+> fine. `createRequire(<package.json>).resolve(...)` asks the question Node will ask when the CLI
+> starts, and answers correctly for hoisted and nested trees alike.
+>
+> **(5) The frame was parsing the pass-through's arguments** — found by the reviewer, not by
+> the suite. The six forwarder tests are unit tests on the argv builder; none started a process,
+> so the engine's own option parser ate `--yes` before the builder was ever called. The rework
+> marks `instance` a RAW command in `tools/snowarch/lib/cli.mjs` and adds root-entry tests that
+> spawn the launchers with real options (AC 11). A pass-through cannot be proved by a test that
+> never passes anything through.
+>
+> **(3) B06's `--instance-file` path does NOT call `addInstance()`.** There is no interface comment
+> naming it: ARC-06-S07 implemented that path directly (`probeAuth` + `completeFlags` +
+> `saveStore`), and it is merged, tested and working. `addInstance()` exists here with the story's
+> signature and is ready for it; rewiring a merged story's step is that story's change to make, not
+> this one's, and doing it silently would alter behaviour nobody asked to alter. No B06 test was
+> `todo` — none needed flipping.
+>
+> **(4) The spawned-CLI integration tests cannot reach a fake ServiceNow.** The URL rule is
+> https-only (correctly), and a TLS fixture would mean either a committed private key — which this
+> repository's own secret sweep would flag, rightly — or generating a certificate at test time on
+> three operating systems. So the composition is proven IN-PROCESS with injected dependencies
+> (24 tests, including every exit path and the store bytes), and the spawned CLI proves what only a
+> process can: commander handing the sub-command its arguments intact, `--help` being the
+> sub-command's, a secret on the command line refused before either parser sees it, and the policy
+> exit taking neither the network nor the store. AC 1, AC 2 and AC 9's spawned form are the owner's
+> sitting, beside AC 10.
+
 **As** an individual practitioner with a PDI **I want** `./snowarch instance add pdi --url https://devNNNNN.service-now.com --env pdi --auth basic --preset pdi-developer --default` to ask for my username and password, prove the instance, let me review the flags, and save one 0600 file — or save nothing at all **so that** the instance is usable "with the right permissions" after one command (README goal; `01` §6.2 steps 6–7).
 
 **Context.** README acceptance criteria 1, 2 and 5 (this story delivers 1 and 2 and the argv/history half of 5). P-23 ("Save anyway", default file mode, `npm link`), P-34 (no secret in argv/`~/.claude.json`), P-03 (six flags), D-04 (store location and modes), D-05 (proposal flow). `01` §6.2 step 7's exact strings: `AUTHENTICATION_FAILED — wrong username or password. Re-enter? (attempt 2 of 3)`; summary `Saved instance "pdi" (pdi · basic · preset pdi-developer · default). Probes: auth ok · write ok · scripting ok · cmdb ok · atf ok.` `01` §4.2 B06: the bootstrap invokes this command as its wizard step.
@@ -318,7 +396,7 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
   6. Save through ARC-04-S02's `saveStore()`: `.local/` created 0700 if absent, temp file + `fsync` + rename, `chmod 0600` (skipped on Windows with the note `file modes: ACL-inherited (Windows)`); `--default` (or the first instance ever, proposed with `Make "pdi" the default instance for this checkout? [Y/n]`) sets `defaultInstance`; `lastProbe` written from S03. The S07 cloud-sync warning runs before the write.
   7. Summary (secret-free): `Saved instance "pdi" (pdi · basic · preset pdi-developer · default). Probes: auth ok · write ok · scripting ok · cmdb ok · atf ok · NOW_ASSIST off · FLUENT off.` then `Store: .local/instances.json (mode 0600, dir 0700)` and, unless `--from-bootstrap`, `Next: in Claude Code run  /snowarch setup-instance --resume  (or restart claude).` The probe list names the enabled flags' results and prints `off` for disabled ones.
 - Programmatic entry: `addInstance({ label, url, environment, auth: { method, username, password, clientId?, clientSecret? }, preset|flags, makeDefault, global, yes: true }, io)` returns `{ saved: boolean, entry (masked), lastProbe, exitCode }` — ARC-06-S07's `--instance-file` path reads its 0600 store-shaped JSON and calls this (the exact call is already written in ARC-06-S07's B06 interface comment); the same story's interactive B06 slot spawns `dist/cli/index.js instance add --from-bootstrap` with `spawnSync(process.execPath, …, { stdio: 'inherit' })` and afterwards reads label/environment/preset back through the store module (`readDefaultLabel()` / `loadStore()`), never url/username/secret.
-- Forwarder in `tools/snowarch/bin/snowarch.mjs` (`instance` → server package): preconditions — Node ≥ floor from `engine.config.json`; `packages/snowarch/dist/cli/index.js` present; server dependencies installed (`existsSync(join(pkgDir, 'node_modules/@modelcontextprotocol/sdk/package.json'))` — `tools/snowarch` is ESM, so no bare `require`). If not: `Live mode is not installed yet — run ./snowarch mode live (installs the server dependencies and starts the instance wizard).` exit 3. Then `spawnSync(process.execPath, [cliPath, 'instance', ...args], { stdio: 'inherit' })` (inherited stdio keeps the TTY so S01 raw mode works; `process.execPath` avoids Windows `.cmd` shims) and propagates the exit code. The forwarder never reads or writes the store.
+- Forwarder in `tools/snowarch/bin/snowarch.mjs` (`instance` → server package): preconditions — Node ≥ floor from `engine.config.json`; `packages/snowarch/dist/cli/index.js` present; server dependencies installed (`existsSync(join(pkgDir, 'node_modules/@modelcontextprotocol/sdk/package.json'))` — `tools/snowarch` is ESM, so no bare `require`). If not: `Live mode is not installed yet — run ./snowarch mode live (installs the server dependencies and starts the instance wizard).` exit 3. Then `spawnSync(process.execPath, [cliPath, 'instance', ...args], { stdio: 'inherit' })` (inherited stdio keeps the TTY so S01 raw mode works; `process.execPath` avoids Windows `.cmd` shims) and propagates the exit code. The forwarder never reads or writes the store. **Everything after `instance` is the server CLI's, unparsed**: the engine frame must not read those arguments, reject a flag it has no table for, or answer `--help` once a sub-command is named — only a bare `./snowarch instance --help` is the frame's own. (Added in rework: the frame parsed them, so `--yes` at the end of the line became `--yes needs a value` and the README command could not run through the launcher at all.)
 - The argv the forwarder builds contains only what the user typed; a unit test asserts the builder has no code path that adds a secret.
 
 **Acceptance criteria.**
@@ -332,6 +410,7 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 8. `./snowarch instance add …` without `node_modules` prints the "Live mode is not installed yet" line and exits 3 without spawning the server CLI; the same on Windows via `snowarch.cmd`.
 9. Given `printf 'p\n' | node packages/snowarch/dist/cli/index.js instance add pdi --url https://dev1.service-now.com --env pdi --auth basic --preset pdi-developer --default --username u --password-stdin --yes` against the fake REST layer (200 everywhere), the process exits 0, stdout contains the `Saved instance` line and none of `Username:`, `Password:`, `> ` (no prompt was shown), and `addInstance()` called with the same values returns `{ saved: true, exitCode: 0 }` whose `entry.auth.username` is `u***` and whose `entry` has no `password` key.
 10. On Windows the summary shows `file modes: ACL-inherited (Windows)` and the store is written under `.local\`.
+11. Every option after `instance` reaches the server CLI unchanged **through each launcher on its OS** — the engine entry, `./snowarch`, and `snowarch.cmd` on Windows: `instance add <label> --url … --env prod --preset full --yes` exits 3 with the server's `PROD_WRITE_NOT_ACKNOWLEDGED` (not the frame's `needs a value`, not the forwarder's not-installed sentence) and writes no store; `instance add --help` prints the server's exit table (not the frame's one-line usage); `instance list` is the server's ARC-07-S06 refusal; a bare `instance --help` is the frame's. *(Added in rework. AC 8 covers the not-installed half only, which is why six green unit tests on the argv builder never noticed that no argument survived the trip.)*
 
 **Tasks.**
 1. Argument parsing and validation (label, options, mutual exclusions `--preset`/`--flags`).
@@ -414,6 +493,53 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ---
 
+> **Amendment 2026-09-10 (ARC-07-S06).** Eight departures and findings, each with its reason.
+>
+> **(1) `test --json` prints the SAME envelope as `test --all --json`** — `{ store, instances: {
+> "<label>": { … } } }` with one key. The story specifies the shape for `--all` only; giving the
+> single form a different one would make ARC-06-S08's merge (`probes[label] = JSON.parse(stdout)`)
+> depend on which flag produced the output, and a consumer that must ask "how many did I request?"
+> before reading a result is one that will get it wrong once.
+>
+> **(2) `test` records `lastProbe` even when the probe FAILED.** A failed probe is the fact the
+> doctor needs, and a store that only remembered good news would report a broken instance as
+> healthy for as long as it stayed broken. AC 2's requirement is met exactly as written: the
+> credentials and the preset are byte-identical after a 401, and the test asserts that field by
+> field rather than on the file as a whole.
+>
+> **(3) `test` requires a label or `--all`** — it does not fall back to `defaultInstance`. Every
+> other sub-command here names its instance, and a `test` that silently probed a different one
+> would be the only command in the set whose subject you cannot read off the command line.
+>
+> **(4) ROPC was unusable and is fixed here.** `probeAuth` refuses an `oauth_ropc` run with no
+> `tokenProbe`, and ARC-07-S05 never passed one — so with probes on, `instance add --auth
+> oauth_ropc` could not succeed AT ALL: the error was neither `ok` nor `unreachable`, so it fell
+> through to the wrong-password branch and exhausted three attempts. Found by this story's
+> `set-credentials --auth oauth_ropc` test. `probeOptionsFor()` now supplies a probe that says
+> "the request that follows IS the token exchange", which is the truth of this client — it
+> acquires the ROPC token inside its first request, so a separate token call would be a SECOND
+> login attempt against S03's one-request-per-probe rule. What is lost is the four-way ROPC error
+> table's extra specificity, which needs a real token endpoint to distinguish; it is on the
+> owner-sitting list.
+>
+> **(5) The production cap gained ONE door.** The S04 screen locks every box on a `prod` instance,
+> so "review screen (flags unlocked, all pre-set per the preset)" needed a way in:
+> `prodAcknowledged` on `ScreenInput`/`ResolveInput`, set by exactly one caller — the branch that
+> has already printed the warning and read the label back. The wizard never sets it and no flag
+> reaches it from `instance add`.
+>
+> **(6) The dependency dialogue is S04's, exported rather than copied.** `toggle` became
+> `toggleFlag` so `set-flags` asks the same question the review screen asks, in the same words.
+>
+> **(7) There were two username maskers, and now there is one.** ARC-04-S02's keeps the domain
+> (`c***@corp.com`); the copy S05 wrote in `instance.ts` dropped it. The store's own is
+> re-exported, so the wizard's summary and `list` cannot mask the same account two ways. The
+> visible change: an email-shaped username now keeps its domain in the wizard's summary too.
+>
+> **(8) ARC-06-S08 invokes `instance test <label> --json` per label**, not `--all --json` as the
+> brief describes; both forms work and both are tested. The `--all` form remains the one the story
+> specifies for the doctor cache.
+
 ### ARC-07-S07 — `--global` store, project-wins precedence messaging, cloud-sync-folder warning (D-04)
 
 **As** an individual practitioner with one personal PDI and several engagement checkouts **I want** to keep that PDI in a per-user store while engagement instances stay per checkout, be told plainly which store wins when both hold a label, and be warned when a checkout sits inside OneDrive/Dropbox/iCloud/Google Drive **so that** the D-04 at-rest policy and the confidentiality firewall are both respected.
@@ -456,6 +582,55 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 **Definition of done.** Merged; tests green; ARC-06-S05's and ARC-08-S03's parity tests pass against `cloud-sync-paths.json`; `docs/MODES-AND-PRESETS.md` "Where credentials live" section (S10) written from this story.
 
 ---
+
+> **Amendment 2026-09-10 (ARC-07-S07).** Eight departures and findings.
+>
+> **(1) A FIFTH provider value.** The story names four; `detectCloudSync` also returns
+> `CloudStorage (unknown provider)`. macOS mounts every vendor under
+> `~/Library/CloudStorage/<Provider>-<tenant>`, so a vendor the table does not name is still a
+> synced folder — and ARC-04-S02's boolean already answered `true` for exactly those paths.
+> Dropping the case would have made the rewrite less truthful than the function it replaced;
+> saying "synced, and I cannot tell you by whom" is more use than saying nothing.
+>
+> **(2) The engine and the server shared an ordering bug, found by the fixture's first row.**
+> `~/Library/CloudStorage/OneDrive-Corp/…` is both a CloudStorage mount and a OneDrive one, and
+> both implementations answered with the mount because `CloudStorage` sat above `OneDrive` in the
+> table and `Library` comes first in the path. Named vendors are matched across the whole path
+> FIRST in both now. ARC-06-S05's parity test reads
+> `packages/snowarch/tests/fixtures/cloud-sync-paths.json` and its six inline rows are gone into
+> it; it asserts WHETHER exactly and WHICH wherever a vendor is named, because the engine keeps
+> its own longer wording for an unnamed mount.
+>
+> **(3) `add --json` had no shape, so it has this one:** `{ saved, label, store, default,
+> instance, lastProbe, warnings }` — the same envelope discipline as `list --json` and `test
+> --json`, with the masked entry and never the stored one.
+>
+> **(4) `--json` suppresses the step lines.** `[1/6] Instance URL` printed above an object makes
+> the object unparseable, and `test --json` already promised a caller one object on stdout.
+>
+> **(5) `warnings[]` carries the CODE**, not the sentence: a caller matching on prose is a caller
+> that breaks when the prose improves. The sentence is on screen in the human form, before the
+> save AND after it.
+>
+> **(6) The WARN is the REGISTRY's text now.** `STORE_IN_CLOUD_SYNC_FOLDER`'s `meaning` and
+> `remedy` carry `<provider>`, `<root>` and `<global>`, and `fillMeaning()` joins `fillRemedy()` so
+> both halves of one entry are filled by one substitution. When the global store is itself synced,
+> or `--global` is already in use, the remedy's `--global` clause is dropped — offering somebody a
+> place with the same problem is advice that cannot be taken.
+>
+> **(7) The `.env.example` allow-list ceiling moved 20 → 24**, deliberately: `XDG_CONFIG_HOME` and
+> the three `OneDrive*` roots are operating-system variables this package reads and must not tell
+> a reader to set in a project `.env`. Each is spelled out with its reason, which is what the test
+> actually enforces; the ceiling is a brake, not a budget.
+>
+> **(8) A vitest worker does not run the pool's exit handler.** ARC-07-S06's fixture sweep covers
+> the engine's `node --test` processes; on the server side a file's fixtures must be removed in
+> its own `afterEach`, or they survive the run. Thirteen `instance-global-*` directories in a
+> private `TMPDIR` is how that was found.
+>
+> **On the documented limit:** a macOS `~/Documents` redirected into a sync client is still
+> undetectable — there is no environment variable to read, and the path says nothing. The story
+> already records it; nothing here improves it.
 
 ### ARC-07-S08 — `instance import --from-legacy`: dry-run plan, field and flag mapping, explicit `FLUENT_ENABLED`, prod cap, deletion advice
 
@@ -506,7 +681,7 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 **Test strategy.** Integration with the fixture and the fake REST layer on all OSes (Windows path form of the advice included). Live: S11 runs the import against the real PDI with a generated legacy file.
 
-**Dependencies.** S04, S05, S07; ARC-04-S02 (the server no longer reads the legacy path — otherwise the import would be redundant); ARC-08-S03 (E-24) prints this command (its text cites "ARC-07-S07" — it is this story, S08); ARC-10-S01 documents it.
+**Dependencies.** S04, S05, S07; ARC-04-S02 (the server no longer reads the legacy path — otherwise the import would be redundant); ARC-08-S03 (E-24) prints this command — its text cites ARC-07-S08 correctly today, so the correction this line called for was already made; ARC-10-S01 documents it.
 
 **Size.** M — 1.5 days.
 
@@ -515,6 +690,53 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 **Definition of done.** Merged; tests green; ARC-10's `docs/MIGRATION.md` step references the command; the ARC-08 legacy-store detector prints it verbatim.
 
 ---
+
+> **Amendment 2026-09-10 (ARC-07-S08).** Nine departures and findings.
+>
+> **(1) One `notes:` clause per entry, WRAPPED.** The story's plan sample joins an entry's notes
+> into a single clause, and the production entry's notes come to three hundred characters. They are
+> joined as written and wrapped at the review screen's own 100-column budget (S04's `wrapText`,
+> reused not retyped): the notes are the part a reader has to act on, and a terminal folding them
+> mid-word is where they stop reading.
+>
+> **(2) The committed fixture has TWO entries** — AC 2 and AC 3 count them ("writes both",
+> "Imported 1 of 2"). The `staging → test` case of AC 4 gets its own legacy file, written in the
+> test, rather than a third row that would change both those numbers.
+>
+> **(3) The reader accepts both container shapes.** The story documents an array of entries each
+> carrying `name`; some 1.x files hold a record keyed by label instead. Rejecting one of them would
+> send a user to a hand-edit for a difference the reader can absorb in three lines.
+>
+> **(4) The legacy field names are DERIVED, not listed.** `WRITE_ENABLED` → `writeEnabled`,
+> `NOW_ASSIST_ENABLED` → `nowAssistEnabled` — the old wizard's names are the lower-camel form of
+> the same words. Listing the five would have put flag literals in `src/cli/`, which the sweep
+> ARC-07-S04 left behind forbids; it caught exactly that, in this file, on the first run.
+>
+> **(5) Two registry codes, not three.** `LEGACY_STORE_NOT_FOUND` and `LEGACY_STORE_UNREADABLE`
+> are registered because the command prints them. `IMPORT_NOTHING_TO_DO` is not: nothing prints it
+> — a run with nothing to import prints the plan and `Imported 0 of N`, which says the same thing
+> in words the reader already has.
+>
+> **(6) `targetStore()` is now shared.** S06's `openStore` computed the path and the source
+> privately; `import` asks the same question, so the resolution moved out to one exported function
+> rather than being repeated. That is the same defect S07's review found, prevented rather than
+> repaired.
+>
+> **(7) The citation this story asked to correct was already correct.** ARC-08-S03's E-24 text
+> cites ARC-07-S08 today. What IS corrected in that story instead is E-25's pointer: it named
+> "ARC-04-S02's fixture list", which does not exist — the list is
+> `packages/snowarch/tests/fixtures/cloud-sync-paths.json`, created by ARC-07-S07, and it carries
+> the provider as well as the boolean.
+>
+> **(8) The snippet names ARC-10's migration document by its STORY, not by a path.**
+> `docs/MIGRATION.md` does not exist yet, and `tests/fixtures/forthcoming-paths.json` — the
+> allow-list for exactly that — records an empty list as its intended resting state and its SK-10
+> test requires an entry to suppress a hit in that check's own scan, which a `docs/snippets/` file
+> does not produce. Naming the story is both accurate and free.
+>
+> **(9) The "not available in this build" example is now `move`.** It was `list` until S06, then
+> `import` until this story. `move` is the one the story says is NOT in 2.0.0 — remove and add
+> instead — so the example cannot be overtaken by the next story.
 
 ### ARC-07-S09 — `/snowarch setup-instance` skill body: prerequisite check, three `AskUserQuestion`s, printed command per OS, `--resume` with reload + doctor, S-02 fallback
 
@@ -594,6 +816,50 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ---
 
+> **Amendment 2026-09-10 (ARC-07-S09).** Six departures and findings.
+>
+> **(1) The hand-off block is the FRAGMENT's, not the story's prose.** The story writes its own
+> wording around the command ("Run this in your own terminal — not here: …"); the skill includes
+> `docs/snippets/terminal-handoff.md` verbatim instead, because ARC-06-S13 made that fragment the
+> one definition and `tests/terminal-handoff.test.mjs` asserts the skill and the install page carry
+> it byte-for-byte. Two wordings of the credential procedure is precisely what that test exists to
+> prevent — so the fragment's command line was amended to the story's FULL form (`--env`, `--auth`,
+> `--preset`), and the install page changed with it. `docs/INSTALL.md` is **249 lines**, unchanged
+> (the budget is 250).
+>
+> **(2) The command shape has one definition and a renderer.**
+> `scripts/handoff-command.mjs` reads the template out of the fragment and fills it; the skill
+> quotes the template, and `tests/handoff-command.test.mjs` asserts that rendering AC 1's answers
+> produces the story's line byte for byte. The story's line is a literal in that test on purpose —
+> it is the acceptance criterion, and a test that derived it from the template it checks would
+> agree with itself about anything.
+>
+> **(3) The eight-entry assertion lives in `tests/snowarch-skill.test.mjs`, not in the tree-wide
+> skills lint.** `skills-lint.test.mjs` is the rule set every skill answers to; "these exact eight
+> tools" is true of one skill only, and putting it there would make the lint carry a per-skill
+> table. It sits beside the other frontmatter assertions for this file, and it is now an EQUALITY
+> rather than a set of `match` calls — a grant is a security surface, and an entry added by
+> accident is invisible to a handful of substring checks.
+>
+> **(4) The password-line count moved from two to four, deliberately.** The authentication question
+> has to say what each method needs ("username + password"; ROPC's "client id + secret AND a user
+> password"), or the choice is made blind. The test's own comment invited the number to move with a
+> reason; the reason is recorded there, and it still catches a fifth line — the softening
+> qualifier it was written to stop.
+>
+> **(5) VALIDATION-TESTS gained a "Reserved numbers" section, and the shape rule changed with it.**
+> T-19 belongs to ARC-08-S10, so this file jumps 18 → **T-20, T-21**. Contiguity could not express
+> a reservation, so the rule is now: ascending, unique, and every gap named with the story that
+> will fill it. That catches strictly more than counting did — an undeclared gap is still a
+> renumbering that lost a test.
+>
+> **(6) `--section prereqs` does not exist yet, and the skill says so.** The field contract is
+> written into the skill body as a comment AND into ARC-08-S01's story text (fixed 2026-09-10), so
+> the story that builds it has something to build to. Until then the skill reads
+> `.local/bootstrap-state.json` for the mode and prints BOTH command spellings rather than guessing
+> a shell it could not detect — stated in the body, in T-20's pass criteria and in the sitting row.
+> `claude plugin validate` passes locally (`✔ Validation passed`) as well as in CI.
+
 ### ARC-07-S10 — `docs/MODES-AND-PRESETS.md` final text; error-registry entries; runtime rule text for `AUTHENTICATION_FAILED` / `INSUFFICIENT_PRIVILEGES` / `PROD_WRITE_NOT_ACKNOWLEDGED`
 
 > **Amendment 2026-09-08 (from ARC-05-S07). First item of this story's list: the permission-modes
@@ -657,6 +923,47 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ---
 
+> **Amendment 2026-09-10 (ARC-07-S10).** Six departures and findings.
+>
+> **(1) THE LINE BUDGET IS RETIRED, and replaced by a structural one.** It moved 150 → 160 → 170 as
+> the page absorbed ARC-04's store facts and S01's credential boundary; this story adds the five
+> sections the README always promised. A number that moves every time the page grows for a good
+> reason is a chore, not a budget. What it protected — a page nobody reads to the end — is
+> protected better by shape: **eleven sections in the story's order, none over sixty lines**, which
+> fails with the section named. The page is **335 lines, 11 sections, longest 60**.
+>
+> **(2) The runtime text does not spell the tool prefix.** The story's draft opens "If any
+> `mcp__servicenow__` tool returns…"; the rule file states that prefix exactly ONCE, rendered from
+> `engine.config.json`'s server key, and ARC-05's own test asserts both the count and the absence of
+> a literal copy. The paragraph therefore reads "If a ServiceNow tool returns AUTHENTICATION_FAILED"
+> — the same instruction, and one that stays right the day the key changes.
+>
+> **(3) Two entries lost their `command` field.** The renderer appends `— \`command\`.` AFTER the
+> remedy, and `AUTHENTICATION_FAILED` and `PROD_WRITE_NOT_ACKNOWLEDGED` now carry their commands
+> INSIDE the paragraph, where the sentence needs them. Keeping both would print each command twice
+> and would break the verbatim paragraph AC 4 asserts. The commands are still in the prose, in
+> `docs/TROUBLESHOOTING.md` and in the rule file.
+>
+> **(4) A remedy now serves two audiences, and that is worth naming.** `showInRule: true` renders
+> the remedy into the rule file for the MODEL, and `docs/TROUBLESHOOTING.md` renders the same field
+> under **Remedy.** for a HUMAN. The three runtime texts read as instructions to a session ("Tell
+> the user to run…"), which is slightly odd on the troubleshooting page. The brief ruled against
+> inventing a `ruleText` field; if that ever changes, these three entries are the reason.
+>
+> **(5) The page may name the legacy STORE PATH.** `tests/no-legacy-surfaces.test.mjs` forbids the
+> retired product name in this page, and the migration section has to name
+> `~/.config/servicenow-mcp/instances.json` — a path a reader types. The exemption is written as the
+> PATH, not as the word, with a planted negative proving the vocabulary ban still bites.
+>
+> **(6) Two blocks moved and one section did not survive as its own heading.** "Propose, don't
+> impose" is a principle about the review screen, so it is a paragraph at the end of section 4
+> rather than a section of its own, and the `/snowarch setup-instance` walkthrough sits inside
+> "Typing secrets safely", where the credential boundary it protects is. The eleven headings are
+> the story's list exactly. A new generator, `gen-modes`, includes the four owned blocks (the two
+> review screens, the migration plan, the terminal hand-off) — separate from `gen-governance`
+> because that one owns the PRESETS block in the same file, and two renderers in one process would
+> each compute from the pre-write text and clobber the other. **Nine generators** now.
+
 ### ARC-07-S11 — Live E2E suite behind `RUN_LIVE_E2E=1`: wizard end to end, three-failure exit with lockout check, prod cap, ROPC-disabled fixture, import
 
 **As** a maintainer **I want** a nightly suite that runs the real CLI against a real PDI and proves the promises the unit tests can only simulate — no echo, no secret in `ps`, no lockout after three failures, 0600/0700, prod cap, the exact ROPC-disabled error text **so that** a regression in the credential boundary is caught before a release, and never on a pull-request runner without secrets.
@@ -679,6 +986,37 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
   8. **Sleeping PDI** (manual, documented) — record which S02 code a hibernated PDI produces; not automated.
 - Workflow `e2e-live.yml`: `schedule` nightly + `workflow_dispatch`; jobs on `macos-latest`, `ubuntu-latest` (cases 1–7) and `windows-latest` (cases 2, 4, 6, 7); secrets only available on the default branch; the job uploads a redacted log (the test's own redactor replaces the secret values with `***` before writing artefacts). Pull-request CI never sets `RUN_LIVE_E2E`.
 - Run record: `docs/validation/<date>-e2e-live-<os>.md` without the instance URL (Q-A persona: the author's PDI is not a product fact).
+
+> **Amendment 2026-09-10 (ARC-07-S11).** Five departures and findings.
+>
+> **(1) `script(1)`'s presence is now MEASURED, not assumed.** The story names the two dialects and
+> takes the binary for granted. `e2e-live.yml`'s first step runs `command -v script` and prints the
+> version line on every non-Windows runner, so the first nightly run records which dialect each
+> image has — the citation this design note lacked. If a runner ever ships without it, the pty
+> cases fail on a step that says why rather than on a timeout.
+>
+> **(2) The suite lives at `tests/e2e/`, beside `tests/live/` rather than inside it.**
+> `tests/live/README.md` documents "the owner's sitting" — cases a person executes by hand. This
+> suite is executed by a scheduled workflow. Same gate (`RUN_LIVE_E2E=1`), same env loading, same
+> redactor; different thing, so a different directory.
+>
+> **(3) The "no workflow reads a secret" rule became an allow-list.** It was the right rule while
+> every job ran on a proposed change. `e2e-live.yml` needs five, on the default branch only, so the
+> test now asserts **exactly those five names in exactly that one workflow** — a sixth, or one of
+> them elsewhere, still fails. The regex widened with it: `[A-Z_]+` captured `SNOW_E`, a prefix
+> matching nothing, which would have made the allow-list a lie.
+>
+> **(4) Case 5's instance write is not mine to make.** Setting
+> `glide.oauth.inbound.ropc.grant_type.disabled` is a WRITE to a real instance, which this project's
+> §2.1 puts behind an explicit human approval. The case is written, gated behind
+> `SNOW_E2E_ALLOW_WRITES=1`, and restores the property in a `finally`; the run — and the fixture
+> capture that follows it — is the owner's, with the procedure in `OWNER-SITTING.md`.
+>
+> **(5) AC 1 is asserted from the REPORTER, not from a comment.** A nested `vitest run` of the live
+> file, with the gate off and `fetch` replaced through `--import`, must report `numPendingTests > 0`
+> and `numPassedTests === 0`, and the stub must never have been called. "Skipped" and "passed" look
+> identical in a summary line, which is how a suite that stopped running goes unnoticed for a
+> release. (`--setupFiles` is not a flag in this vitest; the stub arrives through `NODE_OPTIONS`.)
 
 **Acceptance criteria.**
 1. `npm test` without `RUN_LIVE_E2E=1` skips the suite (reported as skipped, not passed) and makes no network call (asserted by a test that stubs `fetch` to throw during the unit run).

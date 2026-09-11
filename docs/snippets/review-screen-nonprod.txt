@@ -1,0 +1,10 @@
+Proposed preset for "pdi" (pdi): full  — non-production: everything on
+  [x] WRITE        probe: ok
+  [x] CMDB_WRITE   probe: ok
+  [x] SCRIPTING    probe: ok
+  [x] ATF          probe: ok
+  [x] NOW_ASSIST   probe: no Now Assist licence detected — tools will fail until licensed; keep on?
+                   (recommend: off)
+  [x] FLUENT       probe: @servicenow/sdk not on PATH — keep on? (recommend: off)
+Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset · "?"
+explains the flags

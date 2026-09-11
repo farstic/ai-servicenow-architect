@@ -59,12 +59,19 @@ export function prBody(report) {
  *
  * A dry run that left a moved pin behind would be worse than no dry run: the next thing to read the
  * config would believe the bump had happened. So the restore is verified rather than assumed, and
- * the script fails if the tree is not clean afterwards.
+ * the script fails if the tree is not clean afterwards — which is how the third staged path was
+ * caught: the recipe block was regenerated, unstaged, and left modified in the working tree.
  */
-function restore(oldPin) {
+function restore(oldPin, staged) {
   git(['restore', '--staged', '.']);
   git(['-C', CORPUS_DIR, 'checkout', '--detach', oldPin]);
-  git(['restore', 'engine.config.json']);
+  // Restore what the refresh SAID it staged, rather than the one file this used to name. The
+  // recipe fix made `docs/ARCHITECTURE.md` a third possible path, and a hard-coded list is a list
+  // that goes stale the next time the refresh writes something new — here, silently, because the
+  // porcelain check below would blame the tree rather than this function. The corpus is excluded
+  // because it is a gitlink the line above already moved.
+  const files = staged.filter((f) => f !== CORPUS_DIR);
+  if (files.length > 0) git(['restore', '--', ...files]);
   const porcelain = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' })
     .split('\n').filter((l) => l.trim() !== '');
   if (porcelain.length > 0) {
@@ -126,7 +133,7 @@ function main() {
   process.stdout.write(`${body}\n`);
 
   if (dryRun) {
-    restore(oldPin);
+    restore(oldPin, report.staged);
     process.stdout.write('\ndocs-bump: dry run — tree restored, porcelain empty, nothing staged\n');
     if (report.newlyDead.length > 0) {
       // A dry run's job is to REPORT. Newly dead citations are the finding it exists to surface, not

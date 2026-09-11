@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { removeTempDir, reapServerChildren, trackServerChild } from '../helpers/server-child.js';
+import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 
 const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/server.js');
 
@@ -17,17 +17,22 @@ const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/serv
  * the handler USES them — a `capResult` with no caller passes every unit test it has, and a
  * grep proves only that one spelling of the routing is absent.
  *
- * The two instances below use `.invalid` hosts on purpose: the name is guaranteed never to
- * resolve, so the DNS failure is deterministic and its message names the host that was
- * contacted. That name is the evidence — a call that had honoured `instance: "other"` would
- * fail against the other host, and the assertion would read the difference.
+ * The two instances below use distinct fixture hostnames on purpose: the name that appears in the
+ * failure is the evidence — a call that had honoured `instance: "other"` would name the other
+ * host, and the assertion reads the difference. The names are never resolved, and they no longer
+ * lean on a reserved TLD: "guaranteed never to resolve" turned out to be a promise a corporate or
+ * CI resolver does not always keep.
  */
 let base: string;
 let checkout: string;
 let home: string;
 
 const instance = (host: string, environment: string) => ({
-  url: `https://${host}.example.invalid`,
+  // A fixture hostname, never resolved: these assertions are about the STRING the router and the
+  // capability report echo back. Renamed off the reserved TLD with the rest of the suite — a name
+  // that "cannot resolve" is a promise the network does not always keep, and no test here should
+  // depend on it either way.
+  url: `https://${host}.test-only`,
   environment,
   auth: { method: 'basic', username: 'fixture.user', password: 'Fixture-Secret-1' },
   preset: 'pdi-developer',
@@ -70,7 +75,7 @@ async function connect(extraEnv: Record<string, string> = {}): Promise<Client> {
 const text = (r: unknown): string => ((r as { content: Array<{ text: string }> }).content[0].text);
 
 beforeEach(() => {
-  base = mkdtempSync(join(tmpdir(), 'snowarch-routing-'));
+  base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-routing-')));
   home = join(base, 'home');
   checkout = join(base, 'volume', 'repo');
   mkdirSync(home, { recursive: true });
@@ -79,9 +84,14 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  // Reap first: the removal is only safe once nothing can still write into the directory.
-  await reapServerChildren();
-  removeTempDir(base);
+  // Reap first: the removal is only safe once nothing can still write into the directory. In a
+  // `finally`, because a reap that throws must not take the removal with it — that is one of the
+  // two ways these trees survived a run.
+  try {
+    await reapServerChildren();
+  } finally {
+    removeTempDir(base);
+  }
 });
 
 describe('criterion 4 - a per-call `instance` argument does not route', () => {
@@ -92,7 +102,7 @@ describe('criterion 4 - a per-call `instance` argument does not route', () => {
         name: 'snow_core_records_query',
         arguments: { table: 'incident', instance: 'other' },
       }));
-      expect(r).toContain('pdi-host.example.invalid');
+      expect(r).toContain('pdi-host.test-only');
       expect(r).not.toContain('other-host');
     } finally { await client.close(); }
   }, 40_000);
@@ -118,7 +128,7 @@ describe('criterion 4 - a per-call `instance` argument does not route', () => {
     try {
       expect(text(await client.callTool({
         name: 'snow_core_records_query', arguments: { table: 'incident' },
-      }))).toContain('pdi-host.example.invalid');
+      }))).toContain('pdi-host.test-only');
     } finally { await client.close(); }
   }, 40_000);
 });

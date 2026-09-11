@@ -118,6 +118,26 @@ Two mechanical notes worth knowing:
 
 ---
 
+## The live E2E secrets — names only
+
+`e2e-live.yml` runs the wizard against a real instance nightly, on the default branch only. It reads
+five repository secrets, and this list is the whole of what a maintainer has to create:
+
+| Secret | What it is |
+|---|---|
+| `SNOW_E2E_URL` | the instance origin, `https://<host>`, no path |
+| `SNOW_E2E_USERNAME` | an account on that instance — a PDI account, not a customer's |
+| `SNOW_E2E_PASSWORD` | its password |
+| `SNOW_E2E_OAUTH_CLIENT_ID` | optional; case 5 skips without the pair |
+| `SNOW_E2E_OAUTH_CLIENT_SECRET` | optional |
+
+**Names only, here and everywhere.** No value of any of these belongs in a file, a pull request, a
+transcript or a run record — `tests/workflows.test.mjs` allows exactly these five names in exactly
+that one workflow, and a sixth, or one of them elsewhere, fails the suite.
+
+Locally the same values come from a `0600` file pointed at by `SNOW_ENV_FILE`, never a `.env` in the
+working directory: a file the tools pick up by walking the tree is a file that ends up in a tarball.
+
 ## Secret scanning
 
 CI runs `gitleaks` over the **full history** on every push. Two allowances, and they are different kinds:
@@ -786,6 +806,152 @@ a silent behaviour change — which is exactly what a line budget invites.
 
 ---
 
+## Never edit the generated region of `bootstrap.sh`
+
+Everything between `# text-begin` and `# text-end` comes from `scripts/gen-launcher-text.mjs`, which
+reads `remedies.json`, `net-sentences.mjs` and `text.json`. Edit the source and run the generator;
+`npm run gen:check` fails otherwise, and `tests/launcher-parity.test.mjs` compares every sentence
+against its origin. The recipe is *sourced* from `tools/snowarch/launcher/docs-recipe.sh` — never
+pasted in.
+
+The launcher also has a line budget and a bash-3.2 constraint list, both enforced by that test. If
+you are adding a step to it, ask first whether the step belongs on the Node path instead: this file
+exists for the machines that cannot run the other one, not as a second implementation.
+
+## Adding a doctor check: registry → snapshots → mapping table
+
+Three files, in this order, and the tests will tell you if you stop after the first.
+
+1. **The registry.** A check is `defineCheck({ id, section, title, severity, quick, network,
+   spawns, fixable, run })` in `tools/snowarch/lib/doctor/checks/`. The id is permanent: eleven ARCs
+   name a check id as their proof, and renaming one silently removes somebody else's evidence.
+2. **The three snapshots.** `tests/fixtures/doctor/snapshot-{linux,darwin,win32}.json` record what
+   a design-only install answers, per check. A new id is red in `tests/doctor/snapshot.test.mjs`
+   with the id named — on every cell, not only after a bootstrap. Produce the rows from a real run
+   rather than by hand: `node scripts/ci/doctor-snapshot.mjs --in doctor.json --write` on the
+   platform, or from that platform's `doctor-<label>` artifact on a green CI run. If Windows
+   answers differently, add the id to `WINDOWS_DIFFERS` in `scripts/ci/doctor-snapshot.mjs` **with
+   the reason** — an undocumented difference fails the test that compares the platforms.
+3. **The mapping table.** `docs/ARCHITECTURE.md`'s generated appendix maps every legacy check to
+   its replacement; `npm run gen` refreshes it and `npm run gen:check` proves it.
+
+What a check must never do: write anything outside `.local/`, read the real `~/.claude.json` in a
+test, or put a credential in a `detail`. `tests/doctor/redaction-e2e.test.mjs` reads the finished
+report — text, `--json` and `--fix` — looking for the fixture's username and password, because the
+mask functions being correct does not stop a check from printing the store itself.
+
+If the check can repair what it finds, it also needs a fixer in the `--fix` whitelist
+(`tools/snowarch/lib/doctor/fix.mjs`) and a `data.fix.kind` the whitelist knows — the whitelist is
+closed, and a `fixable` check with no fixer fails its own test.
+
+## The Mode line has one definition
+
+`Mode:` is quoted by the bootstrap's summary, the SessionStart banner, `/snowarch status` and
+`snowarch mode`. All four call `modeLine()` in `tools/snowarch/lib/text.mjs`; none of them builds
+the string. Four programs answering "what am I in" three different ways is the failure this
+prevents, and it is the kind that only shows up in a screenshot from a confused user.
+
+The same module owns the dialog count and the command spellings, and `text.json` is generated from
+it for the Node-free launchers. If you are about to type one of those sentences into a second file,
+generate it instead.
+
+## A variable Claude Code sets per session is never read — it is set
+
+`CLAUDE_PROJECT_DIR` is the project root of the session that spawned the process. When one of our
+tools spawns something, **our tool is that session**, so an inherited value is somebody else's
+answer to our question. Every child goes through `childEnv(root, extra)` in
+`tools/snowarch/lib/spawn-env.mjs`, which pins it to the checkout.
+
+This is not hypothetical and it is not visible where most people work. Inside a Claude Code session
+pointed at another repository, the inherited value made B08 spawn
+`…/other-repo/packages/snowarch/dist/server.js` — `Cannot find module`, exit 1 — and would have made
+the server CLI read and write **that repository's** `.local/instances.json`, because the server
+resolves its store as `<CLAUDE_PROJECT_DIR ?? cwd>/.local/instances.json`. In a plain terminal and
+in CI the variable is unset, so everything passes. `tools/snowarch/tests/spawn-env.test.mjs` plants
+a bogus value and asserts every spawn's environment carries the checkout.
+
+The `${CLAUDE_PROJECT_DIR}` in `.mcp.json` and in the SessionStart hook command is a different
+thing: those are templates **Claude Code expands itself**, and they are correct as they stand.
+
+## The server is SPAWNED, never imported — and only once
+
+The server package has an in-process doctor, and verifying an install by importing it would prove
+that a library works when imported — which is not the thing that fails. What fails is the child
+process: a cold start over `MCP_TIMEOUT`, a `dist/` that does not match the contract, an
+`SNOW_STORE` in the operator's shell pointing somewhere else.
+
+There is exactly ONE place that spawns it: the doctor's `server` section (SV-05/SV-06), through the
+server package's own MCP client. B08 used to spawn a second one from `lib/mcp-handshake.mjs`;
+ARC-08-S05 retired that and made the step call `runDoctor({ sections: ['server'] })` instead. If you
+are tempted to add another handshake for speed or convenience, the cost is not the code — it is two
+answers to "does the installed server work", kept in step by nothing.
+
+## Import the store modules lazily, and type-check before you push
+
+`packages/snowarch/dist/store/schema.js` and `index.js` import zod, which exists only after B04's
+`npm ci`. Anything the step registry loads — B06, `lib/instance-file.mjs` — must therefore reach
+them with a dynamic `import()` inside the function that needs them, never at module load: a static
+import would make `./snowarch bootstrap --mode design` fail on a fresh clone, which is the product's
+whole first impression. A test asserts it by scanning the sources.
+
+And run `npm run type-check` before pushing any change under `packages/` — `npm test` does not
+type-check the server package, and nine CI cells will find in a minute what one command finds
+locally.
+
+## The recipe has one source
+
+The git-only corpus recipe lives in `tools/snowarch/lib/docs/recipe-block.mjs` and nowhere else.
+Three files are generated from it — the block in `docs/ARCHITECTURE.md` and the two launcher files
+under `tools/snowarch/launcher/` — and `docs sync --print-recipe` renders from the same function.
+Never edit between the `DOCS-RECIPE` or `# recipe-begin` markers: run
+`node scripts/gen-docs-recipe.mjs`, which `npm run gen:check` enforces. A hand-typed copy is a copy
+that drifts the first time the pin moves, and the launchers are exactly where that would go
+unnoticed — they run on the machines that have no Node to check them.
+
+## Never overwrite `settings.local.json`
+
+`.claude/settings.local.json` belongs to the operator. Anything that writes it — B07, ARC-08's
+`--fix`, `snowarch mode` — goes through `applyToggles()` in `tools/snowarch/lib/settings-local.mjs`,
+which reads the file, applies only the two array members and the hook entry, and writes the same
+object back: other keys untouched, other array members preserved, key order kept. Invalid JSON is
+the only failure mode and it changes nothing. A second writer would be a second opinion about what
+"the toggles" are, and the first casualty would be someone's permission grants.
+
+## Adding a preflight check
+
+1. Add the check function to `tools/snowarch/lib/steps/B00.mjs`, returning `ok` / `warn` / `fail`
+   with a detail, and list it in `runChecks` — order is the operator's reading order.
+2. Add its row to `lib/remedies.json` for all four platform keys; a failure without a remedy is a
+   status, not help, and the test refuses a missing row or an unfilled `{placeholder}`.
+3. Never spell a floor: read it from `ctx.config.floors`, and add the row to the seven-check table
+   in `docs/ARCHITECTURE.md`.
+
+## Adding a bootstrap step
+
+1. Add a `BNN.mjs` to `tools/snowarch/lib/steps/` exporting `id`, `title`, `needsNode`, `runsWhen`,
+   `inputs`, `run` — plus `skipReason` if it can be skipped, and `cacheable: false` if a recorded
+   `ok` must never stand in for running it.
+2. `inputs(ctx)` returns TAGGED entries only — `FILE('path')` or `TEXT('key=value')`. An untagged
+   entry throws, because a literal read as a path hashes as `<absent>` and two different runs then
+   share a digest.
+3. Add it to `STEPS` in `lib/steps/index.mjs`, in order. That list is the only place order lives.
+4. Spawn children through `ctx.spawn` and nothing else — that is how Ctrl-C reaches them.
+5. Add its row to "Bootstrap steps and state file" in `docs/ARCHITECTURE.md`, and never store a URL,
+   a username or a credential in the step's `data`: `saveState` refuses it at write time.
+
+## Editing the registration files
+
+**Never hand-edit `permissions` in `.claude/settings.json`.** It is generated from the server
+contract — 236 allow entries and 161 ask entries, regenerated whenever a tool's gate changes — and a
+hand-edit is overwritten by the next `npm run gen`. **`env` and `hooks` are yours**: the generator
+rewrites only the key it owns and carries the rest through, which is asserted by test rather than
+trusted.
+
+`.mcp.json` is hand-written and small. Every `${…}` must carry a `:-` default, no key may look like
+a credential, and the server key must equal `engine.config.json`'s `mcp.serverKey` — all three are
+enforced by `tests/registration-files.test.mjs`, and the engine lint's L02/L07 cross-check the key
+against the rule file and the pin.
+
 ## Switching release family
 
 `node scripts/docs.mjs family zurich --dry-run` first, always. It prints every edit it would make
@@ -823,6 +989,11 @@ upstream has moved. It never merges anything.
   you would get running it locally. `newly dead (n)` is the whole reason the PR exists.
 - **Remap the citations on the PR's branch**, then push. The `needs-remap` label and the red
   `docs-check` job both clear when `docs verify` reports `dead: 0`.
+- **Two repository settings this depends on.** Settings → Actions → General → **"Allow GitHub
+  Actions to create and approve pull requests"** must be on; without it the run moves the pin, pushes
+  the branch and then fails at `gh pr create`. And the first CI run on each bot-authored pull request
+  may need **"Approve and run"** — GitHub gates first-time-contributor workflows and `github-actions`
+  counts as one.
 - **One bump at a time.** The branch is named for the target SHA, so a re-run against the same tip
   updates the PR rather than opening another; a newer tip closes the older one with `superseded
   by #<n>`. If you see two open, something went wrong — say so rather than merging both.
@@ -1082,3 +1253,32 @@ permission" than another, it has a different set of flags, and the doctor is wha
 
 So "this session is `live` on a `pdi-developer` instance" is a complete statement, and one that
 survives a flag being switched off underneath it. The old single number could not say either half.
+
+## `claude mcp` is called in exactly one module
+
+`~/.claude.json` belongs to Claude Code. Nothing in this repository opens it: every read and write
+goes through `claude mcp add-json|get|remove` in `tools/snowarch/lib/registration-claude.mjs`, and a
+test fails the build if any module under `lib/` builds a path to that file or calls `homedir()`.
+
+If you need a new `claude mcp` call, add it there — not in the command that wants it. The module
+also owns two things that are easy to get wrong once and never notice: `-s <scope>` on every call
+(without it, `remove` deletes from whichever scope it finds, and ours is committed), and the
+`cwd: root` that local scope is keyed on.
+
+## What CI proves about the install
+
+The `bootstrap` job is the install promise, executed. **When it is red, the install is broken, not
+the test** — every one of its ten assertions is something a user would hit within a minute of
+cloning: an installer that edited a tracked file, a state file that does not say `design-only`, a
+toggle that is not S05's target, a credential-shaped key left in a config, a corpus that is not at
+the pin, a `.local` anyone can read, a second run that redid the work of the first.
+
+Thirteen cells, three questions. Nine ask whether the install works where Node is present (three
+operating systems × Node 20/22/24). Three ask whether the launcher finishes design-only ITSELF,
+with no Node to hand over to — in `sh` on macOS and Linux, in PowerShell on Windows. One asks
+whether the Windows path works on a machine with no POSIX shell at all.
+
+The negatives were proven once, by fixture pull requests that were opened red and closed unmerged:
+a root-file write fails assertion 2 with the file named, a `SNOW_PASSWORD` placeholder in
+`.mcp.json` fails assertion 5, and a broken `dist/server.js` fails the handshake smoke on every
+`node-cli` cell. Their logs are quoted in ARC-06-S14's pull request.

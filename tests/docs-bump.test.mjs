@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CORPUS_DIR, EXIT, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
 import { syncUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
 import { prBody } from '../scripts/docs-bump.mjs';
+import { RECIPE_TARGET, renderRecipeBlock } from '../tools/snowarch/lib/docs/recipe-block.mjs';
 import { AREAS, CITED_PAGE, buildUpstream, git, makeWorkspace, writeCitingSkill } from './helpers/docs-fixture.mjs';
 
 /**
@@ -235,4 +236,51 @@ test('the script writes the outputs the workflow reads', () => {
   // The workflow interpolates `short` into a branch name and a commit message, so it must not
   // carry anything a shell would treat as syntax.
   assert.match(kv.short, /^[0-9a-f]{7}$/);
+});
+
+test('the body a reviewer reads names the regenerated document among the staged paths', () => {
+  // The S09 half of the recipe fix. The upstream tests prove the block moves; this proves the
+  // pull-request body SAYS SO, because a reviewer approving a bump has only this text to tell them
+  // that a generated document changed underneath the pin.
+  const w = ready();
+  const { block } = renderRecipeBlock({ config: w.config, areas: AREAS });
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  writeFileSync(join(w.root, RECIPE_TARGET), `# fixture\n\n${block}\n`);
+  git(['add', '-A'], w.root);
+  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'doc'], w.root);
+
+  const report = syncUpstream({ ...w, log: silent });
+  const fenced = prBody(report).split('```')[1].trim().split('\n');
+
+  assert.equal(report.recipe.architecture, 'written');
+  assert.match(fenced[fenced.length - 1],
+    /^staged: engine\.config\.json, vendor\/ServiceNowDocs, docs\/ARCHITECTURE\.md — review, then: /);
+  // The JSON the workflow writes carries it too, without a second place deciding what "staged" is.
+  const out = JSON.parse(JSON.stringify({ ...report, prBody: prBody(report), dryRun: false }));
+  assert.deepEqual(out.staged, ['engine.config.json', CORPUS_DIR, RECIPE_TARGET]);
+  assert.equal(out.recipe.architecture, 'written');
+});
+
+test('a dry run restores the regenerated document too, not just the pin', () => {
+  // The restore used to name `engine.config.json` and nothing else. Once the refresh regenerated a
+  // second file, a dry run unstaged it and left it modified — and the check below is what says so.
+  const w = ready();
+  const { block } = renderRecipeBlock({ config: w.config, areas: AREAS });
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  writeFileSync(join(w.root, RECIPE_TARGET), `# fixture\n\n${block}\n`);
+  git(['add', '-A'], w.root);
+  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'doc'], w.root);
+  const before = read(w.root, RECIPE_TARGET);
+  const pinBefore = JSON.parse(read(w.root, 'engine.config.json')).docs.pin;
+
+  const r = execFileSync(process.execPath, [join(repoRoot, 'scripts/docs-bump.mjs'), '--dry-run'],
+    { cwd: w.root, encoding: 'utf8', env: { ...process.env, GITHUB_OUTPUT: '' } });
+
+  assert.match(r, /dry run — tree restored, porcelain empty, nothing staged/);
+  // Bytes, not a normalised comparison: the fixture workspace pins `eol=lf` exactly as this
+  // repository does, so a document that came back with different line endings would be a fixture
+  // that stopped modelling the real one — worth failing over rather than papering over.
+  assert.equal(read(w.root, RECIPE_TARGET), before, 'the document was left modified');
+  assert.equal(JSON.parse(read(w.root, 'engine.config.json')).docs.pin, pinBefore);
+  assert.equal(git(['status', '--porcelain'], w.root).trim(), '');
 });

@@ -48,7 +48,7 @@ other platform object is created, extended or approved by this ADR. §1.1 govern
 
 ## Consequences
 
-- The `/snowarch setup-instance` skill must guide the user through the terminal hand-off for credentials from inside Claude — say exactly what to type, wait, and resume — so interruption (3) never leaves the user without a next step.
+- The `/snowarch setup-instance` skill must guide the user through the terminal hand-off for credentials from inside Claude — say exactly what to type, wait, and resume — so interruption (3) never leaves the user without a next step. **Satisfied by ARC-07-S09 (2026-09-10):** the skill collects every non-secret choice through three `AskUserQuestion`s, prints the one command a user would type by hand — rendered from the single template in `docs/snippets/terminal-handoff.md` — stops without polling, and picks the session up on `--resume` with the authoritative `Mode:` line. It cannot type the credential: `./snowarch instance …` is deliberately absent from its `allowed-tools`.
 - ARC-00's exit criteria and ARC-06's entry criteria both name the S-14 conclusion.
 - If S-14 proves the eleven behaviours, the owner may re-open the channel decision; ADR-0008 would supersede this ADR and ARC-06 and ARC-07 are re-planned **before** any bootstrap work. Nothing else in ARC-00 is wasted either way — that is the point of the hedge.
 - A plugin-channel move would change the tool prefix, which is a contract value fixed by ADR-0001; that coupling is the main reason the decision must close before ARC-05 generates the governance texts.

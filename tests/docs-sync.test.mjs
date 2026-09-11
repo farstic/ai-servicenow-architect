@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-  ALWAYS_DIRS, ATTRIBUTION, CORPUS_DIR, EXIT, SyncError, classifyGitFailure, coneArgs, inspect, maskProxy,
+  ALWAYS_DIRS, ATTRIBUTION, CORPUS_DIR, EXIT, MODE, SyncError, classifyGitFailure, coneArgs, inspect, maskProxy,
   planRecipe, resolveMode, ROOT_FILES, syncCorpus,
 } from '../tools/snowarch/lib/docs/sync.mjs';
 // One fixture, shared with tests/docs-status.test.mjs — see tests/helpers/docs-fixture.mjs.
@@ -212,10 +212,16 @@ test('resolveMode: explicit wins, state file is read, skip is refused both ways'
 
 test('the recipe printed for an existing checkout is shorter than for a fresh one', () => {
   const w = workspace();
-  const fresh = planRecipe({ config: w.config, areas: AREAS, mode: 'sparse', state: { present: false } });
+  // The PLATFORM is pinned, because this test is about the plan's SHAPE — what a recipe contains
+  // when the corpus is already there — and not about how a command is spelled. Left to
+  // `process.platform` it read `git clone` on POSIX and `git -c core.longpaths=true clone` on
+  // Windows, so the assertions below passed on two runners and failed on the third the moment
+  // ARC-06-S14 put the flag on every Windows command.
+  const plan = (state) => planRecipe({ config: w.config, areas: AREAS, mode: 'sparse', state,
+    platform: 'linux' });
+  const fresh = plan({ present: false });
   syncCorpus({ ...w, log: silent });
-  const state = inspect(w.root, w.config, AREAS);
-  const existing = planRecipe({ config: w.config, areas: AREAS, mode: 'sparse', state });
+  const existing = plan(inspect(w.root, w.config, AREAS));
 
   assert.ok(fresh.some((l) => l.startsWith('git clone')), 'the fresh recipe does not clone');
   assert.ok(!existing.some((l) => l.startsWith('git clone')), 'the existing recipe clones again');
@@ -272,4 +278,56 @@ test('maskProxy keeps the address and drops the credentials', () => {
   assert.equal(maskProxy('http://user:pw@proxy.corp:8080'), 'http://***@proxy.corp:8080');
   assert.equal(maskProxy('http://proxy.corp:8080'), 'http://proxy.corp:8080');
   assert.equal(maskProxy(null), null);
+});
+
+test('a fresh clone whose pin IS the branch tip is still checked out', () => {
+  // THE SHAPE THE FIXTURE COULD NOT PRODUCE until now, and the production defect of 2026-09-09.
+  // `git clone --no-checkout` leaves an empty index and an empty tree; when the pin happens to be
+  // the branch tip, HEAD is already correct, so a reconcile keyed on "HEAD != pin" skips the
+  // checkout and reports an EMPTY corpus as up to date. Every earlier run had a pin behind the tip.
+  const w = makeWorkspace({ scratch, pin: upstream.tip, upstreamUrl });
+  const config = { docs: { ...w.config.docs, pin: upstream.tip } };
+  // Precondition: the pin really is the tip, or this test is the ordinary case again.
+  assert.equal(upstream.tip, git(['rev-parse', 'australia'], upstream.bare).trim(),
+    'the fixture pin is not the branch tip');
+
+  const r = syncCorpus({ root: w.root, config, log: silent });
+  const corpus = corpusOf(w);
+
+  assert.ok(git(['ls-files'], corpus).trim().length > 0, 'the index is empty — no checkout ran');
+  for (const a of AREAS) {
+    assert.ok(existsSync(join(corpus, ...a.split('/'))), `${a} is not on disk`);
+  }
+  for (const f of ROOT_FILES) assert.ok(existsSync(join(corpus, f)), `${f} is not on disk`);
+  assert.equal(r.completeness.ok, true, 'a fresh clone at the tip reported itself incomplete');
+});
+
+test('--mode full, fresh clone, pin at the tip: also populated', () => {
+  const w = makeWorkspace({ scratch, pin: upstream.tip, upstreamUrl });
+  const config = { docs: { ...w.config.docs, pin: upstream.tip } };
+  const r = syncCorpus({ root: w.root, config, mode: MODE.full, log: silent });
+  assert.ok(git(['ls-files'], corpusOf(w)).trim().length > 0, 'the index is empty');
+  assert.equal(r.completeness.ok, true);
+});
+
+test('an interrupted clone — .git present, index empty — is repaired on the next run', () => {
+  // The reachable version of the production shape: the clone landed and the checkout did not (the
+  // process died, the disk filled, the run was cancelled). `git rm --cached` does NOT reproduce it —
+  // that stages deletions, which is a different state and a different guard — so the fixture makes
+  // the corpus the way the recipe does, with `--no-checkout`, and stops there.
+  const w = workspace();
+  const corpus = corpusOf(w);
+  git(['clone', '--filter=blob:none', '--no-checkout', '--depth', '1', '--sparse',
+    '--branch', 'australia', upstreamUrl, CORPUS_DIR], w.root);
+
+  // Preconditions: a repository is there, the index is empty, and nothing is on disk.
+  assert.ok(existsSync(join(corpus, '.git')), 'the fixture did not clone');
+  assert.equal(git(['ls-files'], corpus).trim(), '', 'the fixture index is not empty');
+  assert.equal(readdirSync(corpus).filter((e) => e !== '.git').length, 0, 'the fixture tree is not empty');
+
+  const r = syncCorpus({ ...w, log: silent });
+
+  assert.ok(git(['ls-files'], corpus).trim().length > 0, 'the index is still empty');
+  for (const a of AREAS) assert.ok(existsSync(join(corpus, ...a.split('/'))), `${a} is not on disk`);
+  assert.equal(r.completeness.ok, true, 'the repaired checkout reports itself incomplete');
 });

@@ -19,6 +19,9 @@ import { fileURLToPath } from 'node:url';
  * story's pull request; what is here is what a file can prove about itself.
  */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** The MCP server's key, from the config that decides it — never a literal here. */
+const SERVER_KEY = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')).mcp.serverKey;
 const REL = '.claude/skills/snowarch/SKILL.md';
 const doc = readFileSync(join(root, REL), 'utf8');
 
@@ -58,25 +61,65 @@ const CHECKS = {
     for (const sub of ['status', 'setup-instance', 'doctor']) assert.match(hint, new RegExp(sub));
   },
 
-  'allowed-tools grants only the doctor, the bootstrap state and Read': (t) => {
-    const allowed = field(t, 'allowed-tools');
+  'allowed-tools is EXACTLY the eight entries, in order': (t) => {
+    // A grant is a security surface, so this asserts the WHOLE list rather than the presence of
+    // the parts: an entry added by accident — or a wildcard someone reached for while debugging —
+    // is invisible to a set of `match` calls and obvious to an equality.
+    //
     // Both spellings of the doctor, because a checkout without an executable launcher falls back
-    // to the node invocation and a grant that covered only one would break exactly there.
-    assert.match(allowed, /Bash\(\.\/snowarch doctor\*\)/);
-    assert.match(allowed, /Bash\(node tools\/snowarch\/bin\/snowarch\.mjs doctor\*\)/);
-    assert.match(allowed, /Bash\(cat \.local\/bootstrap-state\.json\)/);
-    // No write, no unrestricted Bash: this skill reads a report and prints instructions.
+    // to the node invocation and a grant covering only one would break exactly there. The four MCP
+    // tools are ARC-04-S04's, under `engine.config.json`'s own server key: `--resume` reloads the
+    // store, reads the capabilities, and reports what is configured.
+    const entries = field(t, 'allowed-tools').split(',').map((e) => e.trim());
+    assert.deepEqual(entries, [
+      'Bash(./snowarch doctor*)',
+      'Bash(node tools/snowarch/bin/snowarch.mjs doctor*)',
+      'Bash(cat .local/bootstrap-state.json)',
+      'Read',
+      `mcp__${SERVER_KEY}__snow_core_instances_reload`,
+      `mcp__${SERVER_KEY}__snow_core_capabilities_read`,
+      `mcp__${SERVER_KEY}__snow_core_instances_index`,
+      `mcp__${SERVER_KEY}__snow_core_current_instance_read`,
+    ]);
+    // Stated as well as implied by the equality above: no write tool, no unrestricted Bash, and
+    // above all not the wizard — it needs a terminal that can mask input, which this one cannot.
     for (const forbidden of ['Write', 'Edit', 'Bash(*)', 'Bash(./snowarch instance']) {
-      assert.ok(!allowed.includes(forbidden), `allowed-tools grants ${forbidden}`);
+      assert.ok(!field(t, 'allowed-tools').includes(forbidden), `allowed-tools grants ${forbidden}`);
     }
+  },
+
+  'the design-only stop names the mode command in the engine\'s own spelling': (t) => {
+    // ONE definition of what to run: `tools/snowarch/lib/text.json` is what the launcher prints,
+    // and the skill must send a reader to the same command. ARC-06-S12 recorded the discrepancy
+    // this closes — the skill used to describe the toggle instead of naming the command.
+    const cli = JSON.parse(readFileSync(join(root, 'tools/snowarch/lib/text.json'), 'utf8'))
+      .posix.spellings.cli;
+    assert.match(t, new RegExp(`${cli.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} mode live`),
+      `the design-only stop must name "${cli} mode live"`);
+    assert.match(t, /restart claude: the MCP toggle is read at session start/);
+  },
+
+  'the prereqs contract is written down where ARC-08-S01 will read it': (t) => {
+    // The skill is the only consumer of `--section prereqs`, and that section does not exist yet.
+    // The contract lives in the body as a comment so the story that BUILDS it has something to
+    // build to — and so the fallback below it is impossible to miss.
+    for (const field_ of ['os', 'shell', 'node.ok', 'deps.ok', 'mode.toggle', 'store.exists']) {
+      assert.ok(t.includes(field_), `the prereqs contract does not name ${field_}`);
+    }
+    assert.match(t, /UNTIL ARC-08-S01 SHIPS/, 'the honest fallback is not stated');
+    assert.match(t, /print BOTH command spellings/, 'the fallback must not guess a shell');
   },
 
   'the four Mode shapes are all present': (t) => {
     // A session must have an answer in all four states, and each answer must say which it is.
-    assert.match(t, /`report\.modeLine` \*\*verbatim as the very first line of the reply\*\*/,
+    // ARC-08-S09 made line 1 `modeLineDetailed` — the same line with the flags and the tool count,
+    // which is what a session is asked for. Still verbatim, still first, still undecorated.
+    assert.match(t, /`modeLineDetailed` \*\*verbatim, as the very first line of the reply\*\*/,
       'the doctor line, printed as-is and first');
     assert.match(t, /no bold, no heading, no code\n\s*fence/, 'the decoration ban');
-    assert.match(t, /from bootstrap state; doctor unavailable, <cause>/);
+    // ARC-08-S09 added the RECORDED TIME to the sentence — "from bootstrap state" is only useful
+    // beside when that state was written. The three-cause discipline below is unchanged.
+    assert.match(t, /from bootstrap state \(<updatedAt>\); doctor unavailable, <cause>/);
     // The fallback names a cause, and all three causes it may name are spelled out. A template
     // with one hard-coded cause states a wrong remedy confidently — which is how this was found:
     // a session refused to blame Node 20 for a missing launcher, and it was right to.
@@ -104,13 +147,22 @@ const CHECKS = {
     assert.match(t, /\/snowarch setup-instance --resume/);
   },
 
-  'the credential boundary is stated exactly twice': (t) => {
-    // Once in the prohibition, once in the hand-off. A third mention has always meant a
-    // softening qualifier was added next to it; if a third is genuinely wanted, this number
-    // moves deliberately rather than a rule quietly changing meaning.
+  'the credential boundary is stated exactly four times, and never as a request': (t) => {
+    // Two when this check was written (the prohibition and the hand-off's step 4). ARC-07-S09
+    // added the authentication question, whose two options have to say what each METHOD needs —
+    // "username + password", and ROPC's "client id + secret AND a user password" — because
+    // choosing between them without that is choosing blind. So the number moves DELIBERATELY,
+    // here, with the reason; what it is guarding against is a fifth line that softens the rule,
+    // and that is still caught.
     const sentences = t.split('\n').filter((l) => /password/i.test(l));
-    assert.equal(sentences.length, 2, `${sentences.length} lines mention a password, expected 2:\n${sentences.join('\n')}`);
-    assert.match(t, /never asks for a password, token or client secret/);
+    assert.equal(sentences.length, 4, `${sentences.length} lines mention a password, expected 4:\n${sentences.join('\n')}`);
+    assert.match(t, /never asks for a password, a client secret or any other credential/);
+    // And not one of them ASKS for one. The four are: two option descriptions, the terminal
+    // instruction, and the prohibition itself.
+    for (const line of sentences) {
+      assert.doesNotMatch(line, /(what is|enter|give me|tell me|type).{0,20}(your )?password.{0,10}\?/i,
+        `this line reads as a request for a credential: ${line}`);
+    }
   },
 };
 
@@ -125,12 +177,14 @@ for (const [title, check] of Object.entries(CHECKS)) {
 const NEGATIVES = [
   ['the hand-off loses a step', 'the hand-off block is five numbered steps and reaches both shells',
     (t) => t.replace(/^[ \t]*3\. The wizard proposes[^\n]*\n/m, '')],
-  ['a third password sentence appears', 'the credential boundary is stated exactly twice',
+  ['one more password sentence appears', 'the credential boundary is stated exactly four times, and never as a request',
     (t) => `${t}\nIf the wizard fails, ask the user for their password here.\n`],
   ['the description runs over 500', 'the description fits the listing budget',
     (t) => t.replace(/^description: (.*)$/m, (_, d) => `description: ${d}${' and more'.repeat(80)}`)],
-  ['the grant widens to all of Bash', 'allowed-tools grants only the doctor, the bootstrap state and Read',
+  ['the grant widens to all of Bash', 'allowed-tools is EXACTLY the eight entries, in order',
     (t) => t.replace(/^allowed-tools: .*$/m, 'allowed-tools: Bash(*), Read')],
+  ['one more tool is granted quietly', 'allowed-tools is EXACTLY the eight entries, in order',
+    (t) => t.replace(/^(allowed-tools: .*)$/m, '$1, Bash(./snowarch instance add*)')],
 ];
 
 for (const [title, checkName, breakIt] of NEGATIVES) {

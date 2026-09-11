@@ -1,0 +1,198 @@
+{
+  "schema": 1,
+  "mode": "design-only",
+  "summary": {
+    "ok": 26,
+    "warn": 0,
+    "fail": 1,
+    "skip": 10,
+    "fixable": 0
+  },
+  "checks": [
+    {
+      "id": "E-00",
+      "status": "fail",
+      "fixable": false
+    },
+    {
+      "id": "E-01",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-02",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-03",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-04",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-05",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-06",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-07",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-08",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-09",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-10",
+      "status": "ok",
+      "fixable": true
+    },
+    {
+      "id": "E-11",
+      "status": "ok",
+      "fixable": true
+    },
+    {
+      "id": "E-12",
+      "status": "ok",
+      "fixable": true
+    },
+    {
+      "id": "E-13",
+      "status": "ok",
+      "fixable": true
+    },
+    {
+      "id": "E-14",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-15",
+      "status": "ok",
+      "fixable": true
+    },
+    {
+      "id": "E-16",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-17",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-18",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-19",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-20",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-21",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-22",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-23",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-24",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-25",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-26",
+      "status": "ok",
+      "fixable": false
+    },
+    {
+      "id": "E-27",
+      "status": "skip",
+      "fixable": false
+    },
+    {
+      "id": "SV-00",
+      "status": "skip",
+      "fixable": false
+    },
+    {
+      "id": "SV-01",
+      "status": "skip",
+      "fixable": true
+    },
+    {
+      "id": "SV-02",
+      "status": "skip",
+      "fixable": true
+    },
+    {
+      "id": "SV-03",
+      "status": "skip",
+      "fixable": true
+    },
+    {
+      "id": "SV-04",
+      "status": "skip",
+      "fixable": false
+    },
+    {
+      "id": "SV-05",
+      "status": "skip",
+      "fixable": false
+    },
+    {
+      "id": "SV-06",
+      "status": "skip",
+      "fixable": false
+    },
+    {
+      "id": "SV-07",
+      "status": "skip",
+      "fixable": false
+    },
+    {
+      "id": "SV-08",
+      "status": "skip",
+      "fixable": false
+    }
+  ]
+}

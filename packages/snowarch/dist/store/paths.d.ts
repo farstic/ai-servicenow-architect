@@ -16,7 +16,14 @@ export interface StoreResolution {
  * directory and load whatever happened to be there.
  */
 export declare function envPath(name: string): string | undefined;
-/** The per-user global store, per OS. */
+/**
+ * The per-user global store, per OS.
+ *
+ * `XDG_CONFIG_HOME` is honoured (ARC-07-S07): `01` §7 names `~/.config/snowarch/instances.json`,
+ * and on a machine where that variable is set, `~/.config` is not where a user's configuration
+ * lives — writing there anyway would put the credential store somewhere they do not look and
+ * somewhere their backup rules do not cover. Windows keeps `%APPDATA%` with ARC-04-S02's fallback.
+ */
 export declare function globalStorePath(): string;
 /** The per-checkout store. `CLAUDE_PROJECT_DIR` is set by Claude Code; cwd is the fallback. */
 export declare function projectStorePath(): string;
@@ -28,7 +35,9 @@ export declare function projectStorePath(): string;
  * a reason to try the next candidate. Falling back would mean a typo in the override
  * silently loads a different instance than the one asked for.
  */
-export declare function resolveStorePath(): StoreResolution;
+export declare function resolveStorePath({ global }?: {
+    global?: boolean;
+}): StoreResolution;
 /**
  * A path fit for a log line: the home directory becomes `~`, the checkout becomes
  * `<checkout>`. Absolute paths carry the account name, and a log is the one place a
@@ -56,16 +65,59 @@ export declare function maskPathForShell(p: string): string;
  *    and rewriting it would make the remedy point somewhere they did not name.
  */
 export declare function shellRemedy(command: string, target: string): string;
-/** `cvetomir@corp.com` → `c***@corp.com`; `admin` → `a***`. Never the whole name. */
+/** `someone@corp.example.com` → `s***@corp.example.com`; `admin` → `a***`. Never the whole name. */
 export declare function maskUsername(u: string): string;
 /**
- * True when the store would sit inside a folder a cloud client synchronises.
+ * The provider names this repository uses, in the words a user would recognise.
  *
- * It matters because 0600 is a LOCAL permission: the sync client runs as the same user,
- * so the mode does not stop the file leaving the machine. The wizard and the doctor turn
- * this into a warning (D-04); the server only logs it.
- *
- * Both separators are accepted, because a Windows path can reach a POSIX test runner
- * (criterion 8 asserts exactly that).
+ * `CloudStorage (unknown provider)` is the fifth, and it is not padding: macOS mounts every
+ * provider under `~/Library/CloudStorage/<Provider>-<tenant>`, so a mount whose vendor is not in
+ * the table is still a synced folder — and saying "synced, and I cannot tell you by whom" is more
+ * use than saying nothing. ARC-06-S05's engine module already worded it that way.
  */
-export declare function isUnderCloudSyncFolder(p: string): boolean;
+export type CloudProvider = 'OneDrive' | 'Dropbox' | 'iCloud Drive' | 'Google Drive' | 'CloudStorage (unknown provider)';
+export interface CloudSyncHit {
+    provider: CloudProvider;
+    /** The ancestor directory that matched — the folder to move the checkout OUT of. */
+    root: string;
+}
+/**
+ * THE provider list, as data.
+ *
+ * Three implementations must agree about it — this one, the bootstrap's stdlib re-implementation
+ * (ARC-06-S05's `lib/cloud-sync.mjs`, for a checkout that has never run `npm ci`) and the doctor's
+ * E-25 (ARC-08-S03). They agree by satisfying ONE fixture,
+ * `packages/snowarch/tests/fixtures/cloud-sync-paths.json`, rather than by three tables that look
+ * alike today. Order matters: `Mobile Documents` and `com~apple~CloudDocs` are how macOS spells
+ * iCloud, and no user calls it either of those.
+ */
+export declare const CLOUD_SYNC_SEGMENTS: ReadonlyArray<{
+    pattern: RegExp;
+    provider: CloudProvider;
+}>;
+/** The Windows variables the OneDrive client sets. Checked BEFORE the name patterns. */
+export declare const ONEDRIVE_ENV_ROOTS: readonly ["OneDrive", "OneDriveCommercial", "OneDriveConsumer"];
+/**
+ * Which cloud provider synchronises this path, and from which folder — or `null`.
+ *
+ * It matters because 0600 is a LOCAL permission: the sync client runs as the same user, so the
+ * mode does not stop the file leaving the machine. The wizard warns and asks (D-04), the doctor
+ * reports it, the server logs it.
+ *
+ * THE ENVIRONMENT ROOTS COME FIRST, and they are the only detector for the case that matters most:
+ * enterprise "Known Folder Move" redirects `Documents` and `Desktop` into OneDrive without the word
+ * OneDrive appearing anywhere in the path the user sees. `%OneDrive%` still points at it. macOS has
+ * no equivalent — a redirected `~/Documents` there is undetectable, and that is a documented limit
+ * rather than an oversight.
+ *
+ * Symlinks are resolved first, because a link into a synced folder is a path into a synced folder.
+ * A path that does not exist — every path in the unit tests, and any path being planned rather than
+ * visited — is matched as given: `realpathSync` throws on those, and refusing to answer would make
+ * the check useless exactly where it is cheapest to run.
+ */
+export declare function detectCloudSync(absPath: string, { env, realpath }?: {
+    env?: NodeJS.ProcessEnv;
+    realpath?: (p: string) => string;
+}): CloudSyncHit | null;
+/** ARC-04-S02's boolean, now one question asked of one detector. */
+export declare const isUnderCloudSyncFolder: (p: string) => boolean;

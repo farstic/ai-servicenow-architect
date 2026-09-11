@@ -202,7 +202,7 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
 1. On a fresh clone (Node 22), `./snowarch bootstrap --mode design --yes` prints ten step lines (`B04`, `B06`, `B08` as `skipped (design-only)`), creates `.local/bootstrap-state.json` with `mode: "design-only"` and `steps.B09.status: "ok"`, exits 0; a second run prints `ok (cached)` for B01, B02, B05, B07 and finishes in < 5 s.
 2. Running `./snowarch bootstrap` (no flags) shows the plan screen; pressing `1` then Enter changes line 1 to `live` and the Steps line to include `B04 · B06 · B08`; `q` exits 0 without creating `.local/`.
 3. Given a live run killed with Ctrl-C while B04 is executing `npm ci`, the state shows `B04.status = "failed", reason = "interrupted"`, the exit code is 130, and the next `./bootstrap.sh` prints `ok (cached)` for B01–B03 and runs B04.
-4. Given a completed live run, appending a newline to `package-lock.json` and re-running makes **only** B04 (and, because its input includes the store mtime, not B08) re-run: the step lines show exactly one non-cached step among B01–B07 and B08 `ok (cached)`; restoring the file makes everything cached again. (B00 and B09 always run.)
+4. Given a completed live run, appending a newline to `package-lock.json` and re-running makes **only** B04 (and, because its input includes the store mtime, not B08) re-run: the step lines show exactly one non-cached step among B01–B07 and B08 `ok (cached)`; restoring the file re-runs B04 once more — the run with the modified lockfile recorded that hash — and then everything is cached again. (B00 and B09 always run.)
 5. `./snowarch bootstrap --from B06` on a completed live run re-runs B06, B07, B08, B09 and caches B01–B05.
 6. `./snowarch bootstrap --reset` removes the state and `doctor-last.json`, prints the "untouched" sentence, and `sha256sum .local/instances.json` is unchanged.
 7. `./snowarch bootstrap --mode live --yes` without `--instance-file` exits 2 with the sentence above and writes nothing.
@@ -636,6 +636,10 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
 6. `tests/launcher-parity.test.mjs` (S10) also passes for `bootstrap.ps1` (recipe lines, remedy and Next sentences).
 7. With a pre-existing `settings.local.json` lacking the toggle and no Node, B07 fails with the hand-edit sentence (Windows spelling: `install Node 20+ and re-run .\bootstrap.cmd`).
 8. `git ls-files --eol bootstrap.ps1 bootstrap.cmd snowarch.cmd` shows `w/crlf` on a Windows checkout and `i/crlf` in the index.
+   *Amended 2026-09-10 (ARC-06-S11 review):* the assertion is `w/crlf` plus
+   `attr/text eol=crlf`. With that attribute the INDEX keeps LF and the checkout converts,
+   which is the attribute working; `i/crlf` would require `-text`, turning normalisation off
+   for a repository three platforms clone.
 
 **Tasks.**
 
@@ -680,6 +684,11 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
 1. After a design-only install with Node 22, `./snowarch mode live` runs B04/B05/B06(wizard)/B07/B08/B09 only (B01–B03 cached), `settings.local.json` flips to `enabledMcpjsonServers: ["servicenow"]` with no `disabledMcpjsonServers` member `servicenow`, and after a Claude restart `/mcp` shows `servicenow ✔ connected`.
 2. `./snowarch mode design` afterwards flips the toggle back, prints the "instance kept" note, leaves `.local/instances.json` byte-identical, and `/mcp` shows the server disabled; `./snowarch mode` prints `Mode: design-only` and `registration: project (.mcp.json)`.
 3. Given `disableAllHooks: true` written by a Node-free install (state `hooksDisabledByBootstrap: true`), `mode design` or `mode live` with Node now present removes the key; given the key was pre-existing (state flag absent), it is left and a note printed.
+   *Amended 2026-09-10 (S-05 variant B):* no bootstrap and no `mode` run ever writes
+   `disableAllHooks`, so `hooksDisabledByBootstrap` is always `false` and branch A has
+   nothing to remove. What remains is variant B's own rule, and it is what the tests assert:
+   `applyToggles` ADDS the SessionStart hook entry when Node is present and REMOVES it when
+   it is not; a pre-existing user-set `disableAllHooks` is left alone and a note is printed.
 4. `./snowarch mode live --register local` (with an existing store) results in `claude mcp get servicenow` showing a local-scope entry whose `command` is `node` and whose args contain `${CLAUDE_PROJECT_DIR:-.}/packages/snowarch/dist/server.js` unexpanded, `.local/config.json.registration = "local"`, `settings.local.json` containing `disabledMcpjsonServers: ["servicenow"]`, and a Claude session in the folder showing `servicenow ✔ connected` exactly once (no duplicate). `~/.claude.json` contains no key matching `/PASSWORD|SECRET|TOKEN/i` under that entry.
 5. `./snowarch mode live --register project` after (4) removes the local entry (`claude mcp get servicenow` shows the project entry) and restores the live toggle.
 6. `./snowarch mode live --register user` exits 2 with the firewall sentence; with `--ack-user-scope` it registers at user scope and `./snowarch mode` prints `registration: user (~/.claude.json, every project — not recommended)`.
@@ -779,6 +788,22 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
 3. A commit adding `"SNOW_PASSWORD": "${SNOW_PASSWORD:-}"` to `.mcp.json` fails assertion 5 (and S01's test) on all cells.
 4. A commit that breaks the committed `dist/server.js` (fixture: syntax error) fails assertion 9 on all `node-cli` cells with the handshake error text.
 5. Assertion 8 passes: the second run's log shows `ok (cached)` for B01, B02, B07 and no network access to github.com (proxy env set to an unreachable host for the second run).
+   *Amended 2026-09-10 (ARC-06-S14):* the unreachable-proxy half cannot be implemented as
+   written. B00 probes github.com on EVERY run by design (S04 — the check is never cached),
+   so a proxy pointing nowhere makes B00 FAIL and proves nothing about caching. What
+   idempotence means here is asserted instead — and it means two different things by variant,
+   which the job's first run is what revealed. In a **Node-CLI** cell: `ok (cached)` for
+   B01/B02/B07, no `[docs]` phase line, those three entries' `finishedAt` UNCHANGED (a cached step
+   is not re-recorded, so the `durationMs < 1000` the brief asked for can never hold — the number
+   is still the first run's), and exit 0 in under 30 s. In a **no-node** cell there is no cache at
+   all: the launchers record `"inputsHash": null` because bash cannot compute the repository's
+   input hashes, and pretending it could would cache a step whose inputs had changed. So the
+   launcher re-runs its steps by design, and what must hold is that nothing changed — `ok B07:
+   already set`, a byte-identical `settings.local.json`, and the same step outcomes. **The
+   launchers time B02; they do not cache it** (ruled 2026-09-10): both record the measured
+   duration — `$SECONDS`-resolution in bash, a `Stopwatch` in PowerShell — so the CI summary's
+   seconds column is filled for a Node-free reader, who is exactly who reads those rows.
+   `inputsHash` stays `null`, because timing a step and caching it are different claims.
 6. The job summary table is present with a non-empty seconds/MB value for every cell.
 7. After ARC-08 S11, the same job additionally asserts `summary.fail == 0` from `./snowarch doctor --json` in the `node-cli` cells without restructuring.
 

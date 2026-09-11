@@ -27,7 +27,9 @@ test('sync prints it on success, --quiet suppresses it, --json never carries it'
   // Printed through `say`, which `--quiet` short-circuits: one mechanism, so the suppression cannot
   // be true of the phase lines and false of this one.
   assert.match(src, /const attribute = \(\) => say\(ATTRIBUTION\);/);
-  const cli = read('scripts/docs.mjs');
+  // The dispatch moved to the library at ARC-06-S02 when `./snowarch docs` mounted it;
+  // `scripts/docs.mjs` is a shim over the same function. Reading the shim would assert nothing.
+  const cli = read('tools/snowarch/lib/docs/cli.mjs');
   // `--json` runs the sync quiet, so the object a caller parses never has prose in front of it.
   assert.match(cli, /quiet: quiet \|\| asJson/);
 });
@@ -39,8 +41,12 @@ test('no placeholder figure ever merges', () => {
   }
 });
 
-test('the README figures are attributed to a measurement, not asserted from nowhere', () => {
-  const readme = read('README.md');
+test('the install figures are attributed to a measurement, not asserted from nowhere', () => {
+  // ARC-06-S13 moved the sentences to `docs/INSTALL.md` and made the README a copy of it. Asserted
+  // on BOTH: the page is where a person edits, the README is what a person reads first, and the
+  // generator is what keeps them the same — a test on only one of them would pass while the other
+  // said something else.
+  const readme = `${read('README.md')}\n${read('docs/INSTALL.md')}`;
   // Every number in the install sentences carries where it came from. S-07 measured sparse; it did
   // not measure full mode, and the README says so rather than borrowing the figure.
   assert.match(readme, /302 MB/);
@@ -68,7 +74,13 @@ test('the consolidated corpus section is one heading and stays under the cap', (
   const start = arch.findIndex((l) => l.startsWith('## Docs corpus: how the pin, the areas file and the gate relate'));
   assert.ok(start !== -1, 'the consolidated heading is missing');
   const end = arch.findIndex((l, i) => i > start && l.startsWith('## '));
-  const length = end - start;
+  // Generator markers and the blank lines that isolate them are not prose: they were added by the
+  // ARC-06 fix that made the recipe block generated, and counting them against a readability cap
+  // would push out a paragraph to make room for two HTML comments.
+  const isMarker = (l) => /^<!-- [A-Z-]+:(BEGIN|END)/.test(l);
+  const body = arch.slice(start, end);
+  const length = body.filter((l, i) => !isMarker(l)
+    && !(l === '' && (isMarker(body[i - 1] ?? '') || isMarker(body[i + 1] ?? '')))).length;
   console.log(`    corpus section: ${length} lines`);
   // 100, ruled at ARC-03-S11: the plan guessed 80 before the byte-identical recipe block and the
   // shared exit table existed, and cutting either would hide what ARC-06 and the tests point at.
@@ -80,10 +92,15 @@ test('the consolidated corpus section is one heading and stays under the cap', (
   assert.deepEqual(strays, [], 'a corpus section is still at the top level');
 });
 
-test('the ARC-06 anchor is where the install sentences are', () => {
-  // ARC-06 owns docs/INSTALL.md and will move them; the comment is how it finds them.
+test('the ARC-06 anchors are consumed, not left behind', () => {
+  // They were "move this to docs/INSTALL.md" notes, and ARC-06-S13 moved them. An anchor that
+  // outlived its move is an instruction to do something already done — so the assertion inverts:
+  // no anchor, and the sentences are on the page it named.
   const readme = read('README.md');
-  const i = readme.indexOf('<!-- ARC-06: move to docs/INSTALL.md under the B02 row -->');
-  assert.ok(i !== -1, 'the anchor comment is missing');
-  assert.ok(readme.slice(i, i + 600).includes('302 MB'), 'the anchor is not next to the sentences');
+  assert.equal(/<!-- ARC-06(-S13)?: move to docs\/INSTALL\.md/.test(readme), false,
+    'a move-me anchor survived the move');
+  const install = read('docs/INSTALL.md');
+  assert.match(install, /302 MB/);
+  assert.match(install, /--instance-file/, 'the Operators paragraph did not arrive');
+  assert.match(install, /mode live/, 'the live-mode sentence did not arrive');
 });

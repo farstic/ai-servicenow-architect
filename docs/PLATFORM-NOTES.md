@@ -117,3 +117,81 @@ baseline concept); observed behaviour
 **Engine consequence:** the Developer skill keeps `sys_script_fix.name` at 40 characters or fewer, and
 reads the stored `name` back from the create response instead of assuming what was sent was kept —
 the same check being worth applying to any short label field written over REST.
+
+---
+
+## PN-08 — ROPC can be switched off instance-wide, and then no client id is the problem
+
+**Applies to:** OAuth password grant (`oauth_token.do`), the wizard's `--auth oauth_ropc` · Australia family
+**Behaviour:** The resource-owner password-credentials grant is disabled instance-wide by the
+hardening property `glide.oauth.inbound.ropc.grant_type.disabled`. With it set, every ROPC token
+request fails whatever the client id, client secret, user name and password are — the account and
+the OAuth application are both fine, and there is nothing to fix on either. The wizard's own answer
+is `OAUTH_ROPC_DISABLED`, offered beside "switch to basic authentication", because basic is the
+path that still works on an instance hardened this way.
+**Grounding:**
+`markdown/platform-security/instance-security-hardening-settings/sc-disable-resource-owner-password-credentials-ropc-in-oauth-2-token-grants.md`
+**Evidence:** the page above states the property and its effect; regression test — the wizard's
+ROPC error table is unit-tested against `packages/snowarch/tests/fixtures/oauth-ropc-errors.json`
+**Engine consequence:** an integration design that assumes ROPC checks the property before promising
+it, and the fallback is named in the design rather than discovered during a cutover.
+
+## PN-09 — A PDI hibernates, and a hibernating instance refuses connections
+
+**Applies to:** personal developer instances (`devNNNNN.service-now.com`) · every family
+**Behaviour:** A PDI that has been idle is put to sleep and has to be woken from the developer
+portal before it answers. Until it is awake, a connection attempt fails at the network layer — the
+name resolves, the TLS handshake may even complete, and the request then goes nowhere. It is not an
+authentication failure, and re-entering a password will not fix it, which is exactly the confusion
+worth naming: the wizard's reachability probe reports the network cause rather than blaming the
+credentials, and the remedy is to wake the instance and run the command again.
+**Grounding:** none in ServiceNowDocs (the developer-programme behaviour is not part of the product
+documentation; the corpus documents instances a customer owns, e.g.
+`markdown/platform-administration/configure-target-instance.md`, and says nothing about the
+developer programme's sleep policy).
+**Marked observed** rather than cited.
+**Evidence:** observed while preparing ARC-07-S11's live suite
+**Engine consequence:** a live test suite wakes the instance first and treats an unreachable PDI as
+an environment problem, never as a failed assertion about the product.
+
+## Windows notes — this repository, not ServiceNow
+
+The notes above are ServiceNow behaviour. These are about the machine the engine runs on, and they
+are here because a Windows reader looking for "why is it different on my machine" looks in one
+place. Each says how it is known, because two of them are known differently.
+
+**Git Bash is needed for the skills, not for the install.** `bootstrap.cmd` → `bootstrap.ps1` →
+`node` uses no POSIX shell at all, and CI proves it by rebuilding PATH without Git Bash before every
+Windows launcher run. But Claude Code's own Bash tool *is* Git Bash, and the in-session skills
+(`/snowarch status`, `/snowarch setup-instance`) run `./snowarch …` through it — so **Git for
+Windows is required for the skills** even though the installer never touches it. It also satisfies
+the git ≥ 2.25 floor, which is why the prerequisites table asks for it once.
+
+**PowerShell 5.1, never 7.** 5.1 is what every Windows 10/11 has; requiring 7 would mean requiring
+an install before the installer runs. `bootstrap.ps1` is 5.1-clean (no `??`, no ternary, no
+`-AsHashtable`) with a test that greps for each and proves the grep is not vacuous, and it carries a
+**UTF-8 BOM** — 5.1 decodes a BOM-less file as the ANSI code page, which would turn every `—` and
+`·` in the shared sentences into mojibake before a line ran. For the same reason the launcher writes
+its JSON through .NET rather than `Set-Content -Encoding UTF8`, which on 5.1 means "UTF-8 *with* a
+BOM" and produces files `JSON.parse` refuses.
+
+**Line endings.** `.gitattributes` gives `*.ps1` and `*.cmd` `text eol=crlf`: the index keeps LF and
+every checkout converts. A lone LF in a `.cmd` is a batch file that stops at the first line.
+
+**Long paths.** The corpus checkout nests deeply. Windows' 260-character limit applies to the
+`MAX_PATH` API, not to git's own operations, and `core.longpaths` is set by Git for Windows'
+installer by default — no measured failure, and no action known to be needed. Recorded so that a
+future long-path failure is not investigated from scratch.
+
+**What is verified where.** Verified by CI on `windows-latest`, every run: `-ExecutionPolicy Bypass`
+working under a Restricted *process* policy; the design-only path with Node **and** Git Bash removed
+by rebuilding PATH; exit codes 0/2/3 from `cmd` and from `powershell.exe`; Node reading the state
+PowerShell wrote; `snowarch.cmd` with and without Node; and the POSIX launcher under Git Bash
+answering `MINGW64_NT` and printing the `winget` remedies rather than `apt`.
+
+Pending the owner's Windows sitting, and recorded in `docs/spikes/OWNER-SITTING.md` rather than
+assumed: the **double-click** experience (the `%CMDCMDLINE%` pause detection is a cmd convention,
+not a documented contract), **Ctrl-C** propagation through `cmd` → `powershell` → `node`, a
+**GPO-locked** `MachinePolicy` (which no runner can apply), and whether Claude Code expands
+`${CLAUDE_PROJECT_DIR}` in `.mcp.json` on native Windows (S-03) — the fallback for which is
+deliberately not built until that spike runs.

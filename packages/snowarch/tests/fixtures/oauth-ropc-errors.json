@@ -1,0 +1,5 @@
+{
+  "_rule": "ARC-07-S03 placeholder. ServiceNow's exact OAuth error bodies are CAPTURED, never assumed: ARC-07-S11 runs the ROPC grant against a PDI with glide.oauth.inbound.ropc.grant_type.disabled toggled and records what came back, here. Until then ROPC_ERROR_TABLE in src/servicenow/probes.ts carries the RFC 6749 5.2 names, and anything unrecognised falls through to 'auth failed' with the raw value — which is why an empty list is a valid state rather than a gap.",
+  "_shape": "one object per observed body: { error, error_description, httpStatus, instanceFamily, observedAt }",
+  "observed": []
+}

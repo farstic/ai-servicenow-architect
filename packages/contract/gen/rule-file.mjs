@@ -20,6 +20,17 @@
  */
 const SWITCH_TOOL = 'snow_us_update_set_switch';
 
+/**
+ * The tool that re-reads the instance's state after the user has fixed something.
+ *
+ * Named for the same reason `SWITCH_TOOL` is — the sentence is about THIS tool, and a sentence
+ * cannot be rendered from a set. Its existence is asserted against the REAL contract by
+ * `tests/contract/gen-governance.test.mjs` ("the … tools are real tools in the contract"), not
+ * here: almost every case in that file renders a synthetic four-tool contract on purpose, to prove
+ * this renderer has not learned the real names, and a hard check here would make that impossible.
+ */
+const CAPABILITIES_TOOL = 'snow_core_capabilities_read';
+
 /** Presets in the words someone chooses one by. `custom` is the absence of a preset, not an entry. */
 const USE_WHEN = {
   'read-only': 'none',
@@ -41,6 +52,7 @@ export function render(ctx) {
 
   const unsupported = contract.tools.filter((t) => t.unsupported).map((t) => t.name);
   if (unsupported.length === 0) throw new Error('rule-file: no tool is marked unsupported in the contract');
+
 
   const byCode = new Map(contract.errorCodes.map((e) => [e.code, e]));
   const entry = (code) => {
@@ -64,6 +76,10 @@ export function render(ctx) {
   const base = contract.flags.find((f) => contract.flags.some((o) => o.requires.includes(f.name)));
   if (!base) throw new Error('rule-file: no flag is required by another — the family has no base');
   const wildcard = entry(`${base.name.replace('_ENABLED', '')}_NOT_ENABLED`);
+  // The six are named so the wildcard is readable as a rule rather than a pattern to match: a
+  // session that has just been handed `SCRIPTING_NOT_ENABLED` should see it in the line. From the
+  // contract's flags, never a list here — ARC-08-S10.
+  const flagList = contract.flags.map((f) => f.name.replace('_ENABLED', '')).join(', ');
 
   const steps = contract.protocols.updateSetCapture;
   if (steps.length < 4) throw new Error('rule-file: updateSetCapture has fewer than four entries');
@@ -107,8 +123,11 @@ ${contract.flags.map(flagRow).join('\n')}
 Presets: ${presetLine}. A flag is on only when its value is the exact string \`"true"\`; absent means off. Reads are never gated by WRITE/SCRIPTING.
 
 ## Runtime errors — stop and give the remedy, never retry, never propose editing flags from inside Claude
+When a tool result contains \`(Code: <CODE>)\` for one of the codes below: stop the current step, print the remedy line verbatim, and wait. Do not call the tool again with the same or different credentials. Do not suggest editing \`.local/instances.json\`, \`.mcp.json\` or any settings file by hand. After the user reports the remedy done, continue from the interrupted step — for \`AUTHENTICATION_FAILED\` and \`NO_INSTANCE_CONFIGURED\`, call \`${CAPABILITIES_TOOL}\` first to confirm the new state.
 ${ruleCodes.map(line).join('\n')}
-- \`*_NOT_ENABLED\` → ${wildcard.remedy} — \`${wildcard.command}\`.
+- \`*_NOT_ENABLED\` (${flagList}) → ${wildcard.remedy} — \`${wildcard.command}\`.
+
+A remedy printed with \`<label>\`, \`<host>\` or \`<proxy>\` still in it: substitute what the tool result carried (\`${CAPABILITIES_TOOL}\` has the label), and print the placeholder only when nothing did. If two different runtime errors occur in one session, also say: run \`./snowarch doctor\` in a terminal and paste the FAIL lines.
 
 Long form: \`governance/mcp-protocols.md\` · every code: \`docs/TROUBLESHOOTING.md\`
 `;

@@ -29,7 +29,8 @@ export function renderText(results) {
     }
   }
   lines.push('');
-  lines.push(results.map((r) => `${r.id} ${r.status}${r.status === 'fail' ? ` (${r.findings.length})` : ''}`).join(' · '));
+  lines.push(results.map((r) => `${r.id} ${r.status}${r.status === 'fail' ? ` (${r.findings.length})` : ''}`
+    + (r.note ? ` [${r.note}]` : '')).join(' · '));
   return `${lines.join('\n')}\n`;
 }
 

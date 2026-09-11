@@ -12,13 +12,27 @@ import { dirname, join, parse, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { instanceManager } from '../servicenow/instances.js';
-import { isUnderCloudSyncFolder } from '../store/index.js';
+import { detectCloudSync } from '../store/index.js';
 import { maskPath, resolveStorePath } from '../store/paths.js';
 import { FLAG_NAMES, checkProdPosture } from '../utils/permissions.js';
+import { checkFluent } from '../servicenow/probes.js';
 import { resolveAuditPath } from '../audit/writer.js';
+import { storeEntry } from './store-entry.js';
 import type { Check, CheckContext, CheckResult } from './types.js';
 
 const isWindows = process.platform === 'win32';
+
+/**
+ * The flag names this check reasons ABOUT, taken from the contract's own list rather than typed.
+ *
+ * `FLAG_NAMES` is the declaration; the two constants below name positions within it — the flag
+ * every other one depends on, and the one that implies an external SDK. Deriving them by suffix
+ * keeps the rule true if a flag is renamed, and the assertions in `tests/tools/permissions.test.ts`
+ * fail loudly if the shape ever stops holding.
+ */
+const WRITE_FLAG = FLAG_NAMES.find((f) => f.startsWith('WRITE'))!;
+const FLUENT_FLAG = FLAG_NAMES.find((f) => f.startsWith('FLUENT'))!;
+const REQUIRES_WRITE = FLAG_NAMES.filter((f) => f !== WRITE_FLAG && f !== FLUENT_FLAG);
 
 /**
  * Where `dist/` is, relative to this module once built.
@@ -106,12 +120,17 @@ export const svStore: Check = {
     const notes: string[] = [`source ${res.source}, ${maskPath(res.path)}`];
     let status: CheckResult['status'] = 'ok';
     let remedy: string | undefined;
+    let fix: Record<string, unknown> | null = null;
 
     if (isWindows) {
       notes.push('mode check skipped (Windows: permissions are ACL-inherited, not POSIX bits)');
     } else if (existsSync(res.path)) {
       const fileMode = statSync(res.path).mode & 0o777;
       const dirMode = statSync(dirname(res.path)).mode & 0o777;
+      // ARC-08-S06's F5 repairs exactly these two, and the hint says which path and which mode —
+      // so the fixer never has to re-derive what this check already measured.
+      if (fileMode !== 0o600) fix = { kind: 'store-mode', path: res.path, to: '600' };
+      else if ((dirMode & 0o077) !== 0) fix = { kind: 'store-mode', path: dirname(res.path), to: '700' };
       if ((fileMode & 0o077) !== 0) {
         status = 'fail';
         notes.push(`mode ${fileMode.toString(8).padStart(4, '0')} is group/world-readable`);
@@ -125,9 +144,13 @@ export const svStore: Check = {
       }
     }
 
-    if (isUnderCloudSyncFolder(res.path) && status === 'ok') {
+    // The PROVIDER, not just the fact: "a cloud-sync folder" tells a reader nothing they can act
+    // on, and the folder to move out of is the one piece of the answer they need (ARC-07-S07).
+    const synced = detectCloudSync(res.path);
+    if (synced && status === 'ok') {
       status = 'warn';
-      notes.push('the store is under a cloud-sync folder; 0600 does not prevent synchronisation');
+      notes.push(`the store is under ${synced.provider} (${maskPath(synced.root)}); `
+        + '0600 does not prevent synchronisation');
       remedy = 'move the store outside the synced folder, or use --global';
     }
 
@@ -144,7 +167,8 @@ export const svStore: Check = {
     }
 
     return { id: 'SV-02', title: 'store', status, detail: notes.join('; '),
-      ...(remedy ? { remedy } : {}), fixable: false };
+      ...(remedy ? { remedy } : {}),
+      ...(fix ? { fixable: true, data: { fix } } : { fixable: false }) };
   },
 };
 
@@ -155,7 +179,7 @@ export const svInstances: Check = {
   title: 'instances',
   severity: 'fail',
   network: false,
-  async run() {
+  async run(ctx: CheckContext) {
     const report = instanceManager.getReport();
     const loaded = instanceManager.listAll().filter((i) => i.status === 'loaded');
 
@@ -175,7 +199,10 @@ export const svInstances: Check = {
 
     const problems: string[] = [];
     const notes: string[] = [];
+    const fixes: Array<Record<string, unknown>> = [];
+    let fixable = false;
     let remedy: string | undefined;
+    const fluent = ctx.fluent ?? checkFluent;
 
     for (const i of loaded) {
       const entry = instanceManager.getEntry(i.name);
@@ -186,9 +213,40 @@ export const svInstances: Check = {
         remedy ??= `./snowarch instance set-url ${i.name} https://<host>`;
       }
 
-      const declared = FLAG_NAMES.filter((f) => entry.flags[f] !== undefined);
-      if (declared.length < FLAG_NAMES.length) {
-        notes.push(`${i.name}: FLAGS_INCOMPLETE (${declared.length}/${FLAG_NAMES.length} explicit)`);
+      // THE FILE's flags, not the loaded entry's: `completeFlags` fills every absent flag from the
+      // preset, so the runtime always has six and the question "which did the user state?" has no
+      // answer there. Asked of the file, it has one.
+      //
+      // NAMED, not counted. "4/6 explicit" tells a reader that something is missing and not which
+      // two, and the remedy they are about to run rewrites all six — so the two they never decided
+      // about are exactly the two they need to see first.
+      const stated = (ctx.storeEntry ?? storeEntry)(i.name)?.flags ?? entry.flags;
+      const absent = FLAG_NAMES.filter((f) => stated[f] === undefined);
+      if (absent.length > 0) {
+        notes.push(`${i.name}: FLAGS_INCOMPLETE — ${absent.join(', ')} not stated`);
+        fixable = true;
+        fixes.push({ kind: 'flags-incomplete', label: i.name, flags: absent });
+      }
+
+      // A flag that requires WRITE while WRITE is off: the tools gated on it are refused at run
+      // time and the refusal names WRITE first, so the entry promises what it cannot deliver.
+      // NEVER fixable — which of the two the user meant is not in the file.
+      const dependents = FLAG_NAMES.filter((f) => f !== WRITE_FLAG
+        && stated[f] === 'true' && stated[WRITE_FLAG] !== 'true'
+        && REQUIRES_WRITE.includes(f));
+      for (const f of dependents) {
+        notes.push(`${i.name}: FLAG_DEPENDENCY_VIOLATION — ${f} is on while ${WRITE_FLAG} is off`);
+      }
+
+      // The SDK, only when the entry says it uses it. `checkFluent` is ARC-07-S03's — including
+      // its `.cmd` rule — and a second resolver here would be a second answer to "is the SDK
+      // installed" on the one platform where that question is hard.
+      if (stated[FLUENT_FLAG] === 'true') {
+        const sdk = fluent();
+        notes.push(sdk.installed
+          ? `${i.name}: ${FLUENT_FLAG} on, SDK present${sdk.where ? ` (${maskPath(sdk.where)})` : ''}`
+          : `${i.name}: FLUENT_NOT_INSTALLED — ${FLUENT_FLAG} is on and @servicenow/sdk is not `
+            + 'resolvable');
       }
 
       const posture = checkProdPosture(entry);
@@ -215,11 +273,15 @@ export const svInstances: Check = {
     if (problems.length > 0) {
       return fail('SV-03', 'instances', problems.join('; '), remedy);
     }
-    const warnings = notes.filter((n) => /FLAGS_INCOMPLETE|toolPackage|dependency/i.test(n));
-    return warnings.length > 0
-      ? warn('SV-03', 'instances', notes.join('; '),
-        'set every flag explicitly: ./snowarch instance set-preset <label> <preset>')
-      : ok('SV-03', 'instances', notes.join('; '));
+    const warnings = notes.filter((n) => /FLAGS_INCOMPLETE|FLAG_DEPENDENCY_VIOLATION|toolPackage|FLUENT_NOT_INSTALLED/.test(n));
+    if (warnings.length === 0) return ok('SV-03', 'instances', notes.join('; '));
+    const result = warn('SV-03', 'instances', notes.join('; '),
+      'set every flag explicitly: ./snowarch instance set-preset <label> <preset>');
+    // `fixable` is a FLAG here (ARC-08-S06 owns the repair); the hint says which entry and which
+    // flags, so the fixer never has to re-derive what this check already knew.
+    return fixable
+      ? { ...result, fixable: true, data: { fix: fixes[0], fixes } }
+      : result;
   },
 };
 
@@ -238,7 +300,10 @@ export const svProbes: Check = {
     if (labels.length === 0) return skip('SV-04', 'instance probes', 'no instances configured');
     const r = await ctx.probes.runAll(labels[0]!);
     return { id: 'SV-04', title: 'instance probes', status: r.status, detail: r.detail,
-      ...(r.remedy ? { remedy: r.remedy } : {}), fixable: false };
+      ...(r.code ? { code: r.code } : {}),
+      ...(r.remedy && !r.code ? { remedy: r.remedy } : {}),
+      ...(r.data ? { data: r.data } : {}),
+      fixable: false };
   },
 };
 
@@ -248,6 +313,12 @@ interface Handshake {
   tools: string[];
   capabilities: Record<string, unknown> | null;
   error?: string;
+  /**
+   * Milliseconds from spawn to the `initialize` reply — the COLD START, which is the number
+   * `MCP_TIMEOUT` is set against (S-06). Recorded here rather than measured by a caller: the
+   * caller would be timing its own `await`, which includes `tools/list` and a tool call.
+   */
+  initializeMs?: number;
 }
 
 /**
@@ -269,9 +340,14 @@ async function handshake(serverPath: string): Promise<Handshake> {
       env: { ...process.env, SNOW_LOG_LEVEL: 'error' },
     });
 
+    const spawnedAt = Date.now();
+    let initializeMs: number | undefined;
     let buffer = '';
     const seen: Record<number, unknown> = {};
-    const finish = (h: Handshake): void => { child.kill(); done(h); };
+    const finish = (h: Handshake): void => {
+      child.kill();
+      done({ ...h, ...(initializeMs === undefined ? {} : { initializeMs }) });
+    };
     const timer = setTimeout(() => finish({ tools: [], capabilities: null, error: 'timed out after 20s' }), 20_000);
 
     const send = (id: number, method: string, params: unknown = {}): void => {
@@ -294,6 +370,7 @@ async function handshake(serverPath: string): Promise<Handshake> {
         seen[msg.id] = msg.result;
 
         if (msg.id === 1) {
+          initializeMs = Date.now() - spawnedAt;
           child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
           send(2, 'tools/list');
         } else if (msg.id === 2) {
@@ -317,6 +394,19 @@ async function handshake(serverPath: string): Promise<Handshake> {
     });
   });
 }
+
+/**
+ * What SV-05 hands its consumers: the count and the cold start.
+ *
+ * ARC-08-S05's `modeLineDetailed` prints the count and says whether it came from a RUNNING server
+ * or from the contract, ARC-06's B08 reports the same two numbers as its own step result, and the
+ * `MCP_TIMEOUT` headroom warning is computed by whoever can read `.claude/settings.json` — which
+ * is the engine, not this package.
+ */
+const handshakeData = (h: Handshake): Record<string, unknown> => ({
+  toolCount: h.tools.length,
+  ...(h.initializeMs === undefined ? {} : { initializeMs: h.initializeMs }),
+});
 
 /** Cached across SV-05 and SV-06 so the server is spawned once, not twice. */
 let handshakeCache: Promise<Handshake> | undefined;
@@ -351,7 +441,8 @@ export const svHandshake: Check = {
       // Unconfigured mode advertises five tools deliberately. Comparing against the full
       // contract here would report a 392-name difference for a server behaving correctly.
       return h.tools.length === 5
-        ? ok('SV-05', 'stdio handshake', `unconfigured: ${h.tools.length} core tools advertised`)
+        ? { ...ok('SV-05', 'stdio handshake', `unconfigured: ${h.tools.length} core tools advertised`),
+          data: handshakeData(h) }
         : fail('SV-05', 'stdio handshake',
           `unconfigured mode advertised ${h.tools.length} tools, expected 5: ${h.tools.join(', ')}`,
           'run node packages/snowarch/dist/server.js and read its stderr');
@@ -363,7 +454,8 @@ export const svHandshake: Check = {
     const extra = h.tools.filter((n) => !declaredSet.has(n));
 
     if (missing.length === 0 && extra.length === 0) {
-      return ok('SV-05', 'stdio handshake', `${h.tools.length} tools advertised, matching the contract`);
+      return { ...ok('SV-05', 'stdio handshake',
+        `${h.tools.length} tools advertised, matching the contract`), data: handshakeData(h) };
     }
     // The differing NAMES, not a count: "3 tools differ" tells nobody which build is stale.
     const parts = [

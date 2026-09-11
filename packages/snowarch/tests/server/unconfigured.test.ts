@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectToolCatalog } from '../../src/tools/index.js';
-import { removeTempDir, reapServerChildren, trackServerChild } from '../helpers/server-child.js';
+import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
@@ -93,7 +93,7 @@ const text = (r: unknown): string =>
 const json = (r: unknown): Record<string, never> => JSON.parse(text(r));
 
 beforeEach(() => {
-  base = mkdtempSync(join(tmpdir(), 'snowarch-unconf-'));
+  base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-unconf-')));
   home = join(base, 'home');
   checkout = join(base, 'volume', 'repo');   // outside HOME, per the S02 lesson
   mkdirSync(home, { recursive: true });
@@ -101,9 +101,14 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  // Reap first: the removal is only safe once nothing can still write into the directory.
-  await reapServerChildren();
-  removeTempDir(base);
+  // Reap first: the removal is only safe once nothing can still write into the directory. In a
+  // `finally`, because a reap that throws must not take the removal with it — that is one of the
+  // two ways these trees survived a run.
+  try {
+    await reapServerChildren();
+  } finally {
+    removeTempDir(base);
+  }
 });
 
 describe('criterion 1 and 2 - the server starts with no instance', () => {

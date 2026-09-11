@@ -28,7 +28,19 @@ const ENV_EXAMPLE = resolve(HERE, '../../.env.example');
  */
 const NOT_OURS = new Set([
   // Set by the operating system or the host, never by a user configuring this server.
-  'HOME', 'USERPROFILE', 'APPDATA', 'PATH', 'NODE_ENV', 'NODE_EXTRA_CA_CERTS',
+  // `Path` and `PATHEXT` are Windows' own: `Path` is the casing Windows uses for `PATH`, and
+  // `PATHEXT` is how it decides what counts as executable — both are read when locating `npm`
+  // for the FLUENT check (ARC-07-S03), and documenting either in `.env.example` would invite a
+  // reader to set an operating-system variable in a project file.
+  //
+  // `XDG_CONFIG_HOME` and the `OneDrive*` variables join them for ARC-07-S07: the first says where
+  // THIS user keeps configuration on THIS machine — the global store follows it rather than
+  // insisting on `~/.config` — and the OneDrive ones are set by the client when enterprise policy
+  // has redirected `Documents` or `Desktop` into a synced folder, which is the only way to detect
+  // that at all. Both are the operating system's to set, and a project `.env` telling a reader to
+  // set either would be this package reaching outside its own contract.
+  'HOME', 'USERPROFILE', 'APPDATA', 'PATH', 'Path', 'PATHEXT', 'NODE_ENV', 'NODE_EXTRA_CA_CERTS',
+  'XDG_CONFIG_HOME', 'OneDrive', 'OneDriveCommercial', 'OneDriveConsumer',
   // Set by Claude Code for a project-scoped server.
   'CLAUDE_PROJECT_DIR',
   // Standard proxy variables. Documented in .env.example's prose (they are not `KEY=` lines
@@ -137,7 +149,11 @@ describe('every key the code reads is documented', () => {
     // So the property asserted instead is the one that can be: the list is short, explicit, and
     // every entry is spelled out above with the reason it is exempt. A wildcard would defeat
     // both directions of this suite at once.
-    expect(NOT_OURS.size).toBeLessThan(20);
+    // A BRAKE, not a budget: the number is raised deliberately, in a commit that says which
+    // entries were added and why, and never to make a red test green. ARC-07-S07 added four —
+    // `XDG_CONFIG_HOME` and the three `OneDrive*` roots — each an operating-system variable this
+    // package reads and must not tell a reader to set in a project `.env`.
+    expect(NOT_OURS.size).toBeLessThan(24);
     for (const k of NOT_OURS) expect(k).toMatch(/^[A-Za-z][A-Za-z0-9_]*$/);
   });
 });

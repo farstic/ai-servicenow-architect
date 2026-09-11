@@ -181,6 +181,531 @@ jobs:
       - name: Lint every workflow
         run: /tmp/actionlint -color
 
+  bootstrap:
+    # THE INSTALL PROMISE, as a job. When this is red the install is broken, not the test: every
+    # assertion is something a user hits within a minute of cloning.
+    #
+    # Thirteen cells, and each variant answers a different question. `node-cli` — does the install
+    # work where Node is present, on three operating systems and three Node majors? `no-node` — does
+    # the launcher finish design-only ITSELF, in `sh` and in PowerShell, with no Node to hand over
+    # to? `no-gitbash` — does the Windows path work on a machine that has no POSIX shell at all?
+    #
+    # The corpus is fetched FOR REAL here. This is the only job that proves an end-to-end
+    # design-only install; `docs-real.yml` proves the recipe weekly, and the two measure the same
+    # thing from opposite ends.
+    name: bootstrap (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: 'ubuntu-latest, node 20',  os: ubuntu-latest,  variant: node-cli, node: '20', writer: node }
+          - { label: 'ubuntu-latest, node 22',  os: ubuntu-latest,  variant: node-cli, node: '22', writer: node }
+          - { label: 'ubuntu-latest, node 24',  os: ubuntu-latest,  variant: node-cli, node: '24', writer: node }
+          - { label: 'macos-latest, node 20',   os: macos-latest,   variant: node-cli, node: '20', writer: node }
+          - { label: 'macos-latest, node 22',   os: macos-latest,   variant: node-cli, node: '22', writer: node }
+          - { label: 'macos-latest, node 24',   os: macos-latest,   variant: node-cli, node: '24', writer: node }
+          - { label: 'windows-latest, node 20', os: windows-latest, variant: node-cli, node: '20', writer: node }
+          - { label: 'windows-latest, node 22', os: windows-latest, variant: node-cli, node: '22', writer: node }
+          - { label: 'windows-latest, node 24', os: windows-latest, variant: node-cli, node: '24', writer: node }
+          - { label: 'no-node, ubuntu-latest',  os: ubuntu-latest,  variant: no-node, writer: bash }
+          - { label: 'no-node, macos-latest',   os: macos-latest,   variant: no-node, writer: bash }
+          - { label: 'no-node, windows-latest', os: windows-latest, variant: no-node, writer: powershell }
+          - { label: 'no-gitbash, windows-latest', os: windows-latest, variant: no-gitbash, node: '22', writer: node }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      # WITHOUT submodules: the bootstrap has to fetch the corpus itself, which is the thing being
+      # proved. A checkout that brought `vendor/ServiceNowDocs` along would make B02 a no-op and
+      # assertion 6 a tautology.
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - uses: actions/setup-node@v4
+        if: matrix.node != ''
+        with:
+          node-version: ${{ matrix.node }}
+      - name: git identity (some git operations need one)
+        run: |
+          git config --global user.name "ci"
+          git config --global user.email "ci@example.invalid"
+
+      # ── node-cli ────────────────────────────────────────────────────────────────────────────
+      - name: Design-only install through the Node CLI
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: ./bootstrap.sh --mode design --yes --skip-claude-check
+      - name: Design-only install through the Node CLI (Windows)
+        if: matrix.variant == 'node-cli' && matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # ── no-node ─────────────────────────────────────────────────────────────────────────────
+      # PATH is REBUILT from the system directories, never filtered: a filter that missed one entry
+      # would test the hand-over instead, and pass. The absence is asserted INSIDE the step, because
+      # a rebuild that silently kept Node is the one failure this variant cannot survive.
+      - name: Design-only install with no Node on PATH
+        if: matrix.variant == 'no-node' && matrix.os != 'windows-latest'
+        run: |
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          command -v node && exit 1
+          command -v git || exit 1
+          ./bootstrap.sh --mode design --yes --skip-claude-check
+      - name: Design-only install with no Node on PATH (Windows)
+        if: matrix.variant == 'no-node' && matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
+          where node && exit /b 1
+          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+
+      # ── no-gitbash ──────────────────────────────────────────────────────────────────────────
+      # Assertion 10. `C:\Windows\System32\bash.exe` is the WSL stub and is on every Windows
+      # machine, so "no bash at all" is not a state a Windows user is ever in; what must be gone is
+      # GIT Bash, the interpreter `bootstrap.sh` needs. `Git\cmd` stays, because git itself is a
+      # prerequisite.
+      - name: No Git Bash on PATH, and the whole Windows path without it
+        if: matrix.variant == 'no-gitbash'
+        shell: cmd
+        run: |
+          set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
+          where bash 2>nul | find /i "\Git\" >nul && exit /b 1
+          where node || exit /b 1
+          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          .\snowarch.cmd version
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          node tools\snowarch\hooks\session-start.mjs > hook.txt
+          type hook.txt | find "Mode:" >nul || exit /b 1
+          del hook.txt
+          exit /b 0
+      - name: ...and the same launcher run from powershell.exe directly
+        if: matrix.variant == 'no-gitbash'
+        shell: powershell
+        run: |
+          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
+          & powershell -NoProfile -ExecutionPolicy Bypass -File .\bootstrap.ps1 --mode design --yes --skip-claude-check
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          # The SessionStart banner, under PowerShell, with no Git Bash to fall back on
+          # (ARC-08-S08). Claude Code runs it as `node <path>`; what is asserted is that the line
+          # arrives and the hook exits 0 — a hook that fails here is a session that starts with an
+          # error about the tool meant to help.
+          $out = & node tools/snowarch/hooks/session-start.mjs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if (-not ($out -match '^Mode: ')) { Write-Host $out; exit 1 }
+          exit 0
+
+      # ── the assertions, one implementation for every cell ────────────────────────────────────
+      # Node is back on PATH here on purpose: it was removed for the RUN, which is the subject. A
+      # bash-and-PowerShell twin of the assertion script would be two opinions about what a correct
+      # install looks like.
+      # ── the second run, in the SAME environment as the first ────────────────────────────────
+      # It has to be. A `no-node` cell whose second run found Node would hand over to the Node CLI,
+      # flip `writer` to "node", add the SessionStart hook and re-run B01/B02 — and the first run's
+      # result would be gone. That is exactly what the first version of this job did, and all three
+      # no-node cells said so.
+      #
+      # The log and the first run's state go to RUNNER_TEMP, OUTSIDE the checkout: a file written
+      # into the repository to check that nothing was written into the repository fails assertion 2
+      # by existing. That was the other thing the first run found.
+      - name: Keep the first run's state, then run it again (POSIX)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cp .local/bootstrap-state.json "$RUNNER_TEMP/first-state.json"
+          cp .claude/settings.local.json "$RUNNER_TEMP/first-settings.json"
+          if [ "${{ matrix.variant }}" = "no-node" ]; then
+            export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+            command -v node && exit 1
+          fi
+          start=$(date +%s)
+          ./bootstrap.sh --mode design --yes --skip-claude-check > "$RUNNER_TEMP/second.log" 2>&1
+          echo "SECOND_SECONDS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/second.log"
+      # The Windows cells measure in PowerShell rather than Git Bash: using Git Bash here would put
+      # a POSIX shell into the one cell whose premise is that there is not one. The encoding matters
+      # too — `>` in 5.1 writes UTF-16LE — so the log goes through .NET as UTF-8 without a BOM, the
+      # lesson S12 learned about `Set-Content -Encoding UTF8`.
+      - name: Keep the first run's state, then run it again (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          Copy-Item .local\bootstrap-state.json "$env:RUNNER_TEMP\first-state.json" -Force
+          Copy-Item .claude\settings.local.json "$env:RUNNER_TEMP\first-settings.json" -Force
+          $bare = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
+          if ('${{ matrix.variant }}' -eq 'no-node') {
+            $env:PATH = $bare
+            if (Get-Command node -ErrorAction SilentlyContinue) { exit 1 }
+          }
+          # The no-gitbash cell keeps its premise on the second run too: Git Bash out, Node in.
+          if ('${{ matrix.variant }}' -eq 'no-gitbash') {
+            $env:PATH = "$bare;C:\Program Files\nodejs"
+            if (-not (Get-Command node -ErrorAction SilentlyContinue)) { exit 1 }
+          }
+          $utf8 = New-Object System.Text.UTF8Encoding($false)
+          $start = Get-Date
+          $out = (& cmd /c ".\bootstrap.cmd --mode design --yes --skip-claude-check 2>&1") | Out-String
+          $rc = $LASTEXITCODE
+          $seconds = [int]((Get-Date) - $start).TotalSeconds
+          [System.IO.File]::WriteAllText("$env:RUNNER_TEMP\second.log", $out, $utf8)
+          [System.IO.File]::AppendAllText($env:GITHUB_ENV, "SECOND_SECONDS=$seconds`n", $utf8)
+          Write-Host $out
+          if ($rc -ne 0) { exit 1 }
+          exit 0
+
+      # ── the assertions, one implementation for every cell ────────────────────────────────────
+      # Node is back on PATH here on purpose: it was removed for the RUN, which is the subject. A
+      # bash-and-PowerShell twin of the assertion script would be two opinions about what a correct
+      # install looks like.
+      - name: Assert the install promise
+        shell: bash
+        run: >
+          node scripts/ci/assert-bootstrap.mjs
+          --variant ${{ matrix.variant }} --writer ${{ matrix.writer }}
+          --second-log "$RUNNER_TEMP/second.log"
+          --first-state "$RUNNER_TEMP/first-state.json"
+          --first-settings "$RUNNER_TEMP/first-settings.json"
+          --seconds "$SECOND_SECONDS" --summary
+      - name: ...and that two installs left nothing tracked behind
+        shell: bash
+        run: node scripts/ci/assert-clean.mjs
+
+      # Assertion 9's second half: the committed dist/ answers a handshake. Needs the runtime
+      # dependencies, which a design-only install deliberately does not fetch — so they are
+      # installed HERE, after every assertion about the install itself has already passed.
+      #
+      # It goes through the doctor's `server` section (ARC-08-S05): the engine's own MCP client was
+      # retired when B08 started asking the doctor, and this job must exercise the handshake the
+      # product actually performs rather than a second one kept for testing.
+      # ── ARC-08-S11: the doctor, on the install this job just proved ─────────────────────────
+      # STEPS in these cells, not a job of their own. `main`'s protection requires 42 named
+      # contexts; a new job name would not be one of them, so it could go red for a week without
+      # blocking anything — which is the opposite of what a guard is for.
+      #
+      # BEFORE `npm ci` on purpose: a design-only install has no runtime dependencies, so every
+      # SV- check reports `skip`, and that is the state being snapshotted. Installing first would
+      # snapshot a machine no user is on.
+      - name: The doctor, on the design-only install (POSIX)
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: |
+          # Exit 1 means "a check FAILED", and one does here on purpose: a hosted runner has no
+          # Claude Code, so E-00 reports it missing. Which failures this environment explains is
+          # `assert-doctor.mjs`'s judgement, not this step's — but 2 (usage) and 3 (the doctor
+          # could not run at all) are fatal wherever they happen.
+          set +e
+          ./snowarch doctor --json --no-cache > doctor.json
+          code=$?
+          set -e
+          echo "doctor exit: $code"
+          if [ "$code" -ge 2 ]; then exit 1; fi
+          ./snowarch doctor --no-cache | tail -25 || true
+      - name: The doctor, on the design-only install (Windows)
+        if: (matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash') && matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          rem CALL, not a bare invocation: cmd TRANSFERS control to another batch file and never
+          rem comes back, so every line after it — including the exit-code check it was written for
+          rem — is dead. The step's code becomes the callee's, which looks like it worked.
+          call .\snowarch.cmd doctor --json --no-cache > doctor.json
+          if %ERRORLEVEL% GEQ 2 exit /b 1
+          call .\snowarch.cmd doctor --no-cache
+          if %ERRORLEVEL% GEQ 2 exit /b 1
+          exit /b 0
+      # The no-gitbash cell runs it from PowerShell too: `snowarch.cmd` is the entry point on a
+      # machine with no POSIX shell, and "works from cmd" and "works from PowerShell" are two
+      # claims — the second is the one a user in a terminal actually makes.
+      - name: ...and the same doctor from powershell.exe
+        if: matrix.variant == 'no-gitbash'
+        shell: powershell
+        run: |
+          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
+          & cmd /c ".\snowarch.cmd doctor --json --no-cache > doctor-ps.json"
+          if ($LASTEXITCODE -ge 2) { exit 1 }
+          $r = Get-Content doctor-ps.json -Raw | ConvertFrom-Json
+          if ($r.mode -ne 'design-only') { Write-Host "mode: $($r.mode)"; exit 1 }
+          # E-00 is the one this environment explains — see assert-doctor.mjs.
+          $failed = @($r.checks | Where-Object { $_.status -eq 'fail' } | ForEach-Object { $_.id })
+          $unexpected = @($failed | Where-Object { $_ -ne 'E-00' })
+          if ($unexpected.Count -gt 0) { Write-Host "unexpected FAIL: $($unexpected -join ', ')"; exit 1 }
+          exit 0
+
+      # The assertions, and the snapshot. One implementation for every cell that has a report.
+      - name: Assert the report, and compare it with this platform's snapshot
+        if: matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash'
+        shell: bash
+        run: |
+          node scripts/ci/assert-doctor.mjs --in doctor.json --expect-fail E-00
+          node scripts/ci/doctor-snapshot.mjs --in doctor.json --out doctor-normalised.json --summary
+
+      # README criterion 5, measured where it is actually paid: five cold spawns, median under a
+      # second. The Windows cells run it through bash too — the hook is invoked as `node <path>` by
+      # Claude Code on every platform, so the shell it is measured from is not the variable.
+      - name: The SessionStart banner, timed
+        if: matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash'
+        shell: bash
+        run: node scripts/ci/banner-timing.mjs --runs 5 --budget-ms 1000 --summary
+
+      # ── the no-node cells: the fallback the /snowarch status skill reads ─────────────────────
+      # There is no doctor to run here, which IS the case being proved. What a session does instead
+      # is read the state file the launcher wrote — so that is what is asserted, with grep and with
+      # Node still off PATH, because a check that needed Node to prove the no-Node path would be
+      # proving something else.
+      - name: With no Node, the state file is what a session falls back to
+        if: matrix.variant == 'no-node' && matrix.os != 'windows-latest'
+        run: |
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          command -v node && exit 1
+          for key in mode docs pin updatedAt; do
+            grep -q "\"$key\"" .local/bootstrap-state.json || { echo "missing $key"; exit 1; }
+          done
+          grep -q '"mode": "design-only"' .local/bootstrap-state.json || { echo "not design-only"; exit 1; }
+          # And the seeded cache. The launcher writes one ITSELF on the Node-free path — three B
+          # steps and a design-only mode line — so that the SessionStart banner has something
+          # truthful to print on a machine that cannot run the doctor at all. Its absence would mean
+          # a first session on such a machine started with no Mode line.
+          grep -q '"writer": "bootstrap"' .local/doctor-last.json || { echo "no seeded cache"; exit 1; }
+          grep -q '"mode": "design-only"' .local/doctor-last.json || { echo "cache is not design-only"; exit 1; }
+          echo "state $(wc -c < .local/bootstrap-state.json) bytes, cache $(wc -c < .local/doctor-last.json) bytes"
+      - name: With no Node, the state file is what a session falls back to (Windows)
+        if: matrix.variant == 'no-node' && matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
+          if (Get-Command node -ErrorAction SilentlyContinue) { exit 1 }
+          $text = Get-Content .local\bootstrap-state.json -Raw
+          foreach ($key in @('"mode"', '"docs"', '"pin"', '"updatedAt"')) {
+            if (-not $text.Contains($key)) { Write-Host "missing $key"; exit 1 }
+          }
+          # `-match`, not `.Contains`: PowerShell 5.1's own JSON writer puts TWO spaces after the
+          # colon, so the exact-spelling test fails on the very file this platform wrote.
+          if ($text -notmatch '"mode"\s*:\s*"design-only"') { Write-Host "not design-only"; exit 1 }
+          # The launcher seeds the banner's cache itself on the Node-free path — see the POSIX twin.
+          # Matched loosely on purpose: this file is written by PowerShell's own JSON writer on
+          # this platform and by a bash heredoc on the others, and their spacing is not the subject.
+          $cache = Get-Content .local\doctor-last.json -Raw
+          foreach ($needle in @('"writer"\s*:\s*"bootstrap"', '"mode"\s*:\s*"design-only"')) {
+            if ($cache -notmatch $needle) { Write-Host "cache missing $needle"; exit 1 }
+          }
+          Write-Host "state $($text.Length) chars, cache $($cache.Length) chars"
+          exit 0
+
+      # Every run, pass or fail: a report you can only read when the job was green is a report you
+      # cannot use to find out why it was red.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: doctor-${{ matrix.label }}
+          path: |
+            doctor.json
+            doctor-ps.json
+            doctor-normalised.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: The committed dist/ answers a handshake on this OS
+        if: matrix.variant == 'node-cli'
+        run: |
+          npm ci --ignore-scripts
+          node tools/snowarch/tests/server-section-smoke.mjs
+
+  launcher:
+    # `bootstrap.sh` is the one file that runs on a machine with NO Node — which means none of the
+    # engine's own tooling can check it, and none of the other jobs would notice it broken. Two
+    # things here: shellcheck, and a real run with Node stripped from PATH, because "it parses" and
+    # "it works without Node" are different claims and only the second is the story.
+    name: launcher
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck (pinned)
+        run: |
+          curl -sSfL -o /tmp/sc.tar.xz \
+            "https://github.com/koalaman/shellcheck/releases/download/v0.10.0/shellcheck-v0.10.0.$(uname -s | tr '[:upper:]' '[:lower:]').x86_64.tar.xz"
+          tar -xJf /tmp/sc.tar.xz -C /tmp
+          /tmp/shellcheck-v0.10.0/shellcheck --version
+      - name: shellcheck
+        run: /tmp/shellcheck-v0.10.0/shellcheck -s bash --severity=warning bootstrap.sh
+      - name: bash -n
+        run: bash -n bootstrap.sh
+      - name: The Node-free design-only path, with Node removed from PATH
+        # The whole point of this job. `command -v node` must find nothing, so PATH is rebuilt from
+        # the system directories rather than filtered — a filter that missed one entry would test
+        # the hand-over instead, and pass.
+        run: |
+          env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin TERM=dumb \
+            bash -o posix ./bootstrap.sh --mode design --yes --docs skip --skip-claude-check
+      - name: The state it wrote is the one Node reads
+        run: |
+          node --input-type=module -e "
+            import { loadState, assertStorable } from './tools/snowarch/lib/state.mjs';
+            const s = loadState(process.cwd());
+            if (s.writer !== 'bash') { console.error('writer is', s.writer); process.exit(1); }
+            assertStorable(s);
+            console.log('state ok:', s.version, s.writer, Object.keys(s.steps).length, 'steps');
+          "
+
+  windows-launcher:
+    # The Windows launchers can be verified nowhere else. They are written on macOS, where no
+    # PowerShell 5.1 exists to run them, so every claim about them is made here or not at all.
+    #
+    # What this job can prove: S-08 (a Bypass call works under Restricted), the Node-free path with
+    # Node and Git Bash both removed, exit-code propagation from cmd and from powershell.exe, and
+    # the root refusal. What it cannot: a double-click, a GPO-locked MachinePolicy, Ctrl-C, and
+    # anything needing Claude Code in a Windows console — those are the owner's sitting (S-03/S-04,
+    # AC 1 and AC 4), recorded as deferred rather than quietly skipped.
+    name: windows launcher
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PSScriptAnalyzer (5.1 compatibility)
+        shell: powershell
+        run: |
+          # PSGallery answered "No match was found for the specified search criteria" once
+          # (run 34424021998) after working on every run before it — a registration hiccup on the
+          # runner, not a finding. Registered explicitly and retried once, because a linter whose
+          # INSTALL is flaky makes every green run of this job slightly less believable.
+          $ErrorActionPreference = 'Continue'
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+            Register-PSRepository -Default
+          }
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck -Repository PSGallery
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Start-Sleep -Seconds 10
+            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck -Repository PSGallery
+          }
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Write-Host 'PSScriptAnalyzer could not be installed from PSGallery'
+            exit 1
+          }
+          $ErrorActionPreference = 'Stop'
+          # Write-Host is excluded, and only that: a launcher's banner IS console text, and
+          # Write-Output would put it in the pipeline for a caller that captures the run.
+          $r = Invoke-ScriptAnalyzer -Path .\bootstrap.ps1 -Severity Error,Warning `
+                 -ExcludeRule PSAvoidUsingWriteHost
+          $r | Format-Table -AutoSize
+          if ($r.Count -gt 0) { exit 1 }
+      - name: The launcher parses under Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # `[ref]$errors` needs the variable to EXIST — PowerShell will not create it for you,
+          # and Set-StrictMode is not what decides that.
+          $errors = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path .\bootstrap.ps1), [ref]$null, [ref]$errors)
+          if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+          Write-Host ("PSVersion: " + $PSVersionTable.PSVersion)
+      - name: S-08 — Bypass works under a Restricted process policy, with no Node and no Git Bash
+        shell: cmd
+        # PATH is REBUILT, not filtered: a filter that missed one entry would test the hand-over
+        # instead, and pass. `Git\cmd` stays (git itself is a prerequisite); `Git\usr\bin`,
+        # `Git\bin` and `Git\mingw64\bin` — the Git Bash tools — do not.
+        run: |
+          rem WindowsPowerShell\v1.0 is part of the DEFAULT Windows PATH, which is what a
+          rem double-click gets, so a rebuild that omitted it was testing a machine nobody has —
+          rem `powershell` then fails 9009 before bootstrap.ps1 is ever read.
+          set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
+          rem `C:\Windows\System32\bash.exe` is the WSL stub and is on every Windows machine, so
+          rem "no bash at all" is not a state a Windows user is ever in. What must be gone is GIT
+          rem Bash — the interpreter bootstrap.sh needs — and it is the one under \Git\.
+          where bash 2>nul | find /i "\Git\" >nul && exit /b 1
+          where node && exit /b 1
+          powershell -NoProfile -Command "Set-ExecutionPolicy Restricted -Scope Process -Force; Get-ExecutionPolicy -Scope Process"
+          .\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check
+          echo ERRORLEVEL=%ERRORLEVEL%
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+      - name: The state it wrote says powershell, and Node reads it
+        shell: powershell
+        run: |
+          # The bug this pins: `Set-Content -Encoding UTF8` on 5.1 writes a BOM, and JSON.parse
+          # calls a BOM a syntax error rather than a hint. Every file the launcher writes here is
+          # read back by Node or by Claude Code.
+          foreach ($f in '.local\bootstrap-state.json', '.local\config.json', '.local\doctor-last.json') {
+            $b = [System.IO.File]::ReadAllBytes((Resolve-Path $f))
+            if ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF) {
+              Write-Host ("BOM in " + $f); exit 1
+            }
+          }
+          $s = Get-Content .\.local\bootstrap-state.json -Raw | ConvertFrom-Json
+          Write-Host ("writer={0} mode={1} fileModes={2}" -f $s.writer, $s.mode, $s.fileModes)
+          if ($s.writer -ne 'powershell') { exit 1 }
+          if ($s.mode -ne 'design-only') { exit 1 }
+          node --input-type=module -e "
+            import { loadState, assertStorable } from './tools/snowarch/lib/state.mjs';
+            const s = loadState(process.cwd());
+            if (s.writer !== 'powershell') { console.error('writer', s.writer); process.exit(1); }
+            assertStorable(s);
+            console.log('node accepts the powershell-written state:', s.version, Object.keys(s.steps).length, 'steps');
+          "
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Nothing tracked was modified
+        shell: powershell
+        run: |
+          $p = (git status --porcelain --untracked-files=no)
+          if ($p) { Write-Host $p; exit 1 }
+          Write-Host 'porcelain clean'
+      - name: The same from powershell.exe, and $LASTEXITCODE propagates
+        shell: powershell
+        run: |
+          Remove-Item -Recurse -Force .\.local, .\.claude\settings.local.json -ErrorAction SilentlyContinue
+          .\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check
+          Write-Host ("LASTEXITCODE=" + $LASTEXITCODE)
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Exit codes 2 and 3 reach the caller
+        shell: powershell
+        run: |
+          .\bootstrap.cmd --mode live --yes
+          Write-Host ("live+yes without an instance file: " + $LASTEXITCODE)
+          if ($LASTEXITCODE -ne 2) { exit 1 }
+          Push-Location .\docs
+          ..\bootstrap.cmd --mode design --yes
+          $rc = $LASTEXITCODE
+          Pop-Location
+          Write-Host ("from a subdirectory: " + $rc)
+          if ($rc -ne 3) { exit 1 }
+          # The runner appends `exit $LASTEXITCODE`, and the last thing this step ran on purpose
+          # exited 3. Saying so explicitly is the difference between "asserted 3" and "failed".
+          exit 0
+      - name: With Node present the hand-over produces the Node CLI's JSON
+        shell: powershell
+        run: |
+          Remove-Item -Recurse -Force .\.local, .\.claude\settings.local.json -ErrorAction SilentlyContinue
+          $out = (.\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check --json | Out-String)
+          $json = $out | ConvertFrom-Json
+          Write-Host ("mode=" + $json.mode + " next-lines=" + ($json.next -split "`n").Length)
+          if ($json.mode -ne 'design-only') { exit 1 }
+          $s = Get-Content .\.local\bootstrap-state.json -Raw | ConvertFrom-Json
+          if ($s.writer -ne 'node') { Write-Host ("writer=" + $s.writer); exit 1 }
+      - name: Git Bash on Windows gets the Windows remedies, not apt
+        # ARC-06-S12 ruling (4). The POSIX launcher runs perfectly well under Git Bash on Windows,
+        # and until now it told that user to `apt install git`. This is the only cell in the matrix
+        # where `uname -s` says MINGW64_NT, so it is the only place the arm can be proved.
+        shell: bash
+        run: |
+          export PATH="/usr/bin:/mingw64/bin:/c/Program Files/Git/cmd"
+          command -v node && exit 1
+          uname -s
+          rm -rf .local .claude/settings.local.json
+          ./bootstrap.sh --mode design --yes --docs skip --skip-claude-check | tee /tmp/gitbash.txt
+          grep -q 'winget install OpenJS.NodeJS.LTS' /tmp/gitbash.txt
+          grep -q 'apt install git' /tmp/gitbash.txt && exit 1
+          exit 0
+      - name: snowarch.cmd, with Node and without
+        shell: cmd
+        run: |
+          .\snowarch.cmd version
+          if not "%ERRORLEVEL%"=="0" exit /b 1
+          set "PATH=C:\Windows\system32;C:\Windows"
+          .\snowarch.cmd version
+          echo without-node ERRORLEVEL=%ERRORLEVEL%
+          if not "%ERRORLEVEL%"=="3" exit /b 1
+          rem Same reason as the step above: the expected code is 3, so the step has to say 0.
+          exit /b 0
+
   secrets:
     name: secret scan
     runs-on: ubuntu-latest

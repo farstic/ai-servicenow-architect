@@ -5,6 +5,11 @@ export interface DoctorOptions {
     noNetwork?: boolean;
     cwd?: string;
     probes?: Probes;
+    /** The SDK resolver, injected in tests so no cell spawns `npm root -g` (ARC-08-S04). */
+    fluent?: () => {
+        installed: boolean;
+        where?: string;
+    };
     /** Reserved for ARC-08's merged report; only `server` exists today. */
     section?: 'server';
 }

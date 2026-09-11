@@ -55,7 +55,7 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
     "summary": { "ok": 41, "warn": 0, "fail": 0, "skip": 0, "fixable": 0 } }
   ```
   `mode`, `modeLine`, `modeLineDetailed`, `engine`, `server`, `stale` are filled by S05/S03/S04; this story emits them as `null` with the keys present so the schema is stable from day one (ARC-02-S11's fixture stub already assumes `modeLine`).
-- **Redaction** (`redact.mjs`, applied by the runner to every `detail`, `remedy`, `command` and to every string leaf of `data` before rendering — the checks never redact themselves, so a forgotten mask cannot leak): usernames → first character + `***` + domain when present (`cvetomir@corp.com` → `c***@corp.com`, `admin` → `a***`); any value whose key matches `/PASSWORD|SECRET|TOKEN|_KEY$/i` → `set (len n)`; proxy URLs → `http://***@host:port`; absolute paths under `homedir` → `~/…`; the store path → `maskPath` semantics of ARC-04-S02 (`~/…/.local/instances.json`). The mask functions mirror `packages/snowarch/src/store/paths.ts` (`maskUsername`, `maskPath`) — `tests/doctor/redact.test.mjs` runs the same fixture table against both implementations so they cannot drift.
+- **Redaction** (`redact.mjs`, applied by the runner to every `detail`, `remedy`, `command` and to every string leaf of `data` before rendering — the checks never redact themselves, so a forgotten mask cannot leak): usernames → first character + `***` + domain when present (`someone@corp.example.com` → `s***@corp.example.com`, `admin` → `a***`); any value whose key matches `/PASSWORD|SECRET|TOKEN|_KEY$/i` → `set (len n)`; proxy URLs → `http://***@host:port`; absolute paths under `homedir` → `~/…`; the store path → `maskPath` semantics of ARC-04-S02 (`~/…/.local/instances.json`). The mask functions mirror `packages/snowarch/src/store/paths.ts` (`maskUsername`, `maskPath`) — `tests/doctor/redact.test.mjs` runs the same fixture table against both implementations so they cannot drift.
 - **Human renderer** (exact layout; the doctor prints the Mode line last so it is the final line of any transcript):
   ```
   snowarch doctor 2.0.0 — 2026-09-04 10:00:12 (quick: no · network: yes · section: all)
@@ -76,13 +76,30 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
   ```
   Statuses are printed as `ok`, `warn`, `FAIL`, `skip` (FAIL upper-case so `grep FAIL` works, as with the old doctor). Colour only when stdout is a TTY and `NO_COLOR` is unset.
 - **CLI** in `bin/snowarch.mjs`: `doctor [--json] [--quick] [--no-network] [--fix] [--section <a,b>] [--no-cache]`; `--quick` implies `--no-network`; `--fix` with `--json` is allowed (fix entries land in `fixes[]`). `--write-cache` is the default (S05 writes `.local/doctor-last.json`); `--no-cache` disables it (used by tests).
+- **The `prereqs` section has a CONSUMER, and its fields are fixed.** `/snowarch setup-instance`
+  (ARC-07-S09) is the only reader of `--json --section prereqs` and branches on it, so the shape is
+  agreed here rather than discovered later — **fixed 2026-09-10**:
+
+  | field | values | why the skill needs it |
+  |---|---|---|
+  | `os` | `darwin` \| `linux` \| `win32` | picks `./snowarch` or `snowarch.cmd` in the hand-off |
+  | `shell` | `bash` \| `zsh` \| `powershell` \| `cmd` \| `unknown` | the parent process; `unknown` makes the skill print BOTH spellings |
+  | `node.ok` / `node.version` | boolean / e.g. `22.14.0` | the "Node 20+ is required" stop |
+  | `deps.ok` | boolean | the "run `./snowarch doctor --fix`" stop |
+  | `mode.toggle` | `enabled` \| `disabled` \| `absent` | the design-only stop, which asks nothing |
+  | `store.exists` | boolean | whether to propose "make it the default" |
+
+  `shell` is the one field the doctor does not have today — S01 adds the parent-process guess, and
+  `unknown` is a first-class answer rather than a failure. Until this section exists the skill
+  degrades honestly (it reads `.local/bootstrap-state.json` and prints both command spellings);
+  ARC-07-S09's body carries that fallback and names this story as the thing that removes it.
 - **No literal names.** Flag names, preset names, tool names and error codes come from the ARC-05-S10 loader; `tests/contract/no-literals.test.mjs` scans `tools/snowarch/**` and fails on any literal (ARC-05 README criterion 7). Design notes in S02–S06 that show a literal (e.g. `WRITE_ENABLED`) describe output, not source.
 **Acceptance criteria.**
 1. Given a checkout with `engine.config.json` present, running `./snowarch doctor --json --no-cache` with an empty registry (test harness) prints a JSON object validating against schema v1 with `summary.ok == 0` and exits 0; the same with a registered check whose `run` returns `fail` exits 1; with a check that throws, the report shows `status: "fail"` with `detail` starting `check crashed:` and the process still exits 1 (not a stack trace).
 2. Running `./snowarch doctor` from `clients/acme/` (a sub-directory) prints `DOCTOR: not at the repository root — run: cd <root>` and exits 3; running it with `NODE_VERSION` below `floors.node` (test spawns with a shimmed `process.versions.node`) exits 3 with the per-OS Node install command from `01` §6.2 step 1.
 3. A check that sets `code: 'AUTHENTICATION_FAILED'` renders exactly the registry's remedy and command (character-identical to `docs/TROUBLESHOOTING.md`'s `### AUTHENTICATION_FAILED` section — the test reads both); a check setting both `code` and a hand-written `remedy` fails the registry self-test.
 4. `--section docs,server` runs only those sections; `--section bogus` exits 2 printing `unknown section "bogus"; valid: prereqs, repo, docs, roster, contract, legacy, host, server`.
-5. Given a check whose `detail` contains the fixture username `cvetomir@corp.com`, a fixture password value and an absolute home path, the JSON and text outputs contain `c***@corp.com`, `set (len 12)` and `~/`, and `grep -c "cvetomir@corp.com\|<fixture password>"` on both outputs returns 0.
+5. Given a check whose `detail` contains the fixture username `someone@corp.example.com` (neutral and assembled — see the amendment), a fixture password value and an absolute home path, the JSON and text outputs contain `s***@corp.example.com`, `set (len 12)` and `~/`, and `grep -c "someone@corp.example.com\|<fixture password>"` on both outputs returns 0.
 6. `node --test tests/doctor/` passes on ubuntu, macOS and Windows before `npm ci` has been run (stdlib only; the contract loader is imported by relative path).
 7. `docs/ARCHITECTURE.md` "Doctor" section lists the sections, the id rule, the exit codes and the JSON shape above verbatim; `scripts/gen-roster.mjs --check`-style staleness is not required (hand-maintained section; S07 appends the mapping table).
 **Tasks.**
@@ -98,6 +115,37 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 **Definition of done.** Merged; tests green on nine cells; `docs/ARCHITECTURE.md` "Doctor" section committed; ARC-02-S11's fixture stub updated to emit schema v1 keys.
 
 ---
+
+> **Amendment 2026-09-10 (ARC-08-S01).** Five departures and findings.
+>
+> **(1) AC 5's fixture username is NEUTRAL.** The criterion spells a real person's address. The rule
+> of record is that no real name, email or account appears in this repository, its tests or its
+> transcripts — so the fixture is assembled from parts as `someone@corp.example.com`, and the
+> assertions are the same three: the masked form, `set (len n)`, and `~/`. A test about redaction is
+> the last place to make an exception to the rule it is testing.
+>
+> **(2) `homedir` is passed IN, never read under `lib/`.** `tools/snowarch/tests/mode-register.test.mjs`
+> forbids `homedir`/`USERPROFILE` anywhere in the engine's library — the rule that keeps the CLI out
+> of `~/.claude.json`. The doctor needs the home directory only to shorten a path to `~` in a report,
+> so `bin/snowarch.mjs` reads it and `main()` threads it through. Without one the rule simply does
+> not apply and a path prints as it is, rather than being half-masked against a guess.
+>
+> **(3) "Not at the repository root" means the ROOT, not "inside it".** The first implementation
+> walked up, found the checkout and ran — which is how the launcher behaves, and wrong here: every
+> path in the report resolves relative to the root, so a run from `clients/acme/` would describe a
+> directory the reader is not in. `realpath`-compared, because `/var` is a symlink to `/private/var`
+> on macOS and a temp checkout is reached through both names.
+>
+> **(4) The engine's registry REQUIRES the three booleans; the server's leaves them optional.** A
+> check written against the engine must declare `quick`, `network` and `spawns` — the failure mode
+> of an undeclared `network` is a doctor that touched the network on a machine that has none. The
+> server's `Check` keeps them optional so ARC-04-S12's own checks compile unchanged, and ARC-08-S04
+> supplies the defaults it knows when it adopts them.
+>
+> **(5) The ARCHITECTURE section's two blocks are GENERATED** (`scripts/gen-doctor-docs.mjs`, from
+> the real modules with a fixture registry) — the JSON shape and the renderer sample. A documentation
+> block that embeds a moving value goes stale the first time it moves, and nobody re-reads a section
+> they already believe. `gen-all` is **10 generators** now.
 
 ### ARC-08-S02 — Engine checks E-00…E-22: prerequisites, repo wiring, docs corpus, roster, contract
 
@@ -160,6 +208,30 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S03 — Stale-registration, legacy-store, cloud-sync, proxy/CA and registration-status detectors (E-23…E-27) with exact commands
+
+> **Amendment 2026-09-10 (from the delivery).** Five departures, each because the tree said
+> otherwise. (1) The stale NAMES live in `tools/snowarch/lib/doctor/checks/stale-registrations.json`
+> rather than in `retired-names.json`: only one of the two is retired there, and the other is a
+> public repository identifier the provenance record names on purpose. That one path is listed in
+> the lint's `POLICY_FILES` and in `tests/no-legacy-names.test.mjs`, on the existing "being the list
+> is what the file is for" ground. (2) E-24's command is a literal in the check with a test
+> asserting it appears verbatim in `docs/snippets/import-from-legacy.md` — the L07 idiom of several
+> declarations that must agree — rather than a runtime read of a document that may not sit beside
+> the code. (3) ARC-06-S12's rule "nothing under `lib/` opens `~/.claude.json`" gains its one argued
+> exception: E-23 is a detector, and a detector that may not read what it detects cannot exist. The
+> ownership half of that rule is asserted MORE strictly for it — no write verb anywhere in the file.
+> (4) E-27 treats `⏸ Pending approval` in design-only as a WARN, not only `not rejected`: the S-01
+> record found `enabledMcpjsonServers` is not honoured before trust, so pending in design-only means
+> the disable toggle is not in force. (5) The recorded mode is `design`/`live` (`state.mjs`), not the
+> `design-only` this story's text quotes; anything that is not `live` is read as design-only.
+>
+> **Amendment 2026-09-10 (b), from the review.** Acceptance criterion 2 — "`sha256sum` of the
+> fixture `.claude.json` is identical before and after the run" — is a promise about THIS product,
+> and it holds for `--section legacy` and for `--quick` (which excludes E-27). It does not hold for
+> a full run against an INSTALLED Claude Code: `claude mcp get` makes Claude Code itself maintain
+> `~/.claude.json` while answering, measured on a redirected HOME. E-27's detail says so, and the
+> owner-sitting commands bracket `--section legacy`.
+
 **As** an individual practitioner migrating from the old install **I want** the doctor to find every leftover of the previous setup — stale `~/.claude.json` registrations that still hold plaintext secrets, the legacy wizard store, a checkout under a cloud-sync folder, proxy/CA variables that are set wrongly, and a Claude Code registration status that contradicts the recorded mode — and to print the exact command for each **so that** nothing with a credential in it is forgotten and the doctor never edits a file it does not own.
 **Context.** README deliverables "stale `~/.claude.json` entries for this folder … → prints `claude mcp remove <name> -s local` and the `.bak-*` reminder; legacy `~/.config/servicenow-mcp/` present → prints `./snowarch instance import --from-legacy`" and acceptance criterion 6 (a copied `~/.claude.json` fixture with stale `servicenow-mcp` and `nowaikit` entries produces the exact removal commands). `00` P-34 (six credential copies; `.bak-*` retain secrets), §5 (local scope keyed on the absolute path), `scripts/doctor.sh:405-466` (the read-only inspection this story ports to Node, minus the username print). `03` R-07. D-04 (WARN under OneDrive/Dropbox/iCloud/Google Drive — obligation shared by wizard and doctor). R-3 (doctor check for proxy and CA). ARC-04-S02 (`isUnderCloudSyncFolder`), ARC-04-S11 (`classifyNetworkError` codes and `NODE_EXTRA_CA_CERTS` semantics), ARC-10-S01 (`docs/MIGRATION.md` reuses these commands).
 **Scope.** In: `tools/snowarch/lib/doctor/checks/legacy.mjs` (E-23, E-24), `host.mjs` (E-25, E-26, E-27), the `stale` block of the JSON, fixtures. Out: performing any removal (never; not even under `--fix`), the network probe itself (SV-04 in S04 surfaces the classifier result), `import --from-legacy` (ARC-07-S08), the toggle writer (ARC-06-S05 / F6 in S06).
@@ -177,7 +249,7 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
              → ./snowarch instance import --from-legacy      (migrates entries, then advises deleting the directory)
   ```
   Reads the file only to count entries (never prints labels' credentials; labels are safe). JSON: `stale.legacyStore: { path: '~/.config/servicenow-mcp/instances.json', instances: 2 }`.
-- **E-25 cloud-sync folder** (section `host`, severity `warn`, quick). `isUnderCloudSyncFolder(root)` (same function as the server's — re-implemented in stdlib with the identical regex, parity-tested against ARC-04-S02's fixture list) → WARN: `checkout is under a cloud-sync folder (OneDrive) — .local/instances.json (0600) will still be synced; move the checkout outside the synced tree or keep this instance read-only`. Reported in design-only too (engagement content under `clients/` is equally affected).
+- **E-25 cloud-sync folder** (section `host`, severity `warn`, quick). `isUnderCloudSyncFolder(root)` (same function as the server's — re-implemented in stdlib, parity-tested against `packages/snowarch/tests/fixtures/cloud-sync-paths.json`, which ARC-07-S07 created as THE list all three implementations answer to; it also returns the PROVIDER, so E-25 names it) → WARN: `checkout is under a cloud-sync folder (OneDrive) — .local/instances.json (0600) will still be synced; move the checkout outside the synced tree or keep this instance read-only`. Reported in design-only too (engagement content under `clients/` is equally affected).
 - **E-26 proxy and CA environment** (section `host`, severity `warn`, quick). Inspects `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `NODE_EXTRA_CA_CERTS` and lowercase forms in the doctor's own environment (the same environment Claude Code inherits when started from that shell — S-20 pending, see risks): each set variable is reported masked (`HTTPS_PROXY=http://***@proxy.corp:8080`); an empty-string value → WARN "set to an empty string — treated as unset by the server; unset it to silence this"; `NODE_EXTRA_CA_CERTS` pointing to a missing file or a file without a `-----BEGIN CERTIFICATE-----` block → WARN with the ARC-04-S11 README "Corporate networks" pointer; both unset → ok "no proxy configured". When a live probe (SV-04) has classified a network failure, its `code` (`DNS_FAILURE`, `TLS_CA_UNTRUSTED`, `PROXY_UNREACHABLE`, `PROXY_AUTH_REQUIRED`, `CONNECTION_REFUSED`, `NETWORK_TIMEOUT`) is echoed here with the registry remedy so the host section and the server section agree (E-26 reads SV-04's `data.networkCode` from the same run).
 - **E-27 Claude Code registration status** (section `host`, severity `warn`, `spawns: true` — excluded from `--quick`; skipped when `claude` is not on PATH with detail `claude CLI not found (see E-00)`). Runs `claude mcp get <config.mcp.serverKey>` (`execFileSync`, no shell, 10 s timeout, `cwd: root`) and records its status text verbatim in `data.statusLine`. This is the `03` R-13 mitigation ("the doctor checks `claude mcp get servicenow` status text") that ARC-06-S01/S05 hand to this ARC; the expected strings come from the S-01 spike (ARC-00-S04) and ARC-06-S05 criterion 6: `✘ Rejected (see disabledMcpjsonServers in settings)` after a design-only bootstrap, an approved project-scope entry after a live one. Rules: recorded mode `design-only` and status *not* rejected/disabled → WARN `server is not disabled in Claude Code although the recorded mode is design-only — run ./snowarch mode design`; recorded mode `live` and status rejected or "needs approval" → WARN `server is rejected/unapproved in Claude Code although the recorded mode is live — run ./snowarch mode live, then answer Yes once in claude (S-01)`; scope reported as `local` → info with the `bootstrap-state.registration` value; command exits non-zero or output unrecognised → WARN `could not read registration status: <first line>` (never FAIL — the status format is Claude Code's, not ours; `R-13` says a format change is handled by a floor bump). Never fixable (the toggle is F6's job via E-10; the approval click is the user's). JSON: `data: { statusLine, scope, approved: true|false|null }`.
 **Acceptance criteria.**
@@ -204,6 +276,26 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S04 — Server checks SV-00…SV-07 integrated: module import, probe wiring (basic + ROPC), FLUENT SDK, capabilities equality, section `server`
+
+> **Amendment 2026-09-10 (from the delivery).** Six departures. (1) **ARC-07-S03 landed first**, so
+> the stub is gone for the configured case and the risk note ("the stub remains until then") is
+> moot: `src/doctor/probes-binding.ts` adapts `runAll(label)` to `probeAll(client, options)`, and
+> `stubProbes` stays as the answer to "no instance configured", which is a state rather than an
+> absence. (2) The engine registers **SV-00…SV-08**, not SV-00…SV-07: the server module has grown
+> SV-08 (ancestor skill directories), and dropping a check the server produces would be a silent
+> loss. (3) **SV-05/SV-06 are adopted, not re-run.** The story asks the engine to spawn the server
+> through `lib/mcp-handshake.mjs`; the server module already spawns it for those two checks, and it
+> cannot import engine code because it ships to npm on its own. Two handshake implementations exist
+> by packaging necessity — a third, in `server.mjs`, would be the one that drifts, and it would
+> cost a second cold start per run. (4) **FLAGS_INCOMPLETE is judged against the FILE**, through
+> `src/doctor/store-entry.ts`: `completeFlags` fills every absent flag from the preset, so the
+> loaded runtime always has six and "which did the user state?" has no answer there. (5) Two codes
+> were **added to the registry** (`FLAGS_INCOMPLETE`, `FLAG_DEPENDENCY_VIOLATION`, both
+> `showInRule: false`), which moved the contract sha — the pin was bumped deliberately with the
+> outputs quoted in the PR. (6) The probe client and `probeOptionsFor` moved from `cli/instance.ts`
+> to `servicenow/probe-client.ts`: the doctor needs both and must not import a CLI to ask a question
+> about credentials. `cli/instance.ts` re-exports `probeOptionsFor` for its existing callers.
+
 **As** the doctor **I want** to import the server package's doctor module and run its checks inside the merged report, with the live probes coming from the wizard's probe functions **so that** flag semantics, store rules and probes are implemented once in the server (never re-derived in engine code — `00` P-16, D25–D27) and a design-only checkout without server dependencies still gets a truthful report.
 **Context.** README deliverable "Server checks SV-00 … (from `packages/snowarch` `doctor`): Node floor; `dist/server.js` and module resolution; store presence, schema, modes; per instance: URL shape, auth probe (basic and ROPC), per-preset probes, six flags explicit and dependency-consistent, `toolPackage == full`, `@servicenow/sdk` when FLUENT; MCP stdio handshake …; `snow_core_capabilities_read` == store; audit log present and writable". ARC-04-S12 implements SV-00…SV-07 with a probe *stub*; ARC-07-S03 implements the probes (`sys_user` auth probe with 401/403 mapping, ROPC variant, per-preset probes on `sys_update_set`, `sys_script_include`, `cmdb_ci`, `sys_atf_test`, `sys_properties` `sn_generative_ai*`); this story replaces the stub, adds what ARC-04-S12 left out, and defines the engine-side import.
 **Scope.** In: `tools/snowarch/lib/doctor/checks/server.mjs` (import, availability handling, result adoption), the probe wiring in `packages/snowarch/src/doctor/` (`Probes` interface bound to ARC-07's implementation), SV-03's `@servicenow/sdk` sub-check and ROPC handling in SV-04, SV-06 equality semantics, the `server` block of the JSON. Out: the probes themselves (ARC-07), the handshake implementation (ARC-04-S12/ARC-06-S08 `lib/mcp-handshake.mjs` — SV-05 calls it), fixers (S06).
@@ -237,6 +329,23 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S05 — Merged report, the authoritative `Mode:` line, `--quick` / `--no-network` / `--section`, capability packs, `.local/doctor-last.json`
+
+> **Amendment 2026-09-10 (from the delivery).** Six departures. (1) **B08 now calls the doctor**
+> (`runDoctor({ sections: ['server'], writeCache: true })`) instead of speaking MCP itself: the
+> story's dependency note had it the other way round. Its own tool/capability comparisons went with
+> the handshake — SV-05 and SV-06 make them against the same child — and the pin-level `used_by`
+> reporting is covered statically by L01 and B05. (2) **`lib/mcp-handshake.mjs` is retired**; what
+> survives is `lib/server-command.mjs` (reading `.mcp.json` into the command Claude Code would run,
+> `CLAUDE_PROJECT_DIR` SET rather than inherited), which is not a handshake and still has callers.
+> One handshake in the product. (3) The **doctor stamp rides on the live line only** — criterion 2
+> calls the design-only sentence exact, and a date after an instruction reads as part of it.
+> (4) **SV-08 is in `--quick`**: the story's list predates ARC-08-S04's ninth server check, and its
+> flags put it there. (5) The cache's `mode` is the DERIVED mode, not the bootstrap's intent: a
+> banner must print what is true rather than what was asked for. (6) `text.mjs` gained the four
+> variant sentences and the `qualifier`/`stamp` parameters — the launcher's `Mode: design-only`
+> (which a Node-free shell prints from `text.json`) is unchanged, and `doctorLine` now delegates to
+> the doctor's `renderSummaryLine` so the install summary and the report cannot disagree.
+
 **As** an individual practitioner and as the engine (Claude) **I want** one command that prints one report and ends with one `Mode:` line derived from the store and the settings toggles — never from `~/.claude.json` or memory — and caches the result **so that** the banner, the `/snowarch` skill and the rule file all quote the same line.
 **Context.** README goal ("one command, one merged report, one authoritative `Mode:` line"), deliverable 5 (merged report, `--section`, capability packs), the P-05/P-21 mode-detection half ("the engine no longer parses `~/.claude.json`; it asks the server"). `01` §8 (Mode line texts), §6.2 step 8 (detailed line with flags and tool count), §9 (design-only definition), `03` R-14 (stale cache misreports the mode — banner re-runs, `/snowarch status` always re-runs `--quick`). ARC-05-S05 rule file: "The authoritative mode is the `Mode:` line printed at session start … never infer mode from any other file". ARC-06-S08 writes `.local/doctor-last.json` at B08 — this story owns its content (it is the doctor JSON).
 **Scope.** In: `tools/snowarch/lib/doctor/mode.mjs` (derivation), `cache.mjs` (read/write/staleness inputs), the merge of E- and SV- results into one report, section ordering and de-duplication rules, the `engine`/`server`/`mode*` blocks of the JSON, `--quick` definition, capability-pack summary line. Out: the banner process (S08), the skill rendering (S09), fixers (S06).
@@ -278,6 +387,35 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S06 — `--fix` whitelist with per-fix reporting and refusal rules
+
+> **Amendment 2026-09-10 (from the delivery).** Six departures. (1) **F4 goes through the store
+> module imported BY FILE PATH** (`dist/store/index.js`), the same seam `server.mjs` uses, rather
+> than through the CLI: the CLI route spawns a process and carries `instance set-flags`'s wider
+> semantics, and the guard belongs with the data. `updateInstance` did not exist — it was added
+> here, and it REFUSES a patch naming `auth`, `password`, `clientSecret` or `clientId` at all, so
+> the fixer cannot touch a credential even if asked. (2) **AC 1's F2 arm is covered separately.**
+> A sparse-set mutation needs a real 35,000-file submodule; the composite fixture links the corpus
+> so E-12/E-15 are green, and F2's own case drives the step runner injected, asserting the recorded
+> mode and the `skip` → `sparse` rewrite. (3) **SV-01's "prebuilt server missing" and E-11's "not
+> bootstrapped" results are `fixable: false`** — the check can be fixable in general, those
+> findings are not, and the JSON now prefers a RESULT's answer over the registry's flag. (4) **SV-02
+> gained the `store-mode` hint** (F5's trigger, which it lacked). (5) The kinds were renamed to one
+> table: `docs-sync` split into `corpus-missing` and `head-off-pin`, `toggles` → `toggles-mismatch`,
+> `chmod` → `store-mode`, `disableAllHooks` → `hooks-disabled-by-bootstrap`. (6) **The cache drops
+> `server.instances[].username`**: masked or not, it is an address shape, and the write-time guard
+> refuses those without exception — every live install would otherwise have had no cache at all.
+>
+> **Amendment 2026-09-10 (b), from the review on a fresh clone.** Two defects the suite could not
+> see. (1) **F2 never worked.** It called `B02.run` with `{root, docs, env, config}` and no
+> `state`, and B02 MUTATES `ctx.state.docs`, so every real run died with `Cannot set properties of
+> undefined`. The test had injected the runner, which proved the mode arithmetic and nothing about
+> the step's contract — the vacuous shape. F2 now builds the context the bootstrap driver builds
+> (through `stepContext`, shared with F1) and PERSISTS the state B02 mutates, so the `skip` →
+> `sparse` rewrite lands in the store rather than only on the screen; the test drives the real
+> `B02.run` against the ARC-03 fixture upstream. (2) **`--fix --json` was not JSON**: the plan and
+> the per-fix lines went to stdout above the object. Under `--json` they go to stderr and stdout
+> carries exactly one object, asserted by `JSON.parse` over the WHOLE of stdout.
+
 **As** an individual practitioner **I want** `./snowarch doctor --fix` to repair the seven classes of drift that are safe to repair, report each repair, and print the exact command for everything it refuses to touch **so that** an install that drifted after an upgrade, a moved checkout or a hand edit returns to 0 FAIL in one run without ever risking credentials or committed files.
 **Context.** README deliverable "`--fix` whitelist (idempotent, reported): deps → B04; docs missing/unsparse → B02; pin drift → `git submodule update --checkout`; flags < 6 → explicit `"false"`; store modes → chmod; toggles → rewrite for recorded mode; stale `doctor-last.json` → re-run. Never: credentials, `.mcp.json`, `~/.claude*`" and acceptance criterion 4 (repairs a four-flag store entry, a wrong sparse set and a missing settings.local toggle in one run; refuses `.mcp.json` and prints `git checkout -- .mcp.json`). `01` §8. Principle 10 applies in spirit: `--fix` shows its plan before applying unless `--yes`.
 **Scope.** In: `tools/snowarch/lib/doctor/fix.mjs` (whitelist registry, plan, apply, report), the `fixes[]` JSON block, `--fix [--yes]`, re-run after fixing. Out: any fixer not in the whitelist (adding one is a deliberate change to this file and its tests), edits to credentials, `.mcp.json`, `.claude/settings.json`, anything under `~/.claude*`, `engine.config.json`, the docs pin in `engine.config.json`.
@@ -329,6 +467,16 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 ---
 
 ### ARC-08-S07 — Old→new check mapping table (`D00–D37` → `E-xx` / `SV-xx` / retired) in `docs/ARCHITECTURE.md`
+
+> **Amendment 2026-09-10 (from the delivery).** Three departures. (1) The table is DATA
+> (`tools/snowarch/lib/doctor/mapping.mjs`) rendered into the appendix by `gen-doctor-docs` — the
+> fifth generated region on that page — because a table of ids maintained beside a registry of ids
+> is a table that disagrees with it. (2) **The "new checks" list is computed, and is 11, not the
+> story's 12.** The story listed `E-09` and `SV-05` as both mapped (D31, D22) and new; computing
+> the list as "registry minus mapped" removes that double count, and adds `SV-08`, which post-dates
+> the story. (3) `D00` is not retired: its intent — missing host tooling ends the run — is the
+> runner's exit 3, and the test requires a row with no new id to say which of the two it is.
+
 **As** a maintainer **I want** a table that accounts for every one of the 39 checks in the old `scripts/doctor.sh` — its new id, or the reason it is retired — **so that** no intent of the most precise existing install specification (`00` §3.9) is lost, and reviewers can audit the doctor by reading one table.
 **Context.** README deliverable "`docs/ARCHITECTURE.md` appendix: mapping table old `D00–D37` → new `E-xx`/`SV-xx` (every old intent accounted for; D19/D20 path checks and D36 prefix check re-targeted; D32/D33 probes moved to the server module)" and acceptance criterion 2. Source: `scripts/doctor.sh` (1,141 lines; 39 `CHECK_ID="D…"` assignments — `D00` at line 53, `D37` at line 1100, `D17` assigned twice; D16 at line 342 has four commented sub-checks (a)–(d); D31 at line 846 has three parts: `~/.claude.json` mode, other projects with credentials, tracked-file leak scan).
 **Scope.** In: the appendix table, a `tests/doctor/mapping.test.mjs` that asserts every `D00…D37` appears exactly once and every referenced new id exists in the registry, and a short "retired" rationale per retired row. Out: any check body.
@@ -390,6 +538,21 @@ New checks with no old counterpart (listed under the table): E-06, E-09 (key sca
 ---
 
 ### ARC-08-S08 — `hooks/session-start.mjs` banner: cache, staleness re-run, nudges, hook timeout, S-05 handling
+
+> **Amendment 2026-09-10 (from the delivery).** Five departures. (1) **S-05 is variant B**: the
+> bootstrap NEVER writes `disableAllHooks`; with Node absent the hook entry is simply not written
+> (ARC-06-S05's toggle writer). The design note's "the bootstrap writes `disableAllHooks: true`"
+> is superseded, and AC 7 reads: E-10 asserts the key is ABSENT, and reports it once as a WARN if
+> an older build left one behind (F6 removes it). (2) **The hook entry is the single-`command`
+> form**, not the `command`/`args` exec pair `01` §5 describes: that is the shape Claude Code's
+> hook schema takes and the shape ARC-06-S05 writes and E-08 asserts. Matcher (`startup|resume`)
+> and `timeout: 10` are the story's, unchanged. (3) **The root is `../../..` from the hook file**,
+> not `../..` — `tools/snowarch/hooks/` is three levels down. (4) The `first-run` nudge fires when
+> THIS invocation created the cache, which is the story's rule, and is therefore silent on every
+> session after the first even though the checkout stays instance-less. (5) AC 6, AC 7's manual
+> half and task 5 (`claude --debug`, plain stdout vs `additionalContext`) are owner-sitting rows
+> (D3), not automated: they need a real Claude Code session on two operating systems.
+
 **As** the engine (Claude) **I want** every session to begin with one truthful `Mode:` line produced from the doctor cache — refreshed when the cache is stale or the inputs changed — plus at most three one-line nudges, within the hook budget and without ever blocking or printing a secret **so that** the rule file's "quote the banner" instruction is always satisfiable and the engine never infers its mode.
 **Context.** README deliverable "`hooks/session-start.mjs` (exec form, `timeout` 10 s, < 300 ms typical): reads `.local/doctor-last.json`, re-runs the offline `--quick` subset when older than 24 h or when `.mcp.json`/store mtime changed; prints one line (`Mode: …`), plus first-run nudge, upgrade nudge, stale-registration nudge; never prints secrets; never blocks" and acceptance criterion 5 (banner within 1 s on CI; with Node absent the launcher's `disableAllHooks` fallback leaves the session clean — S-05). `01` §5 (hook entry: `matcher: "startup|resume"`, exec form `command: "node"`, `args: ["${CLAUDE_PROJECT_DIR}/tools/snowarch/hooks/session-start.mjs"]`, `timeout: 10`), §8, §13 (exec form on Windows — S-03), `03` R-14, S-05, S-14d (SessionStart `additionalContext` is the documented channel). ARC-00-S06 delivers the S-05 verdict; ARC-06-S05 implements the toggle it chose; ARC-09-S07 (`./snowarch upgrade --check`) writes the upgrade-check input `.local/upgrade-check.json` and lists this story as its dependency for the nudge line — the dependency is one-way (this hook only reads the file; absent file = no nudge).
 **Scope.** In: `tools/snowarch/hooks/session-start.mjs` (stdlib only; imports `lib/doctor/cache.mjs` and, for re-runs, the doctor runner in-process), the staleness rule, the three nudges, the watchdog, output format, `tests/hook/session-start.test.mjs` with timing. Out: the hook entry in `.claude/settings.json` (ARC-06-S01 — this story only specifies what it must say), the `disableAllHooks` writer (ARC-06-S05), the fetch that decides "behind origin" (ARC-09-S07 — this hook only reads `.local/upgrade-check.json`).
@@ -434,6 +597,21 @@ New checks with no old counterpart (listed under the table): E-06, E-09 (key sca
 ---
 
 ### ARC-08-S09 — `/snowarch status` skill body: doctor-JSON rendering and the no-Node fallback
+
+> **Amendment 2026-09-10 (from the delivery).** Four departures. (1) **The state file's keys are
+> `mode`, `docs.pin` and `updatedAt`** (`lib/state.mjs` v1) — the story's
+> `{"mode","docsPin","at"}` example was never the shape on disk. (2) **The three-cause fallback
+> stays.** The story's single sentence ("doctor unavailable until Node 20+ is installed") would
+> have replaced a rule ARC-02-S11 added for a reason recorded in its test: a session once refused
+> to blame Node 20 for a missing launcher, and was right to. The Node cause keeps the story's
+> wording; the other two — a missing launcher, a doctor that ran and failed — keep theirs, under
+> "never state a cause you did not check". (3) **`Capabilities:` and the citation counts are
+> routinely absent**, because E-04 spawns and E-16 walks the corpus, so neither is in the `--quick`
+> subset the skill is required to run (R-14). The template omits a null line and says so once,
+> rather than printing a line the model would fill from nowhere. (4) Line 1 is `modeLineDetailed`
+> as the story says, which changes ARC-02-S11's assertion from `report.modeLine`; the "verbatim,
+> first, undecorated" discipline it protects is unchanged.
+
 **As** an individual practitioner **I want** `/snowarch status` (or typing `Status`) to show the Mode line, engine version, docs pin and citation state, roster, capability packs and the doctor summary — from the doctor's JSON, or from the bootstrap state when the doctor cannot run **so that** the in-session view is the same truth as the terminal's, formatted for reading.
 **Context.** README deliverable "`/snowarch status` skill: runs `./snowarch doctor --quick --json` and prints Mode line, engine version, docs pin, roster, capability packs. When `node` is not on PATH (design-only install without Node) it reads `.local/bootstrap-state.json` instead and reports the mode with 'doctor unavailable until Node 20+ is installed'". R-2 (the skill is `/snowarch`, sub-command `status`). ARC-02-S11 created `.claude/skills/snowarch/SKILL.md` with the `status` branch printing `report.modeLine` plus "whatever keys exist" and named this story as the owner of the final layout; ARC-07-S09 edits the `setup-instance` branch (and owns the frontmatter's `allowed-tools` / `metadata.version` — its scope statement says the `status` section belongs to this story) — merge order ARC-07-S09 then this story; this story keeps the frontmatter and the hand-off block byte-identical. `01` §4.1 (the skill runs `./snowarch …` through Claude's Bash tool; on Windows that needs Git for Windows), `03` R-14 (`/snowarch status` always re-runs `--quick`).
 **Scope.** In: the `status` branch of `.claude/skills/snowarch/SKILL.md` (rendering instructions, fallbacks, the exact output template), a fixture JSON for the manual test, the T-07 update in `tests/VALIDATION-TESTS.md`. Out: the frontmatter, the `setup-instance` and `doctor` branches (ARC-07-S09 / ARC-02-S11), any new skill file (there is exactly one), any computation in the skill (it renders; it never derives).
@@ -475,6 +653,52 @@ New checks with no old counterpart (listed under the table): E-06, E-09 (key sca
 ---
 
 ### ARC-08-S10 — Runtime error mapping in the generated rule file; VALIDATION-TESTS T-19 (`AUTHENTICATION_FAILED`) and T-20 (`*_NOT_ENABLED`)
+
+> **Amendment 2026-09-10 (from the delivery).** Six corrections, then two departures.
+>
+> *Corrections.* The registry file is `packages/snowarch/src/errors/codes.ts`, not
+> `src/utils/error-codes.ts`. The timeout code is `CONNECTION_TIMEOUT`; there is no
+> `NETWORK_TIMEOUT` (ARC-07-S02's amendment). The second test is **T-22**, not T-20: ARC-07-S09
+> took T-20 and T-21 and reserved T-19 for this story, and the Reserved-numbers section of
+> `tests/VALIDATION-TESTS.md` governs. The file's count after this story is **22** (T-01…T-22,
+> none reserved), not 20 — and the header now states it with a test asserting the statement.
+> `INSTANCE_NOT_LOADED` was already registered (ARC-04-S03) and keeps ITS remedy: "not loaded" has
+> more than one cause, and the story's proposed text named only the `prod` one, which would send a
+> reader to acknowledge a prod flag on an instance that is not prod. There is no `ruleText` field
+> and none was added — one text serves both audiences for all six codes.
+>
+> *Departure 1 — two remedies were reworded for the second audience.* `PROXY_AUTH_REQUIRED` opened
+> on "put them in the proxy URL", whose antecedent is in the MEANING — which the rule file does not
+> render. `DNS_FAILURE` ended in two adjacent parentheticals, so with a proxy configured it read
+> "…through a proxy (set `HTTPS_PROXY`) (a proxy is configured — …)": advice to set a variable
+> that is set, in the sentence saying it is set. Both now read as one instruction in the rule file
+> and as one paragraph in `docs/TROUBLESHOOTING.md`.
+>
+> *Departure 2 — the rule file's line budget moved from 45 to 55.* The finished section is 6 code
+> lines and 4 of prose longer than the one it replaces, and there is no version of it that is both
+> complete and shorter than the file was. The cap moved to the finished size plus a little (52
+> today), not to wherever the file happens to land, so prose creep still fails the test.
+>
+> **Review ruling, 2026-09-10 (both closed in ARC-08-S11's first commit).** (a) The open question
+> below is ruled as recommended: the wizard's 401 re-entry line now renders the registry's `meaning`
+> followed by its own question, so the condition has one definition and the account-locked cause —
+> the one that matters most, because retrying makes it worse — is in both places. ARC-07-S05's test
+> reads the sentence from the registry rather than a literal. (b) `CONNECTION_REFUSED` joins the
+> family, making it **seven network codes** and nineteen rule-visible in all: the story's list left
+> out the network error this product meets most often, and retrying a refused connection wakes a
+> hibernating PDI no more than retrying a wrong password unlocks an account.
+>
+> *Open question for the story's owner.* AC 2 names four places the `AUTHENTICATION_FAILED` text
+> must be identical. Three are the documents, and the fourth is `./snowarch doctor` SV-04 — which
+> does hold, because the probe returns the CODE and `applyContractRemedy` fills the remedy from the
+> contract. The wizard's 401 re-entry line does NOT: it says "wrong username or password", where
+> the registry says "the instance rejected the credentials — wrong, expired, or the account is
+> locked". Narrower, and a second definition of the same condition, which is the defect the
+> registry exists to prevent — but it is ARC-07-S05's user-visible string and is not this story's
+> to rewrite. Recommended: render it from the registry's `meaning`, as `labelExists()` beside it
+> already renders from the registry. Pending that, the test asserts what is true and what must stay
+> true — the wizard names the code and never carries a remedy of its own.
+
 **As** the engine (Claude) **I want** the always-loaded rule file to tell me, for every runtime error code the server can return, to stop and print the exact remedy — never retry, never edit flags from inside a session — and I want two behavioural tests that prove it **so that** a wrong password or a disabled flag becomes a one-line hand-off to the terminal instead of a retry loop or an improvised fix (README acceptance criterion 7; `00` P-03 at runtime).
 **Context.** README deliverable 10 ("Runtime error mapping in the generated rule file; VALIDATION-TESTS addition for `AUTHENTICATION_FAILED`") and acceptance criterion 7. `01` §6.2 ("Wrong password at runtime: the server returns `AUTHENTICATION_FAILED`; the rule file tells the engine to stop (no retries) and point to `./snowarch instance set-credentials <label>`"). ARC-05-S05 renders the rule file's "Runtime errors" section from `contract.errorCodes[]` filtered to `showInRule: true`; ARC-05-S06 owns the registry and seeds `showInRule` for the six `*_NOT_ENABLED` codes, `AUTHENTICATION_FAILED`, `INSUFFICIENT_PRIVILEGES`, `NO_INSTANCE_CONFIGURED`, `PROD_WRITE_NOT_ACKNOWLEDGED`, `UNKNOWN_TOOL`, `FLUENT_NOT_INSTALLED`; ARC-04-S11 registers the network codes (`showInRule: false` by default). ARC-02-S13 moved the tests to `tests/VALIDATION-TESTS.md` (T-01…T-18) and added T-07 for Mode reporting.
 **Scope.** In: the registry review (which codes carry `showInRule` — a PR against `packages/snowarch/src/utils/error-codes.ts`, the registry file ARC-05-S06 creates in the unified repo; it has no counterpart in the old `snow-mcp/src/utils/`), the per-code `ruleText` for the codes ARC-07-S10 does not own (`*_NOT_ENABLED`, `NO_INSTANCE_CONFIGURED`, `UNKNOWN_TOOL`, `FLUENT_NOT_INSTALLED`, `INSTANCE_NOT_LOADED`, the five network codes), the rule-file section's header and three behavioural sentences (stop / no retry / remedy verbatim / suggest `./snowarch doctor` after two different errors in one session), the `docs/TROUBLESHOOTING.md` cross-reference sentence, T-19 and T-20 in `tests/VALIDATION-TESTS.md`, the T-07 wording update from S09. Out: the renderer (ARC-05-S05), the registry mechanism (ARC-05-S06), the `ruleText` of `AUTHENTICATION_FAILED` / `INSUFFICIENT_PRIVILEGES` / `PROD_WRITE_NOT_ACKNOWLEDGED` and the wizard's own remedies (ARC-07-S10 owns those strings; this story consumes them verbatim and tests them).
@@ -515,6 +739,32 @@ New checks with no old counterpart (listed under the table): E-06, E-09 (key sca
 ---
 
 ### ARC-08-S11 — CI: doctor after bootstrap on three OSes, JSON snapshot test, fixture-driven detector tests, banner timing
+
+> **Amendment 2026-09-11 (from the delivery).** Five departures.
+>
+> 1. **E-00 is a FAIL on a hosted runner, not a `skip`.** The story assumed `--skip-claude-check`
+>    at install time makes the doctor skip it. It does not, deliberately: the doctor's E-00 passes
+>    `skip: false` to `checkClaudeCode`, because the flag is about the install and the doctor's job
+>    is to re-ask on a machine that has since changed. With no `claude` on PATH the honest answer
+>    is `fail`, and the doctor exits 1. Rather than teach the doctor to hide a missing prerequisite,
+>    `scripts/ci/assert-doctor.mjs` takes `--expect-fail E-00` and asserts it BOTH ways — the named
+>    ids must fail and every other check must not — so the allowance cannot outlive the condition
+>    that justified it.
+> 2. **Steps, not a job.** `main`'s protection lists 42 contexts by name, so the doctor runs inside
+>    ARC-06-S14's thirteen `bootstrap` cells and `tests/workflows.test.mjs` now pins the job list.
+> 3. **The snapshots live at `tests/fixtures/doctor/snapshot-<platform>.json`**, not
+>    `tests/doctor/snapshots/design-only.<os>.json` — the repository keeps fixtures under
+>    `tests/fixtures/`, and the platform key is `process.platform` (`win32`, not `windows`) because
+>    that is what the code selecting the file has to hand. All three were produced from this PR's
+>    own CI artifacts, never written by hand.
+> 4. **The fixture username is `someone.fixture@corp.example.com`.** The story's example spelled a
+>    personal name; the rule of record is that no real person's name appears anywhere in this
+>    repository, not even as a masking example. The password is 24 random characters generated in
+>    the test, so a run that passed by not printing one particular string cannot keep passing.
+> 5. **`CI_DOCS=fixture` is not used.** The bootstrap cells fetch the real corpus — that is the
+>    thing ARC-06-S14 exists to prove — so E-12…E-16 answer against it and `assert-doctor.mjs`
+>    fails the job if every docs check skipped. The fixture corpus stays what the unit tests use.
+
 **As** CI **I want** the doctor to run after the design-only bootstrap on ubuntu, macOS and Windows on every commit, its JSON compared against a normalised snapshot, the stale-registration and redaction fixtures exercised, and the banner timed **so that** ARC-08's acceptance criteria are proven continuously and every other ARC can name a doctor check as its proof (README risk "doctor drift").
 **Context.** README deliverable 11 and acceptance criteria 1, 3, 5, 6; README risk mitigation "CI runs the doctor after the bootstrap". ARC-06-S14 (bootstrap CI job on three OSes; Windows without Git Bash), ARC-09-S08 (matrix completion — this story adds the doctor steps to the jobs ARC-06 created; ARC-09-S08 later places the `doctor` job on its final cells and names this story as its source), ARC-00-S13 (Windows PATH-stripping recipe), `01` §13 (CI runs bootstrap, lints, tests on three OSes).
 **Scope.** In: `.github/workflows/ci.yml` steps `doctor` (after `bootstrap --mode design --yes`): `./snowarch doctor --json --no-cache > doctor.json`, exit-code assertion, snapshot comparison, artifact upload of `doctor.json`; `tests/doctor/snapshot.test.mjs` (normaliser + per-OS expected status map); `tests/doctor/fixtures/claude-json-stale/` (S03 criterion 1 in CI with `HOME` redirected); `tests/doctor/redaction-e2e.test.mjs` (README criterion 3 against a fixture store with known credentials — `RUN_LIVE_E2E` not needed; the store is read, probes are skipped); banner timing job step (S08 criterion 1). Out: the live-mode CI job (needs a PDI secret — remains the opt-in `RUN_LIVE_E2E` job owned by ARC-07-S11/ARC-09), the Node-version matrix (ARC-09-S08).
@@ -522,7 +772,7 @@ New checks with no old counterpart (listed under the table): E-06, E-09 (key sca
 - **Snapshot normaliser.** Strips `ranAt`, `durationMs`, `version`/`tag`/`contractSha` values, paths, and counts (`fileCount`, `sizeBytes`), keeps `checks[].{id,status,fixable}` and `summary` minus timing; expected files `tests/doctor/snapshots/design-only.<os>.json` (Windows differs: E-11 and SV-02 mode details, E-04 providers). Any new check id must be added to all three snapshots — that is the "doctor drift" guard.
 - **Assertions per OS** after the design bootstrap: exit code 0; `summary.fail == 0`; `mode == "design-only"`; `modeLine` equals the design-only text; every SV check `skip` (deps not installed in the design job); E-27 `skip` on runners without `claude` and `ok` with `data.approved == false` where the job installs Claude Code (ARC-06-S14's optional `claude`-present variant — the snapshot stores both statuses as allowed); E-12…E-16 `ok` (the corpus is checked out sparse by B02 — ARC-03-S11's real-corpus job proves size; here the fixture corpus from ARC-03-S05 is used when `CI_DOCS=fixture` to keep the job under 3 minutes).
 - **Windows job** (Git Bash removed from PATH per ARC-00-S13): `snowarch.cmd doctor --json --no-cache` from PowerShell and from cmd; the hook timing step runs `node tools/snowarch/hooks/session-start.mjs` under both shells.
-- **Redaction e2e.** A fixture `.local/instances.json` (created by the test with mode 0600, `username: "cvetomir.fixture@corp.example"`, a random 24-char password) → `./snowarch doctor --json --no-network`; assert neither string appears; assert `c***@corp.example` appears in `server.instances[0].username`; repeat for the text output and for `--fix --yes --no-network` output (README criterion 3).
+- **Redaction e2e.** A fixture `.local/instances.json` (created by the test with mode 0600, `username: "someone.fixture@corp.example"`, a random 24-char password) → `./snowarch doctor --json --no-network`; assert neither string appears; assert `s***@corp.example` appears in `server.instances[0].username`; repeat for the text output and for `--fix --yes --no-network` output (README criterion 3).
 - **Stale-registration fixture.** `HOME`/`USERPROFILE` → temp dir with the S03 fixture; assert the two exact `claude mcp remove` lines (README criterion 6) and the unchanged sha.
 - **Banner timing.** Five spawns with a fresh cache; assert median < 1 s (README criterion 5) and record the number in the job summary; on the reference machine the S08 test asserts < 300 ms (not enforced on shared runners).
 - **Job summary.** The workflow writes the `DOCTOR:` line, the Mode line and the banner median into `$GITHUB_STEP_SUMMARY`; `doctor.json` is uploaded as an artifact (ARC-09's release workflow attaches the same file to releases).

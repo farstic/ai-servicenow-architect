@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectToolCatalog } from '../../src/tools/index.js';
-import { removeTempDir, reapServerChildren, trackServerChild } from '../helpers/server-child.js';
+import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 
 const SERVER = resolve(dirname(fileURLToPath(import.meta.url)), '../../dist/server.js');
 
@@ -99,7 +99,7 @@ const auditLines = (): Array<Record<string, unknown>> => (existsSync(auditFile)
 const auditText = (): string => (existsSync(auditFile) ? readFileSync(auditFile, 'utf8') : '');
 
 beforeEach(() => {
-  base = mkdtempSync(join(tmpdir(), 'snowarch-nosecrets-'));
+  base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-nosecrets-')));
   home = join(base, 'home');
   checkout = join(base, 'volume', 'repo');
   auditFile = join(base, 'audit.jsonl');
@@ -108,9 +108,14 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  // Reap first: the removal is only safe once nothing can still write into the directory.
-  await reapServerChildren();
-  removeTempDir(base);
+  // Reap first: the removal is only safe once nothing can still write into the directory. In a
+  // `finally`, because a reap that throws must not take the removal with it — that is one of the
+  // two ways these trees survived a run.
+  try {
+    await reapServerChildren();
+  } finally {
+    removeTempDir(base);
+  }
 });
 
 describe('criterion 1 - a mutating call writes one line, and the payload is not in it', () => {

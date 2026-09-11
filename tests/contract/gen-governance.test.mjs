@@ -67,8 +67,15 @@ test('criterion 1 — the rule file is written, is short, and has no frontmatter
     // opened with `---` would load conditionally, which for this file means not at all.
     assert.ok(!text.startsWith('---'), 'frontmatter would make it conditional');
     assert.ok(!/^paths:/m.test(text));
+    // 45 until ARC-08-S10, which finished the runtime section: the network family (DNS, TLS, both
+    // proxy codes, the timeout) and `INSTANCE_NOT_LOADED` became rule-visible, because a session
+    // that meets one of them mid-task must hand over exactly as it does for a wrong password, and
+    // the instruction paragraph and the placeholder sentence came with them. Six code lines and
+    // four of prose is +9, and there is no version of this section that is both complete and
+    // shorter than the file was. The cap moved to where the finished section sits plus a little,
+    // NOT to wherever the file happens to be: 52 today, so prose creep still fails here.
     const lines = text.trimEnd().split('\n').length;
-    assert.ok(lines <= 45, `${lines} lines, budget 45`);
+    assert.ok(lines <= 55, `${lines} lines, budget 55`);
     console.log(`    rule file: ${lines} lines`);
   } finally { cleanup(dir); }
 });
@@ -270,14 +277,19 @@ test('the wildcard line\'s code is required, and its absence cannot pass silentl
   } finally { cleanup(dir); }
 });
 
-test('the two "not a substitute" tools are real tools in the contract', () => {
+test('every tool the rule file names in prose is a real tool in the contract', () => {
   // The claim about them (they refuse with UNSUPPORTED_ON_THIS_INSTANCE) is not in the contract —
   // no field marks a stub — so the names are a literal in the renderer. What can be enforced is
   // that they are names the server still answers: a rule file telling a reader not to use a tool
   // that no longer exists is noise, and one naming a tool that was renamed is wrong.
   const names = new Set(realContract().tools.map((t) => t.name));
-  for (const n of ['snow_deploy_background_script_exec', 'snow_fluent_script_exec', 'snow_us_update_set_switch']) {
+  // ARC-08-S10 added the fourth: the runtime section tells a session to call it before continuing
+  // from an interrupted step, which is an instruction to make a call — the worst kind of name to
+  // let rot.
+  for (const n of ['snow_deploy_background_script_exec', 'snow_fluent_script_exec',
+    'snow_us_update_set_switch', 'snow_core_capabilities_read']) {
     assert.ok(names.has(n), `${n} is not in the contract`);
+    assert.ok(readFileSync(join(root, RULE), 'utf8').includes(n), `${n} is not named in the rule file`);
   }
 });
 

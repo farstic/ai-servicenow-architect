@@ -327,34 +327,41 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (59), with what to do about it.
+Every code the server can throw (67), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
 |---|---|
 | `ATF_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `ATTACHMENT_UPLOAD_FAILED` | check the file size and that the target record exists |
-| `AUTHENTICATION_FAILED` | stop and re-enter them; do not retry, repeated failures lock the account |
+| `AUTHENTICATION_FAILED` | If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed |
 | `BATCH_FAILED` | the message lists which |
 | `CMDB_WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
-| `CONNECTION_REFUSED` | check the URL and its port, and whether the instance is awake — a hibernating PDI refuses |
-| `CONNECTION_TIMEOUT` | on a corporate network set `HTTPS_PROXY`; otherwise check connectivity and the firewall |
+| `CONNECTION_REFUSED` | `<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too |
+| `CONNECTION_TIMEOUT` | no answer from `<host>` in time. If this network needs a proxy, set `HTTPS_PROXY=http://proxy:port` (and `NO_PROXY` for internal hosts) and run again. An idle PDI may be hibernating — wake it at developer.servicenow.com |
 | `CREATE_FAILED` | the message carries the instance response |
 | `DELETE_ACL_DENIED` | use an account with the role |
 | `DELETE_CONSTRAINT` | remove the reference first |
 | `DELETE_FAILED` | the message carries the instance response |
 | `DELETE_NOT_FOUND` | check the sys_id |
-| `DNS_FAILURE` | check the spelling first; on a VPN-only instance connect first; on a corporate network set `HTTPS_PROXY`. A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong |
+| `DNS_FAILURE` | the name `<host>` does not resolve. Check the instance name first — a typo is the usual cause; on a corporate network the name may resolve only over VPN, or only through a proxy, so set `HTTPS_PROXY` if there is one (there is one — `<proxyVar>=<proxy>` — and a proxy does not resolve names for you unless the request goes through it, which makes a wrong name the likelier cause) |
 | `ECONNREFUSED` | as `CONNECTION_REFUSED`: check the URL, the port and any proxy |
 | `ENOTFOUND` | as `DNS_FAILURE`: check the host in the store |
+| `ENV_REQUIRED` | pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do |
 | `ETIMEDOUT` | as `CONNECTION_TIMEOUT` |
+| `FLAG_DEPENDENCY_VIOLATION` | decide which one was meant: turn WRITE on, or turn the dependent flag off. Neither is guessable from the store, so this is never repaired automatically |
+| `FLAGS_INCOMPLETE` | state every flag explicitly by re-applying a preset — the review screen shows what changes before anything is written |
 | `FLUENT_ERROR` | the message carries the SDK output |
 | `FLUENT_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `FLUENT_NOT_INSTALLED` | install it globally — the doctor checks `PATH`, so a checkout-local install would pass here and fail there |
 | `INSTANCE_NOT_LOADED` | read the reason in the instance listing; a `prod` instance without `prodWriteAck` needs the acknowledgement |
 | `INSTANCE_UNUSABLE` | the message says which field is impossible |
-| `INSUFFICIENT_PRIVILEGES` | grant the role, or use an account that has it; the message names the table |
+| `INSUFFICIENT_PRIVILEGES` | The credentials are valid but the account lacks a role for this table. Report the tool, the table and the roles the preset needs (see docs/TROUBLESHOOTING.md); do not switch instances or retry with another tool to work around it |
 | `INVALID_REQUEST` | the message names the argument |
+| `LABEL_EXISTS` | use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it |
+| `LABEL_NOT_FOUND` | run `instance list` to see the labels this checkout has, or `instance add <label>` to add one |
+| `LEGACY_STORE_NOT_FOUND` | check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `./snowarch doctor` reports where it looked |
+| `LEGACY_STORE_UNREADABLE` | open it and check it is a complete JSON object; a half-written file from an interrupted 1.x session cannot be migrated and its instances are re-added with `instance add` |
 | `NETWORK_ERROR` | the message carries the underlying cause |
 | `NO_INSTANCE_CONFIGURED` | add an instance, then call the reload tool — Claude Code does not need restarting, the server re-advertises its catalogue in the same session |
 | `NOT_FOUND` | check the sys_id and the table name |
@@ -363,21 +370,22 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `NOW_ASSIST_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `OAUTH_CLIENT_INVALID` | check them against the Application Registry entry on the instance |
 | `OAUTH_ROPC_DISABLED` | use basic authentication, or have an administrator enable the grant type |
-| `PROD_WRITE_NOT_ACKNOWLEDGED` | raise it deliberately, typing the label |
-| `PROXY_UNREACHABLE` | the message names the proxy with any credentials masked; correct the host and port, or unset the variable if you are not behind a proxy. `NO_PROXY` exempts internal hosts |
+| `PROD_WRITE_NOT_ACKNOWLEDGED` | A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal |
+| `PROXY_AUTH_REQUIRED` | the proxy is asking for credentials: put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials |
+| `PROXY_UNREACHABLE` | the proxy `<proxyVar>=<proxy>` did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked |
 | `QUERY_FAILED` | the message carries the instance response |
 | `RATE_LIMITED` | retry later; reduce `maxRecords` or the call rate |
 | `REQUEST_FAILED` | the message carries that response |
 | `SCHEMA_NOT_CACHED` | call the schema read tool for that table first |
 | `SCRIPT_FAILED` | the message carries the instance output |
 | `SCRIPTING_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
-| `STORE_IN_CLOUD_SYNC_FOLDER` | move the checkout, or accept it deliberately |
+| `STORE_IN_CLOUD_SYNC_FOLDER` | move the checkout outside the synced folder, or keep credentials in the global store with `--global` (<global> is not synced by default) |
 | `STORE_NOT_FOUND` | correct the variable, unset it, or create the store |
 | `STORE_PERMISSIONS_TOO_OPEN` | tighten the mode; on Windows the check is skipped and the doctor notes it instead |
 | `STORE_SCHEMA_INVALID` | the message names the field path; correct it in the store |
 | `STORE_SCHEMA_UNSUPPORTED` | upgrade this checkout, rather than editing the store down |
 | `STORE_UNREADABLE` | repair or recreate it; the message names the parse error |
-| `TLS_CA_UNTRUSTED` | export your organisation root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it |
+| `TLS_CA_UNTRUSTED` | the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it |
 | `TLS_CERT_INVALID` | check the instance URL and the certificate; this is not a CA-trust problem |
 | `UNKNOWN_GATE` | report it; no user action can help |
 | `UNKNOWN_INSTANCE` | the listing prints the labels that exist |
@@ -388,7 +396,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `URL_HAS_PATH` | drop everything after the host |
 | `URL_INVALID` | enter it as `https://<host>.service-now.com` |
 | `URL_NOT_HTTPS` | use the https form of the same host |
-| `URL_REQUIRED` | enter the full https URL of the instance |
+| `URL_REQUIRED` | enter the full https URL of the instance; non-interactively pass `--url <origin>` (a URL cannot be proposed) |
 | `VALIDATION_ERROR` | the message names the argument and the shape |
 | `WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 

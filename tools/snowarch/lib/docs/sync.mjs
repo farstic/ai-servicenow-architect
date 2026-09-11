@@ -83,29 +83,19 @@ const isWindows = () => process.platform === 'win32';
 const withLongPaths = (args) => (isWindows() ? ['-c', 'core.longpaths=true', ...args] : args);
 
 /**
- * The proxy URL as it may be printed: credentials removed, host and port kept.
+ * The sentences moved to `../net-sentences.mjs` at ARC-06-S04, and are re-exported here so every
+ * existing importer keeps working.
  *
- * `user:password@host` is the shape a corporate proxy is configured in, and the whole point of the
- * proxy message is to print the address back at the operator — so it has to be printed without the
- * password that is sitting in their environment variable.
+ * The preflight (B00) reaches the same internet over `node:https` and hits the same four walls —
+ * DNS, an unreachable proxy, a TLS-intercepting gateway, a full disk. An operator behind a
+ * corporate proxy must not learn two vocabularies for one problem depending on which half of the
+ * tool noticed first, and two copies of "cannot reach proxy …" would drift the first time either
+ * was reworded. What stays here is git's stderr → WHICH sentence, which is genuinely git's
+ * business: the matched substrings are libcurl's, as surfaced by git.
  */
-export function maskProxy(url) {
-  if (!url) return null;
-  return String(url).replace(/\/\/[^/@]*@/, '//***@');
-}
+import * as SENTENCE from '../net-sentences.mjs';
 
-/** `host:port` from a proxy URL, for the message. Falls back to the masked URL if it will not parse. */
-function proxyAddress(url) {
-  try {
-    const u = new URL(/^[a-z]+:\/\//i.test(url) ? url : `http://${url}`);
-    return u.port ? `${u.hostname}:${u.port}` : u.hostname;
-  } catch { return maskProxy(url); }
-}
-
-/** The host an upstream URL points at, for the DNS message. `file://` fixtures have none. */
-export function upstreamHost(upstream) {
-  try { return new URL(upstream).hostname || null; } catch { return null; }
-}
+export { maskProxy, upstreamHost } from '../net-sentences.mjs';
 
 /**
  * git's stderr → the sentence the operator needs.
@@ -120,30 +110,26 @@ export function classifyGitFailure(stderr, { upstream, pin, env = process.env } 
   const text = String(stderr ?? '');
   const low = text.toLowerCase();
   const proxy = env.HTTPS_PROXY || env.https_proxy || null;
-  const host = upstreamHost(upstream) ?? 'the upstream';
+  const host = SENTENCE.upstreamHost(upstream) ?? 'the upstream';
 
   // Proxy first: with a proxy configured, "could not resolve" is about the PROXY, not github.com,
   // and sending someone to check their DNS is sending them to the wrong problem. (S-07 record,
   // "proxy misconfiguration" transcript.)
   if (proxy && (low.includes('could not resolve proxy') || low.includes('failed to connect to'))) {
-    return `cannot reach proxy ${proxyAddress(proxy)} (HTTPS_PROXY) — fix the proxy address, `
-      + 'or unset HTTPS_PROXY / add github.com to NO_PROXY, and re-run';
+    return SENTENCE.proxyUnreachable(proxy);
   }
   if (!proxy && low.includes('could not resolve host')) {
-    return `cannot reach ${host} (DNS) — check your network and re-run`;
+    return SENTENCE.dnsFailure(host);
   }
   if (low.includes('ssl certificate problem')) {
-    return 'TLS interception detected — set GIT_SSL_CAINFO (or git config http.sslCAInfo) to your '
-      + 'corporate CA bundle and re-run; the MCP server needs the same bundle via '
-      + 'NODE_EXTRA_CA_CERTS (docs/TROUBLESHOOTING.md)';
+    return SENTENCE.tlsIntercepted({ tool: SENTENCE.TOOL.git });
   }
   if (low.includes('not our ref') || low.includes("couldn't find remote ref")
       || low.includes('could not find remote ref')) {
-    return `pin ${String(pin ?? '').slice(0, 7)} not fetchable from upstream (force-push or history `
-      + 'rewrite?) — maintainer: run ./snowarch docs sync --upstream';
+    return SENTENCE.unfetchablePin(pin);
   }
   if (low.includes('no space left on device')) {
-    return 'insufficient disk space: need ~400 MB free (~700 MB for --mode full)';
+    return SENTENCE.noDiskSpace;
   }
   const first = text.split('\n').map((l) => l.trim()).find(Boolean) ?? '(no stderr)';
   return `git failed: ${first}`;
@@ -281,6 +267,10 @@ export function inspect(root, config, areas) {
   const list = sparseOn ? probe(['sparse-checkout', 'list'], corpus) : { ok: false, out: '' };
   const sparseList = list.ok ? list.out.split('\n').map((l) => l.trim()).filter(Boolean) : [];
   const dirty = probe(['status', '--porcelain'], corpus).out !== '';
+  // POPULATED is a separate question from AT THE PIN, and conflating them is what let a fresh
+  // `--no-checkout` clone whose HEAD already equalled the pin report itself as up to date with an
+  // EMPTY working tree. The index is the tell: a clone that has never checked out has none.
+  const indexed = probe(['ls-files'], corpus).out !== '';
   const submodule = probe(['submodule', 'status', CORPUS_DIR], root).out;
   const pinPresent = probe(['cat-file', '-e', `${config.docs.pin}^{commit}`], corpus).ok;
 
@@ -293,7 +283,7 @@ export function inspect(root, config, areas) {
     && [...sparseList].sort().join('\0') === [...cone].sort().join('\0');
 
   return {
-    present: true, head, dirty, sparseOn, coneOn, sparseList, sameSet, pinPresent,
+    present: true, head, dirty, indexed, sparseOn, coneOn, sparseList, sameSet, pinPresent,
     submodule, initialised: submodule !== '' && !submodule.startsWith('-'),
     atPin: head === config.docs.pin,
   };
@@ -310,7 +300,16 @@ export function planRecipe({ config, areas, mode = MODE.sparse, state = { presen
   platform = process.platform } = {}) {
   const { docs } = config;
   const C = ['-C', CORPUS_DIR];
-  const g = (...a) => `git ${a.join(' ')}`;
+  // EVERY command carries `-c core.longpaths=true` on Windows, not just the last one.
+  //
+  // Found by ARC-06-S14's `no-node, windows-latest` cell, which is the only place a Node-free
+  // Windows install has ever run: the recipe set `core.longpaths` as its second-to-last line, so
+  // the clone, the sparse-checkout and the CHECKOUT all ran with the default `false` — and one
+  // corpus file whose path exceeds 260 characters was silently absent from the working tree
+  // afterwards (` D markdown/platform-security/…/sc-limit-attachme…`). The Node path never had the
+  // bug: `withLongPaths` has always wrapped every call there. The persistent `config` line stays,
+  // because a later plain `git -C vendor/ServiceNowDocs …` typed by a person needs it too.
+  const g = (...a) => `git ${[...(platform === 'win32' ? ['-c', 'core.longpaths=true'] : []), ...a].join(' ')}`;
   const lines = [];
 
   if (!state.present) {
@@ -375,7 +374,12 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
 
   // 1. The refusal comes first and is absolute. Someone edited a doc; sync's job is to say so, not
   //    to decide their edit was unimportant. `--force` is never reached for from here.
-  if (state.present && state.dirty) {
+  // The refusal is for an operator's OWN edits. An unpopulated checkout also reads as dirty —
+  // measured: a `--no-checkout --sparse` clone leaves an empty index, so every tracked path shows
+  // as a staged deletion — and telling someone they have local changes they never made, about a
+  // corpus that was never checked out, would send them to `git stash` for a problem `sync` is
+  // supposed to fix. Populated is asked first.
+  if (state.present && state.dirty && state.indexed) {
     throw new SyncError(`${CORPUS_DIR} has local changes — commit, stash or discard them, `
       + 'then re-run', EXIT.dirty);
   }
@@ -407,7 +411,13 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   if (!state.pinPresent) {
     phase(`fetch pin ${docs.pin.slice(0, 7)}`, () => runMapped(['fetch', '--depth', '1', 'origin', docs.pin], corpus, ctx));
   }
-  if (!state.atPin) {
+  // ALWAYS after a fresh clone, and whenever the tree is not populated — never merely when HEAD
+  // differs. `git clone --no-checkout` leaves an empty index and an empty working tree, and when the
+  // pin happens to be the branch tip its HEAD is already correct: "at the pin" was true and "there
+  // are files" was false. Every run until 2026-09-09 had a pin seven weeks behind the tip, so the
+  // fetch-by-hash path always ran and hid this. The first bump made pin == tip and the install
+  // produced an empty corpus that called itself complete.
+  if (!state.atPin || !state.indexed) {
     phase(`checkout --detach ${docs.pin.slice(0, 7)}`, () => runMapped(['checkout', '--detach', docs.pin], corpus, ctx));
   }
 
@@ -433,7 +443,7 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   const completeness = checkCompleteness(root, CORPUS_DIR, areas, docs.pin);
   const after = inspect(root, config, areas);
   const elapsed = (Date.now() - t0) / 1000;
-  const changed = !state.present || !state.atPin || !state.sameSet || repaired > 0
+  const changed = !state.present || !state.atPin || !state.indexed || !state.sameSet || repaired > 0
     || (mode === MODE.full) !== !after.sparseOn;
 
   // Printed once, on success, and nowhere else: `--quiet` suppresses it and `--json` never carries

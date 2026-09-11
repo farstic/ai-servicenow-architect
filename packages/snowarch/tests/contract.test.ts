@@ -472,6 +472,46 @@ describe('11 — every code the server can throw has a meaning and a remedy', ()
     }
   });
 
+  it('11d. exactly these codes are rule-visible (ARC-08-S10)', () => {
+    // `showInRule` decides what goes into the file every session has loaded, so the set is a
+    // DESIGN decision and not an accumulation. deepEqual, not "contains": the failure this catches
+    // is the one nobody would report — a code quietly added to the always-loaded file, or one
+    // quietly taken back out after the story that put it there was signed off.
+    //
+    // Three groups, and each is here for a different reason:
+    //   the six flag gates      a session can raise a preset for the user (one wildcard line)
+    //   the six state codes     something about the instance or the call must change first
+    //   the seven network codes  the machine cannot reach the instance; retrying is the wrong move
+    const expected = [
+      'ATF_NOT_ENABLED', 'AUTHENTICATION_FAILED', 'CMDB_WRITE_NOT_ENABLED', 'CONNECTION_REFUSED',
+      'CONNECTION_TIMEOUT', 'DNS_FAILURE', 'FLUENT_NOT_ENABLED', 'FLUENT_NOT_INSTALLED',
+      'INSTANCE_NOT_LOADED',
+      'INSUFFICIENT_PRIVILEGES', 'NOW_ASSIST_NOT_ENABLED', 'NO_INSTANCE_CONFIGURED',
+      'PROD_WRITE_NOT_ACKNOWLEDGED', 'PROXY_AUTH_REQUIRED', 'PROXY_UNREACHABLE',
+      'SCRIPTING_NOT_ENABLED', 'TLS_CA_UNTRUSTED', 'UNKNOWN_TOOL', 'WRITE_NOT_ENABLED',
+    ];
+    const actual = ERROR_CODES.filter((e) => e.showInRule).map((e) => e.code as string).sort();
+    expect(actual).toEqual(expected);
+    // And the contract carries the same set — the rule file renders from THAT, so a `dist/` that
+    // is one compile behind would render yesterday's section from today's registry.
+    expect(CONTRACT.errorCodes.filter((e: { showInRule: boolean }) => e.showInRule)
+      .map((e: { code: string }) => e.code).sort()).toEqual(expected);
+  });
+
+  it('11e. every flag gate has a registry entry named from FLAG_NAMES', () => {
+    // The `*_NOT_ENABLED` family is derived, never listed: `evaluateGate` refuses with the name
+    // built from the flag, the rule file's wildcard names the flags from the contract, and this
+    // asserts the registry holds an entry for each. A seventh flag then fails HERE — with the code
+    // it needs an entry for — instead of reaching a user as a code with no remedy attached.
+    const registered = new Set(ERROR_CODES.map((e) => e.code as string));
+    for (const flag of FLAG_NAMES) {
+      const code = `${flag.replace('_ENABLED', '')}_NOT_ENABLED`;
+      expect(registered.has(code), `${code} has no registry entry`).toBe(true);
+      const entry = ERROR_CODES.find((e) => (e.code as string) === code);
+      expect(entry?.showInRule, `${code} is not rule-visible`).toBe(true);
+    }
+  });
+
   it('11c. a schema advertises what its handler enforces', () => {
     // The `default_name` class, from the ARC-05-S06 amendment. Two halves: a required property is
     // marked required, and a property nobody reads is not advertised. The second half is the one

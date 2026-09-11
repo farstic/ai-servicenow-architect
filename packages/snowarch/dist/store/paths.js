@@ -4,7 +4,7 @@
  * `node:path` and `node:os` only — no filesystem writes here beyond the existence
  * probes the precedence needs.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { homedir, userInfo } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 /**
@@ -18,13 +18,20 @@ export function envPath(name) {
     const v = process.env[name];
     return v !== undefined && v !== '' ? v : undefined;
 }
-/** The per-user global store, per OS. */
+/**
+ * The per-user global store, per OS.
+ *
+ * `XDG_CONFIG_HOME` is honoured (ARC-07-S07): `01` §7 names `~/.config/snowarch/instances.json`,
+ * and on a machine where that variable is set, `~/.config` is not where a user's configuration
+ * lives — writing there anyway would put the credential store somewhere they do not look and
+ * somewhere their backup rules do not cover. Windows keeps `%APPDATA%` with ARC-04-S02's fallback.
+ */
 export function globalStorePath() {
     if (process.platform === 'win32') {
         const appData = envPath('APPDATA') ?? join(homedir(), 'AppData', 'Roaming');
         return join(appData, 'snowarch', 'instances.json');
     }
-    return join(homedir(), '.config', 'snowarch', 'instances.json');
+    return join(envPath('XDG_CONFIG_HOME') ?? join(homedir(), '.config'), 'snowarch', 'instances.json');
 }
 /** The per-checkout store. `CLAUDE_PROJECT_DIR` is set by Claude Code; cwd is the fallback. */
 export function projectStorePath() {
@@ -38,7 +45,14 @@ export function projectStorePath() {
  * a reason to try the next candidate. Falling back would mean a typo in the override
  * silently loads a different instance than the one asked for.
  */
-export function resolveStorePath() {
+export function resolveStorePath({ global = false } = {}) {
+    // `--global` selects a candidate; it does not add a second resolver. The path is returned
+    // whether or not the file is there, because selecting it is what `instance add --global` does
+    // BEFORE the file exists — `source` still says `global`, and `exists` still says the truth.
+    if (global) {
+        const p = globalStorePath();
+        return { path: p, source: 'global', candidates: [{ path: p, exists: existsSync(p) }] };
+    }
     const override = envPath('SNOW_STORE');
     if (override) {
         const p = resolve(override);
@@ -133,7 +147,7 @@ export function shellRemedy(command, target) {
     }
     return `Run: ${command} ${maskPathForShell(target)}`;
 }
-/** `cvetomir@corp.com` → `c***@corp.com`; `admin` → `a***`. Never the whole name. */
+/** `someone@corp.example.com` → `s***@corp.example.com`; `admin` → `a***`. Never the whole name. */
 export function maskUsername(u) {
     if (!u)
         return u;
@@ -142,28 +156,92 @@ export function maskUsername(u) {
         return `${u[0]}***${u.slice(at)}`;
     return `${u[0]}***`;
 }
-const CLOUD_SEGMENT = /^(OneDrive|Dropbox|Google Drive|GoogleDrive|iCloud Drive|Mobile Documents)$/i;
-// Vendors suffix the tenant onto the folder name: `OneDrive-Corp`, `OneDrive - Contoso`.
-const CLOUD_PREFIXED = /^(OneDrive|Dropbox|Google Drive|GoogleDrive)([ _-]|$)/i;
 /**
- * True when the store would sit inside a folder a cloud client synchronises.
+ * THE provider list, as data.
  *
- * It matters because 0600 is a LOCAL permission: the sync client runs as the same user,
- * so the mode does not stop the file leaving the machine. The wizard and the doctor turn
- * this into a warning (D-04); the server only logs it.
- *
- * Both separators are accepted, because a Windows path can reach a POSIX test runner
- * (criterion 8 asserts exactly that).
+ * Three implementations must agree about it — this one, the bootstrap's stdlib re-implementation
+ * (ARC-06-S05's `lib/cloud-sync.mjs`, for a checkout that has never run `npm ci`) and the doctor's
+ * E-25 (ARC-08-S03). They agree by satisfying ONE fixture,
+ * `packages/snowarch/tests/fixtures/cloud-sync-paths.json`, rather than by three tables that look
+ * alike today. Order matters: `Mobile Documents` and `com~apple~CloudDocs` are how macOS spells
+ * iCloud, and no user calls it either of those.
  */
-export function isUnderCloudSyncFolder(p) {
-    const segments = p.split(/[\\/]/).filter(Boolean);
-    for (let i = 0; i < segments.length; i += 1) {
-        const s = segments[i];
-        if (CLOUD_SEGMENT.test(s) || CLOUD_PREFIXED.test(s))
-            return true;
-        // macOS iCloud Drive on disk: ~/Library/Mobile Documents/com~apple~CloudDocs/…
-        if (/^Library$/i.test(s) && /^(Mobile Documents|CloudStorage)$/i.test(segments[i + 1] ?? ''))
-            return true;
+export const CLOUD_SYNC_SEGMENTS = [
+    { pattern: /^Mobile Documents$/i, provider: 'iCloud Drive' },
+    { pattern: /^com~apple~CloudDocs$/i, provider: 'iCloud Drive' },
+    { pattern: /^iCloud ?Drive([ _-]|$)/i, provider: 'iCloud Drive' },
+    { pattern: /^OneDrive([ _-]|$)/i, provider: 'OneDrive' },
+    { pattern: /^Dropbox([ _-]|$)/i, provider: 'Dropbox' },
+    { pattern: /^Google ?Drive([ _-]|$)/i, provider: 'Google Drive' },
+    { pattern: /^My Drive$/i, provider: 'Google Drive' },
+];
+/** The Windows variables the OneDrive client sets. Checked BEFORE the name patterns. */
+export const ONEDRIVE_ENV_ROOTS = ['OneDrive', 'OneDriveCommercial', 'OneDriveConsumer'];
+const split = (p) => p.split(/[\\/]/).filter(Boolean);
+/** `/a/b/c` rebuilt from its first `n` segments, keeping a leading `/` and a `C:` drive intact. */
+function ancestor(original, segments, upTo) {
+    const joined = segments.slice(0, upTo + 1).join('/');
+    return /^[\\/]/.test(original) ? `/${joined}` : joined;
+}
+/**
+ * Which cloud provider synchronises this path, and from which folder — or `null`.
+ *
+ * It matters because 0600 is a LOCAL permission: the sync client runs as the same user, so the
+ * mode does not stop the file leaving the machine. The wizard warns and asks (D-04), the doctor
+ * reports it, the server logs it.
+ *
+ * THE ENVIRONMENT ROOTS COME FIRST, and they are the only detector for the case that matters most:
+ * enterprise "Known Folder Move" redirects `Documents` and `Desktop` into OneDrive without the word
+ * OneDrive appearing anywhere in the path the user sees. `%OneDrive%` still points at it. macOS has
+ * no equivalent — a redirected `~/Documents` there is undetectable, and that is a documented limit
+ * rather than an oversight.
+ *
+ * Symlinks are resolved first, because a link into a synced folder is a path into a synced folder.
+ * A path that does not exist — every path in the unit tests, and any path being planned rather than
+ * visited — is matched as given: `realpathSync` throws on those, and refusing to answer would make
+ * the check useless exactly where it is cheapest to run.
+ */
+export function detectCloudSync(absPath, { env = process.env, realpath = safeRealpath } = {}) {
+    if (!absPath)
+        return null;
+    const resolved = realpath(absPath);
+    const segments = split(resolved);
+    for (const name of ONEDRIVE_ENV_ROOTS) {
+        const root = env[name];
+        if (!root)
+            continue;
+        const rootSegments = split(realpath(root));
+        const under = rootSegments.length > 0
+            && rootSegments.every((s, i) => (segments[i] ?? '').toLowerCase() === s.toLowerCase());
+        if (under)
+            return { provider: 'OneDrive', root: realpath(root) };
     }
-    return false;
+    // The NAMED vendors first, across the whole path. `~/Library/CloudStorage/OneDrive-Corp/…` is
+    // both a CloudStorage mount and a OneDrive one, and answering "CloudStorage (unknown provider)"
+    // about a folder whose name says OneDrive would be this function refusing to read.
+    for (let i = 0; i < segments.length; i += 1) {
+        const segment = segments[i];
+        for (const { pattern, provider } of CLOUD_SYNC_SEGMENTS) {
+            if (pattern.test(segment))
+                return { provider, root: ancestor(resolved, segments, i) };
+        }
+    }
+    // Then the mount itself: macOS puts every vendor under `~/Library/CloudStorage/<Provider>-<tenant>`,
+    // and a vendor the table does not name is still synchronised.
+    for (let i = 0; i < segments.length - 2; i += 1) {
+        if (/^Library$/i.test(segments[i]) && /^CloudStorage$/i.test(segments[i + 1] ?? '')) {
+            return { provider: 'CloudStorage (unknown provider)', root: ancestor(resolved, segments, i + 2) };
+        }
+    }
+    return null;
+}
+/** ARC-04-S02's boolean, now one question asked of one detector. */
+export const isUnderCloudSyncFolder = (p) => detectCloudSync(p) !== null;
+function safeRealpath(p) {
+    try {
+        return realpathSync.native(p);
+    }
+    catch {
+        return p; // a path that is not there yet is matched as written
+    }
 }

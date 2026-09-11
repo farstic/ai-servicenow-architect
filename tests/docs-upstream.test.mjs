@@ -1,13 +1,14 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CORPUS_DIR, EXIT, SyncError, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
 import { docsStatus, formatStatus } from '../tools/snowarch/lib/docs/status.mjs';
 import { formatUpstream, syncUpstream, writePin } from '../tools/snowarch/lib/docs/upstream.mjs';
+import { BEGIN, END, RECIPE_TARGET, renderRecipeBlock } from '../tools/snowarch/lib/docs/recipe-block.mjs';
 import {
   AREAS, CITED_PAGE, buildUpstream, git, makeWorkspace, writeCitingSkill,
 } from './helpers/docs-fixture.mjs';
@@ -21,6 +22,7 @@ import {
  * before asserting what the command did about it.
  */
 let scratch, upstream, upstreamUrl;
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const silent = () => {};
 const corpusOf = (w) => join(w.root, CORPUS_DIR);
@@ -263,4 +265,144 @@ test('the areas file is never touched', () => {
   assert.equal(readFileSync(areas, 'utf8'), before);
   assert.ok(!git(['diff', '--cached', '--name-only'], w.root).includes('docs-areas'));
   assert.equal(AREAS.length, before.split('\n').filter(Boolean).length);
+});
+
+/**
+ * Give the workspace the one generated file that depends on the pin.
+ *
+ * Written at the CURRENT pin and committed, so the fixture starts correct and the staleness is
+ * caused by the move rather than by the setup — the fixture asserts that below before trusting
+ * anything it observes afterwards. `ready()` has already committed, so this commits too: a dirty
+ * tree is refused at step 1 and the test would never reach the behaviour it is about.
+ */
+function withRecipeDoc(w, { markers = true } = {}) {
+  const { block } = renderRecipeBlock({ config: w.config, areas: AREAS });
+  const body = markers ? block : block.replace(BEGIN, '').replace(END, '');
+  mkdirSync(join(w.root, 'docs'), { recursive: true });
+  writeFileSync(join(w.root, RECIPE_TARGET),
+    `# fixture architecture\n\n## The git-only corpus recipe\n\n${body}\n\ntail prose\n`);
+  git(['add', '-A'], w.root);
+  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'recipe doc'], w.root);
+  assert.equal(git(['status', '--porcelain'], w.root).trim(), '', 'fixture tree is not clean');
+  return join(w.root, RECIPE_TARGET);
+}
+
+const docText = (w) => readFileSync(join(w.root, RECIPE_TARGET), 'utf8');
+
+test('the block moves with the pin, and is staged with it', () => {
+  const w = ready();
+  const path = withRecipeDoc(w);
+
+  // Preconditions, on content rather than on a re-render: the block names the pin we are leaving
+  // and does not name the one we are going to. Comparing the document against `renderRecipeBlock`
+  // would only prove the module agrees with itself.
+  assert.ok(docText(w).includes(upstream.pin), 'the fixture block does not carry the old pin');
+  assert.ok(!docText(w).includes(upstream.tip), 'the fixture block already carries the new pin');
+
+  const r = syncUpstream({ ...w, log: silent });
+
+  assert.equal(r.recipe.architecture, 'written');
+  assert.ok(docText(w).includes(upstream.tip), 'the block still does not carry the new pin');
+  assert.ok(!docText(w).includes(upstream.pin), 'the block still carries the old pin');
+  assert.deepEqual(r.staged, ['engine.config.json', CORPUS_DIR, RECIPE_TARGET]);
+  assert.deepEqual(git(['diff', '--cached', '--name-only'], w.root).trim().split('\n').sort(),
+    ['engine.config.json', CORPUS_DIR, RECIPE_TARGET].sort());
+  assert.match(formatUpstream(r).text.split('\n').at(-1),
+    /^staged: engine\.config\.json, vendor\/ServiceNowDocs, docs\/ARCHITECTURE\.md — review, then: /);
+  assert.equal(path, join(w.root, RECIPE_TARGET));
+});
+
+test('the block the bump writes is the block the generator writes', () => {
+  // The one definition, proven against the tool a maintainer actually runs rather than against the
+  // module the bump already imports. If these two ever diverge, every bump pull request ships a
+  // document its own CI rejects — which is the failure this whole fix exists to remove.
+  const w = ready();
+  withRecipeDoc(w);
+  syncUpstream({ ...w, log: silent });
+  const afterBump = docText(w);
+
+  const check = spawnSync(process.execPath,
+    [join(repoRoot, 'scripts', 'gen-docs-recipe.mjs'), '--root', w.root, '--check'],
+    { encoding: 'utf8' });
+  assert.equal(check.status, 0, `the generator calls the bump's own output stale:\n${check.stderr}`);
+  assert.match(check.stdout, /target\(s\) current/);
+  assert.equal(docText(w), afterBump, '--check wrote to the file');
+});
+
+test('a refresh that moves nothing does not stage a document it did not change', () => {
+  const w = ready();
+  withRecipeDoc(w);
+
+  const r = syncUpstream({ ...w, to: upstream.pin, log: silent });
+
+  assert.equal(r.from, r.to, 'the fixture moved after all — this proves nothing');
+  assert.equal(r.recipe.architecture, 'current');
+  assert.deepEqual(r.staged, ['engine.config.json', CORPUS_DIR]);
+  assert.ok(!git(['diff', '--cached', '--name-only'], w.root).includes('ARCHITECTURE'));
+});
+
+test('a document that has lost its markers is reported, not silently skipped', () => {
+  const w = ready();
+  withRecipeDoc(w, { markers: false });
+  const before = docText(w);
+
+  const r = syncUpstream({ ...w, log: silent });
+
+  // The pin still moves. This runs after the write, and a command that aborted here would leave a
+  // moved pin, a moved gitlink and no report — worse than the staleness it was refusing.
+  assert.equal(pinIn(w.root), upstream.tip, 'the pin should still have moved');
+  assert.equal(r.recipe.architecture, 'no-markers');
+  assert.equal(docText(w), before, 'a markerless document must not be rewritten');
+  assert.deepEqual(r.staged, ['engine.config.json', CORPUS_DIR]);
+  assert.match(formatUpstream(r).text,
+    /^recipe: the architecture target has lost its generator markers/m);
+  // ...and the staged line is still the last one, because S09 pastes this and keys on its shape.
+  assert.match(formatUpstream(r).text.split('\n').at(-1), /^staged: /);
+  assert.ok(END.length > 0);
+});
+
+test('a workspace with no such document is not a failure', () => {
+  // Every other test in this file runs in exactly this shape, so the status has to be benign —
+  // but it is asserted by name here rather than inferred from those tests passing.
+  const w = ready();
+  const r = syncUpstream({ ...w, log: silent });
+  assert.deepEqual(r.recipe, { architecture: 'absent', sh: 'absent', ps1: 'absent' },
+    'a fixture tree has none of the three generated targets');
+  assert.deepEqual(r.staged, ['engine.config.json', CORPUS_DIR]);
+});
+
+test('a bump stages five paths when the pin moves, and two when it does not', () => {
+  // ARC-06-S06 made the recipe three generated files rather than one: the published block and the
+  // two launcher recipes the Node-free bootstrap will source. A pin that moves moves all three, so
+  // the staged list is the config, the corpus and whichever targets actually changed — and a
+  // reviewer reading the PR body sees every file the bump touched, not a subset.
+  const w = ready();
+  const targets = ['docs/ARCHITECTURE.md',
+    'tools/snowarch/launcher/docs-recipe.sh', 'tools/snowarch/launcher/docs-recipe.ps1'];
+  for (const t of targets) {
+    mkdirSync(join(w.root, dirname(t)), { recursive: true });
+  }
+  const { block } = renderRecipeBlock({ config: w.config, areas: AREAS });
+  writeFileSync(join(w.root, targets[0]), `# fixture\n\n${block}\n`);
+  for (const [t, marker] of [[targets[1], 'sh'], [targets[2], 'ps1']]) {
+    writeFileSync(join(w.root, t),
+      `# fixture ${marker}\n# recipe-begin sparse\n# recipe-end\n# recipe-begin full\n# recipe-end\n`);
+  }
+  git(['add', '-A'], w.root);
+  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'targets'], w.root);
+
+  const r = syncUpstream({ ...w, log: silent });
+
+  assert.deepEqual(r.staged, ['engine.config.json', CORPUS_DIR, ...targets]);
+  assert.deepEqual(r.recipe, { architecture: 'written', sh: 'written', ps1: 'written' });
+  assert.match(formatUpstream(r).text.split('\n').at(-1),
+    /^staged: engine\.config\.json, vendor\/ServiceNowDocs, docs\/ARCHITECTURE\.md, tools\/snowarch\/launcher\/docs-recipe\.sh, tools\/snowarch\/launcher\/docs-recipe\.ps1 — /);
+
+  // ...and a re-run that moves nothing stages the two it always stages. The first bump's changes
+  // are committed first: `syncUpstream` refuses a dirty tree before it touches the network, which
+  // is the behaviour under test everywhere else in this file.
+  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'bumped'], w.root);
+  const again = syncUpstream({ ...w, config: JSON.parse(readFileSync(join(w.root, 'engine.config.json'), 'utf8')),
+    to: r.to, log: silent });
+  assert.deepEqual(again.staged, ['engine.config.json', CORPUS_DIR]);
 });

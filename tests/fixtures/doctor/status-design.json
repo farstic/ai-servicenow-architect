@@ -1,0 +1,737 @@
+{
+  "schema": 1,
+  "product": "snowarch",
+  "version": "2.0.0-dev",
+  "ranAt": "2026-09-10T19:48:23.749Z",
+  "durationMs": 451,
+  "options": {
+    "quick": true,
+    "noNetwork": true,
+    "fix": false,
+    "section": null
+  },
+  "mode": "design-only",
+  "modeLine": "Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance to add one",
+  "modeLineDetailed": "Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance to add one",
+  "engine": {
+    "version": "2.0.0-dev",
+    "tag": null,
+    "contractSha": "a96863b1104baf43fd223eb7af90a69b8ccafc7a665e617606ad3317b003c7c8",
+    "node": "24.16.0",
+    "capabilities": null,
+    "docs": {
+      "present": true,
+      "mode": "sparse",
+      "pin": "11b39be17307dd4b21df15a54e8011ae68f64dba",
+      "family": "australia",
+      "citations": null,
+      "dead": null
+    },
+    "roster": {
+      "skills": 28,
+      "agents": 9
+    }
+  },
+  "server": {
+    "available": true,
+    "state": "ready",
+    "version": "2.0.0-dev",
+    "mode": "unconfigured",
+    "instances": [],
+    "summary": {
+      "ok": 5,
+      "warn": 1,
+      "fail": 0,
+      "skip": 3
+    },
+    "toolCount": 5,
+    "initializeMs": 191
+  },
+  "prereqs": {
+    "os": "darwin",
+    "shell": "zsh",
+    "node": {
+      "ok": true,
+      "version": "24.16.0"
+    },
+    "deps": {
+      "ok": true
+    },
+    "mode": {
+      "toggle": "disabled"
+    },
+    "store": {
+      "exists": false
+    },
+    "capabilities": null
+  },
+  "checks": [
+    {
+      "id": "E-00",
+      "section": "prereqs",
+      "title": "Claude Code CLI",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
+      "id": "E-01",
+      "section": "prereqs",
+      "title": "git",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "2.39.5",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 12,
+      "data": {
+        "floor": "2.34.1"
+      }
+    },
+    {
+      "id": "E-02",
+      "section": "prereqs",
+      "title": "Node.js",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "24.16.0 (floor 20.0.0)",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "version": "24.16.0",
+        "floor": "20.0.0"
+      }
+    },
+    {
+      "id": "E-03",
+      "section": "prereqs",
+      "title": "npm",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
+      "id": "E-04",
+      "section": "prereqs",
+      "title": "capability packs",
+      "status": "skip",
+      "severity": "info",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
+      "id": "E-05",
+      "section": "repo",
+      "title": "repository root",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "/var/folders/m5/9kmcs00915j9_jrx_71z6wk40000gn/T/snowarch-doctor-2bDUFR",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 13,
+      "data": {
+        "root": "/var/folders/m5/9kmcs00915j9_jrx_71z6wk40000gn/T/snowarch-doctor-2bDUFR",
+        "toplevel": "/private/var/folders/m5/9kmcs00915j9_jrx_71z6wk40000gn/T/snowarch-doctor-2bDUFR"
+      }
+    },
+    {
+      "id": "E-06",
+      "section": "repo",
+      "title": "engine.config.json",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "snowarch servicenow · docs australia",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 1,
+      "data": {
+        "serverKey": "servicenow",
+        "family": "australia"
+      }
+    },
+    {
+      "id": "E-07",
+      "section": "repo",
+      "title": ".mcp.json committed and secret-free",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "one server \"servicenow\", command node, placeholders defaulted",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 12,
+      "data": {
+        "serverKey": "servicenow",
+        "unmodified": true
+      }
+    },
+    {
+      "id": "E-08",
+      "section": "repo",
+      "title": ".claude/settings.json committed",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "MCP_TIMEOUT 120000 · SessionStart hook present",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 12,
+      "data": {
+        "unmodified": true,
+        "mcpTimeout": "120000",
+        "hook": true
+      }
+    },
+    {
+      "id": "E-09",
+      "section": "repo",
+      "title": "no credential-shaped keys",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "no credential-shaped key or literal",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 11,
+      "data": {
+        "scanned": "tracked files"
+      }
+    },
+    {
+      "id": "E-10",
+      "section": "repo",
+      "title": "settings.local toggles match the recorded mode",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "design · disabled",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "mode": "design",
+        "enabled": false,
+        "disabled": true,
+        "fix": {
+          "kind": "toggles-mismatch",
+          "mode": "design"
+        }
+      }
+    },
+    {
+      "id": "E-11",
+      "section": "repo",
+      "title": ".local/ state",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "mode design",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "mode": "700",
+        "schema": 1,
+        "recordedMode": "design",
+        "fix": null
+      }
+    },
+    {
+      "id": "E-12",
+      "section": "docs",
+      "title": "docs corpus present",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "present (sparse)",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 80,
+      "data": {
+        "present": true,
+        "mode": "sparse",
+        "path": "vendor/ServiceNowDocs"
+      }
+    },
+    {
+      "id": "E-13",
+      "section": "docs",
+      "title": "docs pin",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "11b39be (HEAD, gitlink and pin agree)",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "pin": "11b39be17307dd4b21df15a54e8011ae68f64dba",
+        "gitlink": null,
+        "head": "11b39be17307dd4b21df15a54e8011ae68f64dba",
+        "staged": false
+      }
+    },
+    {
+      "id": "E-14",
+      "section": "docs",
+      "title": "docs family",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "australia",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "family": "australia",
+        "branch": "australia"
+      }
+    },
+    {
+      "id": "E-15",
+      "section": "docs",
+      "title": "sparse set",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "cone · 19 area(s)",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": true,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "sparse": "cone",
+        "areas": 19,
+        "missing": [],
+        "fix": {
+          "kind": "sparse-mismatch"
+        }
+      }
+    },
+    {
+      "id": "E-16",
+      "section": "docs",
+      "title": "citations",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
+      "id": "E-17",
+      "section": "roster",
+      "title": "roster from directory listing",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "28 skills · 9 sub-agents · 1 utility",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 14,
+      "data": {
+        "skills": 28,
+        "agents": 9,
+        "utility": [
+          "snowarch"
+        ],
+        "declared": {
+          "skills": 28,
+          "agents": 9
+        },
+        "problems": []
+      }
+    },
+    {
+      "id": "E-18",
+      "section": "roster",
+      "title": "skill descriptions",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "28 skills · 9 agents clean",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 4,
+      "data": {
+        "skills": 0,
+        "agents": 0,
+        "files": 9,
+        "problems": []
+      }
+    },
+    {
+      "id": "E-19",
+      "section": "contract",
+      "title": "no retired tool names",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "401 retired name(s), none in use",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 11,
+      "data": {
+        "ran": true,
+        "findings": 0
+      }
+    },
+    {
+      "id": "E-20",
+      "section": "contract",
+      "title": "prefix consistency",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "mcp__servicenow__",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 1,
+      "data": {
+        "ran": true,
+        "findings": 0,
+        "prefix": "mcp__servicenow__"
+      }
+    },
+    {
+      "id": "E-21",
+      "section": "contract",
+      "title": "generated files fresh",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
+      "id": "E-22",
+      "section": "contract",
+      "title": "contract pin",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "a96863b1104b… · 42 required of 397 declared",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 1,
+      "data": {
+        "pinned": "a96863b1104b",
+        "required": 42,
+        "declared": 397
+      }
+    },
+    {
+      "id": "E-23",
+      "section": "legacy",
+      "title": "stale MCP registrations in ~/.claude.json",
+      "status": "ok",
+      "severity": "warn",
+      "detail": "no ~/.claude.json — nothing to clean",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "entries": [],
+        "present": false
+      }
+    },
+    {
+      "id": "E-24",
+      "section": "legacy",
+      "title": "legacy wizard store",
+      "status": "ok",
+      "severity": "warn",
+      "detail": "no legacy wizard store",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "path": ".config/servicenow-mcp/instances.json",
+        "present": false,
+        "instances": null
+      }
+    },
+    {
+      "id": "E-25",
+      "section": "host",
+      "title": "cloud-sync folder",
+      "status": "ok",
+      "severity": "warn",
+      "detail": "not under a cloud-sync folder",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "provider": null
+      }
+    },
+    {
+      "id": "E-26",
+      "section": "host",
+      "title": "proxy and CA environment",
+      "status": "ok",
+      "severity": "warn",
+      "detail": "no proxy configured",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 1,
+      "data": {
+        "vars": {},
+        "seenBy": "this shell"
+      }
+    },
+    {
+      "id": "E-27",
+      "section": "host",
+      "title": "Claude Code registration status",
+      "status": "skip",
+      "severity": "warn",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0
+    },
+    {
+      "id": "SV-00",
+      "section": "server",
+      "title": "Node version",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "node 24.16.0 (floor 20)",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 276,
+      "data": {
+        "adopted": true,
+        "title": "Node version"
+      }
+    },
+    {
+      "id": "SV-01",
+      "section": "server",
+      "title": "dist artefacts",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "server.js present, contract 397 tools, sha256 a96863b1104b",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "adopted": true,
+        "title": "dist artefacts"
+      }
+    },
+    {
+      "id": "SV-02",
+      "section": "server",
+      "title": "store",
+      "status": "warn",
+      "severity": "fail",
+      "detail": "no store found — the server starts unconfigured",
+      "remedy": "/snowarch setup-instance",
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "adopted": true,
+        "title": "store"
+      }
+    },
+    {
+      "id": "SV-03",
+      "section": "server",
+      "title": "instances",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "no instances configured",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "adopted": true,
+        "title": "instances"
+      }
+    },
+    {
+      "id": "SV-04",
+      "section": "server",
+      "title": "instance probes",
+      "status": "skip",
+      "severity": "warn",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
+      "id": "SV-05",
+      "section": "server",
+      "title": "stdio handshake",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
+      "id": "SV-06",
+      "section": "server",
+      "title": "capabilities match the store",
+      "status": "skip",
+      "severity": "fail",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
+      "id": "SV-07",
+      "section": "server",
+      "title": "audit trail",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "<checkout>/.local/audit.jsonl (not created yet)",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "adopted": true,
+        "title": "audit trail"
+      }
+    },
+    {
+      "id": "SV-08",
+      "section": "server",
+      "title": "ancestor skill directories",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "no .claude/skills above the checkout",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {
+        "adopted": true,
+        "title": "ancestor skill directories"
+      }
+    }
+  ],
+  "fixes": [],
+  "stale": {
+    "claudeJsonEntries": [],
+    "legacyStore": null
+  },
+  "summary": {
+    "ok": 26,
+    "warn": 1,
+    "fail": 0,
+    "skip": 10,
+    "fixable": 0
+  }
+}

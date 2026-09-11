@@ -15,8 +15,11 @@
  *   remedy       what to do; prose, because most remedies are a judgement rather than a command
  *   command      set ONLY when there is something runnable; renderers set it as code, and they
  *                never parse `remedy` looking for one
- *   showInRule   the code appears in the always-loaded rule file. Twelve do: the six flag gates as
- *                one wildcard line, plus the six a session can actually act on mid-task
+ *   showInRule   the code appears in the always-loaded rule file. Nineteen do: the six flag gates
+ *                as one wildcard line, plus the thirteen a session can act on mid-task — seven of
+ *                them the network family (ARC-08-S10), because a session that meets DNS, TLS or a
+ *                refused connection mid-task must stop and hand over exactly as it does for a
+ *                wrong password
  *   httpStatus   the status the instance returned, where the code maps to one
  */
 export interface ErrorCode {
@@ -90,9 +93,12 @@ export const ERROR_CODES = [
   {
     code: 'INSTANCE_NOT_LOADED',
     meaning: "The instance is in the store but was not loaded, and the store carries the reason.",
+    // ARC-08-S10: rule-visible. The remedy names the listing FIRST and the prod case second,
+    // because "not loaded" has more than one cause and a remedy that named only the common one
+    // would send a reader to acknowledge a prod flag on an instance that is not prod.
     remedy: "read the reason in the instance listing; a `prod` instance without `prodWriteAck` needs the acknowledgement",
     command: "./snowarch instance list",
-    showInRule: false,
+    showInRule: true,
   },
   {
     code: 'UNKNOWN_INSTANCE',
@@ -102,10 +108,23 @@ export const ERROR_CODES = [
     showInRule: false,
   },
   {
+    code: 'FLAGS_INCOMPLETE',
+    meaning: "A store entry does not state all six capability flags. An absent flag is off, so the entry works — but nobody can tell an intended `false` from a forgotten one, and the next preset change starts from a guess.",
+    remedy: "state every flag explicitly by re-applying a preset — the review screen shows what changes before anything is written",
+    command: "./snowarch instance set-preset <label> <preset>",
+    showInRule: false,
+  },
+  {
+    code: 'FLAG_DEPENDENCY_VIOLATION',
+    meaning: "A flag that requires `WRITE_ENABLED` is on while `WRITE_ENABLED` is off. The tools gated on it are refused at run time and the refusal names WRITE first, so the entry promises a capability it cannot deliver.",
+    remedy: "decide which one was meant: turn WRITE on, or turn the dependent flag off. Neither is guessable from the store, so this is never repaired automatically",
+    command: "./snowarch instance set-preset <label> <preset>",
+    showInRule: false,
+  },
+  {
     code: 'PROD_WRITE_NOT_ACKNOWLEDGED',
     meaning: "The instance is tagged `environment: prod` and holds a write preset without `prodWriteAck: true`.",
-    remedy: "raise it deliberately, typing the label",
-    command: "./snowarch instance set-preset <label> <preset> --ack-prod",
+    remedy: "A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal",
     showInRule: true,
   },
   {
@@ -144,15 +163,24 @@ export const ERROR_CODES = [
   {
     code: 'AUTHENTICATION_FAILED',
     meaning: "The instance rejected the credentials — wrong, expired, or the account is locked.",
-    remedy: "stop and re-enter them; do not retry, repeated failures lock the account",
-    command: "./snowarch instance set-credentials <label>",
+    // ARC-07-S10: the RUNTIME rule text. `showInRule: true` renders this remedy into
+    // `.claude/rules/00-mode-and-mcp-gate.md`, which a session always has loaded — so the words
+    // are addressed to the model that must stop, and they name the two commands inline rather
+    // than through the `command` field, because the renderer appends that AFTER the sentence and
+    // the paragraph has to read as one instruction. `01` §8's mapping, in the registry.
+    //
+    // "a ServiceNow tool", NOT the `mcp__…__` prefix the story's draft spelled: the rule file
+    // states that prefix exactly ONCE, rendered from `engine.config.json`'s server key, and
+    // ARC-05's own test asserts both the count and the absence of a literal. A second, hard-coded
+    // copy here would fail that test and would be wrong the day the key changes.
+    remedy: "If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed",
     showInRule: true,
     httpStatus: 401,
   },
   {
     code: 'INSUFFICIENT_PRIVILEGES',
     meaning: "The account is authenticated but lacks a ServiceNow role for that table or operation. This is not a flag.",
-    remedy: "grant the role, or use an account that has it; the message names the table",
+    remedy: "The credentials are valid but the account lacks a role for this table. Report the tool, the table and the roles the preset needs (see docs/TROUBLESHOOTING.md); do not switch instances or retry with another tool to work around it",
     showInRule: true,
     httpStatus: 403,
   },
@@ -173,33 +201,42 @@ export const ERROR_CODES = [
   {
     code: 'DNS_FAILURE',
     meaning: "The instance host name did not resolve (`ENOTFOUND`, `EAI_AGAIN`).",
-    remedy: "check the spelling first; on a VPN-only instance connect first; on a corporate network set `HTTPS_PROXY`. A proxy does not resolve names unless the request goes through it, so this code with a proxy already set usually means the name is wrong",
-    showInRule: false,
+    // ARC-08-S10: rule-visible, and reworded for the two audiences it now has. It used to end in
+    // two adjacent parentheticals, so with a proxy configured it read "…through a proxy (set
+    // HTTPS_PROXY) (a proxy is configured — …)" — advice to set a variable that is set, in the
+    // sentence that says it is. One conditional clause now, and the unconditional half states the
+    // usual cause plainly enough to serve as the line a session prints.
+    remedy: "the name `<host>` does not resolve. Check the instance name first — a typo is the usual cause; on a corporate network the name may resolve only over VPN, or only through a proxy, so set `HTTPS_PROXY` if there is one (there is one — `<proxyVar>=<proxy>` — and a proxy does not resolve names for you unless the request goes through it, which makes a wrong name the likelier cause)",
+    showInRule: true,
   },
   {
     code: 'TLS_CA_UNTRUSTED',
     meaning: "The certificate was not signed by a CA this machine trusts — normal on a network that intercepts TLS.",
-    remedy: "export your organisation root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it",
+    remedy: "the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it",
     command: "export NODE_EXTRA_CA_CERTS=<path to the PEM>",
-    showInRule: false,
+    showInRule: true,
   },
   {
     code: 'PROXY_UNREACHABLE',
     meaning: "A proxy variable is set and nothing is listening there, or the connection to it timed out.",
-    remedy: "the message names the proxy with any credentials masked; correct the host and port, or unset the variable if you are not behind a proxy. `NO_PROXY` exempts internal hosts",
-    showInRule: false,
+    remedy: "the proxy `<proxyVar>=<proxy>` did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked",
+    showInRule: true,
   },
   {
     code: 'CONNECTION_REFUSED',
+    // ARC-08-S10's review added the seventh: a hibernating PDI is the network error this product
+    // meets most often, and the story's list had left it out. Retrying a refused connection wakes
+    // nothing — the user has to open developer.servicenow.com — so it belongs with the family that
+    // a session hands over rather than repeats.
     meaning: "The instance refused the connection and no proxy is configured.",
-    remedy: "check the URL and its port, and whether the instance is awake — a hibernating PDI refuses",
-    showInRule: false,
+    remedy: "`<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too",
+    showInRule: true,
   },
   {
     code: 'CONNECTION_TIMEOUT',
     meaning: "The connection timed out with no proxy configured.",
-    remedy: "on a corporate network set `HTTPS_PROXY`; otherwise check connectivity and the firewall",
-    showInRule: false,
+    remedy: "no answer from `<host>` in time. If this network needs a proxy, set `HTTPS_PROXY=http://proxy:port` (and `NO_PROXY` for internal hosts) and run again. An idle PDI may be hibernating — wake it at developer.servicenow.com",
+    showInRule: true,
   },
   {
     code: 'NETWORK_ERROR',
@@ -359,9 +396,53 @@ export const ERROR_CODES = [
     showInRule: false,
   },
   {
+    code: 'PROXY_AUTH_REQUIRED',
+    meaning: "The proxy answered 407: it wants credentials before it will forward the request.",
+    // ARC-08-S10: "put them in the proxy URL" opened on a pronoun whose antecedent was in the
+    // MEANING — which the rule file does not render, only the remedy. Fine in TROUBLESHOOTING,
+    // where the two sit one above the other; a dangling "them" in the file a session reads.
+    remedy: "the proxy is asking for credentials: put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials",
+    showInRule: true,
+    httpStatus: 407,
+  },
+  {
+    code: 'LEGACY_STORE_NOT_FOUND',
+    meaning: "There is no snow-mcp 1.x store at the path the import was pointed at.",
+    remedy: "check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `./snowarch doctor` reports where it looked",
+    command: "./snowarch instance import --from-legacy --path <file> --dry-run",
+    showInRule: false,
+  },
+  {
+    code: 'LEGACY_STORE_UNREADABLE',
+    meaning: "The legacy store is not JSON this reader can parse.",
+    remedy: "open it and check it is a complete JSON object; a half-written file from an interrupted 1.x session cannot be migrated and its instances are re-added with `instance add`",
+    showInRule: false,
+  },
+  {
+    code: 'LABEL_NOT_FOUND',
+    meaning: "No instance with that label is in the store this checkout resolves.",
+    remedy: "run `instance list` to see the labels this checkout has, or `instance add <label>` to add one",
+    command: "./snowarch instance list",
+    showInRule: false,
+  },
+  {
+    code: 'LABEL_EXISTS',
+    meaning: "An instance with that label is already in the store.",
+    remedy: "use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it",
+    command: "./snowarch instance add <label> --url <url> --env <env> --replace",
+    showInRule: false,
+  },
+  {
+    code: 'ENV_REQUIRED',
+    meaning: "The environment could not be proposed and none was given, in a run that cannot ask.",
+    remedy: "pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do",
+    command: "./snowarch instance add <label> --url <url> --env <pdi|dev|test|prod> --yes",
+    showInRule: false,
+  },
+  {
     code: 'URL_REQUIRED',
     meaning: "The wizard needs an instance URL and none was given.",
-    remedy: "enter the full https URL of the instance",
+    remedy: "enter the full https URL of the instance; non-interactively pass `--url <origin>` (a URL cannot be proposed)",
     showInRule: false,
   },
   {
@@ -402,8 +483,8 @@ export const ERROR_CODES = [
   },
   {
     code: 'STORE_IN_CLOUD_SYNC_FOLDER',
-    meaning: "The store is inside a cloud-sync folder, so `0600` does not stop the file leaving the machine (D-04).",
-    remedy: "move the checkout, or accept it deliberately",
+    meaning: "this checkout is under <provider> (<root>). File mode 0600 does not stop synchronisation — the credential store would be uploaded to that service.",
+    remedy: "move the checkout outside the synced folder, or keep credentials in the global store with `--global` (<global> is not synced by default)",
     showInRule: false,
   },
   {
@@ -427,7 +508,17 @@ export const ERROR_CODE_NAMES: ReadonlySet<string> = new Set(ERROR_CODES.map((e)
  */
 export type ErrorCodeName = (typeof ERROR_CODES)[number]['code'];
 
-/** The remedy for a code, for anything that shows one. There is no other source. */
+/**
+ * The remedy for a code, for anything that shows one. There is no other source.
+ *
+ * Overloaded so a REGISTERED name resolves to an `ErrorCode` rather than `ErrorCode | undefined`:
+ * a caller passing a literal key would otherwise need a `??` fallback for an arm that cannot run,
+ * and an unreachable branch fails the 100% gate (ARC-07-S04 hit exactly that with `?? []`).
+ * `ErrorCodeName` makes a removed key a compile error at the call site first, which is what makes
+ * the narrower signature true rather than convenient.
+ */
+export function remedyFor(code: ErrorCodeName): ErrorCode;
+export function remedyFor(code: string): ErrorCode | undefined;
 export function remedyFor(code: string): ErrorCode | undefined {
   return ERROR_CODES.find((e) => e.code === code);
 }

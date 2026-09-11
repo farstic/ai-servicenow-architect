@@ -1,6 +1,6 @@
 # ARC-06 — Bootstrap and MCP registration
 
-Status: **Stories drafted 2026-09-04** · Depends on: ARC-01, ARC-03 (B02), ARC-04 (committed `dist/`, unconfigured mode), ARC-05 (B05 contract check, permission block); ARC-00 S-01/S-03/S-05/S-08/S-09/S-15/S-16/S-20 and — entry condition for S01 (D-06 hedge) — the S-14a–g conclusion recorded in ADR-0006 ("monorepo path confirmed"; ARC-00-S12/S14) · Blocks: ARC-07 (B06 slot), ARC-08, ARC-09, ARC-10
+Status: **ARC COMPLETE 2026-09-10** · **S01–S14 merged (14 of 14) — entry gate ADR-0006 Accepted 2026-09-08, satisfied** · Depends on: ARC-01, ARC-03 (B02), ARC-04 (committed `dist/`, unconfigured mode), ARC-05 (B05 contract check, permission block); ARC-00 S-01/S-03/S-05/S-08/S-09/S-15/S-16/S-20 and — entry condition for S01 (D-06 hedge) — the S-14a–g conclusion recorded in ADR-0006 ("monorepo path confirmed"; ARC-00-S12/S14) · Blocks: ARC-07 (B06 slot), ARC-08, ARC-09, ARC-10
 
 ## Goal
 
@@ -31,15 +31,25 @@ ARC-03 (B02 recipe and areas file), ARC-04 (server that starts unconfigured; com
 
 ## Acceptance criteria
 
-- [ ] **A fresh user on a clean macOS machine with Claude Code and git but no Node** runs `git clone … && cd … && ./bootstrap.sh --mode design` and reaches `Mode: design-only` with the docs corpus present; `claude` then shows the trust dialog only, `/snowarch status` reports `Mode: design-only` from `.local/bootstrap-state.json` (the doctor needs Node), `/mcp` shows `servicenow` as disabled for this project (not failed).
-- [ ] **A fresh user on a clean Windows 10/11 machine without Git Bash** double-clicks or runs `bootstrap.cmd` and reaches the same state (S-08).
-- [ ] **A fresh user with Node 22** runs `./bootstrap.sh` (interactive), switches line `1 Mode` of the single plan screen to `live` and presses Enter (principle 10 — there is no separate B03 prompt), completes B06 (ARC-07) and sees `DOCTOR: … 0 fail` and `Mode: live — …`; the first `claude` shows the trust dialog and at most one MCP approval (S-01 decides which); `/mcp` shows `servicenow ✔ connected`; `~/.claude.json` is byte-identical before and after the bootstrap (Claude Code itself records the folder's trust decision and approval state on the first `claude`; the bootstrap never writes that file).
-- [ ] Killing the bootstrap during B04 and re-running resumes at B04 (state file), and `--reset` starts over; changing `package-lock.json` invalidates only B04 on the next run.
-- [ ] `./bootstrap.sh --mode design --yes` and the Windows equivalent pass on the three CI OSes on every commit; the Windows job runs without Git Bash on PATH.
-- [ ] Path B: from an empty folder, `claude` → paste the recipe sentence → Claude performs the clone and design bootstrap without asking for any typed input (Claude Code's own permission prompts for `git clone` and `./bootstrap.sh` may appear in Manual mode and are answered with Yes) → after one restart the session shows `Mode: design-only` (S-09).
-- [ ] `git status` in the checkout after any bootstrap run shows **no** tracked file modified (all state in `.local/` and `.claude/settings.local.json`).
-- [ ] `grep -r "PASSWORD\|SECRET" .mcp.json .claude/settings.json` returns nothing; the doctor's credential-shaped-key check passes.
-- [ ] **Principle 10 (D-05, `01` §2):** installation runs uninterrupted after one amendable plan summary; every proposal (mode, docs mode, registration, instance values, preset, flags) is shown before it is applied, Enter accepts, any single value is editable, and `--yes` accepts all of them — proven by the plan-screen test (S03) and the B06 review-screen test (ARC-07-S04).
+Ticked where something ran; **deferred** where the evidence needs a machine or a session no agent
+has. Nothing here is ticked on a reading of the code.
+
+- [x] **A fresh user on a clean macOS machine with Claude Code and git but no Node** reaches `Mode: design-only` — the `bootstrap (no-node, macos-latest)` cell proves it on every commit (S14), and a reader followed the page by hand with Node hidden (S13, AC 1 reader one). *Deferred:* the `/mcp` and `/snowarch status` half needs a Claude session — the sitting.
+- [ ] **A fresh user on a clean Windows 10/11 machine without Git Bash** — the `bootstrap (no-gitbash, windows-latest)` cell proves the launchers, `snowarch.cmd` and the exec-form hook without Git Bash, and S11's job proves Bypass under a Restricted policy. **Deferred to the sitting:** the double-click itself, Ctrl-C propagation, a GPO-locked `MachinePolicy`, and S-03/S-04.
+- [ ] **A fresh user with Node 22 completing live mode** — B04/B05/B07/B09 run in the `node-cli` cells and the handshake smoke exercises the committed server, but B06's wizard is ARC-07 and B08 needs an instance. **Deferred:** ARC-07, and the owner's live sitting.
+- [x] **Resume and `--reset`** — S03's runner, with the input-hash invalidation asserted per step and idempotence proven twice per cell in CI (assertion 8).
+- [x] **`--mode design --yes` passes on the three CI OSes on every commit; the Windows job runs without Git Bash on PATH** — thirteen cells (S14).
+- [ ] **Path B from an empty folder** — the page carries the sentence, the exact commands and the non-empty-folder sequence. **Deferred:** a representative run needs a profile without a user-level `CLAUDE.md` or user-scope MCP servers; the two attempts and why they measure the wrong thing are recorded in `docs/spikes/OWNER-SITTING.md` (S13).
+- [x] **`git status` shows no tracked file modified after any bootstrap run** — assertion 2, every cell, plus `assert-clean.mjs` after the second run.
+- [x] **No credential-shaped key in the committed or written configuration** — S01's test at commit time, assertion 5 at run time across five files, and gitleaks over the tree.
+- [x] **Principle 10 — one amendable plan screen, `--yes` accepts it** — S03's plan-screen tests and every `--yes` run in CI.
+
+**What the sitting still owns, in one list:** the Windows double-click, Ctrl-C through `cmd` →
+`powershell` → `node`, a GPO-locked `MachinePolicy` (S11); S-03 (`${CLAUDE_PROJECT_DIR}` expansion
+in `.mcp.json` on native Windows — its fallback is deliberately not built), S-04 (conhost masked
+input) and S-08's remaining half; the `claude mcp add-json` / `remove` halves of S12's AC 4/5/6,
+which write `~/.claude.json`; and S13's reader two and Path B. Each has its own row in
+`docs/spikes/OWNER-SITTING.md` with the exact commands.
 
 ## Risks
 

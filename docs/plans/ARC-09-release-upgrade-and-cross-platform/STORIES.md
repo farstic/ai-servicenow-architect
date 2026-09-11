@@ -28,6 +28,14 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 ## Stories
 
+> **Carried in from ARC-08-S03 (ruling, 2026-09-10).** `ROLE_BUNDLE_MAP` is not in
+> `packages/snowarch/dist/contract.json`, so `scripts/gen-readme-tables.mjs` reads it out of the
+> built module as data (`scripts/lib/bundles.mjs`) — the only way that generator could run on a
+> clone with no `node_modules`. Putting the bundle map INTO the contract is the right home for it
+> and moves the contract sha, so it belongs to a release story with a deliberate pin bump rather
+> than to a fix. Whichever ARC-09 story next touches `scripts/build-dist.mjs` should take it, drop
+> `scripts/lib/bundles.mjs` and its parity test, and quote the pin outputs.
+
 ### ARC-09-S01 — `scripts/release.mjs`: preflight, gates, version writes, release commit, annotated tag with contract sha and docs pin
 
 **As** a maintainer **I want** one command, `node scripts/release.mjs <x.y.z>`, that refuses to run on a dirty or stale tree, runs every gate, writes the version into every place that carries it, commits once and creates one annotated tag whose message records the contract sha and the docs pin **so that** the product has exactly one version counter and one tag per release (P-12, P-19) and a release can never be cut from a tree that CI would reject (P-29).
@@ -388,6 +396,13 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 ---
 
 ### ARC-09-S07 — `./snowarch upgrade [--to vX.Y.Z] [--check]`, the SessionStart "behind origin" nudge, and the upgrade fixture harness
+
+> **Amendment 2026-09-10 — the file's shape is fixed by ARC-08-S08.** `.local/upgrade-check.json`
+> is `{ behind: boolean, latestTag: string, checkedAt: string }`. The session banner reads it and
+> nothing else: an absent file is no nudge, a `behind: false` file is no nudge, and the hook never
+> fetches. The nudge wording is `lib/text.mjs`'s `BANNER.upgrade(tag)` — this story adopts it
+> rather than writing a second sentence.
+
 
 **As** an individual practitioner **I want** `./snowarch upgrade` to fetch the release tags, show me what will change, move my checkout to the target release, re-run only the bootstrap steps whose inputs changed, migrate the store if the release requires it, and finish with a doctor run — and I want the session banner to tell me when a newer release exists without ever fetching by itself **so that** upgrading is one command that never touches my credentials (README deliverable 3, acceptance 3–4; `01` §12; principle 10).
 
