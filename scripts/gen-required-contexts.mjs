@@ -43,6 +43,8 @@ const NOT_REQUIRED = Object.freeze({
   'docs-bump.yml': 'scheduled and manual: it opens the corpus-pin PR, it does not gate one',
   'release.yml': 'tags only (`v*`), never a pull request',
   'e2e-live.yml': 'manual, and it needs a real instance and a credential',
+  'publish-npm.yml': 'manual dispatch only; never a pull request, never a tag — and a dry run '
+    + 'unless the dispatcher says otherwise (ARC-09-S10)',
 });
 
 /** The one workflow that gates a pull request. */

@@ -996,6 +996,46 @@ a rebuilt `dist/` on the maintainer's behalf would ship an artefact nobody revie
 Use `--dry-run` freely: it runs the preflight and the gates, prints the exact tag message, and
 writes nothing. `--offline` skips the remote-ahead check; `--no-install` skips `npm ci`.
 
+## The npm channel (optional)
+
+`npx @farstic/snowarch` is a **secondary** channel, for someone who wants the MCP server without
+the Architect engine. **The engine never consumes this package** — it runs the server from the
+checkout — so nothing here breaks if the package is never published, and none of this is on the
+release path.
+
+**It is disabled by default, and the mechanism is not a habit.** `publish-npm.yml` has no trigger
+but `workflow_dispatch`: no `push`, no `tags:`, no `pull_request`. Cutting a release tag does not
+publish anything. And the dispatch's `dry_run` input **defaults to true**, so accepting the dialog
+as it stands does the harmless thing. Flip it to `false` only when you have decided to publish that
+exact tag — there is no undoing a version on npm.
+
+**The token is granular and scoped to one package.** Create it on npmjs.com as a granular access
+token limited to **`@farstic/snowarch` only**, write-enabled, and store it as the repository secret
+`NPM_TOKEN`. That scope is the point: `@farstic/snow-mcp@1.0.0` is a published record that is
+**never touched again** (D-01), and a token that cannot name it cannot damage it even if it leaks.
+The workflow is the only place in this repository that reads the secret — `tests/workflows.test.mjs`
+fails if the name appears anywhere else, or if a second name appears there.
+
+**And the workflow itself refuses to publish anything but `@farstic/snowarch`.**
+`scripts/ci/assert-publish-target.mjs` runs before `npm ci` and long before the token is used. It
+checks the name (refusing `@farstic/snow-mcp` with D-01 named in the message), that the version
+equals the dispatched tag, `bin`, `files`, `engines.node`, `license`, `repository`, and that
+`publishConfig` asks for public access with provenance. A wrong target costs a second, not a
+publish.
+
+Provenance is why the workflow holds `id-token: write` — npm mints an attestation from GitHub's
+OIDC token linking the tarball to this repository and that tag. It is the only workflow with that
+permission, and a test holds it to that.
+
+**The post-publish smoke is a manual step**, deliberately: `npx -y @farstic/snowarch@2 --version`
+from a clean temp directory needs the real registry, and a test that mocks the registry proves
+nothing about it. The dispatch inputs and what green looks like are written out in
+`docs/spikes/OWNER-SITTING.md` § Sitting E.
+
+Where this is tested: `tests/workflows.test.mjs` (dispatch-only, the secret allow-list, the OIDC
+permission, step order, no required context) and `tests/publish-target.test.mjs` (every refusal
+message, and `npm pack --dry-run` for what the tarball carries).
+
 ## Adding a doctor check: registry → snapshots → mapping table
 
 Three files, in this order, and the tests will tell you if you stop after the first.

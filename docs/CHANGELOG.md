@@ -41,6 +41,18 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **An optional npm channel, off by default and unable to touch the old package.** `npx
+  @farstic/snowarch` is a secondary way to run the MCP server without the Architect engine; the
+  engine itself never consumes it. The workflow that can publish has no trigger but a human's — no
+  push, no tag, no pull request, so cutting a release publishes nothing — and its dry-run input
+  defaults to true, so accepting the dialog as it stands does the harmless thing.
+
+  `@farstic/snow-mcp@1.0.0` stays exactly as published. That is enforced three times over: the
+  token is granular and scoped to `@farstic/snowarch` alone, the workflow is the only place in the
+  repository that may read a secret of that name, and a guard script refuses any other package
+  before the install runs and long before the token is used — naming the decision in the refusal,
+  because a message that merely says "assertion failed" tells a maintainer nothing at 2am.
+
 - **Line endings that survive a Windows clone.** LF everywhere except the two Windows launcher
   kinds (`*.cmd`, `*.ps1`), which are CRLF — and the policy is now read from git rather than taken
   on trust. `tests/eol.test.mjs` parses `git ls-files --eol` and separates the two halves that fail

@@ -73,7 +73,10 @@
   ],
   "author": "Cvetomir Grigorov",
   "homepage": "https://github.com/farstic/ai-servicenow-architect",
-  "repository": "github:farstic/ai-servicenow-architect",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/farstic/ai-servicenow-architect.git"
+  },
   "bugs": "https://github.com/farstic/ai-servicenow-architect/issues",
   "license": "Apache-2.0",
   "dependencies": {
@@ -96,6 +99,7 @@
     "vitest": "^4.0.18"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   }
 }

@@ -1,12 +1,16 @@
 {
   "_rule": "A file may appear here only while it still contains a forbidden pattern AND a named ARC owns its rewrite. The test fails in both directions: a non-listed file that matches, and a listed file that no longer matches (remove the entry). Generated from the measured tree at ARC-01-S10, not copied from the story's 2026-09-04 listing.",
   "files": {
+    ".github/workflows/publish-npm.yml": "ARC-09",
     "docs/CHANGELOG.md": "ARC-09",
     "docs/CONTRIBUTING.md": "ARC-05",
     "packages/contract/retired-identifiers.json": "ARC-05",
     "packages/contract/retired-names.json": "ARC-05",
+    "scripts/ci/assert-publish-target.mjs": "ARC-09",
     "tests/contract/engine-lint.test.mjs": "ARC-05",
     "tests/contract/retired-names.test.mjs": "ARC-05",
-    "tests/fixtures/changelog-before-2.0.0.md": "ARC-09"
+    "tests/fixtures/changelog-before-2.0.0.md": "ARC-09",
+    "tests/publish-target.test.mjs": "ARC-09",
+    "tests/workflows.test.mjs": "ARC-09"
   }
 }

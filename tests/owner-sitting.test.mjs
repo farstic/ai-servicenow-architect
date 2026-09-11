@@ -50,13 +50,22 @@ test('every sitting says what it needs and when it is done', () => {
   }
 });
 
-test('the index at the top names all five, with an exit criterion each', () => {
+test('the index at the top names every sitting, with an exit criterion each', () => {
   const head = text.slice(0, text.indexOf('\n## Sitting A'));
-  for (const name of ['A — Install', 'B — Design-only', 'C — Live with a PDI', 'D — Windows', 'Archive']) {
+  // ARC-09-S10 added E. The index is how a person finds a sitting at all, so a section that
+  // exists and is not listed is a sitting nobody will run — which is why this counts rows rather
+  // than only checking the names it knows about.
+  const SITTINGS = ['A — Install', 'B — Design-only', 'C — Live with a PDI', 'D — Windows',
+    'E — The optional npm channel', 'Archive'];
+  for (const name of SITTINGS) {
     assert.ok(head.includes(name), `the index does not name ${name}`);
   }
-  // Five rows and a header in the table.
-  assert.equal((head.match(/^\| \[/gm) ?? []).length, 5);
+  assert.equal((head.match(/^\| \[/gm) ?? []).length, SITTINGS.length);
+  // ...and the reverse: every `## Sitting X` heading in the body is named in the index above.
+  const headings = [...text.matchAll(/^## Sitting ([A-Z]) — /gm)].map((m) => m[1]);
+  for (const letter of headings) {
+    assert.ok(SITTINGS.some((s) => s.startsWith(`${letter} —`)), `Sitting ${letter} is not indexed`);
+  }
 });
 
 test('every D-id and every story marker appears exactly once', () => {

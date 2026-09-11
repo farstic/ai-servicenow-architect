@@ -12,7 +12,7 @@
 > exclusion will get 592 failures and no explanation.
 
 
-Status: **In progress — S01–S09 merged (9 of 11), started 2026-09-11** · Depends on: ARC-01 (version of record, CI skeleton), ARC-02 (`CLAUDE.md` marker line; `/snowarch status` renders the doctor JSON whose `engine` header S04 feeds), ARC-03 (docs pin, `docs sync` recipe, `docs verify`, `docs-real.yml`), ARC-04 (store module, `build-dist.mjs`, `contract.json`, server doctor module, package identity), ARC-05 (contract gate, error registry), ARC-06 (first `version`, bootstrap state/resume, launchers, `bootstrap` CI job, handshake module), ARC-07 (`--password-stdin`, non-interactive `instance add` with `--no-probes`), ARC-08 (doctor registry/JSON, `doctor` CI job, banner nudge slot); ARC-00 S-03/S-04/S-07/S-08 verdicts and story S13 · Blocks: ARC-10 (the 2.0.0 tag)
+Status: **In progress — S01–S10 merged (10 of 11), started 2026-09-11** · Depends on: ARC-01 (version of record, CI skeleton), ARC-02 (`CLAUDE.md` marker line; `/snowarch status` renders the doctor JSON whose `engine` header S04 feeds), ARC-03 (docs pin, `docs sync` recipe, `docs verify`, `docs-real.yml`), ARC-04 (store module, `build-dist.mjs`, `contract.json`, server doctor module, package identity), ARC-05 (contract gate, error registry), ARC-06 (first `version`, bootstrap state/resume, launchers, `bootstrap` CI job, handshake module), ARC-07 (`--password-stdin`, non-interactive `instance add` with `--no-probes`), ARC-08 (doctor registry/JSON, `doctor` CI job, banner nudge slot); ARC-00 S-03/S-04/S-07/S-08 verdicts and story S13 · Blocks: ARC-10 (the 2.0.0 tag)
 
 ## Goal
 
