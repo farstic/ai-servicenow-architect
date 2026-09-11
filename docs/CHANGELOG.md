@@ -130,6 +130,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The release workflow no longer rejects its own tag.** Checking out a tag ref rewrites it to
+  point at the commit, so an annotated tag arrived in CI looking like one that had never carried a
+  message, and every verification job refused a release that was perfectly well formed. The
+  workflow re-fetches the tag object first, and the check now says when the remote has the
+  annotation and the checkout peeled it rather than telling you to re-cut a tag that is fine.
+
 - **A release now rebuilds the artefact it is about to tag.** `packages/snowarch/dist/contract.json`
   embeds the package version, so writing a new version left the committed contract stale: the
   release commit would have failed its own build check, and the tag would have named a contract that

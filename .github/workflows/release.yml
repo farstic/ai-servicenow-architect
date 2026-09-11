@@ -39,6 +39,17 @@ jobs:
 
       # FIRST, before any gate. A tag whose message does not describe this tree is not a release to
       # be tested — it is a release to be stopped, and every minute after this one is wasted on it.
+
+      # ARC-09-C16 — RE-FETCH THE TAG OBJECT. `actions/checkout@v4` on a tag ref writes
+      # `refs/tags/<name>` pointing straight at the COMMIT, even with `fetch-depth: 0`: it peels the
+      # tag. So an annotated tag arrives in the runner's clone looking exactly like a lightweight
+      # one, `verify-tag.mjs` sees `cat-file -t` say `commit`, and it refuses a release that is
+      # perfectly well formed on the remote. The v2.0.0-rc.0 rehearsal lost all three `verify` jobs
+      # to this (run 34643610242), and nothing before it could have: `release-dryrun` never has a
+      # tag, and the workflow test's fixture tag is local.
+      - name: Re-fetch the tag object (checkout peels annotated tags)
+        run: git fetch --force origin "+refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+
       - name: The tag says what this tree is
         run: node scripts/ci/verify-tag.mjs ${{ github.ref_name }}
 
@@ -90,6 +101,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      # ARC-09-C16 — RE-FETCH THE TAG OBJECT. `actions/checkout@v4` on a tag ref writes
+      # `refs/tags/<name>` pointing straight at the COMMIT, even with `fetch-depth: 0`: it peels the
+      # tag. So an annotated tag arrives in the runner's clone looking exactly like a lightweight
+      # one, `verify-tag.mjs` sees `cat-file -t` say `commit`, and it refuses a release that is
+      # perfectly well formed on the remote. The v2.0.0-rc.0 rehearsal lost all three `verify` jobs
+      # to this (run 34643610242), and nothing before it could have: `release-dryrun` never has a
+      # tag, and the workflow test's fixture tag is local.
+      - name: Re-fetch the tag object (checkout peels annotated tags)
+        run: git fetch --force origin "+refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+
       - uses: actions/download-artifact@v4
         with:
           pattern: release-*

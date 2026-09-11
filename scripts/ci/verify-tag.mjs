@@ -46,8 +46,40 @@ function annotation(name) {
   return tryGit(['cat-file', '-p', `refs/tags/${name}`]);
 }
 
+/**
+ * Does the REMOTE hold an annotated object for this tag?
+ *
+ * ARC-09-C16. `git ls-remote --tags` lists a `^{}` peel line for a tag object and nothing of the
+ * sort for a lightweight one, so the remote can be asked the question the local clone can no longer
+ * answer. This matters because `actions/checkout@v4` writes `refs/tags/<name>` pointing at the
+ * COMMIT — it peels the tag — and a perfectly well-formed annotated tag then looks lightweight
+ * here. Saying "not annotated" in that case blames the tag for the checkout's behaviour, and the
+ * v2.0.0-rc.0 rehearsal lost three jobs to exactly that message.
+ *
+ * Diagnosis only: the refusal stands either way, because this clone genuinely cannot read a message
+ * that is not in it. What changes is what the next person is told to do.
+ */
+function remoteHasAnnotation(name) {
+  // QUIET, and only ever on the failing path. A checkout with no `origin` — every fixture in the
+  // test suite — makes git print two lines about access rights to stderr, which is noise in a
+  // report about a tag and broke a test that asserts the exact refusal. `stdio: pipe` keeps git's
+  // opinion to itself; the answer here is a yes/no, not a diagnosis of the remote.
+  let out;
+  try {
+    out = execFileSync('git', ['ls-remote', '--tags', 'origin',
+      `refs/tags/${name}`, `refs/tags/${name}^{}`],
+    { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch { return false; }
+  return typeof out === 'string' && out.includes(`refs/tags/${name}^{}`);
+}
+
 const body = annotation(tag);
 if (body === null) {
+  if (remoteHasAnnotation(tag)) {
+    fail(`tag ${tag}: the remote has the annotated object; this checkout peeled it to a commit — `
+      + 're-fetch the tag (git fetch --force origin "+refs/tags/<tag>:refs/tags/<tag>"); '
+      + 'release.yml does this after checkout');
+  }
   fail(`tag ${tag} is not annotated — create it with scripts/release.mjs`);
 }
 
