@@ -132,7 +132,17 @@ const KNOWN_JOBS = [
   // ARC-09-S02. The 43rd required context on `main`: it is the only place the commit convention is
   // enforced, and an unrequired check that goes red without blocking anything is not a guard.
   'commitlint',
+  // ARC-09-S03, three more (44–46): the release path is exercised on every commit, because
+  // `release.yml` only ever runs on a tag and a path that runs once per release is broken by then.
+  'release-dryrun',
   'launcher', 'windows-launcher', 'secrets', 'plugin-validate',
+];
+
+/** The three required contexts `release-dryrun` adds, exactly as a check-run prints them. */
+const RELEASE_DRYRUN_CONTEXTS = [
+  'release-dryrun (ubuntu-latest)',
+  'release-dryrun (macos-latest)',
+  'release-dryrun (windows-latest)',
 ];
 
 const BOOTSTRAP_CELLS = [
@@ -226,7 +236,7 @@ test('the doctor runs inside the bootstrap cells, and adds no job name (ARC-08-S
 
 test('commitlint runs on pull requests only, with the history it needs (ARC-09-S02)', () => {
   const ci = wf('ci.yml');
-  const job = ci.slice(ci.indexOf('\n  commitlint:'), ci.indexOf('\n  launcher:'));
+  const job = ci.slice(ci.indexOf('\n  commitlint:'), ci.indexOf('\n  release-dryrun:'));
 
   // On a push there is no base branch to compare against, and `origin/main..HEAD` on `main` itself
   // is empty — a job that ran there would report "0 commits ok" forever and prove nothing.
@@ -237,6 +247,82 @@ test('commitlint runs on pull requests only, with the history it needs (ARC-09-S
   // One cell, so the required context is the bare job name — which is what branch protection lists.
   assert.equal(/strategy:/.test(job), false, 'a matrix would change the required context name');
   assert.match(job, /name: commitlint/);
+});
+
+test('release-dryrun runs the real release on three OSes, every commit (ARC-09-S03)', () => {
+  const ci = wf('ci.yml');
+  const job = ci.slice(ci.indexOf('\n  release-dryrun:'), ci.indexOf('\n  launcher:'));
+
+  // The three contexts, in the form branch protection lists them.
+  const list = /^\s*os: \[([^\]]+)\]$/m.exec(job);
+  assert.ok(list, 'the matrix is not one os list');
+  const contexts = list[1].split(',').map((o) => `release-dryrun (${o.trim()})`);
+  assert.deepEqual(contexts, RELEASE_DRYRUN_CONTEXTS);
+  assert.match(job, /name: release-dryrun \(\$\{\{ matrix\.os \}\}\)/);
+
+  // `--dry-run` is what makes this safe to run on every commit, and `--offline --no-install` keep
+  // it from touching the network twice. A missing `--dry-run` here would WRITE a version on a CI
+  // runner and commit it.
+  assert.match(job, /node scripts\/release\.mjs 9\.9\.9 --dry-run --offline --no-install --allow-branch/);
+  // The branch comes from the checkout, not from `github.head_ref`, which is empty on a push.
+  assert.match(job, /branch=\$\(git rev-parse --abbrev-ref HEAD\)/);
+  // Gate 6 is `docs verify`, so the corpus has to be there.
+  assert.match(job, /snowarch\.mjs docs sync --yes/);
+  // ...and the tree is unchanged afterwards, which is the claim `--dry-run` makes.
+  assert.match(job, /scripts\/ci\/assert-clean\.mjs/);
+  assert.match(job, /fetch-depth: 0/);
+});
+
+test('release.yml runs on tags only, and is the one workflow that may write (ARC-09-S03)', () => {
+  const release = wf('release.yml');
+
+  // A tag trigger and nothing else: a `push` on a branch here would publish a Release per commit.
+  assert.match(release, /^on:\n  push:\n    tags: \['v\*'\]$/m);
+  assert.equal(/pull_request/.test(release), false, 'a fork could then run a job that may write');
+  assert.equal(/workflow_dispatch/.test(release), false, 'a Release must come from a tag, not a button');
+
+  // `contents: write`, and exactly the two workflows that need it — asserted as a CLOSED SET
+  // rather than as "only this one", which is what I first wrote and which is not true:
+  // `docs-bump.yml` pushes the branch it opens its pull request from. Two workflows may write to
+  // this repository, both of them scheduled or tag-triggered, neither reachable from a fork's pull
+  // request. A third appearing is a decision somebody has to make here.
+  assert.match(release, /^permissions:\n  contents: write$/m);
+  const mayWrite = readdirSync(join(root, '.github/workflows'))
+    .filter((name) => /contents: write/.test(wf(name))).sort();
+  assert.deepEqual(mayWrite, ['docs-bump.yml', 'release.yml']);
+
+  // The only credential is the token GitHub hands the job. No repository secret is read.
+  assert.equal(/secrets\./.test(release), false, 'release.yml reads a repository secret');
+  assert.match(release, /GH_TOKEN: \$\{\{ github\.token \}\}/);
+
+  // Every step is a `node` invocation or an action — no `npx`, which would fetch a package at
+  // release time and make the release depend on a registry being up.
+  assert.equal(/npx /.test(release), false, 'release.yml runs npx');
+
+  // The tag is verified BEFORE the gates: a tag that does not describe this tree is not a release
+  // to be tested, and every minute after that one is spent on the wrong thing.
+  const verifyAt = release.indexOf('verify-tag.mjs');
+  assert.notEqual(verifyAt, -1);
+  assert.ok(verifyAt < release.indexOf('npm ci'), 'the gates run before the tag is verified');
+
+  // Three platforms, and `publish` waits for all of them.
+  assert.match(release, /os: \[ubuntu-latest, macos-latest, windows-latest\]/);
+  assert.match(release, /^    needs: verify$/m);
+
+  // The seven assets, named — the criterion is that there are exactly these. Searched inside the
+  // PUBLISH JOB: `gh release create` is also written in the header comment, and an `indexOf` over
+  // the whole file finds the prose first and compares the wrong two positions.
+  const publish = release.slice(release.indexOf('\n  publish:'));
+  const create = publish.slice(publish.indexOf('gh release create'));
+  for (const asset of ['doctor-ubuntu-latest.json', 'doctor-macos-latest.json',
+    'doctor-windows-latest.json', 'install-metrics-ubuntu-latest.json',
+    'install-metrics-macos-latest.json', 'install-metrics-windows-latest.json',
+    'install-metrics.md']) {
+    assert.ok(create.includes(asset), `the release does not attach ${asset}`);
+  }
+  // ...and nothing is published without being read first.
+  assert.ok(publish.indexOf('assert-assets.mjs') < publish.indexOf('gh release create'),
+    'the assets are published before they are checked');
 });
 
 test('the run is cancelled when superseded, so thirteen cells are not paid for twice', () => {

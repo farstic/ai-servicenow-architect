@@ -531,6 +531,47 @@ jobs:
       - name: Every commit on this pull request follows the convention
         run: node scripts/ci/commitlint.mjs
 
+  release-dryrun:
+    # The release path, exercised on every commit — because `release.yml` only ever runs on a tag,
+    # and a path that runs once per release is a path that is broken by the time it runs.
+    # `--dry-run` runs the REAL gates (lint, the suites, the contract gate, `docs verify`) and then
+    # prints the tag message and writes nothing, so this job is both "the release still works" and a
+    # second, independent run of everything else.
+    #
+    # `--allow-branch`: S01's preflight requires `main`, and this runs on pull-request heads and on
+    # `develop`. The branch is read from the checkout rather than from `github.head_ref`, which is
+    # empty on a push — one expression that is right on both events.
+    #
+    # Cost lever (recorded in S11 and in docs/CONTRIBUTING.md): if macOS minutes bite, this matrix
+    # drops to ubuntu + windows. `verify` in release.yml keeps all three, because a release is the
+    # one moment all three must be proven.
+    name: release-dryrun (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      # Gate 6 is `docs verify`, which needs the corpus. The same sparse recipe B02 uses.
+      - name: The pinned corpus, sparse
+        run: node tools/snowarch/bin/snowarch.mjs docs sync --yes
+      - name: The release, rehearsed — every gate, nothing written
+        shell: bash
+        run: |
+          branch=$(git rev-parse --abbrev-ref HEAD)
+          node scripts/release.mjs 9.9.9 --dry-run --offline --no-install --allow-branch "$branch"
+      - name: ...and the tree is exactly as it was
+        run: node scripts/ci/assert-clean.mjs
+
   launcher:
     # `bootstrap.sh` is the one file that runs on a machine with NO Node — which means none of the
     # engine's own tooling can check it, and none of the other jobs would notice it broken. Two
