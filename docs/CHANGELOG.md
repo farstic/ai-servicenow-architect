@@ -130,6 +130,21 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A release now rebuilds the artefact it is about to tag.** `packages/snowarch/dist/contract.json`
+  embeds the package version, so writing a new version left the committed contract stale: the
+  release commit would have failed its own build check, and the tag would have named a contract that
+  no longer matched the tree. The release writes now rebuild it, move the pin with it and re-run the
+  generators before anything quotes the result — and a failure after the writes rolls all of it
+  back, including files the rebuild created.
+
+- **A release no longer loses the hand-written changelog, or leaves files behind.** The block under
+  `## Unreleased` moves into the released section whole. It used to be cut at the first sub-heading
+  after `### Notes`, which dropped every hand-written entry below it — on this file, 25 lines of
+  1,224 survived. Nothing inside the block is treated as a boundary any more, including a `##` line
+  inside a fenced code block. The release commit now contains every file the writes produced,
+  including the ones only a generator knows about, and a release that leaves the working tree dirty
+  fails and names them.
+
 - **The instance wizard was being declared failed the moment it started.** The bootstrap's runner
   hands every step an asynchronous `spawn` so a Ctrl-C can reach the child; B06 read `.status` off
   the returned `ChildProcess`, where it is `undefined`. In a live install the wizard would run, you

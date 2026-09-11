@@ -100,7 +100,59 @@ export function renderGroups(commits) {
 export const trailerLine = (version, { contract, docsPin } = {}) =>
   `Tag v${version} · contract ${String(contract ?? '').slice(0, 12)} · docs-pin ${String(docsPin ?? '').slice(0, 7)}`;
 
-/** The `### Notes` block under `## Unreleased`, verbatim; `''` when empty, `null` with no heading. */
+/**
+ * Where `## Unreleased`'s body starts and ends, FENCE-AWARE.
+ *
+ * ARC-09-C12c. A `## ` line inside a fenced code block is not a section heading, and a changelog
+ * that documents a markdown convention will contain one sooner or later. The regex boundary
+ * (`/^## /m`) could not tell the difference and cut the block there — found by this story's own
+ * negative control, which plants a fence containing `## not a heading, it is in a fence`.
+ *
+ * Returns `null` when there is no `## Unreleased`; otherwise `{ start, end }` as offsets into
+ * `text`, where `end` is the start of the next real `## ` heading or the end of the file.
+ */
+export function unreleasedBounds(text) {
+  const heading = /^## Unreleased[ \t]*$/m.exec(text);
+  if (!heading) return null;
+  const start = heading.index + heading[0].length;
+  const lines = text.slice(start).split('\n');
+  let offset = start;
+  let fenced = false;
+  for (const line of lines) {
+    // ``` or ~~~ at the start of a line toggles the fence. The closing marker of a fence opened
+    // with a longer run is still a run of the same character, so a simple toggle is enough here.
+    if (/^\s{0,3}(```|~~~)/.test(line)) fenced = !fenced;
+    else if (!fenced && /^## /.test(line)) return { start, end: offset };
+    offset += line.length + 1;
+  }
+  return { start, end: text.length };
+}
+
+/**
+ * EVERYTHING under `## Unreleased`, verbatim; `''` when the section is empty, `null` with no heading.
+ *
+ * ARC-09-C12c. This used to read only the `### Notes` sub-block, and it stopped at the first `###`
+ * heading after it — so every hand-written `### Added` / `### Fixed` group that a pull request had
+ * put under Unreleased was silently dropped when the release emptied the section. The v2.0.0-rc.0
+ * rehearsal measured the damage on the real file: `## Unreleased` was 1,226 lines before the run
+ * and the released section was 423 after, with `## Unreleased` left at 3 — roughly eight hundred
+ * lines of hand-written record, gone, from a function whose one job is to move them verbatim.
+ *
+ * The rule is now the section, not a sub-block of it: whatever a person wrote under `## Unreleased`
+ * comes out byte-identical and goes into the release it belongs to. A `####`, a `---`, a fenced
+ * block, a second `### Notes` — none of them is a boundary, because none of them means "the
+ * hand-written part ends here".
+ */
+export function extractUnreleased(text) {
+  const bounds = unreleasedBounds(text);
+  if (!bounds) return null;
+  return text.slice(bounds.start, bounds.end).replace(/^\n+/, '').replace(/\s+$/, '');
+}
+
+/**
+ * The `### Notes` sub-block alone. Kept because it is the narrower question and a test asks it;
+ * `writeChangelog` does NOT use it — see `extractUnreleased` for why.
+ */
 export function extractNotes(text) {
   const unreleased = /^## Unreleased[ \t]*$/m.exec(text);
   if (!unreleased) return null;
@@ -122,7 +174,7 @@ export function extractNotes(text) {
  * `## Before 2.0.0` is read, matched or rewritten: it is not a region this function has an opinion
  * about, and that is what makes AC 7 true by construction rather than by care.
  */
-export function buildFile({ text, version, date, notes, body, trailer }) {
+export function buildFile({ text, version, date, notes, carried = null, body, trailer }) {
   if (new RegExp(`^## ${version.replace(/\./g, '\\.')}[ \t]`, 'm').test(text)) {
     return { ok: false, message: `changelog: section ${version} already exists` };
   }
@@ -130,14 +182,21 @@ export function buildFile({ text, version, date, notes, body, trailer }) {
   if (!unreleased) return { ok: false, message: 'changelog: no "## Unreleased" heading' };
 
   const head = text.slice(0, unreleased.index);
-  const after = text.slice(unreleased.index + unreleased[0].length);
-  const nextSection = /^## /m.exec(after);
-  const tail = nextSection ? after.slice(nextSection.index) : '';
+  // The same fence-aware boundary the extractor uses — two different answers about where the
+  // section ends would put the tail back in the wrong place (ARC-09-C12c).
+  const bounds = unreleasedBounds(text);
+  const tail = text.slice(bounds.end);
 
+  // The hand-written block goes in VERBATIM and first — it already carries its own headings, so it
+  // is not re-wrapped in `### Notes`. `notes` remains the narrow path for a caller that has only
+  // that sub-block. A release section can therefore hold a hand-written `### Added` and the
+  // generated one: that is two lists of the same kind rather than a lost list, and only one of them
+  // was written by a person.
   const section = [
     `## ${version} — ${date}`,
     '',
-    ...(notes ? ['### Notes', '', notes, ''] : []),
+    ...(carried ? [carried, ''] : []),
+    ...(!carried && notes ? ['### Notes', '', notes, ''] : []),
     ...(body ? [body.replace(/\s+$/, ''), ''] : []),
     trailer,
     '',
@@ -154,11 +213,11 @@ export function buildFile({ text, version, date, notes, body, trailer }) {
 export function writeChangelog({ root, version, date, from = null, tag = {}, git = defaultGit,
   read, write }) {
   const text = read('docs/CHANGELOG.md');
-  const notes = extractNotes(text);
-  if (notes === null) return { ok: false, message: 'changelog: no "## Unreleased" heading' };
+  const carried = extractUnreleased(text);
+  if (carried === null) return { ok: false, message: 'changelog: no "## Unreleased" heading' };
 
   const commits = readCommits({ root, from, git });
-  const built = buildFile({ text, version, date, notes,
+  const built = buildFile({ text, version, date, carried,
     body: renderGroups(commits), trailer: trailerLine(version, tag) });
   if (!built.ok) return built;
 
