@@ -16,6 +16,7 @@ import {
   existsSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { EXIT_BEHIND } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { bootstrapUser, buildWorld, fakeClaude, git, snowarch } from './harness.mjs';
@@ -240,8 +241,13 @@ test('AC 7 — an upgrade that stops mid-way resumes where it stopped', async (t
   // step recorded `fail` with everything before it `ok` — by moving the corpus upstream out of the
   // way. It has to be outside git: an edit to `engine.config.json` would be replaced by the tag's
   // own copy at `git checkout`, which is what the first version of this test discovered.
-  const upstream = JSON.parse(readFileSync(join(w.user, 'engine.config.json'), 'utf8'))
-    .docs.upstream.replace('file://', '');
+  // `fileURLToPath`, never the scheme cut off the front. On Windows the URL is
+  // `file:///C:/Users/RUNNER~1/…` with the tilde percent-encoded, so `.replace('file://','')`
+  // produced `/C:/Users/RUNNER%7E1/…`, which resolved against the drive as `D:\C:\Users\…` and
+  // could not be renamed. This repository documents that trap in three other modules and I wrote
+  // the wrong one anyway; the Windows cell is what caught it.
+  const upstream = fileURLToPath(JSON.parse(readFileSync(join(w.user, 'engine.config.json'), 'utf8'))
+    .docs.upstream);
   const parked = `${upstream}.parked`;
   renameSync(upstream, parked);
   // …and the corpus is EMPTIED, because a re-sparse of a checkout that is already there never asks
