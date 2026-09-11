@@ -12,7 +12,7 @@
 > exclusion will get 592 failures and no explanation.
 
 
-Status: **In progress — S01–S05 merged (5 of 11), started 2026-09-11** · Depends on: ARC-01 (version of record, CI skeleton), ARC-02 (`CLAUDE.md` marker line; `/snowarch status` renders the doctor JSON whose `engine` header S04 feeds), ARC-03 (docs pin, `docs sync` recipe, `docs verify`, `docs-real.yml`), ARC-04 (store module, `build-dist.mjs`, `contract.json`, server doctor module, package identity), ARC-05 (contract gate, error registry), ARC-06 (first `version`, bootstrap state/resume, launchers, `bootstrap` CI job, handshake module), ARC-07 (`--password-stdin`, non-interactive `instance add` with `--no-probes`), ARC-08 (doctor registry/JSON, `doctor` CI job, banner nudge slot); ARC-00 S-03/S-04/S-07/S-08 verdicts and story S13 · Blocks: ARC-10 (the 2.0.0 tag)
+Status: **In progress — S01–S06 merged (6 of 11), started 2026-09-11** · Depends on: ARC-01 (version of record, CI skeleton), ARC-02 (`CLAUDE.md` marker line; `/snowarch status` renders the doctor JSON whose `engine` header S04 feeds), ARC-03 (docs pin, `docs sync` recipe, `docs verify`, `docs-real.yml`), ARC-04 (store module, `build-dist.mjs`, `contract.json`, server doctor module, package identity), ARC-05 (contract gate, error registry), ARC-06 (first `version`, bootstrap state/resume, launchers, `bootstrap` CI job, handshake module), ARC-07 (`--password-stdin`, non-interactive `instance add` with `--no-probes`), ARC-08 (doctor registry/JSON, `doctor` CI job, banner nudge slot); ARC-00 S-03/S-04/S-07/S-08 verdicts and story S13 · Blocks: ARC-10 (the 2.0.0 tag)
 
 ## Goal
 
@@ -31,7 +31,7 @@ Closes P-12 (five counters, zero tags), P-19 (server version drift), P-29 (CI ne
 
 - `scripts/release.mjs <x.y.z>`: bump root and package versions; rebuild `dist/`; run `npm test`, contract, engine lint, citations; write `CLAUDE.md` version line, README badge, `docs/CHANGELOG.md`; commit; tag `v<x.y.z>` with message `contract: <sha>\ndocs-pin: <sha>\nclaude-floor: <ver>`; refuse on any failing gate or dirty tree.
 - `.github/workflows/release.yml`: on `v*` tags, re-run all gates on three OSes and attach the doctor JSON and the install-page size/time table as release assets.
-- `./snowarch version` (version, tag, contract sha, docs pin, floors); `./snowarch upgrade [--to vX.Y.Z]` (`git fetch --tags`, checkout or `pull --ff-only`, `bootstrap --resume`, doctor); the SessionStart banner's "behind origin" nudge (reads a cached fetch, never fetches itself).
+- `./snowarch version` (version, tag, contract sha, docs pin, floors); `./snowarch upgrade [--to vX.Y.Z]` (`git fetch --tags`, checkout or `pull --ff-only`, a second `bootstrap` run, doctor); the SessionStart banner's "behind origin" nudge (reads a cached fetch, never fetches itself).
 - Input-hash table (documented in `docs/ARCHITECTURE.md`): `package-lock.json` → B04; `dist/contract.json` sha → B05/B08; `vendor/docs-areas.txt` + gitlink → B02; store schema version → B06 migration; `.mcp.json` / `.claude/settings.json` hashes → B01/B07.
 - Store migration framework in `packages/snowarch` (`version: 1` → n; backup file `instances.json.bak-<ts>` with 0600; never touches credentials' values).
 - CI matrix with the Windows job proving `bootstrap.cmd`, `snowarch.cmd`, masked input (`--password-stdin` path in CI), the MCP handshake, and the SessionStart hook in exec form.

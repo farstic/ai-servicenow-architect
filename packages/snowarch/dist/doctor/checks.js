@@ -1,5 +1,5 @@
 /**
- * SV-00 … SV-08. One function per check, each answering one question a user could act on.
+ * SV-00 … SV-09. One function per check, each answering one question a user could act on.
  *
  * Every `detail` and `remedy` string here reaches a terminal, a log and — through ARC-08's
  * report — a pasted bug report. So: masked paths, no clear usernames, secrets as `set (len n)`
@@ -14,6 +14,7 @@ import { spawn } from 'node:child_process';
 import { instanceManager } from '../servicenow/instances.js';
 import { detectCloudSync } from '../store/index.js';
 import { maskPath, resolveStorePath } from '../store/paths.js';
+import { CURRENT_SCHEMA_VERSION } from '../store/migrations/index.js';
 import { FLAG_NAMES, checkProdPosture } from '../utils/permissions.js';
 import { checkFluent } from '../servicenow/probes.js';
 import { resolveAuditPath } from '../audit/writer.js';
@@ -507,9 +508,58 @@ export const svAncestorSkills = {
                 + 'the roster is larger than this repository defines and the listing budget is spent twice', 'move the checkout out from under those directories, or disable their skills with /skills');
     },
 };
+// ─── SV-09 — the store's schema version ──────────────────────────────────────
+/**
+ * Does this build read the store that is there?
+ *
+ * ARC-09-S06, and it is SV-09 rather than the story's SV-08 — ARC-08-S04 shipped the ancestor
+ * skills check under that id first.
+ *
+ * Separate from SV-02 on purpose. SV-02 answers "is the file safe and loadable"; this answers
+ * "is it the shape this build speaks", and the two have different remedies pointing in opposite
+ * directions — migrate the file, or upgrade the checkout. Folding them together would give one
+ * line that has to hedge.
+ *
+ * NOT fixable, deliberately and permanently: `--fix`'s whitelist never touches the credential
+ * file (`01` §8). The command is what `--fix` reports under REFUSED, which is how a user running
+ * it learns exactly what it declined to do and what to run instead.
+ */
+export const svStoreSchema = {
+    id: 'SV-09',
+    title: 'store schema',
+    severity: 'fail',
+    network: false,
+    async run() {
+        const res = resolveStorePath();
+        if (res.path === null || !existsSync(res.path)) {
+            return skip('SV-09', 'store schema', 'no store to check');
+        }
+        let version;
+        try {
+            version = JSON.parse(readFileSync(res.path, 'utf8')).version;
+        }
+        catch {
+            // SV-02 owns "the file is broken" and says it with the parse error. Repeating it here as a
+            // schema finding would give a reader two failures for one file.
+            return skip('SV-09', 'store schema', 'the store is not readable — see SV-02');
+        }
+        if (version === CURRENT_SCHEMA_VERSION) {
+            return ok('SV-09', 'store schema', `store schema v${CURRENT_SCHEMA_VERSION} (current)`);
+        }
+        if (typeof version === 'number' && version > CURRENT_SCHEMA_VERSION) {
+            return { id: 'SV-09', title: 'store schema', status: 'fail', fixable: false,
+                detail: `store schema v${version} > server v${CURRENT_SCHEMA_VERSION}`,
+                code: 'STORE_SCHEMA_NEWER', command: './snowarch upgrade' };
+        }
+        return { id: 'SV-09', title: 'store schema', status: 'fail', fixable: false,
+            detail: `store schema v${typeof version === 'number' ? version : JSON.stringify(version)} `
+                + `< server v${CURRENT_SCHEMA_VERSION}`,
+            code: 'STORE_SCHEMA_OUTDATED', command: './snowarch store migrate' };
+    },
+};
 export const ALL_CHECKS = [
     svNodeFloor, svDist, svStore, svInstances, svProbes, svHandshake, svCapabilities, svAudit,
-    svAncestorSkills,
+    svAncestorSkills, svStoreSchema,
 ];
 /** Exported so a caller can resolve `dist/` the same way the checks do. */
 export { distDir, pathToFileURL };

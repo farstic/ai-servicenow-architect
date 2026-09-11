@@ -21,8 +21,22 @@ import { INPUTS } from '../inputs.mjs';
 export const id = 'B06';
 export const title = 'instance';
 export const needsNode = true;
-export const runsWhen = (ctx) => ctx.mode === 'live';
+/**
+ * Live mode, OR a store that is already there (ARC-09-S06).
+ *
+ * A design-only checkout that still carries a `.local/instances.json` is not a hypothetical: it is
+ * what a user has after `mode design`, and what S07's upgrade harness is. That file must stay
+ * LOADABLE across an upgrade, which means a schema change has to reach it in either mode — and the
+ * step that reaches it is this one. Without the second clause, upgrading a design-only checkout
+ * would leave the store a version behind and the next `mode live` would meet a schema it cannot
+ * read, in the place least able to explain it.
+ */
+export const runsWhen = (ctx) => ctx.mode === 'live' || storeExists(ctx.root);
 export const skipReason = 'design-only';
+
+export const MIGRATION_FAILED =
+  'the store migration did not complete — run ./snowarch store migrate to see why; '
+  + 'nothing was changed and a backup was written if the migration had started';
 
 export const NO_TERMINAL =
   'no terminal for the instance wizard — run ./snowarch instance add in an interactive terminal, '
@@ -36,6 +50,10 @@ const CLI = join('packages', 'snowarch', 'dist', 'cli', 'index.js');
 // inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
 // set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
 export const inputs = INPUTS.B06.resolve;
+
+// `root` guarded: `runsWhen` is called with whatever ctx a caller has, and a step selector that
+// threw on a ctx without a root would turn "which steps run" into a crash.
+export const storeExists = (root) => Boolean(root) && existsSync(join(root, '.local', 'instances.json'));
 
 function shapeOf(root) {
   const p = join(root, '.local', 'instances.json');
@@ -117,8 +135,62 @@ export async function fromInstanceFile(ctx) {
   };
 }
 
+/**
+ * A store whose schema is behind gets MIGRATED — never re-wizarded.
+ *
+ * This is the branch the whole of S06 exists for. "Something about the store changed" has exactly
+ * one safe answer when the thing that changed is its SHAPE, and re-running the wizard over
+ * somebody's credentials is not it. The migration runs through the built CLI with `--yes` (the
+ * plan was already shown and accepted at the bootstrap's own plan screen), writes its 0600 backup
+ * and never touches a credential value.
+ */
+export async function migrateIfBehind(ctx) {
+  const shape = shapeOf(ctx.root);
+  if (!shape.present) return null;
+
+  const current = await storeSchemaVersion(ctx.root);
+  if (current === null || shape.version === null || shape.version === current) return null;
+  if (shape.version > current) {
+    // A store from the FUTURE is not this step's to fix: downgrading it would mean discarding
+    // whatever the newer build added. The doctor's SV-09 says the same thing with the command.
+    return { status: 'warn', remedy: null,
+      detail: `store schema v${shape.version} is newer than this build's v${current} — `
+        + 'run ./snowarch upgrade' };
+  }
+
+  const spawn = ctx.spawn ?? spawnSync;
+  const r = spawn(process.execPath, [join(ctx.root, CLI), 'store', 'migrate', '--yes'],
+    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) });
+  if (r.status !== 0) return { status: 'fail', detail: MIGRATION_FAILED, remedy: null };
+  return { status: 'ok', detail: `store schema v${shape.version} → v${current} (migrated)`,
+    data: { migratedFrom: shape.version, migratedTo: current } };
+}
+
+/** The schema this BUILD reads, from the contract — the same number S05's B06 row hashes. */
+async function storeSchemaVersion(root) {
+  const p = join(root, 'packages', 'snowarch', 'dist', 'contract.json');
+  const text = readFileSyncSafe(p);
+  if (text === null) return null;
+  try {
+    const v = JSON.parse(text)?.storeSchemaVersion;
+    return Number.isInteger(v) ? v : null;
+  } catch { return null; }
+}
+
 export const run = async (ctx) => {
+  // BEFORE the instance-file and wizard paths, because both write a store and this decides
+  // whether the store that is already there can be read at all.
+  const migrated = await migrateIfBehind(ctx);
+  if (migrated && migrated.status !== 'ok') return migrated;
+  if (migrated) return migrated;
+
   if (ctx.instanceFile) return fromInstanceFile(ctx);
+
+  // A design-only checkout reaches this step only because a store exists (`runsWhen`), and with
+  // the store current there is nothing else here to do: the wizard is live mode's business.
+  if (ctx.mode !== 'live') {
+    return { status: 'ok', detail: 'store present and current; no wizard in design-only mode' };
+  }
 
   const interactive = ctx.isTTY ?? Boolean(process.stdin.isTTY);
   if (!interactive) return { status: 'fail', detail: NO_TERMINAL, remedy: null };

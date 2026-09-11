@@ -505,3 +505,25 @@ test('a cache written for a configured store carries no address-shaped string', 
     'an address-shaped string survived in the cache');
   assert.equal(/https?:\/\/[a-z0-9-]+\.service-now\.com/i.test(text), false);
 });
+
+// ARC-09-S06, AC 4 — the whitelist stays away from the credential file.
+test('an outdated store schema is REFUSED with its command, never repaired', () => {
+  // A SV-09 result as the server module produces one: failed, carrying a command, and explicitly
+  // not fixable. What must come out is a REFUSED line — not an action, and not silence.
+  const report = { checks: [
+    { id: 'SV-09', status: 'fail', fixable: false, command: './snowarch store migrate',
+      detail: 'store schema v1 < server v2' },
+  ] };
+  const plan = buildPlan(report);
+
+  assert.deepEqual(plan.actions, [], 'nothing about a store schema may be applied');
+  assert.deepEqual(plan.refused, [{ check: 'SV-09', detail: 'store schema v1 < server v2',
+    command: './snowarch store migrate' }]);
+
+  const text = renderPlan(plan);
+  assert.match(text, /REFUSED \(1\)/);
+  assert.match(text, /SV-09.*run: \.\/snowarch store migrate/);
+  // And the whitelist has no fixer that could ever touch it: the kinds are a closed set, and
+  // "store-schema" is deliberately not one of them.
+  assert.equal(KINDS.includes('store-schema'), false);
+});

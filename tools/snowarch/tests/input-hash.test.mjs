@@ -28,9 +28,11 @@ const putStore = (root, body) => {
 const linkCorpus = (root, sha) => {
   execFileSync('git', ['-C', root, 'update-index', '--add', '--cacheinfo',
     `160000,${sha},vendor/ServiceNowDocs`], { stdio: 'ignore' });
-  // The identity is passed per-command, the way `makeCheckout` does it: a hosted runner has no
-  // global `user.email`, and a fixture that depends on the machine having one fails only there.
-  execFileSync('git', ['-C', root, '-c', 'user.email=f@example.invalid', '-c', 'user.name=f',
+  // The identity is passed per-command, because a hosted runner has no global `user.email` and a
+  // fixture that depends on the machine having one fails only there. `example.com` is RFC 2606's
+  // reserved name — `.invalid` is the rule of record's counter-example, and the address in
+  // `helpers/workspace.mjs` predates the rule rather than justifying it.
+  execFileSync('git', ['-C', root, '-c', 'user.email=f@example.com', '-c', 'user.name=f',
     'commit', '-q', '-m', 'link'], { stdio: 'ignore' });
 };
 
@@ -70,7 +72,7 @@ test('the table is one row per step, in run order, and every row declares its ki
       assert.ok(i.ref && i.why, `${id}: every declared input says what it is and why`);
     }
     // B00 and B09 are the two with nothing: they run every time, and that is the whole of
-    // "`--resume` on an unchanged checkout still runs B00 and B09".
+    // "a second run on an unchanged checkout still does B00 and B09".
     if (id === 'B00' || id === 'B09') assert.deepEqual(row.inputs, []);
     else assert.ok(row.inputs.length > 0, `${id} must declare what it reads`);
   }
@@ -338,7 +340,7 @@ test('AC 4 — the hash is a function of the inputs alone, not of when it was ta
 
 // ─── AC 3: what a resume on an unchanged checkout actually runs ─────────────────────────────────
 
-test('AC 3 — on an unchanged checkout only B00 and B09 run; the rest print ok (cached)', async (t) => {
+test('AC 3 — a second run on an unchanged checkout does only B00 and B09', async (t) => {
   const root = makeCheckout({}, t);
   const ctx = ctxFor(root);
   const state = fresh(root, ctx);

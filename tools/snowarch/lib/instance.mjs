@@ -90,16 +90,19 @@ export function preconditions({ root = defaultRoot, nodeVersion = process.versio
  * boundary is the server CLI's prompt, and an argument invented here would appear in `ps` for
  * every user on the machine.
  */
-export const buildArgv = (cliPath, args) => [cliPath, 'instance', ...args];
+export const buildArgv = (cliPath, args, command = 'instance') => [cliPath, command, ...args];
 
-export async function instanceCommand({ log, argv = [], root = defaultRoot,
+/**
+ * Hand one sub-command over to the server CLI.
+ *
+ * ARC-09-S06 lifted this out of `instanceCommand` when `store` needed the same three checks and
+ * the same spawn. It is the one place that decides whether this checkout can run the server at
+ * all, so `instance` and `store` cannot come to different conclusions about it — and the argv is
+ * still exactly what the user typed, with the sub-command's name in front.
+ */
+export async function forwardToServerCli(command, { log, argv = [], root = defaultRoot,
   run = spawnSync, exists = existsSync, nodeVersion = process.versions.node,
   depsInstalled = serverDepsInstalled } = {}) {
-  if (argv.includes('--help') && argv.length === 1) {
-    log.step(USAGE);
-    return EXIT_OK;
-  }
-
   const check = preconditions({ root, nodeVersion, exists, depsInstalled });
   if (!check.ok) {
     log.fail(NOT_INSTALLED);
@@ -109,7 +112,15 @@ export async function instanceCommand({ log, argv = [], root = defaultRoot,
     return EXIT_PREREQ;
   }
 
-  const result = run(process.execPath, buildArgv(join(root, CLI_PATH), argv),
+  const result = run(process.execPath, buildArgv(join(root, CLI_PATH), argv, command),
     { stdio: 'inherit', cwd: root, env: childEnv(root) });
   return result.status ?? EXIT_PREREQ;
+}
+
+export async function instanceCommand({ log, argv = [], ...rest } = {}) {
+  if (argv.includes('--help') && argv.length === 1) {
+    log.step(USAGE);
+    return EXIT_OK;
+  }
+  return forwardToServerCli('instance', { log, argv, ...rest });
 }

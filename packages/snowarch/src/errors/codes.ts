@@ -147,11 +147,28 @@ export const ERROR_CODES = [
     showInRule: false,
   },
   {
-    code: 'STORE_SCHEMA_UNSUPPORTED',
-    meaning: "The store was written by a newer server than this one.",
-    remedy: "upgrade this checkout, rather than editing the store down",
+    // ARC-09-S06 split `STORE_SCHEMA_UNSUPPORTED` in two. One code for both directions gave one
+    // remedy — "run ./snowarch upgrade" — which is right for a store from the future and useless
+    // for one from the past: the checkout is already new enough, and the file that needs
+    // migrating is untouched by an upgrade. Two directions, two commands.
+    code: 'STORE_SCHEMA_OUTDATED',
+    meaning: "The store was written by an older server and this build does not read that schema. "
+      + "Nothing migrates on load — an explicit command is what rewrites a credential file.",
+    remedy: "migrate it; a 0600 backup is written first and credential values are never touched",
+    command: "./snowarch store migrate",
+    // A session must STOP here: the model's job is to tell the user to run the command, never to
+    // edit the store itself. That is the whole reason this one is in the always-loaded rule file
+    // and `STORE_SCHEMA_INVALID` is not.
+    showInRule: true,
+  },
+  {
+    code: 'STORE_SCHEMA_NEWER',
+    meaning: "The store was written by a NEWER server than this one — a checkout left behind, "
+      + "not a broken file.",
+    remedy: "upgrade this checkout, rather than editing the store down; a backup can be restored "
+      + "if the newer server wrote one",
     command: "./snowarch upgrade",
-    showInRule: false,
+    showInRule: true,
   },
   {
     code: 'STORE_PERMISSIONS_TOO_OPEN',

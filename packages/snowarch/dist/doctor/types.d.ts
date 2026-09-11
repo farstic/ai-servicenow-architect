@@ -12,7 +12,7 @@
  * Shipping the final ids now makes that step a no-op, and they live in ONE exported constant so
  * a future re-home is a single line.
  */
-export declare const CHECK_IDS: readonly ["SV-00", "SV-01", "SV-02", "SV-03", "SV-04", "SV-05", "SV-06", "SV-07", "SV-08"];
+export declare const CHECK_IDS: readonly ["SV-00", "SV-01", "SV-02", "SV-03", "SV-04", "SV-05", "SV-06", "SV-07", "SV-08", "SV-09"];
 export type CheckId = typeof CHECK_IDS[number];
 export type CheckStatus = 'ok' | 'warn' | 'fail' | 'skip';
 export interface CheckResult {

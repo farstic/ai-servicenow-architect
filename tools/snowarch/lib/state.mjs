@@ -178,9 +178,9 @@ export function resetState(root) {
  * Which steps would run again, and why.
  *
  * ARC-09-S05. The resume rule lives in the runner — skip a step whose recorded hash still matches —
- * and this is the same question asked from outside, for a user who wants to know what `--resume`
- * is about to do, and for `upgrade` (ARC-09-S07), which needs to say what a new version invalidates
- * before it changes anything.
+ * and this is the same question asked from outside, for a user who wants to know what running
+ * `bootstrap` again is about to do, and for `upgrade` (ARC-09-S07), which needs to say what a new
+ * version invalidates before it changes anything.
  *
  * Four reasons, and the fourth is the one that surprises people:
  *

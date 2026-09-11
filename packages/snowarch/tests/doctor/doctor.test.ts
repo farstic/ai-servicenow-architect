@@ -117,6 +117,48 @@ describe('criterion 1 - a valid store', () => {
   }, 120_000);
 });
 
+describe('SV-09 — the store schema (ARC-09-S06)', () => {
+  it('a current store is ok, and says which version that is', async () => {
+    writeStore();
+    const r = await doctor(['--no-network', '--json']);
+    expect(check(r, 'SV-09').status).toBe('ok');
+    expect(check(r, 'SV-09').detail).toMatch(/store schema v\d+ \(current\)/);
+  }, 120_000);
+
+  it('a store from the PAST fails with the migrate command, and is NOT auto-fixable', async () => {
+    const p = writeStore();
+    const raw = JSON.parse(readFileSync(p, 'utf8')) as { version: number };
+    writeFileSync(p, JSON.stringify({ ...raw, version: 0 }, null, 2), { mode: 0o600 });
+
+    const r = await doctor(['--no-network', '--json']);
+    const sv09 = check(r, 'SV-09') as { status: string; detail: string; command?: string;
+      fixable?: boolean };
+    expect(sv09.status).toBe('fail');
+    expect(sv09.detail).toMatch(/store schema v0 < server v\d+/);
+    // The command is what `--fix` reports under REFUSED, and `fixable: false` is what keeps the
+    // whitelist away from the credential file. Both, because either alone would let the other move.
+    expect(sv09.command).toBe('./snowarch store migrate');
+    expect(sv09.fixable).toBe(false);
+  }, 120_000);
+
+  it('a store from the FUTURE fails pointing at upgrade, not migrate', async () => {
+    const p = writeStore();
+    const raw = JSON.parse(readFileSync(p, 'utf8')) as { version: number };
+    writeFileSync(p, JSON.stringify({ ...raw, version: raw.version + 3 }, null, 2), { mode: 0o600 });
+
+    const r = await doctor(['--no-network', '--json']);
+    const sv09 = check(r, 'SV-09') as { status: string; detail: string; command?: string };
+    expect(sv09.status).toBe('fail');
+    expect(sv09.detail).toMatch(/> server v\d+/);
+    expect(sv09.command).toBe('./snowarch upgrade');
+  }, 120_000);
+
+  it('no store means nothing to check — a skip, not a failure', async () => {
+    const r = await doctor(['--no-network', '--json']);
+    expect(check(r, 'SV-09').status).toBe('skip');
+  }, 120_000);
+});
+
 describe('criterion 2 - no store at all', () => {
   it('unconfigured mode, SV-02 warn with the setup remedy, SV-05 five tools, exit 0', async () => {
     const r = await doctor(['--no-network', '--json']);

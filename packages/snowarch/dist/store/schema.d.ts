@@ -254,14 +254,20 @@ export declare const storeSchema: z.ZodObject<{
 export type StoreInstance = z.infer<typeof instanceSchema>;
 export type Store = z.infer<typeof storeSchema>;
 export interface StoreError {
-    code: 'STORE_NOT_FOUND' | 'STORE_UNREADABLE' | 'STORE_SCHEMA_INVALID' | 'STORE_SCHEMA_UNSUPPORTED' | 'STORE_PERMISSIONS_TOO_OPEN';
+    code: 'STORE_NOT_FOUND' | 'STORE_UNREADABLE' | 'STORE_SCHEMA_INVALID' | 'STORE_SCHEMA_OUTDATED' | 'STORE_SCHEMA_NEWER' | 'STORE_PERMISSIONS_TOO_OPEN';
     message: string;
 }
 /** `instances.pdi.flags.WRITE_ENABLED` — the path a user can find in their own file. */
 export declare function issuePath(issue: z.ZodIssue): string;
 /**
- * Version first, and separately from the schema: a store written by a newer server is a
- * different failure from a malformed one, and the remedy is an upgrade, not an edit.
+ * Version first, and separately from the schema: a store written by a different server is a
+ * different failure from a malformed one, and the remedy is a command, not an edit.
+ *
+ * TWO codes, not one (ARC-09-S06). `STORE_SCHEMA_UNSUPPORTED` said "run ./snowarch upgrade" in
+ * both directions, which is right for a store from the future and wrong — actively misleading —
+ * for one from the past: upgrading the checkout that already reads the newer schema does nothing
+ * at all, and the file the user needed to migrate sits there through it. The two directions have
+ * two remedies and now say so.
  */
 export declare function parseStore(raw: unknown): {
     store: Store;

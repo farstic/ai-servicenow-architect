@@ -123,11 +123,17 @@ export declare const ERROR_CODES: readonly [{
     readonly remedy: "the message names the field path; correct it in the store";
     readonly showInRule: false;
 }, {
-    readonly code: "STORE_SCHEMA_UNSUPPORTED";
-    readonly meaning: "The store was written by a newer server than this one.";
-    readonly remedy: "upgrade this checkout, rather than editing the store down";
+    readonly code: "STORE_SCHEMA_OUTDATED";
+    readonly meaning: string;
+    readonly remedy: "migrate it; a 0600 backup is written first and credential values are never touched";
+    readonly command: "./snowarch store migrate";
+    readonly showInRule: true;
+}, {
+    readonly code: "STORE_SCHEMA_NEWER";
+    readonly meaning: string;
+    readonly remedy: string;
     readonly command: "./snowarch upgrade";
-    readonly showInRule: false;
+    readonly showInRule: true;
 }, {
     readonly code: "STORE_PERMISSIONS_TOO_OPEN";
     readonly meaning: "The store holds a password and is group/world-readable, or sits in a group/world-writable directory (D-04).";

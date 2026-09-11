@@ -1322,6 +1322,57 @@ generated file that does not match its source.
 
 ---
 
+## Adding a store migration
+
+`.local/instances.json` carries a `version`, and `packages/snowarch/src/store/migrations/index.ts`
+is the only thing allowed to change it. The registry ships **empty** at v1 on purpose: the
+framework exists before the first migration so that whoever changes the schema is forced through
+it rather than around it.
+
+To change the store's shape:
+
+1. **Write the migration** — `{ from, to, describe, up }`, appended to `MIGRATIONS`, and bump
+   `STORE_VERSION` in `src/store/schema.ts` in the same commit. `CURRENT_SCHEMA_VERSION` is that
+   same constant re-exported; there is only ever one number.
+2. `describe` is shown to a user **before** the migration runs, so it says what changes in words
+   they can check: "add lastUpgradeCheck to every instance", not "v2".
+3. **`up` is pure.** Its input is deep-frozen — a migration that mutates in place throws rather
+   than passing — and it returns a new object.
+4. `npm run build` and commit `dist/`, then `node packages/contract/pin.mjs --yes`: the contract
+   carries `storeSchemaVersion`, so a schema bump moves the contract sha. That is the mechanism by
+   which S05's input table makes exactly B06 stale on the next `bootstrap`, and by which `upgrade`
+   can read a tag's contract and warn about a migration before checking anything out.
+
+Three rules the tests enforce, so none of them is a matter of remembering:
+
+- **Contiguity.** Single steps, in order, ending exactly at `CURRENT_SCHEMA_VERSION`. A bumped
+  constant with no migration fails the suite; so does a gap, and so does a 1→3 leap. With a gap, a
+  v1 store meets the 3→4 migration carrying v1 data.
+- **Credential values are never touched.** Every instance's whole `auth` subtree — method,
+  username, password, client id and secret — is compared before and after, on every migration, and
+  a difference is a refusal *after* the migration ran and *before* anything is written. Add or
+  rename non-`auth` fields and set defaults; nothing else.
+- **A parse error is a hard error.** `STORE_UNREADABLE`, with the path and the remedy, and the file
+  is left exactly as it was. The server this replaced returned an empty config on a parse failure,
+  which is how a store with one typo becomes a store with no instances.
+
+**Nothing migrates on load.** The server reads the version and, if it is not this build's, starts
+unconfigured with `STORE_SCHEMA_OUTDATED` (or `STORE_SCHEMA_NEWER`) and names the command; every
+instance tool answers with that code. Migrating is something a person asks for — `./snowarch store
+migrate`, which prints the plan first and takes `--dry-run` and `--yes`.
+
+**Backups are never pruned.** Every migration copies the store to `instances.json.bak-<timestamp>`
+(0600, byte-identical to the input) before it writes. `./snowarch store backups` lists them and
+`./snowarch store restore <file>` puts one back; deleting old ones is a `rm` the user runs. An
+automatic prune would be this code deleting the rescue copy of a credential file it had just
+rewritten.
+
+The doctor's **SV-09** reports the schema and is deliberately **not** in `--fix`'s whitelist: the
+whitelist never touches the credential file, so an outdated store appears under REFUSED with the
+command to run.
+
+---
+
 ## `.editorconfig` is enforced
 
 `tests/editorconfig.test.mjs` checks every tracked `.md .mjs .ts .json .yml .yaml` file for exactly

@@ -11,6 +11,7 @@ import { createLogger } from './log.mjs';
 import { USAGE as BOOTSTRAP_USAGE } from './bootstrap.mjs';
 import { USAGE as MODE_USAGE } from './mode.mjs';
 import { USAGE as INSTANCE_USAGE } from './instance.mjs';
+import { USAGE as STORE_USAGE } from './store.mjs';
 import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
@@ -102,6 +103,11 @@ async function instanceCommand(args) {
   return run(args);
 }
 
+async function storeCommand(args) {
+  const { storeCommand: run } = await import('./store.mjs');
+  return run(args);
+}
+
 export const COMMANDS = {
   version: { summary: 'print the version, the release tag, the commit, the contract sha and the floors',
     run: versionCommand, usage: 'usage: ./snowarch version [--json]' },
@@ -124,6 +130,10 @@ export const COMMANDS = {
   // frame's, and the forwarder itself answers that one.
   instance: { summary: 'add and manage the ServiceNow instances this checkout can reach',
     run: instanceCommand, usage: INSTANCE_USAGE, defersLog: false, raw: true },
+  // `raw` for the same reason `instance` is: `store restore <file> --yes` is the server CLI's
+  // sentence, and a frame that parsed it would answer `--yes needs a value`.
+  store: { summary: 'migrate, back up and restore the instance store',
+    run: storeCommand, usage: STORE_USAGE, defersLog: false, raw: true },
   upgrade: PLACEHOLDER('upgrade', 'ARC-09'),
 };
 

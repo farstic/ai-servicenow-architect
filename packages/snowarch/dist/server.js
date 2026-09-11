@@ -11,7 +11,7 @@ import { existsSync } from 'node:fs';
 import dotenv from 'dotenv';
 import { instanceManager } from './servicenow/instances.js';
 import { runWithInstance } from './servicenow/context.js';
-import { CORE_TOOLS_UNCONFIGURED, NO_INSTANCE_MESSAGE, setAdvertisedCount, setFullCatalogueSize, setToolListChangedNotifier, } from './tools/status.js';
+import { CORE_TOOLS_UNCONFIGURED, setAdvertisedCount, setFullCatalogueSize, unconfiguredRefusal, setToolListChangedNotifier, } from './tools/status.js';
 import { isUnderCloudSyncFolder, maskPath } from './store/index.js';
 import { collectToolCatalog } from './tools/index.js';
 import { getResources, readResource } from './resources/index.js';
@@ -137,7 +137,10 @@ export function createServer() {
             // when it does and is merely unusable right now, sends them looking in the wrong place.
             if (instanceManager.loadedCount() === 0
                 && !CORE_TOOLS_UNCONFIGURED.includes(name)) {
-                throw new ServiceNowError(NO_INSTANCE_MESSAGE, 'NO_INSTANCE_CONFIGURED');
+                // The refusal carries the STORE's reason when the store had one (ARC-09-S06): a v1 file
+                // against a v2 build is not "no instance configured", it is one command away from working.
+                const refusal = unconfiguredRefusal(instanceManager.getReport().configErrors);
+                throw new ServiceNowError(refusal.message, refusal.code);
             }
             const { routeToolInvocation } = await import('./tools/index.js');
             // The instance-free core tools are dispatched WITHOUT resolving a client or entering a
@@ -210,7 +213,8 @@ export function createServer() {
         const { uri } = request.params;
         try {
             if (instanceManager.loadedCount() === 0) {
-                throw new ServiceNowError(NO_INSTANCE_MESSAGE, 'NO_INSTANCE_CONFIGURED');
+                const refusal = unconfiguredRefusal(instanceManager.getReport().configErrors);
+                throw new ServiceNowError(refusal.message, refusal.code);
             }
             const client = instanceManager.getClient();
             // Resource reads need an instance for the same reason tool calls do.

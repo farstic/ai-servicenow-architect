@@ -18,12 +18,12 @@ import { REAL_ROOT } from './helpers/tree.mjs';
 const checks = engineChecks();
 const ids = checks.map((c) => c.id);
 
-test('E-00 … E-27 and SV-00 … SV-08, once each, in section order', () => {
-  assert.equal(checks.length, 37);
+test('E-00 … E-27 and SV-00 … SV-09, once each, in section order', () => {
+  assert.equal(checks.length, 38);
   assert.deepEqual(ids.filter((id) => id.startsWith('E-')),
     Array.from({ length: 28 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
   assert.deepEqual(ids.filter((id) => id.startsWith('SV-')),
-    Array.from({ length: 9 }, (_, i) => `SV-${String(i).padStart(2, '0')}`));
+    Array.from({ length: 10 }, (_, i) => `SV-${String(i).padStart(2, '0')}`));
   assert.equal(new Set(ids).size, ids.length);
   const order = engineRegistry().all().map((c) => c.section);
   assert.deepEqual([...new Set(order)],
@@ -40,7 +40,8 @@ test('--quick is E-01, E-02, E-05…E-15, E-17…E-20, E-22 and the four quick d
     'E-12', 'E-13', 'E-14', 'E-15',
     'E-17', 'E-18', 'E-19', 'E-20', 'E-22',
     'E-23', 'E-24', 'E-25', 'E-26',
-    'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-07', 'SV-08',
+    // SV-09 (ARC-09-S06) reads one number out of one file: quick by the same rule SV-02 is.
+    'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-07', 'SV-08', 'SV-09',
   ]);
   // AC 8 of S03: `claude mcp get` is a process, so `--quick` never reaches it.
   assert.equal(selected.some((c) => c.id === 'E-27'), false);
@@ -147,7 +148,8 @@ test('--quick membership is the same set in the registry and in a real run', () 
     'E-12', 'E-13', 'E-14', 'E-15',
     'E-17', 'E-18', 'E-19', 'E-20', 'E-22',
     'E-23', 'E-24', 'E-25', 'E-26',
-    'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-07', 'SV-08',
+    // SV-09 (ARC-09-S06) reads one number out of one file: quick by the same rule SV-02 is.
+    'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-07', 'SV-08', 'SV-09',
   ]);
   // And the ones the story leaves out, for the reasons it gives: they spawn, walk the corpus or
   // use the network.

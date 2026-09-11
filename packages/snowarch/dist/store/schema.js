@@ -73,15 +73,26 @@ export function issuePath(issue) {
     return issue.path.join('.');
 }
 /**
- * Version first, and separately from the schema: a store written by a newer server is a
- * different failure from a malformed one, and the remedy is an upgrade, not an edit.
+ * Version first, and separately from the schema: a store written by a different server is a
+ * different failure from a malformed one, and the remedy is a command, not an edit.
+ *
+ * TWO codes, not one (ARC-09-S06). `STORE_SCHEMA_UNSUPPORTED` said "run ./snowarch upgrade" in
+ * both directions, which is right for a store from the future and wrong — actively misleading —
+ * for one from the past: upgrading the checkout that already reads the newer schema does nothing
+ * at all, and the file the user needed to migrate sits there through it. The two directions have
+ * two remedies and now say so.
  */
 export function parseStore(raw) {
     if (raw && typeof raw === 'object' && 'version' in raw) {
         const v = raw.version;
         if (typeof v === 'number' && v !== STORE_VERSION) {
-            return { error: { code: 'STORE_SCHEMA_UNSUPPORTED',
-                    message: `store version ${v} is ${v > STORE_VERSION ? 'newer than' : 'older than'} this server (supports ${STORE_VERSION}) — run ./snowarch upgrade` } };
+            return v > STORE_VERSION
+                ? { error: { code: 'STORE_SCHEMA_NEWER',
+                        message: `store schema ${v} is newer than this server supports (${STORE_VERSION}) — `
+                            + 'run ./snowarch upgrade, or restore a backup (./snowarch store backups)' } }
+                : { error: { code: 'STORE_SCHEMA_OUTDATED',
+                        message: `store schema ${v} is older than this server (${STORE_VERSION}) — `
+                            + 'run ./snowarch store migrate' } };
         }
     }
     const parsed = storeSchema.safeParse(raw);

@@ -241,7 +241,7 @@ on its own, so ARC-08's `--fix` can invoke one without the runner.
 | B03 | mode | no | always | the accepted mode |
 | B04 | deps | yes | mode = live | `package-lock.json`, Node **major** |
 | B05 | contract | yes | Node present | `dist/contract.json`, `required-tools.json` |
-| B06 | instance | yes | mode = live | store schema version, store presence, whether `--instance-file` was given |
+| B06 | instance | yes | mode = live **or** a store exists | store schema version, store presence, whether `--instance-file` was given |
 | B07 | toggles | no | always | mode, Node present, the hook branch, registration kind |
 | B08 | verify | yes | mode = live | contract sha, store mtime |
 | B09 | summary | no | always (never cached) | — |
@@ -391,7 +391,23 @@ contract. ARC-05's CI proves this on every commit; B05 proves it on the machine 
 
 #### The B06 slot
 
-Two ways in, and they are different jobs.
+**Three** ways in since ARC-09-S06, and the new one comes first.
+
+**A store whose schema is behind is MIGRATED, never re-wizarded.** That is the whole reason the
+step's `runsWhen` grew a second clause — `mode === 'live' || storeExists(root)` — because a
+design-only checkout that carries a `.local/instances.json` must keep it loadable across an
+upgrade, and this is the step that reaches it. Before anything else runs, B06 compares the store's
+`version` against `dist/contract.json`'s `storeSchemaVersion` and, when the store is behind, spawns
+`store migrate --yes` through the built CLI: the bootstrap's own plan screen already asked, and the
+migration still writes its 0600 backup and still refuses to touch a credential value — those are
+not the confirmation's job. A store from the FUTURE is a warning pointing at `./snowarch upgrade`,
+never a downgrade: reversing a migration means discarding whatever the newer build added.
+
+Re-running the wizard is the answer this replaces, and it is worth saying why it is wrong: "the
+store changed shape" and "the user needs to re-enter their credentials" are unrelated statements,
+and a design that conflates them asks for a password every time a release moves a field.
+
+The other two ways in are the wizard's, and they are different jobs.
 
 ```js
 // Interactive — SPAWN, never import: the wizard reads raw-mode keystrokes and masks a password,
@@ -585,6 +601,14 @@ the step goes on to return, because the record of why a run stopped is what the 
 `.local/instances.json` (the credential store) and `.local/config.json` are never touched, and the
 command says so.
 
+**There is no `--resume` flag, and that is deliberate.** Resuming is what a second run *is*: the
+rule above applies on every run, so `./snowarch bootstrap` picks up where the last one stopped
+without being asked to. `--from BNN` is the explicit control, for the case the rule cannot infer —
+re-run a step whose inputs did not change. A flag meaning "do what you would have done anyway" is a
+flag a reader assumes has an effect, and `--resume` already means something else one command over:
+`/snowarch setup-instance --resume` (ARC-07-S09) picks the wizard back up after the credential was
+typed in another terminal. One word, two commands, two meanings would be worse than no word.
+
 #### Bootstrap input hashes and upgrade invalidation
 
 The whole rule turns on one word — **inputs** — and until ARC-09-S05 each step answered it in its
@@ -612,7 +636,7 @@ anything), and the table below, which is generated from it.
 |  | `store present` | literal | absent and empty are different states |
 |  | `instance file given` | literal | an `--instance-file` run writes an entry |
 |  | `mode` | literal | design-only never touches the store |
-|  | `store schema version` | literal | the version this build migrates TO (ARC-09-S06 replaces the literal) |
+|  | `packages/snowarch/dist/contract.json#storeSchemaVersion` | json-path | the schema this build reads — a release that changes it makes exactly this step stale |
 | `B07` the local toggles | `mode` | literal | which server list the toggle goes in |
 |  | `node present` | literal | no Node means the hook is disabled |
 |  | `hooks disabled` | literal | S-05: the launcher may have turned them off |
@@ -965,6 +989,7 @@ diverge (P-16).
 | `SV-06` | `snow_core_capabilities_read` over that handshake equals the store entry (flags, effectiveFlags, preset, environment, maxRecords) |
 | `SV-07` | The audit file's location is writable; warns when `SNOW_AUDIT_FILE=off` |
 | `SV-08` | Ancestor `.claude/skills` directories above the checkout (warning) — Claude Code loads project skills from every one of them, so the roster silently doubles and the listing budget is spent twice (`03` §F, S-13 addendum) |
+| `SV-09` | The store's SCHEMA version against this build's (ARC-09-S06). Separate from `SV-02`, which asks whether the file is safe and loadable: these two have remedies pointing in opposite directions — migrate the file (`STORE_SCHEMA_OUTDATED`) or upgrade the checkout (`STORE_SCHEMA_NEWER`) — and one line covering both would have to hedge. Never fixable: `--fix` does not touch the credential file, so it appears under REFUSED with the command |
 
 Ids are `SV-xx` from the first commit. `01` §8 called them `S-xx`, which collides with the spike ids
 in `03`; shipping the settled prefix now makes ARC-08-S01's planned rename a no-op, and they live in
@@ -1100,6 +1125,7 @@ about one registry rather than several:
 | `SV-06` | server | capabilities match the store | — | — |
 | `SV-07` | server | audit trail | yes | — |
 | `SV-08` | server | ancestor skill directories | yes | — |
+| `SV-09` | server | store schema | yes | — |
 <!-- /generated:doctor-checks -->
 
 **`--fix` repairs a closed list of seven drifts** (ARC-08-S06), and the list being closed is the
@@ -1399,5 +1425,5 @@ of `engine.config.json` |
 | D36 | `CLAUDE.md` gates on `mcp__<key>__` | E-20 | re-targeted to the generated rule file, the protocol page and both registrations |
 | D37 | tool-name currency against the rename map | E-19 | `retired-names.json` |
 
-**New checks with no old counterpart** (11): `E-06`, `E-11`, `E-15`, `E-18`, `E-21`, `E-22`, `E-25`, `E-26`, `SV-06`, `SV-07`, `SV-08`.
+**New checks with no old counterpart** (12): `E-06`, `E-11`, `E-15`, `E-18`, `E-21`, `E-22`, `E-25`, `E-26`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
 <!-- /generated:doctor-mapping -->

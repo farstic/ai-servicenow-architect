@@ -41,6 +41,41 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **A store schema migration framework: explicit, versioned, backed up, and never near a
+  credential.** `.local/instances.json` carries a `version`, and from 2.0.0 the only thing that
+  changes it is `./snowarch store migrate` — a command a person runs, after reading a plan that
+  says which versions, which migrations, where the backup goes and that credentials are untouched.
+  `--dry-run` prints the plan and writes nothing; `--yes` is for scripts; `n` leaves the tree
+  exactly as it was. `store backups` lists the backups and `store restore <file>` puts one back.
+
+  The server no longer migrates anything on load. It reads the version and, if it is not this
+  build's, starts unconfigured and says which command to run — `STORE_SCHEMA_OUTDATED` for a store
+  from the past, `STORE_SCHEMA_NEWER` for one from the future, and every instance tool answers with
+  that code rather than "no instance is configured". Those two replace the single
+  `STORE_SCHEMA_UNSUPPORTED`, which gave one remedy for both directions: telling somebody with an
+  older store to upgrade their checkout sends them to a command that changes nothing while the file
+  that needs migrating sits there. A parse error is now a hard `STORE_UNREADABLE` naming the path —
+  the server this replaced returned an empty config, which is how a store with one typo becomes a
+  store with no instances.
+
+  **Credential values are never touched, and that is a test rather than a promise.** Every
+  instance's whole `auth` subtree is compared before and after, on every migration, over a
+  deep-frozen input; a migration that changes one is refused after it runs and before anything is
+  written, and the refusal names no value. A 0600 backup — byte-identical to the input, not a
+  re-serialisation of it — is written before every migration, and backups are never pruned
+  automatically.
+
+  The registry ships EMPTY at v1 on purpose: the framework exists before the first migration so
+  that whoever changes the schema is forced through it. A bumped version with no migration, a gap
+  in the chain, or a 1→3 leap each fail the suite. `dist/contract.json` now carries
+  `storeSchemaVersion`, which is what lets the bootstrap make exactly the instance step stale after
+  a release that changes the schema — and lets that step run the MIGRATION rather than the wizard.
+  Re-running the wizard was the old answer to "the store moved", and it is wrong for a plain
+  reason: "the store changed shape" and "the user must re-type their password" are unrelated
+  statements. The doctor's new `SV-09` reports the schema and is deliberately not auto-fixable —
+  `--fix` never touches the credential file, so an outdated store appears under REFUSED with the
+  command.
+
 - **One table says what each bootstrap step depends on, so the resume rule has one definition.**
   The rule is simple — a step whose inputs have not changed since it last succeeded is skipped —
   and everything hard about it is the word *inputs*, which until now each of the ten steps answered

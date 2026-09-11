@@ -78,6 +78,16 @@ export function storeStamp(root) {
   return `${Math.floor(s.mtimeMs / 1000)}:${s.size}`;
 }
 
+/** The schema version THIS BUILD reads, from the contract `dist/` ships. */
+export function storeSchemaVersion(root) {
+  const p = join(root, 'packages', 'snowarch', 'dist', 'contract.json');
+  if (!existsSync(p)) return 'not-built';
+  try {
+    const v = JSON.parse(readFileSync(p, 'utf8'))?.storeSchemaVersion;
+    return Number.isInteger(v) ? String(v) : 'unknown';
+  } catch { return 'unreadable'; }
+}
+
 /** The store's declared schema version, which is a shape question, not a credential one. */
 export function storeVersion(root) {
   const p = join(root, STORE);
@@ -101,7 +111,7 @@ export const INPUTS = Object.freeze({
     title: 'preflight',
     inputs: [],
     why: 'Asks the MACHINE — git, Node, Claude Code, disk — and a machine is not a committed input. '
-      + 'It runs every time, which is why `--resume` on an unchanged checkout still runs it.',
+      + 'It runs every time, which is why a second run on an unchanged checkout still runs it.',
     resolve: () => [],
   },
 
@@ -169,7 +179,7 @@ export const INPUTS = Object.freeze({
       { kind: 'literal', ref: 'store present', why: 'absent and empty are different states' },
       { kind: 'literal', ref: 'instance file given', why: 'an `--instance-file` run writes an entry' },
       { kind: 'literal', ref: 'mode', why: 'design-only never touches the store' },
-      { kind: 'literal', ref: 'store schema version', why: 'the version this build migrates TO (ARC-09-S06 replaces the literal)' },
+      { kind: 'json-path', ref: 'packages/snowarch/dist/contract.json#storeSchemaVersion', why: 'the schema this build reads — a release that changes it makes exactly this step stale' },
     ],
     why: 'MIGRATE, DON\'T RE-WIZARD: a store whose schema is behind makes this step stale so the '
       + 'migration runs — and a store whose CONTENTS changed does not, because re-running the '
@@ -179,9 +189,11 @@ export const INPUTS = Object.freeze({
       TEXT(`storePresent=${existsSync(join(ctx.root, STORE)) ? 'yes' : 'no'}`),
       TEXT(`instanceFile=${ctx.instanceFile ? 'yes' : 'no'}`),
       TEXT(`mode=${ctx.mode}`),
-      // ARC-09-S06 replaces this literal with `contract.storeSchemaVersion`; until it lands, the
-      // version this build migrates to is 1, and hashing the literal keeps the row honest.
-      TEXT('storeSchemaVersion=1'),
+      // ARC-09-S06: the real number, from the contract. A release that changes the store's shape
+      // moves this one value, which makes exactly B06 stale — and B06's answer to being stale is
+      // the MIGRATION, not the wizard. `not-built` is a state (design-only before B04), not a
+      // failure, and it hashes as itself so a built checkout and an unbuilt one differ.
+      TEXT(`storeSchemaVersion=${storeSchemaVersion(ctx.root)}`),
     ],
   },
 
@@ -225,7 +237,7 @@ export const INPUTS = Object.freeze({
     title: 'the summary',
     inputs: [],
     why: 'Prints what the run did. It has no inputs to be stale against and runs every time, '
-      + 'which is the other half of "`--resume` runs only B00 and B09".',
+      + 'which is the other half of "a second run does only B00 and B09".',
     resolve: () => [],
   },
 });

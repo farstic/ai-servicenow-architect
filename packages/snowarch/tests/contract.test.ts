@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectToolCatalog, routeToolInvocation } from '../src/tools/index.js';
+import { CURRENT_SCHEMA_VERSION } from '../src/store/migrations/index.js';
+import { STORE_VERSION } from '../src/store/schema.js';
 import { runWithInstance, FLAG_NAMES, type Flags, type InstanceRuntime } from '../src/servicenow/context.js';
 import { expandPreset, PRESETS, type PresetName } from '../src/utils/permissions.js';
 import { ERROR_CODES } from '../src/errors/codes.js';
@@ -364,6 +366,16 @@ describe('(g) the contract mirrors permissions.ts, never a retyped copy', () => 
     // The package version of record — ARC-09 sets the release number.
     expect(CONTRACT.version).toBe('2.0.0-dev');
   });
+
+  it('the store schema version is the constant, not a number typed into the contract', () => {
+    // ARC-09-S06. Two readers depend on this field being the code's own answer: S05's input table
+    // hashes it, so a release that changes the schema makes exactly B06 stale; and `upgrade`
+    // (S07) reads it out of a TAG to warn about a migration before checking anything out. A
+    // literal here would let the contract promise a schema the server does not read.
+    expect(CONTRACT.storeSchemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(CONTRACT.storeSchemaVersion).toBe(STORE_VERSION);
+    expect(Number.isInteger(CONTRACT.storeSchemaVersion)).toBe(true);
+  });
 });
 
 describe('5 and 6 — the flag set is closed, and no preset contradicts the dependency rule', () => {
@@ -482,13 +494,18 @@ describe('11 — every code the server can throw has a meaning and a remedy', ()
     //   the six flag gates      a session can raise a preset for the user (one wildcard line)
     //   the six state codes     something about the instance or the call must change first
     //   the seven network codes  the machine cannot reach the instance; retrying is the wrong move
+    //   the two schema codes    ARC-09-S06: the store's shape is not this build's, and the ONLY
+    //                           correct move is to tell the user which command to run. A session
+    //                           that "helpfully" edited a credential file to make a version number
+    //                           match is the failure these two exist to prevent.
     const expected = [
       'ATF_NOT_ENABLED', 'AUTHENTICATION_FAILED', 'CMDB_WRITE_NOT_ENABLED', 'CONNECTION_REFUSED',
       'CONNECTION_TIMEOUT', 'DNS_FAILURE', 'FLUENT_NOT_ENABLED', 'FLUENT_NOT_INSTALLED',
       'INSTANCE_NOT_LOADED',
       'INSUFFICIENT_PRIVILEGES', 'NOW_ASSIST_NOT_ENABLED', 'NO_INSTANCE_CONFIGURED',
       'PROD_WRITE_NOT_ACKNOWLEDGED', 'PROXY_AUTH_REQUIRED', 'PROXY_UNREACHABLE',
-      'SCRIPTING_NOT_ENABLED', 'TLS_CA_UNTRUSTED', 'UNKNOWN_TOOL', 'WRITE_NOT_ENABLED',
+      'SCRIPTING_NOT_ENABLED', 'STORE_SCHEMA_NEWER', 'STORE_SCHEMA_OUTDATED',
+      'TLS_CA_UNTRUSTED', 'UNKNOWN_TOOL', 'WRITE_NOT_ENABLED',
     ];
     const actual = ERROR_CODES.filter((e) => e.showInRule).map((e) => e.code as string).sort();
     expect(actual).toEqual(expected);
