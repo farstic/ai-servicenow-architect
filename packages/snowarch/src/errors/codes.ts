@@ -186,7 +186,7 @@ export const ERROR_CODES = [
   },
   {
     code: 'NOT_FOUND',
-    meaning: "The record or table does not exist on this instance.",
+    meaning: "DRILL: the record or table does not exist on this instance.",
     remedy: "check the sys_id and the table name",
     showInRule: false,
     httpStatus: 404,
