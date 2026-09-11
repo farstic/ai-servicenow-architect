@@ -101,7 +101,7 @@ export const INPUTS = Object.freeze({
     title: 'preflight',
     inputs: [],
     why: 'Asks the MACHINE — git, Node, Claude Code, disk — and a machine is not a committed input. '
-      + 'It runs every time, which is why `--resume` on an unchanged checkout still runs it.',
+      + 'It runs every time, which is why a second run on an unchanged checkout still runs it.',
     resolve: () => [],
   },
 
@@ -225,7 +225,7 @@ export const INPUTS = Object.freeze({
     title: 'the summary',
     inputs: [],
     why: 'Prints what the run did. It has no inputs to be stale against and runs every time, '
-      + 'which is the other half of "`--resume` runs only B00 and B09".',
+      + 'which is the other half of "a second run does only B00 and B09".',
     resolve: () => [],
   },
 });

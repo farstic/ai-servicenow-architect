@@ -585,6 +585,14 @@ the step goes on to return, because the record of why a run stopped is what the 
 `.local/instances.json` (the credential store) and `.local/config.json` are never touched, and the
 command says so.
 
+**There is no `--resume` flag, and that is deliberate.** Resuming is what a second run *is*: the
+rule above applies on every run, so `./snowarch bootstrap` picks up where the last one stopped
+without being asked to. `--from BNN` is the explicit control, for the case the rule cannot infer —
+re-run a step whose inputs did not change. A flag meaning "do what you would have done anyway" is a
+flag a reader assumes has an effect, and `--resume` already means something else one command over:
+`/snowarch setup-instance --resume` (ARC-07-S09) picks the wizard back up after the credential was
+typed in another terminal. One word, two commands, two meanings would be worse than no word.
+
 #### Bootstrap input hashes and upgrade invalidation
 
 The whole rule turns on one word — **inputs** — and until ARC-09-S05 each step answered it in its
