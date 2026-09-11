@@ -12,6 +12,7 @@ import { USAGE as BOOTSTRAP_USAGE } from './bootstrap.mjs';
 import { USAGE as MODE_USAGE } from './mode.mjs';
 import { USAGE as INSTANCE_USAGE } from './instance.mjs';
 import { USAGE as STORE_USAGE } from './store.mjs';
+import { USAGE as UPGRADE_USAGE } from './commands/upgrade.mjs';
 import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
@@ -108,6 +109,11 @@ async function storeCommand(args) {
   return run(args);
 }
 
+async function upgradeCommand(args) {
+  const { upgradeCommand: run } = await import('./commands/upgrade.mjs');
+  return run(args);
+}
+
 export const COMMANDS = {
   version: { summary: 'print the version, the release tag, the commit, the contract sha and the floors',
     run: versionCommand, usage: 'usage: ./snowarch version [--json]' },
@@ -134,7 +140,11 @@ export const COMMANDS = {
   // sentence, and a frame that parsed it would answer `--yes needs a value`.
   store: { summary: 'migrate, back up and restore the instance store',
     run: storeCommand, usage: STORE_USAGE, defersLog: false, raw: true },
-  upgrade: PLACEHOLDER('upgrade', 'ARC-09'),
+  // NOT raw: every flag here is this frame's, and the command spawns `bootstrap` and `doctor`
+  // with arguments it composes itself rather than passing a user's through.
+  upgrade: { summary: 'move this checkout to a release, re-run only what changed, and check it',
+    run: upgradeCommand, usage: UPGRADE_USAGE,
+    booleans: ['check', 'yes', 'pre', 'force-floor'] },
 };
 
 export function helpText() {

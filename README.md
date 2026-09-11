@@ -243,6 +243,22 @@ macOS machine — ARC-00 S-07 did not measure full mode). Every release re-measu
 platforms and attaches the same table as `install-metrics.md` —
 [releases](https://github.com/farstic/ai-servicenow-architect/releases), the first one pending.
 
+### Upgrading
+
+```sh
+./snowarch upgrade --check      # is a newer release out? (exit 4 = yes; nothing changed)
+./snowarch upgrade              # plan first, then move: only the steps whose inputs changed re-run
+```
+
+Nothing is touched before the plan is printed and accepted: it names the release, the steps that
+will re-run, whether the store's schema moves (a migration, with a 0600 backup, announced first),
+and `credentials: untouched` — `.local/instances.json` is never read or written by an upgrade.
+Restart `claude` afterwards; the server binary changed. `--to vX.Y.Z` takes a specific release and
+prints the way back; a branch that has diverged from `origin` is reported, not guessed at; a failed
+fetch prints git's error and a [proxy](TROUBLESHOOTING.md#proxy) or [TLS](TROUBLESHOOTING.md#tls-ca)
+remedy. The banner mentions a newer release only from a check you already ran — it never fetches.
+Full detail: [CONTRIBUTING.md](CONTRIBUTING.md#upgrading-the-product).
+
 ### Uninstall
 
 Delete the checkout: it holds the only copy of anything you configured, in `.local/` — credentials

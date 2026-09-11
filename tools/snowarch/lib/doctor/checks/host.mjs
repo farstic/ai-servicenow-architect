@@ -234,5 +234,82 @@ export function hostChecks() {
           + 'configuration file', data);
       },
     }),
+
+    /**
+     * E-28 — is this checkout on the newest release?
+     *
+     * The one check in the engine that goes to the NETWORK for a reason other than reaching a
+     * ServiceNow instance, and the only one that writes a file outside the report: it refreshes
+     * `.local/upgrade-check.json`, which is what the SessionStart banner reads. The banner cannot
+     * fetch — it has a 300 ms budget and may run on a machine with no Node — so something else has
+     * to, and a doctor run the user started is the honest place for it.
+     *
+     * Rate-limited to once a day. A doctor run is not rare, and `git ls-remote` against a remote
+     * that is slow or behind a proxy is not free; the cache says when it was last asked, and
+     * `needsRefresh` is the whole of the policy.
+     *
+     * `--quick` never selects it and `--no-network` skips it, both by the flags rather than by an
+     * `if` in the body: the runner's rules are the rules.
+     */
+    defineCheck({
+      id: 'E-28',
+      section: 'host',
+      title: 'release currency',
+      severity: 'warn',
+      quick: false,
+      network: true,
+      spawns: true,
+      fixable: false,
+      run: async (ctx) => {
+        const { needsRefresh, readUpgradeCheck, writeUpgradeCheck } =
+          await import('../../upgrade-check.mjs');
+        const cached = readUpgradeCheck(ctx.root);
+        const now = ctx.now ?? (() => new Date());
+
+        if (ctx.noNetwork) {
+          return skip(cached?.latestTag
+            ? `--no-network; the last check (${cached.checkedAt}) saw ${cached.latestTag}`
+            : '--no-network, and nothing has been checked yet');
+        }
+
+        if (!needsRefresh(cached, { now })) {
+          return cached.behind
+            ? warn(`${cached.latestTag} available — run ./snowarch upgrade`,
+              { command: './snowarch upgrade', data: { ...cached, refreshed: false } })
+            : ok(`up to date (${cached.localTag ?? cached.latestTag ?? 'no tag'}) · last checked `
+              + `${cached.checkedAt}`, { ...cached, refreshed: false });
+        }
+
+        // `ls-remote`, not `fetch`: the question is "what tags exist there", and a doctor has no
+        // business writing objects into a user's repository to answer it.
+        const remote = 'origin';
+        const listed = (ctx.exec ?? execFileSync)('git',
+          ['ls-remote', '--tags', '--refs', remote, 'v*'],
+          { cwd: ctx.root, encoding: 'utf8', stdio: 'pipe', timeout: 15_000 });
+        const { sortTags } = await import('../../commands/upgrade.mjs');
+        const names = String(listed ?? '').split('\n')
+          .map((l) => l.split('/').pop()?.trim()).filter(Boolean);
+        const latest = sortTags(names).filter((t) => t.pre === null)[0]?.tag ?? null;
+        if (!latest) return skip(`${remote} advertises no release tags`);
+
+        const localTag = describeExact(ctx.root, ctx.exec);
+        const behind = localTag !== latest;
+        const written = writeUpgradeCheck(ctx.root,
+          { latestTag: latest, localTag, behind, remote, now });
+
+        return behind
+          ? warn(`${latest} available — run ./snowarch upgrade`,
+            { command: './snowarch upgrade', data: { ...written, refreshed: true } })
+          : ok(`up to date (${latest})`, { ...written, refreshed: true });
+      },
+    }),
   ];
+}
+
+/** The tag this checkout is exactly on, or `null`. Never a guess from a nearby one. */
+function describeExact(root, exec = execFileSync) {
+  try {
+    return String(exec('git', ['describe', '--tags', '--exact-match'],
+      { cwd: root, encoding: 'utf8', stdio: 'pipe' })).trim() || null;
+  } catch { return null; }
 }

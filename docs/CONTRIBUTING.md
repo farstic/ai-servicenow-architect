@@ -1322,6 +1322,56 @@ generated file that does not match its source.
 
 ---
 
+## Upgrading the product
+
+`./snowarch upgrade` is seven numbered steps, and the first five happen before anything is written.
+
+```
+[U1/7] preflight            inside the checkout, and `git status` clean — else exit 2, nothing changed
+[U2/7] fetch tags           `git fetch --tags --prune origin`, 120 s; a failure prints git's error
+                            and, when the shape is recognised, ONE remedy line (#proxy / #tls-ca)
+[U3/7] resolve target       `--to` must be an annotated tag with a `contract:` trailer; otherwise the
+                            highest semver `v*` tag (prereleases need `--pre`)
+[U4/7] plan                 computed from the TAG, before the tree moves: which files changed
+                            between HEAD and the tag, restricted to S05's INPUTS table; the gitlink;
+                            `storeSchemaVersion` read out of `git show <tag>:…/contract.json`; the
+                            installed Claude Code against the tag's `claude-floor`
+[U5/7] move                 `--to` detaches; otherwise `git pull --ff-only` on a branch with an
+                            upstream. A diverged branch is reported, never resolved for you
+[U6/7] bootstrap --yes      a second run in the recorded mode: the resume rule re-runs exactly the
+                            stale steps, and B06 MIGRATES a store whose schema moved
+[U7/7] doctor               `doctor --json`, and the upgrade cache is written with `behind: false`
+```
+
+**Nothing before U5 writes anything**, which is what makes `Proceed? [Y/n]` a real question. `--yes`
+skips the question, never the plan: it is still printed, because a transcript that does not say
+what was about to happen is a transcript nobody can debug.
+
+**The credential store is not part of an upgrade.** `.local/instances.json` is opened by exactly one
+thing in the whole sequence: S06's migration, in B06, when the release changes the schema — with its
+0600 backup, announced in the plan before the user agrees. The plan says `credentials: untouched`
+because that is a property of the code, and `tests/upgrade/upgrade.e2e.test.mjs` compares the file's
+sha256 across an upgrade to keep it one.
+
+**A failure leaves the tree at the new tag**, with the state file recording which step stopped.
+Re-running `./snowarch upgrade` continues from there rather than reporting `up to date` — the tree
+being at the target and the upgrade having finished are two different claims.
+
+**The banner never fetches.** `.local/upgrade-check.json` is written by `upgrade`, by
+`upgrade --check`, and by the doctor's `E-28` (once a day, `git ls-remote`, excluded from `--quick`
+and skipped by `--no-network`). The SessionStart hook reads three keys — `behind`, `latestTag`,
+`checkedAt` — and prints one line, only while the check is less than seven days old. A nudge from a
+check nobody has made since is a line readers learn to skip, and then the one that matters is
+skipped too.
+
+**The harness** (`tests/upgrade/harness.mjs`) builds a bare origin at `v9.0.0` and two fixture
+releases: `v9.1.0` moves one declared input (the areas file), `v9.2.0` moves the store schema
+through S06's `migrations` seam and ships a rebuilt `dist/`. 9.x so a fixture tag can never be
+mistaken for a real release. Nothing in it reaches the network: the origin is a path, and the docs
+upstream is the docs suite's own local bare repository.
+
+---
+
 ## Adding a store migration
 
 `.local/instances.json` carries a `version`, and `packages/snowarch/src/store/migrations/index.ts`

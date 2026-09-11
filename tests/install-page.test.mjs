@@ -159,7 +159,14 @@ test('the page stays a page, and the tail stays a tail', () => {
   // attribution tests caught and were right to: every figure on this page names where it was
   // measured, and that is the property the page exists to have. A cap is worth moving for a fact;
   // it is not worth an unattributed number.
-  assert.ok(install <= 252, `${install} lines of install page (criterion: 252)`);
+  //
+  // 268 since ARC-09-S07: "how do I upgrade" is the second question an install page is asked, and
+  // an answer that lived only in CONTRIBUTING would be an answer for contributors. Sixteen lines,
+  // and they are the ones a user needs before typing the command — that nothing moves before the
+  // plan is accepted, that credentials are never read or written, that a schema change is a
+  // migration with a backup, that the banner never fetches. The DETAIL is in CONTRIBUTING, linked
+  // from here. Same rule as the last two moves: a cap is worth moving for a fact.
+  assert.ok(install <= 268, `${install} lines of install page (criterion: 268)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.

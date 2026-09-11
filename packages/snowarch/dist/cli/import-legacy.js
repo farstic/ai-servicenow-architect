@@ -31,7 +31,7 @@ import { cloudSyncGate, maskUsername, probeOptionsFor, targetStore, EXIT_FAILED,
 import { probeAll, toLastProbe } from '../servicenow/probes.js';
 import { ServiceNowClient } from '../servicenow/client.js';
 import { loadStore, saveStore } from '../store/index.js';
-import { completeFlags } from '../store/schema.js';
+import { STORE_VERSION, completeFlags } from '../store/schema.js';
 import { maskPath } from '../store/paths.js';
 import { applyDependencyRule, matchPreset, FLAG_NAMES } from '../utils/permissions.js';
 import { remedyFor } from '../errors/codes.js';
@@ -334,7 +334,7 @@ export async function runImport(options, io, deps = {}) {
     const existing = existsSync(target.path) ? loadStore(target.path) : null;
     const store = existing && 'store' in existing
         ? existing.store
-        : { version: 1, instances: {} };
+        : { version: STORE_VERSION, instances: {} };
     const only = options.only && options.only.length > 0 ? new Set(options.only) : null;
     const taken = new Set(Object.keys(store.instances));
     const entries = [];

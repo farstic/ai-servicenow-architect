@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { banner, MAX_AGE_MS, WATCHDOG_MS } from '../../tools/snowarch/hooks/session-start.mjs';
+import { banner, MAX_AGE_MS, UPGRADE_MAX_AGE_MS, WATCHDOG_MS } from '../../tools/snowarch/hooks/session-start.mjs';
 import { BANNER } from '../../tools/snowarch/lib/text.mjs';
 import { cachePath, inputsPath } from '../../tools/snowarch/lib/doctor-cache.mjs';
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
@@ -323,4 +323,38 @@ test('the nudge strings the hook prints are the ones text.json exports', () => {
   assert.equal(text.banner.upgrade, BANNER.upgrade('v2.1.0'));
   assert.equal(text.banner.doctorFail, BANNER.doctorFail(2));
   assert.equal(text.banner.timedOut, BANNER.timedOut);
+});
+
+// ARC-09-S07 — the freshness rule, and the one number it depends on.
+test('an upgrade check older than a week is silence, not a hedged nudge', async (t) => {
+  const root = await bootstrapped(t);
+  const days = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+
+  writeJson(root, '.local/upgrade-check.json',
+    { behind: true, latestTag: 'v2.1.0', checkedAt: days(6) });
+  assert.ok(runHook(root).lines.includes(BANNER.upgrade('v2.1.0')), 'six days old is still fresh');
+
+  writeJson(root, '.local/upgrade-check.json',
+    { behind: true, latestTag: 'v2.1.0', checkedAt: days(8) });
+  assert.equal(runHook(root).lines.some((l) => /newer release/.test(l)), false,
+    'eight days old must produce NO line — a nudge nobody has rechecked is one a reader learns to skip');
+
+  // A clock that went backwards, which is a real state on a laptop that has just synced time.
+  writeJson(root, '.local/upgrade-check.json',
+    { behind: true, latestTag: 'v2.1.0', checkedAt: days(-3) });
+  assert.equal(runHook(root).lines.some((l) => /newer release/.test(l)), false,
+    'a check from the future is not fresh');
+
+  // And a file with no `checkedAt` at all — the shape ARC-08-S08 fixed has three keys, and a
+  // writer that omitted one must not pin the nudge on for ever.
+  writeJson(root, '.local/upgrade-check.json', { behind: true, latestTag: 'v2.1.0' });
+  assert.equal(runHook(root).lines.some((l) => /newer release/.test(l)), false);
+});
+
+test('the hook and the library agree on how old a check may be', async () => {
+  // The hook inlines the constant on purpose — its budget is 300 ms and it imports nothing on the
+  // fast path — so the two are compared here rather than trusted to stay equal.
+  const { MAX_AGE_MS: LIB_MAX_AGE } = await import('../../tools/snowarch/lib/upgrade-check.mjs');
+  assert.equal(UPGRADE_MAX_AGE_MS, LIB_MAX_AGE);
+  assert.equal(UPGRADE_MAX_AGE_MS, 7 * 24 * 60 * 60 * 1000);
 });

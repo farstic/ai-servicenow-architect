@@ -37,7 +37,7 @@ import {
 import { probeAll, toLastProbe, type LastProbe } from '../servicenow/probes.js';
 import { ServiceNowClient } from '../servicenow/client.js';
 import { loadStore, saveStore } from '../store/index.js';
-import { completeFlags, type Store, type StoreInstance } from '../store/schema.js';
+import { STORE_VERSION, completeFlags, type Store, type StoreInstance } from '../store/schema.js';
 import { maskPath } from '../store/paths.js';
 import { applyDependencyRule, matchPreset, FLAG_NAMES, type Flags } from '../utils/permissions.js';
 import { remedyFor } from '../errors/codes.js';
@@ -416,7 +416,7 @@ Promise<ImportResult> {
   const existing = existsSync(target.path) ? loadStore(target.path) : null;
   const store: Store = existing && 'store' in existing
     ? existing.store
-    : { version: 1, instances: {} } as Store;
+    : { version: STORE_VERSION, instances: {} } as Store;
 
   const only = options.only && options.only.length > 0 ? new Set(options.only) : null;
   const taken = new Set(Object.keys(store.instances));
