@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildTagMessage } from '../scripts/lib/release/tag.mjs';
@@ -250,4 +250,74 @@ test('the release body is the changelog section, and a missing one stops the rel
   const missing = run('v3.0.0');
   assert.equal(missing.code, 1);
   assert.match(missing.err, /has no section for 3\.0\.0/);
+});
+
+// ── ARC-09-C16 — a checkout that peeled the tag is not a tag that was never annotated ──────────
+//
+// `actions/checkout@v4` on a tag ref writes `refs/tags/<name>` pointing straight at the COMMIT,
+// even with `fetch-depth: 0`. So an annotated tag arrives in the runner's clone indistinguishable
+// from a lightweight one, and `verify-tag` refused a release that was perfectly well formed on the
+// remote — all three `verify` jobs of the v2.0.0-rc.0 rehearsal, run 34643610242. The refusal is
+// still right (this clone cannot read a message it does not have); what was wrong was blaming the
+// tag, and telling the reader to re-create it.
+
+/** A bare remote holding an ANNOTATED tag, cloned into a tree whose tag ref was peeled to a commit. */
+function peeledClone(t, { annotatedOnRemote = true } = {}) {
+  const f = tagged(t);
+  annotate(f.root, 'v2.0.0', ['snowarch v2.0.0', '', `contract: ${f.contractSha}`,
+    `docs-pin: ${PIN}`, 'claude-floor: 2.1.214', 'node-floor: 20.0.0', 'git-floor: 2.34.1'].join('\n'));
+  if (!annotatedOnRemote) {
+    // The control: lightweight on the remote too, which is the case the old message is FOR.
+    git(f.root, ['tag', '-d', 'v2.0.0']);
+    git(f.root, ['tag', 'v2.0.0']);
+  }
+  const bare = join(dirname(f.root), `${basename(f.root)}-origin.git`);
+  execFileSync('git', ['clone', '--quiet', '--bare', f.root, bare], { stdio: 'pipe' });
+
+  // What checkout does: the ref exists and points at the commit, not at the tag object.
+  const commit = git(f.root, ['rev-list', '-n', '1', 'v2.0.0']).trim();
+  git(f.root, ['tag', '-d', 'v2.0.0']);
+  git(f.root, ['update-ref', 'refs/tags/v2.0.0', commit]);
+  git(f.root, ['remote', 'add', 'origin', bare]);
+  return f;
+}
+
+test('C16: a peeled tag whose remote IS annotated names the re-fetch, not the tag', (t) => {
+  const f = peeledClone(t);
+  // The precondition, asserted: locally this really does look lightweight.
+  assert.equal(execFileSync('git', ['cat-file', '-t', 'refs/tags/v2.0.0'],
+    { cwd: f.root, encoding: 'utf8' }).trim(), 'commit');
+
+  const r = verify(f.root, 'v2.0.0');
+  assert.equal(r.code, 1);
+  const text = `${r.out}${r.err ?? ''}`;
+  assert.match(text, /the remote has the annotated object; this checkout peeled it to a commit/);
+  assert.match(text, /git fetch --force origin/);
+  // And NOT the message that sends someone to re-cut a tag that is fine.
+  assert.equal(/is not annotated — create it with scripts\/release\.mjs/.test(text), false,
+    'it still blames the tag');
+});
+
+test('C16: a tag lightweight on the remote too keeps the original refusal', (t) => {
+  const f = peeledClone(t, { annotatedOnRemote: false });
+  const r = verify(f.root, 'v2.0.0');
+  assert.equal(r.code, 1);
+  const text = `${r.out}${r.err ?? ''}`;
+  // The negative control: without it, the new branch could swallow the case it was added beside.
+  assert.match(text, /is not annotated — create it with scripts\/release\.mjs/);
+  assert.equal(/the remote has the annotated object/.test(text), false);
+});
+
+test('C16: every job that reads the tag re-fetches it first', () => {
+  const text = readFileSync(join(REAL_ROOT, '.github/workflows/release.yml'), 'utf8');
+  // Comments out first: this step's own comment names both scripts (ARC-09-S09's lesson).
+  const code = text.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  const refetch = /git fetch --force origin "\+refs\/tags\//g;
+  assert.equal((code.match(refetch) ?? []).length, 2, 'a tag-reading job has no re-fetch step');
+  // Order, per job: the re-fetch precedes the thing that reads the tag object.
+  for (const reader of ['verify-tag.mjs', 'release-notes.mjs']) {
+    const at = code.indexOf(reader);
+    const before = code.lastIndexOf('git fetch --force origin "+refs/tags/', at);
+    assert.ok(before > -1 && before < at, `${reader} runs before its re-fetch`);
+  }
 });

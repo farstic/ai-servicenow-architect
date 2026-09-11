@@ -364,6 +364,14 @@ before the writes, which is why `release-dryrun` was green for the whole arc.
 
 **Definition of done.** Merged; rehearsal Release created and deleted with the run URL recorded in `docs/CONTRIBUTING.md`; `release-dryrun` required on `main`.
 
+
+**Amendment after rehearsal run 3 (ARC-09-C16, 2026-09-11).** `release.yml` must RE-FETCH the tag
+object after checkout, in every job that reads it. `actions/checkout@v4` on a tag ref writes
+`refs/tags/<name>` pointing at the commit — it peels the tag — so this story's own first step
+refused an annotated tag as "not annotated" and took all three `verify` jobs with it. The workflow
+test asserts the step exists and precedes the reader; `verify-tag.mjs` names the peel when the
+remote still has the object.
+
 ---
 
 ### ARC-09-S04 — `./snowarch version` extended (tag, commit, tag-message comparison; `--json` superset of ARC-06-S02's shape; feeds the doctor's `engine` header)
