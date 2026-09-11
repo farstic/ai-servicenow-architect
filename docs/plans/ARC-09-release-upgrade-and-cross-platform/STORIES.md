@@ -185,6 +185,20 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 >    instead — passing while proving nothing. `--root` defaults to `process.cwd()`, which is the
 >    checkout in CI and the fixture in a test.
 >
+> 5. **AC 7 cannot be a history comparison.** The first version read
+>    `git show bcd4dcd:docs/CHANGELOG.md`; the `test` job clones SHALLOW, so the object is absent and
+>    the assertion failed on nine cells where nothing was wrong. The frozen region is a COMMITTED
+>    FIXTURE now — `tests/fixtures/changelog-before-2.0.0.md`, written once from that commit — so the
+>    comparison works at any depth and a failure prints the lines that moved. The history comparison
+>    survives as its own test, named for what it needs and skipping with a reason on a shallow clone.
+> 6. **The local base was wrong, and only the local one.** The CI job was always right — drill PR
+>    #126 produced exactly one line, the drill's own commit. But `commitlint` run BY HAND defaulted
+>    to `origin/main..HEAD`, and `main` lags `develop` by a milestone: on a develop-based branch that
+>    is every commit merged since the last release, including subjects written before the convention
+>    (ARC-09-S01's own, for one). The local base is now the branch's upstream, or `origin/develop`.
+>    Two-dot throughout — `A...B` is the symmetric difference and would pull the base's commits in,
+>    which is the opposite of what a lint of "your commits" means.
+>
 > *The new required context is `commitlint`* — one cell, `pull_request` only, so the check-run name
 > is the bare job name. 42 → 43 at the M4 merge.
 

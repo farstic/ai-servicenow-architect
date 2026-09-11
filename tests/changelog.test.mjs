@@ -31,17 +31,22 @@ const readReal = (p) => readFileSync(join(REAL_ROOT, p), 'utf8');
  * what "unchanged" has to mean.
  *
  * The first version of this test compared against `git show bcd4dcd:docs/CHANGELOG.md`, and CI
- * proved that wrong within a run: the `test` job clones SHALLOW, so the object is not there and the
- * assertion failed on a repository where nothing was wrong — `fatal: invalid object name`. A test
- * that needs history to say anything is a test that says nothing on most machines. So the region's
- * sha256 is pinned here, computed from that commit, and the git comparison runs additionally
- * wherever the object happens to be reachable.
+ * proved that wrong within one run: the `test` job clones SHALLOW, so the object is not there and
+ * the assertion failed nine times on a repository where nothing was wrong — `fatal: invalid object
+ * name`. A test that needs history to say anything says nothing on most machines.
  *
- * If this constant ever needs changing, the imported history has been edited, and that is the thing
- * AC 7 exists to prevent.
+ * So the region is a COMMITTED FIXTURE, written once from that commit:
+ * `tests/fixtures/changelog-before-2.0.0.md`, sha256
+ * 65943e7086d5c9618f7c24c13c4a4ae895a2185d8657fe196110fddf57b09beb. Comparing against a file rather
+ * than against a hash is the difference between a failure that says "these two lines changed" and
+ * one that says "the hash is different" — and this is a region whose failure mode is somebody
+ * editing history by accident, where seeing WHAT changed is the whole point.
+ *
+ * The git comparison still runs wherever the object is reachable, which is what proves the fixture
+ * is what that commit actually holds.
  */
 const FROZEN_SINCE = 'bcd4dcd';
-const FROZEN_SHA256 = '3bb91be468e7d6677dc91e623308eeaed91bfc8f88baacb9f4aadc4c46a05eee';
+const FROZEN_FIXTURE = 'tests/fixtures/changelog-before-2.0.0.md';
 
 const HEADER = '# Changelog\n\nA rule.\n\n---\n\n';
 const FROZEN = '## Before 2.0.0\n\nimported history, untouched\n';
@@ -183,24 +188,36 @@ test('AC 7 — the frozen region is not touched, in the fixture and in this repo
   const after = f.read('docs/CHANGELOG.md');
   assert.ok(after.endsWith(FROZEN), 'the generator rewrote the imported history');
 
-  // The real file. By hash, because this runs on a shallow clone as often as not.
+  // The real file, against the committed fixture. Works at any clone depth, and a failure prints
+  // the lines that moved rather than two hashes.
   const region = (text) => {
     const at = text.indexOf('\n## Before 2.0.0');
     assert.notEqual(at, -1, 'the "## Before 2.0.0" heading is gone');
-    return text.slice(at);
+    return text.slice(at).replace(/^\n/, '');
   };
   const current = region(readReal('docs/CHANGELOG.md'));
-  assert.equal(createHash('sha256').update(current).digest('hex'), FROZEN_SHA256,
-    `the imported history has changed since ${FROZEN_SINCE} — it is the one region nothing rewrites`);
+  assert.equal(current, readReal(FROZEN_FIXTURE),
+    `the imported history has changed — it is the one region nothing rewrites. If this is `
+    + `deliberate, ${FROZEN_FIXTURE} is the record it has to be reconciled with.`);
+});
 
-  // ...and against the commit itself where the object is reachable, which is a stronger statement
-  // and the one that proves the pinned hash is the hash of what that commit actually holds.
-  let base = null;
+test('AC 7 (history) — the fixture is what bcd4dcd holds, where the object is reachable', (t) => {
+  // Named for what it needs, and skipped with a reason when it is not there. A shallow clone is the
+  // normal case in CI, and the fixture comparison above is what runs everywhere; this one is the
+  // stronger statement — that the fixture was not simply written from whatever the file said.
+  let base;
   try {
     base = execFileSync('git', ['show', `${FROZEN_SINCE}:docs/CHANGELOG.md`],
       { cwd: REAL_ROOT, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
-  } catch { /* shallow clone: the hash above is the whole assertion */ }
-  if (base !== null) assert.equal(current, region(base), `the region differs from ${FROZEN_SINCE}`);
+  } catch {
+    return t.skip(`${FROZEN_SINCE} is not in this clone (shallow) — the fixture comparison stands alone`);
+  }
+  const at = base.indexOf('\n## Before 2.0.0');
+  assert.notEqual(at, -1);
+  assert.equal(base.slice(at).replace(/^\n/, ''), readReal(FROZEN_FIXTURE),
+    `${FROZEN_FIXTURE} is not what ${FROZEN_SINCE} holds`);
+  assert.equal(createHash('sha256').update(readReal(FROZEN_FIXTURE)).digest('hex'),
+    '65943e7086d5c9618f7c24c13c4a4ae895a2185d8657fe196110fddf57b09beb');
 });
 
 // ── AC 4, on the committed file ────────────────────────────────────────────────────────────────

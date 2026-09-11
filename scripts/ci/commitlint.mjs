@@ -53,18 +53,28 @@ export function allowedScopes(root = process.cwd()) {
 }
 
 /**
- * The range to check.
+ * The range to check: the commits this branch ADDS, and no others.
  *
- * In CI a pull request gives the base branch by name and the head by sha; locally there is no such
- * pair, and `origin/main..HEAD` is what a contributor means. Both shapes are resolved here and
- * tested, because a lint that silently checked the wrong range would pass every pull request.
+ * Two-dot on purpose. `A..B` is "reachable from B, not from A", which is exactly the commits a
+ * pull request contributes; `A...B` is the SYMMETRIC difference and would drag in everything the
+ * base has that the branch does not — the opposite of what a lint of "your commits" means.
+ *
+ * The BASE is the part that goes wrong. In CI the pull request names it and there is nothing to
+ * guess. Locally, the first version of this defaulted to `origin/main`, and in this repository
+ * `main` lags `develop` by a whole milestone: `origin/main..HEAD` therefore included every commit
+ * merged into `develop` since the last release — thirty-odd commits of somebody else's work, some
+ * of them written before this convention existed. The lint was right about them and useless to the
+ * person running it. So the local base is the branch's own upstream when it has one, and
+ * `origin/develop` — where the work actually targets — when it does not.
  */
-export function resolveRange(env = process.env, flags = {}) {
+export function resolveRange(env = process.env, flags = {}, { upstream = null, exists = () => false } = {}) {
   if (flags.base && flags.head) return { base: flags.base, head: flags.head, source: 'flags' };
   if (env.GITHUB_BASE_REF) {
     return { base: `origin/${env.GITHUB_BASE_REF}`, head: env.GITHUB_SHA || 'HEAD', source: 'ci' };
   }
-  return { base: 'origin/main', head: 'HEAD', source: 'local' };
+  if (upstream) return { base: upstream, head: 'HEAD', source: 'upstream' };
+  const base = exists('origin/develop') ? 'origin/develop' : 'origin/main';
+  return { base, head: 'HEAD', source: 'local' };
 }
 
 /** `null` when the subject is fine; the reason when it is not. */
@@ -98,7 +108,13 @@ export function lint({ commits, scopes }) {
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
 if (isMain) {
-  const range = resolveRange(process.env, { base: value('--base'), head: value('--head') });
+  const tryGit = (args) => {
+    try { return git(args).trim(); } catch { return null; }
+  };
+  const range = resolveRange(process.env, { base: value('--base'), head: value('--head') }, {
+    upstream: tryGit(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']),
+    exists: (ref) => tryGit(['rev-parse', '--verify', '--quiet', ref]) !== null,
+  });
   let out;
   try {
     // `%P` so a merge is identified by its parents, not by its wording.

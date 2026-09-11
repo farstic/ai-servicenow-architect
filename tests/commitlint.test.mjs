@@ -64,9 +64,73 @@ test('the range is resolved from the CI shape and from the local one', () => {
   // GITHUB_SHA absent (a workflow that did not set it) still resolves to something runnable.
   assert.deepEqual(resolveRange({ GITHUB_BASE_REF: 'main' }),
     { base: 'origin/main', head: 'HEAD', source: 'ci' });
-  assert.deepEqual(resolveRange({}), { base: 'origin/main', head: 'HEAD', source: 'local' });
   assert.deepEqual(resolveRange({ GITHUB_BASE_REF: 'main' }, { base: 'x', head: 'y' }),
     { base: 'x', head: 'y', source: 'flags' });
+
+  // LOCALLY the base is the branch's own upstream, or `origin/develop`. Not `origin/main`: in this
+  // repository `main` lags `develop` by a whole milestone, so `origin/main..HEAD` on a develop-based
+  // branch is thirty commits of somebody else's work — some of it written before this convention
+  // existed. The lint was right about those commits and useless to the person running it.
+  assert.deepEqual(resolveRange({}, {}, { upstream: 'origin/arc-09/release' }),
+    { base: 'origin/arc-09/release', head: 'HEAD', source: 'upstream' });
+  assert.deepEqual(resolveRange({}, {}, { exists: (r) => r === 'origin/develop' }),
+    { base: 'origin/develop', head: 'HEAD', source: 'local' });
+  assert.deepEqual(resolveRange({}, {}, { exists: () => false }),
+    { base: 'origin/main', head: 'HEAD', source: 'local' });
+});
+
+test('a commit already on the base is not this branch\'s to answer for', (t) => {
+  // The property the range exists for, proved with the shape that actually bit: a base carrying a
+  // non-conventional commit, and a branch that did not write it.
+  //
+  // Two-dot, not three. `A..B` is "reachable from B, not from A" — the commits this branch adds.
+  // `A...B` is the SYMMETRIC difference and would drag the base's own commits in, which is the
+  // opposite of what a lint of "your commits" means.
+  const root = tempDir('snowarch-range-', t);
+  writeFileSync(join(root, 'f.txt'), '1\n');
+  git(root, ['init', '-q', '-b', 'main']);
+  git(root, ['config', 'user.email', 'fixture@example.com']);
+  git(root, ['config', 'user.name', 'fixture']);
+  assert.equal(git(root, ['config', 'user.name']).trim(), 'fixture', 'the fixture identity did not take');
+  git(root, ['add', '-A']);
+  git(root, ['commit', '-qm', 'chore: base']);
+
+  git(root, ['checkout', '-qb', 'feature']);
+  assert.equal(git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).trim(), 'feature',
+    'the fixture did not move off main');
+  writeFileSync(join(root, 'f.txt'), '2\n');
+  git(root, ['commit', '-qam', 'feat(engine): mine, and conventional']);
+
+  // ...and now the BASE grows a commit nobody on this branch wrote — S01's real subject, which is
+  // not conventional because it predates the convention.
+  git(root, ['checkout', '-q', 'main']);
+  assert.equal(git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).trim(), 'main',
+    'the fixture did not move back to the base — the commit below would land on the branch');
+  writeFileSync(join(root, 'f.txt'), '3\n');
+  git(root, ['commit', '-qam', 'ARC-09-S01: one command cuts a release, and refuses to cut a bad one']);
+  git(root, ['checkout', '-q', 'feature']);
+  assert.equal(git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).trim(), 'feature');
+
+  const script = join(REAL_ROOT, 'scripts/ci/commitlint.mjs');
+  const spawn = (args) => {
+    try {
+      return { code: 0, out: execFileSync(process.execPath, [script, ...args],
+        { cwd: root, encoding: 'utf8', stdio: 'pipe' }) };
+    } catch (e) {
+      return { code: e.status, out: String(e.stdout ?? ''), err: String(e.stderr ?? '') };
+    }
+  };
+
+  const r = spawn(['--base', 'main', '--head', 'HEAD']);
+  assert.equal(r.code, 0, `${r.out}${r.err ?? ''}`);
+  assert.match(r.out, /^commitlint: 1 commits ok$/m);
+  assert.equal((r.err ?? '').includes('ARC-09-S01'), false,
+    'the base\'s own commit was linted — the range is wrong');
+
+  // The proof that the negative is not vacuous: the same commit IS seen from the other direction.
+  const reversed = spawn(['--base', 'feature', '--head', 'main']);
+  assert.equal(reversed.code, 1);
+  assert.match(reversed.err, /FAIL [0-9a-f]{7} "ARC-09-S01: one command cuts a release/);
 });
 
 test('lint counts what it checked, and names each failure once', () => {

@@ -858,6 +858,12 @@ A failure reads:
 commitlint: FAIL abcdef1 "updated stuff" — expected type(scope)?: subject; see docs/CONTRIBUTING.md#commits
 ```
 
+**What gets checked.** The commits this branch *adds* — `<base>..HEAD`, two-dot, so a commit
+already on the base is not yours to answer for. In CI the pull request names the base. Locally it is
+your branch's upstream if it has one, otherwise `origin/develop`: **not** `origin/main`, which lags
+`develop` by a whole milestone and would hand you thirty commits of somebody else's work, some
+written before this convention existed.
+
 **The escape hatch is `### Notes`.** Everything else in a release section is generated; that block
 is hand-written, survives regeneration verbatim, and moves down into the release it belongs to. If
 a change needs a paragraph rather than a bullet, that is where it goes.

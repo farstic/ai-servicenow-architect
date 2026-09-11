@@ -223,7 +223,11 @@ test('every reference to the file names its new path', () => {
   const NEEDLE = basename(REL);
   const out = execFileSync('git', ['grep', '-l', '-F', NEEDLE], { cwd: root, encoding: 'utf8' })
     .split('\n').filter(Boolean);
+  // `tests/fixtures/` joins plans, spikes and RELICENSING as EVIDENCE rather than reference: a
+  // fixture is a captured copy of something as it was, and rewriting a path inside one would
+  // falsify the thing it exists to preserve. ARC-09-S02's frozen changelog region is the first.
   const live = out.filter((f) => !f.startsWith('docs/plans/') && !f.startsWith('docs/spikes/')
+    && !f.startsWith('tests/fixtures/')
     && f !== 'docs/RELICENSING.md' && f !== REL);
   // Two places name the BASENAME correctly, and both would be made wrong by a path:
   //   a tree diagram, where the directory is the indentation
