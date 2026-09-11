@@ -365,6 +365,13 @@ before the writes, which is why `release-dryrun` was green for the whole arc.
 **Definition of done.** Merged; rehearsal Release created and deleted with the run URL recorded in `docs/CONTRIBUTING.md`; `release-dryrun` required on `main`.
 
 
+**Amendment after rehearsal run 8 (ARC-09-C20, 2026-09-12).** The judge step passes `--deps
+installed`. This job runs `npm ci` before the doctor, for its lint and test gates, so its server
+checks legitimately answer; `assert-doctor.mjs` had encoded the bootstrap cells' shape — doctor
+before install, so every SV check must be skip — as though it were the only world, and refused a
+green report. The default stays `absent`, which is the cells' shape.
+
+
 **Amendment after rehearsal run 7 (ARC-09-C19, 2026-09-12).** The doctor step CAPTURES the report
 and a separate step JUDGES it with `assert-doctor.mjs --expect-fail E-00`, the same script and flag
 the bootstrap cells have used since ARC-08. A hosted runner has no Claude Code, so E-00 fails on

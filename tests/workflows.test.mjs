@@ -802,7 +802,13 @@ test('C19: the release judges its doctor report instead of letting -e decide', (
 
   // The judgement is the SAME script and the same flag the bootstrap cells use — one implementation
   // of "which failures does this environment explain", not a second opinion in YAML.
-  assert.match(code, /assert-doctor\.mjs --in doctor-\$\{\{ matrix\.os \}\}\.json --expect-fail E-00/);
+  // Matched across the line break: ARC-09-C20 wrapped this step, and an assertion pinned to one
+  // line's worth of it would fail on a reflow rather than on a change of meaning.
+  // Line continuations joined AND whitespace squeezed: the YAML line ends `\` after a space,
+  // so a naive join leaves two. An assertion that fails on a double space is an assertion
+  // about formatting.
+  const judge = code.replace(/\\\n\s+/g, ' ').replace(/ {2,}/g, ' ');
+  assert.match(judge, /assert-doctor\.mjs --in doctor-\$\{\{ matrix\.os \}\}\.json --expect-fail E-00/);
   const ci = wf('ci.yml');
   assert.match(ci, /assert-doctor\.mjs --in "\$RUNNER_TEMP\/doctor\.json" --expect-fail E-00/);
 
@@ -816,4 +822,12 @@ test('C19: the release judges its doctor report instead of letting -e decide', (
 
   // The sentence a reader of the Release needs, next to the numbers.
   assert.match(code, /E-00 is expected there, and every other check must be ok/);
+
+  // ARC-09-C20: this job installs before it runs the doctor, so it says which world it is in. The
+  // bootstrap cells do NOT pass the flag and must not — the default is their shape, and a cell that
+  // started passing `installed` would stop noticing something installing too early.
+  assert.match(code, /--deps installed/);
+  const ciCode = wf('ci.yml').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  assert.equal(/--deps/.test(ciCode), false,
+    'a bootstrap cell passes --deps — the default is its shape and saying so would invite changing it');
 });
