@@ -508,6 +508,29 @@ jobs:
           npm ci --ignore-scripts
           node tools/snowarch/tests/server-section-smoke.mjs
 
+  commitlint:
+    # The changelog is generated from commit subjects (ARC-09-S02), so a subject nobody checked is a
+    # changelog entry nobody wrote. The generator never refuses history — it records an
+    # unconventional subject and moves on — which makes this the only place the convention is
+    # enforced, and it enforces it while the commits can still be reworded.
+    #
+    # `pull_request` only, and `fetch-depth: 0`: the range is `origin/<base>..<head>`, and a shallow
+    # clone has no merge base to compute it from.
+    if: github.event_name == 'pull_request'
+    name: commitlint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Every commit on this pull request follows the convention
+        run: node scripts/ci/commitlint.mjs
+
   launcher:
     # `bootstrap.sh` is the one file that runs on a machine with NO Node — which means none of the
     # engine's own tooling can check it, and none of the other jobs would notice it broken. Two

@@ -818,6 +818,50 @@ The launcher also has a line budget and a bash-3.2 constraint list, both enforce
 you are adding a step to it, ask first whether the step belongs on the Node path instead: this file
 exists for the machines that cannot run the other one, not as a second implementation.
 
+## Commits
+
+`docs/CHANGELOG.md` is generated from commit subjects, so a subject is a changelog entry. The
+`commitlint` job checks every commit on a pull request — and only there, while they can still be
+reworded. History is never rewritten to suit the parser: an unconventional subject from before the
+convention is recorded as written and marked `(unconventional)`.
+
+```
+type(scope)?: subject
+```
+
+**Types.** `feat` → *Added* · `fix` → *Fixed* · `perf`, `refactor` → *Changed* · `docs`, `test`,
+`build`, `ci`, `chore`, `revert` → *Internal*.
+
+**Scopes** are optional and come from the tree: `engine`, `server`, `contract`, `docs`, `bootstrap`,
+`doctor`, `wizard`, `ci`, `release`, `deps`, `changelog`, `tests`, `plan`, or any directory name
+under `.claude/skills/` or `.claude/agents/`. A new skill is nameable in a commit the day it exists,
+with no edit to the lint.
+
+**Breaking changes** take a `!` before the colon, a `BREAKING CHANGE:` footer, or both. The footer's
+text is what appears under *Breaking*; with only a `!`, the subject is used.
+
+**The subject is at most 100 characters**, and `chore(release):` commits and merges are skipped by
+both the lint and the generator.
+
+```
+feat(doctor): report the capability packs the machine can produce
+fix(server)!: stop gating reads on SCRIPTING_ENABLED
+
+BREAKING CHANGE: SCRIPTING_ENABLED now gates writing scripting objects only
+docs(changelog): seed the 2.0.0 migration notes
+chore(deps): bump eslint to 9.39.5
+```
+
+A failure reads:
+
+```
+commitlint: FAIL abcdef1 "updated stuff" — expected type(scope)?: subject; see docs/CONTRIBUTING.md#commits
+```
+
+**The escape hatch is `### Notes`.** Everything else in a release section is generated; that block
+is hand-written, survives regeneration verbatim, and moves down into the release it belongs to. If
+a change needs a paragraph rather than a bullet, that is where it goes.
+
 ## Cutting a release
 
 `node scripts/release.mjs <x.y.z>` — preflight, gates, writes, one commit, one annotated tag. It

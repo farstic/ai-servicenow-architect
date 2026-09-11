@@ -129,6 +129,9 @@ test('the workflows name the repository settings they depend on', () => {
  */
 const KNOWN_JOBS = [
   'test', 'contract', 'no-build', 'docs-check', 'footprint', 'actionlint', 'bootstrap',
+  // ARC-09-S02. The 43rd required context on `main`: it is the only place the commit convention is
+  // enforced, and an unrequired check that goes red without blocking anything is not a guard.
+  'commitlint',
   'launcher', 'windows-launcher', 'secrets', 'plugin-validate',
 ];
 
@@ -219,6 +222,21 @@ test('the doctor runs inside the bootstrap cells, and adds no job name (ARC-08-S
   // skip — the state a design-only install is actually in.
   assert.ok(job.indexOf('assert-doctor.mjs') < job.indexOf('npm ci --ignore-scripts'),
     'the doctor now runs after npm ci — the snapshot would describe a machine no user is on');
+});
+
+test('commitlint runs on pull requests only, with the history it needs (ARC-09-S02)', () => {
+  const ci = wf('ci.yml');
+  const job = ci.slice(ci.indexOf('\n  commitlint:'), ci.indexOf('\n  launcher:'));
+
+  // On a push there is no base branch to compare against, and `origin/main..HEAD` on `main` itself
+  // is empty — a job that ran there would report "0 commits ok" forever and prove nothing.
+  assert.match(job, /if: github\.event_name == 'pull_request'/);
+  // The range is `origin/<base>..<head>`; a shallow clone has no merge base to compute it from.
+  assert.match(job, /fetch-depth: 0/);
+  assert.match(job, /run: node scripts\/ci\/commitlint\.mjs/);
+  // One cell, so the required context is the bare job name — which is what branch protection lists.
+  assert.equal(/strategy:/.test(job), false, 'a matrix would change the required context name');
+  assert.match(job, /name: commitlint/);
 });
 
 test('the run is cancelled when superseded, so thirteen cells are not paid for twice', () => {

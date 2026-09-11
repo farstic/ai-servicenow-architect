@@ -11,6 +11,34 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ## Unreleased
 
+### Notes
+
+This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
+
+#### Migration for snow-mcp 1.0.0 users
+
+Transcribed from `packages/snowarch/CHANGELOG.md` (ARC-04-S14), which is the server's own record of
+the same change:
+
+1. **Move your instance configuration.** The legacy `~/.config/servicenow-mcp/instances.json` is no
+   longer read. Recreate it as a store, or run `./snowarch instance import --from-legacy`
+   (ARC-07-S08). Store precedence is `SNOW_STORE` > the project's `.local/instances.json` > the
+   global one.
+2. **Check your flags.** `SCRIPTING_ENABLED` no longer gates READS — it gates writing scripting
+   objects. If it was on only so that listing worked, turn it off.
+3. **Name your `.env`.** The current directory's `.env` is no longer loaded; set `SNOW_ENV_FILE` if
+   you want one.
+4. **An unconfigured server starts and stays up.** It no longer exits at start-up: five core tools
+   still answer, and they are how it explains itself. `snow_core_instances_reload` picks up a store
+   written while the session is running, so Claude Code does not need restarting.
+5. **The package is `@farstic/snowarch` 2.0.0.** `@farstic/snow-mcp@1.0.0` is untouched on npm and
+   stays exactly as published.
+
+Two more, for completeness: `MAX_RECORDS` defaults to 100 and belongs on the instance entry, and
+there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
+
+---
+
 ### Added
 
 - **`./snowarch bootstrap` — one amendable plan, then ten numbered steps that remember where they
@@ -120,6 +148,21 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   cause you did not check"), a checkout that was never bootstrapped, output that would not parse,
   and Windows without Git for Windows, where the honest answer is that the session cannot run
   `./snowarch` from here at all.
+
+- **The changelog generates itself from here on, and one block stays hand-written.** Every release
+  section is built from the commit subjects since the previous tag — `feat` to Added, `fix` to
+  Fixed, `perf`/`refactor` to Changed, the rest to Internal, a `!` or a `BREAKING CHANGE:` footer
+  also to Breaking — with a trailer naming the tag, the contract sha and the docs pin. Merges and
+  `chore(release):` commits are skipped, and a subject from before the convention is recorded as
+  written and marked `(unconventional)`: history is not rewritten to suit a parser. What is NOT
+  generated is `### Notes`, which is hand-written, survives regeneration verbatim and moves down
+  into the release it belongs to — a generator with no place for a sentence a human needed to write
+  is a generator people route around.
+
+  The convention is enforced by a new `commitlint` job on pull requests only, where a subject can
+  still be reworded, and `docs/CONTRIBUTING.md#commits` is what its failure line points at. And the
+  imported engine history under `## Before 2.0.0` is untouched by construction: the generator
+  inserts between `## Unreleased` and whatever heading follows, and never reads below it.
 
 - **One command cuts a release, and refuses to cut a bad one.** `node scripts/release.mjs <x.y.z>`
   asks eight questions before it writes a byte — the version's shape, the tag name being free, the
