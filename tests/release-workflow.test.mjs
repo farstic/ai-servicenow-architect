@@ -218,14 +218,42 @@ test('an unmasked address in a report is refused, and the value is never printed
     'the check printed the value it found — that publishes it in the job log');
 });
 
-test('a report with a FAIL is not published', (t) => {
-  const root = tempDir('snowarch-assets-fail-', t);
+/** The design-only report the assets check reads, with the named checks forced to `fail`. */
+function reportFailing(root, ids) {
   const report = JSON.parse(readFileSync(join(REAL_ROOT, 'tests/fixtures/doctor/status-design.json'), 'utf8'));
-  report.checks[1] = { ...report.checks[1], status: 'fail' };
+  report.checks = report.checks.map((c) => (ids.includes(c.id) ? { ...c, status: 'fail' } : c));
+  for (const id of ids) {
+    if (!report.checks.some((c) => c.id === id)) report.checks.push({ id, status: 'fail', detail: 'planted' });
+  }
   write(root, 'doctor-ubuntu-latest.json', `${JSON.stringify(report, null, 2)}\n`);
-  const r = assets(root, ['doctor-ubuntu-latest.json']);
+  return assets(root, ['doctor-ubuntu-latest.json']);
+}
+
+test('a report with an unexplained FAIL is not published', (t) => {
+  const r = reportFailing(tempDir('snowarch-assets-fail-', t), ['E-01']);
   assert.equal(r.code, 1);
-  assert.match(r.err, /1 FAIL \(E-01\)/);
+  assert.match(r.err, /1 unexplained FAIL \(E-01\)/);
+});
+
+// ── ARC-09-C19 — E-00 is the runner's, and only E-00 ──────────────────────────────────────────
+//
+// The published reports come from hosted runners, which have no Claude Code: E-00 fails on every
+// one of them. Refusing any FAIL at all would block every release for ever on a machine nobody
+// ships from — which is what rehearsal run 7 walked into from the other side, losing all three
+// `verify` jobs to a report whose only failure was E-00.
+
+test('C19: a report whose only FAIL is E-00 IS published', (t) => {
+  const r = reportFailing(tempDir('snowarch-assets-e00-', t), ['E-00']);
+  assert.equal(r.code, 0, `${r.err}${r.out}`);
+  assert.match(r.out, /asset\(s\) clean/);
+});
+
+test('C19: E-00 beside another FAIL is still refused, and names the other one', (t) => {
+  const r = reportFailing(tempDir('snowarch-assets-e00-plus-', t), ['E-00', 'E-12']);
+  assert.equal(r.code, 1);
+  // The message names what is NOT explained, and says E-00 was.
+  assert.match(r.err, /1 unexplained FAIL \(E-12\)/);
+  assert.match(r.err, /E-00 is expected on a hosted runner/);
 });
 
 // ── release-notes ──────────────────────────────────────────────────────────────────────────────

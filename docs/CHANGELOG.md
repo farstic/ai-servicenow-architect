@@ -143,6 +143,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A release is no longer blocked by the one check a hosted runner cannot pass.** The doctor
+  reports attached to a Release come from machines without Claude Code, so that check fails on all
+  three — expected, and now judged by the same rule the install cells have always used: that one
+  failure is explained, any other refuses the release. The Release notes say so beside the numbers,
+  and nothing pretends the tool is present.
+
 - **A test no longer fails because a step was slow.** The bootstrap's step lines carry a duration,
   and a test that compares them removes it first — with its own pattern, which knew `0.4 s` but not
   `1 s`. On a loaded machine the comparison failed on the clock rather than on what it was
