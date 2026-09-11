@@ -1,29 +1,40 @@
-# The owner's sitting — every ARC-00 step that needs a human
+# The owner's sitting — every step that needs a human
 
-> ## ✅ THE SITTING IS COMPLETE on 2.1.258 (owner, 2026-09-07) — Parts A, B, C and D
+Four sittings, each runnable on its own, in the order a person would reach them. Every row below is
+**evidence**: it is here exactly as the story that raised it wrote it, and moving one into a sitting
+is the only thing this page has done to it.
+
+| Sitting | What it needs | Exit criterion |
+|---|---|---|
+| [A — Install](#sitting-a--install-a-person-who-did-not-write-the-page) | a Mac, and someone who has not read the page | Path A and Path B both pass; the design install reaches `Mode: design-only` with 0 FAIL from the doctor |
+| [B — Design-only in a real Claude session](#sitting-b--design-only-in-a-real-claude-session) | a Mac with Claude Code | every listed VALIDATION-TEST recorded PASS in `docs/validation/`, redaction lint green |
+| [C — Live with a PDI](#sitting-c--live-with-the-owners-pdi-a-test-only-account) | a PDI you own, on a test-only account | nightly `e2e-live` green twice; T-19 and T-22 PASS; the ROPC fixture committed |
+| [D — Windows](#sitting-d--windows-when-a-machine-exists) | a Windows machine, when one exists | each row CONFIRMED or FAILED in `docs/validation/` |
+| [Archive](#archive--answered-rows) | nothing — it is the record | none; it is what was already answered |
+
+---
+
+## Sitting A — Install (a person who did not write the page)
+
+Everything here is about the first fifteen minutes on a machine that has never seen this product.
+The rows cannot be run by whoever wrote the install page: the thing being measured is whether the
+page carries a stranger, and a reader who already knows the answer measures nothing. Do them in one
+go, on a Mac, from a fresh clone.
+
+**Prerequisites.** A Mac, a GitHub account with access to the repository, Claude Code installed, and
+a person who has not read `docs/INSTALL.md`. No instance, no credentials.
+
+**Exit criterion.** Path A and Path B both pass on macOS, run by the owner; the design-only install
+reaches `Mode: design-only` and `./snowarch doctor` reports **0 FAIL**.
+
+> **The install page's second reader (ARC-06-S13, 2026-09-10).** Criterion 1 asks for two people
+> who did not write the page to follow Path A and reach `Mode: design-only` without opening any
+> other file. Reader one is the architect, on a fresh clone with Node hidden. **Reader two is the
+> owner**, on the Windows `clean` snapshot: open `docs/INSTALL.md`, follow it top to bottom, and
+> note every place you had to guess, look elsewhere, or scroll back. The page passes only if the
+> answer is "nowhere" — a page that needs its author present is not the page this story asked for.
 >
-> **Nothing on this list needs running again for 2.1.258, and every Answer line below is filled.**
-> Cleanup is verified and `migrationVersion` is **14** (one binary throughout). What remains of ARC-00's
-> human-gated work is only (a) the **2.1.214 floor repeat — OPTIONAL**, and (b) the **Windows VM rows**,
-> `DEFERRED — owner input #2`.
->
-> **One thing was not captured and is recorded as such:** the interactive `CLAUDE_PROJECT_DIR` probe was
-> not run before cleanup, so that row stays *observed once, unreproduced — not a blocker*. It is a
-> two-minute step if the plugin channel is ever revisited.
->
-> Closed here: **S-01, S-16, S-17, S-06, S-12, S-18, S-05, S-14a–e**. Part D's result is recorded in
-> `spikes/S-05-hook-without-node/README.md` — variant **B** (npm-installed `claude`), notice **shown**
-> and non-blocking.
->
-> ---
->
-> ## ✅ Part A is COMPLETE on 2.1.258 (owner, 2026-09-07) — do not re-run it
->
-> **S-01, S-16, S-17 and S-06 are CONFIRMED on 2.1.258** and their records are written. What is left of
-> Part A is only the **2.1.214 floor row**, and only if the floor is still worth a second sitting.
->
-> **Parts B, C and D are complete too (2026-09-07).** Nothing remains for this version.
->
+
 > **Path B cannot be measured from this account (ARC-06-S13, 2026-09-10).** Criterion 2 asks
 > whether the pasted sentence leads Claude to the two documented commands. Two headless runs were
 > made with ONLY those two commands permitted (`--allowedTools "Bash(git clone:*)"
@@ -39,17 +50,257 @@
 > the story's own risk ("Claude may deviate") was observed, which is why the page prints the exact
 > commands and now names the subfolder variation.
 >
-> **The two network diagnoses that need a real network (ARC-07-S02, 2026-09-10).** Both paths are
-> unit-proven against injected failures; what no injection can prove is that the REAL stack
-> produces the error shape the classifier expects. **(1) `PROXY_UNREACHABLE`** — on the Windows
-> snapshot, `set HTTPS_PROXY=http://127.0.0.1:9` (nothing listens there), run the wizard's probe
-> against any host, and confirm the code is `PROXY_UNREACHABLE`, that the printed proxy is masked
-> (`http://***@…` when the URL carries credentials) and that the remedy names `NO_PROXY`.
-> **(2) `CONNECTION_REFUSED` vs `CONNECTION_TIMEOUT` on a hibernated PDI** — S11 records which of
-> the two a sleeping instance actually produces, and the remedy for both already mentions waking it
-> at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
-> Nothing about a real instance goes into the repository: the record is the CODE and the timing.
+
+> **The registration sitting (added by ARC-06-S12, 2026-09-10).** Everything `--register` does goes
+> through `claude mcp`, which writes `~/.claude.json` — a file this agent is not permitted to touch,
+> so the CLI halves below were never run here. The flag spellings WERE verified read-only on
+> 2.1.258 (`claude mcp add-json --help`: `-s, --scope <scope>`, default `local`; `claude mcp remove
+> --help`: `-s` optional, and **without it the CLI removes from whichever scope it finds** — which
+> is why every call this tool makes passes `-s`). For the sitting, in a trusted checkout:
+> **(1) AC 4** — `./snowarch mode live --register local`, then `claude mcp get servicenow` shows a
+> local entry whose args still read `${CLAUDE_PROJECT_DIR:-.}/…/server.js` UNEXPANDED, and a Claude
+> session in the folder shows the server connected exactly once (no duplicate — the project entry
+> must be rejected by `disabledMcpjsonServers`). **(2) AC 5** — `--register project` afterwards, and
+> `claude mcp get` shows the project entry again. **(3) AC 6** — `--register user --ack-user-scope`,
+> then `./snowarch mode` prints the user-scope line. **(4) AC 1/2** — `/mcp` after `mode live` and
+> after `mode design`. **(5)** the same-key coexistence question the story's task 1 asks: with a
+> local AND a project entry both named `servicenow`, which one loads — recorded with the CLI
+> version. `~/.claude.json` should be fingerprinted by KEY NAME before and after (never contents);
+> for `--register local` the one key that may change is that project's `mcpServers` entry.
 >
+
+> **A robustness CANDIDATE, not a change (ruling 3, ARC-06-S12, 2026-09-10).** `bootstrap.cmd`
+> invokes `powershell` by NAME, so a machine whose PATH has been rewritten (a GPO, a shell started
+> with a scrubbed environment) gets cmd's own `'powershell' is not recognized` instead of our
+> sentence. `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe` removes the dependency
+> in one line. AC 3 fixes the `.cmd` text byte for byte and a test asserts it, so this is recorded
+> here to be tried during the sitting's mangled-PATH check rather than changed on my own judgement.
+>
+
+> **The floor row, and what turns on it (added by ARC-06-S09, 2026-09-09).** The dialog count is
+> measured on 2.1.258: `live` = 1, `design` = 1, `control` = 2. The engine's floor is **2.1.214**,
+> whose row is still pending, and the bootstrap's closing block promises the measured number.
+> **If the floor repeat shows 2, `EXPECTED_DIALOGS` in `tools/snowarch/lib/text.mjs` becomes 2 and
+> the block grows its second sentence by itself** — no other change, because the sentence per dialog
+> is generated from that constant. Until then the install text states the measurement and names the
+> floor as where a second approval may still appear: a stated measurement, not a promise.
+
+## D1. ARC-08-S02 — the doctor's engine checks on a BOOTSTRAPPED machine
+
+*Five minutes, no instance needed, design-only is enough. Everything else about these checks is
+proved by fixtures in CI; the one claim a fixture cannot make is acceptance criterion 1 — that a
+machine which has actually run `./bootstrap.sh` reports **0 FAIL**.*
+
+Why it needs you: a development clone has no `.local/` and no `.claude/settings.local.json`, so
+E-10 and E-11 correctly report "not bootstrapped". Only a real install has the files they check.
+
+```sh
+git clone https://github.com/farstic/ai-servicenow-architect.git ~/snowarch-ref
+cd ~/snowarch-ref
+./bootstrap.sh                      # design-only is fine — answer no to the live prompts
+./snowarch doctor --section prereqs,repo,docs,roster,contract
+echo "exit: $?"
+./snowarch doctor --json --quick > /tmp/doctor-ref.json; echo "quick exit: $?"
+```
+
+1. Does the last line of the first run say **`0 fail`**, and is the exit code **0**?
+2. If anything FAILs, paste the whole `E-nn FAIL …` line **and** its `→` remedy line.
+3. Roughly how long did the `--quick` run take? *(the budget is 1.5 s on a developer machine)*
+
+> *(lands in `docs/plans/ARC-08-doctor-and-self-heal/README.md` acceptance criterion 1, and in the
+> story index row for ARC-08-S02, which records this as your sitting until then)*
+
+**Why it matters, in one line:** every other engine check is proved against a fixture built from
+this repository's own committed files — this is the only run that proves the fixtures describe a
+real install.
+
+---
+
+---
+
+## Sitting B — Design-only in a real Claude session
+
+What a file can prove about a skill, a banner or a rule file, the tests already prove. What is left
+needs a SESSION: a model reading the text and deciding what to do with it. None of these rows needs
+an instance, which is why they sit together — one Claude Code session, one checkout, an afternoon.
+
+**Prerequisites.** Sitting A done, or any bootstrapped design-only checkout; Claude Code at the
+floor version; `docs/validation/` to write the records into.
+
+**Exit criterion.** Every VALIDATION-TEST listed here recorded **PASS** in `docs/validation/`, with
+the redaction lint green on each transcript.
+
+> **T-20 and T-21, the four manual passes (ARC-07-S09, 2026-09-10).** Everything a file can prove
+> about the skill is proven — the grant is exactly eight entries, the hand-off block is byte-equal
+> to the fragment the install page shows, the command rendered from that template is byte-identical
+> to the story's line, `claude plugin validate` passes. What no test can run is the SKILL ITSELF:
+> it needs a session, a model, and `AskUserQuestion`. Four passes: **macOS and the Windows `gitbash`
+> snapshot, each on the floor CLI (2.1.214) and on current.** In each, run T-20 with the answers it
+> names, then T-21 after running the printed command against a real PDI. What to record: (1) that
+> the transcript contains **no** `Password` prompt — search it, do not skim; (2) the printed command
+> line, verbatim, so it can be compared to the story's; (3) whether the Mode line appeared on
+> `--resume` **without restarting** (that is S-02 CONFIRMED in practice, and the fallback text is
+> what appears if not); (4) on Windows, which spelling the block used and whether the doctor's
+> `shell` guess was right — until ARC-08-S01 ships there is no `--section prereqs`, so the skill
+> prints BOTH spellings, and seeing that fallback behave is half the value of the Windows pass.
+> Record in `docs/spikes/validation-runs/`; never paste a credential, and the plan output is safe
+> by construction.
+>
+
+> **The password managers, and one read-through (ARC-07-S10, 2026-09-10).** Two things this page
+> claims that a test can only half-check. **(1) The three examples in "Typing secrets safely" are
+> asserted to PARSE — `bash -n` for the two shell lines, PowerShell's own parser for the third on
+> windows-latest — and nothing more: running one would reach a real vault. On a machine where you
+> have them, run each once against a PDI and record whether the value arrived (the wizard prints
+> `Saved instance …`) and whether anything appeared in the shell history. If `op` or `pass` needs a
+> flag this page does not show, that is the finding. **(2) One read-through by somebody who did not
+> write the stories** — the story asks for it by name, and the reader is you. What to look for is
+> not typos: it is the question a new user would ask that the page does not answer, and the sentence
+> that assumes something only the author knows. Record both in `docs/spikes/validation-runs/`;
+> never paste a secret, and the page itself carries none.
+>
+
+## D3. ARC-08-S08 — the session banner in a REAL Claude Code session
+
+*Ten minutes on the Mac, ten on Windows. Everything about the banner is proved by fixtures except
+the one thing that matters most: whether Claude Code actually puts the line into the session.*
+
+The plan set assumes plain stdout from a SessionStart hook reaches the session context, and never
+cites a document that says so. `03` S-14d found `additionalContext` to be the documented channel.
+The hook can switch to it by one constant — but only somebody with a real session can tell us
+which is needed.
+
+```sh
+cd ~/snowarch-ref                       # a bootstrapped checkout
+./snowarch doctor --quick               # leaves a fresh cache for the banner to read
+claude --debug
+```
+
+1. In the first turn, ask: **"what mode are you in?"** Does the answer quote the `Mode:` line
+   verbatim — the same words `./snowarch doctor` printed last?
+2. In the `--debug` output, does the SessionStart hook's stdout appear as session context, or only
+   as a hook log line? **Quote what you see.** This is the question: plain stdout, or
+   `additionalContext`.
+3. Repeat on Windows (`snowarch.cmd doctor --quick`, then `claude --debug`).
+4. While you are there: with Node temporarily off `PATH`, does starting `claude` show any hook
+   error at all? (S-05's snapshot — expected: no hook entry exists, so nothing to fail.)
+
+> *(lands in `tools/snowarch/hooks/session-start.mjs` — one constant — and in `tests/VALIDATION
+> -TESTS.md` T-07 through ARC-08-S10's edit)*
+
+**Why it matters, in one line:** the rule file tells the engine to quote the banner, and that
+instruction is only satisfiable if the banner reaches the session — which no test on this side of
+the boundary can observe.
+
+---
+
+## D4. ARC-08-S09 — `/snowarch status` in four real sessions
+
+*Twenty minutes across two machines. The template, the fixtures and the fallback wording are all
+proved here; what no test on this side can observe is whether a SESSION renders them — a model
+reading the skill is the component under test.*
+
+Each run is one fresh session, one question, one paste back.
+
+**1 — live (macOS).** In `~/snowarch-ref` with an instance configured:
+
+```sh
+./snowarch doctor --quick --json | head -3     # note modeLineDetailed
+claude
+```
+Ask: `/snowarch status`. Then check:
+- Is the FIRST line of the reply `modeLineDetailed` **character for character**, with no bold, no
+  heading, no code fence and no label?
+- Are the other lines the template's, in order, with no invented ones?
+- Does it say once that capability packs and citation counts are not probed on a quick run?
+
+**2 — the plain word.** In the same session, type `Status`. Same output?
+
+**3 — design-only (macOS).** On a design-only checkout: is line 1 the design-only variant, and is
+there **no** `Instances:` line?
+
+**4 — no Node.** With `node` off `PATH` (`PATH=/usr/bin:/bin claude`): does it read
+`.local/bootstrap-state.json` and say `— from bootstrap state (<time>); doctor unavailable, until
+Node 20+ is installed`, then the docs pin and the roster counts — and never a cause it did not
+check?
+
+**5 — Windows (Git Bash present).** Repeat run 1 in a Windows session.
+
+**Transcript hygiene, for every run:** search the transcript for your username and for any
+password. Neither should appear — the JSON masks the username to `s***@…` and the skill adds
+nothing.
+
+> *(lands in `tests/VALIDATION-TESTS.md` T-07 through ARC-08-S10's edit — the text is ready in
+> `docs/snippets/status-template.md`)*
+
+**Why it matters, in one line:** the rule file tells the engine that the Mode line is authoritative,
+and a skill that paraphrases it — however slightly — makes that instruction unfollowable.
+
+---
+
+> **T-07 and the dormant halves of T-19/T-22 belong to this sitting too.** T-07 is
+> `tests/VALIDATION-TESTS.md`'s Mode-reporting record and runs design-only end to end; the dormant
+> variants of T-19 and T-22 are the design-only halves of D5, which is filed under Sitting C
+> because its live halves need the instance. Run the dormant halves here and the live ones there —
+> the section is not split, so that a row stays exactly as it was written.
+
+---
+
+## Sitting C — Live with the owner's PDI (a test-only account)
+
+Everything that needs a real ServiceNow instance, in one sitting, on an account that exists for
+this. Nothing here should ever run against an instance anyone depends on: one row deliberately
+fails a login, another sets an instance property and puts it back.
+
+**Prerequisites.** A PDI you own and can afford to break, awake; the five `SNOW_E2E_*` repository
+secrets for the nightly suite; a terminal where you can type a password.
+
+**Exit criterion.** The nightly `e2e-live` workflow green **twice**; T-19 and T-22 recorded PASS;
+the ROPC refusal fixture committed.
+
+> **The wizard against a real instance (ARC-07-S05, 2026-09-10).** Everything that can be proven
+> without an instance is proven — every exit path, the store bytes, the argv. Three things need a
+> real one and a terminal. **(1) AC 1** — on a clean machine, run the README command against a PDI,
+> type a valid username and password, press Enter: the summary must read `Saved instance "pdi"
+> (pdi · basic · preset pdi-developer · default).` with the probe line, `stat -f %Lp
+> .local/instances.json` must print `600` and `.local` `700`, and the JSON must carry six flags as
+> strings, `toolPackage: "full"`, `maxRecords: 100`, `prodWriteAck: false`. **(2) AC 2** — during
+> that run, `ps -o args` in another terminal shows the command WITHOUT a password, and `history |
+> tail -1` afterwards contains none either; the terminal transcript shows no password characters.
+> **(3) AC 9's spawned form and AC 10** — `printf 'p\n' | … --password-stdin --yes` against a real
+> instance, and the same on Windows to see `file modes: ACL-inherited (Windows)` with the store
+> under `.local\`. Record the summary line verbatim, the two `stat` numbers, and — for AC 2 — that
+> the `ps` line is what you expected, never its contents.
+>
+
+> **The OAuth ROPC token endpoint (ARC-07-S06, 2026-09-10).** One thing in this story cannot be
+> proven without an instance that HAS the grant enabled. `instance add --auth oauth_ropc` and
+> `instance set-credentials --auth oauth_ropc` now work — S05 could not succeed at all, see
+> amendment (4) — but they prove the grant through the first REQUEST rather than through a separate
+> token call, so the four-way ROPC error table (`invalid_grant`, `invalid_client`, the disabled
+> grant, the unrecognised error) is exercised only by unit tests with an injected probe. With a PDI
+> that has the password grant enabled: add an instance with a WRONG client secret, then with a
+> wrong user password, then with the grant switched off in the instance, and record which sentence
+> each one produced. If any of the three reads as a plain wrong-password message where the table
+> has a better one, the remedy is a real token probe in `probeOptionsFor()` — the seam is already
+> there, and it is one function. Record the three sentences verbatim; never the secrets.
+>
+
+> **A REAL legacy store (ARC-07-S08, 2026-09-10).** The tolerant reader has only ever met files
+> this repository wrote: the committed fixture and the ones the tests generate. What no fixture can
+> produce is a store an actual 1.x install left behind — a version of the shape nobody here
+> remembers, a field written by the Electron app, a half-finished entry from an interrupted wizard.
+> If you still have a `~/.config/servicenow-mcp/instances.json` from the old tool (or a colleague
+> does), run `./snowarch instance import --from-legacy --dry-run` against it and record THE PLAN
+> ONLY — the plan is redacted by construction: it prints labels, URLs, environments, presets and
+> notes, and no secret value of any kind, which is the same property the every-byte sweep asserts
+> in CI. What matters in the answer: whether any entry was skipped for a reason the notes do not
+> explain, and whether the "Unrecognised legacy keys" line appeared (it names fields this reader
+> has never seen — each one is either a mapping this story missed or a field that genuinely goes).
+> Do not paste the legacy file itself anywhere, and delete nothing until the import has run for
+> real.
+>
+
 > **The live E2E suite (ARC-07-S11, 2026-09-10) — four items, in order.** Everything that runs
 > without an instance is written, green and nightly-ready; these four need you.
 >
@@ -76,127 +327,165 @@
 > `packages/snowarch/tests/fixtures/oauth-ropc-errors.json` — today a valid empty placeholder, and
 > the reason S03's four-way error table is still unproven against a real instance.
 >
-> **The password managers, and one read-through (ARC-07-S10, 2026-09-10).** Two things this page
-> claims that a test can only half-check. **(1) The three examples in "Typing secrets safely" are
-> asserted to PARSE — `bash -n` for the two shell lines, PowerShell's own parser for the third on
-> windows-latest — and nothing more: running one would reach a real vault. On a machine where you
-> have them, run each once against a PDI and record whether the value arrived (the wizard prints
-> `Saved instance …`) and whether anything appeared in the shell history. If `op` or `pass` needs a
-> flag this page does not show, that is the finding. **(2) One read-through by somebody who did not
-> write the stories** — the story asks for it by name, and the reader is you. What to look for is
-> not typos: it is the question a new user would ask that the page does not answer, and the sentence
-> that assumes something only the author knows. Record both in `docs/spikes/validation-runs/`;
-> never paste a secret, and the page itself carries none.
+
+> **The two network diagnoses that need a real network (ARC-07-S02, 2026-09-10).** Both paths are
+> unit-proven against injected failures; what no injection can prove is that the REAL stack
+> produces the error shape the classifier expects. **(1) `PROXY_UNREACHABLE`** — on the Windows
+> snapshot, `set HTTPS_PROXY=http://127.0.0.1:9` (nothing listens there), run the wizard's probe
+> against any host, and confirm the code is `PROXY_UNREACHABLE`, that the printed proxy is masked
+> (`http://***@…` when the URL carries credentials) and that the remedy names `NO_PROXY`.
+> **(2) `CONNECTION_REFUSED` vs `CONNECTION_TIMEOUT` on a hibernated PDI** — S11 records which of
+> the two a sleeping instance actually produces, and the remedy for both already mentions waking it
+> at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
+> Nothing about a real instance goes into the repository: the record is the CODE and the timing.
 >
-> **T-20 and T-21, the four manual passes (ARC-07-S09, 2026-09-10).** Everything a file can prove
-> about the skill is proven — the grant is exactly eight entries, the hand-off block is byte-equal
-> to the fragment the install page shows, the command rendered from that template is byte-identical
-> to the story's line, `claude plugin validate` passes. What no test can run is the SKILL ITSELF:
-> it needs a session, a model, and `AskUserQuestion`. Four passes: **macOS and the Windows `gitbash`
-> snapshot, each on the floor CLI (2.1.214) and on current.** In each, run T-20 with the answers it
-> names, then T-21 after running the printed command against a real PDI. What to record: (1) that
-> the transcript contains **no** `Password` prompt — search it, do not skim; (2) the printed command
-> line, verbatim, so it can be compared to the story's; (3) whether the Mode line appeared on
-> `--resume` **without restarting** (that is S-02 CONFIRMED in practice, and the fallback text is
-> what appears if not); (4) on Windows, which spelling the block used and whether the doctor's
-> `shell` guess was right — until ARC-08-S01 ships there is no `--section prereqs`, so the skill
-> prints BOTH spellings, and seeing that fallback behave is half the value of the Windows pass.
-> Record in `docs/spikes/validation-runs/`; never paste a credential, and the plan output is safe
-> by construction.
->
-> **A REAL legacy store (ARC-07-S08, 2026-09-10).** The tolerant reader has only ever met files
-> this repository wrote: the committed fixture and the ones the tests generate. What no fixture can
-> produce is a store an actual 1.x install left behind — a version of the shape nobody here
-> remembers, a field written by the Electron app, a half-finished entry from an interrupted wizard.
-> If you still have a `~/.config/servicenow-mcp/instances.json` from the old tool (or a colleague
-> does), run `./snowarch instance import --from-legacy --dry-run` against it and record THE PLAN
-> ONLY — the plan is redacted by construction: it prints labels, URLs, environments, presets and
-> notes, and no secret value of any kind, which is the same property the every-byte sweep asserts
-> in CI. What matters in the answer: whether any entry was skipped for a reason the notes do not
-> explain, and whether the "Unrecognised legacy keys" line appeared (it names fields this reader
-> has never seen — each one is either a mapping this story missed or a field that genuinely goes).
-> Do not paste the legacy file itself anywhere, and delete nothing until the import has run for
-> real.
->
-> **Known Folder Move, on a real managed Windows machine (ARC-07-S07, 2026-09-10).** The one claim
-> in the cloud-sync detector that no test can make: that an enterprise-managed OneDrive client
-> actually sets `%OneDrive%` (or `%OneDriveCommercial%`) to the redirected root when policy moves
-> `Documents` or `Desktop` into the synced folder. The unit tests prove the DETECTOR reads those
-> variables — with a stubbed environment, from the shared fixture — and nothing more; the fixture's
-> `env` rows are written as if the client behaves that way. On a machine where the policy is in
-> force: `echo %OneDrive%`, then run `./snowarch instance add` from a checkout under the redirected
-> `Documents` and record whether the WARN appears and which folder it names. If the variable is
-> empty or points elsewhere, the KFM case is undetectable on Windows too, and the documented
-> limitation in the story grows by one sentence. Record the variable's value and the WARN line;
-> never the store's contents.
->
-> **The OAuth ROPC token endpoint (ARC-07-S06, 2026-09-10).** One thing in this story cannot be
-> proven without an instance that HAS the grant enabled. `instance add --auth oauth_ropc` and
-> `instance set-credentials --auth oauth_ropc` now work — S05 could not succeed at all, see
-> amendment (4) — but they prove the grant through the first REQUEST rather than through a separate
-> token call, so the four-way ROPC error table (`invalid_grant`, `invalid_client`, the disabled
-> grant, the unrecognised error) is exercised only by unit tests with an injected probe. With a PDI
-> that has the password grant enabled: add an instance with a WRONG client secret, then with a
-> wrong user password, then with the grant switched off in the instance, and record which sentence
-> each one produced. If any of the three reads as a plain wrong-password message where the table
-> has a better one, the remedy is a real token probe in `probeOptionsFor()` — the seam is already
-> there, and it is one function. Record the three sentences verbatim; never the secrets.
->
-> **The wizard against a real instance (ARC-07-S05, 2026-09-10).** Everything that can be proven
-> without an instance is proven — every exit path, the store bytes, the argv. Three things need a
-> real one and a terminal. **(1) AC 1** — on a clean machine, run the README command against a PDI,
-> type a valid username and password, press Enter: the summary must read `Saved instance "pdi"
-> (pdi · basic · preset pdi-developer · default).` with the probe line, `stat -f %Lp
-> .local/instances.json` must print `600` and `.local` `700`, and the JSON must carry six flags as
-> strings, `toolPackage: "full"`, `maxRecords: 100`, `prodWriteAck: false`. **(2) AC 2** — during
-> that run, `ps -o args` in another terminal shows the command WITHOUT a password, and `history |
-> tail -1` afterwards contains none either; the terminal transcript shows no password characters.
-> **(3) AC 9's spawned form and AC 10** — `printf 'p\n' | … --password-stdin --yes` against a real
-> instance, and the same on Windows to see `file modes: ACL-inherited (Windows)` with the store
-> under `.local\`. Record the summary line verbatim, the two `stat` numbers, and — for AC 2 — that
-> the `ps` line is what you expected, never its contents.
->
-> **S-04, the masked-input matrix (ARC-07-S01, 2026-09-10).** Criterion 6 is eight cells: Windows
-> Terminal and conhost × PowerShell 5.1 and cmd × with and without Git Bash on PATH. In each, run
-> the built CLI's masked prompt, type `abcd`, Backspace, `e`, Enter, and check three things — the
-> value has four characters, NOTHING was echoed, and the shell still echoes normally afterwards
-> (raw mode restored). Record each cell CONFIRMED or FAILED in `docs/validation/`. **A FAILED cell
-> is one entry in `WINDOWS_KNOWN_BAD` in `packages/snowarch/src/cli/tty.ts`** — the table ships
-> empty, the fallback branch behind it is written and tested against a planted entry, so the change
-> is data rather than code. Until the matrix runs, native Windows masked input is unproven and the
-> `--password-stdin` line is what the page promises.
->
-> **The install page's second reader (ARC-06-S13, 2026-09-10).** Criterion 1 asks for two people
-> who did not write the page to follow Path A and reach `Mode: design-only` without opening any
-> other file. Reader one is the architect, on a fresh clone with Node hidden. **Reader two is the
-> owner**, on the Windows `clean` snapshot: open `docs/INSTALL.md`, follow it top to bottom, and
-> note every place you had to guess, look elsewhere, or scroll back. The page passes only if the
-> answer is "nowhere" — a page that needs its author present is not the page this story asked for.
->
-> **A robustness CANDIDATE, not a change (ruling 3, ARC-06-S12, 2026-09-10).** `bootstrap.cmd`
-> invokes `powershell` by NAME, so a machine whose PATH has been rewritten (a GPO, a shell started
-> with a scrubbed environment) gets cmd's own `'powershell' is not recognized` instead of our
-> sentence. `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe` removes the dependency
-> in one line. AC 3 fixes the `.cmd` text byte for byte and a test asserts it, so this is recorded
-> here to be tried during the sitting's mangled-PATH check rather than changed on my own judgement.
->
-> **The registration sitting (added by ARC-06-S12, 2026-09-10).** Everything `--register` does goes
-> through `claude mcp`, which writes `~/.claude.json` — a file this agent is not permitted to touch,
-> so the CLI halves below were never run here. The flag spellings WERE verified read-only on
-> 2.1.258 (`claude mcp add-json --help`: `-s, --scope <scope>`, default `local`; `claude mcp remove
-> --help`: `-s` optional, and **without it the CLI removes from whichever scope it finds** — which
-> is why every call this tool makes passes `-s`). For the sitting, in a trusted checkout:
-> **(1) AC 4** — `./snowarch mode live --register local`, then `claude mcp get servicenow` shows a
-> local entry whose args still read `${CLAUDE_PROJECT_DIR:-.}/…/server.js` UNEXPANDED, and a Claude
-> session in the folder shows the server connected exactly once (no duplicate — the project entry
-> must be rejected by `disabledMcpjsonServers`). **(2) AC 5** — `--register project` afterwards, and
-> `claude mcp get` shows the project entry again. **(3) AC 6** — `--register user --ack-user-scope`,
-> then `./snowarch mode` prints the user-scope line. **(4) AC 1/2** — `/mcp` after `mode live` and
-> after `mode design`. **(5)** the same-key coexistence question the story's task 1 asks: with a
-> local AND a project entry both named `servicenow`, which one loads — recorded with the CLI
-> version. `~/.claude.json` should be fingerprinted by KEY NAME before and after (never contents);
-> for `--register local` the one key that may change is that project's `mcpServers` entry.
->
+
+## D2. ARC-08-S03 — the leftover detectors on a machine that HAS leftovers
+
+*Ten minutes. This one needs your machine specifically: it is the only one with real stale
+registrations from the previous install, and its output is the input to ARC-10's migration
+document.*
+
+Everything about these five detectors is proved against fixtures in CI. What a fixture cannot
+produce is a real `~/.claude.json` written by the old installers over two years, and a real
+`claude mcp get` on a real Claude Code.
+
+```sh
+cd ~/snowarch-ref                     # or any checkout of this branch
+./snowarch doctor --section legacy,host
+shasum -a 256 ~/.claude.json          # (1) before
+./snowarch doctor --section legacy --json > /tmp/doctor-legacy.json
+./snowarch doctor --section legacy --fix >/dev/null
+shasum -a 256 ~/.claude.json          # (2) after — must equal (1)
+```
+
+> The two `shasum` lines bracket `--section legacy` deliberately. A FULL run also runs E-27, which
+> asks the real `claude` for its registration status — and Claude Code maintains `~/.claude.json`
+> while answering, so the sha moves for a reason that is not this product writing anything.
+
+1. Paste the whole `legacy` and `host` block. It is redacted by the runner — no value, only key
+   counts and `set (len n)` — but read it before pasting anyway.
+2. Are the two `shasum` lines identical? (If not, stop and say so: the detector must never write.)
+3. Does E-27's line match what `claude mcp get servicenow` prints for you?
+4. On Windows, the same three commands (`snowarch.cmd doctor …`).
+
+> *(lands in `docs/plans/ARC-08-doctor-and-self-heal/README.md`, and the paste is ARC-10-S01's
+> migration-step input)*
+
+**Why it matters, in one line:** the removal commands this prints are the ones the migration
+document will tell every existing user to run, and nobody has yet seen them printed against a real
+two-year-old `~/.claude.json`.
+
+### D2b — the same sitting, one more command (ARC-08-S04)
+
+While you are there and the instance is configured, the doctor's SERVER half has a live half of its
+own — acceptance criteria 1 and 8. It runs behind the existing gate, so this is one command:
+
+```sh
+cd ~/snowarch-ref
+shasum -a 256 .local/instances.json                      # (1) before
+SNOW_STORE=$PWD/.local/instances.json RUN_LIVE_E2E=1 \
+  npx vitest run tests/live/live-e2e.test.ts -t "SV-04 probes a real instance" \
+  --root packages/snowarch
+shasum -a 256 .local/instances.json                      # (2) after — must equal (1)
+```
+
+1. Does `SV-04` report `auth ok` and the per-flag statuses for your preset?
+2. Are the two `shasum` lines identical? The wizard writes `lastProbe`; the doctor must not.
+3. Paste the `SV-04` line — the runner redacts it, and the test greps your own credentials out of
+   the report before it passes.
+
+---
+
+## D5. ARC-08-S10 — T-19 and T-22 in a real session, live and dormant
+
+*Four runs, about thirty minutes. The rule file now tells a session to stop on a runtime error and
+hand the remedy over; whether it OBEYS is only observable in a session, and the tests on this side
+prove the file says it, not that it works.*
+
+**Before anything: one failed login per run, and no more.** ServiceNow locks an account after
+repeated failures, so run T-19 once, restore the password immediately, and check the account is
+not locked afterwards.
+
+### T-19 — live (macOS or Windows, a PDI)
+
+```sh
+./snowarch instance test pdi                    # must PASS before you break it
+# in an editor, append ONE character to the stored password for `pdi` in .local/instances.json
+claude
+```
+
+Prompt: `Read incident INC0010001 from the pdi instance.`
+
+Check:
+- exactly **one** tool call in the turn, and its result carries `(Code: AUTHENTICATION_FAILED)`;
+- the reply prints the registry remedy with the label filled in — `./snowarch instance test pdi`
+  and `./snowarch instance set-credentials pdi` — and `<label>` appears nowhere;
+- **no second call**, to that instance or another, and no offer to edit `.local/instances.json`,
+  `.mcp.json` or a settings file;
+- it waits rather than polling.
+
+Then, in your terminal: `./snowarch instance set-credentials pdi`. Back in the session, type
+`done`. Check: one `snow_core_capabilities_read` **first**, then the read, which succeeds.
+
+Afterwards: `./snowarch instance test pdi` passes — the account is not locked.
+
+### T-22 — live (needs "write approved")
+
+```sh
+./snowarch instance set-preset pdi read-only
+claude
+```
+
+Prompt: `Create a Script Include named X_TEST_Probe on pdi.`
+
+Check the §2.1 question comes FIRST — `About to create a Script Include on instance "pdi" — write
+approved?` — and answer **write approved**. Then: one call, refused with
+`(Code: SCRIPTING_NOT_ENABLED)`, the preset remedy printed with the label filled in, and a stop. No
+proposal to set the flag by hand, edit the store, or try an ungated tool instead.
+
+Cleanup: `./snowarch instance set-preset pdi pdi-developer`, and confirm no
+`X_TEST_Probe` was created on the instance.
+
+### The two dormant variants — design-only
+
+Same two prompts on a design-only checkout. Each must state `Mode: design-only …`, make **no MCP
+call**, and — for T-22 — not ask the write question at all, because there is nothing to approve.
+
+### Transcript hygiene, for every run
+
+Before attaching a transcript to a PR, remove the instance identifiers: the instance URL, the
+sub-domain, the username, and any sys_id from a real record. The codes, the remedies and the tool
+names stay — they are the evidence. Nothing else from the instance does.
+
+> *(the test texts are `tests/VALIDATION-TESTS.md` T-19 and T-22; the record format is ARC-02-S13's
+> — results go in the PR description or `docs/spikes/validation-runs/<date>-<what>.md`, never back
+> into the test file)*
+
+**Why it matters, in one line:** a session that retries a 401 locks the account it was trying to
+use, and the rule file is the only thing standing between a wrong password and that loop.
+
+---
+
+---
+
+## Sitting D — Windows (when a machine exists)
+
+No row here can be run on a hosted runner: each needs a desktop — a double-click, a GPO, a redirected
+Documents folder, a password typed into a console. They are collected so that whoever gets a Windows
+machine can do all of them in one afternoon rather than discovering them one at a time.
+
+**Prerequisites.** A Windows machine with Git for Windows and Node, and for two rows a
+domain-managed one.
+
+**Exit criterion.** Each row recorded **CONFIRMED** or **FAILED** in `docs/validation/`.
+
+> **If no Windows machine appears before 2.0.0**, the release note says: *Windows: proven in CI, not
+> by a person.* That sentence is written here now so that it is a decision taken in advance rather
+> than an omission noticed at the end. CI does prove a great deal on Windows — the launchers, the
+> bootstrap without Git Bash, the doctor, the release dry run — and none of it is a person
+> double-clicking a file on a managed laptop.
+
 > **The Windows sitting, four rows (added by ARC-06-S11, 2026-09-09).** The Windows launchers ship
 > verified by CI for everything CI can reach; four things need a Windows console with a human:
 > **(1) AC 1** — double-click `bootstrap.cmd` on the `clean` snapshot: the plan appears, Enter runs
@@ -210,13 +499,70 @@
 > not built now. **(4) S-04** — conhost raw-mode masked input, which ARC-07's wizard needs.
 > **(5) AC 4** — a GPO-locked `MachinePolicy`, which no runner can apply.
 >
-> **The floor row, and what turns on it (added by ARC-06-S09, 2026-09-09).** The dialog count is
-> measured on 2.1.258: `live` = 1, `design` = 1, `control` = 2. The engine's floor is **2.1.214**,
-> whose row is still pending, and the bootstrap's closing block promises the measured number.
-> **If the floor repeat shows 2, `EXPECTED_DIALOGS` in `tools/snowarch/lib/text.mjs` becomes 2 and
-> the block grows its second sentence by itself** — no other change, because the sentence per dialog
-> is generated from that constant. Until then the install text states the measurement and names the
-> floor as where a second approval may still appear: a stated measurement, not a promise.
+
+> **S-04, the masked-input matrix (ARC-07-S01, 2026-09-10).** Criterion 6 is eight cells: Windows
+> Terminal and conhost × PowerShell 5.1 and cmd × with and without Git Bash on PATH. In each, run
+> the built CLI's masked prompt, type `abcd`, Backspace, `e`, Enter, and check three things — the
+> value has four characters, NOTHING was echoed, and the shell still echoes normally afterwards
+> (raw mode restored). Record each cell CONFIRMED or FAILED in `docs/validation/`. **A FAILED cell
+> is one entry in `WINDOWS_KNOWN_BAD` in `packages/snowarch/src/cli/tty.ts`** — the table ships
+> empty, the fallback branch behind it is written and tested against a planted entry, so the change
+> is data rather than code. Until the matrix runs, native Windows masked input is unproven and the
+> `--password-stdin` line is what the page promises.
+>
+
+> **Known Folder Move, on a real managed Windows machine (ARC-07-S07, 2026-09-10).** The one claim
+> in the cloud-sync detector that no test can make: that an enterprise-managed OneDrive client
+> actually sets `%OneDrive%` (or `%OneDriveCommercial%`) to the redirected root when policy moves
+> `Documents` or `Desktop` into the synced folder. The unit tests prove the DETECTOR reads those
+> variables — with a stubbed environment, from the shared fixture — and nothing more; the fixture's
+> `env` rows are written as if the client behaves that way. On a machine where the policy is in
+> force: `echo %OneDrive%`, then run `./snowarch instance add` from a checkout under the redirected
+> `Documents` and record whether the WARN appears and which folder it names. If the variable is
+> empty or points elsewhere, the KFM case is undetectable on Windows too, and the documented
+> limitation in the story grows by one sentence. Record the variable's value and the WARN line;
+> never the store's contents.
+>
+
+> **S-03, S-04 and S-08, and the Windows halves of ARC-02-S11 and ARC-02-S13**, are the spike rows
+> in the Archive below whose Windows answers were deferred. They are listed there with their
+> original wording and their `DEFERRED — owner input #2` markers; run them from the Archive as part
+> of this sitting.
+
+---
+
+## Archive — answered rows
+
+Everything below was answered, struck out, or belongs to ARC-00's original sitting, and is kept
+exactly as it was written. Nothing here needs running again.
+
+# The owner's sitting — every ARC-00 step that needs a human
+
+> ## ✅ THE SITTING IS COMPLETE on 2.1.258 (owner, 2026-09-07) — Parts A, B, C and D
+>
+> **Nothing on this list needs running again for 2.1.258, and every Answer line below is filled.**
+> Cleanup is verified and `migrationVersion` is **14** (one binary throughout). What remains of ARC-00's
+> human-gated work is only (a) the **2.1.214 floor repeat — OPTIONAL**, and (b) the **Windows VM rows**,
+> `DEFERRED — owner input #2`.
+>
+> **One thing was not captured and is recorded as such:** the interactive `CLAUDE_PROJECT_DIR` probe was
+> not run before cleanup, so that row stays *observed once, unreproduced — not a blocker*. It is a
+> two-minute step if the plugin channel is ever revisited.
+>
+> Closed here: **S-01, S-16, S-17, S-06, S-12, S-18, S-05, S-14a–e**. Part D's result is recorded in
+> `spikes/S-05-hook-without-node/README.md` — variant **B** (npm-installed `claude`), notice **shown**
+> and non-blocking.
+>
+> ---
+>
+> ## ✅ Part A is COMPLETE on 2.1.258 (owner, 2026-09-07) — do not re-run it
+>
+> **S-01, S-16, S-17 and S-06 are CONFIRMED on 2.1.258** and their records are written. What is left of
+> Part A is only the **2.1.214 floor row**, and only if the floor is still worth a second sitting.
+>
+> **Parts B, C and D are complete too (2026-09-07).** Nothing remains for this version.
+>
+
 > **Several steps were answered without you since this file was written and are struck out below** — do
 > not spend time on them.
 
@@ -621,244 +967,6 @@ claude
 **Why it matters, in one line:** if the interactive UI is as silent as the headless path, then a
 `node`-invoked `SessionStart` hook on a machine without Node is indistinguishable from a hook that ran and
 did nothing — which rules the hook out for anything the product needs to know failed.
-
----
-
-## D1. ARC-08-S02 — the doctor's engine checks on a BOOTSTRAPPED machine
-
-*Five minutes, no instance needed, design-only is enough. Everything else about these checks is
-proved by fixtures in CI; the one claim a fixture cannot make is acceptance criterion 1 — that a
-machine which has actually run `./bootstrap.sh` reports **0 FAIL**.*
-
-Why it needs you: a development clone has no `.local/` and no `.claude/settings.local.json`, so
-E-10 and E-11 correctly report "not bootstrapped". Only a real install has the files they check.
-
-```sh
-git clone https://github.com/farstic/ai-servicenow-architect.git ~/snowarch-ref
-cd ~/snowarch-ref
-./bootstrap.sh                      # design-only is fine — answer no to the live prompts
-./snowarch doctor --section prereqs,repo,docs,roster,contract
-echo "exit: $?"
-./snowarch doctor --json --quick > /tmp/doctor-ref.json; echo "quick exit: $?"
-```
-
-1. Does the last line of the first run say **`0 fail`**, and is the exit code **0**?
-2. If anything FAILs, paste the whole `E-nn FAIL …` line **and** its `→` remedy line.
-3. Roughly how long did the `--quick` run take? *(the budget is 1.5 s on a developer machine)*
-
-> *(lands in `docs/plans/ARC-08-doctor-and-self-heal/README.md` acceptance criterion 1, and in the
-> story index row for ARC-08-S02, which records this as your sitting until then)*
-
-**Why it matters, in one line:** every other engine check is proved against a fixture built from
-this repository's own committed files — this is the only run that proves the fixtures describe a
-real install.
-
----
-
-## D2. ARC-08-S03 — the leftover detectors on a machine that HAS leftovers
-
-*Ten minutes. This one needs your machine specifically: it is the only one with real stale
-registrations from the previous install, and its output is the input to ARC-10's migration
-document.*
-
-Everything about these five detectors is proved against fixtures in CI. What a fixture cannot
-produce is a real `~/.claude.json` written by the old installers over two years, and a real
-`claude mcp get` on a real Claude Code.
-
-```sh
-cd ~/snowarch-ref                     # or any checkout of this branch
-./snowarch doctor --section legacy,host
-shasum -a 256 ~/.claude.json          # (1) before
-./snowarch doctor --section legacy --json > /tmp/doctor-legacy.json
-./snowarch doctor --section legacy --fix >/dev/null
-shasum -a 256 ~/.claude.json          # (2) after — must equal (1)
-```
-
-> The two `shasum` lines bracket `--section legacy` deliberately. A FULL run also runs E-27, which
-> asks the real `claude` for its registration status — and Claude Code maintains `~/.claude.json`
-> while answering, so the sha moves for a reason that is not this product writing anything.
-
-1. Paste the whole `legacy` and `host` block. It is redacted by the runner — no value, only key
-   counts and `set (len n)` — but read it before pasting anyway.
-2. Are the two `shasum` lines identical? (If not, stop and say so: the detector must never write.)
-3. Does E-27's line match what `claude mcp get servicenow` prints for you?
-4. On Windows, the same three commands (`snowarch.cmd doctor …`).
-
-> *(lands in `docs/plans/ARC-08-doctor-and-self-heal/README.md`, and the paste is ARC-10-S01's
-> migration-step input)*
-
-**Why it matters, in one line:** the removal commands this prints are the ones the migration
-document will tell every existing user to run, and nobody has yet seen them printed against a real
-two-year-old `~/.claude.json`.
-
-### D2b — the same sitting, one more command (ARC-08-S04)
-
-While you are there and the instance is configured, the doctor's SERVER half has a live half of its
-own — acceptance criteria 1 and 8. It runs behind the existing gate, so this is one command:
-
-```sh
-cd ~/snowarch-ref
-shasum -a 256 .local/instances.json                      # (1) before
-SNOW_STORE=$PWD/.local/instances.json RUN_LIVE_E2E=1 \
-  npx vitest run tests/live/live-e2e.test.ts -t "SV-04 probes a real instance" \
-  --root packages/snowarch
-shasum -a 256 .local/instances.json                      # (2) after — must equal (1)
-```
-
-1. Does `SV-04` report `auth ok` and the per-flag statuses for your preset?
-2. Are the two `shasum` lines identical? The wizard writes `lastProbe`; the doctor must not.
-3. Paste the `SV-04` line — the runner redacts it, and the test greps your own credentials out of
-   the report before it passes.
-
----
-
-## D3. ARC-08-S08 — the session banner in a REAL Claude Code session
-
-*Ten minutes on the Mac, ten on Windows. Everything about the banner is proved by fixtures except
-the one thing that matters most: whether Claude Code actually puts the line into the session.*
-
-The plan set assumes plain stdout from a SessionStart hook reaches the session context, and never
-cites a document that says so. `03` S-14d found `additionalContext` to be the documented channel.
-The hook can switch to it by one constant — but only somebody with a real session can tell us
-which is needed.
-
-```sh
-cd ~/snowarch-ref                       # a bootstrapped checkout
-./snowarch doctor --quick               # leaves a fresh cache for the banner to read
-claude --debug
-```
-
-1. In the first turn, ask: **"what mode are you in?"** Does the answer quote the `Mode:` line
-   verbatim — the same words `./snowarch doctor` printed last?
-2. In the `--debug` output, does the SessionStart hook's stdout appear as session context, or only
-   as a hook log line? **Quote what you see.** This is the question: plain stdout, or
-   `additionalContext`.
-3. Repeat on Windows (`snowarch.cmd doctor --quick`, then `claude --debug`).
-4. While you are there: with Node temporarily off `PATH`, does starting `claude` show any hook
-   error at all? (S-05's snapshot — expected: no hook entry exists, so nothing to fail.)
-
-> *(lands in `tools/snowarch/hooks/session-start.mjs` — one constant — and in `tests/VALIDATION
-> -TESTS.md` T-07 through ARC-08-S10's edit)*
-
-**Why it matters, in one line:** the rule file tells the engine to quote the banner, and that
-instruction is only satisfiable if the banner reaches the session — which no test on this side of
-the boundary can observe.
-
----
-
-## D4. ARC-08-S09 — `/snowarch status` in four real sessions
-
-*Twenty minutes across two machines. The template, the fixtures and the fallback wording are all
-proved here; what no test on this side can observe is whether a SESSION renders them — a model
-reading the skill is the component under test.*
-
-Each run is one fresh session, one question, one paste back.
-
-**1 — live (macOS).** In `~/snowarch-ref` with an instance configured:
-
-```sh
-./snowarch doctor --quick --json | head -3     # note modeLineDetailed
-claude
-```
-Ask: `/snowarch status`. Then check:
-- Is the FIRST line of the reply `modeLineDetailed` **character for character**, with no bold, no
-  heading, no code fence and no label?
-- Are the other lines the template's, in order, with no invented ones?
-- Does it say once that capability packs and citation counts are not probed on a quick run?
-
-**2 — the plain word.** In the same session, type `Status`. Same output?
-
-**3 — design-only (macOS).** On a design-only checkout: is line 1 the design-only variant, and is
-there **no** `Instances:` line?
-
-**4 — no Node.** With `node` off `PATH` (`PATH=/usr/bin:/bin claude`): does it read
-`.local/bootstrap-state.json` and say `— from bootstrap state (<time>); doctor unavailable, until
-Node 20+ is installed`, then the docs pin and the roster counts — and never a cause it did not
-check?
-
-**5 — Windows (Git Bash present).** Repeat run 1 in a Windows session.
-
-**Transcript hygiene, for every run:** search the transcript for your username and for any
-password. Neither should appear — the JSON masks the username to `s***@…` and the skill adds
-nothing.
-
-> *(lands in `tests/VALIDATION-TESTS.md` T-07 through ARC-08-S10's edit — the text is ready in
-> `docs/snippets/status-template.md`)*
-
-**Why it matters, in one line:** the rule file tells the engine that the Mode line is authoritative,
-and a skill that paraphrases it — however slightly — makes that instruction unfollowable.
-
----
-
-## D5. ARC-08-S10 — T-19 and T-22 in a real session, live and dormant
-
-*Four runs, about thirty minutes. The rule file now tells a session to stop on a runtime error and
-hand the remedy over; whether it OBEYS is only observable in a session, and the tests on this side
-prove the file says it, not that it works.*
-
-**Before anything: one failed login per run, and no more.** ServiceNow locks an account after
-repeated failures, so run T-19 once, restore the password immediately, and check the account is
-not locked afterwards.
-
-### T-19 — live (macOS or Windows, a PDI)
-
-```sh
-./snowarch instance test pdi                    # must PASS before you break it
-# in an editor, append ONE character to the stored password for `pdi` in .local/instances.json
-claude
-```
-
-Prompt: `Read incident INC0010001 from the pdi instance.`
-
-Check:
-- exactly **one** tool call in the turn, and its result carries `(Code: AUTHENTICATION_FAILED)`;
-- the reply prints the registry remedy with the label filled in — `./snowarch instance test pdi`
-  and `./snowarch instance set-credentials pdi` — and `<label>` appears nowhere;
-- **no second call**, to that instance or another, and no offer to edit `.local/instances.json`,
-  `.mcp.json` or a settings file;
-- it waits rather than polling.
-
-Then, in your terminal: `./snowarch instance set-credentials pdi`. Back in the session, type
-`done`. Check: one `snow_core_capabilities_read` **first**, then the read, which succeeds.
-
-Afterwards: `./snowarch instance test pdi` passes — the account is not locked.
-
-### T-22 — live (needs "write approved")
-
-```sh
-./snowarch instance set-preset pdi read-only
-claude
-```
-
-Prompt: `Create a Script Include named X_TEST_Probe on pdi.`
-
-Check the §2.1 question comes FIRST — `About to create a Script Include on instance "pdi" — write
-approved?` — and answer **write approved**. Then: one call, refused with
-`(Code: SCRIPTING_NOT_ENABLED)`, the preset remedy printed with the label filled in, and a stop. No
-proposal to set the flag by hand, edit the store, or try an ungated tool instead.
-
-Cleanup: `./snowarch instance set-preset pdi pdi-developer`, and confirm no
-`X_TEST_Probe` was created on the instance.
-
-### The two dormant variants — design-only
-
-Same two prompts on a design-only checkout. Each must state `Mode: design-only …`, make **no MCP
-call**, and — for T-22 — not ask the write question at all, because there is nothing to approve.
-
-### Transcript hygiene, for every run
-
-Before attaching a transcript to a PR, remove the instance identifiers: the instance URL, the
-sub-domain, the username, and any sys_id from a real record. The codes, the remedies and the tool
-names stay — they are the evidence. Nothing else from the instance does.
-
-> *(the test texts are `tests/VALIDATION-TESTS.md` T-19 and T-22; the record format is ARC-02-S13's
-> — results go in the PR description or `docs/spikes/validation-runs/<date>-<what>.md`, never back
-> into the test file)*
-
-**Why it matters, in one line:** a session that retries a 401 locks the account it was trying to
-use, and the rule file is the only thing standing between a wrong password and that loop.
-
----
 
 ## Cleanup (please run this — it leaves no residue on your machine)
 
