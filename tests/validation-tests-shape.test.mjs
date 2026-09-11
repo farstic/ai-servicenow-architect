@@ -282,8 +282,12 @@ for (const [title, checkName, breakIt] of NEGATIVES) {
 // ── ARC-09-C17 — where the changelog stops being live ──────────────────────────────────────────
 
 test('C17: history starts at the newest release heading, not at the frozen one', () => {
+  // A VERSION THAT CAN NEVER BE CURRENT (ARC-09-C17b). This fixture said `2.0.0-rc.0` — the
+  // rehearsal's version — which became the current version ON the rehearsal tree, so the
+  // version-literal sweep flagged it and was right to. A fixture version must be one no release
+  // will ever carry; `9.9.9` is the convention here, and the upgrade harness already uses `v9.x`.
   const released = ['# Changelog', '', '## Unreleased', '', '### Notes', '',
-    '## 2.0.0-rc.0 — 2026-09-11', '', 'a sentence naming an old path', '',
+    '## 9.9.9 — 2026-01-01', '', 'a sentence naming an old path', '',
     '## Before 2.0.0', '', 'the frozen region', ''];
   // The released section is history: its index is the first `## <version>` line, not the frozen one.
   assert.equal(historyStartsAt(released), 6);

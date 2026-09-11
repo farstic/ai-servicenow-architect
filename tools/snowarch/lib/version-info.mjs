@@ -105,7 +105,11 @@ export const floorLine = (floors) => Object.entries(floors)
   .map(([k, v]) => `${k === 'claudeCode' ? 'claude' : k} ≥ ${v}`).join(' · ');
 
 /**
- * The six lines. Line 1 is ARC-06-S02's, byte for byte — four programs quote it and a test pins it.
+ * The six lines — SEVEN on a tagged checkout, where a seventh compares the tag's message with the
+ * tree (ARC-09-C17b: the count is part of what distinguishes the two shapes, and a test and two CI
+ * steps had "six" written into them).
+ *
+ * Line 1 is ARC-06-S02's, byte for byte — four programs quote it and a test pins it.
  */
 export function renderVersion(info) {
   const lines = [];

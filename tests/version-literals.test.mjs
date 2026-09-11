@@ -14,6 +14,12 @@
  *
  * Two more were found the same way (`CONTRACT.version` and the handshake's `serverInfo.version`).
  * This file is what stops the next one being found by a release.
+ *
+ * THE RULE FOR FIXTURES (ARC-09-C17b): a test that needs a version in its DATA uses one no release
+ * will ever carry — `9.9.9`, or the `v9.x` the upgrade harness uses. A plausible one is a trap: a
+ * fixture spelling `2.0.0-rc.0` was invisible until the rehearsal cut `v2.0.0-rc.0`, at which point
+ * the sweep flagged it and was right to. The sweep cannot tell a fixture's version from an
+ * assertion's, and it should not have to.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -126,4 +132,15 @@ test('C17: the allow-list survives a release, because it is not keyed to the ver
   const newRule = Object.entries(FIXTURE_FILES)
     .filter(([rel, { literal }]) => literalLines(readFileSync(join(root, rel), 'utf8'), literal).length === 0);
   assert.deepEqual(newRule, [], 'the new rule still calls a fixture stale on a released tree');
+});
+
+
+test('C17b: a fixture spelling the current version is caught, even in a heading', () => {
+  // The negative control for that rule. The line that slipped through was a markdown `##` heading
+  // inside a fixture array — not an `expect(...)` — so the control uses that shape rather than an
+  // assertion's, which is the shape the earlier control already covered.
+  const planted = `  const released = ['## ${rootVersion} — 2026-01-01', '', 'text'];`;
+  assert.deepEqual(literalLines(planted, rootVersion), [1]);
+  // And the convention passes: a fixture version no release will carry.
+  assert.deepEqual(literalLines(`  const released = ['## 9.9.9 — 2026-01-01'];`, rootVersion), []);
 });

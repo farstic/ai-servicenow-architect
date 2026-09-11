@@ -130,7 +130,6 @@ test('an import/* tag is not a release — the --match filter is the whole point
 test('AC 3 — a checkout says which of the two it is, and means it', () => {
   const info = versionInfo(REAL_ROOT);
   const rendered = renderVersion(info);
-  assert.equal(rendered.length, 6, 'the layout is not six lines');
 
   // TWO TREES (ARC-09-C17). This used to assert `info.tag === null` — a property of the checkout
   // that a RELEASE CHANGES, so it failed on the release commit's own pull request, which is the
@@ -138,6 +137,14 @@ test('AC 3 — a checkout says which of the two it is, and means it', () => {
   // rewriting`. It is rewritten: on a tagged tree the released shape is asserted, and that is the
   // shape this test should be most interested in.
   if (info.tag) {
+    // SEVEN lines on a tagged tree, not six (ARC-09-C17b). The seventh is S04's comparison of the
+    // tag's message with the tree, and it exists only when a tag is exact — so the count itself is
+    // part of what distinguishes the two shapes. I asserted six ABOVE this branch in C17, which
+    // made the branch unreachable in the only case it was written for; rehearsal run 5 reported it
+    // as `the layout is not six lines: 7 !== 6`.
+    assert.equal(rendered.length, 7, `a tagged checkout prints seven lines:\n${rendered.join('\n')}`);
+    assert.match(rendered[6],
+      /^tag says: {3}contract [0-9a-f]{4}…[0-9a-f]{4} · docs-pin [0-9a-f]{7}$/, rendered[6]);
     assert.equal(info.tag.distance, 0,
       `the tag is ${info.tag.distance} commits back — this is not the release commit`);
     assert.equal(info.tag.exact, true, 'a tag is reachable but this commit is not it');
@@ -151,6 +158,8 @@ test('AC 3 — a checkout says which of the two it is, and means it', () => {
       'the tag message carries fewer than three floors');
     return;
   }
+
+  assert.equal(rendered.length, 6, `an untagged checkout prints six lines:\n${rendered.join('\n')}`);
 
   // WHICH "none" depends on the clone, and the test must not decide that for it: CI's `test` job
   // clones shallow, where the honest answer is "tags unreachable" rather than "no release tag".
@@ -357,7 +366,13 @@ test('C17: the released-tree branch of AC 3 is reachable, and asserts the releas
   assert.ok(info.tag, 'the fixture is not tagged — the control proves nothing');
   assert.equal(info.tag.exact, true);
   assert.equal(info.tag.distance, 0);
-  assert.match(renderVersion(info)[1], /^tag: {8}v2\.0\.0 \(exact\)$/);
+  const rendered = renderVersion(info);
+  assert.match(rendered[1], /^tag: {8}v2\.0\.0 \(exact\)$/);
+  // ARC-09-C17b: seven lines on a tagged tree, and the seventh is the tag-message comparison. This
+  // fixture is the only place that shape is exercised until a release happens.
+  assert.equal(rendered.length, 7, `a tagged fixture prints seven lines:\n${rendered.join('\n')}`);
+  assert.match(rendered[6],
+    /^tag says: {3}contract [0-9a-f]{4}…[0-9a-f]{4} · docs-pin [0-9a-f]{7}$/, rendered[6]);
   assert.equal(info.tag.message.contract, f.sha);
   assert.equal(info.tag.message.docsPin, PIN);
 

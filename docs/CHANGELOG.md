@@ -143,6 +143,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **`snowarch version` prints seven lines on a tagged checkout, and everything that counts them
+  knows it.** The seventh compares the tag's message with the tree and exists only when a tag is
+  exact — but a test, two CI steps and two documents had "six lines" written into them, none of
+  which had ever run on a tagged tree.
+
 - **The test suite no longer fails on the release commit.** Five checks asked whether this was a
   development tree — is the changelog's Unreleased section full, is the checkout untagged, does a
   fixture still spell the development version — and a release makes all of those false. They went
