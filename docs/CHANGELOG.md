@@ -121,6 +121,28 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   and Windows without Git for Windows, where the honest answer is that the session cannot run
   `./snowarch` from here at all.
 
+- **One command cuts a release, and refuses to cut a bad one.** `node scripts/release.mjs <x.y.z>`
+  asks eight questions before it writes a byte — the version's shape, the tag name being free, the
+  direction of travel, the branch, a clean tree including untracked files, the remote, the corpus
+  pin, the toolchain — then runs six gates in order, and only then writes. The version goes into
+  the three manifests, the lock file, the `CLAUDE.md` marker and the README head (the README is
+  generated from it), the changelog heading moves, and one commit and one annotated tag follow. The
+  tag's message carries the contract sha, the docs pin and the three floors, because a release
+  downloaded six months later is a tarball and a tag and everything a verifier needs has to be
+  readable from it — `./snowarch version`, `release.yml` and `./snowarch upgrade` all read it back
+  through one parser rather than three.
+
+  A stale `dist/` is a **refusal**, never a repair: committing a rebuilt artefact on the
+  maintainer's behalf would ship something nobody reviewed, and the whole reason `dist/` is
+  committed is that a human sees its diff in a pull request. Nothing is pushed by default. On this
+  repository, where `main` requires 42 status checks, the supported flow is four steps — release
+  branch, pull request, `--tag-only` on the merge commit, push the tag — and it is written down in
+  `docs/CONTRIBUTING.md`.
+
+  One thing the fixture caught before a maintainer could: the git helper had been returning an
+  empty string for a command that failed, so a `git status --porcelain` that could not run read as
+  a clean tree. A refusal to answer and an answer of "nothing" are now different values.
+
 - **CI runs the doctor on the install it just proved — and the first run found three bugs.** The
   bootstrap job builds a design-only install on thirteen cells; the doctor now runs in the same
   cells, as steps rather than a new job, and its report is asserted, compared against a per-platform
