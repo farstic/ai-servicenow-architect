@@ -284,9 +284,8 @@ jobs:
           if not "%ERRORLEVEL%"=="0" exit /b 1
           call .\snowarch.cmd version
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          node tools\snowarch\hooks\session-start.mjs > hook.txt
-          type hook.txt | find "Mode:" >nul || exit /b 1
-          del hook.txt
+          node tools\snowarch\hooks\session-start.mjs > "%RUNNER_TEMP%\hook.txt"
+          type "%RUNNER_TEMP%\hook.txt" | find "Mode:" >nul || exit /b 1
           exit /b 0
       - name: ...and the same launcher run from powershell.exe directly
         if: matrix.variant == 'no-gitbash'
@@ -412,7 +411,7 @@ jobs:
           # `assert-doctor.mjs`'s judgement, not this step's — but 2 (usage) and 3 (the doctor
           # could not run at all) are fatal wherever they happen.
           set +e
-          ./snowarch doctor --json --no-cache > doctor.json
+          ./snowarch doctor --json --no-cache > "$RUNNER_TEMP/doctor.json"
           code=$?
           set -e
           echo "doctor exit: $code"
@@ -425,7 +424,7 @@ jobs:
           rem CALL, not a bare invocation: cmd TRANSFERS control to another batch file and never
           rem comes back, so every line after it — including the exit-code check it was written for
           rem — is dead. The step's code becomes the callee's, which looks like it worked.
-          call .\snowarch.cmd doctor --json --no-cache > doctor.json
+          call .\snowarch.cmd doctor --json --no-cache > "%RUNNER_TEMP%\doctor.json"
           if %ERRORLEVEL% GEQ 2 exit /b 1
           call .\snowarch.cmd doctor --no-cache
           if %ERRORLEVEL% GEQ 2 exit /b 1
@@ -438,9 +437,9 @@ jobs:
         shell: powershell
         run: |
           $env:PATH = "C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
-          & cmd /c ".\snowarch.cmd doctor --json --no-cache > doctor-ps.json"
+          & cmd /c ".\snowarch.cmd doctor --json --no-cache > $env:RUNNER_TEMP\doctor-ps.json"
           if ($LASTEXITCODE -ge 2) { exit 1 }
-          $r = Get-Content doctor-ps.json -Raw | ConvertFrom-Json
+          $r = Get-Content "$env:RUNNER_TEMP\doctor-ps.json" -Raw | ConvertFrom-Json
           if ($r.mode -ne 'design-only') { Write-Host "mode: $($r.mode)"; exit 1 }
           # E-00 is the one this environment explains — see assert-doctor.mjs.
           $failed = @($r.checks | Where-Object { $_.status -eq 'fail' } | ForEach-Object { $_.id })
@@ -453,8 +452,9 @@ jobs:
         if: matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash'
         shell: bash
         run: |
-          node scripts/ci/assert-doctor.mjs --in doctor.json --expect-fail E-00
-          node scripts/ci/doctor-snapshot.mjs --in doctor.json --out doctor-normalised.json --summary
+          node scripts/ci/assert-doctor.mjs --in "$RUNNER_TEMP/doctor.json" --expect-fail E-00
+          node scripts/ci/doctor-snapshot.mjs --in "$RUNNER_TEMP/doctor.json" \
+            --out "$RUNNER_TEMP/doctor-normalised.json" --summary
 
       # ── ARC-09-C5: where the re-run path's time goes ────────────────────────────────────────
       # MEASURE BEFORE ANY FIX. The Windows cells spend 690–920 ms of the product's own time on the
@@ -472,7 +472,7 @@ jobs:
           || (matrix.variant == 'node-cli' && matrix.os == 'ubuntu-latest' && matrix.node == '22')
         shell: bash
         run: >
-          node scripts/ci/check-timings.mjs --in doctor.json --top 5 --summary
+          node scripts/ci/check-timings.mjs --in "$RUNNER_TEMP/doctor.json" --top 5 --summary
           --label "${{ matrix.label }}"
 
       - name: C5 — and where the banner's own phases go
@@ -558,9 +558,9 @@ jobs:
         with:
           name: doctor-${{ matrix.label }}
           path: |
-            doctor.json
-            doctor-ps.json
-            doctor-normalised.json
+            ${{ runner.temp }}/doctor.json
+            ${{ runner.temp }}/doctor-ps.json
+            ${{ runner.temp }}/doctor-normalised.json
           if-no-files-found: ignore
           retention-days: 7
 
@@ -780,9 +780,13 @@ jobs:
       # than by `find /c /v ""`, whose padded output `set /p` keeps (S04's own lesson).
       - name: version, six lines, through snowarch.cmd
         run: |
-          call .\snowarch.cmd version > version.txt
+          rem RUNNER_TEMP, never the checkout: this job's last step claims the tree is as CI found
+          rem it, and a cell that writes its own scratch into the root makes that claim false. The
+          rem first run proved it — `assert-clean` reported `?? version.txt` and `?? hook.txt`,
+          rem which is the step doing exactly its job.
+          call .\snowarch.cmd version > "%RUNNER_TEMP%\version.txt"
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          node -e "const l=require('fs').readFileSync('version.txt','utf8').trim().split(/\r?\n/); if(l.length!==6){console.error('lines: '+l.length+String.fromCharCode(10)+l.join(String.fromCharCode(10)));process.exitCode=1}"
+          node -e "const l=require('fs').readFileSync(process.env.RUNNER_TEMP+'/version.txt','utf8').trim().split(/\r?\n/); if(l.length!==6){console.error('lines: '+l.length+String.fromCharCode(10)+l.join(String.fromCharCode(10)));process.exitCode=1}"
           if not "%ERRORLEVEL%"=="0" exit /b 1
 
       # The wizard's non-interactive door (ARC-07): a password on STDIN, never in argv, against a
@@ -804,10 +808,10 @@ jobs:
       # POSIX shell anywhere (ARC-08-S08).
       - name: The hook, under cmd, with no shell to fall back on
         run: |
-          node tools\snowarch\hooks\session-start.mjs > hook.txt
+          node tools\snowarch\hooks\session-start.mjs > "%RUNNER_TEMP%\hook.txt"
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          type hook.txt | find "Mode:" >nul || exit /b 1
-          type hook.txt
+          type "%RUNNER_TEMP%\hook.txt" | find "Mode:" >nul || exit /b 1
+          type "%RUNNER_TEMP%\hook.txt"
 
       # S06's store command and S07's upgrade check, both through the `.cmd` entry point. Neither
       # writes: `--dry-run` and `--check` are the read-only halves, which is what makes them safe
@@ -988,18 +992,17 @@ jobs:
       - name: snowarch.cmd, with Node and without
         shell: cmd
         run: |
-          call .\snowarch.cmd version > version.txt
+          call .\snowarch.cmd version > "%RUNNER_TEMP%\version.txt"
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          type version.txt
+          type "%RUNNER_TEMP%\version.txt"
           rem ARC-09-S04: six lines, and each one names what it reports. The Windows path reaches
           rem the same code as ./snowarch, and `git.exe` is on PATH here without Git Bash.
           rem
           rem Counted by node, not by `find /c /v ""`: cmd's count comes back padded, `set /p`
           rem keeps the padding, and the comparison then fails on a correct six-line output. Node
           rem is present in this half of the step and has no opinion about whitespace.
-          node -e "const l=require('fs').readFileSync('version.txt','utf8').split(/\r?\n/).filter(Boolean);const want=['snowarch ','tag:','commit:','contract:','docs-pin:','floors:'];if(l.length!==6){console.error('expected 6 lines, got '+l.length);process.exit(1)}want.forEach((w,i)=>{if(!l[i].startsWith(w)){console.error('line '+(i+1)+' is not '+w+': '+l[i]);process.exit(1)}});console.log('six lines, in order')"
+          node -e "const l=require('fs').readFileSync(process.env.RUNNER_TEMP+'/version.txt','utf8').split(/\r?\n/).filter(Boolean);const want=['snowarch ','tag:','commit:','contract:','docs-pin:','floors:'];if(l.length!==6){console.error('expected 6 lines, got '+l.length);process.exit(1)}want.forEach((w,i)=>{if(!l[i].startsWith(w)){console.error('line '+(i+1)+' is not '+w+': '+l[i]);process.exit(1)}});console.log('six lines, in order')"
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          del version.txt
           set "PATH=C:\Windows\system32;C:\Windows"
           rem CALL here too. Without it cmd transferred control and this assertion never ran — which
           rem is how `snowarch.cmd` shipped for three ARCs returning 9009 instead of 3 when Node is

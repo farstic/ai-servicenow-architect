@@ -237,10 +237,12 @@ test('the doctor runs inside the bootstrap cells, and adds no job name (ARC-08-S
   // The allowance in the workflow and the one the snapshots are held to are the same list.
   // `includes`, not a regex: an escaped path in a pattern reads to the citation lint as a file
   // that does not exist, and it is right to — `assert-doctor\.mjs` is not a path.
-  assert.ok(job.includes('scripts/ci/assert-doctor.mjs --in doctor.json '
+  // The report is read from `$RUNNER_TEMP` since ARC-09-S08: a cmd step that wrote it into the
+  // checkout made `assert-clean` report the job's own artefacts as untracked files.
+  assert.ok(job.includes('scripts/ci/assert-doctor.mjs --in "$RUNNER_TEMP/doctor.json" '
     + `--expect-fail ${EXPECTED_FAIL_ON_RUNNERS.join(',')}`),
   'the workflow does not allow exactly the runner-expected failures');
-  assert.match(job, /scripts\/ci\/doctor-snapshot\.mjs --in doctor\.json/);
+  assert.match(job, /scripts\/ci\/doctor-snapshot\.mjs --in "\$RUNNER_TEMP\/doctor\.json"/);
   // Two paths since ARC-09-S08: the fast one under `01` §8's 300 ms (a trip there is a product
   // regression) and the re-run one at 1000 ms on the difference (a trip there is C5's territory).
   assert.match(job, /scripts\/ci\/banner-timing\.mjs --runs 5 --budget-ms 1000/);
@@ -593,4 +595,73 @@ test('every cmd step ends with an explicit exit code (ARC-09-S08)', () => {
   }
   assert.deepEqual(offenders, [],
     'a cmd step ending in a GEQ guard inherits the previous command\'s code — add `exit /b 0`');
+});
+
+/**
+ * ARC-09-S08 — a cmd step writes its scratch to `%RUNNER_TEMP%`, never into the checkout.
+ *
+ * `windows-native`'s last step claims "the checkout is as CI found it", and on its first run
+ * `assert-clean` reported `?? version.txt` and `?? hook.txt` — written by two of the job's own
+ * earlier steps. That is the assertion doing exactly its job, and the reason this is now a rule
+ * rather than a habit: the older cell had the same `version.txt` and remembered to `del` it, which
+ * works until somebody adds a step and does not.
+ *
+ * `%RUNNER_TEMP%` needs no cleanup, cannot be seen by `git status`, and survives between steps of
+ * the same job — which a `del` at the end of one step does not give you anyway.
+ */
+test('no cmd step redirects into the checkout (ARC-09-S08)', () => {
+  const ci = wf('ci.yml');
+  const lines = ci.split('\n');
+
+  // The steps, with the shell each actually runs under: a step's own `shell:` when it has one,
+  // otherwise its JOB's `defaults.run.shell`. A regex over the whole file cannot know that, and the
+  // first version of this test flagged bash redirects, a PowerShell line and a `>` inside a
+  // JavaScript string — three false findings that would have taught a reader to distrust it.
+  const cmdLines = [];
+  let jobDefault = null;
+  let stepShell = null;
+  let inRun = false;
+  let runIndent = 0;
+
+  for (const [i, line] of lines.entries()) {
+    if (/^ {2}[a-z][a-z0-9-]*:$/.test(line)) { jobDefault = null; stepShell = null; inRun = false; }
+    const def = /^ {8}shell:\s*(\S+)/.exec(line);          // defaults.run.shell, at job level
+    if (def) jobDefault = def[1];
+    if (/^ {6}- /.test(line)) { stepShell = null; inRun = false; }
+    const own = /^ {8}shell:\s*(\S+)/.exec(line) ?? /^ {6}shell:\s*(\S+)/.exec(line);
+    if (own && /^ {6,8}shell:/.test(line) && !/^ {8}shell:/.test(line)) stepShell = own[1];
+    else if (own && inRun === false && /^ {8}shell:/.test(line) && jobDefault === own[1]) {
+      // ambiguous at this indentation; the job default already captured it
+    } else if (own) stepShell = own[1];
+
+    const runStart = /^(\s+)run: \|/.exec(line);
+    if (runStart) { inRun = true; runIndent = runStart[1].length; continue; }
+    if (inRun) {
+      if (line.trim() === '') continue;
+      const indent = line.length - line.trimStart().length;
+      if (indent <= runIndent) { inRun = false; continue; }
+      if ((stepShell ?? jobDefault) === 'cmd') cmdLines.push([i + 1, line.trim()]);
+    }
+  }
+
+  assert.ok(cmdLines.length > 20, `only ${cmdLines.length} cmd lines found — the parser is wrong`);
+
+  // `%RUNNER_TEMP%` needs no cleanup, is invisible to `git status`, and survives between steps of
+  // the same job — which a `del` at the end of one step does not give you anyway.
+  const allowed = /^("%RUNNER_TEMP%[^"]*"|"?%GITHUB_STEP_SUMMARY%"?|"?%GITHUB_OUTPUT%"?|nul|&1)$/;
+  const offenders = [];
+  for (const [n, text] of cmdLines) {
+    if (text.startsWith('rem ')) continue;
+    // `(?<![=<])` because `=>` is an arrow function, not a redirect: a `node -e "…"` one-liner
+    // full of them read as five writes into the checkout on the first attempt.
+    for (const [, target] of text.matchAll(/(?<![=<])\d?>>?\s*("[^"]*"|\S+)/g)) {
+      if (!allowed.test(target)) offenders.push(`${n}: ${text}`);
+    }
+  }
+
+  assert.deepEqual(offenders, [],
+    'a cmd step writes into the checkout — use %RUNNER_TEMP%, so no step has to remember a `del`');
+  // …and the rule has no exception left: the `del`s that used to clean up after such writes are
+  // gone with the writes they cleaned up after.
+  assert.equal(/^\s+del (version|hook)\.txt\s*$/m.test(ci), false, 'a `del` survived its write');
 });
