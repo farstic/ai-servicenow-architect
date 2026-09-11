@@ -20,7 +20,7 @@
 // `CLAUDE_PROJECT_DIR`: inside a session that variable is the SESSION's project, which is the same
 // directory here and is not guaranteed to be, and a banner that described another checkout would
 // be worse than no banner.
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -112,8 +112,41 @@ async function reRun({ config, watchdogMs, run }) {
   }
 }
 
+/**
+ * ARC-09-C5 — where the re-run path's time goes, measured, and OFF unless asked.
+ *
+ * The Windows cells spend 690–920 ms of the product's own time on this path and nobody knows on
+ * what; the cap must not move until somebody does. So the phases are timed in the hook itself
+ * rather than inferred from outside, and printed to STDERR — stdout is the banner's, and a
+ * diagnostic on it would reach a user's session.
+ *
+ * The flag is read once, here, and its ABSENCE is the tested default: a timing hook that can be
+ * left on by accident is a product that measures itself for ever. `tests/hook/session-start.test.mjs`
+ * asserts an ordinary run prints nothing extra.
+ */
+const PHASES = process.env.SNOWARCH_BANNER_PHASES === '1';
+
+function phases() {
+  if (!PHASES) return { mark: () => {}, done: () => {} };
+  const marks = [];
+  let last = process.hrtime.bigint();
+  return {
+    mark: (name) => {
+      const nowNs = process.hrtime.bigint();
+      marks.push([name, Number(nowNs - last) / 1e6]);
+      last = nowNs;
+    },
+    done: (path) => {
+      const total = marks.reduce((a, [, ms]) => a + ms, 0);
+      writeSync(2, `banner-phases: path=${path} total=${Math.round(total)} ms · `
+        + `${marks.map(([n, ms]) => `${n} ${Math.round(ms)}`).join(' · ')}\n`);
+    },
+  };
+}
+
 export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCHDOG_MS,
   run = null } = {}) {
+  const phase = phases();
   // The lines belong to THIS call. They were module state once, which is harmless in production —
   // the hook runs once per process — and wrong the moment anything calls it twice, which the tests
   // do: a case's assertion picked up the previous case's line.
@@ -128,9 +161,12 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
 
   // 1. The fast path. Nothing beyond these two files has been read, and nothing else will be.
   const staleness = cacheStale(root, { now, maxAgeMs: MAX_AGE_MS });
+  phase.mark('cache-read+decision');
   if (cache && inputs && !staleness.stale && cache.modeLine) {
     say(cache.modeLine);
     for (const line of nudges({ cache, banner: BANNER, firstRun: false, upgrade, now })) say(line);
+    phase.mark('render');
+    phase.done('cache');
     return { path: 'cache', lines: out };
   }
 
@@ -145,8 +181,11 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   // 2. The re-run.
   const { loadConfig } = await import('../lib/config.mjs');
   let report = null;
+  const config = loadConfig(root);
+  phase.mark('state+config');
   try {
-    ({ report } = await reRun({ config: loadConfig(root), watchdogMs, run }));
+    ({ report } = await reRun({ config, watchdogMs, run }));
+    phase.mark('doctor');
   } catch (e) {
     if (e?.message !== 'watchdog') throw e;
     // The watchdog. An old line marked old beats no line: the mode rarely changes, and the
@@ -157,6 +196,8 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
 
   say(report.modeLine);
   for (const line of nudges({ report, banner: BANNER, firstRun: cache === null, upgrade, now })) say(line);
+  phase.mark('render');
+  phase.done('rerun');
   return { path: 'rerun', lines: out };
 }
 

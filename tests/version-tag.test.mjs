@@ -273,21 +273,49 @@ test('the header costs less than the command — and says the same thing', (t) =
 
 // ── AC 5 ───────────────────────────────────────────────────────────────────────────────────────
 
-test('AC 5 — there is no network code, and an unreachable proxy proves it', () => {
-  // The proxy goes in the INJECTED environment, never the runner's: B00's lesson is that a test
-  // which edits the machine's own settings is a test that breaks the machine.
-  const started = Date.now();
-  const out = execFileSync(process.execPath,
-    [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'version'],
-    {
-      cwd: REAL_ROOT,
-      encoding: 'utf8',
-      stdio: 'pipe',
-      env: { ...process.env, HTTPS_PROXY: 'http://127.0.0.1:9', HTTP_PROXY: 'http://127.0.0.1:9' },
+test('AC 5 — there is no network code, and a listener that nobody calls proves it', async () => {
+  // ARC-09-C3. This used to assert `elapsed < 2000` and call the difference "something waited on a
+  // socket". A wall clock cannot tell a socket from CONTENTION: inside the concurrent suite it read
+  // 2494 ms and failed, while the same file alone reads 232–268 ms and the command itself 240–278
+  // — so the test was red for the machine being busy, which is the one thing it was not about.
+  //
+  // The claim is "this command opens no connection", so the proof counts connections. A real
+  // listener on loopback, named as the proxy in the CHILD's environment only (B00's lesson: a test
+  // that edits the machine's own settings is a test that breaks the machine), and the assertion is
+  // that nothing ever arrived. No timing, nothing to tune, and it fails for exactly one reason.
+  const { connect, createServer } = await import('node:net');
+  const connections = [];
+  const server = createServer((socket) => { connections.push(1); socket.destroy(); });
+  await new Promise((resolve) => { server.listen(0, '127.0.0.1', resolve); });
+  const { port } = server.address();
+
+  try {
+    const proxy = `http://127.0.0.1:${port}`;
+
+    // NEGATIVE CONTROL, first: a listener that cannot count is a listener that proves anything.
+    // One deliberate connection, and the counter must see it — otherwise "zero connections" below
+    // would pass just as happily against a socket nobody was listening on.
+    await new Promise((resolve, reject) => {
+      const probe = connect(port, '127.0.0.1', () => { probe.end(); resolve(); });
+      probe.on('error', reject);
     });
-  const elapsed = Date.now() - started;
-  assert.match(out, /^snowarch /);
-  assert.ok(elapsed < 2000, `${elapsed} ms — something waited on a socket`);
+    assert.equal(connections.length, 1, 'the listener does not count connections');
+    connections.length = 0;
+
+    const out = execFileSync(process.execPath,
+      [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'version'],
+      {
+        cwd: REAL_ROOT,
+        encoding: 'utf8',
+        stdio: 'pipe',
+        env: { ...process.env, HTTPS_PROXY: proxy, HTTP_PROXY: proxy, ALL_PROXY: proxy },
+      });
+    assert.match(out, /^snowarch /);
+    assert.deepEqual(connections, [],
+      `version opened ${connections.length} connection(s) — it is meant to read files and run git`);
+  } finally {
+    await new Promise((resolve) => { server.close(resolve); });
+  }
 });
 
 test('the git seam refuses to answer rather than answering nothing', (t) => {

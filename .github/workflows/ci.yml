@@ -237,7 +237,7 @@ jobs:
         if: matrix.variant == 'node-cli' && matrix.os == 'windows-latest'
         shell: cmd
         run: |
-          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          call .\bootstrap.cmd --mode design --yes --skip-claude-check
           if not "%ERRORLEVEL%"=="0" exit /b 1
 
       # ── no-node ─────────────────────────────────────────────────────────────────────────────
@@ -257,7 +257,7 @@ jobs:
         run: |
           set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd"
           where node && exit /b 1
-          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          call .\bootstrap.cmd --mode design --yes --skip-claude-check
           if not "%ERRORLEVEL%"=="0" exit /b 1
 
       # ── no-gitbash ──────────────────────────────────────────────────────────────────────────
@@ -272,9 +272,9 @@ jobs:
           set "PATH=C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Program Files\Git\cmd;C:\Program Files\nodejs"
           where bash 2>nul | find /i "\Git\" >nul && exit /b 1
           where node || exit /b 1
-          .\bootstrap.cmd --mode design --yes --skip-claude-check
+          call .\bootstrap.cmd --mode design --yes --skip-claude-check
           if not "%ERRORLEVEL%"=="0" exit /b 1
-          .\snowarch.cmd version
+          call .\snowarch.cmd version
           if not "%ERRORLEVEL%"=="0" exit /b 1
           node tools\snowarch\hooks\session-start.mjs > hook.txt
           type hook.txt | find "Mode:" >nul || exit /b 1
@@ -448,13 +448,56 @@ jobs:
           node scripts/ci/assert-doctor.mjs --in doctor.json --expect-fail E-00
           node scripts/ci/doctor-snapshot.mjs --in doctor.json --out doctor-normalised.json --summary
 
+      # ── ARC-09-C5: where the re-run path's time goes ────────────────────────────────────────
+      # MEASURE BEFORE ANY FIX. The Windows cells spend 690–920 ms of the product's own time on the
+      # banner's re-run path — a quick doctor plus rendering — and the cap does not move until
+      # somebody knows on what. Two tables: the doctor's own per-check durations (free: the report
+      # is already on disk), and the hook's phases from inside the hook, behind a flag whose absence
+      # is the tested default.
+      #
+      # The four Windows cells, because that is where the cost is, and ONE ubuntu cell for contrast:
+      # a table with nothing to compare against cannot say whether 900 ms is a platform or a bug.
+      - name: C5 — where the quick doctor spends its time
+        if: >
+          (matrix.variant == 'node-cli' && matrix.os == 'windows-latest')
+          || matrix.variant == 'no-gitbash'
+          || (matrix.variant == 'node-cli' && matrix.os == 'ubuntu-latest' && matrix.node == '22')
+        shell: bash
+        run: >
+          node scripts/ci/check-timings.mjs --in doctor.json --top 5 --summary
+          --label "${{ matrix.label }}"
+
+      - name: C5 — and where the banner's own phases go
+        if: >
+          (matrix.variant == 'node-cli' && matrix.os == 'windows-latest')
+          || matrix.variant == 'no-gitbash'
+          || (matrix.variant == 'node-cli' && matrix.os == 'ubuntu-latest' && matrix.node == '22')
+        shell: bash
+        env:
+          SNOWARCH_BANNER_PHASES: '1'
+        run: |
+          # Cold and warm, one each, so both paths are in the record. The phases print to stderr;
+          # stdout is the banner's, and a diagnostic there would reach a user's session.
+          rm -f .local/doctor-last.json
+          node tools/snowarch/hooks/session-start.mjs > /dev/null 2> cold-phases.txt || true
+          node tools/snowarch/hooks/session-start.mjs > /dev/null 2> warm-phases.txt || true
+          {
+            echo "### banner phases — ${{ matrix.label }}"
+            echo '```'
+            cat cold-phases.txt warm-phases.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat cold-phases.txt warm-phases.txt
+
       # README criterion 5, measured where it is actually paid: five cold spawns, median under a
       # second. The Windows cells run it through bash too — the hook is invoked as `node <path>` by
       # Claude Code on every platform, so the shell it is measured from is not the variable.
       - name: The SessionStart banner, timed
         if: matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash'
         shell: bash
-        run: node scripts/ci/banner-timing.mjs --runs 5 --budget-ms 1000 --summary
+        run: >
+          node scripts/ci/banner-timing.mjs --runs 5 --budget-ms 1000
+          --fast-budget-ms 300 --summary
 
       # ── the no-node cells: the fallback the /snowarch status skill reads ─────────────────────
       # There is no doctor to run here, which IS the case being proved. What a session does instead
@@ -740,7 +783,7 @@ jobs:
           where bash 2>nul | find /i "\Git\" >nul && exit /b 1
           where node && exit /b 1
           powershell -NoProfile -Command "Set-ExecutionPolicy Restricted -Scope Process -Force; Get-ExecutionPolicy -Scope Process"
-          .\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check
+          call .\bootstrap.cmd --mode design --yes --docs skip --skip-claude-check
           echo ERRORLEVEL=%ERRORLEVEL%
           if not "%ERRORLEVEL%"=="0" exit /b 1
       - name: The state it wrote says powershell, and Node reads it

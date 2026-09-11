@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import { EXPECTED_FAIL_ON_RUNNERS } from '../scripts/ci/doctor-snapshot.mjs';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * What the workflows must be true about themselves.
@@ -192,7 +194,10 @@ test('every bootstrap run skips the Claude Code check and fetches its own corpus
   const runs = job.split('\n')
     .map((l) => l.trim())
     .filter((l) => !l.startsWith('#') && !l.startsWith('rem '))
-    .filter((l) => /^(\.[\\/]|& powershell |[^#]*-File \.\\)bootstrap\.(sh|cmd|ps1)/.test(l));
+    // `call ` is allowed at the front since ARC-09-S08: a `.cmd` invoked from `shell: cmd` without
+    // it never returns, so every cmd step now calls one. The test below enforces that; this one
+    // must simply still FIND them, or it would count three invocations and claim six were checked.
+    .filter((l) => /^(call )?(\.[\\/]|& powershell |[^#]*-File \.\\)bootstrap\.(sh|cmd|ps1)/.test(l));
   assert.ok(runs.length >= 6, `only ${runs.length} launcher invocations found`);
   for (const r of runs) {
     assert.match(r, /--mode design --yes --skip-claude-check/,
@@ -231,7 +236,10 @@ test('the doctor runs inside the bootstrap cells, and adds no job name (ARC-08-S
     + `--expect-fail ${EXPECTED_FAIL_ON_RUNNERS.join(',')}`),
   'the workflow does not allow exactly the runner-expected failures');
   assert.match(job, /scripts\/ci\/doctor-snapshot\.mjs --in doctor\.json/);
-  assert.match(job, /scripts\/ci\/banner-timing\.mjs --runs 5 --budget-ms 1000 --summary/);
+  // Two paths since ARC-09-S08: the fast one under `01` §8's 300 ms (a trip there is a product
+  // regression) and the re-run one at 1000 ms on the difference (a trip there is C5's territory).
+  assert.match(job, /scripts\/ci\/banner-timing\.mjs --runs 5 --budget-ms 1000/);
+  assert.match(job, /--fast-budget-ms 300 --summary/);
 
   // The artifact, uploaded whether or not the job was green: a report you can only read when the
   // run passed is a report you cannot use to find out why it failed.
@@ -387,4 +395,67 @@ test('banner-timing measures a node floor and judges the difference (ARC-09-C4)'
   // Both numbers are still printed: "the banner cost 190 ms on a machine where starting node costs
   // 840" is the sentence a reader needs; "1027 ms" is not.
   assert.match(src, /node floor \$\{floor\} ms → banner \$\{cost\} ms/);
+});
+
+/**
+ * ARC-09-S08's first chore, carried from ARC-08-S11 — a `.cmd` invoked without `call` transfers
+ * control and never comes back.
+ *
+ * `cmd.exe` does not return from a batch file unless it was CALLED: `.\bootstrap.cmd …` ends the
+ * calling script, so every line after it is dead. ARC-06-S14's Windows cells were written that
+ * way, which made their `if not "%ERRORLEVEL%"=="0" exit /b 1` lines unreachable — a cell that
+ * could not go red for the thing it was there to check. ARC-09-S04 hit the same rule from the
+ * other side, where an `exit /b 3` sat inside an echoed string.
+ *
+ * `call` is a `cmd` builtin and only that: the two PowerShell steps that run `.\bootstrap.cmd`
+ * must NOT have it, and a regex that added it everywhere put it in both. Hence the pairing below —
+ * the shell decides.
+ */
+test('every cmd step CALLs a .cmd, and no powershell step does (ARC-09-S08)', () => {
+  const ci = wf('ci.yml');
+  const lines = ci.split('\n');
+  let shell = null;
+  const bare = [];
+  const wrongShell = [];
+  for (const [i, line] of lines.entries()) {
+    const m = /^\s+shell:\s*(\S+)/.exec(line);
+    if (m) shell = m[1];
+    if (/^\s+(call )?\.?\.?[\\/]?[a-z]*\\?(bootstrap|snowarch)\.cmd /.test(line)) {
+      const called = /^\s+call /.test(line);
+      // `& cmd /c "…"` inside PowerShell is a new cmd process whose only job is that line: it
+      // returns whatever the batch file exits with, so `call` is neither needed nor allowed there.
+      if (/cmd \/c/.test(line)) continue;
+      if (shell === 'cmd' && !called) bare.push(`${i + 1}: ${line.trim()}`);
+      if (shell !== 'cmd' && called) wrongShell.push(`${i + 1}: ${line.trim()}`);
+    }
+  }
+  assert.deepEqual(bare, [],
+    'a .cmd invoked from `shell: cmd` without `call` never returns — the lines after it are dead');
+  assert.deepEqual(wrongShell, [],
+    '`call` is a cmd builtin; in PowerShell it is not a command at all');
+});
+
+test('the exit-code check after a .cmd is reachable, proven by running cmd (ARC-09-S08)', (t) => {
+  // The claim is about `cmd.exe`, so on anything else this is honest about not having run.
+  if (process.platform !== 'win32') {
+    return t.skip('cmd.exe is the subject; the drill runs on the Windows cells');
+  }
+  const dir = tempDir('snowarch-call-drill-', t);
+  writeFileSync(join(dir, 'fails.cmd'), '@echo off\r\nexit /b 7\r\n');
+
+  // WITHOUT `call`: control never returns, so the marker after it never prints and the step's own
+  // exit check cannot run. That is the bug, reproduced rather than described.
+  writeFileSync(join(dir, 'without.cmd'), '@echo off\r\n.\\fails.cmd\r\necho AFTER\r\nexit /b 0\r\n');
+  const without = spawnSync(process.env.COMSPEC || 'cmd.exe', ['/c', join(dir, 'without.cmd')],
+    { cwd: dir, encoding: 'utf8' });
+  assert.equal(/AFTER/.test(without.stdout ?? ''), false, 'control returned without `call`');
+  assert.equal(without.status, 7, 'the caller exited with the callee\'s code, having never resumed');
+
+  // WITH `call`: control returns, the check runs, and the planted failure turns the step red.
+  writeFileSync(join(dir, 'with.cmd'),
+    '@echo off\r\ncall .\\fails.cmd\r\nif not "%ERRORLEVEL%"=="0" exit /b 1\r\necho AFTER\r\n');
+  const withCall = spawnSync(process.env.COMSPEC || 'cmd.exe', ['/c', join(dir, 'with.cmd')],
+    { cwd: dir, encoding: 'utf8' });
+  assert.equal(withCall.status, 1, 'the exit-code check did not fire');
+  assert.equal(/AFTER/.test(withCall.stdout ?? ''), false, 'the check let a failure through');
 });
