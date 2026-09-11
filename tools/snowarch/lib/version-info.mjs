@@ -47,7 +47,8 @@ function builtContract(root) {
  * something is wrong, and a crash tells them less than a line that names both values. The doctor is
  * what turns a mismatch into a FAIL.
  */
-export function versionInfo(root, { env = process.env, platform = process.platform } = {}) {
+export function versionInfo(root, { env = process.env, platform = process.platform,
+  commitState = true } = {}) {
   const config = loadConfig(root);
   const opts = { env, platform };
 
@@ -82,7 +83,13 @@ export function versionInfo(root, { env = process.env, platform = process.platfo
     // A shallow clone has no tags to describe; saying "no release tag" without saying why sends a
     // reader looking for a bug in the product.
     shallow: found ? false : isShallow(root, opts),
-    commit: branchState(root, opts),
+    // `git status --porcelain` walks the WORKING TREE, and this one has 35,000 corpus files in it:
+    // 300 ms on a warm index, more on a cold one. The doctor's `engine` header does not use it —
+    // it takes `version`, `tag` and `contractSha` — and the doctor is what the SessionStart banner
+    // runs before a session's first word. Measured: the banner's median went 614 ms → 1188 ms on a
+    // macOS runner and failed its own budget, which is how this was found. The command still asks;
+    // the header does not.
+    commit: commitState ? branchState(root, opts) : null,
     contractPinned,
     contractMatches: Boolean(contractSha && contractPinned && contractSha === contractPinned),
     docsPinConfig,
@@ -118,8 +125,9 @@ export function renderVersion(info) {
     lines.push(`tag:        ${info.tag.name}+${n} (${n} commit${n === 1 ? '' : 's'} past ${info.tag.name})`);
   }
 
-  // commit:
-  const c = info.commit;
+  // commit: — always present for the command, which asks for the state; `null` only for the
+  // doctor's header, which does not render lines.
+  const c = info.commit ?? { short: null, branch: null, detached: false, dirty: false };
   const where = c.detached ? 'detached' : (c.branch ?? 'unknown');
   lines.push(`commit:     ${c.short ?? 'unknown'} (${where}, ${c.dirty ? 'dirty' : 'clean'})`);
 

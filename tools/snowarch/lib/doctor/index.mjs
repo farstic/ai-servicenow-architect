@@ -204,7 +204,9 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     // ONE source for the header (ARC-09-S04). It read the version and the sha for itself until
     // then, which is two programs answering "what is this checkout" from two readers — and the day
     // they disagreed, `/snowarch status` would quote one while the tag said the other.
-    engine: engineBlock(results, versionInfo(root)),
+    // `commitState: false` — the header takes `version`, `tag` and `contractSha`, and the branch
+    // and dirty flag cost a `git status` over 35,000 corpus files that nothing here reads.
+    engine: engineBlock(results, versionInfo(root, { commitState: false })),
     prereqs: {
       ...collectPrereqs({ root, config, env }),
       // E-04 resolved these; the renderer's `Capabilities:` line reads them from here rather than

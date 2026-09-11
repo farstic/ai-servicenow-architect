@@ -130,10 +130,17 @@ test('an import/* tag is not a release — the --match filter is the whole point
 test('AC 3 — an untagged checkout says so, and this repository is one', () => {
   const info = versionInfo(REAL_ROOT);
   assert.equal(info.tag, null, 'this checkout has a v* tag now — the case needs rewriting');
-  assert.equal(info.shallow, false);
   const rendered = renderVersion(info);
-  assert.equal(rendered[1], 'tag:        none (no release tag reachable — development checkout)');
   assert.equal(rendered.length, 6, 'the layout is not six lines');
+
+  // WHICH "none" depends on the clone, and the test must not decide that for it: CI's `test` job
+  // clones shallow, where the honest answer is "tags unreachable" rather than "no release tag".
+  // The first version of this pinned the development-checkout wording and went red on four cells
+  // for a checkout that was behaving correctly. What is asserted is the pairing — the flag and the
+  // sentence agree — which is the property either way.
+  assert.equal(rendered[1], info.shallow
+    ? 'tag:        none (shallow clone — tags unreachable; git fetch --tags --unshallow)'
+    : 'tag:        none (no release tag reachable — development checkout)');
 });
 
 test('a shallow clone says WHY it cannot name a tag', (t) => {
@@ -232,6 +239,29 @@ test('AC 4a — the doctor\'s engine header is this command\'s answer, not a sec
   assert.equal(doctor.engine.version, version.version);
   assert.equal(doctor.engine.contractSha, version.contractSha);
   assert.equal(doctor.engine.tag, version.tag?.name ?? null);
+});
+
+test('the header costs less than the command — and says the same thing', (t) => {
+  const f = checkout(t);
+  const full = versionInfo(f.root);
+  const header = versionInfo(f.root, { commitState: false });
+
+  // The three fields the doctor's header takes are identical: that is what "one source" means, and
+  // AC 4a asserts it end to end through the two commands.
+  assert.equal(header.version, full.version);
+  assert.equal(header.contractSha, full.contractSha);
+  assert.equal(header.tag?.name ?? null, full.tag?.name ?? null);
+
+  // ...and the expensive part is genuinely not done. `git status --porcelain` walks the working
+  // tree — 35,000 corpus files in this repository — and the doctor is what the SessionStart banner
+  // runs before a session's first word. The banner's median went 614 ms to 1188 ms on a macOS
+  // runner and failed its own 1 s budget, which is how this was found.
+  assert.notEqual(full.commit, null);
+  assert.equal(header.commit, null, 'the header asked for the commit state it does not use');
+
+  // The renderer tolerates it, because a null here must never become a crash in the one command a
+  // person runs when something is already wrong.
+  assert.match(renderVersion(header)[2], /^commit:     unknown \(unknown, clean\)$/);
 });
 
 // ── AC 5 ───────────────────────────────────────────────────────────────────────────────────────
