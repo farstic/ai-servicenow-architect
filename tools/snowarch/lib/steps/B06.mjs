@@ -16,6 +16,7 @@ import { codeForStatus, probeAuth } from '../probe-auth.mjs';
 import { readInstanceFile, SENTENCE } from '../instance-file.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
+import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B06';
 export const title = 'instance';
@@ -31,15 +32,10 @@ export const WIZARD_ABSENT =
 
 const CLI = join('packages', 'snowarch', 'dist', 'cli', 'index.js');
 
-export const inputs = (ctx) => {
-  const store = shapeOf(ctx.root);
-  return [
-    TEXT(`storeVersion=${store.version ?? 'none'}`),
-    TEXT(`storePresent=${store.present ? 'yes' : 'no'}`),
-    TEXT(`instanceFile=${ctx.instanceFile ? 'yes' : 'no'}`),
-    TEXT(`mode=${ctx.mode}`),
-  ];
-};
+// ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
+// inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
+// set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
+export const inputs = INPUTS.B06.resolve;
 
 function shapeOf(root) {
   const p = join(root, '.local', 'instances.json');

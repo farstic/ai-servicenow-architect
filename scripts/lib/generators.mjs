@@ -80,6 +80,15 @@ export const GENERATORS = [
     targets: ['docs/ARCHITECTURE.md'],
   },
   {
+    // Same target as gen-doctor-docs, different regions: both edit `docs/ARCHITECTURE.md` and
+    // neither reads the other's blocks, so the order they run in does not matter — each replaces
+    // between its own markers and leaves the rest of the file byte-identical.
+    id: 'gen-inputs-docs',
+    script: 'scripts/gen-inputs-docs.mjs',
+    supportsRoot: false,
+    targets: ['docs/ARCHITECTURE.md'],
+  },
+  {
     id: 'gen-roster',
     script: 'scripts/gen-roster.mjs',
     supportsRoot: true,

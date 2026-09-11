@@ -12,16 +12,16 @@ import { join } from 'node:path';
 import { cloudSyncWarning } from '../cloud-sync.mjs';
 import { checkMcpJson, checkSettingsJson } from '../registration.mjs';
 import { FILE, TEXT } from './inputs.mjs';
+import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B01';
 export const title = 'workspace';
 export const needsNode = false;
 export const runsWhen = () => true;
-export const inputs = (ctx) => [
-  FILE('.mcp.json'),
-  FILE('.claude/settings.json'),
-  TEXT(`mode=${ctx.mode}`),
-];
+// ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
+// inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
+// set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
+export const inputs = INPUTS.B01.resolve;
 
 export const REGISTRATION_REMEDY =
   'run: git checkout -- .mcp.json   (never edit this file; per-machine values belong in '

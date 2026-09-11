@@ -41,6 +41,32 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **One table says what each bootstrap step depends on, so the resume rule has one definition.**
+  The rule is simple — a step whose inputs have not changed since it last succeeded is skipped —
+  and everything hard about it is the word *inputs*, which until now each of the ten steps answered
+  in its own file. `tools/snowarch/lib/inputs.mjs` is that answer once: one row per step, naming
+  each input, its kind and why it is one. The runner reads it to decide what to skip,
+  `staleSteps()` reads it to say what an upgrade will invalidate *before* it changes anything, and
+  the table in `docs/ARCHITECTURE.md` is generated from it, so a page that disagrees with the code
+  is a failing `gen-all --check` rather than a surprise during a resume.
+
+  Three things are deliberately **not** hashed, and each has a reason a reader can check. The docs
+  corpus is hashed by its **gitlink**, not its 35,000 files — reading the corpus to decide whether
+  to read the corpus is the cost the row exists to avoid, and the link moves exactly when the
+  corpus is meant to be different. The credential store is hashed by **mtime and size, never
+  content**: nothing outside the wizard and the migration reads that file, and the stamp is
+  truncated to the second because every tool that restores an mtime rounds it — finer, and a
+  restored backup would read as changed. `dist/` is hashed as **bytes**, because a contract that
+  changed is a server that behaves differently, which is exactly when the contract check and the
+  handshake must run again.
+
+  Files are hashed as raw bytes with no line-ending normalisation, which is what makes a hash
+  comparable between machines and what would break it if a checkout ever differed from the commit:
+  a file arriving CRLF on Windows would hash differently there, and every resume on that platform
+  would quietly decide something else. `.gitattributes` prevents it, a test walks the table and
+  asserts `git check-attr` agrees for every file it names, and each `node-cli` CI cell proves its
+  checkout is byte-identical to the commit via `git cat-file`.
+
 - **`./snowarch bootstrap` — one amendable plan, then ten numbered steps that remember where they
   got to.** The plan screen is the only interactive moment of an installation (principle 10): it is
   shown once, before anything is written, and quitting it leaves no `.local/` at all — not even a

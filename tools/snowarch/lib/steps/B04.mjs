@@ -18,16 +18,17 @@ import { parseVersion, formatVersion } from '../versions.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { which } from '../which.mjs';
 import { FILE, TEXT } from './inputs.mjs';
+import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B04';
 export const title = 'deps';
 export const needsNode = true;
 export const runsWhen = (ctx) => ctx.mode === 'live' || ctx.env.SNOWARCH_TEST_FORCE_DEPS === '1';
 export const skipReason = 'design-only';
-export const inputs = (ctx) => [
-  FILE('package-lock.json'),
-  TEXT(`node=${ctx.node.major ?? 'none'}`),
-];
+// ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
+// inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
+// set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
+export const inputs = INPUTS.B04.resolve;
 
 export const NPM_ARGS = Object.freeze([
   'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund',

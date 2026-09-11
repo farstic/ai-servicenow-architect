@@ -11,17 +11,16 @@ import { join } from 'node:path';
 import { readDefaultLabel } from '../../../../packages/snowarch/dist/store/label.js';
 import { applyToggles, HOOKS_LEFT_ALONE, SETTINGS_LOCAL, writeJsonAtomic } from '../settings-local.mjs';
 import { TEXT } from './inputs.mjs';
+import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B07';
 export const title = 'toggles';
 export const needsNode = false;
 export const runsWhen = () => true;
-export const inputs = (ctx) => [
-  TEXT(`mode=${ctx.mode}`),
-  TEXT(`node=${ctx.node.present ? 'yes' : 'no'}`),
-  TEXT(`hooks=${ctx.state.hooksDisabledByBootstrap ? 'disabled' : 'default'}`),
-  TEXT(`registration=${ctx.state.registration}`),
-];
+// ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
+// inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
+// set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
+export const inputs = INPUTS.B07.resolve;
 
 export const CONFIG_FILE = join('.local', 'config.json');
 export const CONFIG_VERSION = 1;

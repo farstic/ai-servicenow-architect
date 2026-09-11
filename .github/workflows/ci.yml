@@ -370,6 +370,17 @@ jobs:
         shell: bash
         run: node scripts/ci/assert-clean.mjs
 
+      # ARC-09-S05, AC 4: the bootstrap input hashes must be the same on all three OSes for one
+      # commit. A STEP in this job rather than a collector job — `main`'s protection names its
+      # required contexts, and a new job name would not be one of them, so it could sit red without
+      # blocking anything. Each cell proves the stronger local fact (this checkout's bytes ARE the
+      # commit's bytes, read through `git cat-file`, which no eol conversion touches), which makes
+      # the three agree transitively and names the culprit file when they do not.
+      - name: The input hashes match the commit on this OS
+        if: matrix.variant == 'node-cli'
+        shell: bash
+        run: node scripts/ci/assert-input-hashes.mjs
+
       # Assertion 9's second half: the committed dist/ answers a handshake. Needs the runtime
       # dependencies, which a design-only install deliberately does not fetch — so they are
       # installed HERE, after every assertion about the install itself has already passed.

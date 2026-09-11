@@ -12,7 +12,7 @@
 > exclusion will get 592 failures and no explanation.
 
 
-Status: **In progress — S01–S04 merged (4 of 11), started 2026-09-11** · Depends on: ARC-01 (version of record, CI skeleton), ARC-02 (`CLAUDE.md` marker line; `/snowarch status` renders the doctor JSON whose `engine` header S04 feeds), ARC-03 (docs pin, `docs sync` recipe, `docs verify`, `docs-real.yml`), ARC-04 (store module, `build-dist.mjs`, `contract.json`, server doctor module, package identity), ARC-05 (contract gate, error registry), ARC-06 (first `version`, bootstrap state/resume, launchers, `bootstrap` CI job, handshake module), ARC-07 (`--password-stdin`, non-interactive `instance add` with `--no-probes`), ARC-08 (doctor registry/JSON, `doctor` CI job, banner nudge slot); ARC-00 S-03/S-04/S-07/S-08 verdicts and story S13 · Blocks: ARC-10 (the 2.0.0 tag)
+Status: **In progress — S01–S05 merged (5 of 11), started 2026-09-11** · Depends on: ARC-01 (version of record, CI skeleton), ARC-02 (`CLAUDE.md` marker line; `/snowarch status` renders the doctor JSON whose `engine` header S04 feeds), ARC-03 (docs pin, `docs sync` recipe, `docs verify`, `docs-real.yml`), ARC-04 (store module, `build-dist.mjs`, `contract.json`, server doctor module, package identity), ARC-05 (contract gate, error registry), ARC-06 (first `version`, bootstrap state/resume, launchers, `bootstrap` CI job, handshake module), ARC-07 (`--password-stdin`, non-interactive `instance add` with `--no-probes`), ARC-08 (doctor registry/JSON, `doctor` CI job, banner nudge slot); ARC-00 S-03/S-04/S-07/S-08 verdicts and story S13 · Blocks: ARC-10 (the 2.0.0 tag)
 
 ## Goal
 
@@ -75,3 +75,11 @@ Full write-ups (persona, context, scope, design notes, acceptance criteria, task
 | ARC-09-S09 | Line-ending proof: `tests/eol.test.mjs` over `git ls-files --eol`; launchers run from a CRLF-default Windows checkout | S |
 | ARC-09-S10 | Optional `publish-npm.yml`: `npm publish --provenance` of `@farstic/snowarch` from a release tag, manual dispatch, dry-run by default (roadmap `01` §17 item 2) | S |
 | ARC-09-S11 | `docs/CONTRIBUTING.md` release / upgrade / CI-matrix sections; `docs/INSTALL.md` "Upgrading" section; `docs/ARCHITECTURE.md` versioning section | S |
+
+### Chores
+
+Work that is not a story: a defect found while building one, fixed in the same arc.
+
+| ID | What | Status |
+|---|---|---|
+| ARC-09-C1 | `tests/helpers/temp.mjs` fixture sweep: `rmSync` defaults to zero retries, and one throw aborted the sweep loop *and* skipped `pending.clear()`, so a single undeletable fixture stranded every directory after it and the diagnosis never printed (`process.stderr.write` from an `exit` handler to a pipe is asynchronous — it needs `writeSync(2, …)`). Each directory is now removed independently, with retries, and survivors are reported with path, errno and the Node version | **Closed pending confirmation** — 48/48 clean on macOS / node 24, which is where it was reproduced, exit `1/null` matching CI. It closes for real the first time ubuntu / node 24 runs green three times in a row |

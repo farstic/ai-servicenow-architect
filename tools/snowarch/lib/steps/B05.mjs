@@ -9,16 +9,17 @@
 // and its rules in the contract, so an inconsistent contract is wrong there too.
 import { ContractPinMismatch, loadContract } from '../../../../packages/contract/lib/contract.mjs';
 import { FILE } from './inputs.mjs';
+import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B05';
 export const title = 'contract';
 export const needsNode = true;
 export const runsWhen = (ctx) => ctx.node.present;
 export const skipReason = 'Node.js 20+ not found';
-export const inputs = () => [
-  FILE('packages/snowarch/dist/contract.json'),
-  FILE('packages/contract/required-tools.json'),
-];
+// ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
+// inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
+// set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
+export const inputs = INPUTS.B05.resolve;
 
 export const INCONSISTENT =
   'This checkout is inconsistent (partial pull or a maintainer forgot to regenerate). '

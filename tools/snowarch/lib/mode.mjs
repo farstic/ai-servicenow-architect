@@ -91,7 +91,10 @@ export function stepsFor(target, registry = STEPS) {
 export async function modeCommand({ flags = {}, positional = [], log, root = defaultRoot,
   env = process.env, out = process.stdout, err = process.stderr, cwd = process.cwd(),
   probe = undefined, exec = undefined, execClaude = undefined, claudePath = undefined,
-  readLabel = readDefaultLabel, registry = STEPS } = {}) {
+  // `hash` travels WITH `registry`, and only with it: the runner hashes a step from ARC-09-S05's
+  // table by step id, so a test that injects stub steps must also say how those are hashed. The
+  // product passes neither and gets the real registry and the real table.
+  readLabel = readDefaultLabel, registry = STEPS, hash = undefined } = {}) {
   const config = loadConfig(root);
   const serverKey = config.mcp.serverKey;
   const refuse = (message, code = EXIT_USAGE) => { log.fail(message); return code; };
@@ -180,7 +183,7 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
     // or has lost Node must not be told it is now live.
     const preflight = await runSteps({
       root, ctx: { ...ctx, cwd, probe, exec }, state, steps: [registry[0]], last: LAST, onLine,
-      save: () => {},
+      save: () => {}, ...(hash ? { hash } : {}),
     });
     if (preflight.code !== EXIT_OK) return preflight.code;
   }
@@ -194,7 +197,7 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
   try {
     outcome = await runSteps({
       root, ctx: { ...ctx, cwd, probe, exec }, state, live, last: LAST, onLine,
-      steps: stepsFor(target, registry),
+      steps: stepsFor(target, registry), ...(hash ? { hash } : {}),
     });
   } finally {
     process.off('SIGINT', onSigint);
