@@ -15,14 +15,21 @@
  * on hardware nobody shares; a hosted runner shares a disk with whoever else is on the box, and a
  * bound that fails on their noise would train everyone to re-run the job.
  *
- * ARC-09-C4 — and the bound is applied to the BANNER, not to the machine. The same cell
+ * ARC-09-C4 — the bound is applied to the BANNER, not to the machine. The same cell
  * (`bootstrap (no-gitbash, windows-latest)`) measured 728, 802, 944 and 1027 ms across four
  * consecutive runs whose product code was byte-identical, and the fourth failed a 1000 ms budget
- * that the first three passed. Most of that number is Node starting up on a cold Windows runner,
- * which this product cannot make faster and should not be judged on. So the floor is measured too
- * — an empty Node process, INTERLEAVED with the real runs so both see the same weather — and the
- * budget is spent on the difference. Both numbers are printed, because "the banner cost 190 ms on
- * a machine where starting Node costs 840" is the sentence a reader needs; "1027 ms" is not.
+ * the first three passed. So the floor is measured too — an empty Node process, INTERLEAVED with
+ * the real runs so both see the same weather — and the budget is spent on the difference.
+ *
+ * WHAT THE FLOOR TURNED OUT TO BE, and it is not what I assumed when I wrote this: on that cell it
+ * is **43 ms** of a 903 ms median. The banner's own work is 860 ms of it. The subtraction is still
+ * the right thing to judge — a budget should not be spent on another process's startup — but it
+ * buys almost nothing here, and the honest reading is that this cell's banner is genuinely close
+ * to its cap. That is a fact about the RE-RUN path, which is all this harness measures: the cache
+ * is deleted before every spawn, so what is timed is a cold first session running a quick doctor,
+ * never the fast path a second session gets (29 ms on macOS). The margin is ~140 ms against an
+ * observed spread of ±150, so this guard can still trip; the number to move, if it does, is this
+ * cell's cap, with the measurement recorded — not the method.
  *
  * Usage: node scripts/ci/banner-timing.mjs [--runs 5] [--budget-ms 1000] [--summary]
  * Exit 0 within budget · 1 over · 2 cannot run.
