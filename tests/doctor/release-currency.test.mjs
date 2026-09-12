@@ -98,3 +98,115 @@ test('C31 — --no-network says what the last check saw, and asks nothing', asyn
   assert.match(r.detail, /--no-network/);
   assert.equal(asked, 0);
 });
+
+// ─── ARC-09-C32 — the empty outcome is cached, and two branches had to learn about it ─────────
+//
+// ARC-09-S07 says E-28 "refreshes the cache at most once per 24 h". The no-release path returned
+// BEFORE `writeUpgradeCheck`, so nothing was cached, `needsRefresh` was true for ever, and every
+// networked doctor run spent an `ls-remote` with a 15 s budget. Measured before the fix: three
+// runs, three calls, no cache.
+//
+// Caching it is not a one-line change, because two other branches assumed "a cache implies a
+// release": the cached hit would have printed `ok "up to date (no tag)"` — currency with something
+// that does not exist — and `--no-network` branched on `latestTag` being TRUTHY, so a run that DID
+// check and found nothing would have said "nothing has been checked yet". The third is the one
+// that turns a true statement into a false one, and it only exists because of the first.
+//
+// The three sentences are asserted VERBATIM below. Present tense for what the check sees now, past
+// for what the cache remembers — the distinction a cache introduces, and the reason the wording is
+// part of the change rather than incidental to it.
+
+test('C32 — the empty outcome is cached: three runs, one remote call', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  let calls = 0;
+  const ctx = { root, noNetwork: false, now: realClock,
+    exec: (cmd, args) => { if (args[0] === 'ls-remote') calls += 1; return lsRemote(['v2.0.0-rc.1']); } };
+
+  const first = await E28.run(ctx);
+  assert.equal(first.status, 'skip');
+  assert.equal(first.detail, 'origin advertises no release tags');
+  assert.equal(calls, 1);
+
+  for (const run of [2, 3]) {
+    const again = await E28.run(ctx);
+    assert.equal(again.status, 'skip', `run ${run}`);
+    assert.match(again.detail, /^origin advertised no release tags · last checked /,
+      `run ${run} did not read the cache`);
+    assert.equal(calls, 1, `run ${run} spent another remote call`);
+  }
+});
+
+test('C32 — a cached empty outcome never reads as "up to date"', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeUpgradeCheck(root, { latestTag: null, localTag: null, behind: false, now: () => new Date() });
+
+  const r = await E28.run({ root, noNetwork: false, now: realClock, exec: () => lsRemote([]) });
+  assert.equal(r.status, 'skip');
+  assert.match(r.detail, /^origin advertised no release tags · last checked /);
+  // The sentence this replaces, which claimed currency with something that does not exist.
+  assert.doesNotMatch(r.detail, /up to date/);
+  assert.doesNotMatch(r.detail, /no tag/);
+});
+
+test('C32 — --no-network tells a checked-and-empty run from one that never ran', async (t) => {
+  const never = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
+  const checked = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
+  const sawOne = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
+  t.after(() => [never, checked, sawOne].forEach((d) => rmSync(d, { recursive: true, force: true })));
+  writeUpgradeCheck(checked, { latestTag: null, localTag: null, behind: false, now: () => new Date() });
+  writeUpgradeCheck(sawOne, { latestTag: 'v2.1.0', localTag: 'v2.0.0', behind: true, now: () => new Date() });
+
+  const run = (root) => E28.run({ root, noNetwork: true, now: realClock, exec: () => '' });
+
+  assert.equal((await run(never)).detail, '--no-network, and nothing has been checked yet');
+  assert.match((await run(checked)).detail,
+    /^--no-network; the last check \(.+\) found no release tags$/);
+  assert.match((await run(sawOne)).detail, /^--no-network; the last check \(.+\) saw v2\.1\.0$/);
+  for (const root of [never, checked, sawOne]) assert.equal((await run(root)).status, 'skip');
+});
+
+test('C32 — the window expiring asks again, and a release that appeared is found', async (t) => {
+  // The other half of "at most once per 24 h": at most, not never. A stale empty outcome must not
+  // pin the check silent — the whole point of caching it is to spend one call per window, and a
+  // release published in the meantime has to be seen on the next one.
+  const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000);
+  writeUpgradeCheck(root, { latestTag: null, localTag: null, behind: false, now: () => twentyFiveHoursAgo });
+
+  let calls = 0;
+  const r = await E28.run({ root, noNetwork: false, now: realClock,
+    exec: (cmd, args) => { if (args[0] === 'ls-remote') calls += 1; return lsRemote(['v2.1.0']); } });
+
+  assert.equal(calls, 1, 'an expired cache did not cost a remote call');
+  assert.equal(r.status, 'warn', `an expired empty outcome pinned the check: ${r.detail}`);
+  assert.match(r.detail, /^v2\.1\.0 available/);
+
+  // ...and a fresh one does not: the same fixture one hour old asks nothing.
+  const fresh = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
+  t.after(() => rmSync(fresh, { recursive: true, force: true }));
+  writeUpgradeCheck(fresh, { latestTag: null, localTag: null, behind: false,
+    now: () => new Date(Date.now() - 60 * 60 * 1000) });
+  let freshCalls = 0;
+  const still = await E28.run({ root: fresh, noNetwork: false, now: realClock,
+    exec: (cmd, args) => { if (args[0] === 'ls-remote') freshCalls += 1; return lsRemote(['v2.1.0']); } });
+  assert.equal(freshCalls, 0, 'a one-hour-old cache spent a remote call');
+  assert.match(still.detail, /^origin advertised no release tags · last checked /);
+});
+
+test('C32 — the release-tag paths are unchanged, in both directions', async (t) => {
+  // The half that stops this chore from quietly turning a warn into a skip. A release still warns,
+  // a matching one is still ok, and both still say what they always said.
+  const behind = await e28(t, { tags: ['v2.1.0'] });
+  assert.equal(behind.status, 'warn');
+  assert.match(behind.detail, /^v2\.1\.0 available — run \.\/snowarch upgrade$/);
+
+  const current = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
+  t.after(() => rmSync(current, { recursive: true, force: true }));
+  writeUpgradeCheck(current, { latestTag: 'v2.0.0', localTag: 'v2.0.0', behind: false, now: () => new Date() });
+  const r = await E28.run({ root: current, noNetwork: false, now: realClock, exec: () => lsRemote(['v2.0.0']) });
+  assert.equal(r.status, 'ok');
+  assert.match(r.detail, /^up to date \(v2\.0\.0\) · last checked /);
+});
