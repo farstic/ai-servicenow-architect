@@ -37,6 +37,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **The first release candidate was tested by the plan, and the record says what held and what did not.**
+  `docs/validation/2026-09-12-macos.md` is the architect's run of the acceptance plan's RC checks on
+  `v2.0.0-rc.1`: the release path end to end with both negative tags refused, the fresh-clone install,
+  the store permission checks and the CI reads, with the defects it raised listed by id.
+  `docs/spikes/validation-runs/2026-09-12-design-only.md` is the design-only suite T-01 … T-18 run
+  headlessly on the same candidate: seventeen of eighteen hold, one is an engine-text finding for ARC-02,
+  and the first-pass tally is kept in full beside the follow-ups.
+
 - **What the two old repositories will say, written before anyone says it.** Both will carry a
   notice at the top of their README pointing at this one, naming the tag their history is preserved
   under, and giving the date they go read-only — two weeks later, so that somebody midway through
