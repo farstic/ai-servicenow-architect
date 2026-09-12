@@ -156,6 +156,25 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The links on the front page go where they say.** `README.md` is assembled from the install
+  page, which lives one directory down and links its neighbours accordingly — so five links on the
+  project's first page pointed at files that were not there. The assembly now rewrites them for the
+  place the README actually sits, and the README itself is checked alongside the pages it is built
+  from, with a planted link proving the rewrite still happens.
+
+- **The commit lint no longer reports success for commits it never looked at.** Run without a range
+  it compared a branch with itself and printed "0 commits ok", which reads exactly like a pass. It
+  now refuses an empty range and says so, and every run names the two points it compared.
+
+- **The Windows upgrade rehearsal finishes in ten minutes instead of running out of time.** The job
+  that walks a whole release inside throwaway checkouts was being cancelled at its thirty-minute
+  limit. Almost all of it was one command: bumping the version across the workspace asks npm to
+  rebuild the dependency tree afterwards, and in these throwaway checkouts that directory is a link
+  to the real one — so on Windows the rebuild took between two and five minutes, fourteen times a
+  run. It is now told not to rebuild a directory it borrowed. Everything the bump exists to do still
+  happens, and a check that runs every time asserts it: all three manifests and the lock file move
+  together. Nine minutes fifty-one seconds, and the limit was not raised to get there.
+
 - **The upgrade rehearsal passes on Windows.** A test that walks a whole release inside a throwaway
   checkout reported the documentation corpus as modified there, and only there. The corpus's longest
   page is 197 characters; inside a temporary directory the full path reaches about 285, past the

@@ -270,20 +270,25 @@ test('no instance hostname, address or sys_id reaches the page', () => {
 
 test('the install page points at it, and the README inherits the pointer', () => {
   assert.ok(existsSync(join(root, PAGE)));
-  // The link is written PAGE-RELATIVE, like the four TROUBLESHOOTING links already on that page:
-  // `docs/INSTALL.md` is the source and `README.md` is a composed copy of its body, so one link
-  // text has to serve both locations and the one that resolves from `docs/` is the one the
-  // link-check can verify. (That the composed copy's relative links do not resolve from the repo
-  // root is a property of every link on that page and predates this one.)
-  const LINK = '[MIGRATION.md](MIGRATION.md)';
+  // The link is written PAGE-RELATIVE in the source, like the four TROUBLESHOOTING links beside it,
+  // and the composition RETARGETS it for the root (ARC-09-C25). Both forms are asserted, because
+  // the pair is the property: a source page writes links that work where it lives, and the copy
+  // gets links that work where IT lives. Asserting only one of them is how the composed page came
+  // to carry five links that 404 from the repository root.
+  const LINK = { 'docs/INSTALL.md': '[MIGRATION.md](MIGRATION.md)',
+    'README.md': '[MIGRATION.md](docs/MIGRATION.md)' };
   // The sentence's SHAPE, not the two names in it. Spelling them here would make this file a hit
   // in the ratchet that forbids them, and importing them from that file would re-run its six tests
   // inside this one — which it did, and the suite count is how it was noticed. The names
   // themselves are already guaranteed: `README.md` and `docs/INSTALL.md` are on the ratchet's
   // allow-list with owner ARC-10, and its backward direction fails if a listed file stops matching.
-  const SENTENCE = /^Coming from `[a-z-]+` \/ `[a-z-]+`\? Follow \[MIGRATION\.md\]\(MIGRATION\.md\)\.$/m;
+  const SENTENCE = /^Coming from `[a-z-]+` \/ `[a-z-]+`\? Follow \[MIGRATION\.md\]\((docs\/)?MIGRATION\.md\)\.$/m;
   for (const rel of ['README.md', 'docs/INSTALL.md']) {
-    assert.ok(read(rel).includes(LINK), `${rel} does not link the migration page`);
+    assert.ok(read(rel).includes(LINK[rel]), `${rel} does not link the migration page as ${LINK[rel]}`);
     assert.match(read(rel), SENTENCE, `${rel} does not say who the migration page is for`);
   }
+  // And they are DIFFERENT, or the retargeting has stopped happening and both would be one form.
+  assert.notEqual(LINK['README.md'], LINK['docs/INSTALL.md']);
+  assert.equal(read('docs/INSTALL.md').includes(LINK['README.md']), false,
+    'the source page carries the composed form — the two have collapsed into one');
 });

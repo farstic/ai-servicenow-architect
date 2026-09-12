@@ -120,8 +120,43 @@ export function renderInstall({ doc, text, remedies, handoff, floor }) {
  */
 const withoutNote = (text) => text.replace(/^<!--[\s\S]*?-->\n+/, '');
 
+/**
+ * A link written for `docs/`, retargeted for the repository root (ARC-09-C25).
+ *
+ * `docs/INSTALL.md` links its neighbours the way a page in that directory must —
+ * `[proxy](TROUBLESHOOTING.md#proxy_unreachable)` — and that same text, copied into `README.md` at
+ * the root, resolves to a file that is not there. Five links on the project's FRONT PAGE were 404
+ * for anyone who clicked them, and `tests/docs-links.test.mjs` could not see it: it checks the
+ * three SOURCE pages, which is right for every other property and blind to this one, because the
+ * composed copy is the only place the defect exists.
+ *
+ * So the composition rewrites them, which is the one place the shape can be decided for all five at
+ * once. A source page keeps writing links that work where it lives — the alternative was to write
+ * every link wrong in the source so it came out right in the copy.
+ *
+ * Left alone: absolute URLs, `mailto:`, root-relative targets (`/x`), and a bare `#anchor`, which
+ * points within the composed document and is already correct. `../x` resolves out of `docs/` to the
+ * root, which is why the join is normalised rather than prefixed.
+ */
+export function retarget(target) {
+  if (/^([a-z][a-z0-9+.-]*:|\/\/|\/|#)/i.test(target)) return target;
+  const [path, ...rest] = target.split('#');
+  if (path === '') return target;
+  const segments = [];
+  for (const part of `docs/${path}`.split('/')) {
+    if (part === '.' || part === '') continue;
+    if (part === '..') segments.pop();
+    else segments.push(part);
+  }
+  return segments.join('/') + (rest.length > 0 ? `#${rest.join('#')}` : '');
+}
+
+/** Every inline link and image target in one block of markdown, retargeted. */
+export const retargetLinks = (text) =>
+  text.replace(/(\]\()([^)\s]+)(\))/g, (_, open, target, close) => `${open}${retarget(target)}${close}`);
+
 export function renderReadme(head, install, tail) {
-  const body = install.slice(install.indexOf('\n## ') + 1);
+  const body = retargetLinks(install.slice(install.indexOf('\n## ') + 1));
   return `${head.trimEnd()}\n\n${body.trimEnd()}\n\n${withoutNote(tail).trimEnd()}\n`;
 }
 

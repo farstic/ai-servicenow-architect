@@ -15,7 +15,7 @@ Two ways in. **Path A** starts in a terminal and is shorter; **Path B** starts i
 for people who would rather ask than type. Both end in the same place: a checkout running
 design-only, with live mode one command away.
 
-Coming from `claude-servicenow-live` / `snow-mcp`? Follow [MIGRATION.md](MIGRATION.md).
+Coming from `claude-servicenow-live` / `snow-mcp`? Follow [MIGRATION.md](docs/MIGRATION.md).
 
 ### Prerequisites
 
@@ -266,9 +266,9 @@ will re-run, whether the store's schema moves (a migration, with a 0600 backup, 
 and `credentials: untouched` — `.local/instances.json` is never read or written by an upgrade.
 Restart `claude` afterwards; the server binary changed. `--to vX.Y.Z` takes a specific release and
 prints the way back; a branch that has diverged from `origin` is reported, not guessed at; a failed
-fetch prints git's error and a [proxy](TROUBLESHOOTING.md#proxy_unreachable) or [TLS](TROUBLESHOOTING.md#tls_ca_untrusted)
+fetch prints git's error and a [proxy](docs/TROUBLESHOOTING.md#proxy_unreachable) or [TLS](docs/TROUBLESHOOTING.md#tls_ca_untrusted)
 remedy. The banner mentions a newer release only from a check you already ran — it never fetches.
-Full detail: [CONTRIBUTING.md](CONTRIBUTING.md#upgrading-the-product).
+Full detail: [CONTRIBUTING.md](docs/CONTRIBUTING.md#upgrading-the-product).
 
 ### Uninstall
 
