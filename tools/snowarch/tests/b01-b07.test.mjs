@@ -268,6 +268,23 @@ test('AC 5 — the cloud-sync warning names the provider, and quiet paths stay q
     assert.equal(cloudSyncWarning(path), null, path);
     assert.equal(isUnderCloudSyncFolder(path), false, `${path}: the two detectors disagree`);
   }
+
+  // ARC-08-C2 — THE THIRD SECTION, which this test did not read. `env[]` is Windows Known Folder
+  // Move: the path names no provider and `%OneDrive%` is the only detector there is. Until C2 this
+  // module answered null for all of it while `isUnderCloudSyncFolder` — which delegates to the
+  // server's detector with default options, so it reads the AMBIENT environment — answered true.
+  // Two halves of one module disagreeing about the case each was imported to keep them agreeing on,
+  // and unread fixture rows are why nobody saw it.
+  //
+  // `isUnderCloudSyncFolder` is NOT asserted here: it takes no env, so its answer depends on the
+  // machine running the suite. The injected pair is what this file can speak for.
+  assert.ok(fixture.env.length > 2, 'the fixture lost its environment rows');
+  for (const { path, set, provider, why } of fixture.env) {
+    assert.equal(cloudSyncProvider(path, { env: set }), provider, `${path} — ${why}`);
+    assert.equal(Boolean(cloudSyncWarning(path, { env: set })), provider !== null, `${path} — ${why}`);
+    // ...and with the variable unset, a redirected path is indistinguishable from any other.
+    assert.equal(cloudSyncProvider(path, { env: {} }), null, `${path} with no variable — ${why}`);
+  }
 });
 
 test('a cloud-synced checkout WARNs and carries on — it is the user\'s call, not ours', async () => {

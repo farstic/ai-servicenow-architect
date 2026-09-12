@@ -13,6 +13,12 @@ story text is corrected with a dated note, never a rewrite of history), or blank
 Corrections to the plan itself are made in place and marked, because a plan that is quietly wrong is
 worse than one that is visibly amended.
 
+**Rebasing an acceptance PR: the changelog will conflict, and both sides are right.** Every
+acceptance PR adds a bullet at the top of the same `### Fixed` group under `## Unreleased`, so each
+one conflicts with every other that merged before it. Keep BOTH, earlier-merged first; drop nothing
+and rewrite nothing. Measured on #164 rebased onto C31: one conflicted file, `docs/CHANGELOG.md`,
+and the code files (`host.test.mjs`, three server tests) rebased untouched.
+
 Owner directive (2026-09-10): when development closes, test every ARC against its own acceptance
 criteria on a release candidate (v2.0.0-rc.1, cut through the standing rehearsal in
 `docs/CONTRIBUTING.md`), fix failures as rework PRs, and only then cut v2.0.0. The owner's own
