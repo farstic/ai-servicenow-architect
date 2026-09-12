@@ -156,6 +156,16 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The links on the front page go where they say.** `README.md` is assembled from the install
+  page, which lives one directory down and links its neighbours accordingly — so five links on the
+  project's first page pointed at files that were not there. The assembly now rewrites them for the
+  place the README actually sits, and the README itself is checked alongside the pages it is built
+  from, with a planted link proving the rewrite still happens.
+
+- **The commit lint no longer reports success for commits it never looked at.** Run without a range
+  it compared a branch with itself and printed "0 commits ok", which reads exactly like a pass. It
+  now refuses an empty range and says so, and every run names the two points it compared.
+
 - **The Windows upgrade rehearsal finishes in ten minutes instead of running out of time.** The job
   that walks a whole release inside throwaway checkouts was being cancelled at its thirty-minute
   limit. Almost all of it was one command: bumping the version across the workspace asks npm to
