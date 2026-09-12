@@ -216,6 +216,13 @@ clearest reason is `engine.config.json validates against its schema`: the schema
 work with no network. Both are right and they cannot both hold. The full suite inside a fixture
 asserts a real checkout, which is not the question the guard is asking.
 
+**Every source scan has the same shape.** Strip comment lines first — in a comment a command is the
+lesson, in code it is the call, and this arc mistook one for the other four times (ARC-09-S09,
+C17b, C19, C14). Exempt the scanning file by name with the reason: a scan that flags its own
+description of what it looks for is a scan nobody can act on. And its control asserts BOTH
+directions — a planted violation is caught, a correct line is not — plus that real files were seen,
+so a regex that stopped matching cannot report nothing and pass.
+
 **A fixture never lets git read the machine.** `-b <branch>` on every `init`, `-c user.name` and
 `-c user.email` on every commit, `GIT_CONFIG_GLOBAL` pointed at an empty file where a global config
 could interfere, and `core.autocrlf` set only where the test is about line endings. Three fixtures
