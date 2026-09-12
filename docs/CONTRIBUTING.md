@@ -973,13 +973,23 @@ than by a list, so a new printing script is covered the day it appears. `tools/s
 in the sweep as a guard over something already correct: the banner hook has never called
 `process.exit`, which is why a 12 KB `additionalContext` reaches the model whole.
 
-## What to paste in a bug report
+## Reporting an install problem
+
+**The product sends nothing; reports are pasted by people.** There is no telemetry, no crash
+reporting and no opt-in analytics anywhere in it — a claim `tests/issue-templates.test.mjs` keeps
+true in three ways rather than by assertion: no telemetry vocabulary in product code; exactly three
+modules that can open a socket (`probe-net.mjs`, `probe-auth.mjs`, `servicenow/http.ts`, each
+reaching only the user's own instance or github.com); and every URL literal on an allow-list that
+separates a host the product CONTACTS from one it merely NAMES in a remedy. So everything a
+maintainer learns about an install is what somebody chose to type.
+
+That is why the two issue forms exist, and why they ask for what they ask for:
 
 ```sh
 ./snowarch version        # six lines: version, tag, commit, contract, docs pin, floors
                           # seven on a TAGGED checkout — the seventh compares the tag's
                           # message with the tree (ARC-09-C17b)
-./snowarch doctor         # the full health check, with a remedy on every failure
+./snowarch doctor --json  # the full health check, in the form that travels
 ```
 
 `version` is offline and takes no arguments you have to remember. It names the release tag you are
@@ -987,6 +997,46 @@ on (or how far past it), the commit and whether the tree is dirty, and whether t
 corpus pin match what the checkout says they should — which is most of what a support conversation
 spends its first exchange establishing. The same values fill the doctor's `engine` header, so
 `/snowarch status` quotes them too: one source, three surfaces.
+
+**The form asks for `--json`, not the text report, and the difference is deliberate.** The text
+report names your instance, because it is meant for the screen in front of you. The JSON is the
+form that travels: instance labels read `<label>`, instance hosts read `<host>`, home-directory
+paths read `~`, and secrets have always read `set (len n)` (ARC-08-C1, `docs/ARCHITECTURE.md`). The standard is ARC-10-S07's six redaction patterns, not a list of fields
+somebody noticed — the checkout path was the one nobody had. Read it before you post it anyway — and if
+you find something in it that identifies you, that is a redaction defect and the most important
+issue you could open that day.
+
+**`.github/ISSUE_TEMPLATE/`.** `install-problem.yml` and `migration-problem.yml`, with blank issues
+off: an install report without the doctor's JSON costs an exchange to ask for it, and the person is
+usually gone by then. The forms are linted — they must parse, the doctor-JSON field must be
+required, and no field may ask for a password, a token, an account name or an instance address.
+
+## Post-release review
+
+Fourteen days after a release tag, and written down: `docs/validation/<date>-post-release-review.md`,
+copied from `docs/validation/TEMPLATE-post-release-review.md`. It passes the same redaction lint as a
+validation record.
+
+1. **List** the issues opened on the `install` and `migration` labels since the tag. Classify each:
+   *page defect* (a document said the wrong thing — an ARC-10 follow-up), *product defect* (the code
+   did — the owning ARC or the 2.0.x stream), or *not a defect*.
+2. **Was the paste enough?** For each report, could it be diagnosed from what the form asked for, or
+   did it take another exchange? A field that was missing is a schema request to ARC-08.
+3. **Did any report carry a secret?** If one did, that is a redaction defect in the doctor and the
+   highest-priority item in the review — before anything else in the record is acted on.
+4. **Decide the archive.** No open migration blocker → execute *Retiring the predecessors* checklist
+   item 4. Otherwise set a new date and say why.
+5. **Write the record.** Including the denominator: how many installs are known to have happened.
+   Zero reports across one install is not the same result as zero across a dozen, and a record that
+   does not say which is not evidence of anything.
+6. **Update** the `docs/ARCHITECTURE.md` History *archived* cells and `docs/CHANGELOG.md`.
+
+**A migration blocker is an open issue for which all four hold:** it is on the `migration` label; it
+stops a user of `claude-servicenow-live` or `snow-mcp` from completing `docs/MIGRATION.md`; there is
+no documented workaround in the issue or in `docs/TROUBLESHOOTING.md`; and the fix is not yet merged
+to the default branch. Anything failing one of the four is a defect to fix, not a reason to keep two
+repositories alive — the fourteen days exist so that somebody mid-migration is not met by a locked
+door, not so that the archive waits on an empty issue list.
 
 ## The release workflow, and the rehearsal
 
@@ -1270,8 +1320,10 @@ On Windows, check 3 is `npm view @farstic/snow-mcp readme > readme.txt` then
 2. Repository description set to *Superseded by farstic/ai-servicenow-architect* and the homepage URL
    pointed at the new repository.
 3. Open issues and pull requests closed with a comment pointing at the new repository, or migrated.
-4. **Wait until `<tag date> + 14 days.`** Check the S10 issue list for a migration blocker; if there
-   is none, Settings → Danger zone → Archive this repository, on both.
+4. **Wait until `<tag date> + 14 days.`** Check the issue list for a **migration blocker** — the
+   four-part definition is in § *Post-release review*, and it is four parts so that "somebody has an
+   open issue" and "somebody cannot migrate" are not confused. If there is none, Settings → Danger
+   zone → Archive this repository, on both.
 5. Fill the *archived* cells in `docs/ARCHITECTURE.md` History and note the date in
    `docs/CHANGELOG.md` (a 2.0.x patch, or the next release's notes).
 6. **Never:** `npm deprecate`, `npm unpublish`, a force-push, deleting a tag, or editing anything on
@@ -1563,7 +1615,9 @@ commit sha. Never in the test file: it is a specification, and the dated run tab
 were removed for exactly that reason. Redact anything naming a real instance, user or credential —
 `tests/validation-records.test.mjs` enforces that and does not take your word for it.
 
-**A failure is a rework item against the story that changed the text**, not a note in the record.
+**A failure is a rework item against the story that changed the text**, not a note in the record. Fix the
+governing document, re-run the failed test in a fresh session, then re-run the whole suite before
+committing — a fix for one test must not break another.
 
 ## Recording a validation run
 
@@ -1608,8 +1662,6 @@ whole-second boundary about once in 1,800 cycles, all of them on one side, and t
 written for it covered the side that never crosses. This is the companion to the rule above that no
 unit test asserts a wall-clock — a duration belongs in `banner-timing.mjs`; a clock VALUE a test
 legitimately depends on belongs in a fixture that cannot land on the boundary.
-Fix the governing document, re-run the failed test in a fresh session, then re-run the whole suite
-before committing — a fix for one test must not break another.
 
 ---
 

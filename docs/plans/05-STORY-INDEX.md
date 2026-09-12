@@ -141,7 +141,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-10-S07 | ARC-10 | Validation-record template, redaction lint and the cutover test list (T-01…T-18 + `AUTHENTICATION_FAILED` + design-only) | M | ARC-01-S11; ARC-02-S13; ARC-08-S10 | M5 | Done (2026-09-12) |
 | ARC-10-S08 | ARC-10 | Clean-machine validation runs: macOS, Ubuntu, Windows in `design-only`; one `live` (`pdi-developer`); one proxied laptop | L | S06, S07; ARC-04-S11; ARC-07-S02; ARC-09-S03/S08 | M5 | Not started |
 | ARC-10-S09 | ARC-10 | Deprecation notices in `farstic/claude-servicenow-live` and `farstic/snow-mcp`; archive checklist for the owner | S | S08; ARC-04-S14; ARC-09-S01 | M5 | Tool half Done (2026-09-12); run half: owner, after the tag |
-| ARC-10-S10 | ARC-10 | Two-week post-release review: telemetry-free feedback loop (issue template with the doctor JSON) and the archive trigger | M | S09; ARC-08-S01 | M5 | Not started |
+| ARC-10-S10 | ARC-10 | Two-week post-release review: telemetry-free feedback loop (issue template with the doctor JSON) and the archive trigger | M | S09; ARC-08-S01 | M5 | Tool half Done (2026-09-12); review: tag + 14 days |
 
 ## Per milestone
 

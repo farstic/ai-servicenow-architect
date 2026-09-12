@@ -234,6 +234,12 @@ written and this records what the tree said.
   record, and the frozen imported entries. None was a stale sentence to rewrite.
 - **The end state is three entries, not the two the brief predicted** — S01's line lives in two files
   because `README.md` is composed from `docs/INSTALL.md`, so the pointer is allow-listed twice.
+  **Five as of ARC-10-S10 (2026-09-12):** `.github/ISSUE_TEMPLATE/config.yml` and
+  `migration-problem.yml` joined, for the reason `docs/MIGRATION.md` is exempt — a form that asks
+  which product you are migrating FROM has to name it. `install-problem.yml` did NOT join: it
+  carries no forbidden pattern, and a listed file that does not match fails the ratchet's backward
+  direction, which is the half that keeps the list from becoming a list of files nobody rewrote.
+  All five are retired by S10's run half, the archive.
 - **Reducing the allow-list removed `docs/CHANGELOG.md` from the retired-SURFACE sweep too**, which
   reads the same owner map. It is exempt there now for its own stated reason rather than as a debt:
   naming a surface while recording its removal is the opposite of describing an installable one.
@@ -693,7 +699,11 @@ Post-release review (`docs/CONTRIBUTING.md` "Post-release review", run at `v2.0.
 
 **Acceptance criteria.**
 1. Opening a new issue on the repository offers "Install problem" and "Migration problem" forms and no blank issue; the doctor-JSON field is required; `node --test tests/issue-templates.test.mjs` passes.
-2. `grep -rinE "telemetry|analytics|phone.?home|posthog|sentry|segment\.io|mixpanel" tools packages/snowarch/src hooks` prints zero lines; `grep -rnE "fetch\(|https?://" tools/snowarch hooks --include=*.mjs | grep -vE "github\.com|service-now\.com|test|fixture"` prints zero lines (the only outbound hosts are GitHub and the user's instance, `01` §8); `docs/CONTRIBUTING.md` contains the sentence "the product sends nothing; reports are pasted by people".
+2. No telemetry, proved three ways by `tests/issue-templates.test.mjs`; `docs/CONTRIBUTING.md` contains the sentence "the product sends nothing; reports are pasted by people".
+
+   **Amended 2026-09-12, after running the two greps this criterion originally named — both were written against a tree that does not exist, and both would have passed while proving less than they claim.** (a) `hooks` is not a path at the repository root; the banner hook lives at `tools/snowarch/hooks/session-start.mjs`, and `grep` WARNS on a missing directory rather than failing, so the command as written scanned two directories and reported success. (b) The second grep prints **three** lines, not zero: `https://code.claude.com/docs/en/setup` appears in a remedy string twice and in a redaction example once — a URL the product NAMES and never contacts, which the exclusion list had no way to express. The word `analytics` is likewise not an offence: all twenty of its hits are ServiceNow's own vocabulary in the server's tool surface (Performance Analytics, and the mobile app-usage analytics tool), and a ServiceNow API the product READS on the user's instance is the opposite of a service it sends to.
+
+   What replaces them, each measured on 2026-09-12 rather than assumed: **(1) vocabulary** — `telemetry|phone.?home|posthog|sentry|segment.io|mixpanel|amplitude|gtag` over all product code, zero hits; **(2) call sites** — exactly three modules can open a socket (`tools/snowarch/lib/probe-net.mjs`, `tools/snowarch/lib/probe-auth.mjs`, `packages/snowarch/src/servicenow/http.ts`), asserted in both directions, with the comment-stripped scan compared against the bare-word one that returns seven; **(3) URL hosts** — every URL literal in product code is on an allow-list that distinguishes a host the product CONTACTS (`github.com`) from one it merely NAMES (`code.claude.com`), rule 2 being what proves the second cannot be reached. Plus the boundary that carries the `analytics` distinction: the engine and the hook may not contain the word at all.
 3. At tag + 14 days a review record exists under `docs/validation/`, passes the redaction lint, and records the archive decision with its reason.
 4. If the decision is "archive", both old repositories show "archived" on GitHub within two working days and the History cells carry the date (README acceptance criterion 3, archive half); if "defer", the new date is in the record and the S09 notices' "will be archived on" line is updated in a follow-up commit to each old repository.
 5. Every issue classified "page defect" has a merged `docs/MIGRATION.md` or install-page fix or an open PR linked from the record.

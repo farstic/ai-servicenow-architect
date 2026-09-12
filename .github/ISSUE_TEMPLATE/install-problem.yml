@@ -1,0 +1,117 @@
+# ARC-10-S10. The product sends nothing; reports are pasted by people — so this form asks for
+# exactly what a maintainer needs to diagnose an install, and nothing that identifies a machine.
+#
+# `./snowarch doctor --json` is the form that travels: instance labels and hosts are masked at that
+# boundary (ARC-08-C1, `docs/ARCHITECTURE.md`). The text report is NOT masked — it is meant for the
+# screen in front of you — which is why this form asks for `--json` and says so.
+name: Install problem
+description: The install, bootstrap or doctor did not do what the page said it would.
+title: "install: "
+labels:
+  - install
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before anything else: **check `docs/TROUBLESHOOTING.md`** — most first-install problems are
+        named there with a remedy.
+
+        Nothing here is collected automatically. The product has no telemetry and never phones
+        home; everything below is text you choose to paste.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Ubuntu / Debian
+        - Other Linux
+        - Windows 10
+        - Windows 11
+    validations:
+      required: true
+  - type: dropdown
+    id: windows-shell
+    attributes:
+      label: On Windows, which shell
+      description: Leave as `n/a` on macOS or Linux.
+      options:
+        - n/a
+        - Native (`bootstrap.cmd` in cmd or PowerShell)
+        - Git Bash
+    validations:
+      required: true
+  - type: dropdown
+    id: install-path
+    attributes:
+      label: Which install path
+      description: The three routes `docs/INSTALL.md` describes.
+      options:
+        - A — terminal first (clone, then bootstrap)
+        - B — Claude first (paste the sentence, let Claude run it)
+        - Migration from the old repositories
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - design-only
+        - live
+        - could not get far enough to tell
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: "`./snowarch version`"
+      description: Six lines, or seven on a tagged checkout. Offline, and takes no arguments.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: doctor-json
+    attributes:
+      label: "`./snowarch doctor --json`"
+      description: >-
+        This is the form that travels: instance labels read `<label>`, instance hosts read
+        `<host>`, home-directory paths read `~`, and secrets are shown as `set (len n)` — never
+        the value. Paste the whole thing.
+        Read it before you post it: if you find anything that identifies you or your instance, that
+        is a defect in the doctor and worth its own issue.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: Quote the sentence in the page that led you to expect it, if there was one.
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened instead
+      description: The error as it appeared, and the command you ran before it.
+    validations:
+      required: true
+  - type: dropdown
+    id: network
+    attributes:
+      label: Network
+      options:
+        - Direct
+        - Behind a proxy
+        - Private / corporate CA
+        - Not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Before you post
+      options:
+        - label: I have read what I pasted and it contains no password, token, account name or instance address.
+          required: true

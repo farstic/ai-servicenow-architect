@@ -7,9 +7,15 @@
  * the pattern and the line, and proves each pattern fires with a fixture carrying only that one.
  *
  * THE REDACTION HALF applies to every `docs/validation/*.md`, including the two records that
- * predate the format. THE SHAPE HALF applies only to files whose first heading is
- * `# Validation run —`, because `TEMPLATE-e2e-live.md` is ARC-07-S11's own format and a rule that
- * demanded one shape would have retired a template that works.
+ * predate the format. THE SHAPE HALF is keyed on the FIRST HEADING, because this directory holds
+ * more than one kind of document and a rule that demanded one shape would have retired a template
+ * that works: `# Validation run —` (ARC-10-S07) and `# Post-release review —` (ARC-10-S10) each
+ * have their own required sections, and `TEMPLATE-e2e-live.md` — ARC-07-S11's own format — matches
+ * neither heading and is governed by the redaction half alone.
+ *
+ * The shape half was DESCRIBED in this paragraph from the day the file was written and implemented
+ * by nothing: the sentence said a rule existed and no test asserted it. Found while adding the
+ * second shape (ARC-10-S10), which is the honest place to record it — a docblock is not a test.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -169,4 +175,67 @@ test('AC — every id in the cutover list resolves to a test in the same file', 
   assert.equal(new Set(headingIds(planted)).has('T-99'), false, 'T-99 must not resolve');
   assert.deepEqual(listIds(planted).filter((id) => !known.has(id)), ['T-99'],
     'the unresolved-id check does not report the planted one');
+});
+
+// ─── The shape half: each kind of record carries its own sections ────────────────────────────
+
+/** First `# ` heading, which is what decides WHICH shape a file in this directory must have. */
+export const firstHeading = (text) => (/^# (.+)$/m.exec(text) || [, ''])[1];
+
+/**
+ * The sections a record of each kind must carry, by the heading that identifies it.
+ *
+ * A template is held to its own shape too — it is the thing people copy, so a template missing a
+ * section propagates the gap into every record made from it.
+ */
+export const SHAPES = new Map([
+  ['# Validation run —', ['## Install timeline', '## Doctor summary', '## Tests',
+    '## Observer notes', '## Defects raised']],
+  ['# Post-release review —', ['## Denominator', '## Issues', '## Was the doctor JSON enough?',
+    '## Did any report carry a secret?', '## Archive decision', '## Next actions']],
+]);
+
+/** `null` when the file is not one of the shaped kinds; otherwise the sections it is missing. */
+export function missingSections(text) {
+  const head = firstHeading(text);
+  for (const [prefix, required] of SHAPES) {
+    // A required heading must be a WHOLE LINE. Substring matching passed `## Archive decisions`
+    // for `## Archive decision`, which is how the negative control below first failed to fire.
+    if (`# ${head}`.startsWith(prefix)) {
+      const lines = new Set(text.split('\n').map((l) => l.trimEnd()));
+      return required.filter((h) => !lines.has(h));
+    }
+  }
+  return null;
+}
+
+test('AC — every shaped record carries its sections, and the unshaped one is left alone', () => {
+  const findings = [];
+  let shaped = 0;
+  for (const f of RECORDS()) {
+    const missing = missingSections(read(`docs/validation/${f}`));
+    if (missing === null) continue;
+    shaped += 1;
+    for (const h of missing) findings.push(`docs/validation/${f}: missing ${h}`);
+  }
+  assert.deepEqual(findings, [], `${findings.length} missing section(s):\n  ${findings.join('\n  ')}`);
+  // Two today — one template of each kind, which is the floor: the sittings' own records (S06,
+  // S08) and the review join them later. The two dated records in this directory are ARC-03's and
+  // predate the format, so they match no shape and are governed by the redaction half alone.
+  assert.ok(shaped >= 2, `only ${shaped} shaped record(s) — the heading match is wrong`);
+
+  // Both kinds are really present, or "every shaped record" is a sentence about one of them.
+  const heads = RECORDS().map((f) => firstHeading(read(`docs/validation/${f}`)));
+  assert.ok(heads.some((h) => h.startsWith('Validation run —')), 'no validation run to shape-check');
+  assert.ok(heads.some((h) => h.startsWith('Post-release review —')), 'no review to shape-check');
+
+  // ARC-07-S11's template matches neither heading and must stay unshaped, not silently pass.
+  assert.equal(missingSections(read('docs/validation/TEMPLATE-e2e-live.md')), null,
+    'the e2e template is being held to a shape it never had');
+
+  // The negative: a record that loses a section is reported.
+  const review = read('docs/validation/TEMPLATE-post-release-review.md');
+  const damaged = review.replace('\n## Archive decision', '\n## Archive decisions');
+  assert.notEqual(damaged, review, 'the plant did not apply — the heading changed');
+  assert.deepEqual(missingSections(damaged), ['## Archive decision']);
 });

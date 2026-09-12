@@ -85,11 +85,29 @@ const EXEMPT_FILES = new Set([
 const isExempt = (f) => EXEMPT_FILES.has(f) || EXEMPT_PREFIXES.some((p) => f.startsWith(p));
 
 const SCANNED = /\.(md|json|ts|mjs|sh|yml|yaml|ps1|cmd)$/;
+
+/**
+ * Every file the commit will contain: tracked, PLUS untracked-and-not-ignored.
+ *
+ * ARC-10-C1. This used to be `git ls-files` alone, which reads the INDEX — so a brand-new file was
+ * invisible to the ratchet until somebody staged it, and a local run before `git add` reported a
+ * pass on a tree the same test fails after. That is precisely what happened to the ARC-10-S10 issue
+ * forms: `npm test` ran green at 15:39 on the final content, `git add -A` ran at 15:47, and CI —
+ * which checks out a commit where everything is tracked — failed on the first cell to finish.
+ *
+ * `--others --exclude-standard` closes it: a file is scanned the moment it exists in the working
+ * tree, and `.gitignore` still decides what is not a source file. In CI the checkout is clean, so
+ * this adds nothing there; the whole benefit is that the author's run and CI's run now ask the same
+ * question. The control below plants an unstaged file and asserts it is reported.
+ */
+const inScope = () => git(['ls-files', '--cached', '--others', '--exclude-standard'])
+  .split('\n').filter(Boolean);
+/** Tracked only — for the questions that are genuinely about the index (`scripts/legacy` below). */
 const tracked = () => git(['ls-files']).split('\n').filter(Boolean);
 
 function scan() {
   const found = new Map();   // file -> [ "line:pattern" ]
-  for (const f of tracked()) {
+  for (const f of inScope()) {
     if (isExempt(f)) continue;
     if (!SCANNED.test(f) && f !== 'LICENSE' && f !== 'NOTICE') continue;
     let lines;
@@ -111,6 +129,34 @@ test('no forbidden pattern outside the allow-list', () => {
   const detail = offenders.flatMap((f) => found.get(f).slice(0, 2)
     .map((d) => `no-legacy-names: ${d} (owner: none — fix or allow-list)`));
   assert.deepEqual(offenders, [], detail.join('\n'));
+});
+
+test('ARC-10-C1 — an UNSTAGED file is scanned, so a local run answers what CI will', () => {
+  // The defect this replaces was quiet in exactly one direction: everything already committed was
+  // checked, so the ratchet looked healthy, while the files a commit was ABOUT to add were not.
+  // The plant is therefore a new file that has never been staged.
+  const dir = join(root, '.github', 'ARC-10-C1-control');
+  const rel = '.github/ARC-10-C1-control/probe.yml';
+  mkdirSync(dir, { recursive: true });
+  try {
+    // Assembled from the detector's own data rather than typed, so this file does not itself become
+    // a carrier of the name — the same rule the validation-record fixtures follow.
+    const name = FORBIDDEN.find((f) => f === 'claude-servicenow-live');
+    assert.ok(name, 'the pattern this control plants is no longer forbidden');
+    writeFileSync(join(dir, 'probe.yml'), `about: see ${name} for the old thing\n`);
+
+    // The precondition, asserted rather than assumed: the file really is unstaged.
+    assert.equal(tracked().includes(rel), false, 'the control file is tracked — the plant is void');
+    assert.ok(inScope().includes(rel), 'an unstaged file is still invisible to the scan');
+
+    const found = scan();
+    assert.ok(found.has(rel), 'the planted unstaged file was not reported');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  // And the other direction: with the directory gone, nothing lingers in the scan.
+  assert.equal(scan().has(rel), false, 'the control file outlived its own cleanup');
 });
 
 test('every allow-list entry still matches — the ratchet direction', () => {
@@ -144,12 +190,18 @@ test('ARC-10-S03 — the legacy scripts are gone, and only history still names t
 });
 
 test('ARC-10-S03 — the allow-list is what is still owed, not what is permanent', () => {
-  // AC 3. Three entries, all ARC-10: the migration pointer (in the install page and the README it
-  // is composed into) and CONTRIBUTING, whose history paragraph keeps old names until S10 trims it.
-  // Everything else moved to EXEMPT_FILES, because a permanent carrier on a list of outstanding
-  // rewrites reads as a debt nobody owes — thirteen entries where three were real.
+  // AC 3. Five entries, all ARC-10. Three from S03: the migration pointer (in the install page and
+  // the README it is composed into) and CONTRIBUTING, whose history paragraph keeps old names until
+  // S10 trims it. Everything else moved to EXEMPT_FILES, because a permanent carrier on a list of
+  // outstanding rewrites reads as a debt nobody owes — thirteen entries where three were real.
+  //
+  // Two more at S10, for the same reason `docs/MIGRATION.md` is exempt: a form that asks which
+  // product you are migrating FROM has to name it. `install-problem.yml` is NOT among them — it
+  // carries no forbidden pattern, and listing it would fail this test's backward direction, which
+  // is the check that keeps the list honest. The archive (S10's run half) retires all of these.
   assert.deepEqual(Object.keys(allowlist.files).sort(),
-    ['README.md', 'docs/CONTRIBUTING.md', 'docs/INSTALL.md']);
+    ['.github/ISSUE_TEMPLATE/config.yml', '.github/ISSUE_TEMPLATE/migration-problem.yml',
+      'README.md', 'docs/CONTRIBUTING.md', 'docs/INSTALL.md']);
   for (const owner of Object.values(allowlist.files)) assert.equal(owner, 'ARC-10');
 
   // The ten that moved must still MATCH — they are exempt because they carry the names on purpose,
