@@ -156,6 +156,15 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The upgrade rehearsal passes on Windows.** A test that walks a whole release inside a throwaway
+  checkout reported the documentation corpus as modified there, and only there. The corpus's longest
+  page is 197 characters; inside a temporary directory the full path reaches about 285, past the
+  limit Windows applies by default, so the file never arrived — and the parent repository reported
+  that as "the corpus changed", which is the same two characters it prints when the corpus really
+  did change. The fixture now enables long paths exactly as the product does, checks that the corpus
+  arrived complete at the moment it is fetched, and records what it found on every run rather than
+  only on a failure.
+
 - **No test fails any more because the machine it ran on was busy.** A pull request went red on a
   Windows runner because a session banner that usually answers in well under a second took 1597 ms
   against a 1000 ms limit — the banner was fine, the runner was loaded. Six such limits have been
