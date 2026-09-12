@@ -25,6 +25,12 @@ export const FORBIDDEN = [
   'reference/templates', 'servicenow-mcp-server', 'npx (-y )?servicenow-mcp\\b',
   'registry\\.npmjs\\.org/servicenow-mcp', '(?i)source.available License',
   'not licensed for redistribution', 'license: MIT', 'SEE LICENSE IN LICENSE',
+  // ARC-01-S08 AC 1 (acceptance item B01-02). The fifth licence pattern, and the only one the
+  // sweep was missing: the pre-relicensing header said "All rights reserved". Every live hit is
+  // already in an exempt carrier — `docs/ARCHITECTURE.md`, `docs/plans/**`, `docs/spikes/licence/**`
+  // — which was checked before adding it, because a pattern that turns the ratchet red on history
+  // is a pattern somebody exempts too widely to make it green.
+  '(?i)all rights reserved',
 ];
 const MD_ONLY = 'Tier [012] \\(';   // the engine's three-tier vocabulary; ARC-02 owns the sweep
 const compile = (p) => p.startsWith('(?i)') ? new RegExp(p.slice(4), 'i') : new RegExp(p);
@@ -33,6 +39,15 @@ const compile = (p) => p.startsWith('(?i)') ? new RegExp(p.slice(4), 'i') : new 
 const FORBIDDEN_PATHS = [
   /^packages\/snowarch\/(desktop|clients|\.github)\//,
   /^packages\/snowarch\/(Dockerfile|server\.json|smithery\.yaml|glama\.json|TERMS\.md)$/,
+  // ARC-01-S03 AC 3 (acceptance item B01-06): the four leaf paths the list did not pin. All four
+  // are absent today and nothing kept them gone — a workspace package has no lockfile of its own
+  // (npm keeps one at the root) and no `.gitignore` of its own, and the two `docs/` files were the
+  // old standalone server's site.
+  /^packages\/snowarch\/docs\/(CLIENT_SETUP\.md|index\.html)$/,
+  /^packages\/snowarch\/(package-lock\.json|\.gitignore)$/,
+  // ARC-01-S10 AC 1 (acceptance item B01-05): the catalogue is gone and stays gone. The run-history
+  // half was asserted; its absence was not.
+  /^docs\/LIVE-ARTEFACTS-CATALOGUE\.md$/,
 ];
 
 // Files allowed to name the past because naming it IS their purpose. Two groups, kept apart because
@@ -270,9 +285,54 @@ test('ARC-10-S03 — the allow-list is what is still owed, not what is permanent
   }
 });
 
+test('ARC-01-S08 AC 1 — ADR-0002 still quotes the licence it superseded', () => {
+  // ARC-01-C1. The criterion is a CONJUNCTION and the first pass asserted one half: the grep is
+  // empty outside the exclusions AND `ADR-0002` still quotes the superseded term. The exemption for
+  // that ADR exists BECAUSE it quotes it — an exempt file that stopped quoting the thing it is
+  // exempt for is the stale-exemption shape this file already guards for the other carriers, one
+  // row up, and it would leave an exemption nobody can justify.
+  const adr = 'docs/decisions/ADR-0002-licence.md';
+  const text = readFileSync(join(root, adr), 'utf8');
+  const hits = text.split('\n').filter((l) => /source.available/i.test(l));
+  assert.ok(hits.length > 0, `${adr} no longer quotes the superseded licence — its exemption is stale`);
+
+  // ...and it is exempt, or the sweep above would already have failed on it. Asserted so the two
+  // facts stay tied: the quote is why the exemption exists.
+  assert.ok(isExempt(adr) || EXEMPT_PREFIXES.some((p) => adr.startsWith(p)),
+    `${adr} quotes the superseded licence and is NOT exempt — one of the two is wrong`);
+});
+
+/** The cut paths, spelled out — the literals the regexes above are supposed to match. */
+const CUT_PATHS = [
+  'packages/snowarch/desktop/app.ts', 'packages/snowarch/clients/x.json',
+  'packages/snowarch/.github/workflows/ci.yml',
+  'packages/snowarch/Dockerfile', 'packages/snowarch/server.json',
+  'packages/snowarch/smithery.yaml', 'packages/snowarch/glama.json', 'packages/snowarch/TERMS.md',
+  'packages/snowarch/docs/CLIENT_SETUP.md', 'packages/snowarch/docs/index.html',
+  'packages/snowarch/package-lock.json', 'packages/snowarch/.gitignore',
+  'docs/LIVE-ARTEFACTS-CATALOGUE.md',
+];
+
 test('the S03 leaf-cut paths stay deleted', () => {
   const back = tracked().filter((f) => FORBIDDEN_PATHS.some((re) => re.test(f)));
   assert.deepEqual(back, [], `no-legacy-names: leaf-cut path is tracked again: ${back[0]}`);
+
+  // ARC-01-C5: the positive control this list never had, and three regexes were added to it. A
+  // pattern that can match NOTHING — one typo away — passes this test for ever, because nothing
+  // tracked matches it either. The allow-list beside it has exactly this shape ("the ten that moved
+  // must still MATCH"); this gives the path list the same one, both directions.
+  const unmatched = CUT_PATHS.filter((p) => !FORBIDDEN_PATHS.some((re) => re.test(p)));
+  assert.deepEqual(unmatched, [],
+    `${unmatched.length} cut path(s) match no pattern — a regex is wrong:\n  ${unmatched.join('\n  ')}`);
+
+  const idle = FORBIDDEN_PATHS.filter((re) => !CUT_PATHS.some((p) => re.test(p)));
+  assert.deepEqual(idle.map(String), [],
+    'a FORBIDDEN_PATHS pattern matches none of the cut paths — it guards nothing');
+
+  // ...and the list is not accidentally matching the tree it lives in: a pattern that matched, say,
+  // every `docs/*.md` would pass both loops above and fail the repository.
+  assert.equal(FORBIDDEN_PATHS.some((re) => re.test('docs/ARCHITECTURE.md')), false);
+  assert.equal(FORBIDDEN_PATHS.some((re) => re.test('packages/snowarch/package.json')), false);
 });
 
 // ---------- mutations, in a throwaway repository ----------

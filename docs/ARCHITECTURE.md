@@ -90,6 +90,37 @@ no empty directories, so a path appears in the repository only when its owner pu
 | `docs/MIGRATION.md` | **ARC-10** | migration and cutover |
 | `.local/` · `clients/` | — | **gitignored, per checkout**; never committed |
 
+## Product constants
+
+`engine.config.json` is the one place a product constant is written down, and this is what each key
+is for. Every leaf key has a row and every row names a key that exists —
+`tests/version-consistency.test.mjs` asserts both directions, so a key added without a row, or a row
+left behind by a key that went, is a failing test rather than a thing somebody notices later.
+
+Values are not repeated here: the file is the source, and a copy of a value in prose is a second
+source that drifts. The schema beside it (`engine.config.schema.json`) refuses an unknown key.
+
+| Key | What it is | Who reads it |
+|---|---|---|
+| `product` | the product's short name, used where a human-readable identifier is needed | the doctor's header, the banner, generated docs |
+| `repo` | `<owner>/<name>` on GitHub | the release script, the upgrade check's remote, the install page |
+| `cli` | the launcher's name, the thing a user types | `bootstrap.sh` / `bootstrap.cmd`, the recipe, the install page |
+| `mcp.serverKey` | the key the server is registered under in `.mcp.json` and `claude mcp` | registration, the doctor's E-23/E-24, the `/mcp` panel a user sees |
+| `mcp.package` | the npm package name the server publishes as | the publish guard (D-01), `version`, the tarball checks |
+| `mcp.packageDir` | where the server package lives in this repository | the contract gate, the build, the doctor's SV- checks |
+| `mcp.permissions.allowStyle` | how `permissions.allow` entries are written — `explicit` rather than a glob | the registration writer, ARC-05-S07's generator |
+| `mcp.permissions.askStyle` | how an `ask` rule is spelled | the same writer, and the S-18 spike's answer |
+| `floors.claudeCode` | the oldest Claude Code the product supports | the doctor's E-00, the bootstrap preflight, the S-11 verdict |
+| `floors.node` | the oldest Node the product supports | the same three, and the `engines` field the package publishes |
+| `floors.git` | the oldest git the product supports | the bootstrap preflight and the B00 remedy |
+| `docs.family` | the ServiceNow release family the corpus is checked out at | `docs sync`, `docs family`, every citation check |
+| `docs.pin` | the corpus commit the repository records | `docs sync`, the doctor's E-12…E-14, the docs-bump workflow |
+| `docs.areasFile` | where the sparse-checkout area list lives | `docs sync`, `gen-docs-areas.mjs --check` |
+| `docs.upstream` | the corpus repository to clone from — there is no environment override | `docs sync`, the failure classifier's remedy text |
+| `roster.skills` | how many skills the roster has | `gen-roster.mjs --check`, the doctor's E-20 |
+| `roster.agents` | how many agents the roster has | the same two |
+| `roster.utility` | the utility skills, which are not personas and are counted separately | `gen-roster.mjs`, the roster lint |
+
 ## Registration files
 
 Two files travel with the clone and one never does.

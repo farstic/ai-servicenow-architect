@@ -749,6 +749,27 @@ Mapping to the README's original titles-only list: 1→S01, 6→S01 (root commit
 
 **Acceptance criteria.**
 1. Both files exist; `docs/ARCHITECTURE.md` contains every directory name from the `01` §3 tree (a script extracts the tree's first-column tokens and greps them — run once by hand) and a "Scope cut ledger" table with exactly 18 rows — the 10 leaf paths removed by S03 (`desktop/`, `clients/`, `.github/`, `Dockerfile`, `server.json`, `smithery.yaml`, `glama.json`, `TERMS.md`, `docs/CLIENT_SETUP.md`, `docs/index.html`) and the 8 import-entangled `src/` items handed to ARC-04-S01 (`src/direct`, `src/a2a`, `src/dashboard`, `src/reports`, `src/prompts`, `src/cli/writers`, `src/cli/detect-clients.ts`, `src/transport/http-server.ts`) — each carrying `ARC-01-S03` or `ARC-04-S01`, plus one note row for `src/api` (survivor per D-03, cut per ARC-04 README item 1 — ARC-04-S01 rules).
+
+> **Amendment 2026-09-12 (acceptance pass, item B01-07). The criterion counts rows in a table that
+> does not exist under that name, and the count was never the claim.**
+>
+> Measured: `docs/ARCHITECTURE.md` carries no "Scope cut ledger" table — `grep -i 'scope.cut'` finds
+> one line, the ADR index row *"the nine surfaces that do not enter the product (D-03)"*. The ledger
+> became **ADR-0003** itself, where the cuts are recorded as PROSE with their source paths ("The nine
+> cuts, with their source paths…") and the only table is *Options considered*, which is four rows
+> about A/B/C/D and not a ledger at all.
+>
+> **Eighteen was a count of items, and the record groups them.** The story's own list is 10 leaf paths
+> and 8 `src/` items, but `clients/`, `src/cli/writers/` and `src/cli/detect-clients.ts` are one cut
+> in the ADR's numbering — the owner ruled on **nine cuts**, not eighteen rows — so a literal row
+> count can never match without ungrouping a decision to satisfy a test. The same shape as ARC-10-S03
+> AC 1, where "returns only `docs/ARCHITECTURE.md`" described a tree nobody has.
+>
+> **What is asserted instead:** every one of the ten leaf paths stays absent, which is
+> `tests/no-legacy-names.test.mjs` `FORBIDDEN_PATHS` — completed to all ten at this same acceptance
+> item (B01-06 added the four it was missing). That is the criterion's substance: the cuts stay cut.
+> The `src/` items are ARC-04-S01's to assert, and its own acceptance row covers them. No table is
+> written to make a row count true.
 2. `docs/ARCHITECTURE.md` "Product constants" table has one row per key in `engine.config.json` (`node -e` count of leaf keys = row count).
 3. `docs/CONTRIBUTING.md` lists the four `tests/*.test.mjs` files by name with their failure messages; a new contributor following §2 on a clean clone gets the same output as CI (verified by the maintainer once on macOS).
 4. The S10 ratchet test passes with `docs/ARCHITECTURE.md` exempt and `docs/CONTRIBUTING.md` **not** exempt (CONTRIBUTING must describe the old names only by reference to ARCHITECTURE, never by spelling them).

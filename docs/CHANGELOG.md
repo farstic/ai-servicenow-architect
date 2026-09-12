@@ -227,6 +227,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Six promises about the package that nothing was keeping.** The licence file shipped with the
+  package is a copy of the project's, and nothing compared them; a dependency with a known flaw was
+  pinned to a safe version, and nothing checked the pin had taken; five files that were removed on
+  purpose could have come back unnoticed. Each is now checked on every push rather than by someone
+  remembering to look.
+
 - **A check that failed about once in ten thousand runs, for a reason that was never a rule.** One
   internal test asserted that a restored file timestamp is "never" exactly equal to the original —
   true almost always, and false whenever the original happens to land on a whole millisecond. It
