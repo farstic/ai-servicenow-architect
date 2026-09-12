@@ -206,6 +206,16 @@ option, not a default.
 ## Tests
 
 
+**The upgrade harness builds a whole tree, and the guard on it is a subset.** `tests/upgrade/` is
+excluded from `npm test` (it builds git worlds and costs minutes) and runs in `upgrade-e2e` on three
+OSes. `harness-shape.test.mjs` produces a RELEASED tree there — the release's own writers, then the
+tag — and runs the tests whose subject is what a tree looks like: changelog, version literals,
+version tag, validation shape, docs links, legacy names, never-commit. Not the whole suite, and the
+clearest reason is `engine.config.json validates against its schema`: the schema requires an
+`https://…git` corpus upstream, and the fixture points at a local bare repository because it must
+work with no network. Both are right and they cannot both hold. The full suite inside a fixture
+asserts a real checkout, which is not the question the guard is asking.
+
 **A test never re-implements a renderer's format — it imports it.** Three clocks in one arc say this
 is a real habit: ARC-09-C3 proved "no network code" with a wall-clock threshold, C4 judged a raw
 median against a budget, and C18 normalised step durations with a regex that knew one of the

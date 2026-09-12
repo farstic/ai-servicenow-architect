@@ -28,10 +28,16 @@ test('the helper writes the repository\'s own .gitattributes, byte for byte (ARC
 });
 
 test('every fixture that makes a git repository carries the file (ARC-09-C12)', () => {
+  // The harness is asserted by MECHANISM above and by RESULT here: a built world really has the
+  // file. Inspection alone would have gone stale the day the mechanism changed — which is exactly
+  // what ARC-09-C13 did to this test's first version.
   // By INSPECTION of the three fixture builders, because the alternative is discovering the fourth
   // one from a red Windows cell — which is how this test came to exist.
   const sources = {
-    'tests/upgrade/harness.mjs': /'\.gitattributes'/,      // in its COPIED list
+    // ARC-09-C13 replaced the harness's curated `COPIED` list with every tracked file, so it no
+    // longer NAMES `.gitattributes` — it carries it because it carries everything. The assertion
+    // follows the mechanism rather than the spelling: what matters is that the file arrives.
+    'tests/upgrade/harness.mjs': /trackedFiles\(\)/,
     'tests/helpers/docs-fixture.mjs': /writeGitattributes\(/,
     'tests/release.test.mjs': /writeGitattributes\(/,
   };

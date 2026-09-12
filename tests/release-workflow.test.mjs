@@ -300,7 +300,11 @@ function peeledClone(t, { annotatedOnRemote = true } = {}) {
     git(f.root, ['tag', '-d', 'v2.0.0']);
     git(f.root, ['tag', 'v2.0.0']);
   }
-  const bare = join(dirname(f.root), `${basename(f.root)}-origin.git`);
+  // INSIDE the fixture's own tempDir (ARC-09-C13). It was a SIBLING — `join(dirname(f.root), …)` —
+  // which `tempDir(…, t)` has no reason to remove, so every run of this file left two
+  // `snowarch-verify-tag-*-origin.git` directories behind. A bare repository next to the fixture is
+  // not "next to" anything as far as the cleanup is concerned; it is outside it.
+  const bare = join(f.root, '.origin.git');
   execFileSync('git', ['clone', '--quiet', '--bare', f.root, bare], { stdio: 'pipe' });
 
   // What checkout does: the ref exists and points at the commit, not at the tag object.

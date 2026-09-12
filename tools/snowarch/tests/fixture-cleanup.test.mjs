@@ -182,3 +182,29 @@ test('and a fixture whose test FAILS is removed too — the case a trailing rmSy
     `a failing test left ${left.names.length} fixture(s) behind (status ${child.status}, `
     + `signal ${child.signal}): ${left.detail}`);
 });
+
+/**
+ * ARC-09-C13 — the real suites leave nothing behind either.
+ *
+ * The cases above prove the MECHANISM on synthetic probes. This one runs a real test file whose
+ * fixtures build git repositories, because the mechanism being correct is not the same claim as
+ * every caller using it: `tests/release-workflow.test.mjs` created its bare remote as a SIBLING of
+ * the fixture's tempDir (`join(dirname(root), …)`), which nothing was ever going to remove, and it
+ * left two directories per run until a review noticed the count. A helper cannot clean up after a
+ * caller that put the directory somewhere else.
+ *
+ * One file rather than the whole suite: the point is to have a real caller under the assertion, and
+ * running everything here would double the cost of the run this file is part of.
+ */
+test('a real fixture suite leaves nothing in TMPDIR (ARC-09-C13)', (t) => {
+  const sandbox = mkdtempSync(join(tmpdir(), 'fixture-cleanup-real-'));
+  t.after(() => rmSync(sandbox, { recursive: true, force: true }));
+
+  const suite = resolve(dirname(fileURLToPath(import.meta.url)), '../../../tests/release-workflow.test.mjs');
+  const child = runProbe(suite, sandbox);
+  assert.equal(child.status, 0, `the suite itself failed:\n${child.stdout}${child.stderr}`);
+
+  const left = leftBehind(sandbox);
+  assert.deepEqual(left.names, [],
+    `release-workflow left ${left.names.length} director(ies) in TMPDIR: ${left.detail}`);
+});

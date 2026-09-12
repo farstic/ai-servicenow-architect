@@ -27,6 +27,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { writeHead, writeMarker } from '../../scripts/lib/release/writers.mjs';
 import { AREAS, buildUpstream } from '../helpers/docs-fixture.mjs';
 
 export const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -54,28 +55,58 @@ export function git(cwd, args, { allowFail = false } = {}) {
  * carried 35,000 files would make every one of these tests a minute longer, and the corpus's own
  * movement is B02's business, which AC 1 exercises through the areas file instead.
  */
-const COPIED = Object.freeze([
-  // `.gitattributes` FIRST in spirit: it pins `* text=auto eol=lf`, and a fixture standing in for
-  // this repository must too. Without it the fixture inherits the machine's `core.autocrlf` — true
-  // on the Windows runner — so `dist/contract.json` is committed LF and checked out CRLF, its
-  // sha256 changes, and B05 fails the pin check with `ad124526e86b ≠ 4117dc73744e` on a fixture
-  // whose contract nobody touched. That is ARC-09-S05's own lesson (files are hashed as bytes, and
-  // `.gitattributes` is what makes that comparable between machines) landing on the fixture that
-  // exists to test it.
-  '.gitattributes',
-  'engine.config.json', 'package.json', 'package-lock.json', '.gitignore', 'CLAUDE.md',
-  '.mcp.json', '.claude/settings.json', 'vendor/docs-areas.txt',
-  'snowarch', 'snowarch.cmd', 'bootstrap.sh', 'bootstrap.cmd',
-  'tools', 'scripts', 'packages',
-  // `scripts/lib/roster.mjs` imports it, and B01 reaches the roster — a fixture without it fails
-  // for a reason that has nothing to do with an upgrade.
-  'tests/lib',
-  // A checkout's own fixtures: the vocabulary lint reads `tests/fixtures/retired-*`. Small files,
-  // and a fixture release without them fails for a reason that is not an upgrade.
-  'tests/fixtures',
-  // The skills and agents the roster counts. Small, and a checkout without them is not one.
-  '.claude/skills', '.claude/agents',
-]);
+/**
+ * What the fixture tree carries: EVERY TRACKED FILE, minus the corpus.
+ *
+ * ARC-09-C13. This was a curated list, and curating it was the defect. A fixture that stands in for
+ * this repository has to satisfy the checks this repository runs on itself, and two of them are
+ * about the tree AS A WHOLE: `gen-all --check` fails when a generator's target or input is absent
+ * ("could not run", not "skipped"), and lint rule L05 asserts that every path a tracked file CITES
+ * exists — so any file left out is reported as a dead citation by whatever cites it. Chasing that
+ * one directory at a time went 79 dead paths → 46 → the next one, because the list was never the
+ * answer; the subset was.
+ *
+ * ARC-09-S11's AC 3 walkthrough is what needed it: a release cut INSIDE the fixture runs the real
+ * lint gate, which is the whole point of running it there.
+ *
+ * WHAT A FIXTURE CANNOT BE, and why the ARC-09-C13 guard is a SUBSET of the suite rather than all
+ * of it: `engine.config.json validates against its schema` requires `docs.upstream` to match
+ * `^https://…\.git$`, and this world points at a local bare repository because it must work with no
+ * network. The schema is right about a real checkout and the fixture is right about a test; they
+ * cannot both hold, and no amount of copying fixes it. So the guard runs the tests whose subject is
+ * WHAT A TREE LOOKS LIKE — changelog, version literals, version tag, validation shape, docs links,
+ * legacy names, never-commit — and not the ones asserting properties a fixture legitimately lacks.
+ *
+ * `vendor/` is the exception and the only one: the corpus is a submodule, the fixture builds its own
+ * three-area upstream for it, and copying 35,000 documentation files per fixture would make this
+ * harness unusable. `node_modules` is not tracked and is handled by `placeModules`.
+ */
+/**
+ * The ONE thing the fixture does not carry, as a list, so adding a second is a conversation.
+ *
+ * ARC-09-C13. A curated `COPIED` list was three fixture-completeness chores in disguise; the cure
+ * is that the fixture IS the repository. Naming the single exclusion here — rather than inlining
+ * the filter — means the next "just exclude X" arrives as an edit to a list with a reason beside
+ * it, and `tests/upgrade/harness-shape.test.mjs` asserts there is exactly one.
+ */
+export const NOT_COPIED = Object.freeze({
+  'vendor/ServiceNowDocs': 'the corpus submodule: a gitlink with nothing to copy, and the fixture '
+    + 'builds its own three-area upstream for it. Copying 35,000 documentation files per fixture '
+    + 'would make this harness unusable.',
+});
+
+function trackedFiles() {
+  return execFileSync('git', ['ls-files', '-z'], { cwd: REAL_ROOT, encoding: 'utf8',
+    maxBuffer: 1 << 28 })
+    .split('\0')
+    .filter(Boolean)
+    // The CORPUS, not the whole of `vendor/`: `vendor/docs-areas.txt` lives there too and is a
+    // real tracked file the fixture needs (B02 reads it, and the first version of this filter
+    // dropped it and died on ENOENT). `vendor/ServiceNowDocs` is the submodule — a gitlink entry
+    // with nothing to copy, and the fixture builds its own three-area upstream for it.
+    .filter((rel) => !Object.keys(NOT_COPIED)
+      .some((skip) => rel === skip || rel.startsWith(`${skip}/`)));
+}
 
 /**
  * Stage everything, RE-ASSERT the gitlink, commit.
@@ -94,11 +125,39 @@ function commit(root, message, pin) {
 
 /** A version everywhere it is written, so `./snowarch version` in the clone says 9.x. */
 function rewriteVersion(root, version) {
-  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-  writeFileSync(join(root, 'package.json'), `${JSON.stringify({ ...pkg, version }, null, 2)}\n`);
-  const server = join(root, 'packages/snowarch/package.json');
-  const sp = JSON.parse(readFileSync(server, 'utf8'));
-  writeFileSync(server, `${JSON.stringify({ ...sp, version }, null, 2)}\n`);
+  // THE RELEASE'S OWN WRITERS (ARC-09-C13). This used to edit two manifests by hand — and there are
+  // three, plus `CLAUDE.md`'s marker line and the README head, so a fixture release left the tree
+  // inconsistent in exactly the way `version-consistency.test.mjs` exists to catch. That test is in
+  // the guard this harness now runs INSIDE the fixture, so the fixture has to be written by the
+  // same code that writes a real release rather than by a second, poorer imitation of it.
+  //
+  // `npm version --workspaces --include-workspace-root` is the one that moves all three manifests
+  // AND `package-lock.json` in a single call: a lock file edited by anything but npm is a lock file
+  // npm rewrites differently on the next install.
+  execFileSync('npm', ['version', version, '--no-git-tag-version', '--workspaces',
+    '--include-workspace-root'], { cwd: root, stdio: 'pipe', shell: process.platform === 'win32' });
+
+  // ...and the two prose files, through the release's own writers rather than a regex here.
+  for (const [rel, write] of [['CLAUDE.md', writeMarker], ['docs/README-head.md', writeHead]]) {
+    const file = join(root, rel);
+    if (!existsSync(file)) continue;
+    const result = write(readFileSync(file, 'utf8'), version);
+    if (!result.ok) throw new Error(`harness: ${rel} — ${result.message}`);
+    writeFileSync(file, result.text);
+  }
+
+  // Several generated blocks embed the version, so regenerating is part of moving it — the same
+  // ordering the release itself keeps (ARC-09-C12b). Without this the fixture's own lint gate
+  // reports stale targets, which is what stopped ARC-09-S11's AC 3 walkthrough.
+  regenerate(root);
+}
+
+/**
+ * `gen-all`, inside a fixture. One call rather than a list of generators, for the same reason
+ * `gen-all` exists: a list here would be the copy that goes stale when somebody adds the next one.
+ */
+function regenerate(root) {
+  execFileSync(process.execPath, [join(root, 'scripts/gen-all.mjs')], { cwd: root, stdio: 'pipe' });
 }
 
 /** The tag message S01 writes, with THIS tree's real contract sha and gitlink. */
@@ -147,16 +206,16 @@ function placeModules(target, modules) {
   symlinkSync(from, join(target, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
 }
 
-export async function buildWorld(t, { claudeFloor = null, modules = 'link' } = {}) {
+export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true } = {}) {
   const scratch = tempDir('snowarch-upgrade-', t);
   const work = join(scratch, 'work');
   mkdirSync(work, { recursive: true });
 
-  for (const rel of COPIED) {
+  for (const rel of trackedFiles()) {
     const from = join(REAL_ROOT, rel);
-    if (!existsSync(from)) continue;
+    if (!existsSync(from)) continue;          // a file staged for deletion, say
     mkdirSync(dirname(join(work, rel)), { recursive: true });
-    cpSync(from, join(work, rel), { recursive: true, dereference: true });
+    cpSync(from, join(work, rel), { dereference: true });
   }
   // A REAL corpus upstream, three areas big.
   //
@@ -187,6 +246,18 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link' } = {
   placeModules(work, modules);
 
   rewriteVersion(work, '9.0.0');
+
+  // ARC-09-C13 — REGENERATE WHAT THE REWRITTEN CONFIG IMPLIES. The lines above deliberately give
+  // the fixture a different corpus upstream and pin from the real checkout, and several generated
+  // files embed one or both — so the COPIED versions are stale BY CONSTRUCTION, not by drift, and
+  // `gen-all --check` says so from inside the release's own lint gate. Copying more files cannot
+  // fix that: the fixture has to regenerate, exactly as a maintainer would after editing
+  // `engine.config.json`. One call rather than a list of generators, for the same reason `gen-all`
+  // Placed LAST, after the version rewrite and the `.gitmodules` write: the generated blocks
+  // embed the version and the corpus registration too, so regenerating before those lines ran
+  // left three targets stale — which the release's lint gate then reported, correctly.
+  // exists — a list here would be the copy that goes stale when somebody adds the next generator.
+  execFileSync(process.execPath, [join(work, 'scripts/gen-all.mjs')], { cwd: work, stdio: 'pipe' });
   git(work, ['init', '-q', '-b', 'main']);
   commit(work, 'v9.0.0', upstream.pin);
   await tagRelease(work, '9.0.0', { claudeFloor });
@@ -201,6 +272,14 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link' } = {
   await tagRelease(work, '9.1.0', { claudeFloor });
 
   // ── B: v9.2.0 — the store's schema moves, so B06 migrates rather than re-wizards ──────────
+  //
+  // `schemaBump: false` (ARC-09-C13) leaves the schema alone. The upgrade suite needs the bump —
+  // it is the whole point of release B — but it EDITS THE SOURCE, so the fixture's own test suite
+  // then disagrees with it: `tests` asserts `schema v1 is current — nothing to do` and the fixture
+  // says `v1 → v2 · 1 migration`. That matters because ARC-09-S11's AC 3 cuts a REAL release
+  // inside this world, and a release runs the suite as a gate. A caller that wants to exercise the
+  // release path rather than the migration path asks for the tree to stay as the repository has it.
+  if (schemaBump) {
   const migrations = join(work, 'packages/snowarch/src/store/migrations/index.ts');
   const src = readFileSync(migrations, 'utf8');
   writeFileSync(migrations, src.replace('export const MIGRATIONS: Migration[] = [];',
@@ -218,14 +297,27 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link' } = {
   const schema = join(work, 'packages/snowarch/src/store/schema.ts');
   writeFileSync(schema, readFileSync(schema, 'utf8')
     .replace('export const STORE_VERSION = 1;', 'export const STORE_VERSION = 2;'));
+  }
 
   // The contract the tag SHIPS has to say 2, which means a real build — `upgrade` reads
   // `storeSchemaVersion` out of the tag before it checks anything out.
+  //
+  // AFTER the version rewrite, not before (ARC-09-C13). The contract EMBEDS the package version,
+  // so building first left the head release carrying a contract that named the previous one — the
+  // fixture's own version of the defect ARC-09-C12b fixed in the release script, and the reason a
+  // release cut inside this world failed its `dist` gate with a sha nobody had touched.
+  rewriteVersion(work, '9.2.0');
   execFileSync(process.execPath, [join(work, 'scripts/build-dist.mjs')],
     { cwd: work, stdio: 'pipe', encoding: 'utf8' });
   execFileSync(process.execPath, [join(work, 'packages/contract/pin.mjs'), '--yes'],
     { cwd: work, stdio: 'pipe', encoding: 'utf8' });
-  rewriteVersion(work, '9.2.0');
+  // AND REGENERATE AGAIN, because three generated files carry the CONTRACT SHA in their header
+  // (`gen-governance`'s rule file, protocols and troubleshooting). `rewriteVersion` regenerated for
+  // the version; the rebuild above moved the sha afterwards, so the headers would name the previous
+  // contract and the release's own lint gate would report them stale — which is ARC-09-C12b's
+  // ordering lesson (rebuild first, then generate, because the generated files quote the artefact)
+  // arriving in the harness.
+  regenerate(work);
   commit(work, 'feat(server): store schema v2', upstream.pin);
   await tagRelease(work, '9.2.0', { claudeFloor });
 

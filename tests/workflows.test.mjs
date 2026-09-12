@@ -298,7 +298,13 @@ test('upgrade-e2e runs the harness on three OSes, and adds three named contexts 
   assert.match(job, /git config --global user\.email/);
   // No secret, and no network beyond the harness's own local origin.
   assert.equal(/secrets\./.test(job), false, 'an upgrade cell reads a secret');
-  assert.match(job, /node --test[^\n]*tests\/upgrade\/upgrade\.e2e\.test\.mjs/);
+  // ARC-09-C13 wrapped this command across lines and added the walkthrough, so the assertion
+  // joins continuations first — pinning one line's worth of a command asserts its formatting.
+  const e2eRun = job.replace(/\\\n\s+/g, ' ');
+  assert.match(e2eRun, /node --test[^\n]*tests\/upgrade\/upgrade\.e2e\.test\.mjs/);
+  // The walkthrough runs HERE rather than in `npm test`: this job already builds a harness
+  // world on three OSes once per commit, and `tests/upgrade/` is excluded from `npm test`.
+  assert.match(e2eRun, /tests\/upgrade\/harness-shape\.test\.mjs/);
   assert.match(job, /tests\/upgrade\/upgrade-unit\.test\.mjs/);
   // The checkout under test must be exactly as it was: the harness builds its world in TMPDIR,
   // and an upgrade test that moved this tree would be the worst possible kind of side effect.

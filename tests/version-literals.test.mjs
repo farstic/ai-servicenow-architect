@@ -66,6 +66,22 @@ const FIXTURE_FILES = {
  */
 const SELF = 'tests/version-literals.test.mjs';
 
+/**
+ * ...and the upgrade harness, which SPELLS its fixture releases by design (ARC-09-C13).
+ *
+ * `buildWorld` builds `v9.0.0 → v9.1.0 → v9.2.0`, and those strings are the fixture world's subject
+ * — its releases — not an expectation about this repository. They are normally invisible to this
+ * sweep, because `9.x` is not the current version here. But ARC-09-C13's guard runs this file
+ * INSIDE the fixture, where the fixture's own version IS current, and the sweep then flags the
+ * harness and its tests for describing the world they exist to describe.
+ *
+ * The whole DIRECTORY, because the harness's tests name the same releases the harness builds: a
+ * file-by-file list would grow with every test added there and the reason would be identical each
+ * time. This is the one place where "a version that can never be current" (ARC-09-C17b) cannot
+ * apply, because the versions being named are the fixture's own.
+ */
+const HARNESS = 'tests/upgrade/';
+
 // NOT this file: it reads the version and interpolates it, so it never spells one — and its own
 // stale-entry check caught the exemption I wrote for it out of habit.
 function testFiles(dir, out = []) {
@@ -91,7 +107,7 @@ export function literalLines(text, version) {
 test('no assertion spells the current version of record (ARC-09-C12a)', () => {
   const offenders = [];
   for (const rel of [...testFiles(join(root, 'tests')), ...testFiles(join(root, 'packages'))]) {
-    if (rel in FIXTURE_FILES || rel === SELF) continue;
+    if (rel in FIXTURE_FILES || rel === SELF || rel.startsWith(HARNESS)) continue;
     const lines = literalLines(readFileSync(join(root, rel), 'utf8'), rootVersion);
     if (lines.length > 0) offenders.push(`${rel}:${lines.join(',')}`);
   }
