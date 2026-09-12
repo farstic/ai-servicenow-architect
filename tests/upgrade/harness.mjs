@@ -21,7 +21,7 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
-  chmodSync, cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync,
+  chmodSync, cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, writeSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -251,24 +251,46 @@ function placeModules(target, modules) {
   symlinkSync(from, join(target, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
 }
 
+/**
+ * TEMPORARY INSTRUMENT — ARC-09-C28, removed in the last commit of that chore.
+ *
+ * The Windows `upgrade-e2e` job runs 26 minutes against a `timeout-minutes: 30`, with fourteen
+ * fixture-building tests at 130–270 s each where Ubuntu takes 10–20 s. The fix is not guessed: this
+ * prints where each world's time goes, on all three OSes, so the dominant term is named with a
+ * number. One line per world, `hrtime`-based, stdout only.
+ */
+const phase = (label, marks, fn) => {
+  const t0 = process.hrtime.bigint();
+  const r = fn();
+  marks.push(`${label}=${Math.round(Number(process.hrtime.bigint() - t0) / 1e6)}ms`);
+  return r;
+};
+
 export async function buildWorld(t, { claudeFloor = null, modules = 'link', schemaBump = true } = {}) {
+  const marks = [];
+  const worldStart = process.hrtime.bigint();
   const scratch = tempDir('snowarch-upgrade-', t);
   const work = join(scratch, 'work');
   mkdirSync(work, { recursive: true });
 
-  for (const rel of trackedFiles()) {
-    const from = join(REAL_ROOT, rel);
-    if (!existsSync(from)) continue;          // a file staged for deletion, say
-    mkdirSync(dirname(join(work, rel)), { recursive: true });
-    cpSync(from, join(work, rel), { dereference: true });
-  }
+  phase('tree-copy', marks, () => {
+    let n = 0;
+    for (const rel of trackedFiles()) {
+      const from = join(REAL_ROOT, rel);
+      if (!existsSync(from)) continue;          // a file staged for deletion, say
+      mkdirSync(dirname(join(work, rel)), { recursive: true });
+      cpSync(from, join(work, rel), { dereference: true });
+      n += 1;
+    }
+    marks.push(`files=${n}`);
+  });
   // A REAL corpus upstream, three areas big.
   //
   // Not the product's: cloning 35,000 files per test would make this harness unusable, and not a
   // dead path either — AC 1's whole claim is that the docs step RE-RUNS when the areas file moves,
   // and a step that cannot sync is a step that skips. `buildUpstream` is the docs suite's own
   // fixture builder, so what B02 does here is what B02 does everywhere.
-  const upstream = buildUpstream(join(scratch, 'corpus'));
+  const upstream = phase('corpus-upstream', marks, () => buildUpstream(join(scratch, 'corpus')));
   const config = JSON.parse(readFileSync(join(work, 'engine.config.json'), 'utf8'));
   writeFileSync(join(work, 'engine.config.json'), `${JSON.stringify({
     ...config,
@@ -288,9 +310,9 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // `dist/`, which needs TypeScript, and copying 400 MB per run would make this harness unusable.
   // It is gitignored, so it never reaches a commit or a tag: the tree the releases carry is the
   // same either way. A caller that will INSTALL must pass `{ modules: 'copy' }`.
-  placeModules(work, modules);
+  phase(`modules-${modules}`, marks, () => placeModules(work, modules));
 
-  rewriteVersion(work, '9.0.0');
+  phase('rewrite-version', marks, () => rewriteVersion(work, '9.0.0'));
 
   // ARC-09-C13 — REGENERATE WHAT THE REWRITTEN CONFIG IMPLIES. The lines above deliberately give
   // the fixture a different corpus upstream and pin from the real checkout, and several generated
@@ -302,22 +324,26 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // embed the version and the corpus registration too, so regenerating before those lines ran
   // left three targets stale — which the release's lint gate then reported, correctly.
   // exists — a list here would be the copy that goes stale when somebody adds the next generator.
-  execFileSync(process.execPath, [join(work, 'scripts/gen-all.mjs')], { cwd: work, stdio: 'pipe' });
-  git(work, ['init', '-q', '-b', 'main']);
+  phase('gen-all', marks, () => execFileSync(process.execPath,
+    [join(work, 'scripts/gen-all.mjs')], { cwd: work, stdio: 'pipe' }));
+  phase('git-init', marks, () => git(work, ['init', '-q', '-b', 'main']));
   // Written into the fixture repository the moment it exists, so every git that ever runs here —
   // including ones this suite does not spawn — reads it. See `persistLongPaths`.
   persistLongPaths(work);
   commit(work, 'v9.0.0', upstream.pin);
   await tagRelease(work, '9.0.0', { claudeFloor });
+  marks.push(`release-A-base=${Math.round(Number(process.hrtime.bigint() - worldStart) / 1e6)}ms`);
 
   // ── A: v9.1.0 — one declared input moves, so exactly one step goes stale ──────────────────
   const areas = join(work, 'vendor/docs-areas.txt');
   // One area REMOVED rather than added: every area the file names must exist upstream, and a
   // release that asks for one that does not is a broken release rather than a test.
   writeFileSync(areas, `${AREAS.slice(0, -1).join('\n')}\n`);
-  rewriteVersion(work, '9.1.0');
+  phase('rewrite-version-A', marks, () => rewriteVersion(work, '9.1.0'));
   commit(work, 'feat(docs): one fewer area', upstream.pin);
+  const tA = process.hrtime.bigint();
   await tagRelease(work, '9.1.0', { claudeFloor });
+  marks.push(`tag-A=${Math.round(Number(process.hrtime.bigint() - tA) / 1e6)}ms`);
 
   // ── B: v9.2.0 — the store's schema moves, so B06 migrates rather than re-wizards ──────────
   //
@@ -354,7 +380,7 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // so building first left the head release carrying a contract that named the previous one — the
   // fixture's own version of the defect ARC-09-C12b fixed in the release script, and the reason a
   // release cut inside this world failed its `dist` gate with a sha nobody had touched.
-  rewriteVersion(work, '9.2.0');
+  phase('rewrite-version-B', marks, () => rewriteVersion(work, '9.2.0'));
   execFileSync(process.execPath, [join(work, 'scripts/build-dist.mjs')],
     { cwd: work, stdio: 'pipe', encoding: 'utf8' });
   execFileSync(process.execPath, [join(work, 'packages/contract/pin.mjs'), '--yes'],
@@ -367,17 +393,19 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // arriving in the harness.
   regenerate(work);
   commit(work, 'feat(server): store schema v2', upstream.pin);
+  const tB = process.hrtime.bigint();
   await tagRelease(work, '9.2.0', { claudeFloor });
+  marks.push(`tag-B=${Math.round(Number(process.hrtime.bigint() - tB) / 1e6)}ms`);
 
   // ── the bare origin, and the user's clone at v9.0.0 ───────────────────────────────────────
   const origin = join(scratch, 'origin.git');
-  gitRaw(['clone', '--quiet', '--bare', work, origin]);
+  phase('clone-bare', marks, () => gitRaw(['clone', '--quiet', '--bare', work, origin]));
 
   const user = join(scratch, 'user');
-  gitRaw(['clone', '--quiet', pathToFileURL(origin).href, user]);
+  phase('clone-user', marks, () => gitRaw(['clone', '--quiet', pathToFileURL(origin).href, user]));
   // The user's clone gets the same treatment: B06's migration runs the BUILT CLI, which imports
   // commander, and a design-only bootstrap never installs dependencies.
-  placeModules(user, modules);
+  phase(`modules-user-${modules}`, marks, () => placeModules(user, modules));
   git(user, ['checkout', '--quiet', 'v9.0.0']);
   git(user, ['config', 'user.email', 'f@example.com']);
   git(user, ['config', 'user.name', 'f']);
@@ -388,6 +416,9 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // AC 8 overrides this with a version below a release's floor.
   const bin = fakeClaude(join(scratch, 'bin'), '2.1.258 (Claude Code)');
 
+  // ARC-09-C28 instrument, removed when the chore closes. One line per world, stdout only.
+  marks.push(`TOTAL=${Math.round(Number(process.hrtime.bigint() - worldStart) / 1e6)}ms`);
+  writeSync(1, `    world[${process.platform}] ${marks.join(' ')}\n`);
   return { scratch, work, origin, user, bin };
 }
 
