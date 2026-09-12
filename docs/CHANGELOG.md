@@ -37,6 +37,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **What the two old repositories will say, written before anyone says it.** Both will carry a
+  notice at the top of their README pointing at this one, naming the tag their history is preserved
+  under, and giving the date they go read-only — two weeks later, so that somebody midway through
+  moving is not met by a locked door. The checklist for that is written down, including the five
+  things never to do: the published package stays exactly as it is, and the check that proves it
+  has a recorded starting value rather than a hopeful instruction.
+
 - **A format for recording a clean-machine run, and a check that it carries nothing it should not.**
   Before this release is called good, the install is run on a machine that has never seen it —
   macOS, Ubuntu and Windows without an instance, and once against a real one. Those runs are written

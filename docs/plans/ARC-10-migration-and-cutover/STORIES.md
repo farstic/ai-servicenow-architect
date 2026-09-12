@@ -655,6 +655,24 @@ Archive checklist (`docs/CONTRIBUTING.md` "Retiring the predecessors"; owner-onl
 
 **Definition of done.** Both notices live; checklist merged; npm record verified untouched; README acceptance criterion 3 (notice half) ticked.
 
+**Amended 2026-09-12 (S09 TOOL HALF).** This story splits: the TEXT and the CHECKLIST are delivered
+here; the RUN is the owner's, once, after `v2.0.0` exists.
+
+- **AC 4 is this PR's** — the checklist exists in `docs/CONTRIBUTING.md` § *Retiring the
+  predecessors*, six numbered items with the `+14 days` rule, asserted by
+  `tests/predecessor-notice.test.mjs`.
+- **AC 1, 2, 3 and 5 are the owner's run**, recorded in S10's review record. Nothing in this PR
+  touches either old repository, and the only npm command anywhere in it is read-only `npm view`.
+- **The npm baseline was re-read rather than copied**: `npm view @farstic/snow-mcp version
+  deprecated` → `1.0.0` with no deprecation line, and `npm view @farstic/snow-mcp readme | shasum
+  -a 256` → `47b71271fc675e850c473e341146beca80fa800d51446e6e41c59a03bf07b70c`. Both match the
+  2026-09-11 measurement, so the digest is recorded as the checklist's "before".
+- **Nothing needed excluding from the link check.** `tests/docs-links.test.mjs` skips `https://`
+  targets entirely — it never fetches — so the two `…/blob/v2.0.0/…` links, which resolve only once
+  the tag exists, need no named exemption.
+- **`packages/snowarch/CHANGELOG.md` § `2.0.0` exists** and is asserted, because the snow-mcp
+  variant links it: a notice promising a section nobody wrote is worse than no link.
+
 ---
 
 ### ARC-10-S10 — Two-week post-release review: telemetry-free feedback loop (issue template with the doctor JSON) and the archive trigger
