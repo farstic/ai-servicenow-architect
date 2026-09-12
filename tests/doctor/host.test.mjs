@@ -145,33 +145,84 @@ test('E-25 answers to the same provider list as the server and the bootstrap', a
   }
 });
 
-test('E-25 does NOT read the Windows environment roots — a recorded gap, not a passing case', async () => {
-  // THE FIXTURE HAS A THIRD SECTION AND THIS CHECK CANNOT ANSWER IT (acceptance item B07-02).
+test('E-25 reads the Windows environment roots — the only detector Known Folder Move has', async () => {
+  // ARC-08-C2, and this case is the one the recorded gap was written to become. It stood here as
+  // `E-25 does NOT read the Windows environment roots — a recorded gap, not a passing case`,
+  // asserting the miss with the message "make this a passing case", and it failed the moment the
+  // detector learned `env` — which is what a pinned gap is for. It is the passing case now.
   //
-  // `env[]` is Known Folder Move: an enterprise policy redirects Documents into OneDrive, the word
+  // `env[]` is enterprise Known Folder Move: the policy redirects Documents into OneDrive, the word
   // OneDrive appears nowhere in the path, and `%OneDrive%` is — in the fixture's own words — "the
-  // only detector there is". The server's `detectCloudSync(path, { env })` reads it and its test
-  // iterates those rows. The bootstrap's `cloudSyncProvider(path)` takes NO env, and E-25 calls it
-  // with `ctx.root` alone, so on such a machine E-25 reports "not under a cloud-sync folder" for a
-  // checkout that is one.
-  //
-  // Asserted as it behaves TODAY, deliberately, so the gap is visible and cannot change unnoticed
-  // in either direction: if someone makes the detector env-aware this test fails and is rewritten
-  // as a passing case, which is the outcome this row wants. Recorded for ARC-06/ARC-08's owner
-  // rather than fixed here — it is a product behaviour change on a Windows path, days before an RC,
-  // and it is not what this acceptance item asked for.
+  // only detector there is". The server's `detectCloudSync(path, { env })` has always read it; the
+  // bootstrap's `cloudSyncProvider` did not, so E-25 could not.
   const fixture = JSON.parse(readFileSync(
     join(repoRoot, 'packages/snowarch/tests/fixtures/cloud-sync-paths.json'), 'utf8'));
   assert.ok(fixture.env.length > 2, 'the fixture lost its environment rows');
 
+  // THE SECTION CARRIES ITS OWN NEGATIVE, and reading it rather than assuming is the point: row 3
+  // is `C:\Users\me\work\x` with `%OneDrive%` set to a DIFFERENT folder — "a set variable is not
+  // a blanket yes". A loop that expected three warns would have demanded exactly the bug where a
+  // set variable syncs the whole disk. So each row is asserted against ITS OWN expected provider.
+  const positive = fixture.env.filter((r) => r.provider !== null);
+  assert.ok(positive.length >= 2, 'the fixture lost its positive environment rows');
+  assert.ok(fixture.env.some((r) => r.provider === null), 'the fixture lost its negative row');
+
   for (const { path, set, provider, why } of fixture.env) {
-    // The environment is passed in, so this is not "the ctx had no env" — the check never looks.
     const r = await runById(checks, 'E-25',
       { root: path, platform: 'win32', env: set, config: {}, home: '' });
-    assert.equal(r.status, 'ok',
-      `E-25 now detects ${path} (${provider}) — make this a passing case: ${why}`);
+    if (provider === null) {
+      assert.equal(r.status, 'ok', `${path} — ${why}`);
+      assert.equal(r.data.provider, null, `${path} — ${why}`);
+    } else {
+      assert.equal(r.status, 'warn', `${path} — ${why}`);
+      assert.equal(r.data.provider, provider, `${path} — ${why}`);
+      assert.match(r.detail, /cloud-sync folder/);
+    }
+  }
+
+  // BOTH DIRECTIONS on the positives: the SAME paths with the variable UNSET are not synced.
+  // Without this, a detector that warned about every Windows path would pass the loop above.
+  for (const { path, why } of positive) {
+    const r = await runById(checks, 'E-25',
+      { root: path, platform: 'win32', env: {}, config: {}, home: '' });
+    assert.equal(r.status, 'ok', `${path} warns with no %OneDrive% set — ${why}`);
     assert.equal(r.data.provider, null);
   }
+});
+
+test('ARC-08-C2 — the bootstrap\'s two halves agree about a redirected folder', async () => {
+  // The disagreement this closes, and the reason it went unnoticed. `lib/cloud-sync.mjs` imports
+  // the server's `isUnderCloudSyncFolder` precisely so the two "cannot disagree about a path
+  // exactly when it mattered" — its own words. But that function delegates to `detectCloudSync`
+  // with DEFAULT options, so it read the ambient environment and answered TRUE, while
+  // `cloudSyncProvider` had no env at all and answered null. Measured before the fix:
+  //
+  //   isUnderCloudSyncFolder("C:/Users/me/Documents/work/x")  → true
+  //   cloudSyncProvider(same)                                 → null
+  //   cloudSyncWarning(same)                                  → null   ← the bootstrap said nothing
+  //
+  // The fixture's `env[]` rows were read by nobody, which is why nothing caught it.
+  const { cloudSyncProvider, cloudSyncWarning } = await import('../../tools/snowarch/lib/cloud-sync.mjs');
+  const { detectCloudSync } = await import('../../packages/snowarch/dist/store/paths.js');
+  const fixture = JSON.parse(readFileSync(
+    join(repoRoot, 'packages/snowarch/tests/fixtures/cloud-sync-paths.json'), 'utf8'));
+
+  for (const { path, set, provider, why } of fixture.env) {
+    assert.equal(cloudSyncProvider(path, { env: set }), provider, `${path} — ${why}`);
+    // The warning follows the provider, in both directions — including the row where the variable
+    // is set and the path is not under it, which must stay silent.
+    assert.equal(Boolean(cloudSyncWarning(path, { env: set })), provider !== null,
+      `${path}: the warning disagrees with the provider — ${why}`);
+    // ...and both agree with the server, which is the invariant the module exists to hold.
+    assert.equal(detectCloudSync(path, { env: set, realpath: (x) => x })?.provider ?? null, provider,
+      `${path}: the two detectors disagree`);
+  }
+
+  // The env is a PARAMETER, defaulting to the ambient one — so every existing caller gains the
+  // case without being changed, and a test can still say what it means without touching
+  // `process.env`. Asserted rather than assumed: an injected empty env overrides the ambient one.
+  const row = fixture.env.find((r) => r.provider !== null);
+  assert.equal(cloudSyncProvider(row.path, { env: {} }), null);
 });
 
 // AC 6.

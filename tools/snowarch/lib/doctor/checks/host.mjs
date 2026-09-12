@@ -85,7 +85,10 @@ export function hostChecks() {
       // detector, the bootstrap's warning and this check all answer to (ARC-07-S07). A second
       // implementation here would be a fourth answer to a question with one right one.
       run: async (ctx) => {
-        const provider = cloudSyncProvider(ctx.root);
+        // ARC-08-C2: `ctx.env` is passed, and E-25 had it all along without looking at it. On a
+        // Windows machine with Known Folder Move the path names no provider and `%OneDrive%` is
+        // the only detector there is.
+        const provider = cloudSyncProvider(ctx.root, { env: ctx.env });
         if (!provider) return ok('not under a cloud-sync folder', { provider: null });
         // Reported in design-only too: `clients/` holds engagement content, and a synced folder
         // copies that as readily as it copies a credential file.

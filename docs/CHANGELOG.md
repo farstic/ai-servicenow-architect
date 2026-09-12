@@ -219,6 +219,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **On Windows, the warning about keeping your checkout in a synced folder now sees the case that
+  hides.** If your employer redirects Documents into OneDrive, the folder is synced and nothing in
+  its name says so — the only clue is a Windows variable. The health check did not look at it, so
+  it told you the checkout was fine when your credentials file was being copied to the cloud. It
+  looks now. A variable that is set but points somewhere else is still not a warning: being in
+  OneDrive means being *under* that folder, not merely having it configured.
+
 - **The health check no longer breaks when a new version exists.** The check that tells you whether
   you are on the latest release crashed as soon as there was a release to compare against — and,
   separately, on any machine that had already completed one successful check, whether or not a new
