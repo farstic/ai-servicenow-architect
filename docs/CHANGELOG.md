@@ -227,6 +227,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A check that failed about once in ten thousand runs, for a reason that was never a rule.** One
+  internal test asserted that a restored file timestamp is "never" exactly equal to the original —
+  true almost always, and false whenever the original happens to land on a whole millisecond. It
+  now checks the thing that actually matters, which holds every time.
+
 - **The engine now says clearly what happens when you ask for something custom.** Asked to build
   against a table you have named yourself, it must stop and ask before building — and it did stop,
   every time, but it explained itself three different ways across three runs, because the rule that

@@ -48,7 +48,13 @@ test('R1 — every body that differs from the import tag is attributable, and no
     try { git(['worktree', 'remove', '--force', work]); } catch { /* already gone */ }
     rmSync(work, { recursive: true, force: true });
   });
-  git(['worktree', 'add', '--detach', work, TAG, '--quiet']);
+  // ARC-02-C1: `-c core.autocrlf=false` on the CHECKOUT, not a normalisation in the comparison.
+  // The tag's tree has no `.gitattributes`, so on a Windows image the worktree checkout converts and
+  // both assets arrive CRLF — and the asset half is meant to be BYTE-EXACT ("never legitimately
+  // changed"), so hashing after a CRLF strip would widen the one comparison that should not widen.
+  // Fixing the checkout gives every platform the tag's own bytes. The process doing the checkout is
+  // what reads this config, which is why it is here and not in the script.
+  git(['-c', 'core.autocrlf=false', 'worktree', 'add', '--detach', work, TAG, '--quiet']);
   assert.ok(existsSync(join(work, '.claude')), 'the import worktree has no .claude tree');
 
   // The script is the ONE definition of "differs": it strips frontmatter and normalises the
@@ -110,7 +116,13 @@ test('R1 — the assets are byte-identical, which the count CAN assert', (t) => 
     try { git(['worktree', 'remove', '--force', work]); } catch { /* already gone */ }
     rmSync(work, { recursive: true, force: true });
   });
-  git(['worktree', 'add', '--detach', work, TAG, '--quiet']);
+  // ARC-02-C1: `-c core.autocrlf=false` on the CHECKOUT, not a normalisation in the comparison.
+  // The tag's tree has no `.gitattributes`, so on a Windows image the worktree checkout converts and
+  // both assets arrive CRLF — and the asset half is meant to be BYTE-EXACT ("never legitimately
+  // changed"), so hashing after a CRLF strip would widen the one comparison that should not widen.
+  // Fixing the checkout gives every platform the tag's own bytes. The process doing the checkout is
+  // what reads this config, which is why it is here and not in the script.
+  git(['-c', 'core.autocrlf=false', 'worktree', 'add', '--detach', work, TAG, '--quiet']);
   let out = '';
   try {
     out = execFileSync(process.execPath, [join(root, SCRIPT), join(work, '.claude'), join(root, '.claude')],

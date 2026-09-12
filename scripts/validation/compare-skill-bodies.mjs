@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// ARC-02-S01 (throwaway, deleted with scripts/validation/ at the end of the ARC).
+// PERMANENT. This was written as a throwaway to be deleted with `scripts/maint/` at the end of the
+// ARC; it is executed by `tests/skill-bodies-preserved.test.mjs` now, which is why it moved to
+// `scripts/validation/`. A script a committed test runs is not throwaway (ARC-02-C1).
 // Proves the roster's BODY CONTENT survived the move: frontmatter aside, and with the rewritten path
 // tokens normalised back, every skill, EXAMPLES and agent file must be byte-identical to the import.
 // ARC README acceptance criterion 1. S03/S04 reuse it against import/engine-v2.8.0-worktree.
@@ -33,7 +35,6 @@ function* mdFiles(root) {
 
 let md = 0, mdSame = 0, asset = 0, assetSame = 0;
 const diffs = [];
-for (const f of mdFiles(join(oldRoot, 'skills'))) { }   // walked below with agents together
 for (const sub of ['skills', 'agents']) {
   for (const f of mdFiles(join(oldRoot, sub))) {
     const rel = relative(oldRoot, f).split(sep).join('/');
