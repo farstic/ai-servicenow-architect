@@ -1348,6 +1348,13 @@ run.
 
 ## History
 
+**Paths named below this heading may no longer exist.** The citation check stops here by design —
+L05 skips a dead path at or below a history heading, which is what lets the ledger below name
+`scripts/legacy/doctor.sh` after ARC-10-S03 deleted it. Keep this heading exactly `## History`: it is
+the marker L05 matches, along with `## The D-03 cut ledger` and `## Before <version>`. Sub-sections
+here are `###`; a new `##` above the ledger rows would put them back in scope and turn every retired
+path into a finding at once.
+
 | Commit / tag | What |
 |---|---|
 | `811163f` (2026-09-06) | the repository's first commit — the programme plans, on `develop` |
@@ -1371,6 +1378,76 @@ prefix without recording a rename, so `git log --follow -- packages/snowarch/src
 **0 commits** while the history was fully present and reachable by other queries. The
 `filter-repo --to-subdirectory-filter` + `merge --allow-unrelated-histories` route — the same shape as
 the engine import — makes the ordinary query work.
+
+### The two predecessors
+
+This product replaces two repositories. Neither was deleted; both are preserved here as tags and
+remain readable at their source.
+
+| Predecessor | Where it landed | Import tag | Source archive |
+|---|---|---|---|
+| Claude ServiceNow Architecture Engine **v2.8.0** | the repository ROOT — `CLAUDE.md`, `.claude/`, `governance/`, `docs/` | `import/engine-v2.8.0-worktree` → `7f99a3a` | [`farstic/claude-servicenow-live`](https://github.com/farstic/claude-servicenow-live) — *(to be archived by ARC-10-S09; date recorded there)* |
+| `snow-mcp` **1.0.0** | `packages/snowarch/` | `import/snow-mcp-1.0.0` → `58a66e0` | [`farstic/snow-mcp`](https://github.com/farstic/snow-mcp) — *(to be archived by ARC-10-S09; date recorded there)* |
+
+**The server was NOT grafted with `git subtree add`.** That was tried first and rejected on the
+evidence recorded above: it places the tree at a prefix without recording a rename, and
+`git log --follow` then reports zero commits for a file whose history is fully present. The route
+used was `git filter-repo --to-subdirectory-filter packages/snowarch` followed by
+`git merge --allow-unrelated-histories` — the same shape as the engine import, chosen so that the
+ordinary query works.
+
+**`@farstic/snow-mcp@1.0.0` stays exactly as published on npm.** It is a record, not a channel: D-01
+forbids republishing under that name, and `scripts/ci/assert-publish-target.mjs` refuses it by name
+before any token is read. The successor package is `@farstic/snowarch`.
+
+### Reading across the import boundary
+
+Both imports were merged with `--allow-unrelated-histories` at the root, so an ordinary `git log`
+on a path reaches the pre-import history with **no `--follow`**:
+
+```sh
+git log -- CLAUDE.md                            # reaches 2026-05-28, the engine's first commit
+git log -- packages/snowarch/src/server.ts      # reaches 2026-06-06, the server's
+```
+
+A sha quoted from either source repository will not resolve here — the server's ids were rewritten
+twice (see above) and the engine's working tree carried uncommitted changes into its tag. Match on
+subject and author-date instead.
+
+### The decisions
+
+Nine ADRs record what was decided and why. Each is immutable once Accepted; a later change is a new
+ADR that supersedes it, never an edit.
+
+| ADR | Subject |
+|---|---|
+| [ADR-0001](decisions/ADR-0001-names.md) | the product, package and server names |
+| [ADR-0002](decisions/ADR-0002-licence.md) | the licence, and the relicensing consent record |
+| [ADR-0003](decisions/ADR-0003-scope-cut.md) | the nine surfaces that do not enter the product (D-03) |
+| [ADR-0004](decisions/ADR-0004-credential-policy.md) | credential-at-rest policy and authentication methods |
+| [ADR-0005](decisions/ADR-0005-permission-posture.md) | the permission posture — modes and presets |
+| [ADR-0006](decisions/ADR-0006-distribution-channel.md) | how the product is distributed |
+| [ADR-0007](decisions/ADR-0007-post-decision-rulings.md) | the post-decision rulings ledger |
+| [ADR-0008](decisions/ADR-0008-git-floor.md) | the git version floor |
+| [ADR-0009](decisions/ADR-0009-contract-and-drift-prevention.md) | the contract, and how drift is prevented |
+
+### Not carried — the nine D-03 surfaces
+
+ADR-0003's ruling of 2026-09-04, one line per item. **Nothing was deleted from the source
+repositories**; these are simply not carried into the unified product, and both histories preserve
+them. The ledger below records which were removed as leaves and which needed source edits.
+
+| # | Surface | Source |
+|---|---|---|
+| 1 | `desktop/` | `snow-mcp` |
+| 2 | `clients/`, `src/cli/writers/`, `src/cli/detect-clients.ts` | `snow-mcp` |
+| 3 | `src/direct/` | `snow-mcp` |
+| 4 | `src/reports/` | `snow-mcp` |
+| 5 | `src/a2a/` | `snow-mcp` |
+| 6 | `src/transport/http-server.ts`, `src/dashboard/`, `Dockerfile` | `snow-mcp` |
+| 7 | `src/prompts/`, `.github/agents/*.agent.md` | `snow-mcp` |
+| 8 | `docs/ADVANCED-WEB-SETUP.md` and the claude.ai-surface sections of `README.md` / `client-onboarding.md` | the engine |
+| 9 | the hooks block of `.claude/settings.json` | the engine |
 
 ---
 

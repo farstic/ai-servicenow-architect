@@ -136,7 +136,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-10-S02 | ARC-10 | Engagement-state carry-over: `clients/` per checkout, `memory/MEMORY.md` retired in favour of Claude Code auto memory | S | ARC-01-S07; ARC-02-S01/S08 | M5 | Done (2026-09-12) |
 | ARC-10-S03 | ARC-10 | Retire the legacy scaffolding: `scripts/legacy/`, obsolete `.gitignore` lines, empty legacy-name allow-list | S | ARC-02-S12; ARC-04-S01/S14; ARC-09-S02 | M5 | Done (2026-09-12) |
 | ARC-10-S04 | ARC-10 | Rewrite the standing rule and the field-notes policy (DR-16) in `CLAUDE.md` and `docs/CONTRIBUTING.md` | S | ARC-02-S08/S10; ARC-04-S14 | M5 | Done (2026-09-12) |
-| ARC-10-S05 | ARC-10 | `docs/ARCHITECTURE.md` "History" section: import tags, ADR links, scope-cut ledger pointer, old-repository links | S | ARC-00-S03; ARC-01-S12 | M5 | Not started |
+| ARC-10-S05 | ARC-10 | `docs/ARCHITECTURE.md` "History" section: import tags, ADR links, scope-cut ledger pointer, old-repository links | S | ARC-00-S03; ARC-01-S12 | M5 | Done (2026-09-12) — the `v2.0.0` cross-boundary half is evaluated at the tag (S06) |
 | ARC-10-S06 | ARC-10 | Author's machine cutover on `v2.0.0`: doctor 0 FAIL, stale entries removed, legacy store gone, engagements untracked | M | S01, S05; ARC-07-S08; ARC-08-S03; ARC-09-S01 | M5 | Not started |
 | ARC-10-S07 | ARC-10 | Validation-record template, redaction lint and the cutover test list (T-01…T-18 + `AUTHENTICATION_FAILED` + design-only) | M | ARC-01-S11; ARC-02-S13; ARC-08-S10 | M5 | Not started |
 | ARC-10-S08 | ARC-10 | Clean-machine validation runs: macOS, Ubuntu, Windows in `design-only`; one `live` (`pdi-developer`); one proxied laptop | L | S06, S07; ARC-04-S11; ARC-07-S02; ARC-09-S03/S08 | M5 | Not started |
