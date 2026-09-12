@@ -1,7 +1,7 @@
 {
   "name": "@farstic/snowarch",
-  "version": "2.0.0-dev",
-  "description": "ServiceNow MCP server and snowarch CLI \u2014 the live-instance half of AI ServiceNow Architect",
+  "version": "2.0.0-rc.1",
+  "description": "ServiceNow MCP server and snowarch CLI — the live-instance half of AI ServiceNow Architect",
   "main": "dist/server.js",
   "types": "dist/server.d.ts",
   "exports": {
@@ -33,7 +33,7 @@
     "start": "node dist/server.js",
     "test": "vitest run --coverage",
     "test:nocov": "vitest run",
-  "test:e2e": "vitest run tests/e2e/instance-wizard.e2e.test.ts --reporter=default",
+    "test:e2e": "vitest run tests/e2e/instance-wizard.e2e.test.ts --reporter=default",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.tests.json"
   },

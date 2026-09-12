@@ -1,8 +1,8 @@
 {
   "name": "ai-servicenow-architect",
-  "version": "2.0.0-dev",
+  "version": "2.0.0-rc.1",
   "private": true,
-  "description": "AI ServiceNow Architect \u2014 Claude Code engine + bundled ServiceNow MCP server (snowarch)",
+  "description": "AI ServiceNow Architect — Claude Code engine + bundled ServiceNow MCP server (snowarch)",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
