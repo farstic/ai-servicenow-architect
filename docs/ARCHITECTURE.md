@@ -1116,6 +1116,17 @@ cannot disagree. A check that sets both a code and its own remedy is refused.
 could not run at all — not at the repository root, an unparsable `engine.config.json`, or Node below
 the floor. Exit codes apply with `--json` too; CI relies on them.
 
+**`--json` is the form that travels; instance labels and hosts are masked; machine consumers use the
+report object** (ARC-08-C1). The text report, the SessionStart banner and the doctor cache are local
+to one machine and keep the user's own words — a practitioner needs to see which instance the banner
+is talking about. The JSON is the form an issue template asks a stranger to paste into a public
+tracker, so at that boundary every string value has each loaded instance's label rewritten to
+`<label>` and any instance host to `<host>`. Masked BY VALUE rather than by field, because the label
+was measured in seven fields across four shapes and the eighth arrives without anyone remembering
+this paragraph. The matching is word-bounded, so a label of `dev` also masks the environment token —
+`(dev)` reads `(<label>)` — which is the accepted cost of not keeping a list of words a user may not
+choose. `--fix` reads the in-process report, not this string, and so is unaffected.
+
 **One report, one Mode line** (ARC-08-S05). The sections print in a fixed order — prereqs, repo,
 docs, roster, contract, legacy, host, server — and the last line is always the Mode line, because
 the last line of a transcript is the one that survives a truncated paste. That line is DERIVED from

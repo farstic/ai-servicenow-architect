@@ -169,7 +169,9 @@ export function forStorage(report) {
 // The SHAPE, not one TLD: `service-now.<anything>` catches a real instance, a fixture's
 // `service-now.invalid`, and a future domain nobody has told this file about. `servicenow.com`
 // (no hyphen) is the product's documentation domain and is deliberately NOT here.
-const INSTANCE_HOST = /\bhttps?:\/\/[^\s/?#]*\.(?:service-now\.[a-z]{2,}|servicenowservices\.com)\b/i;
+// Exported since ARC-08-C1: the `--json` boundary masks the same shape, and two definitions of
+// "an instance address" would be two answers to the question this regex exists to settle.
+export const INSTANCE_HOST = /\bhttps?:\/\/[^\s/?#]*\.(?:service-now\.[a-z]{2,}|servicenowservices\.com)\b/i;
 
 export function cacheSensitiveValue(value) {
   if (typeof value !== 'string') return null;

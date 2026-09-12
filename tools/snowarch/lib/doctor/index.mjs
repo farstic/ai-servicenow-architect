@@ -33,6 +33,7 @@ import { collectPrereqs } from './prereqs.mjs';
 import { buildReport } from './report-json.mjs';
 import { renderText, useColour } from './report-text.mjs';
 import { exitCodeFor, runChecks, selectSections } from './runner.mjs';
+import { maskForJson } from './json-boundary.mjs';
 
 export const USAGE = [
   'usage: ./snowarch doctor [--json] [--quick] [--no-network] [--fix] [--section <a,b>] [--no-cache]',
@@ -41,7 +42,8 @@ export const USAGE = [
   '  --quick           the fast subset; implies --no-network and skips anything that spawns',
   '  --no-network      skip every check that would contact the network',
   '  --fix             repair what is marked fixable (ARC-08-S06)',
-  '  --json            the machine-readable report (schema 1)',
+  '  --json            the machine-readable report (schema 1). This is the form that travels:',
+  '                    instance labels and hosts are masked; machine consumers use the report object.',
   '  --no-cache        do not write .local/doctor-last.json',
   '',
   'exit codes:',
@@ -400,7 +402,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     // A plan the user declined is a successful run of `--fix`: they asked what it would do, and
     // it told them. The findings are still on the screen and the next run still reports them.
     if (outcome.declined) {
-      if (flags.json) write(JSON.stringify(report, null, 2));
+      if (flags.json) write(JSON.stringify(maskForJson(report), null, 2));
       if (log?.commit) log.commit();
       return EXIT_OK;
     }
@@ -425,7 +427,11 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     // this the only signal that the banner will re-run every session was a line it cannot read.
     // Present only when it happened — a `cacheError: null` on every healthy run would be noise in
     // the shape every consumer already parses.
-    write(JSON.stringify(cacheError ? { ...report, cacheError } : report, null, 2));
+    // ARC-08-C1: masked at the boundary, not at each site that writes a string. `--json` is the
+    // form that travels — an issue template asks a stranger to paste it — so instance labels and
+    // hosts leave as `<label>` / `<host>`. The text path below, the banner and the cache keep the
+    // user's own words; a machine consumer uses the report object, not this string.
+    write(JSON.stringify(maskForJson(cacheError ? { ...report, cacheError } : report), null, 2));
   } else {
     write(renderText({ report, checks, colour: useColour({ stream: out, env }) }));
   }

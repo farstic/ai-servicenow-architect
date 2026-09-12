@@ -208,6 +208,17 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The report you are asked to paste no longer names your instance.** `./snowarch doctor --json` is
+  the form that travels — an issue template asks for it, and it goes into a public tracker. It used
+  to carry the instance label in seven places and the instance hostname in two, so pasting a report
+  told strangers what your company calls its production instance and where it lives. The JSON now
+  reads `instance=<label>` and `<host>` throughout, and a file added next month is covered without
+  anyone remembering to mask it, because the masking happens where the report leaves rather than at
+  each place that writes a line. The report on your own screen is unchanged and still names the
+  instance — you need to know which one the doctor is talking about. The one visible cost: if you
+  have named an instance after an environment (`dev`, say), the word is masked wherever it appears,
+  including where it means the environment.
+
 - **The install now checks the server it is about to download from, not a different one.** The
   preflight tested whether it could reach the project's own repository — a place the install never
   contacts — and said nothing about the documentation server it fetches from moments later. Someone

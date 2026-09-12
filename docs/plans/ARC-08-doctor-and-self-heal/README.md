@@ -104,3 +104,25 @@ Full write-ups: [`STORIES.md`](STORIES.md).
 | ARC-08-S11 | CI: doctor after bootstrap on three OSes, JSON snapshot test, fixture-driven detector tests, banner timing | M |
 
 Total: 22–30 engineer-days (≈ 4.5–6 weeks for one engineer). Critical path: S01 → S02/S04 → S05 → S06/S08 → S11.
+
+### Chores
+
+Work that is not a story: a defect found while building one, fixed in the same arc.
+
+| ID | What | Status |
+|---|---|---|
+| ARC-08-C1 | The `--json` report carried the instance LABEL in seven fields and the instance HOST in two, and ARC-10-S10's issue template asks a stranger to paste exactly that output into a public tracker. ARC-10-S07's lint would have refused the same bytes in a validation record, so the two rules disagreed about the same content — one mechanical, one a review note. Found by running the doctor against a live fixture rather than by reading the writer: only a live run has instances to name, and the earlier fixture runs never went live because **SV-02 refuses a group/world-readable store** — a fixture written at the default 0644 is found and not loaded (`mode 0644 is group/world-readable`), so the doctor stayed design-only and every field below was empty | **Closed** — masked at the `--json` BOUNDARY (`lib/doctor/json-boundary.mjs`), not at the nine sites that compose a string: a check added next month is covered the day it is written, and the alternative — nine call sites and a review note — is the arrangement that produced the defect. Masking is by VALUE (every label from `server.instances[].label`, longest first; the host by C9's `INSTANCE_HOST`, now exported rather than copied), so a field nobody listed is covered too, and a test plants one to prove it. The TEXT report is unchanged and still names the instance — it is local, and a practitioner needs to know which instance the doctor is talking about; the test asserts BOTH directions, or "the fixture never had a label" would pass every assertion. `--fix` reads the in-process report and is unaffected. Cost, documented by a test rather than discovered: a label of `dev` also masks the environment token, `(<label>)` — word-bounded matching cannot tell a user's label from the same word used as an environment, and a list of words a user may not choose is wrong for whoever chooses one |
+
+The seven fields, measured on the live fixture before the fix:
+
+| Path | Shape |
+|---|---|
+| `$.modeLine` | `instance=acme-prod (prod)` |
+| `$.modeLineDetailed` | the same line, with the check counts |
+| `$.server.instances[0].label` | the label itself |
+| `$.checks[32].detail` | `acme-prod: …` — a check naming the instance it judged |
+| `$.checks[32].data.fix.label` | the `--fix` payload's target |
+| `$.checks[32].data.fixes[0].label` | the same, in the multi-fix form |
+| `$.checks[35].detail` | a second check, same shape as the first |
+
+After: the JSON passes all six of ARC-10-S07's redaction patterns, contains neither the label nor the host, and the mode line reads `Mode: live — instance=<label> (prod) preset=read-only`.
