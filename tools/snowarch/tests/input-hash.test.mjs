@@ -246,9 +246,21 @@ test('AC 2 — a password edited in place, same length, mtime restored, makes NO
   utimesSync(store, stamp.atime, stamp.mtime);
 
   assert.equal(statSync(store).size, stamp.size, 'the fixture must not have changed the size');
-  // `utimesSync` ROUNDS a Date to the millisecond, so the restored mtime is near but not equal.
-  // That is exactly the case the stamp is coarsened for, and asserting it here says why.
-  assert.notEqual(statSync(store).mtimeMs, stamp.mtimeMs, 'a restored mtime is never byte-equal');
+  // ARC-09-C33. This asserted `notEqual` on the restored mtime, with the explanation that
+  // `utimesSync` ROUNDS a Date to the millisecond so the value comes back "near but not equal".
+  // The rounding is real; "never equal" is not. It holds only while the original mtime carries a
+  // fraction, and when the fixture's write lands on a whole millisecond the round trip is EXACT —
+  // NTFS ticks are 100 ns, so roughly one run in ten thousand, which is what the Windows node-24
+  // cell hit: `actual 1789240976993 = expected 1789240976993`. A probability written as a law.
+  //
+  // The same family as C30's boundary crossing, on the other side of it: C30 guarded the 999.x
+  // side, this is the .000 side. The C30 guard is NOT widened for it — the two are different
+  // questions and one guard answering both would answer neither precisely.
+  //
+  // What the stamp actually depends on is asserted instead, and it holds on every crossing: the
+  // restored mtime is the same SECOND as the original, which is the coarsening the stamp applies.
+  assert.equal(Math.floor(statSync(store).mtimeMs / 1000), Math.floor(stamp.mtimeMs / 1000),
+    'the restored mtime is not in the same second — the stamp would change');
   assert.deepEqual(staleIds(state, ctx), [],
     'a credential change must not re-run anything: the store is hashed by shape, never content');
   // And the reason it holds: the stamp is mtime+size, and the version read is the version only.

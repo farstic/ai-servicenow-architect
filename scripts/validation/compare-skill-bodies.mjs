@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// ARC-02-S01 (throwaway, deleted with scripts/maint/ at the end of the ARC).
+// PERMANENT. This was written as a throwaway to be deleted with `scripts/maint/` at the end of the
+// ARC; it is executed by `tests/skill-bodies-preserved.test.mjs` now, which is why it moved to
+// `scripts/validation/`. A script a committed test runs is not throwaway (ARC-02-C1).
 // Proves the roster's BODY CONTENT survived the move: frontmatter aside, and with the rewritten path
 // tokens normalised back, every skill, EXAMPLES and agent file must be byte-identical to the import.
 // ARC README acceptance criterion 1. S03/S04 reuse it against import/engine-v2.8.0-worktree.
@@ -13,7 +15,12 @@ if (!oldRoot || !newRoot) { console.error('usage: compare-skill-bodies.mjs <old 
 const stripFrontmatter = (t) => t.replace(/^---\n[\s\S]*?\n---\n/, '');
 // The rewrite is the ONLY change this story makes, so it is normalised away before comparing —
 // otherwise every agent file would "differ" for the very reason the story exists.
-const normalise = (t) => stripFrontmatter(t)
+// LINE ENDINGS FIRST. A body is the same body whichever way the lines end, and this script exists
+// to answer "was content lost" — not "which platform checked it out". The import tag predates
+// `* text=auto eol=lf` in `.gitattributes`, so a Windows checkout of the tag arrives CRLF while the
+// working tree is LF, and every one of the 65 files then "differs". Found on the Windows cell:
+// 42 differ on macOS and Linux, 65 on Windows, from the same two trees.
+const normalise = (t) => stripFrontmatter(t.replace(/\r\n/g, '\n'))
   .replace(/\.claude\/skills\//g, 'skills/')
   .replace(/\.claude\/agents\//g, 'agents/');
 
@@ -28,7 +35,6 @@ function* mdFiles(root) {
 
 let md = 0, mdSame = 0, asset = 0, assetSame = 0;
 const diffs = [];
-for (const f of mdFiles(join(oldRoot, 'skills'))) { }   // walked below with agents together
 for (const sub of ['skills', 'agents']) {
   for (const f of mdFiles(join(oldRoot, sub))) {
     const rel = relative(oldRoot, f).split(sep).join('/');
@@ -46,7 +52,11 @@ for (const sub of ['skills', 'agents']) {
     }
   }
 }
-for (const d of diffs.slice(0, 10)) console.error(d);
+// ARC-02 acceptance (B02-01): EVERY difference, not the first ten. This printed
+// `diffs.slice(0, 10)` with no "…and N more", so a reader — including a reviewer measuring the
+// criterion — saw ten names when forty-two files differed, and no line said otherwise. A
+// diagnostic that truncates silently is a diagnostic that misleads precisely when it matters.
+for (const d of diffs) console.error(d);
 console.log(`bodies identical: ${mdSame}/${md}`);
 console.log(`assets identical: ${assetSame}/${asset}`);
 process.exit(diffs.length ? 1 : 0);

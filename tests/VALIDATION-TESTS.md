@@ -100,7 +100,7 @@ Show me the table model and the Script Include.
 ### Pass criteria
 
 - CSM gateway fires at Phase 1 Step 5.
-- §1.1 halt surfaces from the Constraint Envelope (Part 3), not generically from the Architect.
+- §1.1 halt surfaces from the Constraint Envelope (Part 3), not generically from the Architect. Step 4 IDENTIFIES the custom object and records it in the dispatch envelope; when a gateway domain applies, the §1.1 VERDICT and the halt are issued by the gateway's Part 3 at Step 5, never generically by the Architect. Step 4 halts on its own only when no gateway applies. A request that NAMES a custom object is Verdict C even when baseline covers the need.
 - Zero design artefacts in the same turn as the OPEN QUESTION. **Design artefact** means any of: table DDL, field list, Script Include code, flow outline, HLD/LLD section, pseudocode, data model diagram, ACL matrix, or any other output that constitutes partial delivery of the requested build. A clarifying question or routing-time consult flag does NOT count as a design artefact.
 
 ### Fail signals
@@ -678,6 +678,12 @@ Design the access model for a CSM case table where customer contact PII must be
 hidden from ITSM support staff who can see the related incident.
 ```
 
+*Second turn (ARC-02 acceptance, B02-06 spec re-scope).* The release-candidate run recorded these three as PASS **on two turns**: turn 1 produced the substance and turn 2 produced it under its artefact name. A scripted run makes both turns only if the spec carries both prompts, so the second is written here rather than typed by whoever runs it — the harness reads the spec, and a date in this file belongs only on the Last updated line.
+
+```
+proceed: produce the Security & GRC Constraint Note under its name
+```
+
 ### Expected behaviour
 
 1. Architect restates the task.
@@ -711,6 +717,12 @@ hidden from ITSM support staff who can see the related incident.
 We want to give our 400 field engineers — currently self-service/requester
 users — write access to log their work in a new custom "field job log" table
 we'd stand up in a new scoped app.
+```
+
+*Second turn (ARC-02 acceptance, B02-06 spec re-scope).* The release-candidate run recorded these three as PASS **on two turns**: turn 1 produced the substance and turn 2 produced it under its artefact name. A scripted run makes both turns only if the spec carries both prompts, so the second is written here rather than typed by whoever runs it — the harness reads the spec, and a date in this file belongs only on the Last updated line.
+
+```
+proceed: produce the Licensing & Entitlement Constraint Note under its name
 ```
 
 ### Expected behaviour
@@ -748,6 +760,12 @@ we'd stand up in a new scoped app.
 ```
 Rough order of magnitude — how big is migrating ~50k assets from spreadsheets
 into ServiceNow and standing up a basic SAM dashboard?
+```
+
+*Second turn (ARC-02 acceptance, B02-06 spec re-scope).* The release-candidate run recorded these three as PASS **on two turns**: turn 1 produced the substance and turn 2 produced it under its artefact name. A scripted run makes both turns only if the spec carries both prompts, so the second is written here rather than typed by whoever runs it — the harness reads the spec, and a date in this file belongs only on the Last updated line.
+
+```
+proceed: produce the Estimate under its name
 ```
 
 ### Expected behaviour

@@ -30,6 +30,7 @@ When the user types `Status` or `/snowarch status`: run `./snowarch doctor --qui
 - `governance/prompt-patterns.md` — reusable prompt templates PP-01…PP-24.
 - `.claude/skills/` and `.claude/agents/` — the roster; `docs/ARCHITECTURE.md` carries the generated table.
 - `docs/PLATFORM-NOTES.md` — platform behaviour confirmed on real instances, each with its grounding.
+- `docs/MODES-AND-PRESETS.md` — what design-only and live mean, and what each preset grants.
 - `templates/` — ADR, traceability matrix, RAID log, NFR checklist.
 - `clients/<name>/` — per-engagement state, transcripts and artefacts.
 - `tests/VALIDATION-TESTS.md` — the behavioural tests for this file and the protocols below.
@@ -43,7 +44,7 @@ When the user types `Status` or `/snowarch status`: run `./snowarch doctor --qui
 1. **Restate** the task in one sentence.
 2. **Read engagement context** if a client is named: `clients/<name>/` instructions and state.
 3. **Surface assumptions.** Apply engagement defaults silently; raise only genuine uncertainty.
-4. **Evaluate §1.1.** If the request implies a custom table, scoped app, state extension or other major custom object, raise it as a blocking OPEN QUESTION *before* any dispatch. The user's original request is never approval — approval arrives as a separate message.
+4. **Identify the custom object.** If the request implies a custom table, scoped app, state extension or other major custom object, name it and record it in the dispatch envelope. Step 4 IDENTIFIES the custom object and records it in the dispatch envelope; when a gateway domain applies, the §1.1 VERDICT and the halt are issued by the gateway's Part 3 at Step 5, never generically by the Architect. Step 4 halts on its own only when no gateway applies. The user's original request is never approval — approval arrives as a separate message.
 5. **Apply the Domain Expert gateway.** Before any builder dispatch — **and before finalizing a domain-scoped document** (proposal, scoping document, HLD/LLD/PDD) that makes baseline, data-model or §1.1 claims:
 
 | Domain trigger keywords | Gateway specialist | Skill path |
@@ -54,7 +55,7 @@ When the user types `Status` or `/snowarch status`: run `./snowarch doctor --qui
 | MID Server, Discovery, CMDB Discovery, Service Mapping, Event Management, alert correlation | **ITOM/Discovery Specialist** | `.claude/skills/itom-discovery-specialist/SKILL.md` |
 | CMDB data-model / CI class design, CSDM, CSDM phase/stage, service-type modelling (business/technology/service instance), CSDM-to-CMDB mapping, IRE rule design, CMDB Health, install base, shared service/CI layer | **CMDB & CSDM Specialist** | `.claude/skills/cmdb-csdm-specialist/SKILL.md` |
 
-   If a gateway applies, load and adopt that skill. It produces the **5-Part Constraint Envelope**: OOB Process Map · Data Model Alignment · §1.1 Verdict · Routing Recommendation · Anti-Patterns. No builder runs until the Envelope exists and its verdict is resolved. **Verdict A or B** → continue. **Verdict C** → surface the blocking OPEN QUESTION and stop: no table model, no code, no design artefact in the same turn.
+   If a gateway applies, load and adopt that skill. It produces the **5-Part Constraint Envelope**: OOB Process Map · Data Model Alignment · §1.1 Verdict · Routing Recommendation · Anti-Patterns. No builder runs until the Envelope exists and its verdict is resolved. **Verdict A or B** → continue. **Verdict C** → surface the blocking OPEN QUESTION and stop: no table model, no code, no design artefact in the same turn. A request that NAMES a custom object is Verdict C even when baseline covers the need — the baseline finding is Part 2, and A is what lets a builder be dispatched.
 
    **Gateways co-fire.** A cross-domain request fires every matching gateway; reconcile the Envelopes before dispatch, and any one Verdict C halts all of it. ITOM owns CI *population*; CMDB & CSDM owns the *model*.
 6. **Resolve ambiguity** with `governance/taxonomy.md`.

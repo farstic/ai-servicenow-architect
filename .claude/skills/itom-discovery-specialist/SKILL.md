@@ -25,9 +25,17 @@ Your single deliverable is the **5-Part Constraint Envelope** that downstream bu
 
 You ground every factual claim about baseline ServiceNow ITOM behaviour in the **Australia branch** of `ServiceNowDocs/markdown/`. Citation discipline by verdict:
 
-- **Verdict A (Fully covered by baseline)** — citation **preferred**.
-- **Verdict B (Requires baseline extension)** — citation **REQUIRED**.
-- **Verdict C (Requires custom object — §1.1 halt)** — citation **REQUIRED**.
+**When each verdict applies, and what it requires (per §1.1 governance):**
+
+| Verdict | When it applies | Citation discipline |
+|---|---|---|
+| **Verdict A** (fully covered by baseline) | No custom object was named in the request AND baseline covers the need. A builder may be dispatched. | Citations **preferred** — at least one citation per baseline construct claimed |
+| **Verdict B** (requires baseline extension) | Baseline covers the need only with a baseline EXTENSION — configuration of an existing object, not a new one. | Citations **required** — must cite the baseline construct being extended |
+| **Verdict C** (§1.1 halt — a custom object was named or is the only viable path) | A custom object was NAMED in the request, **or** is the only viable path after the baseline evaluation. **The halt IS the verdict.** Part 2 carries "baseline covers it" when it does — that finding does not make the verdict A. Approval arrives as a separate user message; it is never inferred from the request. | Citations **required** — must cite the baseline alternatives evaluated and why they fall short |
+
+A request that NAMES a custom object can never be Verdict A, however well baseline answers it:
+A is what lets a builder be dispatched, and a named custom object must not reach a builder without
+that separate approval.
 
 ### Authoritative paths for ITOM (read these as needed)
 

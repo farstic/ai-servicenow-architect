@@ -227,6 +227,18 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A check that failed about once in ten thousand runs, for a reason that was never a rule.** One
+  internal test asserted that a restored file timestamp is "never" exactly equal to the original —
+  true almost always, and false whenever the original happens to land on a whole millisecond. It
+  now checks the thing that actually matters, which holds every time.
+
+- **The engine now says clearly what happens when you ask for something custom.** Asked to build
+  against a table you have named yourself, it must stop and ask before building — and it did stop,
+  every time, but it explained itself three different ways across three runs, because the rule that
+  decides existed only as a label rather than as a written trigger. It is written now, identically
+  in all five domain gateways and in the routing protocol, so the stop always comes from the same
+  place and says the same thing.
+
 - **The update check stops asking the internet the same question every time.** While no release
   exists to compare against, the check that looks for a newer version contacted the server on
   every run instead of remembering the answer for a day, as it was meant to. It remembers now — and

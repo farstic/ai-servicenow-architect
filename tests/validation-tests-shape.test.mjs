@@ -212,7 +212,7 @@ test('the T-01 regression harness carries the same prompt as the file', () => {
   // The harness copies the prompt rather than reading the file, which is the right call for a
   // script that must run against an old ref — but a copy that nothing compares is a copy that
   // drifts. This is the comparison.
-  const harness = readFileSync(join(root, 'scripts/maint/t01-regression.mjs'), 'utf8');
+  const harness = readFileSync(join(root, 'scripts/validation/t01-regression.mjs'), 'utf8');
   const inHarness = /const T01 = '([^']*)'\s*\+\s*'([^']*)'/.exec(harness);
   assert.ok(inHarness, 'could not find the T01 constant in the harness');
   const prompt = (inHarness[1] + inHarness[2]).trim();

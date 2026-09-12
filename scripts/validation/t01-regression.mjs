@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// ARC-02-S04 — the T-01 regression harness. Throwaway with the rest of scripts/maint/ (S01).
+// ARC-02-S04 — the T-01 regression harness. Throwaway with the rest of scripts/validation/ (S01).
 //
 // Criterion 4 asks a narrow question: does a dispatched `developer` sub-agent return an artefact with
 // the SAME STRUCTURE after `model: inherit` + `skills:` preload as before. So this dispatches that one
 // sub-agent with the T-01 prompt rather than driving the whole interactive routing chain, which needs
 // approval turns a headless run cannot give.
 //
-//   node scripts/maint/t01-regression.mjs <label> [git-ref]
+//   node scripts/validation/t01-regression.mjs <label> [git-ref]
 //
 // The optional ref lets the same harness re-run an OLDER tree, which is how the run-to-run noise floor
 // is measured: two captures of the SAME tree bound how much of a before/after difference is signal.
