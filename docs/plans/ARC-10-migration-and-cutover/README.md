@@ -1,6 +1,6 @@
 # ARC-10 — Migration and cutover from the old repositories
 
-Status: **In progress — S01 merged (1 of 10), started 2026-09-12** · Depends on: every other ARC (ARC-09's `v2.0.0` tag in particular; see the phase split below) · Blocks: nothing — it ends the programme
+Status: **In progress — S01–S02 merged (2 of 10), started 2026-09-12** · Depends on: every other ARC (ARC-09's `v2.0.0` tag in particular; see the phase split below) · Blocks: nothing — it ends the programme
 
 ## Goal
 
@@ -53,7 +53,7 @@ Full write-ups: [STORIES.md](STORIES.md) (10 stories, ≈ 10.5–14 engineer-day
 | ID | Title | Size | Status |
 |---|---|---|---|
 | ARC-10-S01 | `docs/MIGRATION.md`: existing-user step list and the cleanup command list derived from the ARC-08 detectors | M | **Done** |
-| ARC-10-S02 | Engagement-state carry-over: `clients/` per checkout, `memory/MEMORY.md` retired in favour of Claude Code auto memory | S | — |
+| ARC-10-S02 | Engagement-state carry-over: `clients/` per checkout, `memory/MEMORY.md` retired in favour of Claude Code auto memory | S | **Done** |
 | ARC-10-S03 | Retire the legacy scaffolding: `scripts/legacy/`, obsolete `.gitignore` lines, empty legacy-name allow-list | S | — |
 | ARC-10-S04 | Rewrite the standing rule and the field-notes policy (DR-16) in `CLAUDE.md` and `docs/CONTRIBUTING.md` | S | — |
 | ARC-10-S05 | `docs/ARCHITECTURE.md` "History" section: import tags, ADR links, scope-cut ledger pointer, old-repository links | S | — |

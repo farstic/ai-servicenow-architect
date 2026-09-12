@@ -33,6 +33,60 @@ test('every per-checkout and engagement path is ignored', () => {
   }
 });
 
+// ── ARC-10-S02 — the engagement boundary is a gitignore rule, so the RULE is asserted ─────────
+
+/** `.gitignore:<line>:<pattern>\t<path>` — what `check-ignore -v` prints. */
+const ignoredBy = (path, cwd = root) => {
+  const r = spawnSync('git', ['check-ignore', '-v', path], { cwd, encoding: 'utf8' });
+  assert.equal(r.status, 0, `${path} is NOT ignored`);
+  const [source, line, pattern] = String(r.stdout).split('\t')[0].split(':');
+  return { source, line, pattern };
+};
+
+test('S02 AC 2 — the engagement and memory paths are ignored BY A NAMED RULE', () => {
+  // `-v`, not `-q`. Knowing a path is ignored is weaker than knowing WHICH rule ignores it: a
+  // future `.gitignore` that swept them up with something broad would keep this green while the
+  // boundary it is asserting had quietly become an accident. The rule is the property.
+  const engagement = ignoredBy('clients/acme/x.md');
+  assert.equal(engagement.source, '.gitignore');
+  assert.equal(engagement.pattern, 'clients/');
+
+  // `memory/` stays after the convention is retired — a safety net for a checkout that still has
+  // one, which is exactly why it must not quietly stop being ignored (ARC-10-S02).
+  const memory = ignoredBy('memory/MEMORY.md');
+  assert.equal(memory.source, '.gitignore');
+  assert.equal(memory.pattern, 'memory/');
+
+  // Not vacuous: a path that is NOT ignored must come back unignored, or `ignoredBy` is asserting
+  // nothing about the two above.
+  assert.equal(spawnSync('git', ['check-ignore', '-q', 'docs/CONTRIBUTING.md'], { cwd: root }).status, 1,
+    'a tracked product file reports as ignored — the check is inverted');
+});
+
+test('S02 AC 5 — an engagement note in the working tree is invisible to git', () => {
+  // A temp repository with this repository's OWN `.gitignore`, never the real tree: the assertion
+  // is about a file EXISTING and staying unseen, and creating `clients/acme/memory.md` in the
+  // checkout to prove it would be the test leaving engagement-shaped litter behind.
+  const dir = mkdtempSync(join(tmpdir(), 'snowarch-engagement-'));
+  try {
+    git(['init', '-q', '-b', 'main', '.'], dir);
+    writeFileSync(join(dir, '.gitignore'), readFileSync(join(root, '.gitignore'), 'utf8'));
+    mkdirSync(join(dir, 'clients', 'acme'), { recursive: true });
+    writeFileSync(join(dir, 'clients/acme/memory.md'), '# notes for this engagement\n');
+    mkdirSync(join(dir, 'memory'), { recursive: true });
+    writeFileSync(join(dir, 'memory/MEMORY.md'), '# the retired convention\n');
+
+    const status = git(['status', '--porcelain'], dir).split('\n').filter(Boolean);
+    assert.deepEqual(status, ['?? .gitignore'],
+      `git can see engagement content: ${status.join(' · ')}`);
+    // ...and the rule that hid each one, in the copied file rather than by luck.
+    assert.equal(ignoredBy('clients/acme/memory.md', dir).pattern, 'clients/');
+    assert.equal(ignoredBy('memory/MEMORY.md', dir).pattern, 'memory/');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the .env.example files are deliberately NOT ignored, and ARE scanned', () => {
   for (const p of ['.env.example', 'packages/snowarch/.env.example']) {
     const r = spawnSync('git', ['check-ignore', '-q', p], { cwd: root });

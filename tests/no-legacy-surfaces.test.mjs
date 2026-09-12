@@ -188,6 +188,60 @@ test('ARC-02-S06 criterion 2 — no "Tier [0-9]" outside history and the anchore
   assert.deepEqual(hits, [], `${hits.length} hit(s):\n  ${hits.join('\n  ')}`);
 });
 
+test('ARC-10-S02 AC 1 — `memory/MEMORY.md` survives only where it is retired', () => {
+  // The old engine designated one file for cross-session notes. It is retired, and the two places
+  // allowed to say so are the ones a reader arrives at: the CONTRIBUTING rule that retires it, and
+  // the migration page's row telling a user where their copy goes. Anywhere else — `CLAUDE.md`, a
+  // skill, an agent — is the convention still being taught while the rule says it is gone.
+  //
+  // The allowance is per FILE rather than per line, because both of those files name it more than
+  // once and in more than one shape; the ban is on the convention living on somewhere a reader
+  // would take as current.
+  const ALLOWED = new Set(['docs/CONTRIBUTING.md', 'docs/MIGRATION.md']);
+  // ...or ANY line that says it is retired. The rule caught this file's own changelog entry on the
+  // first run, and the entry was right: a release note that names what it retires is the opposite
+  // of teaching it, and a reader who has that file needs to recognise the name. So the allowance
+  // is the SENTENCE, not a third filename — naming the convention while announcing its end is
+  // always fine, and naming it any other way is what this forbids.
+  const RETIRING = /\bretired\b/;
+  const hits = [];
+  for (const f of IN_SCOPE()) {
+    if (ALLOWED.has(f)) continue;
+    currentLines(f).forEach((line, i) => {
+      if (!line.includes('memory/MEMORY.md') || RETIRING.test(line)) return;
+      hits.push(`${f}:${i + 1}: ${line.trim().slice(0, 80)}`);
+    });
+  }
+  assert.deepEqual(hits, [], `${hits.length} live reference(s) to the retired convention`);
+
+  // Both directions: the two allowed files must actually carry it, or this passes on a tree where
+  // the retirement was never written down and nobody is told where their notes go.
+  for (const f of ALLOWED) {
+    assert.ok(read(f).includes('memory/MEMORY.md'), `${f} does not name what it retires`);
+  }
+  // ...and the sentence allowance is not a hole: a line naming it WITHOUT saying it is retired is
+  // still a hit, which is the only thing keeping the exemption from reading as "mention it freely".
+  assert.equal(RETIRING.test('see memory/MEMORY.md for your notes'), false);
+  assert.equal(RETIRING.test('`memory/MEMORY.md` is retired'), true);
+});
+
+test('ARC-10-S02 AC 3 — the migration page names all four directories and their destinations', () => {
+  // The four are the untracked ones: nothing carries them across, and each has somewhere to go.
+  // Asserted with its destination on the same line, because naming a directory without saying
+  // where it goes is the shape of advice a reader cannot act on.
+  const page = read('docs/MIGRATION.md');
+  const rows = page.split('\n').filter((l) => l.startsWith('|'));
+  for (const [name, destination] of [
+    ['memory/MEMORY.md', 'clients/<name>/memory.md'],
+    ['scratchpad/', 'clients/<name>/'],
+    ['deliverables/', 'clients/<name>/'],
+    ['diagram-preview/', 'clients/<name>/'],
+  ]) {
+    assert.ok(rows.some((l) => l.includes(name) && l.includes(destination)),
+      `no row carries ${name} with its destination ${destination}`);
+  }
+});
+
 test('ARC-02-S06 criterion 3 — no "Task tool" in CLAUDE.md or governance/', () => {
   // Harness-neutral wording: the engine describes dispatching a sub-agent, not the name of the
   // mechanism a particular client uses to do it.

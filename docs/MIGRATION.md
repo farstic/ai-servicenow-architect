@@ -197,6 +197,38 @@ one's.
 `clients/` is ignored by git in the new repository, exactly as before: engagement content is yours
 and is never committed.
 
+**Then the four directories that do not travel by themselves.** They were listed in step 1 because
+they are untracked; none of them has any meaning in the new repository, so each one's contents go
+under the engagement that owns them:
+
+| In the old checkout | Where it goes |
+|---|---|
+| `memory/MEMORY.md` | `clients/<name>/memory.md` |
+| `scratchpad/` | `clients/<name>/` — or delete it, if it was scratch |
+| `deliverables/` | `clients/<name>/` |
+| `diagram-preview/` | `clients/<name>/` — or delete it, if it was a preview |
+
+macOS / Linux:
+
+```sh
+mkdir -p clients/<name>
+cp <old-engine-checkout>/memory/MEMORY.md clients/<name>/memory.md
+cp -R <old-engine-checkout>/deliverables/. clients/<name>/
+```
+
+Windows PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force clients\<name> | Out-Null
+Copy-Item <old-engine-checkout>\memory\MEMORY.md clients\<name>\memory.md
+Copy-Item -Recurse <old-engine-checkout>\deliverables\* clients\<name>
+```
+
+`clients/<name>/memory.md` is a file you point Claude at when you want it — it is not read
+automatically. Your own working preferences, as opposed to engagement content, are something Claude
+records for itself now; `/memory` shows you what it has. `memory/` stays in the new repository's
+`.gitignore` as a safety net, so a stray copy is never committed by accident.
+
 ## 5. Run the doctor
 
 ```sh
