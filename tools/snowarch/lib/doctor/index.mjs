@@ -164,6 +164,19 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     // Supplied by the entry point. Nothing under `lib/` reads the home directory itself — the
     // repo-wide rule — and the doctor needs it only to shorten a path to `~` in a report.
     home,
+    /**
+     * THE CLOCK CONTRACT: `ctx.now()` returns EPOCH MILLISECONDS, never a `Date` (ARC-09-C31).
+     *
+     * It is a number because that is what the runner does arithmetic on — `now() - started` for
+     * every check's `durationMs` — and because `Date.now()` is what a caller reaches for. Every
+     * consumer that needs a `Date` writes `new Date(ctx.now())`, as this file already does in
+     * three places.
+     *
+     * E-28 did not, and took the doctor's release-currency check down with
+     * `now(...).toISOString is not a function` the first time a release tag existed to compare
+     * against. `tests/doctor/clock-contract.test.mjs` now refuses a `ctx.now` in any check that is
+     * not wrapped, in both directions.
+     */
     now,
   };
 
