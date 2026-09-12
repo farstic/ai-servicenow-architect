@@ -55,10 +55,11 @@ ARC-01, ARC-02, ARC-03, ARC-04, ARC-05, ARC-06, ARC-07, ARC-08 (per-story detail
 defect found while building a story and fixed in the same arc. Three things are deliberately NOT
 ticked here because a person has to do them, and each names where it waits:
 
-- **The real `v2.0.0` cut and the rehearsal Release.** S03's workflow and S01's script are proven —
-  in CI on three OSes every commit (`release-dryrun`), and end to end on the harness in S11's
-  walkthrough — but a tag that exists is a maintainer action on `main`. The architect cuts it after
-  the M4 merge; the numbers go in the roadmap record PR.
+- **The real `v2.0.0` cut** — a maintainer action on `main` after the acceptance sittings. **The
+  rehearsal Release is done (2026-09-12):** run 10 of the `v2.0.0-rc.0` rehearsal was green end to
+  end on three OSes, seven assets, both negatives refused, everything deleted afterwards — the record
+  is in `docs/CONTRIBUTING.md` § *The rehearsal — a standing step before every release*. Runs 1–9
+  each found one defect (C12, C12c, C16, C17, C17b, C18, C19, C20, C21), all fixed before the M4 merge.
 - **The first `publish-npm` dispatch.** `docs/spikes/OWNER-SITTING.md` § Sitting E, steps E1–E5.
   The secret is deferred to the acceptance phase by the owner's decision of 2026-09-11, and the
   first dispatch is `dry_run: true` against `v2.0.0`.

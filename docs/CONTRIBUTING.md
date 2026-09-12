@@ -930,12 +930,23 @@ negatives refused. Afterwards delete the Release, the tag and the branch — loc
 remote — and record what the run showed in the fields below. They are per-release: a rehearsal that
 is not written down is a rehearsal nobody can compare the next one against.
 
-- **Run URL:** _(the `release.yml` run for this release's rehearsal)_
-- **Assets observed:** _(seven, named)_
-- **Metrics measured:** _(the three rows of `install-metrics.md`)_
-- **Negatives refused:** _(the two, with the line each printed)_
-- **`gh` present on the runner images:** _(confirmed / not — if not, the publish step becomes
-  `actions/github-script` calling `repos.createRelease`)_
+- **Run URL:** https://github.com/farstic/ai-servicenow-architect/actions/runs/34660381461 — the
+  `v2.0.0-rc.0` rehearsal of 2026-09-12 (run 10 of 10; runs 1–9 each found one defect, chores C12,
+  C12c, C16, C17, C17b, C18, C19, C20, C21, all fixed before the M4 merge), from `develop` @
+  `b9c70c3`; `verify` ×3 and `publish` green.
+- **Assets observed:** exactly seven — `doctor-macos-latest.json`, `doctor-ubuntu-latest.json`,
+  `doctor-windows-latest.json`, `install-metrics-macos-latest.json`,
+  `install-metrics-ubuntu-latest.json`, `install-metrics-windows-latest.json`, `install-metrics.md`.
+  The Release body was 118,137 characters, under the 125,000 cap, with the continuation link.
+- **Metrics measured:** macos-latest 174 MB · 35,193 files · B02 35.3 s · node_modules 88 MB ·
+  bootstrap 35.8 s — ubuntu-latest 174 MB · 35,193 · 7.7 s · 91 MB · 7.8 s — windows-latest 178 MB ·
+  35,193 · 37 s · 92 MB · 37.3 s. The three doctor JSONs carried E-00 as their only FAIL.
+- **Negatives refused:** `v9.9.8` (lightweight, run 34660982790) → `tag v9.9.8 is not annotated —
+  create it with scripts/release.mjs`; `v9.9.7` (annotated, one hex digit of `contract:` edited, run
+  34660984646) → `contract sha in message (054a7d8c38bc…) != dist/contract.json (754a7d8c38bc…)`.
+- **`gh` present on the runner images:** confirmed — `gh release create` ran on ubuntu-latest and
+  created the Release. Afterwards the Release, the three tags and the branch were deleted; the remote
+  carries only the two `import/*` tags.
 
 
 ## Commits
