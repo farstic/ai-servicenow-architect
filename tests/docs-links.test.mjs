@@ -21,6 +21,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { COMMANDS } from '../tools/snowarch/lib/cli.mjs';
+import { renderReadme, retarget } from '../scripts/gen-readme.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8');
@@ -29,7 +30,13 @@ const read = (rel) => readFileSync(join(root, rel), 'utf8');
 // a reader copies without reading, and the only one whose audience cannot fall back on
 // knowing the tree.
 const DOCS = ['docs/CONTRIBUTING.md', 'docs/INSTALL.md', 'docs/ARCHITECTURE.md',
-  'docs/MIGRATION.md'];
+  'docs/MIGRATION.md',
+  // ARC-09-C25. The COMPOSED copy, resolved from the repository root — the one place the link
+  // defect could exist, and the one this file could not see. `README.md` is `docs/INSTALL.md`'s
+  // body at a different depth, so a link that is correct in the source is wrong here unless the
+  // generator retargets it. Checking only the sources was right for every other property and blind
+  // to this one; five links on the project's front page were 404.
+  'README.md'];
 
 /** GitHub's anchor rule, near enough for headings we write: lowercase, strip punctuation, hyphens. */
 const anchorFor = (heading) => heading.trim().toLowerCase()
@@ -130,6 +137,24 @@ test('every fenced command in the three documents exists (ARC-09-S11)', () => {
   // The tripwire on the extraction itself: a regex that stopped matching would check nothing and
   // pass. The number is low enough to be a floor and not a maintenance burden.
   assert.ok(checked >= 30, `only ${checked} commands extracted — the scan is broken, not the docs`);
+});
+
+test('ARC-09-C25 — the composition retargets a docs-relative link, and leaves the rest alone', () => {
+  // The control on the retargeting, planted rather than observed: without it, "README.md has no
+  // dead links" stays true the day the generator stops rewriting them, because the four links it
+  // rewrites today are the only evidence and they would simply all break together.
+  const composed = renderReadme('# H', '\n## Install\n\nsee [x](TROUBLESHOOTING.md#y).\n', 'tail');
+  assert.match(composed, /\[x\]\(docs\/TROUBLESHOOTING\.md#y\)/);
+
+  // ...and every shape that must NOT move. An absolute URL is already absolute; a root-relative
+  // target already starts at the root; a bare anchor points inside the composed document itself.
+  for (const target of ['https://example.com/a', 'http://example.com/a', 'mailto:x@example.com',
+    '/LICENSE', '#upgrading']) {
+    assert.equal(retarget(target), target, `${target} was rewritten`);
+  }
+  // `..` resolves OUT of docs/, so the answer is a root path rather than `docs/../x`.
+  assert.equal(retarget('../LICENSE'), 'LICENSE');
+  assert.equal(retarget('./INSTALL.md#uninstall'), 'docs/INSTALL.md#uninstall');
 });
 
 test('every "Where this is tested" names a real file or CI cell (ARC-09-S11)', () => {
