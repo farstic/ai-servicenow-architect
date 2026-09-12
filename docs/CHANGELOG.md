@@ -195,6 +195,17 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **A way to report an install problem, and a promise about what it costs you.** Opening an issue
+  now offers two forms — *Install problem* and *Migration problem* — each asking for the two
+  commands a maintainer would otherwise spend the first exchange asking for, and no blank issue.
+  Neither form asks for a password, a token, an account name or an address, and the doctor output
+  they ask for is the masked `--json`. Behind that is a claim worth stating plainly: **the product
+  sends nothing; reports are pasted by people.** There is no telemetry and no crash reporting in it
+  — three tests keep that true rather than a promise: no vendor name anywhere in the code, exactly
+  three files that can open a network connection at all (the two instance probes and the server's
+  ServiceNow client), and every web address in the code either one the product genuinely contacts
+  or one it only prints for you to read.
+
 - **Every release is rehearsed before it is cut.** A throwaway branch, a prerelease tag, the release
   workflow green on three operating systems with all seven assets, then the tag and branch deleted —
   written down in the contributing guide as a numbered step with per-release record fields. Five

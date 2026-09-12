@@ -1,0 +1,90 @@
+# ARC-10-S10. The same rules as `install-problem.yml`, with the two fields a migration needs: which
+# step of `docs/MIGRATION.md` you were on, and what the doctor still finds left over.
+#
+# A report on this form is what the two-week post-release review reads to decide whether the old
+# repositories can be archived — see `docs/CONTRIBUTING.md` § *Post-release review*, which defines
+# what counts as a MIGRATION BLOCKER.
+name: Migration problem
+description: Moving from `claude-servicenow-live` or `snow-mcp` did not work as `docs/MIGRATION.md` describes.
+title: "migration: "
+labels:
+  - migration
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Nothing here is collected automatically. The product has no telemetry and never phones
+        home; everything below is text you choose to paste.
+  - type: dropdown
+    id: from
+    attributes:
+      label: Coming from
+      options:
+        - claude-servicenow-live (the engine)
+        - snow-mcp (the server)
+        - Both
+    validations:
+      required: true
+  - type: input
+    id: step
+    attributes:
+      label: Which step of `docs/MIGRATION.md`
+      description: The step number and its heading, so the page can be fixed at the right line.
+      placeholder: "Step 4 — move the instance store"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Ubuntu / Debian
+        - Other Linux
+        - Windows 10
+        - Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: "`./snowarch version`"
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: doctor-json
+    attributes:
+      label: "`./snowarch doctor --json`"
+      description: >-
+        This is the form that travels: instance labels read `<label>`, instance hosts read
+        `<host>`, and secrets are shown as `set (len n)` — never the value. Paste the whole thing.
+        Read it before you post it: if you find anything that identifies you or your instance, that
+        is a defect in the doctor and worth its own issue.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: leftovers
+    attributes:
+      label: The doctor's leftovers
+      description: >-
+        The `Leftovers` block of `./snowarch doctor` — the detectors that find a stale registration,
+        a legacy store or an old checkout. Paste it even when it is empty; empty is a result.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: What the step said would happen, and what happened instead.
+    validations:
+      required: true
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Before you post
+      options:
+        - label: I have read what I pasted and it contains no password, token, account name or instance address.
+          required: true

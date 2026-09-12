@@ -1,0 +1,18 @@
+# ARC-10-S10. Blank issues are off: an install report without the doctor's JSON costs an exchange
+# to ask for it, and the person is usually gone by then. The two forms are the only routes in, and
+# the links below are the two places a question is more likely to be answered already.
+#
+# The links name the DEFAULT branch, and one of them (`docs/MIGRATION.md`) is not on it yet —
+# checked, not assumed: `git cat-file -e origin/main:docs/MIGRATION.md` fails today. That is not a
+# broken link, because GitHub serves issue templates from the default branch too: these forms are
+# not offered to anyone until the milestone merges, and the page arrives in the same merge.
+# `tests/issue-templates.test.mjs` asserts every linked path exists in the tree, which is what that
+# merge carries.
+blank_issues_enabled: false
+contact_links:
+  - name: Troubleshooting — the named failures and their remedies
+    url: https://github.com/farstic/ai-servicenow-architect/blob/main/docs/TROUBLESHOOTING.md
+    about: Proxy, private CA, Node floor, registration and store problems, each with a remedy.
+  - name: Migrating from the old repositories
+    url: https://github.com/farstic/ai-servicenow-architect/blob/main/docs/MIGRATION.md
+    about: The nine-step move from claude-servicenow-live / snow-mcp, in both shells.

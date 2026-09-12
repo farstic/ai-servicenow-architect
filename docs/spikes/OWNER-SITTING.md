@@ -741,6 +741,33 @@ about whether the **settings `env` block** is the thing that applies at startup.
 
 # Part B — the plugin channel (~30 min) *(D-06 hedge; S-14)*
 
+## A6. ARC-10-S10 — the two issue forms, as a stranger meets them
+
+Everything a test can prove about the forms is proven: they parse, the doctor-JSON field is
+required, no field asks for a credential, and every contact link points at a file that exists. What
+no test can run is **GitHub rendering them**, which is the half that decides whether anyone uses
+them.
+
+On the repository, **New issue**:
+
+1. Are **both** forms offered — *Install problem* and *Migration problem* — and is there **no**
+   "Open a blank issue" link? Blank issues are off on purpose; if the link is there,
+   `config.yml` did not take effect.
+2. Do the two contact links appear under them, and does each open the page it names? One of them
+   (`docs/MIGRATION.md`) only exists on the default branch after the M5 merge — check this AFTER
+   that merge, or the link is expected to 404 and proves nothing.
+3. Open *Install problem*: does every dropdown render with its options, and is the form refused
+   when the doctor-JSON box is left empty? That refusal is the whole reason blank issues are off.
+4. Read the doctor-JSON field's note as somebody who has never seen it. It promises that labels and
+   hosts are masked — **paste a real `./snowarch doctor --json` from your own machine into a scratch
+   editor and check that promise before anyone else does.** If your instance's name is in there,
+   stop and open an issue: that is a redaction defect (ARC-08-C1) and outranks everything else here.
+5. Note anything a stranger would have to guess. A form that needs its author present is no better
+   than a blank issue.
+
+Record in `docs/validation/<date>-<os>.md`; the forms carry no credential by construction, and the
+JSON you check in step 4 is the masked form.
+
 ## B0. Setup
 
 ```sh

@@ -1,6 +1,6 @@
 # ARC-10 — Migration and cutover from the old repositories
 
-Status: **In progress — S01–S05, S07 and S09's tool half merged (7 of 10), started 2026-09-12; S06/S08 are post-tag sittings and S09/S10 each keep a post-tag run half** · Depends on: every other ARC (ARC-09's `v2.0.0` tag in particular; see the phase split below) · Blocks: nothing — it ends the programme
+Status: **In progress — S01–S05, S07 and the tool halves of S09 and S10 merged (8 of 10), started 2026-09-12; S06/S08 are post-tag sittings and S09/S10 each keep a post-tag run half** · Depends on: every other ARC (ARC-09's `v2.0.0` tag in particular; see the phase split below) · Blocks: nothing — it ends the programme
 
 ## Goal
 
@@ -61,6 +61,6 @@ Full write-ups: [STORIES.md](STORIES.md) (10 stories, ≈ 10.5–14 engineer-day
 | ARC-10-S07 | Validation-record template, redaction lint and the cutover test list (T-01…T-18 + `AUTHENTICATION_FAILED` + design-only) | M | **Done** |
 | ARC-10-S08 | Clean-machine validation runs: macOS, Ubuntu, Windows in `design-only`; one `live` (`pdi-developer`); one proxied laptop | L | — |
 | ARC-10-S09 | Deprecation notices in `farstic/claude-servicenow-live` and `farstic/snow-mcp`; archive checklist for the owner | S | **Tool half Done** · run half: owner, after the tag |
-| ARC-10-S10 | Two-week post-release review: telemetry-free feedback loop (issue template with the doctor JSON) and the archive trigger | M | — |
+| ARC-10-S10 | Two-week post-release review: telemetry-free feedback loop (issue template with the doctor JSON) and the archive trigger | M | **Tool half Done** · review: tag + 14 days |
 
 Mapping from the original titles-only list: 1 → S01; 2 → S06; 3 → S02; 4 → S07 + S08 (tooling split from execution); 5 → S04; 6 → S05; 7 → S09; 8 → S10; S03 is new (discharges the `scripts/legacy/` and `.gitignore` obligations ARC-01 handed to ARC-10).
