@@ -1200,6 +1200,86 @@ refuses, read the line — it is the instruction, not a diagnosis to interpret.
 
 **Where this is tested.** `tests/release.test.mjs`, `tests/release-workflow.test.mjs` and `tests/version-tag.test.mjs` (the preflight refusals, the tag message and its trailers, `--tag-only`'s version check), the `release-dryrun` CI job on three OSes on every commit, and `.github/workflows/release.yml` for the tag path itself.
 
+## Retiring the predecessors
+
+**Everything in this section is the OWNER's to run, and only after `v2.0.0` exists.** Nothing here
+is automated and nothing here runs from this checkout: the two old repositories are cloned fresh,
+edited in one file, and left otherwise exactly as they are — their value now is the history in them.
+
+### The notice
+
+The first block of each old README, identical in both but for one variable:
+
+```
+> **Superseded — <YYYY-MM-DD>.** This repository is no longer maintained. Its successor is
+> **[farstic/ai-servicenow-architect](https://github.com/farstic/ai-servicenow-architect)** — the
+> ServiceNow architecture engine and the MCP server in one repository, installed with two commands
+> (`git clone … && ./bootstrap.sh`, then `claude`). This repository's full history is preserved there
+> under the tag `import/engine-v2.8.0-worktree` ⟨resp. `import/snow-mcp-1.0.0`⟩. Existing users:
+> follow [docs/MIGRATION.md](https://github.com/farstic/ai-servicenow-architect/blob/v2.0.0/docs/MIGRATION.md).
+> This repository will be archived (read-only) on <YYYY-MM-DD + 14>.
+```
+
+`farstic/snow-mcp` gets one sentence more:
+
+```
+> The npm package `@farstic/snow-mcp@1.0.0` remains published as-is and is not updated; the successor
+> server is `@farstic/snowarch` (2.0.0+) — behaviour changes are listed in
+> [packages/snowarch/CHANGELOG.md § 2.0.0](https://github.com/farstic/ai-servicenow-architect/blob/v2.0.0/packages/snowarch/CHANGELOG.md).
+```
+
+**Why that sentence is safe under D-01.** npm serves the README captured from the published tarball,
+so editing a README on GitHub does not change the npm record — which is a claim about npm's
+behaviour rather than ours, and therefore one the checklist MEASURES rather than asserts (check 3).
+
+Both links point into the `v2.0.0` tag and resolve only once it exists. `tests/docs-links.test.mjs`
+skips `https://` targets entirely — it never fetches — so nothing needed excluding.
+
+**The pull requests are opened from a scratch clone, as DRAFTS**, titled
+`docs: superseded by farstic/ai-servicenow-architect`, and un-drafted only after check 1 below
+passes. Each changes `README.md` and nothing else.
+
+### The three checks
+
+Run before un-drafting, and again after merging; paste both outputs into the S10 review record.
+
+```sh
+# 1 — the tag exists. Until this prints a ref, no notice is published.
+git ls-remote --tags https://github.com/farstic/ai-servicenow-architect v2.0.0
+
+# 2 — the npm record is untouched: the version, and NO deprecation line.
+npm view @farstic/snow-mcp version deprecated        # → 1.0.0     (and nothing else)
+
+# 3 — the published README is byte-identical before and after.
+npm view @farstic/snow-mcp readme | shasum -a 256
+```
+
+**Baseline for check 3**, read from the registry on 2026-09-12 and unchanged since 2026-09-11:
+
+```
+47b71271fc675e850c473e341146beca80fa800d51446e6e41c59a03bf07b70c
+```
+
+On Windows, check 3 is `npm view @farstic/snow-mcp readme > readme.txt` then
+`Get-FileHash -Algorithm SHA256 readme.txt`.
+
+### The checklist
+
+1. Notices merged and visible on the default branch of both repositories (screenshot in the S10
+   review record).
+2. Repository description set to *Superseded by farstic/ai-servicenow-architect* and the homepage URL
+   pointed at the new repository.
+3. Open issues and pull requests closed with a comment pointing at the new repository, or migrated.
+4. **Wait until `<tag date> + 14 days.`** Check the S10 issue list for a migration blocker; if there
+   is none, Settings → Danger zone → Archive this repository, on both.
+5. Fill the *archived* cells in `docs/ARCHITECTURE.md` History and note the date in
+   `docs/CHANGELOG.md` (a 2.0.x patch, or the next release's notes).
+6. **Never:** `npm deprecate`, `npm unpublish`, a force-push, deleting a tag, or editing anything on
+   npm.
+
+The fourteen days are the point of the whole sequence, not a formality: a notice tells somebody
+mid-migration where to go, and an archive they meet before they have read it tells them nothing.
+
 ## The npm channel (optional)
 
 `npx @farstic/snowarch` is a **secondary** channel, for someone who wants the MCP server without
@@ -1510,6 +1590,16 @@ record only after redacting both.
 
 **What to write in Observer notes.** Everywhere you had to guess, look elsewhere, or scroll back.
 An empty list is the result the sittings exist to produce; a long one is the more useful record.
+
+**When a change claims a property of the WHOLE TREE — "no file still says X", "every caller passes
+Y", "the only place is Z" — the search that proves it is part of the change.** Run it over the tree,
+not over memory; paste its output in the pull request; and where the property has to keep holding, a
+test asserts it in both directions — the property, and a control that a violation is still found. A
+claim about the tree that was only checked where the author looked is the defect this repository has
+paid for most often: ARC-10-S04 searched memory for a misquote and found four of seven sites;
+ARC-10-S07 changed two sentences after writing "one definition" and a grep found nine; ARC-09-C30
+guarded the side of a boundary that had been reasoned about rather than measured, and it was the
+side that never crossed.
 
 **When a test depends on a clock VALUE rather than an interval, measure the distribution before
 naming a cause** (ARC-09-C30). A single run cannot tell a boundary from noise, and the side you
