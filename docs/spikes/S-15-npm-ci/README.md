@@ -151,7 +151,7 @@ content), not ~20 MB — which makes D-03 roughly twice as attractive as recorde
 
 ## Verdict
 
-`S-15: CONFIRMED — 57.3 MB content / 171 packages on ubuntu-22.04, macos-latest and windows-latest × Node 20/22/24 (72 MB du, measured on macOS only — du was not run on the runners); nothing under tools/snowarch; no packages/snowarch/node_modules on any cell; handshake ok (394 tools)`
+`S-15: CONFIRMED — 57.3 MB content / 171 packages on ubuntu-22.04, macos-latest and windows-latest × Node 20/22/24 (72 MB du, **measured on macOS only — du was not run on the runners**); nothing under tools/snowarch; no packages/snowarch/node_modules on any cell; handshake ok (394 tools)`
 
 `npm ci --omit=dev --ignore-scripts` at the workspace root behaves identically on three operating
 systems and two npm majors (10.x and 11.x): one root `node_modules`, nothing installed for `tools/snowarch`, no

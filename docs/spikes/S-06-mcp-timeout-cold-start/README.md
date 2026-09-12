@@ -222,7 +222,7 @@ owner logged the VM in.
 
 ## Verdict
 
-`S-06: NOT PROVEN — cold start measured over 27 runs on 9 CI cells: initialize 694 ms worst, tools/list 750 ms worst, 394 tools everywhere, so MCP_TIMEOUT=120000 keeps ≈160× headroom on the slower metric; that the settings env block governs startup is untested and needs one interactive run`
+`S-06: CONFIRMED **on 2.1.258** — cold start measured over 27 runs on 9 CI cells: initialize 694 ms worst, tools/list 750 ms worst, 394 tools everywhere, so MCP_TIMEOUT=120000 keeps ≈160× headroom on the slower metric; and the settings env block does govern startup, proven headlessly with a 2×2 over MCP_TIMEOUT and a delayed server in which only the cell that should fail fails`
 
 The number ARC-06 needs is in hand and it is not close: **120 000 ms is roughly 160 times the slowest
 complete handshake observed** (`tools/list`, 750 ms), and the value would still hold with an order of

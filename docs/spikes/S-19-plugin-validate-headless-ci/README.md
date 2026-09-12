@@ -90,7 +90,7 @@ into failures, which is what a lint wants. `{"name":"minimal"}` passes **with wa
 
 ## Verdict
 
-`S-19: CONFIRMED — claude plugin validate runs on ubuntu-22.04, macos-latest and windows-latest with no login and no TTY: exit 0 on valid targets (including --strict and a skills-shaped directory), exit 1 on a manifest missing name and on malformed JSON`
+`S-19: CONFIRMED — `claude plugin validate` runs on ubuntu-22.04, macos-latest and windows-latest with **no login and no TTY**: exit 0 on valid targets including `--strict` and a skills-shaped directory, exit 1 on a manifest missing `name` and on malformed JSON`
 
 **`--strict` fails on *warnings*, and one of them is `author`.** A manifest with `name`, `version` and
 `description` but no `author` passes plain validate (exit 0, "Validation passed with warnings") and

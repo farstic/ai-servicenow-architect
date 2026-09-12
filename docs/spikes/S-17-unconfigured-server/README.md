@@ -146,7 +146,7 @@ during ARC-00-S01 and returned the same five tools on Node v22.23.2).
 
 ## Verdict
 
-`S-17: NOT PROVEN — the five-tool unconfigured advertisement is confirmed and the stub exits 1 writing nothing under STUB_EXIT_ON_START=1; the two /mcp readings — "accepted as connected" and the control's failure — need one interactive run`
+`S-17: CONFIRMED **on 2.1.258** — an unconfigured server is accepted as connected: `/mcp` shows `servicenow · connected · 5 tools` under Project MCPs, which is set A, the unconfigured advertisement, so the panel and the stub agree; and the negative control fails as it must — under STUB_EXIT_ON_START=1 the same panel reads `failed` with Reconnect / Disable`
 
 The half this spike shares with the stub — five tools in unconfigured mode, and a stub that genuinely
 refuses to start under `STUB_EXIT_ON_START=1` — is confirmed on macOS on Node 24 and reproduced on Ubuntu

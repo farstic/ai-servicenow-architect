@@ -157,7 +157,7 @@ the cross-check is that a marketplace *entry* exists for the plugin.
 
 ## Verdict
 
-`S-14f: CONFIRMED — two plugins in one repository produce distinct ANNOTATED `<name>--v<version>` tags at the same HEAD and push cleanly; the exists, dirty-tree and --force guards all behave (exists fires before dirty-tree, and the dirty-tree guard is version-scoped); the dependency field DOES exist on 2.1.258, spelled `dependencies` and array-valued — `plugin-dependencies` and `pluginDependencies` are the unknown spellings 03 §B guesses`
+`S-14f: CONFIRMED **on 2.1.258** — two plugins in one repository produce distinct annotated `<name>--v<version>` tags at the same HEAD and push cleanly; the exists, dirty-tree and --force guards all behave, exists firing before dirty-tree and the dirty-tree guard being version-scoped. **The dependency field is spelled `dependencies` and is array-valued — `plugin-dependencies` and `pluginDependencies` do not exist**`
 
 ## Evidence
 

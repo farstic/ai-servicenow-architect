@@ -40,7 +40,7 @@ _One block per OS. Paste real output, redacted per the rules above._
 
 ## Verdict
 
-`S-08: NOT RUN` — to be replaced by `S-08: CONFIRMED` or `S-08: FAILED → fallback GPO-locked: document the Git Bash path (`./bootstrap.sh`) and ship a pure-batch minimal design-only path (git commands only)`
+`S-08: NOT RUN — **blocked on the Windows VM (owner input #2)**. The fallback if GPO-locked is to document the Git Bash path and ship a pure-batch minimal design-only path`
 
 ## Evidence
 

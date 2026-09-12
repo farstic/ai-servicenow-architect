@@ -7,8 +7,11 @@
 
 **Run by:** ARC-00-S11 · **Verdict consumed by:** ARC-01-S04 (floors in `engine.config.json`), ARC-06-S04
 
-**Status: CONFIRMED, non-interactively, on macOS — 8 of 8 mechanisms behave identically on the floor
-binary 2.1.214 and on 2.1.258.** The floor is sufficient for every mechanism this product uses. A
+**Status: CONFIRMED, non-interactively, on macOS — eight rows behave identically on the floor
+binary 2.1.214 and on 2.1.258.** Rows are not mechanisms: six are mechanism rows and two are
+controls, and row 1 covers two of the story's eleven mechanisms at once (the project `.mcp.json`
+load and the unconfigured advertisement), so the eight rows measure **seven of eleven**. The four
+that are not measured are named in the verdict, and a named one failing later reopens it. A
 by-product of the run is a clean round-trip confirmation of `03` §F **S-21**.
 
 ## Assumption
@@ -126,7 +129,7 @@ macOS/npm **2.1.258** vs Ubuntu/native **2.1.263** (2026-09-06).
 
 ## Verdict
 
-`S-11: NOT RUN` — to be replaced by `S-11: CONFIRMED` or `S-11: FAILED → fallback Raise the floor in `engine.config.json``
+`S-11: CONFIRMED **on the mechanisms measured** — floor 2.1.214 sufficient: eight rows (six mechanism rows, one of them covering two mechanisms, and two controls) measure seven of the story's eleven mechanisms identical on 2.1.214 and 2.1.258, including the `list_changed` resilience ARC-04's reload is built on; **four of the eleven are unmeasured: ${VAR:-default} expansion, enabled/disabledMcpjsonServers, exec-form hook + CLAUDE_PROJECT_DIR, skills/agents listing**`
 
 ## Evidence
 

@@ -378,38 +378,74 @@ alternative, which `03` §D deliberately does **not** use.
 
 ---
 
+## 4b. Fallback propagation
+
+Every verdict that did **not** simply confirm its assumption changed something downstream. This is
+that list, with the consequence and **the measurement that shows it landed** — because "the fallback
+was propagated" is a claim about the tree, and a table that only names intentions is the thing
+ARC-00-S14 AC4 exists to prevent. Each row was re-measured on the ARC-00 acceptance branch.
+
+| Verdict | What it forced | Where it landed | Measured |
+|---|---|---|---|
+| **S-01** — the pre-seed is ignored BEFORE trust and applied at trust time | The install page cannot promise "no dialog"; it describes the trust dialog and the fallback wording | `docs/INSTALL.md` | the page carries the trust dialog wording (6 mentions) |
+| **S-05** — headlessly a failing exec-form hook produces NO notice | The committed settings ship **hook-free** rather than relying on `disableAllHooks`, which would silently disable the user's own hooks | `.claude/settings.json` | **0 hooks** in the committed settings |
+| **S-07** — recipe C needs a fifth step, and `core.longpaths` was not exercised | `git submodule init` is in the recipe on every surface, and the git floor is the version the spike ran | `tools/snowarch/launcher/docs-recipe.{sh,ps1}`, `docs/ARCHITECTURE.md`, `engine.config.json` | `submodule init` present in both recipe modes; `floors.git` = **2.34.1** |
+| **S-12** — one middle-wildcard glob covers 92 of 269 non-mutating tools (34%) | ARC-05 ships a **hybrid**: globs plus explicit per-tool rules, not a single glob | `.claude/settings.json` | **397** explicit `mcp__servicenow__snow_*` rules |
+| **S-16** — Claude runs a compound wrapper, and the wrapper varied between two sittings | Bash allow rules were **abandoned** for this purpose rather than written more cleverly | `.claude/settings.json` | **0** `Bash(` allow rules |
+| **S-14a/b/c/e** — storage answered on macOS only; a plugin-bundled server is invisible to `claude mcp get`; `--config KEY=` is rejected; the marketplace/enable split is user+project | D-06 resolved **away from the plugin channel** (ADR-0006), so none of these became a shipped constraint | ADR-0006, and the absence of a plugin manifest | no `.claude-plugin/` in the tree; `engine.config.json` mentions no plugin |
+| **S-14g** — past the cap npm ci is SIGTERM'd while the installer exits 0 | Would have forced "no completeness check while npm is in flight" — **it has no target in the product**, because the plugin channel was not taken. Recorded so that a future plugin channel inherits the finding rather than rediscovering it | — | no plugin install path exists to carry it |
+
 ## 5. Verdict register
 
 One line per spike; ARC-00-S14 copies the final verdicts here from the records.
 
+**The convention, because a summary that may say less than its source is not a summary.** A record's
+`## Verdict` line reads ``S-NN: <TOKEN><qualifier?><separator><sentence>``. The token is the longest
+match from a closed set of eight — `CONFIRMED`, `CONFIRMED WITH CORRECTIONS`, `REFUTED`, `PARTIAL`,
+`NOT PROVEN`, `NOT RUN`, `DEFERRED`, `INTERACTIVE-PENDING` — *longest* because `CONFIRMED` is a
+prefix of `CONFIRMED WITH CORRECTIONS`. The separator is an em-dash or a **sentence-ending** period,
+which is to say `/—|\.(\s|$)/`: S-14g's `REFUTED on both halves.` ends on a period, and a
+version-qualified verdict like `CONFIRMED on 2.1.258 —` must not be cut at the `2.1`. Everything
+between the token and the separator is a qualifier, and **a qualifier is a caveat**.
+
+**Every caveat is bold, and the register may never say less than the record.** A register row must
+carry its record's token exactly and every bold phrase of its record verbatim; numbers that are not
+bold are the record's business and may be abbreviated here. That is what lets S-06's "394 tools
+everywhere" drop from its row while S-15's "measured on macOS only — du was not run on the runners"
+may not. `tests/spikes-register.test.mjs` enforces all of it, both directions — a row with no
+record, a record with no row — with a guard that fails if no record is bolded at all, because a
+never-says-less test over an unbolded tree proves nothing. Before this convention landed the rule
+was broken in the direction that matters: S-20's row read `NOT RUN` over a record that says
+`CONFIRMED on macOS`, and S-14g's read `PARTIAL` over a record that says `REFUTED on both halves`.
+
 | Spike | Record | Run by | Verdict |
 |---|---|---|---|
-| S-01 | `S-01-preseeded-approval/` | ARC-00-S04 | `S-01: NOT PROVEN — design-only half confirmed on the CLI surface (claude mcp get / mcp list) on 2.1.214 + 2.1.258; the /mcp panel and the live half need one interactive run` |
+| S-01 | `S-01-preseeded-approval/` | ARC-00-S04 | `S-01: CONFIRMED **on 2.1.258** — a pre-seeded `enabledMcpjsonServers` removes the per-server approval: live 1 dialog (trust only), design 1 (trust only, server absent from `/mcp`), no-pre-seed control 2 — the second being the "New MCP server found in this project" prompt, which is what makes the count evidence; **2.1.214 not measured**` |
 | S-02 | `S-02-list-changed-after-reload/` | ARC-00-S10 | `S-02: CONFIRMED on 2.1.258, macOS, non-interactively, with a negative control — after snow_core_instances_reload the newly advertised tools are callable in the same session, no restart and no /mcp reconnect` |
-| S-03 | `S-03-project-dir-expansion-windows/` | ARC-00-S06 | `S-03: NOT RUN` — blocked on the Windows VM |
-| S-04 | `S-04-raw-mode-masked-input/` | ARC-00-S07 | `S-04: NOT RUN` — blocked on the Windows VM |
-| S-05 | `S-05-hook-without-node/` | ARC-00-S06 | `S-05: NOT RUN` |
-| S-06 | `S-06-mcp-timeout-cold-start/` | ARC-00-S08 | `S-06: NOT PROVEN — cold start over 27 runs on 9 CI cells: initialize 694 ms worst, tools/list 750 ms worst, 394 tools everywhere, so MCP_TIMEOUT=120000 keeps ≈160× headroom; that the settings env block governs startup needs one interactive run` |
-| S-07 | `S-07-docs-submodule/` | ARC-00-S09 | `S-07: CONFIRMED WITH CORRECTIONS — recipe C is fastest and smallest on all four machines (302 MB macOS / 305 MB ubuntu / 315 MB windows) and pin-by-hash fetch works everywhere, but it needs a fifth step, `git submodule init`, without which the superproject reports the submodule uninitialised; the core.longpaths control did NOT reach MAX_PATH, so AC 2 is unanswered for a real install path` |
-| S-08 | `S-08-bootstrap-cmd-execution-policy/` | ARC-00-S07 | `S-08: NOT RUN` — blocked on the Windows VM |
-| S-09 | `S-09-claude-first-clone/` | ARC-00-S10 | `S-09: NOT RUN` |
+| S-03 | `S-03-project-dir-expansion-windows/` | ARC-00-S06 | `S-03: DEFERRED — **Windows VM pending (owner input #2)**; the macOS control is recorded and **nothing is inferred about Windows from it**` |
+| S-04 | `S-04-raw-mode-masked-input/` | ARC-00-S07 | `S-04: NOT RUN — **blocked on the Windows VM (owner input #2)**` |
+| S-05 | `S-05-hook-without-node/` | ARC-00-S06 | `S-05: CONFIRMED **on 2.1.258** — interactively an exec-form hook whose interpreter is absent reports its failure verbatim and non-blockingly and the session stays usable, while **headlessly there is no notice at all**` |
+| S-06 | `S-06-mcp-timeout-cold-start/` | ARC-00-S08 | `S-06: CONFIRMED **on 2.1.258** — cold start over 27 runs on 9 CI cells: initialize 694 ms worst, tools/list 750 ms worst, so MCP_TIMEOUT=120000 keeps ≈160× headroom; and the settings env block does govern startup, proven headlessly with a 2×2` |
+| S-07 | `S-07-docs-submodule/` | ARC-00-S09 | `S-07: CONFIRMED WITH CORRECTIONS — recipe C is fastest and smallest on all four machines (302 MB macOS / 305 MB ubuntu / 315 MB windows) and pin-by-hash fetch works everywhere, but **it needs a fifth step, git submodule init**, without which the superproject reports the submodule uninitialised; and **the core.longpaths control did not exercise MAX_PATH, so acceptance criterion 2 is unanswered for a real install path**` |
+| S-08 | `S-08-bootstrap-cmd-execution-policy/` | ARC-00-S07 | `S-08: NOT RUN — **blocked on the Windows VM (owner input #2)**` |
+| S-09 | `S-09-claude-first-clone/` | ARC-00-S10 | `S-09: NOT RUN — **not run in ARC-00, and nothing depends on it**` |
 | S-10 | `S-10-readonly-preset-sufficiency/` | **Deferred → ARC-04-S05** | `S-10: DEFERRED → ARC-04` |
-| S-11 | `S-11-claude-code-floor/` | ARC-00-S11 | `S-11: NOT RUN` |
-| S-12 | `S-12-middle-wildcard-globs/` | ARC-00-S05 | `S-12: INTERACTIVE-PENDING — measured either way, one middle-wildcard glob covers only 92 of 269 non-mutating tools (34%), three globs reach 205, and 64 need explicit rulings, so ARC-05 needs a hybrid` |
+| S-11 | `S-11-claude-code-floor/` | ARC-00-S11 | `S-11: CONFIRMED **on the mechanisms measured** — floor 2.1.214 sufficient: eight rows measure seven of the story's eleven mechanisms identical on 2.1.214 and 2.1.258; **four of the eleven are unmeasured: ${VAR:-default} expansion, enabled/disabledMcpjsonServers, exec-form hook + CLAUDE_PROJECT_DIR, skills/agents listing**` |
+| S-12 | `S-12-middle-wildcard-globs/` | ARC-00-S05 | `S-12: CONFIRMED **on 2.1.258** — a middle-wildcard glob works, with a no-rule control showing `-p` does not auto-approve; but **one glob covers only 92 of 269 non-mutating tools (34%)**, three globs reach 205, and **64 need explicit per-tool rulings**, so ARC-05 needs a hybrid` |
 | S-13 | `S-13-skill-description-cap/` | **CONFIRMED** (closed by ARC-02-S03) — the cause is a TOTAL listing budget stated by the CLI itself (`Skill listing over budget: 42 skills, 34399 chars > 30000 budget`), not a per-file cause; ten YAML hazards were checked and none separated the four empty descriptions from the twenty-four that worked. The engine controls only its share of that total. | `S-13: CONFIRMED — total listing budget; engine share cut 27,119 → 11,191 chars, all 28 register with a description` |
-| S-14a | `S-14a-user-config-masked-dialog/` | ARC-00-S12 | `S-14a: PARTIAL — storage answered ON macOS ONLY (sensitive → keychain; non-sensitive → ~/.claude/settings.json, USER scope, 0644, even for a project-scope install); Windows/Linux stores NOT RUN; masking is INTERACTIVE-PENDING` |
-| S-14b | `S-14b-plugin-server-approval/` | ARC-00-S12 | `S-14b: PARTIAL — a plugin-bundled server is invisible to `claude mcp get`/`list`; the dialog count is INTERACTIVE-PENDING` |
-| S-14c | `S-14c-empty-user-config-substitution/` | ARC-00-S12 | `S-14c: PARTIAL — `--config KEY=` is rejected, so blank and absent are one state; the substitution is INTERACTIVE-PENDING` |
-| S-14d | `S-14d-session-start-additional-context/` | ARC-00-S12 | `S-14d: INTERACTIVE-PENDING — a self-describing 12,299-byte payload and its plugin hook are built and verified standalone` |
-| S-14e | `S-14e-scaffolded-marketplace-install/` | ARC-00-S12 | `S-14e: PARTIAL — private-git marketplace add works; the marketplace/enable split is user+project, not project alone; second machine INTERACTIVE-PENDING` |
-| S-14f | `S-14f-plugin-tag-two-plugins/` | ARC-00-S12 | `S-14f: CONFIRMED — two plugins tag cleanly at one commit with a manifest/marketplace cross-check; `plugin-dependencies` does NOT exist in the 2.1.258 schema` |
-| S-14g | `S-14g-plugin-cache-npm-ci-cap/` | ARC-00-S12 | `S-14g: PARTIAL — the plugin cache does run an install (155 entries / 70 MB in the cache entry); the full tree installs in 1,914 ms against the 60-second cap (~31× headroom, unthrottled); the throttled case is NOT RUN (VM, day 4)` |
-| S-15 | `S-15-npm-ci/` | ARC-00-S08 | `S-15: CONFIRMED — 57.3 MB content / 72 MB du / 171 packages on 3 OSes × Node 20/22/24; nothing under tools/snowarch; no per-package node_modules; handshake ok (394 tools)` |
-| S-16 | `S-16-project-permissions-allow/` | ARC-00-S04 | `S-16: NOT RUN — interactive; runs in the same session as S-01` |
-| S-17 | `S-17-unconfigured-server/` | ARC-00-S04 | `S-17: NOT PROVEN — the five-tool unconfigured advertisement is confirmed and the stub exits 1 writing nothing under STUB_EXIT_ON_START=1; the two /mcp readings — "accepted as connected" and the control's failure — need one interactive run` |
-| S-18 | `S-18-permissions-ask-auto-mode/` | ARC-00-S05 | `S-18: INTERACTIVE-PENDING — of 394 tools, 125 mutate by the §2.1 suffix list, 269 do not, and 64 fall outside both; 34 of those plainly change state, so a suffix-derived ask block would leave 34 write tools ungated` |
-| S-19 | `S-19-plugin-validate-headless-ci/` | ARC-00-S12 | `S-19: CONFIRMED — runs on all three runners with no login and no TTY; exit 0 on valid targets incl. --strict, exit 1 on a manifest missing name and on malformed JSON` |
-| S-20 | `S-20-shell-env-inheritance/` | ARC-00-S06 | `S-20: NOT RUN` |
+| S-14a | `S-14a-user-config-masked-dialog/` | ARC-00-S12 | `S-14a: PARTIAL — storage answered **on macOS only**: sensitive → the keychain, non-sensitive → ~/.claude/settings.json, USER scope, 0644, even for a project-scope install. **Masking of the dialog itself is interactive-pending, and the Windows and Linux stores are not run**` |
+| S-14b | `S-14b-plugin-server-approval/` | ARC-00-S12 | `S-14b: PARTIAL — a plugin-bundled server is invisible to `claude mcp get`/`list` although `claude plugin list --json` shows it fully. **The dialog count is interactive-pending**` |
+| S-14c | `S-14c-empty-user-config-substitution/` | ARC-00-S12 | `S-14c: PARTIAL — `--config KEY=` is rejected, so blank and absent are one state at the CLI. **What ${user_config.KEY} expands to for an unset option is interactive-pending**` |
+| S-14d | `S-14d-session-start-additional-context/` | ARC-00-S12 | `S-14d: INTERACTIVE-PENDING — a self-describing 12,299-byte payload and its plugin hook are built and verified standalone; **startup, compact and resume injection each need a session**` |
+| S-14e | `S-14e-scaffolded-marketplace-install/` | ARC-00-S12 | `S-14e: PARTIAL — private-git marketplace add works; the marketplace/enable split is user+project, not project alone. **The second-machine run and the dialog are interactive-pending**` |
+| S-14f | `S-14f-plugin-tag-two-plugins/` | ARC-00-S12 | `S-14f: CONFIRMED **on 2.1.258** — two plugins tag cleanly at one commit with a manifest/marketplace cross-check. **The dependency field is spelled `dependencies` and is array-valued — `plugin-dependencies` and `pluginDependencies` do not exist**` |
+| S-14g | `S-14g-plugin-cache-npm-ci-cap/` | ARC-00-S12 | `S-14g: REFUTED **on both halves**. The cap is close, not comfortable — 5.2 s unthrottled but **36.5 s on a 4 Mbit link (1.6x headroom, not the 31x claimed from a warm cache)**, crossing 60 s at 1 Mbit; and **it does not fail loudly** — past the cap npm ci is SIGTERM'd while `claude plugin install` prints success and exits 0` |
+| S-15 | `S-15-npm-ci/` | ARC-00-S08 | `S-15: CONFIRMED — 57.3 MB content / 171 packages on 3 OSes × Node 20/22/24 (72 MB du, **measured on macOS only — du was not run on the runners**); nothing under tools/snowarch; no per-package node_modules; handshake ok (394 tools)` |
+| S-16 | `S-16-project-permissions-allow/` | ARC-00-S04 | `S-16: CONFIRMED **on 2.1.258** — a committed `permissions.allow` Bash rule is honoured after trust, with its control blocked. But **Claude runs a compound wrapper rather than the bare command, and the wrapper varied between two sittings of the same command**, and **auto mode makes the spike unreadable**` |
+| S-17 | `S-17-unconfigured-server/` | ARC-00-S04 | `S-17: CONFIRMED **on 2.1.258** — an unconfigured server is accepted as connected (`/mcp`: servicenow · connected · 5 tools, which is set A), and the negative control fails as it must under STUB_EXIT_ON_START=1` |
+| S-18 | `S-18-permissions-ask-auto-mode/` | ARC-00-S05 | `S-18: CONFIRMED **on 2.1.258** — an `ask` rule prompts in auto and manual mode alike, its allow-listed control unprompted in both; but **64 fall outside both lists — 34 of those plainly change state**, so a suffix-derived ask block would leave 34 write tools ungated` |
+| S-19 | `S-19-plugin-validate-headless-ci/` | ARC-00-S12 | `S-19: CONFIRMED — runs on all three runners with **no login and no TTY**; exit 0 on valid targets incl. --strict, exit 1 on a manifest missing name and on malformed JSON` |
+| S-20 | `S-20-shell-env-inheritance/` | ARC-00-S06 | `S-20: CONFIRMED **on macOS** — a project stdio server inherits the launching shell's environment and CLAUDE_PROJECT_DIR is set by Claude Code; **HTTPS_PROXY / HTTP_PROXY not measured directly (an unreachable HTTPS_PROXY stops Claude Code reaching its own API)**` |
 
 Identifier hygiene: spike **`S-13`** (skill listing, deferred to ARC-02) is not story **`ARC-00-S13`**
 (the Windows CI recipe). Spike `S-14` is seven sub-spikes `S-14a`…`S-14g`. `S-20` postdates `03` and

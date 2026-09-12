@@ -96,7 +96,7 @@ _One block per OS. Paste real output, redacted per the rules above._
 
 ## Verdict
 
-`S-02: NOT RUN` — to be replaced by `S-02: CONFIRMED` or `S-02: FAILED → fallback The `/snowarch setup-instance` skill prints "run `/mcp` → servicenow → reconnect"`
+`S-02: CONFIRMED **on 2.1.258, macOS** — after `snow_core_instances_reload` the newly advertised tools are callable in the same session, with no restart and no `/mcp` reconnect, proven non-interactively and with a negative control`
 
 ## Evidence
 

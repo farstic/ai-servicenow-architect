@@ -120,7 +120,7 @@ Steps for the owner are in `INTERACTIVE.md`.
 
 ## Verdict
 
-`S-14b: PARTIAL — a plugin-bundled server is invisible to `claude mcp get`/`list` (exit 1, "No MCP server named servicenow") although `claude plugin list --json` shows it fully; the dialog count is INTERACTIVE-PENDING`
+`S-14b: PARTIAL — a plugin-bundled server is invisible to `claude mcp get` and `claude mcp list` (exit 1, "No MCP server named servicenow") although `claude plugin list --json` shows it fully. **The dialog count is interactive-pending**`
 
 ## Evidence
 

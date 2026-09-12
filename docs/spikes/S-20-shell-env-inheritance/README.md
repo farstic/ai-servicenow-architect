@@ -119,7 +119,7 @@ not `unset`, and ARC-00-S01 recorded it.
 
 ## Verdict
 
-`S-20: CONFIRMED on macOS — a project stdio server inherits the launching shell's environment (NO_PROXY and NODE_EXTRA_CA_CERTS both arrived at their exact lengths without appearing in .mcp.json env), and CLAUDE_PROJECT_DIR is set by Claude Code; HTTPS_PROXY/HTTP_PROXY follow by the same mechanism but were not measured directly, because an unreachable HTTPS_PROXY stops Claude Code reaching its own API`
+`S-20: CONFIRMED **on macOS** — a project stdio server inherits the launching shell's environment (NO_PROXY and NODE_EXTRA_CA_CERTS both arrived at their exact lengths without appearing in .mcp.json env), and CLAUDE_PROJECT_DIR is set by Claude Code. **HTTPS_PROXY / HTTP_PROXY not measured directly (an unreachable HTTPS_PROXY stops Claude Code reaching its own API)**`
 
 **Consequence for ARC-06.** ARC-04-S11's interim recommendation was that ARC-06 forward the four
 variables as `${VAR:-}` in `.mcp.json` `env`. On this evidence **that forwarding is not needed on

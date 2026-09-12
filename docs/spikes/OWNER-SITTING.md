@@ -86,6 +86,16 @@ reaches `Mode: design-only` and `./snowarch doctor` reports **0 FAIL**.
 > is generated from that constant. Until then the install text states the measurement and names the
 > floor as where a second approval may still appear: a stated measurement, not a promise.
 
+> **Initial the eight Accepted ADRs, and the two gate entries (ARC-00-S03 task 4 / AC1,
+> 2026-09-13).** Every `docs/decisions/ADR-000*.md` with Status **Accepted** still carries
+> `Decision owner: initials PENDING OWNER`, and so do both rows of the gate sign-off block at the
+> end of `docs/plans/ARC-00-spikes-and-gating-decisions/README.md`. Edit only the initials cell in
+> each — the dates are already recorded and are evidence; the initials are consent, and nothing in
+> this repository may manufacture the second from the first. **No test enforces this and none will**:
+> a test that is red by design on eight files is noise, and it would go on being red for a reason
+> that is not a defect. This row is the enforcement.
+>
+
 ## D1. ARC-08-S02 — the doctor's engine checks on a BOOTSTRAPPED machine
 
 *Five minutes, no instance needed, design-only is enough. Everything else about these checks is
@@ -560,6 +570,14 @@ domain-managed one.
 > of this sitting.
 
 ---
+
+> **Write `spikes/windows-recipe.md` here, from what this sitting actually does (ARC-00-S13 AC1,
+> 2026-09-13).** The file does not exist and is deliberately not written: a recipe nobody has
+> measured is a recipe nobody should follow. Its content is the VM snapshot steps and the
+> PATH-stripping steps you perform in this sitting, recorded as you perform them — not reconstructed
+> afterwards. ARC-06/ARC-09 CI and the citations in `ARC-00`/`ARC-09` READMEs point at it and say
+> "pending Sitting D" until it exists.
+>
 
 ## Archive — answered rows
 
