@@ -234,6 +234,20 @@ failed on three different tests across four runs while their real costs were ~22
 CI cell is not evidence against it either: a 2-core runner spawns fewer workers and contends less, so
 it says something about the runner, not about the suite.
 
+**And the rule those two converge on: no unit test asserts a wall-clock** (ARC-09-C24). Budgets live
+in `scripts/ci/banner-timing.mjs` and `scripts/ci/check-timings.mjs` — their own jobs, run on a known
+cell, reporting a median rather than one sample. A test under `tests/` asserts STRUCTURE. Six went at
+once, five of them found by grep after the fifth failed a release: the SessionStart hook's fast-path
+(`r.ms < 1000`) and re-run (`< 3000`) budgets, its watchdog's `< 2000` — `path: 'timeout'` on the next
+line already said the watchdog fired — the doctor registry's `--quick` 3 s budget, `docsStatus`'s
+300 ms one and `syncCorpus`'s 60 s no-op detector. Each was standing in for a fact the code already
+reports, and the replacements read it: the banner returns which branch answered, `docsStatus` leaves
+`citations`/`fileCount`/`sizeBytes` `null` for work it did not do, `syncCorpus` prints one
+`[docs] <phase> … N s` line per unit of work and zero lines IS the no-op. Where the claim is only
+"it terminates", the bound is the SPAWN's (`timeout` + `killSignal`, then assert the child was not
+killed), not a comparison against a number — `tests/contract/engine-lint.test.mjs` is the shape to
+copy, control included. If a test has no such fact to assert, it asserts nothing about time.
+
 **A skipped test states its reason, and the reason is load-bearing.** Two skip deliberately today — the
 `docs/CHANGELOG.md` ordering guard (the imported changelog reads *ahead* of the root version because the
 product renumbered downward at the merge; it becomes a live assertion when ARC-09 regenerates the file)

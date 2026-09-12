@@ -63,22 +63,24 @@ test('AC 1 — a fresh sync lands at the pin, sparse, complete, initialised', ()
   assert.ok(existsSync(join(corpusOf(w), 'markdown/alpha', LONG_NAME)), 'the 197-char path is absent');
 });
 
-test('AC 2 — a second run changes nothing, quickly, and says so', () => {
+/** A phase line: `[docs] <label> … N.N s`. One is printed per unit of work `syncCorpus` does. */
+const PHASE_LINE = / … \d+\.\d s$/;
+
+test('AC 2 — a second run changes nothing and says so', () => {
   const w = workspace();
   syncCorpus({ ...w, log: silent });
   const lines = [];
-  const t = Date.now();
   const r = syncCorpus({ ...w, log: (l) => lines.push(l) });
-  const elapsed = (Date.now() - t) / 1000;
 
-  // The substance is that NOTHING WAS DONE — `changed: false` and the up-to-date line. The story's
-  // "< 5 s" is a claim about the reference machine and is measured there and reported in the PR;
-  // asserted here it measures contention, not the subject. It failed at 20.5 s in the full suite
-  // while passing alone, once S06 added two more git-spawning files to the same parallel run.
-  // What stays is a hang detector: a second run that takes a minute is doing real work.
+  // The substance is that NOTHING WAS DONE, and it is read off the log rather than off a clock
+  // (ARC-09-C24). `syncCorpus` prints one `[docs] <phase> … N s` line per clone, sparse-set, fetch
+  // and checkout it performs; zero of them IS the no-op. The story's "< 5 s" is a claim about the
+  // reference machine, measured there and reported in the PR — asserted here it measured
+  // contention, and it failed at 20.5 s in the full suite while passing alone, once S06 added two
+  // more git-spawning files to the same parallel run.
   assert.equal(r.changed, false, 'the second run reported a change');
-  console.log(`    second run: ${elapsed.toFixed(1)} s`);
-  assert.ok(elapsed < 60, `second run took ${elapsed.toFixed(1)} s — it is not a no-op`);
+  const phases = lines.filter((l) => PHASE_LINE.test(l));
+  assert.deepEqual(phases, [], `the second run did work: ${phases.join(' · ')}`);
   // Two lines now: the up-to-date line, then the attribution — printed on EVERY successful sync,
   // including a no-op one, because whose documentation this is does not depend on whether anything
   // changed. Asserted as a pair so a third line cannot appear unnoticed.
@@ -86,6 +88,15 @@ test('AC 2 — a second run changes nothing, quickly, and says so', () => {
     `[docs] up to date (pin ${upstream.pin.slice(0, 7)}, sparse, ${AREAS.length} areas)`,
     ATTRIBUTION,
   ]);
+});
+
+test('...and the no-work claim is not vacuous: a first run prints phase lines', () => {
+  // The negative control for the case above. If `PHASE_LINE` stopped matching what `syncCorpus`
+  // prints, "zero phase lines" would be true of every run and the assertion would guard nothing.
+  const lines = [];
+  syncCorpus({ ...workspace(), log: (l) => lines.push(l) });
+  const phases = lines.filter((l) => PHASE_LINE.test(l));
+  assert.ok(phases.length > 0, `a first run printed no phase line — the pattern is stale: ${lines.join(' · ')}`);
 });
 
 test('AC 3 — a checkout at the wrong commit is returned to the pin by hash', () => {
