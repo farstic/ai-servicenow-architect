@@ -19,10 +19,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
-import { maskForJson, labelsIn, LABEL_MASK, HOST_MASK } from '../../tools/snowarch/lib/doctor/json-boundary.mjs';
+import { maskForJson, labelsIn, LABEL_MASK, HOST_MASK, HOME_MASK, homeValues } from '../../tools/snowarch/lib/doctor/json-boundary.mjs';
 import { greenTree, linkInstall, writeJson } from './helpers/tree.mjs';
 
 const LABEL = 'acme-prod';
@@ -105,6 +105,94 @@ test('C1 — each of the seven measured fields is masked, by path', async (t) =>
     ...(c?.data?.fixes ?? []).map((f) => f?.label)]).filter(Boolean);
   assert.ok(fixLabels.length > 0, 'no fix payload carried a label — the path assertion is vacuous');
   assert.deepEqual([...new Set(fixLabels)], [LABEL_MASK]);
+});
+
+test('C1 — a home directory is masked, in every shape a platform writes one', () => {
+  // ARC-08-C1 second pass, and the reason it is a UNIT test rather than another fixture run: the fixture's own
+  // temp root is home-shaped on ONE platform. `C:/Users/runneradmin/AppData/Local/Temp/...` on a
+  // Windows runner matches S07's home-path pattern; `/var/folders/...` on macOS and `/tmp/...` on
+  // Linux do not. So the live scan above passed on two platforms while the product leaked the
+  // user's account name on all three, and only the Windows cell said so. A table of shapes cannot
+  // have that accident.
+  const cases = [
+    ['/Users/alice/work/repo', `${HOME_MASK}/work/repo`],
+    ['/home/carol/p', `${HOME_MASK}/p`],
+    [String.raw`C:\Users\bob\src\repo`, `${HOME_MASK}\\src\\repo`],
+    ['C:/Users/runneradmin/AppData/Local/Temp/x', `${HOME_MASK}/AppData/Local/Temp/x`],
+    [String.raw`D:\Users\runneradmin\AppData\Local\Temp\x`, `${HOME_MASK}\\AppData\\Local\\Temp\\x`],
+  ];
+  for (const [from, to] of cases) assert.equal(maskForJson({ p: from }).p, to, `not masked: ${from}`);
+
+  // The negatives, and they are the half that keeps the rule useful: a path that names nobody keeps
+  // every character. `D:\a\...` is the CI runner's own checkout; `/var/folders` is macOS's temp.
+  for (const keep of ['/var/folders/xy/T/z', '/tmp/snowarch-doctor-abc',
+    String.raw`D:\a\ai-servicenow-architect\ai-servicenow-architect`]) {
+    assert.equal(maskForJson({ p: keep }).p, keep, `masked something that names nobody: ${keep}`);
+  }
+
+  // What survives is what a maintainer reading a pasted report actually uses.
+  assert.equal(maskForJson({ p: '/Users/alice/my work/repo' }).p, `${HOME_MASK}/my work/repo`);
+});
+
+test('C1 — the three fields that carried the checkout path are masked, by path', () => {
+  // Measured on a real (non-fixture) run of this repository before the fix: `checks[].detail`,
+  // `checks[].data.root` and `checks[].data.toplevel`, each reading `/Users/<me>/work/<repo>`.
+  // Asserted by path as well as by value, so a regression in any one of them is named.
+  const home = '/Users/someone/work/ai-servicenow-architect';
+  const report = { checks: [{ id: 'E-03', detail: home, data: { root: home, toplevel: home } }] };
+  const m = maskForJson(report);
+  assert.equal(m.checks[0].detail, `${HOME_MASK}/work/ai-servicenow-architect`);
+  assert.equal(m.checks[0].data.root, `${HOME_MASK}/work/ai-servicenow-architect`);
+  assert.equal(m.checks[0].data.toplevel, `${HOME_MASK}/work/ai-servicenow-architect`);
+
+  // And the whole point, in the form the lint asks it: the result carries no home path at all.
+  assert.equal(/(\/Users\/|\/home\/|C:\\Users\\)/.test(JSON.stringify(m)), false);
+});
+
+test('C1 — with the run\'s home set to the fixture root, that root appears nowhere in the JSON', async (t) => {
+  // THE PLATFORM-INDEPENDENT FORM of the leak that only Windows CI exposed. The fixture's own temp
+  // root is home-shaped on exactly one platform — `C:/Users/runneradmin/AppData/Local/Temp/…`
+  // matches S07's home-path pattern, `/var/folders/…` and `/tmp/…` do not — so the live scan passed
+  // on macOS and Ubuntu while the product leaked the user's account name on all three.
+  //
+  // Telling the run that the fixture's parent IS its home removes the accident: the checkout sits
+  // under it on every platform, so the path fields carry it, and the assertion is that the literal
+  // string is gone. No pattern is involved, which is the point — this is the by-VALUE half.
+  //
+  // Through the `home` OPTION rather than `process.env`: nothing under `lib/` may read the home
+  // directory, `bin/snowarch.mjs` calls `homedir()` once and threads it, and this test travels the
+  // same path a real run does.
+  const root = linkInstall(greenTree(t, { mode: 'design' }));
+  const fakeHome = dirname(root);
+  assert.deepEqual(homeValues(fakeHome), [fakeHome], 'the fixture root is not usable as a home');
+
+  let json = '';
+  await doctorCommand({ flags: { json: true, 'no-network': true, 'no-cache': true },
+    out: { write: (s) => { json += s; } }, cwd: root, home: fakeHome, input: { isTTY: false } });
+
+  // The precondition, or this asserts nothing: the report really does quote a home-rooted path.
+  const masked = [];
+  const walk = (v) => {
+    if (typeof v === 'string') { if (v.includes(HOME_MASK)) masked.push(v); }
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+  };
+  walk(JSON.parse(json));
+  assert.ok(masked.length > 0, 'no field carried a home-rooted path — the fixture stopped quoting one');
+
+  assert.equal(json.includes(fakeHome), false, `the fixture root survived into the JSON: ${fakeHome}`);
+
+  // Both directions, on a home that NO generic shape matches, so this isolates the by-value half.
+  // `fakeHome` cannot serve: on a Windows runner the fixture root sits under
+  // `C:/Users/runneradmin/AppData/Local/Temp`, which the pattern masks on its own — the control
+  // would then pass for the wrong reason on two platforms and fail on the third, which is the exact
+  // accident this whole chore is about.
+  const odd = '/opt/people/ana';
+  assert.deepEqual(homeValues(odd), [odd]);
+  assert.equal(JSON.stringify(maskForJson({ p: `${odd}/checkout` }, { home: '' })).includes(odd),
+    true, 'something other than the home value masked it — the control proves nothing');
+  assert.equal(JSON.stringify(maskForJson({ p: `${odd}/checkout` }, { home: odd })).includes(odd),
+    false, 'a home that matches no pattern was not masked by value');
 });
 
 test('C1 — masking is by VALUE, so a field nobody listed is covered too', () => {

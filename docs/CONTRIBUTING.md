@@ -1000,8 +1000,9 @@ spends its first exchange establishing. The same values fill the doctor's `engin
 
 **The form asks for `--json`, not the text report, and the difference is deliberate.** The text
 report names your instance, because it is meant for the screen in front of you. The JSON is the
-form that travels: instance labels read `<label>`, instance hosts read `<host>`, secrets have always
-read `set (len n)` (ARC-08-C1, `docs/ARCHITECTURE.md`). Read it before you post it anyway — and if
+form that travels: instance labels read `<label>`, instance hosts read `<host>`, home-directory
+paths read `~`, and secrets have always read `set (len n)` (ARC-08-C1, `docs/ARCHITECTURE.md`). The standard is ARC-10-S07's six redaction patterns, not a list of fields
+somebody noticed — the checkout path was the one nobody had. Read it before you post it anyway — and if
 you find something in it that identifies you, that is a redaction defect and the most important
 issue you could open that day.
 

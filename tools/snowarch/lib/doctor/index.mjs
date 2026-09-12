@@ -402,7 +402,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     // A plan the user declined is a successful run of `--fix`: they asked what it would do, and
     // it told them. The findings are still on the screen and the next run still reports them.
     if (outcome.declined) {
-      if (flags.json) write(JSON.stringify(maskForJson(report), null, 2));
+      if (flags.json) write(JSON.stringify(maskForJson(report, { home }), null, 2));
       if (log?.commit) log.commit();
       return EXIT_OK;
     }
@@ -431,7 +431,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     // form that travels — an issue template asks a stranger to paste it — so instance labels and
     // hosts leave as `<label>` / `<host>`. The text path below, the banner and the cache keep the
     // user's own words; a machine consumer uses the report object, not this string.
-    write(JSON.stringify(maskForJson(cacheError ? { ...report, cacheError } : report), null, 2));
+    write(JSON.stringify(maskForJson(cacheError ? { ...report, cacheError } : report, { home }), null, 2));
   } else {
     write(renderText({ report, checks, colour: useColour({ stream: out, env }) }));
   }

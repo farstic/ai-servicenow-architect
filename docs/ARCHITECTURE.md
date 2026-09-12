@@ -1116,8 +1116,8 @@ cannot disagree. A check that sets both a code and its own remedy is refused.
 could not run at all — not at the repository root, an unparsable `engine.config.json`, or Node below
 the floor. Exit codes apply with `--json` too; CI relies on them.
 
-**`--json` is the form that travels; instance labels and hosts are masked; machine consumers use the
-report object** (ARC-08-C1). The text report, the SessionStart banner and the doctor cache are local
+**`--json` is the form that travels; the instance host and label, and home-directory paths, are
+masked; machine consumers use the report object** (ARC-08-C1). The text report, the SessionStart banner and the doctor cache are local
 to one machine and keep the user's own words — a practitioner needs to see which instance the banner
 is talking about. The JSON is the form an issue template asks a stranger to paste into a public
 tracker, so at that boundary every string value has each loaded instance's label rewritten to
@@ -1126,6 +1126,15 @@ was measured in seven fields across four shapes and the eighth arrives without a
 this paragraph. The matching is word-bounded, so a label of `dev` also masks the environment token —
 `(dev)` reads `(<label>)` — which is the accepted cost of not keeping a list of words a user may not
 choose. `--fix` reads the in-process report, not this string, and so is unaffected.
+
+The standard the boundary is held to is ARC-10-S07's six redaction patterns — the ones a committed
+validation record is refused for — not the particular fields anyone has noticed. The label and the
+host were the two the first ruling named; the CHECKOUT PATH was the third, and it carries the user's
+account name on every platform. A home directory reads `~` — the run's own home by value (threaded
+from `bin/snowarch.mjs`, because nothing under `lib/` may read the home itself) and the four generic
+shapes by pattern —
+and what follows it survives: the depth of the checkout, a space in the path, the drive letter — the
+part a maintainer uses, none of it naming anybody.
 
 **One report, one Mode line** (ARC-08-S05). The sections print in a fixed order — prereqs, repo,
 docs, roster, contract, legacy, host, server — and the last line is always the Mode line, because

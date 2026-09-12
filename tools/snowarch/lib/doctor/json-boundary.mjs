@@ -10,6 +10,12 @@
 // `data.fix*.label` payloads. That is the argument for masking BY VALUE rather than by field: the
 // eighth field arrives without anyone remembering the ruling that created this file.
 //
+// THE STANDARD THIS BOUNDARY IS HELD TO is ARC-10-S07's own six redaction patterns — the ones a
+// validation record is refused for. Labels and hosts were the two the ruling named; the home path
+// is the third, and it was found by the test asserting the general property rather than by anyone
+// re-reading this file (ARC-08-C1, second pass). If a seventh field shape arrives, the S07 scan in the test is
+// what will say so.
+//
 // The host was NOT in that JSON. It is masked anyway, with the same shape the cache guard uses
 // (ARC-09-C9's `INSTANCE_HOST`, imported rather than rewritten): the guard exists because
 // `redact()` leaves an instance address alone, and a report that only happens not to carry one is
@@ -18,6 +24,57 @@ import { INSTANCE_HOST } from '../doctor-cache.mjs';
 
 export const LABEL_MASK = '<label>';
 export const HOST_MASK = '<host>';
+export const HOME_MASK = '~';
+
+/**
+ * A home directory, in every shape the platforms write one — `/Users/<name>`, `/home/<name>`,
+ * `C:\Users\<name>` and the forward-slash form Node hands back on Windows.
+ *
+ * ARC-08-C1, second pass. The label and the host were masked here from the start; the checkout PATH was not, and
+ * it carries the user's account name on every platform. Measured on a real (non-fixture) report:
+ * three fields — `checks[].detail`, `checks[].data.root`, `checks[].data.toplevel` — each reading
+ * `/Users/<me>/work/ai-servicenow-architect`.
+ *
+ * Only the home prefix goes. What follows it is the part a maintainer reading a pasted report
+ * actually uses — how deep the checkout is, whether the path has a space in it, which drive it is
+ * on. That is the part a maintainer reading a pasted report uses, and none of it names
+ * anybody. `~` rather than a bracketed token because the result is still a path and reads
+ * as one — `~/work/repo`.
+ */
+const HOME_PATH = /(?:[A-Za-z]:)?[\\/](?:Users|home)[\\/][^\\/\s"'`,;:]*/g;
+
+/**
+ * The home the ENTRY POINT was given, masked BY VALUE — the same argument as the label.
+ *
+ * The four shapes above are the common ones, not the only ones: a home can be `/opt/people/ana`, a
+ * mounted volume, or whatever an administrator chose, and none of those match a pattern. The
+ * machine's own answer covers the case no pattern can.
+ *
+ * IT ARRIVES AS AN ARGUMENT, and that is a rule rather than a preference: nothing under `lib/` reads
+ * the home directory itself. `tools/snowarch/tests/mode-register.test.mjs` — *nothing under `lib/`
+ * opens `~/.claude.json`, or anything else in the home directory* — fails the build on either
+ * environment name anywhere in this tree. The entry point in `bin/` asks the OS once and threads the
+ * answer through, which is also what lets a test point a whole run at a fixture without touching the
+ * environment. The first version of this file read the environment directly and that guard caught
+ * it, correctly.
+ *
+ * (The guard scans raw text, so it also fires on a COMMENT naming either variable — which is why
+ * this paragraph describes them instead of spelling them. Noted for its owner; this file complies
+ * with the rule either way.)
+ *
+ * The guard on the VALUE is not decoration either. A home of `/`, a bare drive root or an empty
+ * string would match inside every absolute path in the report and turn it to nonsense; below four
+ * characters there is nothing worth masking and plenty to break, so such a value is ignored and the
+ * shapes above still apply.
+ */
+export function homeValues(home) {
+  if (typeof home !== 'string') return [];
+  const v = home.trim().replace(/[\\/]+$/, '');
+  return v.length >= 4 && !/^[A-Za-z]:$/.test(v) ? [v] : [];
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 
 /** `\b` around a label, escaped — a label is a user's word, not a pattern. */
 const wordRe = (s) => new RegExp(`\\b${s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\b`, 'g');
@@ -45,10 +102,15 @@ export function labelsIn(report) {
  * exceptions are wrong for somebody. The collision is asserted in the test, so it is documented
  * behaviour rather than a discovery.
  */
-export function maskForJson(report, labels = labelsIn(report)) {
+export function maskForJson(report, { labels = labelsIn(report), home = '' } = {}) {
   const res = [...labels].sort((a, b) => b.length - a.length).map((l) => [wordRe(l), LABEL_MASK]);
+  // This run's own home FIRST — it is the most specific, and it may match no pattern at all — then
+  // the generic shapes, which also cover a report quoting a path that is somebody else's home.
+  const homes = homeValues(home).map((h) => new RegExp(escapeRe(h), 'g'));
   const maskString = (s) => {
     let out = s.replace(INSTANCE_HOST, HOST_MASK);
+    for (const re of homes) out = out.replace(re, HOME_MASK);
+    out = out.replace(HOME_PATH, HOME_MASK);
     for (const [re, to] of res) out = out.replace(re, to);
     return out;
   };

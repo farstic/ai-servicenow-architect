@@ -223,7 +223,9 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   the form that travels — an issue template asks for it, and it goes into a public tracker. It used
   to carry the instance label in seven places and the instance hostname in two, so pasting a report
   told strangers what your company calls its production instance and where it lives. The JSON now
-  reads `instance=<label>` and `<host>` throughout, and a file added next month is covered without
+  reads `instance=<label>` and `<host>` throughout — and your home directory, which appeared in the
+  path of the checkout and carries your account name on every system, now reads `~` with the rest of
+  the path kept. A file added next month is covered without
   anyone remembering to mask it, because the masking happens where the report leaves rather than at
   each place that writes a line. The report on your own screen is unchanged and still names the
   instance — you need to know which one the doctor is talking about. The one visible cost: if you

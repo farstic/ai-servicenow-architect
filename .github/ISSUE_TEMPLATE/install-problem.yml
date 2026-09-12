@@ -76,7 +76,8 @@ body:
       label: "`./snowarch doctor --json`"
       description: >-
         This is the form that travels: instance labels read `<label>`, instance hosts read
-        `<host>`, and secrets are shown as `set (len n)` — never the value. Paste the whole thing.
+        `<host>`, home-directory paths read `~`, and secrets are shown as `set (len n)` — never
+        the value. Paste the whole thing.
         Read it before you post it: if you find anything that identifies you or your instance, that
         is a defect in the doctor and worth its own issue.
       render: json
