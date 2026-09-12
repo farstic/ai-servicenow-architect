@@ -143,6 +143,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A release with a long changelog can still be published.** GitHub caps a release body at 125,000
+  characters, and 2.0.0's notes are longer than that on their own. The body is now assembled in one
+  place and bounded: the list of what changed is kept whole, and the prose is cut at a paragraph
+  with a link to the changelog in the tagged tree, which has every word.
+
 - **The doctor's judgement knows which kind of install it is looking at.** The check that decides
   whether a report describes a healthy design-only install assumed the dependencies were absent,
   because that was true of its only caller. The release workflow installs first, so its server

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { buildTagMessage } from '../scripts/lib/release/tag.mjs';
 import { collect, directorySize, megabytes, seconds, table } from '../scripts/ci/install-metrics.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { composeBody, RELEASE_BODY_MAX } from '../scripts/ci/release-notes.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
@@ -348,4 +349,78 @@ test('C16: every job that reads the tag re-fetches it first', () => {
     const before = code.lastIndexOf('git fetch --force origin "+refs/tags/', at);
     assert.ok(before > -1 && before < at, `${reader} runs before its re-fetch`);
   }
+});
+
+// ── ARC-09-C21 — the release body is bounded, the record is not ────────────────────────────────
+//
+// Rehearsal run 9 reached `publish` for the first time — download, metrics, notes,
+// `assert-assets: 6 asset(s) clean` — and the API refused the last step:
+//
+//     HTTP 422: Validation Failed — body is too long (maximum is 125000 characters)
+//
+// 2.0.0's section is ~1,636 lines because C12c correctly moved 1,224 lines of hand-written Notes
+// into it. That is a one-off, but a workflow that works only while the changelog stays small breaks
+// on a release nobody is watching.
+
+test('C21: a small section is unchanged apart from what the body always carries', () => {
+  const section = '## 9.9.9 — 2026-01-01\n\n### Added\n\n- a thing\n\n_trailer_';
+  const body = composeBody({ section, metrics: '| os | s |\n|---|---|\n', tag: 'v9.9.9' });
+  assert.ok(body.startsWith(section), 'the section is not the head of the body');
+  assert.match(body, /\| os \| s \|/);
+  assert.match(body, /E-00 is expected there/);
+  assert.equal(body.includes('Notes continue in'), false,
+    'a section that fits was truncated anyway');
+});
+
+test('C21: an oversized section keeps the GROUPS and truncates the prose', () => {
+  // 130,000 characters of Notes — bigger than the API's limit on its own — with the generated
+  // groups and the trailer after them, which is where a real section puts them.
+  const groups = '### Added\n\n- the generated groups, which are what the release IS\n\n_trailer_';
+  const para = `${'x'.repeat(120)}\n\n`;
+  const section = `## 9.9.9 — 2026-01-01\n\n### Notes\n\n${para.repeat(1100)}${groups}`;
+  assert.ok(section.length > 130_000, `the fixture is only ${section.length} characters`);
+
+  const body = composeBody({ section, metrics: '| os | s |\n', tag: 'v9.9.9' });
+  assert.ok(body.length <= RELEASE_BODY_MAX,
+    `${body.length} characters, over the API's ${RELEASE_BODY_MAX}`);
+
+  // WHICH END SURVIVED. The obvious implementation truncates the tail and loses exactly the part
+  // that says what changed; this is the assertion that catches that mistake being made again.
+  assert.match(body, /the generated groups, which are what the release IS/);
+  assert.match(body, /_trailer_/);
+  assert.ok(body.startsWith('## 9.9.9'), 'the version heading was truncated away');
+  assert.match(body, /_Notes continue in \[docs\/CHANGELOG\.md § 9\.9\.9\]\(https:\/\/github\.com\/farstic\/ai-servicenow-architect\/blob\/v9\.9\.9\/docs\/CHANGELOG\.md\)\._/);
+  assert.match(body, /\| os \| s \|/);
+  assert.match(body, /E-00 is expected there/);
+  // And the prose really was cut, or the fixture proves nothing.
+  assert.ok(body.length < section.length, 'nothing was truncated');
+});
+
+test('C21: truncation lands on a paragraph boundary, never inside a fence', () => {
+  // A fence near the budget's edge is the case that matters: a body ending mid-example is worse
+  // than one that says where the rest is.
+  const filler = `${'y'.repeat(200)}\n\n`;
+  const fence = '```sh\n./snowarch doctor\n./snowarch version\n```\n\n';
+  const section = `## 9.9.9 — 2026-01-01\n\n### Notes\n\n${filler.repeat(600)}${fence.repeat(20)}${filler.repeat(600)}`;
+  const body = composeBody({ section, metrics: '', tag: 'v9.9.9', max: 60_000 });
+
+  assert.ok(body.length <= 60_000, `${body.length} over the budget`);
+  // An even number of fence markers: the body neither ends nor OPENS inside a code block. Cutting
+  // from the top makes the second failure mode the likely one, which is why this counts rather
+  // than looking at the end.
+  const fences = (body.match(/^\s{0,3}(```|~~~)/gm) ?? []).length;
+  assert.equal(fences % 2, 0, `the body opens or ends inside a fenced block (${fences} markers)`);
+  // ...and the kept text starts at a paragraph boundary rather than mid-sentence.
+  const afterLink = body.slice(body.indexOf('._\n') + 3);
+  assert.match(afterLink, /^\n?\S/, 'the kept text does not start at a boundary');
+});
+
+test('C21: nothing is appended to the release body after the script runs', () => {
+  const code = readFileSync(join(REAL_ROOT, '.github/workflows/release.yml'), 'utf8')
+    .split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  // The defect was `cat install-metrics.md >> release-notes.md` and a `printf … >>` after it: two
+  // more writers, neither of which could know the total.
+  assert.equal(/>>\s*release-notes\.md/.test(code), false,
+    'something appends to the release body after the script — the budget cannot see it');
+  assert.match(code, /release-notes\.mjs .*--metrics install-metrics\.md/s);
 });
