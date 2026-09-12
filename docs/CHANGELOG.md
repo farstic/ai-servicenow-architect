@@ -219,6 +219,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The health check no longer breaks when a new version exists.** The check that tells you whether
+  you are on the latest release crashed as soon as there was a release to compare against — and,
+  separately, on any machine that had already completed one successful check, whether or not a new
+  version existed. Both came from the same mistake about what the clock hands back. Fixed, with the
+  rule now enforced automatically so the next check cannot repeat it, and with the behaviour
+  pinned: a release candidate is not offered to you as an upgrade.
+
 - **Three checks that were watching nothing now watch something.** Guards exist to fail when a rule
   is broken, and a guard that cannot fail is worse than none — it reads like protection in a diff.
   One checked that a piece of text-matching worked rather than running the rule it was written for;

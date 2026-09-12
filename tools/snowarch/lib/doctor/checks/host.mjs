@@ -264,7 +264,13 @@ export function hostChecks() {
         const { needsRefresh, readUpgradeCheck, writeUpgradeCheck } =
           await import('../../upgrade-check.mjs');
         const cached = readUpgradeCheck(ctx.root);
-        const now = ctx.now ?? (() => new Date());
+        // ARC-09-C31. `ctx.now()` is EPOCH MILLISECONDS (the contract is stated where the context
+        // is built); `upgrade-check.mjs` wants a `Date`, and its own default supplies one. This
+        // used to be `ctx.now ?? (() => new Date())` — which reads as a sensible fallback and is
+        // the bug: with the runner's real `ctx.now` the check handed a NUMBER to code that calls
+        // `.toISOString()` and `.getTime()` on it, so the check crashed on any networked run with
+        // either a release tag to compare against or a cache from a previous one.
+        const now = () => new Date(ctx.now ? ctx.now() : Date.now());
 
         if (ctx.noNetwork) {
           return skip(cached?.latestTag
