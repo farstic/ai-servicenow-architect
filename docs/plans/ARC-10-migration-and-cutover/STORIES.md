@@ -253,6 +253,31 @@ written and this records what the tree said.
 
 ---
 
+> **Amendment 2026-09-12 (acceptance pass, item B10-01). AC 1's second half was false, and so was
+> its first proposed replacement.**
+>
+> The criterion says `git grep -n "scripts/legacy"` returns only `docs/ARCHITECTURE.md`. Measured:
+> **19 files**. The acceptance plan's own proposal — the ledger plus anything citing the import tag
+> — is false too, because it filters LINES rather than files: `docs/ARCHITECTURE.md` has four
+> mentions of which one cites the tag, so it survives the filter as a file either way.
+>
+> **The honest rule is four classes, not a file name**, and the second class is why "only
+> ARCHITECTURE" could never have been right — the ledger is GENERATED, so its data, its generator
+> and the test that asserts it must all name the thing the ledger describes. Nine files outside
+> `docs/plans`, each measured:
+>
+> | Class | Files |
+> |---|---|
+> | **ledger** | `docs/ARCHITECTURE.md` (4 mentions — the `## History` note and the D00–D37 table) |
+> | **ledger-source** | `tools/snowarch/lib/doctor/mapping.mjs` (the mapping data), `scripts/gen-doctor-docs.mjs` (renders it into the table), `tests/doctor/mapping.test.mjs` (asserts it) |
+> | **history** | `docs/CHANGELOG.md`, `packages/snowarch/CHANGELOG.md` (quotes `scripts/legacy/SETUP.md` line 138), `scripts/README.md` (says the originals are readable at the import tag) |
+> | **detector-data** | `tests/no-legacy-names.test.mjs` (6 — including the assertion that the directory is gone: a test proving a path is deleted has to name it), `tools/snowarch/lib/doctor/checks/stale-registrations.json` (E-23's record of where the old installers wrote) |
+>
+> Asserted as a path→class map in `tests/no-legacy-names.test.mjs`, **both directions**: nothing
+> outside the map may name the directory, and a listed file that stops naming it is removed rather
+> than kept — the ratchet's own rule. AC 1's first half is unchanged and holds exactly:
+> `git ls-files scripts/legacy` → 0.
+
 ### ARC-10-S04 — Rewrite the standing rule and the field-notes policy (DR-16) in `CLAUDE.md` and `docs/CONTRIBUTING.md`
 
 **As** the engine (Claude) and its maintainer **I want** one short rule that says where a solved problem is recorded in the merged repository **so that** platform findings, server behaviours and instance-specific values each land in exactly one correct place and the 2026-06-08 "MCP findings excluded" rule — meaningless now that the server is in the same repository — lapses.

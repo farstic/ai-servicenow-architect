@@ -177,6 +177,68 @@ test('AC — every id in the cutover list resolves to a test in the same file', 
     'the unresolved-id check does not report the planted one');
 });
 
+// ─── ARC-10-S07 AC 3, second half, and ARC-10-S02 AC 4 (acceptance items B10-04, B10-05) ──────
+
+/**
+ * The four design-only checks the cutover list names by name.
+ *
+ * AC 3's first half — every `T-` id in the list resolves to a section — has been asserted since
+ * S07. Its second half, that the list also names what a design-only row proves, was true in the
+ * document and asserted by nothing: measured in the acceptance pass, all four phrases are in the
+ * list's own paragraph. A paragraph nothing checks is a paragraph that survives one rewrite.
+ */
+export const DESIGN_ONLY_CHECKS = [
+  ['the banner', /the banner reads `Mode: design-only`/],
+  ['/mcp', /`\/mcp` shows the server disabled/],
+  ['no MCP call', /T-05 and T-06 run their dormant variant/],
+  ['the hand-off', /`\/snowarch setup-instance` prints the terminal hand-off and STOPS/],
+];
+
+test('AC 3 — the cutover list says what a design-only row proves, not only which tests it runs', () => {
+  const text = read('tests/VALIDATION-TESTS.md');
+  const from = text.indexOf('## Cutover test list');
+  assert.ok(from > -1, 'the cutover list is gone');
+  const section = text.slice(from, (text.indexOf('\n## ', from + 1) + 1) || text.length);
+
+  // WHITESPACE-COLLAPSED before matching, and this is not a convenience: the paragraph wraps
+  // "`/mcp` shows / the server disabled", so a raw match found three of the four and reported the
+  // fourth as deleted. The same trap ARC-10-S04's sweep is collapsed for — a rule that a reflowed
+  // paragraph can break is a rule that will be broken by a reflow.
+  const flat = section.replace(/\s+/g, ' ');
+  const missing = DESIGN_ONLY_CHECKS.filter(([, re]) => !re.test(flat)).map(([n]) => n);
+  assert.deepEqual(missing, [], `${missing.length} design-only check(s) no longer named in the list`);
+
+  // In the SECTION, not merely in the file: the phrases exist elsewhere too, and a rule satisfied
+  // by a sentence three pages away tells a reader of this table nothing.
+  assert.ok(section.length < text.length, 'the section slice took the whole file');
+  // The control that the slice is doing work: the list's own table rows are inside it, and the
+  // file's later sections are not.
+  assert.match(flat, /\| # \| Machine · mode \|/);
+  assert.equal(/## Recording a validation run/.test(section), false, 'the slice ran past the section');
+});
+
+test('AC 4 — the engagements guidance claims no absolute path', () => {
+  // ARC-10-S02's other half. The page tells somebody where their engagements live, which is the
+  // kind of sentence that reaches for a real path — and a real path in a committed document is
+  // both wrong for every other machine and a leak of this one. The redaction lint above refuses
+  // the same shapes in a validation record; this refuses them in the guidance that produces one.
+  const doc = read('docs/CONTRIBUTING.md');
+  const from = doc.indexOf('## Engagements and memory');
+  assert.ok(from > -1, 'the Engagements and memory section is gone');
+  const section = doc.slice(from, (doc.indexOf('\n## ', from + 1) + 1) || doc.length);
+
+  const [, , , , homePath] = patterns();
+  const hits = section.split('\n')
+    .map((l, i) => [i + 1, l])
+    .filter(([, l]) => homePath[1].test(l))
+    .map(([i, l]) => `docs/CONTRIBUTING.md § Engagements and memory:+${i}: ${l.trim().slice(0, 70)}`);
+  assert.deepEqual(hits, [], `${hits.length} absolute path(s) in the engagements guidance`);
+
+  // Not vacuous, in both directions: the section is really there, and the pattern really fires.
+  assert.ok(section.includes('clients/'), 'the section does not describe where engagements live');
+  assert.equal(homePath[1].test('put them in /Users/you/work/clients'), true);
+});
+
 // ─── The shape half: each kind of record carries its own sections ────────────────────────────
 
 /** First `# ` heading, which is what decides WHICH shape a file in this directory must have. */
