@@ -445,38 +445,33 @@ test('every surface carries the re-run note, as its last line', () => {
   assert.ok(!RERUN_NOTE.includes('\\'), 'the note carries a continuation');
 });
 
-test('the block is the printed commands plus the packaging — and nothing else', () => {
+test('the block is the POSIX printed recipe plus the packaging — and nothing else', () => {
   // The relation `docs/ARCHITECTURE.md` claims, asserted in BOTH directions. It used to claim the
   // block was byte-identical to `--print-recipe`; since ARC-03-C1 that is false — the block carries
   // the fail-fast packaging and `--print-recipe` deliberately does not, because the shell it is
-  // pasted into is unknown on Windows. A doc claim the code contradicts is worse than no claim, so
-  // the sentence was rewritten to this relation and this is what holds it.
-  const r = spawnSync(process.execPath,
-    [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'docs', 'sync', '--print-recipe', '--mode', 'sparse'],
-    { encoding: 'utf8', cwd: root });
-  assert.equal(r.status, 0, r.stderr);
-  const printed = r.stdout.split('\n').map((l) => l.trim())
-    .filter((l) => l.startsWith('git ') || l.startsWith('echo '));
-  assert.ok(printed.length > 0, 'the command printed no recipe at all');
-
+  // pasted into is unknown on Windows.
+  //
+  // Against the POSIX rendering, with the platform PINNED, and that is the whole lesson of this
+  // test's first version: it compared the block to `--print-recipe` on the RUNNING platform, passed
+  // on macOS, and failed on all three Windows cells, where the CLI legitimately prints
+  // `-c core.longpaths=true` on every command and one extra `config` line. The fix is not to strip
+  // those from the printed lines to make them match — that would let a Windows-only step slip into
+  // the POSIX block unnoticed, which is the one thing this test exists to catch. The CLI's own tie
+  // to the recipe, on whatever platform it is running, is asserted by "the CLI prints lines from
+  // the same recipe" above; this test owns the block, and the block is POSIX.
+  const cfg = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  const posix = recipeLines({ config: cfg, areas: readAreas(root, config.docs.areasFile),
+    platform: 'linux' });
   const block = blockOf(arch);
   const commands = commandsOf(block);
 
-  // Direction 1 — every printed command is in the block, in order. (`--print-recipe` renders for the
-  // state THIS tree is in, so it may print fewer commands; it may never print a different one.)
-  let at = 0;
-  for (const line of printed) {
-    const found = commands.indexOf(line, at);
-    assert.notEqual(found, -1,
-      `the CLI printed a command the block does not carry, or out of order: ${line}`);
-    at = found + 1;
-  }
+  // Direction 1 — the commands ARE the POSIX recipe: same commands, same order, none added, none
+  // dropped. A Windows-only line in the block fails here by name.
+  assert.deepEqual(commands, posix, unified('docs/ARCHITECTURE.md (commands)', posix, commands));
+  assert.ok(!commands.some((l) => l.includes('core.longpaths')),
+    'a Windows-only step reached the POSIX block');
 
-  // Direction 2 — the block adds NOTHING but the four packaging forms. Every block line must be a
-  // command of the generated fresh-checkout recipe once its packaging is stripped.
-  const fresh = recipeLines({ config: JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')),
-    areas: readAreas(root, config.docs.areasFile) });
-  assert.deepEqual(commands, fresh, 'the block carries something that is not a command of the recipe');
+  // Direction 2 — the block adds NOTHING but the four packaging forms.
   const packaging = block.filter((l) => !commands.includes(l));
   assert.ok(packaging.length > 0, 'the block carries no packaging at all — the joiner is gone');
   for (const l of packaging) {

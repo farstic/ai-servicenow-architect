@@ -206,7 +206,11 @@ skill unverified.
 ### The git-only corpus recipe
 
 ARC-06's launchers run this when Node is absent. Not a paraphrase of `sync.mjs`: the **commands**
-are `--print-recipe`'s, for a tree with no checkout, in that order and character for character. What
+are the **POSIX form** of `--print-recipe`'s, for a tree with no checkout, in that order and
+character for character. POSIX form because `--print-recipe` renders for the platform the operator
+is on, and the Windows one carries `-c core.longpaths=true` on every command plus a persistent
+`config` line; this block is the POSIX sequence and a Windows-only step appearing in it is a defect
+the test names. What
 the block adds, and all it adds, is the packaging the generator renders — the ` && \` that stops the
 chain at the first failure, the clone's `[ -e … ]` precondition, `{ … || true ; }` on the two
 tolerated `submodule` steps, and the re-run note as the last line. `--print-recipe` stays unpackaged
