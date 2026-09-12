@@ -17,6 +17,44 @@ import * as SENTENCE from './net-sentences.mjs';
 export const DEFAULT_TARGET = 'https://github.com/';
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
+/** The two "did not probe" sentences live with the others, in `net-sentences.mjs`. */
+export const LOCAL_UPSTREAM = SENTENCE.localUpstream;
+export const UNPROBEABLE_UPSTREAM = SENTENCE.unprobeableUpstream;
+
+/**
+ * WHAT THIS RUN WILL ACTUALLY CONTACT, from the configuration (ARC-09-C29).
+ *
+ * B00 used to probe `https://github.com/<repo>.git` — the PRODUCT repository — as a stand-in for
+ * "is github.com up". Nothing in a bootstrap run contacts that remote: the docs step (B02) fetches
+ * `docs.upstream`, the deps step (B04) talks to the npm registry in live mode, and `upgrade` uses
+ * the checkout's own `origin`. So the check asked about a host the run does not use and stayed
+ * silent about the one it does — a user on an internal corpus mirror passed B00 and failed at B02,
+ * which is the failure a preflight exists to move forward.
+ *
+ * It probes the corpus remote now. In the default configuration that IS github.com, so nothing
+ * changes for anyone; the floor is a consequence of what is configured rather than a constant.
+ *
+ * A LOCAL upstream — `file://`, or a bare path — needs no network, and saying so out loud is the
+ * point: a check that quietly stops checking is worse than one that never existed.
+ */
+export function corpusProbe(upstream) {
+  const value = String(upstream ?? '').trim();
+  if (value === '') return { local: true, reason: 'no corpus upstream configured — no probe' };
+  let url;
+  // A bare path is not a URL, and `file:` is a URL with no host. Both mean the same thing here:
+  // nothing leaves the machine.
+  try { url = new URL(value); } catch { return { local: true, reason: LOCAL_UPSTREAM }; }
+  if (url.protocol === 'file:') return { local: true, reason: LOCAL_UPSTREAM };
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    // `ssh://`, `git://`: REMOTE, and this probe cannot speak to it. Skipping is still the
+    // outcome, and the reason must not be "local" — that would be the same kind of untrue
+    // statement about what the check did that C29 exists to remove, one scheme further along.
+    return { local: false, probe: false, scheme: url.protocol.replace(':', ''),
+      reason: UNPROBEABLE_UPSTREAM(url.protocol.replace(':', '')) };
+  }
+  return { local: false, probe: true, host: url.hostname, target: `${url.protocol}//${url.host}/` };
+}
+
 /**
  * DNS · TLS · refused: the three error families, taken from Node's own tables rather than typed.
  *

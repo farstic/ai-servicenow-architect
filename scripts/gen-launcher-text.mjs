@@ -77,6 +77,7 @@ export function region({ shell = 'bash', remedies: r = remedies, text: t = text,
   };
   // The Windows launcher prints the Windows spellings; the sentences are otherwise identical.
   const next = shell === 'powershell' ? t.windows.nextDesign : t.posix.nextDesign;
+  const hostSlot = shell === 'powershell' ? '{0}' : '%s';
   const lines = [
     BEGIN,
     set('SERVER_KEY', serverKey),
@@ -88,7 +89,13 @@ export function region({ shell = 'bash', remedies: r = remedies, text: t = text,
     set('MSG_GIT_WIN', remedy('git', 'win32')),
     set('MSG_CLAUDE', remedy('claudeCode', 'default')),
     set('MSG_NET', remedy('network', 'default')),
-    set('MSG_DNS', sentences.dnsFailure('github.com')),
+    // ARC-09-C29 — the host is the CONFIGURED corpus remote, so the sentence carries a slot rather
+    // than a name. One sentence, two placeholder spellings: `printf` takes `%s`, PowerShell's `-f`
+    // takes `{0}`. Filling the slot here with a literal host is what made the old line a promise
+    // about github.com that the run did not keep.
+    set('MSG_DNS_FMT', sentences.dnsFailure(hostSlot)),
+    set('MSG_UPSTREAM_LOCAL', sentences.localUpstream),
+    set('MSG_UPSTREAM_SCHEME_FMT', sentences.unprobeableUpstream(hostSlot)),
     set('MSG_TLS', sentences.tlsIntercepted({ tool: sentences.TOOL.git })),
     set('MSG_DOCTOR', t.doctorUnavailable),
     set('MSG_MODE', t.modeDesign),

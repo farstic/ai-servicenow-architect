@@ -164,6 +164,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The install now checks the server it is about to download from, not a different one.** The
+  preflight tested whether it could reach the project's own repository — a place the install never
+  contacts — and said nothing about the documentation server it fetches from moments later. Someone
+  whose documentation comes from an internal mirror passed the check and failed the step; someone
+  behind a proxy that allows their mirror but not the public host was turned away for no reason. It
+  now checks what the run will actually use, and when that is a folder on your own machine it says
+  so rather than quietly checking nothing. Nothing changes for a standard install.
+
 - **The links on the front page go where they say.** `README.md` is assembled from the install
   page, which lives one directory down and links its neighbours accordingly — so five links on the
   project's first page pointed at files that were not there. The assembly now rewrites them for the

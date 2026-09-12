@@ -235,7 +235,7 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
 
 **Context.** `01` §4.1 (floors: Claude Code ≥ 2.1.214 logged in, git ≥ 2.25, Node ≥ 20 for live, disk ≥ 1 GB, HTTPS to github.com), §4.2 B00 ("Any FAIL prints a named remedy and exits 3 — nothing else runs"), §12 ("the doctor reads the floors from `engine.config.json`"). README risk "Users run the launcher from a subfolder → B00 detects 'not at repo root' and prints `cd`". R-3 (proxy / TLS-CA diagnosis; `03` R-15). The legacy `scripts/setup.sh` S1 and `doctor.sh` section 1 checked the toolchain but never disk, network or the working directory (`00` §3.9).
 
-**Scope.** In: `lib/steps/B00.mjs`, `lib/remedies.mjs` (remedy table keyed by check id × platform), `lib/probe-net.mjs` (github.com reachability with failure classification), the `--skip-claude-check` flag (CI runners without Claude Code). Out: the Node-free re-implementation (S10/S11 — same checks, same strings, git-based network probe); the doctor's presentation of the same checks (ARC-08 E-00…E-02 wrap this module).
+**Scope.** In: `lib/steps/B00.mjs`, `lib/remedies.mjs` (remedy table keyed by check id × platform), `lib/probe-net.mjs` (reachability with failure classification — **amended ARC-09-C29, 2026-09-12: the target is the configured corpus remote, not github.com**; `corpusProbe()` decides, and a local or non-HTTPS upstream reports why it was not probed), the `--skip-claude-check` flag (CI runners without Claude Code). Out: the Node-free re-implementation (S10/S11 — same checks, same strings, git-based network probe); the doctor's presentation of the same checks (ARC-08 E-00…E-02 wrap this module).
 
 **Design notes.**
 
