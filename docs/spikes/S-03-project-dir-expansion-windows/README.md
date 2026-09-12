@@ -58,7 +58,7 @@ versions, the `.cmd`-as-hook negative probe — is unchanged and unstarted.
 
 ## Verdict
 
-`S-03: DEFERRED — Windows VM pending (owner input #2). macOS control recorded: .mcp.json args resolve to an absolute forward-slash path and CLAUDE_PROJECT_DIR is set in the server's environment; nothing is inferred about Windows from it.`
+`S-03: DEFERRED — **Windows VM pending (owner input #2)**. The macOS control is recorded — `.mcp.json` args resolve to an absolute forward-slash path and CLAUDE_PROJECT_DIR is set in the server's environment — and **nothing is inferred about Windows from it**`
 
 ## Evidence
 

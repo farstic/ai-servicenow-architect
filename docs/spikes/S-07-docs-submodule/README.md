@@ -424,7 +424,7 @@ root, so the step is a no-op — it is a repair, not a version branch. **This is
 
 ## Verdict
 
-`S-07: CONFIRMED WITH CORRECTIONS — recipe C is fastest and smallest on all four machines (302 MB macOS / 305 MB ubuntu / 315 MB windows on disk; 34,688 materialised files of 48,997 tracked; 37.6 s macOS, 23.6 s ubuntu-22.04, 30.3 s macos-latest, 35.6 s windows-latest) and pin-by-hash fetch works everywhere — but it needs a fifth step, `git submodule init`, without which the superproject reports the submodule uninitialised; and the core.longpaths control did NOT exercise MAX_PATH, so acceptance criterion 2 is unanswered for a real install path`
+`S-07: CONFIRMED WITH CORRECTIONS — recipe C is fastest and smallest on all four machines (302 MB macOS / 305 MB ubuntu / 315 MB windows on disk; 34,688 materialised files of 48,997 tracked; 37.6 s macOS, 23.6 s ubuntu-22.04, 30.3 s macos-latest, 35.6 s windows-latest) and pin-by-hash fetch works everywhere — but **it needs a fifth step, git submodule init**, without which the superproject reports the submodule uninitialised; and **the core.longpaths control did not exercise MAX_PATH, so acceptance criterion 2 is unanswered for a real install path**`
 
 **Recipe C is recommended by measurement, with a fifth step added.** It is fastest on every machine and
 its `.git` is a third smaller than either submodule-update recipe — but as the story specifies it, it

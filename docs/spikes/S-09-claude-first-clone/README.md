@@ -40,7 +40,7 @@ _One block per OS. Paste real output, redacted per the rules above._
 
 ## Verdict
 
-`S-09: NOT RUN` — to be replaced by `S-09: CONFIRMED` or `S-09: FAILED → fallback Always instruct the restart (already in the design)`
+`S-09: NOT RUN — **not run in ARC-00, and nothing depends on it**: the design already instructs the restart this spike would have tested`
 
 ## Evidence
 

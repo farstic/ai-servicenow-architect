@@ -181,7 +181,7 @@ keychain budget behaviour with a 3 KB value. Exact steps for the owner's sitting
 
 ## Verdict
 
-`S-14a: PARTIAL — storage answered on macOS (sensitive → macOS keychain `Claude Code-credentials`; non-sensitive → ~/.claude/settings.json, USER scope, 0644, even for a project-scope install); `title` is a required userConfig field; masking of the dialog itself is INTERACTIVE-PENDING`
+`S-14a: PARTIAL — storage answered **on macOS only**: sensitive → the macOS keychain, non-sensitive → ~/.claude/settings.json at USER scope, 0644, even for a project-scope install; `title` is a required userConfig field. **Masking of the dialog itself is interactive-pending, and the Windows and Linux stores are not run**`
 
 ## Evidence
 

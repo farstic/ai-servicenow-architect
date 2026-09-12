@@ -215,7 +215,7 @@ and whether the `userConfig` dialog appears there.
 
 ## Verdict
 
-`S-14e: PARTIAL — marketplace add from a PRIVATE git URL over SSH works (exit 0, user-scope registration); --scope project writes enabledPlugins into the project; the marketplace/enable split is user+project, not project alone; the second-machine run and the dialog are INTERACTIVE-PENDING`
+`S-14e: PARTIAL — marketplace add from a private git URL over SSH works (exit 0, user-scope registration); `--scope project` writes enabledPlugins into the project, so the marketplace and enable split is user+project, not project alone. **The second-machine run and the dialog are interactive-pending**`
 
 ## Evidence
 

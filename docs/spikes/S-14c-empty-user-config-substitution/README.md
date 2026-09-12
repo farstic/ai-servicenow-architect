@@ -92,7 +92,7 @@ plugin-bundled server at all (S-14b).
 
 ## Verdict
 
-`S-14c: PARTIAL — `--config KEY=` is rejected ("value is empty… leave unset"), so blank and absent are one state at the CLI; what `${user_config.KEY}` expands to for an unset option is INTERACTIVE-PENDING (the echo tool is built and proven)`
+`S-14c: PARTIAL — `--config KEY=` is rejected ("value is empty… leave unset"), so blank and absent are one state at the CLI. **What ${user_config.KEY} expands to for an unset option is interactive-pending**; the echo tool that would answer it is built and proven`
 
 ## Evidence
 

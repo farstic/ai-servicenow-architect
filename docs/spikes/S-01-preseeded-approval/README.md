@@ -217,7 +217,7 @@ per variant, the `/mcp` panel, the S-16 prompt counts and the S-17 tool list.
 
 ## Verdict
 
-`S-01: NOT PROVEN — design-only half confirmed on the CLI surface (claude mcp get / mcp list) on 2.1.214 + 2.1.258; the /mcp panel and the live half need one interactive run`
+`S-01: CONFIRMED **on 2.1.258** — a pre-seeded `enabledMcpjsonServers` removes the per-server approval, and the count is what makes it evidence: `live` 1 dialog (workspace trust only; `/mcp` connected, 5 tools), `design` 1 (trust only, the server absent from `/mcp` rather than disabled), no-pre-seed control 2 — the second being the verbatim "New MCP server found in this project" prompt whose highlighted default is "Continue without using this MCP server". The pre-seed is ignored before trust and applied at trust time; **2.1.214 not measured**`
 
 The `disabledMcpjsonServers` (design-only) mechanism is **confirmed on macOS on both 2.1.214 and 2.1.258,
 on the non-interactive CLI surface only**: the `✘ Rejected (see disabledMcpjsonServers in settings)` status

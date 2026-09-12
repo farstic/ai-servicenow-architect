@@ -71,7 +71,7 @@ sitting — but **ARC-05's design decision no longer depends on it**.
 
 ## Verdict
 
-`S-12: CONFIRMED on 2.1.258 — mcp__servicenow__snow_*_read allows snow_core_capabilities_read and does NOT allow snow_core_records_query, proven headlessly with a no-rule control showing -p does not auto-approve; but one glob covers only 92 of 269 non-mutating tools (34%), three globs reach 205, and 64 need explicit per-tool rulings, so ARC-05 needs a hybrid rather than a single glob`
+`S-12: CONFIRMED **on 2.1.258** — a middle-wildcard glob works: `mcp__servicenow__snow_*_read` allows `snow_core_capabilities_read` and does not allow `snow_core_records_query`, proven headlessly with a no-rule control showing `-p` does not auto-approve. But **one glob covers only 92 of 269 non-mutating tools (34%)**, three globs reach 205, and **64 need explicit per-tool rulings**, so ARC-05 needs a hybrid rather than a single glob`
 
 ## Evidence
 

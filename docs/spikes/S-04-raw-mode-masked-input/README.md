@@ -40,7 +40,7 @@ _One block per OS. Paste real output, redacted per the rules above._
 
 ## Verdict
 
-`S-04: NOT RUN` — to be replaced by `S-04: CONFIRMED` or `S-04: FAILED → fallback `--password-stdin`; later the `--web` one-shot form (roadmap item 5)`
+`S-04: NOT RUN — **blocked on the Windows VM (owner input #2)**. The fallback if it fails is `--password-stdin`, and later the `--web` one-shot form`
 
 ## Evidence
 

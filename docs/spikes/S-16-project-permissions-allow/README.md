@@ -83,7 +83,7 @@ because the doctor is invoked through Claude's own Bash tool).
 
 ## Verdict
 
-`S-16: NOT RUN — interactive; runs in the same session as S-01`
+`S-16: CONFIRMED **on 2.1.258** — a committed `permissions.allow` Bash rule is honoured after trust, with the no-rule control blocked. But **Claude runs a compound wrapper rather than the bare command, and the wrapper varied between two sittings of the same command**, so a Bash allow rule must be written for the form Claude actually runs; **auto mode makes the spike unreadable**, because nothing prompts there`
 
 Nothing in this record moves the `03` S-16 assumption in either direction. The open question is the narrow
 one Procedure step 3 names — whether `permissions.allow` is honoured on the **very first** Bash call

@@ -39,7 +39,9 @@ Closes P-12 (five counters, zero tags), P-19 (server version drift), P-29 (CI ne
 
 ## Dependencies
 
-ARC-01, ARC-02, ARC-03, ARC-04, ARC-05, ARC-06, ARC-07, ARC-08 (per-story detail in `STORIES.md`). ARC-00 S-03/S-04/S-07/S-08 verdicts (Q-B) and the story ARC-00-S13 PATH-stripping recipe (`spikes/windows-recipe.md` — not spike S-13, which is the skill listing deferred to ARC-02) for the Windows job design; ARC-00 S-19 for `plugin-validate`.
+ARC-01, ARC-02, ARC-03, ARC-04, ARC-05, ARC-06, ARC-07, ARC-08 (per-story detail in `STORIES.md`). ARC-00 S-03/S-04/S-07/S-08 verdicts (Q-B) and the story ARC-00-S13 PATH-stripping recipe (`spikes/windows-recipe.md`, **pending Sitting D — the file does not exist**: a recipe nobody has measured is a recipe nobody should follow, so it is written when the sitting produces it — not spike S-13, which is the skill listing deferred to ARC-02) for the Windows job design; ARC-00 S-19 for `plugin-validate`.
+
+**Q-B: pending.** S-03, S-04 and S-08 are NOT RUN — blocked on the Windows VM (owner input #2) — so native Windows is **proven in CI, not by a person**, and the release note says exactly that until those three run (OWNER-SITTING Sitting D).
 
 ## Acceptance criteria
 

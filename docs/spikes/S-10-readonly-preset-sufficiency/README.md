@@ -42,7 +42,7 @@ _One block per OS. Paste real output, redacted per the rules above._
 
 ## Verdict
 
-`S-10: NOT RUN` — to be replaced by `S-10: CONFIRMED` or `S-10: FAILED → fallback Document that Code Review of live scripts needs `pdi-developer` until fixed`
+`S-10: DEFERRED **→ ARC-04** — not run in ARC-00; the question moved to ARC-04-S05, which owns the read-only preset`
 
 ## Evidence
 

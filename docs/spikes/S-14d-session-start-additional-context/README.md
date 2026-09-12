@@ -188,7 +188,7 @@ Everything this spike asks — the byte count received at startup, after `/compa
 
 ## Verdict
 
-`S-14d: INTERACTIVE-PENDING — a self-describing 12,299-byte payload and its plugin hook are built and verified standalone; startup / compact / resume injection needs a session`
+`S-14d: INTERACTIVE-PENDING — a self-describing 12,299-byte payload and its plugin hook are built and verified standalone; **startup, compact and resume injection each need a session**`
 
 ## Evidence
 

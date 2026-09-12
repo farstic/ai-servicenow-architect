@@ -168,7 +168,7 @@ plan-dependent). Six short sessions × two binaries. Steps are in `spikes/OWNER-
 
 ## Verdict
 
-`S-18: INTERACTIVE-PENDING — the prompt behaviour needs a session; but the ask/allow blocks ARC-05 generates cannot be derived from tool-name suffixes: of 394 tools, 125 are mutating by the §2.1 suffix list, 269 are not, and 64 fall outside both lists — 34 of those plainly change state, so a suffix-derived ask block would leave 34 write tools ungated`
+`S-18: CONFIRMED **on 2.1.258** — an `ask` rule prompts in auto mode and in manual mode alike, with its allow-listed control going unprompted in both. But the blocks ARC-05 generates cannot be derived from tool-name suffixes: of 394 tools, 125 mutate by the §2.1 suffix list, 269 do not, and **64 fall outside both lists — 34 of those plainly change state**, so a suffix-derived ask block would leave 34 write tools ungated`
 
 Nothing here retires or fails the assumption. What it does is change the *input* ARC-05 works from: the
 `mutates` flag must be per-tool and authored, and the allow side needs three globs plus a per-tool ruling

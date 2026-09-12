@@ -165,7 +165,7 @@ depend on that.
 
 ## Verdict
 
-`S-05: INTERACTIVE-PENDING — with Node absent the exec-form hook and the .mcp.json server are both unspawnable at exit 127, which is the input under test; whether Claude Code's notice blocks, its text, and whether disableAllHooks silences it need one session (sitting Part D). The record recommends the hook-free-committed-settings fallback regardless of the outcome, because the disableAllHooks alternative silently disables the user's own hooks.`
+`S-05: CONFIRMED **on 2.1.258** — with a split that matters: interactively an exec-form SessionStart hook whose interpreter is absent reports its failure verbatim and non-blockingly and the session is usable immediately, while **headlessly there is no notice at all**. The assumption holds on the path a human uses and fails on the path automation uses; proven with a filesystem marker, so "the hook did not run" is observed rather than inferred`
 
 ## Evidence
 

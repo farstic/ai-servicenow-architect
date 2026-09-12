@@ -378,6 +378,8 @@ Upgrading to live later: `./snowarch mode live` runs B04–B08 only (the state f
 
 ## 13. Cross-platform (Decided: native Windows is first-class)
 
+**Q-B: pending.** S-03, S-04 and S-08 are NOT RUN — blocked on the Windows VM (owner input #2) — so native Windows is **proven in CI, not by a person**, and the release note says exactly that until those three run (OWNER-SITTING Sitting D).
+
 - All shipped tooling is Node (stdlib only for `tools/snowarch`, so it runs before any `npm ci`): bootstrap steps, doctor, hook, citation and contract lints, docs sync, wizard. Launchers: `bootstrap.sh` (bash 3.2-clean), `bootstrap.ps1` (PowerShell 5.1+), `bootstrap.cmd` (runs `powershell -ExecutionPolicy Bypass -File bootstrap.ps1` so the default Restricted policy does not block a double-click or a cmd session — S-08). Post-install: `./snowarch` and `snowarch.cmd`.
 - Paths through `node:path`; store `%APPDATA%\snowarch\` vs `~/.config/snowarch/` for the optional global store; POSIX file modes via `fs.chmod`, skipped with a doctor note on Windows; masked input via `process.stdin.setRawMode` (S-04). `.mcp.json` and hooks use `command: "node"` with forward-slash paths (Node accepts them on Windows); `.gitattributes` forces LF for `*.mjs *.md *.json *.sh` and CRLF for `*.ps1 *.cmd`.
 - The deliverable toolchain keeps its pairs (`md-to-docx.py` ↔ `.ps1`, `render-pdf.sh` ↔ `render-pdf-pages.ps1`, `render-drawio.sh` ↔ `render-diagrams.ps1`); the doctor reports them as capabilities per OS.
