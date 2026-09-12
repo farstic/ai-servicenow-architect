@@ -40,7 +40,8 @@ const FORBIDDEN_PATHS = [
 //   history/decisions — a record of what was decided, quoting the superseded thing as evidence
 //   detectors        — code whose job is to match the old string
 //   fixtures         — trees that MUST contain the defect the lint detects (ARC-05-S03)
-const EXEMPT_PREFIXES = ['docs/plans/', 'docs/decisions/', 'docs/spikes/', 'scripts/legacy/',
+// `scripts/legacy/` left this list at ARC-10-S03 with the directory itself.
+const EXEMPT_PREFIXES = ['docs/plans/', 'docs/decisions/', 'docs/spikes/',
   'packages/contract/lint/tests/fixtures/'];
 const EXEMPT_FILES = new Set([
   'docs/ARCHITECTURE.md', 'docs/RELICENSING.md', 'docs/MIGRATION.md', 'NOTICE',
@@ -51,6 +52,29 @@ const EXEMPT_FILES = new Set([
   'tools/snowarch/lib/doctor/checks/stale-registrations.json',
   'tests/fixtures/retired-vocabulary.json', // SK-09's token list — a detector's data, deliberately its
                                             // own file so this exemption stays one file wide
+  // ── ARC-10-S03: ten files moved here from the allow-list ────────────────────────────────────
+  //
+  // The allow-list is for a rewrite somebody still owes; these are permanent carriers, and leaving
+  // them there made the list read as thirteen outstanding debts when three were. Each is exempt
+  // because naming the dead thing is what the file is FOR — the same criterion as the two rows
+  // above, applied to files that had been queued for a rewrite that is never coming.
+  //
+  // The catalogue, and the two tests that assert what is in it. A detector cannot detect a name it
+  // may not spell.
+  'packages/contract/retired-identifiers.json',
+  'packages/contract/retired-names.json',
+  'tests/contract/retired-names.test.mjs',
+  'tests/contract/engine-lint.test.mjs',   // asserts the FINDINGS, which quote the retired names
+  // D-01's publish guard and its proof. `@farstic/snow-mcp@1.0.0` is a published npm record that
+  // must never be republished, and a guard that refuses a name has to spell the name it refuses.
+  '.github/workflows/publish-npm.yml',
+  'scripts/ci/assert-publish-target.mjs',
+  'tests/publish-target.test.mjs',
+  'tests/workflows.test.mjs',
+  // History. The imported changelog below `## Before 2.0.0` records what things were called at the
+  // time, and the fixture exists to BE that file — rewriting either would falsify the record.
+  'docs/CHANGELOG.md',
+  'tests/fixtures/changelog-before-2.0.0.md',
 ]);
 const isExempt = (f) => EXEMPT_FILES.has(f) || EXEMPT_PREFIXES.some((p) => f.startsWith(p));
 
@@ -93,6 +117,42 @@ test('every allow-list entry still matches — the ratchet direction', () => {
 test('every allow-list entry names an owning ARC', () => {
   for (const [f, owner] of Object.entries(allowlist.files)) {
     assert.match(String(owner), /^ARC-\d\d$/, `allow-list entry "${f}" has no owning ARC`);
+  }
+});
+
+test('ARC-10-S03 — the legacy scripts are gone, and only history still names them', () => {
+  // AC 1. The directory is deleted; what may still SAY `scripts/legacy` is a record of what used to
+  // be there. L05 already refuses a dead path outside a History section, so this asserts the half
+  // L05 cannot: that nothing tracked still carries the directory itself.
+  assert.deepEqual(tracked().filter((f) => f.startsWith('scripts/legacy')), [],
+    'scripts/legacy is tracked again');
+
+  // ...and the mentions that remain are history or provenance, never an instruction to run one.
+  // `docs/ARCHITECTURE.md` is the ledger; the rest name the import tag in the same breath, which is
+  // where the originals are readable now.
+  const TAG = 'import/engine-v2.8.0-worktree';
+  const ledger = readFileSync(join(root, 'docs/ARCHITECTURE.md'), 'utf8');
+  assert.match(ledger, /legacy scripts retired/);
+  assert.ok(ledger.includes(`git show ${TAG}:scripts/legacy/doctor.sh`),
+    'the ledger does not say where the originals are read from');
+});
+
+test('ARC-10-S03 — the allow-list is what is still owed, not what is permanent', () => {
+  // AC 3. Three entries, all ARC-10: the migration pointer (in the install page and the README it
+  // is composed into) and CONTRIBUTING, whose history paragraph keeps old names until S10 trims it.
+  // Everything else moved to EXEMPT_FILES, because a permanent carrier on a list of outstanding
+  // rewrites reads as a debt nobody owes — thirteen entries where three were real.
+  assert.deepEqual(Object.keys(allowlist.files).sort(),
+    ['README.md', 'docs/CONTRIBUTING.md', 'docs/INSTALL.md']);
+  for (const owner of Object.values(allowlist.files)) assert.equal(owner, 'ARC-10');
+
+  // The ten that moved must still MATCH — they are exempt because they carry the names on purpose,
+  // and an exemption for a file that stopped carrying them is an exemption nobody can justify.
+  for (const f of ['packages/contract/retired-names.json', 'scripts/ci/assert-publish-target.mjs',
+    'tests/fixtures/changelog-before-2.0.0.md', 'docs/CHANGELOG.md']) {
+    const text = readFileSync(join(root, f), 'utf8');
+    assert.ok(FORBIDDEN.some((p) => compile(p).test(text)),
+      `${f} is exempt and carries no retired name — the exemption is stale`);
   }
 });
 

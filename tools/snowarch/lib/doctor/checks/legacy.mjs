@@ -47,7 +47,7 @@ export const tildify = (p, home) => {
  * Two signals, because the old scripts wrote two shapes. The NAME is the reliable one. The
  * `snow-mcp` path segment catches a registration whose name was chosen by hand but whose `args`
  * still point at the old checkout. What is deliberately NOT here is a SUBSTRING match: the old
- * `scripts/legacy/doctor.sh` matched a case-insensitive alternation of the two dead names and a
+ * the OLD engine's `doctor.sh` matched a case-insensitive alternation of the two dead names and a
  * bare `snow`, and that last alternative flags the CURRENT registration key — which would tell
  * every correctly installed user to delete their working server. (The dead names are not written
  * out here for the same reason they are not written out anywhere else in the tree: they live in

@@ -217,6 +217,34 @@ the build found and what shipped instead. Source for all of it: the Claude Code 
 
 **Definition of done.** Merged before the tag; `docs/ARCHITECTURE.md` ledger updated; CI green.
 
+**Amended 2026-09-12 (S03 build).** Measured on `c317810` before ruling; the story's text is left as
+written and this records what the tree said.
+
+- **The allow-list held THIRTEEN entries, not the seven the brief measured on 2026-09-11** — S01 had
+  added `README.md` and `docs/INSTALL.md` (one pointer line, in the install page and the README it is
+  composed into) and ARC-09-S10 had added four publish-guard entries. Reduced to **three**, all
+  ARC-10: those two plus `docs/CONTRIBUTING.md`. The story's precondition ("ARC-02/ARC-04/ARC-09 rows
+  empty, else stop") was pre-ruled by the brief and is recorded as met that way, not by measurement.
+- **Ten entries moved to `EXEMPT_FILES` rather than being rewritten**, each a permanent carrier: the
+  two `packages/contract/retired-*.json` and the two tests that assert them (a detector cannot detect
+  a name it may not spell), the four D-01 publish-guard files (a guard that refuses
+  `@farstic/snow-mcp` has to spell it), and `docs/CHANGELOG.md` + `tests/fixtures/changelog-before-2.0.0.md`
+  (history, and a fixture that exists to BE that history). All twelve CHANGELOG matches were read
+  before ruling: the R-03 supersedes sentence, the two migration notes about the untouched npm
+  record, and the frozen imported entries. None was a stale sentence to rewrite.
+- **The end state is three entries, not the two the brief predicted** — S01's line lives in two files
+  because `README.md` is composed from `docs/INSTALL.md`, so the pointer is allow-listed twice.
+- **Reducing the allow-list removed `docs/CHANGELOG.md` from the retired-SURFACE sweep too**, which
+  reads the same owner map. It is exempt there now for its own stated reason rather than as a debt:
+  naming a surface while recording its removal is the opposite of describing an installable one.
+- **Four `scripts/legacy` citations became dead paths** (L05) when the directory went —
+  `tests/doctor/mapping.test.mjs`, `tools/snowarch/lib/doctor/mapping.mjs` ×2 and
+  `.../checks/legacy.mjs`. Rewritten to name the import tag, which is where the originals are read
+  from now. `docs/ARCHITECTURE.md` keeps its mentions: L05 skips below a `## History` heading.
+- **The ledger's read command is `git show import/engine-v2.8.0-worktree:scripts/legacy/doctor.sh`**
+  — the brief wrote `:scripts/doctor.sh`; the import placed them under `scripts/legacy/`. Verified:
+  1,141 lines, matching the figure the doctor-mapping section already quotes.
+
 ---
 
 ### ARC-10-S04 — Rewrite the standing rule and the field-notes policy (DR-16) in `CLAUDE.md` and `docs/CONTRIBUTING.md`

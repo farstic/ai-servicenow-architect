@@ -92,11 +92,14 @@ pwsh scripts/render-pdf-pages.ps1 clients\<client>\designs\MyDesign.docx
 
 ## First-run setup
 
-**The v2 bootstrap is not in this directory any more.** `setup.sh` and `doctor.sh` were imported
-unchanged into `scripts/legacy/`, together with the walkthrough they refer to
-(`scripts/legacy/SETUP.md`), and they are kept as a record of what the v2 engine did rather than as
-a path anyone should run. They still describe the retired permission vocabulary and the registration
-flow of the previous server, which is exactly why they were not carried forward.
+**The v2 bootstrap is not in this repository any more.** `setup.sh`, `doctor.sh` and the walkthrough
+they refer to were imported unchanged, kept as a record of what the v2 engine did rather than as a
+path anyone should run, and retired at ARC-10-S03 once the thing they were kept FOR was finished:
+ARC-08's doctor mapping was audited against the real script, in both directions, and an audit that
+has been done does not need its subject on disk. They are readable at the import tag —
+`git show import/engine-v2.8.0-worktree:scripts/legacy/doctor.sh`. They describe the retired
+permission vocabulary and the previous server's registration flow, which is why they were never
+carried forward.
 
 ARC-06 delivers the bootstrap that replaces them — `./snowarch` and `/snowarch setup-instance`. Until
 it lands, `README.md` at the repository root is the install narrative, and `npm ci` plus

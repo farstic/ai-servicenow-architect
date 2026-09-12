@@ -87,6 +87,40 @@ test('S02 AC 5 — an engagement note in the working tree is invisible to git', 
   }
 });
 
+test('ARC-10-S03 AC 2 — the four engine-era scratch lines are gone, and their paths are visible', () => {
+  // The lines went because nothing in this product writes any of them. The assertion is not that
+  // `.gitignore` lost four strings — it is that a file at each of those paths would now be SEEN,
+  // which is what removing an ignore rule is for. A rule that ignores a path nothing creates is a
+  // rule nobody can tell is wrong.
+  const gitignore = readFileSync(join(root, '.gitignore'), 'utf8').split('\n')
+    .filter((l) => l.trim() && !l.trim().startsWith('#'));
+  for (const line of ['.backups/', 'scratchpad/', 'diagram-preview/', 'node-compile-cache/']) {
+    assert.equal(gitignore.includes(line), false, `.gitignore still carries ${line}`);
+  }
+
+  // A temp repository with this repository's own `.gitignore`: each planted path is REPORTED.
+  // `node-compile-cache` is the one that motivated the line — Node 22+ writes it under TMPDIR, not
+  // in a checkout, so the rule was hiding something that never appears here.
+  const dir = mkdtempSync(join(tmpdir(), 'snowarch-scratch-'));
+  try {
+    git(['init', '-q', '-b', 'main', '.'], dir);
+    writeFileSync(join(dir, '.gitignore'), readFileSync(join(root, '.gitignore'), 'utf8'));
+    for (const rel of ['node-compile-cache/x', 'scratchpad/x', 'deliverables-note.md']) {
+      mkdirSync(dirname(join(dir, rel)), { recursive: true });
+      writeFileSync(join(dir, rel), 'x\n');
+    }
+    const untracked = git(['status', '--porcelain'], dir).split('\n').filter(Boolean).sort();
+    assert.deepEqual(untracked,
+      ['?? .gitignore', '?? deliverables-note.md', '?? node-compile-cache/', '?? scratchpad/'],
+      `git still hides one of them: ${untracked.join(' · ')}`);
+    // ...and the engagement rules S02 relies on are untouched by this trim.
+    assert.equal(spawnSync('git', ['check-ignore', '-q', 'clients/acme/x.md'], { cwd: dir }).status, 0);
+    assert.equal(spawnSync('git', ['check-ignore', '-q', 'memory/MEMORY.md'], { cwd: dir }).status, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the .env.example files are deliberately NOT ignored, and ARE scanned', () => {
   for (const p of ['.env.example', 'packages/snowarch/.env.example']) {
     const r = spawnSync('git', ['check-ignore', '-q', p], { cwd: root });

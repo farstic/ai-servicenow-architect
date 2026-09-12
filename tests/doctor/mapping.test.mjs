@@ -6,23 +6,23 @@
 // have to be the ids that script really assigns, in both directions, because a table written from
 // memory is a table with a row missing.
 //
-// HAND-OFF: ARC-10-S03 deletes `scripts/legacy/`. When it does, the two cross-check cases below go
-// with the file — they are the only reason it is still read — and the rest of this suite stands on
-// its own. Do not keep a copy of the script to keep them alive; the table will have been audited
-// against it by then, which is the whole point of having done it now.
+// HAND-OFF TAKEN (ARC-10-S03, 2026-09-12). The old script is deleted and the two cross-check cases
+// went with it, as S07 asked. They are not replaced and no copy was kept: the table WAS audited
+// against the real script while it was here — both directions, 38 ids — and that audit is the thing
+// of value, not a fixture of a file the product no longer ships. The originals are readable at the
+// import tag: `git show import/engine-v2.8.0-worktree:scripts/legacy/doctor.sh` (1,141 lines).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { isRetired, labelFor, MAPPING, mappedIds,
   unmappedIds } from '../../tools/snowarch/lib/doctor/mapping.mjs';
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
-import { mappingTable } from '../../scripts/gen-doctor-docs.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
+import { mappingTable } from '../../scripts/gen-doctor-docs.mjs';
 
 const registryIds = engineChecks().map((c) => c.id);
-const LEGACY = join(REAL_ROOT, 'scripts/legacy/doctor.sh');
 
 // AC 1.
 test('every D00…D37 appears exactly once', () => {
@@ -89,24 +89,4 @@ test('the rendered appendix is what the generator produces', () => {
     'the committed appendix is not what the generator renders — run npm run gen');
   // And the Doctor section points at it.
   assert.match(page, /Appendix: the old doctor's checks/);
-});
-
-/**
- * The two cases that read the old script. ARC-10-S03 deletes it; delete these with it.
- */
-test('every D id in the table is one the old script really assigns', { skip: !existsSync(LEGACY) }, () => {
-  const script = readFileSync(LEGACY, 'utf8');
-  const assigned = new Set([...script.matchAll(/CHECK_ID="(D\d+)"/g)].map((m) => m[1]));
-  assert.equal(assigned.size, 38, `the script assigns ${assigned.size} distinct ids`);
-  for (const row of MAPPING) {
-    assert.ok(assigned.has(row.old), `${row.old} is in the table and not in the old script`);
-  }
-});
-
-test('the old script assigns no id the table omits', { skip: !existsSync(LEGACY) }, () => {
-  const script = readFileSync(LEGACY, 'utf8');
-  const assigned = [...new Set([...script.matchAll(/CHECK_ID="(D\d+)"/g)].map((m) => m[1]))];
-  const listed = new Set(MAPPING.map((r) => r.old));
-  const missing = assigned.filter((id) => !listed.has(id));
-  assert.deepEqual(missing, [], `the old script checks ${missing.join(', ')} and the table does not`);
 });

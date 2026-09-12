@@ -15,7 +15,6 @@ import { join } from 'node:path';
  *   vendor/**                    not ours; it is what upstream published
  *   packages/snowarch/dist/**    build output; the fix belongs to the build, not to the artefact
  *   ** /fixtures/**              several fixtures are deliberately malformed — that is their subject
- *   scripts/legacy/**            the v2 engine exactly as imported (ARC-01-S02)
  *   docs/spikes/**               records of what was run and found, kept as written
  *
  * `.ps1` and `.cmd` are outside the extension list on purpose: `.editorconfig` gives them CRLF, and
@@ -26,7 +25,6 @@ export const EXTENSIONS = ['.md', '.mjs', '.ts', '.json', '.yml', '.yaml'];
 export const EXCLUDED = [
   'vendor/',
   'packages/snowarch/dist/',
-  'scripts/legacy/',
   'docs/spikes/',
 ];
 
