@@ -13,7 +13,7 @@ import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildTagMessage } from '../scripts/lib/release/tag.mjs';
+import { buildTagMessage, isPrerelease } from '../scripts/lib/release/tag.mjs';
 import { collect, directorySize, megabytes, seconds, table } from '../scripts/ci/install-metrics.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { composeBody, RELEASE_BODY_MAX } from '../scripts/ci/release-notes.mjs';
@@ -427,4 +427,39 @@ test('C21: nothing is appended to the release body after the script runs', () =>
   assert.equal(/>>\s*release-notes\.md/.test(code), false,
     'something appends to the release body after the script — the budget cannot see it');
   assert.match(code, /release-notes\.mjs .*--metrics install-metrics\.md/s);
+});
+
+// ── ARC-09-C22 — a prerelease tag produces a prerelease ────────────────────────────────────────
+//
+// Rehearsal run 10 published `v2.0.0-rc.0` with `prerelease=false`, so the rehearsal sat in the
+// Releases list marked "Latest" — which is the one thing a reader of a Releases page trusts.
+
+test('C22: isPrerelease follows semver §9, and a `v` prefix does not fool it', () => {
+  for (const tag of ['v2.0.0-rc.0', '2.0.0-rc.0', 'v2.0.0-rc.1', 'v9.9.9-alpha.2', 'v1.0.0-0']) {
+    assert.equal(isPrerelease(tag), true, `${tag} should be a prerelease`);
+  }
+  for (const tag of ['v2.0.0', '2.0.0', 'v10.2.3']) {
+    assert.equal(isPrerelease(tag), false, `${tag} should not be a prerelease`);
+  }
+  // Not a prerelease because not a version: a hyphen with nothing after it, and a suffix with no
+  // hyphen. A looser rule would mark a real release as a prerelease, which is the worse mistake —
+  // it hides a shipped version from everyone reading the Releases page.
+  for (const tag of ['v2.0.0-', 'v2.0.0rc0', 'v2.0']) {
+    assert.equal(isPrerelease(tag), false, `${tag} is not a version`);
+  }
+});
+
+test('C22: the workflow asks the module, and passes the flag to gh', () => {
+  const text = readFileSync(join(REAL_ROOT, '.github/workflows/release.yml'), 'utf8');
+  const code = text.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+
+  // The SHAPE is decided by the module that already knows what a tag looks like — not by a second
+  // regex written in YAML, which is the C18 lesson applied before it costs anything.
+  assert.match(code, /isPrerelease\('\$\{\{ github\.ref_name \}\}'\)/);
+  assert.match(code, /'--prerelease' : ''/);
+  // ...and the flag reaches `gh release create`, before the title.
+  const flagAt = code.indexOf('prerelease.flag');
+  const createAt = code.indexOf('gh release create');
+  assert.ok(flagAt > -1 && flagAt < createAt, 'the flag is computed after the release is created');
+  assert.match(code, /gh release create \$\{\{ github\.ref_name \}\}\n\s*\$\(node -e/);
 });

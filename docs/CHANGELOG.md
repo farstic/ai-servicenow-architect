@@ -155,6 +155,9 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   Those are printed as recorded rather than failed — the same tolerance the changelog generator has
   always had — and history is not rewritten to suit the parser.
 
+- **A prerelease tag now produces a prerelease.** A release-candidate tag published a Release marked
+  "Latest", which is the one thing a reader of a Releases page trusts.
+
 - **"Push this branch first" is no longer reported as "you are behind".** A branch that has never
   been pushed and a branch that has fallen behind failed the same check, so the release offered a
   remedy — pull first — that cannot work on a remote branch which does not exist. The two are told

@@ -151,6 +151,18 @@ jobs:
       # with `cat`, so nothing knew the total size — and the API refused a 125,000-character body on
       # rehearsal run 9, after everything else had passed. The script composes the whole body and
       # bounds it; nothing is appended to `release-notes.md` after this line, and a test asserts it.
+      # ARC-09-C22. A prerelease tag must produce a PRERELEASE, or `v2.0.0-rc.0` sits in the
+      # Releases list marked "Latest" — which is what a reader trusts. The shape is decided by
+      # `isPrerelease` in `scripts/lib/release/tag.mjs`, the module that already knows what a tag
+      # looks like, rather than by a regex written a second time in YAML.
+      - name: Is this tag a prerelease?
+        shell: bash
+        run: |
+          node -e "import('./scripts/lib/release/tag.mjs').then(m => \
+            process.stdout.write(m.isPrerelease('${{ github.ref_name }}') ? '--prerelease' : ''))" \
+            > prerelease.flag
+          echo "prerelease flag: [$(cat prerelease.flag)]"
+
       - name: The release notes are the changelog's own section, bounded
         shell: bash
         run: |
@@ -169,6 +181,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >
           gh release create ${{ github.ref_name }}
+          $(node -e "process.stdout.write(require('node:fs').readFileSync('prerelease.flag','utf8'))")
           --title "snowarch ${{ github.ref_name }}"
           --notes-file release-notes.md
           doctor-ubuntu-latest.json doctor-macos-latest.json doctor-windows-latest.json
