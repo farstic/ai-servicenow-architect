@@ -7,6 +7,12 @@ facts about **ServiceNow**, not about this repository's server — a bug in a to
 Ids are stable and chronological. Where the corpus has no page stating the behaviour the `Grounding:`
 line says so and names the nearest page for the baseline concept — never an invented path.
 
+**This file is one of four homes, not the home for everything.** A finding about this repository's
+own server is a failing test under `packages/snowarch/tests/`; an install or Claude Code behaviour is
+`docs/TROUBLESHOOTING.md` or a rule in `docs/CONTRIBUTING.md`; anything instance-specific is never
+committed at all. The table in `docs/CONTRIBUTING.md` § *Where a finding goes* is the authority, and
+`CLAUDE.md` § 11 is the short form a session reads.
+
 ## PN-01 — REST capture follows the user preference, not the "current" update set
 
 **Applies to:** `sys_user_preference`, `sys_update_set` · Australia family · confirmed on PDI 2026-05-27
