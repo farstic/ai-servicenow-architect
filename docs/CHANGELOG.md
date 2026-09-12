@@ -37,6 +37,21 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **A test that failed about once in every two thousand runs now does not.** It checked that
+  changing a stored password does not make the installer think anything needs redoing. To do that it
+  put the file's timestamp back the way it found it — and a timestamp rounded to the millisecond, on
+  a file written a fraction of a millisecond before a whole second, comes back as the next second.
+  One run in about eighteen hundred, which across a full build is a red light every few changes. The
+  fixture now keeps away from that boundary; nothing about the product changed.
+
+- **The record of where this came from, in one place and checked.** Two products were folded into
+  this one, and the History section now says which, where each landed, under which tag it is
+  preserved, and how to read a file's history across the join — with the commands run rather than
+  recalled. It lists the nine things deliberately not carried across, matched line for line against
+  the decision record that ruled on them, and links all nine decision records. A test holds it
+  together: the tags exist and carry history, every link resolves, and the old product names appear
+  nowhere outside that section.
+
 - **One rule for where a thing you learned gets written down, and nothing is excluded from it.** The
   previous version sent every finding to a single file and then carved out an exception for the ones
   about its own tooling — which put the notes most likely to matter to the next person in the one

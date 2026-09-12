@@ -223,7 +223,24 @@ test('AC 2 — a password edited in place, same length, mtime restored, makes NO
   writeFileSync(store, withSecret(secret));
   const ctx = ctxFor(root);
   const state = fresh(root, ctx);
-  const stamp = statSync(store);
+
+  // ARC-09-C30 — keep the fixture off a whole-second boundary before stamping it.
+  //
+  // `storeStamp` is `floor(mtimeMs / 1000):size`, coarsened on purpose so a same-length credential
+  // edit does not restamp the store. The restore below goes through `stamp.mtime`, a Date with
+  // MILLISECOND precision, while `mtimeMs` carries a sub-millisecond fraction — and `Date` ROUNDS.
+  // Measured, one captured crossing: `before 1789207675999.5 → Date() 1789207676000 → after
+  // 1789207676000`, which moves the floor from …675 to …676 and makes B08 read stale.
+  //
+  // 22 crossings in 40,000 cycles (~1 in 1,800), and ALL 22 on the side just BELOW a whole second
+  // — fraction 999.x — with none above. So the guard is one-sided, and it is one-sided because the
+  // run says so: a first attempt guarded `< 2`, the side that never crosses, and would have fixed
+  // nothing at all.
+  let stamp = statSync(store);
+  if (stamp.mtimeMs % 1000 > 998) {
+    utimesSync(store, stamp.atime, new Date(stamp.mtimeMs - 5));
+    stamp = statSync(store);
+  }
 
   writeFileSync(store, withSecret(other));
   utimesSync(store, stamp.atime, stamp.mtime);

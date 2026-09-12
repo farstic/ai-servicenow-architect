@@ -368,6 +368,31 @@ Test: `tests/architecture-history.test.mjs` — runs `git tag -l 'import/*'` and
 
 **Definition of done.** Merged before the tag; test in CI; "archived" cells updated later by S10.
 
+**Amended 2026-09-12 (S05 build).**
+
+- **The server was NOT imported with `git subtree add`, and the section now says so.** The brief's
+  predecessor table described it that way; the History section already recorded the opposite, with
+  evidence — subtree grafts a tree at a prefix without recording a rename, and `git log --follow`
+  then reported **0 commits** for a file whose history was fully present. The route used was
+  `filter-repo --to-subdirectory-filter` + `merge --allow-unrelated-histories`. Writing the brief's
+  version would have put a false fact in the one document whose subject is what actually happened.
+- **Both `git log` sentences were run before being published**: `git log -- CLAUDE.md` reaches
+  2026-05-28 (21 commits) and `git log -- packages/snowarch/src/server.ts` reaches `dd005fa`,
+  2026-06-06 (12 commits) — the same rewritten id the existing SHA note records, so the two agree.
+- **The archive dates are placeholders** — `(to be archived by ARC-10-S09; date recorded there)` —
+  as the brief directs. S09 fills them.
+- **The `v2.0.0` half is deferred and asserted as deferred**: the test checks that `v2.0.0` does NOT
+  yet resolve, and says in its message that the case should assert the cross-boundary claim once it
+  does. A test that asserted it today would be asserting the future.
+- **The shallow-clone rule is implemented as fetch-then-skip-with-reason**, and a skip is only ever
+  the shallow case: any other reason fails. CI's `test` job checks out at depth 1 without tags.
+- **`## The D-03 cut ledger` is also an L05 history heading**, not only `## History` — the check
+  matches `History`, `The D-03 cut ledger` and `Before <version>`. The region helper in the test
+  uses the same three, so the test cannot disagree with the check it documents.
+- **One tautology of mine, caught and replaced**: the tag case first ended in
+  `missing.length < N || missing.length === N`, true of every number. It now records one answer per
+  tag — a commit count or a named reason — and asserts on both.
+
 ---
 
 ### ARC-10-S06 — Author's machine cutover on `v2.0.0`: doctor 0 FAIL, stale entries removed, legacy store gone, engagements untracked
