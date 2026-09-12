@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
   from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -139,9 +139,17 @@ test('the launcher is short — it is a launcher, not a second implementation', 
   // scheme arm — which reported a local upstream as an unspeakable remote, and the case below
   // caught it in one run. The alternative was a launcher that keeps a check simple by making it
   // untrue, which is the defect C29 exists to remove.
-  assert.ok(lines - generated <= 198,
+  //
+  // Raised 198 → 209 (total 220 → 231) by ARC-03-C1. Eleven lines, seven of them the comment: the
+  // recipe's exit status used to be its final `echo`'s, so a transient 408 at the fetch or the
+  // checkout was swallowed and `|| die B02` never fired. Fixing that made `|| die` reachable, which
+  // made the directory a failed clone leaves behind matter — MSG_NET says "re-run", and a re-run
+  // died on "already exists and is not an empty directory". Three lines remember whether the corpus
+  // was there BEFORE this run so a failure removes only what this run created. The comment is the
+  // part a reader needs: `rm -rf` in a launcher must say who is allowed to run it.
+  assert.ok(lines - generated <= 209,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
-  assert.ok(lines <= 220, `${lines} total lines`);
+  assert.ok(lines <= 231, `${lines} total lines`);
 });
 
 test('the state and the cache bash writes are the ones Node reads', async () => {
@@ -499,6 +507,116 @@ test('the Windows launcher is a launcher too — the budget, with the region rep
   // why. Deleting the explanation to hold a number would be the wrong trade — the budget exists
   // to stop a launcher becoming an application, and the total is printed either way.
   // Raised 265 → 278 by ARC-09-C29, for the same probe as bootstrap.sh's 185 → 198.
-  assert.ok(lines - generated <= 278,
+  // Raised 278 → 298 by ARC-03-C1, for bootstrap.sh's 198 → 209 plus nine lines PowerShell costs
+  // for the same work: `$LASTEXITCODE` was never a sound check here — the recipe's two `submodule`
+  // steps are allowed to fail, so their exit code condemned a good install, and a fatal step now
+  // throws, which no exit-code check sees — so the call moved into `try/catch` (seven lines where
+  // bash needs a `|| { … }`), and `Remove-Item -Recurse -Force` with its guard takes three where
+  // `rm -rf` takes one.
+  assert.ok(lines - generated <= 298,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
+});
+
+/**
+ * ARC-03-C1 — a failed corpus checkout leaves nothing behind, so "re-run" is a true instruction.
+ *
+ * The recipe's first step is `git clone … vendor/ServiceNowDocs`, and a clone refuses a directory
+ * that exists and is not empty. Before this, a run that died halfway left the directory there and
+ * MSG_NET's "re-run" walked the operator into "already exists and is not an empty directory". The
+ * rule is narrow on purpose: remove a directory THIS RUN created, never one that was already there,
+ * whatever state it is in. Someone else's checkout is not ours to delete.
+ */
+test('a failed recipe removes the corpus THIS run created, and dies with B02 — not the doctor\'s wording', {
+  skip: process.platform === 'win32' ? 'POSIX launcher; the real .ps1 runs in the no-node, windows-latest cell' : false,
+}, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'launcher-b02-'));
+  // A git that gets the bootstrap to B02, creates the corpus directory at the clone as the real one
+  // would, and then fails the FETCH — the step the 408 landed on in the run that started this.
+  const stub = (failVerb) => [
+    '#!/bin/sh',
+    'case "$1" in --version) echo "git version 2.44.0" ; exit 0 ;; esac',
+    'for a in "$@" ; do case "$a" in',
+    '  clone) mkdir -p vendor/ServiceNowDocs/.git ; exit 0 ;;',
+    `  ${failVerb}) echo "error: RPC failed; HTTP 408 curl 22 The requested URL returned error: 408" >&2 ; exit 128 ;;`,
+    'esac ; done',
+    'exit 0',
+  ].join('\n');
+  const run = () => {
+    const bin = join(dir, 'bin');
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'git'), stub('fetch'), { mode: 0o755 });
+    return spawnSync('bash', [join(dir, 'bootstrap.sh'),
+      '--mode', 'design', '--yes', '--docs', 'sparse', '--skip-claude-check'],
+    { cwd: dir, encoding: 'utf8', env: { PATH: `${bin}:/usr/bin:/bin`, HOME: dir, TERM: 'dumb' } });
+  };
+  try {
+    mkdirSync(join(dir, 'tools/snowarch/launcher'), { recursive: true });
+    mkdirSync(join(dir, 'vendor'), { recursive: true });
+    for (const f of ['bootstrap.sh', 'engine.config.json']) copyFileSync(join(root, f), join(dir, f));
+    copyFileSync(join(root, 'tools/snowarch/launcher/docs-recipe.sh'),
+      join(dir, 'tools/snowarch/launcher/docs-recipe.sh'));
+    copyFileSync(join(root, 'vendor/docs-areas.txt'), join(dir, 'vendor/docs-areas.txt'));
+
+    const r = run();
+    const out = r.stdout + r.stderr;
+    // B02, with the NETWORK remedy. Before this fix the recipe returned 0, bootstrap carried on,
+    // and the failure surfaced three steps later as the doctor's "area missing" — the symptom.
+    assert.match(out, /B02/, out);
+    assert.match(out, /the corpus checkout failed/, out);
+    assert.match(out, /check your network/, out);
+    assert.doesNotMatch(out, /area .* missing/, 'it reported the symptom, not the cause');
+    assert.notEqual(r.status, 0, 'a failed checkout exited 0');
+    // And the directory this run created is gone, so the re-run it just advised can clone.
+    assert.ok(!existsSync(join(dir, 'vendor/ServiceNowDocs')),
+      'the failed run left a directory that the re-run\'s clone will refuse');
+
+    // The other direction, and it is the one that protects the operator: a corpus that was ALREADY
+    // there is not ours to delete, however the run ends.
+    mkdirSync(join(dir, 'vendor/ServiceNowDocs'), { recursive: true });
+    writeFileSync(join(dir, 'vendor/ServiceNowDocs/MINE'), 'not the bootstrap\'s to delete');
+    const second = run();
+    assert.notEqual(second.status, 0, 'the second run should still fail');
+    assert.ok(existsSync(join(dir, 'vendor/ServiceNowDocs/MINE')),
+      'bootstrap deleted a corpus directory it did not create');
+
+    // THE CONTROL. Same fixture, same stub, same failing fetch — with the pre-C1 recipe, whose
+    // steps ran in sequence with no joiner. This is what the `no-node, macos-latest` cell did on
+    // 89bb06f: the function's exit status was its final `echo`'s, `|| die` never fired, and the
+    // failure surfaced as the doctor's "area missing" three steps later. Without this control the
+    // assertions above would also pass on a recipe that swallows the failure and happens to leave
+    // no directory behind, which is a different bug wearing this one's clothes.
+    rmSync(join(dir, 'vendor/ServiceNowDocs'), { recursive: true, force: true });
+    const joined = readFileSync(join(dir, 'tools/snowarch/launcher/docs-recipe.sh'), 'utf8');
+    assert.ok(joined.includes(' && \\\n'), 'fixture: the recipe under test carries no joiner at all');
+    writeFileSync(join(dir, 'tools/snowarch/launcher/docs-recipe.sh'),
+      joined.replace(/ && \\\n/g, '\n').replace(/\{ (.*) \|\| true ; \}/g, '$1'));
+    const swallowed = run();
+    const swallowedOut = swallowed.stdout + swallowed.stderr;
+    assert.match(swallowedOut, /area .* missing/,
+      'the control did not reproduce the swallow — this test proves nothing about the joiner');
+    assert.doesNotMatch(swallowedOut, /the corpus checkout failed/,
+      'the control reported the cause, so the joiner is not what produced it above');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the Windows launcher carries the same two rulings, in PowerShell', () => {
+  // Static, like every other assertion about the .ps1 in this file: the dynamic proof is the
+  // `no-node, windows-latest` CI cell, which runs the real launcher end to end on every push.
+  // $LASTEXITCODE is NOT the check any more, and that is the point — the recipe's two `submodule`
+  // steps are allowed to fail, so their exit code condemned a good install, and a fatal step now
+  // throws, which no exit-code check ever sees.
+  const b02 = ps1.slice(ps1.indexOf('$corpusPre'), ps1.indexOf("Record 'B02' 'ok'"));
+  assert.ok(b02.length > 0, 'no B02 region found in bootstrap.ps1');
+  assert.match(b02, /\$corpusPre = Test-Path/, 'it does not record whether the corpus pre-existed');
+  assert.match(b02, /try \{/, 'the recipe call is not wrapped — a thrown step would escape as a PowerShell error');
+  assert.match(b02, /catch \{/);
+  assert.match(b02, /if \(-not \$corpusPre\) \{[\s\S]*?Remove-Item -Recurse -Force/,
+    'it removes the corpus without asking whether this run created it');
+  assert.match(b02, /Die 'B02' 'the corpus checkout failed' \$MSG_NET 1/);
+  // Both directions on the check that was wrong: the region must no longer consult $LASTEXITCODE
+  // for the recipe's outcome.
+  assert.doesNotMatch(b02, /if \(\$LASTEXITCODE -ne 0\) \{ Die 'B02'/,
+    '$LASTEXITCODE is back as the recipe check, and the tolerated submodule steps will condemn a good install');
 });

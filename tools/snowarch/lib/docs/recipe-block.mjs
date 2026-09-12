@@ -40,10 +40,82 @@ export function recipeLines({ config, areas, mode = MODE.sparse, platform = 'lin
   return planRecipe({ config, areas, mode, state: { present: false }, platform });
 }
 
+/**
+ * The note every rendering ends with.
+ *
+ * It is the LAST line, not a line under the clone, and that placement is forced: in the shell
+ * renderings every step but the last ends with a `\` continuation, and a comment on the line after
+ * a continuation is joined onto it — which comments out the command that follows. A note in the
+ * middle of the chain would therefore delete a step. `#` is a comment in both shells and inside the
+ * markdown fence, so one spelling serves all three surfaces.
+ */
+export const RERUN_NOTE = '# if a step fails with a network error, re-run: a failed run leaves '
+  + 'nothing behind, and a re-run of a checkout fetches only what is missing';
+
+/**
+ * The steps whose failure must NOT stop the recipe — the same two the Node path swallows, and for
+ * the same reasons it gives at `sync.mjs` step 5: before the superproject knows about the path
+ * there is nothing to absorb, and a workspace that has not registered the corpus in `.gitmodules`
+ * is a legitimate plain-directory checkout, not a failed install.
+ *
+ * Without this list the fail-fast joiner would make the Node-FREE launchers STRICTER than the Node
+ * path — a bootstrap that Node finishes with a note would die at B02 — which is a regression of its
+ * own, dressed as a fix. Named by STEP, not by position: a step that moves keeps its ruling.
+ */
+export const TOLERATED = Object.freeze(['submodule absorbgitdirs', 'submodule init']);
+
+/**
+ * The step's name, for the message a failed step throws. Derived from the command rather than
+ * carried alongside it, so a new step in `planRecipe` cannot arrive without one.
+ */
+export function stepName(line) {
+  const t = line.replace(/^git /, '').split(' ')
+    .filter((x, i, a) => x !== '-c' && x !== '-C' && a[i - 1] !== '-c' && a[i - 1] !== '-C');
+  // `submodule` and `sparse-checkout` each front two different steps; one token would name both
+  // the same and a thrown message could not tell them apart.
+  return (t[0] === 'submodule' || t[0] === 'sparse-checkout') ? `${t[0]} ${t[1]}` : t[0];
+}
+
+/**
+ * Fail fast, rendered per surface from the one list of commands.
+ *
+ * WHY THIS EXISTS: until ARC-03-C1 the rendered bodies were six commands in sequence with no check
+ * of any kind, so a shell function's exit status was its final `echo`'s — always 0. A transient 408
+ * at the fetch or the checkout was swallowed whole: `bootstrap.sh`'s `|| die B02` never fired, the
+ * install continued, and the doctor reported "area missing" — the symptom, three steps downstream
+ * of the cause. Measured on `bootstrap (no-node, macos-latest)`.
+ *
+ * The two shells need different mechanisms, and neither is the obvious one:
+ *   sh   ` && \` between steps. NOT `set -e`: this text is pasted into an interactive shell as
+ *        often as it is sourced, and `set -e` there stays set and kills the user's session on their
+ *        next failed command. `bootstrap.sh` itself declines `set -e` for a related reason.
+ *   ps1  an explicit `$LASTEXITCODE` check after each step. PowerShell before 7.4 does not stop on
+ *        a native command's exit code at all, so no preference setting reaches this.
+ */
+export function joinRecipe(lines, surface) {
+  const fatal = (line) => line.startsWith('git ') && !TOLERATED.includes(stepName(line));
+  if (surface === 'ps1') {
+    const out = [];
+    for (const line of lines) {
+      out.push(line);
+      if (fatal(line)) out.push(`if ($LASTEXITCODE -ne 0) { throw "corpus: ${stepName(line)} failed" }`);
+    }
+    return [...out, RERUN_NOTE];
+  }
+  // `{ …; } || true` rather than a bare `… || true`: the precedence of `a || b && c` is genuinely
+  // `(a || b) && c` and this chain decides whether a bootstrap dies, so a reader should not have to
+  // know that rule to trust it.
+  const body = lines.map((l) => (TOLERATED.includes(stepName(l)) ? `{ ${l} || true ; }` : l));
+  return [...body.slice(0, -1).map((l) => `${l} && \\`), body[body.length - 1], RERUN_NOTE];
+}
+
 /** The markdown block: fenced, between HTML comment markers. */
 export function renderRecipeBlock({ config, areas }) {
   const lines = recipeLines({ config, areas });
-  return { block: [BEGIN, '', '```sh', ...lines, '```', '', END].join('\n'), commands: lines.length };
+  // `commands` counts COMMANDS, not rendered lines: the joiners and the note are packaging, and a
+  // count that moved when a comment was added would make the generator's own report meaningless.
+  return { block: [BEGIN, '', '```sh', ...joinRecipe(lines, 'sh'), '```', '', END].join('\n'),
+    commands: lines.length };
 }
 
 /** One `<begin>…<end>` region replaced. Returns null when the markers are not both present. */
@@ -92,7 +164,8 @@ export function applyTarget(target, { root, config, areas = null, write = true }
       commands += lines.length;
       // Two-space indent inside the function body, and the marker lines themselves are preserved:
       // the launcher owns the function wrapper, the generator owns only what is between.
-      const body = `${eol}${lines.map((l) => `  ${l}`).join(eol)}${eol}`;
+      const rendered = joinRecipe(lines, target.platform === 'win32' ? 'ps1' : 'sh');
+      const body = `${eol}${rendered.map((l) => `  ${l}`).join(eol)}${eol}`;
       const spliced = splice(next, launcherBegin(mode), LAUNCHER_END, body);
       if (spliced === null) {
         return { status: 'no-markers', target: target.id, path: target.path, commands };

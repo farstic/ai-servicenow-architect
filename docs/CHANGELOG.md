@@ -227,6 +227,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A network hiccup while downloading the documentation no longer breaks the install — and when it
+  does fail, it says so.** A slow moment at the wrong second used to end the install; it now waits
+  and tries again, twice. Worse, on a machine without Node.js the download could fail while the
+  install carried on regardless, and the first you heard of it was a later complaint about missing
+  documentation. The failure is now reported where it happens, nothing half-downloaded is left
+  behind, and running the install again finishes the job instead of tripping over the remains.
+
 - **Six promises about the package that nothing was keeping.** The licence file shipped with the
   package is a copy of the project's, and nothing compared them; a dependency with a known flaw was
   pinned to a safe version, and nothing checked the pin had taken; five files that were removed on

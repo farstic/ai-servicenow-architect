@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ATTRIBUTION, planRecipe, readAreas } from '../tools/snowarch/lib/docs/sync.mjs';
-import { recipeLines } from '../tools/snowarch/lib/docs/recipe-block.mjs';
+import { RERUN_NOTE, TOLERATED, joinRecipe, recipeLines, stepName } from '../tools/snowarch/lib/docs/recipe-block.mjs';
 
 /**
  * The launcher recipe in `docs/ARCHITECTURE.md` and the module must be the same commands.
@@ -46,14 +46,22 @@ test('the ARCHITECTURE block equals the recipe for a fresh sparse checkout', () 
   // on both, and reading the ambient platform here made this test pass on macOS and fail on the
   // Windows matrix cell for a difference that is by design.
   const planned = planRecipe({ config, areas, mode: 'sparse', state: { present: false }, platform: 'linux' });
-  assert.deepEqual(blockOf(arch), planned);
+  // Against the RENDERED recipe, not the bare command list: since ARC-03-C1 the block is a chain
+  // that stops at the first failure, and comparing it to the unjoined commands would assert the
+  // block is exactly the thing it must no longer be.
+  assert.deepEqual(blockOf(arch), joinRecipe(planned, 'sh'));
 });
 
 test('the block ends with the attribution line, the same string sync prints', () => {
   // Three copies of a licence attribution is three chances for one to be wrong. The recipe's last
   // line is an `echo` of the module's own constant, and this is what compares them.
   const block = blockOf(arch);
-  assert.equal(block[block.length - 1], `echo "${ATTRIBUTION}"`);
+  // Two claims, because the block gained a trailing line that is not a command: the re-run note is
+  // last, and the attribution is the last thing the recipe RUNS. The note has to be last — a
+  // comment between two chained steps is joined onto the `\` above it and eats the step below.
+  assert.equal(block[block.length - 1], RERUN_NOTE);
+  assert.equal(block[block.length - 2], `echo "${ATTRIBUTION}"`);
+  assert.ok(!RERUN_NOTE.includes('\\'), 'the note must not itself carry a continuation');
   assert.match(ATTRIBUTION, /^docs: ServiceNow product documentation © 2026 ServiceNow, Apache-2\.0 — vendor\/ServiceNowDocs\/LICENSE$/);
 });
 
@@ -157,6 +165,20 @@ function launcherRecipe(text, mode) {
     .map((l) => l.replace(/\r$/, '').replace(/^ {2}/, '')).filter((l) => l.trim() !== '');
 }
 
+/**
+ * The commands inside a rendering, with the fail-fast packaging removed.
+ *
+ * Deliberately NOT `joinRecipe` run backwards: this strips by SHAPE (a trailing continuation, a
+ * `{ … || true ; }` wrapper, a `$LASTEXITCODE` guard, a comment), so a test using it fails when the
+ * rendering grows a shape nobody told it about, instead of quietly agreeing with the generator.
+ */
+function commandsOf(lines) {
+  return lines
+    .filter((l) => !l.startsWith('#') && !l.startsWith('if ($LASTEXITCODE'))
+    .map((l) => l.replace(/ && \\$/, ''))
+    .map((l) => l.replace(/^\{ (.*) \|\| true ; \}$/, '$1'));
+}
+
 /** A unified diff naming the target and the line, because "they differ" is not a bug report. */
 function unified(target, expected, actual) {
   const out = [`--- expected (recipe-block.mjs)`, `+++ ${target}`];
@@ -176,14 +198,16 @@ test('AC 5 — all three targets carry the generated recipe, for both modes', ()
     .split('\n').map((l) => l.trim()).filter(Boolean);
 
   // The published block: sparse, POSIX.
-  const expectedBlock = recipeLines({ config: cfg, areas: areasList });
+  const expectedBlock = joinRecipe(recipeLines({ config: cfg, areas: areasList }), 'sh');
   assert.deepEqual(blockOf(arch), expectedBlock,
     unified('docs/ARCHITECTURE.md', expectedBlock, blockOf(arch)));
 
   for (const launcher of LAUNCHERS) {
     const text = readFileSync(join(root, launcher.path), 'utf8');
     for (const mode of ['sparse', 'full']) {
-      const expected = recipeLines({ config: cfg, areas: areasList, mode, platform: launcher.platform });
+      const expected = joinRecipe(
+        recipeLines({ config: cfg, areas: areasList, mode, platform: launcher.platform }),
+        launcher.platform === 'win32' ? 'ps1' : 'sh');
       const actual = launcherRecipe(text, mode);
       assert.deepEqual(actual, expected, unified(`${launcher.path} (${mode})`, expected, actual));
     }
@@ -216,15 +240,21 @@ test('the Windows launcher carries the long-paths line and the POSIX one does no
   const sh = launcherRecipe(readFileSync(join(root, LAUNCHERS[0].path), 'utf8'), 'sparse');
   const ps1 = launcherRecipe(readFileSync(join(root, LAUNCHERS[1].path), 'utf8'), 'sparse');
 
+  // The claim is about the git COMMANDS, and since ARC-03-C1 each rendering wraps them in its own
+  // fail-fast packaging — ` && \` and `{ … || true ; }` in sh, `if ($LASTEXITCODE …)` in ps1, a
+  // trailing note in both. `commandsOf` strips exactly that packaging back off, so this test keeps
+  // asserting what it always asserted and the packaging is proven separately below.
+  const shCmd = commandsOf(sh);
+  const ps1Cmd = commandsOf(ps1);
   // Every command, not just the last (see the amendment above): the checkout is the one that
   // drops the file, and it is not the last line.
-  for (const line of ps1) assert.match(line, /^(git -c core\.longpaths=true |echo )/, line);
-  assert.ok(!sh.some((l) => l.includes('core.longpaths')), 'and POSIX does not');
-  assert.equal(ps1.length, sh.length + 1, 'the persistent config line is the only EXTRA line');
+  for (const line of ps1Cmd) assert.match(line, /^(git -c core\.longpaths=true |echo )/, line);
+  assert.ok(!shCmd.some((l) => l.includes('core.longpaths')), 'and POSIX does not');
+  assert.equal(ps1Cmd.length, shCmd.length + 1, 'the persistent config line is the only EXTRA line');
   assert.deepEqual(
-    ps1.filter((l) => !l.endsWith('config core.longpaths true'))
+    ps1Cmd.filter((l) => !l.endsWith('config core.longpaths true'))
       .map((l) => l.replace('-c core.longpaths=true ', '')),
-    sh);
+    shCmd);
   assert.ok(areasList.length > 0);
 });
 
@@ -280,4 +310,119 @@ test('the generator respects the file\'s own line endings, so a CRLF checkout st
   } finally {
     writeFileSync(target, original);
   }
+});
+
+/**
+ * ARC-03-C1 — the rendered recipe stops at the first failure, on every surface.
+ *
+ * Until this, the generated bodies were commands in sequence with no check of any kind, so a shell
+ * function's exit status was its final `echo`'s — always 0. `bootstrap (no-node, macos-latest)` hit
+ * an HTTP 408 at the fetch on 89bb06f, the function returned 0, `|| die B02` never fired, and the
+ * doctor reported "area missing" three steps downstream. The joiners are rendered from the ONE
+ * source, so no surface can be fixed and another left behind.
+ */
+
+test('the sh renderings fail fast — every step but the last chains, the last does not', () => {
+  const cfg = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  const areasList = readAreas(root, cfg.docs.areasFile);
+
+  for (const [label, lines] of [
+    ['docs/ARCHITECTURE.md', blockOf(arch)],
+    ['docs-recipe.sh (sparse)', launcherRecipe(readFileSync(join(root, LAUNCHERS[0].path), 'utf8'), 'sparse')],
+    ['docs-recipe.sh (full)', launcherRecipe(readFileSync(join(root, LAUNCHERS[0].path), 'utf8'), 'full')],
+  ]) {
+    const steps = lines.filter((l) => !l.startsWith('#'));
+    assert.ok(steps.length >= 5, `${label}: too few steps to be the recipe`);
+    // Both directions, per line: every step but the last ends with the continuation…
+    for (const l of steps.slice(0, -1)) {
+      assert.ok(l.endsWith(' && \\'), `${label}: a step does not chain: ${l}`);
+    }
+    // …and the last carries none, or the chain would swallow whatever follows the block.
+    assert.ok(!steps[steps.length - 1].endsWith('\\'), `${label}: the last step chains into nothing`);
+    // `set -e` is NOT the mechanism, deliberately: this text is pasted into interactive shells, and
+    // `set -e` stays set there and kills the user's session on their next failed command.
+    assert.ok(!lines.some((l) => l.includes('set -e')), `${label}: set -e in pasteable text`);
+  }
+
+  // The joiner is not a property of the file — it is what the generator renders. Proven against a
+  // list the generator has never seen, so the claim is about the function and not about the pin.
+  const rendered = joinRecipe(['git one', 'git two', 'echo three'], 'sh');
+  assert.deepEqual(rendered.slice(0, 3), ['git one && \\', 'git two && \\', 'echo three']);
+  assert.equal(rendered[3], RERUN_NOTE);
+  assert.ok(areasList.length > 0);
+});
+
+test('the tolerated steps are the two the Node path also lets fail — named, not positional', () => {
+  assert.deepEqual([...TOLERATED], ['submodule absorbgitdirs', 'submodule init']);
+
+  // The attribution, not a restatement: in `sync.mjs` every FATAL step goes through `runMapped`
+  // (which throws), and the two tolerated ones deliberately do not — `absorbgitdirs` is wrapped in
+  // try/catch, `submodule init` goes through `probe` and only warns. If a step ever changes sides
+  // there, this fails rather than letting the launcher and the Node path disagree about what a
+  // failed install is.
+  const sync = readFileSync(join(root, 'tools/snowarch/lib/docs/sync.mjs'), 'utf8');
+  // `runMapped(` may wrap before its argument list, and the corpus calls spread `...C` in front of
+  // the verb — both forms are the same claim, so one pattern covers them.
+  const routed = (verb) => new RegExp(`runMapped\\(\\s*\\[(?:\\.\\.\\.C,\\s*)?'${verb}'`).test(sync);
+  for (const verb of ['clone', 'fetch', 'checkout', 'sparse-checkout']) {
+    assert.ok(routed(verb), `${verb} is fatal in the recipe but is not a runMapped call in sync.mjs`);
+  }
+  assert.ok(!routed('submodule'),
+    'submodule is tolerated in the recipe but throws in sync.mjs — the two paths disagree');
+  // Not vacuous: a verb that is in neither list must not match either, or `routed` is matching
+  // something other than what it claims.
+  assert.ok(!routed('bisect'), 'the detector matches a verb sync.mjs never calls');
+  // And the rendering honours it, both directions.
+  const out = joinRecipe(['git clone X', 'git submodule absorbgitdirs Y', 'git submodule init -- Y',
+    'echo done'], 'sh');
+  assert.equal(out[0], 'git clone X && \\');
+  assert.equal(out[1], '{ git submodule absorbgitdirs Y || true ; } && \\');
+  assert.equal(out[2], '{ git submodule init -- Y || true ; } && \\');
+});
+
+test('the ps1 rendering guards every fatal step and no tolerated one', () => {
+  const ps1 = launcherRecipe(readFileSync(join(root, LAUNCHERS[1].path), 'utf8'), 'sparse');
+  const gitSteps = ps1.filter((l) => l.startsWith('git '));
+  const guards = ps1.filter((l) => l.startsWith('if ($LASTEXITCODE -ne 0)'));
+  const tolerated = gitSteps.filter((l) => TOLERATED.includes(stepName(l)));
+  assert.ok(tolerated.length > 0, 'fixture: no tolerated step in the recipe to prove the gap with');
+  assert.equal(guards.length, gitSteps.length - tolerated.length,
+    'one guard per fatal git step, and none for a tolerated one');
+
+  // Each guard sits directly UNDER its step and names it — a guard one line off would check the
+  // previous command's code, which is how this class of bug survives review.
+  for (let i = 0; i < ps1.length; i += 1) {
+    if (!ps1[i].startsWith('git ')) continue;
+    const name = stepName(ps1[i]);
+    if (TOLERATED.includes(name)) {
+      assert.ok(!(ps1[i + 1] ?? '').startsWith('if ($LASTEXITCODE'), `${name} must not be guarded`);
+    } else {
+      assert.equal(ps1[i + 1], `if ($LASTEXITCODE -ne 0) { throw "corpus: ${name} failed" }`);
+    }
+  }
+  // PowerShell before 7.4 does not stop on a native command's exit code, so no preference setting
+  // could replace these — asserted so a future edit does not "simplify" them away.
+  assert.ok(!ps1.some((l) => l.includes('$ErrorActionPreference')),
+    'an ErrorActionPreference does not reach a native command exit code');
+});
+
+test('every surface carries the re-run note, as its last line', () => {
+  const files = {
+    'docs/ARCHITECTURE.md': blockOf(arch),
+    [LAUNCHERS[0].path]: launcherRecipe(readFileSync(join(root, LAUNCHERS[0].path), 'utf8'), 'sparse'),
+    [LAUNCHERS[1].path]: launcherRecipe(readFileSync(join(root, LAUNCHERS[1].path), 'utf8'), 'sparse'),
+  };
+  for (const [path, lines] of Object.entries(files)) {
+    assert.equal(lines[lines.length - 1], RERUN_NOTE, `${path} does not end with the note`);
+    assert.equal(lines.filter((l) => l === RERUN_NOTE).length, 1, `${path} repeats the note`);
+  }
+  // The note names both halves of the promise the rest of this story makes true: the launcher
+  // removes a directory it created (so a clone can run again), and `docs sync` finishes a partial
+  // corpus rather than re-cloning it.
+  assert.match(RERUN_NOTE, /^# /);
+  assert.match(RERUN_NOTE, /leaves nothing behind/);
+  assert.match(RERUN_NOTE, /fetches only what is missing/);
+  // A comment between two chained steps would be joined onto the `\` above it and would eat the
+  // step below — which is why it is last, and why it must never grow a continuation.
+  assert.ok(!RERUN_NOTE.includes('\\'), 'the note carries a continuation');
 });
