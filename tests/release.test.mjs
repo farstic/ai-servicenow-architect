@@ -74,7 +74,7 @@ function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
   // working tree has to hold something git can describe, or `git status` in the outer repository
   // fails with "not a git repository" and every question about cleanliness goes unanswered.
   mkdirSync(join(root, 'vendor/ServiceNowDocs'), { recursive: true });
-  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q']);
+  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q', '-b', 'main']);
 
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);

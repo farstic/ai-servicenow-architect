@@ -216,6 +216,16 @@ clearest reason is `engine.config.json validates against its schema`: the schema
 work with no network. Both are right and they cannot both hold. The full suite inside a fixture
 asserts a real checkout, which is not the question the guard is asking.
 
+**A fixture never lets git read the machine.** `-b <branch>` on every `init`, `-c user.name` and
+`-c user.email` on every commit, `GIT_CONFIG_GLOBAL` pointed at an empty file where a global config
+could interfere, and `core.autocrlf` set only where the test is about line endings. Three fixtures
+in ARC-09 passed locally and failed on the runners because the short form of a git command took a
+default from somewhere outside the test: the harness identity (ARC-08-S05, no global config on a
+fresh runner), `os.devNull` as a config path (ARC-09-C13 — `\\.\nul` on Windows, which git cannot
+open), and a bare repository's HEAD following `init.defaultBranch` while its only branch was `main`
+(ARC-09-C14 — twelve cells red with `src refspec main does not match any`). The `init` half of this
+is checked mechanically by `tests/precondition-asserts.test.mjs`; the rest is this sentence.
+
 **A test never re-implements a renderer's format — it imports it.** Three clocks in one arc say this
 is a real habit: ARC-09-C3 proved "no network code" with a wall-clock threshold, C4 judged a raw
 median against a budget, and C18 normalised step durations with a regex that knew one of the

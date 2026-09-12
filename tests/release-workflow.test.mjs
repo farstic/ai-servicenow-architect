@@ -36,7 +36,7 @@ function tagged(t, { contract = '{"schema":1,"tools":[]}', version = '2.0.0' } =
   write(root, 'engine.config.json', `${JSON.stringify(CONFIG, null, 2)}\n`);
   write(root, 'packages/snowarch/dist/contract.json', contract);
   mkdirSync(join(root, 'vendor/ServiceNowDocs'), { recursive: true });
-  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q']);
+  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q', '-b', 'main']);
 
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);

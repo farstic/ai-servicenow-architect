@@ -99,3 +99,51 @@ test('negative — an unguarded mutation is caught', () => {
   const guarded = [mutation, "  assert.equal(read('core.sparseCheckoutCone'), 'false');", '  syncCorpus(w);'];
   assert.ok(/assert\.|expect\(/.test(guarded.slice(0, 3).join('\n')));
 });
+
+// ── ARC-09-C14 — a fixture never lets git read the machine ─────────────────────────────────────
+//
+// Three fixtures in this arc took a default from the machine they ran on and passed locally while
+// failing on the runners: ARC-08-S05's harness identity (no global git config on a fresh runner),
+// ARC-09-C13's `os.devNull` as a config path (`\\.\nul` on Windows, which git cannot open), and
+// ARC-09-C14's bare origin, whose HEAD followed `init.defaultBranch` — `master` — while its only
+// branch was `main`, so a clone of it landed on an unborn branch and the push failed with
+// `src refspec main does not match any` on twelve cells at once.
+//
+// The pattern is always the same: the SHORT form of a git command takes a default from somewhere
+// outside the test. This scans for the one that is mechanically checkable.
+
+test('every `git init` in the test tree names its branch (ARC-09-C14)', () => {
+  const missing = [];
+  for (const file of testFiles()) {
+    const rel = relative(root, file);
+    // This file names both call shapes in prose and plants one as a control, so it is exempt by
+    // name with the reason — the same way `version-literals.test.mjs` exempts itself. A scanner
+    // that flags its own description of what it scans for is a scanner nobody can act on.
+    if (rel === 'tests/precondition-asserts.test.mjs') continue;
+    const text = readFileSync(file, 'utf8');
+    text.split('\n').forEach((line, i) => {
+      // COMMENTS OUT FIRST (the fourth time this arc: ARC-09-S09, C17b, C19, here). In a comment a
+      // command is the LESSON; in code it is the call.
+      if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+      // Both call shapes in this repository: git(dir, [init, …]) and run(init, …) — written without
+      // the quotes this scan looks for, or the line below would find itself.
+      if (!/\[\s*'init'|\(\s*'init'/.test(line)) return;
+      if (/'-b'/.test(line)) return;
+      missing.push(`${rel}:${i + 1} — ${line.trim().slice(0, 80)}`);
+    });
+  }
+  assert.deepEqual(missing, [], 'a `git init` without `-b <branch>` takes `init.defaultBranch` from '
+    + "the machine: the fixture then has one branch name here and another on a runner, and the "
+    + 'failure arrives as `src refspec … does not match any` in a job nobody was looking at');
+});
+
+test('the init scan would catch a bare init, and is not matching everything (ARC-09-C14)', () => {
+  // The control on the scan. Without it a regex that stopped matching would report nothing and
+  // pass — the exact failure mode `precondition-asserts` was written for.
+  const planted = "  git(root, ['init', '-q']);";
+  assert.equal(/\[\s*'init'|\(\s*'init'/.test(planted) && !/'-b'/.test(planted), true);
+  const fine = "  git(root, ['init', '-q', '-b', 'main']);";
+  assert.equal(/\[\s*'init'|\(\s*'init'/.test(fine) && !/'-b'/.test(fine), false);
+  // ...and it looks at real files: if the sweep found none, the assertion above proves nothing.
+  assert.ok(testFiles().length > 50, `only ${testFiles().length} test files scanned`);
+});

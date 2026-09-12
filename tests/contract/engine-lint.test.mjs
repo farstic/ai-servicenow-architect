@@ -345,7 +345,7 @@ test('criterion 2 — L05 fails on a typo in a cited path and passes on the real
 function gitTree(mutate = () => {}, parent = tmpdir()) {
   const dir = minimalTree(mutate, parent);
   const git = (...args) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' });
-  git('init', '-q');
+  git('init', '-q', '-b', 'main');
   git('add', '-A');
   return dir;
 }

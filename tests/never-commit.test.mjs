@@ -108,7 +108,7 @@ test('one ignore file for the monorepo', () => {
 const withScratchRepo = (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'never-commit-'));
   try {
-    git(['init', '-q', '.'], dir);
+    git(['init', '-q', '-b', 'main', '.'], dir);
     writeFileSync(join(dir, '.gitignore'), readFileSync(join(root, '.gitignore')));
     fn(dir);
   } finally { rmSync(dir, { recursive: true, force: true }); }
