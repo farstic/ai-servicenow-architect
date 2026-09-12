@@ -7,7 +7,7 @@
 // would pass every pull request and nobody would find out until a release read strangely.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -195,4 +195,81 @@ test('the real script, on a real range, in a real repository', (t) => {
   const broken = spawn(['--base', 'origin/nowhere', '--head', 'HEAD']);
   assert.equal(broken.code, 2);
   assert.match(broken.err, /the job needs fetch-depth: 0/);
+});
+
+// ── ARC-09-C23 — the lint governs what the convention governs ─────────────────────────────────
+//
+// A story's pull request lints its own range and never meets anything older. A MILESTONE pull
+// request to `main` lints the whole arc, and the M4 merge stopped on two commits written before the
+// convention existed: ARC-09-S01's own subject (S02 added the lint afterwards) and an M3 record
+// commit using a scope the list did not yet have.
+//
+// ARC-09-S02's rule is that history is never rewritten to suit the parser — the changelog generator
+// already marks such commits `(unconventional)`. The lint agrees with the generator now.
+
+/** A repository with a floor commit, one malformed subject before it and one after. */
+function repoWithFloor(t) {
+  const dir = tempDir('snowarch-commitlint-', t);
+  const git = (...args) => execFileSync('git',
+    ['-c', 'user.email=f@example.invalid', '-c', 'user.name=Fixture', ...args],
+    { cwd: dir, encoding: 'utf8' });
+  git('init', '-q', '-b', 'main');
+  const commit = (subject) => {
+    writeFileSync(join(dir, 'f.txt'), `${subject}\n`);
+    git('add', 'f.txt');
+    git('commit', '-qm', subject);
+    return git('rev-parse', 'HEAD').trim();
+  };
+  const before = commit('ARC-09-S01: a subject from before the convention');
+  const floor = commit('feat(changelog): the commit that introduced the lint');
+  const after = commit('updated stuff');
+  return { dir, git, before, floor, after };
+}
+
+test('C23: a malformed subject before the floor is recorded, not failed', (t) => {
+  const f = repoWithFloor(t);
+  const isAncestor = (since, sha) =>
+    spawnSync('git', ['merge-base', '--is-ancestor', since, sha], { cwd: f.dir }).status === 0;
+
+  const commits = [
+    { sha: f.before, subject: 'ARC-09-S01: a subject from before the convention', parents: ['x'] },
+    { sha: f.after, subject: 'updated stuff', parents: ['y'] },
+  ];
+  // The floor is this fixture's, injected the same way the real one is read.
+  const { failures, preConvention } = lint({
+    commits, scopes: allowedScopes(), isAncestor: (_since, sha) => isAncestor(f.floor, sha),
+  });
+
+  assert.equal(failures.length, 1, `expected one failure, got ${JSON.stringify(failures)}`);
+  assert.match(failures[0], /updated stuff/);
+  assert.equal(preConvention.length, 1);
+  assert.match(preConvention[0], /ARC-09-S01.*\(pre-convention, recorded as written\)/);
+});
+
+test('C23: the floor commit itself IS governed', (t) => {
+  const f = repoWithFloor(t);
+  const isAncestor = (since, sha) =>
+    spawnSync('git', ['merge-base', '--is-ancestor', since, sha], { cwd: f.dir }).status === 0;
+  // A commit is an ancestor of itself, so the floor is inside the governed set — the boundary is
+  // inclusive, and a test that did not say so would leave it a coin flip for the next reader.
+  assert.equal(isAncestor(f.floor, f.floor), true);
+  const { failures } = lint({
+    commits: [{ sha: f.floor, subject: 'updated stuff', parents: ['x'] }],
+    scopes: allowedScopes(),
+    isAncestor: (_since, sha) => isAncestor(f.floor, sha),
+  });
+  assert.equal(failures.length, 1, 'the floor commit was treated as history');
+});
+
+test('C23: an unknown floor lints everything rather than silently stopping', () => {
+  // A shallow clone cannot see the floor. Failing open — governing everything — is the safe
+  // direction: the alternative is a lint that quietly checks nothing, which is the failure this
+  // file exists to prevent.
+  const { failures, preConvention } = lint({
+    commits: [{ sha: 'deadbeef', subject: 'updated stuff', parents: ['x'] }],
+    scopes: allowedScopes(),
+    isAncestor: () => null,
+  });
+  assert.equal(failures.length, 1);
+  assert.equal(preConvention.length, 0);
 });

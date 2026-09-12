@@ -143,6 +143,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The commit lint no longer fails on commits written before it existed.** A merge that spans a
+  whole milestone reads the entire arc, including subjects from before the convention was adopted.
+  Those are printed as recorded rather than failed — the same tolerance the changelog generator has
+  always had — and history is not rewritten to suit the parser.
+
 - **A release with a long changelog can still be published.** GitHub caps a release body at 125,000
   characters, and 2.0.0's notes are longer than that on their own. The body is now assembled in one
   place and bounded: the list of what changed is kept whole, and the prose is cut at a paragraph

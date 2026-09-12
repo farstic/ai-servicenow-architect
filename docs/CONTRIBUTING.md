@@ -995,6 +995,12 @@ your branch's upstream if it has one, otherwise `origin/develop`: **not** `origi
 `develop` by a whole milestone and would hand you thirty commits of somebody else's work, some
 written before this convention existed.
 
+**The lint governs commits after `485fc49`** — ARC-09-S02's merge, the commit that introduced it.
+Anything older is history: the lint prints it as `(pre-convention, recorded as written)` and does
+not fail on it, which is the same tolerance the changelog generator has always had with
+`(unconventional)`. A story's pull request never meets such a commit; a milestone merge to `main`
+lints the whole arc and does. History is not rewritten to suit the parser.
+
 **A subject or body can only be fixed by amending.** `commitlint` reads every commit a branch adds,
 so a malformed subject cannot be repaired by a later commit — there is nothing a fix-up can say
 about the one above it. A SUBJECT/BODY-only amend with `--force-with-lease`, on an unmerged draft

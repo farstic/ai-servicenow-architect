@@ -15,7 +15,7 @@
  * Usage: node scripts/ci/commitlint.mjs [--base <ref>] [--head <ref>]
  * Exit 0 every subject conforms · 1 at least one does not · 2 the range could not be resolved.
  */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { readdirSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -94,16 +94,49 @@ export function check(subject, scopes) {
 export const failLine = (sha, subject, reason) =>
   `commitlint: FAIL ${sha.slice(0, 7)} "${subject}" — ${reason}; see docs/CONTRIBUTING.md#commits`;
 
-export function lint({ commits, scopes }) {
+/**
+ * The commit that introduced this convention: ARC-09-S02's merge into `develop` (PR #125).
+ *
+ * ARC-09-C23. A story's pull request lints its own range and never meets anything older. A MILESTONE
+ * pull request to `main` lints `origin/main..HEAD` — the whole arc, including commits written before
+ * the convention existed. The M4 merge stopped on two of them: ARC-09-S01's own subject, written
+ * before S02 added the lint, and an M3 record commit using a scope the list did not yet have.
+ *
+ * ARC-09-S02's rule is that history is never rewritten to suit the parser — the changelog generator
+ * already tolerates those commits and marks them `(unconventional)`. The lint now agrees with the
+ * generator instead of contradicting it: it governs commits that DESCEND from this sha, and prints
+ * anything older as recorded rather than failing it.
+ */
+export const CONVENTION_SINCE = '485fc491e0a6f70162356d8ff506243f57e60e6d';
+
+/**
+ * Is this commit one the convention governs?
+ *
+ * `merge-base --is-ancestor <since> <commit>` — true for the floor itself and everything after it.
+ * Injected so the tests can answer without a repository, and defaulting to "governed" when the sha
+ * is unknown to this clone: a shallow checkout that cannot see the floor must not silently stop
+ * linting, which would be the quiet failure this whole file exists to prevent.
+ */
+export function governedBy(sha, isAncestor) {
+  const answer = isAncestor(CONVENTION_SINCE, sha);
+  return answer === null ? true : answer;
+}
+
+export function lint({ commits, scopes, isAncestor = () => true }) {
   const failures = [];
+  const preConvention = [];
   let checked = 0;
   for (const { sha, subject, parents } of commits) {
     if ((parents ?? []).length > 1) continue;          // a merge is not somebody's message
+    if (!governedBy(sha, isAncestor)) {
+      preConvention.push(`commitlint: ${sha.slice(0, 7)} "${subject}" (pre-convention, recorded as written)`);
+      continue;
+    }
     const reason = check(subject, scopes);
     if (reason === null) { checked += 1; continue; }
     failures.push(failLine(sha, subject, reason));
   }
-  return { checked, failures };
+  return { checked, failures, preConvention };
 }
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
@@ -131,7 +164,24 @@ if (isMain) {
     return { sha, subject: subject ?? '', parents: (parents ?? '').trim().split(/\s+/).filter(Boolean) };
   });
 
-  const { checked, failures } = lint({ commits, scopes: allowedScopes() });
+  const { checked, failures, preConvention } = lint({
+    commits,
+    scopes: allowedScopes(),
+    // `null` when the floor is not in this clone — `governedBy` then treats the commit as governed.
+    isAncestor: (since, sha) => {
+      const r = spawnSync('git', ['merge-base', '--is-ancestor', since, sha],
+        { cwd: process.cwd(), stdio: 'ignore' });
+      // EXIT 1 IS THE ONLY "no". `merge-base --is-ancestor` answers 0 for yes and 1 for no;
+      // anything else is git failing to answer — 128 when the floor sha is not in this clone, which
+      // is every fixture repository and any shallow checkout. Reading 128 as "not governed" made
+      // the lint silently check NOTHING there, which is the quiet failure this file exists to
+      // prevent, and two existing tests caught it immediately.
+      if (r.error || r.status === null) return null;
+      if (r.status === 0) return true;
+      return r.status === 1 ? false : null;
+    },
+  });
+  for (const line of preConvention) writeSync(1, `${line}\n`);
   for (const line of failures) writeSync(2, `${line}\n`);
   if (failures.length) process.exit(1);
   writeSync(1, `commitlint: ${checked} commits ok\n`);
