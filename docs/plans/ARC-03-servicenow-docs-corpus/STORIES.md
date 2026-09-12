@@ -275,6 +275,30 @@ README titles → stories: README 1 → S01 · README 2 → S02 · README 3 → 
 6. Given local modifications inside the submodule, sync exits 4 with the "local changes" message and touches nothing.
 7. On `windows-latest` (native PowerShell, no Git Bash on PATH), `node tools\snowarch\bin\snowarch.mjs docs sync` succeeds (the `.\snowarch.cmd` launcher form becomes valid once ARC-06 lands — see the invocation convention above) and `git -C vendor/ServiceNowDocs config core.longpaths` prints `true`; the 197-character file exists on disk (`Test-Path`).
 8. With `HTTPS_PROXY=http://user:pw@127.0.0.1:9` (a closed port), the output contains `cannot reach proxy 127.0.0.1:9 (HTTPS_PROXY)` and the `NO_PROXY` remedy, never the DNS message, never the string `pw`; exit code 5. With `HTTPS_PROXY` unset and `SNOWARCH_DOCS_UPSTREAM=https://nonexistent.invalid/x.git`, the output contains `cannot reach nonexistent.invalid (DNS)` (the host is taken from the upstream URL in use, so the production message reads `cannot reach github.com (DNS)`); exit code 5. Both runs leave `vendor/` untouched.
+
+> **Amendment 2026-09-12 (acceptance pass, item B03-04). The second half of AC 8 names a variable
+> that has never existed.**
+>
+> `SNOWARCH_DOCS_UPSTREAM` is in no commit of product code — `git log -S'SNOWARCH_DOCS_UPSTREAM'
+> --all -- tools/ packages/ scripts/` returns **nothing**, and `git grep -ln` finds it only in
+> planning documents: this story, ARC-06-S11's task 4, and the acceptance plan, which inherited the
+> name from them. Not removed later; never built. The story anticipated an override and the
+> implementation resolved the upstream from configuration alone.
+>
+> **What is true instead.** The upstream comes from `engine.config.json` `docs.upstream` —
+> `lib/docs/sync.mjs:323` passes it to the clone and `:369` carries it into the failure classifier
+> as context. There is **no environment override at all** (`grep -rnE 'env\.[A-Z_]*UPSTREAM'` over
+> `lib/docs/` returns nothing), so a DNS negative cannot be driven by a variable in this product; it
+> needs a config fixture. `docs/CONTRIBUTING.md` separately forbids `.invalid` as a network target,
+> so the address the criterion names could not be used even if the variable existed.
+>
+> **AC 8 amended to its two halves.** The PROXY half stands unchanged and was executed on
+> `v2.0.0-rc.1`: `cannot reach proxy 127.0.0.1:9 (HTTPS_PROXY)`, exit 5, the password absent from
+> the output. The DNS half is **proven by unit rows instead** — `tests/docs-sync.test.mjs:252/283`
+> drive `classifyGitFailure` over canned git stderr, which is where the classification lives. No
+> variable is built to satisfy a criterion: an acceptance pass records what the product does, and
+> inventing a new environment surface to make an old sentence true would be the opposite of that.
+
 9. `./snowarch docs sync --print-recipe --mode sparse` prints the exact git command list (one per line, no Node), byte-identical to the block embedded in `docs/ARCHITECTURE.md` (test in S11).
 
 **Tasks.**

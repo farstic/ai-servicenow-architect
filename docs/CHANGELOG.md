@@ -233,6 +233,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   says what it remembered and when, rather than claiming you are up to date with a version that
   does not exist, or that nothing has ever been checked when something has.
 
+- **Three checks that guarded the docs corpus were only ever tested the way that passes.** The one
+  that keeps the downloaded documentation list honest, the one that refuses to switch release
+  family without being asked twice, and the one that flags a documentation update which broke a
+  reference — each had its success path exercised and its failure path assumed. All three now run
+  their failing case, and two of them needed a fixture built a different way, because the commands
+  work on the folder they live in rather than the folder you run them from.
+
 - **On Windows, the warning about keeping your checkout in a synced folder now sees the case that
   hides.** If your employer redirects Documents into OneDrive, the folder is synced and nothing in
   its name says so — the only clue is a Windows variable. The health check did not look at it, so

@@ -284,3 +284,48 @@ test('a dry run restores the regenerated document too, not just the pin', () => 
   assert.equal(JSON.parse(read(w.root, 'engine.config.json')).docs.pin, pinBefore);
   assert.equal(git(['status', '--porcelain'], w.root).trim(), '');
 });
+
+/**
+ * ARC-03-S09 AC 5 — the `needs-remap` label, and the half that was "by construction".
+ *
+ * The workflow adds the label when a citation died: `labels="$labels,needs-remap"` guarded by
+ * `NEWLY_DEAD != "0"`. The test above asserts the gh calls a PR makes; nothing asserted the GUARD,
+ * so "a broken citation gets the label" was true of the file and true of nobody's run
+ * (acceptance item B03-03).
+ *
+ * The snippet is READ OUT OF THE WORKFLOW and executed, rather than retyped here. A copy would be a
+ * second definition of the rule, and the first thing a second definition does is stop matching —
+ * which is the same reason the cloud-sync fixture exists and the roster has one source.
+ */
+test('AC 5 — the needs-remap guard, extracted from the workflow and run both ways', () => {
+  const wf = readFileSync(join(repoRoot, '.github/workflows/docs-bump.yml'), 'utf8');
+
+  // The two lines that decide the labels, taken verbatim and with their indentation stripped.
+  const lines = wf.split('\n').map((l) => l.trim());
+  const start = lines.indexOf('labels=docs-corpus');
+  assert.ok(start > -1, 'the workflow no longer sets `labels=docs-corpus` — find the new shape');
+  const guard = lines[start + 1];
+  assert.match(guard, /^if \[ "\$NEWLY_DEAD" != "0" \]; then labels="\$labels,needs-remap"; fi$/,
+    `the guard changed shape: ${guard}`);
+
+  const snippet = `${lines[start]}\n${guard}\necho "$labels"`;
+  const run = (newlyDead) => execFileSync('sh', ['-c', snippet],
+    { encoding: 'utf8', env: { ...process.env, NEWLY_DEAD: newlyDead } }).trim();
+
+  // Both directions, which is the whole point: a dead citation labels, a clean bump does not.
+  assert.equal(run('0'), 'docs-corpus');
+  assert.equal(run('1'), 'docs-corpus,needs-remap');
+  assert.equal(run('7'), 'docs-corpus,needs-remap');
+  // ...and the label is CREATED before it is used, or `gh pr create --label` fails on a fresh repo.
+  assert.match(wf, /gh label create needs-remap --color [0-9a-f]{6}/);
+  assert.ok(wf.indexOf('gh label create needs-remap') < wf.indexOf('labels=docs-corpus'),
+    'the label is used before it is created');
+});
+
+test('AC 5 — both PR paths pass the computed labels, so an existing PR gains it too', () => {
+  // A bump that breaks a citation usually UPDATES yesterday's open PR rather than opening one, so
+  // the edit path is the one a reader actually meets. Asserted on the workflow's own two calls.
+  const wf = readFileSync(join(repoRoot, '.github/workflows/docs-bump.yml'), 'utf8');
+  assert.match(wf, /gh pr edit "\$existing" --body-file body\.md --add-label "\$labels"/);
+  assert.match(wf, /--body-file body\.md --label "\$labels"/);
+});

@@ -362,7 +362,7 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 · 3 �
 1. Implement `B02.mjs` over `syncDocs()` / `verify()`; map `--docs`.
 2. Write the recipe functions into the launcher templates (handed to S10/S11) with the begin/end markers.
 3. Write the parity test.
-4. Fixture-corpus tests (reuse ARC-03's local bare-repo fixture via `SNOWARCH_DOCS_UPSTREAM`).
+4. Fixture-corpus tests (reuse ARC-03's local bare-repo fixture). *Amended 2026-09-12 (acceptance item B03-04): this task named `SNOWARCH_DOCS_UPSTREAM`, a variable that has never existed in any commit of product code — the upstream is `engine.config.json` `docs.upstream` and there is no environment override. The fixture is pointed at by writing that config, which is what `tests/helpers/docs-fixture.mjs` does.*
 
 **Test strategy.** Fixture upstream in unit/integration tests on three OSes (fast); real corpus once in the S14 CI job (size and time recorded in the job summary) and weekly in ARC-03's `docs-real.yml`.
 

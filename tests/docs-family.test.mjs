@@ -1,9 +1,10 @@
 import { test, before, after } from 'node:test';
+import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CORPUS_DIR, EXIT, SyncError, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
 import {
   applyFamilySwitch, classifyLine, formatPlan, planFamilySwitch,
@@ -44,6 +45,8 @@ const SEEDED = {
   'CLAUDE.md': '# engine\n\nRelease family: Australia branch.\n',
   'governance/governance-rules.md': '# rules\n\nSee the Australia release family for citations.\n',
 };
+
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 const GATEWAYS = ['itsm', 'csm', 'hrsd', 'itom-discovery', 'cmdb-csdm'];
 
@@ -123,6 +126,125 @@ test('AC 1 — the dry run prints both config edits, every gateway, a REVIEW lis
   assert.ok(plan.review.length > 0, 'the REVIEW list is empty');
   assert.match(text, /^dry run — nothing changed\. Re-run with --yes to apply\.$/m);
   assert.equal(git(['status', '--porcelain'], w.root).trim(), '', 'the dry run touched the tree');
+});
+
+/**
+ * AC 2's refusal, through the REAL CLI (acceptance item B03-02).
+ *
+ * Every other case in this file calls `planFamilySwitch` directly, because the planner is where the
+ * rules are. The refusal is not in the planner — it is three lines of argv handling in
+ * `lib/docs/cli.mjs`, and nothing exercised them.
+ *
+ * THE PLAN'S PROPOSED CHECK WOULD HAVE RUN AGAINST THIS REPOSITORY. It said to spawn
+ * `node tools/snowarch/bin/snowarch.mjs docs family zurich` with `cwd` set to the fixture. The CLI
+ * does not read `cwd`: `lib/config.mjs` resolves the root from its OWN location, deliberately —
+ * "cwd is used for exactly one thing: telling them when it differs". So the command would have
+ * planned a family switch against the real checkout and told us nothing about the fixture. (It
+ * would not have CHANGED anything — no `--yes` — but a test that passes for that reason is worse
+ * than no test.)
+ *
+ * So the engine is copied into the workspace and the CLI is spawned from there, which puts its own
+ * root at the fixture. `bin/` and `lib/` only: the tests are a third of the tree and none of them
+ * runs here.
+ */
+/**
+ * The engine, copied ONCE for this file and hard-linked into each workspace.
+ *
+ * `bin/` and `lib/` only — the tests are a third of the tree and none of them runs here. Copied
+ * once because every case needs the same bytes and a per-case copy is the same ~750 KB again.
+ */
+let ENGINE_SRC = null;
+const MARKER = '.docs-family-fixture-root';
+
+/**
+ * What the docs CLI needs on disk, measured rather than guessed: 3.0 MB across 317 files, copied
+ * ONCE for this file and re-copied per workspace.
+ *
+ * `tools/snowarch/lib` alone is not enough — the engine imports out of its own tree, and the first
+ * attempt died on `Cannot find module '<ws>/scripts/lib/release/tag.mjs'`. The list below is every
+ * directory those imports reach (`grep -rhoE "from '\.\./\.\./\.\./[^']+'"` over `bin` and
+ * `lib`). IF A NEW OUT-OF-TREE IMPORT APPEARS, this fixture fails with ERR_MODULE_NOT_FOUND naming
+ * the missing path — loud and diagnosable, which is the right failure for a list that has to track
+ * the engine's dependencies.
+ */
+const ENGINE_TREES = [
+  ['tools/snowarch/bin', 'tools/snowarch/bin'],
+  ['tools/snowarch/lib', 'tools/snowarch/lib'],
+  ['scripts/lib', 'scripts/lib'],
+  ['packages/contract', 'packages/contract'],
+  ['packages/snowarch/dist', 'packages/snowarch/dist'],
+  ['tests/lib', 'tests/lib'],
+  // Data, not code: the engine lint reads `retired-vocabulary.json` from here. Found the same way
+  // — an explicit ENOENT naming the path, which is why this list is iterated rather than guessed.
+  ['tests/fixtures', 'tests/fixtures'],
+];
+
+function withEngine(ws) {
+  ENGINE_SRC ??= (() => {
+    const d = mkdtempSync(join(scratch, 'engine-'));
+    for (const [from, to] of ENGINE_TREES) cpSync(join(REPO, from), join(d, to), { recursive: true });
+    return d;
+  })();
+  cpSync(ENGINE_SRC, ws, { recursive: true });
+
+  // THE PRECONDITION THE COPY EXISTS FOR. `lib/config.mjs` resolves the root from its OWN location,
+  // deliberately — "cwd is used for exactly one thing: telling them when it differs". So a CLI
+  // spawned with `cwd` set here but resolving elsewhere would plan a family switch against THIS
+  // repository and tell us nothing, which is exactly what the plan's proposed check would have
+  // done. The marker proves where it landed: absent from the real checkout, present here.
+  writeFileSync(join(ws, MARKER), 'fixture root\n');
+  assert.equal(existsSync(join(REPO, MARKER)), false,
+    `${MARKER} exists in the real repository — the marker no longer distinguishes the trees`);
+  assert.ok(existsSync(join(ws, 'engine.config.json')), 'the seeded workspace has no config');
+  return ws;
+}
+
+const runCli = (ws, args) => {
+  try {
+    const stdout = execFileSync(process.execPath,
+      [join(ws, 'tools/snowarch/bin/snowarch.mjs'), ...args],
+      { cwd: ws, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { code: 0, stdout, stderr: '' };
+  } catch (e) {
+    return { code: e.status ?? 1, stdout: String(e.stdout ?? ''), stderr: String(e.stderr ?? '') };
+  }
+};
+
+test('AC 2 — `docs family zurich` with no flag prints the plan, exits 2, and changes nothing', () => {
+  const realConfigBefore = readFileSync(join(REPO, 'engine.config.json'), 'utf8');
+  const w = seeded();
+  withEngine(w.root);
+  const before = git(['status', '--porcelain'], w.root).trim();
+
+  const r = runCli(w.root, ['docs', 'family', 'zurich']);
+
+  assert.equal(r.code, 2, `expected exit 2, got ${r.code}\n${r.stderr}`);
+  assert.match(r.stderr, /^refusing to apply without --yes$/m);
+  // WHERE IT RESOLVED, proven rather than trusted: the plan it printed is the FIXTURE's
+  // australia → zurich, and the real checkout's `engine.config.json` is byte-identical afterwards.
+  // A CLI that had resolved to this repository would have printed a plan about it instead.
+  assert.equal(readFileSync(join(REPO, 'engine.config.json'), 'utf8'), realConfigBefore,
+    'the refusal touched the real engine.config.json');
+  // The PLAN is still printed — the refusal is not a silent no. A maintainer who asked for a
+  // switch gets the thing they would have applied, which is what makes the exit code readable.
+  assert.match(r.stdout, /^docs family: australia → zurich$/m);
+  assert.match(r.stdout, /^EDIT engine\.config\.json: docs\.family "australia" → "zurich"$/m);
+  assert.equal(git(['status', '--porcelain'], w.root).trim(), before, 'the refusal touched the tree');
+});
+
+test('AC 2 — `--dry-run` prints the same plan and exits 0, and still changes nothing', () => {
+  // Both directions on the flag that distinguishes them: no flag is a REFUSAL (2), `--dry-run` is
+  // an ANSWER (0). Without this, a CLI that exited 2 for everything would pass the case above.
+  const w = seeded();
+  withEngine(w.root);
+  const before = git(['status', '--porcelain'], w.root).trim();
+
+  const r = runCli(w.root, ['docs', 'family', 'zurich', '--dry-run']);
+
+  assert.equal(r.code, 0, `expected exit 0, got ${r.code}\n${r.stderr}`);
+  assert.equal(r.stderr.includes('refusing to apply'), false, 'a dry run refused');
+  assert.match(r.stdout, /^dry run — nothing changed\. Re-run with --yes to apply\.$/m);
+  assert.equal(git(['status', '--porcelain'], w.root).trim(), before);
 });
 
 test('AC 3 — a family that is not upstream exits 6 and nothing is planned', () => {
