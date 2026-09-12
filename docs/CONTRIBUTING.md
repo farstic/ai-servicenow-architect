@@ -711,7 +711,12 @@ That is the mechanism behind P-09, confirmed and closed as spike S-13. The conse
 **the engine controls only its own share of the budget**, so a description that is longer than it
 needs to be spends a user's headroom, not just its own.
 
-The recipe, applied to all 28 (`scripts/maint/descriptions.mjs` holds the text):
+The recipe, applied to all 28. **The `description:` in each `SKILL.md` frontmatter is the text** —
+there is no second copy. (This sentence used to point at `scripts/maint/descriptions.mjs` as "where
+the text lives", and that file's own header said the opposite: *"NOT a second source of truth …
+SKILL.md frontmatter is authoritative for every description, and a copy that outlived the rewrite
+would drift from it silently."* It was a pointer at a copy the copy disclaimed; the file was one of
+the one-time migration scripts and went with them at ARC-02's acceptance.)
 
 1. **Sentence 1 — the trigger sentence.** `Use when …` for builders, reviewers and consults;
    `Mandatory gateway for …` for the five Domain Experts. Name the domain nouns a user would actually

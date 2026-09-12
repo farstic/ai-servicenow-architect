@@ -49,7 +49,11 @@ test('criterion 5 — one version marker, and no other version claim', () => {
 
 test('criterion 4 — the strings a session needs to find', () => {
   for (const s of ['/snowarch status', './snowarch doctor --quick', 'Mode:',
-    'quote its `Mode:` line verbatim']) {
+    'quote its `Mode:` line verbatim',
+    // ARC-02-S09 AC 4 (acceptance item B02-04): `docs/ARCHITECTURE.md` linked the modes page and
+    // this file did not — `grep -ci 'modes' CLAUDE.md` was 0. A session that has to explain what
+    // design-only means cannot find the page that says so.
+    'docs/MODES-AND-PRESETS.md']) {
     assert.ok(doc.includes(s), `missing: ${s}`);
   }
   // The plain word, as a trigger. Backticked or not, a session must be told what `Status` does.

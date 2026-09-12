@@ -1,0 +1,33 @@
+{
+  "_rule": "ARC-02-S04 AC 4 acceptance (B02-03). The seven-element Output contract a dispatched Developer sub-agent must satisfy — the definition of \"the same artefact structure as before\". HEADINGS ARE NOT THE CONTRACT: two captures of the same unchanged tree differ by whole H2 sections, because heading wording is model output. These seven do not vary. Generated from scripts/validation/t01-regression.mjs so the fixture and the harness cannot disagree; tests/t01-contract.test.mjs asserts they still match.",
+  "elements": [
+    {
+      "key": "code-block-js",
+      "pattern": "/```(javascript|js)\\b/i"
+    },
+    {
+      "key": "file-path",
+      "pattern": "/script_includes\\/|\\.js`|Suggested file path|File path/i"
+    },
+    {
+      "key": "artefact-type",
+      "pattern": "/Script Include/i"
+    },
+    {
+      "key": "spec-compliance",
+      "pattern": "/spec compliance/i"
+    },
+    {
+      "key": "decisions-made",
+      "pattern": "/decisions? made/i"
+    },
+    {
+      "key": "manifest-6.2",
+      "pattern": "/§\\s*6\\.2[^\\n]*manifest/i"
+    },
+    {
+      "key": "manifest-verbatim",
+      "pattern": "/Code artefact produced\\. Proposing a Code Reviewer pass \\(style, performance, security, best-practice\\) before final delivery/i"
+    }
+  ]
+}

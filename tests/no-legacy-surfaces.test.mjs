@@ -380,13 +380,40 @@ test('ARC-10-S02 AC 3 — the migration page names all four directories and thei
 test('ARC-02-S06 criterion 3 — no "Task tool" in CLAUDE.md or governance/', () => {
   // Harness-neutral wording: the engine describes dispatching a sub-agent, not the name of the
   // mechanism a particular client uses to do it.
+  // ARC-02-S04 AC 5 (acceptance item B02-05) widens this to `.claude/agents/`, which is where the
+  // criterion actually pointed — `grep -rn 'Task tool' .claude/agents` = 0 — while the test scoped
+  // itself to CLAUDE.md and governance/. An agent file is exactly where the harness's name would
+  // creep back in, because an agent file is about being dispatched.
+  const inScope = (x) => x === 'CLAUDE.md' || x.startsWith('governance/') || x.startsWith('.claude/agents/');
   const hits = [];
-  for (const f of tracked().filter((x) => x === 'CLAUDE.md' || x.startsWith('governance/'))) {
+  for (const f of tracked().filter(inScope)) {
     read(f).split('\n').forEach((line, i) => {
       if (line.includes('Task tool')) hits.push(`${f}:${i + 1}`);
     });
   }
   assert.deepEqual(hits, []);
+  // Not vacuous: the widened set really contains agent files, or this passes on a filter that
+  // matched nothing new.
+  assert.ok(tracked().filter(inScope).some((f) => f.startsWith('.claude/agents/')),
+    'no agent file is in scope — the filter widened to nothing');
+});
+
+test('ARC-02-S02 AC 8 — every SK-xx and AG-xx rule id is documented in CONTRIBUTING', async () => {
+  // Acceptance item B02-05. The criterion says the rule list is documented; 23 mentions were found
+  // and completeness was unverified — "documented" had never been checked against the ids the lint
+  // actually exports. A rule a contributor cannot look up is a rule they will trip over.
+  // The ids are not exported as data — they are embedded in the failure strings the lint emits
+  // (`fail.push(\`SK-01 ${rel}: …\`)`), so the source of truth is the module's own text. Reading it
+  // is the honest way to ask "which rules exist": a hand-kept list here would be a second
+  // definition, and this file has already learned what those do.
+  const source = read('tests/lib/lint-rules.mjs');
+  const ids = [...new Set([...source.matchAll(/\b((?:SK|AG)-\d\d)\b/g)].map((m) => m[1]))].sort();
+  assert.ok(ids.length >= 15, `only ${ids.length} rule id(s) found — the scan is wrong`);
+
+  const contributing = read('docs/CONTRIBUTING.md');
+  const missing = ids.filter((id) => !contributing.includes(id)).sort();
+  assert.deepEqual(missing, [],
+    `${missing.length} rule id(s) are not in docs/CONTRIBUTING.md: ${missing.join(', ')}`);
 });
 
 test('ARC-02-S06 criterion 4 — every governance reference is prefixed and resolves', () => {

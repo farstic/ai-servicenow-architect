@@ -1,0 +1,186 @@
+{
+  "_rule": "ARC-02-S01 acceptance (B02-01). Every file whose BODY differs from the import tag `import/engine-v2.8.0-worktree`, and the recorded change that explains it. The criterion is not a COUNT — 65/65 became 62/65 became 23/65 as the engine legitimately changed — it is that no body content was lost in the move, which means every difference is attributable. `tests/skill-bodies-preserved.test.mjs` asserts both directions: a differing file that is not listed is a finding, and a listed file that no longer differs is removed.",
+  "_causes": {
+    "ARC-02-S03": "the `## Triggers` section, where the trigger material moved out of the description",
+    "ARC-02-S06": "governance moved from `governance-rules.md` into `governance/`",
+    "ARC-02-S04": "the agent preload: the persona skill arrives through `skills:` frontmatter rather than being re-read",
+    "ARC-02-S12": "the retired-name sweep (9d90a0b)",
+    "ARC-03-S04": "a dead citation repaired"
+  },
+  "_measured": "42 of 65 bodies differ (23 identical), 2026-09-12, against import/engine-v2.8.0-worktree.",
+  "files": {
+    "skills/app-engine-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06",
+      "ARC-03-S04"
+    ],
+    "skills/atf-author/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "skills/cmdb-csdm-specialist/EXAMPLES.md": [
+      "ARC-03-S04"
+    ],
+    "skills/cmdb-csdm-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06",
+      "ARC-03-S04"
+    ],
+    "skills/code-reviewer/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06"
+    ],
+    "skills/csm-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06",
+      "ARC-03-S04"
+    ],
+    "skills/developer/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06"
+    ],
+    "skills/devops-release-manager/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "skills/diagramming-specialist/SKILL.md": [
+      "ARC-02-S03"
+    ],
+    "skills/discovery-specialist/SKILL.md": [
+      "ARC-02-S03"
+    ],
+    "skills/estimation-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "skills/flow-designer-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06"
+    ],
+    "skills/hld-lld-writer/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06"
+    ],
+    "skills/hrsd-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06"
+    ],
+    "skills/integration-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06"
+    ],
+    "skills/itom-discovery-specialist/EXAMPLES.md": [
+      "ARC-02-S12"
+    ],
+    "skills/itom-discovery-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06",
+      "ARC-02-S12",
+      "ARC-03-S04"
+    ],
+    "skills/itsm-specialist/EXAMPLES.md": [
+      "ARC-02-S06"
+    ],
+    "skills/itsm-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06",
+      "ARC-03-S04"
+    ],
+    "skills/licensing-specialist/EXAMPLES.md": [
+      "ARC-02-S06",
+      "ARC-03-S04"
+    ],
+    "skills/licensing-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "skills/migration-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06",
+      "ARC-03-S04"
+    ],
+    "skills/now-assist-genai/EXAMPLES.md": [
+      "ARC-03-S04"
+    ],
+    "skills/now-assist-genai/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "skills/now-assist-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06"
+    ],
+    "skills/operational-documentation/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "skills/performance-scale-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "skills/reporting-analytics-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "skills/security-grc-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "skills/spm-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "skills/story-writer/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06"
+    ],
+    "skills/technical-designer/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-02-S06"
+    ],
+    "skills/ui-ux-specialist/SKILL.md": [
+      "ARC-02-S03",
+      "ARC-03-S04"
+    ],
+    "agents/atf-author.md": [
+      "ARC-02-S06",
+      "ARC-02-S04"
+    ],
+    "agents/developer.md": [
+      "ARC-02-S06",
+      "ARC-02-S04",
+      "ARC-03-S04"
+    ],
+    "agents/diagramming-specialist.md": [
+      "ARC-02-S04"
+    ],
+    "agents/flow-designer-specialist.md": [
+      "ARC-02-S06",
+      "ARC-02-S04",
+      "ARC-03-S04"
+    ],
+    "agents/hld-lld-writer.md": [
+      "ARC-02-S06",
+      "ARC-02-S04"
+    ],
+    "agents/integration-specialist.md": [
+      "ARC-02-S06",
+      "ARC-02-S04",
+      "ARC-03-S04"
+    ],
+    "agents/now-assist-specialist.md": [
+      "ARC-02-S06",
+      "ARC-02-S04",
+      "ARC-03-S04"
+    ],
+    "agents/story-writer.md": [
+      "ARC-02-S06",
+      "ARC-02-S04",
+      "ARC-03-S04"
+    ],
+    "agents/technical-designer.md": [
+      "ARC-02-S06",
+      "ARC-02-S04"
+    ]
+  }
+}

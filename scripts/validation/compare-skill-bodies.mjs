@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ARC-02-S01 (throwaway, deleted with scripts/maint/ at the end of the ARC).
+// ARC-02-S01 (throwaway, deleted with scripts/validation/ at the end of the ARC).
 // Proves the roster's BODY CONTENT survived the move: frontmatter aside, and with the rewritten path
 // tokens normalised back, every skill, EXAMPLES and agent file must be byte-identical to the import.
 // ARC README acceptance criterion 1. S03/S04 reuse it against import/engine-v2.8.0-worktree.
@@ -46,7 +46,11 @@ for (const sub of ['skills', 'agents']) {
     }
   }
 }
-for (const d of diffs.slice(0, 10)) console.error(d);
+// ARC-02 acceptance (B02-01): EVERY difference, not the first ten. This printed
+// `diffs.slice(0, 10)` with no "…and N more", so a reader — including a reviewer measuring the
+// criterion — saw ten names when forty-two files differed, and no line said otherwise. A
+// diagnostic that truncates silently is a diagnostic that misleads precisely when it matters.
+for (const d of diffs) console.error(d);
 console.log(`bodies identical: ${mdSame}/${md}`);
 console.log(`assets identical: ${assetSame}/${asset}`);
 process.exit(diffs.length ? 1 : 0);
