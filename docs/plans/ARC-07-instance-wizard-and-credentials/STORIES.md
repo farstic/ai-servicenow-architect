@@ -1045,6 +1045,28 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 
 ---
 
+> **Amendment 2026-09-12 (acceptance pass, item B07-04). AC 5 is POST-SITTING, and the test that
+> guarded it would have broken on the sitting's own commit.**
+>
+> AC 5 asks that `tests/fixtures/oauth-ropc-errors.json` contain captured `error` /
+> `error_description` values and that S03's table map them to `OAUTH_ROPC_DISABLED`. **The evidence
+> cannot exist until the sitting runs**: capturing a body needs the ROPC grant attempted against a
+> PDI with `glide.oauth.inbound.ropc.grant_type.disabled` toggled, which is OWNER-SITTING's *live
+> E2E suite* item (d). The fixture is a valid EMPTY placeholder meanwhile, and that is the correct
+> state rather than a gap — the table carries the RFC 6749 §5.2 names and an unrecognised body falls
+> through to `auth failed` with the raw value rather than being guessed at. The story is Done on
+> everything else; AC 5 is marked **post-sitting** and is not evidence anyone should look for today.
+>
+> **The defect found while recording that.** `packages/snowarch/tests/servicenow/probes.test.ts`
+> asserted `expect(fixture.observed).toEqual([])` — it pinned the fixture EMPTY. The moment the
+> sitting committed a captured body the test would have gone red, and it would have read like a
+> regression in the probe rather than the arrival of the evidence the criterion asks for. The rule
+> is not "the list is empty"; it is **"every row that exists maps to a code the table knows"**,
+> which is true of an empty list as well. Rewritten that way: each captured row must carry
+> `error` / `error_description` / `httpStatus` / `observedAt`, its `error` must resolve in
+> `ROPC_ERROR_TABLE`, and `unsupported_grant_type` must map to `OAUTH_ROPC_DISABLED`. So the sitting
+> can commit its capture into a green tree, and AC 5 becomes true without anyone editing a test.
+
 ## Sizing summary
 
 | Story | Size | Days (range) |

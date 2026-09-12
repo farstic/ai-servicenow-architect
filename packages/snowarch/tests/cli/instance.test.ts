@@ -172,6 +172,11 @@ describe('the happy path', () => {
       expect(result.entry?.auth.username).toBe('s***');
       expect(JSON.stringify(result.entry)).not.toContain(PASSWORD);
       expect(Object.keys(result.entry ?? {})).not.toContain('password');
+
+      // AC 5, the "once per run" half (acceptance item B07-01). The format and the masking were
+      // asserted in `reachability.test.ts`; the COUNT was documented at the call site and nowhere
+      // else. One line, not zero — a run that printed none would satisfy "not twice".
+      expect(out.match(/^network: /gm) ?? []).toHaveLength(1);
     } finally { w.cleanup(); }
   });
 
@@ -312,6 +317,34 @@ describe('criterion 6 — unreachable, and a role that cannot read', () => {
       expect(result.exitCode).toBe(EXIT_FAILED);
       expect(terminal.written()).toContain('reachability: FAIL DNS_FAILURE');
       expect(terminal.written()).toContain(NOTHING_SAVED);
+      expect(existsSync(w.store)).toBe(false);
+      // Still exactly one: the line is printed before the probe, so a FAILING probe prints it too —
+      // "it worked" and "it failed behind a proxy" are the two facts it exists to tell apart.
+      expect(terminal.written().match(/^network: /gm) ?? []).toHaveLength(1);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and the RETRY path probes again without printing the network line twice', async () => {
+    // The one path that could break "once per run", and the reason the count is asserted at all:
+    // the menu re-probes, and a second `describeNetworkEnv` beside the second probe would look
+    // entirely reasonable to whoever adds it. Two probes, one line.
+    const w = workspace();
+    try {
+      let probes = 0;
+      const failing = async (...args: Parameters<typeof unreachable>) => {
+        probes += 1;
+        return unreachable(...args);
+      };
+      // [2] is retry — [1] is "re-enter the URL", which the first version of this test chose and
+      // the precondition below caught: one probe, not two, so the assertion would have been true
+      // of a run that never retried.
+      const terminal = io(['2']);
+      const result = await runAdd({ ...baseOptions }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: failing, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_FAILED);
+      expect(probes, 'the retry did not re-probe — this asserts nothing').toBeGreaterThan(1);
+      expect(terminal.written().match(/^network: /gm) ?? []).toHaveLength(1);
       expect(existsSync(w.store)).toBe(false);
     } finally { w.cleanup(); }
   });

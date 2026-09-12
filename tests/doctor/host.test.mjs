@@ -7,8 +7,9 @@
 // wording: a wording nobody has seen degrades to a WARN that says so.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, writeFileSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { delimiter, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { which } from '../../tools/snowarch/lib/which.mjs';
 
@@ -16,6 +17,8 @@ import { classifyStatus, hostChecks, inspectCa, PEM_HEADER,
   readVar } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { bootstrap, contextFor, greenTree, runById } from './helpers/tree.mjs';
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 const checks = hostChecks();
 const run = (id, root, over = {}) => runById(checks, id, contextFor(root, over));
@@ -112,11 +115,62 @@ test('E-25 names the provider, and is quiet outside a synced tree', async (t) =>
 });
 
 test('E-25 answers to the same provider list as the server and the bootstrap', async (t) => {
-  const parent = tempDir('snowarch-cloud-', t);
-  for (const [segment, provider] of [['Dropbox', 'Dropbox'], ['Google Drive', 'Google Drive'],
-    ['Mobile Documents', 'iCloud Drive']]) {
-    const r = await atPath(join(parent, segment, 'repo'));
-    assert.equal(r.data.provider, provider, `${segment} read as ${r.data.provider}`);
+  // ARC-07-S07 AC 3, acceptance item B07-02. This case used to carry THREE hand-written segments
+  // while claiming to answer to the shared list — the claim was true of those three and unchecked
+  // for the rest. The fixture is the list: the server's `detectCloudSync()`, the bootstrap's
+  // `cloudSyncProvider()` and this check all answer to it, and three tables that merely look alike
+  // would drift exactly when it mattered.
+  const fixture = JSON.parse(readFileSync(
+    join(repoRoot, 'packages/snowarch/tests/fixtures/cloud-sync-paths.json'), 'utf8'));
+  assert.ok(fixture.synced.length > 5, 'the fixture is not empty — every loop below depends on it');
+  assert.ok(fixture.quiet.length > 3, 'the fixture has no quiet rows — half the table is missing');
+
+  for (const { path, provider, why } of fixture.synced) {
+    const r = await atPath(path);
+    assert.equal(r.status, 'warn', `${path} — ${why}`);
+    // WHETHER is the shared answer and is asserted exactly. WHICH is asserted except where the
+    // fixture itself says the provider is unknown — the engine names the mount where the server
+    // names the vendor, and the warning reads correctly either way.
+    if (provider !== 'CloudStorage (unknown provider)') {
+      assert.equal(r.data.provider, provider, `${path} — ${why}`);
+    } else {
+      assert.ok(r.data.provider, `${path}: detected but with no provider — ${why}`);
+    }
+  }
+
+  for (const { path, why } of fixture.quiet) {
+    const r = await atPath(path);
+    assert.equal(r.status, 'ok', `${path} — ${why}`);
+    assert.equal(r.data.provider, null, `${path} — ${why}`);
+  }
+});
+
+test('E-25 does NOT read the Windows environment roots — a recorded gap, not a passing case', async () => {
+  // THE FIXTURE HAS A THIRD SECTION AND THIS CHECK CANNOT ANSWER IT (acceptance item B07-02).
+  //
+  // `env[]` is Known Folder Move: an enterprise policy redirects Documents into OneDrive, the word
+  // OneDrive appears nowhere in the path, and `%OneDrive%` is — in the fixture's own words — "the
+  // only detector there is". The server's `detectCloudSync(path, { env })` reads it and its test
+  // iterates those rows. The bootstrap's `cloudSyncProvider(path)` takes NO env, and E-25 calls it
+  // with `ctx.root` alone, so on such a machine E-25 reports "not under a cloud-sync folder" for a
+  // checkout that is one.
+  //
+  // Asserted as it behaves TODAY, deliberately, so the gap is visible and cannot change unnoticed
+  // in either direction: if someone makes the detector env-aware this test fails and is rewritten
+  // as a passing case, which is the outcome this row wants. Recorded for ARC-06/ARC-08's owner
+  // rather than fixed here — it is a product behaviour change on a Windows path, days before an RC,
+  // and it is not what this acceptance item asked for.
+  const fixture = JSON.parse(readFileSync(
+    join(repoRoot, 'packages/snowarch/tests/fixtures/cloud-sync-paths.json'), 'utf8'));
+  assert.ok(fixture.env.length > 2, 'the fixture lost its environment rows');
+
+  for (const { path, set, provider, why } of fixture.env) {
+    // The environment is passed in, so this is not "the ctx had no env" — the check never looks.
+    const r = await runById(checks, 'E-25',
+      { root: path, platform: 'win32', env: set, config: {}, home: '' });
+    assert.equal(r.status, 'ok',
+      `E-25 now detects ${path} (${provider}) — make this a passing case: ${why}`);
+    assert.equal(r.data.provider, null);
   }
 });
 

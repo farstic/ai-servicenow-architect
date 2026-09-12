@@ -207,6 +207,11 @@ describe('AC 2 — test', () => {
       expect(JSON.stringify(after?.auth)).toBe(JSON.stringify(before?.auth));
       expect(after?.preset).toBe(before?.preset);
       expect(JSON.stringify(after?.flags)).toBe(JSON.stringify(before?.flags));
+
+      // ARC-07-S02 AC 5's "once per run", on the other command that prints it (acceptance item
+      // B07-01). `instance test` re-probes an entry that already exists, so it is the run where a
+      // second line would be least noticed.
+      expect(terminal.written().match(/^network: /gm) ?? []).toHaveLength(1);
     } finally { ws.cleanup(); }
   });
 
