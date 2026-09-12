@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootstrapCommand } from '../lib/bootstrap.mjs';
@@ -152,6 +152,13 @@ test('AC 6 — without --skip-claude-check on a runner that has none, B00 fails'
 
 test('the network failure a preflight reports is the one the clone would have hit', async () => {
   const root = gitCheckout();
+  // ARC-09-C29: B00 probes the CORPUS remote, and this fixture's upstream is `file:///dev/null` —
+  // a local one, which is correctly not probed at all. This case is about the failure a clone
+  // would hit, so it needs a checkout that would actually clone from somewhere.
+  const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  writeFileSync(join(root, 'engine.config.json'), `${JSON.stringify({
+    ...config, docs: { ...config.docs, upstream: 'https://github.com/ServiceNow/ServiceNowDocs.git' },
+  }, null, 2)}\n`);
   const a = args(root);
   const code = await bootstrapCommand({ ...a, cwd: root,
     probe: async () => ({ ok: false, proxy: null,

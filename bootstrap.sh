@@ -18,7 +18,9 @@ MSG_GIT_LINUX='install git with your distribution'\''s package manager (apt inst
 MSG_GIT_WIN='winget install Git.Git'
 MSG_CLAUDE='install Claude Code from https://code.claude.com/docs/en/setup, then re-run'
 MSG_NET='check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run'
-MSG_DNS='cannot reach github.com (DNS) — check your network and re-run'
+MSG_DNS_FMT='cannot reach %s (DNS) — check your network and re-run'
+MSG_UPSTREAM_LOCAL='corpus upstream is local — no probe'
+MSG_UPSTREAM_SCHEME_FMT='corpus upstream is %s — not probed (this check speaks HTTPS)'
 MSG_TLS='TLS interception detected — set GIT_SSL_CAINFO (or git config http.sslCAInfo) to your corporate CA bundle and re-run; the MCP server needs the same bundle via NODE_EXTRA_CA_CERTS (docs/TROUBLESHOOTING.md)'
 MSG_DOCTOR='DOCTOR: unavailable until Node 20+ is installed (design-only is complete)'
 MSG_MODE='Mode: design-only'
@@ -105,16 +107,31 @@ say "ok B00 disk: $((FREE_KB/1048576)) GB free"
 # returns 2, and git says nothing — so a probe that reads only stderr called that "reachable"
 # and one that reads only the exit code called it "unreachable". Both were reading a flag bug.
 # The rule now: the EXIT CODE decides, stderr only chooses which sentence explains it.
-NET="$(GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 \
-  ls-remote --exit-code "https://github.com/$(sed -n 's/.*"repo": *"\([^"]*\)".*/\1/p' "$ROOT/engine.config.json").git" HEAD 2>&1 >/dev/null)" || NET_RC=$?
-if [ -n "${NET_RC:-}" ] ; then
-  case "$NET" in
-    *"ould not resolve host"*) die B00 "$MSG_DNS" "$MSG_NET" 3 ;;
-    *"SSL certificate problem"*) die B00 "$MSG_TLS" "$MSG_NET" 3 ;;
-    *) die B00 "cannot reach github.com" "$MSG_NET" 3 ;;
-  esac
-fi
-say "ok B00 network: github.com reachable"
+# ARC-09-C29: probe the host THIS RUN contacts — the corpus remote, which B02 fetches. A bootstrap
+# never contacts the product repository (`upgrade` uses the checkout's own `origin`), so probing it
+# asked about one host and said nothing about another. These arms are `corpusProbe()` from
+# `tools/snowarch/lib/probe-net.mjs` in shell; its comment carries the reasoning.
+UPSTREAM="$(sed -n 's/.*"upstream": *"\([^"]*\)".*/\1/p' "$ROOT/engine.config.json" | head -n 1)"
+UP_REST="${UPSTREAM#*://}" ; UP_HOST="${UP_REST%%[/:]*}" ; UP_SCHEME="${UPSTREAM%%://*}"
+case "$UPSTREAM" in
+  http://*|https://*)
+    NET="$(GIT_TERMINAL_PROMPT=0 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 \
+      ls-remote --exit-code "$UPSTREAM" HEAD 2>&1 >/dev/null)" || NET_RC=$?
+    if [ -n "${NET_RC:-}" ] ; then
+      case "$NET" in
+        *"ould not resolve host"*) die B00 "$(printf "$MSG_DNS_FMT" "$UP_HOST")" "$MSG_NET" 3 ;;
+        *"SSL certificate problem"*) die B00 "$MSG_TLS" "$MSG_NET" 3 ;;
+        *) die B00 "cannot reach $UP_HOST" "$MSG_NET" 3 ;;
+      esac
+    fi
+    say "ok B00 network: $UP_HOST reachable" ;;
+  # `file://` BEFORE the scheme arm, or a local upstream is reported as an unspeakable remote —
+  # which is what the first version did, and the launcher test said so in one run.
+  file://*) say "ok B00 network: $MSG_UPSTREAM_LOCAL" ;;
+  # Remote but unspeakable to this probe — NOT the same claim as local, so not the same sentence.
+  *://*) say "ok B00 network: $(printf "$MSG_UPSTREAM_SCHEME_FMT" "$UP_SCHEME")" ;;
+  *) say "ok B00 network: $MSG_UPSTREAM_LOCAL" ;;
+esac
 say "ok B00 node: note: Node.js not found — design-only only; live mode needs Node 20+ ($NODE_REMEDY)"
 step B00 preflight ok
 if [ "$YES" != 1 ] ; then

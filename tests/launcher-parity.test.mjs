@@ -53,8 +53,11 @@ test('every embedded sentence equals the file it was generated from', async () =
   assert.equal(shellVar('MSG_GIT_LINUX'), remedies.git.linux);
   assert.equal(shellVar('MSG_CLAUDE'), remedies.claudeCode.default);
   assert.equal(shellVar('MSG_NET'), remedies.network.default);
-  // ARC-03's network vocabulary, not a second phrasing of it.
-  assert.equal(shellVar('MSG_DNS'), sentences.dnsFailure('github.com'));
+  // ARC-03's network vocabulary, not a second phrasing of it. ARC-09-C29: the host is a SLOT, so
+  // the launcher fills in whichever corpus remote is configured — `printf` takes `%s`.
+  assert.equal(shellVar('MSG_DNS_FMT'), sentences.dnsFailure('%s'));
+  assert.equal(shellVar('MSG_UPSTREAM_LOCAL'), sentences.localUpstream);
+  assert.equal(shellVar('MSG_UPSTREAM_SCHEME_FMT'), sentences.unprobeableUpstream('%s'));
   assert.equal(shellVar('MSG_TLS'), sentences.tlsIntercepted({ tool: sentences.TOOL.git }));
   // ARC-06-S09's closing block, including the newlines inside it.
   assert.equal(shellVar('MSG_DOCTOR'), text.doctorUnavailable);
@@ -127,9 +130,18 @@ test('the launcher is short — it is a launcher, not a second implementation', 
   // are different claims, and one more line to keep the elapsed seconds in a variable rather than
   // calling `date` twice. Same trade as bootstrap.ps1's 250 → 265 — the budget exists to stop a
   // launcher becoming an application, and the measured total is printed either way.
-  assert.ok(lines - generated <= 185,
+  //
+  // Raised 185 → 195 (total 206 → 217) by ARC-09-C29: B00 used to probe one hardcoded URL, and now
+  // probes the CONFIGURED corpus remote — which is three outcomes rather than one (probe it; say it
+  // is local; say it is a scheme this probe cannot speak). Ten lines for a `case` with three arms
+  // and two comments, after the first draft was trimmed from fourteen by using parameter expansion
+  // instead of two `sed` subshells. Three more for a `file://` arm the first draft folded into the
+  // scheme arm — which reported a local upstream as an unspeakable remote, and the case below
+  // caught it in one run. The alternative was a launcher that keeps a check simple by making it
+  // untrue, which is the defect C29 exists to remove.
+  assert.ok(lines - generated <= 198,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
-  assert.ok(lines <= 206, `${lines} total lines`);
+  assert.ok(lines <= 220, `${lines} total lines`);
 });
 
 test('the state and the cache bash writes are the ones Node reads', async () => {
@@ -161,7 +173,10 @@ test('the Windows launcher carries the same sentences, in PowerShell syntax', as
   assert.equal(psVar('MSG_GIT_WIN'), remedies.git.win32);
   assert.equal(psVar('MSG_CLAUDE'), remedies.claudeCode.default);
   assert.equal(psVar('MSG_NET'), remedies.network.default);
-  assert.equal(psVar('MSG_DNS'), sentences.dnsFailure('github.com'));
+  // PowerShell's `-f` takes `{0}` where printf takes `%s`: one sentence, two placeholder spellings.
+  assert.equal(psVar('MSG_DNS_FMT'), sentences.dnsFailure('{0}'));
+  assert.equal(psVar('MSG_UPSTREAM_LOCAL'), sentences.localUpstream);
+  assert.equal(psVar('MSG_UPSTREAM_SCHEME_FMT'), sentences.unprobeableUpstream('{0}'));
   assert.equal(psVar('MSG_TLS'), sentences.tlsIntercepted({ tool: sentences.TOOL.git }));
   assert.equal(psVar('MSG_DOCTOR'), text.doctorUnavailable);
   assert.equal(psVar('MSG_MODE'), text.modeDesign);
@@ -170,7 +185,11 @@ test('the Windows launcher carries the same sentences, in PowerShell syntax', as
   assert.match(psVar('MSG_NEXT'), /snowarch\.cmd mode live/);
   // ...and the two launchers agree on everything that is not a spelling.
   assert.equal(psVar('MSG_DOCTOR'), shellVar('MSG_DOCTOR'));
-  assert.equal(psVar('MSG_DNS'), shellVar('MSG_DNS'));
+  // The two placeholder spellings differ BY DESIGN; what must match is the sentence around them.
+  const slotless = (v) => v.replace('{0}', '<host>').replace('%s', '<host>');
+  assert.equal(slotless(psVar('MSG_DNS_FMT')), slotless(shellVar('MSG_DNS_FMT')));
+  assert.equal(psVar('MSG_UPSTREAM_LOCAL'), shellVar('MSG_UPSTREAM_LOCAL'));
+  assert.equal(slotless(psVar('MSG_UPSTREAM_SCHEME_FMT')), slotless(shellVar('MSG_UPSTREAM_SCHEME_FMT')));
 });
 
 test('the PowerShell recipe is dot-sourced, not copied', () => {
@@ -376,6 +395,37 @@ test('the network probe believes git\'s exit code, and says which failure it was
     // ...and a reachable network is not reported as a failure — the half that proves the rest.
     const ok = run(0, '');
     assert.match(ok.stdout, /ok B00 network: github\.com reachable/, ok.stdout + ok.stderr);
+
+    // ARC-09-C29 — a LOCAL corpus upstream is not probed, and says so. This is the half that makes
+    // the fixture suites hermetic: ten `bootstrapUser` call sites used to need DNS for a host they
+    // never contacted, and one network blip took the run with it.
+    const config = JSON.parse(readFileSync(join(dir, 'engine.config.json'), 'utf8'));
+    const rewrite = (upstream) => writeFileSync(join(dir, 'engine.config.json'),
+      `${JSON.stringify({ ...config, docs: { ...config.docs, upstream } }, null, 2)}\n`);
+
+    // `git` here EXITS 1 on any probe: if the launcher probed at all, B00 would FAIL. The
+    // assertion is on B00's line rather than on the exit code, because this fixture has no
+    // `.mcp.json` and B01 stops the run afterwards for a reason that is not what is being tested.
+    rewrite('file:///srv/corpus.git');
+    const local = run(1, 'fatal: could not resolve host: example.invalid');
+    assert.match(local.stdout, /ok B00 network: corpus upstream is local — no probe/);
+    assert.equal(/FAIL B00/.test(local.stdout + local.stderr), false, local.stdout + local.stderr);
+
+    // A scheme this probe cannot speak is remote, and must not claim to be local.
+    rewrite('ssh://git@git.corp.example/corpus.git');
+    const ssh = run(1, 'fatal: could not resolve host: git.corp.example');
+    assert.match(ssh.stdout, /ok B00 network: corpus upstream is ssh — not probed/);
+    assert.equal(/FAIL B00/.test(ssh.stdout + ssh.stderr), false, ssh.stdout + ssh.stderr);
+
+    // ...and a MIRROR is probed, and named. The old check passed on github.com and said nothing
+    // about the host B02 would actually fetch from.
+    rewrite('https://git.corp.example/mirror/ServiceNowDocs.git');
+    const mirrorOk = run(0, '');
+    assert.match(mirrorOk.stdout, /ok B00 network: git\.corp\.example reachable/);
+    const mirrorDns = run(128, 'fatal: could not resolve host: git.corp.example');
+    assert.equal(mirrorDns.status, 3, 'a DNS failure on the configured host is still a B00 refusal');
+    assert.match(mirrorDns.stdout + mirrorDns.stderr,
+      /cannot reach git\.corp\.example \(DNS\)/, 'the DNS sentence names the configured host');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -448,6 +498,7 @@ test('the Windows launcher is a launcher too — the budget, with the region rep
   // BOM'd on 5.1, which Node then refuses): eight lines, five of them the comment that records
   // why. Deleting the explanation to hold a number would be the wrong trade — the budget exists
   // to stop a launcher becoming an application, and the total is printed either way.
-  assert.ok(lines - generated <= 265,
+  // Raised 265 → 278 by ARC-09-C29, for the same probe as bootstrap.sh's 185 → 198.
+  assert.ok(lines - generated <= 278,
     `${lines - generated} hand-written lines (${lines} total, ${generated} generated)`);
 });

@@ -15,7 +15,9 @@ $MSG_NODE_WIN = 'winget install OpenJS.NodeJS.LTS'
 $MSG_GIT_WIN = 'winget install Git.Git'
 $MSG_CLAUDE = 'install Claude Code from https://code.claude.com/docs/en/setup, then re-run'
 $MSG_NET = 'check your network, or set HTTPS_PROXY / NO_PROXY for your environment, and re-run'
-$MSG_DNS = 'cannot reach github.com (DNS) — check your network and re-run'
+$MSG_DNS_FMT = 'cannot reach {0} (DNS) — check your network and re-run'
+$MSG_UPSTREAM_LOCAL = 'corpus upstream is local — no probe'
+$MSG_UPSTREAM_SCHEME_FMT = 'corpus upstream is {0} — not probed (this check speaks HTTPS)'
 $MSG_TLS = 'TLS interception detected — set GIT_SSL_CAINFO (or git config http.sslCAInfo) to your corporate CA bundle and re-run; the MCP server needs the same bundle via NODE_EXTRA_CA_CERTS (docs/TROUBLESHOOTING.md)'
 $MSG_DOCTOR = 'DOCTOR: unavailable until Node 20+ is installed (design-only is complete)'
 $MSG_MODE = 'Mode: design-only'
@@ -151,18 +153,34 @@ if (-not $FreeBytes) { $FreeBytes = 0 }
 if ($FreeBytes -lt 1073741824) { Die 'B00' 'less than 1 GiB free' ("free up space on $Root") 3 }
 Say ("ok B00 disk: {0} GB free" -f [int]($FreeBytes / 1073741824))
 
-$RepoLine = Select-String -Path "$Root\engine.config.json" -Pattern '"repo": *"([^"]*)"' | Select-Object -First 1
-$RepoUrl = 'https://github.com/' + $RepoLine.Matches[0].Groups[1].Value + '.git'
-$env:GIT_TERMINAL_PROMPT = '0'
-# `-h` is deliberately absent — see the note in bootstrap.sh: with it the pattern matches no head
-# ref and git exits 2 in silence, which each launcher read differently. Same command both sides.
-$NetErr = (& git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 ls-remote --exit-code $RepoUrl HEAD 2>&1 | Out-String)
-if ($LASTEXITCODE -ne 0) {
-  if ($NetErr -match 'ould not resolve host') { Die 'B00' $MSG_DNS $MSG_NET 3 }
-  if ($NetErr -match 'SSL certificate problem') { Die 'B00' $MSG_TLS $MSG_NET 3 }
-  Die 'B00' 'cannot reach github.com' $MSG_NET 3
+# ARC-09-C29: the host THIS RUN will contact, which is the corpus remote (B02 fetches it). The
+# product repository is never contacted by a bootstrap — `upgrade` uses the checkout's own
+# `origin` — so probing it was asking about one host and staying silent about another.
+$UpLine = Select-String -Path "$Root\engine.config.json" -Pattern '"upstream": *"([^"]*)"' | Select-Object -First 1
+$Upstream = if ($UpLine) { $UpLine.Matches[0].Groups[1].Value } else { '' }
+if ($Upstream -match '^https?://') {
+  $UpHost = ([uri]$Upstream).Host
+  $env:GIT_TERMINAL_PROMPT = '0'
+  # `-h` is deliberately absent — see the note in bootstrap.sh: with it the pattern matches no head
+  # ref and git exits 2 in silence, which each launcher read differently. Same command both sides.
+  $NetErr = (& git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 ls-remote --exit-code $Upstream HEAD 2>&1 | Out-String)
+  if ($LASTEXITCODE -ne 0) {
+    if ($NetErr -match 'ould not resolve host') { Die 'B00' ($MSG_DNS_FMT -f $UpHost) $MSG_NET 3 }
+    if ($NetErr -match 'SSL certificate problem') { Die 'B00' $MSG_TLS $MSG_NET 3 }
+    Die 'B00' ("cannot reach {0}" -f $UpHost) $MSG_NET 3
+  }
+  Say ("ok B00 network: {0} reachable" -f $UpHost)
+} elseif ($Upstream -match '^file://') {
+  # `file://` BEFORE the scheme arm, or a local upstream is reported as an unspeakable remote.
+  Say ("ok B00 network: {0}" -f $MSG_UPSTREAM_LOCAL)
+} elseif ($Upstream -match '^([a-z][a-z0-9+.-]*)://') {
+  # A remote this probe cannot speak to is NOT reported as local: same outcome, different claim.
+  Say ("ok B00 network: {0}" -f ($MSG_UPSTREAM_SCHEME_FMT -f $Matches[1]))
+} else {
+  # `file://` or a bare path: nothing leaves the machine, and the line says so rather than the
+  # check quietly not happening.
+  Say ("ok B00 network: {0}" -f $MSG_UPSTREAM_LOCAL)
 }
-Say 'ok B00 network: github.com reachable'
 Say ("ok B00 node: note: Node.js not found — design-only only; live mode needs Node 20+ ({0})" -f $MSG_NODE_WIN)
 Step 'B00' 'preflight' 'ok'
 

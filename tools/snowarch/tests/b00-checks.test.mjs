@@ -188,19 +188,58 @@ test('check 4 — disk, with the full corpus asking for more than the sparse one
 });
 
 test('check 5 — the network check turns a probe failure into a named remedy', async () => {
-  const good = await checkNetwork({ env: {}, plat: 'darwin',
+  // ARC-09-C29: the check needs to be told what this run will fetch. The upstream here is the one
+  // `engine.config.json` ships, so these cases exercise the default configuration.
+  const CORPUS = 'https://github.com/ServiceNow/ServiceNowDocs.git';
+  const good = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS,
     probe: async () => ({ ok: true, status: 200, proxy: null }) });
   assert.equal(good.status, 'ok');
   assert.match(good.detail, /github\.com reachable \(HTTP 200\)/);
 
-  const viaProxy = await checkNetwork({ env: {}, plat: 'darwin',
+  const viaProxy = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS,
     probe: async () => ({ ok: true, status: 200, proxy: 'http://***@p:8080' }) });
   assert.match(viaProxy.detail, /via proxy http:\/\/\*\*\*@p:8080/);
 
-  const bad = await checkNetwork({ env: {}, plat: 'darwin',
+  const bad = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS,
     probe: async () => ({ ok: false, detail: 'cannot reach github.com (DNS) — check your network and re-run' }) });
   assert.equal(bad.status, 'fail');
   assert.match(bad.remedy, /HTTPS_PROXY \/ NO_PROXY/);
+
+  // ...and the host it names is the CONFIGURED one, not a constant. A mirror is the case the old
+  // check could not see: it passed on github.com and said nothing about the host B02 would fetch.
+  const mirror = await checkNetwork({ env: {}, plat: 'darwin',
+    upstream: 'https://git.corp.example/mirror/ServiceNowDocs.git',
+    probe: async () => ({ ok: true, status: 200, proxy: null }) });
+  assert.match(mirror.detail, /^git\.corp\.example reachable/);
+});
+
+test('ARC-09-C29 — an upstream that needs no network is skipped OUT LOUD', async () => {
+  // Both halves matter. A local upstream must not be probed -- that is the ten hermetic fixture
+  // tests -- and it must SAY it was not, because a check that quietly stops checking is worse than
+  // one that never existed.
+  let probed = 0;
+  const count = async () => { probed += 1; return { ok: true, status: 200, proxy: null }; };
+
+  for (const upstream of ['file:///tmp/corpus.git', '/tmp/corpus.git', '']) {
+    const r = await checkNetwork({ env: {}, plat: 'darwin', upstream, probe: count });
+    assert.equal(r.status, 'ok', `${upstream || '<empty>'} did not pass`);
+    assert.match(r.detail, /no probe$/, `${upstream || '<empty>'}: ${r.detail}`);
+  }
+  assert.equal(probed, 0, 'a local upstream was probed anyway');
+
+  // A remote this probe cannot speak to is NOT called local: same outcome, different claim, and
+  // saying "local" about an ssh remote would be the untrue-statement bug one scheme further along.
+  const ssh = await checkNetwork({ env: {}, plat: 'darwin',
+    upstream: 'ssh://git@example.com/x.git', probe: count });
+  assert.equal(ssh.status, 'ok');
+  assert.match(ssh.detail, /corpus upstream is ssh — not probed/);
+  assert.equal(probed, 0, 'an ssh upstream was probed over HTTPS');
+
+  // The other direction, or "nothing was probed" would be true of a check that cannot probe at all.
+  const https = await checkNetwork({ env: {}, plat: 'darwin',
+    upstream: 'https://github.com/ServiceNow/ServiceNowDocs.git', probe: count });
+  assert.equal(probed, 1, 'a remote HTTPS upstream was not probed');
+  assert.match(https.detail, /^github\.com reachable/);
 });
 
 test('AC 5 — Node absent is a note in design-only and a FAIL for live', () => {
@@ -259,7 +298,11 @@ test('every check runs even after one has failed, and the summary counts them', 
   // the tool moving the goalposts.
   const lines = [];
   const r = await runB00({
-    root: '/repo', cwd: '/repo', config: { floors: FLOORS }, docs: 'sparse', mode: 'design-only',
+    // ARC-09-C29: the config carries the corpus upstream, because that is what B00 probes now —
+    // and a fixture config without one is a checkout that would skip the probe, which is a
+    // different case (covered by its own test) rather than this one.
+    root: '/repo', cwd: '/repo', docs: 'sparse', mode: 'design-only',
+    config: { floors: FLOORS, docs: { upstream: 'https://github.com/ServiceNow/ServiceNowDocs.git' } },
     env: {}, plat: 'darwin', line: (l) => lines.push(l),
     exec: execWith({ 'claude --version': '2.1.258', 'claude --help': 'auth', 'claude auth status': 'ok',
       'node --version': 'v22.11.0', 'npm --version': '10.9.0', 'git -C': '/repo' }),

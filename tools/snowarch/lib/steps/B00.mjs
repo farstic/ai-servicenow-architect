@@ -21,7 +21,7 @@ import { EXIT_PREREQ } from '../exit.mjs';
 import { remedyFor } from '../remedies.mjs';
 import { formatVersion, meetsFloor, parseVersion } from '../versions.mjs';
 import { MODE } from '../docs/sync.mjs';
-import { probeNetwork } from '../probe-net.mjs';
+import { corpusProbe, probeNetwork } from '../probe-net.mjs';
 import { which } from '../which.mjs';
 import { INPUTS } from '../inputs.mjs';
 
@@ -201,11 +201,25 @@ export function checkDisk({ root, docs, plat, statfs = statfsSync }) {
   return ok('disk', `${gb(free)} free`);
 }
 
-/** 5. github.com, through whatever the environment puts in the way. */
-export async function checkNetwork({ env, plat, probe = probeNetwork, target }) {
-  const r = await probe({ env, ...(target ? { target } : {}) });
+/**
+ * 5. The host THIS RUN will contact, through whatever the environment puts in the way.
+ *
+ * ARC-09-C29: that host is the corpus remote, because the corpus is what the run fetches (B02).
+ * It used to be `https://github.com/<repo>.git` — the product repository, which no step in a
+ * bootstrap contacts — so the check asked about a host the run does not use and said nothing about
+ * the one it does. In the default configuration the corpus IS on github.com and nothing changes.
+ *
+ * An upstream that needs no network, or one this probe cannot speak to, is reported rather than
+ * skipped in silence: the line says which, and the two are not the same claim.
+ */
+export async function checkNetwork({ env, plat, probe = probeNetwork, target, upstream }) {
+  const plan = target ? { local: false, probe: true, host: new URL(target).hostname, target }
+    : corpusProbe(upstream);
+  if (!plan.probe) return ok('network', plan.reason);
+
+  const r = await probe({ env, target: plan.target });
   if (r.ok) {
-    return ok('network', `github.com reachable (HTTP ${r.status})`
+    return ok('network', `${plan.host} reachable (HTTP ${r.status})`
       + (r.proxy ? ` via proxy ${r.proxy}` : ''));
   }
   return fail('network', r.detail, remedyFor('network', { platform: plat }));
@@ -295,6 +309,9 @@ export const run = async (ctx) => {
     skip: Boolean(ctx.skipClaudeCheck), exec: ctx.exec, locate: ctx.locate, probe: ctx.probe,
     statfs: ctx.statfs,
     target: ctx.env?.SNOWARCH_TEST_NET_URL,
+    // ARC-09-C29: what this run will fetch. `SNOWARCH_TEST_NET_URL` above still wins, because a
+    // test that needs a specific endpoint is asking a different question from "what is configured".
+    upstream: ctx.config?.docs?.upstream,
   });
 
   for (const c of checks) {

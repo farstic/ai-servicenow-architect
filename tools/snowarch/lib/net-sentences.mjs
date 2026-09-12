@@ -41,6 +41,17 @@ export const proxyUnreachable = (proxy) =>
 export const dnsFailure = (host) =>
   `cannot reach ${host} (DNS) — check your network and re-run`;
 
+/**
+ * What B00 says when it did NOT probe, and why (ARC-09-C29).
+ *
+ * Sentences rather than constants in `probe-net.mjs`, because all three implementations need them
+ * and this module is the one the launcher generator already loads from its `--root`: putting them
+ * anywhere else made that generator import a second module that a fixture tree does not have.
+ */
+export const localUpstream = 'corpus upstream is local — no probe';
+export const unprobeableUpstream = (scheme) =>
+  `corpus upstream is ${scheme} — not probed (this check speaks HTTPS)`;
+
 export const noRoute = (host) =>
   `no route to ${host} — are you offline, or is a firewall blocking 443?`;
 
