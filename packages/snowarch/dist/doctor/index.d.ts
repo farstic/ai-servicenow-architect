@@ -9,6 +9,7 @@ export interface DoctorOptions {
     fluent?: () => {
         installed: boolean;
         where?: string;
+        version?: string;
     };
     /** Reserved for ARC-08's merged report; only `server` exists today. */
     section?: 'server';

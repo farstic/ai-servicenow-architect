@@ -147,6 +147,36 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 > block that embeds a moving value goes stale the first time it moves, and nobody re-reads a section
 > they already believe. `gen-all` is **10 generators** now.
 
+> **Amendment 2026-09-12 (acceptance pass, item B08-01). AC 6 measured, and it was wrong in two
+> ways — neither of them a defect in the doctor.**
+>
+> **(a) The command does not run.** `node --test tests/doctor/` reports `Cannot find module
+> '<cwd>/tests/doctor'` on Node 24 — with an install and without one — because a bare directory is
+> not a test target on that line. `tests/run.mjs` computes a file list for exactly this reason, in
+> its own words: "whether `node --test` expands a glob argument itself varies by Node line". The
+> criterion should have named a file list from the day the runner did.
+>
+> **(b) The whole suite cannot pass before `npm ci`, and should not be asked to.** Measured on a
+> worktree with no `node_modules`: **231 cases, 222 pass, 9 fail**, and the nine are in three files
+> — `fix.test.mjs`, `json-boundary.test.mjs`, `redaction-e2e.test.mjs` — every one of which needs a
+> LOADED INSTANCE, which needs the server, which cannot start without its runtime dependencies
+> (`Cannot find package '@modelcontextprotocol/sdk' imported from packages/snowarch/dist/server.js`).
+> They fail loudly rather than silently because each asserts its own precondition first ("not a live
+> run: Mode: design-only …"), which is what made this measurable at all.
+>
+> **What AC 6 is amended to, and what now proves each half.** (1) *The doctor and its tests import
+> nothing but the standard library* — 43 files, zero bare specifiers, asserted by
+> `tests/doctor/stdlib-only.test.mjs` with both directions and a stated one-file self-exemption.
+> (2) *The stdlib subset of the suite runs before any install, on all three operating systems* — a
+> step in the `bootstrap (node-cli)` cells, placed before `npm ci` and refusing to run at all if
+> `node_modules` exists; measured locally on a no-install worktree at **196 cases, 196 pass, 0 fail**.
+> (3) *`./snowarch doctor` itself runs before `npm ci`* — already proven by the doctor step beside
+> it, which predates this amendment.
+>
+> The three server-driven files are excluded from the before-install step by name, and that is not a
+> workaround: those nine cases are about an installed machine, and the `test (os, node)` matrix is
+> where they belong.
+
 ### ARC-08-S02 — Engine checks E-00…E-22: prerequisites, repo wiring, docs corpus, roster, contract
 
 > **Amendment 2026-09-08 (from the ARC-02-S07 delivery).** **The roster check calls `node scripts/gen-roster.mjs --json`** — it does not re-read `.claude/skills` and `.claude/agents` itself. That output carries `skills` (with `firesAs` and `version`), `agents` (with `skills` preloads), `utility`, and a `problems` array that is the same list `--check` prints: count mismatches against `engine.config.json.roster`, an agent preloading a skill that does not exist, and an agent that does not preload its own persona. Exit is 1 when `problems` is non-empty. A second implementation would be a second definition of the roster, which is the defect ARC-02-S07 exists to close (P-12).
@@ -327,6 +357,36 @@ README titles → stories: README 1 → S01 · 2 → S02 · 3 → S03 · 4 → S
 **Definition of done.** Merged on both sides; `docs/ARCHITECTURE.md` lists SV-00…SV-07; ARC-07-S09's `--resume` step can call `./snowarch doctor --json` and read `server.instances[]`.
 
 ---
+
+> **Amendment 2026-09-12 (acceptance pass, items B08-02 and B08-03). Two clauses of S04 were true
+> of the product and asserted by nothing; both are asserted now, and one of them moved the product.**
+>
+> **AC 5, second clause — "with the SDK present it is ok and prints its version".** It printed the
+> LOCATION and not the version: `SDK present (<masked path>)`. The probe had the version within
+> reach the whole time — it resolves `@servicenow/sdk/package.json` to find the SDK at all — so the
+> check now prints **both**: the version is what a support conversation asks for, the location
+> answers which of two installs is in use. Reading it never throws: an unreadable or versionless
+> `package.json` still means the SDK is installed, and a doctor that crashed on a malformed
+> dependency would be worse than one that says less. Asserted in both directions in
+> `packages/snowarch/tests/doctor/sv03-sv04.test.ts`.
+>
+> **AC 7, second half — "editing the store's `maxRecords` to 50 after the server was started makes
+> SV-06 FAIL naming `maxRecords`".** `maxRecords` appeared in the suite only as fixture data. It is
+> now `packages/snowarch/tests/doctor/sv06-store-drift.test.ts`, and two things about it are worth
+> recording because they are not obvious:
+>
+> - **It runs IN PROCESS and imports from `dist/`, not `src/`.** The window SV-06 exists to catch is
+>   between the server reading the store and the doctor reading it, inside one CLI run; reaching it
+>   from a child process would mean editing the file mid-run, which is a race, and this repository
+>   does not write tests that depend on a clock. In process, the cached handshake IS "the server
+>   that is already running" (`resetHandshakeCache` is the seam that exists for fixtures). The
+>   imports must come from `dist/` because SV-05/SV-06 look for `server.js` and `contract.json`
+>   beside their own module — a check imported from `src/` finds no contract and SKIPS, which reads
+>   exactly like a pass, and did on the first attempt.
+> - **The negative control had to be run in SOURCE.** Removing the `maxRecords` comparison from
+>   `dist/` and re-running proved nothing: `npm test` in that workspace runs a `pretest` build,
+>   which regenerated `dist` and silently restored the line. Removed from `src/` instead, both cases
+>   go red — so the test is load-bearing rather than merely green.
 
 ### ARC-08-S05 — Merged report, the authoritative `Mode:` line, `--quick` / `--no-network` / `--section`, capability packs, `.local/doctor-last.json`
 

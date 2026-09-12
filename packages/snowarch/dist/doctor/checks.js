@@ -214,7 +214,7 @@ export const svInstances = {
             if (stated[FLUENT_FLAG] === 'true') {
                 const sdk = fluent();
                 notes.push(sdk.installed
-                    ? `${i.name}: ${FLUENT_FLAG} on, SDK present${sdk.where ? ` (${maskPath(sdk.where)})` : ''}`
+                    ? `${i.name}: ${FLUENT_FLAG} on, SDK present${sdk.version ? ` ${sdk.version}` : ''}${sdk.where ? ` (${maskPath(sdk.where)})` : ''}`
                     : `${i.name}: FLUENT_NOT_INSTALLED — ${FLUENT_FLAG} is on and @servicenow/sdk is not `
                         + 'resolvable');
             }

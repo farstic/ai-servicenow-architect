@@ -127,3 +127,21 @@ The seven fields, measured on the live fixture before the fix:
 | `$.checks[35].detail` | a second check, same shape as the first |
 
 After: the JSON passes all six of ARC-10-S07's redaction patterns, contains neither the label nor the host, and the mode line reads `Mode: live — instance=<label> (prod) preset=read-only`.
+
+### Acceptance
+
+The acceptance pass against `docs/plans/06-ACCEPTANCE-PLAN.md` §2. One row per backlog item: what it
+claimed, what the tree said, and what changed.
+
+| Item | Outcome | Evidence |
+|---|---|---|
+| B08-01 — S01 AC 6: `node --test tests/doctor/` passes on three OSes before `npm ci` | **rework + record** | Measured on a worktree with no `node_modules`: **231 cases, 222 pass, 9 fail**. The nine are `fix.test.mjs`, `json-boundary.test.mjs` and `redaction-e2e.test.mjs`, every one needing a loaded instance → the server → `@modelcontextprotocol/sdk`, which is not there (`ERR_MODULE_NOT_FOUND` from `dist/server.js`). Separately the literal command does not run on Node 24 **with or without** an install: `Cannot find module '<cwd>/tests/doctor'` — a bare directory is not a test target on that line, which is why `tests/run.mjs` computes a file list. Now: `tests/doctor/stdlib-only.test.mjs` asserts the property that is true (43 files, **0 bare specifiers**, both directions, one stated self-exemption), a step in the three `bootstrap (node-cli)` cells runs the 17-file stdlib subset **before `npm ci`** and refuses to run if `node_modules` exists (**196/196** locally on the no-install worktree), and AC 6 is amended to say all of this |
+| B08-02 — S04 AC 7: a store edited after the server started makes SV-06 fail naming `maxRecords` | **rework** | `packages/snowarch/tests/doctor/sv06-store-drift.test.ts`, two cases. In process and importing from `dist/`, because SV-05/SV-06 look for `server.js` and `contract.json` beside their own module — imported from `src/` they find no contract and **skip**, which reads exactly like a pass and did on the first attempt. The cached handshake is "the server already running" (`resetHandshakeCache` is the fixture seam), so no clock is involved. Both directions: the drift fails naming `maxRecords` with `server 100 vs store 50` and a restart remedy; the same edit **after a restart** is green again. The negative control had to be run in SOURCE — removing the comparison from `dist/` proved nothing because `npm test` runs a `pretest` build that restored it |
+| B08-03 — S04 AC 5: with the SDK present SV-03 is ok and prints its version | **rework** | It printed the location, not the version. The probe already resolves `@servicenow/sdk/package.json` to find the SDK at all, so the version was one guarded read away: SV-03 prints **both** now — the version is what a support conversation asks for, the location answers which of two installs is in use. Never throws: a versionless or unreadable `package.json` still reports the SDK as present, asserted as its own case. AC 5 amended to record that both are printed |
+
+**Also resolved in this pass, for the plan's two open flags.** *Sitting B is not empty* —
+`OWNER-SITTING.md:150` defines it and it carries `## B0.`–`## B5.` (lines 771–868), the ARC-00
+`S-14a`–`S-14d` questions; B1–B4 are ANSWERED, **B5 is outstanding**. *The `§ D1`–`D5` references are
+placed correctly* and are not the Windows sitting: `## Sitting D — Windows` is line 502, while the
+six per-story doctor sittings sit at lines 89, 193, 227, 373, 409 and 430. The naming collision is
+the real finding and is recorded in the plan.
