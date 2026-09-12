@@ -158,6 +158,35 @@ Evidence discipline: the auto-memory location is **not** asserted as a fixed pat
 
 **Definition of done.** Merged before the tag; CONTRIBUTING and MIGRATION updated; CI green.
 
+**Amended 2026-09-12 (S02 build).** The text above is left as it was written; what follows is what
+the build found and what shipped instead. Source for all of it: the Claude Code memory documentation,
+<https://docs.claude.com/en/docs/claude-code/memory>, fetched 2026-09-12.
+
+- **Bullet 3's parenthetical is wrong on both halves and is not in the product text.** It says "see
+  the Claude Code memory documentation for the exact location on your platform" — the page states
+  ONE location and describes no platform variance, so the promise cannot be kept. It also cites
+  `the doctor's E-check "auto memory present"`: **there is no such check** (`git grep -i "auto
+  memory" -- tools/snowarch/lib/doctor` is empty). A check is a story, not a sentence in a document,
+  so the clause was dropped rather than the check invented. The shipped text stays path-free for the
+  reason the evidence discipline gives — the location is Claude Code's to change — and points a
+  reader at `/memory`, which the page documents and which cannot go stale.
+- **Two paragraphs were ADDED that the story did not ask for**, both forced by the same page.
+  *Auto memory is per repository and shared by every worktree of it*, so "one checkout per
+  engagement" means a separate CLONE; two `git worktree` siblings would share their notes, which is
+  the arrangement this rule exists to prevent, and a rule about a boundary has to say where the
+  boundary is not. *Claude Code's auto memory keeps its index in a file also called `MEMORY.md`*, so
+  retiring ours "in favour of auto memory" reads as though the file simply moved — the section says
+  they are different files with different owners.
+- **AC 1's scope, as tested.** The literal grep (`CLAUDE.md docs .claude`) also returns
+  `docs/plans/**`, where this story's own text names the file; the test uses ARC-02-S06's `IN_SCOPE`
+  (product documents, excluding plans, spikes, decisions and `RELICENSING.md`) and allows the two
+  files that retire it — **plus any line that says "retired"**, in any file. That allowance was added
+  when the first version caught this story's own changelog entry, which was right to name the file:
+  a release note naming what it retires is the opposite of teaching it. A control asserts a line
+  that merely mentions the path is still a finding.
+- **The fallback recorded in the evidence discipline was not needed:** the feature is present and
+  documented at the 2.1.214 floor, so no product text depends on it being absent.
+
 ---
 
 ### ARC-10-S03 — Retire the legacy scaffolding: `scripts/legacy/`, obsolete `.gitignore` lines, empty legacy-name allow-list
