@@ -661,12 +661,30 @@ describing a state the repository is not in.
 ### Before you push
 
 ```
-npm test
+npm run lint          # gen:check, the workspace lints, the engine's L01-L11
+npm run type-check    # tsc --noEmit, and again for the test tsconfig
+npm test              # the engine suite, then every workspace's
+npm run contract      # the contract gate
 claude plugin validate .claude/skills --strict
 claude plugin validate .claude/agents --strict
 ```
 
-CI runs all three. `--strict` promotes warnings to failures — S-19 found it rejects a missing `author`
+**Run all four npm scripts, and stage your changes first.** Two of them answer a question `npm test`
+does not, and both have let a defect through to CI:
+
+- `type-check` is its OWN step in the `test` job (`ci.yml`: `npm run lint`, `npm run type-check`,
+  `npm test`, in that order), so a type error is invisible to a local `npm test` that passes.
+  ARC-08's acceptance PR shipped three `TS2578: Unused '@ts-expect-error' directive` that way.
+- The legacy-name ratchet reads the working tree, and until ARC-10-C1 it read the INDEX — a run
+  before `git add` scanned neither new file. Staging first is no longer load-bearing, but it is
+  still what makes a local run and CI's run ask the same question.
+
+`actionlint` is a separate job and is NOT installed here: if you edit a workflow, the shell body is
+judged by shellcheck through actionlint on CI. Write the script so `shellcheck -s sh` would pass —
+no `ls | grep` (SC2010), every variable quoted (SC2086) — or install shellcheck and run it on the
+extracted body. ARC-08's acceptance PR was red on exactly those two rules.
+
+CI runs all of these. `--strict` promotes warnings to failures — S-19 found it rejects a missing `author`
 where the component type requires one — so the strict form is the one worth running; the lax form lets a
 warning through unnoticed. The `plugin-validate` job is no longer `continue-on-error`: a real validation
 failure turns the workflow red. What it will not do is go red because the CLI is missing — the install

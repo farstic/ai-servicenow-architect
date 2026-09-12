@@ -219,6 +219,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The health check now tells you which version of the ServiceNow SDK you have, not just where it
+  is.** If you use the Fluent SDK, `snowarch doctor` reported that it was present and printed the
+  folder; it now prints the version too, which is the thing a support conversation actually asks
+  for. The folder is still there — it answers which of two installs is in use.
+
 - **A guard that protects your home directory no longer objects to being explained.** One of the
   checks that keeps this product from ever reading or writing files in your home folder searched the
   source for the names of the things it forbids — including inside comments, so writing down *why*

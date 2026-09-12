@@ -417,6 +417,38 @@ jobs:
           echo "doctor exit: $code"
           if [ "$code" -ge 2 ]; then exit 1; fi
           ./snowarch doctor --no-cache | tail -25 || true
+      # ── ARC-08-S01 AC 6 (acceptance item B08-01) ───────────────────────────────────────────
+      # STILL BEFORE `npm ci`, which is the whole claim: the doctor is what you run when the
+      # install went wrong, so neither it nor the tests that drive it may need the install to have
+      # worked. `tests/doctor/stdlib-only.test.mjs` asserts the property statically on every
+      # platform; this runs the suite for real on a machine that has no `node_modules` at all.
+      #
+      # A FILE LIST, not `tests/doctor/`: a bare directory is not a test target on Node 24 —
+      # `Cannot find module '<cwd>/tests/doctor'`, install or no install — and `tests/run.mjs`
+      # computes its own list for the same reason.
+      #
+      # The three files that drive the SERVER are excluded by name and the reason is not a
+      # workaround: the server cannot start without its runtime dependencies (`Cannot find package
+      # '@modelcontextprotocol/sdk'`), so those nine cases are about the installed machine, and the
+      # `test (os, node)` matrix is where they run. Measured in the acceptance pass: 222 of 231
+      # cases pass here, and the nine that do not are exactly those three files.
+      - name: The doctor's stdlib-only tests, before any install (POSIX)
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: |
+          test ! -d node_modules || { echo "node_modules exists — this step proves nothing"; exit 1; }
+          # Positional parameters, not a string: `ls | grep` is SC2010 and an unquoted `$files` is
+          # SC2086. `set --` builds the list one quoted path at a time, so a path with a space would
+          # survive too.
+          set --
+          for f in tests/doctor/*.test.mjs; do
+            case "$f" in
+              */fix.test.mjs|*/json-boundary.test.mjs|*/redaction-e2e.test.mjs) continue ;;
+            esac
+            set -- "$@" "$f"
+          done
+          test "$#" -gt 0 || { echo "no test files matched — the glob is wrong"; exit 1; }
+          printf '%s\n' "$@"
+          node --test "$@"
       - name: The doctor, on the design-only install (Windows)
         if: (matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash') && matrix.os == 'windows-latest'
         shell: cmd
@@ -429,6 +461,19 @@ jobs:
           call .\snowarch.cmd doctor --no-cache
           if %ERRORLEVEL% GEQ 2 exit /b 1
           exit /b 0
+      # The same claim on Windows, and still before `npm ci`. PowerShell rather than cmd because
+      # the file list needs a glob, and cmd.exe does not expand one.
+      - name: The doctor's stdlib-only tests, before any install (Windows)
+        if: matrix.variant == 'node-cli' && matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          if (Test-Path node_modules) { Write-Error "node_modules exists - this step proves nothing"; exit 1 }
+          $files = Get-ChildItem tests/doctor/*.test.mjs |
+            Where-Object { $_.Name -notin @('fix.test.mjs','json-boundary.test.mjs','redaction-e2e.test.mjs') } |
+            ForEach-Object { $_.FullName }
+          $files
+          & node --test $files
+          if ($LASTEXITCODE -ne 0) { exit 1 }
       # The no-gitbash cell runs it from PowerShell too: `snowarch.cmd` is the entry point on a
       # machine with no POSIX shell, and "works from cmd" and "works from PowerShell" are two
       # claims — the second is the one a user in a terminal actually makes.

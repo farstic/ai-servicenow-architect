@@ -54,6 +54,7 @@ export interface CheckContext {
     fluent?: () => {
         installed: boolean;
         where?: string;
+        version?: string;
     };
     /**
      * The store as the FILE holds it, injected for the same reason `fluent` is. SV-03 asks it which

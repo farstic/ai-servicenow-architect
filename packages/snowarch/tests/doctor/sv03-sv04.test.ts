@@ -84,7 +84,7 @@ const runDoctor = async (opts: Parameters<typeof runServerDoctor>[0] = {}) => {
  * paid for that twice hit the suite timeout, and it was paying for a handshake nobody was
  * asserting. The rules under test are SV-03's, so SV-03 is what runs.
  */
-const runCheck = async (id: string, opts: { fluent?: () => { installed: boolean; where?: string } } = {}) => {
+const runCheck = async (id: string, opts: { fluent?: () => { installed: boolean; where?: string; version?: string } } = {}) => {
   const saved = { ...process.env };
   process.env.HOME = home;
   process.env.USERPROFILE = home;
@@ -167,8 +167,24 @@ describe('SV-03 — the flag matrix', () => {
     expect(missing.detail).toContain('FLUENT_NOT_INSTALLED');
     expect(remedyFor('FLUENT_NOT_INSTALLED')?.command).toContain('@servicenow/sdk');
 
-    const present = await runCheck('SV-03', { fluent: () => ({ installed: true, where: join(home, 'sdk') }) });
+    // B08-03: AC 5's second clause is "with the SDK present it is ok and prints its VERSION", and
+    // the check printed only the location until the acceptance pass. Both now — the version is what
+    // a support conversation asks for, the location answers which of two installs is in use.
+    const present = await runCheck('SV-03', {
+      fluent: () => ({ installed: true, where: join(home, 'sdk'), version: '3.0.0' }),
+    });
     expect(present.detail).toContain('SDK present');
+    expect(present.detail).toMatch(/3\.0\.0/);
+    expect(present.status).toBe('ok');
+
+    // A version the probe could not read is not a failure: the SDK is still installed, and a doctor
+    // that crashed on a malformed dependency would be worse than one that says less.
+    const noVersion = await runCheck('SV-03', {
+      fluent: () => ({ installed: true, where: join(home, 'sdk') }),
+    });
+    expect(noVersion.status).toBe('ok');
+    expect(noVersion.detail).toContain('SDK present');
+    expect(noVersion.detail).not.toMatch(/3\.0\.0/);
     expect(present.detail).not.toContain('FLUENT_NOT_INSTALLED');
   });
 

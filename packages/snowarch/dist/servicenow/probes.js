@@ -14,7 +14,7 @@
  * Nothing here writes. Every probe is a `GET` with `sysparm_limit=1`, and the one that is not a
  * GET — the ROPC token request — asks for a token and discards it.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { delimiter, join } from 'node:path';
@@ -132,6 +132,27 @@ export const CAPABILITY_TABLE = Object.freeze({
     FLUENT_ENABLED: { local: 'fluent' },
 });
 /**
+ * The SDK's version, from the `package.json` the resolver already found.
+ *
+ * ARC-08-S04 AC 5 says SV-03 "prints its version", and the check printed the LOCATION instead —
+ * found in the acceptance pass (plan item B08-01..03, B08-03). The version is the more useful half
+ * of the two in a pasted report ("which SDK do you have" is answerable; "where is it" rarely is),
+ * so the check prints both now.
+ *
+ * Never throws. This whole probe is a hint: an unreadable or versionless `package.json` means the
+ * SDK is still installed, and a doctor check that crashed on a malformed dependency would be worse
+ * than one that says less.
+ */
+function sdkVersion(packageJson, read = readFileSync) {
+    try {
+        const v = JSON.parse(read(packageJson, 'utf8')).version;
+        return typeof v === 'string' && v.length > 0 ? v : undefined;
+    }
+    catch {
+        return undefined;
+    }
+}
+/**
  * Is `@servicenow/sdk` on this machine — in the checkout, or installed globally?
  *
  * The global lookup spawns `npm root -g`, and on Windows `npm` is a `.cmd`: since Node 20.12
@@ -145,14 +166,16 @@ export const CAPABILITY_TABLE = Object.freeze({
 export function checkFluent({ from = import.meta.url, runNpm = defaultNpmRoot, exists = existsSync, } = {}) {
     try {
         const resolved = createRequire(from).resolve('@servicenow/sdk/package.json');
-        return { installed: true, where: resolved };
+        return { installed: true, where: resolved, version: sdkVersion(resolved) };
     }
     catch { /* not in the checkout; try the global root */ }
     const root = runNpm();
     if (!root)
         return { installed: false };
     const candidate = join(root, '@servicenow', 'sdk', 'package.json');
-    return exists(candidate) ? { installed: true, where: candidate } : { installed: false };
+    return exists(candidate)
+        ? { installed: true, where: candidate, version: sdkVersion(candidate) }
+        : { installed: false };
 }
 /** `npm root -g`, with a 5 s deadline, or null. Never throws: this is a hint, not a dependency. */
 function defaultNpmRoot() {

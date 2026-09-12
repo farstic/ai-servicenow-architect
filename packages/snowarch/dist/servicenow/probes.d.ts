@@ -93,6 +93,7 @@ export declare const CAPABILITY_TABLE: Readonly<Record<FlagName, {
 export interface FluentCheck {
     installed: boolean;
     where?: string;
+    version?: string;
 }
 /**
  * Is `@servicenow/sdk` on this machine — in the checkout, or installed globally?
