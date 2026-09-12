@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ATTRIBUTION, planRecipe, readAreas } from '../tools/snowarch/lib/docs/sync.mjs';
-import { RERUN_NOTE, TOLERATED, joinRecipe, recipeLines, stepName } from '../tools/snowarch/lib/docs/recipe-block.mjs';
+import { PRECONDITION, RERUN_NOTE, TOLERATED, joinRecipe, recipeLines, stepName } from '../tools/snowarch/lib/docs/recipe-block.mjs';
 
 /**
  * The launcher recipe in `docs/ARCHITECTURE.md` and the module must be the same commands.
@@ -174,9 +174,13 @@ function launcherRecipe(text, mode) {
  */
 function commandsOf(lines) {
   return lines
-    .filter((l) => !l.startsWith('#') && !l.startsWith('if ($LASTEXITCODE'))
+    .map((l) => l.trim())
+    .filter((l) => l !== '' && l !== '}' && !l.startsWith('#')
+      && !l.startsWith('if ($LASTEXITCODE') && !l.startsWith('if (-not (Test-Path'))
     .map((l) => l.replace(/ && \\$/, ''))
-    .map((l) => l.replace(/^\{ (.*) \|\| true ; \}$/, '$1'));
+    .map((l) => l.replace(/^\{ (.*) \|\| true ; \}$/, '$1'))
+    // The clone's precondition: `{ <test> || <command> ; }` — the COMMAND is what this returns.
+    .map((l) => l.replace(/^\{ \[ [^\]]*\] \|\| (.*) ; \}$/, '$1'));
 }
 
 /** A unified diff naming the target and the line, because "they differ" is not a bug report. */
@@ -375,15 +379,29 @@ test('the tolerated steps are the two the Node path also lets fail — named, no
   // And the rendering honours it, both directions.
   const out = joinRecipe(['git clone X', 'git submodule absorbgitdirs Y', 'git submodule init -- Y',
     'echo done'], 'sh');
-  assert.equal(out[0], 'git clone X && \\');
+  // The clone carries its PRECONDITION — skipped when the checkout is already there, and still
+  // fatal when it runs and fails. A tolerated step is the other shape: it runs and may fail.
+  assert.equal(out[0], `{ ${PRECONDITION.clone.sh} || git clone X ; } && \\`);
   assert.equal(out[1], '{ git submodule absorbgitdirs Y || true ; } && \\');
   assert.equal(out[2], '{ git submodule init -- Y || true ; } && \\');
 });
 
 test('the ps1 rendering guards every fatal step and no tolerated one', () => {
-  const ps1 = launcherRecipe(readFileSync(join(root, LAUNCHERS[1].path), 'utf8'), 'sparse');
+  // TRIMMED first, and that is not cosmetic: the clone sits inside an `if (-not (Test-Path …))`
+  // block, so it and its guard are indented. Classifying on the raw line would drop both — the
+  // counts would still match, and the test would silently stop covering the step it was written
+  // for. (It did, for one commit.)
+  const ps1 = launcherRecipe(readFileSync(join(root, LAUNCHERS[1].path), 'utf8'), 'sparse')
+    .map((l) => l.trim()).filter((l) => l !== '' && l !== '}');
   const gitSteps = ps1.filter((l) => l.startsWith('git '));
   const guards = ps1.filter((l) => l.startsWith('if ($LASTEXITCODE -ne 0)'));
+  // The clone is guarded, and it is guarded INSIDE its precondition block.
+  const raw = launcherRecipe(readFileSync(join(root, LAUNCHERS[1].path), 'utf8'), 'sparse');
+  const at = raw.findIndex((l) => l.trim().startsWith('if (-not (Test-Path'));
+  assert.notEqual(at, -1, 'the clone has no precondition block');
+  assert.match(raw[at + 1].trim(), /^git .*\bclone\b/, 'the block does not contain the clone');
+  assert.equal(raw[at + 2].trim(), 'if ($LASTEXITCODE -ne 0) { throw "corpus: clone failed" }');
+  assert.equal(raw[at + 3].trim(), '}', 'the block does not close after its guard');
   const tolerated = gitSteps.filter((l) => TOLERATED.includes(stepName(l)));
   assert.ok(tolerated.length > 0, 'fixture: no tolerated step in the recipe to prove the gap with');
   assert.equal(guards.length, gitSteps.length - tolerated.length,

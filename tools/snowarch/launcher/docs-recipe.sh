@@ -9,7 +9,7 @@
 
 docs_recipe_sparse() {
 # recipe-begin sparse
-  git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs && \
+  { [ -e vendor/ServiceNowDocs/.git ] || git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs ; } && \
   git -C vendor/ServiceNowDocs sparse-checkout set --cone markdown/api-reference markdown/application-development markdown/build-workflows markdown/core-business-suite markdown/customer-service-management markdown/employee-service-management markdown/governance-risk-compliance markdown/integrate-applications markdown/intelligent-experiences markdown/it-asset-management markdown/it-business-management markdown/it-operations-management markdown/it-service-management markdown/now-intelligence markdown/now-platform markdown/platform-administration markdown/platform-security markdown/platform-user-interface markdown/servicenow-platform legal && \
   git -C vendor/ServiceNowDocs fetch --depth 1 origin 11b39be17307dd4b21df15a54e8011ae68f64dba && \
   git -C vendor/ServiceNowDocs checkout --detach 11b39be17307dd4b21df15a54e8011ae68f64dba && \
@@ -22,7 +22,7 @@ docs_recipe_sparse() {
 
 docs_recipe_full() {
 # recipe-begin full
-  git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs && \
+  { [ -e vendor/ServiceNowDocs/.git ] || git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch australia https://github.com/ServiceNow/ServiceNowDocs.git vendor/ServiceNowDocs ; } && \
   git -C vendor/ServiceNowDocs sparse-checkout disable && \
   git -C vendor/ServiceNowDocs fetch --depth 1 origin 11b39be17307dd4b21df15a54e8011ae68f64dba && \
   git -C vendor/ServiceNowDocs checkout --detach 11b39be17307dd4b21df15a54e8011ae68f64dba && \

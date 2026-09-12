@@ -620,3 +620,81 @@ test('the Windows launcher carries the same two rulings, in PowerShell', () => {
   assert.doesNotMatch(b02, /if \(\$LASTEXITCODE -ne 0\) \{ Die 'B02'/,
     '$LASTEXITCODE is back as the recipe check, and the tolerated submodule steps will condemn a good install');
 });
+
+test('the recipe is idempotent — a second bootstrap succeeds, with .git left as a FILE', {
+  skip: process.platform === 'win32' ? 'POSIX launcher; the real .ps1 runs in the no-node, windows-latest cell' : false,
+}, () => {
+  // Written by CI. The rendered recipe is the FRESH-checkout list and a launcher runs it on every
+  // bootstrap, so its first step meets a directory that is already there — and `git clone` refuses
+  // a non-empty target. Until the fail-fast joiner landed, that failure was swallowed with all the
+  // others and the rest of the recipe reconciled the existing checkout, so the recipe had never
+  // been idempotent and nothing had noticed. All three `no-node` cells went red on the second run.
+  //
+  // The stub reproduces the two behaviours that matter: a clone REFUSES a non-empty target, and
+  // `submodule absorbgitdirs` leaves `.git` as a FILE. The second is why the guard asks whether
+  // `.git` EXISTS rather than whether it is a directory — `-d` is false on exactly the tree the
+  // guard exists for, and a fixture that left a directory behind would have passed a broken guard.
+  const dir = mkdtempSync(join(tmpdir(), 'launcher-idem-'));
+  const stub = [
+    '#!/bin/sh',
+    'case "$1" in --version) echo "git version 2.44.0" ; exit 0 ;; esac',
+    'for a in "$@" ; do case "$a" in',
+    '  clone)',
+    '    if [ -n "$(ls -A vendor/ServiceNowDocs 2>/dev/null)" ] ; then',
+    "      echo \"fatal: destination path 'vendor/ServiceNowDocs' already exists and is not an empty directory.\" >&2",
+    '      exit 128',
+    '    fi',
+    '    mkdir -p vendor/ServiceNowDocs && echo "gitdir: ../../.git/modules/vendor/ServiceNowDocs" > vendor/ServiceNowDocs/.git',
+    '    for d in $(cat vendor/docs-areas.txt) ; do mkdir -p "vendor/ServiceNowDocs/$d" ; done',
+    '    exit 0 ;;',
+    'esac ; done',
+    'exit 0',
+  ].join('\n');
+  const run = () => {
+    const bin = join(dir, 'bin');
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, 'git'), stub, { mode: 0o755 });
+    return spawnSync('bash', [join(dir, 'bootstrap.sh'),
+      '--mode', 'design', '--yes', '--docs', 'sparse', '--skip-claude-check'],
+    { cwd: dir, encoding: 'utf8', env: { PATH: `${bin}:/usr/bin:/bin`, HOME: dir, TERM: 'dumb' } });
+  };
+  try {
+    mkdirSync(join(dir, 'tools/snowarch/launcher'), { recursive: true });
+    mkdirSync(join(dir, 'vendor'), { recursive: true });
+    for (const f of ['bootstrap.sh', 'engine.config.json']) copyFileSync(join(root, f), join(dir, f));
+    copyFileSync(join(root, 'tools/snowarch/launcher/docs-recipe.sh'),
+      join(dir, 'tools/snowarch/launcher/docs-recipe.sh'));
+    copyFileSync(join(root, 'vendor/docs-areas.txt'), join(dir, 'vendor/docs-areas.txt'));
+
+    const first = run();
+    assert.equal(first.status, 0, `first run: ${first.stdout}${first.stderr}`);
+    assert.match(first.stdout + first.stderr, /\[B02\/09\] docs … ok/, 'the first run did not finish B02');
+    // The state the guard has to survive: `.git` is a FILE, not a directory.
+    assert.ok(statSync(join(dir, 'vendor/ServiceNowDocs/.git')).isFile(),
+      'fixture: .git is not a file, so this does not test the absorbgitdirs state at all');
+
+    const second = run();
+    assert.equal(second.status, 0,
+      `the second bootstrap failed — the recipe is not idempotent: ${second.stdout}${second.stderr}`);
+    assert.doesNotMatch(second.stdout + second.stderr, /already exists and is not an empty directory/,
+      'the second run re-ran the clone over an existing checkout');
+    assert.doesNotMatch(second.stdout + second.stderr, /the corpus checkout failed/, second.stdout);
+
+    // THE CONTROL: strip the precondition from the fixture's recipe and the second run must break
+    // exactly as CI broke. Without it this test would pass on a recipe whose clone is guarded by
+    // nothing, so long as something else happened to make the second run succeed.
+    const guarded = readFileSync(join(dir, 'tools/snowarch/launcher/docs-recipe.sh'), 'utf8');
+    assert.ok(guarded.includes('[ -e vendor/ServiceNowDocs/.git ] || git clone'),
+      'fixture: the recipe under test has no clone precondition to strip');
+    writeFileSync(join(dir, 'tools/snowarch/launcher/docs-recipe.sh'),
+      guarded.replace(/\{ \[ -e vendor\/ServiceNowDocs\/\.git \] \|\| (git clone[^\n]*?) ; \}/g, '$1'));
+    const unguarded = run();
+    assert.notEqual(unguarded.status, 0, 'the control did not reproduce the CI failure');
+    assert.match(unguarded.stdout + unguarded.stderr, /already exists and is not an empty directory/,
+      'the control failed for some other reason than the unguarded clone');
+    assert.match(unguarded.stdout + unguarded.stderr, /the corpus checkout failed/,
+      'and the joiner must still report it as the corpus step, not leave it to the doctor');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
