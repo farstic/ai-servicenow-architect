@@ -56,13 +56,11 @@ const hangs = (ms) => new Promise((resolve) => {
 
 /** The hook as Claude Code runs it: a child, with the event JSON on stdin. */
 function runHook(root, { stdin = STDIN, env = {} } = {}) {
-  const started = process.hrtime.bigint();
   const r = spawnSync(process.execPath, [hookIn(root)], {
     cwd: root, input: stdin, encoding: 'utf8', env: { ...process.env, ...env },
   });
-  const ms = Number(process.hrtime.bigint() - started) / 1e6;
   seen.push(r.stdout ?? '');
-  return { ...r, ms, lines: (r.stdout ?? '').trim().split('\n').filter(Boolean) };
+  return { ...r, lines: (r.stdout ?? '').trim().split('\n').filter(Boolean) };
 }
 
 /** A checkout with a doctor cache, written by the doctor itself — never hand-rolled. */
@@ -91,7 +89,7 @@ async function bootstrapped(t, { store = false } = {}) {
   return root;
 }
 
-test('AC 1 — a fresh cache prints exactly one Mode line, fast', async (t) => {
+test('AC 1 — a fresh cache prints one Mode line and nothing but known nudges', async (t) => {
   const root = await bootstrapped(t);
   assert.ok(existsSync(cachePath(root)), 'precondition: the doctor wrote a cache');
   assert.ok(existsSync(inputsPath(root)), 'precondition: and its inputs');
@@ -105,9 +103,9 @@ test('AC 1 — a fresh cache prints exactly one Mode line, fast', async (t) => {
   assert.match(r.lines[0], /^Mode: /);
   for (const line of r.lines.slice(1)) assert.ok(isNudge(line), `unexpected banner line: ${line}`);
 
-  // The budget, asserted where it is measurable: a developer laptop under a full suite is not the
-  // machine the number describes.
-  if (process.env.CI) assert.ok(r.ms < 1000, `the fast path took ${Math.round(r.ms)} ms`);
+  // No budget here. What the number was standing in for — that the fast path does no work — is
+  // asserted as a FACT by the two cases below: the branch returns `cache` without importing the
+  // doctor, and the line is still printed with git off PATH. Both stay true on a saturated runner.
 });
 
 test('AC 1 — the fast path reads two files and imports no part of the doctor', async (t) => {
@@ -167,7 +165,6 @@ test('a changed input makes the next invocation re-run and rewrite the cache', a
   assert.notEqual(statSync(cachePath(root)).mtimeMs, before, 'the cache was not rewritten');
   assert.equal(readJson(root, '.local/doctor-last.inputs.json').mcpJsonMtime,
     Math.round(statSync(join(root, '.mcp.json')).mtimeMs), 'the inputs file kept the old mtime');
-  if (process.env.CI) assert.ok(r.ms < 3000, `the re-run took ${Math.round(r.ms)} ms`);
 });
 
 test('a cache older than a day is stale however unchanged the inputs are', async (t) => {
@@ -272,9 +269,9 @@ test('a doctor that hangs hits the watchdog, and the old line is marked old', as
   // leaves node:test with pending work when the file ends, and it cancels every case after it:
   // on CI that took four unrelated tests down with it. The watchdog still wins by 350 ms, which
   // is the whole claim.
-  const started = Date.now();
   const r = await banner({ root, watchdogMs: 50, run: () => hangs(300) });
-  assert.ok(Date.now() - started < 2000, 'the watchdog did not fire');
+  // `path: 'timeout'` IS "the watchdog fired" — the banner reports which branch answered, so the
+  // claim is read off the result rather than inferred from how long the call took.
   assert.equal(r.path, 'timeout');
   assert.equal(r.lines[0], `${cache.modeLine}${BANNER.staleSuffix}`);
 });

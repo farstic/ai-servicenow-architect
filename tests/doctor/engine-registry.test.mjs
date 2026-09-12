@@ -124,14 +124,11 @@ test('--section nonsense is a usage error, not a report', () => {
   assert.equal(r.status, 2);
 });
 
-// AC 8's timing half. Asserted only under CI: a developer laptop under a full test run is not the
-// machine the budget describes, and a flaky timing failure teaches people to ignore failures.
-test('the quick engine subset finishes inside its budget', { skip: !process.env.CI }, () => {
-  const started = Date.now();
-  cli(['--json', '--quick', '--no-network']);
-  const elapsed = Date.now() - started;
-  assert.ok(elapsed <= 3000, `--quick took ${elapsed} ms, over the 3 s CI budget`);
-});
+// AC 8's timing half is NOT asserted here (ARC-09-C24). `quick: true` is a cost contract with two
+// enforcements that do not involve a clock: the shared-context half is static, in this file, with
+// its own negative control, and the millisecond half is measured by `scripts/ci/check-timings.mjs`
+// on five cells and read from the job summary. A stopwatch inside a parallel matrix cell measures
+// the cell.
 
 /**
  * ARC-08-S05 fixes the `--quick` MEMBERSHIP — S01 defined the flags, S02 asserted them from the

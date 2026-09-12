@@ -143,6 +143,17 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **No test fails any more because the machine it ran on was busy.** A pull request went red on a
+  Windows runner because a session banner that usually answers in well under a second took 1597 ms
+  against a 1000 ms limit — the banner was fine, the runner was loaded. Six such limits have been
+  taken out of the test suite and replaced by the fact each was standing in for: the banner reports
+  which path answered it, the documentation status object leaves a field empty for every piece of
+  work it skipped, and the corpus sync prints one line per unit of work it does, so *no lines* is
+  what "it did nothing" looks like. Where the only claim was that something finishes at all, the
+  limit now belongs to the process itself — it is killed if it overruns, and the test asks whether
+  it was killed. Performance budgets stay where they can be measured: their own CI jobs, on a known
+  machine, reporting a median rather than one sample.
+
 - **The commit lint no longer fails on commits written before it existed.** A merge that spans a
   whole milestone reads the entire arc, including subjects from before the convention was adopted.
   Those are printed as recorded rather than failed — the same tolerance the changelog generator has
