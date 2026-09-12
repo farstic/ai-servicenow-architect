@@ -173,7 +173,7 @@ test('L05 checks a document that has a history section, above the line and not b
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('criterion 7 — the real tree completes quickly, and the budget is a CI observation', () => {
+test('criterion 7 — the lint terminates on the real tree; the budget is a CI observation', () => {
   // Three samples, all printed, and a ceiling contention cannot reach.
   //
   // The story's figure is 5 s and the real evidence for it is the Windows CI log, where the lint
@@ -182,28 +182,47 @@ test('criterion 7 — the real tree completes quickly, and the budget is a CI ob
   // and inside a parallel test runner even the best of three swings between 872 ms and 3786 ms on
   // the same tree. Asserting 5 s here would be asserting how loaded the machine is.
   //
+  // `HANG_MS` is a kill bound, not a budget: an order of magnitude above the worst contended run
+  // ever measured, so reaching it means the lint stopped terminating.
+  const HANG_MS = 45_000;
+  //
   // So the assertion is a hang detector, not a budget, while a lint that genuinely stopped
   // terminating still fails. The budget itself is checked where it is measurable — CI — and the
   // numbers are in the ARC-05-S04 amendment.
   //
   // The ceiling was 15 s when this was written, with the note "no amount of contention has reached
   // it". ARC-06-S06 reached it: best-of-three of 26.9 / 22.7 / 29.8 s in a full `npm test`, while
-  // the same lint alone still finishes in about a second. Two causes, both this story's — the lint
-  // now scans 58 files rather than 49, and the new B02 suite clones a fixture corpus repeatedly
-  // alongside it, so eighteen child processes contend where there used to be fewer. The number is
-  // raised to 45 s against that measurement rather than quietly nudged: it is still an order of
-  // magnitude short of "hung", and the claim it makes is only that the process terminates.
-  const samples = [];
-  for (let i = 0; i < 3; i += 1) {
-    const started = Date.now();
-    try {
-      execFileSync(process.execPath, [CLI, '--root', root], { encoding: 'utf8', stdio: 'pipe' });
-    } catch { /* findings are expected until ARC-02-S12 — the timing is the assertion */ }
-    samples.push(Date.now() - started);
+  // the same lint alone still finishes in about a second.
+  //
+  // ARC-09-C24 stops reading the clock at all. A hang detector does not need a measurement — it
+  // needs a BOUND, and a spawn has one: the child is killed if it outlives `HANG_MS`, and what is
+  // asserted is whether it was killed. That is a fact about the run rather than a number compared
+  // against a machine, so no amount of contention can fail it, and one run replaces the
+  // best-of-three that existed only to get a number worth comparing.
+  let killed = false;
+  try {
+    execFileSync(process.execPath, [CLI, '--root', root],
+      { encoding: 'utf8', stdio: 'pipe', timeout: HANG_MS, killSignal: 'SIGKILL' });
+  } catch (e) {
+    // A non-zero EXIT is the ordinary outcome — findings are expected until ARC-02-S12. Only the
+    // kill means the lint never finished.
+    killed = e.killed === true || e.signal === 'SIGKILL';
   }
-  const best = Math.min(...samples);
-  console.log(`    engine-lint on the real tree: ${samples.join(' / ')} ms (best ${best})`);
-  assert.ok(best < 45_000, `engine-lint took ${best} ms on the real tree (samples ${samples.join(', ')})`);
+  assert.equal(killed, false, `engine-lint did not finish inside ${HANG_MS / 1000} s on the real tree`);
+});
+
+test('...and the hang detector detects a hang', () => {
+  // The control. Without it "was not killed" is a sentence that stays true if `timeout` were
+  // dropped, misspelled, or silently ignored by a Node line — and the case above would then pass
+  // on a lint that never returned.
+  let killed = false;
+  try {
+    execFileSync(process.execPath, ['-e', 'setInterval(() => {}, 1000)'],
+      { encoding: 'utf8', stdio: 'pipe', timeout: 200, killSignal: 'SIGKILL' });
+  } catch (e) {
+    killed = e.killed === true || e.signal === 'SIGKILL';
+  }
+  assert.equal(killed, true, 'a child that never exits was not killed — the bound does nothing');
 });
 
 // ---------------------------------------------------------------------------------------------

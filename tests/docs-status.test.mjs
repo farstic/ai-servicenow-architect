@@ -208,17 +208,24 @@ test('with no state file the mode is inferred from the checkout', () => {
   assert.equal(docsStatus({ root: w.root, verify: false }).mode, MODE.full);
 });
 
-test('criterion 7 — verify:false is well under the SessionStart budget', () => {
+test('criterion 7 — verify:false does no work the budget was paying for (ARC-09-C24)', () => {
+  // The criterion was "well under the SessionStart budget" and was asserted with a stopwatch. What
+  // the stopwatch was standing in for is a fact the function reports: the two expensive things
+  // `docsStatus` can do are the citation sweep and `measure()`'s walk of the corpus, `measure`
+  // defaults to `verify`, and BOTH leave their fields `null` when they did not run. Reading the
+  // fields says the work was skipped on any machine; a millisecond count says it on a quiet one.
   const w = workspace();
   syncCorpus({ ...w, log: () => {} });
-  const t = Date.now();
-  docsStatus({ root: w.root, verify: false });
-  const ms = Date.now() - t;
-  // The story's budget is 300 ms on the reference machine. Asserted generously here because this
-  // runs inside a parallel matrix cell where a wall-clock budget measures contention, not the
-  // subject — the number that matters is logged.
-  console.log(`    docsStatus({verify:false}): ${ms} ms`);
-  assert.ok(ms < 3000, `${ms} ms — an order of magnitude over the 300 ms budget`);
+  const s = docsStatus({ root: w.root, verify: false });
+
+  assert.equal(s.citations, null, 'verify:false ran the citation sweep');
+  assert.equal(s.fileCount, null, 'verify:false walked the corpus');
+  assert.equal(s.sizeBytes, null, 'verify:false measured the corpus');
+  // The other direction, so this cannot pass by the fields never being populated at all: the
+  // default call does all three, and the same three fields come back with values.
+  const full = docsStatus({ root: w.root });
+  assert.equal(full.citations.status, 'ok');
+  assert.ok(full.fileCount > 0 && full.sizeBytes > 0, 'the control measured nothing');
 });
 
 test('the real repository: four ok lines, and the object every key', () => {
