@@ -72,12 +72,18 @@ export class SyncError extends Error {
 /**
  * On Windows every git call carries `-c core.longpaths=true`.
  *
- * **This is deliberately kept even though S-07 acceptance criterion 2 was REFUTED** — every recipe
- * passed on `windows-latest` with `core.longpaths=false`, because today's longest corpus path (197
- * characters) plus a checkout prefix still fits inside 260. The setting stays for two reasons: the
- * corpus grows and the margin is 60-odd characters, and it costs nothing when it is not needed.
- * Anyone removing it should read the S-07 record first and be arguing with the growth, not with a
- * failure they cannot reproduce today.
+ * **This is deliberately kept even though S-07 acceptance criterion 2 went unanswered** — every
+ * recipe passed on `windows-latest` with `core.longpaths=false`, because today's longest corpus
+ * path (197 characters) plus a REAL CHECKOUT prefix still fits inside 260. The setting stays for
+ * two reasons: the corpus grows and the margin is 60-odd characters, and it costs nothing when it
+ * is not needed.
+ *
+ * This comment said "REFUTED" until ARC-09-C27, and the record does not (`docs/spikes/README.md`:
+ * "the core.longpaths control did NOT reach MAX_PATH, so AC 2 is unanswered for a real install
+ * path"). A control that never reached the limit leaves the question OPEN; calling that a
+ * refutation invites the next reader to remove the setting. C27 answered it in the other
+ * direction: the upgrade fixture runs under a temp prefix ~103 characters long, the same file
+ * lands at ~285, and it did not check out — one Windows cell red on a tree green everywhere else.
  */
 const isWindows = () => process.platform === 'win32';
 const withLongPaths = (args) => (isWindows() ? ['-c', 'core.longpaths=true', ...args] : args);

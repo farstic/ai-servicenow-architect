@@ -120,9 +120,12 @@ test('C13: ARC-09-S11 AC 3 — the released shape is produced, tagged, and check
   //
   // `core.longpaths=true` ON WINDOWS, because the PRODUCT carries it on every corpus git call
   // (`withLongPaths` in `tools/snowarch/lib/docs/sync.mjs`) and this fixture stands in for the
-  // product. S-07's record refuted the need for it AGAINST A REAL CHECKOUT — 197 characters plus
-  // `D:\a\<repo>\<repo>\vendor\ServiceNowDocs\markdown\alpha\` still fits inside 260 — and that
-  // record is about a path this fixture does not have. Here the prefix is a TEMP directory:
+  // product. S-07's record did not refute the need for it, whatever the paraphrase in `sync.mjs`
+  // says: its own words are that "the core.longpaths control did NOT reach MAX_PATH, so AC 2 is
+  // unanswered for a real install path". The control never reached the limit, so the question was
+  // LEFT OPEN — and it was left open about a real checkout, where 197 characters plus
+  // `D:\a\<repo>\<repo>\vendor\ServiceNowDocs\markdown\alpha\` fits inside 260 with room to spare.
+  // This fixture is where the open question gets answered. Here the prefix is a TEMP directory:
   // `C:\Users\RUNNER~1\AppData\Local\Temp\snowarch-upgrade-XXXXXX\work\…` is ~103 characters
   // before the corpus path starts, so the same file lands at ~285 and the margin the record
   // measured is spent before the checkout begins.

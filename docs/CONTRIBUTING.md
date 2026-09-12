@@ -276,8 +276,11 @@ killed), not a comparison against a number — `tests/contract/engine-lint.test.
 copy, control included. If a test has no such fact to assert, it asserts nothing about time.
 
 **A fixture does what the product does, including the parts a record says are unnecessary**
-(ARC-09-C27). The corpus submodule's longest page is 197 characters, and ARC-00's S-07 record
-REFUTED the need for `core.longpaths` on Windows — measured against a real checkout, where
+(ARC-09-C27). The corpus submodule's longest page is 197 characters, and ARC-00's S-07 record is quoted around
+the repository as having REFUTED the need for `core.longpaths` on Windows. Its own words are
+narrower and worth reading before relying on them: *"the `core.longpaths` control did NOT reach
+MAX_PATH, so AC 2 is unanswered for a real install path."* The control never reached the limit, so
+the question was left OPEN, not closed — and left open about a real checkout, where
 `D:\a\<repo>\<repo>\vendor\ServiceNowDocs\markdown\alpha\` leaves the path inside 260. The
 upgrade fixture is not a real checkout: it runs under `C:\Users\RUNNER~1\AppData\Local\Temp\…`,
 about 103 characters before the corpus path begins, so the same file lands at roughly 285 and the
