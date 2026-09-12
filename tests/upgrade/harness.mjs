@@ -37,14 +37,59 @@ export const FIXTURE_PASSWORD = `${'Fix'}-${'ture'}-${'8821'}`;
 
 const IDENTITY = ['-c', 'user.email=f@example.com', '-c', 'user.name=f'];
 
+/**
+ * `core.longpaths` on Windows, on EVERY call this suite makes (ARC-09-C27b).
+ *
+ * The corpus's longest page is 197 characters and these fixtures live under a temp prefix roughly
+ * 103 characters long, so the total passes 260 and a git that has not been told about long paths
+ * cannot read it. `tools/snowarch/lib/docs/sync.mjs` carries the same flag on every corpus call
+ * for the same reason; this is the fixture doing what the product does.
+ *
+ * **A `-c` is not enough on its own, and that is the whole lesson of C27b.** It lives for one
+ * process and its children. C27 put it on `submodule update --init` alone: the checkout worked and
+ * every later reader saw nothing — including the git that the PARENT's `status` spawns INSIDE the
+ * submodule, which reads the submodule's config and not the parent's command line. The Windows
+ * cell stayed red with `longpaths: "<unset>"` printed beside the modified file. So the flag is on
+ * every call here AND written into each fixture repository by `persistLongPaths` below: the
+ * wrapper covers the calls this suite makes, the config covers the ones it does not — `git status`
+ * descending into a submodule, `scripts/release.mjs` and `verify-tag.mjs` running inside the
+ * fixture, `node --test` running the tree-scanning tests there. Neither alone is sufficient: the
+ * config cannot be written into a repository that does not exist yet, which is the moment the
+ * first clone needs the flag.
+ */
+export const LONGPATHS = process.platform === 'win32' ? ['-c', 'core.longpaths=true'] : [];
+
+/**
+ * Write it into a fixture repository, so every git that ever runs there reads it.
+ *
+ * The read-back is not ceremony. C27 shipped a fix that looked applied and was not, and the only
+ * reason anybody found out was a CI cell going red twenty-five minutes later; a helper that
+ * silently does nothing is exactly that failure again. This throws where it happens instead.
+ */
+export function persistLongPaths(cwd) {
+  if (process.platform !== 'win32') return;
+  execFileSync('git', [...LONGPATHS, 'config', 'core.longpaths', 'true'],   // scan-exempt: this IS the entry point
+    { cwd, encoding: 'utf8', stdio: 'pipe' });
+  const back = String(execFileSync('git', ['config', '--get', 'core.longpaths'],   // scan-exempt: reads back what the line above wrote
+    { cwd, encoding: 'utf8', stdio: 'pipe' })).trim();
+  if (back !== 'true') throw new Error(`core.longpaths did not persist in ${cwd} (read back "${back}")`);
+}
+
+/** Every git call in this suite goes through here or through `gitRaw`. The scan test says so. */
 export function git(cwd, args, { allowFail = false } = {}) {
   try {
-    return String(execFileSync('git', [...IDENTITY, ...args],
+    return String(execFileSync('git', [...LONGPATHS, ...IDENTITY, ...args],   // scan-exempt: this IS the entry point
       { cwd, encoding: 'utf8', stdio: 'pipe' })).trim();
   } catch (e) {
     if (allowFail) return null;
     throw new Error(`git ${args.join(' ')} in ${cwd}: ${String(e.stderr ?? e.message)}`);
   }
+}
+
+/** No fixture identity — for calls against a REAL checkout, or a clone that has no author. */
+export function gitRaw(args, opts = {}) {
+  return execFileSync('git', [...LONGPATHS, ...args],   // scan-exempt: this IS the entry point
+    { encoding: 'utf8', stdio: 'pipe', ...opts });
 }
 
 /**
@@ -96,7 +141,7 @@ export const NOT_COPIED = Object.freeze({
 });
 
 function trackedFiles() {
-  return execFileSync('git', ['ls-files', '-z'], { cwd: REAL_ROOT, encoding: 'utf8',
+  return gitRaw(['ls-files', '-z'], { cwd: REAL_ROOT,
     maxBuffer: 1 << 28 })
     .split('\0')
     .filter(Boolean)
@@ -259,6 +304,9 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // exists — a list here would be the copy that goes stale when somebody adds the next generator.
   execFileSync(process.execPath, [join(work, 'scripts/gen-all.mjs')], { cwd: work, stdio: 'pipe' });
   git(work, ['init', '-q', '-b', 'main']);
+  // Written into the fixture repository the moment it exists, so every git that ever runs here —
+  // including ones this suite does not spawn — reads it. See `persistLongPaths`.
+  persistLongPaths(work);
   commit(work, 'v9.0.0', upstream.pin);
   await tagRelease(work, '9.0.0', { claudeFloor });
 
@@ -323,10 +371,10 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
 
   // ── the bare origin, and the user's clone at v9.0.0 ───────────────────────────────────────
   const origin = join(scratch, 'origin.git');
-  execFileSync('git', ['clone', '--quiet', '--bare', work, origin], { stdio: 'pipe' });
+  gitRaw(['clone', '--quiet', '--bare', work, origin]);
 
   const user = join(scratch, 'user');
-  execFileSync('git', ['clone', '--quiet', pathToFileURL(origin).href, user], { stdio: 'pipe' });
+  gitRaw(['clone', '--quiet', pathToFileURL(origin).href, user]);
   // The user's clone gets the same treatment: B06's migration runs the BUILT CLI, which imports
   // commander, and a design-only bootstrap never installs dependencies.
   placeModules(user, modules);
