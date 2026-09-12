@@ -155,13 +155,21 @@ jobs:
       # Releases list marked "Latest" — which is what a reader trusts. The shape is decided by
       # `isPrerelease` in `scripts/lib/release/tag.mjs`, the module that already knows what a tag
       # looks like, rather than by a regex written a second time in YAML.
+      #
+      # The flag travels as a STEP OUTPUT rather than a file read inside the publish command.
+      # `gh release create … $(cat flag)` word-splits on purpose — the flag is one argument or
+      # none — and shellcheck flags exactly that (SC2046), which is a fair reading: the mechanism
+      # and the accident are indistinguishable in that syntax. An output is substituted as TEXT
+      # before bash sees the line, so "no flag" leaves nothing behind rather than an empty
+      # argument, and there is no expansion to split.
       - name: Is this tag a prerelease?
+        id: prerelease
         shell: bash
         run: |
-          node -e "import('./scripts/lib/release/tag.mjs').then(m => \
-            process.stdout.write(m.isPrerelease('${{ github.ref_name }}') ? '--prerelease' : ''))" \
-            > prerelease.flag
-          echo "prerelease flag: [$(cat prerelease.flag)]"
+          FLAG=$(node -e "import('./scripts/lib/release/tag.mjs').then(m => \
+            process.stdout.write(m.isPrerelease('${{ github.ref_name }}') ? '--prerelease' : ''))")
+          echo "flag=$FLAG" >> "$GITHUB_OUTPUT"
+          echo "prerelease flag: [$FLAG]"
 
       - name: The release notes are the changelog's own section, bounded
         shell: bash
@@ -181,7 +189,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >
           gh release create ${{ github.ref_name }}
-          $(node -e "process.stdout.write(require('node:fs').readFileSync('prerelease.flag','utf8'))")
+          ${{ steps.prerelease.outputs.flag }}
           --title "snowarch ${{ github.ref_name }}"
           --notes-file release-notes.md
           doctor-ubuntu-latest.json doctor-macos-latest.json doctor-windows-latest.json
