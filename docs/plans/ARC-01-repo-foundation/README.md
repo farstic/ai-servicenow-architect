@@ -121,3 +121,17 @@ Full write-ups: [STORIES.md](STORIES.md) (12 stories, ≈ 12–17 engineer-days,
 | ARC-01-S10 | Purge engagement residue; legacy-name ratchet test | M |
 | ARC-01-S11 | CI skeleton: three OSes × Node 20/22/24; footprint gate; `claude plugin validate` job | M |
 | ARC-01-S12 | `docs/ARCHITECTURE.md` and `docs/CONTRIBUTING.md` first versions | M |
+
+### Acceptance
+
+The acceptance pass against `docs/plans/06-ACCEPTANCE-PLAN.md` §2. One row per backlog item.
+
+| Item | Outcome | Evidence |
+|---|---|---|
+| B01-01 — S08 AC 2: `cmp LICENSE packages/snowarch/LICENSE` | **rework** | The NOTICE copy was compared with its root and the LICENSE copy was not — the same argument one file over, with a test for one of them. `cmp` exits 0 today; the assertion sits beside the NOTICE one, because a copy is a thing that drifts |
+| B01-02 — S08 AC 1: the licence grep | **rework** | `FORBIDDEN` carried four of the five patterns; `all rights reserved` — the pre-relicensing header — was missing. Added, after checking that all seven live hits are already in exempt carriers (`docs/ARCHITECTURE.md`, `docs/plans/**`, `docs/spikes/licence/**`): a pattern that turns the ratchet red on history is a pattern somebody exempts too widely to make green |
+| B01-03 — S05 AC 8: minimatch 10.x only | **rework** | The root override was there and nothing checked that it took. Both halves asserted — the manifest still pins `^10.`, and no `node_modules/**/minimatch` in the lockfile resolves outside 10.x. A lockfile regeneration is exactly the event that would undo it and exactly the event nobody reads line by line |
+| B01-04 — S05 AC 5: lockfileVersion 3 and the workspace links | **rework** | Hand-verified once, asserted never. The criterion's shape ("links `packages/snowarch,tools/snowarch`") is what a person reads; the file holds two `link: true` entries whose `resolved` is the directory, so that is what is asserted — by resolved PATH rather than by key, since the package name may change and the directory may not |
+| B01-05 — S10 AC 1: the catalogue stays gone | **rework** | Absent, and nothing kept it absent; now a `FORBIDDEN_PATHS` entry |
+| B01-06 — S03 AC 3: the twelve leaf paths | **rework** | Eight of twelve were pinned. The four that were not — `docs/CLIENT_SETUP.md`, `docs/index.html`, `package-lock.json`, `.gitignore` under `packages/snowarch/` — are all absent today and nothing kept them gone. A workspace package has no lockfile and no `.gitignore` of its own; the two `docs/` files were the old standalone server's site |
+| B01-07 — S12 AC 1: the ledger's eighteen rows | **record** | **The table does not exist under that name.** `grep -i 'scope.cut'` over `docs/ARCHITECTURE.md` finds one line — the ADR index row. The ledger became ADR-0003 itself, where the cuts are PROSE with their source paths and the only table is *Options considered* (four rows, A/B/C/D). And eighteen was a count of ITEMS where the record groups them: `clients/`, `src/cli/writers/` and `src/cli/detect-clients.ts` are one cut in the ADR's numbering, because the owner ruled on **nine cuts**. A literal row count could never match without ungrouping a decision to satisfy a test — the same shape as ARC-10-S03 AC 1. What is asserted instead is the criterion's substance: all ten leaf paths stay absent, which B01-06 completed in the same pass |

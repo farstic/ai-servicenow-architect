@@ -145,3 +145,43 @@ test('docs/CHANGELOG.md top heading is not ahead of the root version', (t) => {
   }
   assert.ok(cmp <= 0, `docs/CHANGELOG.md top heading v${top.join('.')} is ahead of root ${rootVersion}`);
 });
+
+// ─── ARC-01-S05 — the lockfile and the one override that matters (B01-03, B01-04) ─────────────
+//
+// Both criteria were verified by hand at story time and by nothing since. A lockfile regeneration
+// is exactly the event that would undo either, and it is also the event nobody reviews line by
+// line — which is what makes these worth asserting rather than re-running.
+
+test('AC 5 — the lockfile is v3 and links both workspaces', () => {
+  const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
+  assert.equal(lock.lockfileVersion, 3, 'lockfileVersion moved — npm changed, or the file was hand-edited');
+
+  // The criterion said "workspace links `packages/snowarch,tools/snowarch`", which is the shape a
+  // person reads. What the file actually holds is two `link: true` entries under `node_modules/`
+  // whose `resolved` is the workspace directory — so that is what is asserted, by resolved path
+  // rather than by key, since the package NAME is free to change and the directory is not.
+  const links = Object.entries(lock.packages)
+    .filter(([, v]) => v?.link === true)
+    .map(([, v]) => v.resolved)
+    .sort();
+  assert.deepEqual(links, ['packages/snowarch', 'tools/snowarch'],
+    'the workspace links are not the two directories this repository has');
+});
+
+test('AC 8 — minimatch resolves to 10.x everywhere, and the override is why', () => {
+  // ARC-01-S05 pinned this because the transitive tree carried an old major with a known ReDoS.
+  // The override is in the root manifest; the lockfile is where it either took or did not.
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  assert.match(String(manifest.overrides?.minimatch ?? ''), /^\^?10\./,
+    'the root override no longer pins minimatch 10.x');
+
+  const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
+  const versions = [...new Set(Object.entries(lock.packages)
+    .filter(([k]) => k.endsWith('node_modules/minimatch'))
+    .map(([, v]) => v.version)
+    .filter(Boolean))].sort();
+  assert.ok(versions.length > 0, 'minimatch is not in the lockfile at all — has the scan broken?');
+  const old = versions.filter((v) => !v.startsWith('10.'));
+  assert.deepEqual(old, [],
+    `the lockfile resolves minimatch ${old.join(', ')} as well as 10.x — the override did not take`);
+});

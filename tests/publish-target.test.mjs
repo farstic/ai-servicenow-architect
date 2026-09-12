@@ -134,6 +134,12 @@ test('the published tarball carries dist/ and no sources or tests (ARC-09-S10)',
   assert.equal(readFileSync(join(root, 'packages/snowarch/NOTICE'), 'utf8'),
     readFileSync(join(root, 'NOTICE'), 'utf8'),
     'packages/snowarch/NOTICE has drifted from the root NOTICE');
+  // ARC-01-S08 AC 2 (acceptance item B01-01). The SAME argument one file over, and it had no test:
+  // the package's LICENSE is a copy too, and a copy is a thing that drifts. `cmp` is the criterion's
+  // own command; this is it, in the place that already checks the NOTICE beside it.
+  assert.equal(readFileSync(join(root, 'packages/snowarch/LICENSE'), 'utf8'),
+    readFileSync(join(root, 'LICENSE'), 'utf8'),
+    'packages/snowarch/LICENSE has drifted from the root LICENSE');
   // `bin` points into the tarball, so this is the difference between `npx @farstic/snowarch`
   // working and a 404 from the user's shell.
   assert.ok(files.includes(manifest.bin.snowarch), 'bin points at a file the tarball does not carry');

@@ -25,6 +25,12 @@ export const FORBIDDEN = [
   'reference/templates', 'servicenow-mcp-server', 'npx (-y )?servicenow-mcp\\b',
   'registry\\.npmjs\\.org/servicenow-mcp', '(?i)source.available License',
   'not licensed for redistribution', 'license: MIT', 'SEE LICENSE IN LICENSE',
+  // ARC-01-S08 AC 1 (acceptance item B01-02). The fifth licence pattern, and the only one the
+  // sweep was missing: the pre-relicensing header said "All rights reserved". Every live hit is
+  // already in an exempt carrier — `docs/ARCHITECTURE.md`, `docs/plans/**`, `docs/spikes/licence/**`
+  // — which was checked before adding it, because a pattern that turns the ratchet red on history
+  // is a pattern somebody exempts too widely to make it green.
+  '(?i)all rights reserved',
 ];
 const MD_ONLY = 'Tier [012] \\(';   // the engine's three-tier vocabulary; ARC-02 owns the sweep
 const compile = (p) => p.startsWith('(?i)') ? new RegExp(p.slice(4), 'i') : new RegExp(p);
@@ -33,6 +39,15 @@ const compile = (p) => p.startsWith('(?i)') ? new RegExp(p.slice(4), 'i') : new 
 const FORBIDDEN_PATHS = [
   /^packages\/snowarch\/(desktop|clients|\.github)\//,
   /^packages\/snowarch\/(Dockerfile|server\.json|smithery\.yaml|glama\.json|TERMS\.md)$/,
+  // ARC-01-S03 AC 3 (acceptance item B01-06): the four leaf paths the list did not pin. All four
+  // are absent today and nothing kept them gone — a workspace package has no lockfile of its own
+  // (npm keeps one at the root) and no `.gitignore` of its own, and the two `docs/` files were the
+  // old standalone server's site.
+  /^packages\/snowarch\/docs\/(CLIENT_SETUP\.md|index\.html)$/,
+  /^packages\/snowarch\/(package-lock\.json|\.gitignore)$/,
+  // ARC-01-S10 AC 1 (acceptance item B01-05): the catalogue is gone and stays gone. The run-history
+  // half was asserted; its absence was not.
+  /^docs\/LIVE-ARTEFACTS-CATALOGUE\.md$/,
 ];
 
 // Files allowed to name the past because naming it IS their purpose. Two groups, kept apart because
