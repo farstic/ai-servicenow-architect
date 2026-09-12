@@ -319,9 +319,8 @@ Each imported instance is probed before it is saved; an entry whose credentials 
 explicitly off (the old wizard never had it), production is capped whatever the legacy file said,
 and `aiApiKey` is listed as dropped **by name** — its value is never printed. **It deletes nothing:**
 the closing advice names the directory and the `tokens.json` beside the store, and the deleting is
-yours. The full walkthrough is `docs/snippets/import-from-legacy.md`, which ARC-10-S01's migration document
-will include (it is named by its story rather than by a path, because a citation of a file nobody
-has written yet is a dead path).
+yours. The full walkthrough is `docs/snippets/import-from-legacy.md`, and a user arriving from the
+old two-repository install wants [MIGRATION.md](MIGRATION.md), which quotes it as one step of nine.
 
 ## 11. Known limitations
 

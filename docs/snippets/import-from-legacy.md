@@ -1,8 +1,8 @@
 <!-- ONE SOURCE. This fragment is the legacy-migration step, and three places show it: ARC-08-S03's
-     E-24 detector prints the command when it finds `~/.config/servicenow-mcp`, ARC-10-S01's
-     migration document includes this file as its migration step (that file does not exist yet, so
-     it is named by its story rather than by a path — a citation of something not written is a dead
-     path, and the allow-list for those is meant to stay empty), and `packages/snowarch/tests/cli/
+     E-24 detector prints the command when it finds `~/.config/servicenow-mcp`, `docs/MIGRATION.md`
+     quotes the plan block below as its step 3 (ARC-10-S01 — `tests/migration-doc.test.mjs` asserts
+     the page carries it byte for byte, so a change here fails there rather than leaving the page
+     describing an older screen), and `packages/snowarch/tests/cli/
      import-legacy.test.ts` asserts the plan block below is BYTE-IDENTICAL to what the command
      prints against `packages/snowarch/tests/fixtures/legacy-instances.json`. If the renderer
      changes, that test fails here rather than in a document nobody re-reads.

@@ -1,6 +1,6 @@
 # ARC-10 — Migration and cutover from the old repositories
 
-Status: **Stories drafted 2026-09-04** · Depends on: every other ARC (ARC-09's `v2.0.0` tag in particular; see the phase split below) · Blocks: nothing — it ends the programme
+Status: **In progress — S01 merged (1 of 10), started 2026-09-12** · Depends on: every other ARC (ARC-09's `v2.0.0` tag in particular; see the phase split below) · Blocks: nothing — it ends the programme
 
 ## Goal
 
@@ -50,17 +50,17 @@ All ARCs complete; `v2.0.0` tagged (ARC-09). **Phase split:** S01–S05 and S07 
 
 Full write-ups: [STORIES.md](STORIES.md) (10 stories, ≈ 10.5–14 engineer-days plus a fixed 14-calendar-day wait between S09 and S10).
 
-| ID | Title | Size |
-|---|---|---|
-| ARC-10-S01 | `docs/MIGRATION.md`: existing-user step list and the cleanup command list derived from the ARC-08 detectors | M |
-| ARC-10-S02 | Engagement-state carry-over: `clients/` per checkout, `memory/MEMORY.md` retired in favour of Claude Code auto memory | S |
-| ARC-10-S03 | Retire the legacy scaffolding: `scripts/legacy/`, obsolete `.gitignore` lines, empty legacy-name allow-list | S |
-| ARC-10-S04 | Rewrite the standing rule and the field-notes policy (DR-16) in `CLAUDE.md` and `docs/CONTRIBUTING.md` | S |
-| ARC-10-S05 | `docs/ARCHITECTURE.md` "History" section: import tags, ADR links, scope-cut ledger pointer, old-repository links | S |
-| ARC-10-S06 | Author's machine cutover on `v2.0.0`: doctor 0 FAIL, stale entries removed, legacy store gone, engagements untracked | M |
-| ARC-10-S07 | Validation-record template, redaction lint and the cutover test list (T-01…T-18 + `AUTHENTICATION_FAILED` + design-only) | M |
-| ARC-10-S08 | Clean-machine validation runs: macOS, Ubuntu, Windows in `design-only`; one `live` (`pdi-developer`); one proxied laptop | L |
-| ARC-10-S09 | Deprecation notices in `farstic/claude-servicenow-live` and `farstic/snow-mcp`; archive checklist for the owner | S |
-| ARC-10-S10 | Two-week post-release review: telemetry-free feedback loop (issue template with the doctor JSON) and the archive trigger | M |
+| ID | Title | Size | Status |
+|---|---|---|---|
+| ARC-10-S01 | `docs/MIGRATION.md`: existing-user step list and the cleanup command list derived from the ARC-08 detectors | M | **Done** |
+| ARC-10-S02 | Engagement-state carry-over: `clients/` per checkout, `memory/MEMORY.md` retired in favour of Claude Code auto memory | S | — |
+| ARC-10-S03 | Retire the legacy scaffolding: `scripts/legacy/`, obsolete `.gitignore` lines, empty legacy-name allow-list | S | — |
+| ARC-10-S04 | Rewrite the standing rule and the field-notes policy (DR-16) in `CLAUDE.md` and `docs/CONTRIBUTING.md` | S | — |
+| ARC-10-S05 | `docs/ARCHITECTURE.md` "History" section: import tags, ADR links, scope-cut ledger pointer, old-repository links | S | — |
+| ARC-10-S06 | Author's machine cutover on `v2.0.0`: doctor 0 FAIL, stale entries removed, legacy store gone, engagements untracked | M | — |
+| ARC-10-S07 | Validation-record template, redaction lint and the cutover test list (T-01…T-18 + `AUTHENTICATION_FAILED` + design-only) | M | — |
+| ARC-10-S08 | Clean-machine validation runs: macOS, Ubuntu, Windows in `design-only`; one `live` (`pdi-developer`); one proxied laptop | L | — |
+| ARC-10-S09 | Deprecation notices in `farstic/claude-servicenow-live` and `farstic/snow-mcp`; archive checklist for the owner | S | — |
+| ARC-10-S10 | Two-week post-release review: telemetry-free feedback loop (issue template with the doctor JSON) and the archive trigger | M | — |
 
 Mapping from the original titles-only list: 1 → S01; 2 → S06; 3 → S02; 4 → S07 + S08 (tooling split from execution); 5 → S04; 6 → S05; 7 → S09; 8 → S10; S03 is new (discharges the `scripts/legacy/` and `.gitignore` obligations ARC-01 handed to ARC-10).

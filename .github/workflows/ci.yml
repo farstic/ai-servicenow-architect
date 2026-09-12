@@ -688,7 +688,16 @@ jobs:
         # The files, not the directory: `node --test <dir>` resolves the path as a MODULE on
         # this Node, and a directory is not one. The harness is not a test file, so it is
         # named out rather than matched by a glob that would try to run it.
-        run: node --test --test-concurrency=2 tests/upgrade/upgrade.e2e.test.mjs tests/upgrade/upgrade-unit.test.mjs
+        # `harness-shape.test.mjs` is ARC-09-C13's: it builds the world, produces a RELEASED tree
+        # with the release's own writers, tags it, and runs the tree-scanning tests against it.
+        # That is the guard for the class rehearsal runs 4 and 5 found — tests that only hold on a
+        # development tree — and it belongs here rather than in `npm test` because this job already
+        # pays for a harness world, on three OSes, once per commit.
+        run: |
+          node --test --test-concurrency=2 \
+            tests/upgrade/upgrade.e2e.test.mjs \
+            tests/upgrade/upgrade-unit.test.mjs \
+            tests/upgrade/harness-shape.test.mjs
       - name: ...and the checkout under test is exactly as it was
         run: node scripts/ci/assert-clean.mjs
 

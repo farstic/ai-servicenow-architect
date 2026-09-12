@@ -16,38 +16,14 @@ import { backupFiles, countLegacyInstances, envSummary, isStaleEntry, legacyChec
 import { staleBlock } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { contextFor, greenTree, REAL_ROOT, runById, writeJson } from './helpers/tree.mjs';
+// The fixture HOME moved to its own module at ARC-10-S01: `tests/migration-doc.test.mjs` asserts
+// that the commands E-23 and E-24 print for THIS tree appear in `docs/MIGRATION.md`, and a second
+// copy would let the page be checked against a tree these detectors never see.
+import { fixtureHome, PASSWORD, SECRET_KEY, USERNAME } from './helpers/legacy-home.mjs';
 
 const checks = legacyChecks();
-const PASSWORD = ['hunter', '2', 'hunter', '2'].join('');
-const USERNAME = ['someone', '@', 'corp.example.com'].join('');
-const SECRET_KEY = ['SERVICENOW_', 'PASS', 'WORD'].join('');
 
 const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
-
-/** A HOME with a `.claude.json` shaped like the one the old installers left. */
-function fixtureHome(t, { root, extra = {}, backups = ['.claude.json.bak-20260601'] } = {}) {
-  const home = tempDir('snowarch-home-', t);
-  const claudeJson = {
-    projects: {
-      [root]: {
-        mcpServers: {
-          [STALE.names[0]]: {
-            command: 'node',
-            args: ['/old/snow-mcp/dist/server.js'],
-            env: { SERVICENOW_INSTANCE: 'https://dev12345.service-now.com',
-              SERVICENOW_USERNAME: USERNAME, [SECRET_KEY]: PASSWORD },
-          },
-          [STALE.names[1]]: { command: 'node', args: ['/old/other/server.js'], env: {} },
-        },
-      },
-      '/old/path': { mcpServers: { [STALE.names[0]]: { command: 'node', args: [], env: {} } } },
-      ...extra,
-    },
-  };
-  writeFileSync(join(home, '.claude.json'), `${JSON.stringify(claudeJson, null, 2)}\n`);
-  for (const name of backups) writeFileSync(join(home, name), '{}\n');
-  return home;
-}
 
 const run = (id, root, home, over = {}) => runById(checks, id,
   contextFor(root, { home, ...over }));

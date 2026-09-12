@@ -298,7 +298,13 @@ test('upgrade-e2e runs the harness on three OSes, and adds three named contexts 
   assert.match(job, /git config --global user\.email/);
   // No secret, and no network beyond the harness's own local origin.
   assert.equal(/secrets\./.test(job), false, 'an upgrade cell reads a secret');
-  assert.match(job, /node --test[^\n]*tests\/upgrade\/upgrade\.e2e\.test\.mjs/);
+  // ARC-09-C13 wrapped this command across lines and added the walkthrough, so the assertion
+  // joins continuations first — pinning one line's worth of a command asserts its formatting.
+  const e2eRun = job.replace(/\\\n\s+/g, ' ');
+  assert.match(e2eRun, /node --test[^\n]*tests\/upgrade\/upgrade\.e2e\.test\.mjs/);
+  // The walkthrough runs HERE rather than in `npm test`: this job already builds a harness
+  // world on three OSes once per commit, and `tests/upgrade/` is excluded from `npm test`.
+  assert.match(e2eRun, /tests\/upgrade\/harness-shape\.test\.mjs/);
   assert.match(job, /tests\/upgrade\/upgrade-unit\.test\.mjs/);
   // The checkout under test must be exactly as it was: the harness builds its world in TMPDIR,
   // and an upgrade test that moved this tree would be the worst possible kind of side effect.
@@ -366,9 +372,15 @@ test('release.yml runs on tags only, and is the one workflow that may write (ARC
   assert.match(release, /^    needs: verify$/m);
 
   // The seven assets, named — the criterion is that there are exactly these. Searched inside the
-  // PUBLISH JOB: `gh release create` is also written in the header comment, and an `indexOf` over
-  // the whole file finds the prose first and compares the wrong two positions.
-  const publish = release.slice(release.indexOf('\n  publish:'));
+  // PUBLISH JOB, WITH COMMENTS STRIPPED. Narrowing to the job was the first fix, because the
+  // command is named in the file's header comment and an `indexOf` over the whole file found the
+  // prose. It was not enough: ARC-09-C22's follow-up added a comment INSIDE the publish job that
+  // quotes the command it is explaining, and the ordering assertion below then compared the
+  // comment's position against the assets check and failed on a correct workflow. Comments out
+  // first is the repository's rule for every source scan for exactly this reason — in a comment a
+  // command is the lesson, in a `run:` block it is what executes.
+  const publish = release.slice(release.indexOf('\n  publish:'))
+    .split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
   const create = publish.slice(publish.indexOf('gh release create'));
   for (const asset of ['doctor-ubuntu-latest.json', 'doctor-macos-latest.json',
     'doctor-windows-latest.json', 'install-metrics-ubuntu-latest.json',
@@ -379,6 +391,10 @@ test('release.yml runs on tags only, and is the one workflow that may write (ARC
   // ...and nothing is published without being read first.
   assert.ok(publish.indexOf('assert-assets.mjs') < publish.indexOf('gh release create'),
     'the assets are published before they are checked');
+  // Not vacuous: both positions must exist, or `-1 < -1` is false and `-1 < n` is true for the
+  // wrong reason. This is the pair the comment above is about.
+  assert.ok(publish.includes('assert-assets.mjs') && publish.includes('gh release create'),
+    'the publish job lost a step the ordering assertion compares');
 });
 
 test('the run is cancelled when superseded, so thirteen cells are not paid for twice', () => {

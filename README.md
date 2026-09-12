@@ -15,6 +15,8 @@ Two ways in. **Path A** starts in a terminal and is shorter; **Path B** starts i
 for people who would rather ask than type. Both end in the same place: a checkout running
 design-only, with live mode one command away.
 
+Coming from `claude-servicenow-live` / `snow-mcp`? Follow [MIGRATION.md](MIGRATION.md).
+
 ### Prerequisites
 
 Checked by the bootstrap, never installed by it.

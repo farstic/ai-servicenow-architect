@@ -25,7 +25,11 @@ import { COMMANDS } from '../tools/snowarch/lib/cli.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8');
 
-const DOCS = ['docs/CONTRIBUTING.md', 'docs/INSTALL.md', 'docs/ARCHITECTURE.md'];
+// ARC-10-S01 adds the migration page: it is the document with the highest density of commands
+// a reader copies without reading, and the only one whose audience cannot fall back on
+// knowing the tree.
+const DOCS = ['docs/CONTRIBUTING.md', 'docs/INSTALL.md', 'docs/ARCHITECTURE.md',
+  'docs/MIGRATION.md'];
 
 /** GitHub's anchor rule, near enough for headings we write: lowercase, strip punctuation, hyphens. */
 const anchorFor = (heading) => heading.trim().toLowerCase()
@@ -65,6 +69,9 @@ const REQUIRED = {
     'ci-matrix', 'line-endings'],
   'docs/INSTALL.md': ['upgrading', 'what-to-paste-in-a-bug-report'],
   'docs/ARCHITECTURE.md': ['versioning-tags-and-upgrade'],
+  // The four a reader is sent to by name — from the install page, from the doctor's output, and
+  // from this page's own "Verify".
+  'docs/MIGRATION.md': ['what-changes', 'verify', 'optional-cleanup', 'rollback'],
 };
 
 test('every required section exists, by the anchor other pages link to (ARC-09-S11)', () => {

@@ -206,6 +206,33 @@ option, not a default.
 ## Tests
 
 
+**The upgrade harness builds a whole tree, and the guard on it is a subset.** `tests/upgrade/` is
+excluded from `npm test` (it builds git worlds and costs minutes) and runs in `upgrade-e2e` on three
+OSes. `harness-shape.test.mjs` produces a RELEASED tree there — the release's own writers, then the
+tag — and runs the tests whose subject is what a tree looks like: changelog, version literals,
+version tag, validation shape, docs links, legacy names, never-commit. Not the whole suite, and the
+clearest reason is `engine.config.json validates against its schema`: the schema requires an
+`https://…git` corpus upstream, and the fixture points at a local bare repository because it must
+work with no network. Both are right and they cannot both hold. The full suite inside a fixture
+asserts a real checkout, which is not the question the guard is asking.
+
+**Every source scan has the same shape.** Strip comment lines first — in a comment a command is the
+lesson, in code it is the call, and this arc mistook one for the other four times (ARC-09-S09,
+C17b, C19, C14). Exempt the scanning file by name with the reason: a scan that flags its own
+description of what it looks for is a scan nobody can act on. And its control asserts BOTH
+directions — a planted violation is caught, a correct line is not — plus that real files were seen,
+so a regex that stopped matching cannot report nothing and pass.
+
+**A fixture never lets git read the machine.** `-b <branch>` on every `init`, `-c user.name` and
+`-c user.email` on every commit, `GIT_CONFIG_GLOBAL` pointed at an empty file where a global config
+could interfere, and `core.autocrlf` set only where the test is about line endings. Three fixtures
+in ARC-09 passed locally and failed on the runners because the short form of a git command took a
+default from somewhere outside the test: the harness identity (ARC-08-S05, no global config on a
+fresh runner), `os.devNull` as a config path (ARC-09-C13 — `\\.\nul` on Windows, which git cannot
+open), and a bare repository's HEAD following `init.defaultBranch` while its only branch was `main`
+(ARC-09-C14 — twelve cells red with `src refspec main does not match any`). The `init` half of this
+is checked mechanically by `tests/precondition-asserts.test.mjs`; the rest is this sentence.
+
 **A test never re-implements a renderer's format — it imports it.** Three clocks in one arc say this
 is a real habit: ARC-09-C3 proved "no network code" with a wall-clock threshold, C4 judged a raw
 median against a budget, and C18 normalised step durations with a regex that knew one of the
@@ -247,6 +274,28 @@ reports, and the replacements read it: the banner returns which branch answered,
 "it terminates", the bound is the SPAWN's (`timeout` + `killSignal`, then assert the child was not
 killed), not a comparison against a number — `tests/contract/engine-lint.test.mjs` is the shape to
 copy, control included. If a test has no such fact to assert, it asserts nothing about time.
+
+**A fixture does what the product does, including the parts a record says are unnecessary**
+(ARC-09-C27). The corpus submodule's longest page is 197 characters, and ARC-00's S-07 record is quoted around
+the repository as having REFUTED the need for `core.longpaths` on Windows. Its own words are
+narrower and worth reading before relying on them: *"the `core.longpaths` control did NOT reach
+MAX_PATH, so AC 2 is unanswered for a real install path."* The control never reached the limit, so
+the question was left OPEN, not closed — and left open about a real checkout, where
+`D:\a\<repo>\<repo>\vendor\ServiceNowDocs\markdown\alpha\` leaves the path inside 260. The
+upgrade fixture is not a real checkout: it runs under `C:\Users\RUNNER~1\AppData\Local\Temp\…`,
+about 103 characters before the corpus path begins, so the same file lands at roughly 285 and the
+margin the record measured was spent before the checkout started. The product carries
+`-c core.longpaths=true` on every corpus git call; the fixture did not, and one Windows cell went
+red on a tree green everywhere else. The record was not wrong — it was about a different path.
+
+**And the failure it produced is the reason a symptom is not a diagnosis.** A parent repository
+prints ` M vendor/ServiceNowDocs` for THREE different situations — content modified, HEAD moved off
+the gitlink, or a file that never checked out — and the same two characters for all of them. That
+message cost a round trip through CI to ask which. The fixture now asks the submodule directly
+(its own `status --porcelain`, `HEAD` against the recorded gitlink, and `core.longpaths`), asserts
+each separately at the point the corpus is materialised, and **logs the answer on every run,
+including green ones** — a diagnostic that only prints on failure gives you nothing to compare the
+red run against.
 
 **A skipped test states its reason, and the reason is load-bearing.** Two skip deliberately today — the
 `docs/CHANGELOG.md` ordering guard (the imported changelog reads *ahead* of the root version because the

@@ -13,7 +13,7 @@ import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildTagMessage } from '../scripts/lib/release/tag.mjs';
+import { buildTagMessage, isPrerelease } from '../scripts/lib/release/tag.mjs';
 import { collect, directorySize, megabytes, seconds, table } from '../scripts/ci/install-metrics.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { composeBody, RELEASE_BODY_MAX } from '../scripts/ci/release-notes.mjs';
@@ -36,7 +36,7 @@ function tagged(t, { contract = '{"schema":1,"tools":[]}', version = '2.0.0' } =
   write(root, 'engine.config.json', `${JSON.stringify(CONFIG, null, 2)}\n`);
   write(root, 'packages/snowarch/dist/contract.json', contract);
   mkdirSync(join(root, 'vendor/ServiceNowDocs'), { recursive: true });
-  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q']);
+  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q', '-b', 'main']);
 
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
@@ -300,7 +300,11 @@ function peeledClone(t, { annotatedOnRemote = true } = {}) {
     git(f.root, ['tag', '-d', 'v2.0.0']);
     git(f.root, ['tag', 'v2.0.0']);
   }
-  const bare = join(dirname(f.root), `${basename(f.root)}-origin.git`);
+  // INSIDE the fixture's own tempDir (ARC-09-C13). It was a SIBLING — `join(dirname(f.root), …)` —
+  // which `tempDir(…, t)` has no reason to remove, so every run of this file left two
+  // `snowarch-verify-tag-*-origin.git` directories behind. A bare repository next to the fixture is
+  // not "next to" anything as far as the cleanup is concerned; it is outside it.
+  const bare = join(f.root, '.origin.git');
   execFileSync('git', ['clone', '--quiet', '--bare', f.root, bare], { stdio: 'pipe' });
 
   // What checkout does: the ref exists and points at the commit, not at the tag object.
@@ -423,4 +427,61 @@ test('C21: nothing is appended to the release body after the script runs', () =>
   assert.equal(/>>\s*release-notes\.md/.test(code), false,
     'something appends to the release body after the script — the budget cannot see it');
   assert.match(code, /release-notes\.mjs .*--metrics install-metrics\.md/s);
+});
+
+// ── ARC-09-C22 — a prerelease tag produces a prerelease ────────────────────────────────────────
+//
+// Rehearsal run 10 published `v2.0.0-rc.0` with `prerelease=false`, so the rehearsal sat in the
+// Releases list marked "Latest" — which is the one thing a reader of a Releases page trusts.
+
+test('C22: isPrerelease follows semver §9, and a `v` prefix does not fool it', () => {
+  for (const tag of ['v2.0.0-rc.0', '2.0.0-rc.0', 'v2.0.0-rc.1', 'v9.9.9-alpha.2', 'v1.0.0-0']) {
+    assert.equal(isPrerelease(tag), true, `${tag} should be a prerelease`);
+  }
+  for (const tag of ['v2.0.0', '2.0.0', 'v10.2.3']) {
+    assert.equal(isPrerelease(tag), false, `${tag} should not be a prerelease`);
+  }
+  // Not a prerelease because not a version: a hyphen with nothing after it, and a suffix with no
+  // hyphen. A looser rule would mark a real release as a prerelease, which is the worse mistake —
+  // it hides a shipped version from everyone reading the Releases page.
+  for (const tag of ['v2.0.0-', 'v2.0.0rc0', 'v2.0']) {
+    assert.equal(isPrerelease(tag), false, `${tag} is not a version`);
+  }
+});
+
+test('C22: the workflow asks the module, and passes the flag to gh', () => {
+  const text = readFileSync(join(REAL_ROOT, '.github/workflows/release.yml'), 'utf8');
+  const code = text.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+
+  // The SHAPE is decided by the module that already knows what a tag looks like — not by a second
+  // regex written in YAML, which is the C18 lesson applied before it costs anything.
+  assert.match(code, /isPrerelease\('\$\{\{ github\.ref_name \}\}'\)/);
+  assert.match(code, /'--prerelease' : ''/);
+  // ...and the flag reaches `gh release create`, before the title.
+  const flagAt = code.indexOf('id: prerelease');
+  const createAt = code.indexOf('gh release create');
+  assert.ok(flagAt > -1 && flagAt < createAt, 'the flag is computed after the release is created');
+  assert.match(code,
+    /gh release create \$\{\{ github\.ref_name \}\}\n\s*\$\{\{ steps\.prerelease\.outputs\.flag \}\}/);
+});
+
+test('C22: the flag is a step output, so the publish line has nothing to word-split', () => {
+  // ARC-09-C22 shipped `$(node -e …)` on the publish line. It word-splits BY DESIGN — the flag is
+  // one argument or none — and shellcheck reported SC2046 through actionlint, failing CI. The
+  // reading is fair: in that syntax the intent and the accident look identical. A step output is
+  // substituted as text before bash parses the line, so an empty flag leaves nothing rather than
+  // an empty argument, and the publish command performs no expansion at all.
+  const text = readFileSync(join(REAL_ROOT, '.github/workflows/release.yml'), 'utf8');
+  // COMMENTS OUT FIRST, and this test is why the rule keeps earning its place: the comment above
+  // the step quotes the very syntax being removed, and scanning the raw file found the quotation
+  // rather than the command. In a comment it is the lesson; in the run block it is what executes.
+  const code = text.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+  const publish = code.slice(code.indexOf('gh release create'), code.indexOf('gh release create') + 400);
+  assert.equal(/\$\(/.test(publish), false, 'the publish command substitutes a command again');
+  // Not vacuous: the extraction really is looking at the publish command.
+  assert.match(publish, /--notes-file release-notes\.md/);
+  assert.match(code, /^\s+echo "flag=\$FLAG" >> "\$GITHUB_OUTPUT"$/m);
+  // The file it used to write is gone from the run blocks entirely — a leftover read would be a
+  // second source for the same decision.
+  assert.equal(code.includes('prerelease.flag'), false, 'the flag file is still referenced');
 });

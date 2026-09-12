@@ -33,6 +33,17 @@ export const SURFACES = [
 ];
 
 const EXEMPT_PREFIXES = ['docs/plans/', 'docs/decisions/', 'docs/spikes/', 'scripts/legacy/'];
+/**
+ * A fourth kind, one file wide: the page whose SUBJECT is removing these surfaces (ARC-10-S01).
+ *
+ * `docs/MIGRATION.md` tells a user of the old install how to take the retired hook tooling off
+ * their machine, which it cannot do without naming it. Not the owner map — that list is shared
+ * with the sibling ratchet, which already exempts this file, and an entry there would be reported
+ * as stale by its backward direction. The exemption is kept honest where it can actually be
+ * narrowed: `tests/migration-doc.test.mjs` asserts the name appears under "Optional cleanup" and
+ * nowhere else on the page.
+ */
+const EXEMPT_FILES = new Set(['docs/MIGRATION.md']);
 const HISTORY_FILE = 'docs/ARCHITECTURE.md';
 const HISTORY_MARKER = '<!-- retired-name: historical -->';
 const SCANNED = /\.(md|json|sh)$/;
@@ -43,6 +54,7 @@ export function findLegacySurfaces({ base, files, allow = {} }) {
   for (const rel of files) {
     if (!SCANNED.test(rel)) continue;
     if (EXEMPT_PREFIXES.some((p) => rel.startsWith(p))) continue;
+    if (EXEMPT_FILES.has(rel)) continue;
     if (rel in allow) continue;
     const p = join(base, rel);
     if (!existsSync(p)) continue;

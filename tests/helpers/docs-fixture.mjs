@@ -31,9 +31,17 @@ const LONG_NAME = `${'l'.repeat(197 - 'markdown/alpha/'.length - '.md'.length)}.
  * Not defensive dressing — without it this fixture cannot be BUILT on `windows-latest`:
  * `git add -A` fails with `unable to index file` on the 197-character path, because a temp
  * directory prefix (`D:\a\…\Temp\snowarch-docs-sync-XXXXXX\src\`) is far longer than a normal
- * checkout prefix and the total passes 260. Worth recording against ARC-00 S-07 acceptance
- * criterion 2, which was refuted on the grounds that today's corpus fits: it fits under a SHORT
- * prefix. The margin is the prefix, and a temp directory eats it.
+ * checkout prefix and the total passes 260. The margin is the prefix, and a temp directory eats it.
+ *
+ * Against ARC-00 S-07 acceptance criterion 2, whose record says "the `core.longpaths` control did
+ * NOT reach MAX_PATH, so AC 2 is unanswered for a real install path" — an open question, not the
+ * refutation the ledger row and `sync.mjs` called it until ARC-09-C27.
+ *
+ * THIS COMMENT IS THE EARLIER SIGHTING of the cause C27 chased. It was written at ARC-03-S05, it
+ * names the temp prefix and the 260 limit, and it fixed the call it was standing next to — and
+ * that is as far as it travelled. `tests/upgrade/harness-shape.test.mjs` was written afterwards
+ * without it and lost a Windows cell to the same path. A finding recorded beside one call site is
+ * a finding the next author does not have.
  */
 const git = (args, cwd) => execFileSync(
   'git', process.platform === 'win32' ? ['-c', 'core.longpaths=true', ...args] : args,

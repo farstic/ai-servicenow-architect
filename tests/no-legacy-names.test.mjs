@@ -104,7 +104,7 @@ test('the S03 leaf-cut paths stay deleted', () => {
 // ---------- mutations, in a throwaway repository ----------
 const withScratchRepo = (fn) => {
   const dir = mkdtempSync(join(tmpdir(), 'no-legacy-'));
-  try { git(['init', '-q', '.'], dir); fn(dir); }
+  try { git(['init', '-q', '-b', 'main', '.'], dir); fn(dir); }
   finally { rmSync(dir, { recursive: true, force: true }); }
 };
 

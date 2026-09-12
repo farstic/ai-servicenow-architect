@@ -37,7 +37,7 @@ function checkout(t, { version = '2.0.0', contract = '{"schema":1,"tools":[]}' }
   write(root, 'packages/snowarch/dist/contract.json', contract);
   write(root, 'packages/contract/required-tools.json', `${JSON.stringify({ contractSha256: sha, tools: [] }, null, 2)}\n`);
   mkdirSync(join(root, 'vendor/ServiceNowDocs'), { recursive: true });
-  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q']);
+  git(join(root, 'vendor/ServiceNowDocs'), ['init', '-q', '-b', 'main']);
 
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['config', 'user.email', 'fixture@example.com']);

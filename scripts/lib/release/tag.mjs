@@ -85,3 +85,16 @@ export function tagIsComplete(parsed) {
     && SHA1.test(parsed.docsPin ?? '')
     && parsed.floors?.claudeCode && parsed.floors?.node && parsed.floors?.git);
 }
+
+/**
+ * Is this tag a prerelease?
+ *
+ * ARC-09-C22. The Release for `v2.0.0-rc.0` was created with `prerelease=false`, so a rehearsal tag
+ * sat in the Releases list looking exactly like a shipped version — and "Latest" is what a reader
+ * of a repository's Releases page trusts. Semver §9: a prerelease is a version with a hyphen and a
+ * dot-separated identifier after the patch number. The tag's leading `v` is optional here because
+ * every caller has one and forgetting to strip it would silently answer "not a prerelease".
+ */
+export function isPrerelease(tag) {
+  return /^v?\d+\.\d+\.\d+-[0-9A-Za-z.]+$/.test(String(tag).trim());
+}

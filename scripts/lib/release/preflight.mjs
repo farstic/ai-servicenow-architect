@@ -94,8 +94,22 @@ export function preflight({ version, root, git, config, flags = {}, platform = p
   }
 
   // 6. Up to date with the remote, unless the maintainer says the network is not available.
+  //
+  // THREE STATES, not two (ARC-09-C14). `merge-base --is-ancestor origin/<branch> HEAD` fails both
+  // when the branch is behind AND when `origin/<branch>` does not exist — a ref cannot be an
+  // ancestor of anything if it is not there — so a branch that had never been pushed was reported
+  // as "behind origin/<branch>", and the remedy offered was `git pull --ff-only`, which cannot work
+  // on a ref that does not exist. Rehearsal run 3 stopped there for ten minutes.
   if (!flags.offline) {
     const fetched = git(['fetch', 'origin', branch], { allowFail: true });
+    const hasUpstream = git(['rev-parse', '--verify', '--quiet', `refs/remotes/origin/${branch}`],
+      { allowFail: true }) !== null;
+    if (!hasUpstream) {
+      return { ok: false,
+        message: `release: origin/${branch} does not exist — this branch has never been pushed.\n`
+          + `Push it first (git push -u origin ${branch}), or pass --offline if the remote is not `
+          + 'part of this release' };
+    }
     const behind = fetched === null
       || git(['merge-base', '--is-ancestor', `origin/${branch}`, 'HEAD'], { allowFail: true }) === null;
     if (behind) {
