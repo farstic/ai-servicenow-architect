@@ -37,6 +37,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **A test that failed about once in every two thousand runs now does not.** It checked that
+  changing a stored password does not make the installer think anything needs redoing. To do that it
+  put the file's timestamp back the way it found it — and a timestamp rounded to the millisecond, on
+  a file written a fraction of a millisecond before a whole second, comes back as the next second.
+  One run in about eighteen hundred, which across a full build is a red light every few changes. The
+  fixture now keeps away from that boundary; nothing about the product changed.
+
 - **The record of where this came from, in one place and checked.** Two products were folded into
   this one, and the History section now says which, where each landed, under which tag it is
   preserved, and how to read a file's history across the join — with the commands run rather than
