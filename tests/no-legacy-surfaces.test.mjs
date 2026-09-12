@@ -156,8 +156,13 @@ const isExemptVocabLine = (file, line) =>
  * criterion-2 and criterion-4 checks, so "current" means the same thing to both.
  */
 function currentLines(rel) {
+  return currentLines0(read(rel));
+}
+
+/** The same boundary, over text already in hand — so a caller may flatten it (ARC-10-S04). */
+function currentLines0(text) {
   const out = [];
-  for (const line of read(rel).split('\n')) {
+  for (const line of text.split('\n')) {
     // ARC-09-C17: history starts at the NEWEST release heading, not at the frozen one — a release
     // creates a `## <version>` section above it, and its contents are a record, not live text.
     if (/^## (\d|Before )/.test(line)) break;
@@ -194,6 +199,64 @@ test('ARC-02-S06 criterion 2 — no "Tier [0-9]" outside history and the anchore
     });
   }
   assert.deepEqual(hits, [], `${hits.length} hit(s):\n  ${hits.join('\n  ')}`);
+});
+
+test('ARC-10-S04 AC 1/AC 4 — the old standing rule survives only where it is replaced', () => {
+  // The v2 rule sent every finding to one file and then excluded the ones about our own server.
+  // Both halves are retired. The ONE place their words may appear is the paragraph in CONTRIBUTING
+  // that says what happened to them — a reader who remembers the rule has to be able to find out.
+  //
+  // The first token is assembled, and THE SPLIT HAS TO FALL INSIDE THE RETIRED WORD — not at the
+  // hyphen before the rest of the filename, which leaves the word itself intact and was duly
+  // reported by both the ratchet and L03. Twice, in fact: the second report was this comment,
+  // quoting the fragment while explaining that it must not be written. A comment claiming a file
+  // avoids a sweep is not the same as avoiding it, and the sweep is what decides.
+  const OLD_RULE = [
+    ['now', 'ai', 'kit', '-field-notes'].join(''),
+    ['Standing Rule', ' — Document Every Solved Problem'].join(''),
+    ['MCP findings are', ' EXCLUDED'].join(''),
+  ];
+  const ALLOWED = new Set(['docs/CONTRIBUTING.md', 'docs/PLATFORM-NOTES.md']);
+  // WHITESPACE-COLLAPSED, and the line number goes with it. These tokens are PROSE — the history
+  // paragraph wraps "…Every Solved / Problem" across two lines, and a line-by-line scan misses a
+  // wrapped occurrence in exactly the same way. It missed this file's own paragraph first, which is
+  // how the hole was found: a sweep that cannot see a token split by a newline is a sweep somebody
+  // gets past by reflowing a paragraph.
+  const flat = (text) => currentLines0(text).join(' ').replace(/\s+/g, ' ');
+  const hits = [];
+  for (const f of IN_SCOPE()) {
+    if (ALLOWED.has(f)) continue;
+    const text = flat(read(f));
+    for (const token of OLD_RULE) if (text.includes(token)) hits.push(`${f}: "${token}"`);
+  }
+  assert.deepEqual(hits, [], `${hits.length} live reference(s) to the retired standing rule`);
+
+  // Both directions. The history paragraph must actually carry them, or this passes on a tree where
+  // the replacement was never explained and a reader who remembers the rule is left guessing.
+  const contributing = flat(read('docs/CONTRIBUTING.md'));
+  for (const token of OLD_RULE) {
+    assert.ok(contributing.includes(token), `the history paragraph does not name "${token}"`);
+  }
+  // ...and the negative the story asks for: a file outside the allowed pair naming it IS a hit.
+  assert.equal(OLD_RULE.some((t) => `see docs/${t}.md for the rule`.includes(t)), true);
+});
+
+test('ARC-10-S04 — CLAUDE.md and CONTRIBUTING agree on the four homes', () => {
+  // AC 2's other half: the short form a session reads and the table a maintainer reads must not
+  // drift into two different rules. Asserted on the four DESTINATIONS rather than on wording, so
+  // either may be rewritten and neither may quietly grow a fifth home or lose one.
+  const claude = read('CLAUDE.md');
+  const contributing = read('docs/CONTRIBUTING.md');
+  for (const home of ['docs/PLATFORM-NOTES.md', 'packages/snowarch/tests/',
+    'docs/TROUBLESHOOTING.md', 'clients/<name>/']) {
+    assert.ok(claude.includes(home), `CLAUDE.md § 11 does not name ${home}`);
+    assert.ok(contributing.includes(home), `the CONTRIBUTING table does not name ${home}`);
+  }
+  // The promise that replaced the exclusion, in both places.
+  for (const [name, doc] of [['CLAUDE.md', claude], ['docs/CONTRIBUTING.md', contributing]]) {
+    assert.match(doc, /no excluded category/, `${name} does not say the exclusion is gone`);
+    assert.match(doc, /same pull request as the fix or the test/, `${name} does not say when to record`);
+  }
 });
 
 test('ARC-10-S02 AC 1 — `memory/MEMORY.md` survives only where it is retired', () => {

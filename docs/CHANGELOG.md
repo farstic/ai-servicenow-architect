@@ -37,6 +37,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **One rule for where a thing you learned gets written down, and nothing is excluded from it.** The
+  previous version sent every finding to a single file and then carved out an exception for the ones
+  about its own tooling — which put the notes most likely to matter to the next person in the one
+  place nobody else could read. There are now four homes, chosen so that something fails when the
+  note is wrong: a ServiceNow behaviour goes where its source is checked, a bug in this server goes
+  into a test, an install problem goes where its error code is, and anything naming a real instance
+  is never committed at all. Record it in the same change as the fix.
+
 - **The previous version's install scripts are no longer carried in the repository.** They were kept
   as the specification the new doctor was checked against, one check at a time, in both directions.
   That check is finished, so the copies are gone; the originals stay readable at the import tags, and

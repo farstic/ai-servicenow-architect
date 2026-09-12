@@ -116,9 +116,14 @@ Baseline first: a custom table, scoped app or state extension requires explicit,
 
 One engagement per session. Work inside that engagement's folder. Never echo client content into shared files. When sequencing several builders, confirm the folder before the first dispatch.
 
-## 11. Standing rule — record what you learn
+## 11. Standing rule — where a finding goes
 
-When a ServiceNow platform behaviour is confirmed against a live instance, add it to `docs/PLATFORM-NOTES.md` with its grounding path and what it changes for a specialist. When this repository's own server misbehaves, write a failing test in `packages/snowarch/tests/` and fix it. Instance-specific values — URLs, sys_ids, user names — never enter the repository.
+Record it in the same pull request as the fix or the test. There is no separate field-notes file and no excluded category.
+
+- **A ServiceNow platform behaviour** → `docs/PLATFORM-NOTES.md`, a `PN-xx` entry. `Grounding:` is a real path under `vendor/ServiceNowDocs/` or the words `observed behaviour` — never an invented path.
+- **This server's own behaviour** → a failing test under `packages/snowarch/tests/`, then the fix; a row in `packages/snowarch/CHANGELOG.md` until it is fixed.
+- **An install or Claude Code behaviour** → `docs/TROUBLESHOOTING.md` when it has an error code, `docs/CONTRIBUTING.md` when it is a rule for whoever changes this repository.
+- **Anything instance-specific** — URLs, sys_ids, user names — is never committed: it belongs in `.local/`, in `clients/<name>/`, or in Claude Code's own memory.
 
 ## 12. Maintenance
 

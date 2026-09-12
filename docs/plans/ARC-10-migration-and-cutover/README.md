@@ -1,6 +1,6 @@
 # ARC-10 — Migration and cutover from the old repositories
 
-Status: **In progress — S01–S03 merged (3 of 10), started 2026-09-12** · Depends on: every other ARC (ARC-09's `v2.0.0` tag in particular; see the phase split below) · Blocks: nothing — it ends the programme
+Status: **In progress — S01–S04 merged (4 of 10), started 2026-09-12** · Depends on: every other ARC (ARC-09's `v2.0.0` tag in particular; see the phase split below) · Blocks: nothing — it ends the programme
 
 ## Goal
 
@@ -55,7 +55,7 @@ Full write-ups: [STORIES.md](STORIES.md) (10 stories, ≈ 10.5–14 engineer-day
 | ARC-10-S01 | `docs/MIGRATION.md`: existing-user step list and the cleanup command list derived from the ARC-08 detectors | M | **Done** |
 | ARC-10-S02 | Engagement-state carry-over: `clients/` per checkout, `memory/MEMORY.md` retired in favour of Claude Code auto memory | S | **Done** |
 | ARC-10-S03 | Retire the legacy scaffolding: `scripts/legacy/`, obsolete `.gitignore` lines, empty legacy-name allow-list | S | **Done** |
-| ARC-10-S04 | Rewrite the standing rule and the field-notes policy (DR-16) in `CLAUDE.md` and `docs/CONTRIBUTING.md` | S | — |
+| ARC-10-S04 | Rewrite the standing rule and the field-notes policy (DR-16) in `CLAUDE.md` and `docs/CONTRIBUTING.md` | S | **Done** |
 | ARC-10-S05 | `docs/ARCHITECTURE.md` "History" section: import tags, ADR links, scope-cut ledger pointer, old-repository links | S | — |
 | ARC-10-S06 | Author's machine cutover on `v2.0.0`: doctor 0 FAIL, stale entries removed, legacy store gone, engagements untracked | M | — |
 | ARC-10-S07 | Validation-record template, redaction lint and the cutover test list (T-01…T-18 + `AUTHENTICATION_FAILED` + design-only) | M | — |

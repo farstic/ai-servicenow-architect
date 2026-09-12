@@ -293,6 +293,28 @@ CI: `tests/vocabulary.test.mjs` (ARC-02-S06's grep set) gains the pattern `nowai
 
 **Definition of done.** Merged before the tag; `CLAUDE.md`, `docs/CONTRIBUTING.md`, `docs/PLATFORM-NOTES.md` updated; CI green.
 
+**Amended 2026-09-12 (S04 build).** The full eight-line block landed, not the fallback:
+`CLAUDE.md` measured **125 lines against its 200 cap** before the change and **130** after, so the
+three-lines-plus-pointer form was never needed. `tests/claude-md.test.mjs` has one budget (200 lines
+/ 20,000 bytes), not a per-section table — the story's "the table is the authority" has no table to
+be the authority of; the cap is.
+
+- **The CONTRIBUTING section already existed with TWO rows** (platform, server). It now has four,
+  each with a real example that resolves: `PN-07`, `packages/snowarch/tests/servicenow/client-orderby.test.ts`,
+  `docs/TROUBLESHOOTING.md` § `PROXY_UNREACHABLE`, and the never-committed rule.
+- **Its closing line contradicted ARC-10-S02** — it sent instance-specific values to "local memory",
+  which S02 retired. Corrected to the fourth row's homes; a rule that disagrees with the rule two
+  sections above it is worse than no rule.
+- **`docs/TROUBLESHOOTING.md` has no `MCP_TIMEOUT` entry**, so the install example is
+  `PROXY_UNREACHABLE`, which the error registry generates and which a user actually meets.
+- **The test lives in `tests/no-legacy-surfaces.test.mjs`**, where ARC-02-S06's vocabulary checks
+  are; `tests/vocabulary.test.mjs` does not exist.
+- **The sweep is whitespace-collapsed, not line-by-line.** These tokens are prose and the history
+  paragraph wraps one of them across two lines — a line-based scan missed this file's own paragraph,
+  and would equally miss a live occurrence somebody reflowed. It reports the file, not the line.
+- **`.claude/rules/00-mode-and-mcp-gate.md` was not touched** and needed no generator edit: it
+  quotes none of the old rule's words.
+
 ---
 
 ### ARC-10-S05 — `docs/ARCHITECTURE.md` "History" section: import tags, ADR links, scope-cut ledger pointer, old-repository links

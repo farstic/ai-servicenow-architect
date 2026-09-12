@@ -1745,22 +1745,41 @@ breaches came from the same shape: read a file, split it, transform, join the pa
 
 ## Where a finding goes
 
-A thing learned on a real instance is one of two kinds, and they have different homes because they
-have different enforcement:
+**Record it in the same pull request as the fix or the test.** There is no separate field-notes file
+and no excluded category — the four kinds below are the whole of it, and each has a home because each
+has a different thing holding it in place.
 
-| Kind | Home | What holds it in place |
-|---|---|---|
-| **Platform** — how ServiceNow behaves | `docs/PLATFORM-NOTES.md`, a `PN-xx` entry with all five fields | the citation gate: every path-shaped `Grounding:` must resolve under `vendor/ServiceNowDocs/`, and the file is in the scan set |
-| **Server** — how this MCP server behaves | a failing test under `packages/snowarch/tests/`, then the fix; a row in `packages/snowarch/CHANGELOG.md`'s "Known limitations" until then | the test |
+| Kind | Home | A real one | What holds it in place |
+|---|---|---|---|
+| **Platform** — how ServiceNow behaves | `docs/PLATFORM-NOTES.md`, a `PN-xx` entry with all five fields | `PN-07`: `sys_script_fix.name` is truncated to 40 characters and the call still returns success | the citation gate: every path-shaped `Grounding:` must resolve under `vendor/ServiceNowDocs/`, and the file is in the scan set |
+| **Server** — how this MCP server behaves | a failing test under `packages/snowarch/tests/`, then the fix; a row in `packages/snowarch/CHANGELOG.md`'s "Known limitations" until then | `packages/snowarch/tests/servicenow/client-orderby.test.ts`: the descending form is one term, `ORDERBYDESC<field>`, not two | the test |
+| **Install or Claude Code** — how getting this running behaves | `docs/TROUBLESHOOTING.md` when it has an error code; this file when it is a rule for whoever changes the repository | `docs/TROUBLESHOOTING.md` § `PROXY_UNREACHABLE`; and *A variable Claude Code sets per session is never read — it is set*, below | the error registry generates the page, so a code without an entry fails the build; a rule here is read at review |
+| **Instance-specific** — a URL, a sys_id, a user name | never committed: `.local/`, `clients/<name>/`, or Claude Code's own memory | — | the credential sweep and the ignore rules (*Engagements and memory*, above) |
+
+**What this replaces (ARC-10-S04).** The v2 engine carried a *Standing Rule — Document Every Solved
+Problem* that sent every finding to one file, `docs/nowaikit-field-notes.md`, and then carved out an
+exception: *MCP findings are EXCLUDED from this repo*, to be kept in local memory or contributed
+elsewhere. Both halves were wrong for this product. One file for every kind of finding meant nothing
+held any of them in place — a note about a ServiceNow behaviour and a note about a broken tool sat in
+the same list, and neither was a test. And the exclusion put the findings most likely to bite the
+next reader, the ones about our own server, in the one place nobody else could read. The table above
+is the replacement: four kinds, four homes, no excluded category, and each home chosen because
+something there fails when the finding is wrong. This paragraph is the only place in the product
+where the old rule's words appear, and it is here so that a reader who remembers them knows what
+happened to it.
 
 The distinction is not bureaucratic. A platform fact is true whatever we ship and cannot be fixed
 here, so the useful thing to record is the behaviour and where it is documented. A server fact is a
-defect in code we own, and writing it in prose instead of a test is how it comes back.
+defect in code we own, and writing it in prose instead of a test is how it comes back. An install
+fact is about the one part a user meets before anything works. And the fourth is not a place to
+record something — it is the rule that there is no such place.
 
 Two rules for a `PN-xx` entry. **`Grounding:` is a real path or an admission** — where no corpus page
 states the behaviour, the line reads `none in ServiceNowDocs (<nearest area path> for the baseline
 concept); observed behaviour`, never an invented path that a reader would trust. And **nothing
-instance-specific ever lands here**: no URL, sys_id, user name or address. Those go in local memory.
+instance-specific ever lands here**: no URL, sys_id, user name or address. Those belong where the
+fourth row says — `.local/`, `clients/<name>/`, or Claude Code's own memory (*Engagements and
+memory*, above).
 
 `Engine consequence:` is the field that earns the entry its place — what a specialist now does
 differently. An entry that changes nothing about how the engine works is a note, not a platform note.
