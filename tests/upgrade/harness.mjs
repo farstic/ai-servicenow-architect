@@ -188,10 +188,9 @@ function rewriteVersion(root, version) {
   // world, fourteen times a job, which is what put the cell over `timeout-minutes: 30`.
   //
   // WHAT IT DOES NOT CHANGE is why npm is called here at all: the three manifests AND
-  // `package-lock.json` still move in one call. Measured rather than assumed — the temporary probe
-  // hashed the lock either side of the bump and reported `REWRITTEN` for all three releases with
-  // the flag as without it — and the AC 3 walkthrough, which runs the fixture's own lint gate,
-  // `version-consistency` and six more tree-scanning tests INSIDE the released tree, passes.
+  // `package-lock.json` still move in one call. That is asserted below rather than remembered —
+  // if a future npm made `--no-workspaces-update` skip the lock too, the fixture would go on
+  // producing releases with a stale lock and the first thing to notice would be a release.
   //
   // `--ignore-scripts` is deliberately NOT added: no manifest in this repository has a `version`,
   // `preversion` or `postversion` script, so it would be a flag that changes nothing, and a flag
@@ -202,13 +201,20 @@ function rewriteVersion(root, version) {
   // a real release never pays this. The fixture differs from the product HERE and only here, and
   // the difference is about a directory the fixture does not own, not about what gets written.
   const lock = join(root, 'package-lock.json');
-  const before = existsSync(lock) ? createHash('sha256').update(readFileSync(lock)).digest('hex') : null;
+  // Its ABSENCE is checked, not tolerated. `before === null` would make the assertion below pass
+  // for the wrong reason for ever, and a fixture tree without the lock file is already broken:
+  // `trackedFiles()` carries every tracked file, and this is one.
+  if (!existsSync(lock)) throw new Error(`harness: no package-lock.json in ${root}`);
+  const before = createHash('sha256').update(readFileSync(lock)).digest('hex');
   execFileSync('npm', ['version', version, '--no-git-tag-version', '--workspaces',
     '--include-workspace-root', '--no-workspaces-update'],
   { cwd: root, stdio: 'pipe', shell: process.platform === 'win32' });
-  const after = existsSync(lock) ? createHash('sha256').update(readFileSync(lock)).digest('hex') : null;
-  // ARC-09-C28 probe, temporary: the claim above, checked on every run rather than remembered.
-  if (before !== null) C28_PROBE.push(`lock-${version}=${before === after ? 'SAME' : 'rewritten'}`);
+  const after = createHash('sha256').update(readFileSync(lock)).digest('hex');
+  if (before === after) {
+    throw new Error(`harness: npm version ${version} left package-lock.json unchanged — the bump `
+      + 'must move the lock as well as the three manifests, which is why npm is called here at all '
+      + '(ARC-09-C28)');
+  }
 
   // ...and the two prose files, through the release's own writers rather than a regex here.
   for (const [rel, write] of [['CLAUDE.md', writeMarker], ['docs/README-head.md', writeHead]]) {
@@ -280,15 +286,18 @@ function placeModules(target, modules) {
 }
 
 /**
- * TEMPORARY INSTRUMENT — ARC-09-C28, removed in the last commit of that chore.
+ * One `world[<platform>] …=Nms …` line per world (ARC-09-C28). Kept, not temporary.
  *
- * The Windows `upgrade-e2e` job runs 26 minutes against a `timeout-minutes: 30`, with fourteen
- * fixture-building tests at 130–270 s each where Ubuntu takes 10–20 s. The fix is not guessed: this
- * prints where each world's time goes, on all three OSes, so the dominant term is named with a
- * number. One line per world, `hrtime`-based, stdout only.
+ * It was added to find out why the Windows job ran 26 minutes against a `timeout-minutes: 30`, and
+ * it named the term in one run: `rewrite-version` at 107–290 s, 70–77% of every world. It stays
+ * because the next slow cell should be diagnosable from the log alone rather than from another
+ * round trip to add an instrument — this suite builds fourteen worlds on three operating systems
+ * and is the one place in CI where a platform's cost model shows up as a number.
+ *
+ * It PRINTS and asserts nothing: C24's rule is that a unit test asserts structure, and a
+ * measurement is a measurement. The one thing here that IS asserted is in `rewriteVersion`, and
+ * it is a fact rather than a duration.
  */
-export const C28_PROBE = [];
-
 const phase = (label, marks, fn) => {
   const t0 = process.hrtime.bigint();
   const r = fn();
@@ -448,7 +457,6 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
 
   // ARC-09-C28 instrument, removed when the chore closes. One line per world, stdout only.
   marks.push(`TOTAL=${Math.round(Number(process.hrtime.bigint() - worldStart) / 1e6)}ms`);
-  marks.push(...C28_PROBE.splice(0));
   writeSync(1, `    world[${process.platform}] ${marks.join(' ')}\n`);
   return { scratch, work, origin, user, bin };
 }
