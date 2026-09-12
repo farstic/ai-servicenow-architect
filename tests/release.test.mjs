@@ -558,3 +558,76 @@ test('C12c: a release that leaves the tree dirty FAILS, naming the files', async
   assert.match(err, /the commit left the tree dirty/);
   assert.match(err, /docs\/TROUBLESHOOTING\.md/);
 });
+
+// ── ARC-09-C14 — three states at the remote, not two ──────────────────────────────────────────
+//
+// `merge-base --is-ancestor origin/<branch> HEAD` fails when the branch is BEHIND and also when
+// `origin/<branch>` does not exist — a ref cannot be an ancestor of anything if it is not there. So
+// a branch that had never been pushed was reported as "HEAD is behind origin/<branch>", with the
+// remedy `git pull --ff-only`, which cannot work on a ref that does not exist. Rehearsal run 3
+// stopped there, on a rehearsal branch that was local by design.
+
+/** A fixture with a real `origin`, and a branch that is current, behind, or never pushed. */
+function withRemote(t, state) {
+  const root = fixture(t);
+  // OUTSIDE the working tree, in its own tracked temp directory. Inside it, the bare repository and
+  // the second clone are untracked files — so `git status --porcelain` is not empty and the
+  // preflight refuses for "working tree not clean" before it ever reaches the remote check. That is
+  // the same mistake as ARC-09-C13's leak seen from the other side: where a fixture puts its
+  // scaffolding is part of what it is testing.
+  const scaffold = tempDir('snowarch-origin-', t);
+  const bare = join(scaffold, 'origin.git');
+  execFileSync('git', ['init', '-q', '--bare', bare], { stdio: 'pipe' });
+  git(root, ['remote', 'add', 'origin', bare]);
+  if (state !== 'no-upstream') {
+    git(root, ['push', '-q', 'origin', 'main']);
+    git(root, ['fetch', '-q', 'origin']);
+  }
+  if (state === 'behind') {
+    // A commit on the remote this checkout does not have: clone, commit, push, and the fixture is
+    // now genuinely behind rather than merely told that it is.
+    const other = join(scaffold, 'other');
+    execFileSync('git', ['clone', '-q', bare, other], { stdio: 'pipe' });
+    write(other, 'NOTE.md', 'ahead\n');
+    // Asserted, not assumed, and the assertion sits WITHIN TWO LINES of the mutation because that
+    // is the rule's window (`tests/precondition-asserts.test.mjs`): a comment between them reads
+    // fine and fails the check, which is the right trade — the window is what makes the rule
+    // mechanical rather than a matter of opinion.
+    git(other, ['config', 'user.email', 'fixture@example.com']);
+    git(other, ['config', 'user.name', 'fixture']);
+    assert.equal(git(other, ['config', 'user.name']).trim(), 'fixture',
+      'the second clone did not take the fixture identity');
+    git(other, ['add', 'NOTE.md']);
+    git(other, ['commit', '-qm', 'feat(engine): the remote moved']);
+    git(other, ['push', '-q', 'origin', 'main']);
+  }
+  return root;
+}
+
+test('C14: a branch that was never pushed says so, and names the two ways out', async (t) => {
+  const root = withRemote(t, 'no-upstream');
+  const { code, err } = await run(root, ['2.0.1', '--yes']);
+  assert.equal(code, 2);
+  assert.match(err, /origin\/main does not exist — this branch has never been pushed/);
+  // Both remedies, because which one is right depends on what the maintainer is doing.
+  assert.match(err, /git push -u origin main/);
+  assert.match(err, /--offline/);
+  // And NOT the message that sent someone to pull a ref that does not exist.
+  assert.equal(/HEAD is behind/.test(err), false, 'it still says "behind"');
+});
+
+test('C14: a branch that is genuinely behind still says behind', async (t) => {
+  const root = withRemote(t, 'behind');
+  const { code, err } = await run(root, ['2.0.1', '--yes']);
+  assert.equal(code, 2);
+  // The negative control: without it the new branch could swallow the case it was added beside.
+  assert.match(err, /HEAD is behind origin\/main — git pull --ff-only first/);
+});
+
+test('C14: a branch that is current passes the remote check', async (t) => {
+  const root = withRemote(t, 'current');
+  // It gets past the remote check and stops later, on something else entirely — which is the point:
+  // this assertion is about what it does NOT say.
+  const { err } = await run(root, ['2.0.1', '--yes', '--dry-run']);
+  assert.equal(/HEAD is behind|does not exist/.test(err), false, err);
+});

@@ -159,6 +159,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   Those are printed as recorded rather than failed — the same tolerance the changelog generator has
   always had — and history is not rewritten to suit the parser.
 
+- **"Push this branch first" is no longer reported as "you are behind".** A branch that has never
+  been pushed and a branch that has fallen behind failed the same check, so the release offered a
+  remedy — pull first — that cannot work on a remote branch which does not exist. The two are told
+  apart now, and the message names both ways forward.
+
 - **A release with a long changelog can still be published.** GitHub caps a release body at 125,000
   characters, and 2.0.0's notes are longer than that on their own. The body is now assembled in one
   place and bounded: the list of what changed is kept whole, and the prose is cut at a paragraph
