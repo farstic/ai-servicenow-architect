@@ -23,6 +23,20 @@ import { fileURLToPath } from 'node:url';
  */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
+/**
+ * A tree-relative path with `/` separators, on every platform.
+ *
+ * `relative()` returns `tests\\x.test.mjs` on Windows, and every comparison in this file is against
+ * a literal written with `/`. Two of them were silently platform-dependent: the `helpers/` filter
+ * scanned files on Windows that it skipped everywhere else, and the self-exemption below never
+ * fired there — so this file's own planted control was reported as a finding and three Windows
+ * cells went red on a green macOS tree. `packages/contract/lint/lib/scan.mjs` carries the same
+ * normaliser and the same paragraph; this is the third time in the arc, which is why it is a named
+ * function rather than an inline `.split()`.
+ */
+export const posix = (p) => p.split('\\').join('/');
+const rel = (p) => posix(relative(root, p));
+
 const MUTATIONS = [
   [/\[\s*['"]config['"]/, 'git config — outranked by config.worktree and by --global/--system'],
   [/\[\s*['"]checkout['"]/, 'git checkout — silently a no-op when already there'],
@@ -41,14 +55,14 @@ function testFiles() {
     }
   };
   for (const r of ['tests', 'packages/snowarch/tests']) walk(join(root, r));
-  return out.filter((f) => !relative(root, f).includes('helpers/'));
+  return out.filter((f) => !rel(f).includes('helpers/'));
 }
 
 /** Every (file, test, mutation) triple, with whether an assertion sits within two lines. */
 function sites() {
   const found = [];
   for (const f of testFiles()) {
-    const rel = relative(root, f);
+    const file = rel(f);
     const lines = readFileSync(f, 'utf8').split('\n');
     let current = null;
     lines.forEach((line, i) => {
@@ -112,14 +126,17 @@ test('negative — an unguarded mutation is caught', () => {
 // The pattern is always the same: the SHORT form of a git command takes a default from somewhere
 // outside the test. This scans for the one that is mechanically checkable.
 
+/** The one file exempt from the scan below, because it describes and plants what the scan finds. */
+const SELF = 'tests/precondition-asserts.test.mjs';
+
 test('every `git init` in the test tree names its branch (ARC-09-C14)', () => {
   const missing = [];
   for (const file of testFiles()) {
-    const rel = relative(root, file);
+    const name = rel(file);
     // This file names both call shapes in prose and plants one as a control, so it is exempt by
     // name with the reason — the same way `version-literals.test.mjs` exempts itself. A scanner
     // that flags its own description of what it scans for is a scanner nobody can act on.
-    if (rel === 'tests/precondition-asserts.test.mjs') continue;
+    if (name === SELF) continue;
     const text = readFileSync(file, 'utf8');
     text.split('\n').forEach((line, i) => {
       // COMMENTS OUT FIRST (the fourth time this arc: ARC-09-S09, C17b, C19, here). In a comment a
@@ -129,7 +146,7 @@ test('every `git init` in the test tree names its branch (ARC-09-C14)', () => {
       // the quotes this scan looks for, or the line below would find itself.
       if (!/\[\s*'init'|\(\s*'init'/.test(line)) return;
       if (/'-b'/.test(line)) return;
-      missing.push(`${rel}:${i + 1} — ${line.trim().slice(0, 80)}`);
+      missing.push(`${name}:${i + 1} — ${line.trim().slice(0, 80)}`);
     });
   }
   assert.deepEqual(missing, [], 'a `git init` without `-b <branch>` takes `init.defaultBranch` from '
@@ -146,4 +163,13 @@ test('the init scan would catch a bare init, and is not matching everything (ARC
   assert.equal(/\[\s*'init'|\(\s*'init'/.test(fine) && !/'-b'/.test(fine), false);
   // ...and it looks at real files: if the sweep found none, the assertion above proves nothing.
   assert.ok(testFiles().length > 50, `only ${testFiles().length} test files scanned`);
+  // The two comparisons that were separator-dependent, asserted on the SHAPE `relative()` returns
+  // on Windows — so this runs the same on every platform instead of only proving itself on the one
+  // where it already worked. Both were silent: the exemption stopped matching, so the control
+  // planted above was reported as a finding on three Windows cells while macOS was green; and the
+  // `helpers/` filter scanned files there that it skipped everywhere else.
+  assert.equal(posix(String.raw`tests\precondition-asserts.test.mjs`), SELF);
+  assert.equal(posix(String.raw`tests\doctor\helpers\tree.mjs`).includes('helpers/'), true);
+  // And it is a normalisation rather than a blanket replace of the separator this platform uses.
+  assert.equal(posix('tests/doctor/helpers/tree.mjs'), 'tests/doctor/helpers/tree.mjs');
 });
