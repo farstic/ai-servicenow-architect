@@ -1614,7 +1614,9 @@ commit sha. Never in the test file: it is a specification, and the dated run tab
 were removed for exactly that reason. Redact anything naming a real instance, user or credential —
 `tests/validation-records.test.mjs` enforces that and does not take your word for it.
 
-**A failure is a rework item against the story that changed the text**, not a note in the record.
+**A failure is a rework item against the story that changed the text**, not a note in the record. Fix the
+governing document, re-run the failed test in a fresh session, then re-run the whole suite before
+committing — a fix for one test must not break another.
 
 ## Recording a validation run
 
@@ -1659,8 +1661,6 @@ whole-second boundary about once in 1,800 cycles, all of them on one side, and t
 written for it covered the side that never crosses. This is the companion to the rule above that no
 unit test asserts a wall-clock — a duration belongs in `banner-timing.mjs`; a clock VALUE a test
 legitimately depends on belongs in a fixture that cannot land on the boundary.
-Fix the governing document, re-run the failed test in a fresh session, then re-run the whole suite
-before committing — a fix for one test must not break another.
 
 ---
 

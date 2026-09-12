@@ -234,6 +234,12 @@ written and this records what the tree said.
   record, and the frozen imported entries. None was a stale sentence to rewrite.
 - **The end state is three entries, not the two the brief predicted** — S01's line lives in two files
   because `README.md` is composed from `docs/INSTALL.md`, so the pointer is allow-listed twice.
+  **Five as of ARC-10-S10 (2026-09-12):** `.github/ISSUE_TEMPLATE/config.yml` and
+  `migration-problem.yml` joined, for the reason `docs/MIGRATION.md` is exempt — a form that asks
+  which product you are migrating FROM has to name it. `install-problem.yml` did NOT join: it
+  carries no forbidden pattern, and a listed file that does not match fails the ratchet's backward
+  direction, which is the half that keeps the list from becoming a list of files nobody rewrote.
+  All five are retired by S10's run half, the archive.
 - **Reducing the allow-list removed `docs/CHANGELOG.md` from the retired-SURFACE sweep too**, which
   reads the same owner map. It is exempt there now for its own stated reason rather than as a debt:
   naming a surface while recording its removal is the opposite of describing an installable one.
