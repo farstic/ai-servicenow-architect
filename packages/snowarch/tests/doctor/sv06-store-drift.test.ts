@@ -10,11 +10,11 @@ import { join } from 'node:path';
 // reads like a pass. `tests/doctor/doctor.test.ts` drives `dist/cli/index.js` for the same reason.
 // `instanceManager` must come from `dist/` too: the same module loaded twice is two module
 // instances, and the check would then read a store this file never wrote.
-// @ts-expect-error - the built JS carries no declarations; this file asserts behaviour, not types.
+// No `@ts-expect-error`: the build emits declarations beside the JS, so these are typed exactly as
+// the `src/` imports would be. The first version suppressed errors that do not exist, and
+// `tsc --noEmit` said so — TS2578, an unused directive, which is its own kind of wrong answer.
 import { ALL_CHECKS, resetHandshakeCache } from '../../dist/doctor/checks.js';
-// @ts-expect-error - as above.
 import { stubProbes } from '../../dist/doctor/types.js';
-// @ts-expect-error - as above.
 import { instanceManager } from '../../dist/servicenow/instances.js';
 
 /**
@@ -74,7 +74,7 @@ const runCheck = async (id: string) => {
     'SNOW_ENV_FILE']) delete process.env[k];
   try {
     instanceManager.reload();
-    return await ALL_CHECKS.find((c: { id: string }) => c.id === id)!.run({
+    return await ALL_CHECKS.find((c) => c.id === id)!.run({
       noNetwork: true, cwd: home, probes: stubProbes, fluent: () => ({ installed: false }),
     });
   } finally {

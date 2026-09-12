@@ -436,9 +436,19 @@ jobs:
         if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
         run: |
           test ! -d node_modules || { echo "node_modules exists — this step proves nothing"; exit 1; }
-          files=$(ls tests/doctor/*.test.mjs | grep -vE 'tests/doctor/(fix|json-boundary|redaction-e2e)\.test\.mjs')
-          echo "$files"
-          node --test $files
+          # Positional parameters, not a string: `ls | grep` is SC2010 and an unquoted `$files` is
+          # SC2086. `set --` builds the list one quoted path at a time, so a path with a space would
+          # survive too.
+          set --
+          for f in tests/doctor/*.test.mjs; do
+            case "$f" in
+              */fix.test.mjs|*/json-boundary.test.mjs|*/redaction-e2e.test.mjs) continue ;;
+            esac
+            set -- "$@" "$f"
+          done
+          test "$#" -gt 0 || { echo "no test files matched — the glob is wrong"; exit 1; }
+          printf '%s\n' "$@"
+          node --test "$@"
       - name: The doctor, on the design-only install (Windows)
         if: (matrix.variant == 'node-cli' || matrix.variant == 'no-gitbash') && matrix.os == 'windows-latest'
         shell: cmd
