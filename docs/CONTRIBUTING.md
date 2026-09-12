@@ -1026,6 +1026,20 @@ type(scope)?: subject
 **Types.** `feat` → *Added* · `fix` → *Fixed* · `perf`, `refactor` → *Changed* · `docs`, `test`,
 `build`, `ci`, `chore`, `revert` → *Internal*.
 
+**Running it locally — name the range** (ARC-09-C26):
+
+```sh
+node scripts/ci/commitlint.mjs --base origin/develop --head HEAD
+```
+
+With no flags the range comes from the branch's UPSTREAM, which is correct before a push and
+compares the branch with itself after one. That printed `commitlint: 0 commits ok` — a line
+indistinguishable from a real pass, meaning the opposite, and quoted as a gate twice in one session
+(the same branch reported "7 commits ok" and "0 commits ok" an hour apart). An empty range is now a
+REFUSAL with exit 2 unless `--allow-empty` is given, and every success line names the two refs it
+judged, so a count is never read without knowing what it counted. CI is unaffected: a pull request
+supplies its own base, and a pull request with no commits does not exist.
+
 **Scopes** are optional and come from the tree: `engine`, `server`, `contract`, `docs`, `bootstrap`,
 `doctor`, `wizard`, `ci`, `release`, `deps`, `changelog`, `tests`, `plan`, or any directory name
 under `.claude/skills/` or `.claude/agents/`. A new skill is nameable in a commit the day it exists,

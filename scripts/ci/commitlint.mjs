@@ -164,6 +164,22 @@ if (isMain) {
     return { sha, subject: subject ?? '', parents: (parents ?? '').trim().split(/\s+/).filter(Boolean) };
   });
 
+  // AN EMPTY RANGE IS A REFUSAL, not a pass (ARC-09-C26).
+  //
+  // `commitlint: 0 commits ok` is indistinguishable from a real pass and means the opposite: the
+  // lint judged nothing. It happens by DEFAULT rather than by mistake — with no `--base`/`--head`
+  // the range comes from the branch's UPSTREAM, so running this after a push compares the branch
+  // with itself. The same branch reported "7 commits ok" before a push and "0 commits ok" after,
+  // an hour apart, and both were quoted as a gate.
+  //
+  // CI is unaffected: a pull request supplies `GITHUB_BASE_REF`, and a pull request with no commits
+  // does not exist. `--allow-empty` is for a caller that means it.
+  if (commits.length === 0 && !argv.includes('--allow-empty')) {
+    writeSync(2, `commitlint: nothing to lint — ${range.base}..${range.head} (${range.source}) is `
+      + 'empty; pass --base <ref> --head <ref>, or --allow-empty if that is expected\n');
+    process.exit(2);
+  }
+
   const { checked, failures, preConvention } = lint({
     commits,
     scopes: allowedScopes(),
@@ -184,5 +200,8 @@ if (isMain) {
   for (const line of preConvention) writeSync(1, `${line}\n`);
   for (const line of failures) writeSync(2, `${line}\n`);
   if (failures.length) process.exit(1);
-  writeSync(1, `commitlint: ${checked} commits ok\n`);
+  // The RANGE is named on success too (ARC-09-C26). A count on its own does not say what was
+  // judged, which is how "0 commits ok" read as a gate; a reader can now see which two refs the
+  // number is about without re-deriving them.
+  writeSync(1, `commitlint: ${checked} commits ok (${range.base}..${range.head}, ${range.source})\n`);
 }

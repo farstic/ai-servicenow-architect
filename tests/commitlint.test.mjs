@@ -123,7 +123,7 @@ test('a commit already on the base is not this branch\'s to answer for', (t) => 
 
   const r = spawn(['--base', 'main', '--head', 'HEAD']);
   assert.equal(r.code, 0, `${r.out}${r.err ?? ''}`);
-  assert.match(r.out, /^commitlint: 1 commits ok$/m);
+  assert.match(r.out, /^commitlint: 1 commits ok \(main\.\.HEAD, flags\)$/m);
   assert.equal((r.err ?? '').includes('ARC-09-S01'), false,
     'the base\'s own commit was linted — the range is wrong');
 
@@ -189,12 +189,30 @@ test('the real script, on a real range, in a real repository', (t) => {
   git(root, ['commit', '-q', '--amend', '-m', 'chore(ci): update matrix']);
   const good = spawn(['--base', base, '--head', 'HEAD']);
   assert.equal(good.code, 0, good.err);
-  assert.match(good.out, /^commitlint: 2 commits ok$/m);
+  assert.match(good.out, /^commitlint: 2 commits ok \([0-9a-f]{40}\.\.HEAD, flags\)$/m);
 
   // A range git cannot resolve is exit 2 with the fetch-depth hint, not a stack trace.
   const broken = spawn(['--base', 'origin/nowhere', '--head', 'HEAD']);
   assert.equal(broken.code, 2);
   assert.match(broken.err, /the job needs fetch-depth: 0/);
+
+  // ARC-09-C26 — an EMPTY range is a refusal, not a pass. `0 commits ok` is indistinguishable from
+  // a real pass and means the opposite; it is the DEFAULT outcome of running this after a push,
+  // because the range then comes from an upstream that equals HEAD.
+  const empty = spawn(['--base', 'HEAD', '--head', 'HEAD']);
+  assert.equal(empty.code, 2, `an empty range passed: ${empty.out}${empty.err}`);
+  assert.match(empty.err,
+    /^commitlint: nothing to lint — HEAD\.\.HEAD \(flags\) is empty; pass --base <ref> --head <ref>, or --allow-empty if that is expected$/m);
+  assert.equal(/commits ok/.test(empty.out), false, 'the refusal also printed a pass line');
+
+  // ...and a caller that MEANS it says so, which is the other direction.
+  const allowed = spawn(['--base', 'HEAD', '--head', 'HEAD', '--allow-empty']);
+  assert.equal(allowed.code, 0, allowed.err);
+  assert.match(allowed.out, /^commitlint: 0 commits ok \(HEAD\.\.HEAD, flags\)$/m);
+
+  // The RANGE is named on every success, not just the empty one: a count alone does not say what
+  // was judged, which is how "0 commits ok" came to be quoted as a gate twice in one session.
+  assert.match(good.out, /commits ok \([^)]+\.\.[^)]+, flags\)$/m);
 });
 
 // ── ARC-09-C23 — the lint governs what the convention governs ─────────────────────────────────
