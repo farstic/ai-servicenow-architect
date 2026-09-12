@@ -20,6 +20,7 @@
  * No network: the origin is a path, the clone is `file://`, and nothing here resolves a hostname.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   chmodSync, cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, writeSync,
 } from 'node:fs';
@@ -179,8 +180,35 @@ function rewriteVersion(root, version) {
   // `npm version --workspaces --include-workspace-root` is the one that moves all three manifests
   // AND `package-lock.json` in a single call: a lock file edited by anything but npm is a lock file
   // npm rewrites differently on the next install.
+  // `--no-workspaces-update` (ARC-09-C28), and it is the whole timeout fix.
+  //
+  // Without it `npm version --workspaces` REIFIES `node_modules` after the bump. In this fixture
+  // that directory is a junction to the real checkout's, and on Windows the first bump in a world
+  // then cost 107–290 s against 2.6 s in the one world that gets a real copy — 70–77% of every
+  // world, fourteen times a job, which is what put the cell over `timeout-minutes: 30`.
+  //
+  // WHAT IT DOES NOT CHANGE is why npm is called here at all: the three manifests AND
+  // `package-lock.json` still move in one call. Measured rather than assumed — the temporary probe
+  // hashed the lock either side of the bump and reported `REWRITTEN` for all three releases with
+  // the flag as without it — and the AC 3 walkthrough, which runs the fixture's own lint gate,
+  // `version-consistency` and six more tree-scanning tests INSIDE the released tree, passes.
+  //
+  // `--ignore-scripts` is deliberately NOT added: no manifest in this repository has a `version`,
+  // `preversion` or `postversion` script, so it would be a flag that changes nothing, and a flag
+  // that changes nothing is one the next reader has to work out the purpose of.
+  //
+  // The product's own `applyWrites` keeps the plain call. It reifies a `node_modules` it owns,
+  // where reifying is the conservative thing to do, and it refuses a symlinked one by design — so
+  // a real release never pays this. The fixture differs from the product HERE and only here, and
+  // the difference is about a directory the fixture does not own, not about what gets written.
+  const lock = join(root, 'package-lock.json');
+  const before = existsSync(lock) ? createHash('sha256').update(readFileSync(lock)).digest('hex') : null;
   execFileSync('npm', ['version', version, '--no-git-tag-version', '--workspaces',
-    '--include-workspace-root'], { cwd: root, stdio: 'pipe', shell: process.platform === 'win32' });
+    '--include-workspace-root', '--no-workspaces-update'],
+  { cwd: root, stdio: 'pipe', shell: process.platform === 'win32' });
+  const after = existsSync(lock) ? createHash('sha256').update(readFileSync(lock)).digest('hex') : null;
+  // ARC-09-C28 probe, temporary: the claim above, checked on every run rather than remembered.
+  if (before !== null) C28_PROBE.push(`lock-${version}=${before === after ? 'SAME' : 'rewritten'}`);
 
   // ...and the two prose files, through the release's own writers rather than a regex here.
   for (const [rel, write] of [['CLAUDE.md', writeMarker], ['docs/README-head.md', writeHead]]) {
@@ -259,6 +287,8 @@ function placeModules(target, modules) {
  * prints where each world's time goes, on all three OSes, so the dominant term is named with a
  * number. One line per world, `hrtime`-based, stdout only.
  */
+export const C28_PROBE = [];
+
 const phase = (label, marks, fn) => {
   const t0 = process.hrtime.bigint();
   const r = fn();
@@ -418,6 +448,7 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
 
   // ARC-09-C28 instrument, removed when the chore closes. One line per world, stdout only.
   marks.push(`TOTAL=${Math.round(Number(process.hrtime.bigint() - worldStart) / 1e6)}ms`);
+  marks.push(...C28_PROBE.splice(0));
   writeSync(1, `    world[${process.platform}] ${marks.join(' ')}\n`);
   return { scratch, work, origin, user, bin };
 }
