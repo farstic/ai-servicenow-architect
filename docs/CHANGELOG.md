@@ -37,6 +37,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **One rule for where engagement content lives, and the end of a file that used to hold it.**
+  `docs/CONTRIBUTING.md` gains *Engagements and memory*: one checkout per engagement, each with its
+  own credential store and its own ignored `clients/<name>/`, because the confidentiality boundary
+  is the directory. The old engine's `memory/MEMORY.md` convention is retired — engagement notes go
+  under the engagement, and Claude Code keeps working preferences itself. The migration page now
+  says where each of the four untracked directories goes, and the ignore rules that hide them are
+  asserted by the rule that does it rather than by the fact that something did.
+
 - **A page for people who installed the old two-repository setup.** `docs/MIGRATION.md` takes a user
   of the previous engine and its separate MCP server to a working `2.0.0` checkout in one sitting:
   nine numbered steps, each with a macOS/Linux and a Windows PowerShell form, from fingerprinting

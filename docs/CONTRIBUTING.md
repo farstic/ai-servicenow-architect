@@ -118,6 +118,42 @@ Two mechanical notes worth knowing:
 
 ---
 
+## Engagements and memory
+
+- **One checkout per engagement:** `git clone https://github.com/farstic/ai-servicenow-architect.git acme-architect`.
+  Each checkout has its own `.local/instances.json` and its own `clients/acme/` — the confidentiality
+  firewall is the directory boundary (D-04's rationale, ADR-0004).
+- **`clients/<name>/` is gitignored** and never `git add -f`-ed. Move an engagement by copying the
+  folder, and verify with a checksum listing — `docs/MIGRATION.md` steps 1 and 4 have the commands
+  for both shells.
+- **Instance-specific values — URLs, sys_ids, usernames — are never committed.** They have two homes:
+  the product's own state in `.local/` (store, config, doctor cache, audit log), written only by
+  `snowarch` and the server; and your working notes across sessions, which belong in Claude Code's
+  auto memory rather than in a file in the checkout.
+- **`memory/MEMORY.md`, the old engine convention, is retired.** If you have one, move it to
+  `clients/<name>/memory.md` — gitignored with the folder — and ask Claude to read it when it is
+  needed. `memory/` stays in `.gitignore` as a safety net for a checkout that still has one.
+- **Never put engagement content in `docs/`, `governance/`, `.claude/skills/` or `.claude/agents/`.**
+  Those are product files: they are in every checkout, and one of them is in every other engagement.
+
+**Two things about auto memory that this rule depends on**, both from Claude Code's own documentation
+rather than from us — its location and behaviour are Claude Code's to change, so no path for it
+appears in this repository. Open it with `/memory`, which lists the memory files and offers to open
+the folder.
+
+*It is per repository and machine-local.* Every worktree and subdirectory of one repository shares a
+single auto memory directory, and nothing is shared between machines. So "one checkout per
+engagement" means a separate **clone** — two `git worktree` siblings of one clone would share their
+notes, which is the one arrangement this rule is written to prevent.
+
+*Its index file is also called `MEMORY.md`.* That is a coincidence of naming, not the same file: the
+retired one lived at `memory/MEMORY.md` INSIDE the checkout and was ours; Claude Code's lives in its
+own directory outside the checkout and is Claude's. Retiring the first does not mean moving it to the
+second — it means the notes it held are either engagement content, which belongs in
+`clients/<name>/memory.md`, or working preferences, which Claude records on its own.
+
+---
+
 ## The live E2E secrets — names only
 
 `e2e-live.yml` runs the wizard against a real instance nightly, on the default branch only. It reads

@@ -117,6 +117,34 @@ real install.
 
 ---
 
+> **The engagement rule's second reader (ARC-10-S02, 2026-09-12).** Test strategy asks for "one
+> read-through by a second person", and the person cannot be whoever wrote the section: what is
+> being measured is whether a practitioner with engagements in the OLD checkout can act on it
+> without asking, and a reader who already knows the answer measures nothing.
+>
+> Read `docs/CONTRIBUTING.md` § **Engagements and memory** and `docs/MIGRATION.md` **step 4**, as
+> that user. For each of the five bullets, answer one question: *could I do this now, without
+> opening another file or asking?* The bullets are one-checkout-per-engagement, `clients/<name>/`
+> is gitignored and moves by copy, instance values have two homes and neither is the repository,
+> `memory/MEMORY.md` is retired and where its contents go, and never put engagement content in a
+> product file.
+>
+> Three things to watch for specifically, because they are where this text is most likely to fail a
+> stranger rather than an author:
+>
+> - **The two `MEMORY.md` files.** Claude Code's auto memory keeps its own index under that name.
+>   Does the section make it unmistakable that retiring ours is not moving it to theirs?
+> - **Worktree versus clone.** The rule says "one checkout per engagement" and auto memory is shared
+>   across a repository's worktrees. Would you have known to use a separate clone?
+> - **What you do with the old file.** After reading, is it clear whether `clients/<name>/memory.md`
+>   is read automatically? (It is not — you point Claude at it.)
+>
+> Record every place you had to guess, look elsewhere or scroll back as an ARC-10 follow-up. The
+> section passes only if that list is empty: a rule that needs its author present is not a rule.
+>
+> *(lands in `docs/plans/ARC-10-migration-and-cutover/STORIES.md` § ARC-10-S02 test strategy, and
+> in the story index row for ARC-10-S02, which records this as your sitting until then)*
+
 ---
 
 ## Sitting B — Design-only in a real Claude session
