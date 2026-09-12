@@ -1732,8 +1732,7 @@ breach when the check was written, and every one had passed CI.
 
 Excluded, because a "fix" there would be a falsification rather than a repair: `vendor/**` (not
 ours), `packages/snowarch/dist/**` (build output — fix the build), `**/fixtures/**` (several are
-malformed on purpose, that being their subject), `scripts/legacy/**` (the v2 engine as imported) and
-`docs/spikes/**` (records of what was run). `.ps1` and `.cmd` are outside the extension list because
+malformed on purpose, that being their subject) and `docs/spikes/**` (records of what was run). `.ps1` and `.cmd` are outside the extension list because
 `.editorconfig` gives them CRLF — a check assuming LF everywhere would be wrong about the two file
 types the config is most explicit on.
 

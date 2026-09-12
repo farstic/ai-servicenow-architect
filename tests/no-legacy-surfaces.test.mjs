@@ -3,7 +3,7 @@
 //
 // Three kinds of appearance are legitimate and are handled separately, never by widening the token list:
 //
-//  1. THE DOCUMENTARY RECORD — docs/plans/, docs/decisions/, docs/spikes/, scripts/legacy/. These quote
+//  1. THE DOCUMENTARY RECORD — docs/plans/, docs/decisions/, docs/spikes/. These quote
 //     the past deliberately: the story that says "remove context-mode" has to name it. Purging them
 //     would destroy the plan that motivated the removal. Same exemption the legacy-name ratchet uses.
 //  2. THE HISTORY GLOSSARY in docs/ARCHITECTURE.md — the single permitted place a retired name may be
@@ -32,7 +32,7 @@ export const SURFACES = [
   ['claude-ai-projects', 'the claude.ai project-instruction templates that never shipped (P-07)'],
 ];
 
-const EXEMPT_PREFIXES = ['docs/plans/', 'docs/decisions/', 'docs/spikes/', 'scripts/legacy/'];
+const EXEMPT_PREFIXES = ['docs/plans/', 'docs/decisions/', 'docs/spikes/'];
 /**
  * A fourth kind, one file wide: the page whose SUBJECT is removing these surfaces (ARC-10-S01).
  *
@@ -43,7 +43,15 @@ const EXEMPT_PREFIXES = ['docs/plans/', 'docs/decisions/', 'docs/spikes/', 'scri
  * narrowed: `tests/migration-doc.test.mjs` asserts the name appears under "Optional cleanup" and
  * nowhere else on the page.
  */
-const EXEMPT_FILES = new Set(['docs/MIGRATION.md']);
+const EXEMPT_FILES = new Set([
+  'docs/MIGRATION.md',
+  // ARC-10-S03. This was exempt through the OWNER MAP until the allow-list was reduced, which is
+  // the wrong list for it: an owner entry says "somebody still owes a rewrite", and nobody owes
+  // one here. A changelog names what was REMOVED — the 2.0.0 notes say the old README told readers
+  // to edit `claude_desktop_config.json` and that this product never does — and naming a surface
+  // while recording its removal is the opposite of describing one a user could install.
+  'docs/CHANGELOG.md',
+]);
 const HISTORY_FILE = 'docs/ARCHITECTURE.md';
 const HISTORY_MARKER = '<!-- retired-name: historical -->';
 const SCANNED = /\.(md|json|sh)$/;

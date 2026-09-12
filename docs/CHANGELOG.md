@@ -37,6 +37,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **The previous version's install scripts are no longer carried in the repository.** They were kept
+  as the specification the new doctor was checked against, one check at a time, in both directions.
+  That check is finished, so the copies are gone; the originals stay readable at the import tags, and
+  the History section says which command reads them. Four ignore rules for directories nothing writes
+  went with them — one of them was hiding a path that only ever appears in a temporary folder.
+
 - **One rule for where engagement content lives, and the end of a file that used to hold it.**
   `docs/CONTRIBUTING.md` gains *Engagements and memory*: one checkout per engagement, each with its
   own credential store and its own ignored `clients/<name>/`, because the confidentiality boundary

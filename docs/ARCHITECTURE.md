@@ -1356,6 +1356,7 @@ run.
 | **`4dcb751`** (2026-09-07) | **ARC-01-S03**, server import — an unrelated-histories merge of `import/snow-mcp-1.0.0` (`58a66e0`) into `packages/snowarch`. |
 | `import/engine-v2.8.0-worktree` → `7f99a3a` | the engine working tree at import: source HEAD `21bdf69` plus its 13 uncommitted changes. |
 | `import/snow-mcp-1.0.0` → `58a66e0` | the server at import: source HEAD `bb09bde` plus its one uncommitted change. |
+| **ARC-10-S03** (2026-09-12) | **the legacy scripts retired.** `scripts/legacy/` held the v2 engine's `setup.sh`, `doctor.sh` and `SETUP.md` exactly as imported, kept as the specification ARC-08's doctor was audited against. That audit is done — the D00…D37 mapping table was cross-checked against the real script in both directions — so the copy went. **The originals live under the import tags**, which is where anyone reads them now: `git show import/engine-v2.8.0-worktree:scripts/legacy/doctor.sh` (1,141 lines). |
 
 **Two things about the import SHAs that a reader chasing history will need.**
 

@@ -90,7 +90,7 @@ test('the scope is what the ruling says, and excludes what a fix would falsify',
   // `.ps1` / `.cmd` are absent deliberately: `.editorconfig` gives those CRLF, so a check that
   // assumed LF everywhere would be wrong about the two files the config is most explicit on.
   assert.ok(!EXTENSIONS.includes('.ps1') && !EXTENSIONS.includes('.cmd'));
-  for (const p of ['vendor/', 'packages/snowarch/dist/', 'scripts/legacy/', 'docs/spikes/']) {
+  for (const p of ['vendor/', 'packages/snowarch/dist/', 'docs/spikes/']) {
     assert.ok(EXCLUDED.includes(p), `${p} must stay excluded`);
   }
   const files = filesInScope(root);

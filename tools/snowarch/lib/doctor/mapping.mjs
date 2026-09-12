@@ -1,4 +1,4 @@
-// ARC-08-S07 — every check the old `scripts/legacy/doctor.sh` made, and where it went.
+// ARC-08-S07 — every check the old engine's `doctor.sh` made, and where it went.
 //
 // `00` §3.9 calls that script the most precise existing specification of a correct install, and it
 // is: 39 numbered checks written against a real machine over two years. Rewriting the doctor
@@ -17,7 +17,9 @@
 /**
  * @typedef {object} MappingRow
  * @property {string} old      `D00`…`D37`, exactly once each
- * @property {string} intent   what the old script checked, read against `scripts/legacy/doctor.sh`
+ * @property {string} intent   what the old script checked, read against the script itself while
+ *                            it was still in the tree (ARC-10-S03 retired it; the original is at
+ *                            `git show import/engine-v2.8.0-worktree:scripts/legacy/doctor.sh`)
  * @property {string[]} ids    the new check ids, or `[]` when the intent is retired
  * @property {string} label    what the `New` column prints (ids, or `retired`)
  * @property {string} note     why, or what changed

@@ -33,11 +33,9 @@ Thumbs.db
 .vscode/
 .idea/
 
-# legacy scratch locations from the engine era (removed by ARC-10 once nothing writes them)
-.backups/
-scratchpad/
-diagram-preview/
-node-compile-cache/
+# ARC-10-S03 removed `.backups/`, `scratchpad/`, `diagram-preview/` and `node-compile-cache/`:
+# nothing in this product writes any of them. `node-compile-cache` is Node 22+'s, and it goes under
+# TMPDIR rather than the checkout — a line ignoring it here was ignoring a path that never appears.
 .t01/
 
 # ARC-04-S12: the doctor's criterion-5 test copies dist/ here so it can edit contract.json
