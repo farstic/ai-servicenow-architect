@@ -76,6 +76,33 @@ test('C13: the fixture carries every tracked file but the corpus', async (t) => 
     'the corpus was copied into the fixture');
 });
 
+/**
+ * What the corpus submodule itself says, for a failure message that names its own cause.
+ *
+ * A parent repository reports a submodule as ` M <path>` for THREE different situations — content
+ * modified in its working tree, HEAD moved away from the recorded gitlink, or a file that never
+ * checked out — and prints the same two characters for all of them. Asking the submodule directly
+ * separates them: `porcelain` is empty unless its own tree is dirty, and `head` differing from
+ * `gitlink` is the second case. `longpaths` is here because on Windows it decides whether the
+ * corpus's 197-character page can exist at all under a temp prefix.
+ */
+function submoduleState(corpus) {
+  const ask = (args, cwd) => {
+    const r = run(cwd, 'git', args);
+    return r.status === 0 ? String(r.stdout ?? '').trim() : `<git failed: ${String(r.stderr ?? '').trim().slice(0, 120)}>`;
+  };
+  const parent = dirname(dirname(corpus));
+  return {
+    porcelain: ask(['status', '--porcelain'], corpus).split('\n').slice(0, 5).join(' · '),
+    head: ask(['rev-parse', 'HEAD'], corpus),
+    gitlink: (ask(['ls-tree', 'HEAD', 'vendor/ServiceNowDocs'], parent).split(/\s+/)[2] ?? '?'),
+    // `config --get` exits 1 for a key that is not set, which is an ANSWER rather than a failure —
+    // reading it as one printed `<git failed: >` and hid the very setting this diagnostic is for.
+    longpaths: run(corpus, 'git', ['config', '--get', 'core.longpaths']).stdout?.trim() || '<unset>',
+    platform: process.platform,
+  };
+}
+
 test('C13: ARC-09-S11 AC 3 — the released shape is produced, tagged, and checked', async (t) => {
   // `modules: 'copy'` (ARC-09-C11): this runs the real writers, and the release path installs. With
   // the default link, anything that ran `npm ci` would delete the developer's own `node_modules`
@@ -90,8 +117,32 @@ test('C13: ARC-09-S11 AC 3 — the released shape is produced, tagged, and check
 
   // The corpus. `file://` submodule clones are blocked by git's own policy since 2.38 — a fixture
   // condition, not something the checklist has an opinion about.
-  run(dir, 'git', ['-c', 'protocol.file.allow=always', 'submodule', 'update', '--init',
-    'vendor/ServiceNowDocs']);
+  //
+  // `core.longpaths=true` ON WINDOWS, because the PRODUCT carries it on every corpus git call
+  // (`withLongPaths` in `tools/snowarch/lib/docs/sync.mjs`) and this fixture stands in for the
+  // product. S-07's record refuted the need for it AGAINST A REAL CHECKOUT — 197 characters plus
+  // `D:\a\<repo>\<repo>\vendor\ServiceNowDocs\markdown\alpha\` still fits inside 260 — and that
+  // record is about a path this fixture does not have. Here the prefix is a TEMP directory:
+  // `C:\Users\RUNNER~1\AppData\Local\Temp\snowarch-upgrade-XXXXXX\work\…` is ~103 characters
+  // before the corpus path starts, so the same file lands at ~285 and the margin the record
+  // measured is spent before the checkout begins.
+  run(dir, 'git', [...(process.platform === 'win32' ? ['-c', 'core.longpaths=true'] : []),
+    '-c', 'protocol.file.allow=always', 'submodule', 'update', '--init', 'vendor/ServiceNowDocs']);
+
+  // The corpus materialised COMPLETELY, asserted in the submodule's own terms and immediately.
+  // Without this the same failure arrives much later as ` M vendor/ServiceNowDocs` on the PARENT's
+  // `git status` — a gitlink the parent calls modified, which says nothing about why and is what
+  // sent this to CI twice. A file that did not check out is a file that is missing.
+  const corpus = join(dir, 'vendor/ServiceNowDocs');
+  const corpusState = submoduleState(corpus);
+  // LOGGED ON EVERY RUN, green included. The point of a diagnostic is that the occurrence names
+  // itself, and a message that only prints on failure tells you nothing about the run that worked
+  // — which is the comparison you want when the next cell goes red.
+  console.log(`    corpus: ${JSON.stringify(corpusState)}`);
+  assert.equal(corpusState.porcelain, '',
+    `the corpus checkout is incomplete:\n${JSON.stringify(corpusState, null, 2)}`);
+  assert.equal(corpusState.head, corpusState.gitlink,
+    `the corpus is not at the gitlink the fixture recorded:\n${JSON.stringify(corpusState, null, 2)}`);
   run(dir, 'node', ['scripts/gen-docs-areas.mjs', '--write']);
   run(dir, 'npm', ['run', 'gen']);
   git('commit', '-aqm', 'chore(docs): areas for this corpus');
@@ -123,8 +174,12 @@ test('C13: ARC-09-S11 AC 3 — the released shape is produced, tagged, and check
   // ── THE COMMIT AND THE TAG ─────────────────────────────────────────────────────────────────
   git('add', '-A');
   git('commit', '-qm', 'chore(release): v9.3.0');
+  // The message carries the SUBMODULE's own answer, because ` M vendor/ServiceNowDocs` on the
+  // parent is a symptom with at least three causes — content modified, HEAD moved, or a file that
+  // never checked out — and a failure that does not say which costs a round trip through CI to ask.
   assert.equal(git('status', '--porcelain').stdout.trim(), '',
-    'the release commit left the tree dirty — STAGED missed something (ARC-09-C12c)');
+    'the release commit left the tree dirty — STAGED missed something (ARC-09-C12c); corpus: '
+    + JSON.stringify(submoduleState(corpus)));
 
   const tagOnly = run(dir, 'node', ['scripts/release.mjs', '9.3.0', '--tag-only', '--offline']);
   assert.equal(tagOnly.status, 0, `--tag-only refused:\n${tagOnly.stdout}${tagOnly.stderr}`);

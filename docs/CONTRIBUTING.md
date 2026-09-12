@@ -275,6 +275,25 @@ reports, and the replacements read it: the banner returns which branch answered,
 killed), not a comparison against a number — `tests/contract/engine-lint.test.mjs` is the shape to
 copy, control included. If a test has no such fact to assert, it asserts nothing about time.
 
+**A fixture does what the product does, including the parts a record says are unnecessary**
+(ARC-09-C27). The corpus submodule's longest page is 197 characters, and ARC-00's S-07 record
+REFUTED the need for `core.longpaths` on Windows — measured against a real checkout, where
+`D:\a\<repo>\<repo>\vendor\ServiceNowDocs\markdown\alpha\` leaves the path inside 260. The
+upgrade fixture is not a real checkout: it runs under `C:\Users\RUNNER~1\AppData\Local\Temp\…`,
+about 103 characters before the corpus path begins, so the same file lands at roughly 285 and the
+margin the record measured was spent before the checkout started. The product carries
+`-c core.longpaths=true` on every corpus git call; the fixture did not, and one Windows cell went
+red on a tree green everywhere else. The record was not wrong — it was about a different path.
+
+**And the failure it produced is the reason a symptom is not a diagnosis.** A parent repository
+prints ` M vendor/ServiceNowDocs` for THREE different situations — content modified, HEAD moved off
+the gitlink, or a file that never checked out — and the same two characters for all of them. That
+message cost a round trip through CI to ask which. The fixture now asks the submodule directly
+(its own `status --porcelain`, `HEAD` against the recorded gitlink, and `core.longpaths`), asserts
+each separately at the point the corpus is materialised, and **logs the answer on every run,
+including green ones** — a diagnostic that only prints on failure gives you nothing to compare the
+red run against.
+
 **A skipped test states its reason, and the reason is load-bearing.** Two skip deliberately today — the
 `docs/CHANGELOG.md` ordering guard (the imported changelog reads *ahead* of the root version because the
 product renumbered downward at the merge; it becomes a live assertion when ARC-09 regenerates the file)

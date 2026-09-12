@@ -38,7 +38,18 @@ export const posix = (p) => p.split('\\').join('/');
 const rel = (p) => posix(relative(root, p));
 
 const MUTATIONS = [
-  [/\[\s*['"]config['"]/, 'git config — outranked by config.worktree and by --global/--system'],
+  // The hazard named in this row is a value that DOES NOT TAKE — outranked by a narrower scope. A
+  // `config --get` has no such hazard: it reads. Flagging one demanded an assertion that a read
+  // "took effect", which is not a thing, and the only way to satisfy it was to write a meaningless
+  // assertion or to contort the call. The explicit read flags are excluded by name; a bare
+  // `config <key>` is not, because it is indistinguishable in shape from a set and guarding one
+  // costs nothing.
+  // The QUOTE is required before the lookahead, and that is the whole trick: with the lookahead
+  // placed straight after `\s*`, the engine backtracks the whitespace to zero, tests the negative
+  // at the space — where `'--get'` does not match — and reports a match anyway. Requiring the
+  // opening quote first pins the position to the argument.
+  [/\[\s*['"]config['"]\s*,\s*['"](?!--(?:get|get-all|get-regexp|list)['"])/,
+    'git config — outranked by config.worktree and by --global/--system'],
   [/\[\s*['"]checkout['"]/, 'git checkout — silently a no-op when already there'],
   [/['"]sparse-checkout['"]\s*,\s*['"](?:set|disable|init)['"]/, 'sparse-checkout — may not change the tree'],
   [/\[\s*['"]update-index['"]/, 'index mutation'],
@@ -72,7 +83,10 @@ function sites() {
       if (!hit || current === null) return;
       const near = lines.slice(Math.max(0, i - 2), i + 3).join('\n');
       found.push({
-        rel, line: i + 1, test: current, why: hit[1],
+        // `rel: file`, spelled out. The shorthand `{ rel }` used to mean the local path and now
+        // resolves to the module-level normaliser of the same name — so every finding reported an
+        // arrow function where a file path belongs, and said nothing about which file.
+        rel: file, line: i + 1, test: current, why: hit[1],
         guarded: /assert\.|expect\(/.test(near),
       });
     });
@@ -92,6 +106,13 @@ test('the sweep is looking at something — and reports what', () => {
   const all = sites();
   assert.ok(testFiles().length > 50, `only ${testFiles().length} test files found`);
   assert.ok(all.length > 0, 'no state mutations found at all — the patterns have gone stale');
+  // The config row, both directions: a SET is a mutation and a `--get` is not. Without the second
+  // half the exclusion could widen to every `config` call and nothing would say so.
+  const [configRe] = MUTATIONS[0];
+  assert.equal(configRe.test("git(dir, ['config', 'user.name', 'fixture'])"), true,
+    'a config SET stopped being a mutation');
+  assert.equal(configRe.test("run(dir, 'git', ['config', '--get', 'core.longpaths'])"), false,
+    'a config --get is still reported as a mutation');
   console.log(`    ${testFiles().length} test files · ${all.length} mutations of existing state, all guarded`);
 });
 
