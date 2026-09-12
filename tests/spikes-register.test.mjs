@@ -243,3 +243,36 @@ test('B00-01 — every §A/§B spike row carries a Status and a Record that exis
     assert.doesNotMatch(row.toLowerCase(), /unverified/, `${id}: a gating spike row still says unverified`);
   }
 });
+
+test('ARC-00-C2 — every register row is four cells, and cell 3 names the story that ran it', () => {
+  // The direction that was missing, and it let a broken row through this very PR. S-13's row had
+  // its VERDICT in cell 3 and a second copy of the verdict in cell 4 — the story reference was
+  // simply gone — and every test above passed, because they all read the LAST cell. A test that
+  // only ever looks where the value should be cannot notice that something else is where it isn't.
+  //
+  // The pattern is `ARC-00-Snn`, or `Deferred → ARC-nn-Snn` for a spike ARC-00 handed on rather
+  // than ran: S-10 went to ARC-04-S05 and S-13 to ARC-02-S03, and both of those cells are correct.
+  // The architect's proposed `/^ARC-00-S\d\d$/` would have failed S-10, whose content is right —
+  // so the rule is the one the data supports, and the two forms are both spelled out here.
+  const rows = registerRows();
+  assert.ok(rows.length >= 20, `only ${rows.length} register rows`);
+  let deferred = 0;
+  for (const { row } of rows) {
+    const cells = row.split('|');
+    let last = cells.length - 1;
+    while (last > 0 && cells[last].trim() === '') last -= 1;
+    const id = cells[1].trim();
+    // `split('|')` leaves an empty element at index 0 (the leading pipe), so the data cells are
+    // 1..last and their COUNT is `last`.
+    assert.equal(last, 4, `${id}: the row has ${last} cells, not four — an unescaped | in the text?`);
+    const story = cells[3].trim().replace(/\*/g, '');
+    if (story.startsWith('Deferred')) deferred += 1;
+    assert.match(story, /^(Deferred → )?ARC-\d{2}-S\d{2}$/,
+      `${id}: cell 3 is "${story.slice(0, 60)}" — it must name the story that ran the spike`);
+    // Cell 2 is the record directory, cell 4 the verdict: assert they have not swapped places.
+    assert.match(cells[2].trim(), /^`S-\d+[a-z]?-[a-z0-9-]+\/`$/, `${id}: cell 2 is not a record directory`);
+    assert.match(cells[last].trim(), /^`S-\d+[a-z]?: /, `${id}: cell 4 is not a verdict`);
+  }
+  // Not vacuous: both forms must actually occur, or the pattern is only being proven on one.
+  assert.ok(deferred >= 2, 'no deferred rows found — the second form of cell 3 is untested');
+});

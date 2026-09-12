@@ -138,7 +138,7 @@ _One block per OS. Paste real output, redacted per the rules above._
 
 ## Verdict
 
-`S-13: CONFIRMED — the cause is a **total listing budget** stated by the CLI itself, not a per-file cause: the engine share was cut 27,119 → 11,191 chars and all 28 skills register with a description. Ten YAML hazards were checked and none separated the four empty descriptions from the twenty-four that worked`
+`S-13: CONFIRMED — **closed by ARC-02-S03**; the cause is a **total listing budget** stated by the CLI itself, not a per-file cause: the engine share was cut 27,119 → 11,191 chars and all 28 skills register with a description. Ten YAML hazards were checked and none separated the four empty descriptions from the twenty-four that worked`
 
 ## Evidence
 
