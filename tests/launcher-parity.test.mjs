@@ -635,9 +635,13 @@ test('the recipe is idempotent — a second bootstrap succeeds, with .git left a
   // `.git` EXISTS rather than whether it is a directory — `-d` is false on exactly the tree the
   // guard exists for, and a fixture that left a directory behind would have passed a broken guard.
   const dir = mkdtempSync(join(tmpdir(), 'launcher-idem-'));
+  const calls = join(dir, 'calls');
   const stub = [
     '#!/bin/sh',
     'case "$1" in --version) echo "git version 2.44.0" ; exit 0 ;; esac',
+    // Every invocation is recorded, so the test can assert WHERE the chain stopped rather than
+    // inferring it from what bootstrap printed.
+    `echo "$*" >> "${calls}"`,
     'for a in "$@" ; do case "$a" in',
     '  clone)',
     '    if [ -n "$(ls -A vendor/ServiceNowDocs 2>/dev/null)" ] ; then',
@@ -673,9 +677,19 @@ test('the recipe is idempotent — a second bootstrap succeeds, with .git left a
     assert.ok(statSync(join(dir, 'vendor/ServiceNowDocs/.git')).isFile(),
       'fixture: .git is not a file, so this does not test the absorbgitdirs state at all');
 
+    writeFileSync(calls, '');
     const second = run();
     assert.equal(second.status, 0,
       `the second bootstrap failed — the recipe is not idempotent: ${second.stdout}${second.stderr}`);
+    // The POSITIVE direction, so "nothing ran after the clone" below cannot pass by the recipe
+    // doing nothing at all: with the guard, the clone is SKIPPED and every later step still runs.
+    const secondCalls = readFileSync(calls, 'utf8').split('\n').filter(Boolean);
+    assert.ok(!secondCalls.some((l) => /(^| )clone( |$)/.test(l)),
+      `the guarded second run still cloned: ${secondCalls.join(' | ')}`);
+    for (const verb of ['sparse-checkout', 'fetch', 'checkout']) {
+      assert.ok(secondCalls.some((l) => new RegExp(`(^| )${verb}( |$)`).test(l)),
+        `the guarded second run skipped \`${verb}\` too — it reconciles nothing: ${secondCalls.join(' | ')}`);
+    }
     assert.doesNotMatch(second.stdout + second.stderr, /already exists and is not an empty directory/,
       'the second run re-ran the clone over an existing checkout');
     assert.doesNotMatch(second.stdout + second.stderr, /the corpus checkout failed/, second.stdout);
@@ -688,12 +702,34 @@ test('the recipe is idempotent — a second bootstrap succeeds, with .git left a
       'fixture: the recipe under test has no clone precondition to strip');
     writeFileSync(join(dir, 'tools/snowarch/launcher/docs-recipe.sh'),
       guarded.replace(/\{ \[ -e vendor\/ServiceNowDocs\/\.git \] \|\| (git clone[^\n]*?) ; \}/g, '$1'));
+    writeFileSync(calls, '');
     const unguarded = run();
     assert.notEqual(unguarded.status, 0, 'the control did not reproduce the CI failure');
     assert.match(unguarded.stdout + unguarded.stderr, /already exists and is not an empty directory/,
       'the control failed for some other reason than the unguarded clone');
     assert.match(unguarded.stdout + unguarded.stderr, /the corpus checkout failed/,
       'and the joiner must still report it as the corpus step, not leave it to the doctor');
+
+    // WHERE the chain stopped, and this is the hazard the joiner actually closes. Before ARC-03-C1
+    // the refused clone was swallowed and the next step ran anyway:
+    //   git -C vendor/ServiceNowDocs sparse-checkout set --cone <19 areas> legal
+    // `git -C` on a directory that is NOT a repository walks up and finds the SUPERPROJECT, so that
+    // step sparsified the product checkout itself. Measured on a product-shaped fixture: exit 0,
+    // `core.sparseCheckout=true` set on the superproject, and `tools/`, `tests/` and `docs/` gone
+    // from the working tree — with `git status --porcelain` reporting ZERO deletions, because
+    // sparse-checkout marks them skip-worktree. Source directories vanish and git calls the tree
+    // clean. With the chain, nothing runs after the clone fails, and this asserts exactly that.
+    const made = readFileSync(calls, 'utf8').split('\n').filter(Boolean);
+    assert.ok(made.length > 0, 'the stub recorded no calls at all — the recording is broken');
+    // The recorded line is the argument list, so the verb can be the FIRST word — `includes(' clone ')`
+    // found nothing and the assertion below said so rather than passing vacuously.
+    const cloneAt = made.findIndex((l) => /(^| )clone( |$)/.test(l));
+    assert.notEqual(cloneAt, -1, 'the control never reached the clone');
+    const after = made.slice(cloneAt + 1);
+    for (const verb of ['sparse-checkout', 'fetch', 'checkout', 'submodule']) {
+      assert.ok(!after.some((l) => new RegExp(`(^| )${verb}( |$)`).test(l)),
+        `the chain did not stop: \`${verb}\` ran after the clone was refused — ${after.join(' | ')}`);
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

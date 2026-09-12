@@ -444,3 +444,44 @@ test('every surface carries the re-run note, as its last line', () => {
   // step below — which is why it is last, and why it must never grow a continuation.
   assert.ok(!RERUN_NOTE.includes('\\'), 'the note carries a continuation');
 });
+
+test('the block is the printed commands plus the packaging — and nothing else', () => {
+  // The relation `docs/ARCHITECTURE.md` claims, asserted in BOTH directions. It used to claim the
+  // block was byte-identical to `--print-recipe`; since ARC-03-C1 that is false — the block carries
+  // the fail-fast packaging and `--print-recipe` deliberately does not, because the shell it is
+  // pasted into is unknown on Windows. A doc claim the code contradicts is worse than no claim, so
+  // the sentence was rewritten to this relation and this is what holds it.
+  const r = spawnSync(process.execPath,
+    [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'docs', 'sync', '--print-recipe', '--mode', 'sparse'],
+    { encoding: 'utf8', cwd: root });
+  assert.equal(r.status, 0, r.stderr);
+  const printed = r.stdout.split('\n').map((l) => l.trim())
+    .filter((l) => l.startsWith('git ') || l.startsWith('echo '));
+  assert.ok(printed.length > 0, 'the command printed no recipe at all');
+
+  const block = blockOf(arch);
+  const commands = commandsOf(block);
+
+  // Direction 1 — every printed command is in the block, in order. (`--print-recipe` renders for the
+  // state THIS tree is in, so it may print fewer commands; it may never print a different one.)
+  let at = 0;
+  for (const line of printed) {
+    const found = commands.indexOf(line, at);
+    assert.notEqual(found, -1,
+      `the CLI printed a command the block does not carry, or out of order: ${line}`);
+    at = found + 1;
+  }
+
+  // Direction 2 — the block adds NOTHING but the four packaging forms. Every block line must be a
+  // command of the generated fresh-checkout recipe once its packaging is stripped.
+  const fresh = recipeLines({ config: JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')),
+    areas: readAreas(root, config.docs.areasFile) });
+  assert.deepEqual(commands, fresh, 'the block carries something that is not a command of the recipe');
+  const packaging = block.filter((l) => !commands.includes(l));
+  assert.ok(packaging.length > 0, 'the block carries no packaging at all — the joiner is gone');
+  for (const l of packaging) {
+    const ok = l.endsWith(' && \\') || l === RERUN_NOTE
+      || /^\{ \[ -e .*\] \|\| .* ; \}/.test(l) || /^\{ .* \|\| true ; \}/.test(l);
+    assert.ok(ok, `the block adds something that is not joiner, precondition, tolerance or note: ${l}`);
+  }
+});
