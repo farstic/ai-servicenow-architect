@@ -42,7 +42,13 @@ const FORBIDDEN_PATHS = [
 //   fixtures         — trees that MUST contain the defect the lint detects (ARC-05-S03)
 // `scripts/legacy/` left this list at ARC-10-S03 with the directory itself.
 const EXEMPT_PREFIXES = ['docs/plans/', 'docs/decisions/', 'docs/spikes/',
-  'packages/contract/lint/tests/fixtures/'];
+  'packages/contract/lint/tests/fixtures/',
+  // ARC-10-S07, and the same reason as the row above it: a fixture MUST contain the defect its
+  // lint detects. `tests/validation-records.test.mjs` refuses a retired name in a validation
+  // record, and the fixture proving that refusal fires has to carry one. The name is taken from
+  // `retired-names.json` when the fixture is written, never typed — so the detector's data stays
+  // the one source, here as everywhere else.
+  'tests/fixtures/validation-records/'];
 const EXEMPT_FILES = new Set([
   'docs/ARCHITECTURE.md', 'docs/RELICENSING.md', 'docs/MIGRATION.md', 'NOTICE',
   'tests/no-legacy-names.test.mjs', 'tests/legacy-names.allowlist.json',

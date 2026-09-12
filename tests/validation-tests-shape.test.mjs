@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
  *
  * So the shape is asserted here, and every assertion is proved against a broken copy. What is NOT
  * asserted is the behaviour: that needs a session, and the record of it lives under
- * `docs/spikes/validation-runs/`.
+ * `docs/validation/` (ARC-10-S07's template and lint).
  */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REL = 'tests/VALIDATION-TESTS.md';
@@ -73,8 +73,12 @@ const CHECKS = {
 
   'criterion 1c — the run-history sections are gone': (t) => {
     assert.ok(!/Test Run History|Integrity Runs/.test(t), 'a run-history section is back');
-    // And the thing that brings them back: an instruction to record results in this file.
-    assert.match(t, /docs\/spikes\/validation-runs/, 'the file does not say where runs are recorded');
+    // And the thing that brings them back: an instruction to record results in this file. The
+    // location moved at ARC-10-S07 — `docs/validation/<date>-<os>.md`, from a template with a
+    // redaction lint behind it — and this assertion moved with it. It pinned the OLD path, so
+    // retiring that path made a guard about "does the file say where runs go" fail on a file that
+    // says exactly that, one directory further on.
+    assert.match(t, /docs\/validation\//, 'the file does not say where runs are recorded');
   },
 
   'criterion 1d — a date appears only on the Last updated line, or in a sample': (t) => {

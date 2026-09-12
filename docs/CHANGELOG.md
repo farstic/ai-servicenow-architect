@@ -37,6 +37,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **A format for recording a clean-machine run, and a check that it carries nothing it should not.**
+  Before this release is called good, the install is run on a machine that has never seen it —
+  macOS, Ubuntu and Windows without an instance, and once against a real one. Those runs are written
+  down in one place, in one shape, and a check refuses any of them that names an instance, an
+  address, a record id, a password, a home directory or an old product name. Each of those six rules
+  has a small example proving it still fires. What it deliberately allows is the two ways of
+  describing a secret without carrying one.
+
 - **A test that failed about once in every two thousand runs now does not.** It checked that
   changing a stored password does not make the installer think anything needs redoing. To do that it
   put the file's timestamp back the way it found it — and a timestamp rounded to the millisecond, on
