@@ -13,7 +13,12 @@ if (!oldRoot || !newRoot) { console.error('usage: compare-skill-bodies.mjs <old 
 const stripFrontmatter = (t) => t.replace(/^---\n[\s\S]*?\n---\n/, '');
 // The rewrite is the ONLY change this story makes, so it is normalised away before comparing —
 // otherwise every agent file would "differ" for the very reason the story exists.
-const normalise = (t) => stripFrontmatter(t)
+// LINE ENDINGS FIRST. A body is the same body whichever way the lines end, and this script exists
+// to answer "was content lost" — not "which platform checked it out". The import tag predates
+// `* text=auto eol=lf` in `.gitattributes`, so a Windows checkout of the tag arrives CRLF while the
+// working tree is LF, and every one of the 65 files then "differs". Found on the Windows cell:
+// 42 differ on macOS and Linux, 65 on Windows, from the same two trees.
+const normalise = (t) => stripFrontmatter(t.replace(/\r\n/g, '\n'))
   .replace(/\.claude\/skills\//g, 'skills/')
   .replace(/\.claude\/agents\//g, 'agents/');
 

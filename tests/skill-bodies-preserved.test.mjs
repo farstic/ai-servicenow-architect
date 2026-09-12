@@ -20,7 +20,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -117,4 +117,41 @@ test('R1 — the assets are byte-identical, which the count CAN assert', (t) => 
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   } catch (e) { out = String(e.stdout ?? ''); }
   assert.match(out, /assets identical: (\d+)\/\1$/m, `an asset differs from the import:\n${out}`);
+});
+
+test('R1 — the comparison is line-ending blind, which is why the Windows cell disagreed', (t) => {
+  // THE WINDOWS CELL SAID 65 WHERE macOS AND LINUX SAID 42, from the same two trees. The import tag
+  // predates `* text=auto eol=lf` in `.gitattributes`, so a Windows checkout of the tag arrives CRLF
+  // while the working tree is LF, and every file "differs". A body is the same body whichever way
+  // its lines end, and this script answers "was content lost" — not "which platform ran it".
+  //
+  // Asserted here rather than trusted, because I cannot run the Windows cell: two trees whose only
+  // difference is the line ending must compare identical, and a real content change must still be
+  // caught through the same normalisation.
+  const dir = mkdtempSync(join(tmpdir(), 'snowarch-eol-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const body = '---\nname: x\n---\n\n# A skill\n\nOne line, then another.\n';
+  for (const [side, text] of [['old', body], ['new', body.replace(/\n/g, '\r\n')]]) {
+    mkdirSync(join(dir, side, 'skills', 'x'), { recursive: true });
+    writeFileSync(join(dir, side, 'skills', 'x', 'SKILL.md'), text);
+    mkdirSync(join(dir, side, 'agents'), { recursive: true });
+  }
+  const run = (a, b) => {
+    try {
+      return { code: 0, out: execFileSync(process.execPath, [join(root, SCRIPT), a, b],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }), err: '' };
+    } catch (e) { return { code: e.status ?? 1, out: String(e.stdout ?? ''), err: String(e.stderr ?? '') }; }
+  };
+
+  const same = run(join(dir, 'old'), join(dir, 'new'));
+  assert.match(same.out, /bodies identical: 1\/1/,
+    `CRLF alone was reported as a difference:\n${same.out}${same.err}`);
+
+  // ...and the other direction: a real edit is still a difference, so the normalisation has not
+  // been widened into blindness.
+  writeFileSync(join(dir, 'new', 'skills', 'x', 'SKILL.md'),
+    body.replace('One line', 'A different line').replace(/\n/g, '\r\n'));
+  const changed = run(join(dir, 'old'), join(dir, 'new'));
+  assert.match(changed.out, /bodies identical: 0\/1/, 'a real content change stopped being a difference');
+  assert.match(changed.err, /BODY DIFFERS: skills\/x\/SKILL\.md/);
 });
