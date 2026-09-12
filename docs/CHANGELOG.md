@@ -229,7 +229,7 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 - **Six promises about the package that nothing was keeping.** The licence file shipped with the
   package is a copy of the project's, and nothing compared them; a dependency with a known flaw was
-  pinned to a safe version, and nothing checked the pin had taken; four files that were removed on
+  pinned to a safe version, and nothing checked the pin had taken; five files that were removed on
   purpose could have come back unnoticed. Each is now checked on every push rather than by someone
   remembering to look.
 

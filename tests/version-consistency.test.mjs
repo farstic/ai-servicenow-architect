@@ -166,6 +166,14 @@ test('AC 5 — the lockfile is v3 and links both workspaces', () => {
     .sort();
   assert.deepEqual(links, ['packages/snowarch', 'tools/snowarch'],
     'the workspace links are not the two directories this repository has');
+
+  // ARC-01-C3: the half I dropped without saying so. `npm version` keeps the three in step; a hand
+  // edit of one package.json is exactly the drift nobody reads, and the lockfile is where it shows.
+  const rootVersion = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+  for (const dir of ['packages/snowarch', 'tools/snowarch']) {
+    assert.equal(lock.packages[dir]?.version, rootVersion,
+      `${dir} is ${lock.packages[dir]?.version} in the lockfile, root is ${rootVersion}`);
+  }
 });
 
 test('AC 8 — minimatch resolves to 10.x everywhere, and the override is why', () => {
@@ -184,4 +192,50 @@ test('AC 8 — minimatch resolves to 10.x everywhere, and the override is why', 
   const old = versions.filter((v) => !v.startsWith('10.'));
   assert.deepEqual(old, [],
     `the lockfile resolves minimatch ${old.join(', ')} as well as 10.x — the override did not take`);
+});
+
+// ─── ARC-01-S12 AC 2 (acceptance item B01-07, second half) ───────────────────────────────────
+
+test('AC 2 — the Product constants table has one row per engine.config.json leaf key', () => {
+  // The half of B01-07 the first pass missed entirely: the row covered AC 1 (the ledger) and said
+  // nothing about AC 2, which is a REAL GAP rather than a stale criterion — measured on the previous
+  // head, `docs/ARCHITECTURE.md` had no such table and `docs.upstream`, `roster.utility` and
+  // `mcp.permissions` appeared nowhere in `docs/` at all.
+  //
+  // Both directions, because either alone rots: a key added without a row is undocumented, and a row
+  // left behind by a key that went is a document describing a product nobody has.
+  const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  const leaves = [];
+  const walk = (o, prefix) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (k === '$schema') continue;
+      const path = prefix ? `${prefix}.${k}` : k;
+      if (v && typeof v === 'object' && !Array.isArray(v)) walk(v, path);
+      else leaves.push(path);
+    }
+  };
+  walk(config, '');
+  assert.ok(leaves.length >= 15, `only ${leaves.length} leaf key(s) — the flatten is wrong`);
+
+  const doc = readFileSync(join(root, 'docs/ARCHITECTURE.md'), 'utf8');
+  const from = doc.indexOf('## Product constants');
+  assert.ok(from > -1, 'docs/ARCHITECTURE.md has no Product constants section');
+  const section = doc.slice(from, doc.indexOf('\n## ', from + 1));
+  const rows = [...section.matchAll(/^\| `([^`]+)` \|/gm)].map((m) => m[1]);
+
+  const undocumented = leaves.filter((k) => !rows.includes(k)).sort();
+  assert.deepEqual(undocumented, [],
+    `${undocumented.length} leaf key(s) have no row: ${undocumented.join(', ')}`);
+
+  const orphaned = rows.filter((k) => !leaves.includes(k)).sort();
+  assert.deepEqual(orphaned, [],
+    `${orphaned.length} row(s) name a key the file does not have: ${orphaned.join(', ')}`);
+
+  // The table names each key ONCE — a duplicated row is two descriptions of one thing.
+  assert.deepEqual(rows, [...new Set(rows)], 'a key appears twice in the table');
+
+  // And it carries no VALUES: the file is the source, and a value copied into prose is a second
+  // source that drifts. The pin is the one worth checking, being the longest and most copyable.
+  assert.equal(section.includes(config.docs.pin), false,
+    'the table repeats the docs pin — the file is the source, not the prose');
 });
