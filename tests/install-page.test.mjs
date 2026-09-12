@@ -177,7 +177,13 @@ test('the page stays a page, and the tail stays a tail', () => {
   // fact, never a required sentence removed, and re-wrapping the page instead was tried and
   // rejected — INSTALL.md is a generated SOURCE composed into README.md, so re-flowing its prose
   // moves the composition and buys one line.
-  assert.ok(install <= 277, `${install} lines of install page (criterion: 277)`);
+  //
+  // 279 since ARC-10-S01, and it is the cheapest line on the page: one sentence telling a reader of
+  // the OLD two-repository setup that there is a page for them. Without it, the person most likely
+  // to lose an engagement folder or leave a password in `~/.claude.json` meets an install page
+  // written for a fresh machine and follows it. Same rule as the last three moves — a cap is worth
+  // moving for a fact, and nothing was deleted to pay for it.
+  assert.ok(install <= 279, `${install} lines of install page (criterion: 279)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.

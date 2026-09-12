@@ -94,6 +94,13 @@ export const POLICY_FILES = [
   // cannot name what it detects cannot detect it, and keeping them in JSON rather than in the
   // check body is what makes the exemption one file rather than a check.
   'tools/snowarch/lib/doctor/checks/stale-registrations.json',
+  // ARC-10-S01's migration page. It is the one document written FOR a user of the old install, and
+  // every step of it names something being removed — the registrations by the names the old
+  // scripts wrote, the store by its path. A page that said "run the command the doctor printed"
+  // without printing it would be a page nobody can follow. The sibling ratchet
+  // (`tests/no-legacy-names.test.mjs`) exempts it by name for the same reason; this is the name
+  // checks agreeing with that rather than holding a second opinion.
+  'docs/MIGRATION.md',
 ];
 
 /** True when a file's subject is the retirement policy — exempt from the name checks. */

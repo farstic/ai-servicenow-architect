@@ -37,6 +37,23 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **A page for people who installed the old two-repository setup.** `docs/MIGRATION.md` takes a user
+  of the previous engine and its separate MCP server to a working `2.0.0` checkout in one sitting:
+  nine numbered steps, each with a macOS/Linux and a Windows PowerShell form, from fingerprinting
+  `clients/` before anything moves to rotating any password that sat in Claude Code's configuration.
+  Nothing in the old setup is modified before step 6, so stopping early leaves it exactly as it was.
+
+  The steps that delete things quote the doctor rather than describing it. `./snowarch doctor`
+  prints the exact `claude mcp remove` command for every stale registration it finds, names the
+  folder each must be run from — local-scope registrations are keyed on the absolute path — and
+  points out that the backup files beside the configuration still hold the same credentials, which
+  is the copy people miss. A test runs those checks against a fixture and fails if a command the
+  doctor prints is not on the page, so the page cannot drift into telling someone to run something
+  that no longer exists. The import screen and the plan it prints are on the page byte for byte from
+  the one place each is defined.
+
+  Linked from the install page, and from the modes page where the legacy import is explained.
+
 - **The release, upgrade and CI procedures are written down where they are used.**
   `docs/CONTRIBUTING.md` carries six sections — Commits, Releasing, Store migrations, Upgrading the
   product, CI matrix, Line endings — each starting with the exact commands and ending with where it
