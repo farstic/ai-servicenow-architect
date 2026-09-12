@@ -142,11 +142,34 @@ describe('probeAuth — criterion 3, the ROPC bodies', () => {
       ['unsupported_grant_type', 'invalid_client', 'invalid_grant', 'access_denied']);
     const fixture = JSON.parse(readFileSync(join(here, '../fixtures/oauth-ropc-errors.json'), 'utf8'));
     expect(Array.isArray(fixture.observed)).toBe(true);
-    // Empty is the CORRECT state until S11 records the real bodies from an instance: the table
-    // carries the RFC names meanwhile, and anything unrecognised falls through rather than being
-    // guessed at.
-    expect(fixture.observed).toEqual([]);
     expect(fixture._rule).toContain('ARC-07-S11');
+
+    // ARC-07-S11 AC 5, acceptance item B07-04. Empty is the CORRECT state until the sitting records
+    // real bodies from an instance: the table carries the RFC names meanwhile, and anything
+    // unrecognised falls through rather than being guessed at.
+    //
+    // WHAT THIS USED TO SAY WAS `expect(fixture.observed).toEqual([])` — which pins the fixture
+    // EMPTY, so the sitting's own commit would have turned this red and read like a regression at
+    // exactly the wrong moment. The rule is not "the list is empty", it is "every row that exists
+    // maps to a code we know", and that is true of an empty list too.
+    const known = new Set(ROPC_ERROR_TABLE.map((r) => r.error));
+    for (const row of fixture.observed as Array<Record<string, unknown>>) {
+      for (const field of ['error', 'error_description', 'httpStatus', 'observedAt']) {
+        expect(row[field], `a captured body is missing ${field}: ${JSON.stringify(row)}`).toBeDefined();
+      }
+      // The mapping the criterion is about: a captured body resolves through the same table the
+      // probe uses, and the grant-disabled body is the one that must reach OAUTH_ROPC_DISABLED.
+      expect(known, `captured error "${String(row.error)}" is in no table row`).toContain(row.error);
+      const mapped = ROPC_ERROR_TABLE.find((r) => r.error === row.error);
+      if (row.error === 'unsupported_grant_type') {
+        expect(mapped?.code).toBe('OAUTH_ROPC_DISABLED');
+      }
+    }
+    // And the control on the loop itself: it is written to run, so prove it does when there is
+    // something to run it on. A fabricated row, through the same rule.
+    const sample = { error: 'unsupported_grant_type', error_description: 'x', httpStatus: 401, observedAt: 'x' };
+    expect(known).toContain(sample.error);
+    expect(ROPC_ERROR_TABLE.find((r) => r.error === sample.error)?.code).toBe('OAUTH_ROPC_DISABLED');
   });
 });
 

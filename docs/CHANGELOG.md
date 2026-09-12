@@ -226,6 +226,18 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   rule now enforced automatically so the next check cannot repeat it, and with the behaviour
   pinned: a release candidate is not offered to you as an upgrade.
 
+- **A check that would have broken the moment the evidence arrived.** One guard protected a file
+  that is meant to be filled in later — by asserting it was still empty. The first real entry would
+  have turned it red and looked like a fault in the code rather than the arrival of the thing it was
+  waiting for. It now checks what was actually meant: whatever is in the file has to make sense.
+
+- **The health check's cloud-sync warning is tested against the same list as everything else.** The
+  warning that tells you a checkout sits in a synced folder is answered by three separate pieces of
+  the product, and one of them was being spot-checked against three hand-written examples rather
+  than the shared list. It now answers for every path on that list. One case is recorded as not yet
+  covered: on Windows, where a company policy redirects your Documents folder into OneDrive without
+  the word appearing in the path, the health check does not notice — the server does.
+
 - **Three checks that were watching nothing now watch something.** Guards exist to fail when a rule
   is broken, and a guard that cannot fail is worse than none — it reads like protection in a diff.
   One checked that a piece of text-matching worked rather than running the rule it was written for;
