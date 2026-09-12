@@ -202,8 +202,10 @@ git -C vendor/ServiceNowDocs config core.longpaths true
 
 The launcher then checks each line of `vendor/docs-areas.txt` exists under
 `vendor/ServiceNowDocs/markdown/` and prints `citations: not verified until Node 20+ is installed`.
-S-07's criterion 2 was refuted — the corpus fits in 260 characters under a *short* prefix — but a CI
-temp directory ate that margin at ARC-03-S05, so `core.longpaths` stays.
+S-07's criterion 2 was left unanswered, not refuted — the record's words are "the `core.longpaths`
+control did NOT reach MAX_PATH, so AC 2 is unanswered for a real install path", and the corpus fits
+in 260 characters under a *short* prefix. A CI temp directory ate that margin at ARC-03-S05 and
+again at ARC-09-C27 (~285 characters, one Windows cell red), so `core.longpaths` stays.
 
 
 ## Exit codes — every `docs` sub-command shares one table
