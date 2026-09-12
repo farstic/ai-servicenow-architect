@@ -5,11 +5,14 @@
 // can get wrong — an unknown command, an unknown flag, a missing value — ends in EXIT_USAGE with
 // the usage block for what they were actually trying to do, never a stack trace.
 import { EXIT_OK, EXIT_USAGE } from './exit.mjs';
-import { contractSha, cwdNote, loadConfig, root, version } from './config.mjs';
+import { cwdNote, loadConfig, root } from './config.mjs';
+import { renderVersion, versionInfo } from './version-info.mjs';
 import { createLogger } from './log.mjs';
 import { USAGE as BOOTSTRAP_USAGE } from './bootstrap.mjs';
 import { USAGE as MODE_USAGE } from './mode.mjs';
 import { USAGE as INSTANCE_USAGE } from './instance.mjs';
+import { USAGE as STORE_USAGE } from './store.mjs';
+import { USAGE as UPGRADE_USAGE } from './commands/upgrade.mjs';
 import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
@@ -65,21 +68,12 @@ const PLACEHOLDER = (name, story) => ({
  * declaration of a number the bootstrap enforces, and the two would part company.
  */
 function versionCommand({ flags, log }) {
-  const config = loadConfig();
-  const sha = contractSha();
-  const payload = {
-    version: version(),
-    contractSha: sha,
-    docsPin: config.docs.pin,
-    docsFamily: config.docs.family,
-    floors: config.floors,
-  };
-  if (flags.json) { log.json(payload); return EXIT_OK; }
-
-  const floors = Object.entries(config.floors)
-    .map(([k, v]) => `${k === 'claudeCode' ? 'Claude Code' : k} ≥ ${v}`).join(', ');
-  log.step(`snowarch ${payload.version} · contract ${sha ? sha.slice(0, 12) : 'not built'} · `
-    + `docs pin ${payload.docsPin.slice(0, 7)} (${payload.docsFamily}) · floors: ${floors}`);
+  // ARC-09-S04: the facts come from `versionInfo()`, which the DOCTOR also calls. Two readers of
+  // "what is this checkout" would eventually disagree, and the moment they did, `/snowarch status`
+  // would quote one of them while the tag said the other.
+  const info = versionInfo(root);
+  if (flags.json) { log.json(info); return EXIT_OK; }
+  for (const line of renderVersion(info)) log.step(line);
   return EXIT_OK;
 }
 
@@ -110,9 +104,19 @@ async function instanceCommand(args) {
   return run(args);
 }
 
+async function storeCommand(args) {
+  const { storeCommand: run } = await import('./store.mjs');
+  return run(args);
+}
+
+async function upgradeCommand(args) {
+  const { upgradeCommand: run } = await import('./commands/upgrade.mjs');
+  return run(args);
+}
+
 export const COMMANDS = {
-  version: { summary: 'print versions, the contract sha and the floors', run: versionCommand,
-    usage: 'usage: ./snowarch version [--json]' },
+  version: { summary: 'print the version, the release tag, the commit, the contract sha and the floors',
+    run: versionCommand, usage: 'usage: ./snowarch version [--json]' },
   docs: { summary: 'sync, verify, describe or re-family the documentation corpus', run: docsCommand,
     usage: 'usage: ./snowarch docs (sync | verify | status | family) …\n\n'
       + '  Run `./snowarch docs` with no sub-command for the full flag list.' },
@@ -132,7 +136,15 @@ export const COMMANDS = {
   // frame's, and the forwarder itself answers that one.
   instance: { summary: 'add and manage the ServiceNow instances this checkout can reach',
     run: instanceCommand, usage: INSTANCE_USAGE, defersLog: false, raw: true },
-  upgrade: PLACEHOLDER('upgrade', 'ARC-09'),
+  // `raw` for the same reason `instance` is: `store restore <file> --yes` is the server CLI's
+  // sentence, and a frame that parsed it would answer `--yes needs a value`.
+  store: { summary: 'migrate, back up and restore the instance store',
+    run: storeCommand, usage: STORE_USAGE, defersLog: false, raw: true },
+  // NOT raw: every flag here is this frame's, and the command spawns `bootstrap` and `doctor`
+  // with arguments it composes itself rather than passing a user's through.
+  upgrade: { summary: 'move this checkout to a release, re-run only what changed, and check it',
+    run: upgradeCommand, usage: UPGRADE_USAGE,
+    booleans: ['check', 'yes', 'pre', 'force-floor'] },
 };
 
 export function helpText() {

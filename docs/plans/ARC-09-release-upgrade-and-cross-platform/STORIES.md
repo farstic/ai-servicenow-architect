@@ -16,7 +16,7 @@ Conventions. "Old server" = `~/work/snow-mcp` (`package.json` name `servicenow-m
 | ARC-09-S04 | `./snowarch version` extended (tag, commit, tag-message comparison; `--json` superset of ARC-06-S02's shape; feeds the doctor's `engine` header) | S | ARC-05 S10, ARC-06-S02, ARC-03 S01, ARC-08-S01; S01 (tag format) | The user-side mirror of what the tag records |
 | ARC-09-S05 | Input-hash invalidation table: `lib/inputs.mjs`, `state.staleSteps()`, `tests/input-hash.test.mjs`, `docs/ARCHITECTURE.md` section | M | ARC-06-S03; ARC-03 S02; ARC-04 S06 | Exactly the affected bootstrap steps re-run after a checkout change |
 | ARC-09-S06 | Store schema migration framework in `packages/snowarch` (explicit, versioned, 0600 backup, credential values never touched) | M | ARC-04 S02, S04, S06, S12; ARC-05 S06; ARC-08-S04 | `./snowarch store migrate`; the server refuses an outdated or newer schema with a named remedy |
-| ARC-09-S07 | `./snowarch upgrade [--to vX.Y.Z] [--check]`, the SessionStart "behind origin" nudge, and the upgrade fixture harness | L | S04, S05, S06; ARC-06-S03/S09; ARC-08-S08 | Upgrade = fetch + checkout + `bootstrap --resume` + doctor; credentials byte-identical; proven with two fixture releases |
+| ARC-09-S07 | `./snowarch upgrade [--to vX.Y.Z] [--check]`, the SessionStart "behind origin" nudge, and the upgrade fixture harness | L | S04, S05, S06; ARC-06-S03/S09; ARC-08-S08 | Upgrade = fetch + checkout + a second `bootstrap` run + doctor; credentials byte-identical; proven with two fixture releases |
 | ARC-09-S08 | CI matrix completion: every job on the intended cells; the Windows job without Git Bash (launchers, `--password-stdin`, MCP handshake, hook in exec form) | L | ARC-00 S06/S07/S13, ARC-03 S02/S11, ARC-04 S13, ARC-05 S09, ARC-06-S08/S14, ARC-07-S01/S04/S05, ARC-08-S11; S02, S03, S07, S09 | Nine green cells plus the native-Windows proof on every commit (Q-B) |
 | ARC-09-S09 | Line-ending proof: `tests/eol.test.mjs` over `git ls-files --eol`; launchers run from a CRLF-default Windows checkout | S | ARC-01 S07, ARC-06-S10/S11 (S08 later consolidates the `eol` job — consumer) | No CRLF/LF regression can merge; `bootstrap.cmd` and `bootstrap.ps1` run after a Windows clone |
 | ARC-09-S10 | Optional `publish-npm.yml`: `npm publish --provenance` of `@farstic/snowarch` from a release tag, manual dispatch, dry-run by default (roadmap `01` §17 item 2) | S | S01, S03; ARC-04 S01 | A guarded, never-automatic secondary channel that can only ever publish the new package name |
@@ -37,6 +37,48 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 > `scripts/lib/bundles.mjs` and its parity test, and quote the pin outputs.
 
 ### ARC-09-S01 — `scripts/release.mjs`: preflight, gates, version writes, release commit, annotated tag with contract sha and docs pin
+
+> **Amendment 2026-09-11 (from the delivery).** Five departures, and one bug the fixture found.
+>
+> 1. **The supported flow is four steps, not one.** `main` requires 42 status checks with
+>    `strict: true`, so a release commit pushed straight to it carries no checks and is refused —
+>    the story's one-shot flow cannot land here. The flow of record:
+>    `release.mjs <x.y.z> --yes --allow-branch release/v<x.y.z>` on a branch cut from `main`
+>    (writes + commit, **no tag**) → pull request to `main`, CI runs the checks on the release
+>    commit itself → `release.mjs <x.y.z> --tag-only` on `main` at the merge commit → `git push
+>    origin v<x.y.z>`. `--allow-branch` therefore also suppresses the tag: a tag created on a
+>    release branch would name a commit that the merge is about to replace. Recorded in
+>    `docs/CONTRIBUTING.md`; S03's `release.yml` triggers on the tag.
+> 2. **The README is generated, so the writer edits the HEAD.** `README.md` = `docs/README-head.md`
+>    + `docs/INSTALL.md` body + `docs/README-tail.md`, byte-asserted by `gen-readme --check` inside
+>    the lint the release has just passed. The version line and the badge live in the head, and the
+>    README is regenerated afterwards. A writer that edited `README.md` directly would produce a
+>    tree whose own lint fails — after the gates had already passed, which is the worst moment to
+>    find out. `tests/version-consistency.test.mjs` learned the head's field: it is the **fourth**
+>    version counter, and a release that left it behind would ship a README announcing the previous
+>    version with nothing failing.
+> 3. **There was no `confirm` in `inputs.mjs`.** There were THREE line readers — `bootstrap.mjs`'s
+>    `stdinAsker`, `doctor/index.mjs`'s `defaultAsk` (whose comment already claimed it was "the same
+>    reader the plan screen uses", a claim nothing enforced) and the plan screen's injected `ask`.
+>    ARC-09-S01 made the claim true: `tools/snowarch/lib/ask.mjs`, used by all three and by the
+>    release prompt. `null` for end-of-input is the contract, and `isYes` treats it as a refusal —
+>    a closed stdin must never read as a yes.
+> 4. **A ninth preflight check, in effect: the pin and the artefact must already agree.** The tag
+>    records the contract sha; `packages/contract/required-tools.json` records the same value. A
+>    release whose two records disagreed would carry a sha nobody pinned, so the run refuses with
+>    both abbreviated shas and the `pin.mjs` command.
+> 5. **The message for check 8 is split in two.** "Node ≥ 20" and "npm resolvable" fail for
+>    different reasons and a maintainer can act on only one of them at a time:
+>    `release: Node <v> is below the floor of 20 — upgrade Node first` and `release: npm is not on
+>    PATH`.
+>
+> *The bug.* The first fixture run passed a release on a repository git could not describe. The git
+> helper returned `''` for a failed command, so a `git status --porcelain` that could not run — the
+> corpus gitlink pointed at a gitdir that was not there — came back as an empty string, which reads
+> as a CLEAN TREE. A refusal to answer and an answer of "nothing" must never be the same value; the
+> helper now throws unless the caller passed `allowFail`, and `release()` turns that into
+> `release: git <cmd> failed — <first line of stderr>` with exit 2.
+
 
 **As** a maintainer **I want** one command, `node scripts/release.mjs <x.y.z>`, that refuses to run on a dirty or stale tree, runs every gate, writes the version into every place that carries it, commits once and creates one annotated tag whose message records the contract sha and the docs pin **so that** the product has exactly one version counter and one tag per release (P-12, P-19) and a release can never be cut from a tree that CI would reject (P-29).
 
@@ -115,9 +157,62 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 **Definition of done.** Merged; `tests/release.test.mjs` green on all cells; `docs/CONTRIBUTING.md` release stub present; `npm run release` wired; the `release-dryrun` job (S03) green on three OSes.
 
+
+**Amendment after the rehearsal (ARC-09-C12, 2026-09-11).** The writes in this story stopped at the
+version. They now run **version → `build-dist` → `pin --yes` → `gen-all` → changelog**, because
+`dist/contract.json` EMBEDS the package version: writing the version and stopping left the artefact
+stale, so the release commit would have failed its own `dist ok` gate on its own pull request and
+the tag's `contract:` trailer named a contract that no longer existed in that form. The post-write
+checks are version-consistency AND the contract gate; the tag quotes the REBUILT sha; `STAGED`
+carries `packages/snowarch/dist` and the pin; and the rollback deletes what the rebuild created as
+well as restoring what it changed. `--dry-run` could not have found any of this — a dry run stops
+before the writes, which is why `release-dryrun` was green for the whole arc.
+
 ---
 
 ### ARC-09-S02 — `docs/CHANGELOG.md` generation from conventional commits; commit-message lint in CI; the 2.0.0 "supersedes" and migration notes
+
+> **Amendment 2026-09-11 (from the delivery).** Four departures.
+>
+> 1. **The Notes ruling.** The existing `## Unreleased` block held the per-story entries every PR of
+>    this programme added — the human record of how the product was built. They moved into
+>    `### Notes` **verbatim**, with the seeded 2.0.0 sentence and the migration heading above them.
+>    The generator's groups are for commits from here on; the Notes are what carries a paragraph
+>    somebody needed to write, and they survive regeneration by design.
+> 2. **The frozen heading is `## Before 2.0.0`**, not `## Before 2.0.0 (engine v2.x line)`, and the
+>    baseline for AC 7 is **`bcd4dcd`**, not ARC-02-S05. S05 changed one line of the file; S06
+>    (`69d6efa`) added the heading; S08 (`bcd4dcd`) moved the two engine version footers in, which is
+>    the last DELIBERATE change to the region and therefore what "unchanged" has to mean.
+>    `tests/changelog.test.mjs` compares against `git show bcd4dcd:docs/CHANGELOG.md`.
+> 3. **The retired-name sweep is satisfied by assembling the identifiers, not by allow-listing the
+>    test.** A test asserting the historical "supersedes" sentence would contain the old repository
+>    names forever, so an allow-list entry for it could never go stale — and the ratchet only works
+>    because every entry eventually does. The test builds the two identifiers from parts, the idiom
+>    `tests/doctor/redact.test.mjs` already uses for addresses. `docs/CHANGELOG.md` keeps its
+>    existing ARC-09 allow-list entry; the marker mechanism the story describes
+>    (`<!-- retired-name: historical -->`) does not exist in this tree — the allow-list is by FILE.
+> 4. **`commitlint.mjs` lints the repository it was RUN in**, not the one it lives in. The story's
+>    shape would have made the test spawn it against a fixture and silently lint this checkout
+>    instead — passing while proving nothing. `--root` defaults to `process.cwd()`, which is the
+>    checkout in CI and the fixture in a test.
+>
+> 5. **AC 7 cannot be a history comparison.** The first version read
+>    `git show bcd4dcd:docs/CHANGELOG.md`; the `test` job clones SHALLOW, so the object is absent and
+>    the assertion failed on nine cells where nothing was wrong. The frozen region is a COMMITTED
+>    FIXTURE now — `tests/fixtures/changelog-before-2.0.0.md`, written once from that commit — so the
+>    comparison works at any depth and a failure prints the lines that moved. The history comparison
+>    survives as its own test, named for what it needs and skipping with a reason on a shallow clone.
+> 6. **The local base was wrong, and only the local one.** The CI job was always right — drill PR
+>    #126 produced exactly one line, the drill's own commit. But `commitlint` run BY HAND defaulted
+>    to `origin/main..HEAD`, and `main` lags `develop` by a milestone: on a develop-based branch that
+>    is every commit merged since the last release, including subjects written before the convention
+>    (ARC-09-S01's own, for one). The local base is now the branch's upstream, or `origin/develop`.
+>    Two-dot throughout — `A...B` is the symmetric difference and would pull the base's commits in,
+>    which is the opposite of what a lint of "your commits" means.
+>
+> *The new required context is `commitlint`* — one cell, `pull_request` only, so the check-run name
+> is the bare job name. 42 → 43 at the M4 merge.
+
 
 **As** a maintainer **I want** the changelog section for a version generated from the conventional-commit history since the previous tag, with a hand-written notes block that survives regeneration, and a CI check that every commit on a pull request follows the convention **so that** the changelog is never hand-maintained (P-12 "hand-maintained counts drift") and the 2.0.0 section carries the "supersedes engine v2.8.0 and snow-mcp 1.0.0" statement and the server migration notes (`03` R-03) that existing users need.
 
@@ -161,6 +256,34 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 ---
 
 ### ARC-09-S03 — `.github/workflows/release.yml`: on `v*` tags re-run every gate on three OSes, create the GitHub Release with doctor JSON and install-metrics assets
+
+> **Amendment 2026-09-11 (from the delivery).** Five departures.
+>
+> 1. **`release.yml` is NOT the only workflow that may write.** `docs-bump.yml` has
+>    `contents: write` too — it pushes the branch it opens its pull request from. I wrote the claim
+>    into the workflow's own header and into a test, and the test caught it within the run. The
+>    assertion is a CLOSED SET now (`['docs-bump.yml', 'release.yml']`), which is the true and more
+>    useful statement: a third workflow asking for write is a decision somebody has to make in that
+>    test.
+> 2. **Two scripts the story did not name.** `scripts/ci/release-notes.mjs`, because the story spells
+>    the release body as `changelog.mjs --section`, which would put a CLI on a library S01 and S02
+>    both import — a module that is sometimes a program is a module whose imports have side effects.
+>    And `scripts/ci/assert-assets.mjs`, because criterion 2 requires the redaction check to run on
+>    the assets and nothing else in the workflow reads them: a doctor report attached to a public
+>    Release is permanent in a way a pasted one is not. It never prints what it finds — printing the
+>    secret to prove it was found publishes it in the job log.
+> 3. **`--allow-branch` reads the branch from the checkout**, not from `github.head_ref`, which is
+>    empty on a push. One expression that is right on both events.
+> 4. **The install page's budget moved 250 → 252.** The page gained a fact — every release
+>    re-measures the corpus on three platforms and attaches the table — and the page was at its cap.
+>    My first attempt paid for the two lines by trimming two provenance strings; `install-page` and
+>    `attribution` caught both and were right to. Every figure on that page names where it was
+>    measured, and a cap is worth moving for a fact but not for an unattributed number.
+> 5. **The rehearsal is not run.** Pushing `v2.0.0-rc.0` creates a PUBLIC Release on a public
+>    repository. The procedure is in the pull request, ready to run, and `docs/CONTRIBUTING.md`
+>    carries the placeholders for the run URL, the seven asset names, the measured rows and whether
+>    `gh` was present on the runner images.
+
 
 **As** a maintainer **I want** pushing a `v*` tag to re-run every gate on `ubuntu-latest`, `macos-latest` and `windows-latest`, verify that the tag message matches the tree, and publish a GitHub Release whose assets are the three doctor JSON reports and a size/time table of the install **so that** every release is proven on the three platforms after the fact (P-29 "release never fired"; `03` R-10) and the install page can quote measured numbers.
 
@@ -241,9 +364,69 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 **Definition of done.** Merged; rehearsal Release created and deleted with the run URL recorded in `docs/CONTRIBUTING.md`; `release-dryrun` required on `main`.
 
+
+**Amendment after rehearsal run 9 (ARC-09-C21, 2026-09-12).** The release body is composed in ONE
+place — `release-notes.mjs`, metrics table and doctor sentence included — and bounded at the API's
+125,000-character limit. The workflow appends nothing after the script; a test asserts it. When the
+body must be cut, the generated groups and the trailer are kept and the hand-written Notes are
+replaced by a link to `docs/CHANGELOG.md` at the tag.
+
+
+**Amendment after rehearsal run 8 (ARC-09-C20, 2026-09-12).** The judge step passes `--deps
+installed`. This job runs `npm ci` before the doctor, for its lint and test gates, so its server
+checks legitimately answer; `assert-doctor.mjs` had encoded the bootstrap cells' shape — doctor
+before install, so every SV check must be skip — as though it were the only world, and refused a
+green report. The default stays `absent`, which is the cells' shape.
+
+
+**Amendment after rehearsal run 7 (ARC-09-C19, 2026-09-12).** The doctor step CAPTURES the report
+and a separate step JUDGES it with `assert-doctor.mjs --expect-fail E-00`, the same script and flag
+the bootstrap cells have used since ARC-08. A hosted runner has no Claude Code, so E-00 fails on
+every published report; letting `bash -e` decide cost all three `verify` jobs on a report that was
+correct. `assert-assets.mjs` carries the same rule at the publish gate — E-00 alone is explained,
+anything beside it refuses — and the Release notes say so where a reader meets the numbers.
+
+
+**Amendment after rehearsal run 3 (ARC-09-C16, 2026-09-11).** `release.yml` must RE-FETCH the tag
+object after checkout, in every job that reads it. `actions/checkout@v4` on a tag ref writes
+`refs/tags/<name>` pointing at the commit — it peels the tag — so this story's own first step
+refused an annotated tag as "not annotated" and took all three `verify` jobs with it. The workflow
+test asserts the step exists and precedes the reader; `verify-tag.mjs` names the peel when the
+remote still has the object.
+
 ---
 
 ### ARC-09-S04 — `./snowarch version` extended (tag, commit, tag-message comparison; `--json` superset of ARC-06-S02's shape; feeds the doctor's `engine` header)
+
+> **Amendment 2026-09-11 (from the delivery).** Four departures.
+>
+> 1. **The command lives in `tools/snowarch/lib/cli.mjs`**, not `lib/commands/version.mjs` — there is
+>    no `commands/` directory; ARC-06-S02 put every sub-command in the one CLI file. The FACTS moved
+>    to a new `lib/version-info.mjs` (`versionInfo`, `renderVersion`) so the doctor can import them
+>    without importing the CLI, and the git spawns to a new `lib/git.mjs`.
+> 2. **The git seam is `tools/snowarch/lib/git.mjs`, not S01's helper.** S01's lives in
+>    `scripts/lib/release/` and closes over the release script's own root and flags; the engine
+>    needs `describe`, `tagMessage`, `gitlink` and `branchState` against an arbitrary root, with
+>    `childEnv` and Windows `git.exe` resolution. What IS shared is the rule S01 paid for: a failed
+>    command throws, and only a caller that passed `allowFail` gets `null` — a refusal to answer and
+>    an answer of "nothing" are different values.
+> 3. **`--json`'s five original keys are asserted as a SUPERSET now.** ARC-06-S02's test used
+>    `deepEqual` over every key, which a superset cannot satisfy by definition; it asserts the five
+>    are present and unchanged in name, type and value. That is the property the story actually
+>    fixes, and a consumer written against the old object still reads the same values out of the new
+>    one.
+> 4. **The bug-report sentence is in `docs/CONTRIBUTING.md`, with a one-line pointer on the install
+>    page.** The page was at 252 of 252 after S03 and the full sentence cost two lines; CONTRIBUTING
+>    carries "What to paste in a bug report" and the page says "Reporting it? Paste
+>    `./snowarch version` and `./snowarch doctor`." Final count: **252**.
+>
+> *Also:* the shallow-clone case prints its own wording — `tag: none (shallow clone — tags
+> unreachable; git fetch --tags --unshallow)` — because "no release tag" without saying why sends a
+> reader looking for a bug in the product. And a mismatch cannot be shown through the real binary in
+> a test: the launcher resolves the checkout from its own location, not from `cwd`, so a subprocess
+> cannot be pointed at a fixture. The wording is asserted on the fixture through `versionInfo`, and
+> the exit-0 property through the real binary on the real tree.
+
 
 **As** an individual practitioner **I want** `./snowarch version` to print the product version, the release tag I am on (or how far past it), the commit, the contract sha, the docs pin and the version floors **so that** a support conversation or a bug report starts from the same facts the tag records (P-12, P-19) and the doctor — and through it `/snowarch status` — quotes one source.
 
@@ -296,7 +479,7 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 ### ARC-09-S05 — Input-hash invalidation table: `lib/inputs.mjs`, `state.staleSteps()`, `tests/input-hash.test.mjs`, `docs/ARCHITECTURE.md` section
 
-**As** the engine's bootstrap **I want** each step to declare exactly which committed inputs it depends on and to be marked stale only when one of them changed **so that** `bootstrap --resume` after an upgrade re-runs precisely the affected steps (README acceptance 3: a release changing only `vendor/docs-areas.txt` re-runs only B02) and never touches credentials.
+**As** the engine's bootstrap **I want** each step to declare exactly which committed inputs it depends on and to be marked stale only when one of them changed **so that** running `bootstrap` again after an upgrade re-runs precisely the affected steps (README acceptance 3: a release changing only `vendor/docs-areas.txt` re-runs only B02) and never touches credentials.
 
 **Context.** README deliverable "Input-hash table (documented in `docs/ARCHITECTURE.md`)": `package-lock.json` → B04; `dist/contract.json` sha → B05/B08; `vendor/docs-areas.txt` + gitlink → B02; store schema version → B06 migration; `.mcp.json` / `.claude/settings.json` hashes → B01/B07. `01` §4.2 ("resumes at the first incomplete step or the first step whose inputs hash changed"), §12. ARC-06-S03 ships the state file and per-step `inputsHash`; ARC-06's acceptance already covers "changing `package-lock.json` invalidates only B04". This story makes the table complete, documented and tested, and adds the schema-version input that S06 introduces.
 
@@ -307,7 +490,7 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
   | Step | Inputs hashed (sha256 over the concatenation, in this order) | Why |
   |---|---|---|
-  | B00 preflight | `engine.config.json` (`floors` object only, canonical JSON) | new floors must be re-checked; cheap (< 1 s), so B00 also re-runs when `--resume` is explicit |
+  | B00 preflight | `engine.config.json` (`floors` object only, canonical JSON) | new floors must be re-checked; cheap (< 1 s), so B00 re-runs on every run |
   | B01 workspace | bytes of `.mcp.json`, bytes of `.claude/settings.json` | committed-hash verification must be redone when the wiring changed |
   | B02 docs | bytes of `vendor/docs-areas.txt`; gitlink of `vendor/ServiceNowDocs` from `git ls-tree HEAD`; `engine.config.json.docs` object | new areas or a moved pin need a re-checkout / re-sparse |
   | B03 mode | the recorded mode string from the state file | never invalidated by a checkout change; only `./snowarch mode …` rewrites it |
@@ -325,7 +508,7 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 **Acceptance criteria.**
 1. `tests/input-hash.test.mjs`: for each table row, mutating exactly that input in a temp copy of a bootstrapped checkout makes `staleSteps()` return **only** the listed step(s) (`.mcp.json` → B01 only; `.claude/settings.json` → B01 and B07; `vendor/docs-areas.txt` → B02; gitlink → B02; `package-lock.json` → B04; `dist/contract.json` → B05 and B08; `required-tools.json` → B05; `storeSchemaVersion` → B06; `dist/server.js` → B08; the store file → B08 only).
 2. Editing the fixture store's `auth.password` value without changing size or mtime leaves every step non-stale, proving credential content is never hashed.
-3. `./snowarch bootstrap --resume --yes` on an unchanged, completed checkout runs only B00 and B09; every other step line reads `skipped (inputs unchanged)` (design-only: B01, B02, B03, B07) or `skipped (design-only)` (B04, B05, B06, B08 — ARC-06-S03's `runsWhen` wording), and the run finishes in < 5 s (no network, no npm). On a live checkout all eight read `skipped (inputs unchanged)`.
+3. `./snowarch bootstrap --yes` a second time on an unchanged, completed checkout runs only B00 and B09; every other step line reads `ok (cached)` (its hash still matches) or `skipped (<reason>)` (`runsWhen` declined — `design-only`, `--docs skip`), and the run finishes in < 5 s (no network, no npm). On a live checkout all eight read `ok (cached)`. **Amended in the build (S05):** there is no `--resume` flag — resuming IS a second run, and `--from BNN` is the explicit control; `--resume` belongs to `/snowarch setup-instance` (ARC-07-S09) and means something else there. The cached wording is `ok (cached)`, not `skipped (inputs unchanged)`: `skipped` is `runsWhen`'s word in the same output and is counted separately.
 4. The hash of every row is identical on ubuntu, macOS and Windows for the same commit (CI uploads each cell's `.local/bootstrap-state.json` as an artifact and a final ubuntu step asserts the `steps.*.inputsHash` values agree across the nine cells).
 5. `docs/ARCHITECTURE.md` contains the table and CI's `gen:check`-style test (`tests/input-hash.test.mjs` renders the table from `INPUTS` and diffs it against the docs section) fails when they diverge.
 
@@ -335,7 +518,7 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 3. Write `tests/input-hash.test.mjs` (fixture builder shared with S07's harness).
 4. Write the `docs/ARCHITECTURE.md` section and the render-and-diff test.
 
-**Test strategy.** Unit on all nine cells; cross-OS hash equality via CI artifacts; `bootstrap --resume` smoke in the bootstrap job (ARC-06-S14).
+**Test strategy.** Unit on all nine cells; cross-OS hash equality via CI artifacts; second-run smoke in the bootstrap job (ARC-06-S14).
 
 **Dependencies.** ARC-06-S03 (state file, resume), ARC-03 S02 (`docs-areas.txt`), ARC-04 S06 (`contract.json`) and S06 of this ARC for `storeSchemaVersion` (the B06 row is added when S06 merges; until then it hashes the literal `1`).
 
@@ -360,7 +543,7 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 - `migrateStore(path, { backup = true, dryRun = false })`: read + JSON parse (a parse error is a hard error `STORE_UNREADABLE` with the path — never "return empty"); `version === CURRENT` → `{ migrated: false }`; `version > CURRENT` → throw `STORE_SCHEMA_NEWER` (`store schema 3 is newer than this server supports (2) — run ./snowarch upgrade, or restore instances.json.bak-<ts>`); otherwise copy the file byte-for-byte to `instances.json.bak-<YYYYMMDDTHHMMSSZ>` in the same directory with mode 0600 (Windows: ACL-inherited, reported as such), apply each migration in order, write atomically 0600 through ARC-04 S02's writer, return `{ migrated: true, from, to, backup }`; one stderr line `store: migrated schema v1 → v2 (backup instances.json.bak-20261001T101500Z)`. `dryRun` prints `describe` of each pending migration and touches nothing.
 - **Server start-up** (`src/store` loader): on `version < CURRENT` the server does **not** migrate; it enters the ARC-04 unconfigured mode with `configError: STORE_SCHEMA_OUTDATED` and every instance tool returns that code with remedy `./snowarch store migrate` (explicit by design — a user who `git pull`ed by hand gets a named next step instead of a silent rewrite). On `version > CURRENT` likewise with `STORE_SCHEMA_NEWER`. Both codes join the ARC-05 S06 error registry (remedy text as above) so `docs/TROUBLESHOOTING.md` and the rule file carry them.
 - **CLI**: `./snowarch store migrate` delegates to `packages/snowarch/dist/cli/index.js store migrate` (the same delegation `instance …` uses). Principle 10: prints `Store schema v1 → v2 · 1 migration: "add lastUpgradeCheck to instances" · backup will be written to .local/instances.json.bak-<ts> · credentials: untouched · Proceed? [Y/n]`; `--yes` for scripts. `store backups` lists `instances.json.bak-*` with size and date; `store restore <file>` copies a backup back (0600, atomic) after the same confirmation.
-- **Doctor**: server check `SV-08 store schema` (next free id after ARC-08-S04's `SV-00…SV-07`; implemented in ARC-04 S12's `src/doctor/` module): OK `store schema v1 (current)`; FAIL `store schema v1 < server v2 — run ./snowarch store migrate`; FAIL `store schema v3 > server v2 — run ./snowarch upgrade`. **Not** in the `--fix` whitelist (the whitelist never touches the credential file — `01` §8); the remedy is the explicit command.
+- **Doctor**: server check `SV-09 store schema` (**amended from SV-08 in the build** — ARC-08-S04 shipped the ancestor-skills check under that id first; implemented in ARC-04 S12's `src/doctor/` module): OK `store schema v1 (current)`; FAIL `store schema v1 < server v2 — run ./snowarch store migrate`; FAIL `store schema v3 > server v2 — run ./snowarch upgrade`. **Not** in the `--fix` whitelist (the whitelist never touches the credential file — `01` §8); the remedy is the explicit command.
 - **Contract**: `extract-tools.mjs` writes `"storeSchemaVersion": CURRENT_SCHEMA_VERSION` into `dist/contract.json`; ARC-05's contract test asserts it equals the constant; S05 hashes it for B06; S07 reads `git show <tag>:packages/snowarch/dist/contract.json` to predict a migration before checkout.
 - **B06 branch** (with S05): B06's `runsWhen` becomes `mode === 'live' || storeExists` (a design-only checkout that still carries a `.local/instances.json` must keep it loadable — the S07 harness is exactly that case). When B06 is stale because `storeSchemaVersion` changed and a store exists → run `migrateStore` (after the plan confirmation, `--yes` in upgrade), in either mode; when no store exists → the wizard as today (live) or `skipped (design-only)`; when the store is current → `skipped (inputs unchanged)`.
 
@@ -391,6 +574,18 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 **Risks / open points.** Shipping `CURRENT_SCHEMA_VERSION = 1` with an empty registry means the first real migration is written by whoever changes the schema — the contiguity test forces them through this framework. Backups accumulate: `store backups` lists them; pruning is a manual `rm` (documented), never automatic.
 
+**Amendments made during the build (ARC-09-S06).**
+
+1. **The doctor check is `SV-09`, not `SV-08`.** ARC-08-S04 shipped the ancestor-skills check under that id first. Registered in `src/doctor/checks.ts`, in both `CHECK_IDS` lists (the server module's and the engine's `SERVER_CHECK_IDS`), in `--quick` (it reads one number from one file, the same as `SV-02`), in the three committed doctor snapshots, and in the ARCHITECTURE `SV-` table. The "new checks with no old counterpart" list recomputed itself.
+2. **`STORE_SCHEMA_UNSUPPORTED` is split, not supplemented.** It existed and covered BOTH directions with one remedy — "run `./snowarch upgrade`" — which is right for a store from the future and actively misleading for one from the past: the checkout is already new enough and the file that needs migrating is untouched by an upgrade. It becomes `STORE_SCHEMA_NEWER` and `STORE_SCHEMA_OUTDATED`, both `showInRule: true` (a session must stop and name the command, never edit a credential file). `tests/store/schema.test.ts` was updated; the package README and CHANGELOG rows follow the rename.
+3. **The test hook is a parameter, not `registerMigrationForTest`.** A registry a test can append to is a registry a production path can append to, and a hook must exist in the shipped build to be callable from one. `migrateStore(path, { migrations })` — and `runStoreMigrate(argv, io, chain)` — give a test its 1→2 fixture while the shipped `MIGRATIONS` stays empty; `checkRegistry()` is applied to whatever chain is passed, so a fixture is held to the same rules.
+4. **`checkRegistry` does not check where a chain starts.** `migrateStore` already refuses a store the chain cannot take (`STORE_SCHEMA_OUTDATED`, naming the version), which is the same fact discovered against the actual file. "The shipped chain starts at 1" is a separate claim, exported as `SHIPPED_CHAIN_STARTS_AT` and asserted of the shipped registry.
+5. **AC 2 is a round trip.** A migration ENDING at the version the server reads needs a store below it, and at v1 there is nothing below — `version: 0` is refused by design because it never existed. The test migrates v1 → v2 with the fixture chain, proves the credentials survived, restores the backup, and hands the result to a real spawned server. It asserts the criterion's claim and one more: the backup is a rescue that works.
+6. **AC 2's tools.** `snow_core_capabilities_read` reports the CURRENT instance; `snow_core_instances_index` is the list. Both are asserted.
+7. **`configErrors`, plural.** ARC-04-S04 shipped an array — one store can fail for more than one reason — and the story's `configError` is the singular of it.
+8. **The store stamp's second reader.** S05's B06 row now hashes `dist/contract.json#storeSchemaVersion` in place of the literal, so a release that changes the schema makes exactly B06 stale.
+9. **`store migrate --help` is help.** Answered once in `runStore` before dispatch, rather than three times.
+
 **Definition of done.** Merged; error codes in the registry and `docs/TROUBLESHOOTING.md`; doctor check present; `docs/CONTRIBUTING.md` section written; contract test extended.
 
 ---
@@ -406,7 +601,7 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 **As** an individual practitioner **I want** `./snowarch upgrade` to fetch the release tags, show me what will change, move my checkout to the target release, re-run only the bootstrap steps whose inputs changed, migrate the store if the release requires it, and finish with a doctor run — and I want the session banner to tell me when a newer release exists without ever fetching by itself **so that** upgrading is one command that never touches my credentials (README deliverable 3, acceptance 3–4; `01` §12; principle 10).
 
-**Context.** README deliverable "`./snowarch upgrade [--to vX.Y.Z]` (`git fetch --tags`, checkout or `pull --ff-only`, `bootstrap --resume`, doctor); the SessionStart banner's 'behind origin' nudge (reads a cached fetch, never fetches itself)"; `01` §8 (banner < 300 ms, adds "run ./snowarch upgrade" when behind); `03` R-15 / R-3 (proxies — `git fetch` must fail with a proxy-aware message). ARC-06-S03/S09 ship `--resume` and the summary; ARC-08-S08 ships the banner this story extends.
+**Context.** README deliverable "`./snowarch upgrade [--to vX.Y.Z]` (`git fetch --tags`, checkout or `pull --ff-only`, a second `bootstrap` run, doctor); the SessionStart banner's 'behind origin' nudge (reads a cached fetch, never fetches itself)"; `01` §8 (banner < 300 ms, adds "run ./snowarch upgrade" when behind); `03` R-15 / R-3 (proxies — `git fetch` must fail with a proxy-aware message). ARC-06-S03/S09 ship the resume rule and the summary; ARC-08-S08 ships the banner this story extends.
 
 **Scope.** In: `tools/snowarch/lib/commands/upgrade.mjs`; `.local/upgrade-check.json`; the banner nudge line; the doctor's network-subset "release currency" check that refreshes the cache; `docs/INSTALL.md` "Upgrading"; the fixture harness `tests/upgrade/harness.mjs` with two fixture releases; `tests/upgrade.e2e.test.mjs`; CI job `upgrade-e2e`. Out: moving the docs pin (ARC-03 S07 `docs sync --upstream`, a maintainer action); anything that writes to `~/.claude.json`; auto-upgrade (never — the nudge is text).
 
@@ -428,9 +623,9 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
      ```
      The installed Claude Code version is compared with the tag's `claude-floor`; below the floor the plan says `claude-floor 2.1.214 (installed 2.1.200 — BELOW the floor; upgrade Claude Code first)` and the command exits 2 unless `--force-floor`.
   5. **U5 move the tree**: with `--to`, or when HEAD is detached: `git checkout --quiet <tag>` (detached; the summary says how to return: `git checkout main`). Without `--to` on a branch with an upstream (`main` after a normal clone): `git pull --ff-only origin <branch>`; if the pull is refused (diverged) → `upgrade: main has diverged from origin/main — resolve with git, or use --to v2.1.0 to check out the release tag`; after the pull, if HEAD is past the newest tag, note `main is 3 commits past v2.1.0 (development commits)`. Submodule movement is B02's job (gitlink hash changed → stale).
-  6. **U6 bootstrap --resume --yes** with the recorded mode: S05's stale set runs; a B06 migration runs `migrateStore` (S06) — the plan already announced it and its backup; nothing else touches `.local/instances.json`. On a step failure the tree stays at the new tag (the state file records the failed step; re-run `./snowarch upgrade` or `./snowarch bootstrap --resume`), and the message names the step exactly as bootstrap does.
+  6. **U6 `bootstrap --yes`** (a second run — there is no `--resume` flag; see S05's AC 3 amendment) with the recorded mode: S05's stale set runs; a B06 migration runs `migrateStore` (S06) — the plan already announced it and its backup; nothing else touches `.local/instances.json`. On a step failure the tree stays at the new tag (the state file records the failed step; re-run `./snowarch upgrade` or `./snowarch bootstrap`), and the message names the step exactly as bootstrap does.
   7. **U7 doctor**: `doctor --json` → `.local/doctor-last.json`; print `DOCTOR: … 0 fail` and the `Mode:` line; write `.local/upgrade-check.json` with `behind: false`.
-- **Cache** `.local/upgrade-check.json`: `{ "checkedAt": "<ISO>", "remote": "origin", "localTag": "v2.0.0", "localDistance": 0, "latestTag": "v2.1.0", "behind": true }`. Writers: `upgrade` (U2/U7), `upgrade --check`, and the doctor's network subset (a new engine check `E-27 release currency` — the next id after ARC-08-S03's `E-26`: WARN `v2.1.0 available — run ./snowarch upgrade` when behind; SKIP under `--no-network`/`--quick`; it refreshes the cache at most once per 24 h). **The banner never fetches**: ARC-08-S08 already reserves the upgrade nudge slot — it reads `.local/upgrade-check.json` and, when `behind === true`, prints the separate line `A newer release is available (v2.1.0) — run ./snowarch upgrade.` after the Mode line. This story keeps that wording verbatim and adds only the freshness rule (`checkedAt` < 7 days old, else no nudge) and the file shape above; no cache = no nudge. Budget unchanged (< 300 ms, file read only). *Note for ARC-08:* story 8 attributes the cache writer to "ARC-09-S04"; the writer is this story (S07) — `version` never fetches.
+- **Cache** `.local/upgrade-check.json`: `{ "checkedAt": "<ISO>", "remote": "origin", "localTag": "v2.0.0", "localDistance": 0, "latestTag": "v2.1.0", "behind": true }`. Writers: `upgrade` (U2/U7), `upgrade --check`, and the doctor's network subset (a new engine check **`E-28` release currency** — **amended from `E-27` in the build**, which ARC-08-S03 had already taken: WARN `v2.1.0 available — run ./snowarch upgrade` when behind; SKIP under `--no-network`/`--quick`; it refreshes the cache at most once per 24 h). **The banner never fetches**: ARC-08-S08 already reserves the upgrade nudge slot — it reads `.local/upgrade-check.json` and, when `behind === true`, prints the separate line `A newer release is available (v2.1.0) — run ./snowarch upgrade.` after the Mode line. This story keeps that wording verbatim and adds only the freshness rule (`checkedAt` < 7 days old, else no nudge) and the file shape above; no cache = no nudge. Budget unchanged (< 300 ms, file read only). *Note for ARC-08:* story 8 attributes the cache writer to "ARC-09-S04"; the writer is this story (S07) — `version` never fetches.
 - **Harness** `tests/upgrade/harness.mjs`: builds, in a temp dir, a bare "origin" from the current tree at `v9.0.0` (versions rewritten to 9.0.0 with S01's writers, annotated tag via `tag.mjs`), then two fixture releases committed on top: **A** `v9.1.0` — changes only `vendor/docs-areas.txt` (adds one area from the corpus); **B** `v9.2.0` — registers a `1→2` migration (adds a non-auth field `notes: ""` per instance), bumps `CURRENT_SCHEMA_VERSION`, rebuilds `dist/` (`scripts/build-dist.mjs`), and tags with `storeSchemaVersion: 2` in the contract. A "user" clone is bootstrapped `--mode design --yes` at `v9.0.0`, then given a fixture store (`version: 1`, two instances, fixture credentials; the mode stays design-only so nothing connects — B06's `runsWhen` includes `storeExists`, S06) and its sha256 recorded. For the server-start assertion in criterion 2 the harness runs `npm ci --omit=dev --ignore-scripts` once in the user clone (design-only bootstrap never runs B04); that install is not part of the upgrade under test.
 - `docs/INSTALL.md` "Upgrading": the two commands (`./snowarch upgrade`, `./snowarch upgrade --check`), what is re-run, "credentials are never touched", "restart `claude` afterwards", the diverged-branch note, and the proxy remedy pointer.
 
@@ -454,13 +649,27 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 **Test strategy.** Unit for the classifier, plan and cache (nine cells); the harness e2e on three OSes × Node 22 (it runs `build-dist.mjs`, so it needs dev dependencies — the `test` job's `npm ci --ignore-scripts` install); manual: the first real upgrade `v2.0.0 → v2.0.1` on the author's machine is recorded in ARC-10's validation notes.
 
-**Dependencies.** S04 (tag parsing, version output), S05 (stale set), S06 (migration, `storeSchemaVersion`); ARC-06-S03 (`--resume`, state file), ARC-06-S09 (summary lines); ARC-08-S01 (check registry, JSON), ARC-08-S02 (engine-check shape), ARC-08-S03 (`E-23…E-26` ids precede `E-27`), ARC-08-S08 (banner nudge slot and wording); ARC-04 S13 (`build-dist.mjs` for fixture B); ARC-05 S06 (error remedies).
+**Dependencies.** S04 (tag parsing, version output), S05 (stale set), S06 (migration, `storeSchemaVersion`); ARC-06-S03 (the resume rule, state file), ARC-06-S09 (summary lines); ARC-08-S01 (check registry, JSON), ARC-08-S02 (engine-check shape), ARC-08-S03 (`E-23…E-26` ids precede `E-27`), ARC-08-S08 (banner nudge slot and wording); ARC-04 S13 (`build-dist.mjs` for fixture B); ARC-05 S06 (error remedies).
 
 **Size.** L — 3–5 days: the command is ~300 lines, but the harness with two fixture releases and a rebuilt `dist/` is the bulk.
 
 **Risks / open points.** (a) `git pull --ff-only` on a user who committed engagement files inside the checkout (`clients/` is ignored, so normally nothing) — the diverged message covers it. (b) The harness rebuilds `dist/` for fixture B on every CI run (~1 min); acceptable. (c) Whether a detached-HEAD checkout confuses users — the summary prints the way back; the default path keeps them on `main`. (d) ARC-08-S08's nudge wording is adopted verbatim (see design notes); the cache file shape here is the contract both sides read, and ARC-08's "written by ARC-09-S04" attribution should read S07.
 
-**Definition of done.** Merged; `upgrade-e2e` green on three OSes; `docs/INSTALL.md` "Upgrading" written; banner nudge freshness rule and `E-27` documented in ARC-08's check table; README acceptance 3 and 4 demonstrated by the harness in CI.
+**Amendments made during the build (ARC-09-S07).**
+
+1. **The release-currency check is `E-28`, not `E-27`.** ARC-08-S03 shipped `E-27` (Claude Code registration status). Registered in the `host` section beside it, `network: true`, out of `--quick` for both of that flag's reasons at once — it spawns git and it leaves the machine. The engine registry is 39 checks; the mapping's "new checks with no old counterpart" list recomputed to 13; the three doctor snapshots gained the row and their `summary.skip`.
+2. **A re-run after a failed step CONTINUES, rather than reporting `up to date`.** The failure message this command prints says "re-run ./snowarch upgrade", and a run that answered `up to date` to that would be telling a user to type a command that does nothing. When the tree is already at the target and the state file records a failed or interrupted step, U4 and U5 are skipped and the run continues from U6 — which is what AC 7 actually asks for.
+3. **AC 7's interrupt is PLANTED, not timed.** A SIGINT at a wall-clock guess passes on a fast machine and hangs on a slow one. The harness parks the corpus upstream and empties the corpus directory, which produces the state a Ctrl-C during B02 leaves — `B02: fail` with everything before it `ok` — and then restores both and re-runs. (Emptied rather than removed: an absent directory makes the gitlink modified and U1 refuses the whole upgrade, correctly.)
+4. **AC 4's origin is `https://127.0.0.1:<closed>`, and the proxy is injected into the child.** Never `.invalid`, which is a DNS failure — a different remedy and a different test. The assertion is that a `#proxy` or `#tls-ca` anchor is named and that no cache is written: a failed fetch that wrote one would make the banner report a check that never happened.
+5. **`--force-floor` overrides the TAG's request, not the engine's requirement.** Past the plan, the bootstrap's own B00 still enforces `engine.config.json`'s floor. Asserted rather than worked around: that layering is the right one.
+6. **The troubleshooting anchors needed no registry edit.** `PROXY_UNREACHABLE` and `TLS_CA_UNTRUSTED` already carry remedies that serve; the git-specific sentences live in `classifyGitFetchError`, which is where a git failure is being explained. **No registry text moved, so the contract sha and the pin are untouched** (`4117dc73744e…`).
+7. **The harness links `node_modules` rather than running `npm ci`.** Fixture release B rebuilds `dist/`, which needs TypeScript, and B06's migration runs the built CLI, which needs commander. A link is the same thing without a minute per world and without the network.
+8. **`STORE_VERSION` is now used where `1` was typed.** Three literals in `src/cli/` constructed `{ version: 1 }` and cast to `Store`; bumping the schema in fixture B broke the build on all three, which is the type system doing its job — and the fix is S06's own "one constant" rule.
+9. **A product defect found by the harness and fixed here: B06 read `.status` off an asynchronous `ChildProcess`.** The runner hands every step an async `spawn` so its interrupt handler can reach the child. `r.status` on one is `undefined`, which `!== 0` — so B06 declared every spawn a failure the moment it started it. In production the WIZARD would run, the user would answer its prompts, and the bootstrap would already have printed "the instance wizard exited abnormally" over the top of them. Every test injected a synchronous fake returning `{ status: 0 }`, so nothing caught it. Both paths now await the child, and the failure line names how it ended (`exit 1` vs `killed by SIGTERM`).
+10. **The harness copies `.gitattributes`, and a Windows runner is what proved it had to.** The fixture is meant to be "exactly as a cloned engine checkout carries it", and without that file it inherits the machine's `core.autocrlf` — true on `windows-latest`. `git clone` then rewrote the 2,585-line `dist/contract.json` to CRLF, its sha256 became `ad124526e86b`, and B05 failed the pin check against `4117dc73744e` on a fixture whose contract nobody had touched. All ten e2e cases failed there and only there; ubuntu and macOS passed because autocrlf is off. The fixture clones are deliberately NOT given `core.autocrlf=false`: the point of the Windows cell is that a DEFAULT Windows git produces a checkout the product accepts. This is ARC-09-S05's own lesson — files are hashed as bytes, and `.gitattributes` is what makes that comparable between machines — landing on the fixture built to test it.
+11. **`docs/INSTALL.md`'s budget moves 252 → 268.** "How do I upgrade" is the second question an install page is asked; the detail is in `docs/CONTRIBUTING.md` § Upgrading the product, linked from it.
+
+**Definition of done.** Merged; `upgrade-e2e` green on three OSes; `docs/INSTALL.md` "Upgrading" written; banner nudge freshness rule and `E-28` documented in ARC-08's check table; README acceptance 3 and 4 demonstrated by the harness in CI.
 
 ---
 
@@ -543,6 +752,17 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 **Risks / open points.** (a) `windows-latest` may carry `C:\Windows\System32\bash.exe` (WSL stub) — the recipe (ARC-00 S13) must decide whether to strip `System32` (not possible) or assert `where bash` finds only the WSL stub and that it is not runnable (`bash -c true` fails without a distro); recorded as an open point for S13 to settle. (b) Runner image updates (Server 2022 → 2025) change PATH layout — the strip script prints the resulting PATH for diagnosis. (c) macOS minutes: if budget bites, macOS runs `test`, `bootstrap-design`, `doctor`, `release-dryrun`, `upgrade-e2e` on `main` only (documented option, not the default).
 
+**Amendments made during the build (ARC-09-S08).**
+
+1. **The `doctor` row of the job table is steps inside `bootstrap`'s `node-cli` cells**, per ARC-08-S11's ruling — no separate job, no `needs:` hand-off, and the protection list did not grow for it.
+2. **`windows-native` does not replace ARC-06-S14's `no-gitbash` cell.** That cell's name is a required context on `main` and is untouched. The new job adds what it does not run: three Node majors under `cmd.exe`, `--password-stdin`, the server handshake, the hook, `version`, `store migrate --dry-run` and `upgrade --check`, all through `.cmd`.
+3. **`strip-git-bash.mjs` is one implementation, shared.** S14's cell called it in this story rather than keeping its literal PATH: two copies of a machine's directory layout is one copy too many, and the day a runner image moves `nodejs` one copy gets corrected while the other silently starts proving nothing.
+4. **52 contexts, not 54.** `eol` is ARC-09-S09's and S09 has not merged; a name in `required-contexts.json` that CI does not produce is a required check waiting for ever, which is the failure the file exists to prevent. The CONTRIBUTING matrix carries the row marked S09's. 49 + 3 = 52, and S09 takes it to 54.
+5. **The generator excludes conditional workflows BY NAME, with the reason in the file.** `docs-real.yml` is path-filtered and names its jobs after the OS, so a PR touching its paths produces four extra check runs — `ubuntu-latest`, `macos-latest`, `windows-latest`, `windows-latest (Git Bash on PATH)`. A generator that learned its list from a run would have made them required.
+6. **`instance add --password-stdin` needed a real HTTPS endpoint.** `--no-probes` skips the CAPABILITY probes, not reachability, so the wizard always connects. The cell therefore runs against ARC-07's own loopback stub over TLS, with a throwaway certificate made in an EARLIER step — `openssl.exe` lives in `Git\usr\bin`, the same directory as the `bash.exe` the cell exists to remove. Two things the first attempts measured: a certificate whose only name is `localhost` does not validate for `127.0.0.1` (it needs the SAN, and without it the wizard reports `CONNECTION_TIMEOUT`, which reads like a network problem and is not one); and `spawnSync` cannot be used to drive a child that talks to a listener in the SAME process — the parent is blocked and never accepts, which also reads as a connection timeout. The script spawns asynchronously.
+7. **The doctor's banner cache was never written on a machine without Claude Code (ARC-09-C9).** Not this story's code, but this story's fixtures found it: C8 dropped `--quick` from `tests/doctor/fix.test.mjs`, the fixtures began running E-00, and E-00 fails on a runner with the install page URL in its text — which the state file's `assertStorable` refuses. Three cases went red naming a falsy value while the cause sat on a stream no fixture read. Fixed at the cause (a cache-specific guard), and the fixture now asserts its own precondition: `doctorAt` fails on the stderr line and prints the reason, so the next occurrence names itself.
+8. **The contexts generator was verified against a live run, not trusted.** Its first output named thirteen `bootstrap` cells that no run produces, because `include:` rows were split on every comma and `label: 'ubuntu-latest, node 20'` carries one. Fixed, and the comparison against the run is what caught it.
+
 **Definition of done.** Merged; all contexts required; `docs/CONTRIBUTING.md` CI table with durations; Q-B outcome reflected in the job name and in `docs/INSTALL.md`.
 
 ---
@@ -600,6 +820,15 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 **Size.** S — half a day.
 
 **Risks / open points.** `git ls-files --eol` output for files with `-text` attribute varies slightly across git versions (2.25 floor vs runner's 2.4x) — the parser tolerates both `i/-text` and `i/none`.
+
+**Amendments made during the build (ARC-09-S09).**
+
+1. **`sh -n bootstrap.sh` is dropped, and CI is what settled it.** The design note asks for it beside `bash -n`; the `eol (ubuntu-latest)` cell answered `bootstrap.sh: 34: Syntax error: "(" unexpected`, where `/bin/sh` is dash and line 34 is `ORIG=("$@")` — a bash array. The file's shebang is `#!/usr/bin/env bash` and the `launcher` job lints it with `shellcheck -s bash`, so POSIX-sh compatibility is a claim it has never made. Asserting it would either stay red for ever or force a rewrite nobody asked for. AC 6 names `bash -n` only, and that runs on ubuntu here and on ubuntu + macOS in `launcher`.
+2. **No tracked binary file exists.** The test-design note and AC list `*.png`/`*.docx`; `git ls-files '*.png'` is empty and there is no `.docx`. An assertion over an empty set proves nothing, so the `binary` rule in `.gitattributes` is asserted to exist and `git check-attr` is asked what it resolves to (`text: unset`), and the test fails the day a binary IS tracked, telling the next person to exercise the case rather than leave it empty.
+3. **Extensionless files are answered by NAME.** `snowarch`, `LICENSE`, `NOTICE` and the dot-files are not "an extension that is the empty string". `.gitattributes` already rules `snowarch` by name; the rest are allow-list entries with a reason.
+4. **AC 4 and AC 5 are fixture repositories, not throwaway pull requests.** A throwaway PR proves it once, on the day someone remembers to open it; a fixture proves it on every cell for ever. They are judged by the same functions the repository is judged by, never by a second copy of the rules.
+5. **The completeness check was vacuous until AC 5's fixture caught it.** Its escape hatch for path-scoped rules tested for `eol=lf` in git's resolved attributes — and the catch-all `* text=auto eol=lf` puts `eol=lf` on every file in the repository, so every file was cleared and the check passed without checking. The tell is `text` SET versus `text=auto`.
+6. **`GIT_CONFIG_GLOBAL` points at an empty FILE, not `os.devNull`.** On Windows `devNull` is `\\.\nul`, which git cannot open as a config path: `git init` failed outright on `eol (windows-latest)` while both fixtures passed on macOS. An empty file is a valid config file everywhere and says the same thing.
 
 **Definition of done.** Merged; `eol` required on `main`; `docs/CONTRIBUTING.md` paragraph; README acceptance 6 evidenced by the Windows `eol` run URL.
 
@@ -664,6 +893,13 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 
 **Definition of done.** Merged; one green dry run recorded; CONTRIBUTING paragraph; `npm view @farstic/snow-mcp` unchanged (1.0.0).
 
+
+**Amendment (ARC-09-C17, owner decision 2026-09-11).** The tarball carries `NOTICE`. This repository
+is Apache-2.0 with a root `NOTICE`, and §4(d) asks a redistribution to carry its attribution text —
+npm includes a `LICENSE` automatically and a `NOTICE` not at all, so `packages/snowarch/NOTICE` is a
+byte-for-byte copy listed in `files`. The `npm pack --dry-run` test requires it AND asserts it still
+equals the root file, because a copy nothing compares is a copy that drifts.
+
 ---
 
 ### ARC-09-S11 — `docs/CONTRIBUTING.md` release / upgrade / CI-matrix sections; `docs/INSTALL.md` "Upgrading" section; `docs/ARCHITECTURE.md` versioning section
@@ -705,6 +941,15 @@ README stories → this map: README 1 → S01; README 2 → S02; README 3 → S0
 **Size.** S — half a day of writing plus the walkthrough.
 
 **Risks / open points.** Documentation drift after this ARC — the tests bind commands and anchors, not prose; prose changes remain a review duty.
+
+**Amendments made during the build (ARC-09-S11).**
+
+1. **`tests/docs-links.test.mjs` is NEW, not extended.** The story says to extend it as though ARC-05-S04 had left one. S04's path-reference check is lint rule **L05**, which asks whether a PATH exists — a different question from whether an ANCHOR or a COMMAND does. The file's header says so, so the next reader does not go looking for the version that was extended.
+2. **THE LESSON THE TEST EXISTS FOR: a remedy pointed at a heading that never existed, pinned by a test that asserted the string rather than the target.** `./snowarch upgrade` printed `docs/TROUBLESHOOTING.md#proxy` and `#tls-ca` in four failure remedies; the headings are `PROXY_UNREACHABLE`, `PROXY_AUTH_REQUIRED` and `TLS_CA_UNTRUSTED`, so a user behind a corporate proxy followed the advice to the top of a 600-line page. `tests/upgrade/upgrade-unit.test.mjs` asserted the remedy's TEXT, which is why it stayed green for as long as the text stayed wrong. An assertion about a link that never resolves the link is an assertion about spelling.
+3. **My own anchor rule was wrong twice, and both were found by links that were about to be correct.** Collapsing a run of spaces gave one hyphen where GitHub gives two (`v1 — the other`), and stripping `_` with the emphasis markers turned `PROXY_UNREACHABLE` into `proxyunreachable`. Both corrections are written at the line that gets them right, because the next person will reach for the same two shortcuts.
+4. **`docs/INSTALL.md`'s budget moves 268 → 277**, under ARC-07-S10's ruling and with nothing deleted. Re-wrapping the page to pay for the lines was tried and rejected: INSTALL.md is a generated SOURCE composed into README.md, so re-flowing its prose moves the composition and buys one line.
+5. **Two checklist fixes from the AC 3 walkthrough**, per "fix the checklist, not the transcript": step 1 said "`vendor/ServiceNowDocs` present" without the command that makes it so — and a missing corpus reads to the preflight as a DIRTY TREE (` D vendor/ServiceNowDocs`), which is not what a reader would guess — and the refusal chain is now written under the flags, because the skill being taught is "read the line, it is the instruction".
+6. **The walkthrough emptied the real checkout's `node_modules` (215 entries → 0), and that is ARC-09-C11, the first commit of ARC-10-S01.** `buildWorld` links `node_modules` into the fixture, so the release script's install gate ran `npm install` through the symlink. No tracked file was touched; restored with `npm ci --ignore-scripts`; the walkthrough was re-run with a copy-on-write clone and the real tree was byte-identical before and after. The fix belongs to the harness, not here: M4 closes on this commit and the harness's own tests never install.
 
 **Definition of done.** Merged; docs test green; the release checklist walkthrough recorded; ARC-10 can point users at `docs/INSTALL.md#upgrading`.
 

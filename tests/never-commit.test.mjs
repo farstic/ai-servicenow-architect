@@ -33,11 +33,22 @@ test('every per-checkout and engagement path is ignored', () => {
   }
 });
 
-test('the .env.example files are deliberately NOT ignored', () => {
+test('the .env.example files are deliberately NOT ignored, and ARE scanned', () => {
   for (const p of ['.env.example', 'packages/snowarch/.env.example']) {
     const r = spawnSync('git', ['check-ignore', '-q', p], { cwd: root });
     assert.notEqual(r.status, 0, `${p} is ignored but must not be`);
+    // ARC-09-C10. Tracked and NOT scanned was the state until then: `CREDENTIAL_EXT` listed nine
+    // extensions, none of them the `.env` family, so the sweep below skipped the one kind of file
+    // named after the thing it hunts — including the one that ships in the npm tarball. The sweep
+    // is the same regex the doctor's E-09 uses, so this assertion is about both.
+    assert.ok(CREDENTIAL_EXT.test(p), `${p} is tracked but the credential sweep skips it`);
   }
+  // And a `.env` itself, which is what a person actually leaks — `.env.local` too.
+  for (const p of ['.env', '.env.local', 'packages/snowarch/.env']) {
+    assert.ok(CREDENTIAL_EXT.test(p), `${p} would not be scanned`);
+  }
+  // Not direnv's file: a shell script, and a different question.
+  assert.equal(CREDENTIAL_EXT.test('.envrc'), false);
 });
 
 test('no forbidden path is tracked', () => {

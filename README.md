@@ -229,16 +229,44 @@ Every preflight failure prints its own remedy. These are those sentences:
 The full catalogue is `docs/TROUBLESHOOTING.md`. Whatever went wrong, re-run the bootstrap — it
 resumes at the step that failed rather than starting over.
 
+### What to paste in a bug report
+
+```sh
+./snowarch version      # engine version, contract sha, docs pin, the floors
+./snowarch doctor       # every check, and the Mode line at the end
+```
+
+Those two answer almost every first question. Neither prints a credential: `version` reports what
+was built, the doctor reports what was configured — never a password, never an instance address.
+
 ### What the corpus costs
 
 **The corpus costs about 302 MB on disk and about 30 seconds to fetch** — a sparse, blobless
 checkout of 19 areas out of 49,000 tracked paths. Two measurements, because they count different
-things: the **working tree** is 179 MB on Linux and macOS, 183 MB on Windows, 34,360 files
-(measured 2026-09-09 by `docs-real.yml` on all three runners: 25.3 s Ubuntu · 27.5 s macOS · 35.1 s Windows),
-and **tree plus `.git`** is 302 MB macOS / 305 MB Ubuntu / 315 MB Windows
-(measured 2026-09-06, ARC-00 S-07). The first is what you read, the second is what the disk loses.
-`--docs full` takes the whole corpus instead: **447 MB and 48,997 files**
-(measured 2026-09-09 on the reference macOS machine — ARC-00 S-07 did not measure full mode).
+things: the **working tree** is 179 MB on Linux and macOS, 183 MB on Windows, 34,360 files (25.3 s
+Ubuntu · 27.5 s macOS · 35.1 s Windows, measured 2026-09-09 by `docs-real.yml`), and **tree plus
+`.git`** is 302 MB macOS / 305 MB Ubuntu / 315 MB Windows (measured 2026-09-06, ARC-00 S-07). The
+first is what you read, the second is what the disk loses. `--docs full` takes the whole corpus
+instead: **447 MB and 48,997 files** (measured 2026-09-09 on the reference
+macOS machine — ARC-00 S-07 did not measure full mode). Every release re-measures all three
+platforms and attaches the same table as `install-metrics.md` —
+[releases](https://github.com/farstic/ai-servicenow-architect/releases), the first one pending.
+
+### Upgrading
+
+```sh
+./snowarch upgrade --check      # is a newer release out? (exit 4 = yes; nothing changed)
+./snowarch upgrade              # plan first, then move: only the steps whose inputs changed re-run
+```
+
+Nothing is touched before the plan is printed and accepted: it names the release, the steps that
+will re-run, whether the store's schema moves (a migration, with a 0600 backup, announced first),
+and `credentials: untouched` — `.local/instances.json` is never read or written by an upgrade.
+Restart `claude` afterwards; the server binary changed. `--to vX.Y.Z` takes a specific release and
+prints the way back; a branch that has diverged from `origin` is reported, not guessed at; a failed
+fetch prints git's error and a [proxy](TROUBLESHOOTING.md#proxy_unreachable) or [TLS](TROUBLESHOOTING.md#tls_ca_untrusted)
+remedy. The banner mentions a newer release only from a check you already ran — it never fetches.
+Full detail: [CONTRIBUTING.md](CONTRIBUTING.md#upgrading-the-product).
 
 ### Uninstall
 

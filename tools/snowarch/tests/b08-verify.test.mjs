@@ -92,11 +92,16 @@ test('the cache is v1, 0600, and carries the keys ARC-08 is allowed to rely on',
   if (!isWindows) assert.equal(statSync(cachePath(root)).mode & 0o777, 0o600);
 });
 
-test('AC 6 — the cache refuses a URL, an address or a registered secret', () => {
+// ARC-09-C9 amends this AC. It used to read "refuses a URL"; a doctor report legitimately quotes
+// documentation, and refusing every `scheme://` meant NO cache at all on a machine whose E-00
+// fails with the install page in its remedy. What the AC protects — an instance address, an
+// account name, a registered secret — is unchanged and still asserted here; the reason string
+// moved with the guard. The last case is the one C9 added: a docs URL is cached, not refused.
+test('AC 6 — the cache refuses an instance address, an account name or a registered secret', () => {
   const root = makeCheckout();
   assert.throws(() => writeDoctorCache(root, { mode: 'live',
     checks: [{ id: 'x', status: 'ok', detail: 'connected to https://example.service-now.invalid' }] }),
-  /looks like a URL or an address/);
+  /it carries an instance address/);
   assert.equal(existsSync(cachePath(root)), false, 'a refused write must leave nothing behind');
 
   reset();
@@ -106,6 +111,13 @@ test('AC 6 — the cache refuses a URL, an address or a registered secret', () =
     checks: [{ id: 'x', status: 'ok', detail: `saved with ${secret}` }] }),
   /the redactor would rewrite it/);
   reset();
+
+  // And the other half of the contract: documentation survives. Without this the guard could be
+  // "fixed" back to refusing everything and every assertion above would still pass.
+  writeDoctorCache(root, { mode: 'design',
+    checks: [{ id: 'E-00', status: 'fail', detail: 'not on PATH',
+      remedy: 'install it from https://code.claude.com/docs/en/setup, then re-run' }] });
+  assert.match(readFileSync(cachePath(root), 'utf8'), /code\.claude\.com\/docs\/en\/setup/);
 });
 
 test('AC 2 — B08 against the REAL server with no store: five tools, a WARN, exit 0', async () => {
@@ -152,8 +164,10 @@ test('B08 and `doctor --section server` write the same shape', async () => {
   const fromB08 = JSON.parse(readFileSync(cachePath(root), 'utf8'));
 
   // A `--section` run deliberately does NOT write the cache (a partial report must not look like
-  // a full one), so the comparison is against a `--quick` run — which does. Asserting the section
-  // rule here too, because without it this test would be comparing a file with itself.
+  // a full one), so the comparison is against a FULL run — which does. It was a `--quick` run
+  // until ARC-09-C8 took the server section out of that subset: a quick report cannot be compared
+  // on the server ids it no longer runs. Asserting the section rule here too, because without it
+  // this test would be comparing a file with itself.
   const before = statSync(cachePath(root)).mtimeMs;
   const sectioned = spawnSync(process.execPath,
     [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--section', 'server', '--json'],
@@ -162,7 +176,7 @@ test('B08 and `doctor --section server` write the same shape', async () => {
   assert.equal(statSync(cachePath(root)).mtimeMs, before, '--section wrote the cache');
 
   const cli = spawnSync(process.execPath,
-    [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--quick', '--json'],
+    [join(root, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--json', '--no-network'],
     { cwd: root, encoding: 'utf8', env: { ...process.env } });
   assert.ok([0, 1].includes(cli.status), cli.stderr);
   const direct = JSON.parse(readFileSync(cachePath(root), 'utf8'));

@@ -1,0 +1,176 @@
+name: release
+
+# On a tag, and only on a tag. Everything here is about a version that already exists: the gates run
+# again on all three platforms — after the fact, which is the point (P-29: the old release workflow
+# never fired) — and what they produce becomes the Release's assets.
+#
+# A release downloaded six months later is a tarball and a tag. So the assets are the things a
+# person cannot reconstruct later: three doctor reports, taken on three platforms at that version,
+# and the measured cost of the install on each.
+on:
+  push:
+    tags: ['v*']
+
+# One of the two workflows that may write to this repository — `docs-bump.yml` is the other, and it
+# pushes the branch it opens a pull request from. Both are scheduled or tag-triggered; neither is
+# reachable from a fork's pull request. Everything else asks for `contents: read`.
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      # `fetch-depth: 0`: the tag OBJECT is needed (its message is the thing being verified), and
+      # the changelog section is read from history.
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # FIRST, before any gate. A tag whose message does not describe this tree is not a release to
+      # be tested — it is a release to be stopped, and every minute after this one is wasted on it.
+
+      # ARC-09-C16 — RE-FETCH THE TAG OBJECT. `actions/checkout@v4` on a tag ref writes
+      # `refs/tags/<name>` pointing straight at the COMMIT, even with `fetch-depth: 0`: it peels the
+      # tag. So an annotated tag arrives in the runner's clone looking exactly like a lightweight
+      # one, `verify-tag.mjs` sees `cat-file -t` say `commit`, and it refuses a release that is
+      # perfectly well formed on the remote. The v2.0.0-rc.0 rehearsal lost all three `verify` jobs
+      # to this (run 34643610242), and nothing before it could have: `release-dryrun` never has a
+      # tag, and the workflow test's fixture tag is local.
+      - name: Re-fetch the tag object (checkout peels annotated tags)
+        run: git fetch --force origin "+refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+
+      - name: The tag says what this tree is
+        run: node scripts/ci/verify-tag.mjs ${{ github.ref_name }}
+
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm test
+      - name: The committed dist/ is what the source builds
+        run: node scripts/contract-gate.mjs
+
+      # A real design-only install, on this platform, at this version — which is what makes the
+      # metrics below a measurement rather than an estimate.
+      - name: Install, design-only
+        run: node tools/snowarch/bin/snowarch.mjs bootstrap --mode design --yes --skip-claude-check
+      - name: Every citation resolves against the pinned corpus
+        run: node tools/snowarch/bin/snowarch.mjs docs verify
+
+      # `--no-network --no-cache`: the report has to be about this checkout and nothing else, and it
+      # is about to be published where anyone can read it.
+      # ARC-09-C19. Exit 1 means "a check FAILED", and one does here on purpose: a hosted runner has
+      # no Claude Code, so E-00 reports it missing. The step used to let `-e` decide, so rehearsal
+      # run 7 lost all three `verify` jobs on a report that was CORRECT — `{"ok":31,"warn":1,
+      # "fail":1,"skip":6}`, the one fail being E-00 (run 34653741578).
+      #
+      # Which failures an environment explains is `assert-doctor.mjs`'s judgement, not this step's —
+      # the same script and the same `--expect-fail E-00` the bootstrap cells have used since
+      # ARC-08. Exit 2 (usage) and 3 (the doctor could not run at all) stay fatal wherever they
+      # happen, because those are not a report about the tree.
+      #
+      # Nothing here fakes a Claude Code to make the number nicer: the asset is published where
+      # anyone can read it, and a lie in it would be worse than a FAIL that is explained.
+      - name: The doctor, on the install just made
+        shell: bash
+        run: |
+          set +e
+          node tools/snowarch/bin/snowarch.mjs doctor --json --no-network --no-cache \
+            > doctor-${{ matrix.os }}.json
+          code=$?
+          set -e
+          echo "doctor exit: $code"
+          if [ "$code" -ge 2 ]; then exit 1; fi
+      - name: Judge the report — E-00 is this environment's, nothing else is
+        shell: bash
+        # `--deps installed` (ARC-09-C20): this job runs `npm ci` before the doctor, for its lint
+        # and test gates, so the server checks legitimately answer here. The bootstrap cells keep
+        # the default, `absent`, where an answering SV check means something installed too early.
+        run: |
+          node scripts/ci/assert-doctor.mjs --in doctor-${{ matrix.os }}.json \
+            --expect-fail E-00 --deps installed
+      - name: What the install cost here
+        shell: bash
+        run: node scripts/ci/install-metrics.mjs ${{ matrix.os }} > install-metrics-${{ matrix.os }}.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-${{ matrix.os }}
+          path: |
+            doctor-${{ matrix.os }}.json
+            install-metrics-${{ matrix.os }}.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    # `needs: verify` with the default (all-success) semantics: one red platform means no Release.
+    # A tag that fails its gates stays a tag — the thing it must never become is a published
+    # version somebody installs.
+    needs: verify
+    name: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # ARC-09-C16 — RE-FETCH THE TAG OBJECT. `actions/checkout@v4` on a tag ref writes
+      # `refs/tags/<name>` pointing straight at the COMMIT, even with `fetch-depth: 0`: it peels the
+      # tag. So an annotated tag arrives in the runner's clone looking exactly like a lightweight
+      # one, `verify-tag.mjs` sees `cat-file -t` say `commit`, and it refuses a release that is
+      # perfectly well formed on the remote. The v2.0.0-rc.0 rehearsal lost all three `verify` jobs
+      # to this (run 34643610242), and nothing before it could have: `release-dryrun` never has a
+      # tag, and the workflow test's fixture tag is local.
+      - name: Re-fetch the tag object (checkout peels annotated tags)
+        run: git fetch --force origin "+refs/tags/${{ github.ref_name }}:refs/tags/${{ github.ref_name }}"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+
+      - name: The metrics table, from all three
+        shell: bash
+        run: node scripts/ci/install-metrics.mjs --table install-metrics-*.json > install-metrics.md
+      # ONE WRITER (ARC-09-C21). The metrics table and the doctor sentence used to be appended here
+      # with `cat`, so nothing knew the total size — and the API refused a 125,000-character body on
+      # rehearsal run 9, after everything else had passed. The script composes the whole body and
+      # bounds it; nothing is appended to `release-notes.md` after this line, and a test asserts it.
+      - name: The release notes are the changelog's own section, bounded
+        shell: bash
+        run: |
+          node scripts/ci/release-notes.mjs ${{ github.ref_name }} \
+            --metrics install-metrics.md > release-notes.md
+          wc -c release-notes.md
+      - name: Nothing in the assets carries a credential
+        run: node scripts/ci/assert-assets.mjs doctor-*.json install-metrics-*.json
+
+      # `gh` is present on GitHub-hosted runner images. That is a runner-image fact rather than a
+      # documented guarantee, and the rehearsal run is what proves it; if it is ever absent, this
+      # step becomes `actions/github-script` calling `repos.createRelease` with the same assets.
+      - name: Publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create ${{ github.ref_name }}
+          --title "snowarch ${{ github.ref_name }}"
+          --notes-file release-notes.md
+          doctor-ubuntu-latest.json doctor-macos-latest.json doctor-windows-latest.json
+          install-metrics-ubuntu-latest.json install-metrics-macos-latest.json
+          install-metrics-windows-latest.json install-metrics.md

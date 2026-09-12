@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
+
+import { historyStartsAt, isHistory } from './helpers/changelog-history.mjs';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -223,7 +225,11 @@ test('every reference to the file names its new path', () => {
   const NEEDLE = basename(REL);
   const out = execFileSync('git', ['grep', '-l', '-F', NEEDLE], { cwd: root, encoding: 'utf8' })
     .split('\n').filter(Boolean);
+  // `tests/fixtures/` joins plans, spikes and RELICENSING as EVIDENCE rather than reference: a
+  // fixture is a captured copy of something as it was, and rewriting a path inside one would
+  // falsify the thing it exists to preserve. ARC-09-S02's frozen changelog region is the first.
   const live = out.filter((f) => !f.startsWith('docs/plans/') && !f.startsWith('docs/spikes/')
+    && !f.startsWith('tests/fixtures/')
     && f !== 'docs/RELICENSING.md' && f !== REL);
   // Two places name the BASENAME correctly, and both would be made wrong by a path:
   //   a tree diagram, where the directory is the indentation
@@ -232,14 +238,17 @@ test('every reference to the file names its new path', () => {
     /[├└│]/.test(line)
     || (f === 'tools/snowarch/lib/docs/citations.mjs' && /^\s*'/.test(line));
   const stale = live.filter((f) => {
-    const lines = readFileSync(join(root, f), 'utf8').split('\n');
-    const history = lines.findIndex((h) => /^## Before 2\.0\.0/.test(h));
+    const text = readFileSync(join(root, f), 'utf8');
+    const lines = text.split('\n');
     return lines.some((l, i) => {
       if (!l.includes(NEEDLE)) return false;
       if (l.includes(REL)) return false;
       if (basenameIsCorrect(f, l)) return false;
-      // The changelog's history is excluded the same way it is everywhere else.
-      return !(f === 'docs/CHANGELOG.md' && history !== -1 && i > history);
+      // The changelog's HISTORY is excluded, and history starts at the newest release heading —
+      // not at the frozen `## Before 2.0.0` (ARC-09-C17). A release moves the hand-written block
+      // into a new `## <version>` section above the frozen one, and a sentence that was history
+      // yesterday does not become a live reference because a release happened.
+      return !(f === 'docs/CHANGELOG.md' && isHistory(lines, i));
     });
   });
   assert.deepEqual(stale, [], 'these still name the old root path');
@@ -269,3 +278,30 @@ for (const [title, checkName, breakIt] of NEGATIVES) {
       `"${checkName}" passed a file where ${title}`);
   });
 }
+
+// ── ARC-09-C17 — where the changelog stops being live ──────────────────────────────────────────
+
+test('C17: history starts at the newest release heading, not at the frozen one', () => {
+  // A VERSION THAT CAN NEVER BE CURRENT (ARC-09-C17b). This fixture said `2.0.0-rc.0` — the
+  // rehearsal's version — which became the current version ON the rehearsal tree, so the
+  // version-literal sweep flagged it and was right to. A fixture version must be one no release
+  // will ever carry; `9.9.9` is the convention here, and the upgrade harness already uses `v9.x`.
+  const released = ['# Changelog', '', '## Unreleased', '', '### Notes', '',
+    '## 9.9.9 — 2026-01-01', '', 'a sentence naming an old path', '',
+    '## Before 2.0.0', '', 'the frozen region', ''];
+  // The released section is history: its index is the first `## <version>` line, not the frozen one.
+  assert.equal(historyStartsAt(released), 6);
+  assert.equal(isHistory(released, 5), false, 'the Unreleased skeleton is not history');
+  assert.equal(isHistory(released, 8), true, 'a released section is not being treated as history');
+  assert.equal(isHistory(released, 12), true, 'the frozen region is not being treated as history');
+
+  // THE NEGATIVE CONTROL, and it is the defect: with the old boundary — the frozen heading — line 8
+  // is above it and therefore "live", which is what failed rehearsal run 4 on the release commit.
+  const oldBoundary = released.findIndex((l) => /^## Before 2\.0\.0/.test(l));
+  assert.equal(8 > oldBoundary, false,
+    'the old rule would have called the released section live — that is what this replaces');
+
+  // A changelog that has never released anything has no history at all.
+  assert.equal(historyStartsAt(['# Changelog', '', '## Unreleased', '', '### Notes', '']), Infinity);
+  assert.equal(isHistory(['## Unreleased', '', 'live text'], 2), false);
+});

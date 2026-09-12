@@ -13,6 +13,7 @@
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeSync } from 'node:fs';
 
 /**
  * ARC-02-S12 sets this to true. Its exit test is `engine-lint --only L01,L02,L03` exiting 0.
@@ -43,14 +44,14 @@ try {
   counts = Object.fromEntries(doc.checks.map((c) => [c.id, c.findings.length]));
 } catch { /* the lint could not run; `code` says so and the summary shows ? */ }
 
-process.stdout.write(
+writeSync(1, 
   `SUMMARY engine-lint name checks — L01 ${counts.L01}, L02 ${counts.L02}, L03 ${counts.L03} `
   + `(${NAME_CHECKS_REQUIRED ? 'REQUIRED' : 'reported only until ARC-02-S12'})\n`);
 
 if (code === 2) {
   // "Could not run" is always fatal, whatever the flag says: a summary of a check that never
   // executed is worse than no summary, because it reads as a number.
-  process.stderr.write('SUMMARY: engine-lint could not run — see above.\n');
+  writeSync(2, 'SUMMARY: engine-lint could not run — see above.\n');
   process.exit(2);
 }
 process.exit(NAME_CHECKS_REQUIRED ? code : 0);

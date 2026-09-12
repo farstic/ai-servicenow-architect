@@ -161,9 +161,11 @@ in the initial commit.
 
 ---
 
-## CI
+## CI runners and the footprint gate
 
-`.github/workflows/ci.yml` — four jobs, no secrets, no step declaring a `shell:`.
+The job table lives in [CI matrix](#ci-matrix) — this section is the runners underneath it and the
+one gate whose number needs explaining. `.github/workflows/ci.yml` is the only workflow that gates a
+pull request; it reads no secret.
 
 | Job | What |
 |---|---|
@@ -189,9 +191,11 @@ The `-latest` aliases move without notice; these labels are recorded so a future
 attributed. **Note the Windows cell resolved Node 24 to 24.19.0 while the other two got 24.20.0** — the
 matrix is not as uniform as `[20, 22, 24]` suggests.
 
-**The Windows cell is not the "no Git Bash" proof.** The hosted image ships Git Bash. What that cell does
-prove is narrower: no step calls a POSIX shell (Q-B). The genuine no-Git-Bash test needs a machine where
-the shell is absent and belongs to ARC-09-S08.
+**The Windows cell is not the "no Git Bash" proof.** The hosted image ships Git Bash. What that cell
+proves is narrower: no step calls a POSIX shell (Q-B). The genuine no-Git-Bash test needs a machine
+where the shell is absent — ARC-09-S08 built it, and there are now two: `bootstrap (no-gitbash,
+windows-latest)` and the three `windows-native` cells, which strip Git Bash from `PATH` and drive
+the product entirely through `.cmd`.
 
 **If a macOS cell ever needs to be cheap:** the repository is public, so hosted runners cost nothing
 today. Should it ever become private, scheduling macOS on `main` only is the lever — recorded as an
@@ -201,6 +205,15 @@ option, not a default.
 
 ## Tests
 
+
+**A test never re-implements a renderer's format — it imports it.** Three clocks in one arc say this
+is a real habit: ARC-09-C3 proved "no network code" with a wall-clock threshold, C4 judged a raw
+median against a budget, and C18 normalised step durations with a regex that knew one of the
+formatter's two shapes. The third stopped a release: the gate ran the suite on a loaded machine, a
+step that usually takes 200 ms took a second, `(1 s)` did not match `/\(\d+\.\d+ s\)/`, and a
+comparison failed on a clock rather than on the thing it was comparing. If a test needs to remove a
+rendered value before comparing, the pattern lives beside the code that renders it and the test
+imports it — `withoutDuration` in `tools/snowarch/lib/steps/format.mjs` is the shape to copy.
 `npm test` at the root runs `tests/run.mjs` (engine) and then each workspace's own suite.
 
 `tests/run.mjs` computes its file list **in Node rather than with a shell glob**: on Windows npm runs
@@ -818,6 +831,302 @@ The launcher also has a line budget and a bash-3.2 constraint list, both enforce
 you are adding a step to it, ask first whether the step belongs on the Node path instead: this file
 exists for the machines that cannot run the other one, not as a second implementation.
 
+## A process that prints must not end abruptly
+
+Two rules, one cause: **a write to a pipe past the buffer is asynchronous**, and a process that
+ends before it drains loses it. A terminal is not a pipe, so neither failure is visible by hand.
+
+- **A process that WRITES TO STDOUT must not call `process.exit()`.** Not "an entry point" — the
+  earlier wording invited the reading that a CI script is a different kind of thing, and it is not:
+  the pipe does not know what sort of program is on the other end. Set `process.exitCode` and let
+  the module end, or — where control flow genuinely needs an immediate stop — make every write in
+  the file `writeSync(1, …)` / `writeSync(2, …)`, which returns when the bytes are gone.
+  `scripts/docs.mjs` was the first casualty: its `--json` object reached callers cut in half at
+  exactly 8192 bytes.
+- **Nothing printed from an `exit` handler goes through `process.stderr.write`** — use
+  `writeSync(2, …)`. The handler returns, the process ends, and the stream never flushes.
+  `tools/snowarch/tests/helpers/temp.mjs` reports a fixture it could not remove from exactly there,
+  and the message vanished the first time for this reason.
+
+Both were found by a test that read the finished output rather than the code that produced it.
+
+**And do not touch the streams at all in such a file — not even to read one.** The first reference
+to `process.stdout` makes libuv open fd 1 as a stream and set it **non-blocking**, and
+`fs.writeSync(1, …)` on a non-blocking pipe whose buffer is full does not wait: it throws `EAGAIN`.
+So a script that reads `process.stdout.isTTY` to decide about colour and then writes a large report
+synchronously can crash on a CI runner in exactly the place this rule is protecting. None of the
+swept files does it today, and the sweep is what keeps it that way.
+
+**Why size is the property, and "CI-only" is not.** Measured: `banner-timing.mjs` writes 223 bytes
+in a run and `assert-input-hashes.mjs` 429 — three orders of magnitude under a pipe buffer, so
+their exits could never have truncated anything. That is a fact about those two files on those two
+days, not a rule, and the arithmetic is exactly what an author should not have to do.
+
+**The near-miss that settles it.** `scripts/ci/release-notes.mjs` writes a whole CHANGELOG section
+to stdout — several KB for 2.0.0 and growing — and has three `process.exit` calls. It is safe today
+for a reason nobody wrote down: the big write is its LAST statement and none of the exits follow
+it. Add one `process.exit(0)` at the end, for tidiness, and the script that produces the text of a
+GitHub Release starts publishing half a section.
+
+`tests/entrypoint-exit.test.mjs` therefore sweeps by a SCAN — every `.mjs` under `scripts/`,
+`scripts/ci/`, `tools/snowarch/hooks/` and `tools/snowarch/bin/` that writes to fd 1 or 2 — rather
+than by a list, so a new printing script is covered the day it appears. `tools/snowarch/hooks/` is
+in the sweep as a guard over something already correct: the banner hook has never called
+`process.exit`, which is why a 12 KB `additionalContext` reaches the model whole.
+
+## What to paste in a bug report
+
+```sh
+./snowarch version        # six lines: version, tag, commit, contract, docs pin, floors
+                          # seven on a TAGGED checkout — the seventh compares the tag's
+                          # message with the tree (ARC-09-C17b)
+./snowarch doctor         # the full health check, with a remedy on every failure
+```
+
+`version` is offline and takes no arguments you have to remember. It names the release tag you are
+on (or how far past it), the commit and whether the tree is dirty, and whether the contract and the
+corpus pin match what the checkout says they should — which is most of what a support conversation
+spends its first exchange establishing. The same values fill the doctor's `engine` header, so
+`/snowarch status` quotes them too: one source, three surfaces.
+
+## The release workflow, and the rehearsal
+
+`release.yml` runs on `v*` tags only. It re-runs every gate on ubuntu, macOS and Windows, verifies
+that the tag's message describes the tree it is on, and publishes a GitHub Release with seven
+assets: three `doctor-<os>.json`, three `install-metrics-<os>.json`, and the merged
+`install-metrics.md`. Nothing is published until `assert-assets.mjs` has read every file — a doctor
+report attached to a public Release is permanent in a way a pasted one is not.
+
+`release-dryrun` in `ci.yml` runs the same release path on every commit with `--dry-run --offline
+--no-install`, on the same three OSes. It exists because `release.yml` only ever runs on a tag, and
+a path that runs once per release is broken by the time it runs.
+
+> **Cost lever.** `release-dryrun` is three OSes and macOS minutes bill at 10×. If it bites, drop
+> this job to ubuntu + windows (S11 records the choice); `verify` in `release.yml` keeps all three,
+> because a release is the one moment all three must be proven.
+
+### The rehearsal — a standing step before every release
+
+**Owner decision, 2026-09-11: every release is rehearsed first.** Not once before 2.0.0 — every
+time. The reason is measured rather than cautious: five rehearsal rounds each found a defect that
+`--dry-run` could not reach and no fixture had ever produced — the post-write gates, a stale
+artefact, a hand list of staged files, eight hundred lines of changelog silently dropped, a tag that
+`actions/checkout` peels, and a handful of tests that encode "this is a development tree" and go red
+on the release commit's own pull request. Every one of them would have landed on the real release.
+
+How, in the order it is done:
+
+```sh
+git switch -c rehearsal/vX.Y.Z-rc.N <the release candidate>
+git push -u origin rehearsal/vX.Y.Z-rc.N        # BEFORE --tag-only: the preflight compares against origin
+node scripts/release.mjs X.Y.Z-rc.N --yes --allow-prerelease --allow-branch rehearsal/vX.Y.Z-rc.N
+node scripts/release.mjs X.Y.Z-rc.N --tag-only
+git push origin vX.Y.Z-rc.N
+```
+
+Then watch `release.yml`: green on all three OSes, seven assets on the Release (three
+`doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`), and the two
+negatives refused. Afterwards delete the Release, the tag and the branch — locally and on the
+remote — and record what the run showed in the fields below. They are per-release: a rehearsal that
+is not written down is a rehearsal nobody can compare the next one against.
+
+- **Run URL:** https://github.com/farstic/ai-servicenow-architect/actions/runs/34660381461 — the
+  `v2.0.0-rc.0` rehearsal of 2026-09-12 (run 10 of 10; runs 1–9 each found one defect, chores C12,
+  C12c, C16, C17, C17b, C18, C19, C20, C21, all fixed before the M4 merge), from `develop` @
+  `b9c70c3`; `verify` ×3 and `publish` green.
+- **Assets observed:** exactly seven — `doctor-macos-latest.json`, `doctor-ubuntu-latest.json`,
+  `doctor-windows-latest.json`, `install-metrics-macos-latest.json`,
+  `install-metrics-ubuntu-latest.json`, `install-metrics-windows-latest.json`, `install-metrics.md`.
+  The Release body was 118,137 characters, under the 125,000 cap, with the continuation link.
+- **Metrics measured:** macos-latest 174 MB · 35,193 files · B02 35.3 s · node_modules 88 MB ·
+  bootstrap 35.8 s — ubuntu-latest 174 MB · 35,193 · 7.7 s · 91 MB · 7.8 s — windows-latest 178 MB ·
+  35,193 · 37 s · 92 MB · 37.3 s. The three doctor JSONs carried E-00 as their only FAIL.
+- **Negatives refused:** `v9.9.8` (lightweight, run 34660982790) → `tag v9.9.8 is not annotated —
+  create it with scripts/release.mjs`; `v9.9.7` (annotated, one hex digit of `contract:` edited, run
+  34660984646) → `contract sha in message (054a7d8c38bc…) != dist/contract.json (754a7d8c38bc…)`.
+- **`gh` present on the runner images:** confirmed — `gh release create` ran on ubuntu-latest and
+  created the Release. Afterwards the Release, the three tags and the branch were deleted; the remote
+  carries only the two `import/*` tags.
+
+
+## Commits
+
+`docs/CHANGELOG.md` is generated from commit subjects, so a subject is a changelog entry. The
+`commitlint` job checks every commit on a pull request — and only there, while they can still be
+reworded. History is never rewritten to suit the parser: an unconventional subject from before the
+convention is recorded as written and marked `(unconventional)`.
+
+```
+type(scope)?: subject
+```
+
+**Types.** `feat` → *Added* · `fix` → *Fixed* · `perf`, `refactor` → *Changed* · `docs`, `test`,
+`build`, `ci`, `chore`, `revert` → *Internal*.
+
+**Scopes** are optional and come from the tree: `engine`, `server`, `contract`, `docs`, `bootstrap`,
+`doctor`, `wizard`, `ci`, `release`, `deps`, `changelog`, `tests`, `plan`, or any directory name
+under `.claude/skills/` or `.claude/agents/`. A new skill is nameable in a commit the day it exists,
+with no edit to the lint.
+
+**Breaking changes** take a `!` before the colon, a `BREAKING CHANGE:` footer, or both. The footer's
+text is what appears under *Breaking*; with only a `!`, the subject is used.
+
+**The subject is at most 100 characters**, and `chore(release):` commits and merges are skipped by
+both the lint and the generator.
+
+```
+feat(doctor): report the capability packs the machine can produce
+fix(server)!: stop gating reads on SCRIPTING_ENABLED
+
+BREAKING CHANGE: SCRIPTING_ENABLED now gates writing scripting objects only
+docs(changelog): seed the 2.0.0 migration notes
+chore(deps): bump eslint to 9.39.5
+```
+
+A failure reads:
+
+```
+commitlint: FAIL abcdef1 "updated stuff" — expected type(scope)?: subject; see docs/CONTRIBUTING.md#commits
+```
+
+**What gets checked.** The commits this branch *adds* — `<base>..HEAD`, two-dot, so a commit
+already on the base is not yours to answer for. In CI the pull request names the base. Locally it is
+your branch's upstream if it has one, otherwise `origin/develop`: **not** `origin/main`, which lags
+`develop` by a whole milestone and would hand you thirty commits of somebody else's work, some
+written before this convention existed.
+
+**The lint governs commits after `485fc49`** — ARC-09-S02's merge, the commit that introduced it.
+Anything older is history: the lint prints it as `(pre-convention, recorded as written)` and does
+not fail on it, which is the same tolerance the changelog generator has always had with
+`(unconventional)`. A story's pull request never meets such a commit; a milestone merge to `main`
+lints the whole arc and does. History is not rewritten to suit the parser.
+
+**A subject or body can only be fixed by amending.** `commitlint` reads every commit a branch adds,
+so a malformed subject cannot be repaired by a later commit — there is nothing a fix-up can say
+about the one above it. A SUBJECT/BODY-only amend with `--force-with-lease`, on an unmerged draft
+branch, is therefore allowed, and the pull request records the before and after shas together with
+an empty `git diff <old> <new> --stat` as the proof the tree did not move. **Content rework is
+always a fix-up commit**, never an amend: the red round belongs in the branch's history where a
+reviewer can see what was wrong. (ARC-09-S10 is where this was settled, by a 101-character subject.)
+
+**The escape hatch is `### Notes`.** Everything else in a release section is generated; that block
+is hand-written, survives regeneration verbatim, and moves down into the release it belongs to. If
+a change needs a paragraph rather than a bullet, that is where it goes.
+
+**Where this is tested.** `tests/commitlint.test.mjs` (the subject grammar, the scope vocabulary and the range it reads) and the `commitlint` CI job, which runs on pull requests only.
+
+## Releasing
+
+The checklist, verbatim — paste it into the release pull request's description and tick it:
+
+> 1. **Rehearse it first** — see [The rehearsal](#the-rehearsal--a-standing-step-before-every-release). A throwaway branch, a `X.Y.Z-rc.N` prerelease tag, `release.yml` green on three OSes with its seven assets, then the Release, tag and branch deleted. Every release, not only the first.
+> 2. `git switch main && git pull --ff-only` · CI green on HEAD · the corpus present — `git submodule status vendor/ServiceNowDocs` shows no leading `-`; if it does, `git submodule update --init vendor/ServiceNowDocs`. A missing corpus is a **dirty tree** to the preflight (` D vendor/ServiceNowDocs`) and the release refuses before it writes anything.
+> 3. `git switch -c release/vX.Y.Z main` · `node scripts/release.mjs X.Y.Z --yes --allow-branch release/vX.Y.Z` (writes + commit, **no tag**) · open a pull request to `main` · merge it **without squashing** · then, on `main`, at the merge commit: `node scripts/release.mjs X.Y.Z --tag-only`.
+> 4. `git push origin main --follow-tags` (or pass `--push`).
+> 5. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
+> 6. Update the install page's metrics link if the numbers moved; announce.
+> 7. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
+
+**Step 2 is two-phase because it has to be.** `main` is protected by required status checks with
+`strict: true` — **54** of them after this milestone, generated into
+`tests/fixtures/required-contexts.json` — so a release commit pushed straight to `main` arrives
+carrying no checks and is refused by the branch, not by the script. The one-shot form
+(`node scripts/release.mjs X.Y.Z` on `main`, then push) is correct only where `main` has no required
+checks; it is kept because the script supports it and a fork may want it, not because it is the flow
+here.
+
+`node scripts/release.mjs <x.y.z>` — preflight, gates, writes, one commit, one annotated tag. It
+refuses before it writes anything: a dirty tree, a branch that is not `main`, a tag that exists, a
+version that goes backwards, a corpus that does not match the pin. Nothing is pushed unless you ask.
+
+**The two-phase flow, in full.** `main` requires 54 status checks and is `strict`, so a release
+commit pushed straight to it carries no checks and is refused:
+
+```sh
+git switch -c release/v2.0.0 main
+node scripts/release.mjs 2.0.0 --yes --allow-branch release/v2.0.0   # writes + commit, NO tag
+# open a pull request to main; CI runs the required checks on the release commit itself
+# after it merges, on main, at the merge commit:
+node scripts/release.mjs 2.0.0 --tag-only
+git push origin v2.0.0
+```
+
+`--tag-only` verifies the tree already carries the version everywhere and that a
+`chore(release): v<x.y.z>` commit is in recent history before it makes the tag — so a tag can never
+name a tree that does not carry its own version.
+
+**What the tag records**, and why the trailers are not decoration: a release downloaded six months
+later is a tarball and a tag, and `./snowarch version`, `release.yml` and `./snowarch upgrade` all
+read these back through `parseTagMessage` in `scripts/lib/release/tag.mjs`.
+
+```
+snowarch v2.0.0
+
+contract: <sha256 of packages/snowarch/dist/contract.json>
+docs-pin: <40-hex gitlink of vendor/ServiceNowDocs>
+claude-floor: 2.1.214
+node-floor: 20.0.0
+git-floor: 2.34.1
+```
+
+**A stale `dist/` is a refusal, never a repair.** The script rebuilds and compares; if the result
+differs from what is committed it stops and leaves the rebuild in your tree to look at. Committing
+a rebuilt `dist/` on the maintainer's behalf would ship an artefact nobody reviewed — the reason
+`dist/` is committed at all is that a human sees its diff in a pull request.
+
+Use `--dry-run` freely: it runs the preflight and the gates, prints the exact tag message, and
+writes nothing. `--offline` skips the remote-ahead check; `--no-install` skips `npm ci`.
+
+**Every refusal names its own remedy, and they come in a chain.** Walking this checklist on the
+upgrade harness produced four in a row, each printing what to do next: a missing corpus (`working
+tree not clean: D vendor/ServiceNowDocs`), a stale `dist/` (*run `node scripts/build-dist.mjs` and
+commit it in a normal PR, then release*), a pin behind the contract (*run `node
+packages/contract/pin.mjs`*), and a stale `vendor/docs-areas.txt` (*run `node
+scripts/gen-docs-areas.mjs --write`*). Each was fixed by doing what the line said. If a release
+refuses, read the line — it is the instruction, not a diagnosis to interpret.
+
+**Where this is tested.** `tests/release.test.mjs`, `tests/release-workflow.test.mjs` and `tests/version-tag.test.mjs` (the preflight refusals, the tag message and its trailers, `--tag-only`'s version check), the `release-dryrun` CI job on three OSes on every commit, and `.github/workflows/release.yml` for the tag path itself.
+
+## The npm channel (optional)
+
+`npx @farstic/snowarch` is a **secondary** channel, for someone who wants the MCP server without
+the Architect engine. **The engine never consumes this package** — it runs the server from the
+checkout — so nothing here breaks if the package is never published, and none of this is on the
+release path.
+
+**It is disabled by default, and the mechanism is not a habit.** `publish-npm.yml` has no trigger
+but `workflow_dispatch`: no `push`, no `tags:`, no `pull_request`. Cutting a release tag does not
+publish anything. And the dispatch's `dry_run` input **defaults to true**, so accepting the dialog
+as it stands does the harmless thing. Flip it to `false` only when you have decided to publish that
+exact tag — there is no undoing a version on npm.
+
+**The token is granular and scoped to one package.** Create it on npmjs.com as a granular access
+token limited to **`@farstic/snowarch` only**, write-enabled, and store it as the repository secret
+`NPM_TOKEN`. That scope is the point: `@farstic/snow-mcp@1.0.0` is a published record that is
+**never touched again** (D-01), and a token that cannot name it cannot damage it even if it leaks.
+The workflow is the only place in this repository that reads the secret — `tests/workflows.test.mjs`
+fails if the name appears anywhere else, or if a second name appears there.
+
+**And the workflow itself refuses to publish anything but `@farstic/snowarch`.**
+`scripts/ci/assert-publish-target.mjs` runs before `npm ci` and long before the token is used. It
+checks the name (refusing `@farstic/snow-mcp` with D-01 named in the message), that the version
+equals the dispatched tag, `bin`, `files`, `engines.node`, `license`, `repository`, and that
+`publishConfig` asks for public access with provenance. A wrong target costs a second, not a
+publish.
+
+Provenance is why the workflow holds `id-token: write` — npm mints an attestation from GitHub's
+OIDC token linking the tarball to this repository and that tag. It is the only workflow with that
+permission, and a test holds it to that.
+
+**The post-publish smoke is a manual step**, deliberately: `npx -y @farstic/snowarch@2 --version`
+from a clean temp directory needs the real registry, and a test that mocks the registry proves
+nothing about it. The dispatch inputs and what green looks like are written out in
+`docs/spikes/OWNER-SITTING.md` § Sitting E.
+
+Where this is tested: `tests/workflows.test.mjs` (dispatch-only, the secret allow-list, the OIDC
+permission, step order, no required context) and `tests/publish-target.test.mjs` (every refusal
+message, and `npm pack --dry-run` for what the tarball carries).
+
 ## Adding a doctor check: registry → snapshots → mapping table
 
 Three files, in this order, and the tests will tell you if you stop after the first.
@@ -825,6 +1134,30 @@ Three files, in this order, and the tests will tell you if you stop after the fi
 1. **The registry.** A check is `defineCheck({ id, section, title, severity, quick, network,
    spawns, fixable, run })` in `tools/snowarch/lib/doctor/checks/`. The id is permanent: eleven ARCs
    name a check id as their proof, and renaming one silently removes somebody else's evidence.
+
+   **`quick: true` is a COST CONTRACT, not a label** (ARC-09-C8). The SessionStart banner's re-run
+   path is `doctor({ quick: true, noNetwork: true })`, paid before a user's first word of a
+   session, so a check that joins that subset is spending somebody else's time. To qualify:
+
+   - no process spawn beyond at most one bounded `git` call, and no tree walk — a bounded number
+     of `stat`/`readFile` on named paths is fine;
+   - no network;
+   - under **50 ms** on the slowest Windows cell;
+   - **and it must not reach for a shared context.** This is the one that is easy to miss.
+     `docsFor()`, `serverReport()` / `adopt()`, and `lintContextFor()` / `runLint()` each build
+     something expensive once and cache it on the run's ctx, so whichever check touches one FIRST
+     pays for all of them. Measured twice while writing this: moving E-12 out of `--quick` put its
+     143 ms onto E-13, and moving E-19 out put 66 ms onto E-20. The total did not change either
+     time. A check that needs a shared context is not quick, and neither is any other member of
+     its group.
+
+   `tests/doctor/engine-registry.test.mjs` enforces the shared-context half statically, with a
+   negative control. The rest is measured by `scripts/ci/check-timings.mjs` on five cells and read
+   from the job summary; the C5 chore row records the numbers.
+
+   Applying it took the quick doctor from 776 ms of check time to **89 ms** locally, slowest check
+   20 ms. The full `./snowarch doctor` is unchanged — every one of those checks still runs there,
+   and the cache the banner reads FIRST is written by a full run.
 2. **The three snapshots.** `tests/fixtures/doctor/snapshot-{linux,darwin,win32}.json` record what
    a design-only install answers, per check. A new id is red in `tests/doctor/snapshot.test.mjs`
    with the id named — on every cell, not only after a bootstrap. Produce the rows from a real run
@@ -1172,6 +1505,111 @@ generated file that does not match its source.
 
 ---
 
+## Upgrading the product
+
+`./snowarch upgrade` is seven numbered steps, and the first five happen before anything is written.
+
+```
+[U1/7] preflight            inside the checkout, and `git status` clean — else exit 2, nothing changed
+[U2/7] fetch tags           `git fetch --tags --prune origin`, 120 s; a failure prints git's error
+                            and, when the shape is recognised, ONE remedy line (#proxy / #tls-ca)
+[U3/7] resolve target       `--to` must be an annotated tag with a `contract:` trailer; otherwise the
+                            highest semver `v*` tag (prereleases need `--pre`)
+[U4/7] plan                 computed from the TAG, before the tree moves: which files changed
+                            between HEAD and the tag, restricted to S05's INPUTS table; the gitlink;
+                            `storeSchemaVersion` read out of `git show <tag>:…/contract.json`; the
+                            installed Claude Code against the tag's `claude-floor`
+[U5/7] move                 `--to` detaches; otherwise `git pull --ff-only` on a branch with an
+                            upstream. A diverged branch is reported, never resolved for you
+[U6/7] bootstrap --yes      a second run in the recorded mode: the resume rule re-runs exactly the
+                            stale steps, and B06 MIGRATES a store whose schema moved
+[U7/7] doctor               `doctor --json`, and the upgrade cache is written with `behind: false`
+```
+
+**Nothing before U5 writes anything**, which is what makes `Proceed? [Y/n]` a real question. `--yes`
+skips the question, never the plan: it is still printed, because a transcript that does not say
+what was about to happen is a transcript nobody can debug.
+
+**The credential store is not part of an upgrade.** `.local/instances.json` is opened by exactly one
+thing in the whole sequence: S06's migration, in B06, when the release changes the schema — with its
+0600 backup, announced in the plan before the user agrees. The plan says `credentials: untouched`
+because that is a property of the code, and `tests/upgrade/upgrade.e2e.test.mjs` compares the file's
+sha256 across an upgrade to keep it one.
+
+**A failure leaves the tree at the new tag**, with the state file recording which step stopped.
+Re-running `./snowarch upgrade` continues from there rather than reporting `up to date` — the tree
+being at the target and the upgrade having finished are two different claims.
+
+**The banner never fetches.** `.local/upgrade-check.json` is written by `upgrade`, by
+`upgrade --check`, and by the doctor's `E-28` (once a day, `git ls-remote`, excluded from `--quick`
+and skipped by `--no-network`). The SessionStart hook reads three keys — `behind`, `latestTag`,
+`checkedAt` — and prints one line, only while the check is less than seven days old. A nudge from a
+check nobody has made since is a line readers learn to skip, and then the one that matters is
+skipped too.
+
+**The harness** (`tests/upgrade/harness.mjs`) builds a bare origin at `v9.0.0` and two fixture
+releases: `v9.1.0` moves one declared input (the areas file), `v9.2.0` moves the store schema
+through S06's `migrations` seam and ships a rebuilt `dist/`. 9.x so a fixture tag can never be
+mistaken for a real release. Nothing in it reaches the network: the origin is a path, and the docs
+upstream is the docs suite's own local bare repository.
+
+---
+
+**Where this is tested.** `tests/upgrade/upgrade.e2e.test.mjs` against the two-release fixture harness, `tools/snowarch/tests/input-hash.test.mjs` for the input-hash table that decides which bootstrap steps go stale, and the `upgrade-e2e` CI job on three OSes.
+
+## Store migrations
+
+`.local/instances.json` carries a `version`, and `packages/snowarch/src/store/migrations/index.ts`
+is the only thing allowed to change it. The registry ships **empty** at v1 on purpose: the
+framework exists before the first migration so that whoever changes the schema is forced through
+it rather than around it.
+
+To change the store's shape:
+
+1. **Write the migration** — `{ from, to, describe, up }`, appended to `MIGRATIONS`, and bump
+   `STORE_VERSION` in `src/store/schema.ts` in the same commit. `CURRENT_SCHEMA_VERSION` is that
+   same constant re-exported; there is only ever one number.
+2. `describe` is shown to a user **before** the migration runs, so it says what changes in words
+   they can check: "add lastUpgradeCheck to every instance", not "v2".
+3. **`up` is pure.** Its input is deep-frozen — a migration that mutates in place throws rather
+   than passing — and it returns a new object.
+4. `npm run build` and commit `dist/`, then `node packages/contract/pin.mjs --yes`: the contract
+   carries `storeSchemaVersion`, so a schema bump moves the contract sha. That is the mechanism by
+   which S05's input table makes exactly B06 stale on the next `bootstrap`, and by which `upgrade`
+   can read a tag's contract and warn about a migration before checking anything out.
+
+Three rules the tests enforce, so none of them is a matter of remembering:
+
+- **Contiguity.** Single steps, in order, ending exactly at `CURRENT_SCHEMA_VERSION`. A bumped
+  constant with no migration fails the suite; so does a gap, and so does a 1→3 leap. With a gap, a
+  v1 store meets the 3→4 migration carrying v1 data.
+- **Credential values are never touched.** Every instance's whole `auth` subtree — method,
+  username, password, client id and secret — is compared before and after, on every migration, and
+  a difference is a refusal *after* the migration ran and *before* anything is written. Add or
+  rename non-`auth` fields and set defaults; nothing else.
+- **A parse error is a hard error.** `STORE_UNREADABLE`, with the path and the remedy, and the file
+  is left exactly as it was. The server this replaced returned an empty config on a parse failure,
+  which is how a store with one typo becomes a store with no instances.
+
+**Nothing migrates on load.** The server reads the version and, if it is not this build's, starts
+unconfigured with `STORE_SCHEMA_OUTDATED` (or `STORE_SCHEMA_NEWER`) and names the command; every
+instance tool answers with that code. Migrating is something a person asks for — `./snowarch store
+migrate`, which prints the plan first and takes `--dry-run` and `--yes`.
+
+**Backups are never pruned.** Every migration copies the store to `instances.json.bak-<timestamp>`
+(0600, byte-identical to the input) before it writes. `./snowarch store backups` lists them and
+`./snowarch store restore <file>` puts one back; deleting old ones is a `rm` the user runs. An
+automatic prune would be this code deleting the rescue copy of a credential file it had just
+rewritten.
+
+The doctor's **SV-09** reports the schema and is deliberately **not** in `--fix`'s whitelist: the
+whitelist never touches the credential file, so an outdated store appears under REFUSED with the
+command to run.
+
+---
+
+**Where this is tested.** `tools/snowarch/tests/b06-migration.test.mjs` and the store migration suite under `packages/snowarch/tests/`; the schema stamp itself is one of the inputs in `tests/upgrade/upgrade-unit.test.mjs`.
+
 ## `.editorconfig` is enforced
 
 `tests/editorconfig.test.mjs` checks every tracked `.md .mjs .ts .json .yml .yaml` file for exactly
@@ -1264,6 +1702,67 @@ If you need a new `claude mcp` call, add it there — not in the command that wa
 also owns two things that are easy to get wrong once and never notice: `-s <scope>` on every call
 (without it, `remove` deletes from whichever scope it finds, and ours is committed), and the
 `cwd: root` that local scope is keyed on.
+
+## CI matrix
+
+Generated names live in `tests/fixtures/required-contexts.json`, which is what `main`'s branch
+protection is set from; the table below is the human reading of it. Run `npm run gen` after any
+change to `ci.yml` — `gen-all --check` fails on a stale file, and a name in that file that CI does
+not produce is a required check waiting for ever.
+
+| Job | Cells | Shell | What only this job can answer |
+|---|---|---|---|
+| `test` | 3 OS × node 20/22/24 | node/npm | the suites, the lint, the type-check |
+| `contract` | 3 OS × node 20/22/24 | node/npm | the contract gate, on every platform that ships it |
+| `no-build handshake` | 3 OS | node | the COMMITTED `dist/` answers, with no build step first |
+| `docs-check` | ubuntu | node | the corpus recipe and the citations |
+| `footprint` | ubuntu | node | `node_modules` stays under its limit |
+| `actionlint` | ubuntu | pinned binary | the workflows parse and their expressions type-check |
+| `bootstrap` | 13 (ARC-06-S14) | bash · cmd · powershell | the install promise, executed — including the doctor, the snapshot and the banner as STEPS (ARC-08-S11: steps, not a job, so the protection list did not grow) |
+| `commitlint` | ubuntu | node | the commit convention, which nothing else enforces |
+| `release-dryrun` | 3 OS | bash | the release path, on every commit — `release.yml` only ever runs on a tag |
+| `upgrade-e2e` | 3 OS × node 22 | bash | an upgrade moves a TREE, and a tree is what a unit test cannot move |
+| `windows-native` | windows × node 20/22/24 | **cmd** | a Windows machine used the way a Windows user uses one: `cmd.exe` throughout, no Git Bash, the product driven through `.cmd` |
+| `launcher` | ubuntu + macOS | bash | `bootstrap.sh` with Node stripped from PATH |
+| `windows-launcher` | windows | powershell · cmd | the `.cmd` and `.ps1` launchers, which exist nowhere else to be tested |
+| `secrets` | ubuntu | node | no credential-shaped string reached the tree |
+| `plugin-validate` | ubuntu | node | the plugin manifest is loadable |
+| `eol` | ubuntu + windows | bash · **cmd** | the line-ending policy, on a Windows clone made with the Git-for-Windows default `core.autocrlf=true` — set BEFORE the checkout, because the setting decides what the clone writes. Runs `tests/eol.test.mjs`, asserts the launcher bytes are CRLF and the LF set has no `\r`, and runs `bootstrap.cmd --help`, `snowarch.cmd --help` and `bootstrap.ps1 --help` under `cmd.exe` |
+| `docs-real` | 3 OS + one | bash | **conditional — runs only when the corpus tooling changes; NOT required.** A PR that touches those paths produces four extra check runs and they must never become required contexts |
+
+**The banner's two numbers, per cell.** `banner-timing.mjs` reports both paths: the FAST path (warm
+cache) against `01` §8's 300 ms, and the RE-RUN path (cold, a quick doctor) at 1000 ms on the
+difference between the run and an empty-Node floor measured interleaved. A fast-path trip is a
+product regression; a re-run-path trip is ARC-09-C5's territory, and the cap does not move until
+C5's tables say where the time goes.
+
+**The macOS-minutes lever, documented and not applied.** If the budget bites, narrow
+`release-dryrun` and `upgrade-e2e` to ubuntu + windows by deleting `macos-latest` from their two
+`os:` lists and running `npm run gen` — the required-contexts file and the protection list follow
+from it. `verify` in `release.yml` keeps all three whatever happens here: a release is the one
+moment all three must be proven. Do NOT narrow `test`, `contract` or `bootstrap`; those are where a
+platform-specific break is actually caught.
+
+**Where this is tested.** `tests/workflows.test.mjs` — the cells, the step order, the shells, the secret allow-list, and that every workflow is either the gating one or excluded with a reason — against `tests/fixtures/required-contexts.json`, which is generated from `.github/workflows/ci.yml` by `scripts/gen-required-contexts.mjs`.
+
+## Line endings
+
+LF everywhere, except the two Windows launcher kinds (`*.cmd`, `*.ps1`), which are
+CRLF. Never edit a line ending by hand and never "fix" one in an editor: `.gitattributes` decides,
+git applies it at `add` and at `checkout`, and a hand-edit only puts your working tree out of step
+with what everyone else receives. Two halves, and they fail differently — the INDEX is LF for every
+text file on every platform (git normalises on `add`, so a `.cmd` is LF in the object database and
+CRLF only on disk), and the WORKING TREE is whatever your checkout wrote, which is why the `eol` job
+clones with `core.autocrlf=true` before asserting anything. A `\r` that reaches a tracked
+`bootstrap.sh` is `/bin/bash^M: bad interpreter` on every Unix machine that clones it — an error
+naming an interpreter that plainly exists. The launcher files are GENERATED
+(`scripts/gen-launcher-text.mjs`): if `assert-crlf` fails on one, the generator is the fix, because
+editing the file leaves the two out of step and the next `npm run gen` reverts the repair. A new file
+type needs a rule in `.gitattributes` or an entry with a reason in `tests/eol.allowlist.json` —
+`tests/eol.test.mjs` fails on an extension nobody has answered for, since `text=auto` is a guess and
+removing the guess is what the policy file is for.
+
+**Where this is tested.** `tests/eol.test.mjs` on every cell, and the `eol (ubuntu-latest)` and `eol (windows-latest)` CI cells, which clone with `core.autocrlf=true` before asserting anything.
 
 ## What CI proves about the install
 

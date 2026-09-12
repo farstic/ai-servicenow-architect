@@ -30,6 +30,7 @@
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeSync } from 'node:fs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const skipBuild = process.argv.includes('--skip-build');
@@ -80,11 +81,11 @@ for (const step of STEPS) {
   const r = step.run();
   if (r.status === 0) { done.push(`${step.id} ok`); continue; }
 
-  process.stdout.write(`CONTRACT GATE FAILED at step "${step.id}" — ${step.label}\n\n`);
-  process.stdout.write(`${r.stdout ?? ''}`);
-  process.stderr.write(`${r.stderr ?? ''}`);
-  process.stdout.write(`\n${step.remedy}\n`);
+  writeSync(1, `CONTRACT GATE FAILED at step "${step.id}" — ${step.label}\n\n`);
+  writeSync(1, `${r.stdout ?? ''}`);
+  writeSync(2, `${r.stderr ?? ''}`);
+  writeSync(1, `\n${step.remedy}\n`);
   process.exit(1);
 }
 
-process.stdout.write(`CONTRACT GATE: ${done.join(' · ')}\n`);
+writeSync(1, `CONTRACT GATE: ${done.join(' · ')}\n`);

@@ -28,6 +28,22 @@ export declare const svAudit: Check;
  */
 export declare function pollutingAncestors(dir: string): string[];
 export declare const svAncestorSkills: Check;
+/**
+ * Does this build read the store that is there?
+ *
+ * ARC-09-S06, and it is SV-09 rather than the story's SV-08 — ARC-08-S04 shipped the ancestor
+ * skills check under that id first.
+ *
+ * Separate from SV-02 on purpose. SV-02 answers "is the file safe and loadable"; this answers
+ * "is it the shape this build speaks", and the two have different remedies pointing in opposite
+ * directions — migrate the file, or upgrade the checkout. Folding them together would give one
+ * line that has to hedge.
+ *
+ * NOT fixable, deliberately and permanently: `--fix`'s whitelist never touches the credential
+ * file (`01` §8). The command is what `--fix` reports under REFUSED, which is how a user running
+ * it learns exactly what it declined to do and what to run instead.
+ */
+export declare const svStoreSchema: Check;
 export declare const ALL_CHECKS: Check[];
 /** Exported so a caller can resolve `dist/` the same way the checks do. */
 export { distDir, pathToFileURL };

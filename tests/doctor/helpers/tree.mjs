@@ -55,6 +55,15 @@ export function greenTree(t, { mode = 'design', extra = {} } = {}) {
     mkdirSync(dirname(join(root, rel)), { recursive: true });
     cpSync(join(REAL_ROOT, rel), join(root, rel));
   }
+  // ARC-09-C2, the second half. The copied `engine.config.json` carries the REAL `docs.upstream`,
+  // so a fixer that decided to repair a corpus cloned it from github.com — 305 MB, over the
+  // network, from a unit test. A fixture's upstream is a path that cannot answer: a sync that
+  // should not be happening fails in milliseconds and says so, and the two tests that genuinely
+  // exercise a sync build their own bare repository and set it explicitly.
+  const config = readJson(root, 'engine.config.json');
+  writeJson(root, 'engine.config.json',
+    { ...config, docs: { ...config.docs, upstream: join(root, 'no-upstream-in-a-fixture.git') } });
+
   for (const [rel, value] of Object.entries(extra)) writeJson(root, rel, value);
 
   git(root, ['init', '-q']);
@@ -107,14 +116,36 @@ export const LINKED = Object.freeze([
   'tests/lib',
   'tests/fixtures',
   // The corpus, so the docs checks answer about a real one rather than about its absence. Linked
-  // like the rest: 35,000 files that no fixture should copy.
+  // like the rest: 35,000 files that no fixture should copy — and linked ONLY when it is really
+  // there. See `isCorpus` below; this entry is the one that is not read-only.
   'vendor/ServiceNowDocs',
 ]);
+
+/**
+ * Is this a corpus, or the empty hole where a submodule would be?
+ *
+ * ARC-09-C2. `existsSync` answers YES for `vendor/ServiceNowDocs` on a checkout with no submodule
+ * content, because git creates the mount point. Linking that hole gave every `--fix` fixture a
+ * corpus path that resolved into the LIVE checkout with nothing in it — and F2, whose job is to
+ * repair a missing corpus, did exactly that: one test cloned 305 MB from the real upstream into the
+ * developer's (or the runner's) own `vendor/ServiceNowDocs`.
+ *
+ * Eight tests in `tests/doctor/fix.test.mjs` reached it. On a machine whose corpus is already
+ * complete the sync is a no-op, so it was invisible for four stories; on a CI cell that checks out
+ * no submodule it built the corpus one area at a time while the rest of the suite ran, which is
+ * what made `the two docs entry points are one implementation` read 17 areas and then 19 a moment
+ * later.
+ */
+const isCorpus = (path) => existsSync(join(path, 'markdown'));
 
 export function linkInstall(root, { from = REAL_ROOT, links = LINKED } = {}) {
   for (const rel of links) {
     const target = join(from, rel);
     if (!existsSync(target)) continue;
+    // A fixture gets a REAL corpus or its own empty directory — never the live mount point. With
+    // the hole linked, a fixer writing "the corpus that is missing" writes it into the checkout
+    // this suite is supposed to leave alone.
+    if (rel === 'vendor/ServiceNowDocs' && !isCorpus(target)) continue;
     const dest = join(root, rel);
     if (existsSync(dest)) continue;
     mkdirSync(dirname(dest), { recursive: true });

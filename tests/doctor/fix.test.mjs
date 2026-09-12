@@ -7,8 +7,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync,
-  writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync,
+  statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -27,14 +27,31 @@ const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 /** The doctor, in process, against a fixture — the launcher pins to its own checkout. */
 async function doctorAt(root, flags = {}, over = {}) {
   const chunks = [];
+  const errs = [];
   const code = await doctorCommand({
-    flags: { quick: true, 'no-network': true, ...flags },
+    // NOT `quick`. These tests were fast because they ran the quick subset, and ARC-09-C8 moved
+    // the whole server section out of it — so F4, which repairs what SV-03 finds, stopped being
+    // proposed and five cases went red. Production never had this problem: `--fix` does not imply
+    // `--quick` (`lib/doctor/index.mjs` reads the flag, it does not set it), so a user running
+    // `./snowarch doctor --fix` always saw the full set. The fixture was the thing taking the
+    // shortcut, and it is the fixture that changes.
+    flags: { 'no-network': true, ...flags },
     out: { write: (t) => chunks.push(t) },
+    err: { write: (t) => errs.push(t) },
     cwd: root,
     input: { isTTY: false },
     ...over,
   });
-  return { code, text: chunks.join('') };
+  // Every mutation asserted by its precondition. A doctor run that could not write its cache is
+  // not a failed run and says so only on stderr, so a fixture that ignores stderr reports the
+  // CONSEQUENCE ("expected F4 to be proposed") and hides the CAUSE. That is exactly how ARC-09-C9
+  // reached CI: the three red cases named a falsy value, and the reason — the cache write being
+  // refused because E-00's remedy quotes the install URL — was on a stream nobody read. The
+  // command's surface for it is this line plus the `--json` field; it has no return value to
+  // check, so the line is what gets checked, and the reason is what gets printed.
+  const note = errs.join('').split('\n').find((l) => l.startsWith('doctor: cache not written')) ?? null;
+  assert.equal(note, null, note ?? undefined);
+  return { code, text: chunks.join(''), err: errs.join('') };
 }
 
 /**
@@ -474,7 +491,9 @@ test('--fix --json puts one object on stdout and the plan on stderr', async (t) 
   const stdout = [];
   const stderr = [];
   const code = await doctorCommand({
-    flags: { fix: true, yes: true, quick: true, json: true },
+    // Not `quick`, for the reason `doctorAt` above gives: the server section left that subset
+    // in ARC-09-C8, and F4 repairs what SV-03 finds.
+    flags: { fix: true, yes: true, json: true },
     out: { write: (x) => stdout.push(x) },
     err: { write: (x) => stderr.push(x) },
     cwd: root,
@@ -504,4 +523,62 @@ test('a cache written for a configured store carries no address-shaped string', 
   assert.equal(/[A-Za-z0-9*][A-Za-z0-9.*-]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(text), false,
     'an address-shaped string survived in the cache');
   assert.equal(/https?:\/\/[a-z0-9-]+\.service-now\.com/i.test(text), false);
+});
+
+// ARC-09-S06, AC 4 — the whitelist stays away from the credential file.
+test('an outdated store schema is REFUSED with its command, never repaired', () => {
+  // A SV-09 result as the server module produces one: failed, carrying a command, and explicitly
+  // not fixable. What must come out is a REFUSED line — not an action, and not silence.
+  const report = { checks: [
+    { id: 'SV-09', status: 'fail', fixable: false, command: './snowarch store migrate',
+      detail: 'store schema v1 < server v2' },
+  ] };
+  const plan = buildPlan(report);
+
+  assert.deepEqual(plan.actions, [], 'nothing about a store schema may be applied');
+  assert.deepEqual(plan.refused, [{ check: 'SV-09', detail: 'store schema v1 < server v2',
+    command: './snowarch store migrate' }]);
+
+  const text = renderPlan(plan);
+  assert.match(text, /REFUSED \(1\)/);
+  assert.match(text, /SV-09.*run: \.\/snowarch store migrate/);
+  // And the whitelist has no fixer that could ever touch it: the kinds are a closed set, and
+  // "store-schema" is deliberately not one of them.
+  assert.equal(KINDS.includes('store-schema'), false);
+});
+
+// ARC-09-C2 — the fixtures leave the LIVE checkout alone.
+//
+// This suite ran a real corpus sync into `REAL_ROOT/vendor/ServiceNowDocs` for four stories.
+// `linkInstall` symlinked the corpus into every fixture, `existsSync` said yes to the empty
+// submodule mount point a checkout without content carries, and F2 — whose whole job is to repair
+// a missing corpus — repaired the live one: 305 MB, cloned from the real upstream, by a unit test.
+// Invisible on a machine whose corpus is already complete; on a CI cell with no submodule it built
+// the corpus while the rest of the suite ran, and `the two docs entry points are one
+// implementation` read 17 areas and then 19.
+test('a fixture never gets the live corpus mount point, and never writes the checkout', (t) => {
+  const corpus = join(REAL_ROOT, 'vendor', 'ServiceNowDocs');
+  const before = existsSync(corpus) ? readdirSync(corpus).length : null;
+
+  const root = greenTree(t);
+  linkInstall(root);
+  const linked = join(root, 'vendor', 'ServiceNowDocs');
+
+  if (before === null || !existsSync(join(corpus, 'markdown'))) {
+    // No corpus here: the fixture must NOT have been handed a path into the checkout. This is the
+    // CI shape, and the one that did the damage.
+    assert.equal(existsSync(linked) && lstatSync(linked).isSymbolicLink(), false,
+      'the empty mount point was linked into a fixture — a fixer would write the checkout');
+  } else {
+    assert.equal(lstatSync(linked).isSymbolicLink(), true, 'a real corpus is linked, not copied');
+  }
+
+  // And whatever the fixture's config says, it cannot reach the real upstream: a sync that should
+  // not be running fails in milliseconds instead of cloning the internet into a temp directory.
+  const upstream = readJson(root, 'engine.config.json').docs.upstream;
+  assert.equal(/^https?:|github\.com/.test(upstream), false,
+    `a fixture may not carry a network upstream: ${upstream}`);
+
+  assert.equal(existsSync(corpus) ? readdirSync(corpus).length : null, before,
+    'building a fixture changed the live corpus');
 });

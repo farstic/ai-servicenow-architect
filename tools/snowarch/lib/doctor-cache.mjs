@@ -9,7 +9,7 @@
 // put a URL is a `detail` string.
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { assertStorable } from './state.mjs';
+import { isSecretKey, redact } from './redact.mjs';
 import { writeJsonAtomic } from './settings-local.mjs';
 
 export const CACHE_VERSION = 1;
@@ -110,9 +110,10 @@ export function writeDoctorCache(root, { mode, checks, engineVersion = null, con
     checks,
     summary: summarise(checks),
   };
-  // The same guard the state file uses: a URL, an address or a secret-shaped key fails the write
-  // rather than reaching a file that, unlike the store, things read casually.
-  assertStorable(payload, 'doctor-last');
+  // The cache's own guard, not the state file's — see `assertCacheStorable`. A secret-shaped key,
+  // a redactable value or an instance address fails the write rather than reaching a file that,
+  // unlike the store, things read casually. A documentation URL is allowed through and stored.
+  assertCacheStorable(payload, 'doctor-last');
   mkdirSync(join(root, '.local'), { recursive: true, mode: 0o700 });
   // 0600: it names a configured instance and its probe results. Not a secret, but not the sort of
   // thing another account on a shared machine has any business reading either.
@@ -145,16 +146,61 @@ export function forStorage(report) {
 }
 
 /**
- * ARC-08's write: the doctor's own report, plus the inputs that justify reading it later.
+ * The cache's own storability guard — deliberately NOT the state file's.
  *
- * The SAME file and the same guard as the bootstrap's write — a second writer with its own shape
- * is how a banner ends up reading a key nobody writes any more. What is added is the report
- * itself (the doctor's JSON is the cache; there is nothing to summarise) and the inputs file.
+ * ARC-09-C9. `writeReportCache` used `assertStorable` from `state.mjs`, whose `URLISH` clause
+ * refuses any `scheme://` at all. That is right for the state file, which records what was
+ * configured and has no reason to quote prose. It is wrong for a doctor report, which
+ * legitimately quotes documentation: E-00's remedy names the Claude Code install page, and a
+ * missing corpus names the repo to clone. The consequence was not a redacted field, it was NO
+ * CACHE AT ALL — the throw abandoned the whole write — so on any machine without Claude Code on
+ * PATH every session paid the banner's re-run path and `/snowarch status` read nothing, silently.
+ * Older than C8; C8 only exposed it, because the fixtures used to run `--quick`, which omits E-00.
  *
- * `--section` never gets here: a partial report cached as if it were a full one would tell the
- * banner that checks which never ran had passed. That decision is the caller's, and it is stated
- * where the caller makes it.
+ * What the cache refuses:
+ *   - a KEY that names a secret — exactly as the state file does;
+ *   - a VALUE the redactor would rewrite — credentials, `KEY=value` text, addresses;
+ *   - a VALUE carrying an INSTANCE URL. This clause is not redundant: `register()` is called only
+ *     from `instance-file.mjs` and only for `password`/`clientSecret`, so an instance host is NOT
+ *     registered and `redact()` returns it unchanged — measured, not assumed. Without this clause
+ *     the cache would store `https://dev12345.service-now.com` verbatim.
+ * Documentation URLs pass, and are stored verbatim; that is the point of the change.
  */
+// The SHAPE, not one TLD: `service-now.<anything>` catches a real instance, a fixture's
+// `service-now.invalid`, and a future domain nobody has told this file about. `servicenow.com`
+// (no hyphen) is the product's documentation domain and is deliberately NOT here.
+const INSTANCE_HOST = /\bhttps?:\/\/[^\s/?#]*\.(?:service-now\.[a-z]{2,}|servicenowservices\.com)\b/i;
+
+export function cacheSensitiveValue(value) {
+  if (typeof value !== 'string') return null;
+  if (INSTANCE_HOST.test(value)) return 'it carries an instance address';
+  if (redact(value) !== value) return 'the redactor would rewrite it';
+  return null;
+}
+
+export function assertCacheStorable(value, path = 'doctor-last') {
+  if (Array.isArray(value)) {
+    value.forEach((v, i) => assertCacheStorable(v, `${path}[${i}]`));
+    return value;
+  }
+  if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) {
+      if (isSecretKey(k)) {
+        throw new Error(`refusing to write ${path}.${k}: the key names a secret — `
+          + 'the doctor cache holds a report, never a credential');
+      }
+      assertCacheStorable(v, `${path}.${k}`);
+    }
+    return value;
+  }
+  const why = cacheSensitiveValue(value);
+  if (why) {
+    throw new Error(`refusing to write ${path}: ${why} — `
+      + 'the doctor cache may quote documentation, never a credential or an instance address');
+  }
+  return value;
+}
+
 export function writeReportCache(root, report, { writer = 'doctor', now = new Date() } = {}) {
   const stored = forStorage(report);
   const payload = {
@@ -171,7 +217,7 @@ export function writeReportCache(root, report, { writer = 'doctor', now = new Da
     summary: stored.summary ?? summarise(stored.checks ?? []),
     report: stored,
   };
-  assertStorable(payload, 'doctor-last');
+  assertCacheStorable(payload, 'doctor-last');
   mkdirSync(join(root, '.local'), { recursive: true, mode: 0o700 });
   writeJsonAtomic(cachePath(root), payload, { mode: 0o600 });
   const inputs = collectInputs(root);

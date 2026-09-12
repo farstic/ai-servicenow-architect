@@ -5,7 +5,7 @@
 // every platform, and two shells would be two chances for them to drift. The only platform-specific
 // part is the long-path check, which is meaningful on Windows and vacuous elsewhere — and it says so
 // rather than silently passing.
-import { existsSync, readdirSync, statSync, appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readdirSync, statSync, writeSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, relative, resolve } from 'node:path';
 
@@ -26,10 +26,10 @@ const CAP_BYTES = 350 * 1000 * 1000;
  * is no shell logic left to depend on: the retry, the timing and the assertions are all here.
  */
 function step(label, args) {
-  process.stdout.write(`::group::${label}\n`);
+  writeSync(1, `::group::${label}\n`);
   const r = execFileSync(process.execPath, args, { cwd: root, encoding: 'utf8' });
-  process.stdout.write(r);
-  process.stdout.write('::endgroup::\n');
+  writeSync(1, r);
+  writeSync(1, '::endgroup::\n');
   return r;
 }
 
@@ -39,7 +39,7 @@ try {
 } catch {
   // One retry: a 300 MB fetch across the public internet fails occasionally for reasons that are
   // not this repository's, and a flake that reruns the whole matrix teaches nothing.
-  process.stdout.write('::warning::first sync failed, retrying once\n');
+  writeSync(1, '::warning::first sync failed, retrying once\n');
   step('docs sync (retry)', ['scripts/docs.mjs', 'sync']);
 }
 const syncSeconds = (Date.now() - started) / 1000;
@@ -105,14 +105,14 @@ const summary = `${process.platform} · sparse ${mb} MB · ${status.fileCount} f
   + `dead ${dead} · longest path ${longestInCorpus.n} in corpus / ${longestAbsolute.n} absolute`
   + (isWindows ? ` · core.longpaths ${longpaths}` : '');
 
-process.stdout.write(`${summary}\n`);
-process.stdout.write(`longest: ${relative(corpus, longestInCorpus.f)}\n`);
+writeSync(1, `${summary}\n`);
+writeSync(1, `longest: ${relative(corpus, longestInCorpus.f)}\n`);
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `- ${summary}\n`);
 }
 
 if (fail.length > 0) {
-  for (const f of fail) process.stdout.write(`::error::assert-docs: ${f}\n`);
+  for (const f of fail) writeSync(1, `::error::assert-docs: ${f}\n`);
   process.exit(1);
 }
-process.stdout.write('assert-docs: all assertions hold\n');
+writeSync(1, 'assert-docs: all assertions hold\n');

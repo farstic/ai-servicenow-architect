@@ -16,12 +16,27 @@ import { codeForStatus, probeAuth } from '../probe-auth.mjs';
 import { readInstanceFile, SENTENCE } from '../instance-file.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
+import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B06';
 export const title = 'instance';
 export const needsNode = true;
-export const runsWhen = (ctx) => ctx.mode === 'live';
+/**
+ * Live mode, OR a store that is already there (ARC-09-S06).
+ *
+ * A design-only checkout that still carries a `.local/instances.json` is not a hypothetical: it is
+ * what a user has after `mode design`, and what S07's upgrade harness is. That file must stay
+ * LOADABLE across an upgrade, which means a schema change has to reach it in either mode — and the
+ * step that reaches it is this one. Without the second clause, upgrading a design-only checkout
+ * would leave the store a version behind and the next `mode live` would meet a schema it cannot
+ * read, in the place least able to explain it.
+ */
+export const runsWhen = (ctx) => ctx.mode === 'live' || storeExists(ctx.root);
 export const skipReason = 'design-only';
+
+export const MIGRATION_FAILED =
+  'the store migration did not complete — run ./snowarch store migrate to see why; '
+  + 'nothing was changed and a backup was written if the migration had started';
 
 export const NO_TERMINAL =
   'no terminal for the instance wizard — run ./snowarch instance add in an interactive terminal, '
@@ -31,15 +46,38 @@ export const WIZARD_ABSENT =
 
 const CLI = join('packages', 'snowarch', 'dist', 'cli', 'index.js');
 
-export const inputs = (ctx) => {
-  const store = shapeOf(ctx.root);
-  return [
-    TEXT(`storeVersion=${store.version ?? 'none'}`),
-    TEXT(`storePresent=${store.present ? 'yes' : 'no'}`),
-    TEXT(`instanceFile=${ctx.instanceFile ? 'yes' : 'no'}`),
-    TEXT(`mode=${ctx.mode}`),
-  ];
-};
+// ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
+// inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
+// set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
+export const inputs = INPUTS.B06.resolve;
+
+// `root` guarded: `runsWhen` is called with whatever ctx a caller has, and a step selector that
+// threw on a ctx without a root would turn "which steps run" into a crash.
+/**
+ * Wait for a child, whatever shape the caller's `spawn` returns.
+ *
+ * The runner hands every step an ASYNCHRONOUS `spawn` (ARC-06-S03) so its interrupt handler can
+ * reach the child — and an async `ChildProcess` has no `.status`. Reading one gives `undefined`,
+ * which `!== 0`, so this step declared every spawn a failure the moment it started it: in
+ * production the wizard would run, the user would answer its prompts, and the bootstrap would
+ * already have printed "the instance wizard exited abnormally" over the top of them. Every test
+ * injected a synchronous fake returning `{ status: 0 }`, so nothing caught it; ARC-09-S07's
+ * migration branch is what walked into it.
+ *
+ * Both shapes are accepted on purpose — the fakes are sync, the real one is not — and the answer
+ * is always the same object: `{ status, signal }`, after the child has actually finished.
+ */
+export function awaitChild(child) {
+  if (!child || typeof child.on !== 'function') {
+    return Promise.resolve({ status: child?.status ?? null, signal: child?.signal ?? null });
+  }
+  return new Promise((resolve) => {
+    child.on('error', () => resolve({ status: null, signal: null }));
+    child.on('exit', (status, signal) => resolve({ status, signal }));
+  });
+}
+
+export const storeExists = (root) => Boolean(root) && existsSync(join(root, '.local', 'instances.json'));
 
 function shapeOf(root) {
   const p = join(root, '.local', 'instances.json');
@@ -121,8 +159,68 @@ export async function fromInstanceFile(ctx) {
   };
 }
 
+/**
+ * A store whose schema is behind gets MIGRATED — never re-wizarded.
+ *
+ * This is the branch the whole of S06 exists for. "Something about the store changed" has exactly
+ * one safe answer when the thing that changed is its SHAPE, and re-running the wizard over
+ * somebody's credentials is not it. The migration runs through the built CLI with `--yes` (the
+ * plan was already shown and accepted at the bootstrap's own plan screen), writes its 0600 backup
+ * and never touches a credential value.
+ */
+export async function migrateIfBehind(ctx) {
+  const shape = shapeOf(ctx.root);
+  if (!shape.present) return null;
+
+  const current = await storeSchemaVersion(ctx.root);
+  if (current === null || shape.version === null || shape.version === current) return null;
+  if (shape.version > current) {
+    // A store from the FUTURE is not this step's to fix: downgrading it would mean discarding
+    // whatever the newer build added. The doctor's SV-09 says the same thing with the command.
+    return { status: 'warn', remedy: null,
+      detail: `store schema v${shape.version} is newer than this build's v${current} — `
+        + 'run ./snowarch upgrade' };
+  }
+
+  const spawn = ctx.spawn ?? spawnSync;
+  const r = await awaitChild(spawn(process.execPath,
+    [join(ctx.root, CLI), 'store', 'migrate', '--yes'],
+    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) }));
+  if (r.status !== 0) {
+    // The child's own answer in the line: "exit 1" and "killed by SIGTERM" send a reader to
+    // different places, and a message that says neither sends them to guess.
+    const how = r.signal ? `killed by ${r.signal}` : `exit ${r.status ?? 'none'}`;
+    return { status: 'fail', detail: `${MIGRATION_FAILED} (${how})`, remedy: null };
+  }
+  return { status: 'ok', detail: `store schema v${shape.version} → v${current} (migrated)`,
+    data: { migratedFrom: shape.version, migratedTo: current } };
+}
+
+/** The schema this BUILD reads, from the contract — the same number S05's B06 row hashes. */
+async function storeSchemaVersion(root) {
+  const p = join(root, 'packages', 'snowarch', 'dist', 'contract.json');
+  const text = readFileSyncSafe(p);
+  if (text === null) return null;
+  try {
+    const v = JSON.parse(text)?.storeSchemaVersion;
+    return Number.isInteger(v) ? v : null;
+  } catch { return null; }
+}
+
 export const run = async (ctx) => {
+  // BEFORE the instance-file and wizard paths, because both write a store and this decides
+  // whether the store that is already there can be read at all.
+  const migrated = await migrateIfBehind(ctx);
+  if (migrated && migrated.status !== 'ok') return migrated;
+  if (migrated) return migrated;
+
   if (ctx.instanceFile) return fromInstanceFile(ctx);
+
+  // A design-only checkout reaches this step only because a store exists (`runsWhen`), and with
+  // the store current there is nothing else here to do: the wizard is live mode's business.
+  if (ctx.mode !== 'live') {
+    return { status: 'ok', detail: 'store present and current; no wizard in design-only mode' };
+  }
 
   const interactive = ctx.isTTY ?? Boolean(process.stdin.isTTY);
   if (!interactive) return { status: 'fail', detail: NO_TERMINAL, remedy: null };
@@ -135,9 +233,12 @@ export const run = async (ctx) => {
   // step deliberately learns nothing from it beyond the exit code and what the STORE says
   // afterwards — never a URL, a username or a credential.
   const spawn = ctx.spawn ?? spawnSync;
-  const r = spawn(process.execPath, [join(ctx.root, CLI), 'instance', 'add', '--from-bootstrap'],
+  // AWAITED (ARC-09-S07). The runner's `spawn` is asynchronous, so the old `r.status` read an
+  // undefined off a live ChildProcess and called a wizard that had not finished a failure.
+  const r = await awaitChild(spawn(process.execPath,
+    [join(ctx.root, CLI), 'instance', 'add', '--from-bootstrap'],
     // The wizard writes the store; it must write THIS checkout's.
-    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) });
+    { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) }));
   if (r.status !== 0) {
     return { status: 'fail', remedy: null,
       detail: `the instance wizard exited ${r.status ?? 'abnormally'} — nothing was saved by B06` };

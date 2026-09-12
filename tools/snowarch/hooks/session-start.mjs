@@ -20,7 +20,7 @@
 // `CLAUDE_PROJECT_DIR`: inside a session that variable is the SESSION's project, which is the same
 // directory here and is not guaranteed to be, and a banner that described another checkout would
 // be worse than no banner.
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,6 +31,30 @@ export const WATCHDOG_MS = 5_000;
 
 /** How old a cache may be before it is re-derived, whatever the mtimes say. */
 export const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How old an upgrade check may be before the banner stops repeating it (ARC-09-S07).
+ *
+ * Inlined rather than imported from `lib/upgrade-check.mjs`, and that is the one duplication this
+ * file accepts on purpose: the hook's whole budget is 300 ms on a machine that may have no Node,
+ * and its rule is to read two JSON files and import nothing. A dynamic import here would put a
+ * module resolution on the critical path to save a constant. `tests/hook/session-start.test.mjs`
+ * asserts the two numbers agree.
+ */
+export const UPGRADE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * A check from the future is not fresh either: a clock that went backwards must not pin a nudge.
+ *
+ * `nowMs` is a NUMBER, because that is what this file's `now` has always been (`Date.now()`), and
+ * a second convention inside one module is how a `now()` gets called on a number.
+ */
+function freshUpgradeCheck(upgrade, nowMs) {
+  const at = Date.parse(upgrade?.checkedAt ?? '');
+  if (Number.isNaN(at)) return false;
+  const age = nowMs - at;
+  return age >= 0 && age < UPGRADE_MAX_AGE_MS;
+}
 
 /** Read a JSON file, or `null`. A malformed cache is a stale cache, never a crash. */
 function readJson(path) {
@@ -47,11 +71,16 @@ function readJson(path) {
  * `first` is only a first run when THIS invocation created the cache: a design-only checkout that
  * has been running for a month does not need to be told again every session.
  */
-function nudges({ report, cache, banner, firstRun, upgrade }) {
+function nudges({ report, cache, banner, firstRun, upgrade, now = Date.now() }) {
   const lines = [];
   const instances = report?.server?.instances ?? cache?.server?.instances ?? [];
   if (firstRun && report?.mode !== 'live' && instances.length === 0) lines.push(banner.firstRun);
-  if (upgrade?.behind === true && upgrade.latestTag) lines.push(banner.upgrade(upgrade.latestTag));
+  // FRESH, not merely present (ARC-09-S07). A `behind: true` from a fortnight ago is a claim
+  // nobody has checked since; printing it every session teaches a reader to skip the line, and
+  // then the one that matters is skipped too. Expired means SILENCE — never a hedged nudge.
+  if (upgrade?.behind === true && upgrade.latestTag && freshUpgradeCheck(upgrade, now)) {
+    lines.push(banner.upgrade(upgrade.latestTag));
+  }
   const stale = report?.stale?.claudeJsonEntries ?? cache?.report?.stale?.claudeJsonEntries ?? [];
   if (stale.some((e) => e.scope === 'this-folder')) lines.push(banner.staleRegistration);
   const fail = report?.summary?.fail ?? cache?.summary?.fail ?? 0;
@@ -83,8 +112,41 @@ async function reRun({ config, watchdogMs, run }) {
   }
 }
 
+/**
+ * ARC-09-C5 — where the re-run path's time goes, measured, and OFF unless asked.
+ *
+ * The Windows cells spend 690–920 ms of the product's own time on this path and nobody knows on
+ * what; the cap must not move until somebody does. So the phases are timed in the hook itself
+ * rather than inferred from outside, and printed to STDERR — stdout is the banner's, and a
+ * diagnostic on it would reach a user's session.
+ *
+ * The flag is read once, here, and its ABSENCE is the tested default: a timing hook that can be
+ * left on by accident is a product that measures itself for ever. `tests/hook/session-start.test.mjs`
+ * asserts an ordinary run prints nothing extra.
+ */
+const PHASES = process.env.SNOWARCH_BANNER_PHASES === '1';
+
+function phases() {
+  if (!PHASES) return { mark: () => {}, done: () => {} };
+  const marks = [];
+  let last = process.hrtime.bigint();
+  return {
+    mark: (name) => {
+      const nowNs = process.hrtime.bigint();
+      marks.push([name, Number(nowNs - last) / 1e6]);
+      last = nowNs;
+    },
+    done: (path) => {
+      const total = marks.reduce((a, [, ms]) => a + ms, 0);
+      writeSync(2, `banner-phases: path=${path} total=${Math.round(total)} ms · `
+        + `${marks.map(([n, ms]) => `${n} ${Math.round(ms)}`).join(' · ')}\n`);
+    },
+  };
+}
+
 export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCHDOG_MS,
   run = null } = {}) {
+  const phase = phases();
   // The lines belong to THIS call. They were module state once, which is harmless in production —
   // the hook runs once per process — and wrong the moment anything calls it twice, which the tests
   // do: a case's assertion picked up the previous case's line.
@@ -99,9 +161,12 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
 
   // 1. The fast path. Nothing beyond these two files has been read, and nothing else will be.
   const staleness = cacheStale(root, { now, maxAgeMs: MAX_AGE_MS });
+  phase.mark('cache-read+decision');
   if (cache && inputs && !staleness.stale && cache.modeLine) {
     say(cache.modeLine);
-    for (const line of nudges({ cache, banner: BANNER, firstRun: false, upgrade })) say(line);
+    for (const line of nudges({ cache, banner: BANNER, firstRun: false, upgrade, now })) say(line);
+    phase.mark('render');
+    phase.done('cache');
     return { path: 'cache', lines: out };
   }
 
@@ -116,8 +181,11 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   // 2. The re-run.
   const { loadConfig } = await import('../lib/config.mjs');
   let report = null;
+  const config = loadConfig(root);
+  phase.mark('state+config');
   try {
-    ({ report } = await reRun({ config: loadConfig(root), watchdogMs, run }));
+    ({ report } = await reRun({ config, watchdogMs, run }));
+    phase.mark('doctor');
   } catch (e) {
     if (e?.message !== 'watchdog') throw e;
     // The watchdog. An old line marked old beats no line: the mode rarely changes, and the
@@ -127,7 +195,9 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   }
 
   say(report.modeLine);
-  for (const line of nudges({ report, banner: BANNER, firstRun: cache === null, upgrade })) say(line);
+  for (const line of nudges({ report, banner: BANNER, firstRun: cache === null, upgrade, now })) say(line);
+  phase.mark('render');
+  phase.done('rerun');
   return { path: 'rerun', lines: out };
 }
 

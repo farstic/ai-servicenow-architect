@@ -1,4 +1,6 @@
 import { execFileSync } from 'node:child_process';
+
+import { writeGitattributes } from './gitattributes.mjs';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -132,7 +134,10 @@ function makeWorkspace({ scratch, pin, upstreamUrl }) {
   // runner a file written LF, committed, and restored comes back CRLF — which is git behaving
   // correctly and a fixture that no longer resembles the repository it models. A dry-run restore
   // test comparing bytes across that round trip fails on line endings alone, which is what happened.
-  writeFileSync(join(w, '.gitattributes'), '* text=auto eol=lf\n');
+  // ARC-09-C12: the repository's own rules, copied — this used to be a hand-typed one-liner, and
+  // a subset that omits `packages/snowarch/dist/** text eol=lf` is not reproducing the repository
+  // it stands in for.
+  writeGitattributes(w);
   mkdirSync(join(w, 'vendor'), { recursive: true });
   writeFileSync(join(w, 'vendor/docs-areas.txt'), `${AREAS.join('\n')}\n`);
   // The engine repository registers the corpus in `.gitmodules`, and recipe C's step 5

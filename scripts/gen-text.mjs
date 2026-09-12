@@ -4,7 +4,7 @@
 // The Node-free launchers (S10/S11) print the same closing block, and they cannot import a module.
 // So the strings are exported as data and their parity test reads this file — the same shape as
 // ARC-06-S04's `remedies.json`, and for the same reason: one definition, three programs.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -32,11 +32,11 @@ try { current = readFileSync(path, 'utf8'); } catch { /* first run */ }
 
 if (check) {
   if (current !== next) {
-    process.stderr.write(`gen-text: ${TARGET} is STALE — run node scripts/gen-text.mjs\n`);
+    writeSync(2, `gen-text: ${TARGET} is STALE — run node scripts/gen-text.mjs\n`);
     process.exit(1);
   }
-  process.stdout.write(`gen-text: ${TARGET} is current\n`);
+  writeSync(1, `gen-text: ${TARGET} is current\n`);
   process.exit(0);
 }
 writeFileSync(path, next);
-process.stdout.write(`gen-text: ${current === next ? 'no change to' : 'wrote'} ${TARGET}\n`);
+writeSync(1, `gen-text: ${current === next ? 'no change to' : 'wrote'} ${TARGET}\n`);

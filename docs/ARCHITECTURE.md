@@ -241,7 +241,7 @@ on its own, so ARC-08's `--fix` can invoke one without the runner.
 | B03 | mode | no | always | the accepted mode |
 | B04 | deps | yes | mode = live | `package-lock.json`, Node **major** |
 | B05 | contract | yes | Node present | `dist/contract.json`, `required-tools.json` |
-| B06 | instance | yes | mode = live | store schema version, store presence, whether `--instance-file` was given |
+| B06 | instance | yes | mode = live **or** a store exists | store schema version, store presence, whether `--instance-file` was given |
 | B07 | toggles | no | always | mode, Node present, the hook branch, registration kind |
 | B08 | verify | yes | mode = live | contract sha, store mtime |
 | B09 | summary | no | always (never cached) | — |
@@ -391,7 +391,23 @@ contract. ARC-05's CI proves this on every commit; B05 proves it on the machine 
 
 #### The B06 slot
 
-Two ways in, and they are different jobs.
+**Three** ways in since ARC-09-S06, and the new one comes first.
+
+**A store whose schema is behind is MIGRATED, never re-wizarded.** That is the whole reason the
+step's `runsWhen` grew a second clause — `mode === 'live' || storeExists(root)` — because a
+design-only checkout that carries a `.local/instances.json` must keep it loadable across an
+upgrade, and this is the step that reaches it. Before anything else runs, B06 compares the store's
+`version` against `dist/contract.json`'s `storeSchemaVersion` and, when the store is behind, spawns
+`store migrate --yes` through the built CLI: the bootstrap's own plan screen already asked, and the
+migration still writes its 0600 backup and still refuses to touch a credential value — those are
+not the confirmation's job. A store from the FUTURE is a warning pointing at `./snowarch upgrade`,
+never a downgrade: reversing a migration means discarding whatever the newer build added.
+
+Re-running the wizard is the answer this replaces, and it is worth saying why it is wrong: "the
+store changed shape" and "the user needs to re-enter their credentials" are unrelated statements,
+and a design that conflates them asks for a password every time a release moves a field.
+
+The other two ways in are the wizard's, and they are different jobs.
 
 ```js
 // Interactive — SPAWN, never import: the wizard reads raw-mode keystrokes and masks a password,
@@ -441,6 +457,22 @@ E-07 validates the same file statically.
 The pin-level comparisons went with it: a tool the server advertises that the contract does not
 know is SV-05's finding now, and the `used_by` reporting it used to print is covered statically by
 L01 and by B05's contract check at install time.
+
+#### `.local/upgrade-check.json` v1 — the other thing the banner reads
+
+A second contract, for the same reason as the first: the SessionStart banner has a 300 ms budget on
+a machine that may have no Node, so it cannot fetch, and something else has to. Three keys are the
+hook's and may never be renamed — `behind`, `latestTag`, `checkedAt` — and the rest (`remote`,
+`localTag`, `localDistance`) is for a reader who runs `cat` on it. It is written by `./snowarch
+upgrade`, by `upgrade --check`, and by the doctor's **E-28**, which asks `git ls-remote` at most
+once a day and is excluded from `--quick` for both of that flag's reasons at once: it spawns git and
+it leaves the machine.
+
+The banner prints its one line only while the check is **less than seven days old**. An expired
+check produces SILENCE, never a hedged nudge: "a newer release is available (probably, a fortnight
+ago)" is a line a reader learns to skip, and then the one that matters is skipped too. `upgrade`
+writes `behind: false` when it finishes, so the nudge goes away the moment the thing it asks for is
+done.
 
 #### `.local/doctor-last.json` v1 — what the banner reads
 
@@ -585,6 +617,99 @@ the step goes on to return, because the record of why a run stopped is what the 
 `.local/instances.json` (the credential store) and `.local/config.json` are never touched, and the
 command says so.
 
+**There is no `--resume` flag, and that is deliberate.** Resuming is what a second run *is*: the
+rule above applies on every run, so `./snowarch bootstrap` picks up where the last one stopped
+without being asked to. `--from BNN` is the explicit control, for the case the rule cannot infer —
+re-run a step whose inputs did not change. A flag meaning "do what you would have done anyway" is a
+flag a reader assumes has an effect, and `--resume` already means something else one command over:
+`/snowarch setup-instance --resume` (ARC-07-S09) picks the wizard back up after the credential was
+typed in another terminal. One word, two commands, two meanings would be worse than no word.
+
+#### Bootstrap input hashes and upgrade invalidation
+
+The whole rule turns on one word — **inputs** — and until ARC-09-S05 each step answered it in its
+own file. Ten answers, ten places to get the resume rule wrong, and no way to show anybody the set.
+There is now one table, `tools/snowarch/lib/inputs.mjs`, and three things read it: the runner (to
+decide what to skip), `staleSteps()` (to say what an `upgrade` will invalidate *before* it changes
+anything), and the table below, which is generated from it.
+
+<!-- generated:bootstrap-inputs -->
+| Step | Input | Kind | Why it is an input |
+|---|---|---|---|
+| `B00` preflight | — | — | runs every time: Asks the MACHINE — git, Node, Claude Code, disk — and a machine is not a committed input. |
+| `B01` workspace and registration files | `.mcp.json` | file | the server registration this checkout ships |
+|  | `.claude/settings.json` | file | the committed permissions |
+|  | `mode` | literal | design-only and live write different toggles |
+| `B02` the documentation corpus | `<config.docs.areasFile>` | file | which areas the sparse checkout takes |
+|  | `vendor/ServiceNowDocs` | gitlink | the pinned commit — NOT the 35,000 files |
+|  | `docs` | literal | sparse, full or skip |
+| `B03` the mode toggle | `mode` | literal | the only thing this step writes |
+| `B04` runtime dependencies | `package-lock.json` | file | the exact tree npm would install |
+|  | `node major` | literal | a different major is a different install |
+| `B05` the contract | `packages/snowarch/dist/contract.json` | file | bytes — a changed contract is a changed server |
+|  | `packages/contract/required-tools.json` | file | the pin it is checked against |
+| `B06` the instance store | `.local/instances.json#version` | json-path | the schema, which decides whether a migration is due |
+|  | `store present` | literal | absent and empty are different states |
+|  | `instance file given` | literal | an `--instance-file` run writes an entry |
+|  | `mode` | literal | design-only never touches the store |
+|  | `packages/snowarch/dist/contract.json#storeSchemaVersion` | json-path | the schema this build reads — a release that changes it makes exactly this step stale |
+| `B07` the local toggles | `mode` | literal | which server list the toggle goes in |
+|  | `node present` | literal | no Node means the hook is disabled |
+|  | `hooks disabled` | literal | S-05: the launcher may have turned them off |
+|  | `registration` | literal | project or user changes what is written |
+| `B08` the doctor | `packages/snowarch/dist/contract.json` | file | by sha — a different server answers differently |
+|  | `store mtime+size` | literal | NEVER the content: see the credential rule above |
+|  | `mode` | literal | design-only skips the server section |
+| `B09` the summary | — | — | runs every time: Prints what the run did. |
+<!-- /generated:bootstrap-inputs -->
+
+Three decisions in that table are worth stating plainly, because each is a thing deliberately **not**
+hashed:
+
+- **The corpus is hashed by its gitlink, not its contents.** Reading 35,000 files to decide whether
+  to skip reading 35,000 files is the cost the row exists to avoid, and an unrelated `touch` would
+  invalidate it. The gitlink moves exactly when the corpus is meant to be different. It is read from
+  **HEAD**, because a submodule moved locally and not committed is a dirty checkout — B00's
+  business — rather than a different corpus.
+- **The store is hashed by mtime and size, never by content.** Credentials are never hashed, read or
+  rewritten by any step other than the wizard and the migration. The stamp is truncated to the
+  **second**, the granularity every tool that restores an mtime preserves (`utimesSync` rounds,
+  `cp -p` and tar keep whole seconds); finer, and a restored backup would read as changed. What that
+  costs is two writes of the same byte length inside one second — which for this file is the wizard
+  rewriting a credential in place, and re-running the doctor over that is the behaviour the row
+  exists to prevent.
+- **`dist/` is hashed as bytes.** A contract that changed is a server that behaves differently, and
+  that is exactly when B05 and B08 must run again.
+
+<!-- generated:bootstrap-input-notes -->
+- **`B06` the instance store.** MIGRATE, DON'T RE-WIZARD: a store whose schema is behind makes this step stale so the migration runs — and a store whose CONTENTS changed does not, because re-running the wizard over somebody's credentials is never the right answer to "something moved".
+- **`B08` the doctor.** B08 calls the doctor (ARC-08-S05). This row answers "must the bootstrap run it again"; the doctor CACHE answers "may the banner reuse the last report" (`cacheStale()`, six mtimes). Two mechanisms for two consumers — do not merge them.
+<!-- /generated:bootstrap-input-notes -->
+
+**Determinism across platforms** is the other requirement, and it is why files are hashed as raw
+bytes with no line-ending normalisation: `.gitattributes` keeps every hashed file LF in every
+checkout, and a test walks the table and asserts `git check-attr` agrees for each file it names. A
+file that arrived CRLF on Windows would hash differently there, and the same commit would resume
+differently per OS — in a way nobody would notice until a resume misbehaved on one platform. CI
+asserts the three `node-cli` cells compute the same hashes for the same commit.
+
+**`staleSteps(state, ctx, { hashFor, alwaysRuns })`** returns one entry per step that would run,
+with a reason: `never-run` (no record, or `runsWhen` skipped it last time, so there is no result to
+reuse), `failed` (it ran and did not succeed — a failure is never cached), `launcher-recorded`, or
+`inputs-changed`. `explainStale()` renders those as the sentences the bootstrap prints.
+
+The **`launcher-recorded`** reason is the one that surprises people. The Node-free launchers record
+`inputsHash: null` by design (ARC-06-S14): bash and PowerShell cannot compute the table, so a
+Node-free install leaves every step unverifiable, and the next Node run re-runs B01 and B02 as a
+reconcile. "No hash" and "a hash that matches" must never be the same answer — the same rule
+`lib/git.mjs` follows about a command that failed. B00 and B09 also record `null`, but for the
+opposite reason: they have no inputs and run unconditionally, so `alwaysRuns` excludes them before
+the launcher rule is reached, and they never appear in the list of what changed.
+
+Two caches, two consumers, and they are **not** the same mechanism: this table answers "must the
+bootstrap run B08 again"; the doctor's own cache (`cacheStale()`, six mtimes) answers "may the
+banner reuse the last report". Merging them would tie an install's decisions to a banner's budget.
+
 ### `.local/bootstrap-state.json` v1
 
 Atomic (temp file + `rename`), `0600` on POSIX, and on Windows it records `"fileModes":
@@ -628,6 +753,45 @@ This is a **different table** from the `docs` one above, and the overlap is wort
 "the corpus is missing" there and "a prerequisite is missing" here. Both are "the thing you need is
 not present", which is why the two coexist — but a caller keying on a number must know which family
 it is reading. `lib/exit.mjs` holds these five and deliberately does not re-export the docs codes.
+
+## Versioning, tags and upgrade
+
+**One counter.** The engine, the server package and the tag all carry the same version, and exactly
+one thing writes it: `scripts/release.mjs`. Never edit a version by hand — not in
+`engine.config.json`, not in a `package.json`, not in a document. A version typed in one place and
+not another is the defect the single writer exists to prevent, and `--tag-only` refuses to tag a
+tree that does not already carry its own version everywhere.
+
+**The tag is the record, because a release outlives its repository state.** Six months later a
+release is a tarball and an annotated tag, so the tag message carries what the tree can no longer be
+asked: the contract sha, the docs pin, and the three floors (Claude Code, Node, git). Three
+different readers parse it back through `parseTagMessage` in `scripts/lib/release/tag.mjs` —
+`./snowarch version`, `release.yml`, and `./snowarch upgrade` when it resolves a target. A lightweight
+tag has no message and is refused for that reason.
+
+**`main` is protected with required status checks and `strict: true`**, so the release commit cannot
+be pushed to `main` directly — it arrives through a pull request and the tag is made afterwards on
+the merge commit. The procedure is in
+[CONTRIBUTING.md § Releasing](CONTRIBUTING.md#releasing); the one-shot form is correct only where
+`main` has no required checks.
+
+**An upgrade moves a checkout, and it plans before it moves.** What makes a plan possible is the
+input-hash table — one description of what each bootstrap step depends on, read by three things: the
+runner deciding what to skip, `staleSteps()` naming what an upgrade will invalidate *before*
+anything changes, and the generated table in
+[Bootstrap input hashes and upgrade invalidation](#bootstrap-input-hashes-and-upgrade-invalidation).
+A step whose inputs are unchanged does not re-run; a step whose inputs moved is named in the plan
+before the user accepts it.
+
+**The banner never fetches.** `.local/upgrade-check.json` is written only by a check the user ran
+themselves (`./snowarch upgrade --check`), and the SessionStart banner reads that file — so a
+session start costs no network, and a machine that has never run the check is simply never told
+about a release. The other thing the banner reads is the doctor cache; both are described in
+[`.local/upgrade-check.json` v1](#localupgrade-checkjson-v1--the-other-thing-the-banner-reads).
+
+**Credentials are never part of any of this.** An upgrade does not read or write
+`.local/instances.json`; a store whose schema moved is migrated explicitly, with a 0600 backup,
+announced in the plan first.
 
 ## Roster
 
@@ -880,6 +1044,7 @@ diverge (P-16).
 | `SV-06` | `snow_core_capabilities_read` over that handshake equals the store entry (flags, effectiveFlags, preset, environment, maxRecords) |
 | `SV-07` | The audit file's location is writable; warns when `SNOW_AUDIT_FILE=off` |
 | `SV-08` | Ancestor `.claude/skills` directories above the checkout (warning) — Claude Code loads project skills from every one of them, so the roster silently doubles and the listing budget is spent twice (`03` §F, S-13 addendum) |
+| `SV-09` | The store's SCHEMA version against this build's (ARC-09-S06). Separate from `SV-02`, which asks whether the file is safe and loadable: these two have remedies pointing in opposite directions — migrate the file (`STORE_SCHEMA_OUTDATED`) or upgrade the checkout (`STORE_SCHEMA_NEWER`) — and one line covering both would have to hedge. Never fixable: `--fix` does not touch the credential file, so it appears under REFUSED with the command |
 
 Ids are `SV-xx` from the first commit. `01` §8 called them `S-xx`, which collides with the spike ids
 in `03`; shipping the settled prefix now makes ARC-08-S01's planned rename a no-op, and they live in
@@ -987,34 +1152,36 @@ about one registry rather than several:
 | `E-06` | repo | engine.config.json | yes | — |
 | `E-07` | repo | .mcp.json committed and secret-free | yes | — |
 | `E-08` | repo | .claude/settings.json committed | yes | — |
-| `E-09` | repo | no credential-shaped keys | yes | — |
+| `E-09` | repo | no credential-shaped keys | — | — |
 | `E-10` | repo | settings.local toggles match the recorded mode | yes | yes |
 | `E-11` | repo | .local/ state | yes | yes |
-| `E-12` | docs | docs corpus present | yes | yes |
-| `E-13` | docs | docs pin | yes | yes |
-| `E-14` | docs | docs family | yes | — |
-| `E-15` | docs | sparse set | yes | yes |
+| `E-12` | docs | docs corpus present | — | yes |
+| `E-13` | docs | docs pin | — | yes |
+| `E-14` | docs | docs family | — | — |
+| `E-15` | docs | sparse set | — | yes |
 | `E-16` | docs | citations | — | — |
 | `E-17` | roster | roster from directory listing | yes | — |
 | `E-18` | roster | skill descriptions | yes | — |
-| `E-19` | contract | no retired tool names | yes | — |
-| `E-20` | contract | prefix consistency | yes | — |
+| `E-19` | contract | no retired tool names | — | — |
+| `E-20` | contract | prefix consistency | — | — |
 | `E-21` | contract | generated files fresh | — | — |
-| `E-22` | contract | contract pin | yes | — |
+| `E-22` | contract | contract pin | — | — |
 | `E-23` | legacy | stale MCP registrations in ~/.claude.json | yes | — |
 | `E-24` | legacy | legacy wizard store | yes | — |
 | `E-25` | host | cloud-sync folder | yes | — |
 | `E-26` | host | proxy and CA environment | yes | — |
 | `E-27` | host | Claude Code registration status | — | — |
-| `SV-00` | server | Node version | yes | — |
-| `SV-01` | server | dist artefacts | yes | yes |
-| `SV-02` | server | store | yes | yes |
-| `SV-03` | server | instances | yes | yes |
+| `E-28` | host | release currency | — | — |
+| `SV-00` | server | Node version | — | — |
+| `SV-01` | server | dist artefacts | — | yes |
+| `SV-02` | server | store | — | yes |
+| `SV-03` | server | instances | — | yes |
 | `SV-04` | server | instance probes | — | — |
 | `SV-05` | server | stdio handshake | — | — |
 | `SV-06` | server | capabilities match the store | — | — |
-| `SV-07` | server | audit trail | yes | — |
-| `SV-08` | server | ancestor skill directories | yes | — |
+| `SV-07` | server | audit trail | — | — |
+| `SV-08` | server | ancestor skill directories | — | — |
+| `SV-09` | server | store schema | — | — |
 <!-- /generated:doctor-checks -->
 
 **`--fix` repairs a closed list of seven drifts** (ARC-08-S06), and the list being closed is the
@@ -1314,5 +1481,5 @@ of `engine.config.json` |
 | D36 | `CLAUDE.md` gates on `mcp__<key>__` | E-20 | re-targeted to the generated rule file, the protocol page and both registrations |
 | D37 | tool-name currency against the rename map | E-19 | `retired-names.json` |
 
-**New checks with no old counterpart** (11): `E-06`, `E-11`, `E-15`, `E-18`, `E-21`, `E-22`, `E-25`, `E-26`, `SV-06`, `SV-07`, `SV-08`.
+**New checks with no old counterpart** (13): `E-06`, `E-11`, `E-15`, `E-18`, `E-21`, `E-22`, `E-25`, `E-26`, `E-28`, `SV-06`, `SV-07`, `SV-08`, `SV-09`.
 <!-- /generated:doctor-mapping -->

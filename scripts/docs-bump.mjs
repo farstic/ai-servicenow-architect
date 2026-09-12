@@ -8,7 +8,7 @@
 //
 // The report goes into the body VERBATIM, inside a fence. S07's headings are the contract; wrapping
 // them in prose here would let the two drift apart with nothing to notice.
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -98,10 +98,10 @@ function main() {
     report = syncUpstream({ root, config, to: value('--to') ?? null, verify: true, log: null });
   } catch (e) {
     if (!(e instanceof SyncError)) throw e;
-    process.stderr.write(`${e.message}\n`);
+    writeSync(2, `${e.message}\n`);
     // The annotation is what a maintainer sees in the Actions summary; the exit code is what the
     // job keys on. Both, because one without the other is a failure nobody reads.
-    process.stdout.write(`::error::docs-bump: ${e.message}\n`);
+    writeSync(1, `::error::docs-bump: ${e.message}\n`);
     process.exit(e.code);
   }
 
@@ -128,18 +128,18 @@ function main() {
   if (flag('--json')) {
     const p = join(root, 'bump.json');
     writeFileSync(p, `${JSON.stringify(out, null, 2)}\n`);
-    process.stderr.write(`docs-bump: wrote ${p}\n`);
+    writeSync(2, `docs-bump: wrote ${p}\n`);
   }
-  process.stdout.write(`${body}\n`);
+  writeSync(1, `${body}\n`);
 
   if (dryRun) {
     restore(oldPin, report.staged);
-    process.stdout.write('\ndocs-bump: dry run — tree restored, porcelain empty, nothing staged\n');
+    writeSync(1, '\ndocs-bump: dry run — tree restored, porcelain empty, nothing staged\n');
     if (report.newlyDead.length > 0) {
       // A dry run's job is to REPORT. Newly dead citations are the finding it exists to surface, not
       // a failure of the run, so they arrive as a warning annotation and the job stays green. The
       // red build belongs on the pull request a non-dry run opens, where someone can act on it.
-      process.stdout.write(`::warning::docs-bump: ${report.newlyDead.length} newly dead citation(s) `
+      writeSync(1, `::warning::docs-bump: ${report.newlyDead.length} newly dead citation(s) `
         + `if the pin moves to ${report.to.slice(0, 7)} — see the body above\n`);
     }
     process.exit(EXIT.ok);

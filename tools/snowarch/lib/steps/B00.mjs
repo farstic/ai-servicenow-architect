@@ -23,13 +23,17 @@ import { formatVersion, meetsFloor, parseVersion } from '../versions.mjs';
 import { MODE } from '../docs/sync.mjs';
 import { probeNetwork } from '../probe-net.mjs';
 import { which } from '../which.mjs';
+import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B00';
 export const title = 'preflight';
 export const needsNode = false;
 export const runsWhen = () => true;
 export const cacheable = false;
-export const inputs = () => [];
+// ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
+// inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
+// set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
+export const inputs = INPUTS.B00.resolve;
 
 /** Disk. Not a configured floor — it is what this repository costs, and the numbers are its own. */
 const GIB = 1024 ** 3;

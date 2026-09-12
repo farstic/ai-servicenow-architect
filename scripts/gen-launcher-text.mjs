@@ -9,7 +9,7 @@
 // This is the third consumer of the same rule the recipe taught: a sentence typed into a second
 // file is a sentence that drifts, and the launcher is where a drift would be least visible — it
 // runs on machines that have no Node to check it.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -113,7 +113,7 @@ for (const target of TARGETS) {
   const start = doc.indexOf(BEGIN);
   const stop = doc.indexOf(END, start + BEGIN.length);
   if (start === -1 || stop === -1) {
-    process.stderr.write(`gen-launcher-text: markers not found in ${target.path}\n`);
+    writeSync(2, `gen-launcher-text: markers not found in ${target.path}\n`);
     process.exit(2);
   }
   // The file's OWN line endings: `.gitattributes` stores `*.ps1` as `eol=crlf`, so that file
@@ -128,7 +128,7 @@ for (const target of TARGETS) {
   const unknown = [...used].filter((n) => (n.startsWith('MSG_') || n === 'SERVER_KEY')
     && !NAMES.includes(n));
   if (unknown.length > 0) {
-    process.stderr.write(`gen-launcher-text: ${target.path} mentions ${unknown.join(', ')}, `
+    writeSync(2, `gen-launcher-text: ${target.path} mentions ${unknown.join(', ')}, `
       + 'which this generator does not define — a typo, or a sentence that needs adding here\n');
     process.exit(2);
   }
@@ -141,20 +141,20 @@ for (const target of TARGETS) {
 }
 
 if (checked === 0) {
-  process.stderr.write('gen-launcher-text: no launcher found\n');
+  writeSync(2, 'gen-launcher-text: no launcher found\n');
   process.exit(2);
 }
 if (check) {
   if (stale.length > 0) {
     for (const p of stale) {
-      process.stderr.write(`gen-launcher-text: ${p} text region is STALE — `
+      writeSync(2, `gen-launcher-text: ${p} text region is STALE — `
         + 'run node scripts/gen-launcher-text.mjs\n');
     }
     process.exit(1);
   }
-  process.stdout.write(`gen-launcher-text: ${checked} launcher text region(s) current\n`);
+  writeSync(1, `gen-launcher-text: ${checked} launcher text region(s) current\n`);
   process.exit(0);
 }
-process.stdout.write(stale.length > 0
+writeSync(1, stale.length > 0
   ? `gen-launcher-text: wrote ${stale.join(', ')}\n`
   : `gen-launcher-text: no change to ${checked} launcher(s)\n`);

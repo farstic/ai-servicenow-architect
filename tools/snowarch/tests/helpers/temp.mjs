@@ -19,16 +19,63 @@
  * A directory removed by the first is dropped from the second, so the backstop never touches a
  * path that has been reused since.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const pending = new Set();
 let armed = false;
 
+/**
+ * Remove a tree, and keep trying briefly.
+ *
+ * `rmSync` defaults to **zero** retries, and a recursive removal is not atomic: on a loaded Linux
+ * runner it can come back EBUSY or ENOTEMPTY while something else still holds a handle inside the
+ * tree. Node documents `maxRetries`/`retryDelay` for exactly those errors; without them one
+ * transient failure is a fixture left on disk for good.
+ *
+ * Returns the error rather than throwing, because BOTH callers must carry on: an `exit` handler
+ * that throws loses the rest of the sweep, and a `t.after` that throws turns a passing test red for
+ * a reason that has nothing to do with what it was testing.
+ */
+function remove(dir) {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+    return null;
+  } catch (e) {
+    return e;
+  }
+}
+
+/**
+ * Every tracked directory, each attempted independently of the others.
+ *
+ * It used to be `for (const dir of pending) rmSync(dir, …)` followed by `pending.clear()`, and that
+ * shape has two faults that only show under load: ONE directory that will not go takes every
+ * directory after it with it, and `pending.clear()` — the line that records what was dealt with —
+ * is never reached at all. `fixture-cleanup.test.mjs` beside this file failed three times on ubuntu/node 24
+ * with a POPULATED directory and a normal exit, which is what this looks like from the outside.
+ * Not reproduced on macOS/node 24 in 48 attempts, so this is the cause the code makes possible
+ * rather than the cause observed — and the message below is what the next occurrence will say.
+ */
 const sweep = () => {
-  for (const dir of pending) rmSync(dir, { recursive: true, force: true });
+  const failed = [];
+  for (const dir of pending) {
+    const error = remove(dir);
+    if (error) failed.push(`${dir}: ${error.code ?? error.message}`);
+  }
   pending.clear();
+  if (failed.length) {
+    // An exit handler cannot fail a run, so it says so where a person will see it: stderr, with the
+    // errno and the Node version, which is what the three CI occurrences never told anyone.
+    //
+    // `writeSync(2, …)` and not `process.stderr.write`: from an EXIT handler, a write to a pipe is
+    // asynchronous and the process is gone before it drains — the message vanished exactly that way
+    // the first time this was tried, and it is the same thing `scripts/docs.mjs` was doing to its
+    // `--json` output (ARC-09-S02). A diagnosis that does not arrive is not a diagnosis.
+    writeSync(2, `temp.mjs: ${failed.length} fixture(s) survived on node ${process.versions.node}:\n`
+      + failed.map((f) => `  ${f}\n`).join(''));
+  }
 };
 
 function arm() {
@@ -60,7 +107,11 @@ export function trackTempDir(dir, t) {
   arm();
   // `t?.after?.()` — the context is optional, and a vitest or plain call has none.
   t?.after?.(() => {
-    rmSync(dir, { recursive: true, force: true });
+    // `pending.delete` happens whatever `remove` returned: if the directory is genuinely stuck, the
+    // backstop retrying it at exit would only stall the run, and the sweep's message is where a
+    // survivor gets reported. A hook that THREW here would fail the test it belongs to for a reason
+    // that has nothing to do with what the test was about.
+    remove(dir);
     pending.delete(dir);
   });
   return dir;

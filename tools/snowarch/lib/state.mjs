@@ -173,3 +173,81 @@ export function resetState(root) {
   }
   return removed;
 }
+
+/**
+ * Which steps would run again, and why.
+ *
+ * ARC-09-S05. The resume rule lives in the runner — skip a step whose recorded hash still matches —
+ * and this is the same question asked from outside, for a user who wants to know what running
+ * `bootstrap` again is about to do, and for `upgrade` (ARC-09-S07), which needs to say what a new
+ * version invalidates before it changes anything.
+ *
+ * Four reasons, and the fourth is the one that surprises people:
+ *
+ *   `never-run`        no record — a fresh checkout, or a step added since
+ *   `failed`           it ran and did not succeed; a failure is never cached
+ *   `inputs-changed`   the hash moved, and `changed` names the inputs that did
+ *   `launcher-recorded` the LAUNCHERS record `inputsHash: null` by design (ARC-06-S14): bash and
+ *                      PowerShell cannot compute the table, so a Node-free install leaves every
+ *                      step unverifiable and the next Node run re-runs B01/B02 as a reconcile.
+ *                      Treated as stale, because "no hash" and "a hash that matches" must never be
+ *                      the same answer — the same rule the git seam follows about failure.
+ */
+export function staleSteps(state, ctx, { hashFor, steps = null, alwaysRuns = () => false } = {}) {
+  if (typeof hashFor !== 'function') throw new TypeError('staleSteps needs hashFor');
+  const ids = steps ?? Object.keys(state?.steps ?? {});
+  const out = [];
+
+  for (const step of ids) {
+    // A step that runs every time is not STALE — it is unconditional, and listing it would put
+    // B00 and B09 in every answer to "what changed". The runner spells the same fact
+    // `cacheable = false`; the table spells it as a row with no inputs, and the caller passes
+    // whichever it holds. Both also record `inputsHash: null`, which is why this comes first: the
+    // launcher rule below must not claim a null that was never going to be a hash.
+    if (alwaysRuns(step)) continue;
+
+    const recorded = state?.steps?.[step];
+    // A step recorded `skipped` was decided against by `runsWhen` — design-only never installs
+    // dependencies — so it holds no result to reuse. It has not run in this checkout, and the
+    // detail says which of the two ways that came about.
+    if (!recorded || recorded.status === 'skipped') {
+      out.push({ step, reason: 'never-run', changed: [], ...(recorded ? { detail: 'skipped' } : {}) });
+      continue;
+    }
+    if (recorded.status !== 'ok') {
+      out.push({ step, reason: 'failed', changed: [], detail: recorded.status });
+      continue;
+    }
+    if (recorded.inputsHash === null || recorded.inputsHash === undefined) {
+      out.push({ step, reason: 'launcher-recorded', changed: [] });
+      continue;
+    }
+
+    let current;
+    try { current = hashFor(step, ctx); } catch (e) {
+      // A row that cannot be hashed is stale, not fatal: the step will run, which is the safe
+      // direction, and the reason says what happened rather than crashing a resume.
+      out.push({ step, reason: 'inputs-changed', changed: [`unhashable: ${e.message}`] });
+      continue;
+    }
+    if (current !== recorded.inputsHash) {
+      out.push({ step, reason: 'inputs-changed', changed: [], now: current, was: recorded.inputsHash });
+    }
+  }
+  return out;
+}
+
+/** One line per stale step, in the words the bootstrap's own output uses. */
+export function explainStale(stale) {
+  const REASON = {
+    'never-run': 'has not run in this checkout',
+    failed: 'did not succeed last time',
+    'inputs-changed': 'its inputs changed',
+    'launcher-recorded': 'was recorded by a launcher, which cannot compute the hash',
+  };
+  return stale.map(({ step, reason, changed = [], detail }) => {
+    const why = REASON[reason] ?? reason;
+    const extra = changed.length ? ` (${changed.join(', ')})` : (detail ? ` (${detail})` : '');
+    return `${step} will run — ${why}${extra}`;
+  });
+}

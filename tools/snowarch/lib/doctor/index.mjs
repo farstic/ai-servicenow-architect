@@ -21,6 +21,8 @@ import { meetsFloor } from '../versions.mjs';
 import { childEnv } from '../spawn-env.mjs';
 
 import { SECTIONS } from './registry.mjs';
+import { askOnce } from '../ask.mjs';
+import { versionInfo } from '../version-info.mjs';
 import { engineBlock, engineRegistry, serverBlock, staleBlock,
   summariseMerged } from './checks/index.mjs';
 import { deriveMode, modeLine, modeLineDetailed } from './mode.mjs';
@@ -169,6 +171,10 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
   // angles (E-25's checkout and SV-02's store, both cloud-synced) is one thing to fix.
   const summary = summariseMerged(results, checks);
 
+  // `null` when no server check ran, which since ARC-09-C8 includes every `--quick` run: the
+  // section left that subset because entering it costs one in-process run of the server's own
+  // doctor. Schema v1 already says what null means here — "no check filled it" — and every
+  // consumer reads it that way, so this needs no third state and gets none.
   const server = ctx._server === undefined ? null : serverBlock(ctx._server);
   const instances = server?.instances ?? [];
   // The mode: derived here, from the toggle file and the store, and from nothing else. Not from
@@ -199,8 +205,13 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
         ? (contract ? { count: contract.tools.length, source: 'contract' } : null)
         : { count: toolCount, source: 'server' },
     }),
-    engine: engineBlock(results, { version: readVersion(root),
-      contractSha: contractSha(root) ?? null }),
+    // ONE source for the header (ARC-09-S04). It read the version and the sha for itself until
+    // then, which is two programs answering "what is this checkout" from two readers — and the day
+    // they disagreed, `/snowarch status` would quote one while the tag said the other.
+    // `full: false` — the header takes `version`, `tag.name` and `contractSha`. The tag's message,
+    // the shallow hint and the commit state are for the human lines and cost three more `git`
+    // spawns, on the path the SessionStart banner runs before a session's first word.
+    engine: engineBlock(results, versionInfo(root, { full: false })),
     prereqs: {
       ...collectPrereqs({ root, config, env }),
       // E-04 resolved these; the renderer's `Capabilities:` line reads them from here rather than
@@ -290,17 +301,13 @@ export async function fixCommand({ root, config, registry, options, env, home, n
   return { applied, report: second.report, checks: second.checks, cacheError: second.cacheError };
 }
 
-/** One line from stdin, or `null` at end of input — the same reader the plan screen uses. */
-function defaultAsk(input) {
-  return async () => {
-    const { createInterface } = await import('node:readline');
-    const rl = createInterface({ input, terminal: false });
-    const it = rl[Symbol.asyncIterator]();
-    const { value, done } = await it.next();
-    rl.close();
-    return done ? null : value;
-  };
-}
+/**
+ * One line from stdin, or `null` at end of input.
+ *
+ * The comment here used to say "the same reader the plan screen uses", which was a claim about two
+ * copies rather than a shared one. ARC-09-S01 made it true: `lib/ask.mjs`.
+ */
+const defaultAsk = (input) => askOnce(input);
 
 export async function doctorCommand({ flags = {}, log, out = process.stdout, env = process.env,
   err = process.stderr, cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(),
@@ -404,18 +411,21 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
   }
 
   // A cache that could not be written is not a failed run: the report is on the screen, and the
-  // banner's fallback is to re-run. Said out loud so a read-only checkout is explicable — but on
-  // STDERR under `--json`, the same rule the fix narration follows six lines up. It used to go to
-  // stdout in both modes, so on any machine where `.local` refuses the write, `--json` emitted
-  // `note: …` and then the object, and every consumer's `JSON.parse` threw on the `n`. ARC-08-S11
-  // found it on the CI runners; ARC-08-S06 had already ruled the same thing for `--fix --json`.
+  // banner's fallback is to re-run. Said out loud so a read-only checkout is explicable — and now
+  // on STDERR in BOTH modes (ARC-09-C9), because stdout carries the report and nothing else.
+  // S11 had already moved it off stdout under `--json`, where `note: …` before the object made
+  // every consumer's `JSON.parse` throw on the `n`; C9 finishes the job for the text path, where
+  // a diagnostic was interleaved with the report a human was reading.
   if (cacheError) {
-    const line = `note: the doctor cache could not be written — ${cacheError}`;
-    if (flags.json) err.write(`${line}\n`); else write(line);
+    err.write(`doctor: cache not written — ${cacheError}\n`);
   }
 
   if (flags.json) {
-    write(JSON.stringify(report, null, 2));
+    // ARC-09-C9: and in the object too. A script that reads `--json` never sees stderr, so without
+    // this the only signal that the banner will re-run every session was a line it cannot read.
+    // Present only when it happened — a `cacheError: null` on every healthy run would be noise in
+    // the shape every consumer already parses.
+    write(JSON.stringify(cacheError ? { ...report, cacheError } : report, null, 2));
   } else {
     write(renderText({ report, checks, colour: useColour({ stream: out, env }) }));
   }

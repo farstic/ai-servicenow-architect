@@ -18,12 +18,12 @@ import { REAL_ROOT } from './helpers/tree.mjs';
 const checks = engineChecks();
 const ids = checks.map((c) => c.id);
 
-test('E-00 … E-27 and SV-00 … SV-08, once each, in section order', () => {
-  assert.equal(checks.length, 37);
+test('E-00 … E-28 and SV-00 … SV-09, once each, in section order', () => {
+  assert.equal(checks.length, 39);
   assert.deepEqual(ids.filter((id) => id.startsWith('E-')),
-    Array.from({ length: 28 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
+    Array.from({ length: 29 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
   assert.deepEqual(ids.filter((id) => id.startsWith('SV-')),
-    Array.from({ length: 9 }, (_, i) => `SV-${String(i).padStart(2, '0')}`));
+    Array.from({ length: 10 }, (_, i) => `SV-${String(i).padStart(2, '0')}`));
   assert.equal(new Set(ids).size, ids.length);
   const order = engineRegistry().all().map((c) => c.section);
   assert.deepEqual([...new Set(order)],
@@ -32,15 +32,16 @@ test('E-00 … E-27 and SV-00 … SV-08, once each, in section order', () => {
 });
 
 // S02's AC 8, extended by S03's detectors — the subset, still read from the flags.
-test('--quick is E-01, E-02, E-05…E-15, E-17…E-20, E-22 and the four quick detectors', () => {
+test('--quick is fourteen checks: the ones that cost nothing to run (ARC-09-C8)', () => {
   const { selected } = planRun(checks, { quick: true });
+  // ARC-09-C8 moved three GROUPS out — the docs checks that share `docsStatus`, the whole server
+  // section (one in-process run of the server's own doctor), and the lint checks that share
+  // `buildLintContext`. What is left is bounded: 89 ms of check time locally, slowest 20 ms.
   assert.deepEqual(selected.map((c) => c.id), [
     'E-01', 'E-02',
-    'E-05', 'E-06', 'E-07', 'E-08', 'E-09', 'E-10', 'E-11',
-    'E-12', 'E-13', 'E-14', 'E-15',
-    'E-17', 'E-18', 'E-19', 'E-20', 'E-22',
+    'E-05', 'E-06', 'E-07', 'E-08', 'E-10', 'E-11',
+    'E-17', 'E-18',
     'E-23', 'E-24', 'E-25', 'E-26',
-    'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-07', 'SV-08',
   ]);
   // AC 8 of S03: `claude mcp get` is a process, so `--quick` never reaches it.
   assert.equal(selected.some((c) => c.id === 'E-27'), false);
@@ -55,9 +56,12 @@ test('the four checks --quick leaves out say why in their own flags', () => {
   assert.equal(by.get('E-16').quick, false);
 });
 
-test('only the server section touches the network, and only its probe check', () => {
-  assert.deepEqual(checks.filter((c) => c.network).map((c) => c.id), ['SV-04']);
-  assert.deepEqual(checks.filter((c) => c.network).map((c) => c.section), ['server']);
+test('two checks touch the network, and each says which question it is asking', () => {
+  // ARC-09-S07 added E-28: the release-currency check asks the git REMOTE what tags exist, which
+  // is a different network from SV-04's (the ServiceNow instance). Both are `network: true`, so
+  // `--no-network` covers both, and nothing else in the engine reaches off the machine.
+  assert.deepEqual(checks.filter((c) => c.network).map((c) => c.id), ['E-28', 'SV-04']);
+  assert.deepEqual(checks.filter((c) => c.network).map((c) => c.section), ['host', 'server']);
 });
 
 test('only the checks with a repair declare fixable, and each carries a fix hint or a null', () => {
@@ -81,8 +85,10 @@ test('the detectors warn and the capability packs inform — only the engine\'s 
   // A leftover, a synced folder, a proxy variable and an approval are things the USER chose. The
   // doctor names them and prints the command; failing a run over one would be this tool deciding
   // something that is theirs to decide.
+  // E-28 joins them (ARC-09-S07): a checkout one release behind is a checkout that works, and a
+  // doctor that FAILED over an available upgrade would be this tool deciding when a user upgrades.
   assert.deepEqual(checks.filter((c) => c.severity === 'warn').map((c) => c.id),
-    ['E-23', 'E-24', 'E-25', 'E-26', 'E-27', 'SV-04']);
+    ['E-23', 'E-24', 'E-25', 'E-26', 'E-27', 'E-28', 'SV-04']);
   assert.deepEqual(checks.filter((c) => c.severity === 'info').map((c) => c.id), ['E-04']);
 });
 
@@ -102,7 +108,7 @@ const cli = (args) => spawnSync(process.execPath,
   [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', ...args],
   { cwd: REAL_ROOT, encoding: 'utf8' });
 
-test('--json reports all thirty-seven ids with a status each', () => {
+test('--json reports every id with a status each', () => {
   const r = cli(['--json', '--quick']);
   const report = JSON.parse(r.stdout);
   assert.deepEqual(report.checks.map((x) => x.id), ids);
@@ -143,16 +149,19 @@ test('--quick membership is the same set in the registry and in a real run', () 
   // server check) and belongs where its flags put it: it reads directories and spawns nothing.
   assert.deepEqual(ran, [
     'E-01', 'E-02',
-    'E-05', 'E-06', 'E-07', 'E-08', 'E-09', 'E-10', 'E-11',
-    'E-12', 'E-13', 'E-14', 'E-15',
-    'E-17', 'E-18', 'E-19', 'E-20', 'E-22',
+    'E-05', 'E-06', 'E-07', 'E-08', 'E-10', 'E-11',
+    'E-17', 'E-18',
     'E-23', 'E-24', 'E-25', 'E-26',
-    'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-07', 'SV-08',
   ]);
   // And the ones the story leaves out, for the reasons it gives: they spawn, walk the corpus or
   // use the network.
   assert.deepEqual(report.checks.filter((c) => c.detail === 'not in the --quick subset')
-    .map((c) => c.id), ['E-00', 'E-03', 'E-04', 'E-16', 'E-21', 'E-27', 'SV-04', 'SV-05', 'SV-06']);
+    // E-28 (ARC-09-S07) is out for BOTH of `--quick`'s reasons at once: it spawns git and it
+    // reaches the network. E-09/E-12…E-15/E-19/E-20/E-22 and the whole SV- section left under
+    // ARC-09-C8's cost contract.
+    .map((c) => c.id), ['E-00', 'E-03', 'E-04', 'E-09', 'E-12', 'E-13', 'E-14', 'E-15', 'E-16',
+    'E-19', 'E-20', 'E-21', 'E-22', 'E-27', 'E-28',
+    'SV-00', 'SV-01', 'SV-02', 'SV-03', 'SV-04', 'SV-05', 'SV-06', 'SV-07', 'SV-08', 'SV-09']);
 });
 
 test('a quick run says so in the report a consumer reads', () => {
@@ -160,4 +169,69 @@ test('a quick run says so in the report a consumer reads', () => {
   assert.equal(report.options.quick, true);
   assert.equal(report.options.noNetwork, true, '--quick must imply --no-network');
   assert.match(report.modeLine, /^Mode: /);
+});
+
+/**
+ * ARC-09-C8 — `quick` is a COST contract, and the cost is per SHARED RESOURCE.
+ *
+ * The banner's re-run path is `doctor({ quick: true, noNetwork: true })`, paid before a user's
+ * first word of a session, and on `bootstrap (windows-latest, node 20)` it reached 1014 ms against
+ * a 1000 ms budget. C5's phase table said where: 969 of 987 ms was the doctor spawn.
+ *
+ * What the per-check table then showed is the thing worth writing down. Three expensive contexts
+ * are built once and cached on the run's ctx — `docsStatus` (three git spawns), the server
+ * package's own doctor (one in-process run), and `buildLintContext` — and whichever check touches
+ * one FIRST pays for all of them. So moving the expensive-looking check out does nothing: moving
+ * E-12 put 143 ms onto E-13, and moving E-19 put 66 ms onto E-20. Both measured, both times the
+ * total was unchanged.
+ *
+ * The rule is therefore about GROUPS: a check that reaches for a shared context is not quick,
+ * whatever its own line in the table says. 776 ms of check time became 89 ms locally, with the
+ * slowest remaining check at 20 ms.
+ */
+const SHARED_CONTEXTS = Object.freeze({
+  docsFor: 'docsStatus — three git spawns, shared by E-12…E-15',
+  serverReport: "the server package's own doctor, run in-process, shared by every SV- check",
+  adopt: "the server package's own doctor, run in-process, shared by every SV- check",
+  lintContextFor: 'buildLintContext, shared by E-19…E-22',
+  runLint: 'buildLintContext, shared by E-19…E-22',
+});
+
+test('no --quick check reaches for a shared context (ARC-09-C8)', async () => {
+  const { readFileSync: read, readdirSync: dir } = await import('node:fs');
+  const { join: j } = await import('node:path');
+  const here = j(REAL_ROOT, 'tools/snowarch/lib/doctor/checks');
+  const { selected } = planRun(checks, { quick: true });
+  const quickIds = new Set(selected.map((c) => c.id));
+
+  const offenders = [];
+  for (const file of dir(here).filter((f) => f.endsWith('.mjs'))) {
+    const source = read(j(here, file), 'utf8');
+    // Each check's body, from its `id:` to the next one — near enough to attribute a call, and
+    // exact enough that a helper defined at the top of the file is not blamed on every check in it.
+    const bodies = [...source.matchAll(/id: '([A-Z]+-\d+)',([\s\S]*?)(?=\n\s+id: '[A-Z]+-\d+',|$)/g)];
+    for (const [, id, body] of bodies) {
+      if (!quickIds.has(id)) continue;
+      const code = body.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+      for (const [fn, why] of Object.entries(SHARED_CONTEXTS)) {
+        if (new RegExp(`\\b${fn}\\(`).test(code)) offenders.push(`${id} calls ${fn}() — ${why}`);
+      }
+    }
+  }
+
+  assert.deepEqual(offenders, [],
+    'a --quick check pays for a shared context; the whole group that shares it must leave --quick, '
+    + 'because moving one member just moves the cost to the next');
+});
+
+test('the shared-context rule can actually fail (ARC-09-C8)', () => {
+  // A negative control on the rule, the way ARC-09-C3's listener counts its own connection first:
+  // a regex that stopped matching would report zero offenders for ever.
+  const planted = "id: 'E-99',\n      quick: true,\n      run: async (ctx) => docsFor(ctx),\n";
+  const body = /id: '([A-Z]+-\d+)',([\s\S]*)/.exec(planted)[2];
+  assert.match(body, /\bdocsFor\(/, 'the rule would not catch a check that calls docsFor');
+  // …and a comment mentioning it is the LESSON, not the call.
+  const commented = "id: 'E-98',\n      // docsFor(ctx) is what E-12 does\n      quick: true,\n";
+  const code = commented.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+  assert.equal(/\bdocsFor\(/.test(code), false, 'a comment is being read as a call');
 });

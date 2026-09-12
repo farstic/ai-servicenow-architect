@@ -6,12 +6,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { engineRepoChecks, configProblems, placeholdersWithoutDefault, sessionStartProblems,
   toggleProblems } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { bootstrap, contextFor, copyTree, greenTree, readJson, runById,
   writeJson } from './helpers/tree.mjs';
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+/**
+ * `git add` inside a fixture tree (ARC-09-C10). E-09 scans TRACKED files, so a fixture that only
+ * writes the file proves nothing — `git ls-files` would not name it and the check would pass for
+ * the wrong reason. The identity is per-command so no global git config has to exist (ARC-08-S05).
+ */
+const trackInFixture = (root, rel) => execFileSync('git',
+  ['-c', 'user.email=f@example.invalid', '-c', 'user.name=Fixture', 'add', '--', rel],
+  { cwd: root, encoding: 'utf8' });
 
 const checks = engineRepoChecks();
 const run = (id, root, over = {}) => runById(checks, id, contextFor(root, over));
@@ -114,6 +127,42 @@ test('E-09 finds a credential-shaped KEY at any depth, and never prints the valu
   assert.equal(r.detail.includes('hunter2hunter2'), false, 'the value reached the report');
 });
 
+// ARC-09-C10 — the `.env` family is scanned, and these two cases are the pair that proves it.
+//
+// `ENVISH` has always existed to match `SERVICENOW_BASIC_PASSWORD=…`, and until C10 the only files
+// it could ever see were `.sh` scripts: `CREDENTIAL_EXT` listed nine extensions and none of them
+// was the one named after the thing being hunted. A committed `.env` with a real value is THE
+// classic credential leak. Found by asking whether `packages/snowarch/.env.example`, which ships
+// in the npm tarball, was covered. It was not.
+test('E-09 fails a TRACKED .env file carrying a real-looking value (ARC-09-C10)', async (t) => {
+  const root = copyTree(t, greenTree(t));
+  // Assembled, never spelled — the same rule as the case above: a fixture that writes a
+  // credential-shaped literal out becomes a hit in the sweep that reads this very file. And it
+  // must not look like documentation either, or `isPlaceholder` clears it and the test passes for
+  // the wrong reason: mixed case, digits and punctuation, no placeholder prefix.
+  const key = ['SERVICENOW_BASIC_', 'PASS', 'WORD'].join('');
+  const value = ['Sn0w', 'Q4t', '!x', 'Zr7'].join('');
+  writeFileSync(join(root, '.env.example'), `${key}=${value}\n`);
+  trackInFixture(root, '.env.example');
+
+  const r = await run('E-09', root);
+  assert.equal(r.status, 'fail', `E-09 did not see the tracked .env.example: ${r.detail}`);
+  assert.match(r.detail, /\.env\.example:1/);
+  assert.equal(r.detail.includes(value), false, 'the value reached the report');
+});
+
+test('E-09 passes the .env.example this repository actually ships (ARC-09-C10)', async (t) => {
+  // The positive control, and the reason the widened filter is safe to ship: the real file's
+  // credential variables are all EMPTY, so scanning it changes nothing for this repository. A
+  // widening that turned the product red on its own tree would be a different conversation.
+  const root = copyTree(t, greenTree(t));
+  const real = readFileSync(join(repoRoot, 'packages/snowarch/.env.example'), 'utf8');
+  writeFileSync(join(root, '.env.example'), real);
+  trackInFixture(root, '.env.example');
+  const r = await run('E-09', root);
+  assert.equal(r.status, 'ok', `the shipped .env.example would now fail E-09: ${r.detail}`);
+});
+
 // AC 4.
 test('E-10 fails when the server is in BOTH lists, and reports fixable', async (t) => {
   const root = copyTree(t, greenTree(t));
@@ -201,9 +250,26 @@ test('a bootstrapped live tree passes E-10 with the enabled toggle', async (t) =
 
 test('the fixture is built from the committed files, not from a copy in the test', async (t) => {
   const root = greenTree(t);
-  for (const rel of ['.mcp.json', '.claude/settings.json', 'engine.config.json']) {
+  for (const rel of ['.mcp.json', '.claude/settings.json']) {
     assert.equal(readFileSync(join(root, rel), 'utf8'),
       readFileSync(join(process.cwd(), rel), 'utf8'), `${rel} drifted from the real file`);
   }
+
+  // `engine.config.json` is the real file with ONE field overridden (ARC-09-C2): the docs upstream,
+  // so a fixer that decided to repair a corpus cannot clone 305 MB from github.com inside a unit
+  // test. Asserted field by field rather than as bytes, so the override stays the only difference —
+  // a second one would be a fixture drifting from the product again, which is what this test is for.
+  const real = JSON.parse(readFileSync(join(process.cwd(), 'engine.config.json'), 'utf8'));
+  const fixture = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  assert.deepEqual(Object.keys(fixture).sort(), Object.keys(real).sort());
+  for (const key of Object.keys(real)) {
+    if (key !== 'docs') assert.deepEqual(fixture[key], real[key], `${key} drifted from the real file`);
+  }
+  const { upstream: fixtureUpstream, ...fixtureDocs } = fixture.docs;
+  const { upstream: realUpstream, ...realDocs } = real.docs;
+  assert.deepEqual(fixtureDocs, realDocs, 'docs drifted beyond the upstream override');
+  assert.notEqual(fixtureUpstream, realUpstream);
+  assert.equal(/^https?:|github\.com/.test(fixtureUpstream), false,
+    `a fixture may not carry a network upstream: ${fixtureUpstream}`);
   assert.ok(bootstrap);
 });

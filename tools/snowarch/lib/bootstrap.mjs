@@ -4,7 +4,7 @@
 // accepted, and hands the list to the runner; the resume semantics live in `steps/index.mjs`, the
 // schema in `state.mjs`, the wording in `steps/format.mjs`. Keeping this thin is what lets
 // ARC-06-S04…S09 land one step at a time without any of them touching the command.
-import { createInterface } from 'node:readline';
+import { lineReader } from './ask.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from './exit.mjs';
@@ -43,15 +43,8 @@ const countAreas = (root, config) => {
   return readFileSync(p, 'utf8').split('\n').filter((l) => l.trim() !== '').length;
 };
 
-/** One line from stdin, or `null` at end of input. */
-const stdinAsker = (input, output) => {
-  const rl = createInterface({ input, output, terminal: false });
-  const it = rl[Symbol.asyncIterator]();
-  return {
-    ask: async () => { const { value, done } = await it.next(); return done ? null : value; },
-    close: () => rl.close(),
-  };
-};
+/** One line from stdin, or `null` at end of input — `lib/ask.mjs`, shared with the doctor. */
+const stdinAsker = (input, output) => lineReader(input, output);
 
 export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = [],
   input = process.stdin, out = process.stdout, err = process.stderr, env = process.env,

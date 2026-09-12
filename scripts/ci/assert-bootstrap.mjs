@@ -18,7 +18,7 @@
  * first: a cell that has to be re-run once per problem wastes ten minutes per problem).
  */
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync, statSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -176,7 +176,10 @@ if (process.platform === 'win32') {
 // input hashes, and pretending it could would cache a step whose inputs had changed). So a
 // Node-free second run RE-RUNS its steps by design; what must hold there is that nothing changed.
 if (secondLog && existsSync(secondLog)) {
-  const log = readFileSync(secondLog, 'utf8');
+  // NORMALISED. The Windows cells write this log through PowerShell, so its lines end `\r\n`, and
+  // a `$`-anchored assertion below would be testing whether the line ends in a carriage return
+  // rather than what it says. Every cell is compared as the same text.
+  const log = readFileSync(secondLog, 'utf8').replace(/\r\n/g, '\n');
   const first = firstState && existsSync(firstState) ? JSON.parse(readFileSync(firstState, 'utf8')) : null;
 
   if (variant === 'no-node') {
@@ -226,7 +229,22 @@ if (secondLog && existsSync(secondLog)) {
       }
     }
     if (/^\[docs\]/m.test(log)) fail(8, 'the second run entered the docs phase');
-    notes.push('second run: B01/B02/B07 cached, entries unchanged');
+
+    // ARC-09-S05: and NOTHING else ran. B00 asks the machine and B09 prints the summary — those
+    // two have no inputs and are unconditional. Every other step must report `ok (cached)` (its
+    // hash still matches) or `skipped (…)` (`runsWhen` said no in this mode). A step that
+    // re-ran here is a resume that did work it had already done, which is the whole subject.
+    const ran = [];
+    for (const id of ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08']) {
+      const line = new RegExp(`^\\[${id}/09\\][^\n]*$`, 'm').exec(log)?.[0];
+      if (!line) fail(8, `the second run printed no line for ${id}`);
+      else if (!/ok \(cached\)$|skipped \([^)]+\)$/.test(line)) ran.push(line.trim());
+    }
+    if (ran.length) {
+      fail(8, `the second run re-ran ${ran.length} step(s) that should have been cached or `
+        + `skipped:\n  ${ran.join('\n  ')}`);
+    }
+    notes.push('second run: only B00 and B09 ran; B01–B08 cached or skipped');
   }
   if (seconds >= 30) fail(8, `the second run took ${seconds} s (budget: 30)`);
 }
@@ -275,11 +293,11 @@ function directorySize(dir) {
   return total;
 }
 
-for (const n of notes) process.stdout.write(`  · ${n}\n`);
+for (const n of notes) writeSync(1, `  · ${n}\n`);
 if (problems.length > 0) {
-  process.stderr.write(`\nassert-bootstrap: ${problems.length} failed assertion(s) in the `
+  writeSync(2, `\nassert-bootstrap: ${problems.length} failed assertion(s) in the `
     + `${variant} cell — the install is broken, not the test:\n`);
-  for (const p of problems) process.stderr.write(`  ✗ ${p}\n`);
+  for (const p of problems) writeSync(2, `  ✗ ${p}\n`);
   process.exit(1);
 }
-process.stdout.write(`assert-bootstrap: ${variant} (writer ${writer}) — all assertions passed\n`);
+writeSync(1, `assert-bootstrap: ${variant} (writer ${writer}) — all assertions passed\n`);

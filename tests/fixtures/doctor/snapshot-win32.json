@@ -5,7 +5,7 @@
     "ok": 26,
     "warn": 0,
     "fail": 1,
-    "skip": 10,
+    "skip": 12,
     "fixable": 0
   },
   "checks": [
@@ -150,6 +150,11 @@
       "fixable": false
     },
     {
+      "id": "E-28",
+      "status": "skip",
+      "fixable": false
+    },
+    {
       "id": "SV-00",
       "status": "skip",
       "fixable": false
@@ -191,6 +196,11 @@
     },
     {
       "id": "SV-08",
+      "status": "skip",
+      "fixable": false
+    },
+    {
+      "id": "SV-09",
       "status": "skip",
       "fixable": false
     }

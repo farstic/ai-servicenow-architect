@@ -11,7 +11,264 @@ The engine follows a minor-version cadence where the **first digit** signals a m
 
 ## Unreleased
 
+### Notes
+
+This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
+
+#### Migration for snow-mcp 1.0.0 users
+
+Transcribed from `packages/snowarch/CHANGELOG.md` (ARC-04-S14), which is the server's own record of
+the same change:
+
+1. **Move your instance configuration.** The legacy `~/.config/servicenow-mcp/instances.json` is no
+   longer read. Recreate it as a store, or run `./snowarch instance import --from-legacy`
+   (ARC-07-S08). Store precedence is `SNOW_STORE` > the project's `.local/instances.json` > the
+   global one.
+2. **Check your flags.** `SCRIPTING_ENABLED` no longer gates READS — it gates writing scripting
+   objects. If it was on only so that listing worked, turn it off.
+3. **Name your `.env`.** The current directory's `.env` is no longer loaded; set `SNOW_ENV_FILE` if
+   you want one.
+4. **An unconfigured server starts and stays up.** It no longer exits at start-up: five core tools
+   still answer, and they are how it explains itself. `snow_core_instances_reload` picks up a store
+   written while the session is running, so Claude Code does not need restarting.
+5. **The package is `@farstic/snowarch` 2.0.0.** `@farstic/snow-mcp@1.0.0` is untouched on npm and
+   stays exactly as published.
+
+Two more, for completeness: `MAX_RECORDS` defaults to 100 and belongs on the instance entry, and
+there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
+
+---
+
 ### Added
+
+- **The release, upgrade and CI procedures are written down where they are used.**
+  `docs/CONTRIBUTING.md` carries six sections — Commits, Releasing, Store migrations, Upgrading the
+  product, CI matrix, Line endings — each starting with the exact commands and ending with where it
+  is tested, so a document that drifts from the tree fails a test rather than misleading a reader.
+  The release checklist is the two-phase flow, because `main` requires status checks and a release
+  commit pushed straight to it carries none. `docs/INSTALL.md` gains *What to paste in a bug
+  report*; `docs/ARCHITECTURE.md` gains *Versioning, tags and upgrade*.
+
+- **The doctor now scans `.env` files for committed credentials.** `./snowarch doctor`'s E-09 check
+  sweeps the tracked tree for credential-shaped literals, and until now the one kind of file named
+  after the thing it hunts — `.env`, `.env.local`, `.env.example` — was the one kind it skipped. A
+  checkout that tracks a `.env` with a real password now gets a FAIL naming the file and the line,
+  never the value.
+
+- **An optional npm channel, off by default and unable to touch the old package.** `npx
+  @farstic/snowarch` is a secondary way to run the MCP server without the Architect engine; the
+  engine itself never consumes it. The workflow that can publish has no trigger but a human's — no
+  push, no tag, no pull request, so cutting a release publishes nothing — and its dry-run input
+  defaults to true, so accepting the dialog as it stands does the harmless thing.
+
+  `@farstic/snow-mcp@1.0.0` stays exactly as published. That is enforced three times over: the
+  token is granular and scoped to `@farstic/snowarch` alone, the workflow is the only place in the
+  repository that may read a secret of that name, and a guard script refuses any other package
+  before the install runs and long before the token is used — naming the decision in the refusal,
+  because a message that merely says "assertion failed" tells a maintainer nothing at 2am.
+
+- **Line endings that survive a Windows clone.** LF everywhere except the two Windows launcher
+  kinds (`*.cmd`, `*.ps1`), which are CRLF — and the policy is now read from git rather than taken
+  on trust. `tests/eol.test.mjs` parses `git ls-files --eol` and separates the two halves that fail
+  differently: the INDEX is LF for every text file on every platform, because git normalises on
+  `add`, so a CRLF entry there means normalisation was disabled and every Unix clone receives a
+  file whose shell script fails with `/bin/bash^M: bad interpreter` — an error naming an
+  interpreter that plainly exists; the WORKING TREE is whatever the checkout wrote, which is only
+  meaningful on a tree that was just cloned.
+
+  So the `eol` job clones the way a consultant's machine does — `git config --global
+  core.autocrlf true` BEFORE `actions/checkout`, because the setting decides what the clone writes
+  — then runs the launchers under `cmd.exe`, and checks the BYTES rather than git's opinion of
+  them. Every tracked file must be answered by a rule in `.gitattributes` or an entry with a reason
+  in `tests/eol.allowlist.json`: `text=auto` is a guess, and removing the guess is what the policy
+  file is for.
+
+- **A Windows machine, used the way a Windows user uses one.** `windows-native` runs three Node
+  majors with `cmd.exe` as the shell for every step and no Git Bash anywhere on PATH, driving the
+  product entirely through `snowarch.cmd` and `bootstrap.cmd`: the install, `version`, the wizard's
+  `--password-stdin` door against a loopback endpoint, the server's own handshake, the SessionStart
+  hook, a store migration plan and an upgrade check. The existing no-Git-Bash cell keeps its name
+  and its job; this adds the commands a user reaches for after the install rather than repeating
+  the install.
+
+  The PATH recipe is now one implementation that both cells call. It was a literal list of
+  directories typed into two workflow steps, and two copies of a machine's directory layout is one
+  copy too many: the day a runner image moves `nodejs`, one copy is corrected and the other quietly
+  starts testing a machine with no Node at all — which passes, for the wrong reason.
+
+  **The list of checks a pull request must produce is generated from the workflow.** Branch
+  protection lists its required checks by name, and a list typed into a settings page silently
+  stops matching: a renamed cell is not a red build, it is a required check nobody produces any
+  more. `tests/fixtures/required-contexts.json` is derived from `ci.yml`, a job the generator
+  cannot classify stops the build rather than being quietly omitted, and conditional workflows are
+  excluded by name with the reason written beside them.
+
+- **`./snowarch upgrade` — one command that plans first, moves second, and never touches your
+  credentials.** Seven numbered steps, and the first four are reads: the preflight refuses a dirty
+  tree, the fetch brings the release tags, the target is resolved (an annotated tag with a
+  `contract:` trailer, or the newest one), and the plan is computed FROM THE TAG before anything
+  moves — which files changed, which bootstrap steps that makes stale, whether the store's schema
+  moves, whether the installed Claude Code still clears the release's floor. Then `Proceed? [Y/n]`.
+  `--yes` skips the question, never the plan.
+
+  After the move the bootstrap runs again and does only what changed; a release that touches one
+  file re-runs one step. A release that changes the store's schema runs the MIGRATION, with its
+  0600 backup, announced in the plan before you agree — `.local/instances.json` is opened by
+  nothing else in the whole sequence. A failure leaves the tree at the new tag with the state file
+  recording which step stopped, and re-running continues from there rather than saying "up to
+  date": the tree being at the target and the upgrade having finished are two different claims.
+
+  `./snowarch upgrade --check` asks and changes nothing (exit 4 when a newer release exists). It —
+  and the doctor's new `E-28`, once a day — write `.local/upgrade-check.json`, which is the only
+  reason the session banner can mention a newer release: **the banner never fetches**. It prints
+  that line only while the check is less than seven days old, because a nudge from a check nobody
+  has made since is a line readers learn to skip, and then the one that matters is skipped too.
+
+  Behind a proxy, a failed fetch prints git's own error and then one remedy line naming
+  `docs/TROUBLESHOOTING.md#proxy` or `#tls-ca` — and only when the shape is recognised, because a
+  confident wrong remedy costs more than none.
+
+### Added
+
+- **Every release is rehearsed before it is cut.** A throwaway branch, a prerelease tag, the release
+  workflow green on three operating systems with all seven assets, then the tag and branch deleted —
+  written down in the contributing guide as a numbered step with per-release record fields. Five
+  rehearsal rounds during 2.0.0 each found a defect that a dry run could not reach and no test
+  fixture had ever produced; every one of them would otherwise have landed on a real release.
+
+- **The published package carries its NOTICE.** Apache-2.0 §4(d) asks a redistribution to carry the
+  attribution notice, and npm includes a licence automatically but never a NOTICE — so the package
+  ships its own copy, and a test compares it with the root file so the two cannot drift apart
+  unnoticed.
+
+### Fixed
+
+- **The commit lint no longer fails on commits written before it existed.** A merge that spans a
+  whole milestone reads the entire arc, including subjects from before the convention was adopted.
+  Those are printed as recorded rather than failed — the same tolerance the changelog generator has
+  always had — and history is not rewritten to suit the parser.
+
+- **A release with a long changelog can still be published.** GitHub caps a release body at 125,000
+  characters, and 2.0.0's notes are longer than that on their own. The body is now assembled in one
+  place and bounded: the list of what changed is kept whole, and the prose is cut at a paragraph
+  with a link to the changelog in the tagged tree, which has every word.
+
+- **The doctor's judgement knows which kind of install it is looking at.** The check that decides
+  whether a report describes a healthy design-only install assumed the dependencies were absent,
+  because that was true of its only caller. The release workflow installs first, so its server
+  checks answer — and now say so explicitly, with a failing server check still refused.
+
+- **A release is no longer blocked by the one check a hosted runner cannot pass.** The doctor
+  reports attached to a Release come from machines without Claude Code, so that check fails on all
+  three — expected, and now judged by the same rule the install cells have always used: that one
+  failure is explained, any other refuses the release. The Release notes say so beside the numbers,
+  and nothing pretends the tool is present.
+
+- **A test no longer fails because a step was slow.** The bootstrap's step lines carry a duration,
+  and a test that compares them removes it first — with its own pattern, which knew `0.4 s` but not
+  `1 s`. On a loaded machine the comparison failed on the clock rather than on what it was
+  comparing, and it stopped a release. The pattern now lives beside the code that prints it.
+
+- **`snowarch version` prints seven lines on a tagged checkout, and everything that counts them
+  knows it.** The seventh compares the tag's message with the tree and exists only when a tag is
+  exact — but a test, two CI steps and two documents had "six lines" written into them, none of
+  which had ever run on a tagged tree.
+
+- **The test suite no longer fails on the release commit.** Five checks asked whether this was a
+  development tree — is the changelog's Unreleased section full, is the checkout untagged, does a
+  fixture still spell the development version — and a release makes all of those false. They went
+  red on the one pull request that must merge. Each one now asks a question that is true of a
+  development tree and a released tree alike, and says which it is looking at.
+
+- **The release workflow no longer rejects its own tag.** Checking out a tag ref rewrites it to
+  point at the commit, so an annotated tag arrived in CI looking like one that had never carried a
+  message, and every verification job refused a release that was perfectly well formed. The
+  workflow re-fetches the tag object first, and the check now says when the remote has the
+  annotation and the checkout peeled it rather than telling you to re-cut a tag that is fine.
+
+- **A release now rebuilds the artefact it is about to tag.** `packages/snowarch/dist/contract.json`
+  embeds the package version, so writing a new version left the committed contract stale: the
+  release commit would have failed its own build check, and the tag would have named a contract that
+  no longer matched the tree. The release writes now rebuild it, move the pin with it and re-run the
+  generators before anything quotes the result — and a failure after the writes rolls all of it
+  back, including files the rebuild created.
+
+- **A release no longer loses the hand-written changelog, or leaves files behind.** The block under
+  `## Unreleased` moves into the released section whole. It used to be cut at the first sub-heading
+  after `### Notes`, which dropped every hand-written entry below it — on this file, 25 lines of
+  1,224 survived. Nothing inside the block is treated as a boundary any more, including a `##` line
+  inside a fenced code block. The release commit now contains every file the writes produced,
+  including the ones only a generator knows about, and a release that leaves the working tree dirty
+  fails and names them.
+
+- **The instance wizard was being declared failed the moment it started.** The bootstrap's runner
+  hands every step an asynchronous `spawn` so a Ctrl-C can reach the child; B06 read `.status` off
+  the returned `ChildProcess`, where it is `undefined`. In a live install the wizard would run, you
+  would answer its prompts, and the bootstrap would already have printed "the instance wizard
+  exited abnormally" over the top of them. Every test had injected a synchronous fake returning
+  `{ status: 0 }`, so nothing caught it until an upgrade walked into the same door. Both spawn
+  paths now wait for the child, and the failure line says how it ended.
+
+- **A store schema migration framework: explicit, versioned, backed up, and never near a
+  credential.** `.local/instances.json` carries a `version`, and from 2.0.0 the only thing that
+  changes it is `./snowarch store migrate` — a command a person runs, after reading a plan that
+  says which versions, which migrations, where the backup goes and that credentials are untouched.
+  `--dry-run` prints the plan and writes nothing; `--yes` is for scripts; `n` leaves the tree
+  exactly as it was. `store backups` lists the backups and `store restore <file>` puts one back.
+
+  The server no longer migrates anything on load. It reads the version and, if it is not this
+  build's, starts unconfigured and says which command to run — `STORE_SCHEMA_OUTDATED` for a store
+  from the past, `STORE_SCHEMA_NEWER` for one from the future, and every instance tool answers with
+  that code rather than "no instance is configured". Those two replace the single
+  `STORE_SCHEMA_UNSUPPORTED`, which gave one remedy for both directions: telling somebody with an
+  older store to upgrade their checkout sends them to a command that changes nothing while the file
+  that needs migrating sits there. A parse error is now a hard `STORE_UNREADABLE` naming the path —
+  the server this replaced returned an empty config, which is how a store with one typo becomes a
+  store with no instances.
+
+  **Credential values are never touched, and that is a test rather than a promise.** Every
+  instance's whole `auth` subtree is compared before and after, on every migration, over a
+  deep-frozen input; a migration that changes one is refused after it runs and before anything is
+  written, and the refusal names no value. A 0600 backup — byte-identical to the input, not a
+  re-serialisation of it — is written before every migration, and backups are never pruned
+  automatically.
+
+  The registry ships EMPTY at v1 on purpose: the framework exists before the first migration so
+  that whoever changes the schema is forced through it. A bumped version with no migration, a gap
+  in the chain, or a 1→3 leap each fail the suite. `dist/contract.json` now carries
+  `storeSchemaVersion`, which is what lets the bootstrap make exactly the instance step stale after
+  a release that changes the schema — and lets that step run the MIGRATION rather than the wizard.
+  Re-running the wizard was the old answer to "the store moved", and it is wrong for a plain
+  reason: "the store changed shape" and "the user must re-type their password" are unrelated
+  statements. The doctor's new `SV-09` reports the schema and is deliberately not auto-fixable —
+  `--fix` never touches the credential file, so an outdated store appears under REFUSED with the
+  command.
+
+- **One table says what each bootstrap step depends on, so the resume rule has one definition.**
+  The rule is simple — a step whose inputs have not changed since it last succeeded is skipped —
+  and everything hard about it is the word *inputs*, which until now each of the ten steps answered
+  in its own file. `tools/snowarch/lib/inputs.mjs` is that answer once: one row per step, naming
+  each input, its kind and why it is one. The runner reads it to decide what to skip,
+  `staleSteps()` reads it to say what an upgrade will invalidate *before* it changes anything, and
+  the table in `docs/ARCHITECTURE.md` is generated from it, so a page that disagrees with the code
+  is a failing `gen-all --check` rather than a surprise during a resume.
+
+  Three things are deliberately **not** hashed, and each has a reason a reader can check. The docs
+  corpus is hashed by its **gitlink**, not its 35,000 files — reading the corpus to decide whether
+  to read the corpus is the cost the row exists to avoid, and the link moves exactly when the
+  corpus is meant to be different. The credential store is hashed by **mtime and size, never
+  content**: nothing outside the wizard and the migration reads that file, and the stamp is
+  truncated to the second because every tool that restores an mtime rounds it — finer, and a
+  restored backup would read as changed. `dist/` is hashed as **bytes**, because a contract that
+  changed is a server that behaves differently, which is exactly when the contract check and the
+  handshake must run again.
+
+  Files are hashed as raw bytes with no line-ending normalisation, which is what makes a hash
+  comparable between machines and what would break it if a checkout ever differed from the commit:
+  a file arriving CRLF on Windows would hash differently there, and every resume on that platform
+  would quietly decide something else. `.gitattributes` prevents it, a test walks the table and
+  asserts `git check-attr` agrees for every file it names, and each `node-cli` CI cell proves its
+  checkout is byte-identical to the commit via `git cat-file`.
 
 - **`./snowarch bootstrap` — one amendable plan, then ten numbered steps that remember where they
   got to.** The plan screen is the only interactive moment of an installation (principle 10): it is
@@ -120,6 +377,69 @@ The engine follows a minor-version cadence where the **first digit** signals a m
   cause you did not check"), a checkout that was never bootstrapped, output that would not parse,
   and Windows without Git for Windows, where the honest answer is that the session cannot run
   `./snowarch` from here at all.
+
+- **`./snowarch version` answers the first question a support conversation asks.** Six offline
+  lines: the version, the release tag you are on — or how far past it, or why there is none — the
+  commit and whether the tree is dirty, the contract sha with its verdict against the pin, the
+  corpus gitlink with its verdict against the config, and the floors. When the tag carries its own
+  record, a seventh line says what the tag claims and whether this checkout is still that release.
+  No network: the old server's CLI fetched a registry record on every invocation and nagged about a
+  stranger's package, and this is the command someone runs when something is already wrong.
+
+  The doctor's `engine` header is now the same call rather than a second reading of the same files
+  — two programs answering "what is this checkout" from two readers would eventually disagree, and
+  the day they did, `/snowarch status` would quote one while the tag said the other. `--json` keeps
+  ARC-06-S02's five keys exactly and adds the git facts beside them.
+
+- **A tag is the whole release procedure.** `release.yml` runs on `v*` and nothing else: it verifies
+  that the tag's message describes the tree it sits on — before any gate, because a tag that does
+  not is a release to stop rather than to test — then re-runs every gate on ubuntu, macOS and
+  Windows, installs design-only on each, and publishes a Release with seven assets: three doctor
+  reports, three sets of install metrics, and the merged table. Nothing is published until every
+  asset has been read for credentials, a FAIL or a wrong schema; a report attached to a public
+  Release is permanent in a way a pasted one is not, so the check never prints what it finds.
+
+  And because a workflow that only runs on tags is broken by the time it runs, `release-dryrun`
+  runs the same release path on every commit on the same three platforms — the real gates, the real
+  tag message, nothing written. The install page now says that every release re-measures what the
+  corpus costs on all three, and links the table.
+
+- **The changelog generates itself from here on, and one block stays hand-written.** Every release
+  section is built from the commit subjects since the previous tag — `feat` to Added, `fix` to
+  Fixed, `perf`/`refactor` to Changed, the rest to Internal, a `!` or a `BREAKING CHANGE:` footer
+  also to Breaking — with a trailer naming the tag, the contract sha and the docs pin. Merges and
+  `chore(release):` commits are skipped, and a subject from before the convention is recorded as
+  written and marked `(unconventional)`: history is not rewritten to suit a parser. What is NOT
+  generated is `### Notes`, which is hand-written, survives regeneration verbatim and moves down
+  into the release it belongs to — a generator with no place for a sentence a human needed to write
+  is a generator people route around.
+
+  The convention is enforced by a new `commitlint` job on pull requests only, where a subject can
+  still be reworded, and `docs/CONTRIBUTING.md#commits` is what its failure line points at. And the
+  imported engine history under `## Before 2.0.0` is untouched by construction: the generator
+  inserts between `## Unreleased` and whatever heading follows, and never reads below it.
+
+- **One command cuts a release, and refuses to cut a bad one.** `node scripts/release.mjs <x.y.z>`
+  asks eight questions before it writes a byte — the version's shape, the tag name being free, the
+  direction of travel, the branch, a clean tree including untracked files, the remote, the corpus
+  pin, the toolchain — then runs six gates in order, and only then writes. The version goes into
+  the three manifests, the lock file, the `CLAUDE.md` marker and the README head (the README is
+  generated from it), the changelog heading moves, and one commit and one annotated tag follow. The
+  tag's message carries the contract sha, the docs pin and the three floors, because a release
+  downloaded six months later is a tarball and a tag and everything a verifier needs has to be
+  readable from it — `./snowarch version`, `release.yml` and `./snowarch upgrade` all read it back
+  through one parser rather than three.
+
+  A stale `dist/` is a **refusal**, never a repair: committing a rebuilt artefact on the
+  maintainer's behalf would ship something nobody reviewed, and the whole reason `dist/` is
+  committed is that a human sees its diff in a pull request. Nothing is pushed by default. On this
+  repository, where `main` requires 42 status checks, the supported flow is four steps — release
+  branch, pull request, `--tag-only` on the merge commit, push the tag — and it is written down in
+  `docs/CONTRIBUTING.md`.
+
+  One thing the fixture caught before a maintainer could: the git helper had been returning an
+  empty string for a command that failed, so a `git status --porcelain` that could not run read as
+  a clean tree. A refusal to answer and an answer of "nothing" are now different values.
 
 - **CI runs the doctor on the install it just proved — and the first run found three bugs.** The
   bootstrap job builds a design-only install on thirteen cells; the doctor now runs in the same

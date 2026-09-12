@@ -15,7 +15,7 @@ import * as B06 from './B06.mjs';
 import * as B07 from './B07.mjs';
 import * as B08 from './B08.mjs';
 import * as B09 from './B09.mjs';
-import { hashInputs } from './inputs.mjs';
+import { hashFor } from '../inputs.mjs';
 import { failureBlock, stepLine } from './format.mjs';
 import { saveState } from '../state.mjs';
 import { EXIT_FAIL, EXIT_INTERRUPTED, EXIT_OK } from '../exit.mjs';
@@ -61,7 +61,12 @@ export function killTree(child, { platform = process.platform, spawn = nodeSpawn
  */
 export async function runSteps({ root, ctx, state, from = null, onLine = () => {},
   now = () => new Date(), save = saveState, steps = STEPS, last = null,
-  live = { child: null, step: null } }) {
+  live = { child: null, step: null },
+  // The hasher, as a seam. In the product it is ARC-09-S05's TABLE, by step id — one declaration
+  // of "what are my inputs", read the same way by the runner, by `staleSteps()` and by the
+  // generated ARCHITECTURE table. A test driving FAKE steps has no table row for its invented ids
+  // and passes its own; that is a test fixture, not a second source.
+  hash: hashOf = (step) => hashFor(step.id, ctx) }) {
   const summary = { ok: 0, warn: 0, fail: 0, skipped: 0, cached: 0 };
   // B09 composes the closing block; the runner carries it out so `--json` prints the SAME string a
   // human saw rather than a second rendering of it.
@@ -92,7 +97,7 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
 
     // The hash is computed even when the step is about to run: it is what the NEXT run compares
     // against, so a step that ran without recording its inputs would re-run for ever.
-    const hash = cacheableOf(step) ? hashInputs(root, step.inputs(ctx)) : null;
+    const hash = cacheableOf(step) ? hashOf(step, ctx) : null;
     const forced = fromIndex !== -1 && i >= fromIndex;
     const cached = cacheableOf(step) && !forced
       && recorded?.status === 'ok' && recorded.inputsHash === hash;

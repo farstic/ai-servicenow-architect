@@ -17,8 +17,9 @@ import { capabilitiesLine, renderSummaryLine,
   summaryLine } from '../../tools/snowarch/lib/doctor/report-text.mjs';
 import { summariseMerged, dedupeKeyFor,
   engineBlock } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
-import { cachePath, cacheStale, collectInputs, INPUT_FILES,
-  inputsPath } from '../../tools/snowarch/lib/doctor-cache.mjs';
+import { cachePath, cacheSensitiveValue, cacheStale, collectInputs, INPUT_FILES,
+  inputsPath, writeReportCache } from '../../tools/snowarch/lib/doctor-cache.mjs';
+import { redact } from '../../tools/snowarch/lib/redact.mjs';
 import { doctorLine } from '../../tools/snowarch/lib/text.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
@@ -256,4 +257,70 @@ test('the cache refuses a report carrying a secret-shaped value', async (t) => {
   const text = readFileSync(cachePath(root), 'utf8');
   assert.equal(/https?:\/\/[a-z0-9-]+\.service-now\.com/i.test(text), false);
   assert.equal(/"[A-Z_]*(PASSWORD|SECRET|TOKEN)[A-Z_]*"\s*:\s*"[^"]{6,}"/.test(text), false);
+});
+
+// ─── ARC-09-C9 — the cache's guard is the cache's, not the state file's ──────────────────────
+//
+// Found by C8's fixture change: dropping `--quick` from `tests/doctor/fix.test.mjs` made the
+// fixtures run E-00, which on a machine with no Claude Code fails with the install page URL in its
+// text. `writeReportCache` was calling the STATE FILE's `assertStorable`, whose `URLISH` clause
+// refuses any `scheme://`, so the whole write threw and no cache existed — on CI, on every runner,
+// and on any developer machine with a Claude Code below the floor. Reproduced with an empty HOME
+// and no `claude` on PATH: 23/26 before, 26/26 after, same environment.
+//
+// Two layers, and these tests are about the second:
+//   the RUNNER redacts every result before the writer is handed anything (ARC-08-S11's chokepoint)
+//   — that is why the "no account name" and "no address-shaped string" cases below still pass;
+//   the WRITER is the last line, and refuses what should never reach a file read casually.
+// The writer is tested directly here, with text the runner would never produce, precisely because
+// its job is to be the check that does not depend on the runner having done its own.
+
+test('a check whose remedy quotes documentation is cached, URL and all', (t) => {
+  const root = tempDir('c9-docs-', t);
+  const report = {
+    mode: 'design',
+    checks: [{
+      id: 'E-00',
+      status: 'fail',
+      detail: 'Claude Code not found on PATH',
+      remedy: 'install it from https://code.claude.com/docs/en/setup, then re-run',
+    }],
+  };
+  writeReportCache(root, report);
+  const text = readFileSync(cachePath(root), 'utf8');
+  // Not "a cache exists" — the URL itself survived. A stand-in here would mean the banner and
+  // `/snowarch status` quote a remedy the user cannot act on.
+  assert.match(JSON.parse(text).checks[0].remedy, /https:\/\/code\.claude\.com\/docs\/en\/setup/);
+});
+
+test('a check whose text names an instance is REFUSED, and the message names the field', (t) => {
+  const root = tempDir('c9-instance-', t);
+  const report = {
+    mode: 'live',
+    checks: [{ id: 'E-13', status: 'fail', detail: 'probe of https://dev12345.service-now.com failed' }],
+  };
+  assert.throws(() => writeReportCache(root, report), (e) => {
+    // The path, so the next person knows WHICH field; the reason, so they know why.
+    assert.match(e.message, /doctor-last\.checks\[0\]\.detail/);
+    assert.match(e.message, /it carries an instance address/);
+    return true;
+  });
+  assert.equal(existsSync(cachePath(root)), false, 'a refused write left a file behind');
+});
+
+test('the instance clause is not redundant: the redactor alone would pass that string', () => {
+  // Measured, not assumed. `register()` is called only from `instance-file.mjs`, and only for
+  // `password` and `clientSecret` — an instance host is never registered, so `redact()` returns it
+  // unchanged. Drop the INSTANCE_HOST clause and the case above starts storing the address.
+  const address = 'probe of https://dev12345.service-now.com failed';
+  assert.equal(redact(address), address, 'the redactor now rewrites instance hosts — re-read C9');
+  assert.equal(cacheSensitiveValue(address), 'it carries an instance address');
+  // And the clause is narrow: the product's own documentation domain is not an instance.
+  assert.equal(cacheSensitiveValue('see https://www.servicenow.com/docs for the table API'), null);
+});
+
+test('a secret-shaped key is refused by the cache exactly as by the state file', (t) => {
+  const root = tempDir('c9-key-', t);
+  const report = { mode: 'design', checks: [], server: { instances: [{ label: 'pdi', password: 'x' }] } };
+  assert.throws(() => writeReportCache(root, report), /the key names a secret/);
 });

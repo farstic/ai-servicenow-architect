@@ -33,7 +33,7 @@ import { fillMeaning, fillRemedy } from '../servicenow/net-errors.js';
 import { probeAll, toLastProbe } from '../servicenow/probes.js';
 import { probeClientFor, probeOptionsFor } from '../servicenow/probe-client.js';
 import { loadStore, projectStorePath, resolveStorePath, saveStore } from '../store/index.js';
-import { completeFlags } from '../store/schema.js';
+import { STORE_VERSION, completeFlags } from '../store/schema.js';
 import { FLAG_NAMES, matchPreset } from '../utils/permissions.js';
 export const EXIT_OK = 0;
 export const EXIT_FAILED = 1;
@@ -303,7 +303,7 @@ export async function runAdd(options, terminal, deps = {}) {
     const existing = loadStore(storePath);
     const store = 'store' in existing
         ? existing.store
-        : { version: 1, instances: {} };
+        : { version: STORE_VERSION, instances: {} };
     if ('store' in existing && store.instances[label] && !options.replace) {
         io.write(`${labelExists(label)}\n`);
         return { saved: false, exitCode: EXIT_USAGE, message: labelExists(label) };
@@ -720,7 +720,7 @@ export function targetStore(deps, options = {}) {
 function openStore(deps, options = {}) {
     const { path, source } = targetStore(deps, options);
     if (!existsSync(path)) {
-        return { ok: true, opened: { path, source, store: { version: 1, instances: {} } } };
+        return { ok: true, opened: { path, source, store: { version: STORE_VERSION, instances: {} } } };
     }
     const loaded = loadStore(path);
     if ('error' in loaded) {

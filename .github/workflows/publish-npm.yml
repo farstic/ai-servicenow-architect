@@ -1,0 +1,76 @@
+# The optional secondary channel: `npx @farstic/snowarch`, for someone who wants the MCP server
+# without the Architect engine. The engine itself never consumes this package — it runs the server
+# from the checkout — so nothing in this repository breaks if this workflow is never dispatched.
+#
+# THREE THINGS MAKE IT SAFE TO HAVE AT ALL:
+#
+#   It runs ONLY when a human dispatches it. No `push`, no `tags:`, no `pull_request`. A release
+#   tag does not publish anything; `release.yml` cuts the GitHub Release and stops there.
+#
+#   It is a DRY RUN unless someone says otherwise. `dry_run` defaults to true, so the harmless
+#   thing is what happens when the dialog is accepted as it stands.
+#
+#   It can only publish ONE package. `assert-publish-target.mjs` refuses anything but
+#   `@farstic/snowarch`, and names D-01 when it sees `@farstic/snow-mcp` — the 1.0.0 record on npm
+#   that is never touched again. That check runs BEFORE `npm ci` and long before the token is used.
+#
+# The token is the owner's, granular, and scoped to this one package (docs/CONTRIBUTING.md says so
+# where the secret is created): a leak cannot reach the old record either.
+name: publish-npm (optional)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. v2.0.0'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (no publish)'
+        required: true
+        type: boolean
+        default: true
+
+# `id-token: write` is what npm provenance needs (OIDC), and this is the only workflow that has it.
+# `contents: read` — this one never writes to the repository.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # AT THE TAG, with the full history: `verify-tag.mjs` reads the annotated tag's own message
+      # and compares it with the tree, which a shallow clone cannot do.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      # The tag is a real annotated release tag whose trailers match this tree (ARC-09-S03).
+      - name: verify-tag
+        run: node scripts/ci/verify-tag.mjs ${{ inputs.tag }}
+
+      # The package is the one package this repository may publish, at the version the tag names.
+      # Before `npm ci`, so a wrong target costs a second rather than a full install — and before
+      # anything has touched the registry.
+      - name: assert-publish-target
+        run: node scripts/ci/assert-publish-target.mjs ${{ inputs.tag }}
+
+      - run: npm ci --ignore-scripts
+      - name: contract gate
+        run: node scripts/contract-gate.mjs
+
+      # `--dry-run` unless the dispatcher explicitly said otherwise. The flag is computed here
+      # rather than in the `run:` line so the log records which of the two this run was.
+      - name: publish
+        run: npm publish --workspace packages/snowarch --provenance --access public ${{ inputs.dry_run && '--dry-run' || '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

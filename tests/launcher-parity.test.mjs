@@ -220,9 +220,25 @@ test('the cmd wrappers are exactly the story\'s, and they call powershell not pw
   assert.match(cmd, /endlocal & exit \/b %RC%/);
 
   assert.match(sn, /where node >nul 2>nul \|\|/);
-  assert.match(sn, /exit \/b 3\)/, 'a missing Node must be exit 3, not a stack trace');
   assert.match(sn, /node "%~dp0tools\\snowarch\\bin\\snowarch\.mjs" %\*/);
   assert.match(sn, /exit \/b %ERRORLEVEL%/);
+
+  // A missing Node is exit 3, and this asserts the CODE PATH rather than the sentence.
+  //
+  // It used to be `assert.match(sn, /exit \/b 3\)/)`, which matched
+  // `(echo … ^& exit /b 3)` — and inside a parenthesised block that `^&` is ESCAPED, so
+  // "exit /b 3" was part of the echoed TEXT. The launcher printed the words and fell through to
+  // `node`, which is not there, and returned cmd's 9009. The test passed for three ARCs because it
+  // was reading a message, and the CI cell that would have caught it was dead code — invoked
+  // without `call`, so the assertion on the next line never ran (ARC-09-S04).
+  const branch = sn.slice(sn.indexOf('where node'));
+  assert.match(branch, /\|\| goto :no_node/, 'the no-Node branch must LEAVE, not fall through');
+  assert.match(sn, /^:no_node$/m);
+  const label = sn.slice(sn.indexOf('\n:no_node'));
+  assert.match(label, /^exit \/b 3$/m, 'the no-Node path does not exit 3');
+  // ...and the code is not inside the message, which is the mistake that hid for three ARCs.
+  const echoed = /^echo snowarch: .*$/m.exec(label)?.[0] ?? '';
+  assert.equal(/exit \/b/.test(echoed), false, 'the exit code is part of the printed sentence again');
 
   for (const [name, body] of [['bootstrap.cmd', cmd], ['snowarch.cmd', sn]]) {
     assert.ok(!/\bpwsh\b/.test(body), `${name} reaches for pwsh`);

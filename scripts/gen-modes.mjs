@@ -17,7 +17,7 @@
  *
  * Stdlib only, like every generator in `npm run lint`.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -75,12 +75,12 @@ if (isMain) {
   const next = renderModes(current, sources);
 
   if (current.replace(/\r\n/g, '\n') === next) {
-    process.stdout.write(`gen-modes: ${TARGET} current (${INCLUDES.length} included blocks).\n`);
+    writeSync(1, `gen-modes: ${TARGET} current (${INCLUDES.length} included blocks).\n`);
   } else if (CHECK) {
-    process.stdout.write(`gen-modes: ${TARGET} is stale — run npm run gen and commit the result\n`);
+    writeSync(1, `gen-modes: ${TARGET} is stale — run npm run gen and commit the result\n`);
     process.exit(1);
   } else {
     writeFileSync(join(root, TARGET), next);
-    process.stdout.write(`gen-modes: wrote ${TARGET} (${INCLUDES.length} included blocks).\n`);
+    writeSync(1, `gen-modes: wrote ${TARGET} (${INCLUDES.length} included blocks).\n`);
   }
 }

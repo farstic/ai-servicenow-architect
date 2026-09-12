@@ -13,6 +13,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const distTools = join(__dirname, '..', 'dist', 'tools', 'index.js');
 
 const { collectToolCatalog } = await import(pathToFileURL(distTools).href);
+// From the built module, so the contract cannot disagree with the code that reads the store.
+const { CURRENT_SCHEMA_VERSION } = await import(
+  pathToFileURL(join(__dirname, '..', 'dist', 'store', 'migrations', 'index.js')).href);
 const tools = collectToolCatalog();
 
 const manifest = tools.map(t => ({
@@ -118,6 +121,12 @@ export async function buildContract(manifest) {
       ],
     },
     toolPackage: 'full',
+    // The store schema this build reads and writes (ARC-09-S06). In the contract because two
+    // programs outside this package need it: S05's input table hashes it, so a release that
+    // changes the schema makes exactly B06 stale; and `upgrade` (S07) reads it out of a TAG —
+    // `git show v2.1.0:packages/snowarch/dist/contract.json` — to tell a user a migration is
+    // coming BEFORE it checks anything out. Imported from the module, never typed here.
+    storeSchemaVersion: CURRENT_SCHEMA_VERSION,
     maxRecordsDefault: 100,
     // Derived, never a literal: the constant above can lag a story, this cannot.
     toolCount: manifest.length,
