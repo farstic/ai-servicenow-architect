@@ -577,7 +577,14 @@ function withRemote(t, state) {
   // scaffolding is part of what it is testing.
   const scaffold = tempDir('snowarch-origin-', t);
   const bare = join(scaffold, 'origin.git');
-  execFileSync('git', ['init', '-q', '--bare', bare], { stdio: 'pipe' });
+  // `-b main`, and it is not decoration. `git init --bare` points HEAD at whatever
+  // `init.defaultBranch` says — `master` on a default installation — so a bare repository whose
+  // only branch is `main` has a HEAD naming a branch that does not exist. Cloning THAT leaves the
+  // clone on an unborn `master`, and the push below fails with `src refspec main does not match
+  // any`. It passed locally, where this machine's git resolves it, and failed on all twelve
+  // `test` and `release-dryrun` cells — a fixture that depended on the machine it ran on, which is
+  // ARC-08-S05's lesson arriving a third time.
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare], { stdio: 'pipe' });
   git(root, ['remote', 'add', 'origin', bare]);
   if (state !== 'no-upstream') {
     git(root, ['push', '-q', 'origin', 'main']);
