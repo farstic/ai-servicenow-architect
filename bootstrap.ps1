@@ -240,8 +240,28 @@ if ($Docs -eq 'skip') {
   Record 'B02' 'skipped'
 } else {
   $watch = [System.Diagnostics.Stopwatch]::StartNew()
-  if ($Docs -eq 'full') { Invoke-DocsRecipeFull } else { Invoke-DocsRecipeSparse }
-  if ($LASTEXITCODE -ne 0) { Die 'B02' 'the corpus checkout failed' $MSG_NET 1 }
+  # $LASTEXITCODE is NOT the check here and never was a sound one: the recipe's two `submodule`
+  # steps are allowed to fail (the Node path swallows them too), so their exit code would condemn a
+  # good install — and a fatal step now THROWS, which no exit-code check ever sees. The throw is
+  # what is caught.
+  #
+  # $corpusPre decides what the failure may delete: the recipe's first step is a clone, and a clone
+  # refuses a non-empty directory, so a half-finished run left behind makes MSG_NET's "re-run"
+  # false. Remove only a directory THIS run created; never one that was already there.
+  $corpusPre = Test-Path "$Root\vendor\ServiceNowDocs"
+  $recipeOk = $true
+  try {
+    if ($Docs -eq 'full') { Invoke-DocsRecipeFull } else { Invoke-DocsRecipeSparse }
+  } catch {
+    $recipeOk = $false
+    Say $_.Exception.Message
+  }
+  if (-not $recipeOk) {
+    if (-not $corpusPre) {
+      Remove-Item -Recurse -Force "$Root\vendor\ServiceNowDocs" -ErrorAction SilentlyContinue
+    }
+    Die 'B02' 'the corpus checkout failed' $MSG_NET 1
+  }
   # The recipe already carries -c core.longpaths=true; this makes it stick for later git calls in
   # the submodule, where a 197-character path plus a checkout prefix passes 260.
   & git -C "$Root\vendor\ServiceNowDocs" config core.longpaths true 2>$null | Out-Null

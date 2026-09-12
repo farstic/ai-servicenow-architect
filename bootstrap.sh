@@ -174,8 +174,19 @@ if [ "$DOCS" = skip ] ; then
   record B02 skipped
 else
   T0="$(date +%s)"
-  if [ "$DOCS" = full ] ; then docs_recipe_full ; else docs_recipe_sparse ; fi || \
+  # Whether the corpus was here BEFORE this run decides what a failure is allowed to delete. The
+  # recipe's first step is `git clone … vendor/ServiceNowDocs`, and a clone refuses a directory that
+  # exists and is not empty — so a run that failed halfway and left the directory behind made
+  # MSG_NET's "re-run" false: the re-run died on "already exists and is not an empty directory"
+  # instead of finishing the job. Bootstrap therefore removes a directory IT CREATED in this run,
+  # and never one that was already there, whatever state it is in — someone else's checkout is not
+  # ours to delete.
+  CORPUS_PRE=0
+  [ -d "$ROOT/vendor/ServiceNowDocs" ] && CORPUS_PRE=1
+  if [ "$DOCS" = full ] ; then docs_recipe_full ; else docs_recipe_sparse ; fi || {
+    [ "$CORPUS_PRE" = 1 ] || [ -z "$ROOT" ] || rm -rf "$ROOT/vendor/ServiceNowDocs"
     die B02 "the corpus checkout failed" "$MSG_NET" 1
+  }
   MISSING=''
   while read -r area ; do
     [ -n "$area" ] || continue

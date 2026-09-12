@@ -141,6 +141,82 @@ export function classifyGitFailure(stderr, { upstream, pin, env = process.env } 
   return `git failed: ${first}`;
 }
 
+/**
+ * The same stderr, asked a different question: could a second attempt plausibly survive this?
+ *
+ * Separate from `classifyGitFailure` rather than folded into it, because the two answers are
+ * independent. A transient failure still needs the operator's sentence if it outlives the retries,
+ * and almost every failure that HAS a sentence is permanent. The return value is the LABEL the
+ * retry line prints, not a boolean: a pause that will not say what it is waiting out is a pause
+ * nobody can debug from a CI log.
+ *
+ * PERMANENT WINS over transient wherever both match, which is why that list is consulted first and
+ * exits. git prints `RPC failed` above an HTTP 401, and retrying someone's expired credentials
+ * three times only makes them wait 12 s for the same answer.
+ *
+ * The substrings are libcurl's as surfaced by git (S-07 transcripts,
+ * `docs/spikes/S-07-docs-submodule/`), matched case-insensitively for the reason
+ * `classifyGitFailure` gives above.
+ */
+export function transientReason(stderr) {
+  const low = String(stderr ?? '').toLowerCase();
+  const permanent = ['could not resolve host', 'authentication failed',
+    'invalid username or password', 'repository not found', 'corrupt object'];
+  if (permanent.some((p) => low.includes(p))) return null;
+  // 408 (request timeout), 429 (too many requests) and any 5xx are the upstream asking to be asked
+  // again. Any other 4xx is a statement about the request, which repeating does not change.
+  const http = low.match(/the requested url returned error: (408|429|5\d\d)/);
+  if (http) return `HTTP ${http[1]}`;
+  // curl 18 is a partial transfer, 56 a failure receiving data: a connection that died mid-stream.
+  const curl = low.match(/curl (18|56)\b/);
+  if (curl) return `curl ${curl[1]}`;
+  if (low.includes('unexpected disconnect while reading sideband packet')) return 'sideband disconnect';
+  if (low.includes('the remote end hung up unexpectedly')) return 'remote hung up';
+  if (low.includes('early eof')) return 'early EOF';
+  // Last, and deliberately: `RPC failed` accompanies a more specific line often enough that
+  // matching it first would print the vaguer of two available labels.
+  if (low.includes('rpc failed')) return 'RPC failed';
+  return null;
+}
+
+/**
+ * The retry schedule: one entry per WAIT, so the attempt count is `length + 1` and the two numbers
+ * cannot disagree. Fixed, not jittered — jitter spreads a thundering herd, and one operator
+ * bootstrapping one laptop is not one; what jitter would actually buy here is an untestable pause.
+ */
+export const RETRY_WAITS_MS = Object.freeze([3000, 9000]);
+
+/**
+ * A sleep that BLOCKS the thread, because every git call in this recipe is `execFileSync`. Making
+ * `syncCorpus` async to await a pause would change its signature for all five of its callers — the
+ * bootstrap, the doctor and three `docs` sub-commands — to serve one rare path. `Atomics.wait` on a
+ * throwaway buffer is the stdlib's synchronous sleep. Injected at `syncCorpus` so tests prove the
+ * schedule without spending it.
+ */
+export const blockingSleep = (ms) => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+};
+
+/**
+ * The whole retry decision, as data: `null` to give up now, or what the next attempt waits.
+ *
+ * Extracted from the loop so the SCHEDULE can be proven without a failing git. A fixture cannot
+ * make a real git emit a 408 — `file://` never produces one — and a test that could only reach this
+ * through a fake binary would be a test that only runs where a fake binary can be put on PATH.
+ * The loop keeps one job: do what this says. The wiring is proven separately, once.
+ */
+export function retryPlan(stderr, attempt) {
+  const reason = transientReason(stderr);
+  const waitMs = RETRY_WAITS_MS[attempt - 1];
+  if (reason === null || waitMs === undefined) return null;
+  return { reason, waitMs, next: attempt + 1, of: RETRY_WAITS_MS.length + 1 };
+}
+
+/** The line a retry prints. One function, so the wording is asserted where it is written. */
+export const retryLine = (plan, phase) =>
+  `[docs] corpus: transient (${plan.reason}) during ${phase}, `
+  + `attempt ${plan.next} of ${plan.of} in ${plan.waitMs / 1000} s`;
+
 // maxBuffer matters here and the default is not enough: `git ls-files -v -z` over this corpus emits
 // ~1.1 MB (48,997 index entries), and execFileSync's 1 MB default throws ENOBUFS mid-recipe. Found
 // by running it — the crash dumps the whole listing into the exception, which is its own lesson
@@ -157,13 +233,27 @@ const run = (args, cwd, quiet = false) =>
  * Every git call the recipe makes goes through this. `quiet` is forced on: the classifier needs
  * stderr as a string, and it cannot have it if git inherited the terminal.
  */
-const runMapped = (args, cwd, ctx) => {
-  try {
-    return execFileSync('git', withLongPaths(args), {
-      cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: 'pipe',
-    });
-  } catch (e) {
-    throw new SyncError(classifyGitFailure(e.stderr ?? e.message, ctx), EXIT.git);
+const runMapped = (args, cwd, ctx, retry = null) => {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return execFileSync('git', withLongPaths(args), {
+        cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: 'pipe',
+      });
+    } catch (e) {
+      const stderr = e.stderr ?? e.message;
+      // `retry` null means the caller never declared this call retryable — a local step, which
+      // cannot fail transiently — so the plan is not even asked for.
+      const plan = retry ? retryPlan(stderr, attempt) : null;
+      if (plan === null) {
+        // The exhausted failure is reported as what it IS — the network class, with its sentence —
+        // and the attempt count is appended so a log shows the retries happened. A failure that
+        // only ever prints the last attempt reads as a first attempt.
+        const tried = attempt > 1 ? ` (${attempt} attempts)` : '';
+        throw new SyncError(`${classifyGitFailure(stderr, ctx)}${tried}`, EXIT.git);
+      }
+      retry.say(retryLine(plan, retry.phase));
+      retry.sleep(plan.waitMs);
+    }
   }
 };
 
@@ -361,13 +451,19 @@ export function planRecipe({ config, areas, mode = MODE.sparse, state = { presen
  * `inspect` are reads — which is what makes "up to date" fast and safe to run from a hook.
  */
 export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, log = console.log,
-  quiet = false } = {}) {
+  quiet = false, sleep = blockingSleep } = {}) {
   const { docs } = config;
   const corpus = join(root, CORPUS_DIR);
   const areas = readAreas(root, docs.areasFile);
   const mode = resolveMode(root, requestedMode);
   const ctx = { upstream: docs.upstream, pin: docs.pin };
   const say = quiet ? () => {} : log;
+  // Only the three steps that TOUCH THE NETWORK are declared retryable. The class gate would make
+  // it harmless to declare the local ones too — `sparse-checkout set` cannot emit a libcurl error —
+  // but a retry on a step that cannot fail transiently is code with no failure to answer for.
+  // `checkout` is here because a blobless clone fetches the blobs AT checkout: that is the step the
+  // 408 on `no-node, macos-latest` landed on.
+  const retryAt = (phaseName) => ({ phase: phaseName, say, sleep });
   const t0 = Date.now();
   const phase = (label, fn) => {
     const t = Date.now();
@@ -393,7 +489,7 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   if (!state.present) {
     phase(`clone (depth 1, blobless, ${mode})`, () => runMapped(
       ['clone', '--filter=blob:none', '--no-checkout', '--depth', '1', '--sparse',
-        '--branch', docs.family, docs.upstream, CORPUS_DIR], root, ctx));
+        '--branch', docs.family, docs.upstream, CORPUS_DIR], root, ctx, retryAt('clone')));
     state = inspect(root, config, areas);
   }
 
@@ -415,7 +511,7 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   // 4. The pin. `cat-file -e` decides whether the fetch is needed: GitHub serves reachable SHAs by
   //    hash (S-07), but a fetch we do not need is ~30 s we do not spend.
   if (!state.pinPresent) {
-    phase(`fetch pin ${docs.pin.slice(0, 7)}`, () => runMapped(['fetch', '--depth', '1', 'origin', docs.pin], corpus, ctx));
+    phase(`fetch pin ${docs.pin.slice(0, 7)}`, () => runMapped(['fetch', '--depth', '1', 'origin', docs.pin], corpus, ctx, retryAt('fetch')));
   }
   // ALWAYS after a fresh clone, and whenever the tree is not populated — never merely when HEAD
   // differs. `git clone --no-checkout` leaves an empty index and an empty working tree, and when the
@@ -424,7 +520,7 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   // fetch-by-hash path always ran and hid this. The first bump made pin == tip and the install
   // produced an empty corpus that called itself complete.
   if (!state.atPin || !state.indexed) {
-    phase(`checkout --detach ${docs.pin.slice(0, 7)}`, () => runMapped(['checkout', '--detach', docs.pin], corpus, ctx));
+    phase(`checkout --detach ${docs.pin.slice(0, 7)}`, () => runMapped(['checkout', '--detach', docs.pin], corpus, ctx, retryAt('checkout')));
   }
 
   // 5. The gitlink. absorbgitdirs is allowed to fail — before the superproject knows about the
