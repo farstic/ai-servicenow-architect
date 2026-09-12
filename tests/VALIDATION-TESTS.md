@@ -21,7 +21,8 @@
 > next story that adds one.
 >
 > **Recording a run.** Results go in the pull request description, or in
-> `docs/spikes/validation-runs/<date>-<what>.md`. Never in this file — a test document that
+> `docs/validation/<date>-<os>.md` from `docs/validation/TEMPLATE.md` (ARC-10-S07). Never in this
+> file — a test document that
 > accumulates run history stops being readable as a specification, and the dates rot.
 
 ---
@@ -998,7 +999,8 @@ When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `gove
 4. **Re-run the affected test** in a fresh session.
 5. **Re-run the full suite** before committing — a fix for one test must not break others.
 6. **Record the result** in the pull request description, or in
-   `docs/spikes/validation-runs/<date>-<what>.md` — the engine version and the CLI version with it.
+   `docs/validation/<date>-<os>.md` from `docs/validation/TEMPLATE.md` — the product version and the
+   Claude Code version with it.
    Never in this file: it is a specification, and the two dated run tables that used to sit below
    this section were removed at import for exactly that reason.
 

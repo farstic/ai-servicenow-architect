@@ -172,7 +172,8 @@ the redaction lint green on each transcript.
 > what appears if not); (4) on Windows, which spelling the block used and whether the doctor's
 > `shell` guess was right — until ARC-08-S01 ships there is no `--section prereqs`, so the skill
 > prints BOTH spellings, and seeing that fallback behave is half the value of the Windows pass.
-> Record in `docs/spikes/validation-runs/`; never paste a credential, and the plan output is safe
+> Record in `docs/validation/<date>-<os>.md` from `docs/validation/TEMPLATE.md`; never paste a
+> credential, and the plan output is safe
 > by construction.
 >
 
@@ -185,7 +186,7 @@ the redaction lint green on each transcript.
 > flag this page does not show, that is the finding. **(2) One read-through by somebody who did not
 > write the stories** — the story asks for it by name, and the reader is you. What to look for is
 > not typos: it is the question a new user would ask that the page does not answer, and the sentence
-> that assumes something only the author knows. Record both in `docs/spikes/validation-runs/`;
+> that assumes something only the author knows. Record both in `docs/validation/<date>-<os>.md`;
 > never paste a secret, and the page itself carries none.
 >
 
@@ -487,8 +488,8 @@ Before attaching a transcript to a PR, remove the instance identifiers: the inst
 sub-domain, the username, and any sys_id from a real record. The codes, the remedies and the tool
 names stay — they are the evidence. Nothing else from the instance does.
 
-> *(the test texts are `tests/VALIDATION-TESTS.md` T-19 and T-22; the record format is ARC-02-S13's
-> — results go in the PR description or `docs/spikes/validation-runs/<date>-<what>.md`, never back
+> *(the test texts are `tests/VALIDATION-TESTS.md` T-19 and T-22; the record format is ARC-10-S07's
+> — results go in the PR description or `docs/validation/<date>-<os>.md`, never back
 > into the test file)*
 
 **Why it matters, in one line:** a session that retries a 401 locks the account it was trying to
@@ -1062,7 +1063,7 @@ drifts. Nothing about E1–E5 changes.
 |---|---|
 | **S-03, S-04, S-08** and the Windows halves of S-01 / S-07 / S-15 / S-20 | `DEFERRED — Windows VM pending (owner input #2)`. A machine without Git Bash on `PATH` is needed. |
 | **ARC-02-S11 criterion 9** — `/snowarch status` through `./snowarch` or the `node tools/snowarch/bin/snowarch.mjs` fallback, on Windows | `DEFERRED — Windows VM pending (owner input #2)`, same machine as the row above. The half that a file can prove is done and permanent: `snowarch.cmd instance add …` is in the hand-off text and `tests/snowarch-skill.test.mjs` fails if it leaves. What needs the VM is whether a Windows shell reaches the launcher at all — and before ARC-06 there is no launcher to reach, so this cannot be closed until ARC-06 ships either way. |
-| **ARC-02-S13 criterion 6** — the routing subset (T-01, T-02, T-03, T-04, T-10, T-14, T-15) re-run on Windows | `DEFERRED — Windows VM pending (owner input #2)`, same machine as the rows above. The full eighteen ran in design-only on macOS (`docs/spikes/validation-runs/`); the Windows subset is a cross-platform check of the same loaded texts, not of any Windows-only code path. ARC-02 is not held open for it by standing decision. |
+| **ARC-02-S13 criterion 6** — the routing subset (T-01, T-02, T-03, T-04, T-10, T-14, T-15) re-run on Windows | `DEFERRED — Windows VM pending (owner input #2)`, same machine as the rows above. The full eighteen ran in design-only on macOS (those records stay under `docs/spikes/validation-runs/`); the Windows subset is a cross-platform check of the same loaded texts, not of any Windows-only code path. ARC-02 is not held open for it by standing decision. |
 | **The Ubuntu VM rows** | ✅ **No longer blocked.** `arc00-ubuntu` is logged in and running Claude Code **2.1.263**; `claude -p` works there. **S-07 and S-05 have been run on it since** — see those records, and note S-07's Ubuntu row changed the spike's conclusion (recipe B does not exist on Ubuntu 22.04's stock git 2.34.1, and that git silently omits the corpus's five root files including `LICENSE`). |
 | **S-14e** second machine | Now runnable without you — no longer waiting on a login. |
 | **S-14g** throttled network | Day 4 of the time-box, on the VM (`tc qdisc … rate 2mbit`). Unthrottled it already installs in **1.9 s** against a 60-second cap. |

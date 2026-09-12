@@ -102,6 +102,42 @@ test('AC — a sha is not a sys_id, and a redacted length is not a credential', 
   assert.equal(credential[1].test('password: hunter2'), true, 'a real leak no longer matches');
 });
 
+// ─── One place a new record goes, asserted rather than agreed ────────────────────────────────
+
+/** The documents that TELL somebody where to record a run. History is not in this set. */
+export const INSTRUCTION_FILES = ['tests/VALIDATION-TESTS.md', 'docs/CONTRIBUTING.md',
+  'docs/spikes/OWNER-SITTING.md'];
+
+/** A mention is allowed only while it is saying the path is retired, or that old records stay. */
+export const RETIRED_PATH = 'docs/spikes/validation-runs';
+const allows = (line) => /\bretired\b|\bstay\b/.test(line);
+
+test('AC — no instruction still sends a new record to the retired path', () => {
+  // The sentence lived in FIVE places, not the one this story changed first: two more in
+  // `tests/VALIDATION-TESTS.md` and three in `OWNER-SITTING.md`, which is the file the sittings
+  // actually read while doing the run. "One definition" is a claim about the whole tree, and the
+  // only way it stays true is a check — the next copy is otherwise found by somebody reading.
+  const hits = [];
+  for (const rel of INSTRUCTION_FILES) {
+    read(rel).split('\n').forEach((line, i) => {
+      if (line.includes(RETIRED_PATH) && !allows(line)) {
+        hits.push(`${rel}:${i + 1}: ${line.trim().slice(0, 72)}`);
+      }
+    });
+  }
+  assert.deepEqual(hits, [], `${hits.length} instruction(s) still name the retired path`);
+
+  // ...and each file names the CURRENT one, or this passes on a tree that tells nobody anything.
+  for (const rel of INSTRUCTION_FILES) {
+    assert.ok(read(rel).includes('docs/validation/'), `${rel} does not name the current location`);
+  }
+
+  // Both directions on the allowance: a bare mention is a finding, a retirement sentence is not.
+  assert.equal(allows('or in `docs/spikes/validation-runs/<date>-<what>.md`.'), false);
+  assert.equal(allows('those records stay under `docs/spikes/validation-runs/`'), true);
+  assert.equal(allows('that path is retired for new ones'), true);
+});
+
 // ─── The cutover list's ids resolve against the test file's own headings ──────────────────────
 
 /** `## T-NN — title` — level two, which is what `tests/VALIDATION-TESTS.md` uses. */
