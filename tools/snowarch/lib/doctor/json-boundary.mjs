@@ -51,16 +51,15 @@ const HOME_PATH = /(?:[A-Za-z]:)?[\\/](?:Users|home)[\\/][^\\/\s"'`,;:]*/g;
  * machine's own answer covers the case no pattern can.
  *
  * IT ARRIVES AS AN ARGUMENT, and that is a rule rather than a preference: nothing under `lib/` reads
- * the home directory itself. `tools/snowarch/tests/mode-register.test.mjs` — *nothing under `lib/`
- * opens `~/.claude.json`, or anything else in the home directory* — fails the build on either
- * environment name anywhere in this tree. The entry point in `bin/` asks the OS once and threads the
- * answer through, which is also what lets a test point a whole run at a fixture without touching the
- * environment. The first version of this file read the environment directly and that guard caught
- * it, correctly.
+ * the home directory itself — not `homedir()`, not `process.env.HOME`, not `USERPROFILE`.
+ * `tools/snowarch/tests/mode-register.test.mjs` fails the build on any of them. `bin/snowarch.mjs`
+ * calls `homedir()` once and threads the answer through, which is also what lets a test point a
+ * whole run at a fixture without touching the environment. The first version of this file read the
+ * environment directly and that guard caught it, correctly.
  *
- * (The guard scans raw text, so it also fires on a COMMENT naming either variable — which is why
- * this paragraph describes them instead of spelling them. Noted for its owner; this file complies
- * with the rule either way.)
+ * (This paragraph is allowed to SPELL what the rule forbids only because of ARC-06-C1: the guard
+ * used to scan raw text and fired on the prose explaining it. Naming them here is the point — a
+ * reader who does not know which two variables are meant cannot obey the rule.)
  *
  * The guard on the VALUE is not decoration either. A home of `/`, a bare drive root or an empty
  * string would match inside every absolute path in the report and turn it to nonsense; below four

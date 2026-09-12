@@ -342,6 +342,19 @@ test('nothing under lib/ opens ~/.claude.json, or anything else in the home dire
   const FS_VERB = /readFileSync|writeFileSync|existsSync|openSync|rmSync|appendFileSync|join\(|resolve\(/;
   const WRITE_VERB = /writeFileSync|appendFileSync|rmSync|unlinkSync|renameSync|openSync/;
   /**
+   * ARC-06-C1. Every source scan strips comments (`docs/CONTRIBUTING.md`), and this one did not.
+   *
+   * A COMMENT naming either environment variable was a build failure, which is backwards: the file
+   * most likely to name what it must not read is the file explaining why it must not read it. Found
+   * exactly that way at ARC-08-C1's second pass — the guard fired on a paragraph documenting this
+   * rule before it ever fired on a line of code, and the paragraph had to be reworded around it.
+   *
+   * The RULE does not move an inch. `lib/` still may not read the home directory; only the scan
+   * learns the difference between prose and code, and the control below asserts both sides of it.
+   */
+  const stripComments = (src) => src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  /**
    * The one file allowed to READ it, and never to write it.
    *
    * ARC-08-S03's E-23 is a detector: its whole subject is the stale registrations the old
@@ -353,7 +366,7 @@ test('nothing under lib/ opens ~/.claude.json, or anything else in the home dire
   const READ_ONLY_DETECTOR = 'doctor/checks/legacy.mjs';
 
   for (const file of files) {
-    const text = readFileSync(file, 'utf8');
+    const text = stripComments(readFileSync(file, 'utf8'));
     if (file.split('\\').join('/').endsWith(READ_ONLY_DETECTOR)) {
       assert.equal(WRITE_VERB.test(text), false,
         `${file} is the read-only detector and it writes something`);
@@ -371,4 +384,28 @@ test('nothing under lib/ opens ~/.claude.json, or anything else in the home dire
   }
   // Not vacuous: this is the shape the loop is looking for.
   assert.equal(FS_VERB.test("readFileSync(join(homedir(), '.claude.json'))"), true);
+
+  // ARC-06-C1, both directions. Prose that NAMES the variable is not a finding; a line that READS
+  // it still is. Asserted through `stripComments` on the two shapes a source file actually uses —
+  // the block comment above a function and the trailing comment on a line — because a scan that
+  // stopped firing on code would pass this test silently if only the first half were checked.
+  const HOME_ENV = /\bhomedir\b|USERPROFILE/;
+  for (const prose of [
+    '/**\n * Read at call time; never from the environment.\n */\nexport function f(home) {}',
+    'const h = ctx.home;   // not homedir(), and never USERPROFILE — the entry point supplies it',
+    '// homedir()',
+  ]) {
+    assert.equal(HOME_ENV.test(stripComments(prose)), false,
+      `a comment naming the variable is still a finding:\n${prose}`);
+  }
+  for (const code of [
+    "import { homedir } from 'node:os';",
+    'const h = process.env.USERPROFILE;',
+    'const h = homedir();   // the entry point does this, lib/ may not',
+  ]) {
+    assert.equal(HOME_ENV.test(stripComments(code)), true, `a real read stopped being a finding: ${code}`);
+  }
+
+  // And the stripper does not eat a URL, which is the classic way this rewrite goes wrong.
+  assert.match(stripComments("const u = 'https://example.com/docs';"), /https:\/\/example\.com\/docs/);
 });

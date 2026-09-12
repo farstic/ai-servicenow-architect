@@ -219,6 +219,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A guard that protects your home directory no longer objects to being explained.** One of the
+  checks that keeps this product from ever reading or writing files in your home folder searched the
+  source for the names of the things it forbids — including inside comments, so writing down *why*
+  the rule exists broke the build, and the explanation had to be edited into something vaguer. The
+  check now reads code and ignores prose. Nothing it forbids changed: the same code is still refused,
+  and the one file allowed to read your Claude settings — the detector whose job is finding leftovers
+  from the old installers — still may never write to them.
+
 - **The report you are asked to paste no longer names your instance.** `./snowarch doctor --json` is
   the form that travels — an issue template asks for it, and it goes into a public tracker. It used
   to carry the instance label in seven places and the instance hostname in two, so pasting a report
