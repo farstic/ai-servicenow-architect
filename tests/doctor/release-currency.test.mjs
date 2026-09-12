@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { hostChecks } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
+import { runChecks } from '../../tools/snowarch/lib/doctor/runner.mjs';
 import { writeUpgradeCheck } from '../../tools/snowarch/lib/upgrade-check.mjs';
 
 const E28 = hostChecks().find((c) => c.id === 'E-28');
@@ -150,7 +151,18 @@ test('C32 — a cached empty outcome never reads as "up to date"', async (t) => 
   assert.doesNotMatch(r.detail, /no tag/);
 });
 
-test('C32 — --no-network tells a checked-and-empty run from one that never ran', async (t) => {
+test('C32 — --no-network tells a checked-and-empty run from one that never ran, THROUGH THE RUNNER', async (t) => {
+  // THIS TEST WAS WRONG AND THE PRODUCT PROVED IT. Its first version called `E28.run(...)` directly
+  // with `noNetwork: true` and asserted the three sentences. They are real sentences in the check,
+  // and the doctor could never show them: `planRun` skips every `network: true` check by the FLAG,
+  // before any body runs, so the live report said `E-28 skip release currency: --no-network` and
+  // nothing more. Driving the body past the framework is the passes-for-the-wrong-reason class —
+  // the same one this whole acceptance pass keeps finding, this time in my own test.
+  //
+  // Those sentences had been unreachable since ARC-09-S07 wrote them (`9c4592d`); C32 extended dead
+  // code rather than creating it. The fix-up makes them reachable — E-28 declares `offline: true`,
+  // the runner runs an offline check under `--no-network` — and this case goes THROUGH `runChecks`,
+  // which is the only way to assert that a user would actually see them.
   const never = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
   const checked = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
   const sawOne = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
@@ -158,13 +170,42 @@ test('C32 — --no-network tells a checked-and-empty run from one that never ran
   writeUpgradeCheck(checked, { latestTag: null, localTag: null, behind: false, now: () => new Date() });
   writeUpgradeCheck(sawOne, { latestTag: 'v2.1.0', localTag: 'v2.0.0', behind: true, now: () => new Date() });
 
-  const run = (root) => E28.run({ root, noNetwork: true, now: realClock, exec: () => '' });
+  let execCalls = 0;
+  const through = async (root) => {
+    const { results } = await runChecks([E28],
+      { root, noNetwork: true, now: realClock, exec: () => { execCalls += 1; return ''; } },
+      { noNetwork: true });
+    return results.find((r) => r.id === 'E-28');
+  };
 
-  assert.equal((await run(never)).detail, '--no-network, and nothing has been checked yet');
-  assert.match((await run(checked)).detail,
+  assert.equal((await through(never)).detail, '--no-network, and nothing has been checked yet');
+  assert.match((await through(checked)).detail,
     /^--no-network; the last check \(.+\) found no release tags$/);
-  assert.match((await run(sawOne)).detail, /^--no-network; the last check \(.+\) saw v2\.1\.0$/);
-  for (const root of [never, checked, sawOne]) assert.equal((await run(root)).status, 'skip');
+  assert.match((await through(sawOne)).detail, /^--no-network; the last check \(.+\) saw v2\.1\.0$/);
+
+  // The promise `offline: true` makes, and the flag cannot enforce: no subprocess under
+  // `--no-network`. Without this the opt-out would be a way to reach the network while claiming not
+  // to — which is worse than the skip it replaces.
+  assert.equal(execCalls, 0, 'an offline check spawned something under --no-network');
+});
+
+test('C32 — a network check WITHOUT `offline` is still skipped by the flag', async () => {
+  // The other direction on the runner change, so the opt-out stays an opt-out. `planRun` is the
+  // thing under test here, not E-28: a check that has not claimed an offline answer must not start
+  // getting one.
+  const plain = { ...E28, id: 'E-27', offline: false };
+  const { results } = await runChecks([plain],
+    { root: '/nonexistent', noNetwork: true, now: realClock, exec: () => { throw new Error('ran'); } },
+    { noNetwork: true });
+  const r = results.find((x) => x.id === 'E-27');
+  assert.equal(r.status, 'skip');
+  assert.match(r.detail, /--no-network/);
+  // ...and `--quick` still skips E-28 itself, offline or not: that is a cost contract about
+  // spawning, and this check spawns git.
+  const quick = await runChecks([E28],
+    { root: '/nonexistent', noNetwork: false, now: realClock, exec: () => { throw new Error('ran'); } },
+    { quick: true });
+  assert.equal(quick.results.find((x) => x.id === 'E-28').status, 'skip');
 });
 
 test('C32 — the window expiring asks again, and a release that appeared is found', async (t) => {

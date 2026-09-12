@@ -263,6 +263,10 @@ export function hostChecks() {
       network: true,
       spawns: true,
       fixable: false,
+      // ARC-09-C32 fix-up: this check has an offline answer — the cache — and `--no-network` is
+      // exactly when a user most wants to know what the last check found. It stays out of
+      // `--quick`, which is a cost contract about spawning rather than about the network.
+      offline: true,
       run: async (ctx) => {
         const { needsRefresh, readUpgradeCheck, writeUpgradeCheck } =
           await import('../../upgrade-check.mjs');

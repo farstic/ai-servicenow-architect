@@ -69,6 +69,20 @@ export function defineCheck(check) {
   for (const flag of ['quick', 'network', 'spawns', 'fixable']) {
     if (typeof check?.[flag] !== 'boolean') problems.push(`${flag} must be declared as a boolean`);
   }
+  // ARC-09-C32 fix-up. OPTIONAL, unlike the four above, and that asymmetry is deliberate: those
+  // four are declarations every check must make, this one is an exception a check may claim.
+  //
+  // `offline: true` means "I have an answer that costs no network, and I will give it when
+  // `ctx.noNetwork` is set". It does NOT exempt the check from `--quick`: that is a cost contract
+  // about spawning, and a check may be offline and still expensive. A check that claims it and
+  // then reaches the network under `--no-network` is a defect the flag cannot catch, so E-28's
+  // test counts its subprocess calls.
+  if (check?.offline !== undefined && typeof check.offline !== 'boolean') {
+    problems.push('offline, when declared, must be a boolean');
+  }
+  if (check?.offline === true && check?.network !== true) {
+    problems.push('offline is only meaningful on a network check — a non-network check always runs');
+  }
   if (typeof check?.run !== 'function') problems.push('run must be a function');
   // A server id in the engine's registry, or the reverse, is a re-home nobody meant: the section
   // and the prefix are two statements of the same fact and they must agree.
