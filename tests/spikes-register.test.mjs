@@ -120,6 +120,17 @@ test('B00-02 — every row names a record that exists, parses, and carries a tok
   const recs = records();
   for (const r of recs) {
     assert.equal(r.missing, false, `the register names ${r.dir}/README.md and it is not there`);
+    // The verdict is the line under `## Verdict` — the parser takes the first verdict-shaped line in
+    // the file, which is the same line today only because no record has a second one. That is luck,
+    // not a rule, and luck is what ARC-00-C2 was made of: assert the proxy is valid rather than
+    // assume it. Exactly one candidate, and it sits under the heading.
+    const body = readFileSync(r.path, 'utf8').split('\n');
+    const candidates = body.filter((l) => /^`S-\d+[a-z]?:/.test(l));
+    assert.equal(candidates.length, 1, `${r.dir}: ${candidates.length} verdict-shaped lines, expected one`);
+    const h = body.findIndex((l) => l.trim() === '## Verdict');
+    assert.notEqual(h, -1, `${r.dir}: no "## Verdict" heading`);
+    const after = body.slice(h + 1).find((l) => l.trim() !== '');
+    assert.equal(after, candidates[0], `${r.dir}: the line under "## Verdict" is not the verdict`);
     assert.notEqual(r.line, null, `${r.dir}: no verdict line (expected a line starting \`S-NN:\`)`);
     assert.notEqual(r.verdict, null, `${r.dir}: the verdict line does not parse`);
     assert.notEqual(r.verdict.token, null,
