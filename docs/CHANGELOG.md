@@ -219,6 +219,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Three checks that were watching nothing now watch something.** Guards exist to fail when a rule
+  is broken, and a guard that cannot fail is worse than none — it reads like protection in a diff.
+  One checked that a piece of text-matching worked rather than running the rule it was written for;
+  one claimed a retired folder was mentioned in a single file when nine name it for four good
+  reasons; one described what a clean-machine run proves without checking the description was still
+  there. All three now run the rule they name, and each was confirmed to go red when the thing it
+  guards is broken.
+
 - **The health check now tells you which version of the ServiceNow SDK you have, not just where it
   is.** If you use the Fluent SDK, `snowarch doctor` reported that it was present and printed the
   folder; it now prints the version too, which is the thing a support conversation actually asks

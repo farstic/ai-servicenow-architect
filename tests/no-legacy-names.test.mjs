@@ -189,6 +189,62 @@ test('ARC-10-S03 — the legacy scripts are gone, and only history still names t
     'the ledger does not say where the originals are read from');
 });
 
+/**
+ * Who may still say `scripts/legacy`, by CLASS — ARC-10-S03 AC 1's second half, as amended.
+ *
+ * The criterion said the grep "returns only `docs/ARCHITECTURE.md`". Measured in the acceptance
+ * pass (item B10-01): NINE files outside `docs/plans`, and the amendment's own first proposal —
+ * the ledger plus anything citing the import tag — was false too, because it filtered LINES rather
+ * than files. The honest rule is not a file name, it is four classes, and the reason "only
+ * ARCHITECTURE" could never have been right is the second of them: THE LEDGER IS GENERATED, so its
+ * data, its generator and the test that asserts it must all name the thing the ledger describes.
+ *
+ * Each entry is a path and the class that earns it. A file that is on this list for no reason it
+ * can still show is removed, not kept — the ratchet's own rule, the same shape as ARC-10-S07's
+ * retired-path assertion and the allow-list above.
+ */
+export const LEGACY_MENTIONS = new Map([
+  ['docs/ARCHITECTURE.md', 'ledger'],
+  ['tools/snowarch/lib/doctor/mapping.mjs', 'ledger-source'],
+  ['scripts/gen-doctor-docs.mjs', 'ledger-source'],
+  ['tests/doctor/mapping.test.mjs', 'ledger-source'],
+  ['docs/CHANGELOG.md', 'history'],
+  ['packages/snowarch/CHANGELOG.md', 'history'],
+  ['scripts/README.md', 'history'],
+  ['tests/no-legacy-names.test.mjs', 'detector-data'],
+  ['tools/snowarch/lib/doctor/checks/stale-registrations.json', 'detector-data'],
+]);
+
+/** Tracked files outside `docs/plans` that contain the retired directory path. */
+const mentionsLegacy = () => tracked()
+  .filter((f) => !f.startsWith('docs/plans/'))
+  .filter((f) => {
+    try { return readFileSync(join(root, f), 'utf8').includes('scripts/legacy'); } catch { return false; }
+  });
+
+test('ARC-10-S03 AC 1 — every file that still says `scripts/legacy` is one of the four classes', () => {
+  const found = mentionsLegacy().sort();
+  const listed = [...LEGACY_MENTIONS.keys()].sort();
+
+  // Forward: nothing outside the list. A new file naming the retired directory is a finding, and
+  // the message says which classes exist so the reader can judge rather than just add a row.
+  const unlisted = found.filter((f) => !LEGACY_MENTIONS.has(f));
+  assert.deepEqual(unlisted, [], `${unlisted.length} file(s) name scripts/legacy and belong to no `
+    + `class (ledger · ledger-source · history · detector-data):\n  ${unlisted.join('\n  ')}`);
+
+  // Backward: nothing on the list that stopped saying it. Without this the map becomes a list of
+  // files somebody once edited — exactly what the allow-list above exists to prevent.
+  const stale = listed.filter((f) => !found.includes(f));
+  assert.deepEqual(stale, [], `${stale.length} listed file(s) no longer mention it — remove them`);
+
+  // Every class is represented, or a class that lost its last member stops meaning anything.
+  assert.deepEqual([...new Set([...LEGACY_MENTIONS.values()])].sort(),
+    ['detector-data', 'history', 'ledger', 'ledger-source']);
+
+  // And the first half of AC 1, restated where the second half lives: the directory itself is gone.
+  assert.deepEqual(tracked().filter((f) => f.startsWith('scripts/legacy')), []);
+});
+
 test('ARC-10-S03 — the allow-list is what is still owed, not what is permanent', () => {
   // AC 3. Five entries, all ARC-10. Three from S03: the migration pointer (in the install page and
   // the README it is composed into) and CONTRIBUTING, whose history paragraph keeps old names until

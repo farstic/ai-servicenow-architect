@@ -201,6 +201,43 @@ test('ARC-02-S06 criterion 2 — no "Tier [0-9]" outside history and the anchore
   assert.deepEqual(hits, [], `${hits.length} hit(s):\n  ${hits.join('\n  ')}`);
 });
 
+/**
+ * The retired standing rule's three tokens, and the sweep that looks for them.
+ *
+ * ARC-10-S04's own tokens, assembled rather than spelled — the split falls INSIDE the retired word,
+ * not at the hyphen before the rest of the filename, which would leave the word itself intact and
+ * be reported by both the ratchet and L03.
+ */
+export const OLD_RULE = [
+  ['now', 'ai', 'kit', '-field-notes'].join(''),
+  ['Standing Rule', ' — Document Every Solved Problem'].join(''),
+  ['MCP findings are', ' EXCLUDED'].join(''),
+];
+
+/**
+ * Lifted out of the test at ARC-10-S04's acceptance (item B10-02) so a FIXTURE can drive it. While
+ * it was inlined over `IN_SCOPE()` the only negative available was a string comparison, and that is
+ * what the test had.
+ *
+ * WHITESPACE-COLLAPSED, and the line number goes with it. These tokens are PROSE — the history
+ * paragraph wraps "…Every Solved / Problem" across two lines, and a line-by-line scan misses a
+ * wrapped occurrence in exactly the same way. It missed this file's own paragraph first, which is
+ * how the hole was found: a sweep that cannot see a token split by a newline is one somebody gets
+ * past by reflowing a paragraph.
+ */
+export const flattenCurrent = (text) => currentLines0(text).join(' ').replace(/\s+/g, ' ');
+
+export function findOldRule({ files, read: readFile, allowed = new Set(), tokens = OLD_RULE }) {
+  const flat = flattenCurrent;
+  const hits = [];
+  for (const f of files) {
+    if (allowed.has(f)) continue;
+    const text = flat(readFile(f));
+    for (const token of tokens) if (text.includes(token)) hits.push(`${f}: "${token}"`);
+  }
+  return hits;
+}
+
 test('ARC-10-S04 AC 1/AC 4 — the old standing rule survives only where it is replaced', () => {
   // The v2 rule sent every finding to one file and then excluded the ones about our own server.
   // Both halves are retired. The ONE place their words may appear is the paragraph in CONTRIBUTING
@@ -211,34 +248,44 @@ test('ARC-10-S04 AC 1/AC 4 — the old standing rule survives only where it is r
   // reported by both the ratchet and L03. Twice, in fact: the second report was this comment,
   // quoting the fragment while explaining that it must not be written. A comment claiming a file
   // avoids a sweep is not the same as avoiding it, and the sweep is what decides.
-  const OLD_RULE = [
-    ['now', 'ai', 'kit', '-field-notes'].join(''),
-    ['Standing Rule', ' — Document Every Solved Problem'].join(''),
-    ['MCP findings are', ' EXCLUDED'].join(''),
-  ];
   const ALLOWED = new Set(['docs/CONTRIBUTING.md', 'docs/PLATFORM-NOTES.md']);
-  // WHITESPACE-COLLAPSED, and the line number goes with it. These tokens are PROSE — the history
-  // paragraph wraps "…Every Solved / Problem" across two lines, and a line-by-line scan misses a
-  // wrapped occurrence in exactly the same way. It missed this file's own paragraph first, which is
-  // how the hole was found: a sweep that cannot see a token split by a newline is a sweep somebody
-  // gets past by reflowing a paragraph.
-  const flat = (text) => currentLines0(text).join(' ').replace(/\s+/g, ' ');
-  const hits = [];
-  for (const f of IN_SCOPE()) {
-    if (ALLOWED.has(f)) continue;
-    const text = flat(read(f));
-    for (const token of OLD_RULE) if (text.includes(token)) hits.push(`${f}: "${token}"`);
-  }
+  const hits = findOldRule({ files: IN_SCOPE(), read, allowed: ALLOWED });
   assert.deepEqual(hits, [], `${hits.length} live reference(s) to the retired standing rule`);
 
   // Both directions. The history paragraph must actually carry them, or this passes on a tree where
   // the replacement was never explained and a reader who remembers the rule is left guessing.
-  const contributing = flat(read('docs/CONTRIBUTING.md'));
+  const contributing = flattenCurrent(read('docs/CONTRIBUTING.md'));
   for (const token of OLD_RULE) {
     assert.ok(contributing.includes(token), `the history paragraph does not name "${token}"`);
   }
-  // ...and the negative the story asks for: a file outside the allowed pair naming it IS a hit.
-  assert.equal(OLD_RULE.some((t) => `see docs/${t}.md for the rule`.includes(t)), true);
+  // ...and the negative the story asks for, ON A REAL FILE THROUGH THE SWEEP (acceptance item
+  // B10-02). What stood here was `OLD_RULE.some((t) => `see docs/${t}.md`.includes(t))` — which
+  // asserts that `String.includes` works and never runs the sweep at all. A control that cannot
+  // fail is worse than no control: it reads, in a diff, exactly like one that can.
+  const dir = mkdtempSync(join(tmpdir(), 'snowarch-oldrule-'));
+  try {
+    mkdirSync(join(dir, 'docs'), { recursive: true });
+    const planted = 'docs/GUIDE.md';
+    writeFileSync(join(dir, planted), `put it in ${OLD_RULE[0]}.md as before\n`);
+    writeFileSync(join(dir, 'docs/CONTRIBUTING.md'), `the retired ${OLD_RULE[0]} rule is gone\n`);
+    const readAt = (f) => readFileSync(join(dir, f), 'utf8');
+
+    const found = findOldRule({ files: [planted, 'docs/CONTRIBUTING.md'], read: readAt, allowed: ALLOWED });
+    assert.equal(found.length, 1, `expected exactly the planted file, got ${JSON.stringify(found)}`);
+    assert.match(found[0], /^docs\/GUIDE\.md: "/);
+    // The allowed file carried the same token and was not reported — the exemption suppresses its
+    // own file only, which is the other half of the rule.
+    assert.equal(found.some((h) => h.startsWith('docs/CONTRIBUTING.md')), false);
+
+    // And the wrapped case, which is why the sweep collapses whitespace at all: the same token
+    // split across a newline is still a hit.
+    writeFileSync(join(dir, planted), `put it in ${OLD_RULE[1].replace(' — ', '\n— ')} as before\n`);
+    assert.equal(findOldRule({ files: [planted], read: readAt, allowed: ALLOWED }).length, 1,
+      'a token split across a newline is no longer found');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+
+  // ...and with the planted file gone, nothing lingers.
+  assert.deepEqual(findOldRule({ files: IN_SCOPE(), read, allowed: ALLOWED }), []);
 });
 
 test('ARC-10-S04 — CLAUDE.md and CONTRIBUTING agree on the four homes', () => {
@@ -257,6 +304,23 @@ test('ARC-10-S04 — CLAUDE.md and CONTRIBUTING agree on the four homes', () => 
     assert.match(doc, /no excluded category/, `${name} does not say the exclusion is gone`);
     assert.match(doc, /same pull request as the fix or the test/, `${name} does not say when to record`);
   }
+
+  // AC 3 (acceptance item B10-03): each row carries A REAL ONE, and the examples must RESOLVE.
+  // The assertions above are about destinations; an example that rots is the more likely failure,
+  // because it names a specific note or file rather than a directory. All four were checked by
+  // hand in the acceptance pass and all four held — this is what keeps them holding.
+  const table = contributing.slice(contributing.indexOf('## Where a finding goes'));
+  assert.ok(table.includes('| Kind | Home | A real one |'), 'the four-homes table lost its example column');
+  for (const [example, where] of [
+    ['PN-07', 'docs/PLATFORM-NOTES.md'],
+    ['client-orderby.test.ts', 'packages/snowarch/tests/servicenow/client-orderby.test.ts'],
+  ]) {
+    assert.ok(table.includes(example), `the table no longer cites ${example}`);
+    assert.ok(existsSync(join(root, where)), `${where} does not exist — the example does not resolve`);
+  }
+  // `PN-07` is a note INSIDE a file, so its existence is a different question from the file's.
+  assert.match(read('docs/PLATFORM-NOTES.md'), /\bPN-07\b/, 'PN-07 is cited but is not in the notes');
+  assert.ok(existsSync(join(root, 'docs/TROUBLESHOOTING.md')));
 });
 
 test('ARC-10-S02 AC 1 — `memory/MEMORY.md` survives only where it is retired', () => {
