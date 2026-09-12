@@ -47,7 +47,12 @@ export function planRun(checks, { quick = false, noNetwork = false, sections = n
       skipped.push({ check, reason: 'not in the --quick subset' });
       continue;
     }
-    if ((noNetwork || quick) && check.network) {
+    // ARC-09-C32 fix-up. `|| quick` was redundant — the branch above already skips every network
+    // check under `--quick` — so removing it changes nothing there, and the rule that remains is
+    // about `--no-network` alone. A check that declares `offline: true` RUNS: it has an answer
+    // that costs no network (E-28 reads its cache), and skipping it meant the sentences it was
+    // written to print could never appear. They had been unreachable since ARC-09-S07.
+    if (noNetwork && check.network && check.offline !== true) {
       skipped.push({ check, reason: '--no-network' });
       continue;
     }

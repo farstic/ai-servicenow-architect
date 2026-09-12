@@ -227,6 +227,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The update check stops asking the internet the same question every time.** While no release
+  exists to compare against, the check that looks for a newer version contacted the server on
+  every run instead of remembering the answer for a day, as it was meant to. It remembers now — and
+  says what it remembered and when, rather than claiming you are up to date with a version that
+  does not exist, or that nothing has ever been checked when something has.
+
 - **On Windows, the warning about keeping your checkout in a synced folder now sees the case that
   hides.** If your employer redirects Documents into OneDrive, the folder is synced and nothing in
   its name says so — the only clue is a Windows variable. The health check did not look at it, so

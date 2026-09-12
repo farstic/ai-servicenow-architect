@@ -263,6 +263,10 @@ export function hostChecks() {
       network: true,
       spawns: true,
       fixable: false,
+      // ARC-09-C32 fix-up: this check has an offline answer — the cache — and `--no-network` is
+      // exactly when a user most wants to know what the last check found. It stays out of
+      // `--quick`, which is a cost contract about spawning rather than about the network.
+      offline: true,
       run: async (ctx) => {
         const { needsRefresh, readUpgradeCheck, writeUpgradeCheck } =
           await import('../../upgrade-check.mjs');
@@ -276,16 +280,30 @@ export function hostChecks() {
         const now = () => new Date(ctx.now ? ctx.now() : Date.now());
 
         if (ctx.noNetwork) {
-          return skip(cached?.latestTag
+          // ARC-09-C32. THREE cases, not two, and the third only exists because this chore starts
+          // caching the empty outcome: a cache with `latestTag: null` means a check RAN and found
+          // no releases. Branching on `latestTag` being truthy — as this did — would report that as
+          // "nothing has been checked yet", turning a true statement into a false one.
+          if (!cached?.checkedAt) return skip('--no-network, and nothing has been checked yet');
+          return skip(cached.latestTag
             ? `--no-network; the last check (${cached.checkedAt}) saw ${cached.latestTag}`
-            : '--no-network, and nothing has been checked yet');
+            : `--no-network; the last check (${cached.checkedAt}) found no release tags`);
         }
 
         if (!needsRefresh(cached, { now })) {
+          // ARC-09-C32. A cached run that found NO release is a skip, not an "ok". The `?? 'no tag'`
+          // below used to answer it, and `up to date (no tag)` claims currency with something that
+          // does not exist. PAST TENSE on purpose: the live branch says what it sees now
+          // (`advertises`), this says what the cache remembers (`advertised`), and the stamp says
+          // when — which is the whole distinction a cache introduces.
+          if (!cached.latestTag) {
+            return skip(`${cached.remote ?? remote} advertised no release tags · last checked `
+              + `${cached.checkedAt}`, { data: { ...cached, refreshed: false } });
+          }
           return cached.behind
             ? warn(`${cached.latestTag} available — run ./snowarch upgrade`,
               { command: './snowarch upgrade', data: { ...cached, refreshed: false } })
-            : ok(`up to date (${cached.localTag ?? cached.latestTag ?? 'no tag'}) · last checked `
+            : ok(`up to date (${cached.localTag ?? cached.latestTag}) · last checked `
               + `${cached.checkedAt}`, { ...cached, refreshed: false });
         }
 
@@ -299,7 +317,17 @@ export function hostChecks() {
         const names = String(listed ?? '').split('\n')
           .map((l) => l.split('/').pop()?.trim()).filter(Boolean);
         const latest = sortTags(names).filter((t) => t.pre === null)[0]?.tag ?? null;
-        if (!latest) return skip(`${remote} advertises no release tags`);
+        if (!latest) {
+          // ARC-09-C32. WRITE IT. ARC-09-S07 says this check "refreshes the cache at most once per
+          // 24 h"; returning before the write meant the empty outcome was never cached, so
+          // `needsRefresh` was true for ever and every networked doctor run spent an `ls-remote`
+          // with a 15 s budget. Measured at three runs, three calls, no cache. The banner is
+          // unaffected either way: it needs `behind === true` AND a `latestTag`, and this has
+          // neither.
+          writeUpgradeCheck(ctx.root,
+            { latestTag: null, localTag: describeExact(ctx.root, ctx.exec), behind: false, remote, now });
+          return skip(`${remote} advertises no release tags`);
+        }
 
         const localTag = describeExact(ctx.root, ctx.exec);
         const behind = localTag !== latest;
