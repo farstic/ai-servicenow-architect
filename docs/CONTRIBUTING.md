@@ -1478,11 +1478,46 @@ and a dormant PASS is a real PASS: it proves the gate holds when there is nothin
 live halves need a configured instance and are ARC-09/ARC-10's gate.
 
 **Record the run** in the pull request description, or in
-`docs/spikes/validation-runs/<date>-<what>.md` with the CLI version and the commit sha. Never in the
-test file: it is a specification, and the dated run tables it used to carry were removed for exactly
-that reason. Redact anything naming a real instance, user or credential.
+`docs/validation/<date>-<os>.md` from `docs/validation/TEMPLATE.md`, with the product version and the
+commit sha. Never in the test file: it is a specification, and the dated run tables it used to carry
+were removed for exactly that reason. Redact anything naming a real instance, user or credential —
+`tests/validation-records.test.mjs` enforces that and does not take your word for it.
 
 **A failure is a rework item against the story that changed the text**, not a note in the record.
+
+## Recording a validation run
+
+One place, one format: `docs/validation/<date>-<os>.md`, copied from `docs/validation/TEMPLATE.md`.
+The records already under `docs/spikes/` stay where they are — that path is retired for new ones, so
+that a reader looking for "how did this behave on a clean Windows box" has one directory to open.
+
+**The lint is the format's reason for existing.** A validation record is written from a machine with
+a real instance on it, and everything that makes the run worth recording — the URL it reached, the
+account it used, the ids that came back — is exactly what must not survive into a public repository.
+`tests/validation-records.test.mjs` refuses six things in any `docs/validation/*.md`: an instance
+hostname, an e-mail address, a sys_id, a `password:`/`secret:`/`token:` assignment, a home path, and
+any retired product name. It names the pattern and the line, and each pattern has a fixture carrying
+only that one, so a rule that stopped firing is a failing test rather than a quiet gap.
+
+Two things it deliberately does **not** refuse, because both are how you describe a secret without
+carrying one: the doctor's `set (len 14)` rendering, and a sentence like *edit the stored password in
+`.local/instances.json`*. And a `sys_id` is word-bounded, so the 7-, 40- and 64-character hex shas a
+record legitimately quotes are not mistaken for one.
+
+**Keep the transcript locally.** `script(1)` — or `Start-Transcript` on Windows — for the whole
+sitting, never committed: it contains the URL and the account name in full. Quote from it into the
+record only after redacting both.
+
+**What to write in Observer notes.** Everywhere you had to guess, look elsewhere, or scroll back.
+An empty list is the result the sittings exist to produce; a long one is the more useful record.
+
+**When a test depends on a clock VALUE rather than an interval, measure the distribution before
+naming a cause** (ARC-09-C30). A single run cannot tell a boundary from noise, and the side you
+guard is decided by the run rather than by the reasoning: the store-stamp fixture crossed a
+whole-second boundary about once in 1,800 cycles, all of them on one side, and the first guard
+written for it covered the side that never crosses. This is the companion to the rule above that no
+unit test asserts a wall-clock — a duration belongs in `banner-timing.mjs`; a clock VALUE a test
+legitimately depends on belongs in a fixture that cannot land on the boundary.
 Fix the governing document, re-run the failed test in a fresh session, then re-run the whole suite
 before committing — a fix for one test must not break another.
 

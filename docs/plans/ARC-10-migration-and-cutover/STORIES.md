@@ -533,6 +533,30 @@ Cutover test list (appended to `tests/VALIDATION-TESTS.md`):
 
 **Definition of done.** Merged before the tag; CI green; CONTRIBUTING updated.
 
+**Amended 2026-09-12 (S07 build).** Re-measured on `dafb428`; the story's text stands and this
+records what differed.
+
+- **T-ids are LEVEL-2 headings** (`## T-NN — <title>`), not `### T-NN` as the story says, and there
+  are **22 of them, T-01 through T-22, no number reserved** — not 20. `tests/validation-tests-shape.test.mjs`
+  (18 cases) asserts the count against the header sentence, and the cutover list is a TABLE rather
+  than headings, so appending it leaves that count at 22.
+- **T-19 and T-20 are present** as `## T-19` / `## T-20`, so the STOP condition did not fire.
+- **All three existing records in `docs/validation/` pass the redaction patterns unchanged** — no
+  hold. The required-ROWS half applies only to files whose first heading is `# Validation run —`,
+  so `TEMPLATE-e2e-live.md` keeps ARC-07-S11's own format.
+- **Parity rows added to the new template** for ARC-07's six header facts: *Product version* (its
+  "Build under test"), *Claude Code*, *Node*, *Gate*, *Writes allowed*, plus a **Probes** line and
+  the `script(1)` transcript rule. A live record can use either template.
+- **`tests/fixtures/validation-records/` needed one ratchet exemption**, in the fixture group with
+  the reason: the retired-name fixture must carry a retired name to prove that pattern fires. The
+  name is read from `retired-names.json` when the fixture is written, never typed.
+- **The spikes sentence was in TWO places**, not one: `docs/CONTRIBUTING.md` § *When to run the
+  validation tests* and the last line of `tests/VALIDATION-TESTS.md`. Both now point at
+  `docs/validation/<date>-<os>.md`; existing records under `docs/spikes/` stay.
+- **The ARC-08 plan text already said `ARC-10-S07`** — the correction the brief asked for had
+  already been made, and `grep -rn "ARC-10-S04" docs/plans/ARC-08-*/` returns nothing.
+- **The CONTRIBUTING clock-value line rode this PR**, as ruled.
+
 ---
 
 ### ARC-10-S08 — Clean-machine validation runs: macOS, Ubuntu, Windows in `design-only`; one `live` (`pdi-developer`); one proxied laptop

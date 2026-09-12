@@ -1022,4 +1022,25 @@ claude -p "$(<prompt.txt)"
 T-05 and T-06 run on their dormant variant in `design-only`; their live halves need a configured
 instance and are ARC-09/ARC-10's gate. T-07's setup is in its own section above.
 
-Record the run under `docs/spikes/validation-runs/`.
+Record the run under `docs/validation/<date>-<os>.md`, from `docs/validation/TEMPLATE.md`
+(ARC-10-S07). The records already under `docs/spikes/` stay where they are; that path is retired for
+new ones.
+
+## Cutover test list
+
+What a clean machine runs before `v2.0.0` is called good (ARC-10-S07; the sittings that fill these
+in are ARC-10-S06 and S08). One row per machine and mode. **Design-only rows run no MCP call at
+all** — that is the property, not a limitation: the banner reads `Mode: design-only`, `/mcp` shows
+the server disabled with no prompt, T-05 and T-06 run their dormant variant, and
+`/snowarch setup-instance` prints the terminal hand-off and STOPS rather than asking for a secret.
+
+| # | Machine · mode | Tests | What this row is for |
+|---|---|---|---|
+| 1 | macOS · `design-only` | `T-01` `T-02` `T-03` `T-04` `T-05` `T-06` `T-07` `T-10` `T-11` `T-20` | the first fifteen minutes on a machine that has never seen this product |
+| 2 | Ubuntu · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the same install on the platform CI exercises most |
+| 3 | Windows · `design-only` | `T-01` `T-02` `T-07` `T-10` `T-20` | the launchers, without Git Bash — the path that has cost the most cells |
+| 4 | macOS or Ubuntu · `live`, preset `pdi-developer` | `T-05` `T-06` `T-12` `T-13` `T-19` `T-21` `T-22` | the gate, the write approval and the capture protocol, against a real PDI |
+
+Rows 1–3 need no instance and no credential. Row 4 needs a PDI and is the only row where a write
+reaches ServiceNow; its record names no URL and no account (`docs/validation/TEMPLATE.md`, and
+`tests/validation-records.test.mjs` refuses both).

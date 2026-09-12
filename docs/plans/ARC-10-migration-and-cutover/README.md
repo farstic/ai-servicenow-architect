@@ -1,6 +1,6 @@
 # ARC-10 — Migration and cutover from the old repositories
 
-Status: **In progress — S01–S05 merged (5 of 10), started 2026-09-12** · Depends on: every other ARC (ARC-09's `v2.0.0` tag in particular; see the phase split below) · Blocks: nothing — it ends the programme
+Status: **In progress — S01–S05 + S07 merged (6 of 10), started 2026-09-12; S06 is a post-tag sitting, not a merge** · Depends on: every other ARC (ARC-09's `v2.0.0` tag in particular; see the phase split below) · Blocks: nothing — it ends the programme
 
 ## Goal
 
@@ -58,7 +58,7 @@ Full write-ups: [STORIES.md](STORIES.md) (10 stories, ≈ 10.5–14 engineer-day
 | ARC-10-S04 | Rewrite the standing rule and the field-notes policy (DR-16) in `CLAUDE.md` and `docs/CONTRIBUTING.md` | S | **Done** |
 | ARC-10-S05 | `docs/ARCHITECTURE.md` "History" section: import tags, ADR links, scope-cut ledger pointer, old-repository links | S | **Done** |
 | ARC-10-S06 | Author's machine cutover on `v2.0.0`: doctor 0 FAIL, stale entries removed, legacy store gone, engagements untracked | M | — |
-| ARC-10-S07 | Validation-record template, redaction lint and the cutover test list (T-01…T-18 + `AUTHENTICATION_FAILED` + design-only) | M | — |
+| ARC-10-S07 | Validation-record template, redaction lint and the cutover test list (T-01…T-18 + `AUTHENTICATION_FAILED` + design-only) | M | **Done** |
 | ARC-10-S08 | Clean-machine validation runs: macOS, Ubuntu, Windows in `design-only`; one `live` (`pdi-developer`); one proxied laptop | L | — |
 | ARC-10-S09 | Deprecation notices in `farstic/claude-servicenow-live` and `farstic/snow-mcp`; archive checklist for the owner | S | — |
 | ARC-10-S10 | Two-week post-release review: telemetry-free feedback loop (issue template with the doctor JSON) and the archive trigger | M | — |
