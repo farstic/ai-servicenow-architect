@@ -590,3 +590,49 @@ describe('12, 13 and 14 — the committed artefacts are the ones the code produc
     expect(REQUIRED.serverKey).toBe(ENGINE_CONFIG.mcp.serverKey);
   });
 });
+
+/**
+ * ARC-04 acceptance, B04-07 — ARC-04-S06 criterion 6's spot-check, as a test.
+ *
+ * The criterion names eight tools and the gate and mutates flag each must carry. They were verified
+ * by hand against `dist/contract.json` when the story closed, and nothing guarded them afterwards:
+ * the suite proved the contract is byte-identical to the committed one, which keeps the FILE honest
+ * and says nothing about whether the file is right. These eight are the spread the criterion chose —
+ * an ungated read, a write, a scripting write, a scripting READ that must stay ungated, an ATF
+ * execution, an AI call that does not mutate, an instance switch that does not either, and the
+ * capture-target write — and each is a different way the gate map could be wrong.
+ */
+/** The three fields this spot-check reads; `CONTRACT` itself is an untyped `JSON.parse`. */
+type ContractTool = { name: string; gate: string; mutates: boolean };
+
+describe('B04-07 — the eight spot-checked tools carry their gate and mutates flag', () => {
+  const SPOT: Array<[string, string, boolean]> = [
+    ['snow_core_records_query', 'none', false],
+    ['snow_core_record_add', 'write', true],
+    ['snow_scr_script_include_add', 'scripting', true],
+    ['snow_scr_script_include_read', 'none', false],
+    ['snow_atf_atf_test_exec', 'atf', true],
+    ['snow_na_summary_generate', 'now_assist', false],
+    ['snow_core_instance_switch', 'none', false],
+    ['snow_us_capture_target_set', 'write', true],
+  ];
+
+  it.each(SPOT)('%s is gate %s, mutates %s', (name, gate, mutates) => {
+    const tool = CONTRACT.tools.find((t: ContractTool) => t.name === name);
+    expect(tool, `${name} is not in the contract`).toBeDefined();
+    expect(tool!.gate).toBe(gate);
+    expect(tool!.mutates).toBe(mutates);
+  });
+
+  it('the eight are real, distinct tools — not eight lookups that all missed', () => {
+    // Without this, renaming a tool would turn every row above into `toBeDefined()` failing once
+    // and the rest never running. Asserted as a set, against the contract's own names.
+    const names = SPOT.map(([n]) => n);
+    expect(new Set(names).size).toBe(8);
+    const known = new Set(CONTRACT.tools.map((t: ContractTool) => t.name));
+    expect(names.filter((n) => !known.has(n))).toEqual([]);
+    // And the spread is the point: a spot-check where every row shared one gate would prove nothing
+    // about the map.
+    expect(new Set(SPOT.map(([, g]) => g)).size).toBeGreaterThanOrEqual(5);
+  });
+});

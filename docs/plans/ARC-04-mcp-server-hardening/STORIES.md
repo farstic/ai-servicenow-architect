@@ -80,8 +80,8 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 1. `git ls-files packages/snowarch/src` contains no path under `transport/`, `api/`, `direct/`, `a2a/`, `dashboard/`, `reports/`, `prompts/`, `cli/writers/`, and no `cli/{auth,setup,shortcuts,detect-clients,config-store}.ts`.
 2. `npm run type-check`, `npm run lint` and `npm test` pass in `packages/snowarch` on the three CI OSes × Node 20/22/24; zero test files under a `desktop/` path exist; the parity test still counts 394 tools (tool changes are later stories).
 3. `node -e "const p=require('./packages/snowarch/package.json');console.log(p.name,p.version,p.license)"` prints `@farstic/snowarch 2.0.0 Apache-2.0` (today: `servicenow-mcp 1.0.0 SEE LICENSE IN LICENSE` — D-02), and `node tests/version-consistency.test.mjs` (ARC-01) passes.
-4. `grep -rn "servicenow-mcp\|registry.npmjs.org\|npm link\|smithery\|server.json" packages/snowarch/src packages/snowarch/package.json` returns nothing; `grep -rniE "proprietary|SEE LICENSE IN|\"license\": *\"MIT\"" packages/snowarch --include=*.json --include=*.ts --include=*.md --exclude-dir=node_modules` returns nothing (D-02: no contradictory licence claim survives in the package).
-5. `node packages/snowarch/dist/cli/index.js --help` (after a local build) lists exactly `start`, `instance`, `doctor`, `contract`; `node … contract` exits 2 with `not implemented in this story`.
+4. `grep -rn "servicenow-mcp\|registry.npmjs.org\|npm link\|smithery\|server.json" packages/snowarch/src packages/snowarch/package.json` returns nothing; **AMENDED (ARC-04 acceptance, 2026-09-13, on c8dcd3c): one carrier is exempt — `src/cli/import-legacy.ts` implements `instance import --from-legacy` and cannot find the legacy store without naming `~/.config/servicenow-mcp/instances.json`. Four of the five literals are gone from the package entirely; the fifth has exactly that one carrier. Enforced as a both-directions ratchet in `packages/snowarch/tests/cli/no-legacy-names.test.ts` — an unlisted file carrying a literal fails, AND a listed carrier that stopped carrying one fails, so the exemption cannot outlive its reason, which is how this criterion went stale.** `grep -rniE "proprietary|SEE LICENSE IN|\"license\": *\"MIT\"" packages/snowarch --include=*.json --include=*.ts --include=*.md --exclude-dir=node_modules` returns nothing (D-02: no contradictory licence claim survives in the package).
+5. `node packages/snowarch/dist/cli/index.js --help` (after a local build) lists exactly `start`, `instance`, `store`, `doctor`, `contract`. **AMENDED (ARC-04 acceptance, 2026-09-13, on c8dcd3c): superseded twice and never re-stated — ARC-07 filled `instance`, ARC-09-S06 added `store` and filled `contract`, so `contract` no longer exits 2 and the set is five, not four. The command list now lives in `packages/snowarch/README.md` § CLI, which did not exist either; `tests/cli/contract-cli.test.ts` reads that table and compares it with `--help`, so the two cannot drift.**
 6. `npm ls --omit=dev --depth=0` in the package lists only `@modelcontextprotocol/sdk`, `commander`, `dotenv`, `zod`; `du -sh node_modules` after `npm ci --omit=dev --ignore-scripts` ≤ 80 MB.
 7. The MCP `initialize` response (stdio handshake with a placeholder `SERVICENOW_INSTANCE_URL`) reports `serverInfo.name == "snowarch"` and `serverInfo.version == "2.0.0"`.
 
@@ -381,9 +381,9 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 1. Move the gate in `script.ts`; audit `updateset.ts`; normalise descriptions.
 2. Add `tests/tools/gate-split.test.ts` (parameterised over the two families plus the ATF/NOW_ASSIST invariants).
 3. `CHANGELOG.md` migration note (R-03): "SCRIPTING no longer gates reads; users relying on SCRIPTING to hide script contents must use a role-restricted account".
-4. Run spike S-10 with this build (deferred here by ARC-00-S14 — ARC-00 ends before this code exists): VALIDATION-TESTS T-01…T-18 under `read-only` and `pdi-developer` on a PDI; write the verdict to `docs/spikes/S-10-read-only-sufficiency/README.md` and set the S-10 Status cell in `03` §A.
+4. Run spike S-10 with this build (deferred here by ARC-00-S14 — ARC-00 ends before this code exists): VALIDATION-TESTS T-01…T-18 under `read-only` and `pdi-developer` on a PDI; write the verdict to `docs/spikes/S-10-readonly-preset-sufficiency/README.md` and set the S-10 Status cell in `03` §A.
 
-**Test strategy.** Unit (throwing proxy); live E2E case for `read-only` list/read on a PDI behind `RUN_LIVE_E2E=1`; S-10 manual run by this story (record in `docs/spikes/S-10-read-only-sufficiency/README.md`).
+**Test strategy.** Unit (throwing proxy); live E2E case for `read-only` list/read on a PDI behind `RUN_LIVE_E2E=1`; S-10 manual run by this story (record in `docs/spikes/S-10-readonly-preset-sufficiency/README.md`).
 
 **Dependencies.** S03.
 
@@ -391,7 +391,7 @@ Mapping to the README's original titles: README stories 2 and 7 are merged into 
 
 **Risks / open points.** Some `snow_scr_*_read` tools return script bodies; a client who considered SCRIPTING a confidentiality control loses that — R-03 note. Nothing else.
 
-**Definition of done.** Merged; gate-split test green; CHANGELOG note; S-10 verdict recorded (`docs/spikes/S-10-read-only-sufficiency/README.md`; `03` §A Status cell).
+**Definition of done.** Merged; gate-split test green; CHANGELOG note; S-10 verdict recorded (`docs/spikes/S-10-readonly-preset-sufficiency/README.md`; `03` §A Status cell).
 
 ---
 

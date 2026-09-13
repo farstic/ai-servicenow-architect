@@ -96,6 +96,18 @@ reaches `Mode: design-only` and `./snowarch doctor` reports **0 FAIL**.
 > that is not a defect. This row is the enforcement.
 >
 
+> **Register the server with a generic MCP client, from the README alone (ARC-04-S14 criterion 5,
+> 2026-09-13).** The criterion asks for a reader *other than the author* to follow only
+> `packages/snowarch/README.md`, register the server with a generic MCP client, and call
+> `snow_core_status_read`. No record of that exists anywhere — not in `docs/validation/`, not in this
+> file, not in the ARC-04 exit table — and the author cannot be the reader, which is the whole point.
+>
+> **Pass condition:** the reader reaches a successful `snow_core_status_read` **without opening any
+> file other than that README**. Record, in `docs/validation/`: who by ROLE (not by name), the date,
+> which MCP client, and the redacted `status_read` output — plus every place the reader had to guess
+> or look elsewhere, because those are the finding, not the failure.
+>
+
 ## D1. ARC-08-S02 — the doctor's engine checks on a BOOTSTRAPPED machine
 
 *Five minutes, no instance needed, design-only is enough. Everything else about these checks is
@@ -378,6 +390,25 @@ the ROPC refusal fixture committed.
 > the two a sleeping instance actually produces, and the remedy for both already mentions waking it
 > at developer.servicenow.com. Record the code, the `cause`, and how long it took to arrive.
 > Nothing about a real instance goes into the repository: the record is the CODE and the timing.
+>
+
+> **The three ARC-04 live criteria (ARC-04 acceptance, 2026-09-13).** Three criteria whose unit
+> halves are covered and whose live halves nothing can run from this machine. Each has a written
+> procedure with its pass condition stated as the exact output to see, in
+> `packages/snowarch/tests/live/README.md`:
+>
+> - **ARC-04-S03 c1** — switch to `prod`, `record_add` must refuse with `PROD_WRITE_NOT_ACKNOWLEDGED`;
+>   switch to `pdi-developer`, the SAME call must succeed with a `sys_id` and an `INC` number. A run
+>   where both refuse proves nothing about production.
+> - **ARC-04-S08 c3** — `tools/list` either side of `snow_disco_table_discover incident` must be
+>   byte-identical, and the discover response must name `number`, `short_description`, `state`.
+> - **ARC-04-S10 c1** — the last step of the S07 c4 procedure: `tail -1 .local/audit.jsonl` must
+>   parse with `result: "ok"` and `tool: snow_scr_script_include_add`.
+>
+> Each procedure carries a **negative control**, and a run without its control is not a result.
+> **Write the outcome into `docs/validation/`**, one line per criterion, as
+> `ARC-04-S03 c1: CONFIRMED` / `FAILED` and the redacted evidence the procedure lists. Until then the
+> three criteria stay unticked and the acceptance rows say the run is yours.
 >
 
 ## D2. ARC-08-S03 — the leftover detectors on a machine that HAS leftovers
