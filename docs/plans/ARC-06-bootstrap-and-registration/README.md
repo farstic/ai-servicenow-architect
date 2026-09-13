@@ -1,6 +1,6 @@
 # ARC-06 — Bootstrap and MCP registration
 
-Status: **ARC COMPLETE 2026-09-10** · **S01–S14 merged (14 of 14) — entry gate ADR-0006 Accepted 2026-09-08, satisfied** · Depends on: ARC-01, ARC-03 (B02), ARC-04 (committed `dist/`, unconfigured mode), ARC-05 (B05 contract check, permission block); ARC-00 S-01/S-03/S-05/S-08/S-09/S-15/S-16/S-20 and — entry condition for S01 (D-06 hedge) — the S-14a–g conclusion recorded in ADR-0006 ("monorepo path confirmed"; ARC-00-S12/S14) · Blocks: ARC-07 (B06 slot), ARC-08, ARC-09, ARC-10
+Status: **ARC COMPLETE 2026-09-10** · **acceptance closed 2026-09-13 (ARC-06 acceptance PR) — four of ARC-06-S08's criteria amended: they predate ARC-08-S05 and were never revisited** · **S01–S14 merged (14 of 14) — entry gate ADR-0006 Accepted 2026-09-08, satisfied** · Depends on: ARC-01, ARC-03 (B02), ARC-04 (committed `dist/`, unconfigured mode), ARC-05 (B05 contract check, permission block); ARC-00 S-01/S-03/S-05/S-08/S-09/S-15/S-16/S-20 and — entry condition for S01 (D-06 hedge) — the S-14a–g conclusion recorded in ADR-0006 ("monorepo path confirmed"; ARC-00-S12/S14) · Blocks: ARC-07 (B06 slot), ARC-08, ARC-09, ARC-10
 
 ## Goal
 
@@ -95,3 +95,50 @@ Work that is not a story: a defect found while building one, fixed in the same a
 | ID | What | Status |
 |---|---|---|
 | ARC-06-C1 | The home-directory guard in `tools/snowarch/tests/mode-register.test.mjs` — *nothing under `lib/` opens `~/.claude.json`, or anything else in the home directory* — scanned RAW FILE TEXT (`readFileSync(file, 'utf8')`, then `/\bhomedir\b\|USERPROFILE/` against it), with no comment stripping anywhere in the file. A COMMENT naming either variable was therefore a build failure, which is backwards: the file most likely to name what it must not read is the file explaining why it must not read it. Found exactly that way during ARC-08-C1's second pass — the guard fired on a paragraph documenting this rule before it ever fired on a line of code, and the paragraph had to be reworded around it and shipped with a note for this arc's owner. Against the repository's own standing rule that every source scan strips comments (`docs/CONTRIBUTING.md`), which ARC-10-S10's no-telemetry scan had just applied, moving its count from seven files to three | **Closed** — the scan strips comments first; the RULE is untouched, and that is the point of the change rather than a caveat on it: `lib/` still may not read the home, `doctor/checks/legacy.mjs` keeps its read-only detector exception, and every code shape that was a finding still is. The control runs both directions on the two comment shapes a source file actually uses — a block comment above a function and a trailing comment on a code line — because a scan that had stopped firing on CODE would pass a one-sided control silently; three real reads (`import { homedir }`, `process.env.USERPROFILE`, a call with a trailing comment) must still be findings, and a URL must survive the stripper, which is the classic way this rewrite goes wrong. The proof that the fix is load-bearing is `json-boundary.mjs`: its paragraph now SPELLS both variables, so reverting the strip fails the guard on that file — measured, in both states |
+| ARC-06-C2 | **The handshake gives up at a hardcoded 20 s regardless of `MCP_TIMEOUT`.** An operator who raises the timeout to 120 s because their machine is slow still gets a doctor that stops at 20. The two numbers are about the same thing and are not connected | **Open — 2.0.x robustness candidate.** It cannot bite today: the cold start is ~340 ms here and S-06's worst across nine CI cells was 694 ms. `handshake`'s second parameter is where a fix would tie them together |
+| ARC-06-C3 | **The handshake reads one page of `tools/list`.** If a server ever answered with a cursor, the doctor would silently under-count its tools and SV-05's count — which B08 reports and the mode line prints — would be wrong | **Open — 2.0.x robustness candidate.** It cannot arise today: the doctor only ever talks to our server, which returns every tool in one response (S-06 measured 394 everywhere) |
+
+### Acceptance
+
+The acceptance pass against `docs/plans/06-ACCEPTANCE-PLAN.md` §6. One row per backlog item.
+
+**Four criteria in ARC-06-S08 describe behaviour the product does not have, and they share one
+cause: S08's criteria predate ARC-08-S05 — which moved the handshake into the server package and
+gave the doctor the spawning — and none of the four was revisited afterwards.** AC 3, AC 4, AC 5's
+second half and AC 7's first half are amended in `STORIES.md`, each with the lines that measure it.
+No sentence was added to the product to satisfy a criterion; where the criterion was reaching for
+something real, the real thing is asserted instead.
+
+| Item | Outcome | Evidence |
+|---|---|---|
+| B06-01 — S08 AC 3: a divergent `SNOW_STORE` | **record + rework** | AC 3 asks B08 to FAIL, and it cannot: the ambient value is neutralised on purpose (`server.mjs:80-83`, *"a doctor run describes the root it was GIVEN"*), and the "different store" sentence exists nowhere — the only one naming the variable is SV-06's remedy. Measured: the same doctor run with and without `SNOW_STORE=/nonexistent/store.json` returns the same status for **all ten SV checks**. Asserted instead, in `tools/snowarch/tests/server-store-env.test.mjs`: the server sees the store it was GIVEN (**the positive direction** — without it, two agreeing runs could both be ignoring the store, and the test would survive deleting the four lines), the `else` branch deletes rather than inherits, the restore happens set, unset and on a throw. **Control:** removing those four lines fails exactly the two tests that assert them. Separately, SV-06's remedy was asserted only as `/restart/i`, which passes on a remedy that never names the variable — both halves of the sentence are asserted now at `sv06-store-drift.test.ts` |
+| B06-02 — S08 AC 4: the `initialize` timeout | **record + rework** | `MCP_TIMEOUT` does not bound the handshake and never has — the deadline is fixed in the server package, and the value is what the cold start is compared *against* for a headroom warning the ENGINE computes (`checks.ts:319/404`, `server.mjs:153`). Setting it to `1` produces no timeout at all. Asserted instead: the timeout sentence against a never-answering stub, naming the duration it was given **and asserting it does not name `MCP_TIMEOUT`** — the absence is what keeps the chore honest; and the headroom note as its own claim, both directions, including that 60 % exactly is not over it. Neither `headroomNote` nor `mcpTimeout` had any test before this. The deadline became a parameter with the default unchanged — **a testability seam, not a behaviour change** — and the sentence a person reads is still "timed out after 20s", because whole seconds still render as seconds |
+| B06-03 — S08 AC 5 second half: `used_by` | **record** | Two things wrong: it names **B08**, which performs no required-tools comparison (it adopts `SV-01, SV-05, SV-06, SV-04` only), and it expects the failure to name **`used_by`**, which no product code ever emits — `grep -rn used_by` over `tools/` and `packages/snowarch/src` matches one test fixture. The real check is B05's `checkContract`, whose message names the tools, and `b03-b05.test.mjs` already asserts it. **The plan's proposed fixture could not have been written either:** its literal `snow_fake_x` fails engine-lint L01 in the exact file the row names — planted and measured. That file already builds such a name at runtime, which is the technique the row proposed reinventing |
+| B06-04 — S08 AC 7: paging and the hung child | **record + rework** | The paging clause describes a capability **neither side has**: the handshake reads `result.tools` once and the server returns no cursor (`nextCursor` count is 0 in `src/`). Dropped. The second clause is real and was unproven — `mcp-stub.mjs` was referenced by **nothing** before this. It is wired in for the child half only: a server that never answers, the deadline fires, no stub survives, **with the control the claim needs** — a stub told to ignore SIGTERM, which does survive, so "it is gone" is shown able to fail. The harness's own reaper test (`tests/utils/server-child.test.ts`) was proving the HARNESS, not the handshake |
+| B06-05 — S10 AC 4: live mode with no Node | **rework** | A step in the `launcher` job: exit **3**, the live-needs-Node FAIL, the platform's own remedy from `remedies.json`, and `.local/` **not created**. Placed before the successful install, because after it that last assertion would be about the wrong thing. Validated against a real Node-free run in a throwaway worktree first — which is how an earlier draft's remedy grep (`nodejs.org`) was caught: neither platform remedy says it |
+| B06-06 — S10 AC 5 / S11 AC 7: an unmergeable `settings.local.json` | **rework** | Exit **1**, the "cannot be merged without Node" FAIL, the hand-edit remedy, and the file **byte-identical afterwards** (sha256, not a re-read of one key); then the hand edit the remedy asks for makes the same run print `ok B07: already set`. The step restores the tree and asserts it did. All four outcomes measured in a worktree before the step was written |
+| B06-07 — S10 AC 8: run from a subdirectory | **rework** | From `clients/acme/`, `../../bootstrap.sh` exits **3** with "not at the repository root" and the `cd "` remedy, and `.local/` is absent. The step writes into the checkout, so it removes `clients/acme` and **asserts the removal** — the `launcher` job has no dirty-tree assertion today, and a step that relies on that staying true is a step that breaks quietly when it changes |
+
+**A defect of my own, found by the suite rather than by review.** The B06-04 control used a 120 ms
+deadline and passed alone, then failed in the full run: under load the child had not been exec'd
+when the deadline fired, so `ps` could not see it and *"the stubborn child survived"* read as *"it
+was reaped"*. The same race would have made the positive test pass for the wrong reason — a child
+that never started is also a child that is gone. The deadline is 1 500 ms now, long enough that the
+stub is certainly running and visible before anything kills it.
+
+**And that was still not enough (ARC-06-C4, found in review).** "Certainly running" on my machine is
+a probability on a loaded runner, and the failure mode is the dangerous one — the positive test and
+its control would BOTH pass while measuring nothing. The precondition is asserted now rather than
+assumed: the stub writes a started marker the moment it is running, before it goes silent, and every
+case checks that marker BEFORE concluding anything about the child, failing by name — *"the deadline
+fired before the stub started; the run measured nothing"* — if the deadline beat the fixture to it.
+The deadline stays 1 500 ms; the marker is what turns "long enough" into a checked fact. Proven both
+ways: at 1 ms both cases fail by that name instead of passing, and the marker caught a defect of mine
+on its first run — the scratch directory was removed in `afterEach`, so the second case's stub had
+nowhere to write, which is the assertion doing its job on its author.
+
+**And one false alarm, recorded because it cost time.** Reading `die()`'s definition beside a
+truncated view of its B07 call, I concluded the launcher exits through an unbound-variable error on
+a supported failure path. It does not: all **15** `die` call sites pass an exit code, and the B07
+call ends with ` 1` — the line was simply longer than the `cut` I had read it through. Measured with
+continuations joined before the claim went anywhere.

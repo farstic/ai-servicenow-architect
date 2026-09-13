@@ -227,6 +227,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The installer's own self-check now proves the things it claimed.** Four of its acceptance
+  criteria described behaviour the product does not have — they were written before the health
+  check moved house and were never revisited — so they were corrected to what the code actually
+  does, and the real behaviour behind each is now tested: that a stray setting in your shell
+  cannot change what the installer reads, that a server which never replies is given up on and
+  leaves nothing running behind it, and that a slow start warns you before it becomes a failure.
+
 - **A network hiccup while downloading the documentation no longer breaks the install — and when it
   does fail, it says so.** A slow moment at the wrong second used to end the install; it now waits
   and tries again, twice. Worse, on a machine without Node.js the download could fail while the

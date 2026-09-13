@@ -115,6 +115,14 @@ describe('SV-06 — the running server against the store on disk (ARC-08-S04 AC 
     expect(drifted.detail).toMatch(/server 100 vs store 50/);
     // The remedy is the actionable half — a difference with no instruction is a puzzle.
     expect(drifted.remedy).toMatch(/restart/i);
+    // …and it must name the VARIABLE, which is the half ARC-06-S08 AC 3 was really about and the
+    // only part of it that survives (ARC-06 acceptance, B06-01). `/restart/i` passes on a remedy
+    // that says "restart it" and stops there, leaving an operator whose SNOW_STORE points at
+    // another file with nothing to check. The sentence is
+    // "the running server is not reading the store this doctor read — restart it, and check
+    // SNOW_STORE", and both halves of it are asserted here.
+    expect(drifted.remedy).toContain('not reading the store this doctor read');
+    expect(drifted.remedy).toContain('SNOW_STORE');
   }, 120_000);
 
   it('the same edit with the server restarted is not a difference', async () => {

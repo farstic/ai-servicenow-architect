@@ -334,7 +334,27 @@ interface Handshake {
  * is not a server that failed, and treating any stderr output as an error would make this check
  * red on every machine.
  */
-async function handshake(serverPath: string): Promise<Handshake> {
+/**
+ * The handshake's own deadline, in milliseconds.
+ *
+ * A TESTABILITY SEAM, not a behaviour change: the default is the 20 000 ms this has always used,
+ * and no caller in the product passes anything else. It exists so a test can point the handshake at
+ * a server that never answers and get the timeout in milliseconds instead of twenty seconds on
+ * every CI cell (ARC-06 acceptance, B06-02 and B06-04).
+ *
+ * It is deliberately NOT `MCP_TIMEOUT`. That value is the number the cold start is compared
+ * *against* — the engine reads `.claude/settings.json` and warns when the start is over 60 % of it —
+ * and it has never bounded this deadline. See the ARC-06 chores table: tying the two together is a
+ * 2.0.x candidate, and this parameter is where a fix would attach.
+ */
+export const HANDSHAKE_TIMEOUT_MS = 20_000;
+
+/**
+ * Exported as a test seam only. Production reaches it through `getHandshake()`, which fixes the
+ * server path and the deadline; a test needs both to point a never-answering fixture at it without
+ * a built `dist/` and without waiting the real timeout.
+ */
+export async function handshake(serverPath: string, timeoutMs: number = HANDSHAKE_TIMEOUT_MS): Promise<Handshake> {
   return new Promise<Handshake>((done) => {
     const child = spawn(process.execPath, [serverPath], {
       stdio: ['pipe', 'pipe', 'ignore'],
@@ -349,7 +369,14 @@ async function handshake(serverPath: string): Promise<Handshake> {
       child.kill();
       done({ ...h, ...(initializeMs === undefined ? {} : { initializeMs }) });
     };
-    const timer = setTimeout(() => finish({ tools: [], capabilities: null, error: 'timed out after 20s' }), 20_000);
+    // Whole seconds keep the sentence a person reads unchanged — the default has always said
+    // "timed out after 20s" and a seam must not reword a user-visible message. A test deadline of
+    // 50 ms would render as "0s", so anything that is not a whole number of seconds is printed in
+    // milliseconds instead. Production takes the first branch, always.
+    const took = timeoutMs % 1000 === 0 ? `${timeoutMs / 1000}s` : `${timeoutMs} ms`;
+    const timer = setTimeout(
+      () => finish({ tools: [], capabilities: null, error: `timed out after ${took}` }),
+      timeoutMs);
 
     const send = (id: number, method: string, params: unknown = {}): void => {
       child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
@@ -412,12 +439,21 @@ const handshakeData = (h: Handshake): Record<string, unknown> => ({
 /** Cached across SV-05 and SV-06 so the server is spawned once, not twice. */
 let handshakeCache: Promise<Handshake> | undefined;
 const getHandshake = (): Promise<Handshake> => {
-  handshakeCache ??= handshake(join(distDir(), 'server.js'));
+  handshakeCache ??= handshake(join(distDir(), 'server.js'), handshakeTimeoutMs);
   return handshakeCache;
 };
 
+/** The deadline the next handshake uses. Production never sets it; see HANDSHAKE_TIMEOUT_MS. */
+let handshakeTimeoutMs: number = HANDSHAKE_TIMEOUT_MS;
+
+/** Test seam: run the next handshake against a short deadline, and put it back. */
+export function setHandshakeTimeoutMs(ms: number): void { handshakeTimeoutMs = ms; }
+
 /** Test seam: forget the cached handshake between fixtures. */
-export function resetHandshakeCache(): void { handshakeCache = undefined; }
+export function resetHandshakeCache(): void {
+  handshakeCache = undefined;
+  handshakeTimeoutMs = HANDSHAKE_TIMEOUT_MS;
+}
 
 export const svHandshake: Check = {
   id: 'SV-05',
