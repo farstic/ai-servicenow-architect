@@ -32,7 +32,7 @@
  * directory already on the PATH. A recipe that cannot remove is no use to a cell whose whole
  * subject is an absence.
  *
- * Usage: node scripts/ci/strip-git-bash.mjs [--with-node] (--print | --export)
+ * Usage: node scripts/ci/strip-git-bash.mjs [--with-node] [--no-git] (--print | --export)
  * Exit 0 ok · 1 Git Bash still reachable · 2 not Windows.
  */
 import { appendFileSync, existsSync, writeSync } from 'node:fs';
@@ -40,6 +40,15 @@ import { execFileSync } from 'node:child_process';
 
 const argv = process.argv.slice(2);
 const WITH_NODE = argv.includes('--with-node');
+/**
+ * Also drop `Git\\cmd`, so `git.exe` itself is unreachable (ARC-09 acceptance, B09-02).
+ *
+ * The B00 prerequisite check says git is required and prints a remedy; nothing had ever run the
+ * launcher on a PATH where git is genuinely absent, so that sentence was written and never read
+ * back. Only ever for a SINGLE step with `--print` — a job-wide export would break every later
+ * step, since git is a prerequisite of everything else the cell does.
+ */
+const NO_GIT = argv.includes('--no-git');
 const EXPORT = argv.includes('--export');
 const PRINT_ONLY = argv.includes('--print') || !EXPORT;
 
@@ -58,7 +67,7 @@ const DIRS = [
   'C:\\Windows\\system32',
   'C:\\Windows',
   'C:\\Windows\\System32\\WindowsPowerShell\\v1.0',
-  'C:\\Program Files\\Git\\cmd',
+  ...(NO_GIT ? [] : ['C:\\Program Files\\Git\\cmd']),
   ...(WITH_NODE ? ['C:\\Program Files\\nodejs'] : []),
 ];
 

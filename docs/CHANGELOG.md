@@ -227,6 +227,15 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Three of the checks that guard releases and installs were watching the wrong thing.** One
+  rehearsed a Windows release in an environment Windows users may not have, and so never
+  answered the question it was asked — it does now, and the answer is that the release works
+  without it. Another proved that credentials are handled safely on Windows only, though nothing
+  about the check was Windows-specific; it runs everywhere now. A third described an error
+  message that the installer does not print, and has been corrected to the one it does. The
+  release harness also no longer lets git tidy up in the background while a test is reading, a
+  race that failed one run in thirteen.
+
 - **The installer's own self-check now proves the things it claimed.** Four of its acceptance
   criteria described behaviour the product does not have — they were written before the health
   check moved house and were never revisited — so they were corrected to what the code actually

@@ -38,6 +38,9 @@ const USERNAME = 'fixture.user';
 
 const fail = (why) => { writeSync(2, `assert-password-stdin: ${why}\n`); process.exit(1); };
 
+/** The B09-01 proxy case: the same call under a proxy nothing listens on. */
+const PROXY_CASE = process.env.SNOWARCH_ASSERT_PROXY_FAILS === '1';
+
 const dir = mkdtempSync(join(tmpdir(), 'snowarch-pwstdin-'));
 const store = join(dir, 'instances.json');
 
@@ -98,6 +101,26 @@ async function run() {
     });
 
     const text = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+    // ── the proxy case (acceptance item B09-01) ──────────────────────────────────────────────
+    //
+    // The criterion asked for `lastProbe: null` in the store under `HTTPS_PROXY=http://127.0.0.1:9`.
+    // **Measured: there is no store to read.** `instance add` always makes a reachability request —
+    // `--no-probes` skips the CAPABILITY probes, not that one — so a proxy nothing listens on ends
+    // the run with `reachability: FAIL PROXY_UNREACHABLE — ECONNREFUSED` and `Nothing saved.`
+    //
+    // That is correct behaviour and better than what was asked for: an instance whose proxy does
+    // not connect must not be saved half-verified. So the proxy case asserts THAT, and the
+    // `lastProbe: null` half is asserted in the ordinary run below, where a store exists.
+    if (PROXY_CASE) {
+      if (r.status === 0) fail('a dead HTTPS_PROXY did not stop the add — an unverified instance was saved');
+      if (!/PROXY_UNREACHABLE/.test(text)) fail(`no PROXY_UNREACHABLE in:\n${text}`);
+      if (!/Nothing saved\./.test(text)) fail(`the run did not say "Nothing saved.":\n${text}`);
+      if (existsSync(store)) fail('a store was written by a run that refused');
+      writeSync(1, 'assert-password-stdin: ok — a dead HTTPS_PROXY fails closed, '
+        + 'PROXY_UNREACHABLE, nothing saved\n');
+      return;
+    }
+
     if (r.status !== 0) fail(`the wizard exited ${r.status ?? r.signal}:\n${text}`);
 
     // THE SECRET IS NOT AN ARGUMENT, asserted of the argv this script built rather than trusted: a
@@ -113,6 +136,17 @@ async function run() {
     if (entry.auth?.password !== PASSWORD) fail('the password did not reach the store');
     if (entry.auth?.username !== USERNAME) fail('the username did not reach the store');
     if (entry.preset !== 'read-only') fail(`preset is ${entry.preset}`);
+
+    // ARC-09-S08 AC's `lastProbe: null` half (acceptance item B09-01), and the reason it is worth
+    // asserting rather than assuming: `--no-probes` is supposed to mean NO capability probe ran, and
+    // the store records that as `lastProbe: null`. A run under `HTTPS_PROXY=http://127.0.0.1:9` —
+    // a port nothing listens on — turns "no probe ran" into an observable claim, because a probe
+    // that DID run would have to go through that proxy and could not have succeeded quietly. The
+    // proxy is set by the CI step; this assertion holds either way and is the half that says the
+    // flag did what it says.
+    if (entry.lastProbe !== null && entry.lastProbe !== undefined) {
+      fail(`lastProbe is ${JSON.stringify(entry.lastProbe)}, not null — a probe ran under --no-probes`);
+    }
 
     // The stub is the only honest witness that the wizard talked to THIS endpoint rather than
     // failing its way to a saved store. With `--no-probes` the single request is the

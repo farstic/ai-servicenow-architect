@@ -76,6 +76,42 @@ export function persistLongPaths(cwd) {
   if (back !== 'true') throw new Error(`core.longpaths did not persist in ${cwd} (read back "${back}")`);
 }
 
+/**
+ * Turn git's background housekeeping OFF in a fixture repository, the moment it exists.
+ *
+ * ARC-09-C34. `upgrade-e2e (macos-latest)` failed once in thirteen runs with `bad tree object`,
+ * `git upload-pack: git-pack-objects died` and `early EOF` — reading the harness's OWN bare origin,
+ * in a test the failing PR did not touch, while ubuntu passed the same test in the same run. That
+ * is the signature of a DETACHED auto-gc racing a reader: past the loose-object threshold git
+ * spawns `git gc --auto` in the background (`gc.autoDetach` is true by default) and returns, and
+ * the next clone reads packs it is still repacking. A world makes many commits, two tagged
+ * releases and a bare clone, which is what reaches the threshold.
+ *
+ * **What is established and what is not.** Measured: `git grep 'gc\.auto|maintenance\.auto|
+ * autoDetach' tests/upgrade/` returned nothing before this — the harness disabled none of them, so
+ * the mechanism was available in every repo it creates. NOT established: that gc actually fired in
+ * that run. The job log carries git's client-side error, not the source repo's housekeeping, and
+ * the temp tree is gone. So this is fixture hygiene against a mechanism we know was live, not a
+ * proven diagnosis.
+ *
+ * The local bare clone stays as it is, deliberately: hardlinked objects are safe against what gc
+ * does — git writes new packs and unlinks old NAMES, it never rewrites an object file in place, so
+ * the origin's links keep their inodes when the work tree's gc removes its own. `--no-hardlinks`
+ * would only make the phase timings incomparable with every run recorded before it.
+ *
+ * Read back for the reason `persistLongPaths` gives: a helper that silently does nothing is the
+ * failure it was written to prevent.
+ */
+export function disableBackgroundGit(cwd) {
+  for (const [key, value] of [['gc.auto', '0'], ['maintenance.auto', 'false']]) {
+    execFileSync('git', [...LONGPATHS, 'config', key, value],   // scan-exempt: this IS the entry point
+      { cwd, encoding: 'utf8', stdio: 'pipe' });
+    const back = String(execFileSync('git', ['config', '--get', key],   // scan-exempt: reads back what the line above wrote
+      { cwd, encoding: 'utf8', stdio: 'pipe' })).trim();
+    if (back !== value) throw new Error(`${key} did not persist in ${cwd} (read back "${back}")`);
+  }
+}
+
 /** Every git call in this suite goes through here or through `gitRaw`. The scan test says so. */
 export function git(cwd, args, { allowFail = false } = {}) {
   try {
@@ -369,6 +405,7 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // Written into the fixture repository the moment it exists, so every git that ever runs here —
   // including ones this suite does not spawn — reads it. See `persistLongPaths`.
   persistLongPaths(work);
+  disableBackgroundGit(work);
   commit(work, 'v9.0.0', upstream.pin);
   await tagRelease(work, '9.0.0', { claudeFloor });
   marks.push(`release-A-base=${Math.round(Number(process.hrtime.bigint() - worldStart) / 1e6)}ms`);
@@ -439,9 +476,14 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   // ── the bare origin, and the user's clone at v9.0.0 ───────────────────────────────────────
   const origin = join(scratch, 'origin.git');
   phase('clone-bare', marks, () => gitRaw(['clone', '--quiet', '--bare', work, origin]));
+  // Before anything reads it: a clone inherits nothing from its source's config, so the bare origin
+  // arrives with git's defaults and its own housekeeping enabled. This is the repository the next
+  // line reads from, and the one ARC-09-C34's failure was reading.
+  disableBackgroundGit(origin);
 
   const user = join(scratch, 'user');
   phase('clone-user', marks, () => gitRaw(['clone', '--quiet', pathToFileURL(origin).href, user]));
+  disableBackgroundGit(user);
   // The user's clone gets the same treatment: B06's migration runs the BUILT CLI, which imports
   // commander, and a design-only bootstrap never installs dependencies.
   phase(`modules-user-${modules}`, marks, () => placeModules(user, modules));

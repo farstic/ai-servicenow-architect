@@ -623,6 +623,39 @@ jobs:
           npm ci --ignore-scripts
           node tools/snowarch/tests/server-section-smoke.mjs
 
+      # ── ARC-09-S08 AC (acceptance item B09-01) ─────────────────────────────────────────────
+      # HERE, at the end, and not beside the doctor steps where the criterion's wording pointed.
+      # `instance add` is the built CLI and imports `commander`, and everything above this line in
+      # this job runs BEFORE any install — deliberately, because the doctor is what you run when the
+      # install went wrong. Put there, the smoke failed with `Cannot find package 'commander'`,
+      # which is the job's own claim working exactly as intended. The step above has just run
+      # `npm ci --ignore-scripts`, so the dependencies exist from here on.
+      #
+      # `assert-password-stdin.mjs` had exactly one caller before this, in `windows-native`, and
+      # nothing about its three properties is Windows-specific: a credential door tested on one
+      # platform is a door nobody has tried.
+      - name: 'B09-01 — a throwaway certificate for the stub (POSIX)'
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: node scripts/ci/make-fixture-cert.mjs
+      # Its own step: the cert script publishes its paths through `GITHUB_ENV`, which only reaches
+      # LATER steps — running both in one leaves the second without them, which is how the first
+      # push of this failed.
+      - name: 'B09-01 — the password never reaches argv, and the store is written (POSIX)'
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: node scripts/ci/assert-password-stdin.mjs
+      # The proxy half, and NOT the one the criterion asked for. It wanted `lastProbe: null` in the
+      # store under a dead `HTTPS_PROXY`; measured, there is no store to read — `instance add`
+      # always makes a reachability request (`--no-probes` skips the CAPABILITY probes, not that
+      # one), so the run ends `PROXY_UNREACHABLE` / `Nothing saved.` and exits 1. That is better
+      # than what was asked for, and it is what is asserted; `lastProbe: null` is asserted in the
+      # ordinary run above, where a store exists.
+      - name: 'B09-01 — a dead HTTPS_PROXY fails closed and saves nothing (POSIX)'
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        env:
+          SNOWARCH_ASSERT_PROXY_FAILS: '1'
+          HTTPS_PROXY: http://127.0.0.1:9
+        run: node scripts/ci/assert-password-stdin.mjs
+
   commitlint:
     # The changelog is generated from commit subjects (ARC-09-S02), so a subject nobody checked is a
     # changelog entry nobody wrote. The generator never refuses history — it records an
@@ -679,11 +712,27 @@ jobs:
       # Gate 6 is `docs verify`, which needs the corpus. The same sparse recipe B02 uses.
       - name: The pinned corpus, sparse
         run: node tools/snowarch/bin/snowarch.mjs docs sync --yes
-      - name: The release, rehearsed — every gate, nothing written
+      # ARC-09-S0x AC (acceptance item B09-07). The criterion is that the release runs on
+      # windows-latest **under pwsh, with no Git Bash** — and until this acceptance pass this step
+      # was `shell: bash` on all three OSes, which on windows-latest IS Git Bash. So the cell was
+      # proving the opposite of the claim: that the release works WITH Git Bash present.
+      #
+      # Split rather than translated wholesale: ubuntu and macOS keep the bash step they have always
+      # run, and only the Windows cell moves to pwsh, so a failure here is about the shell and not
+      # about three steps changing at once.
+      - name: The release, rehearsed — every gate, nothing written (POSIX)
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
           branch=$(git rev-parse --abbrev-ref HEAD)
           node scripts/release.mjs 9.9.9 --dry-run --offline --no-install --allow-branch "$branch"
+      - name: The release, rehearsed — every gate, nothing written (Windows, pwsh, no Git Bash)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+          node scripts/release.mjs 9.9.9 --dry-run --offline --no-install --allow-branch $branch
+          if ($LASTEXITCODE -ne 0) { throw "release.mjs exited $LASTEXITCODE under pwsh" }
       - name: ...and the tree is exactly as it was
         run: node scripts/ci/assert-clean.mjs
 
@@ -907,6 +956,37 @@ jobs:
           where bash 2>nul | find /i "\Git\" >nul && exit /b 1
           where node || exit /b 1
           where git || exit /b 1
+          exit /b 0
+
+      # ── ARC-09-S08 AC (acceptance item B09-02) ─────────────────────────────────────────────
+      # BEFORE the install, because it asserts `.local\` was not created. B00 says git is required
+      # and prints a remedy; nothing had ever run the launcher on a PATH where git is genuinely
+      # absent, so that sentence was written and never read back. `--no-git` drops `Git\cmd` for
+      # THIS STEP ONLY — a job-wide export would break every later step, since git is a
+      # prerequisite of everything else this cell does.
+      #
+      # The criterion said "the `git >= 2.25 not found` remedy". Two corrections, both measured: the
+      # launcher says `git not found` when it is absent (the version sentence is the OTHER branch,
+      # for a git that is too old), and the floor is 2.34.1, not 2.25.
+      - name: 'B09-02 — with no git.exe on PATH the launcher stops at B00, exit 3, writes nothing'
+        run: |
+          for /f "delims=" %%P in ('node scripts/ci/strip-git-bash.mjs --with-node --no-git --print') do set "NOGIT=%%P"
+          setlocal
+          set "PATH=%NOGIT%"
+          where git >nul 2>&1 && (echo git is still reachable & exit /b 1)
+          call .\bootstrap.cmd --mode design --yes --skip-claude-check --docs skip > "%RUNNER_TEMP%\b09-02.log" 2>&1
+          set CODE=%ERRORLEVEL%
+          endlocal & set CODE=%CODE%
+          type "%RUNNER_TEMP%\b09-02.log"
+          if not "%CODE%"=="3" (echo expected exit 3, got %CODE% & exit /b 1)
+          findstr /c:"FAIL B00: git not found" "%RUNNER_TEMP%\b09-02.log" >nul || (echo no git FAIL & exit /b 1)
+          rem The remedy line is asserted as `Remedy: winget install`, not as the full literal.
+          rem Measured on the first push: the runner MASKS part of it — the log shows
+          rem `Remedy: winget install G***.G***` — so a findstr for the exact string fails for a
+          rem reason that has nothing to do with the launcher. The exact constant is asserted where
+          rem masking cannot reach it, against the SOURCE, in tests/launcher-parity.test.mjs.
+          findstr /c:"Remedy: winget install" "%RUNNER_TEMP%\b09-02.log" >nul || (echo no git remedy & exit /b 1)
+          if exist .local\ (echo .local was created by a run that refused & exit /b 1)
           exit /b 0
 
       - name: Install through the Windows launcher

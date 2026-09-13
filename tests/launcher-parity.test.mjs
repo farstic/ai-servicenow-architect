@@ -734,3 +734,20 @@ test('the recipe is idempotent — a second bootstrap succeeds, with .git left a
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('B09-02 — the Windows git remedy is the constant the CI step can only assert loosely', () => {
+  // The CI step (ARC-09 acceptance, B09-02) runs the launcher with no `git.exe` on PATH and
+  // asserts `Remedy: winget install` in its output. It cannot assert the full literal: the runner
+  // MASKS part of it — the log reads `Remedy: winget install G***.G***` — so a match on the exact
+  // string fails for a reason that has nothing to do with the launcher. Masking is a property of
+  // the log, not of the source, so the exact constant is asserted here instead, and the two
+  // together are the whole claim: the right sentence exists, and it is the one that gets printed.
+  assert.match(ps1, /^\$MSG_GIT_WIN = 'winget install Git\.Git'$/m);
+  // …and it is what the git branches actually pass, rather than a constant nothing uses.
+  assert.match(ps1, /Die 'B00' 'git not found' \$MSG_GIT_WIN 3/);
+  assert.match(ps1, /Die 'B00' \("git \$GitV found, >= " \+ \(Floor 'git'\) \+ ' required'\) \$MSG_GIT_WIN 3/);
+  // The criterion said "git ≥ 2.25"; the floor is read from the config and is not that.
+  const floor = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')).floors.git;
+  assert.equal(floor, '2.34.1', 'the git floor moved — B09-02 quotes it in its row');
+  assert.notEqual(floor, '2.25');
+});

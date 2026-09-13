@@ -737,6 +737,26 @@ remote still has the object.
 6. Total wall time of the workflow on a push is < 25 min (macOS being the tail); the table in `docs/CONTRIBUTING.md` lists measured durations per job.
 7. With Q-B fallback in force (simulated by an env flag in a throwaway branch), the workflow file switches to the `windows-gitbash` variant by changing one job block only.
 
+> **Amendment 2026-09-13 (ARC-09 acceptance, B09-02 and B09-03).** Two of these criteria quote things
+> that are not true of the product, and both were found by reading the source before writing a test.
+>
+> - **AC 4 is corrected.** The launcher never prints `git ≥ 2.25 not found`. There is no 2.25
+>   anywhere in the tree, and the criterion conflates two distinct paths: git **absent** is
+>   `bootstrap.ps1:132`, `Die 'B00' 'git not found' $MSG_GIT_WIN 3` — message `git not found`,
+>   remedy `winget install Git.Git`, exit 3; git **below floor** is `:133`,
+>   `git <v> found, >= 2.34.1 required`. The stripped-PATH case is the absent one, so the criterion is
+>   met by `git not found` at exit 3. Now pinned against drift by `tests/launcher-parity.test.mjs`,
+>   which asserts both the literal and the floor — so the floor moving reds a test instead of
+>   silently invalidating a story. The CI step proves the sentence is *printed* (and the runner
+>   **masks** part of the remedy in the log, `winget install G***.G***`, which is why the exactness
+>   lives in the source test and not in a log grep).
+> - **AC 5 is unproven and its live proof is withdrawn**, not deferred. `bootstrap.cmd` has no goto
+>   label — it is a six-line wrapper — and it is invoked **eleven times across four jobs**
+>   (`bootstrap` 4, `windows-launcher` 5, `windows-native` 2, `eol` 1), so "the other cells stay
+>   green" is false as written. The throwaway PR was authorised and then declined **before it was
+>   opened**; no branch was created. What holds today is the static assertion in
+>   `tests/workflows.test.mjs`. Re-aiming the experiment is a new design, not a retry.
+
 **Tasks.**
 1. Consolidate the job table into `ci.yml` (some jobs were added by other ARCs — align names, cells, `needs`, artifacts between `bootstrap` and `doctor`).
 2. Write `scripts/ci/strip-git-bash.mjs`, `password-stdin-smoke.mjs`, `hook-smoke.mjs`, `assert-doctor.mjs`.
