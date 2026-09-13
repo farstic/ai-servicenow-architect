@@ -417,33 +417,6 @@ jobs:
           echo "doctor exit: $code"
           if [ "$code" -ge 2 ]; then exit 1; fi
           ./snowarch doctor --no-cache | tail -25 || true
-      # ── ARC-09-S08 AC (acceptance item B09-01) ─────────────────────────────────────────────
-      # `--password-stdin` is the half an operator AUTOMATES, and until this acceptance pass it was
-      # proven on the three Windows cells only — `assert-password-stdin.mjs` had exactly one caller,
-      # in `windows-native`. Nothing about its three properties is Windows-specific, and a
-      # credential door that is only ever tested on one platform is a door nobody has tried.
-      # Its OWN step: `make-fixture-cert.mjs` publishes the paths through `GITHUB_ENV`, which only
-      # reaches LATER steps — running both in one step leaves the second without them, which is
-      # exactly how the first push of this failed.
-      - name: 'B09-01 — a throwaway certificate for the stub (POSIX)'
-        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
-        run: node scripts/ci/make-fixture-cert.mjs
-      - name: 'B09-01 — the password never reaches argv, and the store is written (POSIX)'
-        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
-        run: node scripts/ci/assert-password-stdin.mjs
-      # The proxy half, and NOT the one the criterion asked for. It wanted `lastProbe: null` in the
-      # store under a dead `HTTPS_PROXY`; measured, there is no store to read — `instance add`
-      # always makes a reachability request (`--no-probes` skips the CAPABILITY probes, not that
-      # one), so the run ends `PROXY_UNREACHABLE` / `Nothing saved.` and exits 1. That is better
-      # than what was asked for, and it is what is asserted; `lastProbe: null` is asserted in the
-      # ordinary run above, where a store exists.
-      - name: 'B09-01 — a dead HTTPS_PROXY fails closed and saves nothing (POSIX)'
-        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
-        env:
-          SNOWARCH_ASSERT_PROXY_FAILS: '1'
-          HTTPS_PROXY: http://127.0.0.1:9
-        run: node scripts/ci/assert-password-stdin.mjs
-
       # ── ARC-08-S01 AC 6 (acceptance item B08-01) ───────────────────────────────────────────
       # STILL BEFORE `npm ci`, which is the whole claim: the doctor is what you run when the
       # install went wrong, so neither it nor the tests that drive it may need the install to have
@@ -649,6 +622,39 @@ jobs:
         run: |
           npm ci --ignore-scripts
           node tools/snowarch/tests/server-section-smoke.mjs
+
+      # ── ARC-09-S08 AC (acceptance item B09-01) ─────────────────────────────────────────────
+      # HERE, at the end, and not beside the doctor steps where the criterion's wording pointed.
+      # `instance add` is the built CLI and imports `commander`, and everything above this line in
+      # this job runs BEFORE any install — deliberately, because the doctor is what you run when the
+      # install went wrong. Put there, the smoke failed with `Cannot find package 'commander'`,
+      # which is the job's own claim working exactly as intended. The step above has just run
+      # `npm ci --ignore-scripts`, so the dependencies exist from here on.
+      #
+      # `assert-password-stdin.mjs` had exactly one caller before this, in `windows-native`, and
+      # nothing about its three properties is Windows-specific: a credential door tested on one
+      # platform is a door nobody has tried.
+      - name: 'B09-01 — a throwaway certificate for the stub (POSIX)'
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: node scripts/ci/make-fixture-cert.mjs
+      # Its own step: the cert script publishes its paths through `GITHUB_ENV`, which only reaches
+      # LATER steps — running both in one leaves the second without them, which is how the first
+      # push of this failed.
+      - name: 'B09-01 — the password never reaches argv, and the store is written (POSIX)'
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: node scripts/ci/assert-password-stdin.mjs
+      # The proxy half, and NOT the one the criterion asked for. It wanted `lastProbe: null` in the
+      # store under a dead `HTTPS_PROXY`; measured, there is no store to read — `instance add`
+      # always makes a reachability request (`--no-probes` skips the CAPABILITY probes, not that
+      # one), so the run ends `PROXY_UNREACHABLE` / `Nothing saved.` and exits 1. That is better
+      # than what was asked for, and it is what is asserted; `lastProbe: null` is asserted in the
+      # ordinary run above, where a store exists.
+      - name: 'B09-01 — a dead HTTPS_PROXY fails closed and saves nothing (POSIX)'
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        env:
+          SNOWARCH_ASSERT_PROXY_FAILS: '1'
+          HTTPS_PROXY: http://127.0.0.1:9
+        run: node scripts/ci/assert-password-stdin.mjs
 
   commitlint:
     # The changelog is generated from commit subjects (ARC-09-S02), so a subject nobody checked is a
