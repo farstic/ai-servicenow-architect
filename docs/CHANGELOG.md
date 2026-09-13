@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.0-rc.2 — 2026-09-13
+
+### Notes
+
 This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
 
 #### Migration for snow-mcp 1.0.0 users
@@ -1559,6 +1563,47 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   engine pin and its sha are untouched.
 
 ---
+
+### Fixed
+
+- ci: the POSIX password-stdin smoke runs after the install, not before (c186c88)
+- ci: the two new steps, corrected by their own first run (418b3ff)
+- ci: ARC-09 acceptance — the three cells that proved the opposite, and the harness's gc (e749680)
+- bootstrap: ARC-06 acceptance — four criteria that outlived the code they described (536476a)
+- tests: the gate test stops rebuilding dist under a running suite (f91d16f)
+- tests: ARC-05 acceptance — the drift-prevention tools, exercised (376ef67)
+- plan: the ARC-04 table says what this PR did, and history stops contradicting itself (a3af975)
+- plan: ARC-04 acceptance — procedures for what only the owner can run, tests for the rest (7413bb7)
+- plan: the ARC-00 table says what this PR did, and the register's rows are rows (bf58507)
+- plan: ARC-00 acceptance — the register may never say less than the record (befede8)
+- docs: the recipe's clone skips a checkout that is already there (690cdab)
+- docs: retry a transient corpus checkout, and stop the recipe swallowing failures (948425c)
+- tests: ARC-01 fix-up — five findings, and the half of B01-07 I never read (0e14d2f)
+- tests: ARC-02-C1 and ARC-09-C33 — the assets half, and a probability asserted as a law (f17f22a)
+- tests: ARC-02 fix-up — the body comparison is line-ending blind (714c2fc)
+- doctor: ARC-09-C32 fix-up — the --no-network sentences could not print, and my test hid it (49ccf57)
+- doctor: ARC-09-C32 — cache the empty outcome, and fix the two branches that assumed a release (0431e42)
+- doctor: ARC-08-C2 — E-25 sees Known Folder Move, and the bootstrap stops contradicting itself (4916dee)
+- doctor: ARC-09-C31 — one clock, and E-28 stops crashing when a release exists (b3b6984)
+
+### Internal
+
+- plan: a stale record is not only a false statement, it is an instruction (906f607)
+- plan: record B09-03 as declined and B09-07 as answered green (7e3bfae)
+- plan: B09-03 recorded unproven — the check would have cost a run to refute (9313241)
+- plan: ARC-09 acceptance — the rows, the chore, and what the experiment answered (d15cd8d)
+- tests: the handshake control asserts its precondition instead of assuming it (c2a5356)
+- plan: B05-06 — the contract test measured at 1,295 ms against a 30 s cap (1974325)
+- tests: the verdict parser's proxy is asserted, not assumed (ecba2d0)
+- tests: pin the block comparison to the POSIX rendering, not the running platform (0f9b2aa)
+- state the relation the block and --print-recipe actually have (3857293)
+- tests: ARC-01 acceptance — six promises nothing was keeping, and a ledger that never existed (89bb06f)
+- engine: ARC-02 acceptance — seven items, and a rubric that existed nowhere as a rule (8998b44)
+- docs: ARC-03 acceptance — four items, and two proposed checks that could not have worked (a62e64e)
+- plan: the rc.1 acceptance records — the RC run and the design-only suite (37fbdf5)
+- server: ARC-07 acceptance — four items, and two guards that could not have failed (265f07b)
+
+Tag v2.0.0-rc.2 · contract 80fec80b3952 · docs-pin 11b39be
 
 ## The imported engine's header
 
