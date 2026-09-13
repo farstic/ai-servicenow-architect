@@ -422,11 +422,15 @@ jobs:
       # proven on the three Windows cells only — `assert-password-stdin.mjs` had exactly one caller,
       # in `windows-native`. Nothing about its three properties is Windows-specific, and a
       # credential door that is only ever tested on one platform is a door nobody has tried.
+      # Its OWN step: `make-fixture-cert.mjs` publishes the paths through `GITHUB_ENV`, which only
+      # reaches LATER steps — running both in one step leaves the second without them, which is
+      # exactly how the first push of this failed.
+      - name: 'B09-01 — a throwaway certificate for the stub (POSIX)'
+        if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
+        run: node scripts/ci/make-fixture-cert.mjs
       - name: 'B09-01 — the password never reaches argv, and the store is written (POSIX)'
         if: matrix.variant == 'node-cli' && matrix.os != 'windows-latest'
-        run: |
-          node scripts/ci/make-fixture-cert.mjs
-          node scripts/ci/assert-password-stdin.mjs
+        run: node scripts/ci/assert-password-stdin.mjs
       # The proxy half, and NOT the one the criterion asked for. It wanted `lastProbe: null` in the
       # store under a dead `HTTPS_PROXY`; measured, there is no store to read — `instance add`
       # always makes a reachability request (`--no-probes` skips the CAPABILITY probes, not that
@@ -970,7 +974,12 @@ jobs:
           type "%RUNNER_TEMP%\b09-02.log"
           if not "%CODE%"=="3" (echo expected exit 3, got %CODE% & exit /b 1)
           findstr /c:"FAIL B00: git not found" "%RUNNER_TEMP%\b09-02.log" >nul || (echo no git FAIL & exit /b 1)
-          findstr /c:"winget install Git.Git" "%RUNNER_TEMP%\b09-02.log" >nul || (echo no git remedy & exit /b 1)
+          rem The remedy line is asserted as `Remedy: winget install`, not as the full literal.
+          rem Measured on the first push: the runner MASKS part of it — the log shows
+          rem `Remedy: winget install G***.G***` — so a findstr for the exact string fails for a
+          rem reason that has nothing to do with the launcher. The exact constant is asserted where
+          rem masking cannot reach it, against the SOURCE, in tests/launcher-parity.test.mjs.
+          findstr /c:"Remedy: winget install" "%RUNNER_TEMP%\b09-02.log" >nul || (echo no git remedy & exit /b 1)
           if exist .local\ (echo .local was created by a run that refused & exit /b 1)
           exit /b 0
 

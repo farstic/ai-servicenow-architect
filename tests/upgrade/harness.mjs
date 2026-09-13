@@ -79,7 +79,7 @@ export function persistLongPaths(cwd) {
 /**
  * Turn git's background housekeeping OFF in a fixture repository, the moment it exists.
  *
- * ARC-09-C1. `upgrade-e2e (macos-latest)` failed once in thirteen runs with `bad tree object`,
+ * ARC-09-C34. `upgrade-e2e (macos-latest)` failed once in thirteen runs with `bad tree object`,
  * `git upload-pack: git-pack-objects died` and `early EOF` — reading the harness's OWN bare origin,
  * in a test the failing PR did not touch, while ubuntu passed the same test in the same run. That
  * is the signature of a DETACHED auto-gc racing a reader: past the loose-object threshold git
@@ -478,7 +478,7 @@ export async function buildWorld(t, { claudeFloor = null, modules = 'link', sche
   phase('clone-bare', marks, () => gitRaw(['clone', '--quiet', '--bare', work, origin]));
   // Before anything reads it: a clone inherits nothing from its source's config, so the bare origin
   // arrives with git's defaults and its own housekeeping enabled. This is the repository the next
-  // line reads from, and the one ARC-09-C1's failure was reading.
+  // line reads from, and the one ARC-09-C34's failure was reading.
   disableBackgroundGit(origin);
 
   const user = join(scratch, 'user');
