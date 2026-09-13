@@ -2048,25 +2048,27 @@ protection is set from; the table below is the human reading of it. Run `npm run
 change to `ci.yml` — `gen-all --check` fails on a stale file, and a name in that file that CI does
 not produce is a required check waiting for ever.
 
-| Job | Cells | Shell | What only this job can answer |
-|---|---|---|---|
-| `test` | 3 OS × node 20/22/24 | node/npm | the suites, the lint, the type-check |
-| `contract` | 3 OS × node 20/22/24 | node/npm | the contract gate, on every platform that ships it |
-| `no-build handshake` | 3 OS | node | the COMMITTED `dist/` answers, with no build step first |
-| `docs-check` | ubuntu | node | the corpus recipe and the citations |
-| `footprint` | ubuntu | node | `node_modules` stays under its limit |
-| `actionlint` | ubuntu | pinned binary | the workflows parse and their expressions type-check |
-| `bootstrap` | 13 (ARC-06-S14) | bash · cmd · powershell | the install promise, executed — including the doctor, the snapshot and the banner as STEPS (ARC-08-S11: steps, not a job, so the protection list did not grow) |
-| `commitlint` | ubuntu | node | the commit convention, which nothing else enforces |
-| `release-dryrun` | 3 OS | bash | the release path, on every commit — `release.yml` only ever runs on a tag |
-| `upgrade-e2e` | 3 OS × node 22 | bash | an upgrade moves a TREE, and a tree is what a unit test cannot move |
-| `windows-native` | windows × node 20/22/24 | **cmd** | a Windows machine used the way a Windows user uses one: `cmd.exe` throughout, no Git Bash, the product driven through `.cmd` |
-| `launcher` | ubuntu + macOS | bash | `bootstrap.sh` with Node stripped from PATH |
-| `windows-launcher` | windows | powershell · cmd | the `.cmd` and `.ps1` launchers, which exist nowhere else to be tested |
-| `secrets` | ubuntu | node | no credential-shaped string reached the tree |
-| `plugin-validate` | ubuntu | node | the plugin manifest is loadable |
-| `eol` | ubuntu + windows | bash · **cmd** | the line-ending policy, on a Windows clone made with the Git-for-Windows default `core.autocrlf=true` — set BEFORE the checkout, because the setting decides what the clone writes. Runs `tests/eol.test.mjs`, asserts the launcher bytes are CRLF and the LF set has no `\r`, and runs `bootstrap.cmd --help`, `snowarch.cmd --help` and `bootstrap.ps1 --help` under `cmd.exe` |
-| `docs-real` | 3 OS + one | bash | **conditional — runs only when the corpus tooling changes; NOT required.** A PR that touches those paths produces four extra check runs and they must never become required contexts |
+| Job | Cells | Shell | What only this job can answer | Slowest cell (min) |
+|---|---|---|---|---|
+| `test` | 3 OS × node 20/22/24 | node/npm | the suites, the lint, the type-check | 10.3 |
+| `contract` | 3 OS × node 20/22/24 | node/npm | the contract gate, on every platform that ships it | 0.8 |
+| `no-build handshake` | 3 OS | node | the COMMITTED `dist/` answers, with no build step first | 0.8 |
+| `docs-check` | ubuntu | node | the corpus recipe and the citations | 0.2 |
+| `footprint` | ubuntu | node | `node_modules` stays under its limit | 0.1 |
+| `actionlint` | ubuntu | pinned binary | the workflows parse and their expressions type-check | 0.1 |
+| `bootstrap` | 13 (ARC-06-S14) | bash · cmd · powershell | the install promise, executed — including the doctor, the snapshot and the banner as STEPS (ARC-08-S11: steps, not a job, so the protection list did not grow) | 1.9 |
+| `commitlint` | ubuntu | node | the commit convention, which nothing else enforces | 0.1 |
+| `release-dryrun` | 3 OS | bash | the release path, on every commit — `release.yml` only ever runs on a tag | 9.6 |
+| `upgrade-e2e` | 3 OS × node 22 | bash | an upgrade moves a TREE, and a tree is what a unit test cannot move | 11.1 |
+| `windows-native` | windows × node 20/22/24 | **cmd** | a Windows machine used the way a Windows user uses one: `cmd.exe` throughout, no Git Bash, the product driven through `.cmd` | 0.9 |
+| `launcher` | ubuntu + macOS | bash | `bootstrap.sh` with Node stripped from PATH | 0.2 |
+| `windows-launcher` | windows | powershell · cmd | the `.cmd` and `.ps1` launchers, which exist nowhere else to be tested | 1.6 |
+| `secrets` | ubuntu | node | no credential-shaped string reached the tree | 0.1 |
+| `plugin-validate` | ubuntu | node | the plugin manifest is loadable | 0.2 |
+| `eol` | ubuntu + windows | bash · **cmd** | the line-ending policy, on a Windows clone made with the Git-for-Windows default `core.autocrlf=true` — set BEFORE the checkout, because the setting decides what the clone writes. Runs `tests/eol.test.mjs`, asserts the launcher bytes are CRLF and the LF set has no `\r`, and runs `bootstrap.cmd --help`, `snowarch.cmd --help` and `bootstrap.ps1 --help` under `cmd.exe` | 0.4 |
+| `docs-real` | 3 OS + one | bash | **conditional — runs only when the corpus tooling changes; NOT required.** A PR that touches those paths produces four extra check runs and they must never become required contexts | — |
+
+**The durations are a dated snapshot, not an assertion.** Slowest cell per job, from run `34736611978` on `c186c88` — 54 jobs, **12 min 26 s** wall (`03:54:06Z` → `04:06:32Z`) against the 25-minute budget ARC-09 set. Nothing enforces these numbers: a runner image or a matrix change moves them, and a test that failed when a job got 30 seconds slower would be a test about GitHub's week rather than about this repository. What the budget is for is noticing when the shape changes — three jobs (`upgrade-e2e`, `test`, `release-dryrun`) account for almost all of it, and they run in parallel, which is why the wall time is half the sum of the three.
 
 **The banner's two numbers, per cell.** `banner-timing.mjs` reports both paths: the FAST path (warm
 cache) against `01` §8's 300 ms, and the RE-RUN path (cold, a quick doctor) at 1000 ms on the
