@@ -124,8 +124,18 @@ deadline and passed alone, then failed in the full run: under load the child had
 when the deadline fired, so `ps` could not see it and *"the stubborn child survived"* read as *"it
 was reaped"*. The same race would have made the positive test pass for the wrong reason — a child
 that never started is also a child that is gone. The deadline is 1 500 ms now, long enough that the
-stub is certainly running and visible before anything kills it, which is what makes both directions
-mean what they say.
+stub is certainly running and visible before anything kills it.
+
+**And that was still not enough (ARC-06-C4, found in review).** "Certainly running" on my machine is
+a probability on a loaded runner, and the failure mode is the dangerous one — the positive test and
+its control would BOTH pass while measuring nothing. The precondition is asserted now rather than
+assumed: the stub writes a started marker the moment it is running, before it goes silent, and every
+case checks that marker BEFORE concluding anything about the child, failing by name — *"the deadline
+fired before the stub started; the run measured nothing"* — if the deadline beat the fixture to it.
+The deadline stays 1 500 ms; the marker is what turns "long enough" into a checked fact. Proven both
+ways: at 1 ms both cases fail by that name instead of passing, and the marker caught a defect of mine
+on its first run — the scratch directory was removed in `afterEach`, so the second case's stub had
+nowhere to write, which is the assertion doing its job on its author.
 
 **And one false alarm, recorded because it cost time.** Reading `die()`'s definition beside a
 truncated view of its B07 call, I concluded the launcher exits through an unbound-variable error on
