@@ -37,6 +37,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **The second release candidate was tested by the plan after all eleven arcs closed their acceptance passes.**
+  `docs/validation/2026-09-13-macos.md` is the architect's run of the acceptance plan's RC checks on
+  `v2.0.0-rc.2`: the release path end to end with both negative tags refused, the full gates on the tag
+  itself, the fresh-clone install and the store permission checks, with the one chore it raised.
+  `docs/spikes/validation-runs/2026-09-13-design-only.md` is the design-only suite T-01 … T-18 run
+  headlessly on the same candidate: every test holds on the engine, T-10 three of three, and the three
+  places where the spec — not the engine — is what a judge would fail are recorded as spec items.
+
 - **The first release candidate was tested by the plan, and the record says what held and what did not.**
   `docs/validation/2026-09-12-macos.md` is the architect's run of the acceptance plan's RC checks on
   `v2.0.0-rc.1`: the release path end to end with both negative tags refused, the fresh-clone install,
