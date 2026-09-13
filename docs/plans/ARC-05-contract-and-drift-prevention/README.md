@@ -1,6 +1,6 @@
 # ARC-05 — Engine↔MCP contract and drift prevention
 
-Status: **11 of 11 COMPLETE 2026-09-08** · Depends on: ARC-04 (contract generator, `dist/contract.json`), ARC-01 · Blocks: ARC-02 (final sweep, generated texts)
+Status: **11 of 11 COMPLETE 2026-09-08 · acceptance closed 2026-09-13 (ARC-05 acceptance PR)** · Depends on: ARC-04 (contract generator, `dist/contract.json`), ARC-01 · Blocks: ARC-02 (final sweep, generated texts)
 
 Names in this README follow the owner's decisions of 2026-09-04 (`02-DECISIONS-NEEDED.md`): server package `packages/snowarch` (npm `@farstic/snowarch`, first release `2.0.0`), MCP key `servicenow` → prefix `mcp__servicenow__`, root launcher `./snowarch`, project skill `/snowarch` (`status` · `setup-instance` · `doctor`), vocabulary Mode `design-only` | `live` and Preset `read-only` | `pdi-developer` | `full` | `custom`.
 
@@ -88,3 +88,24 @@ Detailed write-ups: [`STORIES.md`](STORIES.md) (11 stories, 15–20 engineer-day
 | ARC-05-S09 | CI job `contract` and the release gate script | S | Done (2026-09-08) |
 | ARC-05-S10 | Contract loader for engine tooling and the no-literal-names guard | M | Done (2026-09-08) |
 | ARC-05-S11 | Drift drill and contributor documentation | M | Done (2026-09-08) |
+
+### Acceptance
+
+The acceptance pass against `docs/plans/06-ACCEPTANCE-PLAN.md` §5. One row per backlog item.
+
+**Three of the seven proposed checks pointed somewhere the number could not be**, which is the same
+pattern ARC-03, ARC-00 and ARC-04 each recorded: B05-06 named a CI cell that never invokes vitest,
+B05-07 asked for a step to be absent that must be present, and B05-04's fixture would have died on a
+missing input rather than performing the check it describes. Each is corrected in the plan with the
+sha, and each correction is a clause in the row below.
+
+| Item | Outcome | Evidence |
+|---|---|---|
+| B05-01 — S01 AC 4: `pin.mjs` refuses a re-gate, `--accept-regate` applies it | **rework** | Nothing invoked `pin.mjs`; the only evidence was a dated manual capture in CONTRIBUTING, and the story's own fixtures were never written. `tests/contract/pin.test.mjs` derives its fixture pair from the REAL artefacts and mutates one gate: **exactly one** `REGATE` line (a run printing two would mean the fixture moved more than it meant to), the `Re-run with:` remedy, the fixture pin unchanged on refusal, then `--accept-regate` applying it |
+| B05-02 — S01 AC 5: a required tool absent is MISSING, nothing written | **rework** | Same gap. One `MISSING` line naming the tool, the stderr sentence, and **"nothing written" asserted as sha256 of the file** rather than by re-reading one field — a rewrite that happened to preserve that field would otherwise pass |
+| B05-03 — S01 AC 7: propose → review → apply | **rework** | A non-TTY without `--yes` exits **2** with the sentence naming the flag, **and the proposal is still printed first** — a refusal with nothing to review makes the criterion meaningless. The exit table is read out of the source rather than restated (a table copied into a test is a second definition, and the first thing a second definition does is stop matching), and the closed-stdin → abort path is asserted with the source's own reason: *closing stdin is not consent* |
+| B05-01/02/03 — the hazard underneath all three | **rework** | `pin.mjs`'s own comment: *"without a matching `SNOW_PIN_PATH` those runs write their conclusions into the COMMITTED pin."* A suite setting only `SNOW_CONTRACT_PATH` would rewrite `required-tools.json` as a side effect of being run. **Both vars on every spawn**, the committed pin's sha256 asserted unchanged at the end, and a final test that **proves the hazard rather than describing it** — running against a COPY of the pin in a temp tree and showing that copy move, while the real one does not |
+| B05-04 — S02 AC 1: `--check` on a stale tree | **rework** | The existing test runs `--check` on the committed tree, which is the case that is true every day; the failing path the generator exists for was asserted by nothing. **The fixture has the ARC-03 shape and has to:** the generator resolves everything from its own module location with **no** path override, and reads two files one level up — so copying `packages/contract` alone, as proposed, dies on a missing rename map instead of performing the check. Both package directories are copied, `cwd` is left as the REAL repo throughout, and a **marker** absent from the real tree proves where it resolved; the negative control copies only one directory and asserts the failure names the rename map |
+| B05-05 — S10 AC 1 to AC 3: the loader | **rework** | No unit test existed. Six flags **named, not just counted** (a contract that lost one and gained another keeps the six); a stale pin throws `ContractPinMismatch` carrying **both** shas — an error naming only one leaves the reader to compute the other before they can act — and `verifyPin:false` loads the same contract, which is what makes it an escape hatch rather than a second code path; the dependency rule refuses `SCRIPTING_ENABLED requires WRITE_ENABLED` by **naming the pair**, the satisfied pair is allowed, and `pdi-developer` is asserted as a whole object so a seventh flag could not slip past field-by-field checks |
+| B05-06 — S08 AC 7: the contract test under 30 s | **record — see the note below; this row lands one commit after the rest** | The row said to read the duration from the `contract (windows-latest, node 20)` cell. **That cell runs `npm run contract` and never invokes vitest**, so the number cannot be there; it is in the `test (windows-latest, node 20)` cell. Corrected in the plan AND in the RC run order §3 row 6.1, which named the same cell. The measurement itself must come from a run on this PR's own head, so it is added in a fix-up once that run exists rather than quoted from an earlier tree |
+| B05-07 — S09 AC 5: `--skip-build` | **rework** | The proposed check asked the step list to omit `dist` under `--skip-build`. **It does not and must not** — `dist` is step 2 and still runs; the skipped step is step 1, id `server`, whose subject is the committed `dist/` directory. A test written to the proposal would have asserted the opposite of the criterion. Both summary lines are asserted in full and in both directions, plus the source is read so a fifth step or a second `skip:` cannot arrive unnoticed. **Cost, stated: ~19 s** — the second case runs the real build, and the claim cannot be made without it |
