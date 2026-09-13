@@ -14,7 +14,7 @@ Corrections to the plan itself are made in place and marked, because a plan that
 worse than one that is visibly amended.
 
 **A proposed check is a hypothesis about the tree, and the cheapest moment to test it is before
-you write the test.** Through ARC-06's close, **twelve** proposed checks in this plan could not have
+you write the test.** Through ARC-09's close, **thirteen** proposed checks in this plan could not have
 worked as written — not because the reader was careless, but because a check written from a file is
 a guess about a tree nobody re-measured. They fail in four recognisable shapes, and one example of
 each is worth more than the count: a check can name **a cell that cannot contain the number** it
@@ -25,8 +25,10 @@ timeout is not `MCP_TIMEOUT` at all); it can describe **a capability neither sid
 asked for three-page `tools/list` paging, which the handshake does not read and the server does not
 emit — `nextCursor` appears zero times in `src/`); and it can propose **a fixture the repository's
 own lint refuses** (**B06-03**'s `snow_fake_x`, which fails engine-lint L01 in the very file the row
-names). The remedy is cheap and always the same: run the grep, read the line, plant the token, or
-run the two commands and diff them — *first*. A check that cannot pass is worse than no check,
+names). **B09-03 is the thirteenth and the only one that would have cost a CI run to discover** —
+it asked for a PR breaking a `goto` label in a file that has none, to turn three cells red in a
+file eleven other invocations also depend on. The remedy is cheap and always the same: run the
+grep, read the line, plant the token, or run the two commands and diff them — *first*. A check that cannot pass is worse than no check,
 because someone will eventually make the product wrong to satisfy it.
 
 **Rebasing an acceptance PR: the changelog will conflict, and both sides are right.** Every

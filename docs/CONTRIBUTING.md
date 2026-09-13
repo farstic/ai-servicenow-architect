@@ -244,7 +244,8 @@ option, not a default.
 **Before you write a test to a proposed check, test the check.** A check written from a file is a
 hypothesis about the tree: it can name a CI cell that cannot contain the number it asks for, quote
 a sentence the product never says, describe a capability neither side has, or propose a fixture
-this repository's own lint refuses. Twelve did, through ARC-06. The rule, the four shapes and one
+this repository's own lint refuses. Thirteen did, through ARC-09 — and one of those would have
+cost a full CI run to find out. The rule, the four shapes and one
 worked example of each are in the preamble of `docs/plans/06-ACCEPTANCE-PLAN.md` — kept in one
 place on purpose, so this pointer cannot drift from it.
 
