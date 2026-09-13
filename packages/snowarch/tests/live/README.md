@@ -246,3 +246,149 @@ Append one line per criterion:
 A refuted criterion 2 would mean the platform's encoded sort grammar is not what
 `ServiceNowDocs/markdown/api-reference/GlideListClientAPINEx.md` states, which is a documentation
 finding, not a code one — record it and stop rather than changing the client to match one instance.
+
+## ARC-04-S03 criterion 1 — a refusal that is about the INSTANCE, not about the flags
+
+**Build under test:** `develop` @ the sha on the PR that adds this section.
+
+**What the unit tests already prove** (`tests/tools/gates.test.ts`, and the S03 gate-ordering cases):
+that a `prod` preset refuses `snow_core_record_add` with `PROD_WRITE_NOT_ACKNOWLEDGED`, and that the
+gate order puts the production cap ahead of the write flag. **What only a live run can prove** is the
+other half of the same criterion — that switching back to a PDI makes the *same call with the same
+arguments* succeed. A refusal that would also refuse on a PDI proves nothing about production.
+
+### Setup
+
+Two instances in the store: one at preset `prod` (label `acme`), one at preset `pdi-developer`
+(label `dev12345`). Both may point at the SAME PDI — the preset is what is under test, not the host.
+`SNOW_STORE` redirected to a temp file, so the sitting cannot touch the machine's own store.
+
+### The run
+
+```
+1  snow_core_instance_switch { "label": "acme" }          → active instance = acme, preset prod
+2  snow_core_record_add { "table": "incident", "fields": { "short_description": "[LIVE] S03 c1" } }
+   → REFUSED: code PROD_WRITE_NOT_ACKNOWLEDGED, no record created
+3  snow_core_instance_switch { "label": "dev12345" }      → active instance = dev12345
+4  snow_core_record_add { "table": "incident", "fields": { "short_description": "[LIVE] S03 c1" } }
+   → sys_id returned, number INCxxxxxxx
+```
+
+### Pass condition — the exact state to see
+
+Step 2's response `code` is **`PROD_WRITE_NOT_ACKNOWLEDGED`** and no `sys_id` field is present.
+Step 4's response carries a **`sys_id` (32 hex)** and a **`number` matching `^INC\d+$`**.
+**A failure looks like:** step 4 refused as well (then the refusal is about the flags, not the
+instance, and the criterion is NOT met), or step 2 succeeded (the production cap did not hold).
+
+### The evidence to record
+
+Redacted per the ARC-00 rules — no instance URL, user name, password or token; key names only,
+values as `set (len n)`. Record counts, table names, tool names and error codes are not secrets.
+
+- steps 2 and 4's response objects, redacted, with the `code` and the presence/absence of `sys_id`;
+- **the negative control:** step 4 must be the same call as step 2, argument for argument. Paste both
+  requests. If they differ, the run measured two different calls and says nothing about the switch.
+
+### Teardown
+
+Delete the incident created at step 4. Restore `SNOW_STORE`.
+
+### Verdict
+
+Record in `docs/validation/` under the sitting's file, as **ARC-04-S03 c1: CONFIRMED / FAILED**.
+
+## ARC-04-S08 criterion 3 — discovering a table does not change the catalogue
+
+**Build under test:** `develop` @ the sha on the PR that adds this section.
+
+**What the unit tests already prove** (`tests/tools/discovery.test.ts`, *"the catalogue does not
+change when a table is discovered"*): that the in-process tool list is identical either side of a
+discover call. **What only a live run can prove** is that the same holds over the WIRE — that no
+`notifications/tools/list_changed` is emitted and no client-visible catalogue moves — and that a real
+`incident` table answers with the three columns the criterion names.
+
+### Setup
+
+A PDI, an instance at preset `pdi-developer`, the server started over stdio by the client under test.
+Nothing else calling the server during the run.
+
+### The run
+
+```
+1  tools/list                                    → capture the full response to a file, A
+2  snow_disco_table_discover { "table": "incident" }
+3  tools/list                                    → capture the full response to a file, B
+4  diff A B
+```
+
+### Pass condition — the exact state to see
+
+**`diff A B` produces no output** (byte-identical, including tool order), and step 2's response names
+at least the columns **`number`**, **`short_description`** and **`state`**.
+**A failure looks like:** any diff at all — even a reordering — or a `list_changed` notification
+arriving between steps 1 and 3; either means a discover call moved the catalogue.
+
+### The evidence to record
+
+Redacted per the ARC-00 rules. Record:
+
+- the byte counts of A and B and the `diff` exit status;
+- the three column names from step 2's response (column names are not secrets);
+- **the negative control:** capture a third `tools/list` after a call that IS expected to change the
+  catalogue — `snow_core_instances_reload` after adding an instance — and show that diff is NOT
+  empty. Without it, a capture that always produced identical bytes (a cached response, a truncated
+  file) looks exactly like a passing run.
+
+### Teardown
+
+None — nothing is written to the instance.
+
+### Verdict
+
+Record in `docs/validation/` under the sitting's file, as **ARC-04-S08 c3: CONFIRMED / FAILED**.
+
+## ARC-04-S10 criterion 1 — the audit line says `result: "ok"`, and says it about the right call
+
+**Build under test:** `develop` @ the sha on the PR that adds this section.
+
+**What the unit tests already prove** (`tests/audit/no-secrets.test.ts`, *"criterion 1 — a mutating
+call writes one line, and the payload is not in it"*): that one line is appended and the payload does
+not appear in it. **What only a live run can prove** is the `result` field over a real call — a fake
+REST layer returns what the fake was told to return, so `ok` in a unit test is the fixture's word.
+
+**This is run as the last step of the ARC-04-S07 criterion 4 procedure above**, not separately: that
+procedure already makes a real mutating call through the capture chain, and adding a second one would
+be a second chance to get a different answer.
+
+### The run
+
+```
+5  (after S07 c4 step 3, the snow_scr_script_include_add)
+   tail -1 .local/audit.jsonl
+```
+
+### Pass condition — the exact state to see
+
+The line **parses as JSON** and carries **`"result": "ok"`** and **`"tool": "snow_scr_script_include_add"`**.
+**A failure looks like:** `result` absent, `result` anything other than `ok` after a call that
+returned a `sys_id`, or the line naming a different tool — which would mean the audit trail is one
+call behind and every line in it is attributed to the wrong call.
+
+### The evidence to record
+
+Redacted per the ARC-00 rules — **the audit line itself must be pasted redacted**, key names only,
+values as `set (len n)` for anything that could carry an instance, a user or a token.
+
+- the redacted line, with `result` and `tool` shown in full (neither is a secret);
+- **the negative control:** make one call that FAILS (e.g. `snow_scr_script_include_add` with a name
+  that already exists) and show the next line's `result` is NOT `ok`. A trail that writes `ok`
+  unconditionally passes the positive half every time.
+
+### Teardown
+
+Covered by the S07 c4 teardown; no extra objects are created.
+
+### Verdict
+
+Record in `docs/validation/` under the sitting's file, as **ARC-04-S10 c1: CONFIRMED / FAILED**.

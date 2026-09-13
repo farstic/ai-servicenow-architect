@@ -1,6 +1,6 @@
 # ARC-04 — MCP server hardening and scope cut
 
-Status: **Stories drafted 2026-09-04** · Depends on: ARC-01 (import, D-02, D-03); ARC-00 spike verdicts S-02, S-10, S-17 (behaviour ships regardless; fallbacks designed in) · Blocks: ARC-05 (contract generator), ARC-06 (committed `dist/`, unconfigured mode), ARC-07 (store schema, presets, CLI module, network-error classifier), ARC-08 (server doctor module)
+Status: **Stories Done · acceptance closed 2026-09-13 (ARC-04 acceptance PR)** · **Open only on the owner: four criteria whose runs need a live instance — S03 c1, S08 c3, S10 c1 (Sitting C) and S14 c5, the second reader (Sitting A). Each has a written procedure with its pass condition; none is ticked until a run lands in `docs/validation/`.** · Depends on: ARC-01 (import, D-02, D-03); ARC-00 spike verdicts S-02, S-10, S-17 (behaviour ships regardless; fallbacks designed in) · Blocks: ARC-05 (contract generator), ARC-06 (committed `dist/`, unconfigured mode), ARC-07 (store schema, presets, CLI module, network-error classifier), ARC-08 (server doctor module)
 
 Names and versions in this file follow the owner's rulings of 2026-09-04 (`02-DECISIONS-NEEDED.md`): package directory **`packages/snowarch`**, npm name **`@farstic/snowarch`**, `bin` **`snowarch`**, first unified version **2.0.0** (R-1), MCP server key `servicenow` → tools `mcp__servicenow__snow_*` (D-01), project skill **`/snowarch`** with `setup-instance` · `status` · `doctor` (R-2). The existing `@farstic/snow-mcp@1.0.0` npm record is never touched. Vocabulary: Mode `design-only` | `live`; Preset `read-only` | `pdi-developer` | `full` | `custom`.
 
@@ -48,7 +48,7 @@ real instance and no agent in this arc holds credentials; each has a written, ru
 |---|---|---|---|
 | 1 | Unconfigured start: `initialize`, five core tools, `NO_INSTANCE_CONFIGURED` elsewhere, clean exit on stdin close | **Met** | `tests/server/unconfigured.test.ts` (real MCP client over stdio); the `no-build handshake` CI job runs it against the committed `dist/` on three OSes. *Version reads `2.0.0-dev`, not `2.0.0` — the release is ARC-09's.* |
 | 2 | Per-instance flags: `switch prod` then a write → `WRITE_NOT_ENABLED`, `pdi` unaffected | **Met** | `tests/tools/gate-split.test.ts`, `tests/servicenow/context.test.ts`; S03 criterion 1's live half **deferred**. |
-| 3 | `read-only` reads scripting objects; `..._add` → `SCRIPTING_NOT_ENABLED` | **Met** | `tests/tools/gate-split.test.ts` — the split is derived from the registered catalogue, so a new `snow_scr_*` tool cannot escape it. S-10 recorded in `docs/spikes/S-10-read-only-sufficiency/`. |
+| 3 | `read-only` reads scripting objects; `..._add` → **`WRITE_NOT_ENABLED`** under `read-only`, and `SCRIPTING_NOT_ENABLED` only once WRITE is enabled *(corrected at ARC-04 acceptance, 2026-09-13: the row said `SCRIPTING_NOT_ENABLED` under read-only, which the test has never asserted — `tests/tools/gate-split.test.ts:136` expects `WRITE_NOT_ENABLED` with all flags false and `:142` expects `SCRIPTING_NOT_ENABLED` with write-only. That ordering is S03's ruling: the write flag is answered before the scripting flag, so an operator turning on one flag at a time is told the FIRST thing that is missing, not the last)* | **Met** | `tests/tools/gate-split.test.ts` — the split is derived from the registered catalogue, so a new `snow_scr_*` tool cannot escape it. S-10 recorded in `docs/spikes/S-10-readonly-preset-sufficiency/`. |
 | 4 | `prod` + `full` + `prodWriteAck: false` → not loaded; `true` → loads | **Met** | `tests/servicenow/prod-ack.test.ts`; end to end via `SV-03` in `tests/doctor/doctor.test.ts` with both postures. |
 | 5 | `orderBy: "-sys_created_on"` sorts descending | **Met (unit)** | `tests/servicenow/client-orderby.test.ts` asserts the captured URL: `active=true^ORDERBYDESCsys_created_on`. **Live half deferred** (S09 criterion 2), with an ascending negative control in the procedure. |
 | 6 | `capture_target_set` then a write produces a `sys_update_xml` row in the named set | **Deferred** | S07 criterion 4. Unit gate: `tests/tools/update-set-capture.test.ts` asserts the four-call sequence and the `sys_user_preference` write. Procedure includes a negative control. |
@@ -61,11 +61,22 @@ real instance and no agent in this arc holds credentials; each has a written, ru
 | 13 | Fresh clone, no build: `initialize` answers on three OSes; `build-dist.mjs` produces no diff | **Met** | `no-build handshake` and `dist-check` CI jobs, three OSes each; the architect re-verified on a new clone. |
 | 14 | ARC-04 owns no row in `tests/legacy-names.allowlist.json` | **Met** | ARC-04's row left with `docs/INSTALLATION.md` in S14. |
 
-**Deferred to the owner's live sitting**, each with a runnable procedure in
-`packages/snowarch/tests/live/README.md`: S03 criterion 1 (live flag behaviour), S05's S-10
-observation, S07 criterion 4 (update-set capture), S08 criterion 3's live half (byte-identical
-`tools/list`), S09 criteria 2/3/4 (sort order, `event_name`, `action_insert`), S10's literal
-`result: "ok"` (needs a reachable instance). **S-26** — whether any MCP client actually sends
+**Deferred to the owner's live sitting**, each with a runnable procedure. The paragraph used to
+claim that and be false for three of the six — S03 c1, S08 c3 and S10 c1 had no procedure anywhere,
+and S05's lives in a different file from the one named here. Written out per deferral, with where
+each one actually is (ARC-04 acceptance, 2026-09-13):
+
+| Deferral | Procedure |
+|---|---|
+| S03 criterion 1 — live flag behaviour | `packages/snowarch/tests/live/README.md` § *ARC-04-S03 criterion 1* |
+| S05's S-10 observation | `docs/spikes/S-10-readonly-preset-sufficiency/PROCEDURE.md` — **not** in the live README, and the folder is `S-10-readonly-preset-sufficiency`, not `S-10-read-only-sufficiency` as this file used to say |
+| S07 criterion 4 — update-set capture | `packages/snowarch/tests/live/README.md` § *ARC-04-S07 criterion 4* |
+| S08 criterion 3 — byte-identical `tools/list` | `packages/snowarch/tests/live/README.md` § *ARC-04-S08 criterion 3* |
+| S09 criteria 2/3/4 — sort order, `event_name`, `action_insert` | `packages/snowarch/tests/live/README.md` §§ *Criterion 2 / 3 / 4* |
+| S10 criterion 1 — the literal `result: "ok"` | `packages/snowarch/tests/live/README.md` § *ARC-04-S10 criterion 1*, run as the last step of S07 c4 |
+
+All six are owner-run: the procedures are written, the runs are the owner's, and Sitting C names the
+file each outcome goes into. Until a run lands in `docs/validation/`, the criteria stay unticked. **S-26** — whether any MCP client actually sends
 `_meta["anthropic/maxResultSizeChars"]` — is unverified and recorded as a candidate in `03` §F, not
 asserted anywhere.
 
@@ -104,3 +115,31 @@ Full write-ups (persona, context, scope, design notes, acceptance criteria, task
 | ARC-04-S14 | Rewrite `packages/snowarch/README.md`, `.env.example`, `CHANGELOG.md` from code; 2.0.0 migration notes | M | Done (2026-09-08) |
 
 Mapping to the earlier titles-only list: former stories 2 and 7 merged into S04; former story 12 split into S01 (harness, CI) and S03 (coverage); S11 added per R-3; S12 added to carry the server doctor module ARC-08 depends on. Total 31–32 engineer-days. The full former-number → story-ID table is at the top of `STORIES.md`; ARC-05/06/07 still cite this ARC by the former numbers.
+
+### Acceptance
+
+The acceptance pass against `docs/plans/06-ACCEPTANCE-PLAN.md` §4. One row per backlog item.
+
+**Seven of the nine needed an instance this session never touches.** For those the deliverable is a
+written procedure plus a Sitting C row and nothing else: the acceptance row says the run is the
+owner's, the criterion stays unticked, and no test asserts an unrun procedure — a test red by design
+is noise, which is the ruling B00-09 settled. What is NOT here, deliberately, is a `RUN_LIVE_E2E=1`
+case skipped everywhere in CI: a case that has never executed is coverage in the suite listing and
+nothing in fact.
+
+**Every procedure states its pass condition as the exact output to see** — the command, the field or
+line that must be there, and what a failure looks like — and every one carries a **negative control**,
+because a run without its control is not a result. Placeholders only (`dev12345`, `acme`); no
+instance, host, user or sys_id anywhere.
+
+| Item | Outcome | Evidence |
+|---|---|---|
+| B04-01 — S03 c1: the live half of the flag refusal | **record — procedure written, run is the owner's** | `tests/live/README.md` § *ARC-04-S03 criterion 1*. Pass condition: step 2 refuses with `PROD_WRITE_NOT_ACKNOWLEDGED` and no `sys_id`; step 4, **the same call argument for argument**, returns a `sys_id` and an `INC` number. The control is that sameness — *a run where both refuse proves nothing about production*, which is exactly what the unit half already cannot answer |
+| B04-02 — S08 c3: the live half of the byte-identical catalogue | **record — procedure written, run is the owner's** | `tests/live/README.md` § *ARC-04-S08 criterion 3*. Pass condition: `diff A B` produces **no output** and the discover response names `number`, `short_description`, `state`. Control: a third capture after `snow_core_instances_reload`, whose diff must NOT be empty — without it, a capture that always produced identical bytes (a cached response, a truncated file) looks exactly like a passing run |
+| B04-03 — S10 c1: the literal `result: "ok"` | **record — procedure written, run is the owner's** | `tests/live/README.md` § *ARC-04-S10 criterion 1*, run as the **last step of the S07 c4 procedure** rather than separately — a second mutating call would be a second chance at a different answer. Control: one call that FAILS, whose next line must not say `ok`; a trail that writes `ok` unconditionally passes the positive half every time |
+| B04-04 — S06 c3: `contract --sha` | **rework** | Nothing spawned the sub-command; the suite proved the contract file and reached past the command an operator runs. `tests/cli/contract-cli.test.ts`: exactly 64 hex characters and a newline with empty stderr (the property the whole sub-command exists for — a pipeline can compare builds without parsing JSON), stable across two runs, equal to sha256 of `dist/contract.json`, and the gates-not-prose claim asserted through computed shas rather than from memory |
+| B04-05 — S01 c4 / S02 c6: the retired names | **rework** | The criterion has been false since ARC-07-S08: `src/cli/import-legacy.ts` cannot find the legacy store without naming it. Amended, and enforced as a **both-directions ratchet** — an unlisted file carrying a literal fails, and **a listed carrier that stopped carrying one fails too**, so an exemption cannot outlive its reason. Four of the five literals are asserted absent per literal, and the scan asserts it read something |
+| B04-06 — S01 c5: the command set | **rework** | Superseded twice and never re-stated, and its proposed check compared `--help` against `README.md § CLI` — **a section that did not exist**; the five commands appeared together only in the acceptance plan. The section is written, and the test reads it: one source, two readers, and a command added to one but not the other fails rather than drifts. Criterion amended (`store` added, `contract` no longer exits 2) |
+| B04-07 — S06 c6: the eight-tool spot-check | **rework** | Verified by hand when the story closed and guarded by nothing; the suite kept the FILE honest and said nothing about whether the file is right. Eight `it.each` rows, plus a guard that the eight are real and distinct and span at least five gates — a spot-check where every row shared one gate would prove nothing about the map |
+| B04-08 — S14 c5: the second reader | **record — the run is the owner's** | No record existed anywhere, and **the author cannot be the reader**, which is the point of the criterion. A Sitting A row states the pass condition — a successful `snow_core_status_read` **without opening any file but that README** — and asks for role, date, client, redacted output, and every place the reader had to guess, because those are the finding |
+| B04-09 — the deferrals paragraph and R3 | **rework** | The paragraph claimed every deferral had a procedure; **three of six had none** and a fourth pointed at the wrong file. Written out per deferral with where each one is. R3's row said `..._add → SCRIPTING_NOT_ENABLED` under `read-only`; the test has never asserted that — `gate-split.test.ts:136` expects `WRITE_NOT_ENABLED` with all flags false and `:142` expects `SCRIPTING_NOT_ENABLED` with write-only, which is S03's gate ordering: the operator is told the FIRST thing missing, not the last. Corrected, with the dead path `S-10-read-only-sufficiency` → `S-10-readonly-preset-sufficiency` fixed in all five files that carried it. **Re-run after review (ARC-04-C2): the dead name as a LINK a reader follows is 0; the dead name QUOTED AS HISTORY is 3, and those three are correct.** A blanket replace had rewritten two sentences that quote the old name AS the defect — one read "the folder is X, not X as this file used to say" — because a replace cannot tell a path from a name a sentence is recording as wrong. The history is restored in both |

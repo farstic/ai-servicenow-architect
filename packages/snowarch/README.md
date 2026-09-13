@@ -51,6 +51,22 @@ first call precisely because it cannot fail for lack of configuration.
 
 ---
 
+## CLI
+
+`snowarch` ships five commands. This list is the source the `--help` test compares against, so a
+command added to one and not the other fails rather than drifts.
+
+| Command | What it does |
+|---|---|
+| `start` | Start the MCP server on stdio |
+| `instance` | Manage configured ServiceNow instances |
+| `store` | Migrate, back up and restore the instance store |
+| `doctor` | Diagnose the installation |
+| `contract` | Print the tool contract, or its sha256 |
+
+`contract --sha` prints the sha256 of the built contract and nothing else — 64 lower-case hex
+characters and a newline — so a pipeline can compare two builds without parsing JSON.
+
 ## Configuration
 
 There are two ways to configure an instance, and they do not merge.
