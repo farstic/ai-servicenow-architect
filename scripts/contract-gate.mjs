@@ -21,9 +21,18 @@
  * of an earlier failure — a stale `dist/` makes the pin wrong, which makes every generated header
  * wrong — so running them all would report one fault four times and bury the one that matters.
  *
- * Usage: node scripts/contract-gate.mjs [--skip-build]
+ * Usage: node scripts/contract-gate.mjs [--skip-build] [--plan]
  *   --skip-build   skip step 1. For a caller that has just rebuilt (ARC-09-S01's release script),
  *                  where repeating it proves nothing and doubles the slowest step.
+ *   --plan         print the step list and which one is skipped, and RUN NOTHING. Added by ARC-05
+ *                  acceptance so the step SELECTION can be tested without executing the gate: step
+ *                  1 rebuilds `packages/snowarch/dist`, and `scripts/build-dist.mjs` removes that
+ *                  directory before it writes it. `node:test` runs files concurrently, so a unit
+ *                  test that ran the real gate made `dist/` vanish for a few seconds underneath
+ *                  every other test that reads it — an ENOENT in whichever file happened to look
+ *                  during the window, on a different file on each machine. A test must not delete
+ *                  and rebuild a committed directory of the tree it is running in. The gate's full
+ *                  EXECUTION is still proven on every push by CI's `contract` cell.
  *
  * Exit 0 all four pass · 1 one failed.
  */
@@ -34,6 +43,7 @@ import { writeSync } from 'node:fs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const skipBuild = process.argv.includes('--skip-build');
+const planOnly = process.argv.includes('--plan');
 
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
@@ -74,6 +84,13 @@ const STEPS = [
     remedy: 'the pin or a lint check disagrees — run node packages/contract/pin.mjs and read the proposal',
   },
 ];
+
+if (planOnly) {
+  // The same list, in the same order, with the same skip decision — printed rather than run. The
+  // wording matches the summary line exactly so one test can assert both against one expectation.
+  writeSync(1, `CONTRACT GATE PLAN: ${STEPS.map((s) => `${s.id} ${s.skip ? 'skipped' : 'would run'}`).join(' · ')}\n`);
+  process.exit(0);
+}
 
 const done = [];
 for (const step of STEPS) {
