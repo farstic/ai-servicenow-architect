@@ -241,6 +241,13 @@ option, not a default.
 
 ## Tests
 
+**Before you write a test to a proposed check, test the check.** A check written from a file is a
+hypothesis about the tree: it can name a CI cell that cannot contain the number it asks for, quote
+a sentence the product never says, describe a capability neither side has, or propose a fixture
+this repository's own lint refuses. Twelve did, through ARC-06. The rule, the four shapes and one
+worked example of each are in the preamble of `docs/plans/06-ACCEPTANCE-PLAN.md` — kept in one
+place on purpose, so this pointer cannot drift from it.
+
 
 **The upgrade harness builds a whole tree, and the guard on it is a subset.** `tests/upgrade/` is
 excluded from `npm test` (it builds git worlds and costs minutes) and runs in `upgrade-e2e` on three

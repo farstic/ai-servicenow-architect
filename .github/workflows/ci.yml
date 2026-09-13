@@ -769,6 +769,82 @@ jobs:
         run: /tmp/shellcheck-v0.10.0/shellcheck -s bash --severity=warning bootstrap.sh
       - name: bash -n
         run: bash -n bootstrap.sh
+      # ARC-06 acceptance, B06-05 and B06-07. Both assert that `.local/` was NOT created, so they
+      # run BEFORE the successful install below — after it, the directory exists and the assertion
+      # would be about the wrong thing. Same PATH rebuild as that step, and for the same reason.
+      - name: 'B06-05 — live mode with no Node stops at B00, exit 3, and writes nothing'
+        run: |
+          set +e
+          out=$(env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin TERM=dumb \
+            bash -o posix ./bootstrap.sh --mode live --yes --skip-claude-check 2>&1)
+          rc=$?
+          set -e
+          printf '%s\n' "$out"
+          test "$rc" -eq 3 || { echo "expected exit 3, got $rc"; exit 1; }
+          # The remedy is the platform's own, from remedies.json — not a sentence this workflow
+          # invents. A run that failed for some other reason would not carry it.
+          printf '%s' "$out" | grep -qi 'live mode needs Node' || { echo 'no live-needs-Node FAIL'; exit 1; }
+          # The remedy is the PLATFORM's, and this job runs on both: `brew install node@22` on
+          # macOS, the distribution/nvm sentence on Linux. Measured on a real macOS run before this
+          # was written — an earlier draft grepped for `nodejs.org`, which neither remedy says.
+          printf '%s' "$out" | grep -Eq 'brew install node@22|package manager, or use nvm' \
+            || { echo 'no platform Node remedy'; exit 1; }
+          test ! -d .local || { echo '.local was created by a run that refused'; exit 1; }
+
+      - name: 'B06-07 — run from a subdirectory: root FAIL, the cd command, exit 3'
+        run: |
+          mkdir -p clients/acme
+          set +e
+          out=$(cd clients/acme && env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin TERM=dumb \
+            bash -o posix ../../bootstrap.sh --mode design --yes --docs skip --skip-claude-check 2>&1)
+          rc=$?
+          set -e
+          printf '%s\n' "$out"
+          # The step cleans up after itself and asserts that it did: it writes into the checkout,
+          # and a directory left behind would be this step's residue in every later step's view.
+          rmdir clients/acme clients 2>/dev/null || true
+          test ! -d clients/acme || { echo 'the step left clients/acme behind'; exit 1; }
+          test "$rc" -eq 3 || { echo "expected exit 3, got $rc"; exit 1; }
+          printf '%s' "$out" | grep -q 'not at the repository root' || { echo 'no root FAIL'; exit 1; }
+          printf '%s' "$out" | grep -q 'cd "' || { echo 'no cd remedy'; exit 1; }
+          test ! -d .local || { echo '.local was created from a subdirectory'; exit 1; }
+
+      # ARC-06 acceptance, B06-06. Runs before the successful install for the same reason as the
+      # two above: it needs `.claude/settings.local.json` in a state it controls, and the install
+      # below writes that file. It puts the tree back and asserts that it did.
+      - name: 'B06-06 — an unmergeable settings.local.json fails B07 and changes nothing'
+        run: |
+          test ! -e .claude/settings.local.json || { echo 'fixture: the file already exists'; exit 1; }
+          printf '{\n  "permissions": {}\n}\n' > .claude/settings.local.json
+          before=$(shasum -a 256 .claude/settings.local.json | cut -d' ' -f1)
+
+          set +e
+          out=$(env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin TERM=dumb \
+            bash -o posix ./bootstrap.sh --mode design --yes --docs skip --skip-claude-check 2>&1)
+          rc=$?
+          set -e
+          printf '%s\n' "$out"
+          test "$rc" -eq 1 || { echo "expected exit 1, got $rc"; exit 1; }
+          printf '%s' "$out" | grep -q 'cannot be merged without Node' || { echo 'no hand-edit FAIL'; exit 1; }
+          printf '%s' "$out" | grep -q 'by hand' || { echo 'no hand-edit remedy'; exit 1; }
+          # Refused means UNTOUCHED — asserted as bytes, not by re-reading one key.
+          after=$(shasum -a 256 .claude/settings.local.json | cut -d' ' -f1)
+          test "$before" = "$after" || { echo 'B07 rewrote a file it refused to merge'; exit 1; }
+
+          # The other direction: the hand edit the remedy asks for makes the same run pass.
+          printf '{\n  "permissions": {},\n  "disabledMcpjsonServers": ["servicenow"]\n}\n' \
+            > .claude/settings.local.json
+          env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin TERM=dumb \
+            bash -o posix ./bootstrap.sh --mode design --yes --docs skip --skip-claude-check \
+            | tee /tmp/b06-06-second.log
+          grep -q 'ok B07: already set' /tmp/b06-06-second.log || { echo 'no already-set line'; exit 1; }
+
+          # Put the tree back for the steps below, and assert it went.
+          rm -f .claude/settings.local.json
+          rm -rf .local
+          test ! -e .claude/settings.local.json || { echo 'the step left its fixture behind'; exit 1; }
+          test ! -d .local || { echo 'the step left .local behind'; exit 1; }
+
       - name: The Node-free design-only path, with Node removed from PATH
         # The whole point of this job. `command -v node` must find nothing, so PATH is rebuilt from
         # the system directories rather than filtered — a filter that missed one entry would test

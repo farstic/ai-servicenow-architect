@@ -8,6 +8,10 @@
 import { createInterface } from 'node:readline';
 
 const MODE = process.env.SNOWARCH_STUB_MODE ?? 'pages';
+// A child that survives `child.kill()`'s SIGTERM — the CONTROL for "no hung child". Without a
+// stub that can linger, an "is it gone" assertion passes against a handshake that never kills
+// anything, and proves nothing. The test that sets this is responsible for SIGKILLing it.
+if (process.env.SNOWARCH_STUB_IGNORE_SIGTERM === '1') process.on('SIGTERM', () => {});
 const PAGE_SIZE = Number(process.env.SNOWARCH_STUB_PAGE_SIZE ?? 2);
 const TOOLS = (process.env.SNOWARCH_STUB_TOOLS ?? 'a,b,c,d,e').split(',').filter(Boolean);
 
