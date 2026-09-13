@@ -39,12 +39,20 @@ Implement a Script Include that calculates SLA breach risk for incidents based o
 assignment group historical data.
 ```
 
+**Turn 2 — the approval.** The dispatch gate at Phase 1 Step 9 waits for the user, so a single-turn run cannot reach the steps this test exists to check; judged on turn 1 alone it is INCONCLUSIVE, not a pass. The extractor reads **every** fence under this one Prompt heading, so a scripted run makes both turns with no harness change. A second fence placed under a heading of its own would not be read — the extractor's section stops at the next heading.
+
+```
+approved, dispatch
+```
+
 ### Expected behaviour
 
 1. Architect restates the task in one sentence.
 2. **ITSM Specialist gateway fires (Phase 1 Step 5)** — task involves incidents and SLA.
-   ITSM Specialist produces 5-Part Constraint Envelope. Part 3 Verdict: **A** (baseline tables
-   `contract_sla`, `task_sla`, `sys_user_group`, `incident` — no custom table needed).
+   ITSM Specialist produces 5-Part Constraint Envelope. Part 3 Verdict: **A or B — either baseline
+   path** (baseline tables `contract_sla`, `task_sla`, `sys_user_group`, `incident`; no custom table
+   needed). A judged run returned **B** with a reason (the Breakdown plugin, one field), which is
+   still a no-halt path. **The letter is not a criterion** — only a Verdict C halt fails this test.
 3. Architect flags **Performance & Scale** as a §3.1 routing-time consult (historical data = scale).
 4. Architect proposes Developer sub-agent. Waits for approval.
 5. On approval, Developer sub-agent produces Script Include.
@@ -362,8 +370,16 @@ is not installed — run ./bootstrap.sh (Windows: bootstrap.cmd)` · `the doctor
   doctor printed it.
 - The incident request produces no MCP call anywhere in the transcript, and the engine names
   `/snowarch setup-instance` as the way forward.
-- The hand-off block appears with the label and URL substituted, including the Windows
-  `snowarch.cmd instance add …` line.
+- `/snowarch setup-instance` prints the **design-only stop** and asks for nothing — no label, no URL,
+  no secret. This is what the shipped skill does: step 1 reads the doctor's prerequisites, sees
+  `mode.toggle: disabled` and stops (*"print, and stop. Ask nothing"*), so step 6's hand-off is never
+  reached in this mode.
+- *(Live-mode criterion, moved — judged in the live variant / Sitting A, not here:* the hand-off block
+  appears with the label and URL substituted, including the Windows `snowarch.cmd instance add …`
+  line.) Re-scoped by the design-only run's ruling — *engine correct; criterion 3 amended for
+  design-only to expect the stop text* — because the original wording was written against the doctor
+  **stub**; left as it was it instructed the next judge to fail a correct engine. Run record and full
+  citation: the ARC-02 chore row.
 - No question in any of the three sessions asks for a password, token or client secret.
 
 ### Fail signals
@@ -571,6 +587,12 @@ The Developer sub-agent returns a Script Include artefact **destined for a relea
 ```
 Implement a Script Include that returns the active incident count for a given assignment group.
 This is going into next week's release, not a proof of concept.
+```
+
+**Turn 2 — the approval.** The dispatch gate at Phase 1 Step 9 waits for the user, so a single-turn run cannot reach the steps this test exists to check; judged on turn 1 alone it is INCONCLUSIVE, not a pass. The extractor reads **every** fence under this one Prompt heading, so a scripted run makes both turns with no harness change. A second fence placed under a heading of its own would not be read — the extractor's section stops at the next heading.
+
+```
+approved, dispatch
 ```
 
 ### Expected behaviour
