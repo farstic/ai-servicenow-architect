@@ -31,6 +31,20 @@ file eleven other invocations also depend on. The remedy is cheap and always the
 grep, read the line, plant the token, or run the two commands and diff them — *first*. A check that cannot pass is worse than no check,
 because someone will eventually make the product wrong to satisfy it.
 
+**A stale record is not only a false statement, it is an instruction.** A check marked resolved in
+one cell while three other cells still prescribe the disproven step is the same defect as a check
+that could never pass, and the remedy is the same: ask what the tree says before writing the
+sentence down. **B09-02** and **B09-03** were both settled in their Vetting cells while, in the same
+file, B09-03's own coverage-path cell still prescribed the throwaway PR its Vetting cell had
+declined; **drill 7.3** still told the next engineer to plant a `goto` typo in a file that has no
+goto label; and **drill 7.4** still expected ``git ≥ 2.25 not found``, a literal the launcher never
+prints — no `2.25` exists anywhere in the tree — conflating git *absent* (`bootstrap.ps1:132`, `git
+not found`, exit 3) with git *below floor* (`:133`, `git <v> found, >= 2.34.1 required`). A row may
+contradict itself across two columns, so resolving a finding means sweeping every cell that repeats
+it, not only the cell that reported it. Where a record's claim is load-bearing, pin it with a test
+that reds when the tree moves — `tests/launcher-parity.test.mjs` now asserts both the literal and
+the floor, so a floor change fails a test instead of silently invalidating a story.
+
 **Rebasing an acceptance PR: the changelog will conflict, and both sides are right.** Every
 acceptance PR adds a bullet at the top of the same `### Fixed` group under `## Unreleased`, so each
 one conflicts with every other that merged before it. Keep BOTH, earlier-merged first; drop nothing

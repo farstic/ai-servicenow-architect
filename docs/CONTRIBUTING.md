@@ -249,6 +249,12 @@ cost a full CI run to find out. The rule, the four shapes and one
 worked example of each are in the preamble of `docs/plans/06-ACCEPTANCE-PLAN.md` — kept in one
 place on purpose, so this pointer cannot drift from it.
 
+That preamble carries a companion rule with the same remedy: **a stale record is not only a false
+statement, it is an instruction** — a finding marked resolved in one cell while other cells still
+prescribe the disproven step will send the next person to do it. So resolving a finding means
+sweeping every cell that repeats it, not only the cell that reported it, and pinning a load-bearing
+claim with a test that reds when the tree moves.
+
 
 **The upgrade harness builds a whole tree, and the guard on it is a subset.** `tests/upgrade/` is
 excluded from `npm test` (it builds git worlds and costs minutes) and runs in `upgrade-e2e` on three
