@@ -14,7 +14,7 @@ Corrections to the plan itself are made in place and marked, because a plan that
 worse than one that is visibly amended.
 
 **A proposed check is a hypothesis about the tree, and the cheapest moment to test it is before
-you write the test.** Through ARC-09's close, **thirteen** proposed checks in this plan could not have
+you write the test.** Through the rc.2 run order, **fourteen** proposed checks in this plan could not have
 worked as written — not because the reader was careless, but because a check written from a file is
 a guess about a tree nobody re-measured. They fail in four recognisable shapes, and one example of
 each is worth more than the count: a check can name **a cell that cannot contain the number** it
@@ -27,7 +27,10 @@ emit — `nextCursor` appears zero times in `src/`); and it can propose **a fixt
 own lint refuses** (**B06-03**'s `snow_fake_x`, which fails engine-lint L01 in the very file the row
 names). **B09-03 is the thirteenth and the only one that would have cost a CI run to discover** —
 it asked for a PR breaking a `goto` label in a file that has none, to turn three cells red in a
-file eleven other invocations also depend on. The remedy is cheap and always the same: run the
+file eleven other invocations also depend on. **The fourteenth, row 4.2's second half, is the first found by
+*running* rather than by reading** — it set an environment variable the engine never reads, so the
+command it prescribes quietly succeeds against the real upstream instead of failing the way the row
+expects. A check can be wrong by doing nothing at all, and only the run order surfaced it. The remedy is cheap and always the same: run the
 grep, read the line, plant the token, or run the two commands and diff them — *first*. A check that cannot pass is worse than no check,
 because someone will eventually make the product wrong to satisfy it.
 
@@ -417,7 +420,7 @@ Two record homes exist today: `docs/validation/` (ARC-10-S07) and `docs/spikes/v
 | # | Check | Command | Expected | Source |
 |---|---|---|---|---|
 | 4.1 | Sync and verify | `./bootstrap.sh --docs sparse` (fresh clone) then `./snowarch docs verify`; `du -sh vendor/ServiceNowDocs` | `checked: ≥ 160 \| dead: 0` (last dry run: 180); tree ≤ 350 MB | ARC-03 R1 |
-| 4.2 | Network negatives (fresh clone, no vendor/ServiceNowDocs) | `HTTPS_PROXY=http://user:pw@127.0.0.1:9 node tools/snowarch/bin/snowarch.mjs docs sync; echo $?` then `SNOWARCH_DOCS_UPSTREAM=https://nonexistent.invalid/x.git node tools/snowarch/bin/snowarch.mjs docs sync; echo $?` | `cannot reach proxy 127.0.0.1:9 (HTTPS_PROXY)` (never `pw`), exit 5; DNS message, exit 5; `ls vendor/ServiceNowDocs` still absent | ARC-03-S05 AC8 (B03-04) |
+| 4.2 | Network negatives (fresh clone, no vendor/ServiceNowDocs) | `HTTPS_PROXY=http://user:pw@127.0.0.1:9 node tools/snowarch/bin/snowarch.mjs docs sync; echo $?` ~~then `SNOWARCH_DOCS_UPSTREAM=… docs sync`~~ **WITHDRAWN** | `cannot reach proxy 127.0.0.1:9 (HTTPS_PROXY)` (never `pw`), exit 5; `ls vendor/ServiceNowDocs` still absent. ~~DNS message, exit 5~~ **WITHDRAWN, measured on `1d94623`** — no such override exists: `git grep -ohE 'SNOWARCH_DOCS_[A-Z_]+|SNOW_DOCS_[A-Z_]+' -- tools/snowarch/lib/docs tools/snowarch/bin` returns nothing, and the docs engine reads **no** `process.env` at all (the upstream comes from `docs.upstream` in config, `sync.mjs:459`). Run as written the sync uses the real upstream and exits 0. The row also used a `.invalid` hostname as a live network target, which the fixture rule forbids. The DNS class is covered by the classifier's unit tests (canned stderr, both directions) | ARC-03-S05 AC8 (B03-04) |
 | 4.3 | Missing corpus | Move vendor/ServiceNowDocs aside; `./snowarch docs verify; echo $?`; `./snowarch doctor` | Exit 3 with `corpus missing — run ./bootstrap.sh --docs sparse (or ./snowarch docs sync)`, never SKIP; doctor E-12 FAIL | ARC-03 R2, R7 |
 | 4.4 | Pin equality | `git ls-tree HEAD vendor/ServiceNowDocs`; `node -e "console.log(require('./engine.config.json').docs.pin)"` | Same sha (11b39be at review time) | ARC-03 R3 |
 | 4.5 | Family dry run | `./snowarch docs family zurich --dry-run`; then bare `./snowarch docs family zurich; echo $?` | Exact edits printed; bare invocation exit 2 `refusing to apply without --yes`, `git status --porcelain` empty | ARC-03 R6, S08 AC2 |
