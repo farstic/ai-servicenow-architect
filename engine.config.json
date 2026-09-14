@@ -19,7 +19,7 @@
   },
   "docs": {
     "family": "australia",
-    "pin": "11b39be17307dd4b21df15a54e8011ae68f64dba",
+    "pin": "df4afacf9bce08599cedd439a50467448b36114f",
     "areasFile": "vendor/docs-areas.txt",
     "upstream": "https://github.com/ServiceNow/ServiceNowDocs.git"
   },
