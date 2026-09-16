@@ -91,9 +91,18 @@ reaches `Mode: design-only` and `./snowarch doctor` reports **0 FAIL**.
 > `Decision owner: initials PENDING OWNER`, and so do both rows of the gate sign-off block at the
 > end of `docs/plans/ARC-00-spikes-and-gating-decisions/README.md`. Edit only the initials cell in
 > each — the dates are already recorded and are evidence; the initials are consent, and nothing in
-> this repository may manufacture the second from the first. **No test enforces this and none will**:
-> a test that is red by design on eight files is noise, and it would go on being red for a reason
-> that is not a defect. This row is the enforcement.
+> this repository may manufacture the second from the first.
+>
+> **DONE — 2026-09-16: the owner gave `CG`.** The eight Decision-owner cells and both gate rows now
+> read `CG, 2026-09-16`; the two struck-through historical mentions of the old marker are left as
+> they are, because they are history rather than cells.
+>
+> The ruling recorded here — *"No test enforces this and none will: a test that is red by design on
+> eight files is noise"* — **stands, and is not contradicted by the test added on 2026-09-16.** The
+> refused test was one that would have been RED from the day it was written until the sitting
+> happened, for a reason that was not a defect. The test that exists now is the opposite shape: it
+> is green because the initials landed, and it fails only if somebody removes them or adds a new
+> uninitialled cell. A ratchet after the fact is not the red-by-design test that was refused.
 >
 
 > **Register the server with a generic MCP client, from the README alone (ARC-04-S14 criterion 5,

@@ -10,7 +10,7 @@
 | **Title** | Credential-at-rest policy and authentication methods for the first release |
 | **Status** | Accepted |
 | **Date** | 2026-09-06 (recorded) · decision taken 2026-09-04 |
-| **Decision owner** | Cvetomir Grigorov (owner) — initials `PENDING OWNER`, decision taken 2026-09-04 |
+| **Decision owner** | Cvetomir Grigorov (owner) — initials `CG, 2026-09-16`, decision taken 2026-09-04 |
 | **Engagement** | AI ServiceNow Architect — product |
 | **Release family** | Australia (docs corpus) |
 | **§1.1 relevance** | None |
