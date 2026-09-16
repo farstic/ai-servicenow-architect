@@ -505,6 +505,10 @@ that writes escalation events to it.
   named", or any other wording that makes it conditional on information the turn does not have. A
   deferred gateway is a gateway that did not fire; the unknown belongs in the Envelope, not in
   front of it.
+- **The halt is not where the reader looks for it** — the blocking decision delivered as closing
+  prose while the `OPEN QUESTION:` blocks hold clarifying questions, or the firing point left
+  unnamed (which gateway, at which step). Observed in passing runs: the criteria above were all met
+  and the halt was correct, but a reader had to reconstruct where it came from.
 - **Gateway skipped because no trigger keyword appears literally.** This prompt names
   `x_acme_itsm_escalation_log` and escalation semantics and matches no keyword in the ITSM row; the
   gateway fires on the domain. Both of these signals have been seen together in a real run where
