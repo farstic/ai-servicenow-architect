@@ -9,6 +9,7 @@
  *
  * Flag SEMANTICS — how a flag gates a tool — are ARC-04-S03. This module only loads.
  */
+import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
 import { ServiceNowClient } from './client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { loadStore, maskPath, resolveStorePath, } from '../store/index.js';
@@ -214,7 +215,7 @@ class InstanceManager {
         if (!entry) {
             const available = this.listNames();
             throw new Error(available.length === 0
-                ? 'No ServiceNow instance is configured. Run: snowarch instance add <label>'
+                ? NO_INSTANCE_MESSAGE
                 : `Unknown instance "${target}". Available: ${available.join(', ')}`);
         }
         return entry.client;
@@ -285,7 +286,7 @@ class InstanceManager {
             const refused = this.report.notLoaded.find((n) => n.label === this.currentName);
             throw new Error(refused
                 ? `Instance "${this.currentName}" is not loaded — ${refused.code}: ${refused.message}`
-                : 'No ServiceNow instance is configured. Run: snowarch instance add <label>');
+                : NO_INSTANCE_MESSAGE);
         }
         return rt;
     }

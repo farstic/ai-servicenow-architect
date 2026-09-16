@@ -29,9 +29,8 @@ export const CORE_TOOLS_UNCONFIGURED = [
   'snow_core_status_read',
 ] as const;
 
-export const NO_INSTANCE_MESSAGE =
-  'No ServiceNow instance is configured for this checkout. Inside Claude Code run '
-  + '/snowarch setup-instance; in a terminal run ./snowarch instance add <label>.';
+export { NO_INSTANCE_MESSAGE } from '../no-instance.js';
+import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
 
 /**
  * Why an instance tool is refusing, in the words of the ACTUAL reason.

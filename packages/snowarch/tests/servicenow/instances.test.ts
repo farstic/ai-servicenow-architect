@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { instanceManager } from '../../src/servicenow/instances.js';
+import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
 
 /**
  * The precedence, end to end.
@@ -184,6 +185,7 @@ describe('the store carries the metadata the flag gate (S03) will need', () => {
 
   it('getClient names the remedy when nothing is configured', () => {
     instanceManager.reload();
-    expect(() => instanceManager.getClient()).toThrow(/snowarch instance add/);
+    // ARC-08-C7 — the remedy is `mode live` now, and it comes from the one definition.
+    expect(() => instanceManager.getClient()).toThrow(NO_INSTANCE_MESSAGE);
   });
 });

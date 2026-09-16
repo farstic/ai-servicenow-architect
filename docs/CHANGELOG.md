@@ -239,9 +239,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   could print `1 fail` even when the switch had just succeeded — the failure being counted was left
   over from an earlier run, and the health check it claimed to be quoting had never been asked. It
   asks properly now, and agrees with what `./snowarch doctor` tells you.
-- **One answer to "I have no instance yet."** The doctor and the installer used to suggest two
-  different commands for the same situation. Both worked, which only made it harder to know which
-  one was the path: it is `./snowarch mode live`, and everything that offers it now says the same.
+- **One answer to "I have no instance yet."** Six different parts of the product answered that
+  question six different ways — the doctor, the installer, the verify step, `/snowarch status`, the
+  server itself, and the published architecture page. All of them worked, which only made it harder
+  to know which one was the path. It is `./snowarch mode live`, and everything that offers it now
+  says the same thing.
 - **`--section` shows you the section you asked for.** `./snowarch doctor --section host` printed
   39 lines to tell you 2 things, the rest being "this check is not in the section you chose". The
   checks you did not ask for are now counted in the summary instead of listed one by one.
