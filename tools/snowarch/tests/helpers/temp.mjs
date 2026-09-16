@@ -19,7 +19,7 @@
  * A directory removed by the first is dropped from the second, so the backstop never touches a
  * path that has been reused since.
  */
-import { mkdtempSync, rmSync, writeSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -62,6 +62,7 @@ const sweep = () => {
   const failed = [];
   for (const dir of pending) {
     const error = remove(dir);
+    remove(`${dir}.owner`);
     if (error) failed.push(`${dir}: ${error.code ?? error.message}`);
   }
   pending.clear();
@@ -101,9 +102,34 @@ function arm() {
   }
 }
 
+/**
+ * Who made a fixture, written BESIDE it rather than inside it.
+ *
+ * Two leftovers turned up in one day — CI ubuntu/node24 and a local run — each reported as a
+ * directory name with nine entries and nothing about where it came from. An instrument that cannot
+ * say who lost the thing is how a day disappears chasing a race.
+ *
+ * Beside, not inside: `makeCheckout` builds a checkout that tests walk, count and run `git` in, so a
+ * marker file within it would change the subject of the tests it is meant to help debug.
+ *
+ * It is written at CREATION, not at cleanup, because the case worth explaining is the one where the
+ * process dies before any cleanup runs — a killed test file never reaches `t.after` OR the exit
+ * sweep, and 118 of the `makeCheckout()` call sites pass no test context at all, so the exit sweep
+ * is the only thing standing between them and a permanent pile.
+ */
+function recordOwner(dir, t) {
+  try {
+    const where = (new Error().stack ?? '').split('\n')
+      .map((l) => l.trim())
+      .find((l) => l.includes('/tests/') && !l.includes('helpers/temp.mjs')) ?? 'unknown caller';
+    writeFileSync(`${dir}.owner`, `${t?.name ?? '(no test context)'}\n${where}\npid ${process.pid}\n`);
+  } catch { /* an instrument must never fail the run it is instrumenting */ }
+}
+
 /** Track a directory somebody else created. Returns it, so it can wrap an existing expression. */
 export function trackTempDir(dir, t) {
   pending.add(dir);
+  recordOwner(dir, t);
   arm();
   // `t?.after?.()` — the context is optional, and a vitest or plain call has none.
   t?.after?.(() => {
@@ -112,6 +138,7 @@ export function trackTempDir(dir, t) {
     // survivor gets reported. A hook that THREW here would fail the test it belongs to for a reason
     // that has nothing to do with what the test was about.
     remove(dir);
+    remove(`${dir}.owner`);
     pending.delete(dir);
   });
   return dir;

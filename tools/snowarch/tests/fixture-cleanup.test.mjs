@@ -23,6 +23,7 @@ import { tempDir } from './helpers/temp.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspace = pathToFileURL(resolve(here, 'helpers/workspace.mjs')).href;
+const helper = pathToFileURL(resolve(here, 'helpers/temp.mjs')).href;
 
 /**
  * Run one probe file in its own temp directory, as a test run that is nobody's child.
@@ -37,6 +38,12 @@ const workspace = pathToFileURL(resolve(here, 'helpers/workspace.mjs')).href;
  * it. Without this line the failing-path case would have been vacuous in exactly the way it was
  * written to avoid.
  */
+/** Whatever the exit sweep said, on whichever stream `node --test` put it. */
+function sweepOutput(child) {
+  return [child.stdout, child.stderr].filter(Boolean).join('\n')
+    .split('\n').filter((l) => l.includes('temp.mjs:') || /: E[A-Z]+\b/.test(l)).join('\n');
+}
+
 function runProbe(probe, sandbox) {
   const env = { ...process.env, TMPDIR: sandbox, TMP: sandbox, TEMP: sandbox };
   delete env.NODE_TEST_CONTEXT;
@@ -67,8 +74,12 @@ function leftBehind(sandbox) {
   }
   const detail = names.map((name) => {
     const contents = readdirSync(join(sandbox, name));
+    // NOT "removal never ran": a non-empty directory is also what a removal that RAN AND FAILED
+    // leaves behind (EBUSY, ENOTEMPTY, a file held open on another platform), and this function
+    // cannot tell the two apart. It says what it observed; the child's stderr, in the assertion
+    // message above, is what says which.
     return `${name} (${contents.length === 0 ? 'EMPTY — removal started, entry lingering'
-      : `${contents.length} entries — removal never ran`})`;
+      : `${contents.length} entries — not removed`})`;
   }).join(', ');
   return { names, detail };
 }
@@ -93,7 +104,19 @@ test('a fixture made by makeCheckout is gone once the run that made it ends', (t
   assert.equal(child.status, 0, `${child.stdout}${child.stderr}`);
 
   const left = leftBehind(sandbox);
-  assert.deepEqual(left.names, [], `the child left ${left.names.length} fixture(s) behind: ${left.detail}`);
+  // The child's stderr goes in the MESSAGE, because the helper has usually already said why: a
+  // failed `rmSync` is reported by the exit sweep as `temp.mjs: N fixture(s) survived on node X`
+  // with the errno. Two occurrences (CI ubuntu/node24, and a local run) reported a directory and a
+  // file count and nothing else — and in the CI one the child had exited 0, so nothing was killed
+  // and the sweep DID run. The diagnosis existed, was captured here in `child.stderr`, and this
+  // assertion threw it away. Carrying it across is the whole fix.
+  //
+  // BOTH streams, and that is not caution: the probe runs under `node --test`, whose runner
+  // captures a test file's output into its TAP report, so the sweep's `writeSync(2, …)` arrives on
+  // the child's STDOUT. A version of this fix that read only `child.stderr` was written first and
+  // would have surfaced nothing at all — the same shape as the bug it repairs.
+  assert.deepEqual(left.names, [], `the child left ${left.names.length} fixture(s) behind: ${left.detail}`
+    + `\n--- child output ---\n${sweepOutput(child) || '(neither stream mentioned the sweep)'}`);
 });
 
 /**
@@ -207,4 +230,60 @@ test('a real fixture suite leaves nothing in TMPDIR (ARC-09-C13)', (t) => {
   const left = leftBehind(sandbox);
   assert.deepEqual(left.names, [],
     `release-workflow left ${left.names.length} director(ies) in TMPDIR: ${left.detail}`);
+});
+
+/**
+ * The failure that actually happened in CI, and the reason it told nobody anything.
+ *
+ * Two leftovers were reported in one day — CI ubuntu/node24 and a local run — each as a directory
+ * name and a file count. The CI one had `child.status === 0`: nothing was killed, so the exit sweep
+ * DID run. What it hit was an `rmSync` that failed, and the sweep says so, with the errno, on
+ * stderr — which the leftover assertion then dropped on the floor.
+ *
+ * This drives that exact shape: a directory the sweep cannot remove (its parent is read+execute
+ * only, so the child entry cannot be unlinked), in a child that exits cleanly. The point is not
+ * that the fixture survives — it is that the survivor arrives WITH its errno.
+ */
+test('a removal that fails is reported with its errno, not just as a leftover', (t) => {
+  if (process.platform === 'win32') return;   // the permission shape is POSIX; Windows uses ACLs
+  const sandbox = mkdtempSync(join(tmpdir(), 'fixture-errno-'));
+  t.after(() => {
+    // Restore write on every directory first: this test deliberately makes one unremovable, and a
+    // teardown that guesses its path leaves the mess the whole chore is about. (The first version
+    // guessed `readdirSync(sandbox)[0]`, which is `probe.mjs` as often as not, and died ENOTEMPTY.)
+    const openUp = (dir) => {
+      try { chmodSync(dir, 0o700); } catch { /* nothing to open */ }
+      let entries = [];
+      try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) if (e.isDirectory()) openUp(join(dir, e.name));
+    };
+    openUp(sandbox);
+    rmSync(sandbox, { recursive: true, force: true });
+  });
+
+  const probe = join(sandbox, 'probe.mjs');
+  writeFileSync(probe, [
+    `import { tempDir } from ${JSON.stringify(helper)};`,
+    "import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';",
+    "import { join } from 'node:path';",
+    // No test context: this is the shape of the 118 `makeCheckout()` call sites that have only the
+    // exit sweep between them and a permanent pile.
+    "const d = tempDir('snowarch-bootstrap-');",
+    "mkdirSync(join(d, 'sub'), { recursive: true });",
+    "writeFileSync(join(d, 'sub', 'f'), 'x');",
+    "chmodSync(join(d, 'sub'), 0o500);",
+    '',
+  ].join('\n'));
+
+  const child = runProbe(probe, sandbox);
+
+  // The child exits CLEANLY — this is not a kill, which is what made the CI case confusing.
+  assert.equal(child.status, 0, `${child.stdout}${child.stderr}`);
+  const said = `${child.stdout}\n${child.stderr}`;
+  assert.match(said, /fixture\(s\) survived on node /,
+    `the sweep said nothing about a fixture it could not remove:\n${said}`);
+  assert.match(said, /: (ENOTEMPTY|EACCES|EPERM|EBUSY)\b/,
+    `the report carries no errno, which is the one thing that names the cause:\n${said}`);
+  // And the helper the assertion above uses must find it on whichever stream it landed on.
+  assert.match(sweepOutput(child), /: (ENOTEMPTY|EACCES|EPERM|EBUSY)\b/);
 });
