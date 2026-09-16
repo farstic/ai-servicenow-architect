@@ -190,8 +190,8 @@ banner will not run; the bootstrap neither sets nor removes that key, it says so
 
 Claude Code reads `.claude/settings.json` and `.mcp.json` from the session's primary working
 directory, so a session started inside `clients/<name>/` loads neither and the specialists are simply
-absent. Engagement folders are paths *within* the checkout — or one checkout per engagement, which
-is also how the confidentiality boundary is kept.
+absent. Engagement folders are `clients/<name>/` within the checkout, and each
+engagement is its own clone: Claude Code's auto memory is per repository, so two in one clone share notes.
 
 ### If your organisation blocks project MCP servers
 

@@ -26,7 +26,11 @@ const FORBIDDEN_TRACKED = /^(\.local|clients|deliverables|memory)\/|(^|\/)\.env$
 test('every per-checkout and engagement path is ignored', () => {
   const paths = ['.local/instances.json', '.local/audit.jsonl', 'clients/acme/notes.md',
     'deliverables/x.docx', 'memory/MEMORY.md', '.env', '.env.local',
-    '.claude/settings.local.json', '.DS_Store', 'node_modules/x'];
+    '.claude/settings.local.json', '.DS_Store', 'node_modules/x',
+    // ARC-02-S05 deleted the `reports/` pattern from .gitignore and left the comment saying it was
+    // KEPT, so CONTRIBUTING went on telling contributors a directory that may quote live instance
+    // data was hidden when it was not. The pattern is restored; this is what keeps them agreeing.
+    'reports/x.md'];
   for (const p of paths) {
     const r = spawnSync('git', ['check-ignore', '-q', p], { cwd: root });
     assert.equal(r.status, 0, `${p} is NOT ignored`);

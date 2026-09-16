@@ -30,7 +30,7 @@ body:
     attributes:
       label: Which step of `docs/MIGRATION.md`
       description: The step number and its heading, so the page can be fixed at the right line.
-      placeholder: "Step 4 — move the instance store"
+      placeholder: "Step 3 — Bring your instance across"
     validations:
       required: true
   - type: dropdown
@@ -60,18 +60,23 @@ body:
         This is the form that travels: instance labels read `<label>`, instance hosts read
         `<host>`, home-directory paths read `~`, and secrets are shown as `set (len n)` — never
         the value. Paste the whole thing.
-        Read it before you post it: if you find anything that identifies you or your instance, that
-        is a defect in the doctor and worth its own issue.
+        One thing it does carry by design: the path of this checkout below your home (`~/work/…`).
+        Stale registrations in other projects are reported as counts and server names only — the
+        other folders' names are not in the JSON. Read it before you post it: anything else that
+        identifies you or your instance is a defect in the doctor and worth its own issue.
       render: json
     validations:
       required: true
   - type: textarea
     id: leftovers
     attributes:
-      label: The doctor's leftovers
+      label: The doctor's `legacy` section
       description: >-
-        The `Leftovers` block of `./snowarch doctor` — the detectors that find a stale registration,
-        a legacy store or an old checkout. Paste it even when it is empty; empty is a result.
+        The `legacy` block of `./snowarch doctor` — E-23 (stale MCP registrations in ~/.claude.json)
+        and E-24 (legacy wizard store) — or the output of `./snowarch doctor --section legacy`.
+        Paste it even when both lines read ok; ok is a result. E-23 names every other project folder
+        that still holds a stale registration — replace any folder name you would not want public
+        with `~/<other project>`.
       render: text
     validations:
       required: true

@@ -15,7 +15,7 @@ const FLAG_TEXT = {
   WRITE_ENABLED: 'create, update and delete records — incidents, catalog items, users, agile work, update sets. Without it everything is read-only.',
   CMDB_WRITE_ENABLED: 'additionally, CI and relationship reconciliation writes into the CMDB.',
   SCRIPTING_ENABLED: 'unlocks *writing* Script Includes, Business Rules, Client Scripts, ACLs, UI Actions and update-set changes. Reading them is always allowed.',
-  ATF_ENABLED: 'execute ATF tests and suites; authoring and reading are always allowed.',
+  ATF_ENABLED: 'execute ATF tests and suites; listing and reading tests, suites and results is always allowed. There is no ATF authoring tool: creating or editing a test record goes through the generic record tools and needs WRITE.',
   NOW_ASSIST_ENABLED: 'the Now Assist and generative-AI tools; needs a Now Assist licence on the instance.',
   FLUENT_ENABLED: 'the ServiceNow SDK build and deploy tools; deploys also need WRITE.',
 };

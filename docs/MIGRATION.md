@@ -30,7 +30,7 @@ to a fresh machine.
 | `/setup-instance` | `/snowarch setup-instance` |
 | A `.env` in the working directory, loaded automatically | Not read. Point `SNOW_ENV_FILE` at one if you want it |
 | Field notes in one file | `docs/PLATFORM-NOTES.md` for platform facts; the server's own changelog and tests for server behaviour |
-| `memory/MEMORY.md` | Claude Code's own memory |
+| `memory/MEMORY.md` | Retired. Engagement notes go to `clients/<name>/memory.md` (step 4); your own working preferences are Claude Code's own memory — whose index is also named `MEMORY.md`, a different file outside the checkout |
 | Engine v2.8.0 · server 1.0.0 | One product, version `2.0.0` |
 
 Everything below the table is the current vocabulary. The row on the left is the only place the old
@@ -66,15 +66,15 @@ Get-ChildItem clients -Recurse -File | Get-FileHash -Algorithm SHA256 |
 (Import-Csv $HOME\clients-before.csv).Count
 ```
 
-Then list the three things that are untracked and will not travel by themselves — they exist only
+Then list the four things that are untracked and will not travel by themselves — they exist only
 if you made them:
 
 ```sh
-ls -la memory/ scratchpad/ deliverables/ 2>/dev/null
+ls -la memory/ scratchpad/ deliverables/ diagram-preview/ 2>/dev/null
 ```
 
 ```powershell
-Get-ChildItem memory, scratchpad, deliverables -ErrorAction SilentlyContinue
+Get-ChildItem memory, scratchpad, deliverables, diagram-preview -ErrorAction SilentlyContinue
 ```
 
 ## 2. Clone and bootstrap the new repository
@@ -173,10 +173,24 @@ pasted into a conversation** — the skill cannot type them and is not permitted
 
 ## 4. Copy engagement folders
 
+**One engagement per clone.** If your old `clients/` holds more than one engagement, repeat steps 2
+and 3 once per engagement — a separate `git clone … <name>-architect && cd <name>-architect &&
+./bootstrap.sh`, never a `git worktree` of one clone — and copy only that engagement's folder into
+each: `mkdir -p clients && cp -R <old-engine-checkout>/clients/<name> ./clients/` (PowerShell:
+`New-Item -ItemType Directory -Force .\clients | Out-Null; Copy-Item -Recurse
+<old-engine-checkout>\clients\<name> .\clients\`). Claude Code's auto memory is shared by every
+session in one repository, so two engagements in one checkout would share their notes — the one
+arrangement the rule exists to prevent (`docs/CONTRIBUTING.md`, *Engagements and memory*). Each clone
+has its own `.local/instances.json` (unless you chose `--global`), so step 3 runs again in each: the
+import never deletes the legacy store, so it works from every clone — and step 8 waits until the last
+one has imported. No command copies credentials from one clone to another.
+
+The commands below are for the one-engagement case.
+
 macOS / Linux:
 
 ```sh
-cp -R <old-engine-checkout>/clients/ ./clients/
+mkdir -p clients && cp -R <old-engine-checkout>/clients/. ./clients/
 find clients -type f -print0 | sort -z | xargs -0 shasum -a 256 > ~/clients-after.sha256
 diff <(cut -d' ' -f1 ~/clients-before.sha256 | sort) <(cut -d' ' -f1 ~/clients-after.sha256 | sort) && echo "identical"
 ```
@@ -184,6 +198,7 @@ diff <(cut -d' ' -f1 ~/clients-before.sha256 | sort) <(cut -d' ' -f1 ~/clients-a
 Windows PowerShell:
 
 ```powershell
+New-Item -ItemType Directory -Force .\clients | Out-Null
 Copy-Item -Recurse <old-engine-checkout>\clients\* .\clients\
 Get-ChildItem clients -Recurse -File | Get-FileHash -Algorithm SHA256 |
   Sort-Object Path | Export-Csv $HOME\clients-after.csv -NoTypeInformation
@@ -193,6 +208,9 @@ Compare-Object (Import-Csv $HOME\clients-before.csv).Hash (Import-Csv $HOME\clie
 `diff` printing `identical`, or `Compare-Object` printing nothing, means every file arrived. The
 comparison is on the hashes alone because the paths change — the old checkout's root is not the new
 one's.
+
+The hashes prove the bytes arrived, not where they landed: `ls clients` (`Get-ChildItem clients`) must show your
+engagement names directly — not a second `clients` level, and not loose files.
 
 `clients/` is ignored by git in the new repository, exactly as before: engagement content is yours
 and is never committed.
@@ -214,6 +232,9 @@ macOS / Linux:
 mkdir -p clients/<name>
 cp <old-engine-checkout>/memory/MEMORY.md clients/<name>/memory.md
 cp -R <old-engine-checkout>/deliverables/. clients/<name>/
+# and only the ones you are keeping:
+cp -R <old-engine-checkout>/scratchpad clients/<name>/scratchpad
+cp -R <old-engine-checkout>/diagram-preview clients/<name>/diagram-preview
 ```
 
 Windows PowerShell:
@@ -222,10 +243,16 @@ Windows PowerShell:
 New-Item -ItemType Directory -Force clients\<name> | Out-Null
 Copy-Item <old-engine-checkout>\memory\MEMORY.md clients\<name>\memory.md
 Copy-Item -Recurse <old-engine-checkout>\deliverables\* clients\<name>
+# and only the ones you are keeping:
+Copy-Item -Recurse <old-engine-checkout>\scratchpad clients\<name>\scratchpad
+Copy-Item -Recurse <old-engine-checkout>\diagram-preview clients\<name>\diagram-preview
 ```
 
-`clients/<name>/memory.md` is a file you point Claude at when you want it — it is not read
-automatically. Your own working preferences, as opposed to engagement content, are something Claude
+`clients/<name>/memory.md` is a file you point Claude at when you want it ("read clients/acme/memory.md") — it is not read
+automatically. Anything in it that every request should know — release family, naming conventions,
+the sys_ids you keep looking up — belongs instead in `clients/<name>/<name>-engagement-state.md`,
+which the Chief Architect reads at Phase 1 Step 2 whenever the engagement is named
+(`docs/CLIENT-ONBOARDING.md` §3). Your own working preferences, as opposed to engagement content, are something Claude
 records for itself now; `/memory` shows you what it has. `memory/` stays in the new repository's
 `.gitignore` as a safety net, so a stray copy is never committed by accident.
 

@@ -120,21 +120,31 @@ Two mechanical notes worth knowing:
 
 ## Engagements and memory
 
-- **One checkout per engagement:** `git clone https://github.com/farstic/ai-servicenow-architect.git acme-architect`.
+- **One checkout per engagement:** `git clone https://github.com/farstic/ai-servicenow-architect.git acme-architect && cd acme-architect && ./bootstrap.sh` (`.\bootstrap.cmd` on Windows). Every engagement clone is bootstrapped and has its instance added in its own wizard — `./snowarch instance add`, or `./snowarch instance import --from-legacy` while migrating — and nothing is copied from another clone.
   Each checkout has its own `.local/instances.json` and its own `clients/acme/` — the confidentiality
   firewall is the directory boundary (D-04's rationale, ADR-0004).
 - **`clients/<name>/` is gitignored** and never `git add -f`-ed. Move an engagement by copying the
   folder, and verify with a checksum listing — `docs/MIGRATION.md` steps 1 and 4 have the commands
   for both shells.
-- **Instance-specific values — URLs, sys_ids, usernames — are never committed.** They have two homes:
-  the product's own state in `.local/` (store, config, doctor cache, audit log), written only by
-  `snowarch` and the server; and your working notes across sessions, which belong in Claude Code's
-  auto memory rather than in a file in the checkout.
+- **Instance-specific values — URLs, sys_ids, usernames — are never committed.** They have three
+  homes: connection details (URL, username, password) in the product's own state in `.local/`
+  (store, config, doctor cache, audit log), written only by `snowarch` and the server; engagement
+  facts you want to keep — sys_ids, record numbers, group names — in `clients/<name>/memory.md`
+  (see the next bullet); and your own working preferences, which belong in Claude Code's auto
+  memory and not in any file in the checkout.
 - **`memory/MEMORY.md`, the old engine convention, is retired.** If you have one, move it to
   `clients/<name>/memory.md` — gitignored with the folder — and ask Claude to read it when it is
   needed. `memory/` stays in `.gitignore` as a safety net for a checkout that still has one.
+- **`scratchpad/`, `deliverables/` and `diagram-preview/` from the old engine belong under the
+  engagement too** (`docs/MIGRATION.md` step 4). Only `deliverables/` is still ignored: `scratchpad/`
+  and `diagram-preview/` are visible to git here, and the never-commit tracked-path scan does not
+  name them, so a stray copy at the root is one `git add .` from being committed.
 - **Never put engagement content in `docs/`, `governance/`, `.claude/skills/` or `.claude/agents/`.**
   Those are product files: they are in every checkout, and one of them is in every other engagement.
+  A client-specific skill (`docs/CLIENT-ONBOARDING.md` §7) has no home under `.claude/skills/` either,
+  committed or not: the doctor's E-17 and `tests/engine-config.test.mjs` count that directory against
+  `engine.config.json`'s roster, so an extra one is `roster.skills 28 ≠ 29 found` — a FAIL. Keep it
+  under `clients/<name>/` and ask Claude to read it when the engagement is loaded.
 
 **Two things about auto memory that this rule depends on**, both from Claude Code's own documentation
 rather than from us — its location and behaviour are Claude Code's to change, so no path for it

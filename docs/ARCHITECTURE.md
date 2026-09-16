@@ -1040,6 +1040,23 @@ the dashboard, the prompt catalogue, the direct-execution engine and the report 
 buys is a single protocol surface to reason about, and a production install that fell from 57.3 MB to
 14.1 MB. The per-removal detail is in `packages/snowarch/CHANGELOG.md`.
 
+### Env-defined instances — the variable names
+
+With `SERVICENOW_INSTANCE_URL` or any `SN_INSTANCE_<NAME>_URL` set, those are the instances and no
+store is read (the CI path). Per instance `<NAME>`, whose label is `<NAME>` lower-cased:
+`SN_INSTANCE_<NAME>_URL`, `_AUTH` (`oauth` for the password grant, anything else basic), `_USERNAME`,
+`_PASSWORD`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_ENVIRONMENT` (`pdi|dev|test|prod`, default `dev`) and
+`_PROD_WRITE_ACK` (`true` raises a prod instance).
+
+The six flags are read from the **bare** process variables — `WRITE_ENABLED=true` …
+`FLUENT_ENABLED=true`, byte-exact `true`, anything else false — and so are `MAX_RECORDS` (default
+100), `MAX_RETRIES`, `RETRY_DELAY_MS` and `REQUEST_TIMEOUT_MS`, which therefore apply to every
+env-defined instance at once. The preset is always `custom`.
+
+The legacy single-instance names are `SERVICENOW_INSTANCE_URL`, `SERVICENOW_AUTH_METHOD`,
+`SERVICENOW_BASIC_USERNAME` / `_PASSWORD` and `SERVICENOW_OAUTH_CLIENT_ID` / `_CLIENT_SECRET` /
+`_USERNAME` / `_PASSWORD`; that instance is labelled `default`.
+
 ### The audit trail
 
 Every call to a tool declared `mutates` or `sessionMutates` appends one JSON line to
