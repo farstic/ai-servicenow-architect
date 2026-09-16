@@ -235,6 +235,10 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A test fixture left behind now says why.** When the suite could not delete one of its temporary
+  directories it reported the directory and nothing else, twice, while the reason — the operating
+  system's own error — had already been printed and discarded. It travels with the report now.
+
 - **The modes and presets page now matches the product.** It sent a new reader to two commands that
   refuse in a fresh checkout instead of to `./snowarch mode live`, which is what installs live mode
   and starts the wizard; it gave the audit log one fixed path when the file follows your store; and
