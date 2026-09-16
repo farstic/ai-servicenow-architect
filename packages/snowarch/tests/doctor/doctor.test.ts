@@ -295,30 +295,41 @@ describe('SV-07 and SV-08', () => {
   //
   // `project=[…]` names only the checkout. SV-08 counted the USER scope as an ancestor project and
   // told the owner to move his checkout out from under his own home — a remedy nobody can follow.
+  // NOT named `home`: the file-level fixture is called that, and a local `const home` SHADOWS it —
+  // so `afterEach` removed the outer directory and left these behind. That is exactly how the first
+  // version of these two tests leaked into TMPDIR. The `finally` is what removes them.
   it('SV-08 does not report the home directory, even when ~/.claude/skills exists', () => {
-    const home = mkdtempSync(join(tmpdir(), 'sv08-home-'));
-    mkdirSync(join(home, '.claude', 'skills'), { recursive: true });   // the user scope
-    const checkout = join(home, 'work', 'checkout');
-    mkdirSync(join(checkout, '.claude', 'skills'), { recursive: true });
+    const fakeHome = mkdtempSync(join(tmpdir(), 'sv08-home-'));
+    try {
+      mkdirSync(join(fakeHome, '.claude', 'skills'), { recursive: true });   // the user scope
+      const checkout = join(fakeHome, 'work', 'checkout');
+      mkdirSync(join(checkout, '.claude', 'skills'), { recursive: true });
 
-    // The check filters the checkout's own directory (it is expected); the finding is what is ABOVE it.
-    const above = pollutingAncestors(checkout, home).filter((p) => p !== checkout);
-    expect(above).toEqual([]);
+      // The check filters the checkout's own directory (it is expected); the finding is what is ABOVE it.
+      const above = pollutingAncestors(checkout, fakeHome).filter((p) => p !== checkout);
+      expect(above).toEqual([]);
+    } finally {
+      rmSync(fakeHome, { recursive: true, force: true });
+    }
   });
 
   it('SV-08 still reports a REAL ancestor project between the checkout and the home', () => {
     // Both directions: the case S-13 actually measured must keep warning, and must name the
     // ancestor it found — otherwise the exclusion above has silenced the check instead of correcting it.
-    const home = mkdtempSync(join(tmpdir(), 'sv08-home-'));
-    mkdirSync(join(home, '.claude', 'skills'), { recursive: true });
-    const ancestor = join(home, 'projects');
-    mkdirSync(join(ancestor, '.claude', 'skills'), { recursive: true });
-    const checkout = join(ancestor, 'checkout');
-    mkdirSync(join(checkout, '.claude', 'skills'), { recursive: true });
+    const fakeHome = mkdtempSync(join(tmpdir(), 'sv08-home-'));
+    try {
+      mkdirSync(join(fakeHome, '.claude', 'skills'), { recursive: true });
+      const ancestor = join(fakeHome, 'projects');
+      mkdirSync(join(ancestor, '.claude', 'skills'), { recursive: true });
+      const checkout = join(ancestor, 'checkout');
+      mkdirSync(join(checkout, '.claude', 'skills'), { recursive: true });
 
-    const above = pollutingAncestors(checkout, home).filter((p) => p !== checkout);
-    expect(above).toContain(ancestor);
-    expect(above).not.toContain(home);
+      const above = pollutingAncestors(checkout, fakeHome).filter((p) => p !== checkout);
+      expect(above).toContain(ancestor);
+      expect(above).not.toContain(fakeHome);
+    } finally {
+      rmSync(fakeHome, { recursive: true, force: true });
+    }
   });
 
   it('SV-07 warns when the audit trail is switched off', async () => {

@@ -15,18 +15,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn as nodeSpawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+
+import { tempDir } from './helpers/temp.mjs';
 
 import { WIZARD, awaitProbe, firstLine, probeWizard, wizardProbeFailure, WIZARD_ABSENT }
   from '../lib/steps/B06.mjs';
 
 const CLI = join('packages', 'snowarch', 'dist', 'cli', 'index.js');
 
-/** A checkout whose "CLI" is a script we control, so the probe's five answers are reachable. */
-function fixture(body) {
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-probe-'));
+/**
+ * A checkout whose "CLI" is a script we control, so the probe's five answers are reachable.
+ *
+ * Through `tempDir`, never a bare `mkdtempSync`: the helper tracks the directory and removes it
+ * after the test that made it. The first version of this file called `mkdtempSync` directly and
+ * left six directories in TMPDIR — every recorded run before it left none.
+ */
+function fixture(body, t) {
+  const root = tempDir('snowarch-probe-', t);
   const cli = join(root, CLI);
   mkdirSync(dirname(cli), { recursive: true });
   writeFileSync(cli, body);
@@ -36,8 +43,8 @@ function fixture(body) {
 /** EXACTLY what the runner hands a step (`lib/steps/index.mjs`): async spawn, ChildProcess back. */
 const runnerSpawn = (cmd, args, opts) => nodeSpawn(cmd, args, opts);
 
-test('ARC-06-C6 — the probe answers OK through the RUNNER\'s real spawn, not only through spawnSync', async () => {
-  const root = fixture('console.log("usage: instance\\n  add <label>   add an instance");\n');
+test('ARC-06-C6 — the probe answers OK through the RUNNER\'s real spawn, not only through spawnSync', async (t) => {
+  const root = fixture('console.log("usage: instance\\n  add <label>   add an instance");\n', t);
 
   const viaRunner = await probeWizard(root, { run: runnerSpawn });
   assert.equal(viaRunner.klass, WIZARD.OK,
@@ -49,10 +56,10 @@ test('ARC-06-C6 — the probe answers OK through the RUNNER\'s real spawn, not o
   assert.equal(viaSync.klass, WIZARD.OK);
 });
 
-test('ARC-06-C6 control — a live ChildProcess is never stringified into the match', async () => {
+test('ARC-06-C6 control — a live ChildProcess is never stringified into the match', async (t) => {
   // The regression, named: interpolating the ChildProcess is what produced "[object Object]".
   // If someone reinstates the old one-liner, `klass` goes back to ABSENT and this fails.
-  const root = fixture('console.log("usage: instance\\n  add <label>");\n');
+  const root = fixture('console.log("usage: instance\\n  add <label>");\n', t);
   const child = runnerSpawn(process.execPath, [join(root, CLI)], { stdio: 'pipe', encoding: 'utf8' });
   assert.equal(`${child.stdout}`, '[object Object]',
     'the premise of this control moved: a ChildProcess stdout no longer stringifies this way');
@@ -64,9 +71,9 @@ test('ARC-06-C6 control — a live ChildProcess is never stringified into the ma
   assert.equal((await probeWizard(root, { run: runnerSpawn })).klass, WIZARD.OK);
 });
 
-test('ARC-06-C5 — each failure is classified, through the runner\'s spawn', async () => {
+test('ARC-06-C5 — each failure is classified, through the runner\'s spawn', async (t) => {
   const crashed = await probeWizard(
-    fixture('console.error("Error [ERR_MODULE_NOT_FOUND]: Cannot find package \'commander\'");\nprocess.exit(1);\n'),
+    fixture('console.error("Error [ERR_MODULE_NOT_FOUND]: Cannot find package \'commander\'");\nprocess.exit(1);\n', t),
     { run: runnerSpawn });
   assert.equal(crashed.klass, WIZARD.CRASHED);
   assert.equal(crashed.status, 1);
@@ -74,16 +81,16 @@ test('ARC-06-C5 — each failure is classified, through the runner\'s spawn', as
     'the first stderr line is the one thing that says WHY, and it must survive');
 
   const absent = await probeWizard(
-    fixture('console.log("usage: instance\\n  list   list instances");\n'), { run: runnerSpawn });
+    fixture('console.log("usage: instance\\n  list   list instances");\n', t), { run: runnerSpawn });
   assert.equal(absent.klass, WIZARD.ABSENT, 'a healthy CLI without `add` is the only genuine absence');
 
-  const spawnError = await probeWizard(fixture('console.log("unused");\n'), {
+  const spawnError = await probeWizard(fixture('console.log("unused");\n', t), {
     run: () => ({ error: Object.assign(new Error('spawn EAGAIN'), { code: 'EAGAIN' }) }),
   });
   assert.equal(spawnError.klass, WIZARD.SPAWN_ERROR);
   assert.equal(spawnError.detail, 'EAGAIN');
 
-  const signal = await probeWizard(fixture('console.log("unused");\n'), {
+  const signal = await probeWizard(fixture('console.log("unused");\n', t), {
     run: () => ({ status: null, signal: 'SIGKILL', stdout: '', stderr: '' }),
   });
   assert.equal(signal.klass, WIZARD.SIGNAL);
