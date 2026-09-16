@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A corpus download that gave up early no longer claims it ran out of tries.** When the network
+  failure changed to one that is never worth retrying — a name that will not resolve — the message
+  still counted the attempts, which read as though another try had been promised and skipped. It
+  now says it stopped, and why.
+
 - **A test fixture left behind now says why.** When the suite could not delete one of its temporary
   directories it reported the directory and nothing else, twice, while the reason — the operating
   system's own error — had already been printed and discarded. It travels with the report now.
