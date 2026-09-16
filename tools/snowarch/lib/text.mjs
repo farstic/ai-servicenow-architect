@@ -193,9 +193,14 @@ export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, platfor
 
 /** The whole closing block, as one string — what `--json`'s `next` field carries verbatim. */
 export function summaryBlock({ mode, instance = null, counts = {}, nodeUsable = true,
-  dialogs = EXPECTED_DIALOGS, serverKey, platform, env, warnings = [] } = {}) {
+  dialogs = EXPECTED_DIALOGS, serverKey, platform, env, warnings = [], failures = [] } = {}) {
   const lines = [
     doctorLine({ ...counts, nodeUsable }),
+    // ARC-08-C? (Sitting A) — every FAIL, in full, directly under the count that announced it.
+    // The summary used to print `DOCTOR: 8 ok, 0 warn, 1 fail` and stop, and by the time anybody ran
+    // the full doctor the failure was gone: a count with nothing named is a number nobody can act
+    // on, and the one run that saw the failure is the one run that should have said what it was.
+    ...failures.map((f) => `      ${f}`),
     modeLine({ mode, instance }),
     nextBlock({ mode, dialogs, serverKey, platform, env }),
   ];

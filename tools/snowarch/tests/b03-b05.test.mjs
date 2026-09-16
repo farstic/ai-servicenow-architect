@@ -21,17 +21,26 @@ const ctxFor = (root, over = {}) => ({
   instanceFile: null, line: () => {}, ...over,
 });
 
-test('B03 records the accepted mode in the state and in config.json, and asks nothing', async () => {
+test('ARC-06-C7 — B03 ANSWERS the accepted mode, records nothing, and asks nothing', async () => {
+  // Was "records the accepted mode in the state and in config.json". It no longer may: writing the
+  // mode at step 3 made a live switch true on disk before B04/B06 had run, so a failure at B06 left
+  // the checkout claiming a mode it had never reached, with the design toggles still in place and
+  // `E-10 FAIL … mode is live but servicenow is disabled`. Sitting A walked into exactly that. The
+  // record is B07's now — the step that writes the toggles the mode describes.
   const root = makeCheckout();
-  const ctx = ctxFor(root, { mode: 'live' });
+  const ctx = ctxFor(root, { mode: 'live', state: { steps: {}, registration: 'project', mode: 'design-only' } });
   const lines = [];
 
   const r = await runB03({ ...ctx, line: (l) => lines.push(l) });
 
   assert.equal(r.status, 'ok');
-  assert.equal(r.detail, 'live');
-  assert.equal(ctx.state.mode, 'live');
-  assert.equal(JSON.parse(readFileSync(join(root, CONFIG_FILE), 'utf8')).mode, 'live');
+  assert.equal(r.detail, 'live', 'the step still reports the mode being requested');
+  assert.equal(r.data.mode, 'live');
+
+  assert.equal(ctx.state.mode, 'design-only', 'B03 must leave the RECORDED mode alone');
+  assert.equal(existsSync(join(root, CONFIG_FILE)), false,
+    'B03 must not write the per-checkout config either — B07 writes it, with the same fields');
+
   // The plan screen already asked. A second question here would be the one thing principle 10
   // forbids, so the step must print nothing that looks like one.
   assert.deepEqual(lines, []);

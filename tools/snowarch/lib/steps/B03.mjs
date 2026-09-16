@@ -6,7 +6,6 @@
 // read — and, by being an input to B06, B07 and B08, make a changed mode re-run exactly the steps
 // that depend on it.
 import { TEXT } from './inputs.mjs';
-import { writeConfig } from './B07.mjs';
 import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B03';
@@ -19,13 +18,16 @@ export const runsWhen = () => true;
 export const inputs = INPUTS.B03.resolve;
 
 export const run = async (ctx) => {
-  ctx.state.mode = ctx.mode;
-  // The same writer B07 uses. A second one here would be a second opinion about what v1 looks
-  // like, and the two would part company the first time a field was added.
-  writeConfig(ctx.root, {
-    mode: ctx.mode,
-    registration: ctx.state.registration ?? 'project',
-    ...(ctx.readLabel ? { readLabel: ctx.readLabel } : {}),
-  });
+  // ARC-06-C7 — B03 RECORDS NOTHING. It used to write both `state.mode` and the config here, at
+  // step 3, which made the switch true on disk before the steps that make it true had run: a live
+  // switch that failed at B06 left `mode: live` recorded with the toggles still set to design, so
+  // `./snowarch mode` said live while `settings.local.json` disabled the server and the doctor
+  // reported `E-10 FAIL … mode is live but servicenow is disabled`. There is no rollback in this
+  // runner and adding one would be a second mechanism to keep honest; the mode is simply written by
+  // the step that makes it true (B07, the toggles), so an interrupted switch leaves the PREVIOUS
+  // mode recorded and E-10 green.
+  //
+  // Nothing downstream loses an input: every `runsWhen` reads `ctx.mode`, the mode being REQUESTED,
+  // never `ctx.state.mode`, and B07 already writes exactly this config with the same fields.
   return { status: 'ok', detail: ctx.mode, data: { mode: ctx.mode } };
 };

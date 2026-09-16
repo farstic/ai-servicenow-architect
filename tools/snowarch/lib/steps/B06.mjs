@@ -95,13 +95,104 @@ function readFileSyncSafe(p) {
   try { return readFileSync(p, 'utf8'); } catch { return null; }
 }
 
-/** Does the built CLI advertise `instance add`? Asked before spawning, so the failure is named. */
-export function wizardAvailable(root, { run = spawnSync } = {}) {
+/**
+ * The five answers a wizard probe can give. Four of them used to be one boolean.
+ *
+ * `ABSENT` is the only one that means what the old message said, and it is the rarest: it needs a
+ * CLI that starts, answers `--help` and does not list `add`. The other three are a machine problem,
+ * and telling their owner to re-bootstrap a perfectly good build is worse than saying nothing.
+ */
+export const WIZARD = Object.freeze({
+  OK: 'ok', SPAWN_ERROR: 'spawn-error', CRASHED: 'crashed', SIGNAL: 'signal', ABSENT: 'absent',
+});
+
+/**
+ * Wait for a probe, whatever shape the caller's `spawn` returns, AND keep what it printed.
+ *
+ * `awaitChild` above answers `{ status, signal }` and is right for the two call sites that hand the
+ * terminal over with `stdio: 'inherit'` — there is nothing to collect. A probe is the opposite: its
+ * whole purpose is the output, so this collects the pipes before resolving.
+ *
+ * Both shapes are accepted for the same reason `awaitChild` accepts both: the fakes are synchronous
+ * and the runner's `spawn` (ARC-06-S03) is not. THAT is the defect this exists to close — ARC-09-S07
+ * fixed exactly this confusion at the two sites below, and the probe was the third and was missed.
+ * Handed a live `ChildProcess`, the old one interpolated a `Socket` into a template, compared
+ * `"[object Object]"` against /\badd\b/ and answered `false` before the child had run — so
+ * `mode live` could never reach the wizard on any machine, and only a human at a TTY could find it,
+ * because every machine path enters B06 through `--instance-file`.
+ */
+/**
+ * One failure line per probe class, each with a remedy somebody can act on.
+ *
+ * Only ABSENT gets `WIZARD_ABSENT` — the "re-bootstrap this build" sentence. Sending a user there
+ * for a spawn error or a crashed CLI is what this whole chore exists to stop.
+ */
+export function wizardProbeFailure(probe) {
+  switch (probe.klass) {
+    case WIZARD.SPAWN_ERROR:
+      return { status: 'fail', remedy: 'run ./snowarch mode live again',
+        detail: `the wizard probe could not be started (${probe.detail}) — the build was never asked` };
+    case WIZARD.SIGNAL:
+      return { status: 'fail', remedy: 'run ./snowarch mode live again, and report this if it repeats',
+        detail: `the wizard probe was killed by ${probe.signal} before it answered` };
+    case WIZARD.CRASHED:
+      return { status: 'fail', remedy: 'run: npm ci --omit=dev --ignore-scripts   (at the repository root)',
+        detail: `the wizard probe exited ${probe.status}: ${probe.detail || 'no output'}` };
+    default:
+      return { status: 'fail', detail: WIZARD_ABSENT, remedy: null };
+  }
+}
+
+export function awaitProbe(child) {
+  if (!child || typeof child.on !== 'function') {
+    // A synchronous result (spawnSync, or a test's fake). `error` is how spawnSync reports a spawn
+    // that never happened; it is not an exception.
+    return Promise.resolve({
+      status: child?.status ?? null, signal: child?.signal ?? null,
+      stdout: typeof child?.stdout === 'string' ? child.stdout : '',
+      stderr: typeof child?.stderr === 'string' ? child.stderr : '',
+      error: child?.error ?? null,
+    });
+  }
+  return new Promise((resolve) => {
+    let out = ''; let err = '';
+    child.stdout?.setEncoding?.('utf8');
+    child.stderr?.setEncoding?.('utf8');
+    child.stdout?.on?.('data', (c) => { out += c; });
+    child.stderr?.on?.('data', (c) => { err += c; });
+    child.on('error', (error) => resolve({ status: null, signal: null, stdout: out, stderr: err, error }));
+    child.on('close', (status, signal) => resolve({ status, signal, stdout: out, stderr: err, error: null }));
+  });
+}
+
+/** The first line a reader would want — the one that says why, not the stack that followed it. */
+export const firstLine = (text) => String(text ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
+
+/**
+ * Probe the built CLI and say WHICH way it failed, not merely that it did.
+ *
+ * The order matters: a spawn that never happened has no exit code to read, and a child killed by a
+ * signal has a null status that `!== 0` would call a crash. Only when the CLI actually ran and
+ * exited cleanly is the absence of `add` a statement about the build.
+ */
+export async function probeWizard(root, { run = spawnSync } = {}) {
   const cli = join(root, CLI);
-  if (!existsSync(cli)) return false;
-  const r = run(process.execPath, [cli, 'instance', '--help'],
-    { encoding: 'utf8', stdio: 'pipe', cwd: root, env: childEnv(root) });
-  return /\badd\b/.test(`${r.stdout ?? ''}${r.stderr ?? ''}`);
+  if (!existsSync(cli)) return { klass: WIZARD.ABSENT, status: null, signal: null, detail: `${CLI} is not in this checkout` };
+  const r = await awaitProbe(run(process.execPath, [cli, 'instance', '--help'],
+    { encoding: 'utf8', stdio: 'pipe', cwd: root, env: childEnv(root) }));
+
+  if (r.error) return { klass: WIZARD.SPAWN_ERROR, status: null, signal: null, detail: r.error.code || r.error.message };
+  if (r.signal) return { klass: WIZARD.SIGNAL, status: null, signal: r.signal, detail: r.signal };
+  if (r.status !== 0) {
+    return { klass: WIZARD.CRASHED, status: r.status, signal: null, detail: firstLine(r.stderr) || firstLine(r.stdout) };
+  }
+  if (/\badd\b/.test(`${r.stdout}${r.stderr}`)) return { klass: WIZARD.OK, status: 0, signal: null, detail: '' };
+  return { klass: WIZARD.ABSENT, status: 0, signal: null, detail: '' };
+}
+
+/** The boolean the step used to ask for. Kept because a probe that ran is still a yes/no question. */
+export async function wizardAvailable(root, opts = {}) {
+  return (await probeWizard(root, opts)).klass === WIZARD.OK;
 }
 
 /**
@@ -225,9 +316,10 @@ export const run = async (ctx) => {
   const interactive = ctx.isTTY ?? Boolean(process.stdin.isTTY);
   if (!interactive) return { status: 'fail', detail: NO_TERMINAL, remedy: null };
 
-  if (!wizardAvailable(ctx.root, ctx.spawn ? { run: ctx.spawn } : {})) {
-    return { status: 'fail', detail: WIZARD_ABSENT, remedy: null };
-  }
+  // The probe is CLASSIFIED (ARC-06-C5). A boolean here reported four different failures with one
+  // sentence, and the sentence named the only cause it had not checked.
+  const probe = await probeWizard(ctx.root, ctx.spawn ? { run: ctx.spawn } : {});
+  if (probe.klass !== WIZARD.OK) return wizardProbeFailure(probe);
 
   // The terminal is handed over wholesale: the wizard prints its own secret-free summary, and this
   // step deliberately learns nothing from it beyond the exit code and what the STORE says

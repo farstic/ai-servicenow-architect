@@ -39,7 +39,9 @@ export function doctorCounts(state, { root, run = spawnSync, hasDoctor = null } 
     { encoding: 'utf8', stdio: 'pipe', cwd: root, env: childEnv(root) });
     try {
       const parsed = JSON.parse(r.stdout ?? '{}');
-      if (parsed?.summary) return { ...parsed.summary, source: 'doctor' };
+      // The failing checks travel WITH the count. They were already in this JSON and were thrown
+      // away with it, which is how a `1 fail` reached a user with nothing to act on.
+      if (parsed?.summary) return { ...parsed.summary, source: 'doctor', failures: failureLines(parsed) };
     } catch { /* fall through to this run's own tally */ }
   }
   const counts = { ok: 0, warn: 0, fail: 0, source: 'bootstrap' };
@@ -78,6 +80,7 @@ export const run = async (ctx) => {
     platform: ctx.plat,
     env: ctx.env,
     warnings: warningsFrom(state),
+    failures: counts.failures ?? [],
   });
 
   // Design-only runs never reach B08, so the banner would have no cache at all on a first install.
@@ -109,6 +112,19 @@ function instanceFrom(state) {
   const i = state.steps?.B08?.data?.instance ?? state.instance ?? null;
   if (i?.label) return { label: i.label, environment: i.environment, preset: i.preset };
   return null;
+}
+
+/**
+ * `E-10 FAIL settings.local toggles match the recorded mode: mode is live but servicenow is disabled`
+ *
+ * The doctor's own renderer is not reachable from here (it formats a whole report), so this builds
+ * the one line a reader needs per failure: which check, and what it said.
+ */
+export function failureLines(parsed) {
+  return (parsed?.checks ?? [])
+    .filter((c) => c.status === 'fail')
+    .map((c) => `${c.id} FAIL ${c.title}${c.detail ? `: ${c.detail}` : ''}`
+      + (c.remedy ? ` — ${c.remedy}` : ''));
 }
 
 /** The cache's vocabulary is ok/warn/fail; the state also uses `failed` for an interrupt. */

@@ -43,7 +43,26 @@ test('the counts come from this run when no doctor exists, and from the doctor w
 
   const fromDoctor = doctorCounts(state, { root: '/repo', hasDoctor: true,
     run: () => ({ stdout: JSON.stringify({ summary: { ok: 41, warn: 0, fail: 0 } }) }) });
-  assert.deepEqual(fromDoctor, { ok: 41, warn: 0, fail: 0, source: 'doctor' });
+  assert.deepEqual(fromDoctor, { ok: 41, warn: 0, fail: 0, source: 'doctor', failures: [] });
+
+  // Sitting A — the FAILING CHECKS travel with the count. The summary printed `1 fail` and named
+  // nothing, and by the time anyone ran the full doctor the failure had gone: the only run that
+  // saw it is the only run that could have said what it was. They were already in this JSON.
+  const withFailure = doctorCounts(state, { root: '/repo', hasDoctor: true,
+    run: () => ({ stdout: JSON.stringify({
+      summary: { ok: 8, warn: 0, fail: 1 },
+      checks: [
+        { id: 'E-10', status: 'fail', title: 'settings.local toggles match the recorded mode',
+          detail: 'mode is live but servicenow is disabled', remedy: './snowarch doctor --fix' },
+        { id: 'SV-02', status: 'ok', title: 'store' },
+      ],
+    }) }) });
+  assert.deepEqual(withFailure.failures,
+    ['E-10 FAIL settings.local toggles match the recorded mode: mode is live but servicenow is '
+      + 'disabled — ./snowarch doctor --fix'],
+    'a count with nothing named is a number nobody can act on');
+  assert.equal(withFailure.failures.length, withFailure.fail,
+    'both directions: every counted failure is named, and nothing else is');
 
   // A doctor that answers nothing usable falls back rather than printing zeros.
   const unparsable = doctorCounts(state, { root: '/repo', hasDoctor: true,

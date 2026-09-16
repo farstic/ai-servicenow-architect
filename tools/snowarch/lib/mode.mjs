@@ -170,7 +170,13 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
     state,
     ...(readLabel === readDefaultLabel ? {} : { readLabel }),
   };
-  state.mode = mode;
+  // ARC-06-C7 — the REQUESTED mode is not recorded here. It used to be set before a single step
+  // ran and then persisted by the `saveState` below whatever the outcome, so a live switch that
+  // failed at B06 left `mode: live` recorded while B07 had never written the toggles: `./snowarch
+  // mode` said live, `settings.local.json` still disabled the server, and the doctor reported
+  // `E-10 FAIL … mode is live but servicenow is disabled`. The mode is now written by B07, the step
+  // that makes it true, so an interrupted switch leaves the previous mode and E-10 stays green.
+  // The steps are unaffected: they select on `ctx.mode` (the request), never on `state.mode`.
   state.node = node;
   state.engineVersion = version(root);
 

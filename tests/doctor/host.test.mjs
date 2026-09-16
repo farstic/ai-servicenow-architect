@@ -302,8 +302,29 @@ test('E-27 warns when the recorded mode is design-only but the server is not dis
   const r = await run('E-27', root, over);
   assert.equal(r.status, 'warn');
   assert.match(r.detail, /not disabled in Claude Code although the recorded mode is design-only/);
-  assert.equal(r.command, './snowarch mode design');
+  assert.equal(r.remedy, './snowarch mode design');
   assert.equal(r.data.approved, true);
+  // Sitting A: the remedy used to be duplicated into `command`, and the report prints both — so the
+  // same line arrived twice. One remedy, said once.
+  assert.equal(r.command, undefined, 'the remedy must not be printed twice');
+});
+
+test('E-27 — a LOCAL registration gets a remedy that can actually clear it', async (t) => {
+  // `./snowarch mode design` cannot help here: `--register` defaults to "unchanged", so the toggles
+  // are rewritten and the `claude mcp` entry that keeps the server visible is left exactly where it
+  // was. Sitting A hit this and followed the remedy twice with no effect.
+  const { root, over } = withClaude(t, { statusLine: CONNECTED, mode: 'design', scope: 'local' });
+  const r = await run('E-27', root, over);
+  assert.equal(r.status, 'warn');
+  assert.match(r.remedy, /--register project/, 'the scope must be changed, not just the toggles');
+  assert.match(r.remedy, /claude mcp remove/, '...and the direct alternative is named');
+  assert.equal(r.command, undefined);
+
+  // Both directions: a project registration keeps the plain remedy, which does work for it.
+  const project = withClaude(t, { statusLine: CONNECTED, mode: 'design', scope: 'project' });
+  const p = await run('E-27', project.root, project.over);
+  assert.equal(p.remedy, './snowarch mode design',
+    'a project registration must NOT be sent to --register project — it is already there');
 });
 
 test('E-27 treats pending approval in design-only as the toggle not being in force', async (t) => {

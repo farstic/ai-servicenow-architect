@@ -215,12 +215,17 @@ export function hostChecks() {
         // that record also found that `enabledMcpjsonServers` is not honoured before trust, so a
         // pending status in design-only means the disable toggle is not in force.
         if (!live && kind !== 'rejected') {
+          // Sitting A: the remedy used to be `./snowarch mode design` whatever the registration was,
+          // printed twice because `remedy` and `command` carried the same string. For a LOCAL
+          // registration it cannot work: `--register` defaults to "unchanged", so `mode design`
+          // rewrites the toggles and leaves the `claude mcp` entry exactly where it was — the very
+          // entry that keeps the server visible. The scope decides the sentence, and it is said once.
+          const remedy = entry.scope === 'local'
+            ? './snowarch mode design --register project   (or: claude mcp remove '
+              + `${serverKey} -s local)`
+            : './snowarch mode design';
           return warn('server is not disabled in Claude Code although the recorded mode is '
-            + 'design-only', {
-            remedy: './snowarch mode design',
-            command: './snowarch mode design',
-            data,
-          });
+            + 'design-only', { remedy, data });
         }
         if (live && approved !== true) {
           return warn(`server is ${kind === 'rejected' ? 'rejected' : 'unapproved'} in Claude Code `

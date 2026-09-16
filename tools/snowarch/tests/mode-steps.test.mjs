@@ -45,7 +45,16 @@ test('criterion 1 — a live switch caches B01–B03 and runs B04 onwards', asyn
   const root = makeCheckout();
   const ran = [];
   const registry = STEPS.map((s) => stub(s.id, {
-    runsWhen: () => true, inputs: () => [], onRun: async () => { ran.push(s.id); return { status: 'ok' }; },
+    runsWhen: () => true,
+    inputs: () => [],
+    // ARC-06-C7 — B07 is the step that records the mode, so its stub records it too. Before that
+    // ruling `mode.mjs` wrote the mode before any step ran, and this assertion passed whether or
+    // not the switch had actually happened; now it means what it says.
+    onRun: async (ctx) => {
+      ran.push(s.id);
+      if (s.id === 'B07') ctx.state.mode = ctx.mode;
+      return { status: 'ok' };
+    },
   }));
   // B01–B03 have a recorded `ok` whose hash still matches, so the runner stands on them. That is
   // the runner's rule, exercised here rather than restated.
