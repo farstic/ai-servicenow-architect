@@ -207,6 +207,13 @@ gateway as a deferred, conditional step pending the parent table. The baseline c
 fire on a scoped-prefix escalation prompt where it fired on 2026-09-09) needs its own investigation
 before any ruling.
 
+> **Closed 2026-09-17 — ARC-02-C3.** The cause was the instruction, not the engine: both trigger
+> tables are keyword lists and this prompt matches no ITSM keyword in either, and nothing forbade
+> deferring the gateway until a parent table was named. `CLAUDE.md` Step 5 and `taxonomy.md` §6.1
+> step 7 now say the table is a trigger rather than a definition and that a deferred gateway is one
+> that did not fire; both signals are T-10 fail signals. rc.2 already passed T-10 three of three
+> (`2026-09-13-design-only.md`), so this repairs the reading that was permitted, not a live failure.
+
 ## T-13 PASS (n turns), single turn, Phase 2 criteria unverified
 
 Turns 20, tool calls 18, servicenow MCP calls 0. `Write` was in `--allowedTools` for this test, but

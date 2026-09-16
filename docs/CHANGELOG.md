@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The domain specialist can no longer be put off until later.** The keyword tables that say when
+  a domain expert is consulted read as though a request had to use one of the listed words, and as
+  though the consult could wait for a detail the request had not given yet. Both are closed: the
+  expert is consulted because the work is in their domain, and "once we know X" is not a consult.
+
 - **A test fixture left behind now says why.** When the suite could not delete one of its temporary
   directories it reported the directory and nothing else, twice, while the reason — the operating
   system's own error — had already been printed and discarded. It travels with the report now.
