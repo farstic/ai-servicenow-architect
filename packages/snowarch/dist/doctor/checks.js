@@ -9,6 +9,7 @@
 import { createHash } from 'node:crypto';
 import { accessSync, constants, existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, parse, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
 import { instanceManager } from '../servicenow/instances.js';
@@ -510,10 +511,24 @@ export const svAudit = {
  * the S-13 addendum. Kept as a separate exported function so ARC-08 can re-home this check as
  * an engine check without moving the walk.
  */
-export function pollutingAncestors(dir) {
+export function pollutingAncestors(dir, home = homedir()) {
     const found = [];
+    const stop = resolve(home);
     let cur = resolve(dir);
     for (;;) {
+        // THE HOME DIRECTORY IS NOT AN ANCESTOR PROJECT. `~/.claude/skills` is the USER scope, and
+        // Claude Code loads it once, in its own bucket. Measured on 2.1.258 on the sitting checkout:
+        //
+        //   Loading skills from: managed=…, user=~/.claude/skills, project=[<checkout>/.claude/skills]
+        //
+        // `project=[…]` names only the checkout. Counting the home directory as a project ancestor made
+        // this check warn on every checkout on earth and then offer a remedy — "move the checkout out
+        // from under those directories" — that nobody can follow, because every checkout is under a
+        // home. S-13, which this walk was ported from, measured the doubling with a decoy in a real
+        // ancestor PROJECT and a scratch directory that was not under the home; the home case was never
+        // measured, and the generalisation was wrong.
+        if (cur === stop)
+            break;
         if (existsSync(join(cur, '.claude', 'skills')))
             found.push(cur);
         const up = dirname(cur);
@@ -536,7 +551,7 @@ export const svAncestorSkills = {
         return ancestors.length === 0
             ? ok('SV-08', 'ancestor skill directories', 'no .claude/skills above the checkout')
             : warn('SV-08', 'ancestor skill directories', `skills are also loaded from: ${ancestors.map((p) => maskPath(p)).join(', ')} — `
-                + 'the roster is larger than this repository defines and the listing budget is spent twice', 'move the checkout out from under those directories, or disable their skills with /skills');
+                + 'the roster is larger than this repository defines and the listing budget is spent twice', 'disable their skills with /skills, or move the checkout out from under them');
     },
 };
 // ─── SV-09 — the store's schema version ──────────────────────────────────────

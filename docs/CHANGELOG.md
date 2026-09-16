@@ -235,6 +235,28 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Live mode works again.** Switching a checkout to live with `./snowarch mode live` always
+  stopped with "instance wizard not available in this build", on every machine, however healthy
+  the build was — the check that looks for the wizard was asking the question and reading the
+  answer before it arrived. It asks properly now, and when something really is wrong it says
+  which thing: the wizard could not be started, it exited with an error (and the error), or it
+  was killed — instead of one sentence blaming the build.
+- **A switch that fails no longer claims it worked.** If anything went wrong partway through
+  `mode live`, the checkout still reported `Mode: live` afterwards while the settings said
+  otherwise, and the doctor flagged the contradiction. The mode is now written only once the
+  step that makes it true has run, so an interrupted switch simply leaves you where you were.
+- **The bootstrap summary says what failed.** It used to print a count — `1 fail` — and nothing
+  else, so by the time you looked, the failure was gone and unknowable. Every failure is now
+  printed in full, with its remedy, underneath the count.
+- **The doctor's registration advice fits your registration.** When the server was registered
+  locally, the fix it offered could not have helped and was printed twice. It now names the
+  command that matches how the server is registered, once.
+- **No more "move your checkout out of your home directory."** The doctor warned that skills
+  were being loaded from your home as well, and suggested moving the checkout somewhere that
+  does not exist for most people. Your home directory holds your personal skills, which Claude
+  Code loads once and on purpose; it is not a second copy of this project's roster. The warning
+  now fires only for a genuine project directory above the checkout.
+
 - **Three of the checks that guard releases and installs were watching the wrong thing.** One
   rehearsed a Windows release in an environment Windows users may not have, and so never
   answered the question it was asked — it does now, and the answer is that the release works
