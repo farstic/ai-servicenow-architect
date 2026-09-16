@@ -12,7 +12,7 @@ read-only throughout.
 |---|---|
 | `LICENSE` | The canonical Apache License 2.0 text, unmodified. Provenance in §1. |
 | `NOTICE` | The agreed attribution text, byte-identical to the story's design-note block. |
-| `RELICENSING.md` | The commit-message sentence, both `git shortlog`s, and the second-contributor Resolution section with (a)/(b) both `PENDING OWNER`. |
+| `RELICENSING.md` | The commit-message sentence, both `git shortlog`s, and the second-contributor Resolution section — **resolved 2026-09-07 as (a), written consent; (b) withdrawn**. |
 | `header-sweep.txt` | Every pre-Apache licence assertion in both source trees, one action per line, cross-checked against ARC-01's deletion scope. |
 
 ---

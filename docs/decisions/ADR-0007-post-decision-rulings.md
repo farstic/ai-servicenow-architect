@@ -10,7 +10,7 @@
 | **Title** | Post-decision rulings: Q-A, Q-B, R-1, R-2, R-3 and R-4 |
 | **Status** | Accepted |
 | **Date** | 2026-09-06 (recorded) · decision taken 2026-09-04 |
-| **Decision owner** | Cvetomir Grigorov (owner) — initials `PENDING OWNER`, decision taken 2026-09-04 |
+| **Decision owner** | Cvetomir Grigorov (owner) — initials `CG, 2026-09-16`, decision taken 2026-09-04 |
 | **Engagement** | AI ServiceNow Architect — product |
 | **Release family** | Australia (docs corpus) |
 | **§1.1 relevance** | None |
