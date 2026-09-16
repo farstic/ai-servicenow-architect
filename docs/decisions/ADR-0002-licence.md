@@ -10,7 +10,7 @@
 | **Title** | Licence of the unified repository and relicensing of both predecessors |
 | **Status** | **Accepted** (2026-09-07) — both owner-gated items landed: the owner's relicensing confirmation and the second contributor's written consent |
 | **Date** | 2026-09-06 (recorded) · decision taken 2026-09-04 |
-| **Decision owner** | Cvetomir Grigorov (owner) — initials `PENDING OWNER`, decision taken 2026-09-04 |
+| **Decision owner** | Cvetomir Grigorov (owner) — initials `CG, 2026-09-16`, decision taken 2026-09-04 |
 | **Engagement** | AI ServiceNow Architect — product |
 | **Release family** | Australia (docs corpus) |
 | **§1.1 relevance** | None |

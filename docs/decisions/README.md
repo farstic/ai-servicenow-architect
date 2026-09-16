@@ -8,9 +8,29 @@ folder into `farstic/ai-servicenow-architect` as `docs/decisions/` as-is — the
 level (ARC-00 `STORIES.md` conventions: "ARC-01 imports `spikes/` into the new repository as `docs/spikes/`
 and `docs/decisions/` as-is") and **no ARC-01 story currently owns it**; see §4.5.
 
-**Status: PARTIAL.** **Seven** ADRs are Accepted (ADR-0002 and ADR-0008 both moved on 2026-09-07); ADR-0006 remains Proposed
-by design until ARC-00-S12's S-14 verdict; the owner's initials are `PENDING OWNER` on all seven.
-Details in §3.
+**Status: COMPLETE.** **Nine** ADRs, all Accepted: ADR-0001 to ADR-0007 and ADR-0009 (Accepted
+2026-09-08, the owner ratifying it by merging ARC-05-S11), plus ADR-0008 (2026-09-07, option A).
+ADR-0006 moved to Accepted on 2026-09-08 — *"monorepo path confirmed"* — when ARC-00-S12's S-14
+verdict arrived. **The owner's initials landed on 2026-09-16 (`CG`)** on the eight that carry a
+Decision-owner cell. Details in §3.
+
+*This file is an INDEX, and an index is an instruction: it said "Seven … ADR-0006 remains Proposed …
+initials PENDING OWNER on all seven" for eight days after each of those stopped being true, and a
+reader who trusted it would have gone looking for a decision that was already made.*
+
+**Three notes the ADRs cannot carry themselves** — an Accepted ADR is immutable, so what has moved
+since is recorded here rather than by editing them:
+
+1. **ADR-0006's follow-up points at a file that means something else.** It says a re-opened channel
+   decision "writes ADR-0008 superseding it". That ADR was never needed, and the number went to the
+   **git floor** decision instead. A reader following the reference lands on the wrong file; a
+   re-opened channel decision would take the next free number.
+2. **ADR-0001's `docs.pin` is a starting value, not the value in force.** It records
+   `ba513f2…`; the pin is data owned by ARC-03 — ADR-0001 says so itself — and the value in force is
+   whatever `engine.config.json` carries. It was moved to `11b39be…` by ARC-03's own row.
+3. **ADR-0005 names the six flags by the plan's short names** (`WRITE`, `CMDB_WRITE`, …). The names
+   in force are the contract's: `WRITE_ENABLED`, `CMDB_WRITE_ENABLED`, `SCRIPTING_ENABLED`,
+   `ATF_ENABLED`, `NOW_ASSIST_ENABLED`, `FLUENT_ENABLED`.
 
 | ADR | Records | Status |
 |---|---|---|
@@ -57,6 +77,11 @@ ServiceNow Architect — product", `Release family` = "Australia (docs corpus)",
 
 ## 2. Acceptance criteria
 
+*A record of what was true when this story was accepted (2026-09-06), kept in its original tense.
+Statuses have moved since — see the head of this file for where they stand now. Nothing below is a
+statement about the tree today.*
+
+
 | # | Criterion | Status |
 |---|---|---|
 | 1 | Seven files; 0001–0005 and 0007 `Accepted`, 0006 `Proposed` with a *Follow-ups* line naming S12 before ARC-06-S01 | **MET, with one intended exception** — ADR-0002 is `Proposed`, not `Accepted`, on the architect's instruction of 2026-09-06 (its owner-confirmation and (a)/(b) fields are `PENDING OWNER`). ADR-0006 is `Proposed` as required. |
@@ -72,9 +97,9 @@ ServiceNow Architect — product", `Release family` = "Australia (docs corpus)",
 
 | Item | Where | Why |
 |---|---|---|
-| **Owner initials** | the `Decision owner` row of all seven ADRs — `initials PENDING OWNER` | Initials are a signature. The decisions themselves are quoted from the owner's own recorded rulings, so the *substance* is evidenced; the initialling is an owner action, like ARC-00-S02's confirmation line. |
+| *(resolved 2026-09-16)* **Owner initials** | the `Decision owner` row of the eight ADRs — now `initials CG, 2026-09-16` | Initials are a signature. The decisions themselves are quoted from the owner's own recorded rulings, so the *substance* is evidenced; the initialling is an owner action, like ARC-00-S02's confirmation line. |
 | *(resolved 2026-09-07)* **ADR-0002 → Accepted** | its `Status` row | Both owner-gated items landed on 2026-09-07: the owner's relicensing confirmation (`695167a`) and the contributor's own consent (`3611587`). ADR-0002 is **Accepted**; ARC-01-S02 may import the 138 files of `5b40835`. |
-| **ADR-0006 → Accepted or superseded** | its `Status` row | Waits on ARC-00-S12's S-14 verdict; it is an entry gate for ARC-06-S01 (the D-06 hedge). |
+| *(resolved 2026-09-08)* **ADR-0006 → Accepted** | its `Status` row | ARC-00-S12's S-14 verdict arrived and the status reads *"Accepted (2026-09-08) — monorepo path confirmed."* It was an entry gate for ARC-06-S01 (the D-06 hedge), and the gate opened before that story started. |
 | *(resolved 2026-09-06)* **`floors.claudeCode`** | `spikes/engine.config.seed.json` | Previously the literal `pending S-11`. The architect ruled that the floor is decided at **2.1.214** (`01` §4/§12, DR-11), S-11 confirms it, and a FAILED S-11 changes it by superseding ADR-0001 rather than by leaving a blank. The seed now carries `2.1.214`. |
 
 ---

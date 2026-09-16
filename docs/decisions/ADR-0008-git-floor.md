@@ -10,7 +10,7 @@
 | **Title** | Git floor, and the sparse-checkout repair that keeps it low |
 | **Status** | **Accepted (2026-09-07, option A)** — supersedes the `floors.git` row of **ADR-0001** only. Every other value in ADR-0001 stands unchanged. The `--cone` reproduction and the repair step were independently reproduced by the architect on the same VM before acceptance. |
 | **Date** | 2026-09-07 |
-| **Decision owner** | Cvetomir Grigorov (owner) — initials `PENDING OWNER` |
+| **Decision owner** | Cvetomir Grigorov (owner) — initials `CG, 2026-09-16` |
 | **Engagement** | AI ServiceNow Architect — product |
 | **Release family** | Australia (docs corpus) |
 | **§1.1 relevance** | None |

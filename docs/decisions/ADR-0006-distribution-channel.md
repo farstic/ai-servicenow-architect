@@ -10,7 +10,7 @@
 | **Title** | Distribution channel: monorepo and bootstrap for the first release, plugin channel spiked in parallel |
 | **Status** | **Accepted (2026-09-08) — "monorepo path confirmed."** ARC-00-S12's spikes settled the D-06 hedge against the plugin channel for the first release; the evidence is in `03` §F and summarised below. Not superseded. |
 | **Date** | 2026-09-06 (recorded) · decision taken 2026-09-04 · **accepted 2026-09-08** |
-| **Decision owner** | Cvetomir Grigorov (owner) — initials `PENDING OWNER`, decision taken 2026-09-04 |
+| **Decision owner** | Cvetomir Grigorov (owner) — initials `CG, 2026-09-16`, decision taken 2026-09-04 |
 | **Engagement** | AI ServiceNow Architect — product |
 | **Release family** | Australia (docs corpus) |
 | **§1.1 relevance** | None |
