@@ -11,7 +11,6 @@ import { contractSha, version as engineVersion } from '../config.mjs';
 import { writeDoctorCache } from '../doctor-cache.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { EXPECTED_DIALOGS, summaryBlock } from '../text.mjs';
-import { which } from '../which.mjs';
 
 export const id = 'B09';
 export const title = 'summary';
@@ -32,7 +31,18 @@ export const DESIGN_CACHE_STEPS = Object.freeze(['B01', 'B02', 'B05', 'B07']);
  * replaced the moment there is something better to ask.
  */
 export function doctorCounts(state, { root, run = spawnSync, hasDoctor = null } = {}) {
-  const available = hasDoctor ?? Boolean(which('snowarch', { env: process.env }));
+  // ARC-08 (Sitting A) — GATE ON WHAT THE SPAWN NEEDS, which is the launcher in THIS checkout.
+  //
+  // This used to ask `which('snowarch')` — whether the command is on PATH — while the spawn below
+  // runs `<root>/tools/snowarch/bin/snowarch.mjs` by absolute path and needs nothing on PATH at all.
+  // Nobody installs `snowarch` globally to use a checkout, so the gate was false in normal use, the
+  // doctor was never asked, and the fallback tally printed instead — under a line that says DOCTOR.
+  //
+  // That tally counts `state.steps`, which PERSISTS between runs. So a step that failed in an
+  // earlier run was reported by a later, successful one: Sitting A saw `mode design` succeed and
+  // print `1 fail`, and that failure was B06's from the `mode live` before it. The standalone
+  // doctor disagreed because it was the only one of the two actually running checks.
+  const available = hasDoctor ?? existsSync(join(root, 'tools', 'snowarch', 'bin', 'snowarch.mjs'));
   if (available) {
     const r = run(process.execPath, [join(root, 'tools/snowarch/bin/snowarch.mjs'),
       'doctor', '--quick', '--json'],

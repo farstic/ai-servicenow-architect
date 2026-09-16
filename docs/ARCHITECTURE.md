@@ -1396,7 +1396,8 @@ consumer must not have to ask which version of the doctor produced its input.
     "warn": 1,
     "fail": 1,
     "skip": 0,
-    "fixable": 2
+    "fixable": 2,
+    "notInSection": 0
   }
 }
 ```

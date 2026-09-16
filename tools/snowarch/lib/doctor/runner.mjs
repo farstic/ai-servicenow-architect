@@ -119,9 +119,12 @@ export function applyContractRemedy(result, contract) {
 /** Tally, in the order a reader counts them. `fixable` counts results, not checks. */
 export function summarise(results, checks) {
   const byId = new Map(checks.map((c) => [c.id, c]));
-  const summary = { ok: 0, warn: 0, fail: 0, skip: 0, fixable: 0 };
+  const summary = { ok: 0, warn: 0, fail: 0, skip: 0, fixable: 0, notInSection: 0 };
   for (const r of results) {
     summary[r.status] = (summary[r.status] ?? 0) + 1;
+    // A SUBSET of `skip`, never an addition to it. `summariseMerged` is what reaches the report;
+    // this one is kept in step with it so the two summarisers cannot disagree about one run.
+    if (r.status === 'skip' && r.detail === 'not in --section') summary.notInSection += 1;
     const fixable = r.fixable ?? byId.get(r.id)?.fixable ?? false;
     if (fixable && (r.status === 'fail' || r.status === 'warn')) summary.fixable += 1;
   }

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { createRegistry, defineCheck, SECTIONS } from '../../tools/snowarch/lib/doctor/registry.mjs';
 import { applyContractRemedy, planRun, runChecks, summarise } from '../../tools/snowarch/lib/doctor/runner.mjs';
+import { summariseMerged } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
 import { buildReport, SCHEMA_KEYS, validateReport } from '../../tools/snowarch/lib/doctor/report-json.mjs';
 import {
   headerLine, renderText, statusLabel, summaryLine, useColour,
@@ -255,4 +256,40 @@ test('the prereqs object answers the six fields ARC-07-S09 branches on', (t) => 
   assert.ok(SHELLS.includes(guessShell({ platform: 'win32', env: {} })));
   assert.equal(guessShell({ platform: 'win32', env: { PSModulePath: 'x' } }), 'powershell');
   assert.equal(guessShell({ platform: 'linux', exec: () => { throw new Error('no ps'); } }), 'unknown');
+});
+
+/**
+ * ARC-08 (Sitting A) — `--section host` printed 39 lines for 2 results.
+ *
+ * Thirty-seven of them said `skip … not in --section`, which is not a finding about the machine —
+ * it is a restatement of the flag the reader just typed, and it buried the two lines that were
+ * findings. The count stays in the summary, so nothing is hidden; it is only un-listed.
+ */
+test('ARC-08 — with --section, out-of-section checks are counted but not listed', () => {
+  const results = [
+    { id: 'E-25', status: 'ok', detail: 'not under a cloud-sync folder', section: 'host' },
+    { id: 'E-26', status: 'ok', detail: 'no proxy configured', section: 'host' },
+    { id: 'E-28', status: 'skip', detail: 'origin advertises no release tags', section: 'host' },
+    { id: 'E-01', status: 'skip', detail: 'not in --section', section: 'prereqs' },
+    { id: 'E-02', status: 'skip', detail: 'not in --section', section: 'prereqs' },
+  ];
+  const summary = summariseMerged(results, []);
+  assert.equal(summary.skip, 3, 'all three skips are still counted');
+  assert.equal(summary.notInSection, 2, '...and the out-of-section ones are counted separately');
+
+  const line = summaryLine(summary);
+  assert.match(line, /1 skipped/, 'a genuine skip — the machine could not answer — is still a skip');
+  assert.match(line, /2 not in section/, '...and "you did not ask" is named as what it is');
+
+  const text = renderText({ report: { checks: results, summary, version: '0', ranAt: '2026-01-01' }, checks: [] });
+  assert.match(text, /E-25/, 'the section asked for is listed');
+  assert.match(text, /E-28/, '...including its genuine skip, which IS about this checkout');
+  assert.doesNotMatch(text, /E-01/, 'an out-of-section check must not be listed as a finding');
+  assert.doesNotMatch(text, /not in --section/, '...and its reason must not appear 37 times');
+
+  // Both directions: with no --section, nothing is filtered and the old wording is unchanged.
+  const plain = summariseMerged(results.slice(0, 3), []);
+  assert.equal(plain.notInSection, 0);
+  assert.match(summaryLine(plain), /1 skipped/);
+  assert.doesNotMatch(summaryLine(plain), /not in section/);
 });

@@ -235,6 +235,17 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The install summary no longer reports a failure that already happened.** After a mode switch it
+  could print `1 fail` even when the switch had just succeeded — the failure being counted was left
+  over from an earlier run, and the health check it claimed to be quoting had never been asked. It
+  asks properly now, and agrees with what `./snowarch doctor` tells you.
+- **One answer to "I have no instance yet."** The doctor and the installer used to suggest two
+  different commands for the same situation. Both worked, which only made it harder to know which
+  one was the path: it is `./snowarch mode live`, and everything that offers it now says the same.
+- **`--section` shows you the section you asked for.** `./snowarch doctor --section host` printed
+  39 lines to tell you 2 things, the rest being "this check is not in the section you chose". The
+  checks you did not ask for are now counted in the summary instead of listed one by one.
+
 - **Live mode works again.** Switching a checkout to live with `./snowarch mode live` always
   stopped with "instance wizard not available in this build", on every machine, however healthy
   the build was — the check that looks for the wizard was asking the question and reading the

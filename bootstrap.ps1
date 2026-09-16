@@ -23,7 +23,7 @@ $MSG_DOCTOR = 'DOCTOR: unavailable until Node 20+ is installed (design-only is c
 $MSG_MODE = 'Mode: design-only'
 $MSG_NEXT = 'Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.
       (If you are already inside Claude Code in this folder: exit it and start `claude` again.)
-      Add a live instance later with snowarch.cmd mode live, or /snowarch setup-instance inside Claude.'
+      Add a live instance later: run snowarch.cmd mode live, or /snowarch setup-instance inside Claude.'
 $MSG_CITATIONS = 'citations: not verified until Node 20+ is installed'
 # text-end
 

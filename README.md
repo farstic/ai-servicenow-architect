@@ -81,7 +81,7 @@ DOCTOR: unavailable until Node 20+ is installed (design-only is complete)
 Mode: design-only
 Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.
       (If you are already inside Claude Code in this folder: exit it and start `claude` again.)
-      Add a live instance later with ./snowarch mode live, or /snowarch setup-instance inside Claude.
+      Add a live instance later: run ./snowarch mode live, or /snowarch setup-instance inside Claude.
 ```
 <!-- /generated:closing-block -->
 

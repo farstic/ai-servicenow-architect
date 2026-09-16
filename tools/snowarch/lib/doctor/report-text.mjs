@@ -50,9 +50,18 @@ export function headerLine({ version, ranAt, options = {} }) {
  * doctor report that disagree about the same run are two numbers a reader has to reconcile.
  * `renderSummaryLine` is the alias B09 imports, so the two names say who is calling.
  */
+/** The runner's wording for a check the `--section` flag excluded (`doctor/runner.mjs`). */
+export const NOT_IN_SECTION = 'not in --section';
+
 export function summaryLine(summary) {
   const parts = [`${summary.ok} ok`, `${summary.warn} warn`, `${summary.fail} fail`];
-  if (summary.skip > 0) parts.push(`${summary.skip} skipped`);
+  // `--section` splits the skipped count in two, because the two mean different things: "this
+  // checkout could not answer" and "you did not ask". Only the first is about the machine.
+  if (summary.notInSection > 0) {
+    const rest = summary.skip - summary.notInSection;
+    if (rest > 0) parts.push(`${rest} skipped`);
+    parts.push(`${summary.notInSection} not in section`);
+  } else if (summary.skip > 0) parts.push(`${summary.skip} skipped`);
   const fixable = summary.fixable > 0
     ? ` (${summary.fixable} fixable — run ./snowarch doctor --fix)`
     : '';
@@ -105,8 +114,18 @@ export function renderText({ report, checks = [], colour = false }) {
   const idWidth = Math.max(0, ...report.checks.map((c) => String(c.id).length));
   const lines = [headerLine(report), ''];
 
+  // ARC-08 (Sitting A) — with `--section`, the checks that are not in it are NOT listed.
+  //
+  // `./snowarch doctor --section host` printed 39 lines for 2 results: 37 of them said
+  // `skip … not in --section`, which is not a finding about the machine, it is a restatement of the
+  // flag the reader just typed. The count stays in the summary, where a number belongs, so nothing
+  // is hidden — only un-listed. Every other skip reason (`--quick`, design-only, and the rest) is a
+  // fact about this checkout and is still shown.
+  const listed = report.checks.filter((c) => c.detail !== NOT_IN_SECTION);
+  const outOfSection = report.checks.length - listed.length;
+
   for (const section of SECTIONS) {
-    const inSection = report.checks.filter((c) => (c.section ?? byId.get(c.id)?.section) === section);
+    const inSection = listed.filter((c) => (c.section ?? byId.get(c.id)?.section) === section);
     if (inSection.length === 0) continue;
     // A section every one of whose checks skipped for the SAME reason says the reason in its
     // header. The one that matters is design-only: `npm ci` never runs there, so nine `skip` lines

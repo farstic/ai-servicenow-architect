@@ -49,9 +49,23 @@ export function spellings(where = {}) {
  * answered in words, and the rule file's promise — that the Mode line is authoritative — is only
  * true while there is one of it. ARC-08-S05's derivation picks a key; this renders it.
  */
+/**
+ * ARC-05-S06 criterion 3 — ONE remedy for "there is no instance yet", wherever it is offered.
+ *
+ * Sitting A found two, for the same state, in the same run: the doctor's Mode line said
+ * `./snowarch instance add`, and the bootstrap's Next block said `./snowarch mode live`. Both work,
+ * which is what makes two of them worse than one wrong one — a reader has to decide which is THE
+ * path, and the criterion exists so nobody has to.
+ *
+ * `mode live` is the one, because it is the documented path and it runs the wizard as B06 with the
+ * rest of the switch around it; `instance add` is the wizard alone, and a user who runs it is one
+ * step into a live mode the toggles do not yet reflect.
+ */
+export const ADD_INSTANCE = (cli = './snowarch') =>
+  `${cli} mode live, or /snowarch setup-instance inside Claude`;
+
 export const MODE_VARIANTS = Object.freeze({
-  unconfigured: 'no ServiceNow instance configured; run ./snowarch instance add or '
-    + '/snowarch setup-instance to add one',
+  unconfigured: `no ServiceNow instance configured; run ${ADD_INSTANCE()}`,
   serverDisabled: (label) => `server disabled in .claude/settings.local.json although instance `
     + `"${label}" is configured; run ./snowarch mode live`,
   noInstanceLoaded: 'server enabled but no instance is loaded (see SV-02/SV-03); run '
@@ -186,8 +200,7 @@ export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, platfor
   lines.push(mode === 'live'
     ? `      In Claude, /mcp should show: ${serverKey} ✔ connected · /snowarch status quotes the `
       + 'Mode line above.'
-    : `      Add a live instance later with ${s.cli} mode live, or /snowarch setup-instance `
-      + 'inside Claude.');
+    : `      Add a live instance later: run ${ADD_INSTANCE(s.cli)}.`);
   return lines.join('\n');
 }
 
