@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   CORPUS_DIR, EXIT, RETRY_WAITS_MS, SyncError, blockingSleep, inspect, retryLine, retryPlan,
-  syncCorpus, transientReason,
+  stopSuffix, syncCorpus, transientReason,
 } from '../tools/snowarch/lib/docs/sync.mjs';
 import { buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
 
@@ -138,13 +138,23 @@ function fakeGit(dir, { verb, fail, stderr }) {
   const counter = join(dir, 'count');
   writeFileSync(counter, '0');
   const real = execFileSync('/usr/bin/env', ['sh', '-c', 'command -v git'], { encoding: 'utf8' }).trim();
+  // `stderr` is ONE string replayed for every failure, or a LIST — one per attempt, so a failure
+  // can CHANGE CLASS partway through. The list is what ARC-03-C3 needed and what this harness could
+  // not express: it took a single string, so the one sequence that fired in production (transient,
+  // then permanent) was the one sequence no test here could run. A list shorter than `fail` repeats
+  // its last entry, which keeps every existing caller's meaning unchanged.
+  const lines = Array.isArray(stderr) ? stderr : [stderr];
+  const fails = fail ?? lines.length;
+  const cases = lines
+    .map((line, i) => `      if [ "$n" = "${i}" ] ; then echo "${line}" >&2 ; fi`).join('\n');
   writeFileSync(join(dir, 'git'), `#!/bin/sh
 for a in "$@" ; do
   if [ "$a" = "${verb}" ] ; then
     n=$(cat "${counter}")
-    if [ "$n" -lt "${fail}" ] ; then
+    if [ "$n" -lt "${fails}" ] ; then
       echo $((n + 1)) > "${counter}"
-      echo "${stderr}" >&2
+${cases}
+      if [ "$n" -ge "${lines.length}" ] ; then echo "${lines[lines.length - 1]}" >&2 ; fi
       exit 128
     fi
   fi
@@ -230,6 +240,79 @@ test('AC 3 — a permanent failure is not retried at all', posixOnly, () => {
   assert.equal(fake.read(), 1, 'a permanent failure was tried more than once');
   assert.deepEqual(slept, [], 'it waited for a failure that will never change');
   assert.doesNotMatch(err.message, /attempts/, 'a single attempt must not report a count');
+});
+
+/**
+ * ARC-03-C3 — the two ways a retry can END, told apart.
+ *
+ * WHAT HAPPENED: `release-dryrun (macos-latest)` on #183 printed
+ *
+ *   [docs] corpus: transient (curl 56) during checkout, attempt 2 of 3 in 3 s
+ *   cannot reach github.com (DNS) — check your network and re-run (2 attempts)
+ *
+ * which reads as a third attempt promised and never made. It was never owed: attempt 1 was
+ * transient, so "of 3" was true when it was printed, and attempt 2 was `Could not resolve host`,
+ * which is not retried at all. `plan === null` meant BOTH "the schedule ran out" and "this class
+ * will never change", and one suffix spoke for both.
+ *
+ * Why the suite missed it: every test above drives ONE class. The permanent case starts permanent,
+ * the exhaustion case stays transient, and the harness took a single `stderr`. Nothing could make a
+ * failure change class between attempts, so the one sequence that fired in production was the one
+ * sequence no test could run — the gap was in the harness, not in somebody's attention.
+ */
+test('ARC-03-C3 — the suffix says which way the retrying ended, both directions', () => {
+  // A single attempt reports no count at all: a count of one is noise, and the suffix exists to say
+  // that retries HAPPENED. This is the case the old code got right, and it is why the bug hid.
+  assert.equal(stopSuffix('fatal: unable to access: Could not resolve host: github.com', 1), '');
+  assert.equal(stopSuffix('error: RPC failed; HTTP 503', 1), '');
+
+  // EXHAUSTED — still transient on the last attempt, so the schedule genuinely ran out. Unchanged
+  // wording: `tests/docs-retry.test.mjs` and the operator's logs both already read this one.
+  assert.equal(stopSuffix('error: RPC failed; HTTP 503 curl 22', 3), ' (3 attempts)');
+
+  // STOPPED — the class turned permanent partway through. This is the line that was wrong.
+  assert.equal(stopSuffix('fatal: unable to access: Could not resolve host: github.com', 2),
+    ' (stopped after 2 attempts — this failure is not retried)');
+
+  // Both directions on the one thing a reader could confuse: the stopped form must not also read
+  // as the exhausted one, or the fix would be a longer sentence saying the same wrong thing.
+  assert.doesNotMatch(stopSuffix('fatal: Authentication failed', 2), /^ \(2 attempts\)$/);
+});
+
+test('ARC-03-C3 — a failure that CHANGES CLASS says it stopped, not that it ran out', posixOnly, () => {
+  const w = makeWorkspace({ scratch, pin: upstream.pin, upstreamUrl });
+  const bin = join(scratch, 'fake-bin-classchange');
+  const fake = fakeGit(bin, {
+    verb: 'clone',
+    stderr: [
+      'error: RPC failed; curl 56 Recv failure: Connection reset by peer', // transient — retried
+      'fatal: unable to access: Could not resolve host: github.com',       // permanent — stops here
+    ],
+  });
+  const saved = process.env.PATH;
+  const slept = [];
+  const said = [];
+  let err = null;
+  try {
+    process.env.PATH = `${bin}:${saved}`;
+    syncCorpus({ ...w, log: (m) => said.push(m), sleep: (ms) => slept.push(ms) });
+  } catch (e) { err = e; } finally { process.env.PATH = saved; }
+
+  assert.ok(err instanceof SyncError, `expected SyncError, got ${err}`);
+  assert.equal(fake.read(), 2, 'it did not stop on the attempt that turned permanent');
+  assert.deepEqual(slept, [3000], 'it waited once, for the transient failure, and not again');
+
+  // The class really did change, and this is what proves it rather than the fake's own bookkeeping:
+  // the line SAID names attempt 1's class, and the sentence THROWN names attempt 2's.
+  assert.deepEqual(said.filter((l) => l.includes('corpus: transient')),
+    ['[docs] corpus: transient (curl 56) during clone, attempt 2 of 3 in 3 s']);
+  assert.match(err.message, /DNS/, 'the thrown sentence is not the second attempt\'s class');
+
+  assert.match(err.message, / \(stopped after 2 attempts — this failure is not retried\)$/, err.message);
+  // The regression, named: `(2 attempts)` next to `attempt 2 of 3` is the sentence that promised a
+  // third attempt nobody owed. If it comes back, this is the assertion that says so.
+  assert.doesNotMatch(err.message, /\(2 attempts\)/,
+    'the message reads again as a third attempt owed and skipped');
 });
 
 // ── 4. re-runnable on a partial corpus ───────────────────────────────────────────────────────────

@@ -217,6 +217,27 @@ export const retryLine = (plan, phase) =>
   `[docs] corpus: transient (${plan.reason}) during ${phase}, `
   + `attempt ${plan.next} of ${plan.of} in ${plan.waitMs / 1000} s`;
 
+/**
+ * How the retrying ENDED — the half of the report that one value used to hide.
+ *
+ * `retryPlan` returns null for two different reasons: the schedule is EXHAUSTED, or the class is
+ * PERMANENT and there was never going to be another attempt. Both used to render as
+ * `(N attempts)`, and next to a line that had just promised `attempt 2 of 3` that reads as a third
+ * attempt owed and skipped. It is not owed: a `Could not resolve host` after a `curl 56` is not two
+ * attempts of three, it is a failure that will not change however long we wait. Seen in anger on
+ * #183's `release-dryrun (macos-latest)` — ARC-03-C3.
+ *
+ * One function, so the wording is asserted where it is written — the same reason `retryLine` is one.
+ * A single attempt still reports no count at all: a count of one is noise, and the suffix exists to
+ * say that retries HAPPENED.
+ */
+export function stopSuffix(stderr, attempt) {
+  if (attempt < 2) return '';
+  return transientReason(stderr) === null
+    ? ` (stopped after ${attempt} attempts — this failure is not retried)`
+    : ` (${attempt} attempts)`;
+}
+
 // maxBuffer matters here and the default is not enough: `git ls-files -v -z` over this corpus emits
 // ~1.1 MB (48,997 index entries), and execFileSync's 1 MB default throws ENOBUFS mid-recipe. Found
 // by running it — the crash dumps the whole listing into the exception, which is its own lesson
@@ -245,11 +266,11 @@ const runMapped = (args, cwd, ctx, retry = null) => {
       // cannot fail transiently — so the plan is not even asked for.
       const plan = retry ? retryPlan(stderr, attempt) : null;
       if (plan === null) {
-        // The exhausted failure is reported as what it IS — the network class, with its sentence —
-        // and the attempt count is appended so a log shows the retries happened. A failure that
-        // only ever prints the last attempt reads as a first attempt.
-        const tried = attempt > 1 ? ` (${attempt} attempts)` : '';
-        throw new SyncError(`${classifyGitFailure(stderr, ctx)}${tried}`, EXIT.git);
+        // The failure is reported as what it IS — the network class, with its sentence — and the
+        // suffix says how the retrying ENDED. Both halves matter: a failure that only ever prints
+        // the last attempt reads as a first attempt, and one that prints `(2 attempts)` after
+        // `attempt 2 of 3` reads as a third attempt owed and skipped.
+        throw new SyncError(`${classifyGitFailure(stderr, ctx)}${stopSuffix(stderr, attempt)}`, EXIT.git);
       }
       retry.say(retryLine(plan, retry.phase));
       retry.sleep(plan.waitMs);
