@@ -60,7 +60,7 @@ The engine has one commit by a second contributor, which is what section 3 is fo
 
 ## 3. Resolution — the engine's second contributor
 
-**PENDING OWNER.** ARC-01-S02's import of the affected files is blocked until (a) or (b) is chosen
+**Resolved 2026-09-07 — resolution (a), written consent (below); ARC-01-S02's import proceeded under Apache-2.0.**
 and recorded here. No one has been contacted: outreach is the owner's, not the delivery team's.
 
 ### The commit
@@ -128,7 +128,7 @@ GRANTS:         relicensing under the Apache License, Version 2.0
 If (a) is recorded, ARC-01-S02 imports every file below unchanged and this section's blocking note
 is lifted.
 
-### Resolution (b) — rewrite before import  ·  `PENDING OWNER`
+### Resolution (b) — rewrite before import  ·  **WITHDRAWN 2026-09-07 (resolution (a) chosen)**
 
 If consent does not arrive, the files below may **not** be imported verbatim; ARC-01 rewrites them
 from scratch (or omits them). This is the no-dependency fallback and must be chosen by the end of

@@ -25,28 +25,20 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MARKER = 'PENDING OWNER';
 
 /**
- * The mentions that may stay, each with the reason — and the reasons are of three KINDS, which is
- * the part worth reading before adding a fourth entry.
+ * The mentions that may stay, each with the reason. Every one is HISTORY: either struck-through
+ * text inside an immutable ADR, or a record quoting the old marker in a sentence that says it
+ * closed. No live decision hides behind this marker any more.
  *
  * Keyed by file and a fragment of the line rather than `file:line`: a line number is a fact about
  * everything above it, so an unrelated edit higher in the file would fail this test and teach the
  * next person to re-number the allowlist instead of reading it.
  */
 const ALLOWED = [
-  // KIND 1 — a DIFFERENT owner decision, still genuinely open. `RELICENSING.md` §3 is the engine's
-  // second-contributor resolution: the owner chooses (a) or (b), and nothing here may close it.
-  // Writing "the initials landed" over these would have marked an open decision as settled.
-  { file: 'docs/RELICENSING.md', needle: "ARC-01-S02's import", kind: 'open decision' },
-  { file: 'docs/RELICENSING.md', needle: 'Resolution (b)', kind: 'open decision' },
-  { file: 'docs/spikes/licence/RELICENSING.md', needle: "ARC-01-S02's import", kind: 'open decision' },
-  { file: 'docs/spikes/licence/RELICENSING.md', needle: 'Resolution (b)', kind: 'open decision' },
-  { file: 'docs/spikes/licence/README.md', needle: 'second-contributor Resolution', kind: 'open decision' },
-
-  // KIND 2 — struck-through or quoted HISTORY inside an immutable ADR. These are not cells.
+  // KIND 1 — struck-through or quoted HISTORY inside an immutable ADR. These are not cells.
   { file: 'docs/decisions/ADR-0002-licence.md', needle: 'RECEIVED 2026-09-07', kind: 'history' },
   { file: 'docs/decisions/ADR-0007-post-decision-rulings.md', needle: "R-4's obligation 2", kind: 'history' },
 
-  // KIND 3 — a record QUOTING the old marker while stating that it is closed. The sentence around
+  // KIND 2 — a record QUOTING the old marker while stating that it is closed. The sentence around
   // each of these says the initials landed on 2026-09-16; the marker is the thing being quoted.
   { file: 'docs/decisions/README.md', needle: 'for eight days after', kind: 'quoted while closing' },
   { file: 'docs/decisions/README.md', needle: 'MET, with one intended exception', kind: 'dated historical record' },
@@ -88,9 +80,13 @@ test('ARC-00 — no Decision-owner cell is waiting on the owner again', () => {
     + 'If a cell lost its initials, restore them. If this is a NEW owner decision, add an ALLOWED '
     + 'entry saying which kind it is — and do not describe an open decision as closed.');
 
-  // NON-VACUITY: the scan must be finding things, or an empty result proves nothing. Thirteen are
-  // allowlisted today; 10 leaves room for a few legitimate removals and still fails on a broken scan.
-  assert.ok(mentions().length >= 10,
+  // NON-VACUITY: the scan must be finding things, or an empty result proves nothing. EIGHT are
+  // allowlisted today, down from thirteen — five were the RELICENSING markers, which turned out to
+  // be stale text in a record that closed on 2026-09-07 rather than a decision still waiting, and
+  // correcting them removed them from the tree. The floor moved with that count, deliberately: a
+  // floor left at ten would have failed for the honest reason that the tree got better, and the
+  // next person would have learned to lower it without reading why.
+  assert.ok(mentions().length >= 6,
     `the scan found only ${mentions().length} — the tree or the marker moved`);
 });
 
@@ -128,7 +124,7 @@ test('ARC-00 — the allowlist has no dead entries, and every entry says which k
   // An allowlist that keeps excusing something which no longer exists is how a list stops
   // describing the tree, and the next person trusts it anyway.
   const found = mentions();
-  const kinds = new Set(['open decision', 'history', 'quoted while closing', 'dated historical record']);
+  const kinds = new Set(['history', 'quoted while closing', 'dated historical record']);
   for (const entry of ALLOWED) {
     assert.ok(found.some((f) => f.rel === entry.file && f.text.includes(entry.needle)),
       `allowlist entry no longer matches anything: ${entry.file} — "${entry.needle}"`);
@@ -136,8 +132,13 @@ test('ARC-00 — the allowlist has no dead entries, and every entry says which k
     assert.doesNotMatch(entry.file, /\\/, 'allowlist keys are written with forward slashes');
   }
 
-  // The five "open decision" entries are the ones that matter most: they are a DIFFERENT owner
-  // decision that is still waiting, and the initials sweep deliberately did not touch them.
-  assert.equal(ALLOWED.filter((a) => a.kind === 'open decision').length, 5,
-    'the second-contributor resolution is still open — if that changed, close it deliberately');
+  // EVERY entry is history now. There is no live owner decision hiding behind this marker, and an
+  // allowlist entry claiming otherwise would be a false fact asserted by a guard — which is what the
+  // first version of this file did: it excused the RELICENSING markers as an "open decision" when
+  // the same file said, at line 3, that the decision closed on 2026-09-07. Reading one sentence and
+  // not the file around it is the defect this repository keeps finding; encoding it in a test is
+  // worse, because a guard makes it look checked.
+  assert.equal(ALLOWED.filter((a) => a.kind !== 'history'
+    && a.kind !== 'quoted while closing' && a.kind !== 'dated historical record').length, 0,
+  'no allowlist entry may describe a live owner decision — close it in the record instead');
 });
