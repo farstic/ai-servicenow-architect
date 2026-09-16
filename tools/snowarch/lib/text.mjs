@@ -49,9 +49,23 @@ export function spellings(where = {}) {
  * answered in words, and the rule file's promise — that the Mode line is authoritative — is only
  * true while there is one of it. ARC-08-S05's derivation picks a key; this renders it.
  */
+/**
+ * ARC-05-S06 criterion 3 — ONE remedy for "there is no instance yet", wherever it is offered.
+ *
+ * Sitting A found two, for the same state, in the same run: the doctor's Mode line said
+ * `./snowarch instance add`, and the bootstrap's Next block said `./snowarch mode live`. Both work,
+ * which is what makes two of them worse than one wrong one — a reader has to decide which is THE
+ * path, and the criterion exists so nobody has to.
+ *
+ * `mode live` is the one, because it is the documented path and it runs the wizard as B06 with the
+ * rest of the switch around it; `instance add` is the wizard alone, and a user who runs it is one
+ * step into a live mode the toggles do not yet reflect.
+ */
+export const ADD_INSTANCE = (cli = './snowarch') =>
+  `${cli} mode live, or /snowarch setup-instance inside Claude`;
+
 export const MODE_VARIANTS = Object.freeze({
-  unconfigured: 'no ServiceNow instance configured; run ./snowarch instance add or '
-    + '/snowarch setup-instance to add one',
+  unconfigured: `no ServiceNow instance configured; run ${ADD_INSTANCE()}`,
   serverDisabled: (label) => `server disabled in .claude/settings.local.json although instance `
     + `"${label}" is configured; run ./snowarch mode live`,
   noInstanceLoaded: 'server enabled but no instance is loaded (see SV-02/SV-03); run '
@@ -139,8 +153,11 @@ export function registrationLine(kind) {
  * reaches it. Saying so here is the difference between "it did not work" and "it works after a
  * reconnect", which is a support conversation either way if the sentence is missing.
  */
-export const restartSentence = (serverKey) =>
-  `Restart claude (or /mcp → ${serverKey} → reconnect) to load the server.`;
+export const restartSentence = (serverKey, mode = 'live') => (mode === 'live'
+  ? `Restart claude (or /mcp → ${serverKey} → reconnect) to load the server.`
+  // ARC-06 (Sitting A) — after `mode design` the old sentence pointed the wrong way: it told the
+  // user to reconnect in order to LOAD a server the switch had just turned off. Seen on two runs.
+  : `Restart claude to unload the server — ${serverKey} will not be listed in /mcp afterwards.`);
 
 /**
  * `mode design` keeps the store. This says so, names the label, and gives the two commands that
@@ -186,16 +203,20 @@ export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, platfor
   lines.push(mode === 'live'
     ? `      In Claude, /mcp should show: ${serverKey} ✔ connected · /snowarch status quotes the `
       + 'Mode line above.'
-    : `      Add a live instance later with ${s.cli} mode live, or /snowarch setup-instance `
-      + 'inside Claude.');
+    : `      Add a live instance later: run ${ADD_INSTANCE(s.cli)}.`);
   return lines.join('\n');
 }
 
 /** The whole closing block, as one string — what `--json`'s `next` field carries verbatim. */
 export function summaryBlock({ mode, instance = null, counts = {}, nodeUsable = true,
-  dialogs = EXPECTED_DIALOGS, serverKey, platform, env, warnings = [] } = {}) {
+  dialogs = EXPECTED_DIALOGS, serverKey, platform, env, warnings = [], failures = [] } = {}) {
   const lines = [
     doctorLine({ ...counts, nodeUsable }),
+    // ARC-08-C? (Sitting A) — every FAIL, in full, directly under the count that announced it.
+    // The summary used to print `DOCTOR: 8 ok, 0 warn, 1 fail` and stop, and by the time anybody ran
+    // the full doctor the failure was gone: a count with nothing named is a number nobody can act
+    // on, and the one run that saw the failure is the one run that should have said what it was.
+    ...failures.map((f) => `      ${f}`),
     modeLine({ mode, instance }),
     nextBlock({ mode, dialogs, serverKey, platform, env }),
   ];

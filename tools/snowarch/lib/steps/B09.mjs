@@ -11,7 +11,6 @@ import { contractSha, version as engineVersion } from '../config.mjs';
 import { writeDoctorCache } from '../doctor-cache.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { EXPECTED_DIALOGS, summaryBlock } from '../text.mjs';
-import { which } from '../which.mjs';
 
 export const id = 'B09';
 export const title = 'summary';
@@ -32,14 +31,27 @@ export const DESIGN_CACHE_STEPS = Object.freeze(['B01', 'B02', 'B05', 'B07']);
  * replaced the moment there is something better to ask.
  */
 export function doctorCounts(state, { root, run = spawnSync, hasDoctor = null } = {}) {
-  const available = hasDoctor ?? Boolean(which('snowarch', { env: process.env }));
+  // ARC-08 (Sitting A) — GATE ON WHAT THE SPAWN NEEDS, which is the launcher in THIS checkout.
+  //
+  // This used to ask `which('snowarch')` — whether the command is on PATH — while the spawn below
+  // runs `<root>/tools/snowarch/bin/snowarch.mjs` by absolute path and needs nothing on PATH at all.
+  // Nobody installs `snowarch` globally to use a checkout, so the gate was false in normal use, the
+  // doctor was never asked, and the fallback tally printed instead — under a line that says DOCTOR.
+  //
+  // That tally counts `state.steps`, which PERSISTS between runs. So a step that failed in an
+  // earlier run was reported by a later, successful one: Sitting A saw `mode design` succeed and
+  // print `1 fail`, and that failure was B06's from the `mode live` before it. The standalone
+  // doctor disagreed because it was the only one of the two actually running checks.
+  const available = hasDoctor ?? existsSync(join(root, 'tools', 'snowarch', 'bin', 'snowarch.mjs'));
   if (available) {
     const r = run(process.execPath, [join(root, 'tools/snowarch/bin/snowarch.mjs'),
       'doctor', '--quick', '--json'],
     { encoding: 'utf8', stdio: 'pipe', cwd: root, env: childEnv(root) });
     try {
       const parsed = JSON.parse(r.stdout ?? '{}');
-      if (parsed?.summary) return { ...parsed.summary, source: 'doctor' };
+      // The failing checks travel WITH the count. They were already in this JSON and were thrown
+      // away with it, which is how a `1 fail` reached a user with nothing to act on.
+      if (parsed?.summary) return { ...parsed.summary, source: 'doctor', failures: failureLines(parsed) };
     } catch { /* fall through to this run's own tally */ }
   }
   const counts = { ok: 0, warn: 0, fail: 0, source: 'bootstrap' };
@@ -78,6 +90,7 @@ export const run = async (ctx) => {
     platform: ctx.plat,
     env: ctx.env,
     warnings: warningsFrom(state),
+    failures: counts.failures ?? [],
   });
 
   // Design-only runs never reach B08, so the banner would have no cache at all on a first install.
@@ -109,6 +122,19 @@ function instanceFrom(state) {
   const i = state.steps?.B08?.data?.instance ?? state.instance ?? null;
   if (i?.label) return { label: i.label, environment: i.environment, preset: i.preset };
   return null;
+}
+
+/**
+ * `E-10 FAIL settings.local toggles match the recorded mode: mode is live but servicenow is disabled`
+ *
+ * The doctor's own renderer is not reachable from here (it formats a whole report), so this builds
+ * the one line a reader needs per failure: which check, and what it said.
+ */
+export function failureLines(parsed) {
+  return (parsed?.checks ?? [])
+    .filter((c) => c.status === 'fail')
+    .map((c) => `${c.id} FAIL ${c.title}${c.detail ? `: ${c.detail}` : ''}`
+      + (c.remedy ? ` — ${c.remedy}` : ''));
 }
 
 /** The cache's vocabulary is ok/warn/fail; the state also uses `failed` for an interrupt. */

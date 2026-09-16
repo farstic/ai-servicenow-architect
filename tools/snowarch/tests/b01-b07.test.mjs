@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { run as runB01, ensureLocalDir, committedFilesUnchanged } from '../lib/steps/B01.mjs';
 import { run as runB07, writeConfig, CONFIG_FILE } from '../lib/steps/B07.mjs';
+import { run as runB03 } from '../lib/steps/B03.mjs';
 import {
   INVALID_JSON, NOT_IGNORED, SETTINGS_LOCAL, applyToggles, computeSettings, hookEntry, isIgnored,
 } from '../lib/settings-local.mjs';
@@ -391,4 +392,43 @@ test('B01 and B07 run in a checkout with no node_modules at all', () => {
 
   const out = execFileSync(process.execPath, [probe], { cwd: root, encoding: 'utf8' });
   assert.equal(out, 'ok ok');
+});
+
+/**
+ * ARC-06-C7 — the mode is recorded by the step that makes it true, and by nothing earlier.
+ *
+ * Sitting A walked into the state this prevents: a live switch failed at B06, and because the mode
+ * had already been written (by `mode.mjs` before any step ran, and again by B03 at step 3) the
+ * checkout claimed `Mode: live` while `settings.local.json` still disabled the server. `./snowarch
+ * mode` and the doctor then disagreed with each other — `E-10 FAIL … mode is live but servicenow is
+ * disabled` — over a switch that had never happened.
+ */
+test('ARC-06-C7 — B07 records the mode it just made true', async () => {
+  const root = makeCheckout();
+  await runB01(ctxFor(root));
+  const ctx = ctxFor(root, { mode: 'live', state: { steps: {}, registration: 'project', mode: 'design-only' } });
+
+  assert.equal(ctx.state.mode, 'design-only', 'precondition: the checkout starts on the previous mode');
+  const r = await runB07(ctx);
+
+  assert.equal(r.status, 'ok');
+  assert.equal(ctx.state.mode, 'live', 'B07 wrote the toggles and must record the mode they now mean');
+});
+
+test('ARC-06-C7 — B03 records nothing, so a switch that fails before B07 keeps the previous mode', async () => {
+  const root = makeCheckout();
+  await runB01(ctxFor(root));
+  const ctx = ctxFor(root, { mode: 'live', state: { steps: {}, registration: 'project', mode: 'design-only' } });
+
+  // B03 is the step that used to make the switch true on disk at step 3.
+  const b03 = await runB03(ctx);
+  assert.equal(b03.status, 'ok', 'B03 still validates and reports the requested mode');
+  assert.equal(b03.data.mode, 'live', '...and still ANSWERS live — the request is not the record');
+  assert.equal(ctx.state.mode, 'design-only',
+    'B03 recorded the mode again — an interrupted switch will claim a mode it never reached');
+
+  // B06 fails here in the real sequence, so B07 never runs and nothing else may touch the record.
+  assert.equal(ctx.state.mode, 'design-only');
+  assert.ok(!existsSync(join(root, CONFIG_FILE)) || readJson(root, CONFIG_FILE).mode !== 'live',
+    'the per-checkout config must not say live either, for the same reason');
 });

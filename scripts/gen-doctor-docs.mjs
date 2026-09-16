@@ -17,6 +17,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { engineChecks } from '../tools/snowarch/lib/doctor/checks/index.mjs';
+import { MODE_VARIANTS } from '../tools/snowarch/lib/text.mjs';
 import { FIXERS, TARGETS } from '../tools/snowarch/lib/doctor/fix.mjs';
 import { labelFor, MAPPING, unmappedIds } from '../tools/snowarch/lib/doctor/mapping.mjs';
 import { createRegistry } from '../tools/snowarch/lib/doctor/registry.mjs';
@@ -52,8 +53,10 @@ export async function sample() {
     options: { quick: false, noNetwork: false, fix: false, section: null },
     ranAt: '2026-09-04T10:00:12Z',
     durationMs: 1830,
-    modeLine: 'Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add '
-      + 'or /snowarch setup-instance to add one',
+    // ARC-08-C7 — RENDERED, not retyped. This file's whole promise is that the page shows what the
+    // doctor prints; a hardcoded copy here was a fourth wording of "there is no instance yet", and
+    // the one that reached the published docs.
+    modeLine: `Mode: design-only — ${MODE_VARIANTS.unconfigured}`,
     // The version is pinned in the SAMPLE rather than read: a documentation block that changed on
     // every version bump would be a diff in every release commit and a page nobody trusts.
     root: null,

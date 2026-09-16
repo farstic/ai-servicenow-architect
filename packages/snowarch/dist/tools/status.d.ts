@@ -3,7 +3,7 @@ import type { ErrorCodeName } from '../errors/codes.js';
  *  them: there is nothing to switch to, and offering it would invite an error instead of a
  *  remedy. */
 export declare const CORE_TOOLS_UNCONFIGURED: readonly ["snow_core_instances_index", "snow_core_instances_reload", "snow_core_current_instance_read", "snow_core_capabilities_read", "snow_core_status_read"];
-export declare const NO_INSTANCE_MESSAGE: string;
+export { NO_INSTANCE_MESSAGE } from '../no-instance.js';
 /**
  * Why an instance tool is refusing, in the words of the ACTUAL reason.
  *

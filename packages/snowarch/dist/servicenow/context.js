@@ -13,6 +13,7 @@
  *
  * Stable since Node 16; the floor is Node 20.
  */
+import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { ServiceNowError } from '../utils/errors.js';
 export const FLAG_NAMES = [
@@ -30,7 +31,7 @@ export function runWithInstance(rt, fn) {
 export function currentInstance() {
     const rt = als.getStore();
     if (!rt) {
-        throw new ServiceNowError('No ServiceNow instance is configured for this call. Run: ./snowarch instance add <label>', 'NO_INSTANCE_CONFIGURED');
+        throw new ServiceNowError(NO_INSTANCE_MESSAGE, 'NO_INSTANCE_CONFIGURED');
     }
     return rt;
 }

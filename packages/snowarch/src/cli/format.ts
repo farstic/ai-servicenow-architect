@@ -14,6 +14,7 @@ import { maskPath, maskUsername } from '../store/paths.js';
 import { completeFlags, type Store, type StoreInstance } from '../store/schema.js';
 import type { LastProbe } from '../servicenow/probes.js';
 import type { Flags } from '../utils/permissions.js';
+import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
 
 /**
  * A secret, described rather than shown: `set (len 12)`.
@@ -68,8 +69,15 @@ export function listJson(storePath: string, store: Store): ListJson {
   };
 }
 
-export const NO_INSTANCES =
-  'No instances configured. Add one with: ./snowarch instance add <label> --url https://<host>';
+/**
+ * ARC-08-C7 — the SAME state as everywhere else, so the same remedy.
+ *
+ * This was the seventh wording, and it escaped the first scan by being plural: `No instanceS
+ * configured`. Being inside `instance list` is not a reason to send the reader somewhere different —
+ * `instance add` is the wizard alone, and it would leave them one step into a live mode the toggles
+ * do not reflect, in a terminal where `mode live` is just as available.
+ */
+export const NO_INSTANCES = NO_INSTANCE_MESSAGE;
 
 /** One probe as the table shows it: `auth ok · write ok · …`, or a dash when none has run. */
 export function probeCell(probe: LastProbe | null): string {

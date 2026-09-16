@@ -23,10 +23,13 @@ export const id = 'B08';
 export const title = 'verify';
 export const needsNode = true;
 export const runsWhen = (ctx) => ctx.mode === 'live';
+import { ADD_INSTANCE } from '../text.mjs';
+
 export const skipReason = 'design-only';
 
-export const NO_INSTANCE =
-  'no instance configured — run ./snowarch instance add or /snowarch setup-instance';
+// ARC-08-C7 — the SAME state as the doctor's Mode line and the bootstrap's Next block, so the same
+// remedy. This was a third wording of "there is no instance yet", inside the same runner.
+export const NO_INSTANCE = `no instance configured — run ${ADD_INSTANCE()}`;
 export const PROBES_UNAVAILABLE = 'probes: not available in this build';
 
 export function storeMtime(root) {

@@ -75,7 +75,7 @@ DOCTOR: unavailable until Node 20+ is installed (design-only is complete)
 Mode: design-only
 Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.
       (If you are already inside Claude Code in this folder: exit it and start `claude` again.)
-      Add a live instance later with ./snowarch mode live, or /snowarch setup-instance inside Claude.
+      Add a live instance later: run ./snowarch mode live, or /snowarch setup-instance inside Claude.
 ```
 <!-- /generated:closing-block -->
 
@@ -190,8 +190,8 @@ banner will not run; the bootstrap neither sets nor removes that key, it says so
 
 Claude Code reads `.claude/settings.json` and `.mcp.json` from the session's primary working
 directory, so a session started inside `clients/<name>/` loads neither and the specialists are simply
-absent. Engagement folders are paths *within* the checkout — or one checkout per engagement, which
-is also how the confidentiality boundary is kept.
+absent. Engagement folders are `clients/<name>/` within the checkout, and each
+engagement is its own clone: Claude Code's auto memory is per repository, so two in one clone share notes.
 
 ### If your organisation blocks project MCP servers
 

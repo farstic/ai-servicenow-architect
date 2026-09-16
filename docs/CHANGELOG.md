@@ -235,6 +235,73 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The modes and presets page now matches the product.** It sent a new reader to two commands that
+  refuse in a fresh checkout instead of to `./snowarch mode live`, which is what installs live mode
+  and starts the wizard; it gave the audit log one fixed path when the file follows your store; and
+  it said ATF authoring is always allowed when there is no ATF authoring tool at all.
+- **The password-manager examples work now.** All three piped a secret into a command that then had
+  nothing left to read and saved nothing — they needed `--yes`. The PowerShell one also used a form
+  PowerShell refuses to run.
+- **Migrating more than one engagement no longer puts them in one checkout.** The page copied every
+  engagement into a single clone, which is the one arrangement the confidentiality rule exists to
+  prevent; it now says one clone per engagement, and why. Several smaller repairs: the step that
+  said "the four directories" listed three, the copy commands could land your folders a level deep,
+  and the guide that told you to add a client skill under `.claude/skills/` was telling you to break
+  your own health check.
+- **The bug-report forms ask for things that exist.** One asked for a "Leftovers" block the doctor
+  does not print, another pointed at the wrong migration step, and the troubleshooting link promised
+  answers it does not hold.
+
+- **`mode design` now really turns the server off.** If you had registered the server for your whole
+  account, switching back to design-only said "Mode: design-only" while Claude Code still loaded it
+  in every project. The switch now removes a registration it created and says so — and if it did not
+  create it, it tells you plainly, with the command, instead of leaving you to discover it.
+- **Your other projects stay yours.** The health report's `--json` — the one the bug-report form
+  asks you to paste — listed the folder names of your other projects. It now reports how many and
+  which servers, without the folders. Your terminal still shows them, because that is where you go
+  to fix them.
+- **The clean-up advice is complete and in order.** It offered one removal command when two were
+  needed, and told you to "then" delete the backups before the step that comes first.
+- **Smaller wording fixes.** After switching to design-only the last line no longer tells you to
+  reconnect in order to load a server it just unloaded; the registration check no longer shows a ✘
+  inside a line marked ok; and "no release tags" now says that release candidates are ignored on
+  purpose, instead of sounding like the remote is empty.
+
+- **The install summary no longer reports a failure that already happened.** After a mode switch it
+  could print `1 fail` even when the switch had just succeeded — the failure being counted was left
+  over from an earlier run, and the health check it claimed to be quoting had never been asked. It
+  asks properly now, and agrees with what `./snowarch doctor` tells you.
+- **One answer to "I have no instance yet."** Six different parts of the product answered that
+  question six different ways — the doctor, the installer, the verify step, `/snowarch status`, the
+  server itself, and the published architecture page. All of them worked, which only made it harder
+  to know which one was the path. It is `./snowarch mode live`, and everything that offers it now
+  says the same thing.
+- **`--section` shows you the section you asked for.** `./snowarch doctor --section host` printed
+  39 lines to tell you 2 things, the rest being "this check is not in the section you chose". The
+  checks you did not ask for are now counted in the summary instead of listed one by one.
+
+- **Live mode works again.** Switching a checkout to live with `./snowarch mode live` always
+  stopped with "instance wizard not available in this build", on every machine, however healthy
+  the build was — the check that looks for the wizard was asking the question and reading the
+  answer before it arrived. It asks properly now, and when something really is wrong it says
+  which thing: the wizard could not be started, it exited with an error (and the error), or it
+  was killed — instead of one sentence blaming the build.
+- **A switch that fails no longer claims it worked.** If anything went wrong partway through
+  `mode live`, the checkout still reported `Mode: live` afterwards while the settings said
+  otherwise, and the doctor flagged the contradiction. The mode is now written only once the
+  step that makes it true has run, so an interrupted switch simply leaves you where you were.
+- **The bootstrap summary says what failed.** It used to print a count — `1 fail` — and nothing
+  else, so by the time you looked, the failure was gone and unknowable. Every failure is now
+  printed in full, with its remedy, underneath the count.
+- **The doctor's registration advice fits your registration.** When the server was registered
+  locally, the fix it offered could not have helped and was printed twice. It now names the
+  command that matches how the server is registered, once.
+- **No more "move your checkout out of your home directory."** The doctor warned that skills
+  were being loaded from your home as well, and suggested moving the checkout somewhere that
+  does not exist for most people. Your home directory holds your personal skills, which Claude
+  Code loads once and on purpose; it is not a second copy of this project's roster. The warning
+  now fires only for a genuine project directory above the checkout.
+
 - **Three of the checks that guard releases and installs were watching the wrong thing.** One
   rehearsed a Windows release in an environment Windows users may not have, and so never
   answered the question it was asked — it does now, and the answer is that the release works

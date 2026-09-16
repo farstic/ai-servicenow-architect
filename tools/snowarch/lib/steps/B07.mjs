@@ -71,6 +71,11 @@ export const run = async (ctx) => {
   // like every other line.
   if (result.userDisabledHooks && ctx.line) ctx.line(HOOKS_LEFT_ALONE);
 
+  // ARC-06-C7 — the mode is recorded HERE, by the step that just made it true, and never earlier.
+  // The toggles above are what a live checkout actually is; until they are written, "live" is a
+  // request, not a fact. B03 therefore records nothing, and a switch interrupted before this line
+  // leaves the previous mode in `bootstrap-state.json` with the toggles that match it.
+  ctx.state.mode = ctx.mode;
   const config = writeConfig(ctx.root, { mode: ctx.mode, registration,
     ...(ctx.readLabel ? { readLabel: ctx.readLabel } : {}) });
 

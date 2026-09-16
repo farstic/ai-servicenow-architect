@@ -5,6 +5,7 @@ import {
 } from '../../src/servicenow/context.js';
 import { expandPreset, isWriteEnabled, requireWrite } from '../../src/utils/permissions.js';
 import type { ServiceNowError } from '../../src/utils/errors.js';
+import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
 
 /**
  * Criterion 6 — two calls in flight at once each see their own instance.
@@ -108,7 +109,9 @@ describe('currentInstance outside a run', () => {
         throw new Error('expected a throw');
       } catch (e) {
         expect((e as ServiceNowError).code).toBe('NO_INSTANCE_CONFIGURED');
-        expect((e as ServiceNowError).message).toContain('./snowarch instance add');
+        // ARC-08-C7 — the ONE remedy, from its definition; a retyped copy here would be a surface
+        // that drifts exactly the way the six in the product did.
+        expect((e as ServiceNowError).message).toBe(NO_INSTANCE_MESSAGE);
       }
     });
   });

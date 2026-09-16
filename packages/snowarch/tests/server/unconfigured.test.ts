@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectToolCatalog } from '../../src/tools/index.js';
 import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
+import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
@@ -134,7 +135,8 @@ describe('criterion 1 and 2 - the server starts with no instance', () => {
       const r = await client.callTool({ name: 'snow_core_records_query', arguments: { table: 'incident' } });
       expect(text(r)).toContain('NO_INSTANCE_CONFIGURED');
       expect(text(r)).toContain('/snowarch setup-instance');
-      expect(text(r)).toContain('./snowarch instance add');
+      // ARC-08-C7 — one remedy, asserted from its definition rather than retyped.
+      expect(text(r)).toContain(NO_INSTANCE_MESSAGE);
     } finally { await client.close(); }
   }, 40_000);
 

@@ -1040,6 +1040,23 @@ the dashboard, the prompt catalogue, the direct-execution engine and the report 
 buys is a single protocol surface to reason about, and a production install that fell from 57.3 MB to
 14.1 MB. The per-removal detail is in `packages/snowarch/CHANGELOG.md`.
 
+### Env-defined instances — the variable names
+
+With `SERVICENOW_INSTANCE_URL` or any `SN_INSTANCE_<NAME>_URL` set, those are the instances and no
+store is read (the CI path). Per instance `<NAME>`, whose label is `<NAME>` lower-cased:
+`SN_INSTANCE_<NAME>_URL`, `_AUTH` (`oauth` for the password grant, anything else basic), `_USERNAME`,
+`_PASSWORD`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_ENVIRONMENT` (`pdi|dev|test|prod`, default `dev`) and
+`_PROD_WRITE_ACK` (`true` raises a prod instance).
+
+The six flags are read from the **bare** process variables — `WRITE_ENABLED=true` …
+`FLUENT_ENABLED=true`, byte-exact `true`, anything else false — and so are `MAX_RECORDS` (default
+100), `MAX_RETRIES`, `RETRY_DELAY_MS` and `REQUEST_TIMEOUT_MS`, which therefore apply to every
+env-defined instance at once. The preset is always `custom`.
+
+The legacy single-instance names are `SERVICENOW_INSTANCE_URL`, `SERVICENOW_AUTH_METHOD`,
+`SERVICENOW_BASIC_USERNAME` / `_PASSWORD` and `SERVICENOW_OAUTH_CLIENT_ID` / `_CLIENT_SECRET` /
+`_USERNAME` / `_PASSWORD`; that instance is labelled `default`.
+
 ### The audit trail
 
 Every call to a tool declared `mutates` or `sessionMutates` appends one JSON line to
@@ -1318,7 +1335,7 @@ server
              → the doctor writes the missing ones as "false"   [fixable: ./snowarch doctor --fix]
 
 DOCTOR: 1 ok, 1 warn, 1 fail (2 fixable — run ./snowarch doctor --fix)
-Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance to add one
+Mode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude
 ```
 <!-- /generated:doctor-text -->
 
@@ -1340,7 +1357,7 @@ consumer must not have to ask which version of the doctor produced its input.
     "section": null
   },
   "mode": null,
-  "modeLine": "Mode: design-only — no ServiceNow instance configured; run ./snowarch instance add or /snowarch setup-instance to add one",
+  "modeLine": "Mode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude",
   "modeLineDetailed": null,
   "engine": null,
   "server": null,
@@ -1396,7 +1413,8 @@ consumer must not have to ask which version of the doctor produced its input.
     "warn": 1,
     "fail": 1,
     "skip": 0,
-    "fixable": 2
+    "fixable": 2,
+    "notInSection": 0
   }
 }
 ```

@@ -302,8 +302,36 @@ test('E-27 warns when the recorded mode is design-only but the server is not dis
   const r = await run('E-27', root, over);
   assert.equal(r.status, 'warn');
   assert.match(r.detail, /not disabled in Claude Code although the recorded mode is design-only/);
-  assert.equal(r.command, './snowarch mode design');
+  assert.equal(r.remedy, './snowarch mode design');
   assert.equal(r.data.approved, true);
+  // Sitting A: the remedy used to be duplicated into `command`, and the report prints both — so the
+  // same line arrived twice. One remedy, said once.
+  assert.equal(r.command, undefined, 'the remedy must not be printed twice');
+});
+
+test('E-27 — a live LOCAL entry in design mode is a FAIL, with a remedy that can clear it', async (t) => {
+  // Two Sitting A findings meet here. First: `./snowarch mode design` could not help, because
+  // `--register` defaults to "unchanged" — the owner followed that remedy twice with no effect.
+  // Second, and the reason this is now a FAIL rather than a warning: `disabledMcpjsonServers`
+  // governs `.mcp.json` only, so a local- or user-scope entry keeps the server CONNECTED while the
+  // Mode line says design-only. `/mcp` listed `servicenow ✔ connected · 5 tools` after `mode
+  // design` reported success. Reporting that as a warning is asserting a state nobody verified.
+  const { root, over } = withClaude(t, { statusLine: CONNECTED, mode: 'design', scope: 'local' });
+  const r = await run('E-27', root, over);
+  assert.equal(r.status, 'fail', 'design-only is not in force, so this is not a warning');
+  assert.match(r.detail, /design-only is not in force/);
+  assert.match(r.remedy, /mode design/, '`mode design` removes an entry snowarch created now');
+  assert.match(r.remedy, /claude mcp remove .* -s local/, '...and the direct alternative is named');
+  assert.equal(r.command, undefined);
+
+  // Both directions: a project registration keeps the plain remedy, which does work for it.
+  // Both directions: a PROJECT entry in the same state stays a WARN. The toggle does cover it, so
+  // something local went wrong — the mode is not untrue of the machine the way user scope makes it.
+  const project = withClaude(t, { statusLine: CONNECTED, mode: 'design', scope: 'project' });
+  const p = await run('E-27', project.root, project.over);
+  assert.equal(p.status, 'warn', 'a project entry is covered by the toggle — not the same defect');
+  assert.equal(p.remedy, './snowarch mode design',
+    'a project registration must NOT be sent to --register project — it is already there');
 });
 
 test('E-27 treats pending approval in design-only as the toggle not being in force', async (t) => {
@@ -352,4 +380,18 @@ test('the status table is the S-01 record\'s, and an empty status is not an appr
   assert.deepEqual(classifyStatus(CONNECTED), { kind: 'approved', approved: true });
   assert.deepEqual(classifyStatus(''), { kind: 'unknown', approved: null });
   assert.deepEqual(classifyStatus(null), { kind: 'unknown', approved: null });
+});
+
+test('ARC-08 — E-27\'s ok line describes the state in OUR words, not Claude\'s ✘', async (t) => {
+  // It used to read: `✘ Rejected (see disabledMcpjsonServers in settings)` — inside an `ok`. A
+  // failure symbol reported as a success is a line people stop trusting in both directions.
+  const { root, over } = withClaude(t, { statusLine: REJECTED, mode: 'design' });
+  const r = await run('E-27', root, over);
+
+  assert.equal(r.status, 'ok');
+  assert.doesNotMatch(r.detail, /✘/, 'an ok line must not carry a failure symbol');
+  assert.match(r.detail, /disabled in design mode \(expected\)/, 'say what it means, in our words');
+
+  // Claude's raw answer is kept where a machine reads it and a person does not.
+  assert.match(String(r.data.statusLine), /Rejected/, 'the raw status must survive in --json');
 });

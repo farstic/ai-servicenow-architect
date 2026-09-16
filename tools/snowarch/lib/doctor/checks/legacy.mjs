@@ -175,10 +175,22 @@ export function legacyChecks() {
         if (entries.length > 0 && ctx.platform !== 'win32') {
           try { insecure = (statSync(path).mode & 0o077) !== 0; } catch { insecure = false; }
         }
+        // ARC-08 / ARC-10-S10 (Sitting A D1) — `--json` IS THE FORM THAT TRAVELS, and the
+        // Install-problem issue template asks a stranger to paste it into a public tracker. On the
+        // owner's machine that JSON carried the names of his OTHER project folders — client and
+        // engagement folders on a consultant's laptop — nine times. The boundary in
+        // `json-boundary.mjs` masks the HOME PREFIX, which is right for this checkout's own path
+        // (depth, spaces, drive letter are what a maintainer uses) and useless here: what survives
+        // is `~/Documents/work/<client>`, and the client name is the whole of the secret.
+        //
+        // So the folder never enters the JSON at all. `project` is dropped from the travelling
+        // entries and kept only for the terminal, which is where the user acts on it.
         const data = {
           present: true,
           parsed: true,
-          entries,
+          entries: entries.map(({ project, ...rest }) => rest),
+          otherProjectCount: new Set(entries.filter((e) => e.scope === 'other')
+            .map((e) => e.project)).size,
           backups,
           registration,
           mode: insecure ? 'group/world-readable' : null,
@@ -196,34 +208,88 @@ export function legacyChecks() {
         const counts = (e) => (e.credential > 0
           ? `holds ${e.keys} env keys, ${e.credential} credential-shaped — set (len ${e.length})`
           : `holds ${e.keys} env keys`);
+        // Two details, deliberately. `textLines` is for the terminal, where the folder is the thing
+        // the user needs in order to go and run the command. `lines` is what travels.
+        const textLines = [];
         const lines = [];
         // The first line says WHERE, because the command differs: a registration under this folder
         // is removed by running the command here, and one under another project is removed by
         // running it there. Saying "for this folder" about somebody else's project would send a
         // user to run a command that reports nothing and leaves the entry in place.
         if (here.length > 0) {
-          lines.push(`stale MCP registration "${here[0].name}" in ~/${CLAUDE_JSON} for this folder `
+          textLines.push(`stale MCP registration "${here[0].name}" in ~/${CLAUDE_JSON} for this folder `
             + `(${counts(here[0])})`);
-          if (here.length > 1) lines.push(`and ${here.length - 1} more under this folder`);
+          if (here.length > 1) textLines.push(`and ${here.length - 1} more under this folder`);
         } else {
-          lines.push(`no stale registration for this folder; ${elsewhere.length} under other `
+          textLines.push(`no stale registration for this folder; ${elsewhere.length} under other `
             + 'project(s)');
         }
         for (const other of elsewhere) {
-          lines.push(`also registered under: ${other.project} (${other.name}) — run the same `
+          textLines.push(`also registered under: ${other.project} (${other.name}) — run the same `
             + 'command from that folder');
         }
+        // The travelling summary: how many, under how many OTHER folders, and which servers — the
+        // three facts a maintainer reading a pasted report actually uses. No folder, ever.
+        const byName = new Map();
+        for (const e of entries) byName.set(e.name, (byName.get(e.name) ?? 0) + 1);
+        const named = [...byName].map(([name, n]) => (n > 1 ? `${name} ×${n}` : name)).join(', ');
+        lines.push(`${entries.length} stale registration(s) under ${data.otherProjectCount} other `
+          + `project folder(s): ${named}`);
+        // The credential SHAPE travels too, in the repository's own `set (len n)` form: a maintainer
+        // reading a pasted report needs to know secrets are sitting in that file, and the form says
+        // so without disclosing one. Dropping it with the folder names would have thrown away the
+        // half of this finding that makes it urgent.
+        const totalKeys = entries.reduce((n, e) => n + e.keys, 0);
+        const totalCred = entries.reduce((n, e) => n + e.credential, 0);
+        const firstLen = entries.find((e) => e.credential > 0)?.length;
+        lines.push(totalCred > 0
+          ? `holds ${totalKeys} env keys, ${totalCred} credential-shaped — set (len ${firstLen})`
+          : `holds ${totalKeys} env keys`);
+
         if (backups.count > 0) {
-          lines.push(`${backups.count} ~/${CLAUDE_JSON}.bak-* file(s) present`
-            + `${backups.newest ? `, newest ${backups.newest}` : ''}`);
+          const backupLine = `${backups.count} ~/${CLAUDE_JSON}.bak-* file(s) present`
+            + `${backups.newest ? `, newest ${backups.newest}` : ''}`;
+          textLines.push(backupLine);
+          lines.push(backupLine);
         }
-        if (insecure) lines.push(`and it is group/world-readable — chmod 600 ~/${CLAUDE_JSON}`);
+        if (insecure) {
+          const insecureLine = `and it is group/world-readable — chmod 600 ~/${CLAUDE_JSON}`;
+          textLines.push(insecureLine);
+          lines.push(insecureLine);
+        }
+
+        // ARC-08 (Sitting A D1) — ONE REMOVAL PER DISTINCT SERVER NAME, and the reminder last.
+        //
+        // The remedy printed a SINGLE `claude mcp remove <server> -s local` while the findings named
+        // two different server names, so following it cleared part of the mess and left the rest.
+        // (The names are not spelled here: one of them is a retired name, and engine-lint L03
+        // refuses it in source — including in a comment quoting it as the defect.)
+        // And with nothing registered under THIS folder the remedy was only the backup reminder,
+        // while the removal arrived on the renderer's `command` line below it — so "then review and
+        // delete …" printed BEFORE the step it refers to.
+        // ONE PER DISTINCT SERVER NAME. Deduping the rendered LINE was not enough: the same server
+        // under this folder and under another produces two different "run from …" suffixes, so the
+        // same removal was offered twice. The name is what the command acts on, so the name is the key.
+        const removals = [];
+        const offered = new Set();
+        for (const e of [...here, ...elsewhere]) {
+          if (offered.has(e.name)) continue;
+          offered.add(e.name);
+          const where = e.scope === 'this-folder' ? '(run from this folder)' : '(run from that folder)';
+          removals.push(`${e.command}        ${where}`);
+        }
+        const remedyLines = [...removals, ...(backups.count > 0 ? [BACKUP_REMINDER] : [])];
 
         return warn(lines.join(' · '), {
-          // The commands, in the order a user runs them: every removal, then the reminder that the
-          // backups still hold what was removed.
-          remedy: [...here.map((e) => `${e.command}        (run from this folder)`),
-            ...(backups.count > 0 ? [BACKUP_REMINDER] : [])].join('\n             → '),
+          // ARC-08 (Sitting A D1) — the TEXT detail keeps the folders; the JSON one does not.
+          // `checkToJson` copies an explicit list of fields, so a field it does not name cannot
+          // reach a pasted report by accident — which is why this is a separate key rather than a
+          // flag threaded through the renderer.
+          textDetail: textLines.join(' · '),
+          remedy: remedyLines.join('\n             → '),
+          // `command` stays: the `--fix` report renders it as its own "run:" line, and dropping it
+          // silently removed that. What changes is that the TEXT renderer no longer prints it a
+          // second time below the remedy — which is what put the reminder above the step.
           command: here[0]?.command ?? elsewhere[0]?.command,
           data,
         });

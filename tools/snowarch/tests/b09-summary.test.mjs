@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DESIGN_CACHE_STEPS, doctorCounts, run as runB09, warningsFrom } from '../lib/steps/B09.mjs';
-import { EXPECTED_DIALOGS, spellings, summaryBlock } from '../lib/text.mjs';
+import { EXPECTED_DIALOGS, spellings, summaryBlock, ADD_INSTANCE } from '../lib/text.mjs';
 import { cachePath } from '../lib/doctor-cache.mjs';
 import { bootstrapCommand } from '../lib/bootstrap.mjs';
 import { commandArgs, makeCheckout, recorder } from './helpers/workspace.mjs';
@@ -43,7 +43,26 @@ test('the counts come from this run when no doctor exists, and from the doctor w
 
   const fromDoctor = doctorCounts(state, { root: '/repo', hasDoctor: true,
     run: () => ({ stdout: JSON.stringify({ summary: { ok: 41, warn: 0, fail: 0 } }) }) });
-  assert.deepEqual(fromDoctor, { ok: 41, warn: 0, fail: 0, source: 'doctor' });
+  assert.deepEqual(fromDoctor, { ok: 41, warn: 0, fail: 0, source: 'doctor', failures: [] });
+
+  // Sitting A — the FAILING CHECKS travel with the count. The summary printed `1 fail` and named
+  // nothing, and by the time anyone ran the full doctor the failure had gone: the only run that
+  // saw it is the only run that could have said what it was. They were already in this JSON.
+  const withFailure = doctorCounts(state, { root: '/repo', hasDoctor: true,
+    run: () => ({ stdout: JSON.stringify({
+      summary: { ok: 8, warn: 0, fail: 1 },
+      checks: [
+        { id: 'E-10', status: 'fail', title: 'settings.local toggles match the recorded mode',
+          detail: 'mode is live but servicenow is disabled', remedy: './snowarch doctor --fix' },
+        { id: 'SV-02', status: 'ok', title: 'store' },
+      ],
+    }) }) });
+  assert.deepEqual(withFailure.failures,
+    ['E-10 FAIL settings.local toggles match the recorded mode: mode is live but servicenow is '
+      + 'disabled — ./snowarch doctor --fix'],
+    'a count with nothing named is a number nobody can act on');
+  assert.equal(withFailure.failures.length, withFailure.fail,
+    'both directions: every counted failure is named, and nothing else is');
 
   // A doctor that answers nothing usable falls back rather than printing zeros.
   const unparsable = doctorCounts(state, { root: '/repo', hasDoctor: true,
@@ -164,8 +183,50 @@ test('AC 1 — the last five lines of a real run are the block', async () => {
   // The spelling comes from `spellings()` for THIS shell, not from a POSIX literal: on the Windows
   // runner the block correctly says `snowarch.cmd`, and asserting `./snowarch` there was the test
   // choosing a platform and then checking a different one.
-  assert.equal(last[4], `      Add a live instance later with ${spellings().cli} mode live, `
-    + 'or /snowarch setup-instance inside Claude.');
+  // Built from ADD_INSTANCE rather than retyped: ARC-05-S06 criterion 3 is that this remedy has ONE
+  // definition, and a test that spells its own copy is a second one that drifts the same way the
+  // doctor's Mode line did.
+  assert.equal(last[4], `      Add a live instance later: run ${ADD_INSTANCE(spellings().cli)}.`);
   // ...and the step line is above them, not below.
   assert.match(log.lines.at(-6), /^\[B09\/09\] summary … ok/);
+});
+
+
+/**
+ * ARC-08 (Sitting A) — the gate asked whether `snowarch` is on PATH; the spawn needs the launcher
+ * in THIS checkout.
+ *
+ * Nobody installs `snowarch` globally to use a checkout, so the gate was false in ordinary use, the
+ * doctor was never asked, and B09 printed its fallback tally under a line that says DOCTOR. That
+ * tally counts `state.steps`, which PERSISTS between runs — so a step that failed in an earlier run
+ * was reported by a later, successful one. Sitting A watched `mode design` succeed and print
+ * `1 fail`, and the failure was B06's, from the `mode live` before it.
+ */
+test('ARC-08 — the doctor is asked because the launcher is in the checkout, not because it is on PATH', () => {
+  const state = stateWith({ B00: { status: 'ok' }, B06: { status: 'fail' } });
+  let spawned = null;
+
+  const counts = doctorCounts(state, {
+    root: '/repo',
+    hasDoctor: true,
+    run: (exec, args) => { spawned = args; return { stdout: JSON.stringify({ summary: { ok: 9, warn: 0, fail: 0 } }) }; },
+  });
+
+  // Separators normalised: `join()` gives backslashes on Windows, and a forward-slash substring
+  // check would fail there for a reason that has nothing to do with what this test is about.
+  assert.ok(spawned.some((a) => String(a).replaceAll('\\', '/').includes('tools/snowarch/bin/snowarch.mjs')),
+    'the spawn runs the checkout\'s own launcher by absolute path — so PATH is the wrong question');
+  assert.equal(counts.source, 'doctor');
+  assert.equal(counts.fail, 0,
+    'a step that failed in an EARLIER run must not be reported by a later, successful one');
+});
+
+test('ARC-08 control — without the doctor, the tally is the persisted steps, and that is the defect', () => {
+  // Kept as a control so the fix above cannot be mistaken for cosmetics: this is what the user saw.
+  const state = stateWith({ B00: { status: 'ok' }, B06: { status: 'fail' } });
+  const fallback = doctorCounts(state, { root: '/repo', hasDoctor: false });
+
+  assert.equal(fallback.source, 'bootstrap');
+  assert.equal(fallback.fail, 1,
+    'the fallback counts state.steps, which persists — which is why it must not be the usual path');
 });

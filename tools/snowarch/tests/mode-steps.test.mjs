@@ -45,7 +45,16 @@ test('criterion 1 — a live switch caches B01–B03 and runs B04 onwards', asyn
   const root = makeCheckout();
   const ran = [];
   const registry = STEPS.map((s) => stub(s.id, {
-    runsWhen: () => true, inputs: () => [], onRun: async () => { ran.push(s.id); return { status: 'ok' }; },
+    runsWhen: () => true,
+    inputs: () => [],
+    // ARC-06-C7 — B07 is the step that records the mode, so its stub records it too. Before that
+    // ruling `mode.mjs` wrote the mode before any step ran, and this assertion passed whether or
+    // not the switch had actually happened; now it means what it says.
+    onRun: async (ctx) => {
+      ran.push(s.id);
+      if (s.id === 'B07') ctx.state.mode = ctx.mode;
+      return { status: 'ok' };
+    },
   }));
   // B01–B03 have a recorded `ok` whose hash still matches, so the runner stands on them. That is
   // the runner's rule, exercised here rather than restated.
@@ -111,8 +120,12 @@ test('...and says so: the instance is kept, and a running Claude has to reconnec
   assert.equal(text.includes(instanceKeptNote({ label: 'dev1', env: {} })), true);
   assert.match(text, /mode live re-enables it/);
   assert.match(text, /instance remove dev1 deletes it/);
-  // The sentence that separates "it did not work" from "it works after a reconnect".
-  assert.equal(text.includes(restartSentence('servicenow')), true);
+  // ARC-06 (Sitting A) — the sentence follows the mode being switched TO. This is a `design` run,
+  // so it must be the design sentence: the previous one told the user to reconnect in order to LOAD
+  // a server the switch had just turned off, which is the opposite of what happens next.
+  assert.equal(text.includes(restartSentence('servicenow', 'design-only')), true);
+  assert.equal(text.includes(restartSentence('servicenow', 'live')), false,
+    'a design switch must not carry the live wording');
 });
 
 test('AC 3 — the SessionStart hook follows Node, in both directions', () => {

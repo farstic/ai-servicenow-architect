@@ -1,14 +1,3 @@
-/**
- * The instance manager: one store, one precedence, and a report of what happened.
- *
- * Before ARC-04-S02 there were four configuration sources and the legacy wizard store
- * returned EARLY, overriding env-defined instances — the override was documented by a
- * test rather than intended (P-21). Now there is one store module, one precedence, and
- * `load()` returns a LoadReport so the caller can say what was loaded, what was refused
- * and why, instead of the server guessing from an empty instance map.
- *
- * Flag SEMANTICS — how a flag gates a tool — are ARC-04-S03. This module only loads.
- */
 import { ServiceNowClient } from './client.js';
 import { type StoreError, type StoreSource } from '../store/index.js';
 import { type Flags, type InstanceRuntime } from './context.js';

@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECK_IDS } from '../../src/doctor/types.js';
+import { pollutingAncestors } from '../../src/doctor/checks.js';
 
 /**
  * The doctor as a user runs it: the built CLI, in a child process, against a fixture store.
@@ -286,6 +287,51 @@ describe('criterion 6 - no credential in the JSON output', () => {
 });
 
 describe('SV-07 and SV-08', () => {
+  // ── ARC-08 (Sitting A) — the home directory is not an ancestor project ──────────────────────
+  //
+  // Measured on Claude Code 2.1.258, on the sitting checkout (home redacted):
+  //
+  //   Loading skills from: managed=…, user=~/.claude/skills, project=[<checkout>/.claude/skills]
+  //
+  // `project=[…]` names only the checkout. SV-08 counted the USER scope as an ancestor project and
+  // told the owner to move his checkout out from under his own home — a remedy nobody can follow.
+  // NOT named `home`: the file-level fixture is called that, and a local `const home` SHADOWS it —
+  // so `afterEach` removed the outer directory and left these behind. That is exactly how the first
+  // version of these two tests leaked into TMPDIR. The `finally` is what removes them.
+  it('SV-08 does not report the home directory, even when ~/.claude/skills exists', () => {
+    const fakeHome = mkdtempSync(join(tmpdir(), 'sv08-home-'));
+    try {
+      mkdirSync(join(fakeHome, '.claude', 'skills'), { recursive: true });   // the user scope
+      const checkout = join(fakeHome, 'work', 'checkout');
+      mkdirSync(join(checkout, '.claude', 'skills'), { recursive: true });
+
+      // The check filters the checkout's own directory (it is expected); the finding is what is ABOVE it.
+      const above = pollutingAncestors(checkout, fakeHome).filter((p) => p !== checkout);
+      expect(above).toEqual([]);
+    } finally {
+      rmSync(fakeHome, { recursive: true, force: true });
+    }
+  });
+
+  it('SV-08 still reports a REAL ancestor project between the checkout and the home', () => {
+    // Both directions: the case S-13 actually measured must keep warning, and must name the
+    // ancestor it found — otherwise the exclusion above has silenced the check instead of correcting it.
+    const fakeHome = mkdtempSync(join(tmpdir(), 'sv08-home-'));
+    try {
+      mkdirSync(join(fakeHome, '.claude', 'skills'), { recursive: true });
+      const ancestor = join(fakeHome, 'projects');
+      mkdirSync(join(ancestor, '.claude', 'skills'), { recursive: true });
+      const checkout = join(ancestor, 'checkout');
+      mkdirSync(join(checkout, '.claude', 'skills'), { recursive: true });
+
+      const above = pollutingAncestors(checkout, fakeHome).filter((p) => p !== checkout);
+      expect(above).toContain(ancestor);
+      expect(above).not.toContain(fakeHome);
+    } finally {
+      rmSync(fakeHome, { recursive: true, force: true });
+    }
+  });
+
   it('SV-07 warns when the audit trail is switched off', async () => {
     writeStore();
     const r = await doctor(['--no-network', '--json'], { SNOW_AUDIT_FILE: 'off' });

@@ -1,6 +1,6 @@
 # ARC-10-S10. Blank issues are off: an install report without the doctor's JSON costs an exchange
 # to ask for it, and the person is usually gone by then. The two forms are the only routes in, and
-# the links below are the two places a question is more likely to be answered already.
+# the links below are the three places a question is more likely to be answered already.
 #
 # The links name the DEFAULT branch, and one of them (`docs/MIGRATION.md`) is not on it yet —
 # checked, not assumed: `git cat-file -e origin/main:docs/MIGRATION.md` fails today. That is not a
@@ -12,7 +12,10 @@ blank_issues_enabled: false
 contact_links:
   - name: Troubleshooting — the named failures and their remedies
     url: https://github.com/farstic/ai-servicenow-architect/blob/main/docs/TROUBLESHOOTING.md
-    about: Proxy, private CA, Node floor, registration and store problems, each with a remedy.
+    about: Every error code the server can return — proxy, private CA, store and instance problems — each with a remedy. The Node floor and the other bootstrap preflight failures are in docs/INSTALL.md under "What to do if".
+  - name: Installing — the preflight failures and their remedies
+    url: https://github.com/farstic/ai-servicenow-architect/blob/main/docs/INSTALL.md
+    about: Path A and Path B, the prerequisites and their floors, and what to do when a preflight check fails.
   - name: Migrating from the old repositories
     url: https://github.com/farstic/ai-servicenow-architect/blob/main/docs/MIGRATION.md
     about: The nine-step move from claude-servicenow-live / snow-mcp, in both shells.

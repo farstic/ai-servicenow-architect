@@ -31,7 +31,15 @@ export interface ListJson {
 }
 /** `list --json`. The store path is masked too: an absolute path carries the account name. */
 export declare function listJson(storePath: string, store: Store): ListJson;
-export declare const NO_INSTANCES = "No instances configured. Add one with: ./snowarch instance add <label> --url https://<host>";
+/**
+ * ARC-08-C7 — the SAME state as everywhere else, so the same remedy.
+ *
+ * This was the seventh wording, and it escaped the first scan by being plural: `No instanceS
+ * configured`. Being inside `instance list` is not a reason to send the reader somewhere different —
+ * `instance add` is the wizard alone, and it would leave them one step into a live mode the toggles
+ * do not reflect, in a terminal where `mode live` is just as available.
+ */
+export declare const NO_INSTANCES: string;
 /** One probe as the table shows it: `auth ok · write ok · …`, or a dash when none has run. */
 export declare function probeCell(probe: LastProbe | null): string;
 /**

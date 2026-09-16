@@ -409,3 +409,65 @@ test('nothing under lib/ opens ~/.claude.json, or anything else in the home dire
   // And the stripper does not eat a URL, which is the classic way this rewrite goes wrong.
   assert.match(stripComments("const u = 'https://example.com/docs';"), /https:\/\/example\.com\/docs/);
 });
+
+/**
+ * ARC-06 (Sitting A) — `mode design` must make design-only TRUE OF THE MACHINE.
+ *
+ * The owner's sequence: `mode live --register user --ack-user-scope`, then `mode design`. The mode
+ * line said design-only and `/mcp` still listed `servicenow ✔ connected · 5 tools` under User MCPs,
+ * in every project. `disabledMcpjsonServers` governs `.mcp.json` entries and nothing else, so the
+ * toggles B07 writes never reached that entry, and nothing mentioned it.
+ */
+const runDesign = async (root, { fake = fakeClaude(), state = {} } = {}) => {
+  bootstrapped(root, state);
+  const log = recorder();
+  const code = await modeCommand({
+    root, positional: ['design'], flags: { yes: true }, log, env: {}, cwd: root,
+    claudePath: '/fake/bin/claude', execClaude: fake.exec,
+    registry: [{ id: 'B00', title: 'preflight', needsNode: false, runsWhen: () => true,
+      cacheable: false, inputs: () => [], run: async () => ({ status: 'fail', detail: 'stub stop' }) }],
+  });
+  return { code, log, fake, text: log.lines.join('\n'), state: loadState(root) };
+};
+
+test('ARC-06 — mode design REMOVES a user-scope entry snowarch created, and says so', async () => {
+  const root = makeCheckout();
+  const r = await runDesign(root, {
+    state: { registration: 'user', registrationReason: CREATED_BY_US },
+  });
+
+  const [removed] = r.fake.of('remove');
+  assert.ok(removed, 'design-only left the user-scope entry in place — /mcp would still load it');
+  assert.ok(removed.args.includes('-s') && removed.args.includes('user'),
+    `the removal must name the scope: ${removed.args.join(' ')}`);
+  assert.match(r.text, /removed the user-scope entry/);
+  assert.equal(r.state.registration, 'project');
+});
+
+test('ARC-06 — an entry snowarch did NOT create is reported loudly and left alone', async () => {
+  // The rule from changeRegistration is kept: a tool that deletes configuration it did not create
+  // is a tool nobody runs twice. What changes is that we no longer stay silent about it.
+  const root = makeCheckout();
+  const r = await runDesign(root, {
+    state: { registration: 'user', registrationReason: 'found' },
+  });
+
+  assert.equal(r.fake.of('remove').length, 0, 'it must not delete an entry it did not create');
+  assert.match(r.text, /design-only is NOT in force/);
+  assert.match(r.text, /claude mcp remove .* -s user/, 'the command the user must run is named');
+  assert.match(r.text, /every project/, 'user scope affects every project — say it');
+
+  // ...and the recorded registration is LEFT ALONE. Calling it `project` while a user entry still
+  // loads the server would be the same false claim one layer down.
+  assert.equal(r.state.registration, 'user');
+});
+
+test('ARC-06 — a project registration in design mode needs no removal at all', async () => {
+  // Both directions: the toggle DOES cover `.mcp.json`, so nothing is spawned and nothing is said.
+  const root = makeCheckout();
+  const r = await runDesign(root, { state: { registration: 'project' } });
+
+  assert.equal(r.fake.of('remove').length, 0);
+  assert.doesNotMatch(r.text, /design-only is NOT in force/);
+  assert.equal(r.state.registration, 'project');
+});

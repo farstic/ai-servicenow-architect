@@ -71,7 +71,7 @@ export declare const svAudit: Check;
  * the S-13 addendum. Kept as a separate exported function so ARC-08 can re-home this check as
  * an engine check without moving the walk.
  */
-export declare function pollutingAncestors(dir: string): string[];
+export declare function pollutingAncestors(dir: string, home?: string): string[];
 export declare const svAncestorSkills: Check;
 /**
  * Does this build read the store that is there?

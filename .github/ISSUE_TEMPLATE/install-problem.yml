@@ -13,8 +13,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        Before anything else: **check `docs/TROUBLESHOOTING.md`** — most first-install problems are
-        named there with a remedy.
+        Before anything else: **check `docs/INSTALL.md` under "What to do if"** — every bootstrap
+        preflight failure is named there with its remedy — and **`docs/TROUBLESHOOTING.md`** for any
+        error code the doctor or the server printed.
 
         Nothing here is collected automatically. The product has no telemetry and never phones
         home; everything below is text you choose to paste.
@@ -34,7 +35,7 @@ body:
     id: windows-shell
     attributes:
       label: On Windows, which shell
-      description: Leave as `n/a` on macOS or Linux.
+      description: Pick `n/a` on macOS or Linux.
       options:
         - n/a
         - Native (`bootstrap.cmd` in cmd or PowerShell)
@@ -45,7 +46,7 @@ body:
     id: install-path
     attributes:
       label: Which install path
-      description: The three routes `docs/INSTALL.md` describes.
+      description: Path A or Path B from `docs/INSTALL.md`, or the move `docs/MIGRATION.md` describes.
       options:
         - A — terminal first (clone, then bootstrap)
         - B — Claude first (paste the sentence, let Claude run it)
@@ -78,8 +79,10 @@ body:
         This is the form that travels: instance labels read `<label>`, instance hosts read
         `<host>`, home-directory paths read `~`, and secrets are shown as `set (len n)` — never
         the value. Paste the whole thing.
-        Read it before you post it: if you find anything that identifies you or your instance, that
-        is a defect in the doctor and worth its own issue.
+        One thing it does carry by design: the path of this checkout below your home (`~/work/…`).
+        Stale registrations in other projects are reported as counts and server names only — the
+        other folders' names are not in the JSON. Read it before you post it: anything else that
+        identifies you or your instance is a defect in the doctor and worth its own issue.
       render: json
     validations:
       required: true

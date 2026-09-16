@@ -140,7 +140,7 @@ export function dedupeKeyFor(result) {
 /** The summary, with each de-duplicated condition counted once. */
 export function summariseMerged(results, checks) {
   const byId = new Map(checks.map((c) => [c.id, c]));
-  const summary = { ok: 0, warn: 0, fail: 0, skip: 0, fixable: 0 };
+  const summary = { ok: 0, warn: 0, fail: 0, skip: 0, fixable: 0, notInSection: 0 };
   const seen = new Set();
   for (const r of results) {
     const key = dedupeKeyFor(r);
@@ -149,6 +149,10 @@ export function summariseMerged(results, checks) {
       seen.add(key);
     }
     summary[r.status] = (summary[r.status] ?? 0) + 1;
+    // ARC-08 (Sitting A) — counted separately, and as a SUBSET of `skip`, never an addition to it.
+    // "You did not ask for this check" is not a fact about the machine, and listing 37 of them as
+    // findings buried the 2 that were.
+    if (r.status === 'skip' && r.detail === 'not in --section') summary.notInSection += 1;
     // The result's own answer first — see `checkToJson`. A check that can be fixable in general
     // still produces findings that are not.
     const fixable = r.fixable ?? byId.get(r.id)?.fixable ?? false;

@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { EXIT_CODES, labelExists } from '../../src/cli/instance.js';
+import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
 
 /**
  * ARC-07-S05 — the BUILT CLI, run as a process.
@@ -89,7 +90,8 @@ describe('the built CLI', () => {
     try {
       const r = run(['instance', 'list'], { SNOW_STORE: join(dir, 'instances.json') });
       expect(r.status).toBe(0);
-      expect(r.stdout).toContain('No instances configured');
+      // ARC-08-C7 — one remedy, from its definition.
+      expect(r.stdout).toContain(NO_INSTANCE_MESSAGE);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
