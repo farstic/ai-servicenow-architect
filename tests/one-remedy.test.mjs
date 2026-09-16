@@ -41,7 +41,10 @@ const FILES = ['README.md', 'docs/INSTALL.md', 'docs/ARCHITECTURE.md', 'bootstra
  * what do I do?" — so that question is what this matches, and the remedy is checked in the message
  * that answers it.
  */
-const STATE = /no (?:ServiceNow )?instance(?: is)? configured|No ServiceNow instance/i;
+// Singular AND plural. The pattern was a third enumeration: it listed the phrasings its author
+// could imagine, and `No instanceS configured` — the empty-store message in `format.ts` — walked
+// straight through it. Same state, seventh wording.
+const STATE = /no (?:ServiceNow )?instances?(?: (?:is|are))? configured|No ServiceNow instances?/i;
 const IS_COMMENT = /^\s*(\/\/|\*|#|<!--)/;
 
 /**
@@ -56,6 +59,10 @@ const IS_COMMENT = /^\s*(\/\/|\*|#|<!--)/;
 const ALLOWED = [
   { file: 'packages/snowarch/src/doctor/types.ts', needle: 'nothing to probe',
     state: 'a check DETAIL, not a remedy — it explains why a probe was skipped and offers nothing' },
+  { file: 'packages/snowarch/src/doctor/checks.ts', needle: "skip('SV-03'",
+    state: 'a check DETAIL for SV-03 — it reports why the check was skipped and offers no remedy' },
+  { file: 'packages/snowarch/src/doctor/checks.ts', needle: "skip('SV-04'",
+    state: 'a check DETAIL for SV-04 — same: a skip reason, with nothing offered to act on' },
   { file: 'tools/snowarch/lib/text.mjs', needle: 'firstRun',
     state: 'the session-start BANNER, which this file constrains to one line — "a nudge that wraps '
       + 'is a nudge that gets skipped". It offers the in-Claude half, which is the actionable one '
@@ -114,7 +121,11 @@ test('ARC-08-C7 — every mention of this remedy is the one remedy, or is allowl
     + 'Render ADD_INSTANCE, or add an entry to ALLOWED saying which state it belongs to.');
 
   // NON-VACUITY: the scan must actually be finding things, or an empty result proves nothing.
-  assert.ok(occurrences().length >= 5, 'the scan found almost nothing — the trees or the pattern moved');
+  // The floor moves with the pattern, or it stops meaning anything. Widening to `instances?` took
+  // the scan from 5 matches to 11; 9 leaves room for two legitimate removals while still failing
+  // loudly if the pattern stops matching or a tree is renamed out from under it.
+  assert.ok(occurrences().length >= 9,
+    `the scan found only ${occurrences().length} — the trees or the pattern moved`);
   assert.match(remedy, /mode live/);
 });
 

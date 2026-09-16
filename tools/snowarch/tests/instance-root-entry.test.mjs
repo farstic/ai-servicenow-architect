@@ -19,6 +19,7 @@ import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { CLI_PATH, preconditions, USAGE } from '../lib/instance.mjs';
+import { NO_INSTANCE_MESSAGE } from '../../../packages/snowarch/dist/no-instance.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -105,7 +106,9 @@ for (const entry of ENTRIES) {
       const store = join(dir, 'instances.json');
       const plain = run(entry, ['instance', 'list', '--all'], { SNOW_STORE: store });
       assert.equal(plain.status, 0, plain.text);
-      assert.match(plain.text, /No instances configured/);
+      // ARC-08-C7 — the empty-store line is the ONE remedy now, asserted from its definition so
+      // this test cannot become another copy of it.
+      assert.ok(plain.text.includes(NO_INSTANCE_MESSAGE), plain.text);
 
       const json = run(entry, ['instance', 'list', '--all', '--json'], { SNOW_STORE: store });
       assert.equal(json.status, 0, json.text);
