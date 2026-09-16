@@ -142,3 +142,45 @@ test('ARC-00 — the allowlist has no dead entries, and every entry says which k
     && a.kind !== 'quoted while closing' && a.kind !== 'dated historical record').length, 0,
   'no allowlist entry may describe a live owner decision — close it in the record instead');
 });
+
+test('the two copies of the relicensing record stay byte-identical', () => {
+  // `docs/RELICENSING.md` and `docs/spikes/licence/RELICENSING.md` are the same document: ARC-01
+  // imported the spike workspace "as-is", and nothing since has marked the copy frozen — its own
+  // README says later stories go on filling it in.
+  //
+  // They were identical by hand until today, which is a property that holds right up until somebody
+  // edits one. That is not hypothetical here: this pair carried the same stale `PENDING OWNER`
+  // sentence in both copies, and the correction had to be applied twice. A consent record that says
+  // two different things in two places is the worst version of a stale record, because each copy
+  // looks authoritative on its own.
+  //
+  // If they are ever MEANT to diverge — the spike copy freezing as history while the live document
+  // moves on — that is a deliberate decision: delete this test in the same commit that makes them
+  // differ, and say in the message which copy is the record and which is the history. Do not edit
+  // one and let this fail.
+  const live = readFileSync(join(root, 'docs/RELICENSING.md'), 'utf8');
+  const spike = readFileSync(join(root, 'docs/spikes/licence/RELICENSING.md'), 'utf8');
+
+  if (live !== spike) {
+    // A whole-file diff in an assertion message is unreadable; the first differing line is what
+    // somebody needs in order to see which copy they edited.
+    const a = live.split('\n');
+    const b = spike.split('\n');
+    // Scanned over the LONGER file. Searching only `a` finds nothing when the edit APPENDED lines —
+    // every line of the shorter file still matches — so `findIndex` returned -1 and the message read
+    // "diverged at line 0: <end of file> / <end of file>", which tells a reader nothing. Appending
+    // is the likeliest way somebody edits one copy, so it was the one case the message got wrong.
+    // Found by the control that edits a copy on purpose; the test failed either way, but only the
+    // control showed that it failed UNHELPFULLY.
+    const n = Math.max(a.length, b.length);
+    let i = -1;
+    for (let k = 0; k < n; k += 1) { if (a[k] !== b[k]) { i = k; break; } }
+    assert.fail(`the two copies diverged at line ${i + 1}:\n`
+      + `  docs/RELICENSING.md              ${JSON.stringify(a[i] ?? '<end of file>')}\n`
+      + `  docs/spikes/licence/RELICENSING  ${JSON.stringify(b[i] ?? '<end of file>')}`);
+  }
+
+  // NON-VACUITY: two empty or missing files would also be "identical".
+  assert.ok(live.length > 2000, `the record is only ${live.length} bytes — is this the right file?`);
+  assert.match(live, /Status: COMPLETE \(2026-09-07\)/, 'the copies match but the content moved');
+});
