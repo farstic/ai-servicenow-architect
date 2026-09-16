@@ -155,6 +155,21 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
     saveState(root, state);
   }
 
+  // ARC-06 (Sitting A) — DESIGN-ONLY MUST BE TRUE OF THE MACHINE, not just of our own toggles.
+  //
+  // `disabledMcpjsonServers` governs `.mcp.json` entries and nothing else. A user- or local-scope
+  // entry lives in `~/.claude.json`, outside that toggle, so `mode design` used to print
+  // "Mode: design-only" while `/mcp` still showed `servicenow ✔ connected · 5 tools` under User
+  // MCPs — in every project on the machine. The line asserted a state it had not checked.
+  if (!wantsLive && flags.register === undefined
+      && state.registration && state.registration !== 'project') {
+    const settled = await releaseScopedRegistration({
+      root, serverKey, state, log, exec: execClaude, env, claudePath,
+    });
+    if (!settled.ok) return refuse(settled.reason, settled.code ?? EXIT_FAIL);
+    if (settled.changed) saveState(root, state);
+  }
+
   const node = { present: true, version: process.versions.node,
     major: Number(process.versions.node.split('.')[0]) };
   const mode = wantsLive ? 'live' : 'design-only';
@@ -241,7 +256,7 @@ export function closingBlock({ outcome, state, root, serverKey, wantsLive, env,
   }
   if (outcome.next) parts.push(outcome.next);
   if (!wantsLive) parts.push(instanceKeptNote({ label: defaultLabel(root, readLabel), env }));
-  parts.push(restartSentence(serverKey));
+  parts.push(restartSentence(serverKey, wantsLive ? 'live' : 'design-only'));
   return parts.join('\n');
 }
 
@@ -266,6 +281,43 @@ function report({ state, root, flags, log, readLabel }) {
   log.step(line);
   log.step(registrationLine(state.registration));
   return EXIT_OK;
+}
+
+
+/**
+ * Switching to design-only: let go of a user- or local-scope entry, or say plainly that we cannot.
+ *
+ * Sitting A's sequence: `mode live --register user --ack-user-scope`, then `mode design`. The mode
+ * line said design-only and `/mcp` still listed the server, connected, under User MCPs — because
+ * the toggles B07 writes only reach `.mcp.json`.
+ *
+ * The rule from `changeRegistration` is kept: a tool that deletes configuration it did not create
+ * is a tool nobody runs twice. So an entry WE made is removed, and one we did not is reported in
+ * full with the command — and in that case the recorded registration is LEFT ALONE, because
+ * calling it `project` while a user entry is still loading the server would be the same false
+ * claim one layer down.
+ */
+export async function releaseScopedRegistration({ root, serverKey, state, log, exec, env,
+  claudePath = undefined }) {
+  const scope = state.registration;
+  const ownedByUs = state.registrationReason === CREATED_BY_US;
+  const path = claudePath === undefined ? resolveClaude({ env }) : claudePath;
+  const removed = unregister({ root, claudePath: path, env, ...(exec ? { exec } : {}),
+    serverKey, scope, ownedByUs });
+
+  if (!removed.ok && !removed.skipped) return { ok: false, reason: removed.reason };
+
+  if (removed.skipped) {
+    log.warn(`a ${scope}-scope ${serverKey} entry keeps the server loaded${scope === 'user' ? ' in every project' : ''}`
+      + ` — design-only is NOT in force; remove it with: claude mcp remove ${serverKey} -s ${scope}`);
+    return { ok: true, changed: false };
+  }
+
+  state.registration = 'project';
+  state.registrationReason = 'default';
+  log.step(`registration: removed the ${scope}-scope entry — design-only does not reach `
+    + `${scope === 'user' ? '~/.claude.json' : 'local scope'} through the toggles`);
+  return { ok: true, changed: true };
 }
 
 /**

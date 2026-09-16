@@ -46,7 +46,10 @@ test('C31 — a PRERELEASE on its own is not "available", and that is the decisi
   // candidate must not nudge every user to upgrade to it.
   const r = await e28(t, { tags: ['v2.0.0-rc.1'] });
   assert.equal(r.status, 'skip');
-  assert.match(r.detail, /advertises no release tags/);
+  // ARC-08 (Sitting A) — and it must SAY that is what happened. "advertises no release tags" reads
+  // as "the remote is empty" to somebody standing on v2.0.0-rc.2, which is where the owner was.
+  assert.match(r.detail, /no non-prerelease tags/);
+  assert.match(r.detail, /rc tags are ignored/, 'the decision is stated, not left to be inferred');
 });
 
 test('C31 — a prerelease BESIDE a release reports the release', async (t) => {
@@ -126,7 +129,8 @@ test('C32 — the empty outcome is cached: three runs, one remote call', async (
 
   const first = await E28.run(ctx);
   assert.equal(first.status, 'skip');
-  assert.equal(first.detail, 'origin advertises no release tags');
+  assert.equal(first.detail,
+    'origin advertises no non-prerelease tags; rc tags are ignored by this check');
   assert.equal(calls, 1);
 
   for (const run of [2, 3]) {

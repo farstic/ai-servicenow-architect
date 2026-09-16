@@ -143,8 +143,12 @@ export function renderText({ report, checks = [], colour = false }) {
       // The ID column is padded to the widest id in the report, so `E-00` and `SV-03` put their
       // statuses in the same place. A column that moves per row is a column a reader cannot scan,
       // and scanning for `FAIL` is what this layout is for.
+      // ARC-08 (Sitting A D1) — the TERMINAL may say more than the JSON. `textDetail` exists for
+      // exactly one reason: E-23 needs to name the other project folders here, where the user goes
+      // and runs the command, and must not name them in the `--json` a stranger pastes into a
+      // public tracker. `checkToJson` copies a fixed list of fields and does not copy this one.
       lines.push(`  ${result.id.padEnd(idWidth)} ${paint(label, colour)}${padding} `
-        + `${title}: ${result.detail ?? ''}`);
+        + `${title}: ${result.textDetail ?? result.detail ?? ''}`);
       // The remedy is indented UNDER its check rather than beside it: it is often the longest
       // string in the report, and a wrapped remedy that starts mid-line is the part people stop
       // reading.
@@ -152,7 +156,13 @@ export function renderText({ report, checks = [], colour = false }) {
         const fixable = byId.get(result.id)?.fixable ? '   [fixable: ./snowarch doctor --fix]' : '';
         lines.push(`             → ${result.remedy}${fixable}`);
       }
-      if (result.command) lines.push(`               ${result.command}`);
+      // ARC-08 (Sitting A D1) — not a SECOND time. `command` duplicates one of the remedy's lines
+      // for consumers that want a single runnable string (the `--fix` report's "run:" line). Printed
+      // again here it landed BELOW the remedy, so "then review and delete …" appeared above the step
+      // it refers to whenever the only removal was on that line.
+      if (result.command && !String(result.remedy ?? '').includes(result.command)) {
+        lines.push(`               ${result.command}`);
+      }
     }
   }
 

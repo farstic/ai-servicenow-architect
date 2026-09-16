@@ -36,15 +36,22 @@ test('E-23 names every stale entry, prints both removal commands and the .bak re
 
   const r = await run('E-23', root, home);
   assert.equal(r.status, 'warn');
-  const text = `${r.detail}\n${r.remedy}\n${r.command}`;
+  // `command` is gone (ARC-08, Sitting A D1): it duplicated the first removal onto a line BELOW the
+  // "then review and delete …" reminder, so the reminder printed before the step it refers to.
+  const text = `${r.textDetail}\n${r.remedy}`;
   assert.match(text, new RegExp(removalCommand(STALE.names[0]).replace(/[-]/g, '\\-')));
   assert.match(text, new RegExp(removalCommand(STALE.names[1]).replace(/[-]/g, '\\-')));
-  assert.match(text, /also registered under: \/old\/path/);
+  assert.match(r.textDetail, /also registered under: \/old\/path/,
+    'the TERMINAL still names the folder — it is where the user goes to run the command');
+  assert.doesNotMatch(String(r.detail), /also registered under/,
+    'the travelling detail must not name another project folder');
   // The REMINDER, counted by its own sentence rather than by the glob it contains — the line
   // names `.bak-*` twice on purpose (what to delete, and how to list it).
   assert.equal((text.match(/they retain the same secrets/g) ?? []).length, 1,
     'the .bak reminder appeared more than once');
   assert.match(r.detail, /1 ~\/\.claude\.json\.bak-\* file\(s\) present/);
+  assert.match(r.detail, /stale registration\(s\) under \d+ other project folder\(s\)/,
+    'the travelling detail carries counts and server names instead');
 
   // AC 1's second half: neither the password nor the username is anywhere in the output.
   assert.equal(text.includes(PASSWORD), false, 'the fixture password reached the output');
@@ -204,4 +211,64 @@ test('neither detector file can write, rename or delete anything', () => {
       assert.equal(code.includes(verb), false, `${rel} contains ${verb}`);
     }
   }
+});
+
+/**
+ * ARC-08 / ARC-10-S10 (Sitting A D1) — the `--json` a stranger is asked to paste must not carry
+ * the user's other project folders.
+ *
+ * The Install-problem issue template asks a reporter for `doctor --json`. On the owner's machine
+ * that JSON named four of his OTHER project folders — engagement and client folders on a
+ * consultant's laptop — nine times. `json-boundary.mjs` masks the HOME PREFIX, which is right for
+ * this checkout's own path and useless here: `~/Documents/work/<client>` survives it, and the
+ * client name is the whole of the secret.
+ *
+ * This is the refusal `tests/validation-records.test.mjs` already applies to records, pointed at
+ * the JSON — the repository's own rule that a record nobody can publish is a record nobody writes.
+ */
+test('ARC-08 — E-23 puts no project folder in anything that travels', async (t) => {
+  const root = greenTree(t);
+  const home = fixtureHome(t, { root });
+  const r = await run('E-23', root, home);
+
+  // Everything `checkToJson` copies, plus `data`, which it copies wholesale.
+  const travelling = JSON.stringify({ detail: r.detail, remedy: r.remedy, command: r.command,
+    data: r.data });
+
+  assert.doesNotMatch(travelling, /\/old\/path/, 'another project folder reached the JSON');
+  assert.doesNotMatch(travelling, /"project"/, 'the entries still carry a project path field');
+  // `~/.claude.json` and its `.bak-*` siblings are the SUBJECT of this check: a fixed filename
+  // every user has, naming nobody. Any OTHER home-relative path is a folder somebody chose, and
+  // that is what must not travel — so the refusal is written against those rather than against the
+  // tilde, which would have forced the finding to stop naming the file it is about.
+  const homePaths = String(travelling).match(/~\/[^"'\s,;)]*/g) ?? [];
+  assert.deepEqual(homePaths.filter((h) => !h.startsWith('~/.claude.json')), [],
+    'a user-chosen home-relative path reached the JSON');
+
+  // And the finding survives: counts, server names, and the credential SHAPE, which is the half
+  // that makes it urgent.
+  assert.match(String(r.detail), /stale registration\(s\) under \d+ other project folder\(s\)/);
+  assert.match(String(r.detail), /credential-shaped — set \(len \d+\)/);
+
+  // Both directions: the TERMINAL still names the folder, because that is where the user goes.
+  assert.match(String(r.textDetail), /\/old\/path/);
+});
+
+test('ARC-08 — one removal per DISTINCT server name, and the reminder comes last', async (t) => {
+  const root = greenTree(t);
+  const home = fixtureHome(t, { root });
+  const r = await run('E-23', root, home);
+
+  const lines = String(r.remedy).split('\n').map((l) => l.trim());
+  const removals = lines.filter((l) => l.includes('mcp remove'));
+  const names = new Set(removals.map((l) => l.split('mcp remove ')[1]?.split(' ')[0]));
+  assert.equal(removals.length, names.size, 'a server name was offered a removal twice');
+  assert.ok(names.size >= 2, 'both stale server names must get their own removal command');
+
+  // Sitting A saw "then review and delete …" printed ABOVE the command it refers to, because the
+  // only removal was on the renderer's separate `command` line.
+  const reminder = lines.findIndex((l) => l.includes('then review and delete'));
+  assert.ok(reminder > 0, 'the reminder is missing');
+  assert.ok(removals.every((l) => lines.indexOf(l) < reminder),
+    `"then …" must follow the steps it refers to:\n${lines.join('\n')}`);
 });

@@ -18,7 +18,7 @@ import { loadState } from '../../state.mjs';
 import { remedyFor } from '../../../../../packages/contract/lib/contract.mjs';
 import { defineCheck } from '../registry.mjs';
 
-import { ok, skip, warn } from './result.mjs';
+import { fail, ok, skip, warn } from './result.mjs';
 
 /** The four variables, in both spellings. POSIX tools read either; Windows sets the upper form. */
 export const PROXY_VARS = Object.freeze([
@@ -215,6 +215,21 @@ export function hostChecks() {
         // that record also found that `enabledMcpjsonServers` is not honoured before trust, so a
         // pending status in design-only means the disable toggle is not in force.
         if (!live && kind !== 'rejected') {
+          // ARC-06 (Sitting A) — a USER- or LOCAL-scope entry that is NOT rejected makes this a
+          // FAIL, not a warning. `disabledMcpjsonServers` governs `.mcp.json` and nothing else, so
+          // an entry in `~/.claude.json` keeps the server connected — in every project, for user
+          // scope — while the Mode line says design-only. The owner watched `/mcp` list
+          // `servicenow ✔ connected · 5 tools` under User MCPs after `mode design` reported success.
+          // A project-scope entry in this state stays a WARN: the toggle covers it, so something
+          // local went wrong rather than the mode being untrue of the machine.
+          if (entry.scope === 'user' || entry.scope === 'local') {
+            return fail(`design-only is not in force: a ${entry.scope}-scope entry keeps the server `
+              + `loaded${entry.scope === 'user' ? ' in every project on this machine' : ''}`, {
+              remedy: './snowarch mode design   (removes an entry snowarch created), or: '
+                + `claude mcp remove ${serverKey} -s ${entry.scope}`,
+              data,
+            });
+          }
           // Sitting A: the remedy used to be `./snowarch mode design` whatever the registration was,
           // printed twice because `remedy` and `command` carried the same string. For a LOCAL
           // registration it cannot work: `--register` defaults to "unchanged", so `mode design`
@@ -235,10 +250,18 @@ export function hostChecks() {
             data,
           });
         }
+        // ARC-08 (Sitting A) — OUR words for the state, not Claude's raw status.
+        //
+        // This line used to read `✘ Rejected (see disabledMcpjsonServers in settings)` inside an
+        // `ok`, which is a failure symbol reported as a success. The raw text stays in `data` for
+        // `--json`, where a machine reads it and a person does not.
+        const expected = !live && kind === 'rejected'
+          ? 'project entry present, disabled in design mode (expected)'
+          : statusLine;
         const scopeNote = entry.scope === 'local'
           ? ` · scope local (${state?.registration ?? 'registration not recorded'})`
           : '';
-        return ok(`${statusLine}${scopeNote} · read by running claude, which maintains its own `
+        return ok(`${expected}${scopeNote} · read by running claude, which maintains its own `
           + 'configuration file', data);
       },
     }),
@@ -331,7 +354,15 @@ export function hostChecks() {
           // neither.
           writeUpgradeCheck(ctx.root,
             { latestTag: null, localTag: describeExact(ctx.root, ctx.exec), behind: false, remote, now });
-          return skip(`${remote} advertises no release tags`);
+          // ARC-08 (Sitting A) — say WHY. `sortTags(...).filter((t) => t.pre === null)` drops
+          // prereleases on purpose, so a remote carrying only `v2.0.0-rc.N` has no latest RELEASE
+          // and this check has nothing to compare against. The old wording — "advertises no release
+          // tags" — read as "the remote is empty" to somebody standing on `v2.0.0-rc.2`, which is
+          // exactly where the owner was.
+          const sawPre = names.length > 0;
+          return skip(sawPre
+            ? `${remote} advertises no non-prerelease tags; rc tags are ignored by this check`
+            : `${remote} advertises no release tags`);
         }
 
         const localTag = describeExact(ctx.root, ctx.exec);

@@ -120,8 +120,12 @@ test('...and says so: the instance is kept, and a running Claude has to reconnec
   assert.equal(text.includes(instanceKeptNote({ label: 'dev1', env: {} })), true);
   assert.match(text, /mode live re-enables it/);
   assert.match(text, /instance remove dev1 deletes it/);
-  // The sentence that separates "it did not work" from "it works after a reconnect".
-  assert.equal(text.includes(restartSentence('servicenow')), true);
+  // ARC-06 (Sitting A) — the sentence follows the mode being switched TO. This is a `design` run,
+  // so it must be the design sentence: the previous one told the user to reconnect in order to LOAD
+  // a server the switch had just turned off, which is the opposite of what happens next.
+  assert.equal(text.includes(restartSentence('servicenow', 'design-only')), true);
+  assert.equal(text.includes(restartSentence('servicenow', 'live')), false,
+    'a design switch must not carry the live wording');
 });
 
 test('AC 3 — the SessionStart hook follows Node, in both directions', () => {

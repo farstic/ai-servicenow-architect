@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ADD_INSTANCE, EXPECTED_DIALOGS, MODE_VARIANTS, doctorLine, exportable, isWindowsShell, modeLine,
-  nextBlock, spellings, summaryBlock,
+  nextBlock, restartSentence, spellings, summaryBlock,
 } from '../lib/text.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -157,4 +157,20 @@ test('the add-an-instance remedy is one string, in every place that offers it', 
     `the Windows Next block does not carry the one remedy:\n${winBlock}`);
   assert.doesNotMatch(winBlock, /\.\/snowarch mode live/,
     'a Windows reader must not be handed the POSIX spelling');
+});
+
+test('ARC-06 — the restart sentence follows the mode being switched TO', () => {
+  // After `mode design` this used to say "reconnect to LOAD the server" — pointing the user at the
+  // thing the switch had just turned off. Seen on two of Sitting A's runs.
+  const live = restartSentence('servicenow', 'live');
+  assert.match(live, /to load the server/);
+
+  const design = restartSentence('servicenow', 'design-only');
+  assert.doesNotMatch(design, /to load the server/,
+    'design-only must not tell anyone to reconnect in order to load a server it just unloaded');
+  assert.match(design, /unload/);
+  assert.match(design, /will not be listed in \/mcp/, 'say what they will see, not what to do again');
+
+  // The default stays `live`, so every existing caller keeps its wording.
+  assert.equal(restartSentence('servicenow'), live);
 });

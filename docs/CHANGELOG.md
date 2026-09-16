@@ -235,6 +235,21 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **`mode design` now really turns the server off.** If you had registered the server for your whole
+  account, switching back to design-only said "Mode: design-only" while Claude Code still loaded it
+  in every project. The switch now removes a registration it created and says so — and if it did not
+  create it, it tells you plainly, with the command, instead of leaving you to discover it.
+- **Your other projects stay yours.** The health report's `--json` — the one the bug-report form
+  asks you to paste — listed the folder names of your other projects. It now reports how many and
+  which servers, without the folders. Your terminal still shows them, because that is where you go
+  to fix them.
+- **The clean-up advice is complete and in order.** It offered one removal command when two were
+  needed, and told you to "then" delete the backups before the step that comes first.
+- **Smaller wording fixes.** After switching to design-only the last line no longer tells you to
+  reconnect in order to load a server it just unloaded; the registration check no longer shows a ✘
+  inside a line marked ok; and "no release tags" now says that release candidates are ignored on
+  purpose, instead of sounding like the remote is empty.
+
 - **The install summary no longer reports a failure that already happened.** After a mode switch it
   could print `1 fail` even when the switch had just succeeded — the failure being counted was left
   over from an earlier run, and the health check it claimed to be quoting had never been asked. It

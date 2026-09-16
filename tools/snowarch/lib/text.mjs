@@ -153,8 +153,11 @@ export function registrationLine(kind) {
  * reaches it. Saying so here is the difference between "it did not work" and "it works after a
  * reconnect", which is a support conversation either way if the sentence is missing.
  */
-export const restartSentence = (serverKey) =>
-  `Restart claude (or /mcp → ${serverKey} → reconnect) to load the server.`;
+export const restartSentence = (serverKey, mode = 'live') => (mode === 'live'
+  ? `Restart claude (or /mcp → ${serverKey} → reconnect) to load the server.`
+  // ARC-06 (Sitting A) — after `mode design` the old sentence pointed the wrong way: it told the
+  // user to reconnect in order to LOAD a server the switch had just turned off. Seen on two runs.
+  : `Restart claude to unload the server — ${serverKey} will not be listed in /mcp afterwards.`);
 
 /**
  * `mode design` keeps the store. This says so, names the label, and gives the two commands that
