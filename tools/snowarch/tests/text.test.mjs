@@ -130,15 +130,31 @@ test('the add-an-instance remedy is one string, in every place that offers it', 
   assert.doesNotMatch(remedy, /instance add/,
     '`instance add` is the wizard alone: it leaves a live instance with design toggles around it');
 
+  // Each surface is checked against the remedy AS THAT SURFACE SPELLS THE LAUNCHER. The Next block
+  // renders `spellings().cli`, which is `snowarch.cmd` on Windows, so comparing it against the
+  // `./snowarch` default was the test choosing a platform and then checking a different one — it
+  // passed on macOS and failed on every Windows cell.
   const surfaces = {
-    'the doctor Mode line': MODE_VARIANTS.unconfigured,
-    'the bootstrap Next block': nextBlock({ mode: 'design-only', serverKey: 'servicenow' }),
+    'the doctor Mode line': [MODE_VARIANTS.unconfigured, ADD_INSTANCE()],
+    'the bootstrap Next block': [nextBlock({ mode: 'design-only', serverKey: 'servicenow' }),
+      ADD_INSTANCE(spellings().cli)],
   };
-  for (const [where, text] of Object.entries(surfaces)) {
-    assert.ok(text.includes(remedy), `${where} does not carry the one remedy verbatim:\n${text}`);
+  for (const [where, [text, expected]] of Object.entries(surfaces)) {
+    assert.ok(text.includes(expected), `${where} does not carry the one remedy verbatim:\n${text}`);
   }
 
   // Both directions — N places, counted. If a third surface starts offering its own wording, this
   // number is what makes somebody come back here instead of adding a fourth.
   assert.equal(Object.keys(surfaces).length, 2);
+
+  // WINDOWS, asserted from a machine that is not Windows. The first version of this test compared
+  // the Next block against the `./snowarch` default and was green here and red on four Windows
+  // cells for three pushes. `spellings()` takes the platform, so the case can simply be stated.
+  const win = spellings({ platform: 'win32', env: {} });
+  assert.equal(win.cli, 'snowarch.cmd', 'the premise moved: Windows no longer spells the launcher this way');
+  const winBlock = nextBlock({ mode: 'design-only', serverKey: 'servicenow', platform: 'win32', env: {} });
+  assert.ok(winBlock.includes(ADD_INSTANCE(win.cli)),
+    `the Windows Next block does not carry the one remedy:\n${winBlock}`);
+  assert.doesNotMatch(winBlock, /\.\/snowarch mode live/,
+    'a Windows reader must not be handed the POSIX spelling');
 });

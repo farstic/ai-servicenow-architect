@@ -212,7 +212,9 @@ test('ARC-08 — the doctor is asked because the launcher is in the checkout, no
     run: (exec, args) => { spawned = args; return { stdout: JSON.stringify({ summary: { ok: 9, warn: 0, fail: 0 } }) }; },
   });
 
-  assert.ok(spawned.some((a) => String(a).includes('tools/snowarch/bin/snowarch.mjs')),
+  // Separators normalised: `join()` gives backslashes on Windows, and a forward-slash substring
+  // check would fail there for a reason that has nothing to do with what this test is about.
+  assert.ok(spawned.some((a) => String(a).replaceAll('\\', '/').includes('tools/snowarch/bin/snowarch.mjs')),
     'the spawn runs the checkout\'s own launcher by absolute path — so PATH is the wrong question');
   assert.equal(counts.source, 'doctor');
   assert.equal(counts.fail, 0,

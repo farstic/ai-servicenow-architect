@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { ADD_INSTANCE } from '../tools/snowarch/lib/text.mjs';
@@ -86,7 +86,10 @@ function occurrences() {
   ];
   const found = [];
   for (const file of files) {
-    const rel = relative(root, file);
+    // Forward slashes ALWAYS: `relative()` answers in the platform's separator, so on Windows every
+    // allowlist key (written with `/`) missed and the scan reported five allowlisted occurrences as
+    // violations. The test was green on macOS and red on four Windows cells.
+    const rel = relative(root, file).split(sep).join('/');
     const lines = readFileSync(file, 'utf8').split('\n');
     lines.forEach((line, i) => {
       if (!STATE.test(line) || IS_COMMENT.test(line)) return;
@@ -127,6 +130,18 @@ test('ARC-08-C7 — every mention of this remedy is the one remedy, or is allowl
   assert.ok(occurrences().length >= 9,
     `the scan found only ${occurrences().length} — the trees or the pattern moved`);
   assert.match(remedy, /mode live/);
+});
+
+test('ARC-08-C7 — allowlist keys match on Windows too', () => {
+  // The scan keys the allowlist on a repo-relative path written with forward slashes, while
+  // `relative()` answers in the platform's separator. On four Windows cells that mismatch turned
+  // five allowlisted occurrences into reported violations, for three pushes, while this suite was
+  // green on macOS. The normalisation is asserted here rather than hoped for.
+  const windowsShaped = 'packages\\snowarch\\src\\doctor\\checks.ts';
+  assert.equal(windowsShaped.split('\\').join('/'), 'packages/snowarch/src/doctor/checks.ts');
+  for (const entry of ALLOWED) {
+    assert.doesNotMatch(entry.file, /\\/, `an allowlist key must be written with forward slashes: ${entry.file}`);
+  }
 });
 
 test('ARC-08-C7 — the allowlist has no dead entries', () => {
