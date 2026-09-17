@@ -240,6 +240,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   way — and a recommendation is the part people act on. The block is now the last word, and a
   disagreement with it has to be raised as an open question of its own.
 
+- **The specialists now call the customer-service agent screen by its current name.** ServiceNow
+  renamed it, and our guidance still used the old one throughout. Each file uses the new name, with
+  the old one in brackets on first mention, because the rename is only part-done upstream and a
+  reader will meet both.
+
 - **The doctor now notices a documentation corpus that is missing pieces.** It checked that the
   subject areas were all there, but not the handful of files every copy carries — so a corpus that
   had lost its licence file, to a hand-prune or an interrupted download, was reported as healthy.
