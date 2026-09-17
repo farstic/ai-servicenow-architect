@@ -21,6 +21,7 @@ const EVERY_KEY = [
   'present', 'path', 'pin', 'gitlink', 'head', 'pinMatchesGitlink', 'headMatchesPin',
   'family', 'branch', 'familyMatches', 'sparse', 'areasExpected', 'areasPresent', 'areasMissing',
   'mode', 'fileCount', 'sizeBytes', 'citations', 'longpaths', 'schema', 'gitlinkStaged',
+  'rootMissing',
 ];
 
 let scratch, upstream, upstreamUrl;
@@ -117,6 +118,40 @@ test('branch ≠ family is reported even while HEAD matches the pin', () => {
   const f = formatStatus(s);
   assert.equal(f.code, 1);
   assert.match(f.text, /family .*MISMATCH/);
+});
+
+/**
+ * ARC-03-C2 — the OTHER half of ADR-0008's "the doctor asserts corpus completeness".
+ *
+ * The area half has been checked since S06. The root files — the ones present at any cone — were
+ * checked only inside `syncCorpus`, by `checkCompleteness`, and nothing read them afterwards. So a
+ * corpus that lost `LICENSE` to a hand prune or a half-finished checkout reported present, on the
+ * pin, on the family, correctly sparse, citations clean.
+ *
+ * Driven against a REAL fixture rather than an injected status, because the claim being tested is
+ * that `docsStatus` looks at the disk. `tests/doctor/engine-docs.test.mjs` covers what E-12 then
+ * does with the answer.
+ */
+test('ARC-03-C2 — a corpus missing a root file reports it, and a complete one reports none', () => {
+  const w = workspace();
+  syncCorpus({ ...w, log: () => {} });
+  const corpus = join(w.root, CORPUS_DIR);
+
+  // The control first: this fixture is complete BEFORE the prune, or the assertion below would
+  // pass for the wrong reason — the fixture never having had a LICENSE at all.
+  assert.deepEqual(docsStatus({ root: w.root }).rootMissing, [],
+    'the fixture was already incomplete, so pruning it proves nothing');
+
+  rmSync(join(corpus, 'LICENSE'), { force: true });
+  assert.ok(!existsSync(join(corpus, 'LICENSE')), 'the fixture did not lose its LICENSE');
+
+  const s = docsStatus({ root: w.root });
+  assert.deepEqual(s.rootMissing, ['LICENSE']);
+  // And the rest of the corpus is untouched — this is a completeness defect, not a broken pin or a
+  // narrowed cone, and reporting it as one of those would send the operator somewhere else.
+  assert.equal(s.present, true);
+  assert.equal(s.headMatchesPin, true);
+  assert.deepEqual(s.areasMissing, []);
 });
 
 test('criterion 5 — one area missing: n−1 of n, MISMATCH, and the area is named', () => {
