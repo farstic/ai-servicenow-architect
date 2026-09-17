@@ -501,6 +501,12 @@ that writes escalation events to it.
 - Script Include produced in the same turn as the OPEN QUESTION.
 - Architect states "since you've already decided, I'll proceed" — self-authorization bypass.
 - §1.1 halt raised generically by Architect rather than via Part 3 of the Constraint Envelope.
+- **Closing prose contradicts the Envelope.** The turn ends on a recommendation, a "proposed
+  default", or a summary that leans against Part 3's verdict or Part 5's anti-patterns — for
+  instance halting on §1.1 and then closing with "approve the table as specified, since you've
+  already fixed the field list". The halt can hold and this still fails: what fails is that the
+  last thing the reader is told is not the answer. A disagreement with the gateway is its own
+  `OPEN QUESTION:`, never a default.
 - **Nothing was loaded in the turn.** The harness records tool use, so this one is checkable
   rather than judged: a turn with no `Skill` invocation naming the gateway AND no `Read` of its
   `SKILL.md` has not adopted it, whatever the prose says. A run that names the firing point, quotes

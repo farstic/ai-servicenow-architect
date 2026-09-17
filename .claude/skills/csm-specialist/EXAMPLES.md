@@ -11,7 +11,7 @@ Three examples exercising each §1.1 verdict path. Each example shows the full 5
 **Source:** Chief Architect, routing from a user request.
 **User request:** *"We need work-notes audit trail on customer cases — every change made to a case should be logged with the agent's name, timestamp, and what changed. Show me how to design this."*
 **Module:** CSM
-**Workspace:** CSM Configurable Workspace
+**Workspace:** CRM Workspace (formerly CSM Configurable Workspace)
 **Volume:** ~50K cases/year, ~3K active concurrent
 **Sensitivity:** PII (customer contact details on cases)
 
@@ -30,7 +30,7 @@ Three examples exercising each §1.1 verdict path. Each example shows the full 5
 
 ServiceNow CSM cases extend `task`, which inherits the platform's audit history machinery. The OOB audit flow for a `sn_customerservice_case` record is:
 
-1. **User opens case in CSM Configurable Workspace** — case form renders with `work_notes`, `comments`, and activity stream populated from `sys_journal_field` and `sys_history_set`.
+1. **User opens case in CRM Workspace** — case form renders with `work_notes`, `comments`, and activity stream populated from `sys_journal_field` and `sys_history_set`.
 2. **Agent makes a change** — any field write fires the dictionary's audit flag (`sys_dictionary.audit = true`) and writes a row to `sys_history_set` + `sys_history_line` capturing old value, new value, who, and when.
 3. **Agent adds a work note** — appends to `case.work_notes` journal; the activity stream renders it with agent name, timestamp, and the work-note body.
 4. **Activity stream rebuild** — the case form's activity-stream formatter (baseline UI formatter) reads from `sys_journal_field` + `sys_history_set` and renders the chronological audit log.
@@ -71,7 +71,7 @@ The audit-trail requirement is fully satisfied by three baseline constructs:
 
 1. **`work_notes` journal field** on `sn_customerservice_case` — captures agent commentary, timestamped, attributed.
 2. **`sys_history_set` + `sys_history_line`** — captures field-level changes (old value, new value, who, when) whenever auditing is enabled on the dictionary entry.
-3. **Activity stream formatter** on the case form — renders the combined timeline natively in CSM Configurable Workspace.
+3. **Activity stream formatter** on the case form — renders the combined timeline natively in CRM Workspace.
 
 No custom object needed. No new table. No new field. Pure configuration: ensure `sys_dictionary.audit = true` on the fields the engagement wants to audit (typically all of: `state`, `assigned_to`, `priority`, `category`, `account`, `contact`, `consumer`, `contract`, `entitlement`).
 
@@ -84,7 +84,7 @@ No custom object needed. No new table. No new field. Pure configuration: ensure 
 No Technical Designer dispatch needed. The configuration path:
 
 1. Confirm field-level audit flags in `sys_dictionary` for the fields the engagement wants to track. Typically baseline already audits `state`, `assigned_to`, `priority`; verify and extend as needed.
-2. Confirm the activity-stream formatter is enabled on the case form in CSM Configurable Workspace (baseline behaviour; verify it has not been removed in form layout).
+2. Confirm the activity-stream formatter is enabled on the case form in CRM Workspace (baseline behaviour; verify it has not been removed in form layout).
 3. If a structured *export* of the audit trail is needed (e.g., for compliance reporting), use a report or a Performance Analytics indicator over `sys_history_set`. No custom storage needed.
 
 Consult flags: none fire for this request. PII is present on the case form, but baseline ACLs on `sn_customerservice_case` already enforce read/write rules for agent vs customer roles — no architectural security work needed.
@@ -116,7 +116,7 @@ None. Requirement is fully satisfied by baseline configuration.
 **Source:** Chief Architect, routing from a user request.
 **User request:** *"We need to add a 'customer journey stage' on every customer service case — onboarding, adoption, expansion, renewal, churn. Agents should set it on case create; we want to report on case volume per stage."*
 **Module:** CSM
-**Workspace:** CSM Configurable Workspace
+**Workspace:** CRM Workspace
 **Volume:** ~80K cases/year
 **Sensitivity:** Internal CRM data, not PII
 
@@ -175,7 +175,7 @@ The smallest viable extension:
 - **Choice values:** `onboarding` / `adoption` / `expansion` / `renewal` / `churn`
 - **Mandatory:** No (agent may leave blank on case create if unknown; populate on next-touch)
 - **ACL:** Inherits `sn_customerservice_case` field ACL — no new ACLs required.
-- **Reporting:** Add to case-list view in CSM Configurable Workspace; Performance Analytics indicator `Cases by Customer Journey Stage` straightforward to define.
+- **Reporting:** Add to case-list view in CRM Workspace; Performance Analytics indicator `Cases by Customer Journey Stage` straightforward to define.
 
 (citation: markdown/customer-service-management/csm-data-management.md)
 
@@ -196,7 +196,7 @@ A new field on a baseline table is the smallest-scope custom object per §1.1's 
 Technical Designer's deliverable should include:
 
 1. **Field definition** — `u_customer_journey_stage` (Choice, 5 values), mandatory=No, default=blank.
-2. **Form layout update** — surface the field in CSM Configurable Workspace case form, near `account` / `contract` (customer-context cluster).
+2. **Form layout update** — surface the field in CRM Workspace case form, near `account` / `contract` (customer-context cluster).
 3. **List view update** — add column to baseline case list view (engagement default view).
 4. **Choice population** — populate `sys_choice` records for the five values.
 5. **Reporting note** — direction to Reporting & Analytics for the indicator (not Technical Designer's deliverable).
@@ -235,7 +235,7 @@ Consult flags:
 **Source:** Chief Architect, routing from a user request.
 **User request:** *"We need a separate 'case escalation' table for our CSM cases. Each escalation should track from-tier, to-tier, reason code, business-impact summary, and stakeholder list. We need a related list on the case form with full escalation history. Build the table and the Script Include that creates an escalation record when the agent clicks an Escalate button."*
 **Module:** CSM
-**Workspace:** CSM Configurable Workspace
+**Workspace:** CRM Workspace
 **Volume:** ~80K cases/year, ~10% escalate at least once (~8K escalation events/year)
 **Sensitivity:** Customer escalations include business-impact statements (potentially commercially sensitive)
 

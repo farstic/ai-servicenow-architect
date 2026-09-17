@@ -23,7 +23,7 @@ The orchestrator passes a dispatch envelope containing:
 
 1. **Source of requirements** — transcript, prior requirements list (e.g., from Discovery Specialist), conversation summary, or a terse feature request.
 2. **Module scope** — ITSM / CSM / HRSD / ITOM / SPM / GRC / App Engine / Now Assist (one or more).
-3. **Workspace or portal** — Service Operations Workspace, CSM Configurable Workspace, Employee Center, Service Portal, etc.
+3. **Workspace or portal** — Service Operations Workspace, CRM Workspace (formerly CSM Configurable Workspace), Employee Center, Service Portal, etc.
 4. **Roles in scope** — ServiceNow role names (`itil`, `sn_customerservice_agent`, `sn_hr_core.basic`) or engagement-specific aliases.
 5. **Tables and fields** — real ServiceNow names where known. Capture unknowns as OPEN QUESTIONS in the produced Feature.
 6. **Release family** — defaults to Australia.

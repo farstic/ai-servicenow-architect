@@ -28,7 +28,7 @@ Customer case lifecycle (portal + email intake → agent triage → resolution);
 
 ## Target-state requirements   (MoSCoW)
 - **M** Customers raise cases via **portal** and **email** (baseline Customer Service Portal + inbound email).
-- **M** Agents work cases in a **CSM Configurable Workspace**.
+- **M** Agents work cases in a **CRM Workspace (formerly CSM Configurable Workspace)**.
 - **M** On a product-outage case, agents see the **related ITSM incident** and its **service impact** (shared CSDM service layer).
 - **M** **Platinum** customers route to a **senior queue** with **faster SLAs** (entitlement/SLA by tier).
 - **S** Account data sourced/synced from the **external CRM**.
