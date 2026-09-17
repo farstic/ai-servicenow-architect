@@ -1107,12 +1107,43 @@ jobs:
             exit 1
           }
           $ErrorActionPreference = 'Stop'
+          # ARC-09-C42 — IMPORT it, do not merely list it.
+          #
+          # `Get-Module -ListAvailable` reads the module MANIFEST; it does not load the module. A
+          # half-extracted or broken install satisfies that check by its .psd1 and then throws a
+          # .NET null on first use — which is what #198 hit: the guard above stayed silent, the
+          # analyzer threw `Value cannot be null. Parameter name: source`, and the step's entire
+          # output was three lines with no version, no path and no way to tell a bad release from a
+          # partial extraction.
+          try {
+            Import-Module PSScriptAnalyzer -ErrorAction Stop
+          } catch {
+            Write-Host "PSScriptAnalyzer is installed but will not import: $($_.Exception.Message)"
+            Get-Module -ListAvailable PSScriptAnalyzer | Format-Table Name, Version, Path -AutoSize
+            exit 2
+          }
+          # Printed on EVERY run, including green ones. Before this, a passing run said nothing at
+          # all — which is why the version the last green run resolved cannot be recovered from any
+          # log, and why this job could not be pinned to a known-good version.
+          $m = Get-Module PSScriptAnalyzer
+          Write-Host "PSScriptAnalyzer $($m.Version) from $($m.ModuleBase)"
+
           # Write-Host is excluded, and only that: a launcher's banner IS console text, and
           # Write-Output would put it in the pipeline for a caller that captures the run.
-          $r = Invoke-ScriptAnalyzer -Path .\bootstrap.ps1 -Severity Error,Warning `
-                 -ExcludeRule PSAvoidUsingWriteHost
+          #
+          # A CRASH and a FINDING are different failures and now exit differently. They used to
+          # share exit 1, so a reader could not tell "the launcher has a problem" from "the linter
+          # broke" — the same shape as the exit-code overlap ARC-06-C10 closed.
+          try {
+            $r = Invoke-ScriptAnalyzer -Path .\bootstrap.ps1 -Severity Error,Warning `
+                   -ExcludeRule PSAvoidUsingWriteHost
+          } catch {
+            Write-Host "Invoke-ScriptAnalyzer itself failed — this is a CRASH, not a finding about bootstrap.ps1: $($_.Exception.Message)"
+            exit 3
+          }
           $r | Format-Table -AutoSize
-          if ($r.Count -gt 0) { exit 1 }
+          if ($r.Count -gt 0) { Write-Host "$($r.Count) finding(s) in bootstrap.ps1"; exit 1 }
+          Write-Host 'bootstrap.ps1: no findings'
       - name: The launcher parses under Windows PowerShell 5.1
         shell: powershell
         run: |

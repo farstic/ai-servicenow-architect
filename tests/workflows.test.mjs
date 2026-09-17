@@ -852,3 +852,45 @@ test('C19: the release judges its doctor report instead of letting -e decide', (
   assert.equal(/--deps/.test(ciCode), false,
     'a bootstrap cell passes --deps — the default is its shape and saying so would invite changing it');
 });
+
+/**
+ * ARC-09-C42 — the PowerShell linter step must be able to say which kind of failure it had.
+ *
+ * #198's `windows launcher` cell printed three lines: `Value cannot be null. Parameter name:
+ * source`, and an exit 1. No version, no path, no findings table — so a **bad module release**, a
+ * **partial extraction** and a **real finding about bootstrap.ps1** were indistinguishable, and the
+ * step's own `Get-Module -ListAvailable` guard had stayed silent because the manifest WAS there.
+ *
+ * These are structural assertions, and that limit is the point of saying it here: the behavioural
+ * control — break the import on purpose and watch it print the import sentence instead of the null
+ * — needs a Windows runner, and `pwsh` is not on the machine this suite runs on. What a test on
+ * this side CAN hold is that the step still carries each of the three distinctions. A step that
+ * loses one of them loses the ability to tell the next reader what happened.
+ */
+test('ARC-09-C42 — the analyzer step imports, prints its version, and separates a crash from a finding', () => {
+  const ci = wf('ci.yml');
+  const from = ci.indexOf('PSScriptAnalyzer (5.1 compatibility)');
+  assert.ok(from > 0, 'the PSScriptAnalyzer step is gone from ci.yml');
+  // Bounded by the NEXT step, not by indentation guessing: `- name:` at six spaces is what starts
+  // one in this file, and a slice that stops at the first two-space line stops inside the script.
+  const next = ci.indexOf('\n      - name:', from);
+  const step = ci.slice(from, next === -1 ? ci.length : next);
+  assert.ok(step.includes('Invoke-ScriptAnalyzer'), 'the slice did not capture the analysis itself');
+
+  // 1. It IMPORTS rather than listing. `-ListAvailable` reads a manifest; only an import loads the
+  //    assemblies that threw.
+  assert.match(step, /Import-Module PSScriptAnalyzer -ErrorAction Stop/,
+    'the step does not import the module, so a half-extracted install still passes its check');
+
+  // 2. It prints the version and the path, on EVERY run. Without this the value a `-RequiredVersion`
+  //    pin would need does not exist in any log — which is why this job is not pinned yet.
+  assert.match(step, /Write-Host "PSScriptAnalyzer \$\(\$m\.Version\) from \$\(\$m\.ModuleBase\)"/,
+    'the step no longer records which version it resolved');
+
+  // 3. Three failures, three exits, three sentences. Sharing exit 1 is what made #198 unreadable.
+  const exits = [...step.matchAll(/exit (\d)/g)].map((m) => m[1]);
+  assert.deepEqual([...new Set(exits)].sort(), ['1', '2', '3'],
+    `a crash, an import failure and a finding must not share an exit code — found: ${exits.join(', ')}`);
+  assert.match(step, /will not import/, 'the import failure has no sentence of its own');
+  assert.match(step, /this is a CRASH, not a finding/, 'a crash is not distinguished from a finding');
+});

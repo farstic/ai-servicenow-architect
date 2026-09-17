@@ -235,6 +235,10 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **When the Windows style-checker in our pipeline breaks, it now says so instead of looking like a
+  problem with the script it was checking.** It also records which version of the checker ran —
+  which no previous run did, so nobody could tell whether a bad release was the cause.
+
 - **The install page now says how to install a particular version, and counts its own steps
   correctly.** Its one command installs the latest release, which is right most of the time and
   wrong while a candidate is being tested — there is now a line for that, and a sentence explaining
