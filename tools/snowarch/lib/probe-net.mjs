@@ -131,6 +131,38 @@ export function classifyNetFailure(err, { host, proxy = null } = {}) {
   return proxy ? SENTENCE.proxyUnreachable(proxy) : SENTENCE.noRoute(host);
 }
 
+/**
+ * ARC-09-C40 — could a second probe plausibly survive this?
+ *
+ * The same question `transientReason` asks of git's stderr, asked of what THIS probe returns: an
+ * errno or DNS code, or an HTTP status. It is deliberately NOT `transientReason`: that classifier
+ * reads libcurl's words as git surfaces them, and applying it here would mean rendering structured
+ * codes back into prose so a text matcher could read them — throwing away better evidence than the
+ * one we would be reconstructing.
+ *
+ * What IS shared is the rule, stated once in `transientReason` and applied here unchanged: 408,
+ * 429 and any 5xx are the upstream asking to be asked again, and any other 4xx is a statement
+ * about the request that repeating does not change. The code families come from this module's own
+ * sets, never a second copy of them.
+ *
+ * Returns the LABEL the retry line prints, or `null` for "do not retry" — the same shape as
+ * `transientReason`, and for the same reason: a pause that will not say what it is waiting out is
+ * a pause nobody can debug from a CI log.
+ */
+export function probeRetryReason({ code = null, status = null } = {}) {
+  // An HTTP answer means the network worked; only the server's verdict is in question.
+  if (status !== null) return (status === 408 || status === 429 || status >= 500) ? `HTTP ${status}` : null;
+  if (code === null) return null;            // unclassified: do not spend the schedule on a guess
+  // PERMANENT WINS, consulted first, as it is in `transientReason`. A name that does not resolve
+  // and an intercepted TLS chain are both settled answers: three more attempts cost 12 s and
+  // return the same sentence.
+  if (isTlsCode(code) || code === NOTFOUND) return null;
+  if (code === 'EAI_AGAIN') return 'temporary DNS failure';
+  if (code === 'ETIMEDOUT_PROBE') return 'probe timed out';
+  if (REFUSED_CODES.has(code)) return code;
+  return null;
+}
+
 /** Open a CONNECT tunnel through the proxy, then hand back a socket TLS can run over. */
 function tunnel({ proxyUrl, host, port, timeoutMs }) {
   return new Promise((resolve, reject) => {

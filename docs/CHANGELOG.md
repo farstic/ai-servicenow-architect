@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **One unlucky moment on the network no longer stops the install before it starts.** The check that
+  runs first, to confirm the machine can reach the documentation host, gave up after a single try —
+  while the download step later in the same run has waited and retried for months. It now waits the
+  same way, and a failure that will never change still stops immediately and says so.
+
 - **Three specialists were repeating facts the documentation had changed.** The licensing guidance
   used the wrong set of tier names for AI products and understated how entitlements get assigned;
   the flow guidance was missing two trigger settings and a warning about re-running. All three now

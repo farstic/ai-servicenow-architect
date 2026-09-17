@@ -232,10 +232,22 @@ export const retryLine = (plan, phase) =>
  * say that retries HAPPENED.
  */
 export function stopSuffix(stderr, attempt) {
+  return attemptSuffix(attempt, transientReason(stderr) !== null);
+}
+
+/**
+ * The SENTENCE, without the git stderr — so B00's network preflight says it in the same words.
+ *
+ * ARC-09-C40 gave the preflight probe the same three-attempt schedule, and a second copy of this
+ * wording there would be two definitions of one sentence: the thing this repository keeps finding
+ * and removing. The classifier differs by necessity (git stderr against errno codes); the way a
+ * run reports how its retrying ENDED does not, and should not.
+ */
+export function attemptSuffix(attempt, stillTransient) {
   if (attempt < 2) return '';
-  return transientReason(stderr) === null
-    ? ` (stopped after ${attempt} attempts — this failure is not retried)`
-    : ` (${attempt} attempts)`;
+  return stillTransient
+    ? ` (${attempt} attempts)`
+    : ` (stopped after ${attempt} attempts — this failure is not retried)`;
 }
 
 // maxBuffer matters here and the default is not enough: `git ls-files -v -z` over this corpus emits

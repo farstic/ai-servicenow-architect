@@ -20,8 +20,8 @@ import { posix, resolve, win32 } from 'node:path';
 import { EXIT_PREREQ } from '../exit.mjs';
 import { remedyFor } from '../remedies.mjs';
 import { formatVersion, meetsFloor, parseVersion } from '../versions.mjs';
-import { MODE } from '../docs/sync.mjs';
-import { corpusProbe, probeNetwork } from '../probe-net.mjs';
+import { MODE, RETRY_WAITS_MS, attemptSuffix } from '../docs/sync.mjs';
+import { corpusProbe, probeNetwork, probeRetryReason } from '../probe-net.mjs';
 import { which } from '../which.mjs';
 import { INPUTS } from '../inputs.mjs';
 
@@ -212,17 +212,51 @@ export function checkDisk({ root, docs, plat, statfs = statfsSync }) {
  * An upstream that needs no network, or one this probe cannot speak to, is reported rather than
  * skipped in silence: the line says which, and the two are not the same claim.
  */
-export async function checkNetwork({ env, plat, probe = probeNetwork, target, upstream }) {
+/** A pause the tests replace, so the schedule is proven without being spent (ARC-03-C1's rule). */
+const pause = (ms) => new Promise((resolve) => { const t = setTimeout(resolve, ms); t.unref?.(); });
+
+export async function checkNetwork({ env, plat, probe = probeNetwork, target, upstream,
+                                     sleep = pause }) {
   const plan = target ? { local: false, probe: true, host: new URL(target).hostname, target }
     : corpusProbe(upstream);
   if (!plan.probe) return ok('network', plan.reason);
 
-  const r = await probe({ env, target: plan.target });
-  if (r.ok) {
-    return ok('network', `${plan.host} reachable (HTTP ${r.status})`
-      + (r.proxy ? ` via proxy ${r.proxy}` : ''));
+  // ARC-09-C40 — the same three attempts B02's checkout has had since ARC-03-C1, one step earlier.
+  //
+  // A preflight that failed a whole install on ONE unlucky HTTP probe was the ARC-03-C1 defect
+  // moved forward in the run: the same flaky minute that B02 survives by waiting 3 s used to stop
+  // the bootstrap before it started, and `bootstrap (macos-latest, node 24)` on #193 is the
+  // occurrence that made the case — exit 3 with no log, and disk or network the only two
+  // candidates.
+  //
+  // The SCHEDULE and the closing sentence are shared with B02 (`RETRY_WAITS_MS`, `attemptSuffix`);
+  // the CLASSIFIER is not, and deliberately: `transientReason` reads libcurl's words as git
+  // surfaces them, while this probe returns errno and DNS codes and an HTTP status. Rendering
+  // those back into prose so a text matcher could read them would discard the better evidence.
+  //
+  // COST, measured rather than assumed: a permanent class — a name that does not resolve, an
+  // intercepted TLS chain — stops on the first attempt and costs nothing, which is the common
+  // shape of a genuinely broken setup. Only a flaky network pays, and it pays at most the two
+  // waits (3 s + 9 s) plus its own probe timeouts.
+  let r;
+  for (let attempt = 1; ; attempt += 1) {
+    r = await probe({ env, target: plan.target });
+    if (r.ok) {
+      return ok('network', `${plan.host} reachable (HTTP ${r.status})`
+        + (r.proxy ? ` via proxy ${r.proxy}` : '')
+        + (attempt > 1 ? ` after ${attempt} attempts` : ''));
+    }
+    const reason = probeRetryReason(r);
+    const waitMs = RETRY_WAITS_MS[attempt - 1];
+    if (reason === null || waitMs === undefined) {
+      // Exhausted or permanent, told apart the way #186 tells them apart: `(3 attempts)` when the
+      // schedule ran out, `stopped after N` when the class turned settled partway through, and
+      // nothing at all after a single attempt, because a count of one is noise.
+      return fail('network', `${r.detail}${attemptSuffix(attempt, reason !== null)}`,
+        remedyFor('network', { platform: plat }));
+    }
+    await sleep(waitMs);
   }
-  return fail('network', r.detail, remedyFor('network', { platform: plat }));
 }
 
 /**

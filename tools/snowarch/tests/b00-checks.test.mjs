@@ -12,6 +12,9 @@ import { compareVersion, formatVersion, meetsFloor, parseVersion } from '../lib/
 import { which } from '../lib/which.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
 
+/** The upstream `engine.config.json` ships, shared by every network case below. */
+const CORPUS_UPSTREAM = 'https://github.com/ServiceNow/ServiceNowDocs.git';
+
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const FLOORS = JSON.parse(readFileSync(join(repoRoot, 'engine.config.json'), 'utf8')).floors;
 
@@ -187,20 +190,103 @@ test('check 4 — disk, with the full corpus asking for more than the sparse one
   assert.equal(unmeasured.status, 'warn');
 });
 
+/**
+ * ARC-09-C40 — the preflight probe retries, on the same schedule B02's checkout has had since
+ * ARC-03-C1.
+ *
+ * WHAT HAPPENED: `bootstrap (macos-latest, node 24)` on #193 exited 3 — EXIT_PREREQ — with no log,
+ * leaving disk and network as the only two candidates and no way to tell which. A preflight that
+ * fails a whole install on ONE unlucky HTTP probe is the ARC-03-C1 defect one step earlier in the
+ * same run: the flaky minute B02 survives by waiting 3 s used to stop the bootstrap before it
+ * started.
+ *
+ * The schedule is PROVEN WITHOUT BEING SPENT — `sleep` is injected, as ARC-03-C1 injects it — so
+ * these cases cost nothing and still assert the waits.
+ */
+test('ARC-09-C40 — a transient probe failure is retried and the check passes', async () => {
+  const slept = [];
+  let call = 0;
+  const probe = async () => {
+    call += 1;
+    if (call === 1) return { ok: false, status: 503, detail: 'github.com answered HTTP 503' };
+    return { ok: true, status: 200, proxy: null };
+  };
+  const r = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS_UPSTREAM,
+    probe, sleep: async (ms) => { slept.push(ms); } });
+
+  assert.equal(r.status, 'ok', r.detail);
+  assert.equal(call, 2, 'it did not try again after a retryable answer');
+  assert.deepEqual(slept, [3000], 'it waited something other than the planned first pause');
+  // The ok line says the retry happened. A run that recovered silently tells a CI reader nothing
+  // about a network that is degrading.
+  assert.match(r.detail, /after 2 attempts/, r.detail);
+});
+
+test('ARC-09-C40 — a permanent probe failure stops at once, and says what it was', async () => {
+  const slept = [];
+  let call = 0;
+  const probe = async () => {
+    call += 1;
+    return { ok: false, code: 'ENOTFOUND', detail: 'cannot reach github.com (DNS) — check your network and re-run' };
+  };
+  const r = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS_UPSTREAM,
+    probe, sleep: async (ms) => { slept.push(ms); } });
+
+  assert.equal(r.status, 'fail');
+  assert.equal(call, 1, 'a name that does not resolve was probed more than once');
+  assert.deepEqual(slept, [], 'it waited for a failure that will never change');
+  // A single attempt reports no count at all — the rule #186 set, shared through `attemptSuffix`
+  // rather than re-worded here.
+  assert.doesNotMatch(r.detail, /attempts/, r.detail);
+  assert.match(r.detail, /cannot reach github\.com \(DNS\)/);
+});
+
+test('ARC-09-C40 — the schedule runs out, and the count says so', async () => {
+  const slept = [];
+  let call = 0;
+  const probe = async () => { call += 1; return { ok: false, status: 503, detail: 'github.com answered HTTP 503' }; };
+  const r = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS_UPSTREAM,
+    probe, sleep: async (ms) => { slept.push(ms); } });
+
+  assert.equal(r.status, 'fail');
+  assert.equal(call, 3, `it made ${call} attempts, not three`);
+  assert.deepEqual(slept, [3000, 9000], 'it slept a schedule it had not planned');
+  assert.match(r.detail, / \(3 attempts\)$/, r.detail);
+});
+
+test('ARC-09-C40 — a failure that CHANGES CLASS says it stopped, not that it ran out', async () => {
+  // The case ARC-03-C3 found in the corpus checkout, at the probe: retryable first, settled second.
+  // The count alone would read as a third attempt owed and skipped.
+  const slept = [];
+  let call = 0;
+  const probe = async () => {
+    call += 1;
+    return call === 1
+      ? { ok: false, status: 503, detail: 'github.com answered HTTP 503' }
+      : { ok: false, code: 'ENOTFOUND', detail: 'cannot reach github.com (DNS) — check your network and re-run' };
+  };
+  const r = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS_UPSTREAM,
+    probe, sleep: async (ms) => { slept.push(ms); } });
+
+  assert.equal(call, 2);
+  assert.deepEqual(slept, [3000], 'it waited once, for the retryable answer, and not again');
+  assert.match(r.detail, / \(stopped after 2 attempts — this failure is not retried\)$/, r.detail);
+  assert.doesNotMatch(r.detail, /\(2 attempts\)/, 'it reads again as a third attempt owed and skipped');
+});
+
 test('check 5 — the network check turns a probe failure into a named remedy', async () => {
   // ARC-09-C29: the check needs to be told what this run will fetch. The upstream here is the one
   // `engine.config.json` ships, so these cases exercise the default configuration.
-  const CORPUS = 'https://github.com/ServiceNow/ServiceNowDocs.git';
-  const good = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS,
+  const good = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS_UPSTREAM,
     probe: async () => ({ ok: true, status: 200, proxy: null }) });
   assert.equal(good.status, 'ok');
   assert.match(good.detail, /github\.com reachable \(HTTP 200\)/);
 
-  const viaProxy = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS,
+  const viaProxy = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS_UPSTREAM,
     probe: async () => ({ ok: true, status: 200, proxy: 'http://***@p:8080' }) });
   assert.match(viaProxy.detail, /via proxy http:\/\/\*\*\*@p:8080/);
 
-  const bad = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS,
+  const bad = await checkNetwork({ env: {}, plat: 'darwin', upstream: CORPUS_UPSTREAM,
     probe: async () => ({ ok: false, detail: 'cannot reach github.com (DNS) — check your network and re-run' }) });
   assert.equal(bad.status, 'fail');
   assert.match(bad.remedy, /HTTPS_PROXY \/ NO_PROXY/);
