@@ -8,7 +8,7 @@ Two examples: a configurable-workspace design (Verdict A, configuration) and a �
 
 ### Context
 
-CSM gateway confirmed the agent surface is the **CSM Configurable Workspace** (not the portal) and the data model is baseline `sn_customerservice_case`. Technical Designer set the field/ACL model. Now design the agent experience.
+CSM gateway confirmed the agent surface is the **CRM Workspace (formerly CSM Configurable Workspace)** (not the portal) and the data model is baseline `sn_customerservice_case`. Technical Designer set the field/ACL model. Now design the agent experience.
 
 ### Output
 
@@ -37,7 +37,7 @@ Home (my work) → Case list → Case record page → (resolve) → back to list
 - Performance: side-panel data brokers (contracts, install base) should lazy-load on record open, not on list render; cap the related-cases query. Flag to Performance & Scale if case volume is high.
 
 ## §1.1 verdict
-**Configuration-only — PROCEED.** Baseline CSM Configurable Workspace configured in UI Builder; baseline components only. No new UX scope, no custom component.
+**Configuration-only — PROCEED.** Baseline CRM Workspace configured in UI Builder; baseline components only. No new UX scope, no custom component.
 
 ## Handoffs
 - Now Assist Specialist — the AI summarisation/agent-assist capability.

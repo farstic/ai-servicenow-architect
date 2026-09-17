@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The specialists now call the customer-service agent screen by its current name.** ServiceNow
+  renamed it, and our guidance still used the old one throughout. Each file uses the new name, with
+  the old one in brackets on first mention, because the rename is only part-done upstream and a
+  reader will meet both.
+
 - **A test fixture that could not be cleaned up no longer disappears from the report.** The tidy-up
   step deleted its own record of a directory it had just failed to delete, so the end-of-run check
   found nothing left to mention and said nothing. The directory stayed on disk, unexplained.

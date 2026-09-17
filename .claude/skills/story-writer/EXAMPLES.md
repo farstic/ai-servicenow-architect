@@ -224,9 +224,11 @@ The four scenarios cover happy path, exclusion, partial-data fallback, and confi
 
 ### Input prompt
 
-> *"Tier-2 CSM agents need cases auto-routed when an account hits a contract-renewal trigger. Specifically: any case opened against an account with `contract.renewal_status = 'AT_RISK'` should auto-assign to the account's Customer Success Manager. CSM module, CSM Configurable Workspace, roles: sn_customerservice_agent (tier-2), sn_customerservice_account_relationship_manager (CSM alias). Australia release. Sprint planning kicks off Monday — needs to be ready."*
+> *"Tier-2 CSM agents need cases auto-routed when an account hits a contract-renewal trigger. Specifically: any case opened against an account with `contract.renewal_status = 'AT_RISK'` should auto-assign to the account's Customer Success Manager. CSM module, CRM Workspace, roles: sn_customerservice_agent (tier-2), sn_customerservice_account_relationship_manager (CSM alias). Australia release. Sprint planning kicks off Monday — needs to be ready."*
 
 ### Expected output
+
+*Surface naming: the corpus renamed **CSM Configurable Workspace** to **CRM Workspace**; the steps below use the current name.*
 
 ```gherkin
 Feature: Auto-route case to CSM when account contract is at-risk
@@ -235,7 +237,7 @@ Feature: Auto-route case to CSM when account contract is at-risk
   So that high-stakes customer interactions land with the relationship owner immediately, not after triage delay
 
   Background:
-    Given the user is logged into CSM Configurable Workspace
+    Given the user is logged into CRM Workspace
     And the user holds the role sn_customerservice_agent
     And the case is being opened against an existing account record
     And the account has at least one active contract record
