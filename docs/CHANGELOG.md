@@ -235,6 +235,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The install page now says how to install a particular version, and counts its own steps
+  correctly.** Its one command installs the latest release, which is right most of the time and
+  wrong while a candidate is being tested — there is now a line for that, and a sentence explaining
+  the difference. The preflight count it quoted matched neither of the two ways the install can
+  run; it now describes both.
+
 - **A failed install now ends with a line saying what stopped it.** The exit number on its own was
   ambiguous — the same number means two different things in two parts of the product — so a log
   that had been cut short left the reader guessing. The last line now names the step, what that

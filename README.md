@@ -37,6 +37,15 @@ the doctor, the live wizard and the MCP server are what wait for Node.
 git clone https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
 ```
 
+**That installs the latest release.** `main` is whatever was released last; a **tag** is a specific version, including a release candidate, and `main` does not move to one until it ships. To install a named version — pinning a rollout, or testing a candidate — clone the tag instead:
+
+```sh
+git clone --branch v2.0.0 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
+```
+
+An existing checkout moves between versions with `./snowarch upgrade`, which is the better tool once
+you have one.
+
 On Windows, three lines instead — or double-click `bootstrap.cmd` in the folder:
 
 ```bat
@@ -52,7 +61,7 @@ Then `claude` in the same folder.
 The bootstrap shows its plan before it does anything, and every step prints one line. A real
 design-only run, start to finish:
 
-Six preflight checks print a line each (git, Claude Code, disk, network, Node, platform), and then:
+Five preflight checks print a line each on every path — git, Claude Code, disk, network, Node. The Node path adds two more lines, the checkout root and the platform, so a Node install prints seven and a Node-free one prints five. *(The root is checked on both; the Node-free launcher only speaks when it fails.)* Then:
 
 ```
 [B00/09] preflight … ok (0.7 s)
