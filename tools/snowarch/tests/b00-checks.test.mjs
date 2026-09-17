@@ -378,6 +378,58 @@ test('check 7 — the machine is recorded, and only 32-bit is worth saying anyth
   assert.equal(checkPlatform({ plat: 'win32', cpu: 'ia32', rel: '10.0' }).status, 'warn');
 });
 
+/**
+ * ARC-06-C11 — the install page's preflight count, pinned to the runner's own list.
+ *
+ * The page said *"Six preflight checks print a line each"* and named six. The Node path prints
+ * SEVEN — the sentence omitted `root` — and the Node-free launcher prints FIVE, because it reports
+ * no `platform` line and checks the root silently, speaking only when it fails. A number that is
+ * right for neither path a reader can be on is worse than no number: it is the kind of almost-right
+ * a reader trusts once and then has to re-count. Found by following Path A on Ubuntu and counting.
+ *
+ * The count comes from `Object.keys(result.data.checks)` — the runner's own answer, not a copy of
+ * it — so **adding a check fails this test and the page together**, which is the only arrangement
+ * that keeps a prose number true over time.
+ */
+test('ARC-06-C11 — docs/INSTALL.md states the preflight count the runner actually prints', async () => {
+  const r = await runB00({
+    root: '/repo', cwd: '/repo', docs: 'sparse', mode: 'design-only',
+    config: { floors: FLOORS, docs: { upstream: CORPUS_UPSTREAM } },
+    env: {}, plat: 'darwin', line: () => {},
+    exec: execWith({ 'claude --version': '2.1.258', 'claude --help': 'auth', 'claude auth status': 'ok',
+      'node --version': 'v22.11.0', 'npm --version': '10.9.0', 'git --version': 'git version 2.39.5',
+      'git -C': '/repo' }),
+    statfs: () => ({ bavail: 20_000_000, bsize: 4096 }),
+    probe: async () => ({ ok: true, status: 200, proxy: null }),
+  });
+
+  const ids = Object.keys(r.data.checks);
+  const onNode = ids.length;
+  // The two the Node path reports and the Node-free launcher does not. Named rather than counted,
+  // so a rename shows up here instead of silently keeping the arithmetic right.
+  const nodeOnly = ['root', 'platform'];
+  for (const id of nodeOnly) assert.ok(ids.includes(id), `${id} is no longer a B00 check`);
+  const onLauncher = onNode - nodeOnly.length;
+
+  // Spelled numbers, because the sentence is prose. One lowercase table and a capitaliser, rather
+  // than two tables that could disagree about the same number.
+  const WORD = { 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine' };
+  const Cap = (n) => WORD[n][0].toUpperCase() + WORD[n].slice(1);
+  const page = readFileSync(join(repoRoot, 'docs/INSTALL.md'), 'utf8');
+  const sentence = page.split('\n').find((l) => l.includes('preflight checks print a line each'));
+  assert.ok(sentence, 'the preflight sentence is gone from docs/INSTALL.md');
+
+  assert.ok(sentence.startsWith(`${Cap(onLauncher)} preflight checks print a line each`),
+    `the page opens with a count that is not the ${onLauncher} both paths print:\n${sentence}`);
+  assert.ok(sentence.includes(`prints ${WORD[onNode]}`),
+    `the page does not say the Node path prints ${WORD[onNode]}:\n${sentence}`);
+  assert.ok(sentence.includes(`Node-free one prints ${WORD[onLauncher]}`),
+    `the page does not say the Node-free path prints ${WORD[onLauncher]}:\n${sentence}`);
+  // The silence is the fact that made the old number wrong, so the page has to keep saying it.
+  assert.match(sentence, /root is checked on both/,
+    'the page no longer says the root is checked on the Node-free path too');
+});
+
 test('every check runs even after one has failed, and the summary counts them', async () => {
   // The rule this is about: an operator missing git AND behind a broken proxy should learn both in
   // one pass. A short-circuiting preflight makes that two runs, and the second failure feels like

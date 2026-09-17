@@ -183,7 +183,20 @@ test('the page stays a page, and the tail stays a tail', () => {
   // to lose an engagement folder or leave a password in `~/.claude.json` meets an install page
   // written for a fresh machine and follows it. Same rule as the last three moves — a cap is worth
   // moving for a fact, and nothing was deleted to pay for it.
-  assert.ok(install <= 279, `${install} lines of install page (criterion: 279)`);
+  // 288 since ARC-06-C12, and this one was bought by a validation run rather than by a review. The
+  // Ubuntu validation of v2.0.0-rc.4 could not be done from this page: Path A's one-line command
+  // clones the default branch, `main` was five days and about twenty merged pull requests behind the
+  // candidate, and the page documented no other case. The run had to deviate from the page to test
+  // the thing being released, and that deviation is in `docs/validation/2026-09-17-ubuntu.md`.
+  //
+  // Eight lines pay for the named-version clone, the sentence that `main` is the last released
+  // version while a tag is a specific one, and the pointer to `snowarch upgrade` for a checkout that
+  // already exists. The ninth is ARC-06-C11: the preflight sentence now states a count that is true
+  // on BOTH paths — seven lines on the Node path, five without it — where the old one was right for
+  // neither, and it says that the root is checked on both even though the Node-free launcher speaks
+  // only when it fails. Same rule as the five moves above: a cap is worth moving for a fact, and
+  // NOTHING WAS DELETED to pay for it.
+  assert.ok(install <= 288, `${install} lines of install page (criterion: 288)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.
