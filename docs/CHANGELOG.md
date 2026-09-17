@@ -240,6 +240,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   while the download step later in the same run has waited and retried for months. It now waits the
   same way, and a failure that will never change still stops immediately and says so.
 
+- **Three specialists were repeating facts the documentation had changed.** The licensing guidance
+  used the wrong set of tier names for AI products and understated how entitlements get assigned;
+  the flow guidance was missing two trigger settings and a warning about re-running. All three now
+  match the documentation they cite.
+
 - **A failing check in our own test pipeline now says what went wrong.** One step saved its output
   to a file so it could print it, but stopped at the failure and never got to the printing — so the
   one run where the output mattered reported a bare number and nothing else.

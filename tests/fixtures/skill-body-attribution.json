@@ -6,7 +6,8 @@
     "ARC-02-S04": "the agent preload: the persona skill arrives through `skills:` frontmatter rather than being re-read",
     "ARC-02-S12": "the retired-name sweep (9d90a0b)",
     "ARC-03-S04": "a dead citation repaired",
-    "ARC-03-C4": "the corpus renamed CSM Configurable Workspace to CRM Workspace, and our prose followed it — 25 mentions across 9 files, first mention per file carrying the old name in parentheses"
+    "ARC-03-C4": "the corpus renamed CSM Configurable Workspace to CRM Workspace, and our prose followed it — 25 mentions across 9 files, first mention per file carrying the old name in parentheses",
+    "ARC-03-C5": "a fact the cited page changed: the AI-native tier names and AI Control Tower's tier coverage, automatic entitlement assignment, and the record-trigger settings plus the reactivation re-run warning"
   },
   "_measured": "47 of 65 bodies differ (18 identical), 2026-09-17, against import/engine-v2.8.0-worktree. The five newly differing are EXAMPLES.md files that ARC-03-C4's rename reached and no earlier change had.",
   "files": {
@@ -104,7 +105,8 @@
     ],
     "skills/flow-designer-specialist/SKILL.md": [
       "ARC-02-S03",
-      "ARC-02-S06"
+      "ARC-02-S06",
+      "ARC-03-C5"
     ],
     "skills/hld-lld-writer/EXAMPLES.md": [
       "ARC-03-C4"
@@ -144,7 +146,8 @@
     ],
     "skills/licensing-specialist/SKILL.md": [
       "ARC-02-S03",
-      "ARC-03-S04"
+      "ARC-03-S04",
+      "ARC-03-C5"
     ],
     "skills/migration-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -156,7 +159,8 @@
     ],
     "skills/now-assist-genai/SKILL.md": [
       "ARC-02-S03",
-      "ARC-03-S04"
+      "ARC-03-S04",
+      "ARC-03-C5"
     ],
     "skills/now-assist-specialist/SKILL.md": [
       "ARC-02-S03",
