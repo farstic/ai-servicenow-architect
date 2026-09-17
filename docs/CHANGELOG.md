@@ -235,6 +235,10 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A failing check in our own test pipeline now says what went wrong.** One step saved its output
+  to a file so it could print it, but stopped at the failure and never got to the printing — so the
+  one run where the output mattered reported a bare number and nothing else.
+
 - **A blocked request no longer ends with a suggestion to go ahead anyway.** When the domain
   specialist blocks a design, the answer sometimes closed with a recommendation pointing the other
   way — and a recommendation is the part people act on. The block is now the last word, and a
