@@ -894,3 +894,52 @@ test('ARC-09-C42 — the analyzer step imports, prints its version, and separate
   assert.match(step, /will not import/, 'the import failure has no sentence of its own');
   assert.match(step, /this is a CRASH, not a finding/, 'a crash is not distinguished from a finding');
 });
+
+/**
+ * ARC-09-C42 — nothing but ASCII inside a `shell: powershell` step.
+ *
+ * WHAT HAPPENED: #201's first head failed to PARSE, not to run — `ParserError …
+ * TerminatorExpectedAtEndOfString`. GitHub writes a `shell: powershell` step to a `.ps1` with **no
+ * BOM**, and Windows PowerShell 5.1 then reads it in the ANSI code page. A UTF-8 em dash is
+ * `E2 80 94`; in cp1252 that is `â€"`, and `0x94` is the curly double quote `”`, which 5.1 accepts
+ * as a **string terminator**. So a sentence with an em dash inside a double-quoted string closes
+ * the string early and the parser dies before a single line runs.
+ *
+ * `pwsh` (7) reads UTF-8 and would not care. 5.1 is exactly what that job exists to test, which is
+ * why the rule is scoped to `shell: powershell` and not to the file.
+ *
+ * ONE LINE BROKE IT and ten did not: the ten were `#` comments, where a stray quote is harmless
+ * because a comment runs to end of line — four of them had been shipping green for months. The rule
+ * is still the whole block, because "ASCII except inside comments" is a rule nobody can apply while
+ * writing, and because this is the structural control the C42 docblock said was missing: it needs
+ * no Windows runner.
+ */
+test('ARC-09-C42 — no `shell: powershell` step carries a byte 5.1 will misread', () => {
+  const ci = wf('ci.yml');
+  const lines = ci.split('\n');
+  const blocks = [];
+  lines.forEach((line, i) => {
+    if (line.trim() !== 'shell: powershell') return;          // `pwsh` is UTF-8 and exempt
+    const indent = line.length - line.trimStart().length;
+    let j = i;
+    while (j < lines.length && !lines[j].trim().startsWith('run: |') && j <= i + 6) j += 1;
+    if (!lines[j]?.trim().startsWith('run: |')) return;
+    let k = j + 1;
+    while (k < lines.length
+      && (lines[k].trim() === '' || lines[k].length - lines[k].trimStart().length > indent)) k += 1;
+    blocks.push([j + 1, k]);
+  });
+  assert.ok(blocks.length >= 10, `only ${blocks.length} powershell blocks found — the scan moved`);
+
+  const offenders = [];
+  for (const [a, b] of blocks) {
+    for (let n = a; n < b; n += 1) {
+      const bad = [...lines[n]].filter((c) => c.codePointAt(0) > 127);
+      if (bad.length) offenders.push(`ci.yml:${n + 1}: ${[...new Set(bad)].join('')} in ${lines[n].trim().slice(0, 70)}`);
+    }
+  }
+  assert.deepEqual(offenders, [],
+    `${offenders.length} non-ASCII character(s) inside a Windows PowerShell 5.1 step. 5.1 reads these\n`
+    + 'steps in the ANSI code page, where an em dash decodes to a curly quote that terminates a\n'
+    + `string. Use a plain hyphen and straight quotes:\n  ${offenders.join('\n  ')}`);
+});
