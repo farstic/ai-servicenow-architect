@@ -9,6 +9,7 @@
 // E-12 and E-16 are FAIL and never WARN or SKIP when the corpus is absent. The engine's whole
 // claim is that its ServiceNow facts are grounded; reporting the failure of the thing the product
 // is FOR as a note in the margin is the one report that would mislead an operator into shipping.
+import { ALWAYS_DIRS, ROOT_FILES } from '../../docs/sync.mjs';
 import { docsStatus, E12_ABSENT, SPARSE } from '../../docs/status.mjs';
 import { defineCheck } from '../registry.mjs';
 
@@ -60,6 +61,27 @@ export function engineDocsChecks() {
             data: { present: false, mode, fix: { kind: 'corpus-missing', mode } },
           });
         }
+        // ADR-0008's Consequences say "ARC-03's doctor asserts corpus completeness", and until
+        // ARC-03-C2 only half of that was true: E-15 checks the AREAS, and nothing checked the
+        // files every corpus has. A corpus whose `LICENSE` or `llms.txt` was pruned by hand, or
+        // lost to a half-finished checkout, passed every check in this file — present, on the pin,
+        // on the family, correctly sparse, citations clean. The remedy is the same `docs sync`
+        // that would have caught it, because `checkCompleteness` has always looked at this list;
+        // it simply had no reader after the sync returned.
+        //
+        // Reported by E-12 rather than E-15 deliberately: these files are NOT part of the sparse
+        // set — `LICENSE` and `llms.txt` are there at any cone — so failing a check named "sparse
+        // set" on them would misname the defect. E-12 already reports a corpus that is on disk and
+        // nonetheless wrong (the mode-says-skip case below), which is the same kind of statement.
+        if (s.rootMissing?.length) {
+          const names = s.rootMissing.join(', ');
+          return fail(`the corpus is on disk but incomplete — missing ${names}`, {
+            remedy: 'run ./snowarch docs sync',
+            command: './snowarch docs sync',
+            data: { present: true, mode, rootMissing: s.rootMissing,
+              fix: { kind: 'corpus-missing', mode } },
+          });
+        }
         if (mode === 'skip') {
           // Present on disk while the recorded mode says the corpus was skipped: two records of
           // one fact that disagree. Which is right is not the doctor's to decide, so it reports
@@ -70,7 +92,8 @@ export function engineDocsChecks() {
             data: { present: true, mode, fix: { kind: 'corpus-missing', mode } },
           });
         }
-        return ok(`present (${mode})`, { present: true, mode, path: s.path });
+        return ok(`present (${mode}), ${ROOT_FILES.length + ALWAYS_DIRS.length} root entries`,
+          { present: true, mode, path: s.path, rootMissing: [] });
       },
     }),
 

@@ -240,6 +240,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   the old one in brackets on first mention, because the rename is only part-done upstream and a
   reader will meet both.
 
+- **The doctor now notices a documentation corpus that is missing pieces.** It checked that the
+  subject areas were all there, but not the handful of files every copy carries — so a corpus that
+  had lost its licence file, to a hand-prune or an interrupted download, was reported as healthy.
+  It is now reported, named, and repaired by the same sync that would have prevented it.
+
 - **A test fixture that could not be cleaned up no longer disappears from the report.** The tidy-up
   step deleted its own record of a directory it had just failed to delete, so the end-of-run check
   found nothing left to mention and said nothing. The directory stayed on disk, unexplained.

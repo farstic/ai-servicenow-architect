@@ -8,7 +8,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
-import { CORPUS_DIR, MODE, readAreas } from './sync.mjs';
+import { ALWAYS_DIRS, CORPUS_DIR, MODE, ROOT_FILES, readAreas } from './sync.mjs';
 import { verifyCitations } from './verify.mjs';
 
 /**
@@ -153,6 +153,11 @@ export function docsStatus({ root = process.cwd(), verify = true, measure: doMea
     head: null, pinMatchesGitlink: null, headMatchesPin: null,
     family: docs.family, branch: null, familyMatches: null,
     sparse: 'none', areasExpected, areasPresent: [], areasMissing: areasExpected,
+    // ADR-0008's other half. `checkCompleteness` has always checked these at SYNC time; nothing
+    // read them afterwards, so a corpus that lost `LICENSE` — pruned by hand, a half-finished
+    // checkout, a `git clean` — passed every doctor check ever written. An absent corpus is
+    // missing all of them, which is the honest reading rather than an empty list.
+    rootMissing: [...ROOT_FILES, ...ALWAYS_DIRS],
     mode: recordedMode(root), fileCount: null, sizeBytes: null,
     citations: null,
     // Only meaningful on Windows: elsewhere the setting does not exist and `false` would read as
@@ -190,6 +195,10 @@ export function docsStatus({ root = process.cwd(), verify = true, measure: doMea
     sparse,
     areasPresent,
     areasMissing: areasExpected.filter((a) => !areasPresent.includes(a)),
+    // One definition of "the files every corpus has", imported from the module that already owns
+    // it rather than retyped here — `ROOT_FILES` is `checkCompleteness`'s list, and a second copy
+    // would be a second thing to keep in step.
+    rootMissing: [...ROOT_FILES, ...ALWAYS_DIRS].filter((f) => !existsSync(join(corpus, f))),
     mode: base.mode ?? (sparse === SPARSE.full ? MODE.full : MODE.sparse),
     longpaths: process.platform === 'win32'
       ? git(['config', '--get', 'core.longpaths'], corpus).out === 'true'
