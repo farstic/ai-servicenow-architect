@@ -20,3 +20,24 @@ export const EXIT_INTERRUPTED = 130;   // 128 + SIGINT, the shell convention
 export const EXIT = Object.freeze({
   ok: EXIT_OK, fail: EXIT_FAIL, usage: EXIT_USAGE, prereq: EXIT_PREREQ, interrupted: EXIT_INTERRUPTED,
 });
+
+/**
+ * ARC-06-C10 — what each number MEANS, in words, beside the numbers.
+ *
+ * The overlap this file already names — `3` is "corpus missing" in the docs family and "prerequisite
+ * missing" here — was called tolerable, and an occurrence proved it is not. A CI log carrying
+ * `##[error]Process completed with exit code 3` and nothing else was read by someone with this file
+ * open, and mapped to the wrong family (#193, ARC-09-C40).
+ *
+ * Renumbering was the alternative and was rejected on evidence: the table is published in
+ * `docs/ARCHITECTURE.md`, `snowarch.cmd` prints its Node sentence with a hard-coded 3, and B02 keys
+ * remedies off the docs family's numbers. So the numbers stay and the RUN says which family it
+ * belongs to, on its last line — the number is never the only signal.
+ */
+export const EXIT_MEANING = Object.freeze({
+  [EXIT_OK]: 'ok',
+  [EXIT_FAIL]: 'a step failed',
+  [EXIT_USAGE]: 'usage error',
+  [EXIT_PREREQ]: 'a prerequisite is missing',
+  [EXIT_INTERRUPTED]: 'interrupted',
+});

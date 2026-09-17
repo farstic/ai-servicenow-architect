@@ -798,6 +798,19 @@ This is a **different table** from the `docs` one above, and the overlap is wort
 not present", which is why the two coexist — but a caller keying on a number must know which family
 it is reading. `lib/exit.mjs` holds these five and deliberately does not re-export the docs codes.
 
+**That overlap was called tolerable until it was not (ARC-06-C10).** A CI log carrying
+`##[error]Process completed with exit code 3` and nothing else was read by someone with `exit.mjs`
+open, and mapped to the wrong family. Renumbering was rejected on evidence — this table is published
+here, `snowarch.cmd` hard-codes `3` for its Node sentence, and B02 keys remedies off the `docs`
+numbers — so the numbers stay and **the run says which family it belongs to, on its last line**:
+
+```
+stopped at B00 — exit 3 (a prerequisite is missing): 2 prerequisite(s) missing: disk, network
+```
+
+Rendered by `stopLine` from `EXIT_MEANING` beside the numbers, printed last on purpose: it is the
+one line a truncated log is sure to carry, and the number is never the only signal.
+
 ## Versioning, tags and upgrade
 
 **One counter.** The engine, the server package and the tag all carry the same version, and exactly

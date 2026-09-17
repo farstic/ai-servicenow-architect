@@ -93,6 +93,19 @@ export function failureBlock({ id, cause, remedy, launcher = './bootstrap.sh' })
 }
 
 /**
+ * ARC-06-C10 — the LAST line of a failed run, and the only one a truncated CI log is sure to carry.
+ *
+ * Three lines above this one say what happened, and a reader who has them needs no more. A reader
+ * who has only `##[error]Process completed with exit code 3` has none of them — and `3` means two
+ * different things in this product. So the last line repeats the three facts the number cannot
+ * give: WHICH step stopped, what that number means in the family it came from, and the class.
+ *
+ * Last on purpose. A summary in the middle of a log is a summary nobody scrolls to.
+ */
+export const stopLine = ({ id, code, meaning, detail }) =>
+  `stopped at ${id} — exit ${code} (${meaning})${detail ? `: ${detail}` : ''}`;
+
+/**
  * The sentences the Node-FREE launchers print about the corpus.
  *
  * S10 and S11 have no Node and cannot run `verifyCitations`, so they check only that every area in
