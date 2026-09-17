@@ -49,6 +49,8 @@ Cite the path used. If a path is unavailable in the Australia branch, flag it ex
 - **Now Assist Skill Kit** lets teams build **custom** Now Assist skills with their own prompts and inputs/outputs over platform data. *(citation: `markdown/intelligent-experiences/now-assist-skill-kit/now-assist-skill-kit-landing.md`)*
 - **AI Agents / agentic** experiences (AI Agent Advisor, agentic workflows) orchestrate multi-step AI work with human-in-the-loop boundaries. *(citation: `markdown/intelligent-experiences/ai-agent-advisor-landing-page.md`)*
 - **AI Control Tower** is the governance surface — discover, monitor, manage, and audit AI features (ServiceNow and third-party) across the instance, including where third-party models are configured and routed. *(citation: `ai-control-tower/ai-control-tower-landing.md`, `ai-control-tower/configure-third-party-llms-using-ai-control-tower.md`)*
+- AI Control Tower is **included in every AI-native tier (Foundation, Advanced, Prime) with the same capabilities at each** — governance is not a tier upsell, which is the question this comes up in. *(citation: `markdown/intelligent-experiences/ai-native-sku-overview.md`)*
+- Its **Support Matrix** lists every AI system with its model providers, type, activation status and selected provider; a **Model Preview Program (MPP)** gives eligible users opt-in early access to models that are not yet generally available — worth naming in a governance review, because a preview model is a different risk posture from a GA one. *(citation: `markdown/intelligent-experiences/ai-control-tower/ai-model-providers.md`)*
 
 ## §1.1 awareness
 

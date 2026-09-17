@@ -40,6 +40,8 @@ You do not own:
 | Trigger | Use case | Notes |
 |---|---|---|
 | **Record** | Lifecycle automation: approvals, escalations, side-effects on insert/update | Runs in the context of the record. Composable equivalent of a Business Rule. |
+
+**Two record-trigger settings people miss, and one that bites.** *Run this trigger on extended tables* decides whether the trigger also fires for child classes; *Trigger on unique values* restricts it to genuine changes of the record's values. And the one that bites: **editing and reactivating an existing definition can make it run again for a trigger that was already fulfilled** — so a reactivation is a change to plan for, not a save. *(citation: `markdown/build-workflows/workflow-studio/add-configure-trigger.md`)*
 | **Scheduled** | Periodic batch work, housekeeping | If the work is purely scripty and not orchestration-shaped, prefer a Scheduled Job + Script Include. Flow is right when steps are heterogeneous. |
 | **Application** | Custom triggers from script | `sn_fd.FlowAPI` programmatic invocation. |
 | **REST** | Inbound API trigger to start a flow | The Scripted REST API that fronts the flow is Integration Specialist territory; the flow itself is yours. |
