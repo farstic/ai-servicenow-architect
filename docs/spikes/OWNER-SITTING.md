@@ -28,6 +28,28 @@ a person who has not read `docs/INSTALL.md`. No instance, no credentials.
 **Exit criterion.** Path A and Path B both pass on macOS, run by the owner; the design-only install
 reaches `Mode: design-only` and `./snowarch doctor` reports **0 FAIL**.
 
+> **RUN ON 2026-09-16 — the record is `docs/validation/2026-09-16-macos.md`.** The owner, macOS,
+> design-only, `v2.0.0-rc.2` at `a1340a6`, on a machine that was **not** clean — earlier
+> registrations of this product sat under other project folders.
+>
+> **The exit criterion is met on its own terms**: Path A reached `Mode: design-only` and
+> `./snowarch doctor` reported `30 ok, 4 warn, 0 fail` — **0 FAIL**. Path B is not measurable from
+> this account and remains so (see the note below, unchanged).
+>
+> Steps run: A1–A3, B1–B5, C1–C7, D1, E1–E4, F1, H. **Ten defects came out of it** — three in B06
+> (`ARC-06-C5`, `C6`, `C7`), six in the doctor and the bootstrap summary (`ARC-08-C3` to `C9`), and
+> the ADR initials (PR #184). The largest was `ARC-06-C6`: **`mode live` could not reach the wizard
+> on any machine**, which is a defect no CI cell had caught and the sitting found in minutes.
+>
+> Two exit-criterion caveats, stated rather than smoothed over: the bootstrap's own B09 summary
+> reported `1 fail` on this build while the doctor reported none (`ARC-08-C3`, cause `ARC-08-C6`),
+> so *"0 FAIL"* was true of the doctor and not of the line the installer prints last; and the
+> GitHub half of E4 is `n/a` with a reason — the default branch carries no issue templates until the
+> 2.0.0 milestone merge, which makes it a post-tag check.
+>
+> `ARC-06 R3` (the wizard against a real instance) is **not** a Sitting A row and has moved to
+> Sitting C, where there is an instance to run it against.
+
 > **The install page's second reader (ARC-06-S13, 2026-09-10).** Criterion 1 asks for two people
 > who did not write the page to follow Path A and reach `Mode: design-only` without opening any
 > other file. Reader one is the architect, on a fresh clone with Node hidden. **Reader two is the
