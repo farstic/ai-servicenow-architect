@@ -235,6 +235,10 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A test fixture that could not be cleaned up no longer disappears from the report.** The tidy-up
+  step deleted its own record of a directory it had just failed to delete, so the end-of-run check
+  found nothing left to mention and said nothing. The directory stayed on disk, unexplained.
+
 - **A corpus download that gave up early no longer claims it ran out of tries.** When the network
   failure changed to one that is never worth retrying — a name that will not resolve — the message
   still counted the attempts, which read as though another try had been promised and skipped. It
