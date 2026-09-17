@@ -515,22 +515,27 @@ are placed right; the naming collision is the real finding, and it is worth rena
 sections (`DR-1`…, say) before anyone runs them from this table.
 
 
+**Sitting A ran on 2026-09-16** (the owner, macOS, design-only, `v2.0.0-rc.2` @ `a1340a6`). The
+record is `docs/validation/2026-09-16-macos.md`; the T-10 runs that followed on rc.3 and on PR #188's
+heads are `docs/spikes/validation-runs/2026-09-17-rc3-design-only.md`. Rows below carry what was
+actually done. **A row nobody ran still says `open`** — the sitting is not a licence to tick.
+
 | Source story / criterion | What the owner does | Reader's location in OWNER-SITTING.md | Status |
 |---|---|---|---|
-| ARC-06-S01 AC5 | The registration sitting, item A1 | "The registration sitting" | open |
-| ARC-06-S05 AC6 | Registration sitting item 4 (toggle semantics; S-01 A1 CONFIRMED 2026-09-07 on 2.1.258) | "The registration sitting" | partly done |
-| ARC-06-S12 AC1, AC2, AC4, AC5, AC6 | Mode switching / `--register` in a real session (code halves tested by mode-steps, mode-register, mode-report) | "The registration sitting" | open |
-| ARC-06 R1 (`/mcp` + `/snowarch status` half), ARC-06-S10 AC1, ARC-06-S13 AC1 | Reader two of the install page (reader one, the architect with Node hidden, is recorded) | Sitting A | open |
-| ARC-06 R3 | A fresh user with Node 22 completing live mode: B06 wizard and B08 against an instance (see also C) | rows "The wizard against a real instance (ARC-07-S05)", "The live E2E suite (ARC-07-S11)" | open |
-| ARC-09 README "real upgrade on a lived-in machine" | `./snowarch upgrade` on the owner's machine from v2.0.0-rc.1 to v2.0.0 | Sitting A install rows | open (post-tag) |
+| ARC-06-S01 AC5 | The registration sitting, item A1 | "The registration sitting" | **done 2026-09-16** — steps C1–C7; project registration confirmed, `claude mcp get` reports project scope, rejected by `disabledMcpjsonServers` |
+| ARC-06-S05 AC6 | Registration sitting item 4 (toggle semantics; S-01 A1 CONFIRMED 2026-09-07 on 2.1.258) | "The registration sitting" | **done 2026-09-16** — toggle semantics observed across C1–C7 |
+| ARC-06-S12 AC1, AC2, AC4, AC5, AC6 | Mode switching / `--register` in a real session (code halves tested by mode-steps, mode-register, mode-report) | "The registration sitting" | **done 2026-09-16** — steps C5–C7. `mode live --register user` reached `/mcp` under *User MCPs*; the wizard itself did NOT (ARC-06-C6), and the user entry survived `mode design` until removed by hand at C7 |
+| ARC-06 R1 (`/mcp` + `/snowarch status` half), ARC-06-S10 AC1, ARC-06-S13 AC1 | Reader two of the install page (reader one, the architect with Node hidden, is recorded) | Sitting A | **done 2026-09-16** — steps B1–B4. `/mcp` shows the server disabled with no prompt; the `Mode` line quoted verbatim and undecorated |
+| ARC-06 R3 | A fresh user with Node 22 completing live mode: B06 wizard and B08 against an instance (see also C) | rows "The wizard against a real instance (ARC-07-S05)", "The live E2E suite (ARC-07-S11)" | **moved to Sitting C** — it needs a real instance, which Sitting A did not have |
+| ARC-09 README "real upgrade on a lived-in machine" | `./snowarch upgrade` on the owner's machine from v2.0.0-rc.1 to v2.0.0 | Sitting A install rows | open (post-tag) — pending the owner's own rc.2 → rc.3 upgrade step |
 | ARC-02-S09 AC5, ARC-07-S10 AC5 | Owner read-through of docs/MODES-AND-PRESETS.md; password managers | "The password managers, and one read-through"; ARC-07-S10 read-through row (lines 180-186) | open |
 | ARC-04-S14 c5 | Someone other than the author registers the server with a generic MCP client and calls `snow_core_status_read`, recorded | not listed (B04-08 proposes folding into A) | open, verify placement |
-| ARC-10-S10 AC1 (GitHub-rendering half) | The two issue forms as a stranger meets them | § A6 | open |
-| ARC-08-S02 AC1 / README-1 | `./snowarch doctor` reports 0 FAIL on a machine with `claude` installed (CI tolerates exactly E-00) | § D1 (OWNER-SITTING section label; not the Windows sitting; verify placement) | open |
-| ARC-08-S08 AC6, AC7 / README-5 | The SessionStart banner line quoted from a real session; Node-absent fallback by hand | § D3 (verify placement) | open |
-| ARC-08-S09 AC1 to AC6, ARC-05-S05 AC7 | `/snowarch status` rendered in four real sessions | § D4 "ARC-08-S09 — /snowarch status in four real sessions" (verify placement) | open |
-| ARC-08-S03 AC8 (real-machine sentence) | E-23 stale-registration report on the owner's real `~/.claude.json` | § D2 (verify placement; Windows `claude mcp get` half goes to D) | open |
-| ARC-00-S03 AC1, ARC-00 R11 | Initial the eight ADR Decision-owner rows and the ARC-00 gate sign-off block | not yet a row (B00-08/B00-09 add it) | open |
+| ARC-10-S10 AC1 (GitHub-rendering half) | The two issue forms as a stranger meets them | § A6 | `n/a` with a reason, **post-tag** — `/issues/new/choose` redirects to a blank issue because the default branch carries no issue templates until the 2.0.0 milestone merge. Not a defect; re-check after the tag, as the ARC-10-S08 rows are |
+| ARC-08-S02 AC1 / README-1 | `./snowarch doctor` reports 0 FAIL on a machine with `claude` installed (CI tolerates exactly E-00) | § D1 (OWNER-SITTING section label; not the Windows sitting; verify placement) | **done 2026-09-16** — `30 ok, 4 warn, 0 fail`, no FAIL lines |
+| ARC-08-S08 AC6, AC7 / README-5 | The SessionStart banner line quoted from a real session; Node-absent fallback by hand | § D3 (verify placement) | **done 2026-09-16** — steps B3/B4 (banner from a real session) and B5 (Node off `PATH`: *"doctor unavailable, until Node 20+ is installed"*) |
+| ARC-08-S09 AC1 to AC6, ARC-05-S05 AC7 | `/snowarch status` rendered in four real sessions | § D4 "ARC-08-S09 — /snowarch status in four real sessions" (verify placement) | **partly done 2026-09-16** — `/snowarch status` rendered and correct, and in DEFAULT mode it ran `doctor --quick --json` with no permission prompt (B4b). The *four real sessions* half was not run |
+| ARC-08-S03 AC8 (real-machine sentence) | E-23 stale-registration report on the owner's real `~/.claude.json` | § D2 (verify placement; Windows `claude mcp get` half goes to D) | **done 2026-09-16** — step D1: the stale-registration report on the owner's own machine, `--fix legacy` leaving the rest of the file alone |
+| ARC-00-S03 AC1, ARC-00 R11 | Initial the eight ADR Decision-owner rows and the ARC-00 gate sign-off block | not yet a row (B00-08/B00-09 add it) | **ADR half done 2026-09-16** (PR #184, initials `CG`). The ARC-00 gate sign-off block was not part of this sitting and stays open |
 | ARC-00 R3 2.1.214 cell, ARC-00-S11 AC2 | One-session pass on 2.1.214 | OWNER-SITTING archive marks the floor repeat OPTIONAL | optional |
 
 ### Sitting A, clean machines (executors other than the author)
