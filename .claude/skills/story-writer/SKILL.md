@@ -35,7 +35,7 @@ If the input is a raw transcript with no requirements yet extracted, the correct
 - The functional requirement, transcript, or Discovery output.
 - The release family in scope (default: Australia).
 - The module(s) in scope (ITSM / CSM / HRSD / ITOM / SPM / etc.).
-- The workspace or portal where the user interacts (`Service Operations Workspace`, `CSM Configurable Workspace`, `Employee Center`, etc.).
+- The workspace or portal where the user interacts (`Service Operations Workspace`, `CRM Workspace` (formerly CSM Configurable Workspace), `Employee Center`, etc.).
 - The persona/role list — ServiceNow role names or engagement aliases.
 - Sprint context: standalone story, story map, or part of an existing epic.
 
@@ -99,7 +99,7 @@ A Feature without an `OPEN QUESTIONS` block is suspicious. If you genuinely have
 - **Roles** use real ServiceNow role names (`itil`, `sn_customerservice_agent`, `sn_hr_core.basic`, `admin`) or the engagement-specific aliases the user has provided. **Never** write generic "user" without qualification.
 - **Tables and fields** are referenced by their actual ServiceNow names (`incident`, `sn_customerservice_case`, `sn_hr_core_case`, `priority`, `assigned_to`, `assignment_group`).
 - **State values** include label and value where ambiguity is possible: `Awaiting Info (state=3)`, `Resolved (state=6)`. Explicitly verify state vocabulary against the target instance — state values are commonly customised.
-- **Workspaces and portals** are named explicitly (`Service Operations Workspace`, `CSM Configurable Workspace`, `Employee Center`, `Service Portal`).
+- **Workspaces and portals** are named explicitly (`Service Operations Workspace`, `CRM Workspace`, `Employee Center`, `Service Portal`).
 - **Now Assist / AI Agent** scenarios reference the specific AI Agent or Now Assist skill by name and surface the AI Control Tower governance check if applicable.
 
 ## Acceptance criteria depth

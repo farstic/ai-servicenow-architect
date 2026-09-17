@@ -69,7 +69,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 
 | In scope (R1) | Out of scope (R1, deferred to R2–R4) |
 |---|---|
-| Case Escalation Button on CSM Configurable Workspace | Escalation analytics dashboards (R2) |
+| Case Escalation Button on CRM Workspace (formerly CSM Configurable Workspace) | Escalation analytics dashboards (R2) |
 | Mandatory reason picklist + escalation details free-text | On-Call rota integration (R3) |
 | State transition to "Escalated" (using existing baseline state value, TBD per OD-01) | De-escalation workflow (R4) |
 | Audit trail via case `work_notes` journal | Custom escalation history table (rejected per §1.1) |
@@ -113,7 +113,7 @@ flowchart LR
 
 ### 3.2 User journeys per persona
 
-**sn_customerservice_agent** — primary journey: identifies a case requiring senior attention, opens it in CSM Configurable Workspace, clicks "Escalate to Duty Manager" button on the form header, selects reason from the picklist and enters details, submits. Receives confirmation and continues working other cases.
+**sn_customerservice_agent** — primary journey: identifies a case requiring senior attention, opens it in CRM Workspace, clicks "Escalate to Duty Manager" button on the form header, selects reason from the picklist and enters details, submits. Receives confirmation and continues working other cases.
 
 **Regional duty manager (sn_user with assignment_group.manager relationship)** — primary journey: receives email notification with case number, link, reason, and details. Opens the case in the workspace, reviews the work-note audit trail, takes action (assigns to themselves, reassigns, etc.).
 
