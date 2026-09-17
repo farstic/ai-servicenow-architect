@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **One unlucky moment on the network no longer stops the install before it starts.** The check that
+  runs first, to confirm the machine can reach the documentation host, gave up after a single try —
+  while the download step later in the same run has waited and retried for months. It now waits the
+  same way, and a failure that will never change still stops immediately and says so.
+
 - **A blocked request no longer ends with a suggestion to go ahead anyway.** When the domain
   specialist blocks a design, the answer sometimes closed with a recommendation pointing the other
   way — and a recommendation is the part people act on. The block is now the last word, and a
