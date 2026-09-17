@@ -326,9 +326,18 @@ jobs:
             command -v node && exit 1
           fi
           start=$(date +%s)
-          ./bootstrap.sh --mode design --yes --skip-claude-check > "$RUNNER_TEMP/second.log" 2>&1
+          # `|| code=$?` and not a bare call: this step runs under `bash -e`, and the redirect means
+          # the ONLY record of what went wrong is the file. A bare call aborts the step at the
+          # failure, the `cat` below never runs, and the failure is reported as a number with no
+          # sentence attached. That is exactly what happened on `bootstrap (macos-latest, node 24)`:
+          # exit 3 arrived with nothing to read, and `3` is EXIT_PREREQ here and "corpus missing" in
+          # the docs family, so the number alone does not even name which. Capture, always print,
+          # then exit with the code the run actually returned.
+          code=0
+          ./bootstrap.sh --mode design --yes --skip-claude-check > "$RUNNER_TEMP/second.log" 2>&1 || code=$?
           echo "SECOND_SECONDS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
           cat "$RUNNER_TEMP/second.log"
+          exit $code
       # The Windows cells measure in PowerShell rather than Git Bash: using Git Bash here would put
       # a POSIX shell into the one cell whose premise is that there is not one. The encoding matters
       # too — `>` in 5.1 writes UTF-16LE — so the log goes through .NET as UTF-8 without a BOM, the
@@ -357,8 +366,10 @@ jobs:
           [System.IO.File]::WriteAllText("$env:RUNNER_TEMP\second.log", $out, $utf8)
           [System.IO.File]::AppendAllText($env:GITHUB_ENV, "SECOND_SECONDS=$seconds`n", $utf8)
           Write-Host $out
-          if ($rc -ne 0) { exit 1 }
-          exit 0
+          # `exit $rc`, not `exit 1`: the CODE is the diagnosis here. 3 is EXIT_PREREQ from B00 and
+          # "corpus missing" in the docs family — collapsing every failure to 1 throws away the one
+          # thing that says which, on the cells where reading the log is hardest.
+          exit $rc
 
       # ── the assertions, one implementation for every cell ────────────────────────────────────
       # Node is back on PATH here on purpose: it was removed for the RUN, which is the subject. A

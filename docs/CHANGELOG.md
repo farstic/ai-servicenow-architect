@@ -240,6 +240,15 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   the flow guidance was missing two trigger settings and a warning about re-running. All three now
   match the documentation they cite.
 
+- **A failing check in our own test pipeline now says what went wrong.** One step saved its output
+  to a file so it could print it, but stopped at the failure and never got to the printing — so the
+  one run where the output mattered reported a bare number and nothing else.
+
+- **A blocked request no longer ends with a suggestion to go ahead anyway.** When the domain
+  specialist blocks a design, the answer sometimes closed with a recommendation pointing the other
+  way — and a recommendation is the part people act on. The block is now the last word, and a
+  disagreement with it has to be raised as an open question of its own.
+
 - **The specialists now call the customer-service agent screen by its current name.** ServiceNow
   renamed it, and our guidance still used the old one throughout. Each file uses the new name, with
   the old one in brackets on first mention, because the rename is only part-done upstream and a

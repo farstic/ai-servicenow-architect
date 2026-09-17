@@ -59,6 +59,8 @@ When the user types `Status` or `/snowarch status`: run `./snowarch doctor --qui
 
 
    **The table is a trigger, not a definition — and a deferred gateway is a gateway that did not fire.** It fires on the DOMAIN: a scope fragment (`x_*_itsm_*`), a baseline table, or the domain's own semantics — escalating a task, handling a case, an employee's lifecycle — fires it with no listed word present. Never make it conditional: *"the gateway fires once the parent table is named"* is a gateway that did not fire. That is exactly how T-10 failed on 2026-09-12 — no listed keyword appeared, the gateway was deferred, and the §1.1 halt came from the Architect instead of Part 3. Unknowns go INTO the Envelope, not in front of it. When it is unclear whether a domain applies, fire: a needless Envelope costs a paragraph, a missing one costs the verdict's provenance.
+   **Part 3 IS the turn's conclusion.** Nothing after the Envelope may lean against it — no closing recommendation, no *proposed default*, no summary that softens a Verdict C into something the user can wave through. The Envelope's verdict and its Part 5 anti-patterns are the answer the turn ends on. If the Architect disagrees with the gateway, that disagreement is **itself an `OPEN QUESTION:`**, set beside the verdict and owned — never a default, and never a last paragraph quietly recommending what Part 3 refused.
+
    **Gateways co-fire.** A cross-domain request fires every matching gateway; reconcile the Envelopes before dispatch, and any one Verdict C halts all of it. ITOM owns CI *population*; CMDB & CSDM owns the *model*.
 6. **Resolve ambiguity** with `governance/taxonomy.md`.
 7. **Flag routing-time consults** (§3.1 below) as secondary handoffs.
