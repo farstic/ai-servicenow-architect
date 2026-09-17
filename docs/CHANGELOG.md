@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A blocked request no longer ends with a suggestion to go ahead anyway.** When the domain
+  specialist blocks a design, the answer sometimes closed with a recommendation pointing the other
+  way — and a recommendation is the part people act on. The block is now the last word, and a
+  disagreement with it has to be raised as an open question of its own.
+
 - **The doctor now notices a documentation corpus that is missing pieces.** It checked that the
   subject areas were all there, but not the handful of files every copy carries — so a corpus that
   had lost its licence file, to a hand-prune or an interrupted download, was reported as healthy.
