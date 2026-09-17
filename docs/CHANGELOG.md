@@ -235,6 +235,15 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A test fixture that could not be cleaned up no longer disappears from the report.** The tidy-up
+  step deleted its own record of a directory it had just failed to delete, so the end-of-run check
+  found nothing left to mention and said nothing. The directory stayed on disk, unexplained.
+
+- **The domain specialist can no longer be put off until later.** The keyword tables that say when
+  a domain expert is consulted read as though a request had to use one of the listed words, and as
+  though the consult could wait for a detail the request had not given yet. Both are closed: the
+  expert is consulted because the work is in their domain, and "once we know X" is not a consult.
+
 - **A corpus download that gave up early no longer claims it ran out of tries.** When the network
   failure changed to one that is never worth retrying — a name that will not resolve — the message
   still counted the attempts, which read as though another try had been promised and skipped. It

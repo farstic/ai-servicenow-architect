@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -65,7 +65,10 @@ function runProbe(probe, sandbox) {
 function leftBehind(sandbox) {
   let names = [];
   for (let attempt = 0; attempt < 10; attempt += 1) {
-    names = readdirSync(sandbox).filter((name) => name.startsWith('snowarch-'));
+    // `.owner` records are excluded from the COUNT — they are the instrument, and a survivor is
+    // now meant to keep one — but read below, because the record is the thing that says WHO.
+    names = readdirSync(sandbox)
+      .filter((name) => name.startsWith('snowarch-') && !name.endsWith('.owner'));
     if (names.length === 0) return { names, detail: '' };
     // 50 ms × 10: long enough for a teardown that is merely slow, short enough that a real leak
     // does not cost the suite half a second per case.
@@ -78,8 +81,16 @@ function leftBehind(sandbox) {
     // leaves behind (EBUSY, ENOTEMPTY, a file held open on another platform), and this function
     // cannot tell the two apart. It says what it observed; the child's stderr, in the assertion
     // message above, is what says which.
+    // The owner record is written BESIDE the fixture at creation, so it survives even a process
+    // that dies before any cleanup — and it names the test that made this one. When it is missing,
+    // say so: an absent record is itself a fact (either the fixture predates the instrument, or
+    // something removed the record and left the directory, which is ARC-09-C39's defect).
+    let owner = 'no owner record';
+    try {
+      owner = readFileSync(join(sandbox, `${name}.owner`), 'utf8').split('\n')[0];
+    } catch { /* left as "no owner record" */ }
     return `${name} (${contents.length === 0 ? 'EMPTY — removal started, entry lingering'
-      : `${contents.length} entries — not removed`})`;
+      : `${contents.length} entries — not removed`}; made by: ${owner})`;
   }).join(', ');
   return { names, detail };
 }
@@ -154,10 +165,20 @@ test('one fixture that will not go does not take the others with it', (t) => {
   const child = runProbe(probe, sandbox);
   assert.equal(child.status, 0, `${child.stdout}${child.stderr}`);
 
-  const left = readdirSync(sandbox).filter((n) => n.startsWith('snowarch-'));
+  const survivors = readdirSync(sandbox).filter((n) => n.startsWith('snowarch-'));
+  // `.owner` records are INSTRUMENTATION, not fixtures, and a stuck fixture is now meant to keep
+  // its own: the sweep deletes an owner record only when the directory it describes has actually
+  // gone. Counting them here would fail this test for the instrument working.
+  const left = survivors.filter((n) => !n.endsWith('.owner'));
   // At most the stuck one. Before the fix this was two or three, because the loop stopped.
   assert.ok(left.length <= 1,
     `${left.length} fixtures survived — one stuck directory aborted the sweep: ${left.join(', ')}`);
+  // Both directions on that exemption: every surviving fixture keeps its record, and no record
+  // outlives the fixture it names. An `.owner` with nothing beside it is an orphan, which is the
+  // instrument lying in the other direction.
+  assert.deepEqual(survivors.filter((n) => n.endsWith('.owner')).sort(),
+    left.map((n) => `${n}.owner`).sort(),
+    'the owner records do not match the fixtures still on disk');
   // ...and if one did survive, the sweep said so, with the errno and the Node major.
   if (left.length === 1) {
     // BOTH streams: the sweep writes to fd 2 from an exit handler, and `node --test` owns the
@@ -286,4 +307,75 @@ test('a removal that fails is reported with its errno, not just as a leftover', 
     `the report carries no errno, which is the one thing that names the cause:\n${said}`);
   // And the helper the assertion above uses must find it on whichever stream it landed on.
   assert.match(sweepOutput(child), /: (ENOTEMPTY|EACCES|EPERM|EBUSY)\b/);
+});
+
+/**
+ * The case the errno test above could not reach: the fixture has a TEST CONTEXT.
+ *
+ * WHAT HAPPENED, and it was diagnosed by the instrument rather than guessed at. `test (ubuntu-latest,
+ * node 24)` failed with `snowarch-bootstrap-GrwiZp (9 entries — not removed)` and, underneath it,
+ * `(neither stream mentioned the sweep)` — the line this file added so a leftover would arrive with
+ * its reason. The silence WAS the reason. Three facts settle it between them:
+ *
+ *   - the child exited 0, so nothing was killed and the exit handler had its turn;
+ *   - the sweep printed nothing, so it did not try and fail — it had nothing in `pending` to try;
+ *   - the `.owner` record was gone, and `leftBehind` would have listed it (it starts `snowarch-`
+ *     too), so something removed it. Only the after-hook and a SUCCESSFUL sweep do that, and a
+ *     successful sweep would have taken the directory with it.
+ *
+ * So the after-hook ran, its `remove(dir)` failed, it deleted the owner record anyway and then
+ * `pending.delete(dir)` struck the directory off the register of things still owed. The comment
+ * above that line said "the sweep's message is where a survivor gets reported" — and the line
+ * itself is what guaranteed the sweep would never see this survivor. The reporting path was cut
+ * off from the failure by the code that handled it.
+ */
+test('a teardown that FAILS to remove keeps the fixture on the register, and the sweep reports it', (t) => {
+  if (process.platform === 'win32') return;   // the permission shape is POSIX; Windows uses ACLs
+  const sandbox = mkdtempSync(join(tmpdir(), 'fixture-ctx-'));
+  t.after(() => {
+    const openUp = (dir) => {
+      try { chmodSync(dir, 0o700); } catch { /* nothing to open */ }
+      let entries = [];
+      try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) if (e.isDirectory()) openUp(join(dir, e.name));
+    };
+    openUp(sandbox);
+    rmSync(sandbox, { recursive: true, force: true });
+  });
+
+  // WITH a context — that is the whole difference from the test above, and it is the half of
+  // `trackTempDir` the suite had never driven to failure.
+  const probe = join(sandbox, 'probe.test.mjs');
+  writeFileSync(probe, [
+    "import { test } from 'node:test';",
+    `import { tempDir } from ${JSON.stringify(helper)};`,
+    "import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';",
+    "import { join } from 'node:path';",
+    "test('holds a fixture that cannot be removed', (t) => {",
+    "  const d = tempDir('snowarch-bootstrap-', t);",
+    "  mkdirSync(join(d, 'sub'), { recursive: true });",
+    "  writeFileSync(join(d, 'sub', 'f'), 'x');",
+    "  chmodSync(join(d, 'sub'), 0o500);",
+    '});',
+    '',
+  ].join('\n'));
+
+  const child = runProbe(probe, sandbox);
+  assert.equal(child.status, 0, `${child.stdout}${child.stderr}`);
+
+  // The report is the assertion. A teardown that swallowed the failure would leave this silent —
+  // which is precisely how the CI occurrence looked, and why it took three sightings to explain.
+  assert.match(sweepOutput(child), /fixture\(s\) survived on node /,
+    'the after-hook failed to remove it and the sweep said nothing — the survivor was struck off '
+    + `the register by the code that failed to remove it:\n${child.stdout}\n${child.stderr}`);
+  assert.match(sweepOutput(child), /: (ENOTEMPTY|EACCES|EPERM|EBUSY)\b/,
+    'the report carries no errno');
+
+  // BOTH DIRECTIONS on the instrument: the owner record must SURVIVE a failed removal, because a
+  // survivor whose creator is unknown is the state this whole chore exists to leave behind.
+  const owners = readdirSync(sandbox).filter((n) => n.endsWith('.owner'));
+  assert.equal(owners.length, 1, `the owner record was deleted for a fixture that is still there: ${owners}`);
+  const owner = readFileSync(join(sandbox, owners[0]), 'utf8');
+  assert.match(owner, /holds a fixture that cannot be removed/,
+    `the owner record does not name the test that made it:\n${owner}`);
 });
