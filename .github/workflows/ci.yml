@@ -1089,6 +1089,16 @@ jobs:
       - name: PSScriptAnalyzer (5.1 compatibility)
         shell: powershell
         run: |
+          # PINNED to 1.25.0 (ARC-09-C42 follow-up). The version is not a guess: it is what the
+          # first green run after the version-printing landed actually resolved -- run
+          # 35186868730, job "windows launcher", which printed
+          # `PSScriptAnalyzer 1.25.0 from <the runner's user modules path>` and
+          # `bootstrap.ps1: no findings`. Before that line existed no log carried a version at all,
+          # which is why this job could not be pinned and why the printing shipped first.
+          #
+          # An unpinned linter means every green run of this job is only as believable as whatever
+          # PSGallery served that minute. The version line stays: when the pin is raised, the next
+          # run says what it got, and the raise is evidence the same way this one is.
           # PSGallery answered "No match was found for the specified search criteria" once
           # (run 34424021998) after working on every run before it -- a registration hiccup on the
           # runner, not a finding. Registered explicitly and retried once, because a linter whose
@@ -1097,10 +1107,10 @@ jobs:
           if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
             Register-PSRepository -Default
           }
-          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck -Repository PSGallery
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck -Repository PSGallery -RequiredVersion 1.25.0
           if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
             Start-Sleep -Seconds 10
-            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck -Repository PSGallery
+            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -SkipPublisherCheck -Repository PSGallery -RequiredVersion 1.25.0
           }
           if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
             Write-Host 'PSScriptAnalyzer could not be installed from PSGallery'

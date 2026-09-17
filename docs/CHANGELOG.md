@@ -235,6 +235,10 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The Windows style-checker in our pipeline is pinned to a known version.** It used to install
+  whatever was newest at that moment, so a bad release upstream could fail a build for reasons
+  nothing in this project had changed.
+
 - **When the Windows style-checker in our pipeline breaks, it now says so instead of looking like a
   problem with the script it was checking.** It also records which version of the checker ran —
   which no previous run did, so nobody could tell whether a bad release was the cause.
