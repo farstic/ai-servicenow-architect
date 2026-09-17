@@ -501,6 +501,19 @@ that writes escalation events to it.
 - Script Include produced in the same turn as the OPEN QUESTION.
 - Architect states "since you've already decided, I'll proceed" — self-authorization bypass.
 - §1.1 halt raised generically by Architect rather than via Part 3 of the Constraint Envelope.
+- **Nothing was loaded in the turn.** The harness records tool use, so this one is checkable
+  rather than judged: a turn with no `Skill` invocation naming the gateway AND no `Read` of its
+  `SKILL.md` has not adopted it, whatever the prose says. A run that names the firing point, quotes
+  the rule back and declares Verdict C while making zero tool calls is a FAIL — there was nothing
+  to adopt, and "adopt" degraded into "dispatch".
+- **The gateway is treated as a sub-agent** — asking to "dispatch the ITSM Specialist gateway", or
+  seeking approval to run it. A gateway is a skill; there is nothing to approve.
+- **A Verdict with no Envelope.** Naming a custom object fixes Part 3 to Verdict C; Parts 1, 2, 4
+  and 5 are still produced. A verdict declared "regardless of what the baseline check finds" is a
+  verdict that skipped the check.
+- **The Envelope made conditional on an engagement folder** — "which client folder is this under?"
+  asked before the Envelope exists. That is another deferral; with no engagement, the Envelope is
+  written against the request as given.
 - **Gateway deferred rather than fired** — "the ITSM gateway must fire once a parent table is
   named", or any other wording that makes it conditional on information the turn does not have. A
   deferred gateway is a gateway that did not fire; the unknown belongs in the Envelope, not in
