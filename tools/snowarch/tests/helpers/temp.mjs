@@ -62,8 +62,11 @@ const sweep = () => {
   const failed = [];
   for (const dir of pending) {
     const error = remove(dir);
-    remove(`${dir}.owner`);
+    // The owner record outlives a FAILED removal, and that is the point of writing it: a fixture
+    // still on disk with no record of who made it is the state this instrument exists to prevent.
+    // It goes only when the directory it describes has actually gone.
     if (error) failed.push(`${dir}: ${error.code ?? error.message}`);
+    else remove(`${dir}.owner`);
   }
   pending.clear();
   if (failed.length) {
@@ -133,11 +136,23 @@ export function trackTempDir(dir, t) {
   arm();
   // `t?.after?.()` — the context is optional, and a vitest or plain call has none.
   t?.after?.(() => {
-    // `pending.delete` happens whatever `remove` returned: if the directory is genuinely stuck, the
-    // backstop retrying it at exit would only stall the run, and the sweep's message is where a
-    // survivor gets reported. A hook that THREW here would fail the test it belongs to for a reason
-    // that has nothing to do with what the test was about.
-    remove(dir);
+    // A hook that THREW here would fail the test it belongs to for a reason that has nothing to do
+    // with what the test was about — so `remove` returns its error and this decides what to do
+    // with it. What it must NOT do is forget it.
+    //
+    // It used to `remove(dir)`, remove the owner record and `pending.delete(dir)` unconditionally,
+    // reasoning that "the sweep's message is where a survivor gets reported". The delete is what
+    // guaranteed the sweep would never see it: a directory whose removal FAILED was struck from
+    // the register of things still owed, its owner record — the one thing that would have named
+    // its creator — was deleted, and the exit handler then found nothing to report and said
+    // nothing. That is the exact signature ubuntu/node 24 produced: a populated directory, a clean
+    // exit, an owner record gone, and `(neither stream mentioned the sweep)` in the assertion.
+    //
+    // So: on failure keep BOTH the directory in `pending` and its `.owner` beside it. The exit
+    // sweep retries it — up to 500 ms once, at exit, and only for a fixture something already
+    // failed to remove, which is a fair price for the difference between a diagnosis and a
+    // directory name — and reports it with its errno if it fails again.
+    if (remove(dir)) return;
     remove(`${dir}.owner`);
     pending.delete(dir);
   });
