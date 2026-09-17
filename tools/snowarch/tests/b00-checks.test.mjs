@@ -398,7 +398,10 @@ test('every check runs even after one has failed, and the summary counts them', 
 
   assert.equal(r.status, 'fail');
   assert.equal(r.code, 3, 'a missing prerequisite is not the same number as a failed step');
-  assert.equal(r.detail, '3 prerequisite(s) missing');
+  // ARC-06-C10 — NAMED, not counted. This assertion used to pin the count alone, which is exactly
+  // the shape ARC-08-C3 found in B09's summary: a number with nothing under it. The three names
+  // are the three checks that failed, in the order they ran.
+  assert.equal(r.detail, '3 prerequisite(s) missing: git, disk, network');
   assert.ok(lines.some((l) => l.startsWith('FAIL B00: git not found')));
   assert.ok(lines.some((l) => l.includes('free,')), 'the disk check still ran after git failed');
   assert.ok(lines.some((l) => l.includes('no route to github.com')), 'and so did the network check');

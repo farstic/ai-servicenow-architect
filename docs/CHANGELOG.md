@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A failed install now ends with a line saying what stopped it.** The exit number on its own was
+  ambiguous — the same number means two different things in two parts of the product — so a log
+  that had been cut short left the reader guessing. The last line now names the step, what that
+  number means, and which check failed.
+
 - **One unlucky moment on the network no longer stops the install before it starts.** The check that
   runs first, to confirm the machine can reach the documentation host, gave up after a single try —
   while the download step later in the same run has waited and retried for months. It now waits the

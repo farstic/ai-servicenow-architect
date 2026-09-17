@@ -16,9 +16,9 @@ import * as B07 from './B07.mjs';
 import * as B08 from './B08.mjs';
 import * as B09 from './B09.mjs';
 import { hashFor } from '../inputs.mjs';
-import { failureBlock, stepLine } from './format.mjs';
+import { failureBlock, stepLine, stopLine } from './format.mjs';
 import { saveState } from '../state.mjs';
-import { EXIT_FAIL, EXIT_INTERRUPTED, EXIT_OK } from '../exit.mjs';
+import { EXIT_FAIL, EXIT_INTERRUPTED, EXIT_MEANING, EXIT_OK } from '../exit.mjs';
 
 export const STEPS = Object.freeze([B00, B01, B02, B03, B04, B05, B06, B07, B08, B09]);
 export const LAST = STEPS[STEPS.length - 1].id;
@@ -159,7 +159,12 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
       save(root, state);
       // A step may name its own exit code — B00's failures are missing PREREQUISITES, which is a
       // different thing from "a step failed" and a different number to key on.
-      return { code: result.code ?? EXIT_FAIL, summary, state, stoppedAt: step.id, live };
+      const code = result.code ?? EXIT_FAIL;
+      // ...and because that number is not unique across the product — `3` is a missing prerequisite
+      // here and a missing corpus in the docs family — the run says which on its last line
+      // (ARC-06-C10). This is the line a truncated CI log carries.
+      onLine(stopLine({ id: step.id, code, meaning: EXIT_MEANING[code] ?? 'unclassified', detail: result.detail }));
+      return { code, summary, state, stoppedAt: step.id, live };
     }
 
     if (result.next) next = result.next;

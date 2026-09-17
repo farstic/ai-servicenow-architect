@@ -4,7 +4,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ABSENT, FILE, TEXT, hashInputs } from '../lib/steps/inputs.mjs';
 import { STEPS, interrupt, killTree, runSteps, stepById } from '../lib/steps/index.mjs';
-import { failureBlock, humanDuration, stepLine } from '../lib/steps/format.mjs';
+import { failureBlock, humanDuration, stepLine, stopLine } from '../lib/steps/format.mjs';
+import { EXIT_MEANING } from '../lib/exit.mjs';
 import { emptyState, loadState } from '../lib/state.mjs';
 import { makeCheckout, stub } from './helpers/workspace.mjs';
 
@@ -148,6 +149,10 @@ test('a fail stops the run, writes the state, and prints cause, remedy and how t
     'Remedy: run ./snowarch docs sync',
     'Re-run ./bootstrap.sh to resume at B02.',
   ]);
+  // ARC-06-C10 — and the LAST line names the step, what the number means, and the class. The three
+  // lines above are what a reader with the whole log has; this is what a reader with only the tail
+  // has, and `##[error]Process completed with exit code 3` is a real thing someone had to read.
+  assert.equal(lines[lines.length - 1], 'stopped at B02 — exit 1 (a step failed): the corpus is empty');
 });
 
 test('a warn continues, and is counted as a warn rather than an ok', async () => {
@@ -173,6 +178,64 @@ test('every step records a duration, because ARC-09 reads it and no flag turns i
   assert.equal(humanDuration(48000), '48 s');
   assert.equal(humanDuration(400), '0.4 s', 'a sub-second step must not print as (0 s)');
   assert.equal(humanDuration(-1), null);
+});
+
+/**
+ * ARC-06-C10 — the number is never the only signal.
+ *
+ * `exit.mjs` defines `3` as EXIT_PREREQ; the docs family defines `3` as "corpus missing"; and
+ * `exit.mjs`'s own comment called that overlap tolerable. An occurrence settled it: a CI log
+ * carrying `##[error]Process completed with exit code 3` and nothing else was read by someone with
+ * this file open and mapped to the wrong family (#193 → ARC-09-C40).
+ *
+ * Renumbering was the other option and was rejected on evidence — the table is published in
+ * `docs/ARCHITECTURE.md`, `snowarch.cmd` hard-codes 3 for its Node sentence, and B02 keys remedies
+ * off the docs numbers. So the numbers stay and the RUN says which family it belongs to.
+ */
+test('ARC-06-C10 — a step with its own exit code says what that number means', async () => {
+  const root = makeCheckout();
+  const lines = [];
+  const r = await run({ root, ctx: base(root), state: state(), onLine: (l) => lines.push(l),
+    steps: [stub('B00', { title: 'preflight', result: { status: 'fail', code: 3,
+      detail: '2 prerequisite(s) missing: disk, network', remedy: 'free some disk' } })] });
+
+  assert.equal(r.code, 3);
+  assert.equal(lines[lines.length - 1],
+    'stopped at B00 — exit 3 (a prerequisite is missing): 2 prerequisite(s) missing: disk, network');
+  // The half that matters: the words, not the number, are what tell the two families apart.
+  assert.match(lines[lines.length - 1], /a prerequisite is missing/);
+  assert.doesNotMatch(lines[lines.length - 1], /corpus/);
+});
+
+test('ARC-06-C10 — an unknown code still says so, rather than printing nothing', async () => {
+  // A code with no entry is a gap in EXIT_MEANING, and the line must not quietly omit the half it
+  // could not fill: "unclassified" is a fact, an empty parenthesis is a bug that reads as a fact.
+  const root = makeCheckout();
+  const lines = [];
+  await run({ root, ctx: base(root), state: state(), onLine: (l) => lines.push(l),
+    steps: [stub('B04', { title: 'deps', result: { status: 'fail', code: 77, detail: 'npm said no' } })] });
+  assert.equal(lines[lines.length - 1], 'stopped at B04 — exit 77 (unclassified): npm said no');
+});
+
+test('ARC-06-C10 — a run that succeeds says nothing about stopping', async () => {
+  // Both directions. A summary line that appears on a green run is noise, and noise is what gets
+  // filtered out of the logs where this line has to survive.
+  const root = makeCheckout();
+  const lines = [];
+  const r = await run({ root, ctx: base(root), state: state(), onLine: (l) => lines.push(l),
+    steps: [stub('B01', { result: { status: 'ok' } })] });
+  assert.equal(r.code, 0);
+  assert.equal(lines.filter((l) => l.startsWith('stopped at')).length, 0);
+});
+
+test('ARC-06-C10 — stopLine is the one definition of that sentence', () => {
+  // Rendered from EXIT_MEANING rather than from a second table of words, so a number whose meaning
+  // changes changes here too.
+  assert.equal(stopLine({ id: 'B00', code: 3, meaning: EXIT_MEANING[3], detail: 'x' }),
+    'stopped at B00 — exit 3 (a prerequisite is missing): x');
+  assert.equal(stopLine({ id: 'B02', code: 1, meaning: EXIT_MEANING[1] }),
+    'stopped at B02 — exit 1 (a step failed)');
+  assert.equal(EXIT_MEANING[130], 'interrupted');
 });
 
 test('a step that throws becomes a fail, not a crash', async () => {

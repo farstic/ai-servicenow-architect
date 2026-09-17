@@ -366,7 +366,10 @@ export const run = async (ctx) => {
 
   if (failures.length > 0) {
     return { status: 'fail', code: EXIT_PREREQ, data,
-      detail: `${failures.length} prerequisite(s) missing`,
+      // NAMED, not counted. ARC-08-C3 is the same defect one step later: B09's summary "printed a
+      // failure count and named nothing", which is what Sitting A's owner found first. A count is
+      // what you write when you have the list and do not print it.
+      detail: `${failures.length} prerequisite(s) missing: ${failures.map((f) => f.id).join(', ')}`,
       remedy: failures.map((f) => f.remedy).filter(Boolean)[0] ?? null };
   }
   const warned = checks.filter((c) => c.status === 'warn').length;
