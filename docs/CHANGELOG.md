@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.0-rc.4 — 2026-09-17
+
+### Notes
+
 This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
 
 #### Migration for snow-mcp 1.0.0 users
@@ -1686,6 +1690,40 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   engine pin and its sha are untouched.
 
 ---
+
+### Added
+
+- doctor: E-12 asserts corpus completeness, not just presence (5060488)
+
+### Fixed
+
+- engine: a failed run names the step and what its exit code means (14aa88a)
+- engine: the network preflight retries, on B02's schedule and in #186's words (85f3927)
+- docs: Part 3 is the turn's conclusion, and a disagreement is an OPEN QUESTION (55f31f8)
+- docs: three specialists were repeating facts the cited pages had changed (c1f1fe8)
+- docs: the specialists call the agent workspace by its current name (fc7c84e)
+- docs: drop a submodule bump that was never this branch's to make (6a39d61)
+- docs: adopting a gateway is an action with a trace, not a description (7ec6543)
+- tests: the teardown no longer deletes the record of what it failed to remove (339471d)
+- docs: ARC-02-C3 — the Domain Expert gateway fires on the domain, and is never deferred (2df7903)
+- docs: a retry that stopped early no longer claims it ran out of tries (3907870)
+
+### Internal
+
+- plan: point ARC-08-C3 back at ARC-06-C10 (4d91556)
+- plan: name it as ARC-08-C3's shape in B00, and cross-reference (e7c4bf8)
+- plan: name the shape in ARC-09-C41 — one rule, two readers (cc3b365)
+- plan: the two transcript hits were not what I said they were (7c8ea52)
+- plan: the Sitting A and rc.3 records, and the rows they close (008fc33)
+- ci: the second bootstrap run prints its log, and keeps its exit code (b538a23)
+- plan: ARC-03-C4 — our skills name a workspace the corpus has renamed (8e64af8)
+- docs: bump ServiceNowDocs to df4afac (2026-09-10) (352a423)
+- plan: the gateway names its firing point, and the halt is an OPEN QUESTION block (5101580)
+- plan: ARC-03-C3 — a retry that stopped early reports a count it did not owe (dfc7655)
+- plan: ARC-07-C1 — the two strings that name PowerShell give the spelling PowerShell refuses (9bbb7c0)
+- tests: a leftover fixture now arrives with the reason it was left (2da5509)
+
+Tag v2.0.0-rc.4 · contract 642e4f80bf2c · docs-pin df4afac
 
 ## The imported engine's header
 
