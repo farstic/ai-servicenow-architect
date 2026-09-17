@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Three specialists were repeating facts the documentation had changed.** The licensing guidance
+  used the wrong set of tier names for AI products and understated how entitlements get assigned;
+  the flow guidance was missing two trigger settings and a warning about re-running. All three now
+  match the documentation they cite.
+
 - **The specialists now call the customer-service agent screen by its current name.** ServiceNow
   renamed it, and our guidance still used the old one throughout. Each file uses the new name, with
   the old one in brackets on first mention, because the rename is only part-done upstream and a
