@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 
 import { docsFor, engineDocsChecks } from '../../tools/snowarch/lib/doctor/checks/engine-docs.mjs';
 import { E12_ABSENT } from '../../tools/snowarch/lib/docs/status.mjs';
+import { KINDS } from '../../tools/snowarch/lib/doctor/fix.mjs';
 import { contextFor, greenTree, runById } from './helpers/tree.mjs';
 
 const checks = engineDocsChecks();
@@ -20,6 +21,7 @@ const status = (over = {}) => ({
   pinMatchesGitlink: true, headMatchesPin: true,
   family: 'australia', branch: 'australia', familyMatches: true,
   sparse: 'cone', areasExpected: ['now/x'], areasPresent: ['now/x'], areasMissing: [],
+  rootMissing: [],
   citations: { checked: 289, dead: [] },
   ...over,
 });
@@ -47,6 +49,55 @@ test('docsStatus is computed once per verification level, not once per check', a
   await runById(checks, 'E-16', c);
   assert.equal(calls, 2, 'the citation walk did not get its own answer');
   assert.ok(docsFor(c));
+});
+
+/**
+ * ARC-03-C2 — ADR-0008's Consequences say "ARC-03's doctor asserts corpus completeness", and until
+ * now only half of that was true. E-15 checks the AREAS; nothing checked the files every corpus
+ * has, at any cone. A corpus whose `LICENSE` had been pruned passed every check in the file:
+ * present, on the pin, on the family, correctly sparse, citations clean.
+ *
+ * `checkCompleteness` in `sync.mjs` has always looked at this list — it simply had no reader once
+ * the sync returned, which is why the remedy for a missing root file is the same `docs sync` that
+ * would have caught it in the first place.
+ */
+test('E-12 fails a corpus that is present but missing a root file, and names it', async (t) => {
+  const r = await run(t, 'E-12', { status: { rootMissing: ['LICENSE'] } });
+  assert.equal(r.status, 'fail', 'a corpus missing LICENSE was reported as present and well');
+  assert.match(r.detail, /on disk but incomplete/);
+  assert.match(r.detail, /LICENSE/, 'the report does not say WHICH file is missing');
+  assert.equal(r.command, './snowarch docs sync');
+  assert.deepEqual(r.data.rootMissing, ['LICENSE']);
+  assert.equal(r.data.fix.kind, 'corpus-missing', 'the fix route does not reach `docs sync`');
+  // ...and that kind is one the fixer actually knows. A `fix` naming a kind nothing handles is a
+  // remedy the user is offered and never gets — asserted here rather than assumed from the string.
+  assert.ok(KINDS.includes(r.data.fix.kind), `the fixer has no kind "${r.data.fix.kind}"`);
+});
+
+test('E-12 names every missing root file, not just the first', async (t) => {
+  const r = await run(t, 'E-12', { status: { rootMissing: ['LICENSE', 'llms.txt', 'legal'] } });
+  for (const f of ['LICENSE', 'llms.txt', 'legal']) assert.match(r.detail, new RegExp(f));
+});
+
+test('E-12 on a complete corpus says how many root entries it checked', async (t) => {
+  // BOTH DIRECTIONS. A check that cannot fail on a pruned corpus is the defect being fixed — and a
+  // check whose ok line does not say what it looked at is the next version of the same problem:
+  // "present" meant four things before this story and five after, with no way to tell from the
+  // report which it had done.
+  const r = await run(t, 'E-12');
+  assert.equal(r.status, 'ok');
+  assert.match(r.detail, /root entries/, `the ok line does not say the root files were checked: ${r.detail}`);
+  assert.deepEqual(r.data.rootMissing, []);
+});
+
+test('E-12 prefers the ABSENT sentence over the incomplete one — an absent corpus is missing all of them', async (t) => {
+  // Ordering matters and is asserted rather than assumed: `docsStatus` reports every root file as
+  // missing when the corpus is absent, which is the honest reading, and an operator with no corpus
+  // must be told THAT rather than handed a list of five files.
+  const r = await run(t, 'E-12', { status: { present: false, mode: 'skip', rootMissing: ['LICENSE', 'llms.txt'] } });
+  assert.equal(r.status, 'fail');
+  assert.doesNotMatch(r.detail, /on disk but incomplete/,
+    'an absent corpus was reported as an incomplete one');
 });
 
 // AC 5.

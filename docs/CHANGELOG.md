@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The doctor now notices a documentation corpus that is missing pieces.** It checked that the
+  subject areas were all there, but not the handful of files every copy carries — so a corpus that
+  had lost its licence file, to a hand-prune or an interrupted download, was reported as healthy.
+  It is now reported, named, and repaired by the same sync that would have prevented it.
+
 - **A corpus download that gave up early no longer claims it ran out of tries.** When the network
   failure changed to one that is never worth retrying — a name that will not resolve — the message
   still counted the attempts, which read as though another try had been promised and skipped. It
