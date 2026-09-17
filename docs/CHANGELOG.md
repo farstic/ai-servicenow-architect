@@ -235,6 +235,10 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A failing check in our own test pipeline now says what went wrong.** One step saved its output
+  to a file so it could print it, but stopped at the failure and never got to the printing — so the
+  one run where the output mattered reported a bare number and nothing else.
+
 - **The doctor now notices a documentation corpus that is missing pieces.** It checked that the
   subject areas were all there, but not the handful of files every copy carries — so a corpus that
   had lost its licence file, to a hand-prune or an interrupted download, was reported as healthy.
