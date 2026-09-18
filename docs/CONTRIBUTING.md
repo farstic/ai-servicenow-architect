@@ -683,6 +683,47 @@ missing test (owner directive, 2026-09-08). Three places, in the same PR as the 
 Status filled in later is status nobody can trust; the point of the rule is that the plan is never
 describing a state the repository is not in.
 
+### Citing code in a plan row — the expression, not the line
+
+A row in `docs/plans/**` cites code by **identifier or expression**, never as `path/file.ext:NNN`.
+Write `` `finish()` `` , or the expression itself in backticks — `` `state?.mode === 'live' ? 'live'
+: 'design'` `` — or any string a reader can grep. All three survive the file moving under them; a
+line number does not.
+
+The reason is the one `tests/one-remedy.test.mjs` already gives for keying its allow-list on a
+needle: *a line number is a fact about everything above it*. An unrelated insertion higher up
+silently repoints it, and the reader who notices is taught to re-number rather than to read.
+
+This is not hypothetical. ARC-09-C44 cited `upgrade.mjs:416` for where the mode is chosen; ARC-09-C46
+inserted a function above it two PRs later, and 416 became an unrelated `rev-list --count`. The row
+still looked precise. **The citation that rots is worse than no citation, because it reads as
+checked.**
+
+**The rule forbids one use, and there are three.** `file:line` under `docs/plans/` is one of:
+
+1. **A pointer into this tree's current code.** The only kind that rots silently, and the only kind
+   this rule is about. Rewrite it as an identifier or expression.
+2. **Provenance — a tree this repository does not contain**: the imported source repos, or a file at
+   a frozen tag. It cannot rot here, because the file is not here to move, and the line number is
+   part of the evidence about what was found where. **Keep it**, and say the foreignness in the
+   sentence around it (`snow-mcp's src/cli/config-store.ts:97, at the import commit`, `the engine's
+   README.md:490`) so nobody reads a historical record as a live pointer and goes looking. A
+   colliding filename does not make it local: `docs/plans/00-CURRENT-STATE-ANALYSIS.md` is a dated
+   audit of the two OLD trees, and its `CLAUDE.md:325` is the engine's file, not this one's.
+3. **Expected command output.** An acceptance row is `| id | what | command | expected |`, and a
+   cell reading `README.md:18, docs/INSTALL.md:12` is what the `grep` in the same row is asserted to
+   print. That is not a citation pointing at code, it is the assertion — and the run recomputes it,
+   so an edit above cannot rot it. **Keep it.** Rewriting one destroys the check.
+
+Measured once, on 2026-09-19, so the scale is known rather than guessed: 326 `file:line` tokens under
+`docs/plans/`, of which 51 are kind 1. The other 275 are kinds 2 and 3, and a sweep that treated
+them as kind 1 would have rewritten an audit's evidence and broken seven acceptance checks.
+
+**No test enforces this.** One was considered and refused: a check that every cited path exists, and
+is long enough to have that line, catches deletion only — it passes happily while a live number
+points at the wrong code, which is the whole failure mode — and it would teach exactly the
+re-numbering reflex the rule exists to remove. This one is held by review.
+
 ### Before you push
 
 ```
