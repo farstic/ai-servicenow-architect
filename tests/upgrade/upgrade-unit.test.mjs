@@ -13,8 +13,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
-  classifyGitFetchError, parseSemver, renderPlan, sortTags,
+  classifyGitFetchError, doctorLines, parseSemver, renderPlan, sortTags,
 } from '../../tools/snowarch/lib/commands/upgrade.mjs';
+import { failureLines } from '../../tools/snowarch/lib/steps/B09.mjs';
 import {
   MAX_AGE_MS, REFRESH_AFTER_MS, cachePath, isFresh, needsRefresh, readUpgradeCheck,
   writeUpgradeCheck,
@@ -124,4 +125,93 @@ test('freshness: a week old is silence, and a clock that went backwards is too',
   assert.ok(REFRESH_AFTER_MS < MAX_AGE_MS);
   assert.equal(needsRefresh(at(1_000_000_000_000 - 2 * REFRESH_AFTER_MS), { now }), true);
   assert.equal(needsRefresh(at(1_000_000_000_000 - 1000), { now }), false);
+});
+
+/**
+ * ARC-09-C46 — U7 named a number and not what it counted.
+ *
+ * The owner's rc.4 → rc.5 upgrade printed `[U7/7] doctor` and then `DOCTOR: 31 ok, 3 warn, 1 fail
+ * (4 skip)` and the Mode line, nothing else. They had to run `./snowarch doctor` a second time to
+ * learn the failure was E-27. The lines were in the parsed report the whole time and were dropped
+ * with it — ARC-08-C3's defect one command over, and B09 had already fixed it for the bootstrap.
+ *
+ * So the renderer is B09's, imported rather than re-typed, and the tally now lives INSIDE the same
+ * function as the lines. That is the part that closes the row: the two were separable, and for one
+ * release a caller printed the number and skipped the list. There is nothing left to skip.
+ */
+const REPORT = {
+  summary: { ok: 31, warn: 3, fail: 1, skip: 4 },
+  checks: [
+    { id: 'E-01', status: 'ok', title: 'node' },
+    { id: 'E-28', status: 'warn', title: 'release currency', detail: 'v9.9.8 available',
+      remedy: './snowarch upgrade' },
+    { id: 'E-27', status: 'fail', title: 'Claude Code registration status',
+      detail: 'design-only is not in force: a local-scope entry keeps the server loaded',
+      remedy: './snowarch mode design' },
+    { id: 'E-30', status: 'warn', title: 'proxy' },
+    { id: 'E-40', status: 'skip', title: 'network' },
+  ],
+};
+
+test('ARC-09-C46 — U7 prints the tally AND every check it counted, failures first', () => {
+  const lines = doctorLines(REPORT);
+
+  assert.equal(lines[0], 'DOCTOR: 31 ok, 3 warn, 1 fail (4 skip)',
+    'the tally must survive the fix — this row adds to U7, it does not replace what was there');
+
+  // THE DEFECT, named: a reader must be able to act without running the doctor again.
+  assert.equal(lines[1],
+    'E-27 FAIL Claude Code registration status: design-only is not in force: a local-scope entry '
+    + 'keeps the server loaded — ./snowarch mode design',
+    'the failing check is not named with its remedy on the line after the tally');
+
+  // Failures FIRST: a reader scanning for what stopped them should not pass two warnings to reach
+  // it. E-28 appears before E-30 in the report and after E-27 here, which is the whole ordering.
+  assert.deepEqual(lines.slice(2).map((l) => l.split(' ')[0]), ['E-28', 'E-30']);
+  assert.match(lines[2], /E-28 WARN release currency: v9\.9\.8 available — \.\/snowarch upgrade/);
+
+  // A check with no detail and no remedy still gets a line — its ID and title are the point.
+  assert.equal(lines[3], 'E-30 WARN proxy');
+
+  // `ok` and `skip` are NOT printed: 31 ok lines would bury the one that matters, and a skip is
+  // already reported by the doctor's own run. The tally still counts them, which is its job.
+  assert.equal(lines.length, 4);
+  assert.equal(lines.filter((l) => /E-01|E-40/.test(l)).length, 0);
+});
+
+test('ARC-09-C46 control — the tally cannot be printed without its lines', () => {
+  // NON-VACUITY AND THE CLOSED PATH IN ONE. The defect was a caller that could take the number and
+  // leave the list. There is now no way to ask for one: a report with failures always renders more
+  // than one line, and the count is index 0 of the same array.
+  assert.ok(doctorLines(REPORT).length > 1,
+    'the tally is separable from its lines again — this is exactly the C46 defect');
+
+  // A healthy report is still ONE line, or every clean upgrade grows noise it has no reason to.
+  const healthy = { summary: { ok: 35, warn: 0, fail: 0, skip: 4 }, checks: [
+    { id: 'E-01', status: 'ok', title: 'node' }] };
+  assert.deepEqual(doctorLines(healthy), ['DOCTOR: 35 ok, 0 warn, 0 fail (4 skip)']);
+
+  // And the shapes that reach this on a bad day. A doctor whose JSON did not parse is `null`, and
+  // U7 must print nothing rather than `DOCTOR: undefined ok` — the caller's `if (report?.summary)`
+  // guard used to live at the call site, so moving it had to bring the behaviour with it.
+  assert.deepEqual(doctorLines(null), []);
+  assert.deepEqual(doctorLines({}), []);
+  assert.deepEqual(doctorLines({ summary: { ok: 1, warn: 0, fail: 0, skip: 0 } }),
+    ['DOCTOR: 1 ok, 0 warn, 0 fail (0 skip)'], 'a summary with no checks array must not throw');
+});
+
+test('ARC-09-C46 — B09 keeps the output it had, which is why the renderer could be shared', () => {
+  // BOTH DIRECTIONS. `failureLines` is B09's view and is now defined over `nonOkLines`; if that
+  // refactor had changed what the bootstrap prints, this row would have broken B09's summary to
+  // fix U7's. Fail-only, and byte-identical to the template it replaced.
+  assert.deepEqual(failureLines(REPORT), [
+    'E-27 FAIL Claude Code registration status: design-only is not in force: a local-scope entry '
+    + 'keeps the server loaded — ./snowarch mode design',
+  ]);
+  assert.equal(failureLines(REPORT).length, 1, 'a warning reached B09\'s failure list');
+  assert.deepEqual(failureLines({ checks: [] }), []);
+  assert.deepEqual(failureLines(null), []);
+
+  // The two views share one implementation, so the fail line must be the same string in both.
+  assert.equal(failureLines(REPORT)[0], doctorLines(REPORT)[1]);
 });
