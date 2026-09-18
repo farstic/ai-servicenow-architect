@@ -19,7 +19,7 @@
  * A directory removed by the first is dropped from the second, so the backstop never touches a
  * path that has been reused since.
  */
-import { mkdtempSync, rmSync, writeFileSync, writeSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -37,14 +37,32 @@ let armed = false;
  * Returns the error rather than throwing, because BOTH callers must carry on: an `exit` handler
  * that throws loses the rest of the sweep, and a `t.after` that throws turns a passing test red for
  * a reason that has nothing to do with what it was testing.
+ *
+ * AND IT CHECKS. `rmSync` returning is a report, not a fact, and the difference between the two is
+ * the only path left in this file that produces all four things the 2026-09-18 recurrence showed at
+ * once: a populated directory, NO owner record beside it, a clean exit, and a sweep that said
+ * nothing. Both places that delete an owner record do it only when this function reported success,
+ * and both places that would have reported the survivor skip it for the same reason — so one
+ * unverified `return null` silently disarms every instrument downstream of it. A removal that
+ * cannot tell "gone" from "I called the syscall" is the same defect as a check that cannot tell
+ * failure from absence, which is the one this programme keeps finding.
+ *
+ * `rm` is a parameter so the closed path can be driven directly: no filesystem reliably produces a
+ * successful-but-ineffective removal on demand, and a defect that can only be waited for is a
+ * defect with no test.
  */
-function remove(dir) {
+export function remove(dir, rm = rmSync) {
   try {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
-    return null;
+    rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
   } catch (e) {
     return e;
   }
+  if (!existsSync(dir)) return null;
+  // Shaped like the errno errors the callers already know how to print, so the survivor reaches the
+  // stderr message and the `.owner` record stays put — the handling was always right, it was just
+  // never reached.
+  return Object.assign(new Error(`${dir} still exists after a removal that reported success`),
+    { code: 'ESURVIVED' });
 }
 
 /**
@@ -55,8 +73,11 @@ function remove(dir) {
  * directory after it with it, and `pending.clear()` — the line that records what was dealt with —
  * is never reached at all. `fixture-cleanup.test.mjs` beside this file failed three times on ubuntu/node 24
  * with a POPULATED directory and a normal exit, which is what this looks like from the outside.
- * Not reproduced on macOS/node 24 in 48 attempts, so this is the cause the code makes possible
- * rather than the cause observed — and the message below is what the next occurrence will say.
+ *
+ * Still not reproduced on demand: 48 concurrent probes on macOS/node 24 (APFS) and 192 on
+ * Ubuntu 22.04/node 22 (ext4), 240 in all, none of which fired. So this remains the cause the code
+ * makes possible rather than the cause observed, and the message below is what the next occurrence
+ * will say.
  */
 const sweep = () => {
   const failed = [];
@@ -152,6 +173,15 @@ export function trackTempDir(dir, t) {
     // sweep retries it — up to 500 ms once, at exit, and only for a fixture something already
     // failed to remove, which is a fair price for the difference between a diagnosis and a
     // directory name — and reports it with its errno if it fails again.
+    //
+    // THAT FIX WAS IN PLACE AND THE SIGNATURE CAME BACK. It shipped on 2026-09-17; ubuntu/node 24
+    // produced the same four facts again on 2026-09-18, which retires the explanation above as the
+    // whole story. Reading the code for what can still do it: every route to a missing `.owner`
+    // runs through `remove` reporting success, and a fixture created after this hook would have
+    // written an owner record of its own at creation — so a survivor with no record was not
+    // recreated by anything, it was never removed by a call that said it had been. That is the one
+    // candidate the four facts leave standing, and it is what `remove` now verifies rather than
+    // assumes.
     if (remove(dir)) return;
     remove(`${dir}.owner`);
     pending.delete(dir);
