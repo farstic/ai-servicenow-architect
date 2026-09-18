@@ -699,7 +699,7 @@ inserted a function above it two PRs later, and 416 became an unrelated `rev-lis
 still looked precise. **The citation that rots is worse than no citation, because it reads as
 checked.**
 
-**The rule forbids one use, and there are three.** `file:line` under `docs/plans/` is one of:
+**The rule forbids one use, and there are four.** `file:line` under `docs/plans/` is one of:
 
 1. **A pointer into this tree's current code.** The only kind that rots silently, and the only kind
    this rule is about. Rewrite it as an identifier or expression.
@@ -710,14 +710,33 @@ checked.**
    README.md:490`) so nobody reads a historical record as a live pointer and goes looking. A
    colliding filename does not make it local: `docs/plans/00-CURRENT-STATE-ANALYSIS.md` is a dated
    audit of the two OLD trees, and its `CLAUDE.md:325` is the engine's file, not this one's.
-3. **Expected command output.** An acceptance row is `| id | what | command | expected |`, and a
+3. **Specimen or expected output — in a fence, a cell, or a sentence.** An acceptance row is
+   `| id | what | command | expected |`, and a
    cell reading `README.md:18, docs/INSTALL.md:12` is what the `grep` in the same row is asserted to
    print. That is not a citation pointing at code, it is the assertion — and the run recomputes it,
-   so an edit above cannot rot it. **Keep it.** Rewriting one destroys the check.
+   so an edit above cannot rot it. **Keep it.** Rewriting one destroys the check. The same holds
+   inline and in fences: `L01 FAIL governance/mcp-protocols.md:57 token…` mid-sentence is a sample of
+   what the linter prints, and a fenced `DEAD …/SKILL.md:41` line is a specimen of a tool's report
+   format. Rewriting either corrupts a specification of an output.
+4. **A pointer into this tree's PAST.** A story that describes deleting something cites what it
+   deleted: `package.json:54-55` named two `keywords` entries that story removed, and
+   `packages/snowarch/README.md:83-85` named text it replaced. There is no expression to cite,
+   because the expression is gone. **Keep it**, and say it is the tree as that story found it —
+   inventing a present-tense citation would put a false fact into a historical record.
 
-Measured once, on 2026-09-19, so the scale is known rather than guessed: 326 `file:line` tokens under
-`docs/plans/`, of which 51 are kind 1. The other 275 are kinds 2 and 3, and a sweep that treated
-them as kind 1 would have rewritten an audit's evidence and broken seven acceptance checks.
+Measured once, on 2026-09-19, so the scale is known rather than guessed: 326 `file:line` tokens
+under `docs/plans/`, of which 51 are kind 1. The other 275 are kinds 2, 3 and 4, and a sweep that
+treated them as kind 1 would have rewritten an audit's evidence and broken seven acceptance checks.
+
+**Why the rule exists, measured rather than argued: of those 51 live citations, 12 had already
+drifted — and every one still read as precise.** `package.json:54` pointed past the end of its file;
+`docs/spikes/OWNER-SITTING.md:150` pointed at a blank line. Nothing failed and nothing warned,
+because nothing checks. The twelve are listed with what each landed on in **ARC-01-C7**, together
+with the method — a hand reading of all 51, after an automated check was tried and discarded.
+
+A row that *reports* a rotted citation quotes it verbatim; those tokens are evidence, not pointers,
+and a later sweep must leave them alone. ARC-01-C7 says so in its own text, because the one way to
+destroy that finding is to enforce this rule on it.
 
 **No test enforces this.** One was considered and refused: a check that every cited path exists, and
 is long enough to have that line, catches deletion only — it passes happily while a live number
