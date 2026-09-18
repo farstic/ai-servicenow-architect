@@ -742,7 +742,7 @@ remote still has the object.
 >
 > - **AC 4 is corrected.** The launcher never prints `git ≥ 2.25 not found`. There is no 2.25
 >   anywhere in the tree, and the criterion conflates two distinct paths: git **absent** is
->   `bootstrap.ps1:132`, `Die 'B00' 'git not found' $MSG_GIT_WIN 3` — message `git not found`,
+>   `bootstrap.ps1`, `Die 'B00' 'git not found' $MSG_GIT_WIN 3` — message `git not found`,
 >   remedy `winget install Git.Git`, exit 3; git **below floor** is `:133`,
 >   `git <v> found, >= 2.34.1 required`. The stripped-PATH case is the absent one, so the criterion is
 >   met by `git not found` at exit 3. Now pinned against drift by `tests/launcher-parity.test.mjs`,
