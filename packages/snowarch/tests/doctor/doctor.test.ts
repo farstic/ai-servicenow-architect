@@ -160,6 +160,72 @@ describe('SV-09 — the store schema (ARC-09-S06)', () => {
   }, 120_000);
 });
 
+/**
+ * ARC-09-C45 — the one state SV-02 was never asserted in: healthy.
+ *
+ * The suite pinned SV-02 as `warn` (no store) and `fail` (0644), and nothing pinned it as **ok**. A
+ * healthy 0600 store is written fifteen times in this file and the doctor runs over it, so there is
+ * incidental exercise — but `summary.fail === 0` is equally true of a check that quietly became
+ * `warn` or `skip`, so the state the check EXISTS FOR was the one state a regression could reach
+ * without turning anything red.
+ *
+ * Found from the other side: the architect's own rc-checks harness had been red since rc.2 because a
+ * dangling symlink made the doctor crash before it ever reached SV-02 — and the harness reported
+ * something else entirely rather than "the doctor never got there". Same defect, two instruments.
+ *
+ * The fixture here was already the real schema (version 1, an `instances` map, an `auth` object),
+ * which is what the harness's was not — so this pins behaviour rather than repairing a fixture.
+ */
+describe('ARC-09-C45 - a healthy store is asserted, not assumed', () => {
+  it.skipIf(isWindows)('SV-02 is exactly ok on a healthy 0600 store', async () => {
+    writeStore();
+    const r = await doctor(['--no-network', '--json']);
+
+    // EXACTLY 'ok'. Not `not.toBe('fail')`: warn and skip are both "not fail", and both are what a
+    // silently-unreached check looks like.
+    expect(check(r, 'SV-02').status).toBe('ok');
+    expect(check(r, 'SV-02').detail).not.toContain(FIXTURE_PASS);
+  }, 120_000);
+
+  it.skipIf(!isWindows)('on Windows a healthy store keeps the ACL note, and is still not a failure', async () => {
+    // The platform exception is written out rather than left as a weaker assertion. Windows has no
+    // POSIX mode to read, so SV-02 reports the ACL note instead of `ok` — that is a DIFFERENT
+    // correct answer, not a laxer one, and saying so here stops the next reader treating the
+    // Windows branch as the one where the check does less.
+    writeStore();
+    const r = await doctor(['--no-network', '--json']);
+    expect(check(r, 'SV-02').status).not.toBe('fail');
+    expect(check(r, 'SV-02').detail).toContain('ACL-inherited');
+  }, 120_000);
+
+  it('SV-02 is present in the report in every store state', async () => {
+    // The assertion the harness lacked. "The doctor never got there" used to be indistinguishable
+    // from "the check passed", because an absent check reads as an absent failure. Each state below
+    // is one the suite already exercises; what is new is that the check must be THERE in all of
+    // them, named, before anything is said about its status.
+    const seen: Array<[string, string]> = [];
+
+    const noStore = await doctor(['--no-network', '--json']);
+    expect(check(noStore, 'SV-02')).toBeDefined();
+    seen.push(['no store', check(noStore, 'SV-02').status]);
+
+    writeStore();
+    const healthy = await doctor(['--no-network', '--json']);
+    expect(check(healthy, 'SV-02')).toBeDefined();
+    seen.push(['healthy 0600', check(healthy, 'SV-02').status]);
+
+    writeStore({ pdi: instance() }, 0o644);
+    const loose = await doctor(['--no-network', '--json']);
+    expect(check(loose, 'SV-02')).toBeDefined();
+    seen.push(['0644', check(loose, 'SV-02').status]);
+
+    // Both directions: three states, three reports, and SV-02 named in each — so a doctor that
+    // stopped emitting it fails here by name rather than by a count that stayed green.
+    expect(seen.map(([state]) => state)).toEqual(['no store', 'healthy 0600', '0644']);
+    expect(seen.every(([, status]) => typeof status === 'string' && status.length > 0)).toBe(true);
+  }, 180_000);
+});
+
 describe('criterion 2 - no store at all', () => {
   it('unconfigured mode, SV-02 warn with the setup remedy, SV-05 five tools, exit 0', async () => {
     const r = await doctor(['--no-network', '--json']);
