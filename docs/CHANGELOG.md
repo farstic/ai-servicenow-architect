@@ -235,6 +235,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Upgrading now tells you which check failed, not just that one did.** The last step of an upgrade
+  runs the doctor and printed only a tally — `31 ok, 3 warn, 1 fail` — so the one thing you needed,
+  which check and what to do about it, meant running the doctor again yourself. It now lists every
+  failing and warning check by name with its remedy, failures first. A clean upgrade still prints
+  the single tally line.
+
 - **Our test suite can no longer lose track of a temporary folder it failed to delete.** The cleanup
   treated "the delete call returned" as "the folder is gone". When those two came apart, every
   safeguard downstream went quiet at once: the record of which test created the folder was thrown

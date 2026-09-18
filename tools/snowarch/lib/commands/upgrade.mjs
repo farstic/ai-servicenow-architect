@@ -30,9 +30,35 @@ import { childEnv } from '../spawn-env.mjs';
 import { loadConfig, root as defaultRoot } from '../config.mjs';
 import { loadState } from '../state.mjs';
 import { makeExec } from '../steps/B00.mjs';
+import { nonOkLines } from '../steps/B09.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
 import { INPUTS, STEP_IDS } from '../inputs.mjs';
+
+/**
+ * What U7 says about a doctor report — the tally AND the checks it counted, as one list.
+ *
+ * ARC-09-C46. U7 printed `DOCTOR: 31 ok, 3 warn, 1 fail (4 skip)` and stopped, so the owner's rc.5
+ * upgrade told them a check had failed and not which one; they ran `./snowarch doctor` again to
+ * learn it was E-27. The lines were already in `report` and were thrown away with it. That is
+ * ARC-08-C3's defect one command over — "a count is what you write when you have the list and do
+ * not print it" — and B09 fixed it for the bootstrap, which is why the renderer is imported rather
+ * than written a second time.
+ *
+ * A FUNCTION, and the tally is inside it, because the defect was that the two were separable: a
+ * caller could print the number and skip the list, and for one release that is exactly what it did.
+ * Now there is nothing to skip — the count and what it counted are one return value.
+ *
+ * WARNINGS TOO, not only failures, which is wider than the brief and deliberately so. The next row
+ * on this list is about an E-28 WARN printed by this very step whose wording cannot now be
+ * recovered, because the tally was all that reached the transcript. A run of this command is
+ * evidence about a warning as often as about a failure.
+ */
+export function doctorLines(report) {
+  if (!report?.summary) return [];
+  const { ok = 0, warn = 0, fail = 0, skip = 0 } = report.summary;
+  return [`DOCTOR: ${ok} ok, ${warn} warn, ${fail} fail (${skip} skip)`, ...nonOkLines(report)];
+}
 
 /** `--check` found a newer release. A code, so a script can ask without parsing prose. */
 export const EXIT_BEHIND = 4;
@@ -431,10 +457,7 @@ async function finish({ root, env, log, run, target, latest, remote, now, state 
   { cwd: root, encoding: 'utf8', env: childEnv(root, env), stdio: ['ignore', 'pipe', 'pipe'] });
   let report = null;
   try { report = JSON.parse(doctor.stdout ?? ''); } catch { report = null; }
-  if (report?.summary) {
-    const { ok: okCount = 0, warn = 0, fail = 0, skip = 0 } = report.summary;
-    log.step(`DOCTOR: ${okCount} ok, ${warn} warn, ${fail} fail (${skip} skip)`);
-  }
+  for (const line of doctorLines(report)) log.step(line);
   if (report?.modeLine) log.step(report.modeLine);
 
   writeUpgradeCheck(root, { latestTag: latest, localTag: target, behind: false, remote, now });
