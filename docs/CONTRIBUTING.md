@@ -699,16 +699,25 @@ inserted a function above it two PRs later, and 416 became an unrelated `rev-lis
 still looked precise. **The citation that rots is worse than no citation, because it reads as
 checked.**
 
-**The exception, and it is a real one.** A citation into a tree *this repository does not contain* —
-the imported source repos, or a file at a frozen tag — is **provenance, not a pointer**. It cannot
-rot here, because the file is not here to move, and the line number is part of the evidence about
-what was found where. Keep those, and make the foreignness explicit in the sentence around them
-(`snow-mcp's src/cli/config-store.ts:97, at the import commit`) so nobody reads a historical record
-as a live pointer and goes looking.
+**The rule forbids one use, and there are three.** `file:line` under `docs/plans/` is one of:
 
-The split is worth knowing before anybody sweeps: of the `file:line` citations under `docs/plans/`,
-roughly a quarter point at paths that exist here and can rot; the rest point at the old repos and are
-provenance. Only the first kind is worth rewriting.
+1. **A pointer into this tree's current code.** The only kind that rots silently, and the only kind
+   this rule is about. Rewrite it as an identifier or expression.
+2. **Provenance — a tree this repository does not contain**: the imported source repos, or a file at
+   a frozen tag. It cannot rot here, because the file is not here to move, and the line number is
+   part of the evidence about what was found where. **Keep it**, and say the foreignness in the
+   sentence around it (`snow-mcp's src/cli/config-store.ts:97, at the import commit`, `the engine's
+   README.md:490`) so nobody reads a historical record as a live pointer and goes looking. A
+   colliding filename does not make it local: `docs/plans/00-CURRENT-STATE-ANALYSIS.md` is a dated
+   audit of the two OLD trees, and its `CLAUDE.md:325` is the engine's file, not this one's.
+3. **Expected command output.** An acceptance row is `| id | what | command | expected |`, and a
+   cell reading `README.md:18, docs/INSTALL.md:12` is what the `grep` in the same row is asserted to
+   print. That is not a citation pointing at code, it is the assertion — and the run recomputes it,
+   so an edit above cannot rot it. **Keep it.** Rewriting one destroys the check.
+
+Measured once, on 2026-09-19, so the scale is known rather than guessed: 326 `file:line` tokens under
+`docs/plans/`, of which 51 are kind 1. The other 275 are kinds 2 and 3, and a sweep that treated
+them as kind 1 would have rewritten an audit's evidence and broken seven acceptance checks.
 
 **No test enforces this.** One was considered and refused: a check that every cited path exists, and
 is long enough to have that line, catches deletion only — it passes happily while a live number
