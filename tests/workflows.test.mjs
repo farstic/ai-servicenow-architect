@@ -943,3 +943,91 @@ test('ARC-09-C42 — no `shell: powershell` step carries a byte 5.1 will misread
     + 'steps in the ANSI code page, where an em dash decodes to a curly quote that terminates a\n'
     + `string. Use a plain hyphen and straight quotes:\n  ${offenders.join('\n  ')}`);
 });
+
+/**
+ * ARC-09-C48 — no test file runs nowhere, including inside the directory the walk is told to skip.
+ *
+ * `tests/run.mjs` walks the tree so that a new test file is picked up without anybody remembering
+ * to add it, and excludes exactly one directory — `tests/upgrade/`, whose harness builds a world
+ * per case and needs a full-depth checkout with tags. That exclusion is defended in the file, and
+ * the defence contains a promise nothing checks:
+ *
+ *   "An exclusion is a thing that rots, so it is a LIST of one with the job that covers it named:
+ *    anything added here that no job runs is documentation, which is what the recursive walk above
+ *    exists to prevent."
+ *
+ * The walk prevents an unrun file everywhere EXCEPT inside the directory it is told to skip, and
+ * there the covering job names its three files by hand. So the one place the guarantee is asserted
+ * in prose is the one place the mechanism cannot reach. A fourth file added to `tests/upgrade/`
+ * today runs in neither `npm test` nor CI, and nothing says so — it passes both, by being absent
+ * from both, which is the failure-versus-absence confusion this arc keeps finding.
+ *
+ * Found while reporting gate numbers for #206: `npm test` read 1378 before and after that PR
+ * merged, although it added three tests. They were real and they passed; they were simply not in
+ * the suite whose number I was quoting.
+ */
+
+/** The files a `node --test` run-block names, in the job whose step contains `marker`. */
+export function testFilesInJob(text, marker) {
+  const lines = text.split('\n');
+  const at = lines.findIndex((l) => l.includes(marker));
+  if (at === -1) return null;
+  const out = [];
+  for (let i = at; i < lines.length; i += 1) {
+    const m = /(tests\/[\w./-]+\.test\.mjs)/.exec(lines[i]);
+    if (m) { out.push(m[1]); continue; }
+    // Stop at the next step, so a later job's list cannot be read as this one's.
+    if (out.length && /^\s{6}- name:/.test(lines[i])) break;
+  }
+  return out;
+}
+
+/** Which files are on disk but named by no job, and which are named but no longer on disk. */
+export function runsNowhere({ onDisk, named }) {
+  return {
+    unrun: onDisk.filter((f) => !named.includes(f)),
+    stale: named.filter((f) => !onDisk.includes(f)),
+  };
+}
+
+test('ARC-09-C48 — every test file excluded from `npm test` is named by the job that covers it', () => {
+  const dir = 'tests/upgrade';
+  const onDisk = readdirSync(join(root, dir))
+    .filter((f) => f.endsWith('.test.mjs')).map((f) => `${dir}/${f}`).sort();
+  const named = (testFilesInJob(wf('ci.yml'), 'node --test --test-concurrency=2') ?? []).sort();
+
+  // NON-VACUITY, both sides. An empty parse and an empty directory agree perfectly, and that
+  // agreement is exactly what this test must not report as health.
+  assert.ok(onDisk.length >= 3, `only ${onDisk.length} test files found in ${dir} — has it moved?`);
+  assert.ok(named.length >= 3, `the job's file list parsed as ${named.length} entries — the step moved`);
+
+  const { unrun, stale } = runsNowhere({ onDisk, named });
+  assert.deepEqual(unrun, [],
+    `${unrun.length} test file(s) in ${dir} run NOWHERE: excluded from \`npm test\` by tests/run.mjs `
+    + 'and not named by the upgrade-e2e job. Add them to that job\'s run-block, or move them under a '
+    + 'directory the walk covers.');
+  assert.deepEqual(stale, [],
+    `the upgrade-e2e job names ${stale.length} file(s) that no longer exist: ${stale.join(', ')}`);
+});
+
+test('ARC-09-C48 control — the predicate fails by NAME in both directions', () => {
+  // The closed path, driven directly: no file is planted, because the thing under test is the
+  // comparison, and a test that created a file to prove a comparison works would be testing the
+  // filesystem. A fourth file nobody listed is the case that reached CI.
+  const onDisk = ['tests/upgrade/a.test.mjs', 'tests/upgrade/b.test.mjs'];
+  assert.deepEqual(runsNowhere({ onDisk, named: ['tests/upgrade/a.test.mjs'] }),
+    { unrun: ['tests/upgrade/b.test.mjs'], stale: [] });
+
+  // And the rot facing the other way: a list that outlives the file it names. Same defect class —
+  // the list stops describing the tree — and it would otherwise fail in CI as a missing path.
+  assert.deepEqual(runsNowhere({ onDisk: ['tests/upgrade/a.test.mjs'], named: onDisk }),
+    { unrun: [], stale: ['tests/upgrade/b.test.mjs'] });
+
+  // Agreement is reported as agreement, or the test above could never pass.
+  assert.deepEqual(runsNowhere({ onDisk, named: onDisk }), { unrun: [], stale: [] });
+
+  // The parser is aimed at ONE step: a marker that is not there returns null rather than the first
+  // list it can find, so a renamed step fails the non-vacuity floor instead of silently comparing
+  // against some other job's files.
+  assert.equal(testFilesInJob(wf('ci.yml'), 'a step that does not exist'), null);
+});

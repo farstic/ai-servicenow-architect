@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A test we add can no longer end up running nowhere.** One directory of slow tests is skipped by
+  the main suite and covered by a dedicated CI job that lists its files by hand — so a file added
+  there was in neither, and both reported success by not knowing about it. A check now holds that
+  list to the directory it describes, in both directions.
+
 - **Upgrading now tells you which check failed, not just that one did.** The last step of an upgrade
   runs the doctor and printed only a tally — `31 ok, 3 warn, 1 fail` — so the one thing you needed,
   which check and what to do about it, meant running the doctor again yourself. It now lists every
