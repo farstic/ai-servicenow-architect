@@ -471,3 +471,101 @@ test('ARC-06 — a project registration in design mode needs no removal at all',
   assert.doesNotMatch(r.text, /design-only is NOT in force/);
   assert.equal(r.state.registration, 'project');
 });
+
+/**
+ * ARC-06-C14 — a switch that did not happen leaves no registration behind.
+ *
+ * The owner ran `./snowarch mode live --register local` on rc.4. B06 stopped with "needs a label",
+ * the mode stayed design-only, and the local-scope entry — written before the steps, by design —
+ * stayed too. The next `./snowarch doctor` said `E-27 FAIL … design-only is not in force: a
+ * local-scope entry keeps the server loaded`, which was correct and which the owner had to clear
+ * by hand with a second command.
+ *
+ * The ordering is NOT the defect and is not what changed: `mode.mjs` settles the registration
+ * before the steps because B07 writes the toggles from `state.registration`, and an entry made
+ * after B07 would leave the project entry enabled so both load. What was missing is the other half
+ * of that decision — the entry is recorded as OURS precisely so it can be taken back, and nothing
+ * took it back.
+ */
+
+/** `mode live --register local` against a registry whose LAST step fails — the owner's shape. */
+const runToFailure = async (root, { fake = fakeClaude(), steps } = {}) => {
+  bootstrapped(root);
+  writeFileSync(join(root, '.local', 'instances.json'), '{"defaultInstance":"dev1"}\n');
+  const log = recorder();
+  const stub = (id, status, detail) => ({ id, title: id, needsNode: false, runsWhen: () => true,
+    cacheable: false, inputs: () => [], run: async () => ({ status, detail }) });
+  const code = await modeCommand({
+    root, positional: ['live'], flags: { yes: true, register: 'local' }, log, env: {}, cwd: root,
+    claudePath: '/fake/bin/claude', execClaude: fake.exec,
+    registry: steps ?? [stub('B00', 'ok'), stub('B06', 'fail', 'needs a label')],
+  });
+  return { code, log, fake, text: log.lines.join('\n'), state: loadState(root) };
+};
+
+test('ARC-06-C14 — the wizard fails, and the local entry it was registered for is taken back', async () => {
+  const root = makeCheckout();
+  const r = await runToFailure(root);
+
+  assert.notEqual(r.code, EXIT_OK, 'the run was supposed to fail — this test proves nothing green');
+
+  // THE DEFECT. `claude mcp remove -s local` is the thing that never happened.
+  const [removed] = r.fake.of('remove');
+  assert.ok(removed, `the entry was left on the machine after a failed switch:\n${r.text}`);
+  assert.deepEqual(removed.args, ['mcp', 'remove', 'servicenow', '-s', 'local']);
+
+  // And the record says what the machine says. A state still reading `local` would send the next
+  // doctor looking for an entry that is gone; one reading `project` while the entry remained would
+  // disown it, which is the orphan `mode.mjs` already refuses to create.
+  assert.equal(r.state.registration, 'project');
+  assert.equal(r.state.registrationReason, 'default');
+
+  // It says so, in its own words rather than design-only's: nothing here switched to design-only.
+  assert.match(r.text, /rolled back to project — the local-scope entry was removed because the mode switch it was made for did not complete/);
+  assert.doesNotMatch(r.text, /design-only does not reach/);
+});
+
+test('ARC-06-C14 — the preflight is the other way out, and it rolls back too', async () => {
+  // Two exits follow the registration and they were added at different times: this one is named in
+  // `mode.mjs`'s own comment ("if B00 then fails — no network, Node gone"). A rollback covering
+  // only the later one would be the half-fix that reads as done.
+  const root = makeCheckout();
+  const stub = (id, status, detail) => ({ id, title: id, needsNode: false, runsWhen: () => true,
+    cacheable: false, inputs: () => [], run: async () => ({ status, detail }) });
+  const r = await runToFailure(root, { steps: [stub('B00', 'fail', 'no network')] });
+
+  assert.notEqual(r.code, EXIT_OK);
+  assert.ok(r.fake.of('remove')[0], `B00 failed and the entry stayed:\n${r.text}`);
+  assert.equal(r.state.registration, 'project');
+});
+
+test('ARC-06-C14 control — a run that SUCCEEDS keeps its registration', async () => {
+  // NON-VACUITY, and the direction that matters most: a rollback that fired on success would undo
+  // every working install, and every assertion above would still pass.
+  const root = makeCheckout();
+  const stub = (id) => ({ id, title: id, needsNode: false, runsWhen: () => true,
+    cacheable: false, inputs: () => [], run: async () => ({ status: 'ok' }) });
+  const r = await runToFailure(root, { steps: [stub('B00'), stub('B06')] });
+
+  assert.equal(r.code, EXIT_OK, r.text);
+  assert.deepEqual(r.fake.of('remove'), [], 'a successful switch removed its own registration');
+  assert.equal(r.state.registration, 'local');
+  assert.equal(r.state.registrationReason, CREATED_BY_US);
+  assert.doesNotMatch(r.text, /rolled back/);
+});
+
+test('ARC-06-C14 — an entry that cannot be removed is reported, not disowned', async () => {
+  // The rollback's own failure path. Rewriting the state to `project` while the entry is still on
+  // the machine is the disowning this file refuses everywhere else — and it would leave the next
+  // doctor with nothing to find it by, which is how the original leftover went unexplained.
+  const root = makeCheckout();
+  const fake = fakeClaude({ removeStatus: 1 });
+  const r = await runToFailure(root, { fake });
+
+  assert.notEqual(r.code, EXIT_OK);
+  assert.ok(r.fake.of('remove')[0], 'the removal was never attempted');
+  assert.equal(r.state.registration, 'local', 'the entry is still there and the state disowned it');
+  assert.equal(r.state.registrationReason, CREATED_BY_US);
+  assert.match(r.text, /could not be removed after the switch failed/);
+  assert.match(r.text, /claude mcp remove servicenow -s local/);
+});
