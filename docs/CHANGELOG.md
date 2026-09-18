@@ -235,6 +235,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Our test suite can no longer lose track of a temporary folder it failed to delete.** The cleanup
+  treated "the delete call returned" as "the folder is gone". When those two came apart, every
+  safeguard downstream went quiet at once: the record of which test created the folder was thrown
+  away, the folder was struck off the list of things still owed, and the end-of-run report said
+  nothing — leaving a stray directory behind with no way to trace it. The cleanup now checks that
+  the folder actually went, and reports it with an error code if it did not.
+
 - **Setting up a live instance works from the installer again.** Asked for an instance label that it
   had never given you a chance to type, the setup step stopped with a usage error before the first
   question. It now asks for the label, suggesting one you can accept with Enter — and when there is

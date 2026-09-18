@@ -14,12 +14,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { tempDir } from './helpers/temp.mjs';
+import { remove, tempDir } from './helpers/temp.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const workspace = pathToFileURL(resolve(here, 'helpers/workspace.mjs')).href;
@@ -62,7 +62,45 @@ function runProbe(probe, sandbox) {
  * EMPTY (removal started, entry lingering) or populated (removal never ran), because those are
  * different bugs and the next occurrence should not need a third guess.
  */
-function leftBehind(sandbox) {
+/**
+ * WHEN was the survivor created, relative to the run that should have removed it?
+ *
+ * ARC-09-C40 made a leftover arrive with its reason; C39 made a failed removal keep its record. The
+ * occurrence after both reported all three of C39's settled facts at once — register silent, owner
+ * record gone, nine entries on disk — and those are consistent with two DIFFERENT defects that need
+ * different fixes:
+ *
+ *   (a) the removal genuinely succeeded and something recreated the path afterwards — a producer
+ *       that outlived the teardown. Then "no owner record" is exactly right, and the sweep is not
+ *       the thing to change.
+ *   (b) a removal that returned without throwing while the directory persisted. Then the register
+ *       logic is right and the removal CHECK is wrong.
+ *
+ * The message could not tell them apart, which is this week's shape once more: two causes, one
+ * observation. A birth time bounded by the child's own lifetime separates them — created during the
+ * run means the original was never removed; created after the child exited means something put it
+ * back.
+ *
+ * `birthtime` is not universally available (ext4 exposes it through statx on modern kernels, some
+ * filesystems report 0). When it is missing this says so rather than guessing, because a fabricated
+ * timestamp would answer the question wrongly and confidently.
+ */
+function age(sandbox, name, window) {
+  let born;
+  try { born = statSync(join(sandbox, name)).birthtimeMs; } catch { return 'age unreadable'; }
+  if (!born) return 'birthtime unavailable on this filesystem — cannot say when it was created';
+  if (!window) return `born ${new Date(born).toISOString()}`;
+  if (born > window.exitedAt) {
+    return `born ${born - window.exitedAt} ms AFTER the child exited — something recreated it`;
+  }
+  if (born >= window.startedAt) {
+    return `born during the child's run, ${window.exitedAt - born} ms before it exited `
+      + '— the original, never removed';
+  }
+  return `born BEFORE the child started (${window.startedAt - born} ms) — not this run's fixture`;
+}
+
+function leftBehind(sandbox, window = null) {
   let names = [];
   for (let attempt = 0; attempt < 10; attempt += 1) {
     // `.owner` records are excluded from the COUNT — they are the instrument, and a survivor is
@@ -90,7 +128,7 @@ function leftBehind(sandbox) {
       owner = readFileSync(join(sandbox, `${name}.owner`), 'utf8').split('\n')[0];
     } catch { /* left as "no owner record" */ }
     return `${name} (${contents.length === 0 ? 'EMPTY — removal started, entry lingering'
-      : `${contents.length} entries — not removed`}; made by: ${owner})`;
+      : `${contents.length} entries — not removed`}; made by: ${owner}; ${age(sandbox, name, window)})`;
   }).join(', ');
   return { names, detail };
 }
@@ -111,10 +149,15 @@ test('a fixture made by makeCheckout is gone once the run that made it ends', (t
     '',
   ].join('\n'));
 
+  // The window the birth time is judged against. Taken around the spawn rather than inside it: the
+  // child's own clock is not this process's, and what matters is whether the survivor appeared
+  // while the child could still have been writing.
+  const startedAt = Date.now();
   const child = runProbe(probe, sandbox);
+  const exitedAt = Date.now();
   assert.equal(child.status, 0, `${child.stdout}${child.stderr}`);
 
-  const left = leftBehind(sandbox);
+  const left = leftBehind(sandbox, { startedAt, exitedAt });
   // The child's stderr goes in the MESSAGE, because the helper has usually already said why: a
   // failed `rmSync` is reported by the exit sweep as `temp.mjs: N fixture(s) survived on node X`
   // with the errno. Two occurrences (CI ubuntu/node24, and a local run) reported a directory and a
@@ -378,4 +421,58 @@ test('a teardown that FAILS to remove keeps the fixture on the register, and the
   const owner = readFileSync(join(sandbox, owners[0]), 'utf8');
   assert.match(owner, /holds a fixture that cannot be removed/,
     `the owner record does not name the test that made it:\n${owner}`);
+});
+
+/**
+ * The recurrence of 2026-09-18: the survivor that no instrument mentioned.
+ *
+ * `d5b3f0e` reported a populated `snowarch-bootstrap-*` with NO owner record, a clean exit, and
+ * `(neither stream mentioned the sweep)` — on a tree that already carried the 2026-09-17 fix for
+ * exactly that signature. So the explanation written into `temp.mjs` at the time was not the whole
+ * one, and the four facts had to be taken back to the code.
+ *
+ * Two candidates were on the table: something recreated the directory after the teardown, or a
+ * removal returned without removing. The first is dead on the evidence rather than on taste —
+ * `recordOwner` writes the `.owner` file at CREATION, so anything that recreated a fixture would
+ * have left a record beside it, and the survivor had none. The second is the only route left:
+ * both places that delete an owner record, and both that would have reported the survivor, are
+ * downstream of `remove` reporting success, so a single unverified `return null` disarms all four
+ * instruments at once and produces precisely the state observed.
+ *
+ * NOT REPRODUCED ON DEMAND — 48 concurrent probes on macOS/node 24 (APFS), 192 on Ubuntu 22.04/
+ * node 22 (ext4). These tests therefore drive the closed path directly through the injected `rm`
+ * instead of waiting for a filesystem to do it, which is the only way a defect that appears three
+ * times in a fortnight of CI gets a test at all.
+ */
+test('a removal that reports success without removing is a failure, not a success', (t) => {
+  const dir = tempDir('snowarch-survivor-', t);
+  writeFileSync(join(dir, 'f'), 'x');
+
+  // The closed path, exactly: a removal that returns cleanly and does nothing.
+  const error = remove(dir, () => {});
+  assert.ok(error, 'a removal that left the tree on disk reported success');
+  assert.equal(error.code, 'ESURVIVED');
+  assert.match(error.message, /still exists after a removal that reported success/);
+
+  // Shaped like the errno errors the callers print, or the survivor reaches no message.
+  assert.match(`${dir}: ${error.code ?? error.message}`, /: E[A-Z]+$/);
+});
+
+test('control — the check is aimed at the closed path, and does not fire on a real removal', (t) => {
+  // NON-VACUITY, both halves. A verification that answered "survived" for everything would pass the
+  // test above while making every successful teardown report a failure, and a run in which nothing
+  // is ever removed looks identical from the outside to one in which nothing ever fails.
+  const real = tempDir('snowarch-survivor-', t);
+  writeFileSync(join(real, 'f'), 'x');
+  assert.equal(remove(real), null, 'a removal that actually removed the tree was reported as failed');
+  assert.equal(existsSync(real), false);
+
+  // And the OLD shape is provably blind to it, or this control proves nothing about what changed.
+  // This is what `remove` did before: call, catch, return null — with no check that it worked.
+  const old = (d, rm) => { try { rm(d, {}); return null; } catch (e) { return e; } };
+  const survivor = tempDir('snowarch-survivor-', t);
+  writeFileSync(join(survivor, 'f'), 'x');
+  assert.equal(old(survivor, () => {}), null,
+    'the premise of this control moved: the old shape no longer passes a survivor as removed');
+  assert.equal(existsSync(survivor), true, 'the survivor is still on disk, and the old shape said null');
 });
