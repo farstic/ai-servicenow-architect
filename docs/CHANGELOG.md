@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.0-rc.5 — 2026-09-18
+
+### Notes
+
 This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
 
 #### Migration for snow-mcp 1.0.0 users
@@ -1705,6 +1709,20 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   engine pin and its sha are untouched.
 
 ---
+
+### Fixed
+
+- wizard: on a terminal, a missing instance label is a question (a9518be)
+- docs: the install page counts its own preflight, and can install a version (60525f4)
+
+### Internal
+
+- ci: pin PSScriptAnalyzer to 1.25.0, the version a green run reported (e4a090a)
+- ci: ASCII only inside a Windows PowerShell 5.1 step (1dd6b2c)
+- ci: the analyzer step says which kind of failure it had (646d4fc)
+- plan: the Ubuntu clean-machine validation of v2.0.0-rc.4 (cfbd088)
+
+Tag v2.0.0-rc.5 · contract 829908107404 · docs-pin df4afac
 
 ## The imported engine's header
 
