@@ -140,7 +140,14 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
   // The registration is settled BEFORE the steps run, because B07 writes the toggles from
   // `state.registration`: a local registration made after B07 would leave the project entry
   // enabled and both would load.
+  // ARC-06-C14 — what to put back if the switch this registration was FOR does not happen.
+  //
+  // Captured before the change and not after it, because `changeRegistration` overwrites both
+  // fields and the previous scope is then unrecoverable from the state.
+  let undoRegistration = null;
   if (flags.register !== undefined) {
+    const before = { registration: state.registration ?? 'project',
+      registrationReason: state.registrationReason ?? 'default' };
     const changed = await changeRegistration({
       root, serverKey, scope: flags.register, state, log,
       exec: execClaude, env, claudePath, config,
@@ -153,6 +160,9 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
     // undo (`--register project`) refuses to remove what it does not own. The orphan would
     // outlive the failure, and only `claude mcp get` would ever mention it.
     saveState(root, state);
+    // Only a change that CREATED an entry can be rolled back. `--register project` removes one and
+    // creates nothing, and `already local — nothing to change` touched neither file.
+    if (changed.changed && state.registration !== 'project') undoRegistration = before;
   }
 
   // ARC-06 (Sitting A) — DESIGN-ONLY MUST BE TRUE OF THE MACHINE, not just of our own toggles.
@@ -199,6 +209,15 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
   const onLine = (line) => { lines.push(line); log.step(line); };
   const live = { child: null, step: null };
 
+  // ARC-06-C14. One definition for the two ways a switch can fail after the entry was written —
+  // the preflight's early return and a stopped run — because the second was added to this function
+  // long after the first, and a rollback that covered only one exit would be the half-fix that
+  // reads as done. A no-op when nothing was registered, so both call sites are unconditional.
+  const undo = () => (undoRegistration
+    ? rollbackRegistration({ root, serverKey, state, log, exec: execClaude, env, claudePath,
+      before: undoRegistration })
+    : Promise.resolve({ ok: true, changed: false }));
+
   if (wantsLive) {
     // B00 first and alone, exactly as `bootstrap` runs it: a machine that cannot reach github.com
     // or has lost Node must not be told it is now live.
@@ -206,7 +225,13 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
       root, ctx: { ...ctx, cwd, probe, exec }, state, steps: [registry[0]], last: LAST, onLine,
       save: () => {}, ...(hash ? { hash } : {}),
     });
-    if (preflight.code !== EXIT_OK) return preflight.code;
+    if (preflight.code !== EXIT_OK) {
+      // ARC-06-C14. The earliest of the two ways out after the entry exists, and the one the
+      // `saveState` comment above names by hand: "if B00 then fails — no network, Node gone".
+      await undo();
+      saveState(root, state);
+      return preflight.code;
+    }
   }
 
   const onSigint = () => {
@@ -223,6 +248,10 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
   } finally {
     process.off('SIGINT', onSigint);
   }
+  // ARC-06-C14 — BEFORE the state is saved and before the closing block is built, so the record
+  // and the sentence both describe the machine as it is being left. `stoppedAt` is the switch not
+  // happening: B07 writes the mode, so a run that stopped short never became live.
+  if (outcome.code !== EXIT_OK) await undo();
   saveState(root, state);
 
   const closing = closingBlock({ outcome, state, root, serverKey, wantsLive, env, readLabel });
@@ -317,6 +346,52 @@ export async function releaseScopedRegistration({ root, serverKey, state, log, e
   state.registrationReason = 'default';
   log.step(`registration: removed the ${scope}-scope entry — design-only does not reach `
     + `${scope === 'user' ? '~/.claude.json' : 'local scope'} through the toggles`);
+  return { ok: true, changed: true };
+}
+
+/**
+ * Put the registration back when the switch it was made for did not happen.
+ *
+ * ARC-06-C14. The owner ran `./snowarch mode live --register local` on rc.4; B06 stopped with
+ * "needs a label", the mode stayed design-only — and the local-scope entry, written before the
+ * steps by design, stayed too. The next `./snowarch doctor` said `E-27 FAIL … design-only is not
+ * in force: a local-scope entry keeps the server loaded`. The doctor was right, and the entry was
+ * correctly recorded as ours; what was missing is that a command which did not do the thing it
+ * announced left a machine-level change behind for the user to undo by hand.
+ *
+ * NOT a reordering. `mode.mjs` settles the registration before the steps on purpose — B07 writes
+ * the toggles from `state.registration`, and an entry made after B07 leaves the project entry
+ * enabled so both load. That constraint stands; this is the other half of it, which the comment
+ * above `saveState` had already reasoned towards: the state is saved so the entry is OWNED, and
+ * ownership is what makes this removal possible at all.
+ *
+ * Its own sentence, sharing `unregister` with the two callers above rather than their wording: a
+ * rollback is not a switch to design-only, and `releaseScopedRegistration`'s line — "design-only
+ * does not reach ~/.claude.json through the toggles" — would be a true sentence about the wrong
+ * event.
+ */
+export async function rollbackRegistration({ root, serverKey, state, log, exec, env,
+  claudePath = undefined, before }) {
+  const scope = state.registration;
+  if (!before || !scope || scope === 'project') return { ok: true, changed: false };
+
+  const path = claudePath === undefined ? resolveClaude({ env }) : claudePath;
+  const removed = unregister({ root, claudePath: path, env, ...(exec ? { exec } : {}),
+    serverKey, scope, ownedByUs: state.registrationReason === CREATED_BY_US });
+
+  // A rollback that cannot complete must SAY so and leave the record accurate. Rewriting the state
+  // to `before` while the entry is still on the machine would be the disowning this file already
+  // refuses elsewhere — and the next doctor would have nothing left to find it by.
+  if (!removed.ok) {
+    log.warn(`the ${scope}-scope "${serverKey}" entry could not be removed after the switch failed`
+      + ` — it still loads the server; remove it with: claude mcp remove ${serverKey} -s ${scope}`);
+    return { ok: false, changed: false };
+  }
+
+  state.registration = before.registration;
+  state.registrationReason = before.registrationReason;
+  log.step(`registration: rolled back to ${before.registration} — the ${scope}-scope entry was `
+    + 'removed because the mode switch it was made for did not complete');
   return { ok: true, changed: true };
 }
 

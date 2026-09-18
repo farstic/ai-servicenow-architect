@@ -241,6 +241,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   failing and warning check by name with its remedy, failures first. A clean upgrade still prints
   the single tally line.
 
+- **A failed switch to live mode no longer leaves the server registered behind it.** If setting up a
+  live instance stopped part-way — a missing label, no network — the mode correctly stayed
+  design-only, but the registration made moments earlier stayed too, so the server kept loading and
+  the next `doctor` run reported it. Clearing that took a second command. The switch now takes its
+  own registration back when it does not complete, and says so; if the entry cannot be removed, it
+  tells you plainly rather than quietly forgetting it was ours.
+
 - **Our test suite can no longer lose track of a temporary folder it failed to delete.** The cleanup
   treated "the delete call returned" as "the folder is gone". When those two came apart, every
   safeguard downstream went quiet at once: the record of which test created the folder was thrown
