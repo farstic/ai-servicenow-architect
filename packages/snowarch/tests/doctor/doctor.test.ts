@@ -161,7 +161,7 @@ describe('SV-09 — the store schema (ARC-09-S06)', () => {
 });
 
 /**
- * ARC-09-C45 — the one state SV-02 was never asserted in: healthy.
+ * ARC-08-C14 — the one state SV-02 was never asserted in: healthy.
  *
  * The suite pinned SV-02 as `warn` (no store) and `fail` (0644), and nothing pinned it as **ok**. A
  * healthy 0600 store is written fifteen times in this file and the doctor runs over it, so there is
@@ -176,7 +176,7 @@ describe('SV-09 — the store schema (ARC-09-S06)', () => {
  * The fixture here was already the real schema (version 1, an `instances` map, an `auth` object),
  * which is what the harness's was not — so this pins behaviour rather than repairing a fixture.
  */
-describe('ARC-09-C45 - a healthy store is asserted, not assumed', () => {
+describe('ARC-08-C14 - a healthy store is asserted, not assumed', () => {
   it.skipIf(isWindows)('SV-02 is exactly ok on a healthy 0600 store', async () => {
     writeStore();
     const r = await doctor(['--no-network', '--json']);
