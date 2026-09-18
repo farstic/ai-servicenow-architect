@@ -20,8 +20,8 @@ import { join, dirname } from 'node:path';
 
 import { tempDir } from './helpers/temp.mjs';
 
-import { WIZARD, awaitProbe, firstLine, probeWizard, wizardProbeFailure, WIZARD_ABSENT }
-  from '../lib/steps/B06.mjs';
+import { WIZARD, awaitProbe, firstLine, probeWizard, wizardExitFailure, wizardProbeFailure,
+  WIZARD_ABSENT } from '../lib/steps/B06.mjs';
 
 const CLI = join('packages', 'snowarch', 'dist', 'cli', 'index.js');
 
@@ -130,4 +130,42 @@ test('awaitProbe normalises both shapes, and keeps what was printed', async () =
 
   assert.equal(firstLine('\n\n  the reason  \nthe stack\n'), 'the reason');
   assert.equal(firstLine(null), '');
+});
+
+/**
+ * ARC-07-C2 — a wizard that RAN and refused its own arguments is not an unanticipated failure.
+ *
+ * The owner's `mode live` printed `Remedy: none recorded — please report this with the log`, which
+ * is the right sentence for something nobody foresaw and the wrong one for exit 2: the CLI's usage
+ * code, raised because this step passed argv the CLI would not take. The report IS what it needs —
+ * it is a defect in the caller — but it has to say so rather than shrug.
+ */
+test('ARC-07-C2 — exit 2 is classified as usage and carries a remedy', () => {
+  const usage = wizardExitFailure(2);
+  assert.equal(usage.status, 'fail');
+  assert.equal(usage.klass, WIZARD.USAGE);
+  assert.match(usage.detail, /rejected its arguments \(exit 2\)/);
+  assert.match(usage.detail, /nothing was saved by B06/);
+  assert.ok(usage.remedy, 'exit 2 still says "none recorded" — the C2 defect');
+  assert.match(usage.remedy, /defect in the bootstrap, not in what you typed/);
+  assert.match(usage.remedy, /instance add <label>/, 'the remedy does not say how to finish the install');
+
+  // WHAT IT DOES NOT CLAIM. The wizard is spawned `stdio: 'inherit'` so it can mask a password on
+  // the operator's own terminal, so there is no captured stderr to quote — the detail points at the
+  // message already on screen instead of pretending to carry it.
+  assert.doesNotMatch(usage.detail, /stderr/);
+  assert.match(usage.detail, /above, in this terminal/);
+});
+
+test('ARC-07-C2 — every other non-zero exit keeps the sentence it had', () => {
+  // Both directions: the new class must not swallow the failures it was not written for. A crash
+  // nobody anticipated still reads "none recorded", which is honest for a cause nobody has named.
+  for (const status of [1, 3, 130, null]) {
+    const r = wizardExitFailure(status);
+    assert.equal(r.status, 'fail');
+    assert.equal(r.klass, undefined, `exit ${status} was classified as something it is not`);
+    assert.equal(r.remedy, null);
+    assert.match(r.detail, /the instance wizard exited/);
+  }
+  assert.match(wizardExitFailure(null).detail, /exited abnormally/);
 });

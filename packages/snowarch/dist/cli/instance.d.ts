@@ -73,6 +73,15 @@ export interface AddIo extends ReviewIo {
     /** S01's masked prompt, injected so a test never needs a terminal. */
     secret: (label: string) => Promise<string>;
     io?: Io;
+    /**
+     * Is there a terminal to ask a question on? (ARC-07-C2)
+     *
+     * Injected rather than read from `process.stdin` at the point of use, for the reason every other
+     * terminal fact in this file is injected: a test that had to own a TTY to exercise the prompt
+     * path would not be run, and the path would go unexercised — which is exactly how the missing
+     * label reached an owner's machine.
+     */
+    isTty?: boolean;
 }
 export interface AddResult {
     saved: boolean;
@@ -118,6 +127,7 @@ export declare function parseAddArgs(argv: readonly string[]): {
 } | {
     ok: false;
     message: string;
+    needsLabel?: true;
 };
 export interface AddDeps {
     storePath?: string;

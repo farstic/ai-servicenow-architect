@@ -221,8 +221,13 @@ export function parseAddArgs(argv) {
             default: return { ok: false, message: `unknown option --${name}` };
         }
     }
-    if (options.label === undefined)
-        return { ok: false, message: 'instance add needs a label' };
+    // ARC-07-C2 — the ONE refusal a caller may recover from, and it is marked rather than matched
+    // on its sentence. Everything else here stays exit 2 before anything is asked, which is this
+    // function's contract; a missing label is the only one a terminal can supply, and the caller
+    // that has the terminal decides. A caller without one gets the usage error unchanged.
+    if (options.label === undefined) {
+        return { ok: false, message: 'instance add needs a label', needsLabel: true };
+    }
     if (!LABEL_RULE.test(options.label)) {
         return { ok: false, message: `"${options.label}" is not a valid label — lower case, starting `
                 + 'with a letter, up to 32 characters of a-z 0-9 _ -' };

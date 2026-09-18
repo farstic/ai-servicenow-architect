@@ -235,6 +235,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Setting up a live instance works from the installer again.** Asked for an instance label that it
+  had never given you a chance to type, the setup step stopped with a usage error before the first
+  question. It now asks for the label, suggesting one you can accept with Enter — and when there is
+  no terminal to ask on, it still says plainly what was missing.
+
 - **The Windows style-checker in our pipeline is pinned to a known version.** It used to install
   whatever was newest at that moment, so a bad release upstream could fail a build for reasons
   nothing in this project had changed.

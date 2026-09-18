@@ -136,6 +136,15 @@ export interface AddIo extends ReviewIo {
   /** S01's masked prompt, injected so a test never needs a terminal. */
   secret: (label: string) => Promise<string>;
   io?: Io;
+  /**
+   * Is there a terminal to ask a question on? (ARC-07-C2)
+   *
+   * Injected rather than read from `process.stdin` at the point of use, for the reason every other
+   * terminal fact in this file is injected: a test that had to own a TTY to exercise the prompt
+   * path would not be run, and the path would go unexercised — which is exactly how the missing
+   * label reached an owner's machine.
+   */
+  isTty?: boolean;
 }
 
 export interface AddResult {
@@ -209,7 +218,8 @@ export const storeLine = (path: string, platform: NodeJS.Platform = process.plat
     : `Store: ${path} (mode 0600, dir 0700)`);
 
 /** Parse and validate; every refusal here is exit 2 and happens before anything is asked. */
-export function parseAddArgs(argv: readonly string[]): { ok: true; options: AddOptions } | { ok: false; message: string } {
+export function parseAddArgs(argv: readonly string[]):
+{ ok: true; options: AddOptions } | { ok: false; message: string; needsLabel?: true } {
   const options: AddOptions = {};
   const rest = [...argv];
   const takeValue = (): string | null => {
@@ -249,7 +259,13 @@ export function parseAddArgs(argv: readonly string[]): { ok: true; options: AddO
     }
   }
 
-  if (options.label === undefined) return { ok: false, message: 'instance add needs a label' };
+  // ARC-07-C2 — the ONE refusal a caller may recover from, and it is marked rather than matched
+  // on its sentence. Everything else here stays exit 2 before anything is asked, which is this
+  // function's contract; a missing label is the only one a terminal can supply, and the caller
+  // that has the terminal decides. A caller without one gets the usage error unchanged.
+  if (options.label === undefined) {
+    return { ok: false, message: 'instance add needs a label', needsLabel: true };
+  }
   if (!LABEL_RULE.test(options.label)) {
     return { ok: false, message: `"${options.label}" is not a valid label — lower case, starting `
       + 'with a letter, up to 32 characters of a-z 0-9 _ -' };
