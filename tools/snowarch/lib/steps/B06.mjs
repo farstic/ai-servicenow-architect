@@ -46,6 +46,22 @@ export const WIZARD_ABSENT =
 
 const CLI = join('packages', 'snowarch', 'dist', 'cli', 'index.js');
 
+// The CLI's usage code, named rather than typed as a 2. `lib/exit.mjs` owns the engine's five and
+// deliberately does not re-export the CLI's; this is the one value B06 needs to read back from a
+// child, so it is named here once with the reason attached.
+const EXIT_USAGE_CODE = 2;
+
+/**
+ * The argv this step hands the wizard — EXPORTED so a test can drive the real CLI with it.
+ *
+ * ARC-07-C2's gap was the same as ARC-06-C6's: nothing ever ran B06's spawn against the actual
+ * command-line parser. The step passed no label, the CLI required one, and every interactive
+ * install died at exit 2 before asking anything — while CI stayed green because CI has no TTY and
+ * never reaches this step. An argv written as a literal inside a spawn call is an argv no test can
+ * reach; a named export is one a test can hand to the parser that has to accept it.
+ */
+export const WIZARD_ARGV = Object.freeze(['instance', 'add', '--from-bootstrap']);
+
 // ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
 // inputs" in ten files is ten places to get the resume rule wrong, and no way to show a user the
 // set — the table is one answer, and `docs/ARCHITECTURE.md` renders from it.
@@ -104,7 +120,37 @@ function readFileSyncSafe(p) {
  */
 export const WIZARD = Object.freeze({
   OK: 'ok', SPAWN_ERROR: 'spawn-error', CRASHED: 'crashed', SIGNAL: 'signal', ABSENT: 'absent',
+  // ARC-07-C2 — the class C5 did not have, because nothing had ever seen it: the wizard RAN and
+  // refused its own arguments. It is the one an operator actually hit.
+  USAGE: 'usage',
 });
+
+/**
+ * What a non-zero wizard exit MEANS, and what to do about it.
+ *
+ * `remedy: null` prints "none recorded — please report this", which is the right sentence for a
+ * failure nobody anticipated and the wrong one for exit 2: the CLI's own usage code, raised because
+ * this step passed argv the CLI would not take. That is a defect in the caller, and a report is
+ * exactly what it needs — but it needs to say so rather than shrug.
+ *
+ * WHAT THIS CANNOT DO, stated because the obvious reading of the rule expects it: the wizard is
+ * spawned with `stdio: 'inherit'` so it can mask a password on the operator's own terminal, which
+ * means there is NO captured stderr here to quote. Its message is already on screen, above this
+ * line. Capturing it would take the terminal away from the thing that needs it most.
+ */
+export function wizardExitFailure(status) {
+  const nothingSaved = 'nothing was saved by B06';
+  if (status === EXIT_USAGE_CODE) {
+    return { status: 'fail', klass: WIZARD.USAGE,
+      detail: `the wizard rejected its arguments (exit ${EXIT_USAGE_CODE}) — ${nothingSaved}. `
+        + 'Its own message is above, in this terminal',
+      remedy: 'this is a defect in the bootstrap, not in what you typed: run '
+        + '`./snowarch instance add <label>` to finish the install, and please report the line above '
+        + 'with the log from .local/logs/' };
+  }
+  return { status: 'fail', remedy: null,
+    detail: `the instance wizard exited ${status ?? 'abnormally'} — ${nothingSaved}` };
+}
 
 /**
  * Wait for a probe, whatever shape the caller's `spawn` returns, AND keep what it printed.
@@ -328,13 +374,10 @@ export const run = async (ctx) => {
   // AWAITED (ARC-09-S07). The runner's `spawn` is asynchronous, so the old `r.status` read an
   // undefined off a live ChildProcess and called a wizard that had not finished a failure.
   const r = await awaitChild(spawn(process.execPath,
-    [join(ctx.root, CLI), 'instance', 'add', '--from-bootstrap'],
+    [join(ctx.root, CLI), ...WIZARD_ARGV],
     // The wizard writes the store; it must write THIS checkout's.
     { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) }));
-  if (r.status !== 0) {
-    return { status: 'fail', remedy: null,
-      detail: `the instance wizard exited ${r.status ?? 'abnormally'} — nothing was saved by B06` };
-  }
+  if (r.status !== 0) return wizardExitFailure(r.status);
 
   const { readDefaultLabel } = await import('../../../../packages/snowarch/dist/store/label.js');
   const label = readDefaultLabel(join(ctx.root, '.local', 'instances.json'));

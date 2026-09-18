@@ -1,6 +1,8 @@
 import { type AddIo, type ManageOptions } from './instance.js';
 /** The real terminal, wired to S01's prompts. Tests pass their own. */
 export declare const terminalIo: () => AddIo;
+/** The label the prompt proposes. ADR-0005: propose, do not impose — Enter accepts, typing wins. */
+export declare const DEFAULT_LABEL = "pdi";
 /** How many positional arguments each sub-command takes after its name. */
 declare const SUB_COMMANDS: {
     readonly list: {

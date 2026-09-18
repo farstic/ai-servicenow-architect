@@ -10,7 +10,7 @@
  * arguments, `set-flags` takes a label and a list, the rest take a label. One parser with a table
  * of shapes cannot drift the way eight parsers can.
  */
-import { promptLine, promptSecret } from './tty.js';
+import { CANCELLED, promptLine, promptSecret } from './tty.js';
 import {
   addHelp, parseAddArgs, runAdd, runList, runRemove, runSetCredentials, runSetDefault,
   runSetFlags, runSetPreset, runTest, EXIT_CODES, EXIT_OK, EXIT_USAGE,
@@ -23,7 +23,13 @@ export const terminalIo = (): AddIo => ({
   ask: async (prompt: string) => promptLine(prompt.replace(/[:>]\s*$/, '').trim(), {}),
   write: (text: string) => { process.stdout.write(text); },
   secret: (label: string) => promptSecret(label, {}),
+  // ARC-07-C2 — INJECTED, like every other terminal fact in this file, so a test can take the
+  // prompt path without a terminal and the no-terminal path without hiding one.
+  isTty: process.stdin.isTTY === true,
 });
+
+/** The label the prompt proposes. ADR-0005: propose, do not impose — Enter accepts, typing wins. */
+export const DEFAULT_LABEL = 'pdi';
 
 /** How many positional arguments each sub-command takes after its name. */
 const SUB_COMMANDS = {
@@ -164,7 +170,22 @@ export async function runInstance(argv: readonly string[], io: AddIo = terminalI
 
   if (sub === 'add') {
     if (rest.includes('--help') || rest.includes('-h')) { io.write(`${addHelp()}\n`); return EXIT_OK; }
-    const parsed = parseAddArgs(rest);
+    let parsed = parseAddArgs(rest);
+    // ARC-07-C2 — on a terminal, a missing label is a QUESTION, not a usage error.
+    //
+    // B06 spawns `instance add --from-bootstrap` with no label and `stdio: 'inherit'`, so the
+    // wizard has the operator's terminal — and every interactive install died here at exit 2
+    // before asking anything. CI never caught it because CI has no TTY, and rc.2 never reached B06.
+    //
+    // Without a terminal, or with --yes, the usage error stands exactly as it was: a run that
+    // cannot ask must not hang waiting for an answer nobody can type.
+    if (!parsed.ok && parsed.needsLabel === true && io.isTty === true && !rest.includes('--yes')) {
+      const typed = (await io.ask(`Label for this instance [${DEFAULT_LABEL}]: `))?.trim();
+      if (typed === undefined) { io.write(`${CANCELLED}\n`); return EXIT_USAGE; }
+      // Re-parsed rather than patched in: the label goes through the SAME validation as one typed
+      // on the command line, so `LABEL_RULE` has one enforcement point and its sentence one author.
+      parsed = parseAddArgs([typed === '' ? DEFAULT_LABEL : typed, ...rest]);
+    }
     if (!parsed.ok) { io.write(`${parsed.message}\n`); return EXIT_USAGE; }
     return (await runAdd(parsed.options, io)).exitCode;
   }
