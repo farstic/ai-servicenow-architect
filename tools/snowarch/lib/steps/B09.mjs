@@ -128,14 +128,25 @@ function instanceFrom(state) {
  * `E-10 FAIL settings.local toggles match the recorded mode: mode is live but servicenow is disabled`
  *
  * The doctor's own renderer is not reachable from here (it formats a whole report), so this builds
- * the one line a reader needs per failure: which check, and what it said.
+ * the one line a reader needs per check: which one, and what it said.
+ *
+ * FAILS FIRST, then warnings, rather than in report order: a reader scanning for the thing that
+ * stopped them should not have to pass three warnings to reach it.
+ *
+ * The status is read off the check instead of being written into the template, so the two views
+ * below are ONE implementation. A second copy of a sentence is the thing this repository keeps
+ * removing, and U7 (ARC-09-C46) is the second reader of this one.
  */
-export function failureLines(parsed) {
-  return (parsed?.checks ?? [])
-    .filter((c) => c.status === 'fail')
-    .map((c) => `${c.id} FAIL ${c.title}${c.detail ? `: ${c.detail}` : ''}`
-      + (c.remedy ? ` — ${c.remedy}` : ''));
+export function nonOkLines(parsed, statuses = ['fail', 'warn']) {
+  const checks = parsed?.checks ?? [];
+  return statuses.flatMap((status) => checks
+    .filter((c) => c.status === status)
+    .map((c) => `${c.id} ${status.toUpperCase()} ${c.title}${c.detail ? `: ${c.detail}` : ''}`
+      + (c.remedy ? ` — ${c.remedy}` : '')));
 }
+
+/** FAILs alone — what B09's summary block carries. Its output is unchanged by the above. */
+export const failureLines = (parsed) => nonOkLines(parsed, ['fail']);
 
 /** The cache's vocabulary is ok/warn/fail; the state also uses `failed` for an interrupt. */
 const normalise = (status) => (status === 'failed' ? 'fail' : status);

@@ -235,6 +235,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Upgrading now tells you which check failed, not just that one did.** The last step of an upgrade
+  runs the doctor and printed only a tally — `31 ok, 3 warn, 1 fail` — so the one thing you needed,
+  which check and what to do about it, meant running the doctor again yourself. It now lists every
+  failing and warning check by name with its remedy, failures first. A clean upgrade still prints
+  the single tally line.
+
 - **A failed switch to live mode no longer leaves the server registered behind it.** If setting up a
   live instance stopped part-way — a missing label, no network — the mode correctly stayed
   design-only, but the registration made moments earlier stayed too, so the server kept loading and
