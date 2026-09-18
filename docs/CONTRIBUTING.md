@@ -683,6 +683,38 @@ missing test (owner directive, 2026-09-08). Three places, in the same PR as the 
 Status filled in later is status nobody can trust; the point of the rule is that the plan is never
 describing a state the repository is not in.
 
+### Citing code in a plan row — the expression, not the line
+
+A row in `docs/plans/**` cites code by **identifier or expression**, never as `path/file.ext:NNN`.
+Write `` `finish()` `` , or the expression itself in backticks — `` `state?.mode === 'live' ? 'live'
+: 'design'` `` — or any string a reader can grep. All three survive the file moving under them; a
+line number does not.
+
+The reason is the one `tests/one-remedy.test.mjs` already gives for keying its allow-list on a
+needle: *a line number is a fact about everything above it*. An unrelated insertion higher up
+silently repoints it, and the reader who notices is taught to re-number rather than to read.
+
+This is not hypothetical. ARC-09-C44 cited `upgrade.mjs:416` for where the mode is chosen; ARC-09-C46
+inserted a function above it two PRs later, and 416 became an unrelated `rev-list --count`. The row
+still looked precise. **The citation that rots is worse than no citation, because it reads as
+checked.**
+
+**The exception, and it is a real one.** A citation into a tree *this repository does not contain* —
+the imported source repos, or a file at a frozen tag — is **provenance, not a pointer**. It cannot
+rot here, because the file is not here to move, and the line number is part of the evidence about
+what was found where. Keep those, and make the foreignness explicit in the sentence around them
+(`snow-mcp's src/cli/config-store.ts:97, at the import commit`) so nobody reads a historical record
+as a live pointer and goes looking.
+
+The split is worth knowing before anybody sweeps: of the `file:line` citations under `docs/plans/`,
+roughly a quarter point at paths that exist here and can rot; the rest point at the old repos and are
+provenance. Only the first kind is worth rewriting.
+
+**No test enforces this.** One was considered and refused: a check that every cited path exists, and
+is long enough to have that line, catches deletion only — it passes happily while a live number
+points at the wrong code, which is the whole failure mode — and it would teach exactly the
+re-numbering reflex the rule exists to remove. This one is held by review.
+
 ### Before you push
 
 ```
