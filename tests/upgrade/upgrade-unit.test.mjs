@@ -93,8 +93,21 @@ test('the cache is the hook\'s contract: three keys that may never be renamed', 
 
   const written = writeUpgradeCheck(dir,
     { latestTag: 'v2.1.0', localTag: 'v2.0.0', localDistance: 3, behind: true });
-  assert.deepEqual(Object.keys(written).sort(),
-    ['behind', 'checkedAt', 'latestTag', 'localDistance', 'localTag', 'remote']);
+  // SUPERSET, NOT EQUALITY — and the difference is this test's own title. It promises three names
+  // that may never be RENAMED; `deepEqual` on the sorted keys froze the whole set at six, so ADDING
+  // a field failed a test about removing one. ARC-08-C17's `source` marker did exactly that: the
+  // over-assertion was the test's, not the change's, and a test that fails for a property it does
+  // not name teaches the next author to delete it rather than to read it.
+  //
+  // What must never happen is a key going away or changing its spelling under a reader that has no
+  // way to notice — the SessionStart hook and the banner both read this file and both fail quietly.
+  // A new key beside them breaks nobody. So: everything that has ever been in this file is still in
+  // it, by name.
+  for (const key of ['behind', 'checkedAt', 'latestTag', 'localDistance', 'localTag', 'remote']) {
+    assert.ok(key in written, `${key} left the cache — something reads it and will not say so`);
+  }
+  // …and the three of them the banner reads, named again with the story that owns them, because
+  // that is the promise in the title.
   for (const key of ['behind', 'latestTag', 'checkedAt']) {
     assert.ok(key in written, `${key} is the banner's contract (ARC-08-S08)`);
   }
