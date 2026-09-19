@@ -27,3 +27,16 @@ export interface DefaultSummary {
  * a guard like that is a second function with its own guard, not an argument with it.
  */
 export declare function readDefaultSummary(storePath: string): DefaultSummary | null;
+/**
+ * Every configured instance, named — ARC-09-C17.
+ *
+ * SV-03's cheap half: who is in the store, without a probe, a network call or a spawned server.
+ * The doctor's quick run needs this because `deriveMode` was deciding "design-only" from an empty
+ * instance list that was empty only because nobody had asked — and the SessionStart hook prints
+ * that line, while the rule file forbids every MCP call in design-only. A checkout with a working
+ * instance could not get a single tool called.
+ *
+ * Same discipline as its two siblings: three non-secret fields per entry, named one at a time, and
+ * a test pins the key set. A spread of the entry would carry the credential block.
+ */
+export declare function readStoreSummaries(storePath: string): DefaultSummary[];

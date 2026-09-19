@@ -235,6 +235,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A configured instance is no longer reported as "not configured" at the start of a session.**
+  The session banner and `/snowarch status` decide the mode from a quick check that does not start
+  the server — and because it never looked in the instance store, it announced `design-only — no
+  ServiceNow instance configured` on checkouts with a working, connected instance. The assistant
+  follows that line, so it would decline every ServiceNow call and offer to set up the instance you
+  already had. The quick check now reads the store directly.
+
 - **`./snowarch mode` now tells you which instance you are live against.** It printed
   `instance=<label> (unknown) preset=unknown` on every live checkout — not sometimes, always: the
   two fields were read from places nothing ever wrote. The install now records the instance's

@@ -34,6 +34,7 @@ import { buildReport } from './report-json.mjs';
 import { renderText, useColour } from './report-text.mjs';
 import { exitCodeFor, runChecks, selectSections } from './runner.mjs';
 import { maskForJson } from './json-boundary.mjs';
+import { readStoreSummaries } from '../../../../packages/snowarch/dist/store/label.js';
 
 export const USAGE = [
   'usage: ./snowarch doctor [--json] [--quick] [--no-network] [--fix] [--section <a,b>] [--no-cache]',
@@ -140,6 +141,23 @@ export function findRoot(from) {
  * `writeCache: true` overrides the section rule for exactly that caller: B08 runs `--section
  * server` and its answer IS what the banner should hold after an install.
  */
+
+/**
+ * The store's instances, named, for a run that did not spawn the server — ARC-09-C17.
+ *
+ * `SNOW_STORE` first, because that is the precedence the server itself uses and a doctor that
+ * disagreed with the server about WHICH store it is reading would answer a different question
+ * from the one asked.
+ */
+function storeSummaries(root, config) {
+  const path = process.env.SNOW_STORE || join(root, '.local', 'instances.json');
+  try {
+    return readStoreSummaries(path).map((i) => ({ ...i, status: 'configured' }));
+  } catch {
+    return [];
+  }
+}
+
 export async function runDoctor({ root, config, registry = engineRegistry(), sections = null,
   quick = false, noNetwork = false, fix = false, section = null, writeCache = 'auto',
   env = process.env, home = '', now = () => Date.now(), started = null } = {}) {
@@ -195,9 +213,15 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
   // The mode: derived here, from the toggle file and the store, and from nothing else. Not from
   // `~/.claude.json`, which belongs to Claude Code and describes a registration rather than a
   // configuration (`00` P-05/P-21).
+  // ARC-09-C17 — when the server was not spawned, the STORE answers. `instances` above is the
+  // server's report, and a quick run has none, so an empty list used to mean "design-only" when it
+  // meant "nobody asked". This read is SV-03's cheap half: no probe, no network, no spawn.
+  const probed = ctx._server !== undefined;
+  const fromStore = probed ? [] : storeSummaries(root, config);
   const derived = deriveMode({
     toggles: { enabled: serverEnabled(root, config) },
-    instances,
+    instances: probed ? instances : fromStore,
+    probed,
     bootstrapped: existsSync(join(root, '.local', 'bootstrap-state.json')),
     // ARC-08-C16 — which entry carries the server. Our own record, read from
     // `bootstrap-state.json`; NOT `~/.claude.json`, which this module promises never to read.

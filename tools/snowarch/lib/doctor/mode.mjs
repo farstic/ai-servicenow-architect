@@ -37,7 +37,7 @@ export function doctorStamp({ summary = {}, at = new Date() } = {}) {
  * @param {boolean} facts.bootstrapped            a `bootstrap-state.json` exists
  */
 export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
-  registration = 'project' } = {}) {
+  registration = 'project', probed = true } = {}) {
   const loaded = instances.filter((i) => i.status === 'loaded');
   const configured = instances.length > 0;
   // ARC-08-C16 — the toggle file decides only when the PROJECT entry is the carrier.
@@ -61,6 +61,23 @@ export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
   if (serverEnabled && loaded.length > 0) {
     const first = loaded[0];
     return { mode: 'live', variant: 'live', qualifier: null, loaded, serverEnabled,
+      instance: { label: first.label, environment: first.environment, preset: first.preset } };
+  }
+  // ARC-09-C17 — A QUICK RUN HAS NOT PROBED, AND ABSENCE IS NOT A VERDICT.
+  //
+  // `loaded` is the SERVER's answer, and a quick run never spawns it, so `instances` arrived
+  // empty and this function concluded design-only about a checkout with a configured store and a
+  // connected server. That line is what the SessionStart hook prints, and the rule file forbids
+  // every MCP call in design-only — so a user with a working instance could not get one tool
+  // called. The hook was not describing the machine, it was disabling it.
+  //
+  // `probed: false` says the question was not ASKED. The store's own entries then decide, which
+  // is what the quick run can cheaply know: a configured instance and a reachable server is live.
+  // It is not a claim that the server loaded the entry — SV-02/SV-03 own that, on a full run —
+  // and the variant says so, so nothing here asserts a probe that did not happen.
+  if (!probed && serverEnabled && configured) {
+    const first = instances[0];
+    return { mode: 'live', variant: 'liveUnprobed', qualifier: null, loaded, serverEnabled,
       instance: { label: first.label, environment: first.environment, preset: first.preset } };
   }
   if (!serverEnabled && configured) {

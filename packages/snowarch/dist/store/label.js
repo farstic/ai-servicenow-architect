@@ -63,3 +63,32 @@ export function readDefaultSummary(storePath) {
     // Named explicitly, one at a time. A spread of the entry would carry the credential block.
     return { label, environment: str(entry?.environment), preset: str(entry?.preset) };
 }
+/**
+ * Every configured instance, named — ARC-09-C17.
+ *
+ * SV-03's cheap half: who is in the store, without a probe, a network call or a spawned server.
+ * The doctor's quick run needs this because `deriveMode` was deciding "design-only" from an empty
+ * instance list that was empty only because nobody had asked — and the SessionStart hook prints
+ * that line, while the rule file forbids every MCP call in design-only. A checkout with a working
+ * instance could not get a single tool called.
+ *
+ * Same discipline as its two siblings: three non-secret fields per entry, named one at a time, and
+ * a test pins the key set. A spread of the entry would carry the credential block.
+ */
+export function readStoreSummaries(storePath) {
+    let parsed;
+    try {
+        parsed = JSON.parse(readFileSync(storePath, 'utf8'));
+    }
+    catch {
+        return [];
+    }
+    const instances = parsed?.instances;
+    if (!instances || typeof instances !== 'object')
+        return [];
+    const str = (v) => (typeof v === 'string' && v.length > 0 ? v : null);
+    return Object.entries(instances).map(([label, raw]) => {
+        const entry = raw;
+        return { label, environment: str(entry?.environment), preset: str(entry?.preset) };
+    });
+}

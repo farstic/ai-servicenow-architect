@@ -7,7 +7,7 @@
 // registration goes stale.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { toggleProblems } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
@@ -24,8 +24,9 @@ import { cachePath, cacheSensitiveValue, cacheStale, collectInputs, INPUT_FILES,
 import { redact } from '../../tools/snowarch/lib/redact.mjs';
 import { doctorLine } from '../../tools/snowarch/lib/text.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
-import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
-import { bootstrap, greenTree, readJson, writeJson } from './helpers/tree.mjs';
+import { doctorCommand, runDoctor } from '../../tools/snowarch/lib/doctor/index.mjs';
+import { bootstrap, contextFor, greenTree, readJson, writeJson } from './helpers/tree.mjs';
+import { engineRegistry } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
 
 /**
  * The command, in process, against a FIXTURE root.
@@ -420,4 +421,127 @@ test('ARC-08-C16 — writer, E-10 and the Mode line agree on what a live checkou
   assert.match(both.problems[0], /both load/);
   assert.equal(deriveMode({ toggles: { enabled: true }, instances: [loaded()],
     registration: 'local' }).mode, 'live');
+});
+
+/**
+ * ARC-09-C17 — the hook told a working checkout it was design-only, and the rule file then
+ * forbade every tool call. A release blocker, found at T-22.
+ *
+ * Sitting C, B2, rc.5. Fresh `claude` in the checkout: store present (pdi), local registration,
+ * server connected, 397 tools. Prompt: "Create a Script Include named X_TEST_Probe on the pdi
+ * instance now." The engine answered:
+ *
+ *   "Mode is design-only — the session hook reports no ServiceNow instance is configured. Per
+ *    .claude/rules/00-mode-and-mcp-gate.md, in design-only mode I never call an MCP tool, so I
+ *    can't reach a "pdi instance" right now regardless of the request."
+ *
+ * It then offered to set up the PDI that was already set up. The model was obeying the rule
+ * correctly; the rule was reading a line that was false. Net effect: a user with a configured,
+ * connected instance could not get one tool called.
+ *
+ * The cause is not C16's. C16 fixed the toggle's vote; this is the other input. `loaded` is the
+ * SERVER's answer and a quick run never spawns it, so `instances` arrived empty and `deriveMode`
+ * read "empty" as "none work" when it meant "nobody asked". Absence was being reported as a
+ * verdict — the same defect this arc keeps finding, in the one line a session reads first.
+ */
+const configured = (over = {}) => ({ label: 'pdi', environment: 'pdi', preset: 'custom',
+  status: 'configured', ...over });
+
+test('ARC-09-C17 — an unprobed run with a configured store is live', () => {
+  // The owner's exact state: local registration, project toggle off by design, one instance in
+  // the store, quick run so nothing was probed.
+  const derived = deriveMode({
+    toggles: { enabled: false },
+    registration: 'local',
+    instances: [configured()],
+    probed: false,
+  });
+
+  assert.equal(derived.mode, 'live',
+    'the hook tells a working checkout it is design-only — this is the C17 defect');
+  assert.equal(derived.variant, 'liveUnprobed');
+  assert.equal(derived.instance.label, 'pdi');
+  assert.equal(derived.qualifier, null, 'a live line carries no explanation of why it is not live');
+});
+
+test('ARC-09-C17 — an unprobed run with an EMPTY store is still not live', () => {
+  // Both directions. The fix must not turn "nobody asked" into "yes" either: with nothing in the
+  // store there is nothing to be live against, and the line must keep saying so.
+  const derived = deriveMode({ toggles: { enabled: true }, instances: [], probed: false });
+  assert.notEqual(derived.mode, 'live');
+});
+
+test('ARC-09-C17 — a PROBED run keeps every verdict it had', () => {
+  // The full doctor spawns the server and gets real statuses; `probed: true` is the default, so
+  // nothing about that path moves. An entry the server refused is still not live, and that is the
+  // distinction worth keeping: `configured` is what the store knows, `loaded` is what the server
+  // answered, and only the second is evidence about whether it works.
+  const refused = deriveMode({
+    toggles: { enabled: true },
+    instances: [{ label: 'pdi', environment: 'pdi', preset: 'custom', status: 'not_loaded' }],
+  });
+  assert.equal(refused.mode, 'design-only');
+  assert.equal(refused.variant, 'noInstanceLoaded');
+
+  // ...and a probed run that DID load is live through the original branch, not the new one.
+  const ok = deriveMode({ toggles: { enabled: true }, instances: [loaded()] });
+  assert.equal(ok.mode, 'live');
+  assert.equal(ok.variant, 'live');
+});
+
+test('ARC-09-C17 — `probed` defaults to true, so no existing caller changes behaviour', () => {
+  // The flag has to be opt-IN. Defaulting it the other way would make every caller that has not
+  // been updated start trusting a store it never read.
+  const derived = deriveMode({ toggles: { enabled: true }, instances: [configured()] });
+  assert.notEqual(derived.mode, 'live',
+    'an unupdated caller would now call a store entry live without the server having loaded it');
+});
+
+/**
+ * ARC-09-C17, the wiring — and the reason this test exists separately.
+ *
+ * The four above drive `deriveMode` with a hand-built instance list. That proves the READER and
+ * says nothing about whether the quick run ever hands it the store, which is exactly the shape
+ * ARC-06-C15 was caught in: a fix that is correct and unconnected. This runs the real
+ * `runDoctor` on a fixture checkout with a real store and reads the Mode line off the report.
+ */
+test('ARC-09-C17 — the quick run reads the store, end to end', async (t) => {
+  const root = greenTree(t, { mode: 'live' });
+  mkdirSync(join(root, '.local'), { recursive: true });
+  const store = join(root, '.local', 'instances.json');
+  writeFileSync(store, `${JSON.stringify({
+    version: 1,
+    defaultInstance: 'pdi',
+    instances: {
+      pdi: {
+        url: 'https://fixture.example',
+        environment: 'pdi',
+        preset: 'custom',
+        auth: { method: 'basic', username: 'someone', password: 'a-secret-value' },
+        flags: {
+          WRITE_ENABLED: 'true', CMDB_WRITE_ENABLED: 'true', SCRIPTING_ENABLED: 'true',
+          ATF_ENABLED: 'true', NOW_ASSIST_ENABLED: 'true', FLUENT_ENABLED: 'false',
+        },
+        toolPackage: 'full', maxRecords: 100, prodWriteAck: false,
+      },
+    },
+  }, null, 2)}\n`);
+  chmodSync(store, 0o600);
+
+  const saved = process.env.SNOW_STORE;
+  process.env.SNOW_STORE = store;
+  try {
+    const { report } = await runDoctor({ root, config: contextFor(root).config,
+      registry: engineRegistry(), quick: true, noNetwork: true, writeCache: false });
+
+    assert.match(report.modeLine, /^Mode: live/,
+      `the quick run still calls a configured checkout design-only:\n${report.modeLine}`);
+    assert.match(report.modeLine, /pdi/, 'the line does not name the instance it found');
+    // The line a session reads must not carry the store's secrets into a hook's output.
+    for (const secret of ['a-secret-value', 'someone', 'https://fixture']) {
+      assert.equal(report.modeLine.includes(secret), false, `the Mode line carried ${secret}`);
+    }
+  } finally {
+    if (saved === undefined) delete process.env.SNOW_STORE; else process.env.SNOW_STORE = saved;
+  }
 });
