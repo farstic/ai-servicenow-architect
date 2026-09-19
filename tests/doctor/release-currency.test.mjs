@@ -29,7 +29,13 @@ async function e28(t, { tags = [], now = realClock, cache = null, noNetwork = fa
   const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   if (cache) writeUpgradeCheck(root, { ...cache, now: () => new Date() });
-  return E28.run({ root, noNetwork, now, exec: () => lsRemote(tags) });
+  // ARC-09-C47 — the stub must answer the command it is GIVEN. E-28 now also asks
+  // `git describe --tags --exact-match`, and a stub that returned ls-remote output to that
+  // question was telling the check this tree is on a tag called
+  // "0000…\trefs/tags/v2.1.0" — which no checkout is. Empty is the honest fixture answer:
+  // these cases are about tags and caching, and their tree is not on a tag.
+  const exec = (_cmd, args) => (args.includes('describe') ? '' : lsRemote(tags));
+  return E28.run({ root, noNetwork, now, exec });
 }
 
 test('C31 — a newer release tag is a warn, with the clock the runner actually passes', async (t) => {
@@ -85,8 +91,16 @@ test('C31 — a cache that says BEHIND still warns, without asking the remote ag
   const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   writeUpgradeCheck(root, { latestTag: 'v9.0.0', localTag: 'v2.0.0', behind: true, now: () => new Date() });
+  // ARC-09-C47 — the stub answers the command it is given, and the counter counts what this
+  // test's own message claims: a REMOTE call. E-28 now also runs `git describe` to notice a
+  // record left behind by an interrupted upgrade; that is local, and the property being
+  // protected here — "without asking the remote again" — is untouched by it.
   const r = await E28.run({ root, noNetwork: false, now: realClock,
-    exec: () => { asked += 1; return lsRemote(['v9.0.0']); } });
+    exec: (_cmd, args) => {
+      if (args.includes('describe')) return 'v2.0.0\n';
+      asked += 1;
+      return lsRemote(['v9.0.0']);
+    } });
   assert.equal(r.status, 'warn');
   assert.match(r.detail, /v9\.0\.0 available/);
   assert.equal(asked, 0, 'a fresh cache must not cost a remote call');
@@ -251,7 +265,121 @@ test('C32 — the release-tag paths are unchanged, in both directions', async (t
   const current = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
   t.after(() => rmSync(current, { recursive: true, force: true }));
   writeUpgradeCheck(current, { latestTag: 'v2.0.0', localTag: 'v2.0.0', behind: false, now: () => new Date() });
-  const r = await E28.run({ root: current, noNetwork: false, now: realClock, exec: () => lsRemote(['v2.0.0']) });
+  // The tree IS on v2.0.0 in this scenario, so `describe` says so; a stub that answered
+  // ls-remote output to that question would be describing a tree nobody has.
+  const r = await E28.run({ root: current, noNetwork: false, now: realClock,
+    exec: (_cmd, args) => (args.includes('describe') ? 'v2.0.0\n' : lsRemote(['v2.0.0'])) });
   assert.equal(r.status, 'ok');
   assert.match(r.detail, /^up to date \(v2\.0\.0\) · last checked /);
+});
+
+/**
+ * ARC-09-C47 — the doctor reported currency from records that had never measured it.
+ *
+ * Two sightings from the owner's sitting, and they are DIFFERENT failures:
+ *
+ *   after a COMPLETED `--pre` upgrade, on a tree at rc.5:
+ *     { localTag: "v2.0.0-rc.5", latestTag: "v2.0.0-rc.5", behind: false }
+ *     → `E-28 ok release currency: up to date (v2.0.0-rc.5) · last checked …`
+ *   after an INTERRUPTED one, on a tree at rc.6:
+ *     { localTag: "v2.0.0-rc.5", behind: true }
+ *     → `E-28 warn release currency: v2.0.0-rc.6 available — run ./snowarch upgrade`
+ *
+ * The first AGREES with its tree and is still wrong: `finish()` wrote `behind: false` as a
+ * literal, and `latestTag` is a prerelease, which this check's live rule never stores. The second
+ * DISAGREES with its tree: the plan phase's record outlived the upgrade that was interrupted
+ * before `finish()` ran. A fix for one leaves the other standing, which is why there are three
+ * checks and not one.
+ */
+const gitFor = ({ describe: tag, tags = [] }) => (_cmd, args) => (
+  args.includes('describe') ? `${tag}\n` : lsRemote(tags));
+
+async function e28With(t, { cache, describe, tags = [], noNetwork = false }) {
+  const root = mkdtempSync(join(tmpdir(), 'snowarch-c47-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeUpgradeCheck(root, { ...cache, now: () => new Date() });
+  return E28.run({ root, noNetwork, now: realClock, exec: gitFor({ describe, tags }) });
+}
+
+test('ARC-09-C47 — an upgrade\'s own record is not a currency measurement', async (t) => {
+  // `finish()` now writes `source: 'upgrade'` and no verdict. Offline, the check must say which
+  // record it found rather than answering the question from it.
+  const r = await e28With(t, {
+    cache: { localTag: 'v2.0.0-rc.6', source: 'upgrade' },
+    describe: 'v2.0.0-rc.6',
+    noNetwork: true,
+  });
+  assert.equal(r.status, 'skip');
+  assert.match(r.detail, /the last record is an upgrade's, not a currency check/);
+  // And NOT the C32 sentence, which would claim a check ran and found nothing.
+  assert.doesNotMatch(r.detail, /advertised no release tags/);
+});
+
+test('ARC-09-C47 — a record describing another tree is not used (the interrupted upgrade)', async (t) => {
+  // The owner's second sighting: the plan phase's record, on a tree that has moved. Networked,
+  // because the disagreement is found with `git describe` and `--no-network` promises no spawn —
+  // so offline this check deliberately does not run, and the test says which path it is on.
+  //
+  // The observable is NOT a message: `notCurrency` makes the check MEASURE instead of reading a
+  // verdict out of the record. So the assertion is that the stale `behind: true` was not used —
+  // the remote says v2.0.0 is the newest release and the tree is on it, so the answer is `ok`,
+  // where the cached record would have said "v2.0.0-rc.6 available".
+  const root = mkdtempSync(join(tmpdir(), 'snowarch-c47-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  // RELEASE tags, deliberately. The owner's own record named prereleases, and a prerelease is
+  // caught by check 3 before check 2 is reached — so a test written with their exact tags passes
+  // whether or not this check exists. Found by the control: disabling the `describe` comparison
+  // failed nothing. The interrupted upgrade is the same shape with release tags: the plan phase
+  // wrote v2.0.0/behind, U5 moved the tree to v2.1.0, `finish()` never ran.
+  writeUpgradeCheck(root, { localTag: 'v2.0.0', latestTag: 'v2.1.0', behind: true,
+    source: 'upgrade-check', now: () => new Date() });
+
+  let askedRemote = 0;
+  const r = await E28.run({ root, noNetwork: false, now: realClock,
+    exec: (_cmd, args) => {
+      if (args.includes('describe')) return 'v2.1.0\n';
+      askedRemote += 1;
+      return lsRemote(['v2.1.0']);
+    } });
+
+  assert.equal(askedRemote, 1, 'it answered from the stale record instead of measuring');
+  assert.equal(r.status, 'ok');
+  assert.match(r.detail, /up to date \(v2\.1\.0\)/);
+  assert.doesNotMatch(r.detail, /available — run/, 'the stale record still drove the answer');
+});
+
+test('ARC-09-C47 — a prerelease latestTag is not a measurement, marker or no marker', async (t) => {
+  // The owner's FIRST sighting, and the check that works on records written before this fix:
+  // no `source` key at all, `localTag` agreeing with the tree, and still not evidence, because
+  // E-28's live rule stores only non-prerelease tags.
+  const r = await e28With(t, {
+    cache: { localTag: 'v2.0.0-rc.5', latestTag: 'v2.0.0-rc.5', behind: false },
+    describe: 'v2.0.0-rc.5',
+    noNetwork: true,
+  });
+  assert.equal(r.status, 'skip');
+  assert.match(r.detail, /names a prerelease \(v2\.0\.0-rc\.5\), which a currency check never stores/);
+  assert.doesNotMatch(r.detail, /up to date/, 'it still reported currency from an assertion');
+});
+
+test('ARC-09-C47 — a real measurement is still trusted, and still answers offline', async (t) => {
+  // THE DIRECTION THAT MATTERS MOST. Three refusals that refused everything would be worse than
+  // the defect: the banner and the offline doctor would go silent. A record from a genuine
+  // currency check, on the tree it describes, with a release tag, is reported exactly as before.
+  const fresh = await e28With(t, {
+    cache: { localTag: 'v2.0.0', latestTag: 'v2.1.0', behind: true, source: 'currency' },
+    describe: 'v2.0.0',
+    noNetwork: true,
+  });
+  assert.equal(fresh.status, 'skip', 'offline is always a skip; the detail is what carries the news');
+  assert.match(fresh.detail, /the last check .* saw v2\.1\.0/);
+  assert.doesNotMatch(fresh.detail, /stale record|upgrade's, not a currency|prerelease/);
+
+  // ...and a cached up-to-date record is still `ok`, networked, without re-fetching.
+  const uptodate = await e28With(t, {
+    cache: { localTag: 'v2.0.0', latestTag: 'v2.0.0', behind: false, source: 'currency' },
+    describe: 'v2.0.0',
+  });
+  assert.equal(uptodate.status, 'ok');
+  assert.match(uptodate.detail, /up to date \(v2\.0\.0\)/);
 });

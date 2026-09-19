@@ -341,7 +341,12 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   }
 
   const behind = Boolean(latest && localTag !== latest);
-  writeUpgradeCheck(root, { latestTag: latest, localTag, behind, remote, now });
+  // ARC-09-C47 — this write KEEPS its verdict, and that is deliberate. It fetched the tags and
+  // compared them, so `behind` here is a measurement; `upgrade --check` exists to refresh exactly
+  // this record, and the banner's nudge reads it. Do not strip it for symmetry with `finish()`,
+  // whose `behind` was a literal — the asymmetry IS the distinction this row is about.
+  writeUpgradeCheck(root, { latestTag: latest, localTag, behind, remote, now,
+    source: 'upgrade-check' });
 
   if (flags.check) {
     log.step(behind
@@ -460,7 +465,12 @@ async function finish({ root, env, log, run, target, latest, remote, now, state 
   for (const line of doctorLines(report)) log.step(line);
   if (report?.modeLine) log.step(report.modeLine);
 
-  writeUpgradeCheck(root, { latestTag: latest, localTag: target, behind: false, remote, now });
+  // ARC-09-C47 — NO CURRENCY VERDICT HERE. This used to write `behind: false` as a literal,
+  // because an upgrade had just finished, and overwrite the measurement U7's doctor had made
+  // moments earlier. An upgrade knows which tag it moved to; it does not know whether a newer
+  // release exists, and it had not asked. It records what it did and leaves currency to the check
+  // that defines it.
+  writeUpgradeCheck(root, { localTag: target, remote, now, source: 'upgrade' });
   return EXIT_OK;
 }
 
