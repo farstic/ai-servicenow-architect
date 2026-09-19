@@ -235,6 +235,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **An unattended install now says why a capability may not work.** Adding an instance with `--yes`
+  skips the review screen — so when a probe reported, say, that the Fluent SDK was not installed,
+  the install saved the capability switched on and said nothing, and the confirmation line read as
+  a contradiction. It still saves exactly what you asked for, which is deliberate, but the line now
+  names the probe: `FLUENT=on (probe: not installed — tools will fail until @servicenow/sdk is on
+  PATH)`.
+
 - **A configured instance is no longer reported as "not configured" at the start of a session.**
   The session banner and `/snowarch status` decide the mode from a quick check that does not start
   the server — and because it never looked in the instance store, it announced `design-only — no
