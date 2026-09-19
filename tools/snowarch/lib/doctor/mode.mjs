@@ -12,6 +12,7 @@
 // described. The toggle file and the store are the two things that decide, and both are ours.
 import { flagNames } from '../../../../packages/contract/lib/contract.mjs';
 import { modeLine as renderModeLine, MODE_VARIANTS } from '../text.mjs';
+import { projectEntryCarries } from '../settings-local.mjs';
 
 /** `2026-09-10 41 ok` / `2026-09-10 2 FAIL` — what the banner shows about the last run. */
 export function doctorStamp({ summary = {}, at = new Date() } = {}) {
@@ -24,8 +25,9 @@ export function doctorStamp({ summary = {}, at = new Date() } = {}) {
 /**
  * Which mode this checkout is in, and why — the whole decision, in one place.
  *
- * `live` is the conjunction of two facts and nothing else: the server is not disabled in the
- * toggle file, and the store has an instance that LOADED. Everything else is design-only with a
+ * `live` is the conjunction of two facts and nothing else: the server is REACHABLE — the project
+ * toggle is on, or a local/user registration carries it instead — and the store has an instance
+ * that LOADED. Everything else is design-only with a
  * qualifier that names which half is missing, because "design-only" alone sends a user looking for
  * a problem that may be a deliberate choice.
  *
@@ -34,10 +36,23 @@ export function doctorStamp({ summary = {}, at = new Date() } = {}) {
  * @param {Array} facts.instances                 `server.instances[]` from the SV checks
  * @param {boolean} facts.bootstrapped            a `bootstrap-state.json` exists
  */
-export function deriveMode({ toggles = {}, instances = [], bootstrapped = true } = {}) {
+export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
+  registration = 'project' } = {}) {
   const loaded = instances.filter((i) => i.status === 'loaded');
   const configured = instances.length > 0;
-  const serverEnabled = toggles.enabled !== false;
+  // ARC-08-C16 — the toggle file decides only when the PROJECT entry is the carrier.
+  //
+  // `.claude/settings.local.json` governs `.mcp.json` and nothing else. A `local` or `user`
+  // registration carries the server in `~/.claude.json`, and on that path the project toggle is
+  // deliberately OFF — otherwise both entries load. Reading `toggles.enabled` alone therefore
+  // called a live, connected checkout design-only, in a report whose own E-11 said `mode live`
+  // and whose E-27 said `Connected · scope local`.
+  //
+  // This does NOT reach into `~/.claude.json` — the thing this module promises never to read.
+  // The registration is OUR record of what we did, in `bootstrap-state.json`, which is the same
+  // file the mode itself comes from; the promise is about Claude Code's file, not about knowing
+  // which entry we created.
+  const serverEnabled = projectEntryCarries(registration) ? toggles.enabled !== false : true;
 
   if (!bootstrapped) {
     return { mode: 'unknown', variant: 'notBootstrapped',

@@ -10,6 +10,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { toggleProblems } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
+import { projectEntryEnabled } from '../../tools/snowarch/lib/settings-local.mjs';
 import { deriveMode, doctorStamp, flagSummary, modeLine,
   modeLineDetailed } from '../../tools/snowarch/lib/doctor/mode.mjs';
 import { MODE_VARIANTS } from '../../tools/snowarch/lib/text.mjs';
@@ -323,4 +325,99 @@ test('a secret-shaped key is refused by the cache exactly as by the state file',
   const root = tempDir('c9-key-', t);
   const report = { mode: 'design', checks: [], server: { instances: [{ label: 'pdi', password: 'x' }] } };
   assert.throws(() => writeReportCache(root, report), /the key names a secret/);
+});
+
+/**
+ * ARC-08-C16 — the Mode line called a live, connected checkout design-only.
+ *
+ * The owner's Sitting C, rc.5, `./snowarch mode live --register local`, in ONE doctor report:
+ *
+ *   E-11 ok  .local/ state: mode live
+ *   E-27 ok  Claude Code registration status: ✔ Connected · scope local (local)
+ *   SV-05 ok stdio handshake: 397 tools advertised, matching the contract
+ *   Mode: design-only — server disabled in .claude/settings.local.json although instance "pdi"
+ *         is configured; run ./snowarch mode live
+ *
+ * …and `/mcp` in a real session showed `servicenow · ✔ connected · 397 tools` through the local
+ * entry. Four statements that the server is live, and the one line the banner and
+ * `/snowarch status` quote saying it is not.
+ *
+ * The cause is ARC-08-C15's, one line lower. `.claude/settings.local.json` governs `.mcp.json` and
+ * nothing else; a local or user registration carries the server in `~/.claude.json`, and on that
+ * path the project toggle is deliberately OFF because otherwise both entries load. `deriveMode`
+ * read `toggles.enabled` alone.
+ *
+ * WHAT THIS IS NOT: it is not "let the recorded mode win". That rule exists for the DOCS mode
+ * (`docsStatus`, sparse/full/skip) and is a different subsystem. This module is "derived, never
+ * remembered" on purpose — reading `state.mode` here would reinstate the stale-state defect it was
+ * built to avoid. The fix corrects the derivation instead, and the registration it now reads is
+ * our own record in `bootstrap-state.json`, not Claude Code's `~/.claude.json`.
+ */
+test('ARC-08-C16 — a live checkout registered `local` is live, toggle off and all', () => {
+  const facts = { toggles: { enabled: false }, instances: [loaded()], registration: 'local' };
+  const derived = deriveMode(facts);
+
+  assert.equal(derived.mode, 'live',
+    'the owner\'s connected checkout is reported design-only — this is the C16 defect');
+  assert.equal(derived.variant, 'live');
+  assert.equal(derived.qualifier, null, 'a live checkout carries no qualifier to explain itself');
+  assert.equal(derived.instance.label, 'pdi');
+
+  // `user` scope carries the server the same way.
+  assert.equal(deriveMode({ ...facts, registration: 'user' }).mode, 'live');
+});
+
+test('ARC-08-C16 — the project path keeps every verdict it had', () => {
+  // The paths this change must NOT move. Stays green when the fix is reverted.
+  assert.equal(deriveMode({ toggles: { enabled: false }, instances: [loaded()],
+    registration: 'project' }).variant, 'serverDisabled');
+  assert.equal(deriveMode({ toggles: { enabled: false }, instances: [],
+    registration: 'project' }).variant, 'unconfigured');
+  assert.equal(deriveMode({ toggles: { enabled: true }, instances: [] }).variant, 'noInstanceLoaded');
+  assert.equal(deriveMode({ toggles: { enabled: true }, instances: [loaded()] }).mode, 'live');
+  // The default is `project`, so every existing caller keeps the behaviour it had.
+  assert.equal(deriveMode({ toggles: { enabled: false }, instances: [loaded()] }).mode, 'design-only');
+});
+
+test('ARC-08-C16 — a local registration with NO loaded instance is still not live', () => {
+  // Both directions: the registration makes the server reachable, it does not invent a store.
+  const derived = deriveMode({ toggles: { enabled: false }, instances: [], registration: 'local' });
+  assert.notEqual(derived.mode, 'live');
+  assert.equal(derived.variant, 'noInstanceLoaded',
+    'with the project toggle no longer deciding, an empty store is the reason and must say so');
+});
+
+test('ARC-08-C16 — writer, E-10 and the Mode line agree on what a live checkout looks like', () => {
+  // C15 made the CHECK and the WRITER agree. This extends the property to the THIRD reader.
+  //
+  // The property is not "no pair produces a problem" — the first version of this test asserted
+  // that and failed correctly: a `local` registration with the project entry ENABLED is the double
+  // load, and E-10 is supposed to fault it. The property that matters is narrower and stronger:
+  // for each registration, the toggle state the WRITER produces for live is the state the Mode
+  // line calls live and E-10 calls correct. One rule, three readers, no daylight.
+  for (const registration of ['project', 'local', 'user']) {
+    const writerToggle = projectEntryEnabled({ mode: 'live', registration });
+    const settings = writerToggle
+      ? { enabledMcpjsonServers: ['servicenow'] }
+      : { disabledMcpjsonServers: ['servicenow'] };
+
+    const derived = deriveMode({ toggles: { enabled: writerToggle },
+      instances: [loaded()], registration });
+    assert.equal(derived.mode, 'live',
+      `the Mode line calls the writer's own live state ${derived.mode} (registration=${registration})`);
+
+    const { problems } = toggleProblems({ mode: 'live', settings, serverKey: 'servicenow',
+      registration });
+    assert.deepEqual(problems, [],
+      `E-10 faults the writer's own live state (registration=${registration})`);
+  }
+
+  // And the state E-10 calls broken is not one the Mode line blesses as ordinary: with a local
+  // registration and the project entry enabled, the double load is reported by E-10 while the
+  // Mode line still says live — the server IS reachable — so the report is consistent, not silent.
+  const both = toggleProblems({ mode: 'live', settings: { enabledMcpjsonServers: ['servicenow'] },
+    serverKey: 'servicenow', registration: 'local' });
+  assert.match(both.problems[0], /both load/);
+  assert.equal(deriveMode({ toggles: { enabled: true }, instances: [loaded()],
+    registration: 'local' }).mode, 'live');
 });

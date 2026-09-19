@@ -65,8 +65,10 @@ const withValue = (list, value) => (Array.isArray(list) && list.includes(value)
  * checkout registered `local` the writer wrote DISABLED, correctly, and the check then called that
  * a failure — ARC-08-C15. A rule stated twice is a rule that gets to disagree with itself.
  */
+export const projectEntryCarries = (registration) => registration === 'project';
+
 export const projectEntryEnabled = ({ mode, registration }) =>
-  mode === 'live' && registration === 'project';
+  mode === 'live' && projectEntryCarries(registration);
 
 export function computeSettings(current, { mode, nodePresent, registration, serverKey,
   removeDisableAllHooks = false }) {

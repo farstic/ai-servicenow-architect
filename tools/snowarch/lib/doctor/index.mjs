@@ -199,6 +199,10 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     toggles: { enabled: serverEnabled(root, config) },
     instances,
     bootstrapped: existsSync(join(root, '.local', 'bootstrap-state.json')),
+    // ARC-08-C16 — which entry carries the server. Our own record, read from
+    // `bootstrap-state.json`; NOT `~/.claude.json`, which this module promises never to read.
+    registration: (() => { try { return loadState(root)?.registration ?? 'project'; }
+      catch { return 'project'; } })(),
   });
   const data = (id) => results.find((r) => r.id === id)?.data ?? null;
   const toolCount = data('SV-05')?.toolCount ?? null;
