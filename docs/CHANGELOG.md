@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.0-rc.7 — 2026-09-19
+
+### Notes
+
 This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
 
 #### Migration for snow-mcp 1.0.0 users
@@ -1781,6 +1785,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   engine pin and its sha are untouched.
 
 ---
+
+### Fixed
+
+- bootstrap: an upgrade keeps the instance the store already has (78e1d43)
+
+Tag v2.0.0-rc.7 · contract 7e2bd84d1021 · docs-pin df4afac
 
 ## The imported engine's header
 
