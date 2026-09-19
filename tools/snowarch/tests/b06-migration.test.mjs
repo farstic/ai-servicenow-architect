@@ -11,7 +11,8 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { MIGRATION_FAILED, migrateIfBehind, run as runB06, runsWhen, storeExists } from '../lib/steps/B06.mjs';
+import { MIGRATION_FAILED, NO_TERMINAL, migrateIfBehind, run as runB06, runsWhen,
+  storeExists } from '../lib/steps/B06.mjs';
 import { INPUTS, hashFor } from '../lib/inputs.mjs';
 import { loadConfig } from '../lib/config.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
@@ -201,4 +202,72 @@ test('ARC-06-C15 — B06 returns the instance it found in the store, secrets exc
   for (const secret of ['a-secret-value', 'someone', 'https://', 'basic']) {
     assert.equal(serialised.includes(secret), false, `B06's step data carried ${secret}`);
   }
+});
+
+/**
+ * ARC-06-C16 — the upgrade every live user runs, refused for credentials it never needed.
+ *
+ * The owner's rc.5 → rc.6 upgrade on the sitting checkout, with `pdi` already in the store:
+ *
+ *   [U6/7] bootstrap (only the steps whose inputs changed)
+ *   error: live mode with --yes needs --instance-file <path>: credentials cannot be typed
+ *          non-interactively (see docs/INSTALL.md "Operators and CI")
+ *   error: upgrade: the bootstrap stopped (exit 2) — the tree is at v2.0.0-rc.6 …
+ *
+ * No B0x line printed: it refused at argument validation, so B04, B05 and B08 never ran and the
+ * tree sat at rc.6 with rc.5's `node_modules`. The remedy it prints is to re-run the upgrade,
+ * which hits the same refusal.
+ *
+ * TWO STATEMENTS OF ONE RULE, AGAIN. `mode.mjs` asked `&& !hasStore`; `bootstrap.mjs` did not —
+ * and `mode.mjs`'s own comment says the sentence was "imported rather than repeated: there is one
+ * reason this combination cannot work and it should not have two phrasings". They shared the
+ * message and then each wrote its own condition.
+ *
+ * And the validation is only half. Letting the run through moves the failure to B06, which
+ * demanded a terminal in live mode even with the store already populated — so the fix had to be
+ * both, or the error would simply have arrived later, after writes.
+ */
+test('ARC-06-C16 — a non-interactive live run keeps the instance the store already holds', async (t) => {
+  const root = makeCheckout({}, t);
+  mkdirSync(join(root, '.local'), { recursive: true });
+  writeFileSync(join(root, '.local', 'instances.json'), JSON.stringify({
+    version: 1,
+    defaultInstance: 'pdi',
+    instances: {
+      pdi: {
+        url: 'https://fixture-host-never-dialled',
+        environment: 'pdi',
+        preset: 'custom',
+        auth: { method: 'basic', username: 'someone', password: 'a-secret-value' },
+      },
+    },
+  }));
+
+  // No TTY injected: this is the upgrade's own shape, `bootstrap --mode live --yes`.
+  const result = await runB06({ ...ctxFor(root, { spawn: () => ({ status: 0 }) }), mode: 'live' });
+
+  assert.equal(result.status, 'ok',
+    `the upgrade path still refuses a checkout that already has an instance: ${result.detail}`);
+  assert.match(result.detail, /kept instance "pdi"/);
+  assert.equal(result.data.kept, true);
+  assert.equal(result.data.saved, 0, 'nothing was added — the instance was already there');
+  assert.deepEqual(result.data.instance, { label: 'pdi', environment: 'pdi', preset: 'custom' });
+
+  // The step data reaches the state file, so it must carry no credential.
+  const serialised = JSON.stringify(result.data);
+  for (const secret of ['a-secret-value', 'someone', 'https://']) {
+    assert.equal(serialised.includes(secret), false, `B06's step data carried ${secret}`);
+  }
+});
+
+test('ARC-06-C16 — an EMPTY store still fails for want of a terminal', async (t) => {
+  // Both directions. The no-op is "there is nothing to add", not "never ask": with no instance
+  // in the store a non-interactive live run genuinely cannot proceed, and must say so.
+  const root = makeCheckout({}, t);
+  mkdirSync(join(root, '.local'), { recursive: true });
+  writeFileSync(join(root, '.local', 'instances.json'), JSON.stringify({ version: 1, instances: {} }));
+
+  const result = await runB06({ ...ctxFor(root, { spawn: () => ({ status: 0 }) }), mode: 'live' });
+  assert.equal(result.status, 'fail');
+  assert.equal(result.detail, NO_TERMINAL);
 });

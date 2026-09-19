@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from './exit.mjs';
 import { loadConfig, root as defaultRoot, version } from './config.mjs';
 import { checkLocation, checkMode } from './instance-file.mjs';
-import { LIVE_YES_WITHOUT_FILE } from './bootstrap.mjs';
+import { LIVE_YES_WITHOUT_FILE, liveYesNeedsInstanceFile } from './bootstrap.mjs';
 import { CREATED_BY_US, SCOPES, resolveClaude, register as registerServer, serverEntry, unregister }
   from './registration-claude.mjs';
 import { LAST, STEPS, interrupt, runSteps } from './steps/index.mjs';
@@ -125,7 +125,8 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
   const hasStore = existsSync(storePath(root));
   // Criterion 7. The same sentence S03 prints, imported rather than repeated: there is one reason
   // this combination cannot work and it should not have two phrasings.
-  if (wantsLive && flags.yes && !flags['instance-file'] && !hasStore) {
+  if (liveYesNeedsInstanceFile({ mode: wantsLive ? 'live' : 'design', yes: flags.yes,
+    instanceFile: flags['instance-file'], hasStore })) {
     return refuse(LIVE_YES_WITHOUT_FILE);
   }
   if (flags['instance-file']) {

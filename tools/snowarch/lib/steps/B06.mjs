@@ -360,7 +360,26 @@ export const run = async (ctx) => {
   }
 
   const interactive = ctx.isTTY ?? Boolean(process.stdin.isTTY);
-  if (!interactive) return { status: 'fail', detail: NO_TERMINAL, remedy: null };
+
+  // ARC-06-C16 — NOTHING TO ADD IS NOT A FAILURE.
+  //
+  // `upgrade` runs `bootstrap --mode live --yes`, which has no terminal, and this step demanded
+  // one even when the store already held the instance the run was about to keep. Every live user
+  // upgrading hit it, and the remedy it printed — re-run the upgrade — hit it again. The wizard
+  // exists to ADD an instance; a checkout that has one is not being asked to.
+  //
+  // Only the non-interactive case is short-circuited, so an operator at a terminal keeps the
+  // behaviour they had: this converts a failure into a no-op exactly where it was failing, and
+  // leaves every other path to decide for itself.
+  if (!interactive) {
+    const { readDefaultSummary } = await import('../../../../packages/snowarch/dist/store/label.js');
+    const kept = readDefaultSummary(join(ctx.root, '.local', 'instances.json'));
+    if (kept) {
+      return { status: 'ok', detail: `kept instance "${kept.label}"`,
+        data: { saved: 0, defaultInstance: kept.label, instance: kept, kept: true } };
+    }
+    return { status: 'fail', detail: NO_TERMINAL, remedy: null };
+  }
 
   // The probe is CLASSIFIED (ARC-06-C5). A boolean here reported four different failures with one
   // sentence, and the sentence named the only cause it had not checked.

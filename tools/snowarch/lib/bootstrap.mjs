@@ -28,6 +28,21 @@ export const USAGE = [
 ].join('\n');
 
 /** The sentence for the one combination that cannot work. Exported so the test cannot paraphrase it. */
+/**
+ * Is this the combination that genuinely cannot work? — ARC-06-C16.
+ *
+ * ONE statement of the rule, used by `bootstrap` and by `mode`. They already shared the SENTENCE,
+ * with `mode.mjs` noting that "there is one reason this combination cannot work and it should not
+ * have two phrasings" — and then each wrote its own condition, which disagreed. `mode` asked
+ * `&& !hasStore`; `bootstrap` did not, so an upgrade of a LIVE checkout that already holds an
+ * instance was refused for not being able to type credentials it was never going to be asked for.
+ *
+ * The rule is about a store with nothing in it. A checkout that already has an instance is not
+ * being asked to add one.
+ */
+export const liveYesNeedsInstanceFile = ({ mode, yes, instanceFile, hasStore }) =>
+  mode === 'live' && yes === true && !instanceFile && !hasStore;
+
 export const LIVE_YES_WITHOUT_FILE =
   'live mode with --yes needs --instance-file <path>: credentials cannot be typed '
   + 'non-interactively (see docs/INSTALL.md "Operators and CI")';
@@ -73,7 +88,11 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
   // Checked BEFORE the state is loaded or anything is written: the story requires that this
   // combination writes nothing at all, and a usage error discovered halfway through a run has
   // already broken that promise.
-  if (flags.mode === 'live' && flags.yes && !flags['instance-file']) {
+  // The path is spelled here rather than imported from `mode.mjs`: that module imports the
+  // refusal sentence FROM this one, and a second edge would close the cycle.
+  if (liveYesNeedsInstanceFile({ mode: flags.mode, yes: flags.yes,
+    instanceFile: flags['instance-file'],
+    hasStore: existsSync(join(root, '.local', 'instances.json')) })) {
     return refuse(LIVE_YES_WITHOUT_FILE);
   }
 
