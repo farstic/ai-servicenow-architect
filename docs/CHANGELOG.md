@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.0-rc.6 — 2026-09-19
+
+### Notes
+
 This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
 
 #### Migration for snow-mcp 1.0.0 users
@@ -1774,6 +1778,39 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   engine pin and its sha are untouched.
 
 ---
+
+### Fixed
+
+- wizard: one import of annotate, not two (b5451ef)
+- doctor: the quick run reads the store, so a live checkout reads as live (042f20d)
+- wizard: an unattended install names the probe it is saving against (5043664)
+- server: the auth remedy names the reload, and the confirm re-reads the store (f2eafb9)
+- bootstrap: the install records the instance it created (c97e518)
+- doctor: the Mode line asks which entry carries the server (7a1a0aa)
+- doctor: E-10 reads the registration, not just the mode (4580246)
+- bootstrap: a failed mode switch takes its registration back (11ecf4b)
+- release: U7 names the checks it counted, not just how many (f083a95)
+- tests: a removal that reports success must prove the tree is gone (e3ba852)
+
+### Internal
+
+- plan: the Mode-line row is ARC-08-C17, and lives under ARC-08 (161f6ba)
+- plan: the record names no retired surface (b2f1b4f)
+- plan: Sitting C §A — the record, and two acceptance rows close on it (9f0c9b9)
+- plan: three rows close on the owner's rc.5 sitting (5def7a3)
+- plan: ARC-06-C11 quotes the install page in the past tense it belongs to (7032dc8)
+- plan: the citation rule gains its fourth kind and its evidence (19bce0b)
+- plan: plan rows cite expressions, not line numbers (ceaf7f7)
+- plan: the citation rule names three kinds, and forbids one (cf4456c)
+- plan: plan rows cite the expression, never a line number (7cef451)
+- plan: ARC-09-C47 — E-28 reports the upgrade's assertion as a measurement (31256b5)
+- ci: no test file can run in neither suite (786f06e)
+- plan: ARC-09-C44 records its second sighting, on rc.4 to rc.5 (4132d23)
+- plan: ARC-09-C45 names C39 as the fix that came back, not C38 (933a369)
+- doctor: the test and its row now carry the same id (29e039b)
+- doctor: assert SV-02 is ok on a healthy store, and present in every state (d5b3f0e)
+
+Tag v2.0.0-rc.6 · contract 88a12cbde005 · docs-pin df4afac
 
 ## The imported engine's header
 
