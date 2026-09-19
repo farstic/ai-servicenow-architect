@@ -143,7 +143,7 @@ export function findRoot(from) {
  */
 
 /**
- * The store's instances, named, for a run that did not spawn the server — ARC-09-C17.
+ * The store's instances, named, for a run that did not spawn the server — ARC-08-C17.
  *
  * `SNOW_STORE` first, because that is the precedence the server itself uses and a doctor that
  * disagreed with the server about WHICH store it is reading would answer a different question
@@ -213,7 +213,7 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
   // The mode: derived here, from the toggle file and the store, and from nothing else. Not from
   // `~/.claude.json`, which belongs to Claude Code and describes a registration rather than a
   // configuration (`00` P-05/P-21).
-  // ARC-09-C17 — when the server was not spawned, the STORE answers. `instances` above is the
+  // ARC-08-C17 — when the server was not spawned, the STORE answers. `instances` above is the
   // server's report, and a quick run has none, so an empty list used to mean "design-only" when it
   // meant "nobody asked". This read is SV-03's cheap half: no probe, no network, no spawn.
   const probed = ctx._server !== undefined;

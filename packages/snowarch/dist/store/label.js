@@ -64,7 +64,7 @@ export function readDefaultSummary(storePath) {
     return { label, environment: str(entry?.environment), preset: str(entry?.preset) };
 }
 /**
- * Every configured instance, named — ARC-09-C17.
+ * Every configured instance, named — ARC-08-C17.
  *
  * SV-03's cheap half: who is in the store, without a probe, a network call or a spawned server.
  * The doctor's quick run needs this because `deriveMode` was deciding "design-only" from an empty

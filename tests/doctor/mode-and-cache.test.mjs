@@ -424,7 +424,7 @@ test('ARC-08-C16 — writer, E-10 and the Mode line agree on what a live checkou
 });
 
 /**
- * ARC-09-C17 — the hook told a working checkout it was design-only, and the rule file then
+ * ARC-08-C17 — the hook told a working checkout it was design-only, and the rule file then
  * forbade every tool call. A release blocker, found at T-22.
  *
  * Sitting C, B2, rc.5. Fresh `claude` in the checkout: store present (pdi), local registration,
@@ -447,7 +447,7 @@ test('ARC-08-C16 — writer, E-10 and the Mode line agree on what a live checkou
 const configured = (over = {}) => ({ label: 'pdi', environment: 'pdi', preset: 'custom',
   status: 'configured', ...over });
 
-test('ARC-09-C17 — an unprobed run with a configured store is live', () => {
+test('ARC-08-C17 — an unprobed run with a configured store is live', () => {
   // The owner's exact state: local registration, project toggle off by design, one instance in
   // the store, quick run so nothing was probed.
   const derived = deriveMode({
@@ -464,14 +464,14 @@ test('ARC-09-C17 — an unprobed run with a configured store is live', () => {
   assert.equal(derived.qualifier, null, 'a live line carries no explanation of why it is not live');
 });
 
-test('ARC-09-C17 — an unprobed run with an EMPTY store is still not live', () => {
+test('ARC-08-C17 — an unprobed run with an EMPTY store is still not live', () => {
   // Both directions. The fix must not turn "nobody asked" into "yes" either: with nothing in the
   // store there is nothing to be live against, and the line must keep saying so.
   const derived = deriveMode({ toggles: { enabled: true }, instances: [], probed: false });
   assert.notEqual(derived.mode, 'live');
 });
 
-test('ARC-09-C17 — a PROBED run keeps every verdict it had', () => {
+test('ARC-08-C17 — a PROBED run keeps every verdict it had', () => {
   // The full doctor spawns the server and gets real statuses; `probed: true` is the default, so
   // nothing about that path moves. An entry the server refused is still not live, and that is the
   // distinction worth keeping: `configured` is what the store knows, `loaded` is what the server
@@ -489,7 +489,7 @@ test('ARC-09-C17 — a PROBED run keeps every verdict it had', () => {
   assert.equal(ok.variant, 'live');
 });
 
-test('ARC-09-C17 — `probed` defaults to true, so no existing caller changes behaviour', () => {
+test('ARC-08-C17 — `probed` defaults to true, so no existing caller changes behaviour', () => {
   // The flag has to be opt-IN. Defaulting it the other way would make every caller that has not
   // been updated start trusting a store it never read.
   const derived = deriveMode({ toggles: { enabled: true }, instances: [configured()] });
@@ -498,14 +498,14 @@ test('ARC-09-C17 — `probed` defaults to true, so no existing caller changes be
 });
 
 /**
- * ARC-09-C17, the wiring — and the reason this test exists separately.
+ * ARC-08-C17, the wiring — and the reason this test exists separately.
  *
  * The four above drive `deriveMode` with a hand-built instance list. That proves the READER and
  * says nothing about whether the quick run ever hands it the store, which is exactly the shape
  * ARC-06-C15 was caught in: a fix that is correct and unconnected. This runs the real
  * `runDoctor` on a fixture checkout with a real store and reads the Mode line off the report.
  */
-test('ARC-09-C17 — the quick run reads the store, end to end', async (t) => {
+test('ARC-08-C17 — the quick run reads the store, end to end', async (t) => {
   const root = greenTree(t, { mode: 'live' });
   mkdirSync(join(root, '.local'), { recursive: true });
   const store = join(root, '.local', 'instances.json');

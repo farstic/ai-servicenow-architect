@@ -63,7 +63,7 @@ export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
     return { mode: 'live', variant: 'live', qualifier: null, loaded, serverEnabled,
       instance: { label: first.label, environment: first.environment, preset: first.preset } };
   }
-  // ARC-09-C17 — A QUICK RUN HAS NOT PROBED, AND ABSENCE IS NOT A VERDICT.
+  // ARC-08-C17 — A QUICK RUN HAS NOT PROBED, AND ABSENCE IS NOT A VERDICT.
   //
   // `loaded` is the SERVER's answer, and a quick run never spawns it, so `instances` arrived
   // empty and this function concluded design-only about a checkout with a configured store and a
