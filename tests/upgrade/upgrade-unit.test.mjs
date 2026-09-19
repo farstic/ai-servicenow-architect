@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import {
   classifyGitFetchError, doctorLines, parseSemver, renderPlan, sortTags,
 } from '../../tools/snowarch/lib/commands/upgrade.mjs';
-import { failureLines } from '../../tools/snowarch/lib/steps/B09.mjs';
+import { failureLines } from '../../tools/snowarch/lib/doctor/panel.mjs';
 import {
   MAX_AGE_MS, REFRESH_AFTER_MS, cachePath, isFresh, needsRefresh, readUpgradeCheck,
   writeUpgradeCheck,

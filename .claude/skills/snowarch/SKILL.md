@@ -2,7 +2,7 @@
 name: snowarch
 description: Status, instance setup and health check for the AI ServiceNow Architect. Use `/snowarch status` (or when the user types Status) to report the authoritative Mode line from the doctor; `/snowarch setup-instance` to add a ServiceNow instance, which hands off to the user's terminal because credentials never pass through chat; `/snowarch doctor` to run the full health check and relay its failures with their remedies.
 argument-hint: "status | setup-instance [--resume] | doctor"
-allowed-tools: Bash(./snowarch doctor*), Bash(node tools/snowarch/bin/snowarch.mjs doctor*), Bash(cat .local/bootstrap-state.json), Read, mcp__servicenow__snow_core_instances_reload, mcp__servicenow__snow_core_capabilities_read, mcp__servicenow__snow_core_instances_index, mcp__servicenow__snow_core_current_instance_read
+allowed-tools: Bash(./snowarch status*), Bash(node tools/snowarch/bin/snowarch.mjs status*), Bash(./snowarch doctor*), Bash(node tools/snowarch/bin/snowarch.mjs doctor*), Bash(cat .local/bootstrap-state.json), Read, mcp__servicenow__snow_core_instances_reload, mcp__servicenow__snow_core_capabilities_read, mcp__servicenow__snow_core_instances_index, mcp__servicenow__snow_core_current_instance_read
 metadata:
   version: 2.0.0
 ---
@@ -27,62 +27,43 @@ The first word of the arguments selects the sub-command (`status` when none is g
 
 Also runs when the user simply types `Status` — the same branch, the same output.
 
-1. Run `./snowarch doctor --quick --json`. On Windows in Git Bash the command is the same; if
-   `./snowarch` is not executable, run `node tools/snowarch/bin/snowarch.mjs doctor --quick --json`.
-   `--quick` every time: a session must never answer from the cache alone.
-2. **If it succeeds:** print these lines, in this order, filling each from the JSON key named in
-   brackets. Line 1 is `modeLineDetailed` **verbatim, as the very first line of the reply** — on
-   its own, with nothing before it and no decoration of any kind: no bold, no heading, no code
-   fence, no "Mode line:" label. It is quoted, not presented.
+1. Run `./snowarch status`. On Windows in Git Bash the command is the same; if `./snowarch` is not
+   executable, run `node tools/snowarch/bin/snowarch.mjs status`.
+2. **Print its output verbatim, as the very first thing in the reply** — on its own, with nothing
+   before it and no decoration of any kind: no bold, no heading, no code fence, no "Mode line:"
+   label. It is quoted, not presented. Add nothing to it and drop nothing from it.
+
+   **Do not run `./snowarch doctor --quick --json` and render the lines yourself, and do not parse
+   the JSON.** The command renders the panel, applies the null rule, lists the failing checks and
+   names its own fallbacks; a session that re-rendered them would be a second implementation of the
+   same seven lines, disagreeing the first day one of them changed. `--json` exists for a script,
+   and prints the doctor's report unchanged.
 
 ```
-Mode: live — pdi (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 398 tools (contract)   [modeLineDetailed]
-Engine: snowarch 2.0.0 · tag v2.0.0 · contract a1b2c3d                                       [engine.version, engine.tag, engine.contractSha]
-Docs: vendor/ServiceNowDocs @ ba513f2 (australia) · sparse · citations checked: 181 | dead: 0 [engine.docs]
-Roster: 28 skills / 9 agents                                                                 [engine.roster]
-Capabilities: docx yes (python3) · PDF QA no · draw.io yes · Mermaid no                       [engine.capabilities]
-Instances: pdi (pdi, custom, default) · uat (test, read-only)                                 [server.instances]
-Doctor: 41 ok, 1 warn, 0 fail — quick run 2026-09-10 10:00 · full report: ./snowarch doctor   [summary, ranAt, options.quick]
+Mode: live — pdi (pdi) · preset custom · WRITE=off CMDB_WRITE=off SCRIPTING=off ATF=off NOW_ASSIST=off FLUENT=off · 397 tools (contract) · +1 instance (uat)
+Engine: snowarch 2.0.0-dev · contract a96863b1104b
+Docs: vendor/ServiceNowDocs @ 11b39be17307 (australia) · sparse
+Roster: 28 skills / 9 agents
+Instances: pdi (pdi, custom) · uat (test, read-only)
+Doctor: 28 ok, 0 warn, 0 fail — quick run 2026-09-10 19:48 UTC · full report: ./snowarch doctor
+Capability packs and citation counts are not probed on a quick run — ./snowarch doctor reports them.
 ```
 
-   A line whose key is `null` is **omitted**, never guessed. Two are routinely null on a quick run,
-   because the checks that fill them spawn a process or walk the corpus and are outside the quick
-   subset: `engine.capabilities` and the citation counts in `engine.docs`. When either is missing,
-   say so once, at the end:
-
-   `Capability packs and citation counts are not probed on a quick run — ./snowarch doctor reports them.`
-
-   `Instances:` is omitted entirely in design-only.
-3. **When `summary.fail > 0`,** add one line per failing check after the seven — id, title and its
-   remedy — and then, when `summary.fixable > 0`:
-   `Run ./snowarch doctor --fix for the fixable ones (<summary.fixable>).`
-   Never list WARNs one by one; that is `/snowarch doctor`.
-4. **If the command exits 3** ("not at the repository root"), print the `cd` remedy from its own
-   output and nothing else about mode.
-5. **If the doctor cannot run at all,** read `.local/bootstrap-state.json` and print
-   `Mode: <mode> — from bootstrap state (<updatedAt>); doctor unavailable, <cause>`, naming the
-   cause you actually observed and no other:
-   - Node is absent or below 20 → `until Node 20+ is installed`
-   - Node is fine but `./snowarch` is not there → `the launcher is not installed — run ./bootstrap.sh (Windows: bootstrap.cmd)`
-   - it ran and failed → `the doctor exited <code>`
-
-   Never state a cause you did not check. A remedy for the wrong problem costs the user the time
-   they spend following it.
-
-   Then print `Docs: pin <docs.pin>` and `Roster: <n> skills / <n> agents`, counted by listing
-   `.claude/skills/*/SKILL.md` and `.claude/agents/*.md`. The roster is the ONE fact this skill may
-   derive, and only by listing directories.
-6. **If there is no state file either:** print
-   `Mode: unknown — this checkout has not been bootstrapped; run ./bootstrap.sh (Windows: bootstrap.cmd)`.
-7. **If the JSON does not parse:** print
-   `Mode: unknown — doctor output unreadable; run ./snowarch doctor in a terminal`.
-8. **On Windows without Git for Windows** the Bash tool is unavailable, so say:
-   `On Windows without Git for Windows I cannot run ./snowarch from here — run snowarch.cmd doctor in PowerShell and paste the Mode line.`
-9. **Never infer the mode** from `~/.claude.json`, from `/mcp`, from memory, or from which tools
+3. **The exit code is the doctor's verdict, not the command's health.** `1` means a check failed,
+   and the panel on the screen says which — report it as a finding, never as "the command failed".
+4. **If it did not run at all** — no Node, or the launcher is not installed — say so and name the
+   cause you actually observed, no other:
+   `Mode: unverified — ./snowarch status did not run (<cause>); run ./bootstrap.sh (Windows: bootstrap.cmd)`.
+   Every other fallback is the command's own: it reads `.local/bootstrap-state.json` and prints the
+   `from bootstrap state` line itself, because it is what observed the cause. Never state a cause
+   you did not check. A remedy for the wrong problem costs the user the time they spend following
+   it.
+5. **On Windows without Git for Windows** the Bash tool is unavailable, so say:
+   `On Windows without Git for Windows I cannot run ./snowarch from here — run snowarch.cmd status in PowerShell and paste the Mode line.`
+6. **Never infer the mode** from `~/.claude.json`, from `/mcp`, from memory, or from which tools
    appear in the tool list. A disabled family is still advertised, so the tool list says nothing
-   about mode. The doctor's line is the only answer; if it cannot run, say the mode is unverified
+   about mode. The panel's line is the only answer; if it cannot run, say the mode is unverified
    rather than guessing.
-
 ## setup-instance
 
 Collects every NON-SECRET choice here, hands you one command to run in your own terminal, and

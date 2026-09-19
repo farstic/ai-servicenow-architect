@@ -15,6 +15,15 @@
 // piped into `grep` must not carry escape codes, and a user who has said they do not want colour
 // has said it once, for every tool.
 import { SECTIONS } from './registry.mjs';
+// ARC-08-C18 — the pure line renderers live one layer DOWN, in `panel.mjs`. This module reads
+// `process.env` for the colour decision, so anything importing it inherits an environment read;
+// the panel's promise is that the same report renders to the same bytes for every reader, and it
+// is kept structurally rather than by care. Same definitions, imported rather than copied — the
+// full report, B09's install summary, the upgrade block and the panel print a capability set and
+// a failing check identically.
+import { capabilitiesLine, nonOkLines } from './panel.mjs';
+
+export { capabilitiesLine, nonOkLines };
 
 // Written as escape SEQUENCES, never as the characters themselves: a raw control byte in a source
 // file is invisible in a diff and in a review.
@@ -69,27 +78,6 @@ export function summaryLine(summary) {
 }
 
 export { summaryLine as renderSummaryLine };
-
-/**
- * The capability packs, on one line above the summary.
- *
- * E-04 already reports them as a check; this is the line a reader scans when they are about to
- * author a deliverable rather than diagnose an install, and it names the PROVIDER because "docx
- * yes" does not tell a Windows user whether it was PowerShell or a Python nobody installed.
- */
-export function capabilitiesLine(packs) {
-  if (!packs) return null;
-  const LABELS = { docx: 'docx', pdf: 'PDF QA', drawio: 'draw.io', mermaid: 'Mermaid' };
-  const parts = Object.entries(LABELS).map(([key, label]) => {
-    const pack = packs[key];
-    if (!pack) return `${label} no`;
-    // The provider, not the path: `/opt/homebrew/bin/python3` is a path a reader has to parse to
-    // learn one word, and the word is the answer.
-    const how = pack.how ? String(pack.how).split(/[\\/]/).pop().replace(/\.(exe|cmd|app)$/i, '') : null;
-    return pack.present && how ? `${label} yes (${how})` : `${label} no`;
-  });
-  return `Capabilities: ${parts.join(' · ')}`;
-}
 
 /**
  * The report, as a person reads it.

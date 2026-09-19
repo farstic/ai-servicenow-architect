@@ -233,6 +233,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   ships its own copy, and a test compares it with the root file so the two cannot drift apart
   unnoticed.
 
+### Added
+
+- **`./snowarch status` — the one-screen panel, as a command you can type.** Mode, engine, docs,
+  roster, capabilities, instances and the quick doctor's tally, with each failing check and its
+  remedy on its own line. A session prints exactly this, so what you see in a terminal and what a
+  session reports are the same bytes; `--json` prints the doctor's own report unchanged. Exit `0`
+  when no check failed, `1` when one did — a finding about the checkout, not a failure to render.
+
 ### Fixed
 
 - **The doctor no longer reports "up to date" from a record that never checked.** An upgrade wrote
