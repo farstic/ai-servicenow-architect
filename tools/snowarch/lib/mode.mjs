@@ -25,7 +25,7 @@ import { CREATED_BY_US, SCOPES, resolveClaude, register as registerServer, serve
   from './registration-claude.mjs';
 import { LAST, STEPS, interrupt, runSteps } from './steps/index.mjs';
 import { readDefaultLabel } from '../../../packages/snowarch/dist/store/label.js';
-import { StateError, loadState, saveState } from './state.mjs';
+import { StateError, loadState, recordedInstance, saveState } from './state.mjs';
 import { instanceKeptNote, modeLine, registrationLine, restartSentence } from './text.mjs';
 
 export const USAGE = [
@@ -292,11 +292,17 @@ export function closingBlock({ outcome, state, root, serverKey, wantsLive, env,
 /** `mode` with no argument: two lines, or the object. Reads the state; writes nothing. */
 function report({ state, root, flags, log, readLabel }) {
   const label = defaultLabel(root, readLabel);
-  const instance = state.mode === 'live' && label
-    ? { label, environment: state.instance?.environment ?? 'unknown',
-      preset: state.instance?.preset ?? 'unknown' }
+  // ARC-06-C15 — one resolver, shared with B09. This used to fall back to the string `unknown`
+  // for environment and preset, and those fallbacks fired on EVERY live checkout because nothing
+  // in the tree wrote the two places it read. `mode` still does not open the store: it reports
+  // what the install recorded.
+  const recorded = recordedInstance(state);
+  const instance = state.mode === 'live' && (recorded || label)
+    ? { label: recorded?.label ?? label,
+      environment: recorded?.environment ?? 'unknown',
+      preset: recorded?.preset ?? 'unknown' }
     : null;
-  const line = modeLine({ mode: state.mode, instance: state.steps?.B08?.data?.instance ?? instance });
+  const line = modeLine({ mode: state.mode, instance });
   if (flags.json) {
     log.json({
       mode: state.mode,

@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { MIGRATION_FAILED, migrateIfBehind, runsWhen, storeExists } from '../lib/steps/B06.mjs';
+import { MIGRATION_FAILED, migrateIfBehind, run as runB06, runsWhen, storeExists } from '../lib/steps/B06.mjs';
 import { INPUTS, hashFor } from '../lib/inputs.mjs';
 import { loadConfig } from '../lib/config.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
@@ -152,5 +152,53 @@ test('S05\'s B06 row hashes the CONTRACT\'s number, so a schema release makes ex
   // neither must not.
   for (const step of ['B01', 'B02', 'B03', 'B04', 'B07']) {
     assert.equal(hashFor(step, ctx), hashFor(step, ctx), `${step} must be stable`);
+  }
+});
+
+/**
+ * ARC-06-C15 — B06 must RECORD what the wizard saved, or the resolver has nothing to resolve.
+ *
+ * The resolver tests in `mode-report.test.mjs` hand `recordedInstance` a state and check it reads
+ * it. That proves the reader and says nothing about the writer — exactly the shape where a fix is
+ * correct and unconnected. This drives the real step against a real store and asserts the data it
+ * returns, so reverting B06's recording fails here rather than passing everywhere.
+ */
+test('ARC-06-C15 — B06 returns the instance it found in the store, secrets excluded', async (t) => {
+  const root = makeCheckout({}, t);
+  mkdirSync(join(root, '.local'), { recursive: true });
+  writeFileSync(join(root, '.local', 'instances.json'), JSON.stringify({
+    version: 1,
+    defaultInstance: 'pdi',
+    instances: {
+      pdi: {
+        url: 'https://fixture-host-never-dialled',
+        environment: 'pdi',
+        preset: 'custom',
+        auth: { method: 'basic', username: 'someone', password: 'a-secret-value' },
+      },
+    },
+  }));
+
+  // The wizard is a no-op that "succeeds": the store is already written, which is the state B06
+  // finds itself in after a real run. The stdout carries `add` so the wizard PROBE (ARC-06-C5)
+  // classifies the CLI as present; `isTTY` is injected because the step refuses without a terminal
+  // and a test has none.
+  // The probe checks the built CLI is in the checkout before it spawns anything, so the fixture
+  // needs the file to exist; its contents are never read here because `spawn` is stubbed.
+  mkdirSync(join(root, 'packages', 'snowarch', 'dist', 'cli'), { recursive: true });
+  writeFileSync(join(root, 'packages', 'snowarch', 'dist', 'cli', 'index.js'), '');
+  const spawn = () => ({ status: 0, stdout: 'usage: instance\n  add <label>   add an instance',
+    stderr: '' });
+  const result = await runB06({ ...ctxFor(root, { spawn }), mode: 'live', isTTY: true, spawn });
+
+  assert.equal(result.status, 'ok', result.detail);
+  assert.deepEqual(result.data.instance, { label: 'pdi', environment: 'pdi', preset: 'custom' },
+    'B06 recorded nothing for `mode` to report — this is the C15 defect');
+  assert.equal(result.data.defaultInstance, 'pdi');
+
+  // Asserted on the serialised step data, because that is what reaches the state file on disk.
+  const serialised = JSON.stringify(result.data);
+  for (const secret of ['a-secret-value', 'someone', 'https://', 'basic']) {
+    assert.equal(serialised.includes(secret), false, `B06's step data carried ${secret}`);
   }
 });

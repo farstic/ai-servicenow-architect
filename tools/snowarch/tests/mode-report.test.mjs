@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { modeCommand, NOT_BOOTSTRAPPED, userScopeRefusal, USER_SCOPE_REFUSAL } from '../lib/mode.mjs';
+import { recordedInstance } from '../lib/state.mjs';
 import { LIVE_YES_WITHOUT_FILE } from '../lib/bootstrap.mjs';
 import { EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from '../lib/exit.mjs';
 import { emptyState, saveState } from '../lib/state.mjs';
@@ -147,4 +148,61 @@ test('a missing --instance-file is refused before anything runs', async () => {
   const r = await run(root, ['live'], { 'instance-file': join(root, 'nope.json') });
   assert.equal(r.code, EXIT_USAGE);
   assert.match(r.text, /does not exist/);
+});
+
+/**
+ * ARC-06-C15 — `./snowarch mode` reported two fields nothing ever wrote.
+ *
+ * The owner's Sitting C, rc.5, on a live checkout whose store holds environment `pdi` and preset
+ * `custom` — and whose full doctor reads both fine at SV-03:
+ *
+ *   Mode: live — instance=pdi (unknown) preset=unknown
+ *
+ * Not an unlucky run. `report()` built `{ environment: state.instance?.environment ?? 'unknown',
+ * preset: state.instance?.preset ?? 'unknown' }` and rendered
+ * `state.steps?.B08?.data?.instance ?? instance`. **Nothing in the tree assigned `state.instance`,
+ * and no step ever set `data.instance`** — B08 collects labels, B06's data carried `saved` and
+ * `defaultInstance` only. Both fallbacks fired on every live checkout, so those two fields could
+ * not print anything else. B09's `instanceFrom` read the same two places and returned `null` for
+ * the same reason.
+ *
+ * B06 now records what the wizard saved, through `readDefaultSummary` — a sibling of
+ * `readDefaultLabel` rather than a widening of it, because that one's shape is pinned by a test
+ * whose message reads "exactly one key, so nothing else can ride along".
+ */
+test('ARC-06-C15 — mode reports the environment and preset the install recorded', () => {
+  const state = { mode: 'live', steps: { B06: { data: { saved: 1, defaultInstance: 'pdi',
+    instance: { label: 'pdi', environment: 'pdi', preset: 'custom' } } } } };
+
+  assert.deepEqual(recordedInstance(state), { label: 'pdi', environment: 'pdi', preset: 'custom' });
+
+  const line = modeLine({ mode: state.mode, instance: recordedInstance(state) });
+  assert.match(line, /instance=pdi \(pdi\) preset=custom/);
+  assert.doesNotMatch(line, /unknown/, 'the owner\'s line again — this is the C15 defect');
+});
+
+test('ARC-06-C15 — the old sources are proven empty, not merely unread', () => {
+  // NON-VACUITY, and the part that makes this a defect rather than a miss: a state carrying
+  // everything the OLD code knew how to read still yields nothing, because nothing wrote it.
+  assert.equal(recordedInstance({ mode: 'live', steps: { B08: { data: { saved: 1 } } } }), null);
+  assert.equal(recordedInstance({ mode: 'live', steps: {} }), null);
+  assert.equal(recordedInstance({}), null);
+  assert.equal(recordedInstance(null), null);
+
+  // And a half-written record degrades to `unknown` rather than throwing or inventing.
+  const partial = { steps: { B06: { data: { instance: { label: 'pdi' } } } } };
+  assert.deepEqual(recordedInstance(partial), { label: 'pdi', environment: null, preset: null });
+});
+
+test('ARC-06-C15 — B09 and mode resolve through the same function', () => {
+  // The two readers each had their own expression for this fact and both were wrong the same way.
+  // One resolver now, so a third reader cannot invent a fourth path.
+  const state = { mode: 'live', steps: { B06: { data: {
+    instance: { label: 'dev', environment: 'sub-prod', preset: 'full' } } } } };
+  const viaB08 = { mode: 'live', steps: { B08: { data: {
+    instance: { label: 'dev', environment: 'sub-prod', preset: 'full' } } } } };
+
+  // B06 is preferred, B08 still honoured — an older state file keeps working.
+  assert.deepEqual(recordedInstance(state), recordedInstance(viaB08));
+  assert.equal(recordedInstance(state).preset, 'full');
 });

@@ -235,6 +235,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **`./snowarch mode` now tells you which instance you are live against.** It printed
+  `instance=<label> (unknown) preset=unknown` on every live checkout — not sometimes, always: the
+  two fields were read from places nothing ever wrote. The install now records the instance's
+  environment and preset when the wizard saves them, and `mode` reports what was recorded. The
+  same gap was blanking the instance in the install's own closing summary.
+
 - **The Mode line now recognises a live setup registered to this checkout.** With
   `--register local` the server is registered directly and the shared project entry is left off on
   purpose — but the `Mode:` line read only that switched-off entry and announced `design-only` for

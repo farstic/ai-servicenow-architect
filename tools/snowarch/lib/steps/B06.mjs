@@ -379,8 +379,15 @@ export const run = async (ctx) => {
     { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) }));
   if (r.status !== 0) return wizardExitFailure(r.status);
 
-  const { readDefaultLabel } = await import('../../../../packages/snowarch/dist/store/label.js');
-  const label = readDefaultLabel(join(ctx.root, '.local', 'instances.json'));
+  const { readDefaultSummary } = await import('../../../../packages/snowarch/dist/store/label.js');
+  const label = readDefaultSummary(join(ctx.root, '.local', 'instances.json'));
+  // ARC-06-C15 — RECORD what the wizard just saved. `./snowarch mode` reported
+  // `instance=<label> (unknown) preset=unknown` on every live checkout because it read
+  // `state.instance` and `state.steps.B08.data.instance`, and nothing in the tree wrote either.
+  // The step that watched the save is the step that should write it down (ARC-06-C7's rule for
+  // the mode itself). Three non-secret fields, from a reader that cannot return more.
   return { status: 'ok', detail: label ? `default instance "${label.label}"` : 'wizard completed',
-    data: { saved: label ? 1 : 0, defaultInstance: label?.label ?? null } };
+    data: { saved: label ? 1 : 0,
+      defaultInstance: label?.label ?? null,
+      ...(label ? { instance: label } : {}) } };
 };
