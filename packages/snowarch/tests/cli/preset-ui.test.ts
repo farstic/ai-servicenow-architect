@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   COLUMNS, ENTRY_DEFAULTS, FLAG_MEANINGS, PROBE_FIELD, annotate, applyingLine, dependencyViolation,
-  annotate, labelOf, parseFlagsArg, probeNote, probeRecommendsOff, prodRefusal, proposePreset,
+  labelOf, parseFlagsArg, probeNote, probeRecommendsOff, prodRefusal, proposePreset,
   renderReviewScreen, resolveFlags,
   runReviewScreen, wrapRow,
 } from '../../src/cli/preset-ui.js';
