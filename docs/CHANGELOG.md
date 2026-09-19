@@ -235,6 +235,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **An instance you just probed no longer lists as never probed.** `instance add` ran the probes,
+  printed the results and reported them in `--json`, then saved an entry with no record of them, so
+  `instance list` showed `LAST PROBE —` for an instance probed seconds before. It looked correct only
+  because the next `doctor` re-probed through `instance test` and backfilled the value. The entry now
+  keeps the probes the run took. `--no-probes` still stores nothing.
+
 - **Upgrading a live checkout works again.** `./snowarch upgrade` runs the installer
   non-interactively, and the installer refused — *"live mode with --yes needs --instance-file"* —
   even when the instance it was asking you to supply was already saved. Every live user hit it, and
