@@ -62,7 +62,7 @@ export const needsRefresh = (cache, { now = () => new Date(), afterMs = REFRESH_
  * half-written file read at the wrong moment is a session that starts with a parse error.
  */
 export function writeUpgradeCheck(root, { latestTag = null, localTag = null, localDistance = null,
-  behind = false, remote = 'origin', now = () => new Date() } = {}) {
+  behind = false, remote = 'origin', source = 'currency', now = () => new Date() } = {}) {
   const body = {
     checkedAt: now().toISOString(),
     remote,
@@ -70,6 +70,18 @@ export function writeUpgradeCheck(root, { latestTag = null, localTag = null, loc
     localDistance,
     latestTag,
     behind,
+    // ARC-09-C47 — WHO WROTE THIS, and therefore what it is evidence of.
+    //
+    // Three writers share this file and they do not all measure currency. E-28 and the plan phase
+    // fetch the tags and compare; `finish()` wrote `behind: false` as a literal because an upgrade
+    // had just happened. A reader could not tell a measurement from an assertion, so it reported
+    // the assertion as currency for 24 hours.
+    //
+    // Not a renamed key and not a repurposed one: `behind`, `latestTag` and `checkedAt` are the
+    // hook's frozen contract (ARC-08-S08) and are untouched. Omitting `latestTag` instead would
+    // have been read as "a check ran and found no releases" — the ARC-09-C32 branch — which is a
+    // different false statement, quieter than the one being removed.
+    source,
   };
   const path = cachePath(root);
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
