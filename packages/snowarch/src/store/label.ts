@@ -1,5 +1,5 @@
 /**
- * The store's default-instance LABEL, and nothing else.
+ * The store's default instance, named — never its secrets.
  *
  * `.local/config.json` mirrors the label so the doctor and the launchers can name the configured
  * instance without opening the credential store. Two constraints shaped this into its own module:
@@ -8,10 +8,11 @@
  *   `npm ci`. B07 runs in a design-only checkout that never installs anything, so a reader that
  *   imported the validator could not run at all there.
  *
- *   NO SECRETS, BY CONSTRUCTION. This returns one string. It does not read, copy or return a URL,
- *   a username or a credential, and a test asserts the returned object has exactly one key — so a
- *   later "while we're here, also return the instance URL" has to argue with a test rather than
- *   slip in.
+ *   NO SECRETS, BY CONSTRUCTION. `readDefaultLabel` returns one string and `readDefaultSummary`
+ *   returns three — label, environment, preset, the three fields B09 already calls "the three that
+ *   are not secrets". Neither reads, copies or returns a URL, a username or a credential, and a
+ *   test pins the exact key set of each — so a later "while we're here, also return the instance
+ *   URL" has to argue with a test rather than slip in.
  *
  * The store remains authoritative: this is a mirror, and ARC-07's `set-default` re-mirrors it.
  */
@@ -35,4 +36,40 @@ export function readDefaultLabel(storePath: string): DefaultLabel | null {
   }
   const value = (parsed as { defaultInstance?: unknown } | null)?.defaultInstance;
   return typeof value === 'string' && value.length > 0 ? { label: value } : null;
+}
+
+/** The three non-secret fields that name an install: what B09 prints and what `mode` reports. */
+export interface DefaultSummary {
+  label: string;
+  environment: string | null;
+  preset: string | null;
+}
+
+/**
+ * The default instance's label, environment and preset — ARC-06-C15.
+ *
+ * `./snowarch mode` printed `instance=pdi (unknown) preset=unknown` on every live checkout, because
+ * it read `state.instance` and `state.steps.B08.data.instance` and NOTHING in the tree ever wrote
+ * either. The two fields could not be anything but `unknown`. B06 has just watched the wizard save
+ * them, so B06 is the step that should record them — the same rule ARC-06-C7 applied to the mode
+ * itself: the step that makes it true is the step that writes it down.
+ *
+ * Deliberately NOT an extension of `readDefaultLabel`: that function's one-key shape is pinned by a
+ * test whose message says "exactly one key, so nothing else can ride along", and the right answer to
+ * a guard like that is a second function with its own guard, not an argument with it.
+ */
+export function readDefaultSummary(storePath: string): DefaultSummary | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(storePath, 'utf8'));
+  } catch {
+    return null;
+  }
+  const root = parsed as { defaultInstance?: unknown; instances?: Record<string, unknown> } | null;
+  const label = root?.defaultInstance;
+  if (typeof label !== 'string' || label.length === 0) return null;
+  const entry = root?.instances?.[label] as { environment?: unknown; preset?: unknown } | undefined;
+  const str = (v: unknown) => (typeof v === 'string' && v.length > 0 ? v : null);
+  // Named explicitly, one at a time. A spread of the entry would carry the credential block.
+  return { label, environment: str(entry?.environment), preset: str(entry?.preset) };
 }
