@@ -61,17 +61,22 @@ const CHECKS = {
     for (const sub of ['status', 'setup-instance', 'doctor']) assert.match(hint, new RegExp(sub));
   },
 
-  'allowed-tools is EXACTLY the eight entries, in order': (t) => {
+  'allowed-tools is EXACTLY the ten entries, in order': (t) => {
     // A grant is a security surface, so this asserts the WHOLE list rather than the presence of
     // the parts: an entry added by accident — or a wildcard someone reached for while debugging —
     // is invisible to a set of `match` calls and obvious to an equality.
     //
-    // Both spellings of the doctor, because a checkout without an executable launcher falls back
-    // to the node invocation and a grant covering only one would break exactly there. The four MCP
+    // Both spellings of EACH command, because a checkout without an executable launcher falls back
+    // to the node invocation and a grant covering only one would break exactly there. `status` is
+    // ARC-08-C18's: § status runs it now instead of rendering the panel from the doctor's JSON, and
+    // a skill told to run a command its frontmatter does not allow falls back on every invocation —
+    // silently, and looking exactly like a broken install. The four MCP
     // tools are ARC-04-S04's, under `engine.config.json`'s own server key: `--resume` reloads the
     // store, reads the capabilities, and reports what is configured.
     const entries = field(t, 'allowed-tools').split(',').map((e) => e.trim());
     assert.deepEqual(entries, [
+      'Bash(./snowarch status*)',
+      'Bash(node tools/snowarch/bin/snowarch.mjs status*)',
       'Bash(./snowarch doctor*)',
       'Bash(node tools/snowarch/bin/snowarch.mjs doctor*)',
       'Bash(cat .local/bootstrap-state.json)',
@@ -112,22 +117,21 @@ const CHECKS = {
 
   'the four Mode shapes are all present': (t) => {
     // A session must have an answer in all four states, and each answer must say which it is.
-    // ARC-08-S09 made line 1 `modeLineDetailed` — the same line with the flags and the tool count,
-    // which is what a session is asked for. Still verbatim, still first, still undecorated.
-    assert.match(t, /`modeLineDetailed` \*\*verbatim, as the very first line of the reply\*\*/,
-      'the doctor line, printed as-is and first');
-    assert.match(t, /no bold, no heading, no code\n\s*fence/, 'the decoration ban');
-    // ARC-08-S09 added the RECORDED TIME to the sentence — "from bootstrap state" is only useful
-    // beside when that state was written. The three-cause discipline below is unchanged.
-    assert.match(t, /from bootstrap state \(<updatedAt>\); doctor unavailable, <cause>/);
-    // The fallback names a cause, and all three causes it may name are spelled out. A template
-    // with one hard-coded cause states a wrong remedy confidently — which is how this was found:
-    // a session refused to blame Node 20 for a missing launcher, and it was right to.
-    for (const cause of [/until Node 20\+ is installed/, /the launcher is not installed/, /the doctor exited/]) {
-      assert.match(t, cause, `the fallback cannot name the cause ${cause}`);
-    }
-    assert.match(t, /Never state a cause you did not check\./);
-    assert.match(t, /Mode: unknown — this checkout has not been bootstrapped; run \.\/bootstrap\.sh \(Windows: bootstrap\.cmd\)/);
+    //
+    // ARC-08-C18 moved three of the four INTO `./snowarch status`: exit 3, the bootstrap-state
+    // fallback and its causes are the command's now, because the command is what observes them.
+    // What the skill still owns is the printing discipline — verbatim, first, undecorated — and
+    // the one state the command cannot report, which is the command not running at all.
+    assert.match(t, /\*\*Print its output verbatim, as the very first thing in the reply\*\*/,
+      'the panel, printed as-is and first');
+    assert.match(t, /no bold, no heading, no code\s+fence/, 'the decoration ban');
+    assert.match(t, /Mode: unverified — \.\/snowarch status did not run \(<cause>\)/);
+    assert.match(t, /Never state a cause\s+you did not check\./);
+    // The two causes the skill may name are the two where the command is the thing that did not
+    // run. A template with one hard-coded cause states a wrong remedy confidently — which is how
+    // this was found: a session refused to blame Node 20 for a missing launcher, and it was right
+    // to. The command carries the rest, each named from what it observed.
+    assert.match(t, /no Node, or the launcher is not installed/);
     assert.match(t, /\*\*Never infer the mode\*\*/, 'the rule that forbids guessing');
   },
 
@@ -181,9 +185,9 @@ const NEGATIVES = [
     (t) => `${t}\nIf the wizard fails, ask the user for their password here.\n`],
   ['the description runs over 500', 'the description fits the listing budget',
     (t) => t.replace(/^description: (.*)$/m, (_, d) => `description: ${d}${' and more'.repeat(80)}`)],
-  ['the grant widens to all of Bash', 'allowed-tools is EXACTLY the eight entries, in order',
+  ['the grant widens to all of Bash', 'allowed-tools is EXACTLY the ten entries, in order',
     (t) => t.replace(/^allowed-tools: .*$/m, 'allowed-tools: Bash(*), Read')],
-  ['one more tool is granted quietly', 'allowed-tools is EXACTLY the eight entries, in order',
+  ['one more tool is granted quietly', 'allowed-tools is EXACTLY the ten entries, in order',
     (t) => t.replace(/^(allowed-tools: .*)$/m, '$1, Bash(./snowarch instance add*)')],
 ];
 

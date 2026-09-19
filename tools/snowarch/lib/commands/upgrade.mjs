@@ -30,7 +30,7 @@ import { childEnv } from '../spawn-env.mjs';
 import { loadConfig, root as defaultRoot } from '../config.mjs';
 import { loadState } from '../state.mjs';
 import { makeExec } from '../steps/B00.mjs';
-import { nonOkLines } from '../steps/B09.mjs';
+import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
 import { INPUTS, STEP_IDS } from '../inputs.mjs';

@@ -55,7 +55,13 @@ export const USAGE = [
 ].join('\n');
 
 /** The message a run from a sub-directory gets. One sentence, and the command that fixes it. */
-export const notAtRoot = (root) => `DOCTOR: not at the repository root — run: cd ${root}`;
+/**
+ * `who` names the command that printed it. ARC-08-C18 — `./snowarch status` shares this preamble
+ * with the doctor, and a `DOCTOR:` prefix on the output of a command nobody ran would send a reader
+ * looking for a doctor run that never happened. Default unchanged, so every existing caller and the
+ * line `framework.test.mjs` pins are exactly as they were.
+ */
+export const notAtRoot = (root, who = 'DOCTOR') => `${who}: not at the repository root — run: cd ${root}`;
 
 /**
  * Walk up for `engine.config.json`, and stop at the git top level.
@@ -352,44 +358,62 @@ export async function fixCommand({ root, config, registry, options, env, home, n
  */
 const defaultAsk = (input) => askOnce(input);
 
+/**
+ * The four things that must be true before any check can run — resolved once, for two commands.
+ *
+ * ARC-08-C18 extracted this from `doctorCommand`, where it was inline, because `./snowarch status`
+ * needs the identical four and a second copy is a second answer to "where am I and can I run".
+ * Each returns a `problem` rather than writing or throwing, so the caller owns its own stream and
+ * its own exit — and `who` puts the caller's name on the sentence, since a reader who typed
+ * `status` should not be told what the doctor thinks.
+ *
+ * The order is the dependency order, not a preference: there is no config to read until the root is
+ * known, and no floor to compare until the config is read.
+ */
+export function resolveCheckout({ cwd = process.cwd(), who = 'DOCTOR', node = process.versions.node } = {}) {
+  const fail = (message, exit = EXIT_PREREQ) => ({ problem: { message, exit } });
+
+  const root = findRoot(cwd);
+  // Nothing above this directory is a checkout. The sentence still names what to do, and says
+  // what it does not know rather than inventing a path.
+  if (!root) return fail(notAtRoot('<the checkout>', who));
+
+  // INSIDE the checkout is not AT it. Every path in a report — the store, the corpus, the
+  // settings — is resolved relative to the root, and a run from `clients/acme/` that quietly used
+  // the root anyway would print a report about a directory the reader is not in. Compared through
+  // `realpath`, because `/var` is a symlink to `/private/var` on macOS and a temp checkout is
+  // reached through both names.
+  if (realpathOrSelf(cwd) !== realpathOrSelf(root)) return fail(notAtRoot(root, who));
+
+  let config;
+  try {
+    config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+  } catch (e) {
+    return fail(`${who}: engine.config.json is unreadable — ${e.message}`);
+  }
+
+  const floor = config?.floors?.node;
+  if (floor && !meetsFloor(node, floor).ok) {
+    return fail(`${who}: Node ${node} is below the floor ${floor} — `
+      + 'install it (macOS: brew install node@22 · Windows: winget install OpenJS.NodeJS.LTS · '
+      + "Linux: your distribution's package or nvm)");
+  }
+
+  return { root, config };
+}
+
 export async function doctorCommand({ flags = {}, log, out = process.stdout, env = process.env,
   err = process.stderr, cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(),
   home = '', input = process.stdin, ask = null, fixDeps = {} } = {}) {
   const started = now();
   const write = (text) => out.write(`${text}\n`);
 
-  const root = findRoot(cwd);
-  if (!root) {
-    // Nothing above this directory is a checkout. The sentence still names what to do, and says
-    // what it does not know rather than inventing a path.
-    write(notAtRoot('<the checkout>'));
-    return EXIT_PREREQ;
+  const checkout = resolveCheckout({ cwd });
+  if (checkout.problem) {
+    write(checkout.problem.message);
+    return checkout.problem.exit;
   }
-  // INSIDE the checkout is not AT it. Every path in this report — the store, the corpus, the
-  // settings — is resolved relative to the root, and a run from `clients/acme/` that quietly used
-  // the root anyway would print a report about a directory the reader is not in. Compared through
-  // `realpath`, because `/var` is a symlink to `/private/var` on macOS and a temp checkout is
-  // reached through both names.
-  if (realpathOrSelf(cwd) !== realpathOrSelf(root)) {
-    write(notAtRoot(root));
-    return EXIT_PREREQ;
-  }
-
-  let config;
-  try {
-    config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
-  } catch (e) {
-    write(`DOCTOR: engine.config.json is unreadable — ${e.message}`);
-    return EXIT_PREREQ;
-  }
-
-  const floor = config?.floors?.node;
-  if (floor && !meetsFloor(process.versions.node, floor).ok) {
-    write(`DOCTOR: Node ${process.versions.node} is below the floor ${floor} — `
-      + 'install it (macOS: brew install node@22 · Windows: winget install OpenJS.NodeJS.LTS · '
-      + "Linux: your distribution's package or nvm)");
-    return EXIT_PREREQ;
-  }
+  const { root, config } = checkout;
 
   const sections = selectSections(flags.section);
   if (sections && sections.unknown.length > 0) {

@@ -13,6 +13,7 @@ import { USAGE as MODE_USAGE } from './mode.mjs';
 import { USAGE as INSTANCE_USAGE } from './instance.mjs';
 import { USAGE as STORE_USAGE } from './store.mjs';
 import { USAGE as UPGRADE_USAGE } from './commands/upgrade.mjs';
+import { USAGE as STATUS_USAGE } from './commands/status.mjs';
 import { USAGE as DOCTOR_USAGE, doctorCommand } from './doctor/index.mjs';
 
 /** Flags every sub-command understands, so no sub-command has to remember them. */
@@ -109,6 +110,12 @@ async function storeCommand(args) {
   return run(args);
 }
 
+// Lazy, like `upgrade`: `status` pulls the whole doctor in, and `./snowarch version` must not.
+async function statusCommand(args) {
+  const { statusCommand: run } = await import('./commands/status.mjs');
+  return run(args);
+}
+
 async function upgradeCommand(args) {
   const { upgradeCommand: run } = await import('./commands/upgrade.mjs');
   return run(args);
@@ -142,6 +149,12 @@ export const COMMANDS = {
     run: storeCommand, usage: STORE_USAGE, defersLog: false, raw: true },
   // NOT raw: every flag here is this frame's, and the command spawns `bootstrap` and `doctor`
   // with arguments it composes itself rather than passing a user's through.
+  // ARC-08-C18 — the panel, as a command a person can type. It renders the quick doctor
+  // IN-PROCESS: a session's first line is on a budget ARC-09-C8 measured in milliseconds, and
+  // spawning `doctor --quick --json` to read its stdout spends a Node start-up before the first
+  // check runs. `--json` prints that report unchanged rather than a shape of its own.
+  status: { summary: 'the one-screen panel: mode, engine, docs, roster, instances and the quick doctor',
+    run: statusCommand, usage: STATUS_USAGE },
   upgrade: { summary: 'move this checkout to a release, re-run only what changed, and check it',
     run: upgradeCommand, usage: UPGRADE_USAGE,
     booleans: ['check', 'yes', 'pre', 'force-floor'] },

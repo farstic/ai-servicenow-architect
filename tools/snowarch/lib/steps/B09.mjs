@@ -12,6 +12,11 @@ import { recordedInstance } from '../state.mjs';
 import { writeDoctorCache } from '../doctor-cache.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { EXPECTED_DIALOGS, summaryBlock } from '../text.mjs';
+// ARC-08-C18 — `nonOkLines`/`failureLines` moved to the doctor's human renderer, which is where
+// their other two readers already live. Same definition, imported rather than copied: B09's
+// install summary, the upgrade report and `./snowarch status` must print a failing check the
+// same way, and three surfaces sharing one function is how that stays true.
+import { failureLines } from '../doctor/panel.mjs';
 
 export const id = 'B09';
 export const title = 'summary';
@@ -126,30 +131,6 @@ export const run = async (ctx) => {
  * one place that knows where B06 puts it, shared with `mode.mjs` so there is no second answer.
  */
 const instanceFrom = (state) => recordedInstance(state);
-
-/**
- * `E-10 FAIL settings.local toggles match the recorded mode: mode is live but servicenow is disabled`
- *
- * The doctor's own renderer is not reachable from here (it formats a whole report), so this builds
- * the one line a reader needs per check: which one, and what it said.
- *
- * FAILS FIRST, then warnings, rather than in report order: a reader scanning for the thing that
- * stopped them should not have to pass three warnings to reach it.
- *
- * The status is read off the check instead of being written into the template, so the two views
- * below are ONE implementation. A second copy of a sentence is the thing this repository keeps
- * removing, and U7 (ARC-09-C46) is the second reader of this one.
- */
-export function nonOkLines(parsed, statuses = ['fail', 'warn']) {
-  const checks = parsed?.checks ?? [];
-  return statuses.flatMap((status) => checks
-    .filter((c) => c.status === status)
-    .map((c) => `${c.id} ${status.toUpperCase()} ${c.title}${c.detail ? `: ${c.detail}` : ''}`
-      + (c.remedy ? ` — ${c.remedy}` : '')));
-}
-
-/** FAILs alone — what B09's summary block carries. Its output is unchanged by the above. */
-export const failureLines = (parsed) => nonOkLines(parsed, ['fail']);
 
 /** The cache's vocabulary is ok/warn/fail; the state also uses `failed` for an interrupt. */
 const normalise = (status) => (status === 'failed' ? 'fail' : status);

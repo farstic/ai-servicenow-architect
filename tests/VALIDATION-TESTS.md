@@ -325,26 +325,32 @@ Create an incident on the live instance for the outage.
 
 ### Expected behaviour
 
-1. **`Status`** — the doctor's line is quoted verbatim as the first line of the answer, undecorated:
-   no bold, no heading, no code fence, no label. Then the rest of the seven lines, each filled from
-   the key named in brackets (ARC-08-S09; this block is `docs/snippets/status-template.md`
-   verbatim, and `tests/doctor/status-template.test.mjs` fails if the two drift):
+1. **`Status`** — the session runs `./snowarch status` and prints its output verbatim as the first
+   thing in the answer, undecorated: no bold, no heading, no code fence, no label. It does NOT run
+   `doctor --quick --json` and render the lines itself (ARC-08-C18 made the panel a command; this
+   block is `docs/snippets/status-template.md` verbatim, which is in turn `renderPanel()`'s output
+   for the live fixture, and `tests/doctor/status-template.test.mjs` fails if any of the three
+   drift):
 
    ```
-   Mode: live — pdi (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 398 tools (contract)   [modeLineDetailed]
-   Engine: snowarch 2.0.0 · tag v2.0.0 · contract a1b2c3d                                       [engine.version, engine.tag, engine.contractSha]
-   Docs: vendor/ServiceNowDocs @ ba513f2 (australia) · sparse · citations checked: 181 | dead: 0 [engine.docs]
-   Roster: 28 skills / 9 agents                                                                 [engine.roster]
-   Capabilities: docx yes (python3) · PDF QA no · draw.io yes · Mermaid no                       [engine.capabilities]
-   Instances: pdi (pdi, custom, default) · uat (test, read-only)                                 [server.instances]
-   Doctor: 41 ok, 1 warn, 0 fail — quick run 2026-09-10 10:00 · full report: ./snowarch doctor   [summary, ranAt, options.quick]
+   Mode: live — pdi (pdi) · preset custom · WRITE=off CMDB_WRITE=off SCRIPTING=off ATF=off NOW_ASSIST=off FLUENT=off · 397 tools (contract) · +1 instance (uat)
+   Engine: snowarch 2.0.0-dev · contract a96863b1104b
+   Docs: vendor/ServiceNowDocs @ 11b39be17307 (australia) · sparse
+   Roster: 28 skills / 9 agents
+   Instances: pdi (pdi, custom) · uat (test, read-only)
+   Doctor: 28 ok, 0 warn, 0 fail — quick run 2026-09-10 19:48 UTC · full report: ./snowarch doctor
+   Capability packs and citation counts are not probed on a quick run — ./snowarch doctor reports them.
    ```
 
-   A line whose key came back empty is **left out**, not guessed — on the `--quick` run a session
-   makes, `Capabilities:` and the citation counts routinely are, and the reply says so once:
-   `Capability packs and citation counts are not probed on a quick run — ./snowarch doctor reports
-   them.` `Instances:` is absent in design-only. The Mode is never inferred from which tools appear
-   in the tool list.
+   A line whose key came back empty is **left out** by the command, not guessed — on the `--quick`
+   run the panel makes, `Capabilities:` and the citation counts routinely are, and the last line
+   names whichever is missing. `Instances:` is absent in design-only and on any quick run, where
+   the server section does not run at all; the Mode line's own `+1 instance (uat)` is what names
+   the rest. The Mode is never inferred from which tools appear in the tool list.
+
+   **What a tester marks FAILED here:** a reply whose seven lines were assembled by the session
+   rather than printed — the tell is any line the command did not emit, a local-time stamp where
+   the panel prints UTC, or a seven-character sha where it prints twelve.
 2. **The incident request** — the engine states that no live instance is configured, proposes
    `/snowarch setup-instance`, and makes no MCP call. No specialist attempts one either: a gateway
    may fire and produce its envelope, but nothing reaches the instance.

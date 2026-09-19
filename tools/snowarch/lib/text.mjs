@@ -123,9 +123,17 @@ export const BANNER = Object.freeze({
    * so — "from bootstrap state" is the difference between a fact the doctor established a moment
    * ago and one the bootstrap recorded at install time, and a reader deciding whether to trust it
    * needs to know which they have.
+   *
+   * ARC-08-C18 — THE CAUSE IS AN ARGUMENT, and deliberately has no default. It used to end
+   * "until Node 20+ is installed" unconditionally, which is the one cause `./snowarch status`
+   * can never be the one to report: a machine without Node cannot run the command that would
+   * say so. SKILL.md's own rule for this line is *"never state a cause you did not check"*, and a
+   * default here would be a cause nobody checked. A caller that forgets renders the word
+   * `undefined`, which is visibly broken — the right failure for a sentence whose whole job is to
+   * be trusted.
    */
-  fromState: (mode, at) => `Mode: ${mode} — from bootstrap state (${at}); doctor unavailable `
-    + 'until Node 20+ is installed',
+  fromState: (mode, at, cause) => `Mode: ${mode} — from bootstrap state (${at}); `
+    + `doctor unavailable ${cause}`,
 });
 
 /**
@@ -247,7 +255,8 @@ export function exportable({ serverKey }) {
       staleSuffix: BANNER.staleSuffix,
       timedOut: BANNER.timedOut,
       failed: BANNER.failed('Error'),
-      fromState: BANNER.fromState('design-only', '2026-09-10T10:00:00.000Z'),
+      fromState: BANNER.fromState('design-only', '2026-09-10T10:00:00.000Z',
+        'until Node 20+ is installed'),
     },
     doctorUnavailable: doctorLine({ nodeUsable: false }),
     posix: forShell({ platform: 'linux', env: {} }),
