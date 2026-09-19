@@ -98,7 +98,7 @@ Local MCPs (<home>/.claude.json [project: <home>/snowarch-sitting-a/ref])
   servicenow · ✔ connected · 397 tools
 ```
 
-…alongside the user-scope context-mode entry and the connectors.
+…alongside one user-scope entry of the author's own tooling, and the connectors.
 
 | acceptance row | evidenced by | verdict |
 |---|---|---|
