@@ -251,3 +251,20 @@ export function explainStale(stale) {
     return `${step} will run — ${why}${extra}`;
   });
 }
+
+/**
+ * The instance this install recorded — label, environment, preset — or `null`.
+ *
+ * ARC-06-C15. Two readers wanted this and each had its own expression for it: `mode.mjs` built one
+ * from `state.instance` and `state.steps.B08.data.instance`, and B09's `instanceFrom` read the same
+ * two. NOTHING ever wrote either, so both answered `unknown` (mode) or `null` (B09) on every live
+ * checkout. B06 now records it; this is the one place that knows where to look, so the next reader
+ * does not invent a third path to the same fact.
+ */
+export function recordedInstance(state) {
+  const i = state?.steps?.B06?.data?.instance
+    ?? state?.steps?.B08?.data?.instance
+    ?? state?.instance
+    ?? null;
+  return i?.label ? { label: i.label, environment: i.environment ?? null, preset: i.preset ?? null } : null;
+}

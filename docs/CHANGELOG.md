@@ -235,6 +235,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **`./snowarch mode` now tells you which instance you are live against.** It printed
+  `instance=<label> (unknown) preset=unknown` on every live checkout — not sometimes, always: the
+  two fields were read from places nothing ever wrote. The install now records the instance's
+  environment and preset when the wizard saves them, and `mode` reports what was recorded. The
+  same gap was blanking the instance in the install's own closing summary.
+
 - **After you fix a password, the assistant can actually use it.** When a ServiceNow call failed
   authentication, the guidance told the assistant to stop, have you repair the credentials, and
   continue when you said they were fixed — but the running server still held the password it read

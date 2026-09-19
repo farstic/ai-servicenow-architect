@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { contractSha, version as engineVersion } from '../config.mjs';
+import { recordedInstance } from '../state.mjs';
 import { writeDoctorCache } from '../doctor-cache.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { EXPECTED_DIALOGS, summaryBlock } from '../text.mjs';
@@ -117,12 +118,14 @@ export const run = async (ctx) => {
     next: block };
 };
 
-/** The label, environment and preset — the three fields that are not secrets. */
-function instanceFrom(state) {
-  const i = state.steps?.B08?.data?.instance ?? state.instance ?? null;
-  if (i?.label) return { label: i.label, environment: i.environment, preset: i.preset };
-  return null;
-}
+/**
+ * The label, environment and preset — the three fields that are not secrets.
+ *
+ * ARC-06-C15: this used to read `state.steps.B08.data.instance ?? state.instance`, and nothing in
+ * the tree wrote either, so it returned `null` for every live install. `recordedInstance` is the
+ * one place that knows where B06 puts it, shared with `mode.mjs` so there is no second answer.
+ */
+const instanceFrom = (state) => recordedInstance(state);
 
 /**
  * `E-10 FAIL settings.local toggles match the recorded mode: mode is live but servicenow is disabled`

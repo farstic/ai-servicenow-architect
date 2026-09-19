@@ -13,7 +13,8 @@ import {
 } from '../lib/settings-local.mjs';
 import { cloudSyncProvider, cloudSyncWarning, isUnderCloudSyncFolder } from '../lib/cloud-sync.mjs';
 import { checkMcpJson, checkSettingsJson } from '../lib/registration.mjs';
-import { readDefaultLabel } from '../../../packages/snowarch/dist/store/label.js';
+import { tempDir } from './helpers/temp.mjs';
+import { readDefaultLabel, readDefaultSummary } from '../../../packages/snowarch/dist/store/label.js';
 import { makeCheckout } from './helpers/workspace.mjs';
 
 // Four levels up: tests → snowarch → tools → the repository root. The shared cloud-sync fixture
@@ -431,4 +432,40 @@ test('ARC-06-C7 — B03 records nothing, so a switch that fails before B07 keeps
   assert.equal(ctx.state.mode, 'design-only');
   assert.ok(!existsSync(join(root, CONFIG_FILE)) || readJson(root, CONFIG_FILE).mode !== 'live',
     'the per-checkout config must not say live either, for the same reason');
+});
+
+test('ARC-06-C15 — readDefaultSummary returns three non-secret keys and no more', () => {
+  // The sibling of the one-key guard above, and it exists for the same reason: the next person
+  // wanting "just the URL as well" argues with a test rather than editing a reader.
+  const dir = tempDir('snowarch-summary-');
+  const store = join(dir, 'instances.json');
+  writeFileSync(store, JSON.stringify({
+    version: 1,
+    defaultInstance: 'pdi',
+    instances: {
+      pdi: {
+        url: 'https://example.invalid-host-not-used',
+        environment: 'pdi',
+        preset: 'custom',
+        auth: { method: 'basic', username: 'someone', password: 'a-secret-value' },
+      },
+    },
+  }));
+
+  const summary = readDefaultSummary(store);
+  assert.deepEqual(Object.keys(summary), ['label', 'environment', 'preset'],
+    'exactly three keys, so a credential cannot ride along');
+  assert.deepEqual(summary, { label: 'pdi', environment: 'pdi', preset: 'custom' });
+
+  // Asserted on the SERIALISED form, because that is what reaches a step's data and the state file.
+  const serialised = JSON.stringify(summary);
+  for (const secret of ['a-secret-value', 'someone', 'https://', 'basic']) {
+    assert.equal(serialised.includes(secret), false, `the summary carried ${secret}`);
+  }
+
+  // A store with no default, and an unreadable one, are `null` rather than a throw.
+  writeFileSync(store, JSON.stringify({ version: 1, instances: {} }));
+  assert.equal(readDefaultSummary(store), null);
+  writeFileSync(store, 'not json');
+  assert.equal(readDefaultSummary(store), null);
 });
