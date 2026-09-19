@@ -27,11 +27,17 @@ const RULE = '.claude/rules/00-mode-and-mcp-gate.md';
 const RUNTIME = {
   // "a ServiceNow tool" rather than the story's `mcp__servicenow__`: the rule file states that
   // prefix once, from the config, and ARC-05's test asserts there is no literal copy of it.
+  // ARC-07-C3 extended the tail. The literal moves WITH it, on purpose: this map is the
+  // acceptance criterion, so a change to the runtime wording has to be made twice and meant both
+  // times. What was added is the reload; what must never be dropped is the stop and the lockout
+  // warning, and both are still here to be read.
   AUTHENTICATION_FAILED: 'If a ServiceNow tool returns AUTHENTICATION_FAILED: stop '
     + 'immediately. Do not retry that call or make any other call to the same instance — repeated '
     + 'failed logins can lock the account. Tell the user to run ./snowarch instance test <label> '
     + 'and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user '
-    + 'says the credentials were fixed.',
+    + 'says the credentials were fixed — and then call snow_core_instances_reload before you '
+    + 'retry, because this server still holds the credentials it read at startup and a retry '
+    + 'without it is a second failed login.',
   INSUFFICIENT_PRIVILEGES: 'The credentials are valid but the account lacks a role for this table. '
     + 'Report the tool, the table and the roles the preset needs (see docs/TROUBLESHOOTING.md); do '
     + 'not switch instances or retry with another tool to work around it.',
