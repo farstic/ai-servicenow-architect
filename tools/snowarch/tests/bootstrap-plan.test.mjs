@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DOCS, MODES, applyChoice, buildPlan, formatPlan, runPlanScreen } from '../lib/plan.mjs';
-import { LIVE_YES_WITHOUT_FILE, USAGE, bootstrapCommand } from '../lib/bootstrap.mjs';
+import { LIVE_YES_WITHOUT_FILE, USAGE, bootstrapCommand,
+  liveYesNeedsInstanceFile } from '../lib/bootstrap.mjs';
 import { loadState, statePath } from '../lib/state.mjs';
 import { commandArgs, makeCheckout, recorder } from './helpers/workspace.mjs';
 
@@ -243,4 +244,57 @@ test('a state file from a newer snowarch stops the run with the upgrade sentence
     out: sink(), err: sink() });
   assert.equal(code, 1);
   assert.ok(log.lines.includes('state file is from a newer snowarch — run ./snowarch upgrade'));
+});
+
+/**
+ * ARC-06-C16 — the refusal is about an EMPTY store, and said so in only one of the two places.
+ *
+ * The owner's rc.5 → rc.6 upgrade, with `pdi` already in the store:
+ *
+ *   [U6/7] bootstrap (only the steps whose inputs changed)
+ *   error: live mode with --yes needs --instance-file <path>: credentials cannot be typed
+ *          non-interactively (see docs/INSTALL.md "Operators and CI")
+ *
+ * `upgrade` runs `bootstrap --mode live --yes`, so every live user upgrading hit this, and the
+ * remedy it prints — re-run the upgrade — hits it again. No B0x line was printed: it refused at
+ * argument validation, so B04, B05 and B08 never ran and the tree sat at the new tag with the old
+ * `node_modules`.
+ *
+ * `mode.mjs` had the right condition all along — `&& !hasStore` — and its comment says the
+ * SENTENCE was "imported rather than repeated: there is one reason this combination cannot work
+ * and it should not have two phrasings". The sentence was shared and the condition was not.
+ * `liveYesNeedsInstanceFile` is now the one statement, and both callers ask it.
+ */
+test('ARC-06-C16 — live --yes is allowed when the store already holds an instance', async () => {
+  const root = makeCheckout();
+  mkdirSync(join(root, '.local'), { recursive: true });
+  writeFileSync(join(root, '.local', 'instances.json'), JSON.stringify({
+    version: 1, defaultInstance: 'pdi', instances: { pdi: { environment: 'pdi', preset: 'custom' } },
+  }));
+
+  const log = recorder();
+  const code = await bootstrapCommand({ ...commandArgs(root, { mode: 'live', yes: true }), log,
+    out: sink(), err: sink() });
+
+  assert.notEqual(code, 2, 'the upgrade path is still refused at argument validation');
+  assert.equal(log.lines.includes(LIVE_YES_WITHOUT_FILE), false,
+    'the empty-store sentence was printed for a store that is not empty');
+});
+
+test('ARC-06-C16 — the predicate is one rule, and both callers get the same answer', () => {
+  // The two callers each wrote their own condition and disagreed on exactly the case that
+  // mattered. This asserts the rule itself over the whole space, so a third caller cannot invent
+  // a fourth reading of it.
+  for (const hasStore of [true, false]) {
+    for (const yes of [true, false]) {
+      for (const instanceFile of [undefined, '/tmp/i.json']) {
+        const expected = yes === true && !instanceFile && !hasStore;
+        assert.equal(liveYesNeedsInstanceFile({ mode: 'live', yes, instanceFile, hasStore }),
+          expected, `live yes=${yes} file=${!!instanceFile} store=${hasStore}`);
+        // design-only never needs the file, whatever else is true.
+        assert.equal(liveYesNeedsInstanceFile({ mode: 'design', yes, instanceFile, hasStore }),
+          false);
+      }
+    }
+  }
 });

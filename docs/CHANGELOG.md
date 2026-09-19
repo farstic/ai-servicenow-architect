@@ -235,6 +235,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Upgrading a live checkout works again.** `./snowarch upgrade` runs the installer
+  non-interactively, and the installer refused — *"live mode with --yes needs --instance-file"* —
+  even when the instance it was asking you to supply was already saved. Every live user hit it, and
+  the advice it printed was to run the upgrade again. The installer now asks for an instance file
+  only when the store is genuinely empty, and the instance step reports `kept instance "<label>"`
+  instead of demanding a terminal it will not use.
+
 - **An unattended install now says why a capability may not work.** Adding an instance with `--yes`
   skips the review screen — so when a probe reported, say, that the Fluent SDK was not installed,
   the install saved the capability switched on and said nothing, and the confirmation line read as
