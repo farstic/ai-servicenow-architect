@@ -97,6 +97,17 @@ export function serverStatus() {
     };
 }
 export function currentCapabilities() {
+    // ARC-07-C3 — RE-READ THE STORE FIRST. This is the call a session makes to confirm its state
+    // after the user says "done" to a credential fix, and it reported the credentials this process
+    // read at startup. So `set-credentials` succeeded in the terminal, the confirm said fine, and
+    // the retry was a SECOND failed login against an account the AUTHENTICATION_FAILED remedy warns
+    // can be locked by repeated failures. A confirm that reports a state the server is no longer in
+    // is worse than no confirm: it is the sentence that authorises the retry.
+    //
+    // The reload is cheap and already exists — `load()` is idempotent and the store is a small 0600
+    // file — and `reloadInstances()` is not used here because that one also re-advertises the tool
+    // catalogue and notifies the client; this call only needs the credentials to be current.
+    instanceManager.reload();
     const report = instanceManager.getReport();
     if (instanceManager.loadedCount() === 0) {
         return {

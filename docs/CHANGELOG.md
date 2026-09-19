@@ -241,6 +241,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   environment and preset when the wizard saves them, and `mode` reports what was recorded. The
   same gap was blanking the instance in the install's own closing summary.
 
+- **After you fix a password, the assistant can actually use it.** When a ServiceNow call failed
+  authentication, the guidance told the assistant to stop, have you repair the credentials, and
+  continue when you said they were fixed — but the running server still held the password it read
+  at startup, so continuing meant a second failed login against an account the same guidance warns
+  can be locked. The guidance now names the reload step, and the check the assistant makes after
+  you say "done" re-reads the store first, so it reports what is true now rather than what was true
+  at startup.
+
 - **The Mode line now recognises a live setup registered to this checkout.** With
   `--register local` the server is registered directly and the shared project entry is left off on
   purpose — but the `Mode:` line read only that switched-off entry and announced `design-only` for

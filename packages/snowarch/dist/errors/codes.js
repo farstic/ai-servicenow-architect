@@ -152,7 +152,7 @@ export const ERROR_CODES = [
         // states that prefix exactly ONCE, rendered from `engine.config.json`'s server key, and
         // ARC-05's own test asserts both the count and the absence of a literal. A second, hard-coded
         // copy here would fail that test and would be wrong the day the key changes.
-        remedy: "If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed",
+        remedy: "If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed — and then call snow_core_instances_reload before you retry, because this server still holds the credentials it read at startup and a retry without it is a second failed login",
         showInRule: true,
         httpStatus: 401,
     },
