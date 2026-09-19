@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { makeExec, samePath } from '../../steps/B00.mjs';
 import { loadState, STATE_VERSION } from '../../state.mjs';
 import { defineCheck } from '../registry.mjs';
+import { projectEntryEnabled } from '../../settings-local.mjs';
 
 import { credentialKeys, credentialLines, CREDENTIAL_EXT } from './credential-shape.mjs';
 import { fail, ok, warn } from './result.mjs';
@@ -149,20 +150,29 @@ export function sessionStartProblems(local, root) {
  * that combination itself, and whichever way it resolves it, the file no longer says what the user
  * asked for — so it is a FAIL with a fix rather than a warning, and S06's rewrite is the fix.
  */
-export function toggleProblems({ mode, settings, serverKey }) {
+export function toggleProblems({ mode, settings, serverKey, registration = 'project' }) {
   const enabled = (settings?.enabledMcpjsonServers ?? []).includes(serverKey);
   const disabled = (settings?.disabledMcpjsonServers ?? []).includes(serverKey);
+  // THE WRITER'S RULE, IMPORTED. `mode === 'live'` is not the question — the question is whether
+  // the PROJECT entry is the one that should load, and a `local` or `user` registration carries
+  // the server itself, so the project entry stays disabled however live the checkout is.
+  const wantEnabled = projectEntryEnabled({ mode, registration });
   const problems = [];
   if (enabled && disabled) {
     problems.push(`${serverKey} is in BOTH enabledMcpjsonServers and disabledMcpjsonServers`);
   } else if (!enabled && !disabled) {
     problems.push(`${serverKey} is in NEITHER enabledMcpjsonServers nor disabledMcpjsonServers`);
-  } else if (mode === 'live' && !enabled) {
+  } else if (wantEnabled && !enabled) {
     problems.push(`mode is live but ${serverKey} is disabled`);
-  } else if (mode && mode !== 'live' && !disabled) {
-    problems.push(`mode is ${mode} but ${serverKey} is enabled`);
+  } else if (mode && !wantEnabled && !disabled) {
+    // Two reasons the project entry must be off, and they need different sentences: design-only,
+    // and a live checkout whose server arrives through a local or user registration.
+    problems.push(mode === 'live'
+      ? `mode is live with a ${registration} registration, but ${serverKey} is enabled in `
+        + '.mcp.json — the local entry and the project entry would both load'
+      : `mode is ${mode} but ${serverKey} is enabled`);
   }
-  return { problems, enabled, disabled };
+  return { problems, enabled, disabled, wantEnabled };
 }
 
 export function engineRepoChecks() {
@@ -385,8 +395,13 @@ export function engineRepoChecks() {
         }
         const serverKey = ctx.config.mcp.serverKey;
         const mode = state?.mode ?? null;
-        const { problems, enabled, disabled } = toggleProblems({ mode, settings, serverKey });
-        const data = { mode, enabled, disabled,
+        // ARC-08-C15 — the registration is half the question. Without it this check read
+        // "live means enabled" and failed a live checkout registered `local`, whose project entry
+        // is disabled BY DESIGN because the local entry carries the same server.
+        const registration = state?.registration ?? 'project';
+        const { problems, enabled, disabled, wantEnabled } =
+          toggleProblems({ mode, settings, serverKey, registration });
+        const data = { mode, registration, enabled, disabled,
           fix: { kind: 'toggles-mismatch', mode: mode ?? 'design' } };
         if (problems.length > 0) {
           return fail(problems.join('; '), {
@@ -406,6 +421,11 @@ export function engineRepoChecks() {
               data: { ...data, fix: { kind: 'hooks-disabled-by-bootstrap' } },
             })
             : ok(`${mode ?? 'design'} · hooks disabled by choice (disableAllHooks)`, data);
+        }
+        // The ok line SAYS WHY when "live" and "disabled" appear together, because that pair reads
+        // as a contradiction to anybody who has just been told the mode is live.
+        if (mode === 'live' && !wantEnabled) {
+          return ok(`live · disabled (${registration} registration carries the server)`, data);
         }
         return ok(`${mode ?? 'design'} · ${enabled ? 'enabled' : 'disabled'}`, data);
       },
