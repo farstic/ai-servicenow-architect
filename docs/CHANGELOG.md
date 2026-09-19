@@ -235,6 +235,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **An unattended install now says why a capability may not work.** Adding an instance with `--yes`
+  skips the review screen — so when a probe reported, say, that the Fluent SDK was not installed,
+  the install saved the capability switched on and said nothing, and the confirmation line read as
+  a contradiction. It still saves exactly what you asked for, which is deliberate, but the line now
+  names the probe: `FLUENT=on (probe: not installed — tools will fail until @servicenow/sdk is on
+  PATH)`.
+
 - **`./snowarch mode` now tells you which instance you are live against.** It printed
   `instance=<label> (unknown) preset=unknown` on every live checkout — not sometimes, always: the
   two fields were read from places nothing ever wrote. The install now records the instance's

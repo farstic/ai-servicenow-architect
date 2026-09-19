@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import type { ProbeStatus } from '../../src/servicenow/probes.js';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
   COLUMNS, ENTRY_DEFAULTS, FLAG_MEANINGS, PROBE_FIELD, annotate, applyingLine, dependencyViolation,
-  labelOf, parseFlagsArg, prodRefusal, proposePreset, renderReviewScreen, resolveFlags,
+  annotate, labelOf, parseFlagsArg, probeNote, probeRecommendsOff, prodRefusal, proposePreset,
+  renderReviewScreen, resolveFlags,
   runReviewScreen, wrapRow,
 } from '../../src/cli/preset-ui.js';
 import {
@@ -56,8 +58,15 @@ describe('proposePreset — the proposal is the environment, and nothing else', 
     expect(withProbes.preset).toBe('full');
     expect(withProbes.flags).toEqual(without.flags);
     expect(withProbes.flags).toEqual(expandPreset('full'));
-    expect(withProbes.applying).toBe(
-      'Applying: preset full — WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=on');
+    // ARC-07-C4 — the three assertions ABOVE are criterion 7 and are untouched: same preset, same
+    // flags, with and without a failing probe. What changed is that this path now carries the
+    // recommendation TEXT that D-05 requires and it was not printing — "a failing probe changes
+    // only the recommendation text on that line, never the toggle". So the line says more and
+    // decides nothing more, which is the distinction the criterion is about.
+    expect(withProbes.applying).toContain('WRITE=on (probe: role missing');
+    expect(withProbes.applying).toContain('NOW_ASSIST=on (probe: no Now Assist licence');
+    expect(withProbes.applying).toContain('FLUENT=on (probe: not installed');
+    expect(withProbes.applying).toMatch(/^Applying: preset full — WRITE=on /);
   });
 });
 
@@ -444,5 +453,98 @@ describe('criterion 8 and the cross-checks', () => {
     expect(dependencyViolation(expandPreset('full'))).toBeNull();
     const contradiction = { ...expandPreset('read-only'), SCRIPTING_ENABLED: 'true' } as Flags;
     expect(dependencyViolation(contradiction)).toContain('SCRIPTING requires WRITE');
+  });
+});
+
+/**
+ * ARC-07-C4 — `--yes` applied a preset the same run's probes had just argued against.
+ *
+ * Sitting C, A6, rc.5. `instance add pdi2 … --password-stdin --yes` probed, printed
+ * `fluent not installed`, and then:
+ *
+ *   Applying: preset full — WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=on
+ *   Saved instance "pdi2" (pdi · basic · preset full). Probes: … fluent not installed.
+ *
+ * One sentence saying FLUENT=on and fluent not installed. The interactive path shows
+ * "(recommend: off)" and the owner had taken that advice on pdi minutes earlier; the probes were
+ * computed and handed ONLY to the review screen, so the path with nobody to ask never saw them.
+ *
+ * The fix is neither of the two obvious ones. Applying silently would overrule a user on the path
+ * whose whole promise is "no review screen"; refusing would block an install that works. It
+ * applies the recommendation AND names the probe in the one line the path prints.
+ */
+const PROBED = (fluent: 'ok' | 'not installed') => ({
+  at: '2026-09-19T06:09:48.841Z',
+  auth: 'ok', write: 'ok', cmdb: 'ok', scripting: 'ok', atf: 'ok', nowAssist: 'ok', fluent,
+}) as never;
+
+describe('ARC-07-C4 — the non-interactive path annotates, and never toggles', () => {
+  it('names the failing probe in the Applying line and leaves the flag ON', async () => {
+    const r = await resolveFlags({
+      label: 'pdi2', environment: 'pdi', yes: true, probes: PROBED('not installed'),
+    } as never) as { ok: boolean; preset: string; flags: Record<string, string>; applying: string };
+
+    expect(r.ok).toBe(true);
+    // THE RULING, asserted: ADR-0005 — "a failing probe changes only the recommendation text on
+    // that line, never the toggle". The flag stays on and the preset stays `full`.
+    expect(r.flags.FLUENT_ENABLED).toBe('true');
+    expect(r.preset).toBe('full');
+    // THE DEFECT, closed: the line explains itself, so the Saved line's `fluent not installed`
+    // confirms a stated choice instead of contradicting one.
+    expect(r.applying).toContain(
+      'FLUENT=on (probe: not installed — tools will fail until @servicenow/sdk is on PATH)');
+    // Only the failing one is annotated.
+    expect(r.applying).toContain('WRITE=on ');
+    expect(r.applying).not.toContain('WRITE=on (');
+  });
+
+  it('is byte-identical to today when every probe is ok', async () => {
+    const r = await resolveFlags({
+      label: 'pdi2', environment: 'pdi', yes: true, probes: PROBED('ok'),
+    } as never) as { preset: string; applying: string };
+
+    expect(r.preset).toBe('full');
+    expect(r.applying).toBe('Applying: preset full — WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on '
+      + 'NOW_ASSIST=on FLUENT=on');
+    expect(r.applying).not.toContain('probe:');
+  });
+
+  it('says nothing when the probe did not run', async () => {
+    // `skipped` and "no probes at all" are not failures, and a line that annotated them would be
+    // reporting absence as a finding.
+    const noProbes = await resolveFlags({
+      label: 'pdi2', environment: 'pdi', yes: true,
+    } as never) as { applying: string };
+    expect(noProbes.applying).not.toContain('probe:');
+
+    const skipped = await resolveFlags({
+      label: 'pdi2', environment: 'pdi', yes: true, probes: PROBED('skipped' as never),
+    } as never) as { applying: string };
+    expect(skipped.applying).not.toContain('probe:');
+  });
+});
+
+describe('ARC-07-C4 — the screen and the non-interactive path share one rule', () => {
+  it('recommends off for exactly the statuses whose annotation says so', () => {
+    // THE PROPERTY THAT WAS MISSING. `annotate` renders "(recommend: off)" and the `--yes` path
+    // applies `probeRecommendsOff`; these were one rule stated in two places, and they disagreed
+    // by omission — one shown, the other never consulted. This walks every status and requires
+    // them to agree, so a new probe outcome cannot be added to one side alone.
+    const statuses: ProbeStatus[] = ['ok', 'auth failed', 'role missing', 'unreachable', 'error',
+      'not licensed', 'not installed', 'skipped'];
+    for (const status of statuses) {
+      const annotated = annotate(status).includes('(recommend: off)');
+      expect(probeRecommendsOff(status)).toBe(annotated);
+      // ...and the non-interactive phrasing exists for exactly the same set.
+      expect(probeNote(status) !== null).toBe(annotated);
+    }
+    // And the unprobed case, which is neither.
+    expect(probeRecommendsOff(undefined)).toBe(false);
+    expect(annotate(undefined)).not.toContain('(recommend: off)');
+    expect(probeNote(undefined)).toBeNull();
+
+    // NON-VACUITY: the loop must actually find both answers, or it proves nothing.
+    expect(statuses.filter((s) => probeRecommendsOff(s)).length).toBeGreaterThan(0);
+    expect(statuses.filter((s) => !probeRecommendsOff(s)).length).toBeGreaterThan(0);
   });
 });
