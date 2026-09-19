@@ -235,6 +235,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The Mode line now recognises a live setup registered to this checkout.** With
+  `--register local` the server is registered directly and the shared project entry is left off on
+  purpose — but the `Mode:` line read only that switched-off entry and announced `design-only` for
+  a checkout whose server was connected and answering, in the same report that said `mode live` and
+  `✔ Connected`. It is the line the session banner and `/snowarch status` quote, so it was the
+  sentence users saw most and the only one that was wrong. It now asks which entry carries the
+  server before deciding.
+
 - **The doctor no longer reports a healthy live setup as broken.** If you set up live mode with
   `--register local`, the server is registered to this checkout directly and the shared project
   entry is deliberately left switched off — otherwise both would load. The doctor did not know
