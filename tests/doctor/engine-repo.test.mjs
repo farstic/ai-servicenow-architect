@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { engineRepoChecks, configProblems, placeholdersWithoutDefault, sessionStartProblems,
   toggleProblems } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
+import { computeSettings, projectEntryEnabled } from '../../tools/snowarch/lib/settings-local.mjs';
 import { bootstrap, contextFor, copyTree, greenTree, readJson, runById,
   writeJson } from './helpers/tree.mjs';
 
@@ -272,4 +273,83 @@ test('the fixture is built from the committed files, not from a copy in the test
   assert.equal(/^https?:|github\.com/.test(fixtureUpstream), false,
     `a fixture may not carry a network upstream: ${fixtureUpstream}`);
   assert.ok(bootstrap);
+});
+
+/**
+ * ARC-08-C15 — E-10 judged the toggles without the registration, and failed a correct state.
+ *
+ * The owner's Sitting C, rc.5, after `./snowarch mode live --register local`:
+ *
+ *   DOCTOR: 12 ok, 1 warn, 1 fail, 25 skipped (1 fixable — run ./snowarch doctor --fix)
+ *   E-10 FAIL settings.local toggles match the recorded mode: mode is live but servicenow is
+ *        disabled — ./snowarch mode live
+ *
+ * The state was right. `mode.mjs` settles a local registration before the steps *because* an
+ * enabled project entry plus a local entry would load the server twice, so on that path the
+ * project toggle stays DISABLED however live the checkout is — and the writer knows it:
+ * `computeSettings` gates on `mode === 'live' && registration === 'project'`. The check gated on
+ * `mode === 'live'` alone. Two statements of one rule, and they disagreed.
+ *
+ * The C4 shape, in full: the FAIL's remedy is `./snowarch mode live` — the command just run — and
+ * B09 advertises `--fix`; both write through the registration-aware writer, both reproduce the
+ * state already on disk, and the FAIL returns. A user is handed a failure, a remedy that no-ops,
+ * and a fix that reports success while nothing changes.
+ */
+const TOGGLED = { disabledMcpjsonServers: ['servicenow'] };
+const ENABLED = { enabledMcpjsonServers: ['servicenow'] };
+
+test('ARC-08-C15 — a live checkout registered `local` is not a failure', () => {
+  const r = toggleProblems({ mode: 'live', settings: TOGGLED, serverKey: 'servicenow',
+    registration: 'local' });
+  assert.deepEqual(r.problems, [],
+    'the owner\'s state is reported as broken — this is the C15 defect');
+  assert.equal(r.wantEnabled, false);
+});
+
+test('ARC-08-C15 — the project path keeps the message it had', () => {
+  // Both directions: the fix must not buy the local path by going quiet on the real mismatch.
+  const r = toggleProblems({ mode: 'live', settings: TOGGLED, serverKey: 'servicenow',
+    registration: 'project' });
+  assert.deepEqual(r.problems, ['mode is live but servicenow is disabled']);
+
+  // ...and the design-side message is untouched.
+  assert.deepEqual(
+    toggleProblems({ mode: 'design-only', settings: ENABLED, serverKey: 'servicenow' }).problems,
+    ['mode is design-only but servicenow is enabled']);
+
+});
+
+test('ARC-08-C15 — live + local + an ENABLED project entry is the double load, and is named', () => {
+  // Kept apart from the test above on purpose. That one asserts the paths this change must NOT
+  // move, so it stays green when the fix is reverted; this one asserts the case the fix adds, so
+  // it goes red. Bundled together they would fail as one and say nothing about which half moved.
+  const both = toggleProblems({ mode: 'live', settings: ENABLED, serverKey: 'servicenow',
+    registration: 'local' });
+  assert.equal(both.problems.length, 1);
+  assert.match(both.problems[0], /both load/);
+});
+
+test('ARC-08-C15 — the check and the writer agree on every (mode, registration) pair', () => {
+  // THE PROPERTY THAT WAS MISSING. Two copies of one rule cannot be kept in step by review; this
+  // asserts they are the same rule by running both over the whole space. It fails the moment
+  // somebody re-states either side.
+  const settingsFor = (enabled) => (enabled ? { ...ENABLED } : { ...TOGGLED });
+  for (const mode of ['live', 'design-only', 'design']) {
+    for (const registration of ['project', 'local', 'user']) {
+      const want = projectEntryEnabled({ mode, registration });
+      // the writer, on a tree in the OPPOSITE state, must move it to `want`
+      const written = computeSettings(settingsFor(!want),
+        { mode, nodePresent: true, registration, serverKey: 'servicenow' });
+      const writerEnabled = (written.enabledMcpjsonServers ?? []).includes('servicenow');
+      assert.equal(writerEnabled, want,
+        `writer disagrees at mode=${mode} registration=${registration}`);
+
+      // the check, on a tree already in `want`, must find nothing to complain about
+      const { problems, wantEnabled } = toggleProblems({
+        mode, settings: settingsFor(want), serverKey: 'servicenow', registration });
+      assert.equal(wantEnabled, want, `check disagrees at mode=${mode} registration=${registration}`);
+      assert.deepEqual(problems, [],
+        `check faults the writer's own output at mode=${mode} registration=${registration}`);
+    }
+  }
 });

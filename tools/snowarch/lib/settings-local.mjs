@@ -56,10 +56,22 @@ const withValue = (list, value) => (Array.isArray(list) && list.includes(value)
  * Pure, and exported for the tests: every merge case is a question about this function, and
  * answering it through the filesystem would make the tests slower and the failures vaguer.
  */
+/**
+ * Is the `.mcp.json` PROJECT entry the one that should be loading?
+ *
+ * ONE definition with two readers — this writer, and the doctor's E-10 check. They were separate
+ * before: the writer knew that a `local` or `user` registration carries the server itself and so
+ * the project entry must stay disabled, and the check knew only `mode === 'live'`. On a live
+ * checkout registered `local` the writer wrote DISABLED, correctly, and the check then called that
+ * a failure — ARC-08-C15. A rule stated twice is a rule that gets to disagree with itself.
+ */
+export const projectEntryEnabled = ({ mode, registration }) =>
+  mode === 'live' && registration === 'project';
+
 export function computeSettings(current, { mode, nodePresent, registration, serverKey,
   removeDisableAllHooks = false }) {
   const next = { ...current };
-  const live = mode === 'live' && registration === 'project';
+  const live = projectEntryEnabled({ mode, registration });
 
   // `disabledMcpjsonServers` wins over `enabledMcpjsonServers` in Claude Code, so design-only is
   // expressed by the disable list and live by its absence. A registration that is not `project`

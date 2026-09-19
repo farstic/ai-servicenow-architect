@@ -235,6 +235,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The doctor no longer reports a healthy live setup as broken.** If you set up live mode with
+  `--register local`, the server is registered to this checkout directly and the shared project
+  entry is deliberately left switched off — otherwise both would load. The doctor did not know
+  that, and reported `mode is live but servicenow is disabled`, offering a remedy and a `--fix`
+  that could not change anything because nothing was wrong. It now reads the registration, says
+  `live · disabled (local registration carries the server)`, and keeps its warning for the case
+  where both really would load.
+
 - **A test we add can no longer end up running nowhere.** One directory of slow tests is skipped by
   the main suite and covered by a dedicated CI job that lists its files by hand — so a file added
   there was in neither, and both reported success by not knowing about it. A check now holds that
