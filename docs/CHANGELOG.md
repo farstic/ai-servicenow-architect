@@ -243,6 +243,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **`instance list` shows every probe result, not five of seven.** The `LAST PROBE` column printed
+  `auth`, `write`, `scripting`, `cmdb` and `atf` and silently dropped Now Assist and Fluent — so an
+  instance whose Now Assist probe came back `not licensed` listed as a row of `ok`s. It now prints
+  every result the record holds, in the same order and under the same names as the wizard's own
+  Saved line, leaving out a key an older record does not carry rather than inventing one. The
+  header says `LAST PROBE (most recent: …)`, because the time it carries is the newest in the
+  store rather than each row's, and a footnote explains the dash when one is on the screen.
+
 - **The doctor no longer reports "up to date" from a record that never checked.** An upgrade wrote
   its own entry into the file the release-currency check reads, saying the checkout was current —
   which it had not measured, it had simply just finished upgrading. For a day afterwards the

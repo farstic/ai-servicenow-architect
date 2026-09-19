@@ -12,6 +12,7 @@
  */
 import { maskPath, maskUsername } from '../store/paths.js';
 import { completeFlags } from '../store/schema.js';
+import { PROBE_FIELDS } from '../servicenow/probes.js';
 import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
 /**
  * A secret, described rather than shown: `set (len 12)`.
@@ -54,13 +55,63 @@ export function listJson(storePath, store) {
  * do not reflect, in a terminal where `mode live` is just as available.
  */
 export const NO_INSTANCES = NO_INSTANCE_MESSAGE;
-/** One probe as the table shows it: `auth ok · write ok · …`, or a dash when none has run. */
+/**
+ * One probe as the table shows it: `auth ok · write ok · …`, or a dash when none has run.
+ *
+ * ARC-07-C6 — EVERY KEY THE RECORD CARRIES, in `PROBE_FIELDS`' order, which the wizard's Saved line
+ * also reads. This used to name five of the seven in a hand-written list — `auth`, `write`,
+ * `scripting`, `cmdb`, `atf` — so `nowAssist` and `fluent` were measured, stored, and never shown:
+ * an instance whose Now Assist probe returned `not licensed` listed as a row of `ok`s. The fixture
+ * in `instance-manage.test.ts` had carried `nowAssist: 'not licensed'` and `fluent: 'not installed'`
+ * since the test was written, and nothing asserted on them because nothing printed them.
+ *
+ * PRESENT, not merely declared. A record written by an older build has fewer keys, and a cell
+ * reading `now_assist undefined` would be a renderer inventing a result for a probe that never ran.
+ * An absent key is left out; the dash is reserved for a record that does not exist at all.
+ */
 export function probeCell(probe) {
     if (!probe)
-        return '—';
-    return [`auth ${probe.auth}`, `write ${probe.write}`, `scripting ${probe.scripting}`,
-        `cmdb ${probe.cmdb}`, `atf ${probe.atf}`].join(' · ');
+        return NEVER_PROBED;
+    return PROBE_FIELDS
+        .filter(({ key }) => probe[key] !== undefined && probe[key] !== null)
+        .map(({ label, key }) => `${label} ${probe[key]}`)
+        .join(' · ');
 }
+/**
+ * `LAST PROBE (most recent: 2026-09-04T10:12:00Z)` — and `most recent:` is not decoration.
+ *
+ * ARC-07-C6. The header carries ONE time because every row's own would repeat a 20-character
+ * timestamp per line to say what one header says once, and a table nobody can read across is a
+ * table nobody reads. But the time it carries is the newest in the store, so on a store with two
+ * instances probed a week apart the bare `LAST PROBE (<at>)` read as a claim about both rows — and
+ * the row it was wrong about was the stale one, which is the row a reader is looking for.
+ *
+ * Two instances, one aggregate: say which.
+ */
+export function probeColumnHeader(instances) {
+    const latest = instances
+        .map((i) => i.lastProbe?.at)
+        .filter((at) => typeof at === 'string')
+        .sort()
+        .at(-1);
+    return latest ? `LAST PROBE (most recent: ${latest})` : 'LAST PROBE';
+}
+/** The cell for an instance nothing has probed. Spelled once — the footnote explains this glyph. */
+export const NEVER_PROBED = '—';
+/**
+ * What the column means, printed under the table only when a row actually shows the dash.
+ *
+ * The header says WHEN — `LAST PROBE (2026-09-04T10:12:00Z)` — and a reader who sees `—` in a cell
+ * has no way to tell "never probed" from "probed, nothing to report". It is the second of those
+ * that would be alarming, and it is never what the dash means.
+ *
+ * Conditional on purpose: a table where every instance has been probed gets no footnote, because a
+ * sentence explaining a glyph that is not on the screen is a line a reader has to rule out.
+ */
+export const neverProbedNote = (instances) => (instances.some((i) => !i.lastProbe)
+    ? `${NEVER_PROBED} = never probed. ./snowarch instance test <label> probes one; `
+        + '--all probes every one.'
+    : null);
 const HEADERS = ['LABEL', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER'];
 /**
  * The table. Columns are as wide as their widest cell, never wider.
@@ -76,16 +127,13 @@ export function listTable(list) {
         i.label, i.environment, i.auth.method, i.preset,
         list.defaultInstance === i.label ? '*' : '', i.auth.username,
     ]);
-    const latest = list.instances
-        .map((i) => i.lastProbe?.at)
-        .filter((at) => typeof at === 'string')
-        .sort()
-        .at(-1);
-    const probeHeader = latest ? `LAST PROBE (${latest})` : 'LAST PROBE';
+    const probeHeader = probeColumnHeader(list.instances);
     const width = HEADERS.map((h, c) => Math.max(h.length, ...rows.map((r) => r[c]?.length ?? 0)));
     const line = (cells, last) => `${cells.map((cell, c) => cell.padEnd(width[c])).join('  ')}  ${last}`.trimEnd();
+    const note = neverProbedNote(list.instances);
     return [line(HEADERS, probeHeader),
-        ...rows.map((r, n) => line(r, probeCell(list.instances[n]?.lastProbe ?? null)))].join('\n');
+        ...rows.map((r, n) => line(r, probeCell(list.instances[n]?.lastProbe ?? null))),
+        ...(note ? ['', note] : [])].join('\n');
 }
 /**
  * `test --json` and `test --all --json` — ONE envelope, whether it holds one instance or five.
@@ -169,9 +217,14 @@ export function listAllTable(list) {
     ]);
     const width = ALL_HEADERS.map((h, c) => Math.max(h.length, ...rows.map((r) => r[c]?.length ?? 0)));
     const line = (cells, last) => `${cells.map((cell, c) => cell.padEnd(width[c])).join('  ')}  ${last}`.trimEnd();
+    // ARC-07-C6 — the same header and the same footnote as `list`. This table showed a bare
+    // `LAST PROBE` and no explanation of the dash, so the one view that spans two stores was the one
+    // that said least about the column both of them share.
+    const note = neverProbedNote(list.instances);
     return [
-        line(ALL_HEADERS, 'LAST PROBE'),
+        line(ALL_HEADERS, probeColumnHeader(list.instances)),
         ...rows.map((r, n) => line(r, probeCell(list.instances[n]?.lastProbe ?? null))),
+        ...(note ? ['', note] : []),
         ...(list.notes.length > 0 ? ['', ...list.notes] : []),
     ].join('\n');
 }

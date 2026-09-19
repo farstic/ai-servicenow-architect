@@ -28,6 +28,37 @@ import { classifyNetworkError } from './net-errors.js';
  * otherwise would be the wizard promising something the instance has not agreed to.
  */
 export const HONESTY_NOTE = 'Probes confirm the account can reach each table family; write ACLs are still evaluated per call.';
+/**
+ * ARC-07-C6 — THE ORDER AND THE NAMES OF A PROBE RECORD, once, for every renderer.
+ *
+ * There were two. `probeSummary` (the wizard's Saved line) printed seven fields in the flag order,
+ * spelled as the flags are — `auth · write · cmdb_write · scripting · atf · now_assist · fluent`.
+ * `probeCell` (the `instance list` table) printed FIVE in a different order with different names —
+ * `auth · write · scripting · cmdb · atf` — and silently dropped `nowAssist` and `fluent`. So an
+ * instance whose Now Assist probe came back `not licensed` listed as a row of `ok`s, and the two
+ * surfaces disagreed about both the vocabulary and the number of facts a probe has.
+ *
+ * DERIVED FROM `FLAG_NAMES`, not spelled again: a seventh capability added to the flags appears in
+ * both renderers or in neither, and cannot appear under two names. `auth` leads because it is not a
+ * capability — it is the question the other six presuppose, and a reader scanning a row wants the
+ * answer to "did it log in" before the answer to "may it write".
+ */
+export const PROBE_FIELD_OF = Object.freeze({
+    WRITE_ENABLED: 'write',
+    CMDB_WRITE_ENABLED: 'cmdb',
+    SCRIPTING_ENABLED: 'scripting',
+    ATF_ENABLED: 'atf',
+    NOW_ASSIST_ENABLED: 'nowAssist',
+    FLUENT_ENABLED: 'fluent',
+});
+export const PROBE_FIELDS = Object.freeze([
+    { label: 'auth', key: 'auth', flag: null },
+    ...FLAG_NAMES.map((flag) => ({
+        label: flag.replace(/_ENABLED$/, '').toLowerCase(),
+        key: PROBE_FIELD_OF[flag],
+        flag,
+    })),
+]);
 /** The 403 hint, spelled once: the account is real, the role is not. */
 export const ROLE_MISSING_HINT = 'The credentials are valid but the account cannot read sys_user over REST. On a PDI use the '
     + 'admin account; elsewhere ask for a role that grants sys_user read (itil or admin).';

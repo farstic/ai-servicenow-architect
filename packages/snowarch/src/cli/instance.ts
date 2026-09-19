@@ -40,7 +40,8 @@ import {
 } from '../store/paths.js';
 import { describeNetworkEnv, formatFailure, probeReachability, reachabilityMenu } from '../servicenow/reachability.js';
 import { fillMeaning, fillRemedy } from '../servicenow/net-errors.js';
-import { probeAll, toLastProbe, type AuthProbe, type LastProbe, type ProbeClient } from '../servicenow/probes.js';
+import { probeAll, PROBE_FIELDS, toLastProbe, type AuthProbe, type LastProbe,
+  type ProbeClient } from '../servicenow/probes.js';
 import { probeClientFor, probeOptionsFor } from '../servicenow/probe-client.js';
 import { loadStore, projectStorePath, resolveStorePath, saveStore } from '../store/index.js';
 import { STORE_VERSION, completeFlags, type Store, type StoreInstance } from '../store/schema.js';
@@ -192,19 +193,24 @@ export function maskEntry(entry: StoreInstance): MaskedEntry {
   };
 }
 
-/** The probe line of the summary: enabled flags report, disabled ones read `off`. */
+/**
+ * The probe line of the summary: enabled flags report, disabled ones read `off`.
+ *
+ * ARC-07-C6 — the order and the names come from `PROBE_FIELDS` now, which `instance list`'s table
+ * also reads. This function kept its own copy of the flag-to-field map, and the table kept a third
+ * spelling; one definition is what stops a seventh capability from reaching one surface and not
+ * the other.
+ *
+ * What stays here is the only thing that is this line's own: a DISABLED flag reads `off` instead of
+ * its probe result, because the wizard is reporting the choice just made rather than the instance.
+ */
 export function probeSummary(probe: LastProbe | null, flags: Flags, noProbes: boolean): string {
   if (noProbes) return 'Probes: skipped (--no-probes)';
   if (!probe) return 'Probes: not run';
-  const field = { WRITE_ENABLED: 'write', CMDB_WRITE_ENABLED: 'cmdb', SCRIPTING_ENABLED: 'scripting',
-    ATF_ENABLED: 'atf', NOW_ASSIST_ENABLED: 'nowAssist', FLUENT_ENABLED: 'fluent' } as const;
-  const parts = [`auth ${probe.auth}`];
-  for (const flag of FLAG_NAMES) {
-    const label = flag.replace(/_ENABLED$/, '').toLowerCase();
-    parts.push(flags[flag] === 'true'
-      ? `${label} ${probe[field[flag]]}`
-      : `${flag.replace(/_ENABLED$/, '')} off`);
-  }
+  const parts = PROBE_FIELDS.map(({ label, key, flag }) => {
+    if (flag === null) return `${label} ${probe[key]}`;
+    return flags[flag] === 'true' ? `${label} ${probe[key]}` : `${label.toUpperCase()} off`;
+  });
   return `Probes: ${parts.join(' · ')}.`;
 }
 
