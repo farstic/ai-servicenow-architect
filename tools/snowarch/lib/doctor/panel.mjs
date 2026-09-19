@@ -132,8 +132,12 @@ export function notProbedLine(report) {
     missing.push('citation counts');
   }
   if (missing.length === 0) return null;
-  const subject = missing.join(' and ');
-  return `${subject} ${missing.length > 1 ? 'are' : 'is'} not probed on a quick run`
+  // ALWAYS `are`. The first version chose the verb from `missing.length`, which looked like
+  // agreement and was keyed to the wrong thing: the number that governs it is the subject's, not
+  // the list's, and BOTH subjects are plural nouns. One null key produced "Capability packs is not
+  // probed" — a sentence disagreeing with itself in the line whose whole job is to be quoted
+  // verbatim. There is no singular case to handle here, so there is no conditional.
+  return `${missing.join(' and ')} are not probed on a quick run`
     + ' — ./snowarch doctor reports them.';
 }
 

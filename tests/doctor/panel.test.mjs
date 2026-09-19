@@ -192,9 +192,30 @@ test('a missing segment drops the segment, not the line', () => {
 test('what a quick run did not probe is read off the report, not remembered', () => {
   // The skill carried this as a fixed sentence naming a fixed two, so a check moving in or out of
   // the quick subset would have left it describing the old subset.
-  assert.match(notProbedLine(LIVE), /^Capability packs and citation counts are not probed/);
+  //
+  // AND IT AGREES WITH ITSELF IN ALL THREE CASES. The verb was chosen from the number of null keys
+  // — which is not what governs it — so a design-only quick run, where only `capabilities` is null,
+  // printed "Capability packs is not probed". Both subjects are plural nouns, so all three
+  // assertions below pin `are`, and the one-key cases are the ones that were wrong.
+  assert.equal(notProbedLine(LIVE),
+    'Capability packs and citation counts are not probed on a quick run'
+    + ' — ./snowarch doctor reports them.');
+
   const withPacks = { ...LIVE, engine: { ...LIVE.engine, capabilities: { docx: { present: true } } } };
-  assert.match(notProbedLine(withPacks), /^citation counts is not probed/);
+  assert.equal(notProbedLine(withPacks),
+    'citation counts are not probed on a quick run — ./snowarch doctor reports them.');
+
+  // The case the owner hit on a design-only clone: capabilities null, citations present.
+  const withCitations = { ...LIVE,
+    engine: { ...LIVE.engine, docs: { ...LIVE.engine.docs, citations: 181, dead: 0 } } };
+  assert.equal(notProbedLine(withCitations),
+    'Capability packs are not probed on a quick run — ./snowarch doctor reports them.');
+
+  // …and a report with no docs block at all names only what it can: the citation counts are not
+  // missing from a corpus that is not there, they are not a fact about this checkout.
+  const noDocs = { ...withPacks, engine: { ...withPacks.engine, docs: null } };
+  assert.equal(noDocs.engine.capabilities !== null, true);
+  assert.equal(notProbedLine(noDocs), null);
   const full = { ...LIVE, engine: { ...LIVE.engine,
     capabilities: { docx: { present: true } }, docs: { ...LIVE.engine.docs, citations: 181 } } };
   assert.equal(notProbedLine(full), null);
