@@ -298,6 +298,9 @@ export function hostChecks() {
       run: async (ctx) => {
         const { needsRefresh, readUpgradeCheck, writeUpgradeCheck } =
           await import('../../upgrade-check.mjs');
+        // ARC-09-C47 — the same parser `sortTags` uses below, so "is this a prerelease?" has one
+        // answer in this file rather than a second regex that could disagree with the first.
+        const { parseSemver } = await import('../../commands/upgrade.mjs');
         const cached = readUpgradeCheck(ctx.root);
         // ARC-09-C31. `ctx.now()` is EPOCH MILLISECONDS (the contract is stated where the context
         // is built); `upgrade-check.mjs` wants a `Date`, and its own default supplies one. This
@@ -307,7 +310,42 @@ export function hostChecks() {
         // either a release tag to compare against or a cache from a previous one.
         const now = () => new Date(ctx.now ? ctx.now() : Date.now());
 
+        // ARC-09-C47 — IS THIS RECORD EVIDENCE ABOUT CURRENCY? Three ways it is not, and each
+        // catches a different sighting from the owner's sitting. Only the third works on a record
+        // written by a build that predates this check.
+        const notCurrency = (() => {
+          if (!cached) return null;
+          // 1. An upgrade wrote it. It knows which tag it moved to and never asked what exists.
+          if (cached.source === 'upgrade') {
+            return "the last record is an upgrade's, not a currency check";
+          }
+          // 2. It describes a tree this one is not: the interrupted rc.5 -> rc.6 upgrade left
+          //    `localTag: v2.0.0-rc.5` on a tree at rc.6. `describeExact` answers null when HEAD
+          //    is not exactly on a tag, and then this says nothing rather than guessing.
+          //
+          //    NOT UNDER `--no-network`. That flag's contract is that the check spawns nothing —
+          //    `tests/doctor/release-currency.test.mjs` asserts it — and `git describe` is a
+          //    spawn even though it is local. Offline keeps checks 1 and 3, which are pure reads
+          //    of the record, and says nothing about a disagreement it did not look for.
+          const here = ctx.noNetwork ? null : describeExact(ctx.root, ctx.exec);
+          if (cached.localTag && here && cached.localTag !== here) {
+            return `stale record from an interrupted upgrade (it describes ${cached.localTag}, `
+              + `this tree is ${here})`;
+          }
+          // 3. Its `latestTag` is a PRERELEASE, which this check's own live rule never stores.
+          //    So the record cannot be a currency measurement, whoever wrote it and whether or
+          //    not they stamped a source.
+          if (cached.latestTag && parseSemver(cached.latestTag)?.pre) {
+            return `the last record names a prerelease (${cached.latestTag}), which a currency `
+              + 'check never stores';
+          }
+          return null;
+        })();
+
         if (ctx.noNetwork) {
+          // ARC-09-C47 — a record that is not a currency measurement cannot answer offline
+          // either. Say which one was found rather than reading a verdict out of it.
+          if (notCurrency) return skip(`--no-network; ${notCurrency}`);
           // ARC-09-C32. THREE cases, not two, and the third only exists because this chore starts
           // caching the empty outcome: a cache with `latestTag: null` means a check RAN and found
           // no releases. Branching on `latestTag` being truthy — as this did — would report that as
@@ -318,7 +356,7 @@ export function hostChecks() {
             : `--no-network; the last check (${cached.checkedAt}) found no release tags`);
         }
 
-        if (!needsRefresh(cached, { now })) {
+        if (!notCurrency && !needsRefresh(cached, { now })) {
           // ARC-09-C32. A cached run that found NO release is a skip, not an "ok". The `?? 'no tag'`
           // below used to answer it, and `up to date (no tag)` claims currency with something that
           // does not exist. PAST TENSE on purpose: the live branch says what it sees now

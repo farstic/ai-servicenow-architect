@@ -235,6 +235,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The doctor no longer reports "up to date" from a record that never checked.** An upgrade wrote
+  its own entry into the file the release-currency check reads, saying the checkout was current —
+  which it had not measured, it had simply just finished upgrading. For a day afterwards the
+  session banner and every quick doctor repeated that as fact. An interrupted upgrade produced the
+  opposite: a stale entry advertising a release you were already on. The upgrade now records only
+  what it did, and the check ignores any entry that is not a measurement of currency.
+
 - **An instance you just probed no longer lists as never probed.** `instance add` ran the probes,
   printed the results and reported them in `--json`, then saved an entry with no record of them, so
   `instance list` showed `LAST PROBE —` for an instance probed seconds before. It looked correct only
