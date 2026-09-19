@@ -496,3 +496,70 @@ describe('the sentences are not retyped here', () => {
     }
   });
 });
+
+/**
+ * ARC-07-C5 — `add` probed, printed the results, and threw them away.
+ *
+ * Sitting C, A6, rc.5. `instance add pdi2 … --yes` ran seven probes at `[5/6]` and printed
+ * `Probes: auth ok · write ok · cmdb_write ok · scripting ok · atf ok · now_assist ok · fluent not
+ * installed.` — and then `instance list` showed:
+ *
+ *   pdi2  pdi  basic  full  <blank default>  t***@<domain>  —
+ *
+ * `LAST PROBE —` for an instance probed seconds earlier. The entry `add` builds carried no
+ * `lastProbe` key at all, on any path: it reported the results to stdout and to `--json` and
+ * dropped them from the thing it saved.
+ *
+ * WHY IT LOOKED FINE INTERACTIVELY, and this is what made it invisible: `pdi`'s `lastProbe` in the
+ * owner's store did not come from the wizard either. The next `./snowarch doctor` runs SV-04,
+ * which calls `instance test`, which DOES write `lastProbe` — so the value was always backfilled
+ * by something else, and only an instance listed before any doctor ran showed the gap. pdi2 was
+ * added and listed with nothing in between.
+ *
+ * Same shape as ARC-09-C46's tally: the data was in hand and thrown away.
+ */
+describe('ARC-07-C5 — add keeps the probes it took', () => {
+  it('writes lastProbe from the run that probed, not from a later doctor', async () => {
+    const w = workspace();
+    try {
+      const result = await runAdd({ ...baseOptions, makeDefault: true, yes: true }, io([]), {
+        storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {},
+      });
+      expect(result.exitCode).toBe(EXIT_OK);
+
+      const store = (loadStore(w.store) as { store: Store }).store;
+      const stored = store.instances.pdi.lastProbe as { at?: string; auth?: string } | undefined;
+
+      expect(stored, 'the entry carries no lastProbe — this is the C5 defect').toBeTruthy();
+      expect(stored!.auth).toBe('ok');
+      expect(typeof stored!.at).toBe('string');
+
+      // It is the SAME result the run reported, not a second measurement.
+      expect(stored).toEqual(result.lastProbe);
+
+      // And it carries no credential: this lands in a 0600 file a person may `cat`.
+      const serialised = JSON.stringify(stored);
+      expect(serialised).not.toContain(PASSWORD);
+      expect(serialised).not.toContain(USERNAME);
+    } finally {
+      w.cleanup();
+    }
+  });
+
+  it('still writes nothing when there were no probes to keep', async () => {
+    // Both directions, and it is the existing `--no-probes` contract: an entry that was never
+    // probed must not grow a `lastProbe`, because a record of a probe that did not happen is
+    // worse than no record. `expect(result.lastProbe).toBeNull()` is already asserted above for
+    // the reported value; this asserts the STORED one.
+    const w = workspace();
+    try {
+      await runAdd({ ...baseOptions, makeDefault: true, yes: true, noProbes: true }, io([]), {
+        storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {},
+      });
+      const store = (loadStore(w.store) as { store: Store }).store;
+      expect(store.instances.pdi.lastProbe ?? null).toBeNull();
+    } finally {
+      w.cleanup();
+    }
+  });
+});

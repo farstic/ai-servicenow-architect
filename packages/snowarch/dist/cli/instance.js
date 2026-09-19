@@ -509,6 +509,13 @@ export async function runAdd(options, terminal, deps = {}) {
         flags: completeFlags(decision.flags),
         ...ENTRY_DEFAULTS,
         prodWriteAck: false,
+        // ARC-07-C5 — KEEP THE PROBES THIS RUN JUST TOOK. `add` probed at [5/6], printed the results
+        // in the Saved line and reported them in `--json`, and then built an entry without them — so
+        // `instance list` showed `LAST PROBE —` for an instance probed seconds earlier. The gap was
+        // invisible on the interactive path because the next `./snowarch doctor` runs SV-04, which
+        // calls `instance test`, which writes `lastProbe`; the value was always backfilled by
+        // something else. Same shape as ARC-09-C46's tally: the data was in hand and thrown away.
+        ...(probeResult?.last ? { lastProbe: storedProbe(probeResult.last) } : {}),
     };
     const next = {
         version: store.version ?? 1,
