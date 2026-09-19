@@ -116,7 +116,17 @@ export interface MaskedEntry {
  */
 export { maskUsername };
 export declare function maskEntry(entry: StoreInstance): MaskedEntry;
-/** The probe line of the summary: enabled flags report, disabled ones read `off`. */
+/**
+ * The probe line of the summary: enabled flags report, disabled ones read `off`.
+ *
+ * ARC-07-C6 — the order and the names come from `PROBE_FIELDS` now, which `instance list`'s table
+ * also reads. This function kept its own copy of the flag-to-field map, and the table kept a third
+ * spelling; one definition is what stops a seventh capability from reaching one surface and not
+ * the other.
+ *
+ * What stays here is the only thing that is this line's own: a DISABLED flag reads `off` instead of
+ * its probe result, because the wizard is reporting the choice just made rather than the instance.
+ */
 export declare function probeSummary(probe: LastProbe | null, flags: Flags, noProbes: boolean): string;
 export declare const savedLine: (label: string, entry: MaskedEntry, isDefault: boolean) => string;
 export declare const storeLine: (path: string, platform?: NodeJS.Platform) => string;

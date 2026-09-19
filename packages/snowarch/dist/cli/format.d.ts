@@ -1,5 +1,5 @@
 import { type Store, type StoreInstance } from '../store/schema.js';
-import type { LastProbe } from '../servicenow/probes.js';
+import { type LastProbe } from '../servicenow/probes.js';
 import type { Flags } from '../utils/permissions.js';
 /**
  * A secret, described rather than shown: `set (len 12)`.
@@ -40,8 +40,46 @@ export declare function listJson(storePath: string, store: Store): ListJson;
  * do not reflect, in a terminal where `mode live` is just as available.
  */
 export declare const NO_INSTANCES: string;
-/** One probe as the table shows it: `auth ok · write ok · …`, or a dash when none has run. */
+/**
+ * One probe as the table shows it: `auth ok · write ok · …`, or a dash when none has run.
+ *
+ * ARC-07-C6 — EVERY KEY THE RECORD CARRIES, in `PROBE_FIELDS`' order, which the wizard's Saved line
+ * also reads. This used to name five of the seven in a hand-written list — `auth`, `write`,
+ * `scripting`, `cmdb`, `atf` — so `nowAssist` and `fluent` were measured, stored, and never shown:
+ * an instance whose Now Assist probe returned `not licensed` listed as a row of `ok`s. The fixture
+ * in `instance-manage.test.ts` had carried `nowAssist: 'not licensed'` and `fluent: 'not installed'`
+ * since the test was written, and nothing asserted on them because nothing printed them.
+ *
+ * PRESENT, not merely declared. A record written by an older build has fewer keys, and a cell
+ * reading `now_assist undefined` would be a renderer inventing a result for a probe that never ran.
+ * An absent key is left out; the dash is reserved for a record that does not exist at all.
+ */
 export declare function probeCell(probe: LastProbe | null): string;
+/**
+ * `LAST PROBE (most recent: 2026-09-04T10:12:00Z)` — and `most recent:` is not decoration.
+ *
+ * ARC-07-C6. The header carries ONE time because every row's own would repeat a 20-character
+ * timestamp per line to say what one header says once, and a table nobody can read across is a
+ * table nobody reads. But the time it carries is the newest in the store, so on a store with two
+ * instances probed a week apart the bare `LAST PROBE (<at>)` read as a claim about both rows — and
+ * the row it was wrong about was the stale one, which is the row a reader is looking for.
+ *
+ * Two instances, one aggregate: say which.
+ */
+export declare function probeColumnHeader(instances: readonly MaskedInstance[]): string;
+/** The cell for an instance nothing has probed. Spelled once — the footnote explains this glyph. */
+export declare const NEVER_PROBED = "\u2014";
+/**
+ * What the column means, printed under the table only when a row actually shows the dash.
+ *
+ * The header says WHEN — `LAST PROBE (2026-09-04T10:12:00Z)` — and a reader who sees `—` in a cell
+ * has no way to tell "never probed" from "probed, nothing to report". It is the second of those
+ * that would be alarming, and it is never what the dash means.
+ *
+ * Conditional on purpose: a table where every instance has been probed gets no footnote, because a
+ * sentence explaining a glyph that is not on the screen is a line a reader has to rule out.
+ */
+export declare const neverProbedNote: (instances: readonly MaskedInstance[]) => string | null;
 /**
  * The table. Columns are as wide as their widest cell, never wider.
  *

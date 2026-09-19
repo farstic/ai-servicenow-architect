@@ -31,6 +31,31 @@ export interface LastProbe {
     nowAssist: ProbeStatus;
     fluent: ProbeStatus;
 }
+/**
+ * ARC-07-C6 — THE ORDER AND THE NAMES OF A PROBE RECORD, once, for every renderer.
+ *
+ * There were two. `probeSummary` (the wizard's Saved line) printed seven fields in the flag order,
+ * spelled as the flags are — `auth · write · cmdb_write · scripting · atf · now_assist · fluent`.
+ * `probeCell` (the `instance list` table) printed FIVE in a different order with different names —
+ * `auth · write · scripting · cmdb · atf` — and silently dropped `nowAssist` and `fluent`. So an
+ * instance whose Now Assist probe came back `not licensed` listed as a row of `ok`s, and the two
+ * surfaces disagreed about both the vocabulary and the number of facts a probe has.
+ *
+ * DERIVED FROM `FLAG_NAMES`, not spelled again: a seventh capability added to the flags appears in
+ * both renderers or in neither, and cannot appear under two names. `auth` leads because it is not a
+ * capability — it is the question the other six presuppose, and a reader scanning a row wants the
+ * answer to "did it log in" before the answer to "may it write".
+ */
+export declare const PROBE_FIELD_OF: Readonly<Record<FlagName, keyof Omit<LastProbe, 'at' | 'auth'>>>;
+export interface ProbeField {
+    /** How it is written for a reader: the flag's own name, lower-cased. `auth` is its own. */
+    label: string;
+    /** The key in the stored record. */
+    key: keyof Omit<LastProbe, 'at'>;
+    /** The flag that turns the capability on — `null` for `auth`, which no flag gates. */
+    flag: FlagName | null;
+}
+export declare const PROBE_FIELDS: readonly ProbeField[];
 /** What a probe needs of a client. `ServiceNowClient` satisfies it; a fake can too. */
 export interface ProbeClient {
     queryRecords(params: {

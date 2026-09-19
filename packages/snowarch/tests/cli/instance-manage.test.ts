@@ -6,9 +6,10 @@ import { join } from 'node:path';
 import {
   EXIT_FAILED, EXIT_OK, EXIT_POLICY, MISMATCH, WAS_DEFAULT, credentialsUpdated, defaultChanged,
   labelNotFound, mirrorDefault, parseFlagPairs, prodRaiseWarning, removeQuestion, runList,
-  runRemove, runSetCredentials, runSetDefault, runSetFlags, runSetPreset, runTest, type AddIo,
-  type ManageDeps,
+  runRemove, runSetCredentials, runSetDefault, runSetFlags, runSetPreset, runTest, probeSummary,
+  type AddIo, type ManageDeps,
 } from '../../src/cli/instance.js';
+import { expandPreset } from '../../src/utils/permissions.js';
 import { EXIT_USAGE } from '../../src/cli/tty.js';
 import { instanceHelp, parseManageArgs } from '../../src/cli/instance-command.js';
 import { NO_INSTANCES, listJson, listTable, secretNote } from '../../src/cli/format.js';
@@ -587,5 +588,105 @@ describe('the sweep', () => {
     for (const secret of [PASSWORD, NEW_PASSWORD, CLIENT_SECRET]) {
       expect(all.includes(secret), `a command printed a ${secret.length}-character secret`).toBe(false);
     }
+  });
+});
+
+/**
+ * ARC-07-C6 — the LAST PROBE column showed five of the seven facts it had.
+ *
+ * `probeCell` named them in a hand-written list — `auth`, `write`, `scripting`, `cmdb`, `atf` — so
+ * `nowAssist` and `fluent` were probed, stored and never printed. An instance whose Now Assist
+ * probe returned `not licensed` listed as a row of `ok`s.
+ *
+ * THE EVIDENCE WAS ALREADY IN THIS FILE. `AC 1 — list` above has built its fixture with
+ * `nowAssist: 'not licensed'` and `fluent: 'not installed'` since it was written, and asserted on
+ * neither, because nothing printed them. Two renderers of one record also disagreed about the
+ * vocabulary: the wizard's Saved line says `cmdb_write` and `now_assist` (the flags' own names)
+ * where the table said `cmdb` and nothing.
+ */
+describe('ARC-07-C6 — the probe column shows every fact the record holds', () => {
+  const FULL = { at: '2026-09-04T10:12:00Z', auth: 'ok', write: 'ok', scripting: 'ok', cmdb: 'ok',
+    atf: 'ok', nowAssist: 'not licensed', fluent: 'not installed' } as const;
+
+  it('prints all seven, in the wizard\'s order and with the wizard\'s names', () => {
+    const ws = workspace({ pdi: entry({ lastProbe: { ...FULL } }) });
+    try {
+      const table = listTable(listJson(ws.store, read(ws)));
+      const cell = table.split('\n')[1]?.split('  ').at(-1);
+      expect(cell).toBe('auth ok · write ok · cmdb_write ok · scripting ok · atf ok'
+        + ' · now_assist not licensed · fluent not installed');
+
+      // The two that were dropped are the two a reader most needs: a capability that is OFF is the
+      // reason a tool will refuse, and refusing is what sends them to this table.
+      expect(cell).toContain('now_assist not licensed');
+      expect(cell).toContain('fluent not installed');
+    } finally { ws.cleanup(); }
+  });
+
+  it('is the same order and the same names as the wizard\'s Saved line', () => {
+    // ONE DEFINITION, TWO READERS. Asserted against `probeSummary` rather than against a second
+    // literal, so a seventh capability added to `FLAG_NAMES` cannot reach one surface and not the
+    // other, and cannot arrive under two spellings.
+    const ws = workspace({ pdi: entry({ lastProbe: { ...FULL } }) });
+    try {
+      const cell = listTable(listJson(ws.store, read(ws))).split('\n')[1]?.split('  ').at(-1);
+      const saved = probeSummary({ ...FULL }, expandPreset('full'), false);
+      expect(saved).toBe(`Probes: ${cell}.`);
+    } finally { ws.cleanup(); }
+  });
+
+  it('leaves out a key the record does not carry, rather than inventing a result', () => {
+    // A record written by an older build has fewer keys. `now_assist undefined` would be a renderer
+    // reporting a probe that never ran — the defect this row is about, facing the other way.
+    const ws = workspace({ pdi: entry({ lastProbe: { at: FULL.at, auth: 'ok', write: 'ok',
+      scripting: 'ok', cmdb: 'ok', atf: 'ok' } }) });
+    try {
+      const cell = listTable(listJson(ws.store, read(ws))).split('\n')[1]?.split('  ').at(-1);
+      expect(cell).toBe('auth ok · write ok · cmdb_write ok · scripting ok · atf ok');
+      expect(cell).not.toContain('undefined');
+      expect(cell).not.toContain('—');
+    } finally { ws.cleanup(); }
+  });
+
+  it('explains the dash, and only when a dash is on the screen', () => {
+    const both = workspace({
+      pdi: entry({ lastProbe: { ...FULL } }),
+      uat: entry({ environment: 'test' }),
+    });
+    try {
+      const table = listTable(listJson(both.store, read(both)));
+      expect(table).toContain('— = never probed. ./snowarch instance test <label> probes one;'
+        + ' --all probes every one.');
+      // The dash means never probed — never "probed, nothing to report", which is the reading a
+      // reader would otherwise have to guess at and the only one that would be alarming.
+      expect(table.split('\n')[2]).toMatch(/ {2}—$/);
+    } finally { both.cleanup(); }
+
+    const probed = workspace({ pdi: entry({ lastProbe: { ...FULL } }) });
+    try {
+      // A sentence explaining a glyph that is not on the screen is a line a reader has to rule out.
+      expect(listTable(listJson(probed.store, read(probed)))).not.toContain('never probed');
+    } finally { probed.cleanup(); }
+  });
+
+  it('the header says the time is the most recent, not every row\'s', () => {
+    // Two instances probed a week apart: the header carries ONE time, and the row it was silently
+    // wrong about was the stale one — which is the row a reader opens this table to find.
+    const ws = workspace({
+      pdi: entry({ lastProbe: { ...FULL, at: '2026-09-04T10:12:00Z' } }),
+      uat: entry({ environment: 'test', lastProbe: { ...FULL, at: '2026-08-28T09:00:00Z' } }),
+    });
+    try {
+      const header = listTable(listJson(ws.store, read(ws))).split('\n')[0];
+      expect(header).toContain('LAST PROBE (most recent: 2026-09-04T10:12:00Z)');
+      expect(header).not.toContain('2026-08-28');
+    } finally { ws.cleanup(); }
+
+    // Nothing probed at all: no time to qualify, so no parenthesis.
+    const none = workspace({ pdi: entry() });
+    try {
+      expect(listTable(listJson(none.store, read(none))).split('\n')[0])
+        .toMatch(/LAST PROBE$/);
+    } finally { none.cleanup(); }
   });
 });
