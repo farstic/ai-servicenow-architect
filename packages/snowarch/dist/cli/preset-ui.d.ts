@@ -40,6 +40,28 @@ export declare const prodRefusal: (label: string) => string;
  * `ok` is one word; everything else says what was found AND what it would mean to leave the flag
  * on — a recommendation the user is free to ignore, which is the whole shape of this screen.
  */
+/**
+ * The statuses on which the review screen recommends turning a flag OFF — ARC-07-C4.
+ *
+ * ONE definition, two readers. `annotate` below renders "(recommend: off)" for exactly these, and
+ * the non-interactive path applies exactly these; a test walks every `ProbeStatus` and asserts the
+ * two agree, because a recommendation shown on one path and not applied on the other is how
+ * `FLUENT=on` and `fluent not installed` came to print in the same Saved line.
+ *
+ * `skipped` and `undefined` are NOT here on purpose: a probe that did not run is not a probe that
+ * failed, and turning a flag off because nobody looked would be the check-cannot-tell-absence-from-
+ * failure defect wearing the other hat.
+ */
+export declare const probeRecommendsOff: (status: ProbeStatus | undefined) => boolean;
+/**
+ * The same finding, phrased for a line nobody can answer — ARC-07-C4.
+ *
+ * `annotate` asks "keep on?", which is right on a screen and wrong on the one line a `--yes` run
+ * prints: there is nobody to ask. This states the consequence instead, and returns `null` for
+ * exactly the statuses `probeRecommendsOff` rejects, so the two cannot drift — a test walks every
+ * status and requires them to agree.
+ */
+export declare function probeNote(status: ProbeStatus | undefined): string | null;
 export declare function annotate(status: ProbeStatus | undefined, hint?: string): string;
 /** The `LastProbe` field that carries a flag's result. One mapping, used by the screen and S05. */
 export declare const PROBE_FIELD: Readonly<Record<FlagName, keyof Omit<LastProbe, 'at' | 'auth'>>>;
@@ -83,7 +105,7 @@ export declare function wrapRow(prefix: string, note: string, columns?: number):
 /** The screen, byte for byte. The snapshot files in `docs/snippets/` are this function's output. */
 export declare function renderReviewScreen(input: ScreenInput): string;
 /** `Applying: preset custom — WRITE=on CMDB_WRITE=on …` — printed before anything is saved. */
-export declare function applyingLine(preset: PresetName, flags: Flags): string;
+export declare function applyingLine(preset: PresetName, flags: Flags, because?: Partial<Record<FlagName, string>>): string;
 export interface FlagsParse {
     ok: boolean;
     flags?: Flags;

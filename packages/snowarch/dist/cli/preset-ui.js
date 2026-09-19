@@ -53,6 +53,39 @@ export const prodRefusal = (label) => `PROD_WRITE_NOT_ACKNOWLEDGED — "${label}
  * `ok` is one word; everything else says what was found AND what it would mean to leave the flag
  * on — a recommendation the user is free to ignore, which is the whole shape of this screen.
  */
+/**
+ * The statuses on which the review screen recommends turning a flag OFF — ARC-07-C4.
+ *
+ * ONE definition, two readers. `annotate` below renders "(recommend: off)" for exactly these, and
+ * the non-interactive path applies exactly these; a test walks every `ProbeStatus` and asserts the
+ * two agree, because a recommendation shown on one path and not applied on the other is how
+ * `FLUENT=on` and `fluent not installed` came to print in the same Saved line.
+ *
+ * `skipped` and `undefined` are NOT here on purpose: a probe that did not run is not a probe that
+ * failed, and turning a flag off because nobody looked would be the check-cannot-tell-absence-from-
+ * failure defect wearing the other hat.
+ */
+export const probeRecommendsOff = (status) => status === 'role missing' || status === 'not licensed' || status === 'not installed';
+/**
+ * The same finding, phrased for a line nobody can answer — ARC-07-C4.
+ *
+ * `annotate` asks "keep on?", which is right on a screen and wrong on the one line a `--yes` run
+ * prints: there is nobody to ask. This states the consequence instead, and returns `null` for
+ * exactly the statuses `probeRecommendsOff` rejects, so the two cannot drift — a test walks every
+ * status and requires them to agree.
+ */
+export function probeNote(status) {
+    if (!probeRecommendsOff(status))
+        return null;
+    switch (status) {
+        case 'role missing':
+            return 'probe: role missing — those tools will fail until the account has the role';
+        case 'not licensed':
+            return 'probe: no Now Assist licence detected — those tools will fail until licensed';
+        default:
+            return 'probe: not installed — tools will fail until @servicenow/sdk is on PATH';
+    }
+}
 export function annotate(status, hint) {
     switch (status) {
         case 'ok': return 'probe: ok';
@@ -149,8 +182,15 @@ export function renderReviewScreen(input) {
     return lines.join('\n');
 }
 /** `Applying: preset custom — WRITE=on CMDB_WRITE=on …` — printed before anything is saved. */
-export function applyingLine(preset, flags) {
-    const pairs = FLAG_NAMES.map((f) => `${labelOf(f)}=${flags[f] === 'true' ? 'on' : 'off'}`);
+export function applyingLine(preset, flags, because = {}) {
+    // ARC-07-C4 — a flag the PROBE turned off says so, inline. The non-interactive path has no
+    // review screen to explain itself on, so the one line it does print has to carry the reason or
+    // the user is silently overruled.
+    const pairs = FLAG_NAMES.map((f) => {
+        const state = flags[f] === 'true' ? 'on' : 'off';
+        const why = because[f];
+        return why ? `${labelOf(f)}=${state} (${why})` : `${labelOf(f)}=${state}`;
+    });
     return `Applying: preset ${preset} — ${pairs.join(' ')}`;
 }
 /**
@@ -348,7 +388,26 @@ export async function resolveFlags(input) {
         flags = expandPreset('read-only');
     }
     if (yes || !io) {
-        return { ok: true, preset, flags, applying: applyingLine(preset, flags) };
+        // ARC-07-C4 — D-05 APPLIED TO THE PATH THAT WAS NOT APPLYING IT.
+        //
+        // `instance add … --yes` printed `Applying: … FLUENT=on` in the same run whose probe said
+        // `fluent not installed`, and the Saved line then carried both. The probes were computed and
+        // handed ONLY to the review screen, so the path with nobody to ask showed nothing at all.
+        //
+        // The toggle is NOT touched, and that is the owner's ruling rather than a preference:
+        // ADR-0005 says "a failing probe changes only the recommendation text on that line, never the
+        // toggle". What was missing here is the recommendation text — every flag is supposed to be
+        // "annotated with its live probe result", and this path annotated none of them. So the line
+        // now explains itself and still saves exactly what was asked for.
+        const because = {};
+        for (const flag of FLAG_NAMES) {
+            if (flags[flag] !== 'true')
+                continue;
+            const note = probeNote(input.probes?.[PROBE_FIELD[flag]]);
+            if (note)
+                because[flag] = note;
+        }
+        return { ok: true, preset, flags, applying: applyingLine(preset, flags, because) };
     }
     const reviewed = await runReviewScreen({
         label, environment, preset, flags,
