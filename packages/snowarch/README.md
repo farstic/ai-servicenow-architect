@@ -350,7 +350,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 |---|---|
 | `ATF_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `ATTACHMENT_UPLOAD_FAILED` | check the file size and that the target record exists |
-| `AUTHENTICATION_FAILED` | If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed |
+| `AUTHENTICATION_FAILED` | If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed — and then call snow_core_instances_reload before you retry, because this server still holds the credentials it read at startup and a retry without it is a second failed login |
 | `BATCH_FAILED` | the message lists which |
 | `CMDB_WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `CONNECTION_REFUSED` | `<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too |
