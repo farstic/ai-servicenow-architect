@@ -218,10 +218,30 @@ export const savedLine = (label: string, entry: MaskedEntry, isDefault: boolean)
   `Saved instance "${label}" (${entry.environment} · ${entry.auth.method} · preset ${entry.preset}`
   + `${isDefault ? ' · default' : ''}).`;
 
+/**
+ * `Store: ~/checkout/.local/instances.json (mode 0600, dir 0700)`
+ *
+ * ARC-08-C23 — MASKED, like every other path this CLI prints. It was the one that was not:
+ * `precedenceNote` in `format.ts` sends its two store paths through `maskPath`, `listJson` masks
+ * the store it reports, the audit writer masks the file it could not open — and this line, the one
+ * in the block a user pastes when an install goes wrong, printed the absolute path with the
+ * account name in it. One surface, two redaction levels, and the leakier one was on the line most
+ * likely to be quoted.
+ */
 export const storeLine = (path: string, platform: NodeJS.Platform = process.platform): string =>
   (platform === 'win32'
-    ? `Store: ${path} (file modes: ACL-inherited (Windows))`
-    : `Store: ${path} (mode 0600, dir 0700)`);
+    ? `Store: ${maskPath(path)} (file modes: ACL-inherited (Windows))`
+    : `Store: ${maskPath(path)} (mode 0600, dir 0700)`);
+
+/**
+ * Why `[3/6]` did not ask. Named from what was actually observed, never a default sentence.
+ *
+ * `--auth` and `--yes` are two different reasons a question goes unasked, and a reader deciding
+ * whether the answer is theirs needs to know which: one is what they typed, the other is what the
+ * flag chose for them.
+ */
+export const skipReason = (options: { auth?: string; yes?: boolean }): string =>
+  (options.auth !== undefined ? 'from --auth' : 'default; --yes asked nothing');
 
 /** Parse and validate; every refusal here is exit 2 and happens before anything is asked. */
 export function parseAddArgs(argv: readonly string[]):
@@ -468,6 +488,14 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     }
     const answer = ((await io.ask('> ')) ?? '').trim();
     method = answer === '2' ? 'oauth_ropc' : 'basic';
+  } else {
+    // ARC-08-C23 — A SKIPPED STEP SAYS SO. `[3/6]` printed nothing when the question was already
+    // answered, so a run went `[2/6] … [4/6]` and the reader was left to work out whether a step
+    // had failed, been dropped, or scrolled past. It is six numbered steps: the numbering is a
+    // promise that all six are accounted for, and a silent gap breaks it in the direction that
+    // worries people. The line names the ANSWER and where it came from, because "skipped" alone
+    // would tell a reader that something did not happen without telling them what was used.
+    io.write(`[3/6] Authentication … ${method} (${skipReason(options)})\n`);
   }
 
   let attempt = 1;

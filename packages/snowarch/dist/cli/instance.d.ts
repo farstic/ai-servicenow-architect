@@ -129,7 +129,28 @@ export declare function maskEntry(entry: StoreInstance): MaskedEntry;
  */
 export declare function probeSummary(probe: LastProbe | null, flags: Flags, noProbes: boolean): string;
 export declare const savedLine: (label: string, entry: MaskedEntry, isDefault: boolean) => string;
+/**
+ * `Store: ~/checkout/.local/instances.json (mode 0600, dir 0700)`
+ *
+ * ARC-08-C23 — MASKED, like every other path this CLI prints. It was the one that was not:
+ * `precedenceNote` in `format.ts` sends its two store paths through `maskPath`, `listJson` masks
+ * the store it reports, the audit writer masks the file it could not open — and this line, the one
+ * in the block a user pastes when an install goes wrong, printed the absolute path with the
+ * account name in it. One surface, two redaction levels, and the leakier one was on the line most
+ * likely to be quoted.
+ */
 export declare const storeLine: (path: string, platform?: NodeJS.Platform) => string;
+/**
+ * Why `[3/6]` did not ask. Named from what was actually observed, never a default sentence.
+ *
+ * `--auth` and `--yes` are two different reasons a question goes unasked, and a reader deciding
+ * whether the answer is theirs needs to know which: one is what they typed, the other is what the
+ * flag chose for them.
+ */
+export declare const skipReason: (options: {
+    auth?: string;
+    yes?: boolean;
+}) => string;
 /** Parse and validate; every refusal here is exit 2 and happens before anything is asked. */
 export declare function parseAddArgs(argv: readonly string[]): {
     ok: true;

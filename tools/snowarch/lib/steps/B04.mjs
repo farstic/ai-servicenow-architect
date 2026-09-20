@@ -110,6 +110,27 @@ export function resolutionCheck(root, { requireFrom = createRequire } = {}) {
   return { deps, missing };
 }
 
+/**
+ * `, ~68 MB` — the size this checkout measured LAST time, or nothing at all.
+ *
+ * ARC-08-C23 — the line said `~72 MB`, hand-typed, and it was wrong twice over: it is the `du`
+ * figure from ARC-01-S05 while the step itself reports summed content two screens later (the two
+ * differ by 15 MB on the same tree, which is why the footprint gate names the metric it uses), and
+ * a number typed into a step cannot follow a dependency being added or dropped.
+ *
+ * So the hint is a MEASUREMENT or it is absent. B04 already records `sizeBytes` in the state after
+ * every successful install, so the second install onwards quotes what this machine actually wrote;
+ * the first install says nothing, because there is nothing to say and a made-up magnitude is worse
+ * than none — a user watching a download is trying to decide whether to wait, and a wrong number
+ * is what makes them stop waiting at the wrong moment.
+ */
+export function installSizeHint(state, { round = Math.round } = {}) {
+  const bytes = state?.steps?.B04?.data?.sizeBytes;
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes <= 0) return '';
+  return `, ~${round(bytes / (1024 * 1024))} MB last time`;
+}
+
+
 export const run = async (ctx) => {
   const npm = npmCommand({ env: ctx.env, plat: ctx.plat ?? process.platform });
   if (!npm) {
@@ -124,7 +145,7 @@ export const run = async (ctx) => {
     } catch { return null; }
   })();
 
-  ctx.line?.('[B04/09] deps … installing (npm ci, ~72 MB)');
+  ctx.line?.(`[B04/09] deps … installing (npm ci${installSizeHint(ctx.state)})`);
   const started = Date.now();
   let log = '';
   try {
