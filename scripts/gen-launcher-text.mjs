@@ -111,6 +111,21 @@ export const NAMES = Object.freeze(
   region({ shell: 'bash' }).split('\n').slice(1, -1).map((line) => line.split('=')[0]));
 
 let stale = [];
+/**
+ * Run only when this file IS the command — ARC-08-C25.
+ *
+ * `tests/launcher-parity.test.mjs` imports this module for `TARGETS`, `BEGIN` and `END`, and the
+ * import RAN the generator: on a clean tree it printed `no change to 2 launcher(s)`, and on a dirty
+ * one it would have WRITTEN `bootstrap.sh` and `bootstrap.ps1` as a side effect of a test reading
+ * three constants. Found by `tests/scripts-are-importable.test.mjs` on its first run — an
+ * instrument written because I had made this mistake three times in three rows, which then found a
+ * fourth instance that was not mine.
+ */
+const INVOKED_DIRECTLY = process.argv[1]
+  && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+if (INVOKED_DIRECTLY) main();
+
+function main() {
 let checked = 0;
 for (const target of TARGETS) {
   const path = join(root, target.path);
@@ -165,3 +180,4 @@ if (check) {
 writeSync(1, stale.length > 0
   ? `gen-launcher-text: wrote ${stale.join(', ')}\n`
   : `gen-launcher-text: no change to ${checked} launcher(s)\n`);
+}

@@ -1031,3 +1031,68 @@ test('ARC-09-C48 control — the predicate fails by NAME in both directions', ()
   // against some other job's files.
   assert.equal(testFilesInJob(wf('ci.yml'), 'a step that does not exist'), null);
 });
+
+/**
+ * ARC-08-C25 — the doctor artifact and the product's `--json` are held to ONE shape.
+ *
+ * The `doctor-<label>` bundle carried three files with three shapes and nothing checked any of
+ * them, so a reviewer pulling one to read a quick run's `durationMs` got `doctor-normalised.json` —
+ * which `doctor-snapshot.mjs` strips of the clock and the counts on purpose — and reasonably
+ * concluded the artifact was a legacy shape that could not answer the question.
+ *
+ * The bundle was right and unlabelled. The report that WOULD have answered it, `doctor-quick.json`,
+ * was written by the job and never uploaded at all: the one number ARC-08-C19's budget question
+ * turned on existed for the length of a step and was thrown away.
+ */
+test('ARC-08-C25 — every report the job uploads is validated, by the product\'s own validator', () => {
+  const ci = wf('ci.yml');
+
+  // The quick report reaches the artifact. It is the one a timing question needs, and it was the
+  // one missing.
+  const upload = /name: doctor-\$\{\{ matrix\.label \}\}[\s\S]*?retention-days/.exec(ci);
+  assert.ok(upload, 'the doctor artifact step is gone');
+  for (const file of ['doctor.json', 'doctor-quick.json', 'doctor-ps.json',
+    'doctor-normalised.json']) {
+    assert.ok(upload[0].includes(file), `${file} is not uploaded`);
+  }
+
+  // …and every one of them that CLAIMS to be a report is validated before it is uploaded.
+  const validate = /node scripts\/ci\/validate-report\.mjs[\s\S]*?\n\n/.exec(ci);
+  assert.ok(validate, 'the reports are uploaded without being validated');
+  for (const file of ['doctor.json', 'doctor-quick.json', 'doctor-ps.json']) {
+    assert.ok(validate[0].includes(file), `${file} is uploaded but never validated`);
+  }
+
+  // Runs on a red job too: a report validated only when the job was green is a report you cannot
+  // trust on the run you actually needed it for.
+  const step = /- name: The uploaded reports are schema-v1[\s\S]*?run: >/.exec(ci);
+  assert.ok(step, 'the validation step is gone');
+  assert.match(step[0], /if: always\(\)/);
+});
+
+test('ARC-08-C25 — the validator is the product\'s, and the exemption is by name', async () => {
+  // ONE SHAPE, NOT TWO. The point of the row is that the artifact cannot drift from the product,
+  // and it cannot because the CI script imports `validateReport` rather than describing the schema
+  // a second time. A test that only checked the workflow text would not see a second copy.
+  const mod = await import('../scripts/ci/validate-report.mjs');
+  const src = readFileSync(join(root, 'scripts/ci/validate-report.mjs'), 'utf8');
+  assert.match(src, /import \{ validateReport \} from '\.\.\/\.\.\/tools\/snowarch\/lib\/doctor\/report-json\.mjs'/,
+    'the CI validator describes the schema itself instead of importing the product\'s');
+
+  // The stripped snapshot is exempt BY NAME, with the reason beside it — an allow-list rather than
+  // a pattern, so the next file added to the bundle has to say which of the two it is.
+  assert.deepEqual([...mod.NOT_A_REPORT.keys()], ['doctor-normalised.json']);
+  assert.match(mod.NOT_A_REPORT.get('doctor-normalised.json'), /comparison key, not a report/);
+  assert.deepEqual(mod.problemsFor('x/doctor-normalised.json', '{"anything":true}'), [],
+    'the normalised snapshot is being held to a schema it never claimed');
+
+  // A report missing the number the artifact exists to answer is refused, and says which.
+  const { ranAt: _gone, ...noClock } = JSON.parse(
+    readFileSync(join(root, 'tests/fixtures/doctor/status-design.json'), 'utf8'));
+  const problems = mod.problemsFor('doctor.json', JSON.stringify(noClock));
+  assert.ok(problems.some((p) => /ranAt is missing/.test(p)), problems.join('\n'));
+
+  // …and a real, current report passes, which is the half that proves the rule is satisfiable.
+  assert.deepEqual(mod.problemsFor('doctor.json',
+    readFileSync(join(root, 'tests/fixtures/doctor/status-design.json'), 'utf8')), []);
+});
