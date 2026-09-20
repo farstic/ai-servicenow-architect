@@ -262,7 +262,20 @@ function assertNoHostValues(report, mode) {
   }
 }
 
-export async function capture(mode) {
+/**
+ * `{ pin: false }` returns the report as the doctor produced it, before the table above touches it.
+ *
+ * ARC-08-C20 — the pinning made an assertion that could not fail. The three-layout test checked the
+ * captured text for `/private~` and for surviving `var/folders` paths, and once `toplevel` and
+ * `data.root` were pinned those strings were gone from the PINNED bytes whether the masker worked
+ * or not: reverting the masker failed one test where it had failed three, and the two assertions
+ * naming the bug ran on a value that no longer carried it. A check that cannot fail, presented as
+ * the thing holding the line — the defect this programme keeps finding, this time in my own test.
+ *
+ * So the byte-identity and committed-file comparisons take the PINNED report, which is what is
+ * committed; the masker assertions take the RAW one, which is where a leak would actually be.
+ */
+export async function capture(mode, { pin = true } = {}) {
   const root = checkout(mode);
   try {
     const chunks = [];
@@ -279,7 +292,11 @@ export async function capture(mode) {
     });
     const text = chunks.join('');
     if (!text.trimStart().startsWith('{')) die(`${mode}: status did not print a report (exit ${code})\n${text}`);
-    const pinned = pinMachine(JSON.parse(text));
+    const report = JSON.parse(text);
+    // The raw report legitimately carries this machine's values — that is what it is for — so the
+    // host-value guard applies only to what would be written.
+    if (!pin) return report;
+    const pinned = pinMachine(report);
     assertNoHostValues(pinned, mode);
     return pinned;
   } finally {

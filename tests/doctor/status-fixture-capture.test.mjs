@@ -179,8 +179,11 @@ test('the capture is byte-identical under three TMPDIR layouts, including one un
     // deliberately a test about the CAPTURE rather than about the masker: the masker's own unit
     // assertions can pass while the bytes that get committed still differ.
     //
-    // `toplevel` is NOT on the pin list, and that is the choice this test defends: pinning it would
-    // keep the fixture green if the masker broke again, and the value being `~` IS the assertion.
+    // `toplevel` IS pinned — on Windows the temp directory lives under HOME, so it arrives
+    // home-relative and per-run, and three Windows cells failed on it. The masker is held instead
+    // by `json-boundary`'s C1 and by the RAW-capture assertions at the bottom of this test: the
+    // pinned bytes cannot carry a masking bug, so looking for one in them would be a check that
+    // cannot fail.
     const plain = tempDir('snowarch-tmp-plain-', t);
     const linked = join(tempDir('snowarch-tmp-real-', t), 'through-a-link');
     mkdirSync(join(linked, '..', 'target'), { recursive: true });
@@ -211,9 +214,35 @@ test('the capture is byte-identical under three TMPDIR layouts, including one un
     // And the committed file agrees with both, which is the half that would otherwise be assumed.
     assert.deepEqual(captures[0], committed('live'));
 
-    // The shape the bug produced, named so a reader recognises it if it returns.
-    const text = JSON.stringify(captures[0]);
-    assert.equal(text.includes('/private~'), false, 'the unresolved-prefix bug is back');
-    assert.equal(/"[^"]*\/(?:private\/)?var\/folders/.test(text), false,
-      'a temp path survived into the fixture');
+    // THE MASKER, CHECKED ON THE RAW CAPTURE — before the pin table can hide the evidence.
+    //
+    // These four assertions name the three defects this row found, and each one is checked where
+    // the value would actually carry it: the pinned report has `toplevel` and `data.root` replaced
+    // outright, so a masking bug is invisible in it by construction.
+    const raw = [];
+    try {
+      for (const dir of [plain, linked, underHome]) {
+        process.env.TMPDIR = dir;
+        raw.push(JSON.stringify(await capture('live', { pin: false })));
+      }
+    } finally {
+      if (before === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = before;
+    }
+
+    for (const [n, text] of raw.entries()) {
+      const where = `layout #${n + 1}`;
+      // (b) the unresolved prefix left in front of the mask: `/var/…` replaced inside
+      // `/private/var/…`.
+      assert.equal(text.includes('/private~'), false, `${where}: the unresolved-prefix bug is back`);
+      // …and no temp path survived under either spelling.
+      assert.equal(/"[^"]*\/(?:private\/)?var\/folders/.test(text), false,
+        `${where}: a temp path survived the masker`);
+      // (c2) the Windows shape: a home-relative remainder after the mask. `~/` followed by
+      // anything is the signature — on Windows it was `~/AppData/Local/Temp/snowarch-doctor-…`.
+      assert.equal(/"~[\\/][^"]*(?:AppData|Temp|snowarch-doctor)/.test(text), false,
+        `${where}: a home-relative path survived the masker`);
+      // …and no backslash spelling of the capture root escaped either.
+      assert.equal(/"[^"]*\\\\(?:Users|AppData)\\\\/.test(text), false,
+        `${where}: a backslash-spelled home path survived the masker`);
+    }
   });
