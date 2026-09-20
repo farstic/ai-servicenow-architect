@@ -166,3 +166,41 @@ test('nothing that needs node_modules is imported at load time', () => {
   assert.equal([...codes.matchAll(/^import\s/gm)].length, 0,
     'the error registry gained an import — probe-auth loads it before B04 has run');
 });
+
+/**
+ * ARC-08-C23 (d) — the size in the line B04 prints, which is where the defect was.
+ *
+ * The step announced `installing (npm ci, ~72 MB)` with the number hand-typed: ARC-01-S05's `du`
+ * figure, while the step reports summed content two screens later — 15 MB apart on the same tree.
+ *
+ * HERE, AND DRIVING THE STEP, because the first version of this test asserted `installSizeHint()`
+ * alone. Restoring the literal in the printed line left it green: the helper proved, the line
+ * unproved — the same reader-vs-writer split I had just fixed for two other items in the same
+ * change, left standing on the third. A hand-typed literal ON THAT LINE is the entire defect, so a
+ * test that never reads the line cannot fail on it.
+ */
+test('ARC-08-C23 — B04 announces a size it measured, or no size at all', async () => {
+  const root = makeCheckout();
+  const printed = [];
+  const ctx = (state) => ctxFor(root, {
+    state,
+    line: (text) => printed.push(text),
+    // The install itself is not the subject: the line is printed before it, and a real `npm ci`
+    // in a unit test would be minutes of network for one string.
+    runNpm: () => '',
+  });
+
+  // A second install: the state carries what the first one measured, and the line quotes it.
+  printed.length = 0;
+  await runB04(ctx({ steps: { B04: { data: { sizeBytes: 71_000_000 } } } }));
+  const announced = printed.find((l) => l.startsWith('[B04/09]'));
+  assert.equal(announced, '[B04/09] deps … installing (npm ci, ~68 MB last time)');
+
+  // A first install has nothing to quote, and says nothing rather than inventing a magnitude.
+  printed.length = 0;
+  await runB04(ctx({ steps: {} }));
+  const first = printed.find((l) => l.startsWith('[B04/09]'));
+  assert.equal(first, '[B04/09] deps … installing (npm ci)');
+  // Stated as the property rather than as the string: no number-then-MB anywhere on the line.
+  assert.equal(/\d+\s*MB/.test(first), false, `a size reached the line: ${first}`);
+});

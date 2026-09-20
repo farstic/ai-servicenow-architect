@@ -78,10 +78,29 @@ test('the review screen describes the preset it is proposing, not the environmen
     'Proposed preset for "pdi" (pdi): full  — non-production: everything on');
 });
 
-test('B04 quotes a size it measured, or none at all', () => {
+/**
+ * WHICH OF THESE FOUR NEEDED A WRITER TEST, and why it is not all of them.
+ *
+ * `storeLine` and `presetNote`/`renderReviewScreen` ARE the line-producers: the defect was inside
+ * the function, so calling it is driving the writer, and reverting either fails the assertion
+ * below. `skipReason` and `installSizeHint` are helpers that a CALL SITE has to use — and in both
+ * cases the defect lived at that call site, as a line that was never printed and a literal that
+ * was printed instead. A helper assertion cannot see either.
+ *
+ * So those two are asserted where their writers live and can be driven:
+ * `[3/6]` in `packages/snowarch/tests/cli/instance.test.ts` (the wizard's harness) and the B04
+ * line in `tools/snowarch/tests/b04-deps.test.mjs` (the step's). The helper assertions here are
+ * kept because the rounding and the refusals are worth pinning on their own — but they are not the
+ * assertion that fails on the defect.
+ */
+test('B04 quotes a size it measured, or none at all — the helper half', () => {
   // The line said `~72 MB`, hand-typed — the `du` figure from ARC-01-S05, while the step itself
   // reports summed content two screens later; the two differ by 15 MB on the same tree, which is
   // why the footprint gate names the metric it uses.
+  //
+  // THE LINE is asserted in `tools/snowarch/tests/b04-deps.test.mjs`. This file's first version
+  // had only the assertions below, and restoring the literal left it green: a test that never
+  // reads the line cannot fail on a literal printed into it.
   assert.equal(installSizeHint({ steps: { B04: { data: { sizeBytes: 71_000_000 } } } }),
     ', ~68 MB last time');
   // A first install has nothing to quote and says nothing. A made-up magnitude is worse than none:
