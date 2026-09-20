@@ -243,6 +243,10 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The doctor's report names the capability packs once.** They were written under two keys from
+  one check, and the report's two renderers each read a different one — so a change to either
+  write site would have made the status panel and the full report disagree about the same answer.
+
 - **A path under your home directory is masked however it is spelled.** On Windows a path can
   arrive with forward slashes — `git` prints them that way, and so does a HOME set from a bash
   shell — and the masker compared only the platform separator, so the account name reached the

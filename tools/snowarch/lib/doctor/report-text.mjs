@@ -155,7 +155,11 @@ export function renderText({ report, checks = [], colour = false }) {
   }
 
   lines.push('');
-  const capabilities = capabilitiesLine(report.prereqs?.capabilities ?? null);
+  // ARC-08-C24 — `engine.capabilities`, the key the `/snowarch status` template names and the
+  // panel reads. This read `prereqs.capabilities`, a second copy of E-04's answer written at a
+  // different site: two renderers of one check reading two keys is a disagreement waiting for
+  // either site to change.
+  const capabilities = capabilitiesLine(report.engine?.capabilities ?? null);
   if (capabilities) lines.push(capabilities);
   lines.push(summaryLine(report.summary));
   if (report.modeLine) lines.push(report.modeLine);

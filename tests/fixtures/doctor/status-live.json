@@ -61,8 +61,7 @@
     },
     "store": {
       "exists": true
-    },
-    "capabilities": null
+    }
   },
   "checks": [
     {
