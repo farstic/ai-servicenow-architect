@@ -17,6 +17,7 @@ import { statSync } from 'node:fs';
 import { promptLine } from './tty.js';
 import { EXIT_OK, EXIT_FAILED, EXIT_USAGE } from './instance.js';
 import { maskPath, resolveStorePath } from '../store/paths.js';
+import { STORE_SUB_COMMANDS, storeSubCommandLines, storeSubCommandList } from './help-tables.js';
 import { CURRENT_SCHEMA_VERSION, listBackups, migrateStore, restoreBackup, } from '../store/migrations/index.js';
 export const defaultStoreIo = () => ({
     write: (text) => { process.stdout.write(text); },
@@ -24,13 +25,13 @@ export const defaultStoreIo = () => ({
     ask: (prompt) => promptLine(prompt, {}),
 });
 export const NOTHING_CHANGED = 'store: nothing changed';
+// ARC-08-C22 — re-exported from the dependency-free table module, where the generator reads them.
+export { STORE_SUB_COMMANDS, storeSubCommandList };
 export function storeHelp() {
     return [
         'usage: snowarch store <command> [options]',
         '',
-        '  migrate [--dry-run] [--yes]   bring the store up to the schema this build reads',
-        '  backups                       the backups beside the store, newest first',
-        '  restore <file> [--yes]        put one of them back',
+        ...storeSubCommandLines(),
         '',
         '  A migration writes a 0600 backup first and never changes a credential value.',
         '  Backups are never pruned automatically — delete them yourself when you no longer want them.',
@@ -187,7 +188,9 @@ export async function runStore(args, io = defaultStoreIo()) {
         case 'backups': return runStoreBackups(io);
         case 'restore': return runStoreRestore(rest, io);
         default:
-            io.error(`store: unknown command "${name}" — migrate, backups or restore\n`);
+            // The list comes from the table, so a sub-command added tomorrow is offered here the day it
+            // exists rather than the day somebody notices.
+            io.error(`store: unknown command "${name}" — ${storeSubCommandList()}\n`);
             return EXIT_USAGE;
     }
 }

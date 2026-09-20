@@ -243,6 +243,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **`./snowarch instance --help` lists every sub-command.** It showed only `add`, so `list`,
+  `test`, `set-credentials`, `set-preset`, `set-flags`, `set-default`, `remove` and `import` were
+  not documented where anyone would look for them. `./snowarch store --help` gets the same
+  treatment, and both are generated from the dispatchers' own tables, so a sub-command added later
+  cannot be missing from the help.
+
 - **The Mode line shows the permissions your instance actually has.** On the quick check a session
   makes, it printed `WRITE=off CMDB_WRITE=off …` for every instance — including one whose store
   says those capabilities are on — because the flags were read from a server that the quick check

@@ -11,12 +11,18 @@
  * of shapes cannot drift the way eight parsers can.
  */
 import { CANCELLED, promptLine, promptSecret } from './tty.js';
+import { instanceSubCommandLines, SUB_COMMANDS, type SubCommand } from './help-tables.js';
 import {
   addHelp, parseAddArgs, runAdd, runList, runRemove, runSetCredentials, runSetDefault,
   runSetFlags, runSetPreset, runTest, EXIT_CODES, EXIT_OK, EXIT_USAGE,
   type AddIo, type ManageOptions,
 } from './instance.js';
 import { runImport } from './import-legacy.js';
+
+// ARC-08-C22 — the table moved to `help-tables.js` (which imports nothing, so the generator can
+// read it without dependencies) and is re-exported here, where its consumers already look for it.
+export { SUB_COMMANDS };
+export type { SubCommand };
 
 /** The real terminal, wired to S01's prompts. Tests pass their own. */
 export const terminalIo = (): AddIo => ({
@@ -31,31 +37,17 @@ export const terminalIo = (): AddIo => ({
 /** The label the prompt proposes. ADR-0005: propose, do not impose — Enter accepts, typing wins. */
 export const DEFAULT_LABEL = 'pdi';
 
-/** How many positional arguments each sub-command takes after its name. */
-const SUB_COMMANDS = {
-  list: { positionals: 0, summary: 'the instances this checkout can reach, and their last probe' },
-  test: { positionals: 1, summary: 're-probe one instance (or --all --json); writes only lastProbe' },
-  'set-credentials': { positionals: 1, summary: 'new username/password; saved only if the instance says ok' },
-  'set-preset': { positionals: 2, summary: 'change the preset (production needs --ack-prod)' },
-  'set-flags': { positionals: -1, summary: 'change individual flags: WRITE=on CMDB_WRITE=off …' },
-  'set-default': { positionals: 1, summary: 'which instance the server starts with' },
-  remove: { positionals: 1, summary: 'delete an instance and its stored credentials' },
-  import: { positionals: 0, summary: 'migrate a snow-mcp 1.x store (--from-legacy), plan first' },
-} as const;
-
-export type SubCommand = keyof typeof SUB_COMMANDS;
 
 /** `instance --help` — every sub-command, then the exit table. ARC-06-S08's B08 reads this. */
 export function instanceHelp(): string {
-  const width = Math.max(...Object.keys(SUB_COMMANDS).map((k) => k.length), 'add <label>'.length);
+  // ARC-08-C22 — the table and the layout come from `help-tables.ts`, which imports nothing, so
+  // `scripts/gen-cli-help.mjs` can read them on a clone with no `node_modules` and carry the same
+  // lines into the frame's own help.
   const lines = [
     'usage: snowarch instance <command> [options]',
     '',
-    `  ${'add <label>'.padEnd(width)}  add an instance (the wizard)`,
+    ...instanceSubCommandLines(),
   ];
-  for (const [name, meta] of Object.entries(SUB_COMMANDS)) {
-    lines.push(`  ${name.padEnd(width)}  ${meta.summary}`);
-  }
   lines.push('', '  --json      machine-readable output (list, test)',
     '  --all       list BOTH stores, with a STORE column (list)',
     '  --global    act on the per-user store instead of this checkout\'s',

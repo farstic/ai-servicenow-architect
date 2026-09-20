@@ -1,3 +1,4 @@
+import { STORE_SUB_COMMANDS, storeSubCommandList, type StoreSubCommand } from './help-tables.js';
 import { type Migration } from '../store/migrations/index.js';
 export interface StoreIo {
     write(text: string): void;
@@ -6,6 +7,8 @@ export interface StoreIo {
 }
 export declare const defaultStoreIo: () => StoreIo;
 export declare const NOTHING_CHANGED = "store: nothing changed";
+export { STORE_SUB_COMMANDS, storeSubCommandList };
+export type { StoreSubCommand };
 export declare function storeHelp(): string;
 /**
  * `chain` is the same seam `migrateStore` exposes, passed through rather than re-invented.

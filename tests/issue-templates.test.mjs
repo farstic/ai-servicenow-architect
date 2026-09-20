@@ -267,6 +267,10 @@ test('AC 2 — exactly three modules open a socket, and the list is complete in 
   const looseStripped = productFiles().filter((rel) => LOOSE.test(stripComments(read(rel))));
   assert.deepEqual(looseStripped, found, 'stripped, the loose scan agrees with the precise one');
   assert.deepEqual(looseRaw.filter((r) => !found.includes(r)).sort(), [
+    // ARC-08-C22 — this one is prose about why it has NO imports: the generator that reads it must
+    // run on a clone with no `node_modules`, and naming the two packages that would break that is
+    // the point of the paragraph. Re-measured, not appended: the precise scan still finds nothing.
+    'packages/snowarch/src/cli/help-tables.ts',
     'packages/snowarch/src/servicenow/net-errors.ts',
     'packages/snowarch/src/servicenow/reachability.ts',
     'tools/snowarch/lib/docs/sync.mjs',
