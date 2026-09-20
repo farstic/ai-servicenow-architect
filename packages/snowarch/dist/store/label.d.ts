@@ -1,3 +1,4 @@
+import { type Flags } from '../utils/permissions.js';
 export interface DefaultLabel {
     label: string;
 }
@@ -39,4 +40,20 @@ export declare function readDefaultSummary(storePath: string): DefaultSummary | 
  * Same discipline as its two siblings: three non-secret fields per entry, named one at a time, and
  * a test pins the key set. A spread of the entry would carry the credential block.
  */
-export declare function readStoreSummaries(storePath: string): DefaultSummary[];
+/**
+ * ARC-08-C21 — a summary that can answer "what is this instance allowed to do".
+ *
+ * `effectiveFlags` is what the SERVER would gate on, computed here with the server's own two
+ * functions rather than a second reading: `expandPreset` turns a named preset into six explicit
+ * strings (and `custom` into the entry's own), `applyDependencyRule` then turns off anything whose
+ * prerequisite is off. Two encodings of that rule disagree the moment a dependency is added, and
+ * `DEPENDENCIES` is already the one definition both the server and the wizard read.
+ *
+ * `null` when the entry names a preset this build does not know — which is a real possibility on a
+ * store written by a newer version. Guessing `read-only` would understate it and `full` would
+ * overstate it; saying nothing is what the caller can render honestly.
+ */
+export interface StoreSummary extends DefaultSummary {
+    effectiveFlags: Flags | null;
+}
+export declare function readStoreSummaries(storePath: string): StoreSummary[];

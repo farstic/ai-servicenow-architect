@@ -12,7 +12,7 @@
   },
   "mode": "live",
   "modeLine": "Mode: live — instance=pdi (pdi) preset=custom — doctor 2026-09-20 14 ok",
-  "modeLineDetailed": "Mode: live — pdi (pdi) · preset custom · WRITE=off CMDB_WRITE=off SCRIPTING=off ATF=off NOW_ASSIST=off FLUENT=off · 397 tools (contract)",
+  "modeLineDetailed": "Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 397 tools (contract)",
   "engine": {
     "version": "2.0.0-dev",
     "tag": null,

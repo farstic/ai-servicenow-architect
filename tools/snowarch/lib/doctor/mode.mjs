@@ -118,13 +118,50 @@ export function modeLine(derived, { summary, at } = {}) {
   });
 }
 
-/** `WRITE=on CMDB_WRITE=off …` — the labels from the contract, never a list typed here. */
-export function flagSummary(contract, flags = {}) {
-  if (!contract) return null;
+/**
+ * `WRITE=on CMDB_WRITE=off …` — the labels from the contract, never a list typed here.
+ *
+ * ARC-08-C21 — `null` FLAGS PRODUCE NO SUMMARY, and that is the whole defect.
+ *
+ * The default was `flags = {}`, so `flags[name] === 'true'` was false for every name and a caller
+ * with nothing to report rendered six `off`s. Since ARC-09-C8 took the server section out of the
+ * quick subset, `modeLineDetailed`'s caller passed exactly that on every quick run — so a live user
+ * read `WRITE=off CMDB_WRITE=off SCRIPTING=off ATF=off NOW_ASSIST=off FLUENT=off` about an instance
+ * whose store says five of the six are on, in the line the SessionStart banner, `./snowarch mode`
+ * and the panel all quote. **A flag nobody read printed as a flag that is off** — absence rendered
+ * as a finding, which is this programme's own defect class in the most-quoted sentence it ships.
+ *
+ * `{}` is still a summary of six `off`s, because an empty flag set IS six flags that are off. It is
+ * `null`/`undefined` — "I did not read them" — that has no summary to give.
+ */
+export function flagSummary(contract, flags) {
+  // NO `= {}` DEFAULT, and that is the fix rather than a tidy-up: the default caught `undefined`
+  // before the guard could see it, so "called with nothing" still rendered six `off`s while
+  // "called with null" did not — two spellings of the same absence, one of them still lying. A
+  // caller that passes nothing has read nothing.
+  if (!contract || flags === null || flags === undefined) return null;
   return flagNames(contract)
     .map((name) => `${name.replace(/_ENABLED$/, '')}=${flags[name] === 'true' ? 'on' : 'off'}`)
     .join(' ');
 }
+
+/**
+ * What the line says in live mode when there is no flag summary to give.
+ *
+ * NOT an omission. A live panel that silently dropped the summary would be a shorter line nobody
+ * notices — absence hidden one step later, which is the same defect wearing a quieter coat.
+ * Design-only omits it because there is no instance for the flags to be about.
+ *
+ * AND IT NAMES THE CAUSE IT OBSERVED, which cost me a rewrite: the first version said
+ * `flags unknown (store not read)` unconditionally, and the first test to hit it had a readable
+ * store and no CONTRACT — so the sentence stated a cause that was not the one. `flagSummary`
+ * returns null for two different absences and the line must not conflate them; *never state a
+ * cause you did not check* is the rule this repository applies to remedies, and a parenthesis in
+ * the most-quoted line of the product is not exempt from it.
+ */
+export const flagsUnknown = ({ contract = null } = {}) => (contract
+  ? 'flags unknown (store not read)'
+  : 'flags unknown (contract unavailable)');
 
 /**
  * The skill form: everything `/snowarch status` prints on one line.
@@ -139,8 +176,10 @@ export function modeLineDetailed(derived, { contract = null, instances = [], too
   if (derived.mode !== 'live' || !derived.instance) return modeLine(derived);
   const parts = [`Mode: live — ${derived.instance.label} (${derived.instance.environment})`,
     `preset ${derived.instance.preset}`];
-  const summary = flagSummary(contract, flags ?? {});
-  if (summary) parts.push(summary);
+  // `flags ?? {}` is gone: it turned "not read" into "all off" at the call site, which is where the
+  // defect actually lived — `flagSummary` was only obeying it.
+  const summary = flagSummary(contract, flags);
+  parts.push(summary ?? flagsUnknown({ contract }));
   if (toolCount?.count != null) {
     parts.push(`${toolCount.count} tools${toolCount.source === 'contract' ? ' (contract)' : ''}`);
   }

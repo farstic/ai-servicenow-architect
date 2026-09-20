@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 import { toggleProblems } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { projectEntryEnabled } from '../../tools/snowarch/lib/settings-local.mjs';
-import { deriveMode, doctorStamp, flagSummary, modeLine,
+import { deriveMode, doctorStamp, flagSummary, flagsUnknown, modeLine,
   modeLineDetailed } from '../../tools/snowarch/lib/doctor/mode.mjs';
 import { MODE_VARIANTS } from '../../tools/snowarch/lib/text.mjs';
 import { capabilitiesLine, renderSummaryLine,
@@ -99,6 +99,33 @@ test('the detailed line derives its flag labels from the contract, never from a 
   assert.equal(line,
     'Mode: live — pdi (pdi) · preset pdi-developer · WRITE=on SCRIPTING=off · 398 tools');
   assert.equal(flagSummary(null, {}), null);
+});
+
+test('ARC-08-C21 — flags nobody read do not render as flags that are off', () => {
+  // THE DEFECT, in one assertion. The default was `flags = {}`, so every name compared false and a
+  // caller with nothing to report rendered six `off`s. The quick path passed exactly that on every
+  // run since ARC-09-C8, and a live user read `WRITE=off CMDB_WRITE=off …` about an instance whose
+  // store says otherwise — in the line the banner, `./snowarch mode` and the panel all quote.
+  const contract = { flags: [{ name: 'WRITE_ENABLED' }, { name: 'SCRIPTING_ENABLED' }],
+    tools: [{ name: 'a' }] };
+
+  // `{}` IS six flags that are off — an empty flag set is a real answer and keeps its rendering.
+  assert.equal(flagSummary(contract, {}), 'WRITE=off SCRIPTING=off');
+  // `null` and `undefined` are "I did not read them", and have no summary to give.
+  assert.equal(flagSummary(contract, null), null);
+  assert.equal(flagSummary(contract, undefined), null);
+
+  // In live mode that absence is said in WORDS, never dropped: a panel that quietly shortened its
+  // line would hide the absence one step later instead of reporting it.
+  const derived = deriveMode({ toggles: { enabled: true }, instances: [loaded()] });
+  const line = modeLineDetailed(derived, { contract, flags: null,
+    toolCount: { count: 398, source: 'server' } });
+  assert.ok(line.includes('flags unknown (store not read)'), line);
+  assert.equal(/WRITE=(on|off)/.test(line), false, 'it invented a flag state it had not read');
+
+  // …and the cause named is the one observed. No contract is a different absence from no flags.
+  assert.equal(flagsUnknown({ contract }), 'flags unknown (store not read)');
+  assert.equal(flagsUnknown({ contract: null }), 'flags unknown (contract unavailable)');
 });
 
 test('a tool count from the contract says so, because a number with no provenance is trusted', () => {

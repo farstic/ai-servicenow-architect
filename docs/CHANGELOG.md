@@ -243,6 +243,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The Mode line shows the permissions your instance actually has.** On the quick check a session
+  makes, it printed `WRITE=off CMDB_WRITE=off …` for every instance — including one whose store
+  says those capabilities are on — because the flags were read from a server that the quick check
+  never starts. They come from the store now, through the same expansion and dependency rules the
+  server applies. When they cannot be read at all the line says so in words rather than showing
+  everything as off, and design-only shows no flags, because there is no instance for them to
+  describe.
+
 - **A path in a report is masked whichever way it is spelled.** On macOS the temp directory is
   reached by two names — `/var/folders/…` and its real `/private/var/folders/…` — and a report
   quoting the resolved one had only the unresolved prefix replaced, leaving `/private` in front of
