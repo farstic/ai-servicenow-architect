@@ -150,6 +150,27 @@ export function wrapRow(prefix, note, columns = COLUMNS) {
     return [prefix + first, ...rest.map((line) => ' '.repeat(prefix.length) + line)];
 }
 /** The screen, byte for byte. The snapshot files in `docs/snippets/` are this function's output. */
+/**
+ * What the proposal actually IS, read off the flags.
+ *
+ * ARC-08-C23 — this said `non-production: everything on` for every non-production environment,
+ * whatever the preset. So `set-preset pdi read-only` printed
+ * `read-only  — non-production: everything on`: a header contradicting the word beside it, on the
+ * screen whose entire job is to show what is about to be turned on. The phrase was describing the
+ * ENVIRONMENT — "this is not production, so we are allowed to offer everything" — and reading as a
+ * description of the PRESET.
+ *
+ * It is read from the flags rather than from the preset NAME, so `custom` gets an honest sentence
+ * too and a preset whose expansion changes cannot leave this line behind.
+ */
+export function presetNote(flags) {
+    const on = FLAG_NAMES.filter((f) => flags[f] === 'true');
+    if (on.length === 0)
+        return 'nothing on';
+    if (on.length === FLAG_NAMES.length)
+        return 'everything on';
+    return `${on.length} of ${FLAG_NAMES.length} on`;
+}
 export function renderReviewScreen(input) {
     const { label, environment, preset, flags, probes, hints } = input;
     // LOCKED, not "is production": an acknowledged raise is still production — the banner says so —
@@ -161,7 +182,12 @@ export function renderReviewScreen(input) {
             + 'read-only (D-05)'
         : environment === 'prod'
             ? `Preset for "${label}" (${environment}): ${preset}  — PRODUCTION, raise acknowledged`
-            : `Proposed preset for "${label}" (${environment}): ${preset}  — non-production: everything on`);
+            // `non-production:` is the ENVIRONMENT half and stays — it is why everything MAY be on.
+            // What follows it is now the proposal's own description instead of a repetition of that
+            // permission, so `full` renders exactly as it always did and `read-only` stops claiming the
+            // opposite of the word beside it.
+            : `Proposed preset for "${label}" (${environment}): ${preset}  `
+                + `— non-production: ${presetNote(flags)}`);
     for (const flag of FLAG_NAMES) {
         const box = !locked && flags[flag] === 'true' ? '[x]' : '[ ]';
         const name = labelOf(flag).padEnd(LABEL_WIDTH + 2);

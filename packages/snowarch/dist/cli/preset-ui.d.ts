@@ -103,6 +103,20 @@ export declare function wrapText(text: string, width: number): string[];
  */
 export declare function wrapRow(prefix: string, note: string, columns?: number): string[];
 /** The screen, byte for byte. The snapshot files in `docs/snippets/` are this function's output. */
+/**
+ * What the proposal actually IS, read off the flags.
+ *
+ * ARC-08-C23 — this said `non-production: everything on` for every non-production environment,
+ * whatever the preset. So `set-preset pdi read-only` printed
+ * `read-only  — non-production: everything on`: a header contradicting the word beside it, on the
+ * screen whose entire job is to show what is about to be turned on. The phrase was describing the
+ * ENVIRONMENT — "this is not production, so we are allowed to offer everything" — and reading as a
+ * description of the PRESET.
+ *
+ * It is read from the flags rather than from the preset NAME, so `custom` gets an honest sentence
+ * too and a preset whose expansion changes cannot leave this line behind.
+ */
+export declare function presetNote(flags: Flags): string;
 export declare function renderReviewScreen(input: ScreenInput): string;
 /** `Applying: preset custom — WRITE=on CMDB_WRITE=on …` — printed before anything is saved. */
 export declare function applyingLine(preset: PresetName, flags: Flags, because?: Partial<Record<FlagName, string>>): string;

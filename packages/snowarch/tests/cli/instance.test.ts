@@ -563,3 +563,49 @@ describe('ARC-07-C5 — add keeps the probes it took', () => {
     }
   });
 });
+
+/**
+ * ARC-08-C23 — `[3/6]` printed nothing when the question was already answered.
+ *
+ * With `--auth` or `--yes` the wizard went `[2/6] … [4/6]`, and a reader was left to decide
+ * whether a step had failed, been dropped, or scrolled past. Six numbered steps is a promise that
+ * all six are accounted for, and a silent gap breaks it in the direction that worries people.
+ *
+ * Here rather than in `tests/cosmetics.test.mjs` because this is the WRITER: that file asserts
+ * `skipReason` returns the right words, which proves nothing about whether the line is ever
+ * printed — and a line that is never printed was the whole defect.
+ */
+describe('ARC-08-C23 — the numbering has no silent gaps', () => {
+  it('names the method it used and why, on the path that asked nothing', async () => {
+    const w = workspace();
+    try {
+      const terminal = io([]);
+      // `auth` DELETED from the options: `baseOptions` carries `auth: 'basic'`, so leaving it in
+      // takes the `--auth` branch and this case would never have been exercised. The path under
+      // test is the one where nobody chose — `--yes` did.
+      const noAuth = { ...baseOptions, auth: undefined };
+      await runAdd({ ...noAuth, makeDefault: true, yes: true }, terminal, {
+        storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {},
+      });
+
+      const out = terminal.written();
+      expect(out).toContain('[3/6] Authentication … basic (default; --yes asked nothing)');
+      // Every step from 1 to 6 appears, in order, with none missing.
+      const steps = [...out.matchAll(/\[(\d)\/6\]/g)].map((m) => Number(m[1]));
+      expect([...new Set(steps)]).toEqual([1, 2, 3, 4, 5, 6]);
+    } finally { w.cleanup(); }
+  });
+
+  it('says `from --auth` when the user chose it, not when a flag did', async () => {
+    // Two different reasons a question goes unasked, and a reader deciding whether the answer is
+    // theirs needs to know which.
+    const w = workspace();
+    try {
+      const terminal = io([]);
+      await runAdd({ ...baseOptions, makeDefault: true, yes: true, auth: 'basic' }, terminal, {
+        storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {},
+      });
+      expect(terminal.written()).toContain('[3/6] Authentication … basic (from --auth)');
+    } finally { w.cleanup(); }
+  });
+});
