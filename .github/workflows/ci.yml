@@ -615,6 +615,22 @@ jobs:
           Write-Host "state $($text.Length) chars, cache $($cache.Length) chars"
           exit 0
 
+      # ARC-08-C25 — the reports that claim to be schema-v1 are held to it, with the SAME validator
+      # the product's own `--json` is held to. A second copy of the schema is how an artifact and
+      # the product drift apart, and this bundle had already drifted far enough that a reviewer
+      # pulling it to read a quick run's `durationMs` concluded it was a legacy shape.
+      #
+      # `if: always()` like the upload below: a report that is only validated when the job was
+      # green is a report you cannot trust on the run you actually needed it for.
+      - name: The uploaded reports are schema-v1, and carry what they are collected for
+        if: always()
+        shell: bash
+        run: >
+          node scripts/ci/validate-report.mjs
+          "$RUNNER_TEMP/doctor.json"
+          "$RUNNER_TEMP/doctor-quick.json"
+          "$RUNNER_TEMP/doctor-ps.json"
+
       # Every run, pass or fail: a report you can only read when the job was green is a report you
       # cannot use to find out why it was red.
       - uses: actions/upload-artifact@v4
@@ -623,6 +639,7 @@ jobs:
           name: doctor-${{ matrix.label }}
           path: |
             ${{ runner.temp }}/doctor.json
+            ${{ runner.temp }}/doctor-quick.json
             ${{ runner.temp }}/doctor-ps.json
             ${{ runner.temp }}/doctor-normalised.json
           if-no-files-found: ignore

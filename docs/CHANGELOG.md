@@ -243,6 +243,10 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The diagnostic reports CI collects are checked against the same schema the product promises**,
+  and the quick run's report — the one that carries the timing — is uploaded with them instead of
+  being discarded at the end of the step.
+
 - **The doctor's report names the capability packs once.** They were written under two keys from
   one check, and the report's two renderers each read a different one — so a change to either
   write site would have made the status panel and the full report disagree about the same answer.
