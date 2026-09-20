@@ -243,6 +243,16 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **Releasing no longer fails its own tests.** The sample report the documentation shows carried
+  the version number and the contract checksum of the checkout it was captured from, and a release
+  rewrites both — so every release tag failed the test that compares the sample against what the
+  product produces. Both are fixed sample values now, and a test proves a checkout on any version
+  produces the same sample.
+
+- **A failed release run keeps its diagnostics.** The doctor report and the install metrics were
+  collected only when everything else had already passed, so the runs that most needed explaining
+  were the ones that carried no evidence.
+
 - **The diagnostic reports CI collects are checked against the same schema the product promises**,
   and the quick run's report — the one that carries the timing — is uploaded with them instead of
   being discarded at the end of the step.
