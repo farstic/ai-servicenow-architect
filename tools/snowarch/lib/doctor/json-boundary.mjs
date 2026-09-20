@@ -20,6 +20,8 @@
 // (ARC-09-C9's `INSTANCE_HOST`, imported rather than rewritten): the guard exists because
 // `redact()` leaves an instance address alone, and a report that only happens not to carry one is
 // not the same as a report that cannot.
+import { realpathSync } from 'node:fs';
+
 import { INSTANCE_HOST } from '../doctor-cache.mjs';
 
 export const LABEL_MASK = '<label>';
@@ -66,10 +68,30 @@ const HOME_PATH = /(?:[A-Za-z]:)?[\\/](?:Users|home)[\\/][^\\/\s"'`,;:]*/g;
  * characters there is nothing worth masking and plenty to break, so such a value is ignored and the
  * shapes above still apply.
  */
-export function homeValues(home) {
+export function homeValues(home, { realpath = realpathSync } = {}) {
   if (typeof home !== 'string') return [];
   const v = home.trim().replace(/[\\/]+$/, '');
-  return v.length >= 4 && !/^[A-Za-z]:$/.test(v) ? [v] : [];
+  if (v.length < 4 || /^[A-Za-z]:$/.test(v)) return [];
+
+  // ARC-08-C20 — BOTH SPELLINGS, and the longer one first.
+  //
+  // A path can reach the report resolved while the home arrives unresolved, and on macOS that is
+  // the normal case rather than an edge: `os.tmpdir()` says `/var/folders/…` and the realpath of
+  // anything inside it is `/private/var/folders/…`. Replacing the unresolved prefix INSIDE the
+  // resolved path left `/private` in front of the mask, and the committed fixture carried
+  // `toplevel: '/private~'` — a masker that only works where it was written, which is the same
+  // class as the harness symlink `realpathOrSelf` exists for in `doctor/index.mjs`.
+  //
+  // Longest first because the order is the bug: mask `/var/folders/x` before
+  // `/private/var/folders/x` and the second can never match.
+  //
+  // `realpath` is a parameter so the closed path can be driven without a symlink on disk, and it
+  // is allowed to throw — a home that does not exist is still a string worth masking.
+  let resolved = null;
+  try { resolved = realpath(v).replace(/[\\/]+$/, ''); } catch { /* not on disk; the literal stands */ }
+
+  return [...new Set([v, resolved].filter((x) => typeof x === 'string' && x.length >= 4))]
+    .sort((a, b) => b.length - a.length);
 }
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

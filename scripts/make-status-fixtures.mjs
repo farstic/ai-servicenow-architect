@@ -33,6 +33,7 @@
  *
  * Exit 0 written / identical · 1 drifted · 2 cannot run.
  */
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,8 +61,6 @@ const die = (m) => { writeSync(2, `make-status-fixtures: ${m}\n`); process.exit(
  * `quick run <at> UTC` line in the snippet, the skill and VALIDATION-TESTS every time somebody ran
  * the script, which is three documents churning to say nothing.
  */
-export const FIXED_RAN_AT = '2026-09-20T09:00:00.000Z';
-
 /** One instance, and nothing in it that a stranger reading the committed file should not see. */
 export const FIXTURE_STORE = Object.freeze({
   version: 1,
@@ -114,25 +113,103 @@ function checkout(mode) {
 }
 
 /**
- * The clock and the capturing PROCESS — the two things that differ between two correct captures.
+ * EVERY FACT ABOUT THE CAPTURING MACHINE, pinned to a sample value — by name, in one table.
  *
- * Found by the drift test on its first run, which is what it is for: a second capture differed in
- * `prereqs.shell` (`zsh` from a terminal, `unknown` under `node --test`, because `guessShell` walks
- * the PARENT process with `ps` — a fact about who typed the command, not about the product) and in
- * `E-05`'s detail, which carries the temp checkout's own path.
+ * The fixture is a SAMPLE, not a measurement of whoever ran the capture. The first version pinned
+ * the clock and the shell and nothing else, and the drift test then held only on the machine that
+ * made the file: CI's macOS node-20 and node-22 cells failed with `2.55.0` vs `2.39.5` (git),
+ * `22.23.2` vs `24.16.0` (node, in three places) and a capability pack the runner lacked, while the
+ * node-24 cells passed — for the same reason.
  *
- * The path is not normalised here: the capture passes the fixture root as `home`, so the SHIPPED
- * masker rewrites it to `~` at the same boundary that masks a real user's. One masker, and the
- * committed fixture carries no machine path for the same reason a pasted report does not.
+ * The rule the list encodes: **if the value would differ between two correct captures on two
+ * correct machines, it is the machine's and it is pinned.** The product's own facts — version,
+ * contract sha, docs pin, the floors, which checks ran and what they concluded — are captured
+ * verbatim, because those are what the fixture is for and they are meant to move with a release.
+ *
+ * ADD TO THIS LIST, not to the diff. The next ambient field belongs here the day it appears; a
+ * capture that starts differing between machines is this table being out of date, not the test
+ * being wrong. `assertNoHostValues` below is what makes that discoverable on the machine that
+ * would otherwise commit it.
  */
+export const HOST_FACTS = Object.freeze({
+  /** `prereqs.os`. One platform's name has to be in a sample; this is the one the docs show. */
+  os: 'darwin',
+  /** `prereqs.shell`. `guessShell` walks the PARENT process — `zsh` from a terminal, `unknown`
+   *  under `node --test`. A fact about who typed the command. */
+  shell: 'unknown',
+  /** `engine.node`, `prereqs.node.version`, E-02's detail and data. */
+  node: '24.0.0',
+  /** E-01's detail: the git on PATH. */
+  git: '2.40.0',
+  /** `prereqs.node.ok`, `prereqs.deps.ok` — a runner missing a dependency must not bake a `false`
+   *  into a sample that the docs present as a healthy install. */
+  ok: true,
+  /** The clock: `ranAt`, and every `durationMs` in the report and its checks. */
+  ranAt: '2026-09-20T09:00:00.000Z',
+});
+
+/** Kept as a separate export because three places read the instant and none should retype it. */
+export const FIXED_RAN_AT = HOST_FACTS.ranAt;
+
+/** The checks whose RESULT is a fact about the host rather than about the checkout. */
+const HOST_CHECKS = Object.freeze({
+  'E-01': (c) => ({ ...c, detail: HOST_FACTS.git }),
+  'E-02': (c) => {
+    const data = c.data ? { ...c.data, version: HOST_FACTS.node } : c.data;
+    return { ...c, detail: `${HOST_FACTS.node} (floor ${data?.floor ?? '?'})`, data };
+  },
+});
+
 function pinMachine(report) {
+  const prereqs = report.prereqs ? {
+    ...report.prereqs,
+    os: HOST_FACTS.os,
+    shell: HOST_FACTS.shell,
+    ...(report.prereqs.node ? { node: { ...report.prereqs.node, ok: HOST_FACTS.ok, version: HOST_FACTS.node } } : {}),
+    ...(report.prereqs.deps ? { deps: { ...report.prereqs.deps, ok: HOST_FACTS.ok } } : {}),
+  } : report.prereqs;
+
   return {
     ...report,
-    ranAt: FIXED_RAN_AT,
+    ranAt: HOST_FACTS.ranAt,
     durationMs: 0,
-    prereqs: report.prereqs ? { ...report.prereqs, shell: 'unknown' } : report.prereqs,
-    checks: report.checks.map((c) => (c.durationMs === undefined ? c : { ...c, durationMs: 0 })),
+    prereqs,
+    engine: { ...report.engine, node: HOST_FACTS.node },
+    checks: report.checks.map((c) => {
+      const pinned = HOST_CHECKS[c.id] ? HOST_CHECKS[c.id](c) : c;
+      return pinned.durationMs === undefined ? pinned : { ...pinned, durationMs: 0 };
+    }),
   };
+}
+
+/**
+ * Refuse to write a fixture that still carries THIS machine's values.
+ *
+ * The list above is a list, and a list goes out of date. This is what makes that discoverable here
+ * rather than on somebody else's CI run: the real node version and the real git version are looked
+ * for in the serialised report, and finding either means a field was added that nobody pinned.
+ *
+ * It cannot check `os` the same way — a sample has to name some platform, and on that platform the
+ * pinned value and the real one are the same string. `prereqs.os` is pinned explicitly above and is
+ * the only place it appears.
+ */
+function assertNoHostValues(report, mode) {
+  const text = JSON.stringify(report);
+  const real = {
+    node: process.versions.node,
+    git: (() => {
+      try {
+        return /(\d+\.\d+\.\d+)/.exec(
+          execFileSync('git', ['--version'], { encoding: 'utf8' }))?.[1] ?? null;
+      } catch { return null; }
+    })(),
+  };
+  for (const [what, value] of Object.entries(real)) {
+    if (value && value !== HOST_FACTS[what] && text.includes(value)) {
+      die(`${mode}: this machine's ${what} version (${value}) survived into the fixture — `
+        + 'add the field that carries it to HOST_FACTS in this file');
+    }
+  }
 }
 
 export async function capture(mode) {
@@ -152,7 +229,9 @@ export async function capture(mode) {
     });
     const text = chunks.join('');
     if (!text.trimStart().startsWith('{')) die(`${mode}: status did not print a report (exit ${code})\n${text}`);
-    return pinMachine(JSON.parse(text));
+    const pinned = pinMachine(JSON.parse(text));
+    assertNoHostValues(pinned, mode);
+    return pinned;
   } finally {
     // `remove()` and the `.owner` beside it — the two steps `trackTempDir` takes, because
     // `greenTree` writes an ownership record NEXT TO the directory and a bare `rmSync(root)` leaves

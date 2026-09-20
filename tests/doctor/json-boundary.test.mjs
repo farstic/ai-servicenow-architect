@@ -18,7 +18,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync } from 'node:fs';
+import { chmodSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { doctorCommand } from '../../tools/snowarch/lib/doctor/index.mjs';
@@ -164,7 +164,27 @@ test('C1 — with the run\'s home set to the fixture root, that root appears now
   // same path a real run does.
   const root = linkInstall(greenTree(t, { mode: 'design' }));
   const fakeHome = dirname(root);
-  assert.deepEqual(homeValues(fakeHome), [fakeHome], 'the fixture root is not usable as a home');
+  // ARC-08-C20 — BOTH SPELLINGS now, longest first. A path can reach the report resolved while the
+  // home arrives unresolved, and on macOS that is the normal case: `os.tmpdir()` says
+  // `/var/folders/…` and the realpath of anything inside it is `/private/var/folders/…`. Masking
+  // only the unresolved prefix left `/private` in front of the mask — a committed fixture carried
+  // `toplevel: '/private~'`.
+  const values = homeValues(fakeHome);
+  assert.ok(values.includes(fakeHome), 'the fixture root is not usable as a home');
+  assert.deepEqual([...values].sort((a, b) => b.length - a.length), values,
+    'the spellings are not longest-first — the shorter one would mask inside the longer');
+  const resolved = realpathSync(fakeHome);
+  if (resolved !== fakeHome) {
+    assert.ok(values.includes(resolved), 'the resolved spelling is not masked');
+  }
+
+  // The closed path, driven rather than waited for: a `realpath` that reports a different prefix
+  // must produce both, longer first, with no filesystem involved.
+  assert.deepEqual(homeValues('/var/folders/x', { realpath: () => '/private/var/folders/x' }),
+    ['/private/var/folders/x', '/var/folders/x']);
+  // …and a home that is not on disk at all is still a string worth masking.
+  assert.deepEqual(homeValues('/var/folders/x', { realpath: () => { throw new Error('ENOENT'); } }),
+    ['/var/folders/x']);
 
   let json = '';
   await doctorCommand({ flags: { json: true, 'no-network': true, 'no-cache': true },

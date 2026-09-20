@@ -17,7 +17,7 @@
     "version": "2.0.0-dev",
     "tag": null,
     "contractSha": "96d056414da54ca793ea9034d9cbdd7028d3af74ea49253468a6e7f97d667ba6",
-    "node": "24.16.0",
+    "node": "24.0.0",
     "capabilities": null,
     "docs": {
       "present": true,
@@ -42,7 +42,7 @@
     "shell": "unknown",
     "node": {
       "ok": true,
-      "version": "24.16.0"
+      "version": "24.0.0"
     },
     "deps": {
       "ok": true
@@ -76,7 +76,7 @@
       "title": "git",
       "status": "ok",
       "severity": "fail",
-      "detail": "2.39.5",
+      "detail": "2.40.0",
       "remedy": null,
       "command": null,
       "code": null,
@@ -93,7 +93,7 @@
       "title": "Node.js",
       "status": "ok",
       "severity": "fail",
-      "detail": "24.16.0 (floor 20.0.0)",
+      "detail": "24.0.0 (floor 20.0.0)",
       "remedy": null,
       "command": null,
       "code": null,
@@ -101,7 +101,7 @@
       "quick": true,
       "durationMs": 0,
       "data": {
-        "version": "24.16.0",
+        "version": "24.0.0",
         "floor": "20.0.0"
       }
     },
@@ -148,7 +148,7 @@
       "durationMs": 0,
       "data": {
         "root": "~",
-        "toplevel": "/private~"
+        "toplevel": "~"
       }
     },
     {
