@@ -124,6 +124,16 @@ export const GENERATORS = [
     targets: ['tools/snowarch/lib/text.json'],
   },
   {
+    // ARC-08-C22 — the frame's `instance`/`store` help, from the dispatchers' own tables. The frame
+    // cannot import them: it runs in design-only where `node_modules` is absent and the dist help
+    // reaches `zod` and `undici` through its graph. So the lines are generated in and `gen:check`
+    // keeps them current — `gen-launcher-text`'s arrangement, for the same reason.
+    id: 'gen-cli-help',
+    script: 'scripts/gen-cli-help.mjs',
+    supportsRoot: true,
+    targets: ['tools/snowarch/lib/instance.mjs', 'tools/snowarch/lib/store.mjs'],
+  },
+  {
     // ARC-06-S10: the sentences `bootstrap.sh` prints. bash cannot read JSON, so they are generated
     // into a marked region — the launcher runs on machines with no Node to check it, which is
     // exactly where a drifted copy would go unnoticed.
