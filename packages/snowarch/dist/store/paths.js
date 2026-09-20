@@ -166,18 +166,31 @@ export function maskPathForShell(p, { sepChar = sep } = {}) {
  *  - anywhere else        → as given. The user chose that path explicitly (SNOW_STORE),
  *    and rewriting it would make the remedy point somewhere they did not name.
  */
-export function shellRemedy(command, target) {
+export function shellRemedy(command, target, { sepChar = sep } = {}) {
     const checkout = envPath('CLAUDE_PROJECT_DIR');
     if (checkout) {
-        const norm = checkout.endsWith(sep) ? checkout.slice(0, -1) : checkout;
-        if (target === norm)
+        // ARC-08-C26 — THE THIRD SITE of the single-separator assumption, and the last one in this
+        // file. `maskPath` and `maskPathForShell` learned both spellings in ARC-08-C23; this branch
+        // still compared `norm + sep`, so on Windows a forward-slash target under the checkout —
+        // which `git rev-parse --show-toplevel` produces, and a HOME set from a bash shell carries —
+        // missed the checkout-relative form and fell through to `maskPathForShell`.
+        //
+        // No leak, because that masker is now correct: the cost was a remedy naming an absolute
+        // `~/…` path where a short relative one was available. A worse remedy rather than a wrong
+        // one — which is why it was a queue note and not a fix-up, and why it is fixed here with the
+        // other two rather than left as the one site that still has the assumption.
+        const rest = underPrefix(target, checkout, sepChar);
+        if (rest === '')
             return `Run, from the checkout: ${command} .`;
-        if (target.startsWith(norm + sep)) {
-            const rel = target.slice(norm.length + 1).split(sep).join('/');
+        if (rest !== null) {
+            // Leading separator in either spelling, and the remainder rendered with `/`: this is a
+            // path for a SHELL, and every shell the remedies target takes forward slashes — including
+            // PowerShell and cmd.
+            const rel = rest.replace(/^[\\/]+/, '').split(/[\\/]/).join('/');
             return `Run, from the checkout: ${command} ${rel}`;
         }
     }
-    return `Run: ${command} ${maskPathForShell(target)}`;
+    return `Run: ${command} ${maskPathForShell(target, { sepChar })}`;
 }
 /** `someone@corp.example.com` → `s***@corp.example.com`; `admin` → `a***`. Never the whole name. */
 export function maskUsername(u) {

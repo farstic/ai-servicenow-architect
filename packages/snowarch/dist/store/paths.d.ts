@@ -87,7 +87,9 @@ export declare function maskPathForShell(p: string, { sepChar }?: {
  *  - anywhere else        → as given. The user chose that path explicitly (SNOW_STORE),
  *    and rewriting it would make the remedy point somewhere they did not name.
  */
-export declare function shellRemedy(command: string, target: string): string;
+export declare function shellRemedy(command: string, target: string, { sepChar }?: {
+    sepChar?: string;
+}): string;
 /** `someone@corp.example.com` → `s***@corp.example.com`; `admin` → `a***`. Never the whole name. */
 export declare function maskUsername(u: string): string;
 /**
