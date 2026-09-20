@@ -243,6 +243,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A path under your home directory is masked however it is spelled.** On Windows a path can
+  arrive with forward slashes — `git` prints them that way, and so does a HOME set from a bash
+  shell — and the masker compared only the platform separator, so the account name reached the
+  screen. Both spellings are matched now, in both of the maskers that had the assumption.
+
 - **Four lines in the wizard and the review screen now say what they measured.** Step `[3/6]`
   named the authentication method it used instead of printing nothing and leaving a gap in the
   numbering; the `Store:` line is masked like every other path the CLI prints; the review screen

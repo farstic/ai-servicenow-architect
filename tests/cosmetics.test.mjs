@@ -10,7 +10,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { join } from 'node:path';
+
 import { skipReason, storeLine } from '../packages/snowarch/dist/cli/instance.js';
+import { underPrefix } from '../packages/snowarch/dist/store/paths.js';
 import { presetNote, renderReviewScreen } from '../packages/snowarch/dist/cli/preset-ui.js';
 import { expandPreset } from '../packages/snowarch/dist/utils/permissions.js';
 import { installSizeHint } from '../tools/snowarch/lib/steps/B04.mjs';
@@ -37,10 +40,29 @@ test('the Store line is masked, like every other path this CLI prints', () => {
   // install goes wrong, printed the absolute path with the account name in it.
   const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
   if (home.length >= 4) {
-    const line = storeLine(`${home}/checkout/.local/instances.json`, 'darwin');
-    assert.equal(line.includes(home), false, 'the home directory survived into the Store line');
-    assert.match(line, /^Store: ~/);
+    // BOTH SPELLINGS. The first version built only the forward-slash one, which on Windows is
+    // `C:\\Users\\someone/checkout/…` — a path `maskPath` compared with the platform separator
+    // alone and therefore did not mask at all, so `test (windows-latest, node 24)` failed with the
+    // account name in the line. That spelling is not the test being clever: #229 measured that
+    // `git rev-parse --show-toplevel` answers with forward slashes on Windows, and a HOME set by a
+    // bash shell arrives the same way.
+    for (const path of [
+      join(home, 'checkout', '.local', 'instances.json'),
+      `${home}/checkout/.local/instances.json`,
+    ]) {
+      const line = storeLine(path);
+      assert.equal(line.includes(home), false,
+        `the home directory survived into the Store line for ${path}`);
+      assert.match(line, /^Store: ~/);
+    }
   }
+  // WHAT THIS TEST CANNOT SEE, said rather than left for the next reader to discover. A masker can
+  // only mask the home it actually has, so a `C:\\Users\\someone` path is unmasked on a POSIX
+  // runner for the right reason — it is not under this machine's home. The two spellings of the
+  // REAL home above are identical on POSIX, so the separator defect is invisible from here: the
+  // Windows cell is the end-to-end judge, and `underPrefix` below is what makes the rule itself
+  // checkable on every platform, with the separator injected.
+  //
   // The mode half is untouched: it is a fact about the file, not about who owns it.
   assert.match(storeLine('/tmp/x/instances.json', 'darwin'), /\(mode 0600, dir 0700\)$/);
   assert.match(storeLine('/tmp/x/instances.json', 'win32'), /ACL-inherited \(Windows\)\)$/);
@@ -113,4 +135,33 @@ test('B04 quotes a size it measured, or none at all — the helper half', () => 
     assert.equal(installSizeHint({ steps: { B04: { data: { sizeBytes: bytes } } } }), '',
       `sizeBytes ${String(bytes)} reached the line`);
   }
+});
+
+test('ARC-08-C23 — both maskers match a prefix under either separator', () => {
+  // THE SECOND MASKER WITH THIS DEFECT. #229 taught `homeValues` in `doctor/json-boundary.mjs`
+  // that a path can be spelled with the other separator; I fixed that one and did not look for
+  // another. `maskPath` had the same single-separator assumption one file over, and the Windows
+  // cell found it — through a test of a different item entirely.
+  //
+  // Driven with an injected separator so every platform exercises the Windows behaviour, the way
+  // `homeValues` is driven with an injected `realpath`. A defect that only one of three CI
+  // platforms can see is a defect that waits for that platform.
+  const WIN_HOME = 'C:\\Users\\someone';
+
+  // Windows: both spellings are separators, and the remainder comes back exactly as given.
+  assert.equal(underPrefix(`${WIN_HOME}\\checkout\\x`, WIN_HOME, '\\'), '\\checkout\\x');
+  assert.equal(underPrefix(`${WIN_HOME}/checkout/x`, WIN_HOME, '\\'), '/checkout/x');
+  assert.equal(underPrefix(WIN_HOME, WIN_HOME, '\\'), '', 'the home itself is the whole match');
+  assert.equal(underPrefix('D:/elsewhere/x', WIN_HOME, '\\'), null);
+  // A trailing separator on the prefix, in either spelling, is not a different prefix.
+  assert.equal(underPrefix(`${WIN_HOME}/x`, `${WIN_HOME}\\`, '\\'), '/x');
+
+  // POSIX: `\` is a legal FILENAME character, so the two are not interchangeable here. One
+  // direction only, as in #229 — the reverse would match paths that do not exist.
+  assert.equal(underPrefix('/home/a/b', '/home/a', '/'), '/b');
+  assert.equal(underPrefix('/home/a\\b', '/home/a', '/'), null,
+    'a backslash in a POSIX filename was treated as a separator');
+
+  // A neighbour whose name merely starts with the prefix is not under it.
+  assert.equal(underPrefix('/home/alice-backup/x', '/home/alice', '/'), null);
 });

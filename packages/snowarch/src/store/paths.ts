@@ -92,7 +92,36 @@ export function resolveStorePath({ global = false }: { global?: boolean } = {}):
  * `<checkout>`. Absolute paths carry the account name, and a log is the one place a
  * username reaches a screen share, a bug report or a support ticket.
  */
-export function maskPath(p: string): string {
+/**
+ * Is `path` the prefix, or under it? The remainder if so, `null` if not.
+ *
+ * ARC-08-C23 — BOTH SEPARATORS, and this is the second masker in this product to need it. #229
+ * taught `homeValues` in `doctor/json-boundary.mjs` the lesson: on Windows `git rev-parse
+ * --show-toplevel` answers with FORWARD slashes, and a HOME or `CLAUDE_PROJECT_DIR` set by a bash
+ * shell arrives the same way, so a path under home spelled with `/` is a spelling the product
+ * itself produces. `maskPath` compared with the platform separator alone, so on Windows
+ * `C:\Users\someone/checkout/.local/instances.json` matched nothing and the account name printed.
+ * I fixed the first masker and did not look for a second; the Windows cell found it.
+ *
+ * Normalised for COMPARISON only — the remainder is returned exactly as it was given, because a
+ * remedy or a log line should read the way the caller wrote it. The replacement is 1:1 in length,
+ * which is what makes slicing by the original prefix's length correct.
+ *
+ * ONE DIRECTION, as in #229: `\` is a legal filename character on POSIX, so the two are treated as
+ * interchangeable only where the platform says they are.
+ */
+export function underPrefix(path: string, prefix: string, sepChar: string = sep): string | null {
+  if (!prefix) return null;
+  const trimmed = prefix.endsWith('/') || prefix.endsWith('\\') ? prefix.slice(0, -1) : prefix;
+  if (!trimmed) return null;
+  const norm = (v: string) => (sepChar === '\\' ? v.replace(/\\/g, '/') : v);
+  const a = norm(path);
+  const b = norm(trimmed);
+  if (a === b) return '';
+  return a.startsWith(`${b}/`) ? path.slice(trimmed.length) : null;
+}
+
+export function maskPath(p: string, { sepChar = sep }: { sepChar?: string } = {}): string {
   if (!p) return p;
   let out = p;
   const checkout = envPath('CLAUDE_PROJECT_DIR');
@@ -109,9 +138,11 @@ export function maskPath(p: string): string {
     [checkout, '<checkout>'], [homedir(), '~'], [osHome, '~'],
   ] as const) {
     if (!prefix) continue;
-    const norm = prefix.endsWith(sep) ? prefix.slice(0, -1) : prefix;
-    if (out === norm) return label;
-    if (out.startsWith(norm + sep)) { out = label + out.slice(norm.length); break; }
+    const rest = underPrefix(out, prefix, sepChar);
+    if (rest === null) continue;
+    if (rest === '') return label;
+    out = label + rest;
+    break;
   }
   return out;
 }
@@ -123,12 +154,13 @@ export function maskPath(p: string): string {
  * `maskPath` is for prose and log lines; this is for the text after `Run:`. A remedy that
  * has been prettified into something unrunnable is worse than one that was never offered.
  */
-export function maskPathForShell(p: string): string {
+export function maskPathForShell(p: string, { sepChar = sep }: { sepChar?: string } = {}): string {
   if (!p) return p;
-  const home = homedir();
-  const norm = home.endsWith(sep) ? home.slice(0, -1) : home;
-  if (p === norm) return '~';
-  return p.startsWith(norm + sep) ? `~${p.slice(norm.length)}` : p;
+  // ARC-08-C23 — the same two spellings as `maskPath`. This is the remedy path a reader pastes, so
+  // an unmasked one puts the account name in the line most likely to be copied into a ticket.
+  const rest = underPrefix(p, homedir(), sepChar);
+  if (rest === null) return p;
+  return rest === '' ? '~' : `~${rest}`;
 }
 
 /**

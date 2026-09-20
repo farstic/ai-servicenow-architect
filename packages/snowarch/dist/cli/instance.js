@@ -146,9 +146,16 @@ export const savedLine = (label, entry, isDefault) => `Saved instance "${label}"
  * account name in it. One surface, two redaction levels, and the leakier one was on the line most
  * likely to be quoted.
  */
-export const storeLine = (path, platform = process.platform) => (platform === 'win32'
-    ? `Store: ${maskPath(path)} (file modes: ACL-inherited (Windows))`
-    : `Store: ${maskPath(path)} (mode 0600, dir 0700)`);
+export const storeLine = (path, platform = process.platform) => {
+    // ARC-08-C23 — the mask follows the PLATFORM ARGUMENT, not the running process. The line already
+    // renders the Windows mode sentence when told `win32`; masking with POSIX rules at the same time
+    // meant a function that had been given a platform honoured it in one half and ignored it in the
+    // other — and it is the half that decides whether an account name reaches the screen.
+    const masked = maskPath(path, { sepChar: platform === 'win32' ? '\\' : '/' });
+    return platform === 'win32'
+        ? `Store: ${masked} (file modes: ACL-inherited (Windows))`
+        : `Store: ${masked} (mode 0600, dir 0700)`;
+};
 /**
  * Why `[3/6]` did not ask. Named from what was actually observed, never a default sentence.
  *

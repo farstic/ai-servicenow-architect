@@ -43,7 +43,28 @@ export declare function resolveStorePath({ global }?: {
  * `<checkout>`. Absolute paths carry the account name, and a log is the one place a
  * username reaches a screen share, a bug report or a support ticket.
  */
-export declare function maskPath(p: string): string;
+/**
+ * Is `path` the prefix, or under it? The remainder if so, `null` if not.
+ *
+ * ARC-08-C23 — BOTH SEPARATORS, and this is the second masker in this product to need it. #229
+ * taught `homeValues` in `doctor/json-boundary.mjs` the lesson: on Windows `git rev-parse
+ * --show-toplevel` answers with FORWARD slashes, and a HOME or `CLAUDE_PROJECT_DIR` set by a bash
+ * shell arrives the same way, so a path under home spelled with `/` is a spelling the product
+ * itself produces. `maskPath` compared with the platform separator alone, so on Windows
+ * `C:\Users\someone/checkout/.local/instances.json` matched nothing and the account name printed.
+ * I fixed the first masker and did not look for a second; the Windows cell found it.
+ *
+ * Normalised for COMPARISON only — the remainder is returned exactly as it was given, because a
+ * remedy or a log line should read the way the caller wrote it. The replacement is 1:1 in length,
+ * which is what makes slicing by the original prefix's length correct.
+ *
+ * ONE DIRECTION, as in #229: `\` is a legal filename character on POSIX, so the two are treated as
+ * interchangeable only where the platform says they are.
+ */
+export declare function underPrefix(path: string, prefix: string, sepChar?: string): string | null;
+export declare function maskPath(p: string, { sepChar }?: {
+    sepChar?: string;
+}): string;
 /**
  * A path fit for a REMEDY the reader will paste into a shell: home becomes `~`, which a
  * shell expands, and the checkout is left alone because `<checkout>` is not a path.
@@ -51,7 +72,9 @@ export declare function maskPath(p: string): string;
  * `maskPath` is for prose and log lines; this is for the text after `Run:`. A remedy that
  * has been prettified into something unrunnable is worse than one that was never offered.
  */
-export declare function maskPathForShell(p: string): string;
+export declare function maskPathForShell(p: string, { sepChar }?: {
+    sepChar?: string;
+}): string;
 /**
  * The whole `Run:` clause for a remedy, phrased so it is BOTH pasteable and free of an
  * absolute path. Which of the three it is depends on where the file actually lives:
