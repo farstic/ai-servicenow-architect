@@ -251,6 +251,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   one check, and the report's two renderers each read a different one — so a change to either
   write site would have made the status panel and the full report disagree about the same answer.
 
+- **A remedy for a file inside your checkout names it relatively, however the path was spelled.**
+  On Windows a path can arrive with forward slashes, and the check that recognises "this is inside
+  the checkout" compared only the platform separator — so the remedy fell back to the long absolute
+  form. Same rule as the masking fix below, now applied at the last of its three sites.
+
 - **A path under your home directory is masked however it is spelled.** On Windows a path can
   arrive with forward slashes — `git` prints them that way, and so does a HOME set from a bash
   shell — and the masker compared only the platform separator, so the account name reached the
