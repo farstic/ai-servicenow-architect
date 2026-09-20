@@ -160,9 +160,18 @@ test('the clock and the capturing process are pinned, and nothing else is', () =
     // No machine path: the capture passes its root as `home`, so the shipped masker rewrites it.
     assert.equal(/\/var\/folders|\/tmp\/|C:\\/.test(JSON.stringify(r)), false,
       'a capture-machine path is in the committed fixture');
-    // Real values, not placeholders: these move with a release and the sample block moves with them.
-    assert.match(r.engine.version, /^\d+\.\d+\.\d+/);
-    assert.match(r.engine.contractSha, /^[0-9a-f]{64}$/);
+    // ARC-08-C27 — the version and the contract sha are SAMPLES now, and this comment used to say
+    // the opposite: "real values, not placeholders: these move with a release and the sample block
+    // moves with them". That was the defect stated as a virtue. Nothing regenerated them at
+    // release time, so `release.mjs` rewriting the version — and the contract sha moving with it,
+    // because `dist/contract.json` embeds the version — made every release tag fail this test by
+    // construction. v2.0.0-rc.8's `verify` job found it on all three platforms.
+    //
+    // The docs PIN is still the product's: it moves when a maintainer moves the corpus, which is a
+    // deliberate act on develop, not something a release rewrites underneath the fixture.
+    assert.equal(r.version, HOST_FACTS.version);
+    assert.equal(r.engine.version, HOST_FACTS.version);
+    assert.equal(r.engine.contractSha, HOST_FACTS.contractSha);
     assert.match(r.engine.docs.pin, /^[0-9a-f]{40}$/);
   }
 });
@@ -271,5 +280,30 @@ test('the capture is byte-identical under three TMPDIR layouts, including one un
       // …and no backslash spelling of the capture root escaped either.
       assert.equal(/"[^"]*\\\\(?:Users|AppData)\\\\/.test(text), false,
         `${where}: a backslash-spelled home path survived the masker`);
+    }
+  });
+
+test('ARC-08-C27 — a release commit produces the same bytes as develop',
+  { timeout: 120_000 }, async () => {
+    // THE SHAPE THAT NEEDED A TAG TO SEE. The drift this row is about was invisible on develop for
+    // one reason: the version never changes here, so every capture agreed with every other and the
+    // pin table looked complete. It took a release tag to produce a second correct commit of the
+    // same product — and by then the tag was red on three platforms, its publish skipped.
+    //
+    // The version is injected, the way the clock and the separator are, so the condition is tested
+    // in this world rather than waited for in the next one.
+    for (const version of ['9.9.9-rc.1', '2.0.0', '0.0.1-alpha.0']) {
+      assert.deepEqual(await capture('live', { asVersion: version }), committed('live'),
+        `a checkout whose package version reads ${version} produced different bytes`);
+    }
+
+    // …and the guard refuses to WRITE a fixture that carries the checkout's own version, so the
+    // next field of this kind is caught here rather than on the next tag.
+    const pkg = JSON.parse(readFileSync(join(REAL_ROOT, 'package.json'), 'utf8'));
+    const text = readFileSync(
+      join(REAL_ROOT, 'tests/fixtures/doctor/status-live.json'), 'utf8');
+    if (pkg.version !== HOST_FACTS.version) {
+      assert.equal(text.includes(pkg.version), false,
+        `this checkout's version (${pkg.version}) is in the committed fixture`);
     }
   });

@@ -61,7 +61,17 @@ jobs:
 
       # A real design-only install, on this platform, at this version — which is what makes the
       # metrics below a measurement rather than an estimate.
+      # ARC-08-C27 — `always()` here too, because the doctor below reports on WHAT THIS STEP MADE.
+      #
+      # `npm test` runs before it, so rc.8's failure skipped this, which skipped the doctor, which
+      # left the `always()` upload with `No files were found`. Making only the doctor unconditional
+      # would have produced a report about a tree that was never installed — an answer to a
+      # different question from the one the artifact exists for, and `install-metrics.mjs` measures
+      # the same install.
+      #
+      # If the bootstrap itself fails, all three fail and say so, which is the truth about that run.
       - name: Install, design-only
+        if: always()
         run: node tools/snowarch/bin/snowarch.mjs bootstrap --mode design --yes --skip-claude-check
       - name: Every citation resolves against the pinned corpus
         run: node tools/snowarch/bin/snowarch.mjs docs verify
@@ -80,7 +90,18 @@ jobs:
       #
       # Nothing here fakes a Claude Code to make the number nicer: the asset is published where
       # anyone can read it, and a lie in it would be worse than a FAIL that is explained.
+      # ARC-08-C27 — `if: always()`, on the doctor and on everything that reads it.
+      #
+      # v2.0.0-rc.8's `verify` failed at `npm test`, so this step never ran, so
+      # `doctor-<os>.json` was never written — and the `always()` upload below then failed on
+      # `No files were found`. **A red release run carried no evidence at all**, which is the run
+      # where the evidence matters most: the artifact exists to explain a failure, and it was
+      # collected only when there was nothing to explain.
+      #
+      # Same reasoning as `ci.yml`'s doctor artifact, which has said `if: always()` since it was
+      # written — this workflow simply never had the failure that shows why.
       - name: The doctor, on the install just made
+        if: always()
         shell: bash
         run: |
           set +e
@@ -90,6 +111,11 @@ jobs:
           set -e
           echo "doctor exit: $code"
           if [ "$code" -ge 2 ]; then exit 1; fi
+      # NOT `always()`, and the distinction is the point: the two steps around it WRITE evidence,
+      # this one JUDGES it. On a job already red for another reason — a failed `npm test`, which is
+      # what started this row — a judgement step that runs anyway adds a second red step that is not
+      # the cause, and on a job whose INSTALL failed it would judge a garbage report loudly. The
+      # artifact carries the doctor either way, which is what was actually missing.
       - name: Judge the report — E-00 is this environment's, nothing else is
         shell: bash
         # `--deps installed` (ARC-09-C20): this job runs `npm ci` before the doctor, for its lint
@@ -99,6 +125,7 @@ jobs:
           node scripts/ci/assert-doctor.mjs --in doctor-${{ matrix.os }}.json \
             --expect-fail E-00 --deps installed
       - name: What the install cost here
+        if: always()
         shell: bash
         run: node scripts/ci/install-metrics.mjs ${{ matrix.os }} > install-metrics-${{ matrix.os }}.json
 
@@ -109,6 +136,9 @@ jobs:
           path: |
             doctor-${{ matrix.os }}.json
             install-metrics-${{ matrix.os }}.json
+          # `error` stays: the two files are the job's evidence and a silent empty artifact is the
+          # thing this row is fixing. What changed is that the steps that WRITE them now run on a
+          # red job too, so `error` fires for a missing file rather than for a skipped step.
           if-no-files-found: error
           retention-days: 30
 

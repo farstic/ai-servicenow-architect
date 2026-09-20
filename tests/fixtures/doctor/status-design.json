@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "product": "snowarch",
-  "version": "2.0.0-dev",
+  "version": "9.9.9",
   "ranAt": "2026-09-20T09:00:00.000Z",
   "durationMs": 0,
   "options": {
@@ -14,9 +14,9 @@
   "modeLine": "Mode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude",
   "modeLineDetailed": "Mode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude",
   "engine": {
-    "version": "2.0.0-dev",
+    "version": "9.9.9",
     "tag": null,
-    "contractSha": "96d056414da54ca793ea9034d9cbdd7028d3af74ea49253468a6e7f97d667ba6",
+    "contractSha": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
     "node": "24.0.0",
     "capabilities": null,
     "docs": {

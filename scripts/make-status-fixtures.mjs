@@ -165,6 +165,25 @@ export const HOST_FACTS = Object.freeze({
    */
   checkoutPath: '~',
   /**
+   * `version`, `engine.version` and `engine.contractSha` — THE COMMIT'S, not the product's.
+   *
+   * ARC-08-C27, and it is the pin table's own rule one axis over. The table was written for facts
+   * that differ between two correct captures on two correct MACHINES; these differ between two
+   * correct captures on two correct COMMITS of one product. `release.mjs` rewrites the version in
+   * the release commit and `dist/contract.json` embeds it, so the sha moves with it — and every
+   * release tag failed the drift test by construction. It was invisible on develop, where the
+   * version never changes, and v2.0.0-rc.8's `verify` job found it on all three platforms.
+   *
+   * So the rule, stated whole: **if a value would differ between two correct captures — on two
+   * machines OR on two commits — it is not the product's, and it is pinned.**
+   *
+   * `9.9.9` is this repository's established fixture-release version (the upgrade harness builds
+   * v9.0.0…v9.2.0), and the sha is `deadbeef` repeated so that nobody reads it as a real pin. The
+   * sample block in the three documents shows them, beside the sample timestamp it already showed.
+   */
+  version: '9.9.9',
+  contractSha: 'deadbeef'.repeat(8),
+  /**
    * `engine.docs.present` / `.head` / `.headMatchesPin` — whether the SUBMODULE IS CHECKED OUT.
    *
    * The `test` job checks out without `vendor/ServiceNowDocs`, the `bootstrap` job with it: two
@@ -223,8 +242,12 @@ function pinMachine(report) {
     ...report,
     ranAt: HOST_FACTS.ranAt,
     durationMs: 0,
+    // BOTH PLACES. `version` is the report's own and `engine.version` is `versionInfo()`'s; they
+    // are filled from one source and pinning one would have left the other moving.
+    version: HOST_FACTS.version,
     prereqs,
-    engine: { ...report.engine, node: HOST_FACTS.node, docs },
+    engine: { ...report.engine, node: HOST_FACTS.node, version: HOST_FACTS.version,
+      contractSha: HOST_FACTS.contractSha, docs },
     checks: report.checks.map((c) => {
       const pinned = HOST_CHECKS[c.id] ? HOST_CHECKS[c.id](c) : c;
       return pinned.durationMs === undefined ? pinned : { ...pinned, durationMs: 0 };
@@ -246,6 +269,14 @@ function pinMachine(report) {
 function assertNoHostValues(report, mode) {
   const text = JSON.stringify(report);
   const real = {
+    // ARC-08-C27 — the COMMIT's facts are checked the same way the machine's are: a capture that
+    // still carries this checkout's version or contract sha is a capture that will fail on the
+    // next release tag, and the guard is what makes that discoverable here instead of there.
+    version: (() => {
+      try {
+        return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version ?? null;
+      } catch { return null; }
+    })(),
     node: process.versions.node,
     git: (() => {
       try {
@@ -275,8 +306,25 @@ function assertNoHostValues(report, mode) {
  * So the byte-identity and committed-file comparisons take the PINNED report, which is what is
  * committed; the masker assertions take the RAW one, which is where a leak would actually be.
  */
-export async function capture(mode, { pin = true, onCheckout = null } = {}) {
+/**
+ * `{ asVersion }` rewrites the fixture checkout's `package.json` version before the capture runs.
+ *
+ * ARC-08-C27 — THE RELEASE SHAPE, EXERCISED ON DEVELOP. The drift this row is about was invisible
+ * here for one reason: the version never changes on develop, so every capture agreed with every
+ * other and the pin table looked complete. It took a release tag to produce a second correct
+ * commit, and by then the tag was red on three platforms.
+ *
+ * This is the injection that removes the wait, and it is the same shape as the injected clock, the
+ * injected separator and the injected `realpath`: a fact the code reads from its surroundings,
+ * handed to it instead, so a condition that needs a different world can be tested in this one.
+ */
+export async function capture(mode, { pin = true, onCheckout = null, asVersion = null } = {}) {
   const root = checkout(mode);
+  if (asVersion) {
+    const pkgPath = join(root, 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+    writeFileSync(pkgPath, `${JSON.stringify({ ...pkg, version: asVersion }, null, 2)}\n`);
+  }
   // The caller may need the path the capture ran in — a test asserting that the home appears in
   // NO spelling has to know what the home was. Told, rather than guessed from the report.
   onCheckout?.(root);
