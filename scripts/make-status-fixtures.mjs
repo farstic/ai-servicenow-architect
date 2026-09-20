@@ -146,6 +146,34 @@ export const HOST_FACTS = Object.freeze({
   ok: true,
   /** The clock: `ranAt`, and every `durationMs` in the report and its checks. */
   ranAt: '2026-09-20T09:00:00.000Z',
+  /**
+   * `.local/`'s file mode — E-11's `data.mode` and the ` · file modes: …` half of its detail.
+   * POSIX reports `700`; Windows has no POSIX mode and reports `acl-inherited`. A property of the
+   * filesystem, not of the checkout.
+   */
+  fileMode: '700',
+  /**
+   * E-05's `detail`, `data.root` and `data.toplevel` — WHERE THE CAPTURE RAN.
+   *
+   * On POSIX the capture's temp checkout sits outside HOME and the masker leaves `~`. On Windows
+   * the temp directory lives UNDER HOME, so the same value arrives as
+   * `~/AppData/Local/Temp/snowarch-doctor-lffMzB` — home-relative, with the run's random suffix.
+   * I argued this one should stay unpinned because "the value being `~` is the assertion"; that
+   * holds only where TMPDIR sits outside HOME, which is two platforms out of three. The masker
+   * regression it was guarding is held by `json-boundary`'s C1 and by the two-TMPDIR test's
+   * explicit `/private~` and `var/folders` absence assertions, so the pin removes nothing.
+   */
+  checkoutPath: '~',
+  /**
+   * `engine.docs.present` / `.head` / `.headMatchesPin` — whether the SUBMODULE IS CHECKED OUT.
+   *
+   * The `test` job checks out without `vendor/ServiceNowDocs`, the `bootstrap` job with it: two
+   * correct jobs on one commit, two byte streams. By the rule, the corpus's presence is the
+   * checkout's and not the product's. `docs.pin` and `docs.family` stay verbatim — they come from
+   * `engine.config.json` and are the product's own answer, and `head` is pinned TO the pin, which
+   * is what a checked-out corpus at the pin reports.
+   */
+  docsPresent: true,
 });
 
 /** Kept as a separate export because three places read the instant and none should retype it. */
@@ -154,6 +182,21 @@ export const FIXED_RAN_AT = HOST_FACTS.ranAt;
 /** The checks whose RESULT is a fact about the host rather than about the checkout. */
 const HOST_CHECKS = Object.freeze({
   'E-01': (c) => ({ ...c, detail: HOST_FACTS.git }),
+  // Where the capture ran. Masked to `~` on POSIX already; home-relative with a random suffix on
+  // Windows, where the temp directory lives under HOME.
+  'E-05': (c) => ({
+    ...c,
+    detail: HOST_FACTS.checkoutPath,
+    ...(c.data ? { data: { ...c.data, root: HOST_FACTS.checkoutPath,
+      toplevel: HOST_FACTS.checkoutPath } } : {}),
+  }),
+  // `.local/`'s file mode, and the half of the detail that quotes it. Rebuilt rather than
+  // overwritten — the rest of the sentence is the checkout's state and is what the fixture shows.
+  'E-11': (c) => ({
+    ...c,
+    detail: String(c.detail ?? '').replace(/\s*·\s*file modes: [^·]*/i, ''),
+    ...(c.data ? { data: { ...c.data, mode: HOST_FACTS.fileMode } } : {}),
+  }),
   'E-02': (c) => {
     const data = c.data ? { ...c.data, version: HOST_FACTS.node } : c.data;
     return { ...c, detail: `${HOST_FACTS.node} (floor ${data?.floor ?? '?'})`, data };
@@ -169,12 +212,19 @@ function pinMachine(report) {
     ...(report.prereqs.deps ? { deps: { ...report.prereqs.deps, ok: HOST_FACTS.ok } } : {}),
   } : report.prereqs;
 
+  const docs = report.engine?.docs ? {
+    ...report.engine.docs,
+    present: HOST_FACTS.docsPresent,
+    head: report.engine.docs.pin ?? null,
+    headMatchesPin: report.engine.docs.pin ? true : null,
+  } : report.engine?.docs;
+
   return {
     ...report,
     ranAt: HOST_FACTS.ranAt,
     durationMs: 0,
     prereqs,
-    engine: { ...report.engine, node: HOST_FACTS.node },
+    engine: { ...report.engine, node: HOST_FACTS.node, docs },
     checks: report.checks.map((c) => {
       const pinned = HOST_CHECKS[c.id] ? HOST_CHECKS[c.id](c) : c;
       return pinned.durationMs === undefined ? pinned : { ...pinned, durationMs: 0 };

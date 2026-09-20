@@ -90,7 +90,23 @@ export function homeValues(home, { realpath = realpathSync } = {}) {
   let resolved = null;
   try { resolved = realpath(v).replace(/[\\/]+$/, ''); } catch { /* not on disk; the literal stands */ }
 
-  return [...new Set([v, resolved].filter((x) => typeof x === 'string' && x.length >= 4))]
+  // ARC-08-C20 — AND BOTH SEPARATORS, for the same reason as both realpaths.
+  //
+  // On Windows `git rev-parse --show-toplevel` answers with FORWARD slashes while the home arrives
+  // with backslashes, so the by-value mask missed and only the generic `HOME_PATH` pattern fired —
+  // masking `C:/Users/<name>` and leaving `~/AppData/Local/Temp/snowarch-doctor-lffMzB` in the
+  // report. The username was covered; the rest of the path was not, and the value differed per run.
+  // Three Windows cells failed on it. A masker that only works where it was written, a third time,
+  // so this is the third spelling it now knows.
+  // ONE DIRECTION ONLY. A Windows home holds backslashes and git prints forward ones, so the
+  // forward spelling is added. The reverse never happens — a POSIX path has no backslashes to
+  // convert, and generating `\var\folders\x` from `/var/folders/x` would put a string in the
+  // mask list that nothing can produce and something might collide with.
+  const spellings = [v, resolved]
+    .filter((x) => typeof x === 'string')
+    .flatMap((x) => (x.includes('\\') ? [x, x.replace(/\\/g, '/')] : [x]));
+
+  return [...new Set(spellings.filter((x) => x.length >= 4))]
     .sort((a, b) => b.length - a.length);
 }
 

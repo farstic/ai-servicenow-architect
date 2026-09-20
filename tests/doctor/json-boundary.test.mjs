@@ -186,6 +186,17 @@ test('C1 — with the run\'s home set to the fixture root, that root appears now
   assert.deepEqual(homeValues('/var/folders/x', { realpath: () => { throw new Error('ENOENT'); } }),
     ['/var/folders/x']);
 
+  // ARC-08-C20 — BOTH SEPARATORS, driven with a Windows-shaped value on any platform. `git
+  // rev-parse --show-toplevel` answers with forward slashes on Windows while the home arrives with
+  // backslashes, so a by-value mask holding one spelling missed the other: the report kept
+  // `~/AppData/Local/Temp/snowarch-doctor-<random>` — the username masked by the generic pattern,
+  // the rest of the path left behind, different every run. Three Windows cells failed on it.
+  const win = homeValues('C:\\Users\\someone\\AppData\\Local\\Temp\\run',
+    { realpath: (x) => x });
+  assert.ok(win.includes('C:\\Users\\someone\\AppData\\Local\\Temp\\run'));
+  assert.ok(win.includes('C:/Users/someone/AppData/Local/Temp/run'),
+    'the forward-slash spelling git prints on Windows is not masked');
+
   let json = '';
   await doctorCommand({ flags: { json: true, 'no-network': true, 'no-cache': true },
     out: { write: (s) => { json += s; } }, cwd: root, home: fakeHome, input: { isTTY: false } });

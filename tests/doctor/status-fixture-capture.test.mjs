@@ -16,7 +16,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, symlinkSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { capture, FIXED_RAN_AT, FIXTURE_STORE, HOST_FACTS } from '../../scripts/make-status-fixtures.mjs';
@@ -26,6 +27,26 @@ import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 const committed = (mode) => JSON.parse(readFileSync(
   join(REAL_ROOT, `tests/fixtures/doctor/status-${mode}.json`), 'utf8'));
+
+/**
+ * ARC-08-C20 — WHY THERE IS NO CORPUS PRECONDITION HERE, and why that is the stronger answer.
+ *
+ * A checkout without `vendor/ServiceNowDocs` used to capture `docs.present: false`, `head: null`,
+ * `headMatchesPin: null`, and this test reported a six-line byte diff: every line true, none of
+ * them the reason. The first fix was a precondition that named the missing submodule before
+ * comparing bytes — which made the failure legible and left the bytes depending on it.
+ *
+ * That was the wrong half. CI proved it: the `test` job checks out WITHOUT the submodule and the
+ * `bootstrap` job WITH it, so two correct jobs on one commit produced two byte streams, and a
+ * precondition would have turned five green cells into five explained failures. By the rule the
+ * pin table encodes — *if the value would differ between two correct captures on two correct
+ * machines, it is the machine's* — the corpus's PRESENCE is the checkout's and belongs in
+ * `HOST_FACTS`, which is where it now is. `docs.pin` and `docs.family` stay verbatim: those are
+ * `engine.config.json`'s answer and they are the product's.
+ *
+ * So the fixture says `present: true` on a machine with no corpus for the same reason it says
+ * `os: 'darwin'` on Linux. It is a sample, not a measurement of whoever ran the capture.
+ */
 
 test('the committed fixtures are what the capture produces, today', { timeout: 120_000 }, async () => {
   // THE WHOLE POINT. Not "the fixture parses" or "the fixture has these keys" — those were true of
@@ -95,6 +116,20 @@ test('every fact about the capturing machine is the sample value, not this machi
     assert.equal(r.engine.node, HOST_FACTS.node);
     const byId = new Map(r.checks.map((c) => [c.id, c]));
     assert.equal(byId.get('E-01').detail, HOST_FACTS.git);
+    // Where the capture ran. On Windows the temp directory is under HOME, so this arrives as
+    // `~/AppData/Local/Temp/snowarch-doctor-<random>` — home-relative AND per-run.
+    assert.equal(byId.get('E-05').detail, HOST_FACTS.checkoutPath);
+    assert.equal(byId.get('E-05').data.root, HOST_FACTS.checkoutPath);
+    assert.equal(byId.get('E-05').data.toplevel, HOST_FACTS.checkoutPath);
+    // `.local/`'s file mode: `700` on POSIX, `acl-inherited` on Windows — the filesystem's answer.
+    assert.equal(byId.get('E-11').data.mode, HOST_FACTS.fileMode);
+    assert.equal(/file modes:/i.test(byId.get('E-11').detail), false,
+      'the Windows file-mode clause survived into the detail');
+    // Whether the submodule is checked out: the `test` CI job has no corpus, the `bootstrap` job
+    // does, and both are correct. The pin is what makes their bytes agree.
+    assert.equal(r.engine.docs.present, HOST_FACTS.docsPresent);
+    assert.equal(r.engine.docs.head, r.engine.docs.pin);
+    assert.equal(r.engine.docs.headMatchesPin, true);
     assert.equal(byId.get('E-02').data.version, HOST_FACTS.node);
     // …and the floor beside it is the PRODUCT's, captured verbatim — pinning that would freeze a
     // fact the fixture exists to show.
@@ -132,7 +167,7 @@ test('the clock and the capturing process are pinned, and nothing else is', () =
   }
 });
 
-test('the capture is byte-identical under two different TMPDIRs, one behind a symlink',
+test('the capture is byte-identical under three TMPDIR layouts, including one under HOME',
   { timeout: 120_000 }, async (t) => {
     // THE CONTROL FOR THE SECOND FINDING. The committed fixture carried `toplevel: '/private~'`:
     // the capture had run in a checkout under macOS's default temp dir, whose realpath is
@@ -150,11 +185,18 @@ test('the capture is byte-identical under two different TMPDIRs, one behind a sy
     const linked = join(tempDir('snowarch-tmp-real-', t), 'through-a-link');
     mkdirSync(join(linked, '..', 'target'), { recursive: true });
     symlinkSync(join(linked, '..', 'target'), linked);
+    // THE THIRD ONE IS THE WINDOWS SHAPE, run on every platform. There the temp directory lives
+    // under HOME, so E-05's `toplevel` comes back `~/AppData/Local/Temp/snowarch-doctor-<random>`
+    // — home-relative and different every run. Three Windows cells failed on exactly that, and a
+    // test with only the two POSIX layouts could not have seen it from here.
+    const underHome = join(homedir(), '.snowarch-capture-probe');
+    mkdirSync(underHome, { recursive: true });
+    t.after(() => rmSync(underHome, { recursive: true, force: true }));
 
     const before = process.env.TMPDIR;
     const captures = [];
     try {
-      for (const dir of [plain, linked]) {
+      for (const dir of [plain, linked, underHome]) {
         process.env.TMPDIR = dir;
         captures.push(await capture('live'));
       }
@@ -162,8 +204,10 @@ test('the capture is byte-identical under two different TMPDIRs, one behind a sy
       if (before === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = before;
     }
 
-    assert.deepEqual(captures[0], captures[1],
-      'the capture depends on where it ran — a machine path reached the fixture');
+    for (const [n, other] of captures.slice(1).entries()) {
+      assert.deepEqual(captures[0], other,
+        `the capture depends on where it ran — TMPDIR #${n + 2} produced different bytes`);
+    }
     // And the committed file agrees with both, which is the half that would otherwise be assumed.
     assert.deepEqual(captures[0], committed('live'));
 
