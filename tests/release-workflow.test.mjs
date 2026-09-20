@@ -208,8 +208,15 @@ test('the real doctor fixtures are publishable — including the live one, which
 test('an unmasked address in a report is refused, and the value is never printed', (t) => {
   const root = tempDir('snowarch-assets-', t);
   const report = JSON.parse(readFileSync(join(REAL_ROOT, 'tests/fixtures/doctor/status-live.json'), 'utf8'));
-  // The shape the mask exists to prevent: a username that reached the report whole.
-  report.server.instances[0].username = ['someone', '@', 'corp.example.com'].join('');
+  // The shape the mask exists to prevent: an account name that reached the report whole.
+  //
+  // ARC-08-C20 — the plant site moved from `server.instances[0].username`, which no longer exists:
+  // a `--quick` capture has no server block (ARC-09-C8) and the `instances` block carries only a
+  // label, an environment and a preset (ARC-08-C19). A check's `detail` is where one could still
+  // arrive — several of them quote a store entry — so that is where it is planted now. What is
+  // being proved is unchanged: an address ANYWHERE in a report stops the publish, and the value is
+  // not echoed into the job log.
+  report.checks[0].detail = `store entry for ${['someone', '@', 'corp.example.com'].join('')}`;
   write(root, 'doctor-ubuntu-latest.json', `${JSON.stringify(report, null, 2)}\n`);
 
   const r = assets(root, ['doctor-ubuntu-latest.json']);
