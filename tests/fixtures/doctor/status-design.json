@@ -52,8 +52,7 @@
     },
     "store": {
       "exists": false
-    },
-    "capabilities": null
+    }
   },
   "checks": [
     {

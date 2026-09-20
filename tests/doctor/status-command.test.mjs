@@ -415,3 +415,71 @@ test('ARC-08-C21 — the two absences are told apart, by name', async (t) => {
   assert.equal(line.includes('store not read'), false,
     'it blamed the store for an absence the contract caused');
 });
+
+/**
+ * ARC-08-C24 — one check's answer, one key.
+ *
+ * E-04 resolves the capability packs once, and the report carried them TWICE: `engineBlock` wrote
+ * `engine.capabilities` and the report assembly wrote `prereqs.capabilities`, from the same
+ * expression, at two sites a hundred lines apart. They agreed only because both read
+ * `data('E-04')?.packs`.
+ *
+ * That is not a tidiness complaint. Two renderers read the two keys — the `/snowarch status` panel
+ * reads `engine`, the doctor's own text report read `prereqs` — so the day either write site
+ * changed, the two surfaces would have disagreed about the same check's answer with nothing in the
+ * suite to notice. The duplicate is gone rather than kept in step.
+ */
+describe('ARC-08-C24 — the capability packs appear under one key', () => {
+  const capabilitiesKeys = (value, path = '', found = []) => {
+    if (!value || typeof value !== 'object') return found;
+    if (Array.isArray(value)) {
+      value.forEach((v, i) => capabilitiesKeys(v, `${path}[${i}]`, found));
+      return found;
+    }
+    for (const [k, v] of Object.entries(value)) {
+      if (k === 'capabilities') found.push(path ? `${path}.${k}` : k);
+      capabilitiesKeys(v, path ? `${path}.${k}` : k, found);
+    }
+    return found;
+  };
+
+  test('the emitted report names it exactly once, and it is the one the template names', async (t) => {
+    const out = sink();
+    await statusCommand({ out, cwd: greenTree(t), flags: { json: true }, registry: registry({}) });
+    const report = JSON.parse(out.text());
+
+    assert.deepEqual(capabilitiesKeys(report), ['engine.capabilities'],
+      'the packs are under more than one key, or under the wrong one');
+    // `null` on a quick run — E-04 spawns and is outside the subset — and the KEY is still there,
+    // which is how a consumer tells "not asked" from "asked and empty".
+    assert.equal('capabilities' in report.engine, true);
+  });
+
+  test('the text report reads the value the writer meant', async (t) => {
+    // The reader-vs-writer half: the renderer could have gone on reading a key nobody writes and
+    // simply printed nothing, which looks identical to "no packs found" on the screen.
+    const { renderText } = await import('../../tools/snowarch/lib/doctor/report-text.mjs');
+    const { buildReport } = await import('../../tools/snowarch/lib/doctor/report-json.mjs');
+
+    const packs = { docx: { present: true, how: '/usr/bin/python3' }, pdf: { present: false },
+      drawio: { present: false }, mermaid: { present: false } };
+    const report = buildReport({
+      summary: { ok: 1, warn: 0, fail: 0, skip: 0, fixable: 0 },
+      engine: { version: '9.9.9-fixture', tag: null, contractSha: null, node: null,
+        capabilities: packs, docs: null, roster: null },
+      prereqs: { os: 'darwin', shell: 'bash' },
+      checks: [], results: [],
+    });
+
+    const text = renderText({ report, checks: [] });
+    assert.match(text, /Capabilities: docx yes \(python3\)/);
+    // And it is not reading the old key: a report with packs ONLY under `prereqs` prints no line.
+    const stale = buildReport({
+      summary: { ok: 1, warn: 0, fail: 0, skip: 0, fixable: 0 },
+      prereqs: { os: 'darwin', shell: 'bash', capabilities: packs },
+      checks: [], results: [],
+    });
+    assert.equal(/Capabilities:/.test(renderText({ report: stale, checks: [] })), false,
+      'the renderer is still reading prereqs.capabilities');
+  });
+});

@@ -301,12 +301,16 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
       // run's measured answer is never replaced by a cheaper one.
       { docsFallback: () => configuredDocs({ root }) }),
     instances: instanceBlock,
-    prereqs: {
-      ...collectPrereqs({ root, config, env }),
-      // E-04 resolved these; the renderer's `Capabilities:` line reads them from here rather than
-      // resolving them again.
-      capabilities: data('E-04')?.packs ?? null,
-    },
+    // ARC-08-C24 — E-04's packs live under `engine.capabilities` and NOWHERE ELSE.
+    //
+    // They were written twice, from the same expression, at two sites a hundred lines apart:
+    // `engineBlock` filled `engine.capabilities` and this block filled `prereqs.capabilities`. The
+    // two agreed only because both read `data('E-04')?.packs` — so the day either site changed,
+    // the panel (which reads `engine`) and the doctor's own text report (which read `prereqs`)
+    // would have disagreed about the same check's answer, with nothing to notice. One check, one
+    // key: `prereqs` carries what `collectPrereqs` measures and the capability packs are not
+    // among them.
+    prereqs: collectPrereqs({ root, config, env }),
     // Filled by ARC-08-S03's detectors, from their own results — `null` until one of them ran, so
     // a `--section contract` run does not claim there are no leftovers.
     stale: results.some((r) => ['E-23', 'E-24'].includes(r.id) && r.status !== 'skip')
