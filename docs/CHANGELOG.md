@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.0-rc.8 — 2026-09-20
+
+### Notes
+
 This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
 
 #### Migration for snow-mcp 1.0.0 users
@@ -1867,6 +1871,37 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   engine pin and its sha are untouched.
 
 ---
+
+### Added
+
+- engine: instance and store --help list every sub-command the dispatcher takes (aae4b8e)
+- doctor: every panel line is producible by the quick run the skill mandates (b4ef9ff)
+- doctor: ./snowarch status renders the panel the skill used to render (68cbfb7)
+
+### Fixed
+
+- server: shellRemedy recognises the checkout under either separator (a0af4f3)
+- doctor: the capability packs are one key, not two (eac99cb)
+- server: maskPath matches a prefix under either separator (cffffe7)
+- engine: four lines that stated more than they measured, or nothing at all (555acb8)
+- doctor: the Mode line reports flags that were read, not flags it assumed (a0fe164)
+- doctor: pin every field that reads the host, and mask a Windows path both ways (54a31c5)
+- doctor: a path is masked whichever way it is spelled, and the capture pins the machine (e3ca720)
+- server: the LAST PROBE column shows every fact the record holds (6283a72)
+- doctor: the not-probed sentence agrees with its own subject (5d04a80)
+- server: instance add keeps the probes it took (87d375c)
+- doctor: currency is measured, never inherited from an upgrade (17f8cb2)
+
+### Internal
+
+- the doctor artifact is held to the product's own schema, and carries the quick run (89c84bf)
+- engine: the B04 size is asserted on the line the step prints (da922a0)
+- doctor: the masker assertion states its contract instead of a bug signature (baaf40f)
+- doctor: the masker assertions run on the raw capture, where a leak would be (625162c)
+- doctor: the status fixtures are captured from a real run, and checked (864cf34)
+- release: the cache key test asserts what its title promises (e71fa99)
+
+Tag v2.0.0-rc.8 · contract 59bf850bfb29 · docs-pin df4afac
 
 ## The imported engine's header
 
