@@ -243,6 +243,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A session's status panel shows your instances and your documentation corpus again.** Two of its
+  seven lines — the instance list and the `Docs:` line carrying the release family — were blank on
+  the quick run a session makes, because the checks that filled them had been moved out of that run
+  for speed. Both are read cheaply now: the instances from the store (labels, environments and
+  presets, with the panel saying that nothing was probed), and the corpus pin and family from the
+  configuration, with one quick check that the corpus is actually on the pin — and a line that says
+  so when it is not.
+
 - **`instance list` shows every probe result, not five of seven.** The `LAST PROBE` column printed
   `auth`, `write`, `scripting`, `cmdb` and `atf` and silently dropped Now Assist and Fluent — so an
   instance whose Now Assist probe came back `not licensed` listed as a row of `ok`s. It now prints

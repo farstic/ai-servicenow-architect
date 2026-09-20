@@ -17,7 +17,11 @@ export const SCHEMA_VERSION = 1;
 export const SCHEMA_KEYS = Object.freeze([
   'schema', 'product', 'version', 'ranAt', 'durationMs', 'options',
   'mode', 'modeLine', 'modeLineDetailed',
-  'engine', 'server', 'prereqs', 'checks', 'fixes', 'stale', 'summary',
+  // ARC-08-C19 — `instances` is TOP-LEVEL and carries its own source, rather than being folded
+  // into `server`. `server` means "the server answered": a quick run never spawns it, and putting
+  // a store read under that key would report a file read as a handshake. One key, one meaning,
+  // and a consumer that needs to know which it has is told.
+  'engine', 'server', 'instances', 'prereqs', 'checks', 'fixes', 'stale', 'summary',
 ]);
 
 const CHECK_KEYS = Object.freeze([
@@ -59,7 +63,7 @@ export function checkToJson(result, check) {
  */
 export function buildReport({
   results = [], checks = [], summary, options = {}, ranAt, durationMs = 0, prereqs = null,
-  root, engine = null, server = null, stale = null, mode = null, modeLine = null,
+  root, engine = null, server = null, instances = null, stale = null, mode = null, modeLine = null,
   modeLineDetailed = null, fixes = [],
 } = {}) {
   const byId = new Map(checks.map((c) => [c.id, c]));
@@ -83,6 +87,10 @@ export function buildReport({
     engine: engine ?? (root ? { version: engineVersion(root), tag: null, contractSha: contractSha(root),
       docs: null, roster: null, capabilities: null } : null),
     server,
+    // `{ source: 'store' | 'server', entries: [...] }`, or null when neither ran. The source is
+    // not decoration: the store knows a label, an environment and a preset, and the server knows
+    // whether any of it works.
+    instances,
     prereqs,
     checks: results.map((r) => checkToJson(r, byId.get(r.id))),
     fixes,
@@ -148,7 +156,7 @@ export function validateReport(report) {
   }
 
   // The keys a later story fills: object or null, never a string that happened to be handy.
-  for (const key of ['engine', 'server', 'stale', 'prereqs']) {
+  for (const key of ['engine', 'server', 'instances', 'stale', 'prereqs']) {
     if (report[key] !== null && !isObject(report[key])) fail(key, 'object or null');
   }
   for (const key of ['mode', 'modeLine', 'modeLineDetailed']) {

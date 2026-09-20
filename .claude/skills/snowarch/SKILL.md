@@ -46,7 +46,7 @@ Docs: vendor/ServiceNowDocs @ 11b39be17307 (australia) · sparse
 Roster: 28 skills / 9 agents
 Instances: pdi (pdi, custom) · uat (test, read-only)
 Doctor: 28 ok, 0 warn, 0 fail — quick run 2026-09-10 19:48 UTC · full report: ./snowarch doctor
-Capability packs and citation counts are not probed on a quick run — ./snowarch doctor reports them.
+Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.
 ```
 
 3. **The exit code is the doctor's verdict, not the command's health.** `1` means a check failed,

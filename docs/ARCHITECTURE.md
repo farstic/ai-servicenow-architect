@@ -1374,6 +1374,7 @@ consumer must not have to ask which version of the doctor produced its input.
   "modeLineDetailed": null,
   "engine": null,
   "server": null,
+  "instances": null,
   "prereqs": null,
   "checks": [
     {

@@ -339,7 +339,7 @@ Create an incident on the live instance for the outage.
    Roster: 28 skills / 9 agents
    Instances: pdi (pdi, custom) · uat (test, read-only)
    Doctor: 28 ok, 0 warn, 0 fail — quick run 2026-09-10 19:48 UTC · full report: ./snowarch doctor
-   Capability packs and citation counts are not probed on a quick run — ./snowarch doctor reports them.
+   Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.
    ```
 
    A line whose key came back empty is **left out** by the command, not guessed — on the `--quick`

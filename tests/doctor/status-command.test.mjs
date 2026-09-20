@@ -7,7 +7,7 @@
  * emit the doctor's report under `--json` rather than a shape of its own, and return the doctor's
  * verdict as the exit code without letting that suppress the panel.
  */
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -184,4 +184,118 @@ test('the command writes no file', async (t) => {
   // inputs that decide whether it is stale. Nothing else, and nothing outside `.local/`.
   assert.deepEqual(localAfter.filter((f) => !localBefore.includes(f)),
     ['doctor-last.inputs.json', 'doctor-last.json']);
+});
+
+/**
+ * ARC-08-C19 — the wiring, driven through the real `runDoctor`.
+ *
+ * `panel.test.mjs` hands `renderPanel` a report and proves the READER. It says nothing about
+ * whether anything WRITES `report.instances` or fills `engine.docs` on the run the skill mandates,
+ * and that gap is how ARC-07-C5 and ARC-09-C19 both reached a user: a resolver with green tests and
+ * no writer. These drive `statusCommand` on a fixture checkout and read what comes out.
+ */
+describe('ARC-08-C19 — the quick run produces the lines the skill specifies', () => {
+  const STORE = {
+    version: 1,
+    defaultInstance: 'pdi',
+    instances: {
+      pdi: { url: 'https://example.test', environment: 'pdi', preset: 'custom',
+        auth: { method: 'basic', username: 'u', password: 'p' },
+        flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false },
+      uat: { url: 'https://example.test', environment: 'test', preset: 'read-only',
+        auth: { method: 'basic', username: 'u', password: 'p' },
+        flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false },
+    },
+  };
+
+  const withStore = (t) => {
+    const root = greenTree(t);
+    writeFileSync(join(root, '.local', 'instances.json'),
+      `${JSON.stringify(STORE, null, 2)}\n`, { mode: 0o600 });
+    return root;
+  };
+
+  test('names the instances from the store, and says that is where they came from', async (t) => {
+    const root = withStore(t);
+    const out = sink();
+    await statusCommand({ out, cwd: root, registry: registry({}) });
+    const text = out.text();
+
+    assert.ok(text.includes('Instances: pdi (pdi, custom) · uat (test, read-only)'), text);
+    assert.ok(text.includes("Instances are the store's own records; nothing was probed."));
+    // No credential and no host reaches a line a person pastes into a conversation.
+    assert.equal(text.includes('example.test'), false);
+    assert.equal(/\bp\b\s*$/.test(text), false);
+  });
+
+  test('marks the source in --json so a consumer can tell a read from a handshake', async (t) => {
+    const root = withStore(t);
+    const out = sink();
+    await statusCommand({ out, cwd: root, flags: { json: true }, registry: registry({}) });
+    const report = JSON.parse(out.text());
+
+    assert.equal(report.instances.source, 'store');
+    assert.equal(report.instances.entries.length, 2);
+    // `server` still means "the server answered", and on a quick run nothing did.
+    assert.equal(report.server, null);
+    assert.equal('instances' in report, true, 'the key is absent from schema v1');
+  });
+
+  test('an empty store is no instances block at all, not an empty one', async (t) => {
+    // The difference between "nobody asked" and "asked and there are none" is the distinction
+    // ARC-08-C17 was about; an empty `entries` would erase it again.
+    const out = sink();
+    await statusCommand({ out, cwd: greenTree(t), registry: registry({}) });
+    assert.equal(out.text().includes('Instances:'), false);
+    assert.equal(out.text().includes("store's own records"), false);
+  });
+
+  test('fills the docs line from the configured corpus and one bounded rev-parse', async (t) => {
+    const root = greenTree(t);
+    const out = sink();
+    await statusCommand({ out, cwd: root, flags: { json: true }, registry: registry({}) });
+    const docs = JSON.parse(out.text()).engine.docs;
+
+    // The two facts a grounding decision turns on, on the run the skill mandates.
+    assert.equal(typeof docs.pin, 'string');
+    assert.equal(docs.family, 'australia');
+    // …and the fields a quick run cannot know stay null, which schema v1 reads as "not filled".
+    // `null` is not `false`: a corpus nobody compared has not failed to match anything.
+    assert.equal(docs.citations, null);
+    assert.equal(docs.familyMatches, null);
+    assert.ok(docs.headMatchesPin === null || typeof docs.headMatchesPin === 'boolean');
+  });
+});
+
+test('ARC-08-C19 — the instances block carries no account name, whatever its source', async (t) => {
+  // FOUND BY `fix.test.mjs`, NOT BY THIS FILE. The first version copied the server's own entries
+  // into the new key wholesale, and those carry a `username` — masked, but still address-shaped —
+  // so a masked account name reached the doctor CACHE, which is a file an issue template asks a
+  // stranger to paste. The redaction test caught it within the hour.
+  //
+  // The block is narrowed to what the panel renders: a report that travels must not carry a field
+  // nothing reads. This asserts the property directly rather than relying on the redactor to keep
+  // catching it, because the redactor's test is about the cache and this is about the key.
+  const root = greenTree(t);
+  writeFileSync(join(root, '.local', 'instances.json'), `${JSON.stringify({
+    version: 1,
+    defaultInstance: 'pdi',
+    instances: {
+      pdi: { url: 'https://example.test', environment: 'pdi', preset: 'custom',
+        auth: { method: 'basic', username: 'someone@corp.example.com', password: 'p' },
+        flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false },
+    },
+  }, null, 2)}\n`, { mode: 0o600 });
+
+  const out = sink();
+  await statusCommand({ out, cwd: root, flags: { json: true }, registry: registry({}) });
+  const block = JSON.parse(out.text()).instances;
+
+  assert.deepEqual(Object.keys(block).sort(), ['entries', 'source']);
+  for (const entry of block.entries) {
+    assert.deepEqual(Object.keys(entry).sort(), ['environment', 'label', 'preset']);
+  }
+  const serialised = JSON.stringify(block);
+  assert.equal(/@/.test(serialised), false, 'an address-shaped string is in the instances block');
+  assert.equal(serialised.includes('example.test'), false, 'a host is in the instances block');
 });

@@ -96,10 +96,13 @@ export function serverBlock(answer) {
  * a second reading of the same files. The rest of the header comes from the checks, which is where
  * it is measured.
  */
-export function engineBlock(results = [], info = {}) {
+export function engineBlock(results = [], info = {}, { docsFallback = null } = {}) {
   const { version = null, contractSha = null, tag = null } = info;
   const data = (id) => results.find((r) => r.id === id)?.data ?? null;
-  const docs = data('E-12');
+  // ARC-08-C19 — E-12's answer when it ran, the configured corpus when it did not, null when
+  // there is no corpus to describe at all. The fallback is a THUNK so that a full run never pays
+  // for it: E-12's data is the measured answer and it wins without the cheap one being computed.
+  const docs = data('E-12') ?? (docsFallback ? docsFallback() : null);
   return {
     version,
     // The tag NAME, which is what a reader quotes. `null` on a development checkout, honestly:
@@ -108,8 +111,25 @@ export function engineBlock(results = [], info = {}) {
     contractSha,
     node: data('E-02')?.version ?? null,
     capabilities: data('E-04')?.packs ?? null,
+    // ARC-08-C19 — the CHECK's answer first, the object's own second. E-13 and E-14 are where the
+    // pin and the family are measured against the corpus, and they win whenever they ran; the
+    // `?? docs.x` half is what a quick run has, and without it the fallback's fields were computed
+    // and then dropped on the floor by this mapping — the defect one layer below itself.
     docs: docs ? { present: docs.present, mode: docs.mode ?? null,
-      pin: data('E-13')?.pin ?? null, family: data('E-14')?.family ?? null,
+      pin: data('E-13')?.pin ?? docs.pin ?? null,
+      family: data('E-14')?.family ?? docs.family ?? null,
+      // The one bounded `rev-parse` a quick run pays for, and the comparison it buys. `null` on a
+      // full run only if E-13 did not record them; `false` means the corpus has drifted off the
+      // pin and the panel says so on its own line.
+      head: data('E-13')?.head ?? docs.head ?? null,
+      headMatchesPin: data('E-13')?.head !== undefined && data('E-13')?.pin !== undefined
+        ? data('E-13').head === data('E-13').pin
+        : docs.headMatchesPin ?? null,
+      // E-14 is where the corpus BRANCH is compared against the configured family. It was never
+      // mapped into this block at all, so `familyMatches` was `undefined` for every consumer and
+      // the panel's "not probed" sentence could not name the branch — a key read by a renderer and
+      // written by nobody. `null` when E-14 did not run, which a quick run never does.
+      familyMatches: data('E-14') ? data('E-14').family === docs.family : docs.familyMatches ?? null,
       citations: data('E-16')?.checked ?? null, dead: data('E-16')?.dead ?? null } : null,
     roster: data('E-17') ? { skills: data('E-17').skills, agents: data('E-17').agents } : null,
   };
