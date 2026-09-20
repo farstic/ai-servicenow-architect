@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -223,13 +223,22 @@ test('the capture is byte-identical under three TMPDIR layouts, including one un
     try {
       for (const dir of [plain, linked, underHome]) {
         process.env.TMPDIR = dir;
-        raw.push(JSON.stringify(await capture('live', { pin: false })));
+        // Resolved INSIDE the callback: `capture` removes the checkout in its `finally`, and a
+        // `realpathSync` afterwards fails with ENOENT on the very path being asserted about.
+        let roots = [];
+        const report = await capture('live', {
+          pin: false,
+          onCheckout: (r) => {
+            roots = [...new Set([r, realpathSync(r)].flatMap((v) => [v, v.replace(/\\/g, '/')]))];
+          },
+        });
+        raw.push({ text: JSON.stringify(report), report, roots });
       }
     } finally {
       if (before === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = before;
     }
 
-    for (const [n, text] of raw.entries()) {
+    for (const [n, { text, report, roots }] of raw.entries()) {
       const where = `layout #${n + 1}`;
       // (b) the unresolved prefix left in front of the mask: `/var/…` replaced inside
       // `/private/var/…`.
@@ -237,10 +246,28 @@ test('the capture is byte-identical under three TMPDIR layouts, including one un
       // …and no temp path survived under either spelling.
       assert.equal(/"[^"]*\/(?:private\/)?var\/folders/.test(text), false,
         `${where}: a temp path survived the masker`);
-      // (c2) the Windows shape: a home-relative remainder after the mask. `~/` followed by
-      // anything is the signature — on Windows it was `~/AppData/Local/Temp/snowarch-doctor-…`.
-      assert.equal(/"~[\\/][^"]*(?:AppData|Temp|snowarch-doctor)/.test(text), false,
-        `${where}: a home-relative path survived the masker`);
+      // (c2) THE POSITIVE FORM, and the negative one it replaced was wrong in principle.
+      //
+      // That assertion read `/"~[\\/][^"]*(?:AppData|Temp|snowarch-doctor)/` and called a
+      // home-relative path a masking failure. On a raw Windows capture under the default TMPDIR,
+      // `toplevel` is legitimately `~/AppData/Local/Temp/snowarch-doctor-<random>`: the home WAS
+      // replaced by `~`, which is the mask working. The masker's contract is *the home never
+      // appears in any spelling*, not *no path under the home is ever shown*. Three Windows cells
+      // failed on it, and it passed here only because macOS's layout #3 path happens to contain
+      // none of those three words — a Windows string used as a bug signature, which is the mirror
+      // of the mistake it was written to catch.
+      //
+      // So: the path is rooted at the mask…
+      const toplevel = report.checks.find((c) => c.id === 'E-05')?.data?.toplevel;
+      assert.match(String(toplevel), /^~([\\/]|$)/,
+        `${where}: the capture root is not masked at all (${toplevel})`);
+      // …and the absolute home appears in NO spelling: as given, as resolved, and each with the
+      // separator git prints. That is the contract, stated as what must be true.
+      assert.ok(roots.length >= 1, `${where}: the capture did not report its checkout`);
+      for (const spelling of roots) {
+        assert.equal(text.includes(spelling), false,
+          `${where}: the capture root survived the masker as ${spelling}`);
+      }
       // …and no backslash spelling of the capture root escaped either.
       assert.equal(/"[^"]*\\\\(?:Users|AppData)\\\\/.test(text), false,
         `${where}: a backslash-spelled home path survived the masker`);

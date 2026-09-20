@@ -275,8 +275,11 @@ function assertNoHostValues(report, mode) {
  * So the byte-identity and committed-file comparisons take the PINNED report, which is what is
  * committed; the masker assertions take the RAW one, which is where a leak would actually be.
  */
-export async function capture(mode, { pin = true } = {}) {
+export async function capture(mode, { pin = true, onCheckout = null } = {}) {
   const root = checkout(mode);
+  // The caller may need the path the capture ran in — a test asserting that the home appears in
+  // NO spelling has to know what the home was. Told, rather than guessed from the report.
+  onCheckout?.(root);
   try {
     const chunks = [];
     const code = await statusCommand({
