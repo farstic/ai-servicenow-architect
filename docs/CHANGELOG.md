@@ -243,6 +243,16 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **A path in a report is masked whichever way it is spelled.** On macOS the temp directory is
+  reached by two names — `/var/folders/…` and its real `/private/var/folders/…` — and a report
+  quoting the resolved one had only the unresolved prefix replaced, leaving `/private` in front of
+  the mask. Both spellings are masked now, the longer one first.
+
+- **The sample panel in the documentation is captured from a real run, not transcribed.**
+  `node scripts/make-status-fixtures.mjs` produces the two reports the docs and the tests read, and
+  a test re-runs it and fails if they have drifted from what the product produces. The previous
+  pair had been committed by hand and one of them could no longer be produced at all.
+
 - **A session's status panel shows your instances and your documentation corpus again.** Two of its
   seven lines — the instance list and the `Docs:` line carrying the release family — were blank on
   the quick run a session makes, because the checks that filled them had been moved out of that run

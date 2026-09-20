@@ -31,17 +31,20 @@ test('the live fixture renders to exactly these bytes', () => {
   // fixed report's fixed rendering, so the test that matters is the one that writes the rendering
   // out in full. If a line moves, this fails and a person reads the diff — which is what the skill
   // asked a model to do from a description.
+  // The version, the contract sha and the docs pin are READ FROM THE FIXTURE, not spelled: they
+  // move with a release, and `tests/version-literals.test.mjs` forbids the version of record
+  // appearing in a test at all — the release script writes the new version before the post-write
+  // gates run, so a literal here fails the release commit itself. Everything the renderer DECIDES
+  // is still spelled out in full, which is what this assertion is for.
   assert.equal(renderPanel(LIVE), [
     LIVE.modeLineDetailed,
-    `Engine: snowarch ${LIVE.engine.version} · contract a96863b1104b`,
-    'Docs: vendor/ServiceNowDocs @ 11b39be17307 (australia) · sparse',
+    `Engine: snowarch ${LIVE.engine.version} · contract ${LIVE.engine.contractSha.slice(0, 12)}`,
+    `Docs: vendor/ServiceNowDocs @ ${LIVE.engine.docs.pin.slice(0, 12)} (australia) · sparse`,
     'Roster: 28 skills / 9 agents',
-    'Instances: pdi (pdi, custom) · uat (test, read-only)',
-    'Doctor: 28 ok, 0 warn, 0 fail — quick run 2026-09-10 19:48 UTC · full report: ./snowarch doctor',
-    // ARC-08-C19 — the corpus branch joined the list. This fixture predates ARC-09-C8 and carries
-    // no `familyMatches` at all, which the sentence reads as "not measured" and names, correctly.
-    'Capability packs, citation counts and the corpus branch are not probed on a quick run'
-      + ' — ./snowarch doctor reports them.',
+    'Instances: pdi (pdi, custom)',
+    'Doctor: 14 ok, 0 warn, 0 fail — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor',
+    'Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.',
+    "Instances are the store's own records; nothing was probed.",
   ].join('\n'));
 });
 
@@ -93,7 +96,9 @@ test('the same report renders identically under a different ambient environment'
   }
   // And the stamp is the report's own instant, in UTC, said out loud.
   assert.equal(ranAtLine('2026-09-10T19:48:24.123Z'), '2026-09-10 19:48 UTC');
-  assert.match(first, /quick run 2026-09-10 19:48 UTC/);
+  // The fixture's own pinned instant (ARC-08-C20 pins the clock so a capture is comparable), read
+  // from the report rather than spelled again here — a second literal is a second thing to move.
+  assert.match(first, new RegExp(`quick run ${ranAtLine(LIVE.ranAt)}`));
 });
 
 test('nothing in the renderer\'s import graph reaches the filesystem, the environment or a clock', () => {
@@ -235,15 +240,17 @@ test('the instances line prints what the report carries and no more', () => {
   // ARC-08-C19 — it takes the `instances` BLOCK now, or a bare array. `report.server` is null on
   // every quick run, which is why the line it used to read was unproducible by the command the
   // skill mandates.
-  assert.equal(instancesLine({ source: 'server', entries: LIVE.server.instances }),
-    'Instances: pdi (pdi, custom) · uat (test, read-only)');
-  assert.equal(instancesLine(LIVE.server.instances),
-    'Instances: pdi (pdi, custom) · uat (test, read-only)');
+  assert.equal(instancesLine(LIVE.instances), 'Instances: pdi (pdi, custom)');
+  assert.equal(instancesLine(LIVE.instances.entries), 'Instances: pdi (pdi, custom)');
+  assert.equal(instancesLine({ source: 'server', entries: [
+    { label: 'pdi', environment: 'pdi', preset: 'custom' },
+    { label: 'uat', environment: 'test', preset: 'read-only' },
+  ] }), 'Instances: pdi (pdi, custom) · uat (test, read-only)');
   assert.equal(instancesLine({ source: 'store', entries: [{ label: 'pdi', environment: 'pdi',
     preset: 'custom', default: true }] }), 'Instances: pdi (pdi, custom, default)');
   // Design-only: an empty list is not a line saying there are none.
   assert.equal(instancesLine({ source: 'store', entries: [] }), null);
-  assert.equal(instancesLine(DESIGN.server?.instances ?? null), null);
+  assert.equal(instancesLine(DESIGN.instances), null);
   assert.equal(instancesLine(null), null);
 });
 

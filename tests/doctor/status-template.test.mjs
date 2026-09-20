@@ -84,20 +84,12 @@ test('every mapped key is a key of schema v1', () => {
 
 test('every bracketed key resolves against a report the doctor really produced', () => {
   const live = report('live');
-  // ARC-08-C19 — this fixture is a PRE-C8, PRE-C19 capture and is knowingly stale: it carries a
-  // `server` block from a `--quick` run, which no current quick run produces (ARC-09-C8 took the
-  // server section out of the subset), and it predates the `instances` key. It cannot be
-  // regenerated as a quick run by the current product at all, so it is left exactly as captured —
-  // forging a key into a file whose test says "a report the doctor really produced" would make
-  // that sentence false. The keys added since are excluded here and asserted against a REAL
-  // current report in the test below, which is the stronger form of what this was standing in for.
-  assert.deepEqual(validateReport(live).filter((p) => !/^instances:/.test(p)), [],
-    'the live fixture is not a valid schema-v1 report, for a reason other than its age');
-  // Keys added after this fixture was captured are resolved against a CURRENT report
-  // instead, in the test at the bottom of this file. Listing them is deliberate: an unexplained
-  // `filter` here would quietly excuse the next key too.
-  const ADDED_SINCE = ['instances'];
-  for (const key of mappedKeys().filter((k) => !ADDED_SINCE.includes(k.split('.')[0]))) {
+  // ARC-08-C20 — no exclusions any more. C19 had to excuse the `instances` key by name because
+  // this file predated it and could not be regenerated; it is captured from the current product by
+  // `scripts/make-status-fixtures.mjs` now, and `status-fixture-capture.test.mjs` re-runs that
+  // capture and fails if the two have drifted. The excuse is gone and the assertion is whole.
+  assert.deepEqual(validateReport(live), [], 'the live fixture is not a valid schema-v1 report');
+  for (const key of mappedKeys()) {
     // `capabilities` is legitimately null on a quick run — the check that fills it spawns and is
     // outside the quick subset. The template says so, and this test asserts the KEY exists rather
     // than that it has a value.
@@ -108,20 +100,26 @@ test('every bracketed key resolves against a report the doctor really produced',
 
 test('the design fixture is a valid report with no instances', () => {
   const design = report('design');
-  // Same age, same exclusion — and the same replacement below.
-  assert.deepEqual(validateReport(design).filter((p) => !/^instances:/.test(p)), []);
+  assert.deepEqual(validateReport(design), []);
   assert.equal(design.mode, 'design-only');
   assert.deepEqual(design.server?.instances ?? [], [],
     'the design fixture has instances — then it is not a design-only fixture');
 });
 
-test('the live fixture has two instances and a detailed mode line to quote', () => {
+test('the live fixture is a quick run with one instance, from the store', () => {
+  // ARC-08-C20 — ONE instance, not two, and it comes from `instances` rather than `server`.
+  //
+  // The two-instance fixture was captured before ARC-09-C8 took the server section out of the
+  // quick subset; a quick run cannot produce a `server` block at all now, so the second instance
+  // was there to exercise the mode line's `+1 instance (uat)` suffix and nothing else. One
+  // instance is what a capture can honestly produce, and the suffix is exercised by
+  // `mode-and-cache.test.mjs`, which owns that line.
   const live = report('live');
   assert.equal(live.mode, 'live');
-  assert.equal(live.server.instances.length, 2);
+  assert.equal(live.server, null);
+  assert.equal(live.instances.source, 'store');
+  assert.equal(live.instances.entries.length, 1);
   assert.match(live.modeLineDetailed, /^Mode: live — /);
-  // The second instance is named in the line, which is what the template's `Instances:` row shows.
-  assert.match(live.modeLineDetailed, /\+1 instance \(uat\)/);
 });
 
 test('neither fixture carries a clear username, a password or an instance URL', () => {

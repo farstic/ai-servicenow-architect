@@ -333,13 +333,14 @@ Create an incident on the live instance for the outage.
    drift):
 
    ```
-   Mode: live — pdi (pdi) · preset custom · WRITE=off CMDB_WRITE=off SCRIPTING=off ATF=off NOW_ASSIST=off FLUENT=off · 397 tools (contract) · +1 instance (uat)
-   Engine: snowarch 2.0.0-dev · contract a96863b1104b
-   Docs: vendor/ServiceNowDocs @ 11b39be17307 (australia) · sparse
+   Mode: live — pdi (pdi) · preset custom · WRITE=off CMDB_WRITE=off SCRIPTING=off ATF=off NOW_ASSIST=off FLUENT=off · 397 tools (contract)
+   Engine: snowarch 2.0.0-dev · contract 96d056414da5
+   Docs: vendor/ServiceNowDocs @ df4afacf9bce (australia) · sparse
    Roster: 28 skills / 9 agents
-   Instances: pdi (pdi, custom) · uat (test, read-only)
-   Doctor: 28 ok, 0 warn, 0 fail — quick run 2026-09-10 19:48 UTC · full report: ./snowarch doctor
+   Instances: pdi (pdi, custom)
+   Doctor: 14 ok, 0 warn, 0 fail — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
    Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.
+   Instances are the store's own records; nothing was probed.
    ```
 
    A line whose key came back empty is **left out** by the command, not guessed — on the `--quick`
