@@ -17,6 +17,7 @@
  * The store remains authoritative: this is a mirror, and ARC-07's `set-default` re-mirrors it.
  */
 import { readFileSync } from 'node:fs';
+import { applyDependencyRule, expandPreset, PRESETS } from '../utils/permissions.js';
 /**
  * `{ label }` when the store names a default, `null` otherwise — including when the file is
  * missing or malformed. A mirror that threw would make an unreadable store fail a step whose job
@@ -63,18 +64,14 @@ export function readDefaultSummary(storePath) {
     // Named explicitly, one at a time. A spread of the entry would carry the credential block.
     return { label, environment: str(entry?.environment), preset: str(entry?.preset) };
 }
-/**
- * Every configured instance, named — ARC-08-C17.
- *
- * SV-03's cheap half: who is in the store, without a probe, a network call or a spawned server.
- * The doctor's quick run needs this because `deriveMode` was deciding "design-only" from an empty
- * instance list that was empty only because nobody had asked — and the SessionStart hook prints
- * that line, while the rule file forbids every MCP call in design-only. A checkout with a working
- * instance could not get a single tool called.
- *
- * Same discipline as its two siblings: three non-secret fields per entry, named one at a time, and
- * a test pins the key set. A spread of the entry would carry the credential block.
- */
+const KNOWN_PRESETS = [...Object.keys(PRESETS), 'custom'];
+function effectiveFlagsOf(label, preset, raw) {
+    if (!preset || !KNOWN_PRESETS.includes(preset))
+        return null;
+    const stored = raw?.flags;
+    const custom = (stored && typeof stored === 'object' ? stored : {});
+    return applyDependencyRule(expandPreset(preset, custom), label).effective;
+}
 export function readStoreSummaries(storePath) {
     let parsed;
     try {
@@ -89,6 +86,11 @@ export function readStoreSummaries(storePath) {
     const str = (v) => (typeof v === 'string' && v.length > 0 ? v : null);
     return Object.entries(instances).map(([label, raw]) => {
         const entry = raw;
-        return { label, environment: str(entry?.environment), preset: str(entry?.preset) };
+        const preset = str(entry?.preset);
+        // Named one at a time, never a spread: a spread of the entry would carry the credential block,
+        // which is the rule this reader and its two siblings are built on. `effectiveFlags` is derived,
+        // not copied — six `'true'`/`'false'` strings and nothing from the entry itself.
+        return { label, environment: str(entry?.environment), preset,
+            effectiveFlags: effectiveFlagsOf(label, preset, raw) };
     });
 }

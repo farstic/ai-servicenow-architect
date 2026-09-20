@@ -18,6 +18,9 @@
  */
 import { readFileSync } from 'node:fs';
 
+import { applyDependencyRule, expandPreset, PRESETS, type Flags, type PresetName }
+  from '../utils/permissions.js';
+
 export interface DefaultLabel {
   label: string;
 }
@@ -86,7 +89,33 @@ export function readDefaultSummary(storePath: string): DefaultSummary | null {
  * Same discipline as its two siblings: three non-secret fields per entry, named one at a time, and
  * a test pins the key set. A spread of the entry would carry the credential block.
  */
-export function readStoreSummaries(storePath: string): DefaultSummary[] {
+/**
+ * ARC-08-C21 — a summary that can answer "what is this instance allowed to do".
+ *
+ * `effectiveFlags` is what the SERVER would gate on, computed here with the server's own two
+ * functions rather than a second reading: `expandPreset` turns a named preset into six explicit
+ * strings (and `custom` into the entry's own), `applyDependencyRule` then turns off anything whose
+ * prerequisite is off. Two encodings of that rule disagree the moment a dependency is added, and
+ * `DEPENDENCIES` is already the one definition both the server and the wizard read.
+ *
+ * `null` when the entry names a preset this build does not know — which is a real possibility on a
+ * store written by a newer version. Guessing `read-only` would understate it and `full` would
+ * overstate it; saying nothing is what the caller can render honestly.
+ */
+export interface StoreSummary extends DefaultSummary {
+  effectiveFlags: Flags | null;
+}
+
+const KNOWN_PRESETS: readonly string[] = [...Object.keys(PRESETS), 'custom'];
+
+function effectiveFlagsOf(label: string, preset: string | null, raw: unknown): Flags | null {
+  if (!preset || !KNOWN_PRESETS.includes(preset)) return null;
+  const stored = (raw as { flags?: unknown } | undefined)?.flags;
+  const custom = (stored && typeof stored === 'object' ? stored : {}) as Partial<Flags>;
+  return applyDependencyRule(expandPreset(preset as PresetName, custom), label).effective;
+}
+
+export function readStoreSummaries(storePath: string): StoreSummary[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(storePath, 'utf8'));
@@ -98,6 +127,11 @@ export function readStoreSummaries(storePath: string): DefaultSummary[] {
   const str = (v: unknown) => (typeof v === 'string' && v.length > 0 ? v : null);
   return Object.entries(instances).map(([label, raw]) => {
     const entry = raw as { environment?: unknown; preset?: unknown } | undefined;
-    return { label, environment: str(entry?.environment), preset: str(entry?.preset) };
+    const preset = str(entry?.preset);
+    // Named one at a time, never a spread: a spread of the entry would carry the credential block,
+    // which is the rule this reader and its two siblings are built on. `effectiveFlags` is derived,
+    // not copied — six `'true'`/`'false'` strings and nothing from the entry itself.
+    return { label, environment: str(entry?.environment), preset,
+      effectiveFlags: effectiveFlagsOf(label, preset, raw) };
   });
 }

@@ -17,7 +17,7 @@ import { fallbackPanel, statusCommand } from '../../tools/snowarch/lib/commands/
 import { maskForJson } from '../../tools/snowarch/lib/doctor/json-boundary.mjs';
 import { BANNER } from '../../tools/snowarch/lib/text.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
-import { greenTree } from './helpers/tree.mjs';
+import { greenTree, linkInstall } from './helpers/tree.mjs';
 
 /** A collector standing in for stdout, so nothing in a test reaches a terminal. */
 const sink = () => {
@@ -298,4 +298,120 @@ test('ARC-08-C19 — the instances block carries no account name, whatever its s
   const serialised = JSON.stringify(block);
   assert.equal(/@/.test(serialised), false, 'an address-shaped string is in the instances block');
   assert.equal(serialised.includes('example.test'), false, 'a host is in the instances block');
+});
+
+/**
+ * ARC-08-C21 — the most-quoted line in the product was reporting flags nobody had read.
+ *
+ * `modeLineDetailed`'s caller took `effectiveFlags` from the SERVER's instance list, which has been
+ * empty on every `--quick` run since ARC-09-C8 moved the server section out of the subset. The
+ * summary's `flags = {}` default then rendered every name as `off`, so a live user read
+ * `WRITE=off CMDB_WRITE=off …` about an instance whose store says five of the six are on — in the
+ * line the SessionStart banner, `./snowarch mode` and the panel all quote verbatim.
+ *
+ * A flag nobody read, printed as a flag that is off: absence rendered as a finding, in the sentence
+ * this product repeats most often.
+ */
+describe('ARC-08-C21 — the mode line reports the flags that are actually set', () => {
+  const storeWith = (root, over) => {
+    writeFileSync(join(root, '.local', 'instances.json'), `${JSON.stringify({
+      version: 1,
+      defaultInstance: 'pdi',
+      instances: {
+        pdi: {
+          url: 'https://example.test', environment: 'pdi', preset: 'custom',
+          auth: { method: 'basic', username: 'u', password: 'p' },
+          flags: {
+            WRITE_ENABLED: 'true', CMDB_WRITE_ENABLED: 'true', SCRIPTING_ENABLED: 'true',
+            ATF_ENABLED: 'true', NOW_ASSIST_ENABLED: 'true', FLUENT_ENABLED: 'false',
+          },
+          toolPackage: 'full', maxRecords: 100, prodWriteAck: false,
+          ...over,
+        },
+      },
+    }, null, 2)}\n`, { mode: 0o600 });
+    return root;
+  };
+
+  // `linkInstall` because the flag LABELS come from the contract, and a fixture without it has no
+  // list of names to render — a different absence from "the flags were not read", which the line
+  // now distinguishes. A real checkout has both.
+  const live = (t) => linkInstall(greenTree(t, { mode: 'live' }));
+
+  const modeLineFrom = async (root) => {
+    const out = sink();
+    await statusCommand({ out, cwd: root, flags: { json: true }, registry: registry({}) });
+    return JSON.parse(out.text()).modeLineDetailed;
+  };
+
+  test('a quick live run prints the store\'s own flags, and never six offs', async (t) => {
+    // The owner's state: five on, FLUENT off, on the run a session actually makes.
+    const line = await modeLineFrom(storeWith(live(t), {}));
+
+    assert.match(line, /^Mode: live — pdi \(pdi\)/);
+    assert.ok(line.includes('WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off'),
+      line);
+    // The defect, named as what must not come back.
+    assert.equal(line.includes('WRITE=off CMDB_WRITE=off'), false,
+      'the line reports six offs for a store that says otherwise');
+  });
+
+  test('the dependency rule is applied, not just the stored flags', async (t) => {
+    // SCRIPTING requires WRITE. A store that declares scripting without write is a contradiction,
+    // and the server gates on `false` — so the line must say `off`, not repeat the declaration.
+    // Computed by the server's own `applyDependencyRule`, never a second encoding of the graph.
+    const line = await modeLineFrom(storeWith(live(t), {
+      flags: {
+        WRITE_ENABLED: 'false', CMDB_WRITE_ENABLED: 'false', SCRIPTING_ENABLED: 'true',
+        ATF_ENABLED: 'true', NOW_ASSIST_ENABLED: 'false', FLUENT_ENABLED: 'false',
+      },
+    }));
+    assert.ok(line.includes('WRITE=off CMDB_WRITE=off SCRIPTING=off ATF=on'), line);
+  });
+
+  test('a live run whose flags could not be read says so, in words', async (t) => {
+    // A store written by a newer build naming a preset this one does not know. Guessing
+    // `read-only` would understate it and `full` would overstate it — and OMITTING the summary
+    // would be a shorter line nobody notices, which is absence hidden one step later.
+    const line = await modeLineFrom(storeWith(live(t),
+      { preset: 'a-preset-from-a-newer-build' }));
+
+    assert.match(line, /^Mode: live — /);
+    assert.ok(line.includes('flags unknown (store not read)'), line);
+    assert.equal(/WRITE=(on|off)/.test(line), false, 'it invented a flag state it had not read');
+  });
+
+  test('design-only prints no flag summary at all', async (t) => {
+    // There is no instance for the flags to be about. This is the one case where saying nothing is
+    // the honest answer rather than the quiet one.
+    const line = await modeLineFrom(linkInstall(greenTree(t, { mode: 'design' })));
+    assert.match(line, /^Mode: design-only/);
+    assert.equal(/WRITE=|flags unknown/.test(line), false, line);
+  });
+});
+
+test('ARC-08-C21 — the two absences are told apart, by name', async (t) => {
+  // `flagSummary` returns null for two different reasons and the line must not conflate them. My
+  // first version said `(store not read)` unconditionally and the first fixture to reach it had a
+  // readable store and no contract — a sentence stating a cause that was not the one, in the line
+  // the banner quotes. The rule this repository applies to remedies applies to a parenthesis too.
+  const unlinked = greenTree(t, { mode: 'live' });
+  writeFileSync(join(unlinked, '.local', 'instances.json'), `${JSON.stringify({
+    version: 1,
+    defaultInstance: 'pdi',
+    instances: {
+      pdi: { url: 'https://example.test', environment: 'pdi', preset: 'full',
+        auth: { method: 'basic', username: 'u', password: 'p' },
+        flags: {}, toolPackage: 'full', maxRecords: 100, prodWriteAck: false },
+    },
+  }, null, 2)}\n`, { mode: 0o600 });
+
+  const out = sink();
+  await statusCommand({ out, cwd: unlinked, flags: { json: true }, registry: registry({}) });
+  const line = JSON.parse(out.text()).modeLineDetailed;
+
+  // The store IS readable here; the contract is what is missing, and the line says so.
+  assert.ok(line.includes('flags unknown (contract unavailable)'), line);
+  assert.equal(line.includes('store not read'), false,
+    'it blamed the store for an absence the contract caused');
 });

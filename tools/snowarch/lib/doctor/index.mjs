@@ -273,7 +273,16 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     modeLineDetailed: modeLineDetailed(derived, {
       contract,
       instances,
-      flags: instances.find((i) => i.label === derived.instance?.label)?.effectiveFlags ?? null,
+      // ARC-08-C21 — the SERVER's effective flags when it answered, the STORE's when it did not.
+      //
+      // `instances` is the server's list and is empty on every `--quick` run since ARC-09-C8, so
+      // this resolved to `null` and the line printed six `off`s about an instance whose store says
+      // otherwise. `fromStore` already carries `effectiveFlags`, computed by the server's own
+      // `expandPreset` + `applyDependencyRule` rather than a second encoding of the rule — so the
+      // quick path states what the server would gate on, and says nothing when the store could not
+      // be read at all.
+      flags: (probed ? instances : fromStore)
+        .find((i) => i.label === derived.instance?.label)?.effectiveFlags ?? null,
       toolCount: toolCount === null
         ? (contract ? { count: contract.tools.length, source: 'contract' } : null)
         : { count: toolCount, source: 'server' },
