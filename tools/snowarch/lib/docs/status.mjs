@@ -132,6 +132,76 @@ function measure(corpus) {
 }
 
 /**
+ * ARC-08-C19 — the corpus, as much of it as a `--quick` run may pay for.
+ *
+ * `docsStatus` is not available to a quick run: it spawns git five times — `rev-parse` in the
+ * submodule, `branchOf`, `sparseOf`, and `gitlinkOf`'s two — and `verify: false` does not change
+ * that, it only skips `verifyCitations`. ARC-09-C8 moved E-12…E-15 out of the quick subset for
+ * exactly that cost, and the consequence nobody had noticed was that `engine.docs` came back null,
+ * so the panel's `Docs:` line — the one carrying the release family a grounding decision turns on —
+ * was omitted on the one run SKILL.md mandates.
+ *
+ * WHAT THIS COSTS: two file reads the doctor has already done, one `existsSync`, and ONE bounded
+ * git call.
+ *
+ *   `pin` and `family`    `engine.config.json`, already parsed by `doctorCommand`
+ *   `mode`                `.local/bootstrap-state.json`, already read for `registration`
+ *   `present`             one `existsSync`
+ *   `head`                `git rev-parse HEAD` in the submodule — the one call
+ *
+ * THE ONE CALL IS THE POINT, not a convenience. Without it this function reports the corpus the
+ * checkout is CONFIGURED for, and a `Docs:` line naming a pin the corpus has drifted off would be
+ * asserting what it did not measure — the defect this programme has spent the week removing. With
+ * it, `headMatchesPin` is a measurement, and a drifted corpus says so on the first line a session
+ * prints. Bounded and offline: `rev-parse` reads `.git/HEAD`, touches no network, and carries an
+ * explicit timeout, because C8's contract is about the worst case and the shared `git()` helper
+ * above has no deadline at all.
+ *
+ * Every field this cannot know stays `null`, which schema v1 already defines as "no check filled
+ * it": `citations`, `branch`, `familyMatches`, `gitlink`, `pinMatchesGitlink`. `family` is the
+ * CONFIGURED family and `branch` is what the corpus is actually on; naming the first as if it were
+ * the second is the same error one layer down, so only the first is filled here.
+ */
+export function configuredDocs({ root = process.cwd(), exec = execFileSync, timeoutMs = 2000 } = {}) {
+  let docs;
+  try {
+    ({ docs } = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8')));
+  } catch { return null; }
+  if (!docs) return null;
+
+  const corpus = join(root, CORPUS_DIR);
+  const present = existsSync(join(corpus, 'markdown'));
+
+  let head = null;
+  if (present) {
+    try {
+      head = exec('git', ['rev-parse', 'HEAD'],
+        { cwd: corpus, encoding: 'utf8', stdio: 'pipe', timeout: timeoutMs, maxBuffer: 1024 * 64 })
+        .trim() || null;
+    } catch { head = null; }
+  }
+
+  return {
+    present,
+    path: CORPUS_DIR,
+    pin: docs.pin ?? null,
+    family: docs.family ?? null,
+    mode: recordedMode(root),
+    head,
+    // `null` when there was nothing to compare, not `false`: a corpus that is absent has not
+    // failed to match a pin, and the two readings send a reader to different remedies.
+    headMatchesPin: head === null || !docs.pin ? null : head === docs.pin,
+    gitlink: null,
+    pinMatchesGitlink: null,
+    branch: null,
+    familyMatches: null,
+    citations: null,
+    dead: null,
+    source: 'configured',
+  };
+}
+
+/**
  * Everything ARC-08 needs about the corpus, in one object.
  *
  * `verify` defaults to true. The doctor's `--quick` path and the SessionStart banner pass

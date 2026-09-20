@@ -75,6 +75,15 @@ export function docsLine(docs) {
     + `${docs.family ? ` (${docs.family})` : ''}`;
   const parts = [head];
   if (docs.mode) parts.push(docs.mode);
+  // ARC-08-C19 — the drift, when it was measured and is real. A `Docs:` line naming a pin the
+  // corpus is not on would be asserting what it did not measure, which is why the quick run spends
+  // one bounded `rev-parse` to find out. `null` is "not compared" and says nothing; `true` is the
+  // normal case and also says nothing, because a line that announces agreement on every healthy
+  // run is a line readers learn to skip.
+  if (docs.headMatchesPin === false) {
+    parts.push(`corpus is on ${shortSha(docs.head) ?? 'an unknown commit'}, NOT the pin`
+      + ' — ./snowarch docs sync');
+  }
   if (docs.citations !== null && docs.citations !== undefined) {
     parts.push(`citations checked: ${docs.citations} | dead: ${docs.dead ?? 0}`);
   }
@@ -89,21 +98,22 @@ export const rosterLine = (roster) => (roster
 /**
  * `Instances: pdi (pdi, custom, default) · uat (test, read-only)`
  *
- * READ THIS BEFORE EXPECTING IT ON A QUICK RUN. `report.server` is null whenever no server check
- * ran, and since ARC-09-C8 that includes every `--quick` run — so this line is omitted on exactly
- * the run SKILL.md mandates. That is the null rule working, not a gap being papered over: the Mode
- * line already carries the default instance's label, environment, preset and flags, and the full
- * list is `./snowarch instance list`. Raised as a question in its own right — see the row.
+ * ARC-08-C19 — it reads `report.instances`, not `report.server`. `server` is null on every
+ * `--quick` run (ARC-09-C8 took the section out), so this line was omitted on exactly the run
+ * SKILL.md mandates — a line specified by a skill and unproducible by the command that skill
+ * mandates. `report.instances` carries the store's own records on a quick run and the server's
+ * when one answered, with `source` saying which; `notProbedLine` states the difference rather than
+ * leaving a reader to infer it from a line that looks identical either way.
  */
-export function instancesLine(server) {
-  const instances = server?.instances ?? [];
-  if (instances.length === 0) return null;
+export function instancesLine(instances) {
+  const entries = Array.isArray(instances) ? instances : (instances?.entries ?? []);
+  if (entries.length === 0) return null;
   const one = (i) => {
     const inner = [i.environment, i.preset].filter(Boolean);
     if (i.default === true || i.isDefault === true) inner.push('default');
     return inner.length ? `${i.label} (${inner.join(', ')})` : String(i.label);
   };
-  return `Instances: ${instances.map(one).join(' · ')}`;
+  return `Instances: ${entries.map(one).join(' · ')}`;
 }
 
 /** `Doctor: 12 ok, 1 warn, 1 fail — quick run 2026-09-19 22:11 UTC · full report: ./snowarch doctor` */
@@ -127,18 +137,29 @@ export function doctorLine(report) {
 export function notProbedLine(report) {
   const missing = [];
   if (!report?.engine?.capabilities) missing.push('Capability packs');
-  const citations = report?.engine?.docs?.citations;
-  if (report?.engine?.docs && (citations === null || citations === undefined)) {
+  const docs = report?.engine?.docs;
+  const citations = docs?.citations;
+  if (docs && (citations === null || citations === undefined)) {
     missing.push('citation counts');
   }
+  // ARC-08-C19 — the corpus's BRANCH is the half the one bounded `rev-parse` does not buy. The
+  // commit is compared against the pin; whether the corpus is on the configured family is
+  // `branchOf`, which is one of the spawns C8 moved out. Named here rather than implied by a
+  // `(australia)` on the Docs line that is the config's word for it.
+  // `?? null` rather than `=== null`: an older report has no such key at all, and a renderer that
+  // treated "absent" as "measured" would go quiet about the one thing it is here to name.
+  if (docs && (docs.familyMatches ?? null) === null) missing.push('the corpus branch');
   if (missing.length === 0) return null;
   // ALWAYS `are`. The first version chose the verb from `missing.length`, which looked like
   // agreement and was keyed to the wrong thing: the number that governs it is the subject's, not
   // the list's, and BOTH subjects are plural nouns. One null key produced "Capability packs is not
   // probed" — a sentence disagreeing with itself in the line whose whole job is to be quoted
   // verbatim. There is no singular case to handle here, so there is no conditional.
-  return `${missing.join(' and ')} are not probed on a quick run`
-    + ' — ./snowarch doctor reports them.';
+  // Oxford-comma list once there are three: "a, b and c". Two stay "a and b".
+  const subject = missing.length > 2
+    ? `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}`
+    : missing.join(' and ');
+  return `${subject} are not probed on a quick run — ./snowarch doctor reports them.`;
 }
 
 /**
@@ -208,7 +229,7 @@ export function renderPanel(report) {
     docsLine(report?.engine?.docs),
     rosterLine(report?.engine?.roster),
     capabilitiesLine(report?.engine?.capabilities),
-    instancesLine(report?.server),
+    instancesLine(report?.instances ?? report?.server?.instances ?? null),
     doctorLine(report),
     // A line whose key is null is OMITTED, never guessed — the rule SKILL.md stated and a model
     // applied by hand. `filter` is that rule, in one place, for all seven.
@@ -222,6 +243,14 @@ export function renderPanel(report) {
 
   const notProbed = notProbedLine(report);
   if (notProbed) lines.push(notProbed);
+
+  // ARC-08-C19 — WHERE the instances came from, said out loud when it was the store. A store read
+  // knows a label, an environment and a preset; it knows nothing about whether any of it works,
+  // and the line it produces looks identical to one the server answered. Stated rather than
+  // implied is the whole rule this row is built on.
+  if (report?.instances?.source === 'store') {
+    lines.push('Instances are the store\'s own records; nothing was probed.');
+  }
 
   return lines.join('\n');
 }

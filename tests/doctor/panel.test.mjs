@@ -38,7 +38,9 @@ test('the live fixture renders to exactly these bytes', () => {
     'Roster: 28 skills / 9 agents',
     'Instances: pdi (pdi, custom) · uat (test, read-only)',
     'Doctor: 28 ok, 0 warn, 0 fail — quick run 2026-09-10 19:48 UTC · full report: ./snowarch doctor',
-    'Capability packs and citation counts are not probed on a quick run'
+    // ARC-08-C19 — the corpus branch joined the list. This fixture predates ARC-09-C8 and carries
+    // no `familyMatches` at all, which the sentence reads as "not measured" and names, correctly.
+    'Capability packs, citation counts and the corpus branch are not probed on a quick run'
       + ' — ./snowarch doctor reports them.',
   ].join('\n'));
 });
@@ -198,26 +200,30 @@ test('what a quick run did not probe is read off the report, not remembered', ()
   // printed "Capability packs is not probed". Both subjects are plural nouns, so all three
   // assertions below pin `are`, and the one-key cases are the ones that were wrong.
   assert.equal(notProbedLine(LIVE),
-    'Capability packs and citation counts are not probed on a quick run'
+    'Capability packs, citation counts and the corpus branch are not probed on a quick run'
     + ' — ./snowarch doctor reports them.');
 
   const withPacks = { ...LIVE, engine: { ...LIVE.engine, capabilities: { docx: { present: true } } } };
   assert.equal(notProbedLine(withPacks),
-    'citation counts are not probed on a quick run — ./snowarch doctor reports them.');
+    'citation counts and the corpus branch are not probed on a quick run'
+    + ' — ./snowarch doctor reports them.');
 
   // The case the owner hit on a design-only clone: capabilities null, citations present.
   const withCitations = { ...LIVE,
     engine: { ...LIVE.engine, docs: { ...LIVE.engine.docs, citations: 181, dead: 0 } } };
   assert.equal(notProbedLine(withCitations),
-    'Capability packs are not probed on a quick run — ./snowarch doctor reports them.');
+    'Capability packs and the corpus branch are not probed on a quick run'
+    + ' — ./snowarch doctor reports them.');
 
   // …and a report with no docs block at all names only what it can: the citation counts are not
   // missing from a corpus that is not there, they are not a fact about this checkout.
   const noDocs = { ...withPacks, engine: { ...withPacks.engine, docs: null } };
   assert.equal(noDocs.engine.capabilities !== null, true);
   assert.equal(notProbedLine(noDocs), null);
-  const full = { ...LIVE, engine: { ...LIVE.engine,
-    capabilities: { docx: { present: true } }, docs: { ...LIVE.engine.docs, citations: 181 } } };
+  // Everything measured: capabilities resolved, citations counted, and the branch compared — the
+  // last of which only a full run does.
+  const full = { ...LIVE, engine: { ...LIVE.engine, capabilities: { docx: { present: true } },
+    docs: { ...LIVE.engine.docs, citations: 181, familyMatches: true } } };
   assert.equal(notProbedLine(full), null);
 });
 
@@ -226,10 +232,89 @@ test('the instances line prints what the report carries and no more', () => {
   // and NO default marker, while the SKILL.md sample line showed `(pdi, custom, default)`. That
   // word was an invention of the prose renderer: there is no key for it in a schema-v1 instance.
   // It prints when a report does carry one, and is silent otherwise.
-  assert.equal(instancesLine(LIVE.server), 'Instances: pdi (pdi, custom) · uat (test, read-only)');
-  assert.equal(instancesLine({ instances: [{ label: 'pdi', environment: 'pdi', preset: 'custom',
-    default: true }] }), 'Instances: pdi (pdi, custom, default)');
+  // ARC-08-C19 — it takes the `instances` BLOCK now, or a bare array. `report.server` is null on
+  // every quick run, which is why the line it used to read was unproducible by the command the
+  // skill mandates.
+  assert.equal(instancesLine({ source: 'server', entries: LIVE.server.instances }),
+    'Instances: pdi (pdi, custom) · uat (test, read-only)');
+  assert.equal(instancesLine(LIVE.server.instances),
+    'Instances: pdi (pdi, custom) · uat (test, read-only)');
+  assert.equal(instancesLine({ source: 'store', entries: [{ label: 'pdi', environment: 'pdi',
+    preset: 'custom', default: true }] }), 'Instances: pdi (pdi, custom, default)');
   // Design-only: an empty list is not a line saying there are none.
-  assert.equal(instancesLine(DESIGN.server), null);
+  assert.equal(instancesLine({ source: 'store', entries: [] }), null);
+  assert.equal(instancesLine(DESIGN.server?.instances ?? null), null);
   assert.equal(instancesLine(null), null);
+});
+
+/**
+ * ARC-08-C19 — every line the skill specifies is producible by the command the skill mandates.
+ *
+ * `Instances:` read `report.server`, and `Docs:` read `engine.docs` which only E-12 filled. Both
+ * are null on every `--quick` run since ARC-09-C8 moved the server section and the docs group out
+ * of the subset — so two of the seven lines were specified by SKILL.md and unproducible by the
+ * `--quick` run SKILL.md mandates. The store read that fills the first was ALREADY HAPPENING and
+ * being dropped, which is ARC-07-C5's shape a third time.
+ */
+test('the instances line comes from the store when no server answered', () => {
+  const quick = { ...DESIGN,
+    instances: { source: 'store', entries: [
+      { label: 'pdi', environment: 'pdi', preset: 'custom' },
+      { label: 'uat', environment: 'test', preset: 'read-only' },
+    ] } };
+  const lines = renderPanel(quick).split('\n');
+  assert.ok(lines.includes('Instances: pdi (pdi, custom) · uat (test, read-only)'));
+  // …and WHERE they came from, because the line looks identical either way and the difference is
+  // the whole of what a store read does not know.
+  assert.ok(lines.includes("Instances are the store's own records; nothing was probed."));
+});
+
+test('a server-answered list says nothing about the store', () => {
+  const answered = { ...DESIGN,
+    instances: { source: 'server', entries: [{ label: 'pdi', environment: 'pdi', preset: 'custom' }] } };
+  const text = renderPanel(answered);
+  assert.ok(text.includes('Instances: pdi (pdi, custom)'));
+  assert.equal(text.includes("the store's own records"), false);
+});
+
+test('the docs line survives a quick run, and names the drift when there is drift', () => {
+  // The pin and the family are the facts a grounding decision turns on and they are two reads of
+  // `engine.config.json`. What the one bounded `rev-parse` buys is the difference between naming
+  // a pin and knowing the corpus is on it.
+  const agreeing = { ...DESIGN, engine: { ...DESIGN.engine, docs: { present: true, mode: 'sparse',
+    pin: 'a'.repeat(40), family: 'australia', head: 'a'.repeat(40), headMatchesPin: true,
+    citations: null, dead: null, familyMatches: null } } };
+  assert.equal(docsLine(agreeing.engine.docs),
+    `Docs: vendor/ServiceNowDocs @ ${'a'.repeat(12)} (australia) · sparse`);
+
+  // A line that announced agreement on every healthy run is a line readers learn to skip, so
+  // `true` says nothing and `false` says it loudly.
+  const drifted = { ...agreeing.engine.docs, head: 'b'.repeat(40), headMatchesPin: false };
+  assert.equal(docsLine(drifted),
+    `Docs: vendor/ServiceNowDocs @ ${'a'.repeat(12)} (australia) · sparse`
+    + ` · corpus is on ${'b'.repeat(12)}, NOT the pin — ./snowarch docs sync`);
+
+  // Not compared is not "agrees": a quick run that could not reach the submodule says nothing
+  // rather than implying the corpus is fine.
+  const uncompared = { ...agreeing.engine.docs, head: null, headMatchesPin: null };
+  assert.equal(docsLine(uncompared).includes('NOT the pin'), false);
+});
+
+test('the not-probed sentence names the branch too, and reads as a list of three', () => {
+  // `familyMatches` is the half the one bounded call does not buy — `branchOf` is one of the
+  // spawns C8 moved out. Named, rather than implied by an `(australia)` that is the config's word
+  // for it.
+  const quick = { ...DESIGN, engine: { ...DESIGN.engine, capabilities: null,
+    docs: { present: true, mode: 'sparse', pin: 'a'.repeat(40), family: 'australia',
+      head: 'a'.repeat(40), headMatchesPin: true, citations: null, dead: null,
+      familyMatches: null } } };
+  assert.equal(notProbedLine(quick),
+    'Capability packs, citation counts and the corpus branch are not probed on a quick run'
+    + ' — ./snowarch doctor reports them.');
+
+  // A full run measured the branch, so it is not on the list.
+  const full = { ...quick, engine: { ...quick.engine,
+    docs: { ...quick.engine.docs, familyMatches: true, citations: 181, dead: 0 },
+    capabilities: { docx: { present: true } } } };
+  assert.equal(notProbedLine(full), null);
 });

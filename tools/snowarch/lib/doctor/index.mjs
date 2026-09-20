@@ -31,6 +31,7 @@ import { cacheStale, writeReportCache } from '../doctor-cache.mjs';
 import { contractSha, version as engineVersion } from '../config.mjs';
 import { collectPrereqs } from './prereqs.mjs';
 import { buildReport } from './report-json.mjs';
+import { configuredDocs } from '../docs/status.mjs';
 import { renderText, useColour } from './report-text.mjs';
 import { exitCodeFor, runChecks, selectSections } from './runner.mjs';
 import { maskForJson } from './json-boundary.mjs';
@@ -237,6 +238,29 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
   const data = (id) => results.find((r) => r.id === id)?.data ?? null;
   const toolCount = data('SV-05')?.toolCount ?? null;
 
+  // ARC-08-C19 — the instances REACH THE REPORT. `fromStore` above is computed on every unprobed
+  // run and was handed to `deriveMode` and then dropped, so a quick run knew the labels and threw
+  // them away — the third time this shape has turned up (ARC-07-C5, ARC-09-C46). The source rides
+  // with them because the two are different facts: the store knows what is configured, the server
+  // knows whether it works.
+  //
+  // ONE SHAPE, WHATEVER THE SOURCE — and narrowed on purpose. The server's own entries carry a
+  // `username`; copying them wholesale put a masked account name into a NEW key, and the doctor
+  // cache's redaction test caught it within the hour (`an address-shaped string survived in the
+  // cache`). The panel renders a label, an environment and a preset, so that is what the key
+  // holds: a report that travels — into the cache, into an issue template — must not carry a field
+  // nothing reads. The server's richer view stays under `server`, where the redactor already
+  // knows about it.
+  const summarise = (list) => list.map((i) => ({
+    label: i.label,
+    environment: i.environment ?? null,
+    preset: i.preset ?? null,
+    ...(i.default === true || i.isDefault === true ? { default: true } : {}),
+  }));
+  const instanceBlock = probed
+    ? (instances.length > 0 ? { source: 'server', entries: summarise(instances) } : null)
+    : (fromStore.length > 0 ? { source: 'store', entries: summarise(fromStore) } : null);
+
   const report = buildReport({
     results,
     checks,
@@ -260,7 +284,14 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     // `full: false` — the header takes `version`, `tag.name` and `contractSha`. The tag's message,
     // the shallow hint and the commit state are for the human lines and cost three more `git`
     // spawns, on the path the SessionStart banner runs before a session's first word.
-    engine: engineBlock(results, versionInfo(root, { full: false })),
+    engine: engineBlock(results, versionInfo(root, { full: false }),
+      // ARC-08-C19 — when E-12 did not run, `engine.docs` came back null and the panel's `Docs:`
+      // line vanished on the one run SKILL.md mandates. The fallback is the CONFIGURED corpus plus
+      // one bounded `rev-parse`; every field it cannot know stays null, which schema v1 already
+      // reads as "no check filled it". Computed only when the checks did not fill it, so a full
+      // run's measured answer is never replaced by a cheaper one.
+      { docsFallback: () => configuredDocs({ root }) }),
+    instances: instanceBlock,
     prereqs: {
       ...collectPrereqs({ root, config, env }),
       // E-04 resolved these; the renderer's `Capabilities:` line reads them from here rather than

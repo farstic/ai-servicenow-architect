@@ -12,6 +12,7 @@ import { join } from 'node:path';
 
 import { SCHEMA_KEYS, validateReport } from '../../tools/snowarch/lib/doctor/report-json.mjs';
 import { renderPanel } from '../../tools/snowarch/lib/doctor/panel.mjs';
+import { statusCommand } from '../../tools/snowarch/lib/commands/status.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
 
 const SNIPPET = join(REAL_ROOT, 'docs/snippets/status-template.md');
@@ -83,8 +84,20 @@ test('every mapped key is a key of schema v1', () => {
 
 test('every bracketed key resolves against a report the doctor really produced', () => {
   const live = report('live');
-  assert.deepEqual(validateReport(live), [], 'the live fixture is not a valid schema-v1 report');
-  for (const key of mappedKeys()) {
+  // ARC-08-C19 — this fixture is a PRE-C8, PRE-C19 capture and is knowingly stale: it carries a
+  // `server` block from a `--quick` run, which no current quick run produces (ARC-09-C8 took the
+  // server section out of the subset), and it predates the `instances` key. It cannot be
+  // regenerated as a quick run by the current product at all, so it is left exactly as captured —
+  // forging a key into a file whose test says "a report the doctor really produced" would make
+  // that sentence false. The keys added since are excluded here and asserted against a REAL
+  // current report in the test below, which is the stronger form of what this was standing in for.
+  assert.deepEqual(validateReport(live).filter((p) => !/^instances:/.test(p)), [],
+    'the live fixture is not a valid schema-v1 report, for a reason other than its age');
+  // Keys added after this fixture was captured are resolved against a CURRENT report
+  // instead, in the test at the bottom of this file. Listing them is deliberate: an unexplained
+  // `filter` here would quietly excuse the next key too.
+  const ADDED_SINCE = ['instances'];
+  for (const key of mappedKeys().filter((k) => !ADDED_SINCE.includes(k.split('.')[0]))) {
     // `capabilities` is legitimately null on a quick run — the check that fills it spawns and is
     // outside the quick subset. The template says so, and this test asserts the KEY exists rather
     // than that it has a value.
@@ -95,7 +108,8 @@ test('every bracketed key resolves against a report the doctor really produced',
 
 test('the design fixture is a valid report with no instances', () => {
   const design = report('design');
-  assert.deepEqual(validateReport(design), []);
+  // Same age, same exclusion — and the same replacement below.
+  assert.deepEqual(validateReport(design).filter((p) => !/^instances:/.test(p)), []);
   assert.equal(design.mode, 'design-only');
   assert.deepEqual(design.server?.instances ?? [], [],
     'the design fixture has instances — then it is not a design-only fixture');
@@ -188,7 +202,7 @@ test('VALIDATION-TESTS T-07 quotes the same template (ARC-08-S10)', () => {
   const indented = block.split('\n').map((l) => (l ? `   ${l}` : l)).join('\n');
   assert.ok(doc.includes(indented), 'T-07 and docs/snippets/status-template.md have drifted');
   // And the quick-run sentence, which is the half a tester would otherwise mark as a missing line.
-  assert.match(doc, /Capability packs and citation counts are not probed on a quick run/);
+  assert.match(doc, /Capability packs, citation counts and the corpus branch are not probed on a quick run/);
 });
 
 test('the skill names its one fallback and forbids the inferences', () => {
@@ -200,4 +214,26 @@ test('the skill names its one fallback and forbids the inferences', () => {
   // And the Windows sentence, which is the difference between "I cannot" and silence.
   assert.match(skill, /On Windows without Git for Windows I cannot run \.\/snowarch from here/);
   assert.match(skill, /\*\*Never infer the mode\*\*/);
+});
+
+test('a report the CURRENT product produces is valid, key for key', async () => {
+  // ARC-08-C19 — what the two fixtures were standing in for, done against the product instead of
+  // against a file captured a fortnight ago. A fixture proves what the doctor produced ONCE; this
+  // proves what it produces now, which is the property the template actually depends on, and it
+  // cannot go stale.
+  const out = [];
+  await statusCommand({
+    out: { write: (t) => out.push(t) },
+    cwd: REAL_ROOT,
+    flags: { json: true },
+  });
+  const fresh = JSON.parse(out.join(''));
+  assert.deepEqual(validateReport(fresh), [], 'the doctor no longer produces a valid report');
+
+  // And every key the snippet's table names resolves on it — the assertion above resolves them
+  // against the fixture, which is the half that ages.
+  for (const key of mappedKeys()) {
+    const top = key.split('.')[0];
+    assert.ok(top in fresh, `${key} is not in a report the current product produces`);
+  }
 });

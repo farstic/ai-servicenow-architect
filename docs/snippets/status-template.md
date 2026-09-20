@@ -19,7 +19,7 @@ Docs: vendor/ServiceNowDocs @ 11b39be17307 (australia) · sparse
 Roster: 28 skills / 9 agents
 Instances: pdi (pdi, custom) · uat (test, read-only)
 Doctor: 28 ok, 0 warn, 0 fail — quick run 2026-09-10 19:48 UTC · full report: ./snowarch doctor
-Capability packs and citation counts are not probed on a quick run — ./snowarch doctor reports them.
+Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.
 ```
 
 Rendered from the quick doctor's own report. Line 1 is `modeLineDetailed` **verbatim** —
@@ -36,17 +36,18 @@ unchanged — it is the same object `doctor --quick --json` prints, not a shape 
 | `Docs:` | `engine.docs` |
 | `Roster:` | `engine.roster` |
 | `Capabilities:` | `engine.capabilities` |
-| `Instances:` | `server.instances` |
+| `Instances:` | `instances` (`server.instances` on a report that predates it) |
 | `Doctor:` | `summary`, `ranAt`, `options.quick` |
 
 A line whose key is `null` is **omitted**, not guessed — which is why the block above has no
-`Capabilities:` line. Two keys are routinely null on the quick run the panel makes, because the
+`Capabilities:` line. Three things are routinely null on the quick run the panel makes, because the
 checks that fill them spawn a process or walk the corpus and are therefore outside the quick subset:
-`engine.capabilities` (E-04) and the citation half of `engine.docs` (E-16). The closing sentence
-names whichever of the two is actually missing, rather than a remembered pair:
+`engine.capabilities` (E-04), the citation half of `engine.docs` (E-16), and the corpus branch
+(E-14). The closing sentence names whichever of them is actually missing, rather than a remembered
+list:
 
 ```
-Capability packs and citation counts are not probed on a quick run — ./snowarch doctor reports them.
+Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.
 ```
 
 Both shas are shortened to twelve characters — the prefix `./snowarch version`, the install summary
@@ -54,9 +55,19 @@ and the doctor cache all print, so a reader comparing two of them never has to n
 shorter. Times are the report's own `ranAt`, in **UTC**: two people comparing pasted panels in two
 timezones is the only reason "verbatim" is worth anything.
 
-`Instances:` is omitted when the report carries none — in design-only there are none, and on a
-`--quick` run the server section does not run at all (ARC-09-C8), so the Mode line's own
-`+1 instance (uat)` is what names the rest. `./snowarch instance list` is the full list.
+`Instances:` comes from `instances`, which carries its own `source`. On a quick run the server
+section does not run at all (ARC-09-C8), so the entries are the STORE's — label, environment and
+preset, read without probing anything — and the panel says so in a line of its own rather than
+printing a list that looks identical to one a handshake produced. `server.instances` still means
+"the server answered". In design-only there are none and the line is omitted.
+`./snowarch instance list` is the full list.
+
+`Docs:` survives a quick run for the same reason: the pin and the family are two reads of
+`engine.config.json`, and one bounded `git rev-parse` in the submodule compares the corpus HEAD
+against the pin. When they disagree the line says so — `corpus is on <sha>, NOT the pin
+— ./snowarch docs sync` — because a line naming a pin the corpus has drifted off would be asserting
+what it did not measure. Agreement is silent: a line that announces it on every healthy run is a
+line readers learn to skip.
 
 When `summary.fail > 0`, one line per failing check follows the seven, and then the fix sentence
 when there is anything to fix:
