@@ -57,8 +57,8 @@ function clone(t) {
   // The order they are CREATED in is rc.9 then rc.10, so a sort that did nothing at all would also
   // put rc.10 last. The assertions below read position 0 of a descending list, which creation order
   // cannot satisfy by accident.
-  tagRelease(dir, '2.0.0-rc.9');
-  tagRelease(dir, '2.0.0-rc.10');
+  tagRelease(dir, '9.0.0-rc.9');
+  tagRelease(dir, '9.0.0-rc.10');
   // Back to the branch head so the clone is not left on a detached tag.
   git(dir, ['checkout', '--quiet', 'base']);
 
@@ -77,7 +77,7 @@ function clone(t) {
 test('a checkout on rc.9 resolves rc.10 as the newest prerelease', { timeout: 120_000 }, (t) => {
   const root = clone(t);
   const tags = releaseTags(root, { pre: true }).map((x) => x.tag);
-  assert.deepEqual(tags, ['v2.0.0-rc.10', 'v2.0.0-rc.9'],
+  assert.deepEqual(tags, ['v9.0.0-rc.10', 'v9.0.0-rc.9'],
     `the upgrade would offer ${tags[0]} to a checkout on rc.9`);
   // Without `--pre` a prerelease is not a target at all — a different rule, and still true. This
   // fixture has no release tag, so the honest assertion is that the list is empty rather than that
@@ -88,9 +88,9 @@ test('a checkout on rc.9 resolves rc.10 as the newest prerelease', { timeout: 12
 
 test('upgrade --check from rc.9 reports rc.10 as available', { timeout: 180_000 }, async (t) => {
   const root = clone(t);
-  git(root, ['checkout', '--quiet', 'v2.0.0-rc.9']);
+  git(root, ['checkout', '--quiet', 'v9.0.0-rc.9']);
   const head = git(root, ['describe', '--tags', '--exact-match']).trim();
-  assert.equal(head, 'v2.0.0-rc.9', 'the checkout is not on rc.9, so this proves nothing');
+  assert.equal(head, 'v9.0.0-rc.9', 'the checkout is not on rc.9, so this proves nothing');
 
   const lines = [];
   const log = { step: (l) => lines.push(l), fail: (l) => lines.push(`FAIL ${l}`),

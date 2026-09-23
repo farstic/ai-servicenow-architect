@@ -234,13 +234,27 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
   }
 
   // THE POST-WRITE CHECKS. The tree that was just produced has to be one the release PR can pass,
-  // and these are the two gates it will meet there: the counters agree, and the artefact matches
-  // its pin. Both run AFTER the writes because both are about what the writes produced — and
-  // ARC-09-C12b added the second one, because until then a release could rebuild nothing and hand
-  // its own pull request a stale `dist/`. A failure rolls everything back, including the rebuild.
+  // and these are the gates it will meet there. They run AFTER the writes because they are about
+  // what the writes produced — ARC-09-C12b added the contract gate, because until then a release
+  // could rebuild nothing and hand its own pull request a stale `dist/`. A failure rolls everything
+  // back, including the rebuild.
+  //
+  // ARC-09-C49 — AND THE WHOLE SUITE, because the version is one of the things the writes change.
+  //
+  // `npm test` was already in the gate plan above, and the plan runs BEFORE the writes: it tested a
+  // tree whose `package.json` still said `2.0.0-dev`. `version-literals.test.mjs` exists to catch a
+  // test that spells the version of record — its own message says *"a literal here fails on the
+  // release commit itself"* — and the one tree it was never run against was the release commit.
+  // rc.10 was cut locally with every gate green and went red on all three `verify` cells for
+  // exactly that check.
+  //
+  // So the post-write list runs what `release.yml`'s verify runs. It is the slowest gate in the
+  // script and it is now run twice; a release is rare and a dead tag costs more. The pre-write run
+  // keeps its own value: it fails before anything on disk has been touched.
   for (const [name, argv, why] of [
     ['version-consistency', ['node', '--test', 'tests/version-consistency.test.mjs'],
       'version-consistency failed after the writes'],
+    ['test', ['npm', 'test'], 'npm test failed after the writes — the tree CI would refuse'],
     ['contract', ['node', 'scripts/contract-gate.mjs', '--skip-build'],
       'the contract gate failed after the writes'],
   ]) {

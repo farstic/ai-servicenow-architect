@@ -208,8 +208,8 @@ test('versions sort the way semver says, prerelease below its release', () => {
   // ARC-09-S12 — every case here was single-digit, which is why a string compare passed it for
   // nine release candidates and then blocked rc.10. The comparator's own file has the full §11
   // table; these stay because this is where a reader of the release path looks.
-  assert.equal(compareVersions('2.0.0-rc.10', '2.0.0-rc.9'), 1);
-  assert.equal(latestTag(['v2.0.0-rc.9', 'v2.0.0-rc.10']), 'v2.0.0-rc.10');
+  assert.equal(compareVersions('9.0.0-rc.10', '9.0.0-rc.9'), 1);
+  assert.equal(latestTag(['v9.0.0-rc.9', 'v9.0.0-rc.10']), 'v9.0.0-rc.10');
   assert.equal(latestTag(['v1.9.0', 'v2.0.0', 'v2.0.0-rc.1', 'not-a-tag']), 'v2.0.0');
   assert.equal(latestTag([]), null, 'the 2.0.0 case: no tag is not an error');
 });
@@ -332,17 +332,17 @@ test('ARC-09-S12 — rc.10 is cut while rc.9 is the latest tag', async (t) => {
   // above proves the comparator, and this proves the CHECK USES IT. Those are different claims, and
   // the defect lived in the second one for both copies.
   const root = fixture(t);
-  git(root, ['tag', '-a', 'v2.0.0-rc.9', '-m', 'snowarch v2.0.0-rc.9']);
+  git(root, ['tag', '-a', 'v9.0.0-rc.9', '-m', 'snowarch v9.0.0-rc.9']);
   const { code, err, out } = await run(root,
-    ['2.0.0-rc.10', '--yes', '--offline', '--no-install', '--allow-prerelease', '--dry-run']);
+    ['9.0.0-rc.10', '--yes', '--offline', '--no-install', '--allow-prerelease', '--dry-run']);
   assert.equal(code, 0, `rc.10 was refused: ${err.trim()}`);
   assert.doesNotMatch(`${out}${err}`, /is not greater than/,
     'the ordering check still refuses rc.10 after rc.9');
   // The opposite direction still holds — this must not have become "everything is greater".
   const back = await run(root,
-    ['2.0.0-rc.2', '--yes', '--offline', '--no-install', '--allow-prerelease', '--dry-run']);
+    ['9.0.0-rc.2', '--yes', '--offline', '--no-install', '--allow-prerelease', '--dry-run']);
   assert.equal(back.code, 2);
-  assert.equal(back.err.trim(), 'release: 2.0.0-rc.2 is not greater than the latest tag v2.0.0-rc.9');
+  assert.equal(back.err.trim(), 'release: 9.0.0-rc.2 is not greater than the latest tag v9.0.0-rc.9');
 });
 
 test('AC 7 — a version below the latest tag is refused, naming both', async (t) => {
@@ -535,6 +535,56 @@ test('C12b: a post-write failure rolls back the rebuild and the pin too', async 
   assert.equal(read(root, 'packages/contract/required-tools.json'), before.pin);
   assert.equal(read(root, 'package.json'), before.manifest);
   assert.equal(git(root, ['status', '--porcelain']).trim(), '', 'the rollback left the tree dirty');
+  assert.equal(git(root, ['tag', '-l']).trim(), '', 'a tag survived a rolled-back release');
+});
+
+test('ARC-09-C49 — the whole suite runs after the writes, on the version being committed', async (t) => {
+  // THE GAP THAT KILLED rc.10. `npm test` was in the gate plan, and the gate plan runs BEFORE the
+  // writes — so it tested a tree whose `package.json` still said `2.0.0-dev`.
+  // `version-literals.test.mjs` exists to catch a test that spells the version of record, and its
+  // own message says *"a literal here fails on the release commit itself"*. The one tree it was
+  // never run against was the release commit. rc.10 was cut locally with every gate green and went
+  // red on all three `verify` cells for exactly that check.
+  //
+  // Asserted as WHAT THE MANIFEST SAID AT THE MOMENT OF EACH CALL, not as call order. Ordering in a
+  // list proves the list; this proves the thing the list is for — that the suite saw the version
+  // the commit will carry. The stub rewrites the manifests on `npm version` exactly as npm does,
+  // which is what makes the question askable at all.
+  const root = fixture(t);
+  const base = runner(root, {});
+  const versionAtTest = [];
+  const r = (args) => {
+    const code = base.run(args);
+    if (args.join(' ') === 'npm test') {
+      versionAtTest.push(JSON.parse(read(root, 'package.json')).version);
+    }
+    return code;
+  };
+  const out = capture();
+  const err = capture();
+  const code = await release({ argv: ['2.0.0', '--yes', '--offline'], root,
+    out: out.stream, err: err.stream, run: r, now: () => new Date('2026-09-11T00:00:00Z') });
+
+  assert.equal(code, 0, `${err.text()}${out.text()}`);
+  assert.equal(versionAtTest.length, 2,
+    `npm test ran ${versionAtTest.length} time(s); it must run before AND after the writes`);
+  assert.equal(versionAtTest[0], '2.0.0-dev', 'the pre-write run should see the old version');
+  assert.equal(versionAtTest[1], '2.0.0',
+    'the post-write run saw the OLD version — the suite never sees the tree that ships');
+  assert.match(out.text(), /post test ok/);
+});
+
+test('ARC-09-C49 — a post-write suite failure rolls the release back', async (t) => {
+  const root = fixture(t);
+  const before = read(root, 'package.json');
+  // `skip: 1` lets the PRE-write run pass, so the post-write path is the one exercised — the same
+  // reason C12b's contract-gate test skips one.
+  const { code, err } = await run(root, ['2.0.0', '--yes', '--offline'],
+    { fail: 'npm test', skip: 1 });
+  assert.equal(code, 1);
+  assert.match(err, /npm test failed after the writes/);
+  assert.match(err, /rolled back, nothing was committed/);
+  assert.equal(read(root, 'package.json'), before, 'the version write survived a rolled-back release');
   assert.equal(git(root, ['tag', '-l']).trim(), '', 'a tag survived a rolled-back release');
 });
 
