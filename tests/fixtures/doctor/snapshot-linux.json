@@ -2,7 +2,7 @@
   "schema": 1,
   "mode": "design-only",
   "summary": {
-    "ok": 26,
+    "ok": 27,
     "warn": 0,
     "fail": 1,
     "skip": 12,
@@ -68,6 +68,11 @@
       "id": "E-11",
       "status": "ok",
       "fixable": true
+    },
+    {
+      "id": "E-29",
+      "status": "ok",
+      "fixable": false
     },
     {
       "id": "E-12",

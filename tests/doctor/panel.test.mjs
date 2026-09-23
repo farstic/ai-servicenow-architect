@@ -42,7 +42,11 @@ test('the live fixture renders to exactly these bytes', () => {
     `Docs: vendor/ServiceNowDocs @ ${LIVE.engine.docs.pin.slice(0, 12)} (australia) · sparse`,
     'Roster: 28 skills / 9 agents',
     'Instances: pdi (pdi, custom)',
-    'Doctor: 14 ok, 0 warn, 0 fail — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor',
+    // The tally moves when a check is added — ARC-08-C30's E-29 took it from 14 to 15 — so it is
+    // read from the fixture's own summary rather than spelled, the way the version and the shas
+    // are. What this assertion is for is the SHAPE of the line, not the arithmetic in it.
+    `Doctor: ${LIVE.summary.ok} ok, ${LIVE.summary.warn} warn, ${LIVE.summary.fail} fail`
+      + ' — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor',
     'Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.',
     "Instances are the store's own records; nothing was probed.",
   ].join('\n'));

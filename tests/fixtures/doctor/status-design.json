@@ -264,6 +264,21 @@
       }
     },
     {
+      "id": "E-29",
+      "section": "repo",
+      "title": "the bootstrap finished",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "no steps recorded yet",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {}
+    },
+    {
       "id": "E-12",
       "section": "docs",
       "title": "docs corpus present",
@@ -682,7 +697,7 @@
     "legacyStore": null
   },
   "summary": {
-    "ok": 14,
+    "ok": 15,
     "warn": 0,
     "fail": 0,
     "skip": 25,

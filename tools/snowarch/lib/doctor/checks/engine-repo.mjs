@@ -12,6 +12,8 @@ import { join } from 'node:path';
 
 import { makeExec, samePath } from '../../steps/B00.mjs';
 import { loadState, STATE_VERSION } from '../../state.mjs';
+import { plannedSteps } from '../../steps/index.mjs';
+import { version as engineVersionOf } from '../../config.mjs';
 import { defineCheck } from '../registry.mjs';
 import { projectEntryEnabled } from '../../settings-local.mjs';
 
@@ -173,6 +175,37 @@ export function toggleProblems({ mode, settings, serverKey, registration = 'proj
       : `mode is ${mode} but ${serverKey} is enabled`);
   }
   return { problems, enabled, disabled, wantEnabled };
+}
+
+/** `[{id, why}]` → `[[why, [ids]]]`, preserving the order the reasons first appeared. */
+function groupByReason(problems) {
+  const byReason = new Map();
+  for (const { id, why } of problems) {
+    if (!byReason.has(why)) byReason.set(why, []);
+    byReason.get(why).push(id);
+  }
+  return [...byReason];
+}
+
+/**
+ * `['B07','B08','B09']` → `B07–B09`; `['B04','B09']` → `B04, B09`.
+ *
+ * A reader scanning a failure wants the shape of the gap, and three consecutive ids spelled out is
+ * a list they have to reassemble. Only genuinely consecutive runs collapse — `B04, B09` stays two
+ * items, because a gap between them is information.
+ */
+function ranges(ids) {
+  const sorted = [...ids].sort();
+  const out = [];
+  let i = 0;
+  while (i < sorted.length) {
+    let j = i;
+    const num = (id) => Number(String(id).slice(1));
+    while (j + 1 < sorted.length && num(sorted[j + 1]) === num(sorted[j]) + 1) j += 1;
+    out.push(j - i >= 2 ? `${sorted[i]}\u2013${sorted[j]}` : sorted.slice(i, j + 1).join(', '));
+    i = j + 1;
+  }
+  return out.join(', ');
 }
 
 export function engineRepoChecks() {
@@ -500,6 +533,96 @@ export function engineRepoChecks() {
         }
         const detail = [`mode ${state?.mode ?? 'unset'}`, ...notes].join(' · ');
         return ok(detail, data);
+      },
+    }),
+    /**
+     * ARC-08-C30 — DID THE INSTALL FINISH? Nothing asked, and the state knew.
+     *
+     * The owner Ctrl+C'd an upgrade at B06's prompt (sitting, 2026-09-23). The runner recorded it
+     * — `status: 'failed', reason: 'interrupted'` — and printed `interrupted during B06`. Then
+     * `./snowarch doctor` reported `37 ok, 1 warn, 0 fail` and E-11 said `.local/ state: mode
+     * live`, because **no check read `state.steps` at all**: `git grep 'state.steps'` over the
+     * doctor returned nothing. B07, B08 and B09 never ran, U7 never ran, and no surface said so.
+     *
+     * E-11 asks whether the state file is WELL-FORMED. This asks whether the install it describes
+     * FINISHED — the same distinction this arc keeps finding, one file over.
+     *
+     * The comparison is against `plannedSteps()`, the runner's own list, so a step that was never
+     * going to run in the recorded mode is not reported as missing; and against the checkout's
+     * CURRENT version rather than `state.engineVersion`, which `emptyState` writes once at install
+     * and nothing updates — it names the version a checkout was first installed at, not the one it
+     * is on.
+     */
+    defineCheck({
+      id: 'E-29',
+      section: 'repo',
+      title: 'the bootstrap finished',
+      severity: 'fail',
+      quick: true,
+      network: false,
+      spawns: false,
+      fixable: false,
+      run: async (ctx) => {
+        const state = loadState(ctx.root);
+        // No state is E-11's finding, not this one. A check that repeated it would put two
+        // failures on one cause and send a reader to two remedies.
+        if (!state?.mode) return ok('no recorded install to check');
+
+        // NOTHING STARTED IS NOT SOMETHING UNFINISHED, and this cost a correction: the first
+        // version reported a state with a mode and no steps as `B01–B09 never ran`, which is
+        // technically true and is also the shape of a run that has only just written its state
+        // file — `.local/` and the record exist before B01 finishes. Every fixture tree carries
+        // it, so the capture came back `14 ok, 0 warn, 1 fail` and the release-assets check
+        // refused the report.
+        //
+        // This check is about an install that STARTED and did not finish. "Nothing started" is a
+        // different sentence and E-11 already owns the tree that has no install at all.
+        if (Object.keys(state.steps ?? {}).length === 0) {
+          return ok('no steps recorded yet');
+        }
+
+        const current = engineVersionOf(ctx.root);
+        const expected = plannedSteps({
+          mode: state.mode,
+          docs: state.docs?.mode ?? null,
+          node: state.node ?? { present: false },
+          env: {},
+          root: ctx.root,
+        });
+
+        const problems = [];
+        const stale = [];
+        for (const step of expected) {
+          const recorded = state.steps?.[step.id];
+          if (!recorded) { problems.push({ id: step.id, why: 'never ran' }); continue; }
+          if (recorded.status === 'failed' || recorded.status === 'fail') {
+            problems.push({ id: step.id, why: recorded.reason === 'interrupted' ? 'interrupted' : 'failed' });
+            continue;
+          }
+          if (recorded.status !== 'ok' && recorded.status !== 'warn' && recorded.status !== 'skipped') {
+            problems.push({ id: step.id, why: recorded.status });
+            continue;
+          }
+          // ABSENT IS NOT A MISMATCH. States written before ARC-08-C30 carry no per-step version,
+          // and reporting that as "recorded under another version" would turn every older install
+          // into a finding — the defect this check exists to catch, facing the other way.
+          if (recorded.engineVersion && current && recorded.engineVersion !== current) {
+            stale.push({ id: step.id, was: recorded.engineVersion });
+          }
+        }
+
+        if (problems.length === 0 && stale.length === 0) {
+          return ok(`${expected.length} steps recorded, all current`);
+        }
+
+        const parts = [];
+        for (const [why, ids] of groupByReason(problems)) parts.push(`${ranges(ids)} ${why}`);
+        for (const { id, was } of stale) parts.push(`${id} recorded under ${was}`);
+        return fail(`bootstrap incomplete since ${current ?? 'this version'}: ${parts.join(', ')}`, {
+          remedy: ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh',
+          command: ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh',
+          data: { expected: expected.map((s) => s.id), problems, stale, engineVersion: current },
+        });
       },
     }),
   ];

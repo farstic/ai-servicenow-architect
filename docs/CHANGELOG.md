@@ -243,6 +243,15 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+### Added
+
+- **The doctor says when an install did not finish.** Interrupting a bootstrap or an upgrade left
+  a checkout that every check called healthy — the state file was well formed, so nothing asked
+  whether the steps it describes had actually run. A new check names the ones that were
+  interrupted, never ran, or were recorded by an earlier version.
+
+### Fixed
+
 - **The test suite no longer starts failing simply because the date changed.** The sample report
   the documentation shows carries the doctor's own line, and that line has the day written into it —
   so the suite agreed with the product only on the day the sample was captured.
