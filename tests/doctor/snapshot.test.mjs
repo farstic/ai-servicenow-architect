@@ -113,3 +113,47 @@ test('the snapshots are design-only, and fail only where the runner explains it'
       `${platform}: a WARN in the snapshot — a design-only install should have nothing to warn about`);
   }
 });
+
+/**
+ * ARC-08-C30, the fix-up — A SNAPSHOT'S COUNTS ARE ITS OWN ROWS, TALLIED.
+ *
+ * I added E-29's row to all three snapshots and not its count. `summary.ok` stayed 26 while the
+ * rows said 27, and nothing here noticed: **every `bootstrap` cell on all three operating systems
+ * failed** — ubuntu 20/22/24, macos 20/22/24, windows 20/22/24 and no-gitbash — with
+ * `doctor-snapshot: linux differs … summary.ok: 26 → 27`. Ten cells for one arithmetic slip that a
+ * single local assertion can catch.
+ *
+ * WHY THE SNAPSHOT IS EDITED RATHER THAN REGENERATED, which is the thing that made the slip
+ * possible and is worth writing down: these files encode a CI RUNNER, not a developer's machine.
+ * Regenerating `snapshot-darwin.json` from a properly design-only bootstrapped clone on this
+ * machine produced **eleven** differing rows, not one — `E-00 fail → ok` (a runner has no Claude
+ * Code CLI), `E-23 ok → warn` (this machine has stale registrations), `E-27 skip → ok`,
+ * `E-28 skip → warn` (network), and six `SV-* skip → ok` (a runner has not installed dependencies
+ * before the doctor). So a derived one-row edit is the correct operation and `--write` from a
+ * laptop is not; what a derived edit needs is this guard, because the reason to prefer it — the
+ * environment is not reproducible here — is exactly the reason nothing else can check it.
+ */
+test('each snapshot\'s summary is the tally of its own rows', () => {
+  for (const platform of PLATFORMS) {
+    const snapshot = load(platform);
+    const tally = { ok: 0, warn: 0, fail: 0, skip: 0 };
+    for (const check of snapshot.checks) {
+      assert.ok(check.status in tally, `${platform}: ${check.id} has status "${check.status}"`);
+      tally[check.status] += 1;
+    }
+    for (const status of Object.keys(tally)) {
+      assert.equal(snapshot.summary[status], tally[status],
+        `${platform}: summary.${status} says ${snapshot.summary[status]} and the rows say `
+        + `${tally[status]} — a row was added or changed without its count`);
+    }
+    // `fixable` counts FINDINGS that can be repaired, not rows that could be — `summariseMerged`
+    // adds one only when the result is `fail` or `warn` AND fixable. My first version of this
+    // assertion counted every row declaring `fixable: true` and said `0 !== 8`; the semantics were
+    // in `checks/index.mjs:179` and I had inferred them instead of reading them.
+    const repairable = snapshot.checks
+      .filter((c) => c.fixable && (c.status === 'fail' || c.status === 'warn')).length;
+    assert.equal(snapshot.summary.fixable, repairable,
+      `${platform}: summary.fixable says ${snapshot.summary.fixable} and the repairable findings `
+      + `are ${repairable}`);
+  }
+});
