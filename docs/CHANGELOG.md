@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.0-rc.10 — 2026-09-23
+
+### Notes
+
 This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
 
 #### Migration for snow-mcp 1.0.0 users
@@ -1916,6 +1920,25 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   engine pin and its sha are untouched.
 
 ---
+
+### Added
+
+- contract: capabilities are read before a mutating call, not discovered by making one (d2b58e8)
+- doctor: E-29 says when the bootstrap did not finish (990a8ed)
+
+### Fixed
+
+- release: one version comparator, and it is semver's (4fca5ca)
+- release: the plan builds its ctx with the runner's own constructor (fadbfe4)
+- release: the upgrade plan is the runner's decision, taken early (cb4394e)
+- doctor: a snapshot's counts are its own rows, tallied (8f241d6)
+- engine: B06 keeps the instance the store holds, whoever is watching (642e776)
+
+### Internal
+
+- release: the plan is driven by the ctx the command actually hands it (3dfe063)
+
+Tag v2.0.0-rc.10 · contract a62a4877b4ec · docs-pin df4afac
 
 ## The imported engine's header
 
