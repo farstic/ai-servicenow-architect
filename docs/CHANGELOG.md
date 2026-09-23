@@ -45,6 +45,12 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **Three records to delete is three questions.** A request that lists what to change is a request,
+  not an approval, and a session now asks about each record on its own and waits for each answer —
+  so declining the second leaves the first done and the third untouched. The one exception is the
+  update-set machinery that a configuration write needs: it is covered by that write's approval
+  only when the question says so out loud.
+
 - **A session checks whether it may write before it asks you to approve a write.** It used to find
   out that a capability was switched off by making the call and reading the refusal — which meant
   being asked to approve a write the instance was always going to reject. It now reads the

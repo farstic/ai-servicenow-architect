@@ -59,6 +59,38 @@ export const PREFLIGHT_STOP = 'Pre-flight on "<label>": preset=<preset> · <flag
  */
 export const PREFLIGHT_UNKNOWN_GATE = 'unknown gate `<gate>` — contract and rule disagree';
 
+/**
+ * Approval granularity — Sitting D1, two findings in one sitting, both about "how many questions".
+ *
+ * The owner asked for three records to be deleted by sys_id; one question listed all three, one
+ * `write approved` came back, and the server was called three times. §2.1 already said *"Approval
+ * is per action — one write approved covers exactly one write"*, so the rule was right and the
+ * reading was wrong — which means the rule was not stated in a way that survives an enumerated
+ * request. That is a rule-file defect, not a judgement lapse.
+ *
+ * The sentence is deliberately the SAME shape as the "not approval" list beside it: a request that
+ * enumerates its targets is still a request. Naming three records is how a person describes a job,
+ * not how they approve three writes.
+ */
+export const APPROVAL_PER_RECORD = 'N distinct records is N questions, each asked and answered '
+  + 'before its own call. A request that enumerates them is the request, not the approval — the '
+  + 'same sentence as "the original task description is not approval".';
+
+/**
+ * The §2.2 pair under one approval — but only when the question says so.
+ *
+ * The same session treated `ensure` + `capture_target_set` as covered by the write's approval once
+ * and asked a separate question for `capture_target_set` another time. Both readings are
+ * defensible from the old text, which is the problem: a rule that can be read two ways has been
+ * written once and understood twice.
+ *
+ * The ruling is the cheap one. The pair is machinery FOR the write the user approved, so folding it
+ * into that approval is honest — provided the approval said so. Asked bare, they are two writes
+ * nobody agreed to, and they get their own questions.
+ */
+export const APPROVAL_WITH_CAPTURE = 'About to <action> on instance "<label>", after ensuring '
+  + 'update set <name> and pointing capture at it — write approved?';
+
 /** Presets in the words someone chooses one by. `custom` is the absence of a preset, not an entry. */
 const USE_WHEN = {
   'read-only': 'none',
@@ -142,6 +174,8 @@ export function render(ctx) {
 - Not approval: the original task description; a "yes" to a routing or review proposal; an earlier general go-ahead; a preset or flag change made in the terminal.
 - Before any mutating call, ask exactly: \`About to <action> on instance "<label>" — write approved?\` and wait for the answer.
 - Self-approval is prohibited: approval is never inferred from context, urgency or logical flow.
+- Granularity: ${APPROVAL_PER_RECORD}
+- The §2.2 ensure + capture pair is covered by the configuration write's approval ONLY when the question names them: \`${APPROVAL_WITH_CAPTURE}\` Asked bare, each is its own write and gets its own question.
 
 ## §2.2 — Update-set capture (before every configuration write: Script Include, Business Rule, Client Script, UI Policy, UI Action, ACL, Flow, table or field)
 1. \`${ensure}\` \`{ "name": "<engagement>-<topic>" }\` — returns the in-progress update set created by the authenticated user, creating it if absent.
