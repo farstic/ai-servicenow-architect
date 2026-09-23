@@ -94,12 +94,37 @@ function testFiles(dir, out = []) {
   return out;
 }
 
-/** The offending lines of one file: the version, spelled, outside a comment. */
+/**
+ * The offending lines of one file: the version, spelled AS A WHOLE VERSION, outside a comment.
+ *
+ * It used to be `line.includes(version)`, and a substring match is wrong in both directions once
+ * the version of record is a release triple. Measured against `2.0.0` on the 2.0.0-final table:
+ * **21 lines and four whole files** were flagged for naming `2.0.0-rc.6`, `2.0.0-dev` or
+ * `2.0.0-test` — versions that are not the record and never will be — because each of them contains
+ * `2.0.0`. Those are not what this sweep is for, and a guard that cries at 21 lines nobody can act
+ * on is a guard people learn to wave through.
+ *
+ * The rule is a version boundary, not a word boundary, because `v` is part of how a version is
+ * written and a digit is not:
+ *
+ *   NOT preceded by a digit or a dot — `12.0.0` does not contain the version `2.0.0`;
+ *                                      `v2.0.0` does, and must still be caught.
+ *   NOT followed by `-` or a digit   — `2.0.0-rc.6` is a different version, and so is `2.0.01`.
+ *
+ * A following dot is deliberately allowed: `…released in 2.0.0.` ends a sentence, and excluding it
+ * would make the sweep MISS a real literal. Between over-flagging and under-flagging, this one
+ * over-flags: a false positive is an argument, a false negative is a dead tag.
+ *
+ * The same rule holds when the record is itself a prerelease — `2.0.0-rc.11` does not match inside
+ * `2.0.0-rc.110`.
+ */
 export function literalLines(text, version) {
+  const escaped = String(version).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const whole = new RegExp(`(?<![\\d.])${escaped}(?![-\\d])`);
   const hits = [];
   text.split('\n').forEach((line, i) => {
     if (/^\s*(\/\/|\*|\/\*|#)/.test(line)) return;      // in a comment it is the lesson
-    if (line.includes(version)) hits.push(i + 1);
+    if (whole.test(line)) hits.push(i + 1);
   });
   return hits;
 }
@@ -123,6 +148,37 @@ test('the sweep would catch a planted literal, and ignores one in a comment (ARC
   assert.deepEqual(literalLines(planted, rootVersion), [1]);
   assert.deepEqual(literalLines(`// the version was ${rootVersion} when this was written`, rootVersion), []);
   assert.ok(rootVersion.length > 0 && /\d/.test(rootVersion), 'the version being searched for is not a version');
+});
+
+test('ARC-09-C50 — the sweep matches a version, not a substring of one', () => {
+  // The 2.0.0-final table measured what a substring match costs at a RELEASE TRIPLE: 172 flagged
+  // lines, of which 21 — and four whole files — named only `2.0.0-rc.6`, `2.0.0-dev` or
+  // `2.0.0-test`. `v2.0.0-rc.6` contains `2.0.0`, so every one of them would have failed the
+  // release for mentioning a version that is not the record and never will be.
+  //
+  // Asserted at `2.0.0` specifically, because that is the record version this fails at and the one
+  // no run has had yet. The cases are both directions: the prerelease is NOT flagged, the bare
+  // triple IS.
+  assert.deepEqual(literalLines("  const tags = ['v2.0.0-rc.6'];", '2.0.0'), [],
+    'a prerelease of the record version is not the record version');
+  assert.deepEqual(literalLines("  version: '2.0.0-dev',", '2.0.0'), []);
+  assert.deepEqual(literalLines("  assert.equal(v, '2.0.0');", '2.0.0'), [1],
+    'the record version itself must still be caught');
+  assert.deepEqual(literalLines("  annotate(root, 'v2.0.0', msg);", '2.0.0'), [1],
+    'a `v` prefix is how a version is written, not a different token');
+
+  // A digit before is a DIFFERENT version; a dot before is a longer one.
+  assert.deepEqual(literalLines("  const v = '12.0.0';", '2.0.0'), []);
+  assert.deepEqual(literalLines("  const v = '2.0.01';", '2.0.0'), []);
+
+  // A trailing dot is a SENTENCE, and excluding it would make the sweep miss a real literal.
+  // Between over-flagging and under-flagging this errs toward over: a false positive is an
+  // argument, a false negative is a dead tag.
+  assert.deepEqual(literalLines("  const note = 'released in 2.0.0.';", '2.0.0'), [1]);
+
+  // And the rule holds when the record is itself a prerelease — the case that killed rc.10.
+  assert.deepEqual(literalLines("  const t = '2.0.0-rc.110';", '2.0.0-rc.11'), []);
+  assert.deepEqual(literalLines("  const t = '2.0.0-rc.11';", '2.0.0-rc.11'), [1]);
 });
 
 test('every allow-listed fixture file still contains the literal it is listed for (ARC-09-C12a)', () => {
