@@ -18,10 +18,26 @@ import { REAL_ROOT } from './helpers/tree.mjs';
 const checks = engineChecks();
 const ids = checks.map((c) => c.id);
 
-test('E-00 … E-28 and SV-00 … SV-09, once each, in section order', () => {
-  assert.equal(checks.length, 39);
-  assert.deepEqual(ids.filter((id) => id.startsWith('E-')),
-    Array.from({ length: 29 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
+test('E-00 … E-29 and SV-00 … SV-09, once each, in section order', () => {
+  assert.equal(checks.length, 40);
+  // ARC-08-C30 — THE SET, NOT THE ORDER, and the difference is a decision worth stating.
+  //
+  // This asserted `deepEqual` against an ASCENDING list, which held because every check until now
+  // was appended: the highest id was also the last defined. E-29 belongs to the `repo` section,
+  // whose block is E-05…E-11, and the report renders `report.checks` in definition order rather
+  // than grouping by section — so a new repo check either reads last in the report, after the
+  // server section, or breaks the ascending order.
+  //
+  // Renumbering to fit was the other option and it is worse: ids are a vocabulary users quote.
+  // The owner's own sitting notes say "the warn is E-23"; a remedy names E-16; the snapshots,
+  // the docs and three transcripts carry them. Shifting a dozen ids to keep a sort order tidy
+  // would break every one of those to satisfy a test.
+  //
+  // So: the SET is complete and has no gaps and no duplicates, and the SECTION order is asserted
+  // below. What is no longer asserted is that definition order happens to be numeric — which was
+  // never a property anyone relied on, only one that had not yet been contradicted.
+  assert.deepEqual([...ids.filter((id) => id.startsWith('E-'))].sort(),
+    Array.from({ length: 30 }, (_, i) => `E-${String(i).padStart(2, '0')}`));
   assert.deepEqual(ids.filter((id) => id.startsWith('SV-')),
     Array.from({ length: 10 }, (_, i) => `SV-${String(i).padStart(2, '0')}`));
   assert.equal(new Set(ids).size, ids.length);
@@ -32,7 +48,7 @@ test('E-00 … E-28 and SV-00 … SV-09, once each, in section order', () => {
 });
 
 // S02's AC 8, extended by S03's detectors — the subset, still read from the flags.
-test('--quick is fourteen checks: the ones that cost nothing to run (ARC-09-C8)', () => {
+test('--quick is fifteen checks: the ones that cost nothing to run (ARC-09-C8)', () => {
   const { selected } = planRun(checks, { quick: true });
   // ARC-09-C8 moved three GROUPS out — the docs checks that share `docsStatus`, the whole server
   // section (one in-process run of the server's own doctor), and the lint checks that share
@@ -40,6 +56,12 @@ test('--quick is fourteen checks: the ones that cost nothing to run (ARC-09-C8)'
   assert.deepEqual(selected.map((c) => c.id), [
     'E-01', 'E-02',
     'E-05', 'E-06', 'E-07', 'E-08', 'E-10', 'E-11',
+    // ARC-08-C30 — E-29 reads `.local/bootstrap-state.json`, which E-11 has already read on the
+    // same run: no spawn, no walk, no network. It belongs in the subset for the same reason E-11
+    // does, and the banner is where "your install did not finish" most needs to be said. It sits
+    // here because the list is in DEFINITION order and E-29 is defined at the end of the repo
+    // block, next to the sibling it extends.
+    'E-29',
     'E-17', 'E-18',
     'E-23', 'E-24', 'E-25', 'E-26',
   ]);
@@ -147,6 +169,12 @@ test('--quick membership is the same set in the registry and in a real run', () 
   assert.deepEqual(ran, [
     'E-01', 'E-02',
     'E-05', 'E-06', 'E-07', 'E-08', 'E-10', 'E-11',
+    // ARC-08-C30 — E-29 reads `.local/bootstrap-state.json`, which E-11 has already read on the
+    // same run: no spawn, no walk, no network. It belongs in the subset for the same reason E-11
+    // does, and the banner is where "your install did not finish" most needs to be said. It sits
+    // here because the list is in DEFINITION order and E-29 is defined at the end of the repo
+    // block, next to the sibling it extends.
+    'E-29',
     'E-17', 'E-18',
     'E-23', 'E-24', 'E-25', 'E-26',
   ]);

@@ -70,6 +70,11 @@
       "fixable": true
     },
     {
+      "id": "E-29",
+      "status": "ok",
+      "fixable": false
+    },
+    {
       "id": "E-12",
       "status": "ok",
       "fixable": true

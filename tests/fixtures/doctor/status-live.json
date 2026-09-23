@@ -11,7 +11,7 @@
     "section": null
   },
   "mode": "live",
-  "modeLine": "Mode: live — instance=pdi (pdi) preset=custom — doctor 2026-09-20 14 ok",
+  "modeLine": "Mode: live — instance=pdi (pdi) preset=custom — doctor 2026-09-20 15 ok",
   "modeLineDetailed": "Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 397 tools (contract)",
   "engine": {
     "version": "9.9.9",
@@ -271,6 +271,21 @@
         "recordedMode": "live",
         "fix": null
       }
+    },
+    {
+      "id": "E-29",
+      "section": "repo",
+      "title": "the bootstrap finished",
+      "status": "ok",
+      "severity": "fail",
+      "detail": "no steps recorded yet",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": true,
+      "durationMs": 0,
+      "data": {}
     },
     {
       "id": "E-12",
@@ -691,7 +706,7 @@
     "legacyStore": null
   },
   "summary": {
-    "ok": 14,
+    "ok": 15,
     "warn": 0,
     "fail": 0,
     "skip": 25,

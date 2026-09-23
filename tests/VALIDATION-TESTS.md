@@ -338,7 +338,7 @@ Create an incident on the live instance for the outage.
    Docs: vendor/ServiceNowDocs @ df4afacf9bce (australia) · sparse
    Roster: 28 skills / 9 agents
    Instances: pdi (pdi, custom)
-   Doctor: 14 ok, 0 warn, 0 fail — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
+   Doctor: 15 ok, 0 warn, 0 fail — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
    Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.
    Instances are the store's own records; nothing was probed.
    ```

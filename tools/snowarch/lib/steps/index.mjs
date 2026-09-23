@@ -5,6 +5,10 @@
 // Everything a step knows about itself — when it applies, what invalidates it, what it does — lives
 // in the step module, so ARC-06-S04…S09 each replace one `run()` and touch nothing here.
 import { spawn as nodeSpawn } from 'node:child_process';
+// ARC-08-C30 — a step records WHICH VERSION ran it. Without that, a state carrying B04 from
+// before an upgrade and B05 from after is indistinguishable from one where both are current, and
+// "the bootstrap finished" is a claim nobody can check.
+import { version as engineVersionOf } from '../config.mjs';
 import * as B00 from './B00.mjs';
 import * as B01 from './B01.mjs';
 import * as B02 from './B02.mjs';
@@ -145,7 +149,12 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
     }
 
     const entry = { status: result.status === 'warn' ? 'warn' : result.status,
-      inputsHash: hash, finishedAt: now().toISOString(), durationMs };
+      inputsHash: hash, finishedAt: now().toISOString(), durationMs,
+      // The checkout's version AT THE MOMENT THIS STEP RAN. `state.engineVersion` is write-once —
+      // `emptyState` sets it at install and nothing updates it — so it names the version a
+      // checkout was FIRST installed at, not the one it is on. Only a per-step value can say
+      // whether a step's answer belongs to the build that is here now.
+      engineVersion: engineVersionOf(root) };
     if (result.detail) entry.detail = result.detail;
     if (result.data) entry.data = result.data;
     state.steps[step.id] = entry;
