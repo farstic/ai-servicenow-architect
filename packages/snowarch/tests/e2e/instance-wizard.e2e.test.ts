@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { PROBE_FIELDS } from '../../src/servicenow/probes.js';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -120,8 +121,18 @@ describe.skipIf(!ready)('ARC-07-S11 live E2E — the wizard against a real insta
       // rather than asserted: an instance without Now Assist is not a failing test.
       const entry = (readStore() as unknown as { instances: Record<string, { lastProbe: Record<string, string> }> })
         .instances.e2e;
-      expect(run.output).toContain(`nowAssist ${entry?.lastProbe?.nowAssist}`);
-      expect(run.output).toContain(`fluent ${entry?.lastProbe?.fluent}`);
+      // ARC-07-C8 — THE LABEL COMES FROM THE PRODUCT, the value from the store, and they are not
+      // the same string. `PROBE_FIELDS` derives `label` from the FLAG name (`NOW_ASSIST_ENABLED` →
+      // `now_assist`) and carries `key` as the store field (`nowAssist`). This retyped the key as
+      // though it were the label, so it asserted `nowAssist ok` against a line that says
+      // `now_assist ok` — and it failed on the first nightly that ever ran against the branch under
+      // development. A test that spells a label the product renders from a constant is the
+      // `sortTags` shape: one definition, a second writer, and nothing to notice until they differ.
+      for (const key of ['nowAssist', 'fluent'] as const) {
+        const field = PROBE_FIELDS.find((f) => f.key === key);
+        expect(field, `PROBE_FIELDS no longer carries ${key}`).toBeDefined();
+        expect(run.output).toContain(`${field!.label} ${entry?.lastProbe?.[key]}`);
+      }
 
       expect(findSecret(run.output, c()), 'the transcript leaked a secret').toBeNull();
       expect(findSecret(snapshot, c()), 'the process arguments leaked a secret').toBeNull();
