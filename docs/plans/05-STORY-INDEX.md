@@ -4,7 +4,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 
 **How to read it.** One row per story, in ARC order. *Depends on* is the normalised form of the story-map "Depends on" cell: same-ARC stories as `S05`, other ARCs as `ARC-04-S02/S03`, a whole earlier ARC as `ARC-01 (all)`, and spike verdicts as `verdicts S-01 S-16` (each verdict is produced by the ARC-00 story named in `03` §E). Consumer relationships ("later overwrites", "consumed by") are deliberately **not** dependencies and do not appear here. *Size* uses each ARC's own bands (S ≤ 1 day · M 1–2 days · L 3–5 days; ARC-04 uses L 3–4 / M 1.5–2). *Status* values: Not started · In progress · Blocked (name the gate) · Done (every acceptance criterion of the story passed).
 
-**Totals.** 132 stories: ARC-00 14 · ARC-01 12 · ARC-02 13 · ARC-03 11 · ARC-04 14 · ARC-05 11 · ARC-06 14 · ARC-07 11 · ARC-08 11 · ARC-09 11 · ARC-10 10. Sizes: S 25 · M 83 · L 24.
+**Totals.** 133 stories: ARC-00 14 · ARC-01 12 · ARC-02 13 · ARC-03 11 · ARC-04 14 · ARC-05 12 · ARC-06 14 · ARC-07 11 · ARC-08 11 · ARC-09 11 · ARC-10 10. Sizes: S 25 · M 84 · L 24.
 
 ## The sheet
 
@@ -85,6 +85,7 @@ Status: **Integrated 2026-09-04** · Generated from the story-map tables of the 
 | ARC-05-S09 | ARC-05 | CI job `contract` and the release gate script | S | S03, S04, S08; ARC-01-S11 | M2 | Done (2026-09-08) |
 | ARC-05-S10 | ARC-05 | Contract loader for engine tooling and the no-literal-names guard | M | S01, S06 | M2 | Done (2026-09-08) |
 | ARC-05-S11 | ARC-05 | Drift drill and contributor documentation | M | S01, S10 | M2 | Done (2026-09-08) |
+| ARC-05-S12 | ARC-05 | Capabilities pre-flight before a mutating MCP call: §2.0 in the rule-file generator, T-22 rewritten and T-22b, ADR-0010 | M | S05, S06, S10 | M5 | Done (2026-09-23) — the owner's decision 2026-09-23. A session learned a flag was off by making the call and reading the error code, so §2.1's one deliberate approval was spent on a write the instance was always going to refuse. The gate resolution was already free in the contract (`"gate": "scripting"` → `gates.scripting`), so the read replaces the refusal. Per call, not per session — no cache is the point, and inside a §2.2 chain that is three reads for one approved action. The stop prints what it read, so a mis-resolved gate is refutable against `./snowarch instance list` rather than silently costing a capability. Sentences single-sourced from `packages/contract/gen/rule-file.mjs`; both the rule file and T-22 are asserted against the same constants |
 | ARC-06-S01 | ARC-06 | Committed `.mcp.json` and `.claude/settings.json`; placeholder and secret-shape tests | M | ARC-00-S06/S08; ARC-01 (all); verdicts S-05 S-06 S-20 | M3 | Done (2026-09-09) |
 | ARC-06-S02 | ARC-06 | `snowarch` CLI skeleton (stdlib only): argument parsing, exit codes, secret-free logging, `version` | M | ARC-01 (all) | M3 | Done (2026-09-09) |
 | ARC-06-S03 | ARC-06 | Bootstrap orchestrator: state file, step registry, resume, per-step input hashes, plan summary, `--yes` / `--from` / `--reset` | L | S02 | M3 | Done (2026-09-09) |

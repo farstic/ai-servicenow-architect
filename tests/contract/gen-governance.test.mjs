@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { PREFLIGHT_STOP, PREFLIGHT_UNKNOWN_GATE } from '../../packages/contract/gen/rule-file.mjs';
+
 /**
  * `scripts/gen-governance.mjs`, driven through the CLI.
  *
@@ -74,8 +76,16 @@ test('criterion 1 — the rule file is written, is short, and has no frontmatter
     // four of prose is +9, and there is no version of this section that is both complete and
     // shorter than the file was. The cap moved to where the finished section sits plus a little,
     // NOT to wherever the file happens to be: 52 today, so prose creep still fails here.
+    //
+    // ARC-05-S12 moved it again, to 64, for §2.0 — the capabilities pre-flight (ADR-0010, owner
+    // 2026-09-23). Six lines: a numbered step each for the read, the gate resolution, the stop and
+    // the continue, plus the stop sentence on its own line because it is text a session prints
+    // VERBATIM and a wrapped one is a paraphrased one. The section cannot be shorter and still say
+    // what happens to a gate the contract does not define, which is the half of the rule that a
+    // reader would otherwise resolve by guessing. Same principle as the move above: the cap sits at
+    // the finished section plus two, so prose creep still fails here.
     const lines = text.trimEnd().split('\n').length;
-    assert.ok(lines <= 55, `${lines} lines, budget 55`);
+    assert.ok(lines <= 64, `${lines} lines, budget 64`);
     console.log(`    rule file: ${lines} lines`);
   } finally { cleanup(dir); }
 });
@@ -507,4 +517,42 @@ test('the generated files are in the repository and current', () => {
   assert.ok(existsSync(join(root, RULE)));
   const r = run(root, ['--check']);
   assert.equal(r.code, 0, r.out);
+});
+
+test('ADR-0010 — the pre-flight sentences are the generator\'s constants, not a second copy', () => {
+  // THE CONTROL FOR THE WHOLE ROW. ADR-0010's ruling only exists as behaviour if the rule file
+  // states it, and it only stays stated if removing it breaks something by name. Delete §2.0 from
+  // `packages/contract/gen/rule-file.mjs` and this fails.
+  //
+  // Asserted against the CONSTANTS rather than against a string typed here, because a test that
+  // retypes the sentence is the second copy the constants exist to prevent — it would go on passing
+  // while the rule file and the test drifted apart together. P-33 is that story: one protocol
+  // stated in four documents in two naming generations, every copy true when written.
+  const dir = tree();
+  try {
+    assert.equal(run(dir).code, 0);
+    const text = ruleOf(dir);
+    assert.ok(text.includes('## §2.0'), 'the rule file has no §2.0 pre-flight section');
+    assert.ok(text.includes(PREFLIGHT_STOP), 'the stop sentence is not the generator\'s constant');
+    assert.ok(text.includes(PREFLIGHT_UNKNOWN_GATE), 'the unknown-gate sentence is not the constant');
+    // The pre-flight must come BEFORE the write gate, because its whole subject is not asking a
+    // question that a read would have made unnecessary. A §2.0 rendered after §2.1 would be the
+    // same words describing the sequence this ADR rejected.
+    assert.ok(text.indexOf('## §2.0') < text.indexOf('## §2.1'), '§2.0 is rendered after §2.1');
+    // It is a READ, and the rule must not leave that to inference: a pre-flight a session thinks
+    // needs approval is a pre-flight it skips.
+    const section = text.slice(text.indexOf('## §2.0'), text.indexOf('## §2.1'));
+    assert.match(section, /It is a read/, '§2.0 does not say the pre-flight needs no approval');
+    assert.match(section, /not carried past/, '§2.0 does not say the answer expires with the call');
+  } finally { cleanup(dir); }
+});
+
+test('ADR-0010 — T-22 states the same sentence, from the same constant', () => {
+  // The second reader. The rule file tells a session what to print; T-22 tells a tester what to
+  // compare against. Those two sentences disagreeing is a test that fails on correct behaviour, or
+  // passes on wrong behaviour, and which one it is depends on which document drifted.
+  const doc = readFileSync(join(root, 'tests/VALIDATION-TESTS.md'), 'utf8');
+  const t22 = doc.slice(doc.indexOf('## T-22'));
+  assert.ok(t22.length > 0, 'T-22 is not in tests/VALIDATION-TESTS.md');
+  assert.ok(t22.includes(PREFLIGHT_STOP), 'T-22 does not state the generator\'s stop sentence');
 });

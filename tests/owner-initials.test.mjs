@@ -103,10 +103,17 @@ test('ARC-00 — every ADR with a Decision-owner cell is initialled', () => {
       .find((l) => l.startsWith('| **Decision owner**'));
     if (line) cells.push({ f, line });
   }
-  // NINE carry the cell, and they are not all the same shape: ADR-0009's records consent as
+  // TEN carry the cell, and they are not all the same shape: ADR-0009's records consent as
   // "ratified by merging ARC-05-S11" — the owner's merge WAS the signature, so it has no initials
   // marker and never had one. Asserting a flat count of eight was my own error, caught here.
-  assert.equal(cells.length, 9, `${cells.length} ADRs carry a Decision-owner cell`);
+  //
+  // ARC-05-S12 added ADR-0010 as the SECOND of that kind ("decided 2026-09-23, ratified by merging
+  // ARC-05-S12"), so the two moving numbers are the total and the ratified count. **`initialled`
+  // stays at 8 on purpose**: 2026-09-16 was a single signing event on the ADRs that existed then,
+  // and a later ADR cannot join it. A test that let that number grow would accept a new ADR
+  // claiming a signature from a day it was not written on, which is the one thing this file exists
+  // to prevent.
+  assert.equal(cells.length, 10, `${cells.length} ADRs carry a Decision-owner cell`);
 
   const initialled = cells.filter(({ line }) => line.includes('initials'));
   assert.equal(initialled.length, 8, 'eight cells are the initials kind');
@@ -115,7 +122,7 @@ test('ARC-00 — every ADR with a Decision-owner cell is initialled', () => {
   }
 
   const ratified = cells.filter(({ line }) => !line.includes('initials'));
-  assert.equal(ratified.length, 1);
+  assert.equal(ratified.length, 2, 'ADR-0009 and ADR-0010 record consent by merge');
   assert.match(ratified[0].line, /ratified by merging/,
     'a Decision-owner cell with no initials must say how consent was given instead');
 });
