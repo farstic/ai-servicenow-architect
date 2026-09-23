@@ -21,7 +21,7 @@
  *   hook reads it. A banner that could fetch would be a banner that could hang a session start.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -33,6 +33,7 @@ import { loadState } from '../state.mjs';
 // ARC-08-C29 — the runner's own step list, so the plan and the run are one computation.
 import { STEPS } from '../steps/index.mjs';
 import { makeExec } from '../steps/B00.mjs';
+import { nodeInfo, stepContext } from '../bootstrap.mjs';
 import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
@@ -229,11 +230,40 @@ export function stepsThatWillRun(root, tag, { ctx, opts = {} }) {
  * FILE-CHANGE ESTIMATE rather than silently printing a different computation under the same
  * heading. Two answers wearing one label is the defect this row exists to remove.
  */
+/**
+ * The ctx the plan asks its questions with — EXPORTED so a test asks them the same way.
+ *
+ * `mode` and `docs` come from the RECORDED state, because that is what the upgrade re-runs under:
+ * an upgrade does not ask the two plan questions again, it repeats the answers already on disk.
+ * `node` is this machine's, because it is this machine that will run the steps. Everything else is
+ * `stepContext`'s, which is what the bootstrap hands its steps.
+ *
+ * Exported because the first version of `plan-agrees.test.mjs` built its own ctx to record the
+ * "current" hashes and then compared them against ones built here — two constructions, disagreeing
+ * about `state.registration`, and the test reported B07 stale on a tree where nothing had changed.
+ * A test that constructs its own version of the thing under test is measuring its own copy.
+ */
+export function planContext({ root, config, ctx = {}, state = null }) {
+  return {
+    ...stepContext({ root, config, env: ctx.env ?? process.env, node: ctx.node ?? nodeInfo(),
+      flags: { yes: true }, state }),
+    mode: state?.mode ?? ctx.mode ?? 'design',
+    docs: state?.docs?.mode ?? ctx.docs ?? 'sparse',
+  };
+}
+
 export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktree = null } = {}) {
-  const at = keepWorktree ?? join(mkdtempSync(join(tmpdir(), 'snowarch-plan-')), 'at-tag');
-  const added = keepWorktree === null && run('git', ['worktree', 'add', '--detach', '--quiet', at, tag],
-    { cwd: root, encoding: 'utf8', stdio: 'pipe' })?.status === 0;
-  if (keepWorktree === null && !added) return null;
+  const scratch = keepWorktree ? null : mkdtempSync(join(tmpdir(), 'snowarch-plan-'));
+  const at = keepWorktree ?? join(scratch, 'at-tag');
+  const added = keepWorktree !== null
+    || run('git', ['worktree', 'add', '--detach', '--quiet', at, tag],
+      { cwd: root, encoding: 'utf8', stdio: 'pipe' })?.status === 0;
+  if (!added) {
+    // The worktree failed, so the directory made for it is rubbish. Removed HERE rather than in
+    // the `finally` below, which the early return never reaches.
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
+    return null;
+  }
 
   try {
     // The store and the state are the CHECKOUT's, not the tag's: an upgrade does not move them,
@@ -246,7 +276,16 @@ export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktre
 
     let config = ctx.config;
     try { config = JSON.parse(readFileSync(join(at, 'engine.config.json'), 'utf8')); } catch { /* the tag's, or ours */ }
-    const tagCtx = { ...ctx, root: at, config };
+
+    // THE RUNNER'S OWN SHAPE, from the runner's own constructor. A spread of the upgrade
+    // command's `{ root, config }` was missing `env`, and `B04.runsWhen` reads
+    // `ctx.env.SNOWARCH_TEST_FORCE_DEPS` — so every real upgrade crashed at `[U4/7] plan`. A ctx
+    // assembled at a call site is a ctx that drifts from what the steps read.
+    //
+    // `mode` and `docs` come from the RECORDED state, because that is what the upgrade re-runs
+    // under: an upgrade does not ask the two questions again, it repeats the answers already on
+    // disk. `node` is this machine's, because it is this machine that will run the steps.
+    const tagCtx = planContext({ root: at, config, ctx, state });
 
     const out = new Map();
     for (const step of STEPS) {
@@ -267,6 +306,11 @@ export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktre
   } finally {
     if (keepWorktree === null) {
       run('git', ['worktree', 'remove', '--force', at], { cwd: root, encoding: 'utf8', stdio: 'pipe' });
+      // AND THE DIRECTORY THAT HELD IT. Removing the worktree leaves the `mkdtemp` behind, so
+      // every real plan left one empty `snowarch-plan-*` in the OS temp directory — measured at
+      // five after one test file. `rmSync` after `worktree remove`, in the same `finally`, so an
+      // exception between them still cleans up.
+      if (scratch) rmSync(scratch, { recursive: true, force: true });
     }
   }
 }

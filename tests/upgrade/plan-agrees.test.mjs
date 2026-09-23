@@ -18,17 +18,22 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { planSteps, rerunAtTag } from '../../tools/snowarch/lib/commands/upgrade.mjs';
+import { planContext, planSteps, rerunAtTag } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { hashFor } from '../../tools/snowarch/lib/inputs.mjs';
 import { STEPS } from '../../tools/snowarch/lib/steps/index.mjs';
+import { git } from './harness.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { REAL_ROOT } from '../doctor/helpers/tree.mjs';
 
-const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' });
+// ARC-09-C27b — the HARNESS's git, not a bare `execFileSync`. Every git call in this directory
+// carries `core.longpaths` on Windows, and a raw call is the one that fails on the cell nobody
+// runs by hand. `tests/upgrade` has its own guard for exactly this and it caught the first
+// version of this file.
 
 /**
  * Check out a tag AND assert it took.
@@ -78,18 +83,27 @@ const ctxFor = (root) => ({
   state: { registration: 'project', hooksDisabledByBootstrap: false },
 });
 
-/** A recorded state in which every step that will run is `ok` and current for THIS tree. */
+/**
+ * A recorded state in which every step that will run is `ok` and current for THIS tree.
+ *
+ * Hashed through `planContext` — the PRODUCT's constructor — rather than through a ctx this file
+ * assembles. The first version built its own and the two disagreed about `state.registration`, so
+ * the test reported B07 stale on a tree where nothing had changed: a test constructing its own
+ * version of the thing under test measures its own copy.
+ */
 function recordCurrent(root, ctx) {
-  const steps = {};
+  const state = { version: 1, product: 'snowarch', mode: ctx.mode, docs: { mode: ctx.docs },
+    registration: 'project', hooksDisabledByBootstrap: false, steps: {} };
+  const hashCtx = planContext({ root, config: ctx.config, ctx, state });
   for (const step of STEPS) {
-    if (step.runsWhen(ctx) === false || step.cacheable === false) continue;
-    steps[step.id] = { status: 'ok', inputsHash: hashFor(step.id, ctx),
+    if (step.runsWhen(hashCtx) === false || step.cacheable === false) continue;
+    state.steps[step.id] = { status: 'ok', inputsHash: hashFor(step.id, hashCtx),
       finishedAt: '2026-09-20T09:00:00.000Z', durationMs: 0, engineVersion: '9.9.9' };
   }
   mkdirSync(join(root, '.local'), { recursive: true });
   writeFileSync(join(root, '.local', 'bootstrap-state.json'),
-    `${JSON.stringify({ version: 1, product: 'snowarch', mode: ctx.mode, steps }, null, 2)}\n`);
-  return steps;
+    `${JSON.stringify(state, null, 2)}\n`);
+  return state.steps;
 }
 
 test('a state current for the target re-runs nothing', { timeout: 120_000 }, (t) => {
@@ -167,4 +181,72 @@ test('the plan says so when it could not make the runner\'s comparison', { timeo
     run: spawnSync });
   assert.equal(estimate, true);
   assert.equal(rerunAtTag(root, 'v0.0.0-no-such-tag', { ctx, state: { steps: {} } }), null);
+});
+
+test('the plan leaves no temp directory behind', { timeout: 120_000 }, (t) => {
+  // MEASURED IN REVIEW, on a PASSING run: five `snowarch-plan-*` directories left in TMPDIR after
+  // this one file. `rerunAtTag` removed the worktree and not the `mkdtemp` that held it, so every
+  // real upgrade plan left an empty directory in the OS temp — a passing test and a leak, which is
+  // the combination nothing notices.
+  //
+  // Counted here rather than left to `fixture-cleanup`: that test watches what `npm test` leaves,
+  // and `tests/upgrade/` is outside `npm test`.
+  const root = clone(t);
+  const ctx = ctxFor(root);
+  checkoutTag(root, 'v9.9.9-target');
+  recordCurrent(root, ctx);
+  const state = JSON.parse(readFileSync(join(root, '.local', 'bootstrap-state.json'), 'utf8'));
+
+  const before = readdirSync(tmpdir()).filter((n) => n.startsWith('snowarch-plan-')).length;
+  for (let i = 0; i < 3; i += 1) {
+    planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync });
+  }
+  // …and the failing path too, which returns early and must clean up on the way out.
+  rerunAtTag(root, 'v0.0.0-no-such-tag', { ctx, state });
+  const after = readdirSync(tmpdir()).filter((n) => n.startsWith('snowarch-plan-')).length;
+
+  assert.equal(after, before,
+    `${after - before} snowarch-plan-* director(ies) left in ${tmpdir()} after four plans`);
+
+  // The worktree register is clean too: a removed directory with a registered worktree still
+  // shows in `git worktree list` and makes the next `add` at that path fail.
+  const worktrees = git(root, ['worktree', 'list']).trim().split('\n').filter(Boolean);
+  assert.equal(worktrees.length, 1, `worktrees left registered:\n${worktrees.join('\n')}`);
+});
+
+test('the plan ctx is the shape every step reads', { timeout: 120_000 }, (t) => {
+  // THE ASSERTION THAT WOULD HAVE CAUGHT THE CRASH, and it costs nothing.
+  //
+  // `rerunAtTag` handed `runsWhen` a ctx spread from the upgrade command's `{ root, config }` —
+  // no `env` — and `B04.runsWhen` reads `ctx.env.SNOWARCH_TEST_FORCE_DEPS`. **Every real
+  // `./snowarch upgrade` died at `[U4/7] plan`** with `Cannot read properties of undefined`, on
+  // every machine. Four green tests above and a product that could not plan an upgrade, because
+  // each of them BUILDS its own ctx and so none of them exercised the contract between
+  // `rerunAtTag` and the steps.
+  //
+  // The e2e does drive the real command and it did catch this — on CI, after the push, because
+  // `tests/upgrade/` is outside `npm test` and I had not run it. This assertion is the cheap half
+  // that fails in a second: every step is asked its own question with the ctx the plan builds, and
+  // `runsWhen` throwing is the failure.
+  const root = clone(t);
+  const ctx = ctxFor(root);
+  const state = { mode: 'live', docs: { mode: 'sparse' }, registration: 'project',
+    hooksDisabledByBootstrap: false, steps: {} };
+  const planned = planContext({ root, config: ctx.config, ctx, state });
+
+  for (const key of ['root', 'config', 'env', 'node', 'state', 'mode', 'docs']) {
+    assert.notEqual(planned[key], undefined, `the plan ctx has no ${key}`);
+  }
+
+  for (const step of STEPS) {
+    assert.doesNotThrow(() => step.runsWhen(planned),
+      `${step.id}.runsWhen threw on the ctx the plan builds`);
+  }
+
+  // …and the hasher too, which reads the same ctx by a different path.
+  for (const step of STEPS) {
+    if (step.cacheable === false || step.runsWhen(planned) === false) continue;
+    assert.doesNotThrow(() => hashFor(step.id, planned),
+      `${step.id}'s inputs could not be resolved from the ctx the plan builds`);
+  }
 });
