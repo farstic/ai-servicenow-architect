@@ -214,6 +214,49 @@ test('the plan leaves no temp directory behind', { timeout: 120_000 }, (t) => {
   assert.equal(worktrees.length, 1, `worktrees left registered:\n${worktrees.join('\n')}`);
 });
 
+test('the plan survives the ctx the COMMAND hands it, which carries neither env nor node',
+  { timeout: 120_000 }, (t) => {
+    // THE CASE THAT ACTUALLY SHIPPED, and the one the test below does not reach.
+    //
+    // `upgradeCommand` builds `const ctx = { root, config };` — that literal, nothing else — and
+    // hands it to `planSteps`. `rerunAtTag` spread it (`{ ...ctx, root: at, config }`) into the
+    // object it gives `runsWhen`, `B04.runsWhen` read `ctx.env.SNOWARCH_TEST_FORCE_DEPS`, and
+    // **every** `./snowarch upgrade` died at `[U4/7] plan`.
+    //
+    // The test below hands `planContext` a ctx from `ctxFor()`, which already has `env` — so it
+    // holds `planContext`'s contract and says nothing about `rerunAtTag`'s use of it, and it stays
+    // green with the original crash line restored. Measured, not assumed: the architect restored
+    // line 288 and got 6/6. A test that cannot fail on the defect it was written for is the same
+    // shape as a check that cannot tell failure from absence.
+    //
+    // So this one enters through the front door with the POOREST ctx the command could hand in.
+    // A lower bound, deliberately: if the command is ever enriched, this still holds, because the
+    // fix must be that the plan builds what the steps read rather than that its caller happened to
+    // pass enough.
+    const root = clone(t);
+    const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
+    const state = { version: 1, product: 'snowarch', mode: 'design', docs: { mode: 'sparse' },
+      registration: 'project', hooksDisabledByBootstrap: false, steps: {} };
+
+    const commandCtx = { root, config };   // `upgrade.mjs`, U4 — verbatim
+    assert.equal(commandCtx.env, undefined, 'the command ctx this drives must have no env');
+    assert.equal(commandCtx.node, undefined, 'the command ctx this drives must have no node');
+
+    let plan;
+    assert.doesNotThrow(() => { plan = planSteps(root, 'v9.9.9-target', { ctx: commandCtx, state }); },
+      'the plan threw on the ctx the upgrade command hands it');
+
+    // …and it is a real plan, not a swallowed estimate: `estimate: true` is the worktree fallback,
+    // and a crash that degraded into it would pass a no-throw assertion while the user read the
+    // other computation under the same heading — which is this row's whole point.
+    assert.equal(plan.estimate, false, 'the plan fell back to the file-diff estimate');
+    assert.ok(Array.isArray(plan.steps), 'the plan has no steps array');
+    // Nothing is recorded, so every cacheable step is `never recorded` — the runner's answer, and
+    // proof the hash comparison ran rather than short-circuiting on the missing keys.
+    assert.ok(plan.steps.length > 0, 'a state with no recorded steps re-runs nothing');
+    for (const s of plan.steps) assert.equal(typeof s.why, 'string', `${s.step} has no reason`);
+  });
+
 test('the plan ctx is the shape every step reads', { timeout: 120_000 }, (t) => {
   // THE ASSERTION THAT WOULD HAVE CAUGHT THE CRASH, and it costs nothing.
   //
