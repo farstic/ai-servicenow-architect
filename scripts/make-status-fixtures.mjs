@@ -222,6 +222,20 @@ const HOST_CHECKS = Object.freeze({
   },
 });
 
+/**
+ * Replace a rendered `doctor <YYYY-MM-DD> …` day with the pinned instant's.
+ *
+ * Narrow on purpose: it rewrites a date that follows the word `doctor`, and nothing else in the
+ * line. A blanket date substitution would also rewrite a docs pin or an instance label that
+ * happened to look like one, and this runs over a sentence the product composed rather than over
+ * a field it owns.
+ */
+export function stampDay(line, ranAt) {
+  if (typeof line !== 'string') return line;
+  const day = String(ranAt).slice(0, 10);
+  return line.replace(/(doctor )\d{4}-\d{2}-\d{2}/g, `$1${day}`);
+}
+
 function pinMachine(report) {
   const prereqs = report.prereqs ? {
     ...report.prereqs,
@@ -245,6 +259,18 @@ function pinMachine(report) {
     // BOTH PLACES. `version` is the report's own and `engine.version` is `versionInfo()`'s; they
     // are filled from one source and pinning one would have left the other moving.
     version: HOST_FACTS.version,
+    // ARC-08-C31 — THE CLOCK, IN A SENTENCE. `modeLine` ends `doctor 2026-09-20 14 ok`: the day is
+    // rendered INTO it by `doctorStamp`, from `new Date(now())` rather than from the report's
+    // `ranAt`. Pinning `ranAt` and every `durationMs` left this one moving, so the committed
+    // fixture agreed with a capture only on the day it was taken — and `npm test` went red on
+    // develop and on v2.0.0-rc.9 three days later, for nobody's change.
+    //
+    // The pin table's rule reaches it exactly: a value that differs between two correct captures
+    // — on two machines, two commits, or TWO DAYS — is not the product's. The day is replaced with
+    // the pinned instant's, so the sentence stays the product's and only the clock in it is a
+    // sample.
+    modeLine: stampDay(report.modeLine, HOST_FACTS.ranAt),
+    modeLineDetailed: stampDay(report.modeLineDetailed, HOST_FACTS.ranAt),
     prereqs,
     engine: { ...report.engine, node: HOST_FACTS.node, version: HOST_FACTS.version,
       contractSha: HOST_FACTS.contractSha, docs },

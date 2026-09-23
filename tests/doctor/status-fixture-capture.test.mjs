@@ -20,7 +20,8 @@ import { mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { capture, FIXED_RAN_AT, FIXTURE_STORE, HOST_FACTS } from '../../scripts/make-status-fixtures.mjs';
+import { capture, FIXED_RAN_AT, FIXTURE_STORE, HOST_FACTS, stampDay }
+  from '../../scripts/make-status-fixtures.mjs';
 import { validateReport } from '../../tools/snowarch/lib/doctor/report-json.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -157,6 +158,17 @@ test('the clock and the capturing process are pinned, and nothing else is', () =
     assert.equal(r.durationMs, 0);
     assert.deepEqual([...new Set(r.checks.map((c) => c.durationMs))], [0]);
     assert.equal(r.prereqs.shell, HOST_FACTS.shell);
+    // ARC-08-C31 — THE CLOCK RENDERED INTO A SENTENCE. `modeLine` ends `doctor <day> <n> ok`, and
+    // the day came from `new Date(now())` rather than from the report's `ranAt` — so pinning every
+    // timestamp FIELD still left the fixture agreeing with a capture only on the day it was taken.
+    // `npm test` went red on develop and on v2.0.0-rc.9 three days after the capture, for nobody's
+    // change at all.
+    for (const line of [r.modeLine, r.modeLineDetailed]) {
+      for (const stamped of String(line).matchAll(/doctor (\d{4}-\d{2}-\d{2})/g)) {
+        assert.equal(stamped[1], FIXED_RAN_AT.slice(0, 10),
+          `a rendered day is not the pinned instant's: ${line}`);
+      }
+    }
     // No machine path: the capture passes its root as `home`, so the shipped masker rewrites it.
     assert.equal(/\/var\/folders|\/tmp\/|C:\\/.test(JSON.stringify(r)), false,
       'a capture-machine path is in the committed fixture');
@@ -307,3 +319,23 @@ test('ARC-08-C27 — a release commit produces the same bytes as develop',
         `this checkout's version (${pkg.version}) is in the committed fixture`);
     }
   });
+
+test('ARC-08-C31 — the day rendered into the mode line is pinned, not today\'s', () => {
+  // The substitution is NARROW on purpose: it rewrites a date that follows the word `doctor` and
+  // nothing else. A blanket date replacement would also rewrite a docs pin or an instance label
+  // that happened to look like one, and this runs over a sentence the product composed rather than
+  // over a field it owns.
+  const at = '2026-09-20T09:00:00.000Z';
+  assert.equal(stampDay('Mode: live — pdi — doctor 2026-01-02 14 ok', at),
+    'Mode: live — pdi — doctor 2026-09-20 14 ok');
+  assert.equal(stampDay('doctor 2026-01-02 3 FAIL', at), 'doctor 2026-09-20 3 FAIL');
+  assert.equal(stampDay('corpus pinned 2026-01-02', at), 'corpus pinned 2026-01-02');
+  assert.equal(stampDay(null, at), null);
+
+  for (const mode of ['design', 'live']) {
+    const line = String(committed(mode).modeLine);
+    if (/doctor \d{4}-\d{2}-\d{2}/.test(line)) {
+      assert.match(line, new RegExp(`doctor ${FIXED_RAN_AT.slice(0, 10)}`), `${mode}: ${line}`);
+    }
+  }
+});

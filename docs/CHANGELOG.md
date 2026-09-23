@@ -243,6 +243,16 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Fixed
 
+- **The test suite no longer starts failing simply because the date changed.** The sample report
+  the documentation shows carries the doctor's own line, and that line has the day written into it —
+  so the suite agreed with the product only on the day the sample was captured.
+
+- **Upgrading no longer asks you to set up the instance you already have.** On a live checkout the
+  upgrade printed "credentials: untouched" and then started the instance wizard anyway, asking for
+  a label and a password for an entry already in the store — on a run that had been told not to ask
+  anything. An instance already in the store is kept, whether or not you are watching a terminal,
+  and a run told not to ask now refuses with the flag that answers it instead of prompting.
+
 - **Releasing no longer fails its own tests.** The sample report the documentation shows carried
   the version number and the contract checksum of the checkout it was captured from, and a release
   rewrites both — so every release tag failed the test that compares the sample against what the
