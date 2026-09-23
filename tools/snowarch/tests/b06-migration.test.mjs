@@ -271,3 +271,98 @@ test('ARC-06-C16 — an EMPTY store still fails for want of a terminal', async (
   assert.equal(result.status, 'fail');
   assert.equal(result.detail, NO_TERMINAL);
 });
+
+/**
+ * ARC-08-C28 — the keep-path is decided by THE STORE, not by the terminal.
+ *
+ * ARC-06-C16 short-circuited only the non-interactive case, on a premise its own comment stated:
+ * *"`upgrade` runs `bootstrap --mode live --yes`, which has no terminal"*. That premise is false on
+ * every upgrade a person types — `upgrade.mjs`'s `finish()` spawns the bootstrap with
+ * `stdio: 'inherit'`, so the child holds the operator's terminal and `isTTY` is true. The
+ * short-circuit was written for the CI path and never matched the path it was written for.
+ *
+ * The owner's rc.6 → rc.9 upgrade reached `Label for this instance [pdi]` (sitting, 2026-09-23):
+ * the wizard, over an instance the plan had promised two lines earlier was untouched, on a run
+ * carrying `--yes`. And `--yes` could not stop it, because it never reached the decision.
+ *
+ * B06's own input table already said what should happen, and this code disagreed with it:
+ *
+ *   "MIGRATE, DON'T RE-WIZARD: a store whose schema is behind makes this step stale so the
+ *    migration runs — and a store whose CONTENTS changed does not, because re-running the wizard
+ *    over somebody's credentials is never the right answer to 'something moved'."
+ *
+ * `isTTY` is INJECTED both ways in every case below, so the terminal is a parameter of the test
+ * rather than a property of whoever runs it.
+ */
+const storeWithPdi = (root) => {
+  mkdirSync(join(root, '.local'), { recursive: true });
+  writeFileSync(join(root, '.local', 'instances.json'), JSON.stringify({
+    version: 1,
+    defaultInstance: 'pdi',
+    instances: {
+      pdi: {
+        url: 'https://fixture-host-never-dialled',
+        environment: 'pdi',
+        preset: 'custom',
+        auth: { method: 'basic', username: 'someone', password: 'a-secret-value' },
+      },
+    },
+  }));
+  return root;
+};
+
+/** A spawn that fails the test if anything reaches it: the wizard must not be started. */
+const refuseToSpawn = (t) => (...args) => {
+  t.diagnostic(`spawn reached with ${JSON.stringify(args[1] ?? [])}`);
+  throw new Error('the wizard was started over an existing instance');
+};
+
+test('ARC-08-C28 — an interactive --yes run keeps the instance and never prompts', async (t) => {
+  // THE OWNER'S PATH, exactly: a terminal (`stdio: 'inherit'`) and `--yes`.
+  const root = storeWithPdi(makeCheckout({}, t));
+  const result = await runB06(ctxFor(root, {
+    mode: 'live', isTTY: true, yes: true, spawn: refuseToSpawn(t),
+  }));
+
+  assert.equal(result.status, 'ok');
+  assert.equal(result.detail, 'kept instance "pdi"');
+  assert.equal(result.data.kept, true);
+  assert.equal(result.data.saved, 0, 'a kept instance was counted as a save');
+});
+
+test('ARC-08-C28 — a non-interactive --yes run keeps it too (C16 unchanged)', async (t) => {
+  const root = storeWithPdi(makeCheckout({}, t));
+  const result = await runB06(ctxFor(root, {
+    mode: 'live', isTTY: false, yes: true, spawn: refuseToSpawn(t),
+  }));
+  assert.equal(result.detail, 'kept instance "pdi"');
+});
+
+test('ARC-08-C28 — interactive WITHOUT --yes keeps it as well', async (t) => {
+  // The case the C16 comment deliberately left alone — "an operator at a terminal keeps the
+  // behaviour they had" — and it was the wrong thing to leave alone. Re-running the wizard over
+  // somebody's credentials is never the right answer to "something moved", whoever is watching.
+  const root = storeWithPdi(makeCheckout({}, t));
+  const result = await runB06(ctxFor(root, {
+    mode: 'live', isTTY: true, yes: false, spawn: refuseToSpawn(t),
+  }));
+  assert.equal(result.detail, 'kept instance "pdi"');
+});
+
+test('ARC-08-C28 — a --yes run with nothing to keep REFUSES rather than asking', async (t) => {
+  // `--yes` means "do not put a question in front of me", and a prompt is the one thing it must
+  // never produce. The sentence names the flag that answers it without a terminal.
+  const root = makeCheckout({}, t);
+  mkdirSync(join(root, '.local'), { recursive: true });
+  writeFileSync(join(root, '.local', 'instances.json'),
+    JSON.stringify({ version: 1, instances: {} }));
+
+  for (const isTTY of [true, false]) {
+    const result = await runB06(ctxFor(root, {
+      mode: 'live', isTTY, yes: true, spawn: refuseToSpawn(t),
+    }));
+    assert.equal(result.status, 'fail', `isTTY=${isTTY}`);
+    assert.equal(result.detail, NO_TERMINAL, `isTTY=${isTTY}`);
+    assert.match(result.detail, /--instance-file/);
+  }
+});

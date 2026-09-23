@@ -361,23 +361,39 @@ export const run = async (ctx) => {
 
   const interactive = ctx.isTTY ?? Boolean(process.stdin.isTTY);
 
-  // ARC-06-C16 — NOTHING TO ADD IS NOT A FAILURE.
+  // ARC-06-C16, corrected by ARC-08-C28 — NOTHING TO ADD IS NOT A FAILURE, **AND NOT A QUESTION**.
   //
-  // `upgrade` runs `bootstrap --mode live --yes`, which has no terminal, and this step demanded
-  // one even when the store already held the instance the run was about to keep. Every live user
-  // upgrading hit it, and the remedy it printed — re-run the upgrade — hit it again. The wizard
-  // exists to ADD an instance; a checkout that has one is not being asked to.
+  // C16 short-circuited only the NON-interactive case, on a premise written into the comment it
+  // replaced: *"`upgrade` runs `bootstrap --mode live --yes`, which has no terminal"*. That premise
+  // is false on every upgrade a person types. `upgrade.mjs`'s `finish()` spawns the bootstrap with
+  // **`stdio: 'inherit'`**, so the child has the operator's terminal and `process.stdin.isTTY` is
+  // true — the short-circuit was written for the CI path and never matched the path it was written
+  // for. The owner's rc.6 → rc.9 upgrade reached `Label for this instance [pdi]`: the wizard, over
+  // an instance the plan had just promised was untouched, on a run carrying `--yes`.
   //
-  // Only the non-interactive case is short-circuited, so an operator at a terminal keeps the
-  // behaviour they had: this converts a failure into a no-op exactly where it was failing, and
-  // leaves every other path to decide for itself.
-  if (!interactive) {
-    const { readDefaultSummary } = await import('../../../../packages/snowarch/dist/store/label.js');
-    const kept = readDefaultSummary(join(ctx.root, '.local', 'instances.json'));
-    if (kept) {
-      return { status: 'ok', detail: `kept instance "${kept.label}"`,
-        data: { saved: 0, defaultInstance: kept.label, instance: kept, kept: true } };
-    }
+  // And `--yes` could not stop it, because it never reached this decision at all.
+  //
+  // So the keep-path is decided by THE STORE, not by the terminal. B06's own input table already
+  // said so and this code disagreed with it:
+  //
+  //   "MIGRATE, DON'T RE-WIZARD: a store whose schema is behind makes this step stale so the
+  //    migration runs — and a store whose CONTENTS changed does not, because re-running the wizard
+  //    over somebody's credentials is never the right answer to 'something moved'."
+  //
+  // The wizard exists to ADD an instance. A checkout that has one is not being asked to, whoever
+  // is watching.
+  const { readDefaultSummary } = await import('../../../../packages/snowarch/dist/store/label.js');
+  const kept = readDefaultSummary(join(ctx.root, '.local', 'instances.json'));
+  if (kept) {
+    return { status: 'ok', detail: `kept instance "${kept.label}"`,
+      data: { saved: 0, defaultInstance: kept.label, instance: kept, kept: true } };
+  }
+
+  // Nothing to keep. A run told not to ask REFUSES rather than asking — `--yes` means "do not put
+  // a question in front of me", and a prompt is the one thing it must never produce. The sentence
+  // names the flag that answers it without a terminal, which is the same remedy the no-terminal
+  // path gives, because it is the same problem: an answer is needed and nobody can supply one.
+  if (ctx.yes === true || !interactive) {
     return { status: 'fail', detail: NO_TERMINAL, remedy: null };
   }
 
@@ -398,7 +414,8 @@ export const run = async (ctx) => {
     { stdio: 'inherit', cwd: ctx.root, env: childEnv(ctx.root) }));
   if (r.status !== 0) return wizardExitFailure(r.status);
 
-  const { readDefaultSummary } = await import('../../../../packages/snowarch/dist/store/label.js');
+  // The same reader the keep-path above used; imported once, higher up, because a second
+  // `const { readDefaultSummary }` in one function is a second binding of one name.
   const label = readDefaultSummary(join(ctx.root, '.local', 'instances.json'));
   // ARC-06-C15 — RECORD what the wizard just saved. `./snowarch mode` reported
   // `instance=<label> (unknown) preset=unknown` on every live checkout because it read

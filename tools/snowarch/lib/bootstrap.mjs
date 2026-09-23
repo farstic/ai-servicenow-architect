@@ -129,6 +129,11 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
     areaCount: countAreas(root, config),
     instanceFile: flags['instance-file'] ?? null,
     skipClaudeCheck: Boolean(flags['skip-claude-check']),
+    // ARC-08-C28 — B06 needs to know it was told not to ask. It decided by TTY alone, so an
+    // upgrade typed at a terminal — which inherits stdio — started the wizard over an instance
+    // the run had been told to keep, with `--yes` invisible to the decision.
+    yes: Boolean(flags.yes),
+
     // Filled in from the accepted plan below. Present here so a step reading `ctx.mode` before the
     // plan is accepted gets `null` rather than a silently wrong default.
     mode: null, docs: null,
