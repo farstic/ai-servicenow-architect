@@ -30,9 +30,18 @@ permissions:
 
 jobs:
   live:
-    # The secrets exist on the default branch only. A dispatch from a topic branch would otherwise
-    # start, find empty values and report a green run that tested nothing.
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    # ARC-07-S11 / Sitting E2 — A DISPATCH RUNS ON THE REF IT WAS DISPATCHED ON.
+    #
+    # This guard used to be the ref alone. The owner dispatched the workflow on `develop` with
+    # `allow-writes` off; the job was skipped, the run finished `conclusion=skipped`, and a skipped
+    # run reads as a calm nothing rather than a refusal with a reason. Nothing was tested and the
+    # log said so nowhere.
+    #
+    # The guard's stated reason was secrets, and it kept the schedule honest; it was never a reason
+    # to refuse a person who chose a ref deliberately. The schedule keeps the default-branch
+    # requirement — which it satisfies by construction, since GitHub only schedules the default
+    # branch — and a dispatch is allowed wherever it was asked for.
+    if: github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -43,11 +52,30 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: false
+          # ARC-07-S11 / Sitting E2 — THE SCHEDULE HAD BEEN AIMED AT `main` SINCE THIS WORKFLOW WAS
+          # WRITTEN. GitHub runs a schedule on the DEFAULT branch, which is `main`, and `main` was
+          # 289 commits behind `develop` when this was measured — without a single row of ARC-08 or
+          # ARC-09 in it. **No scheduled run has ever tested a tree with the live-suite rows in it**,
+          # and a green nightly on that tree says nothing about the release candidate.
+          #
+          # So the schedule names the branch under development, and a dispatch tests what the person
+          # chose. When ARC-10 makes the release line the default, this constant moves once.
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+
+      # WHICH TREE THE INSTANCE SAW. A run whose log does not say this cannot be read afterwards:
+      # the schedule and a dispatch check out different refs on purpose, so "it was green" is only
+      # an answer once it is attached to a sha.
+      - name: The tree this run tests
+        run: |
+          echo "event:  ${{ github.event_name }}"
+          echo "ref:    ${{ github.event_name == 'schedule' && 'develop' || github.ref }}"
+          echo "sha:    $(git rev-parse HEAD)"
+          echo "subject: $(git log -1 --format=%s)"
 
       # The story ASSUMED `script(1)` is on the hosted images. This step is the citation it lacked:
       # it prints which dialect the runner has, and the pty cases depend on it. On Windows there is
@@ -99,3 +127,18 @@ jobs:
           path: e2e-log-*.txt
           if-no-files-found: ignore
           retention-days: 7
+
+  # A SKIP IS NEVER SILENT.
+  #
+  # The reason cannot be printed from inside `live`: a job whose `if` is false runs none of its
+  # steps, which is exactly how Sitting E2's dispatch produced a completed run, a skipped job and no
+  # sentence anywhere saying why. So the explanation is its own job, with the negated condition.
+  explain-skip:
+    if: ${{ !(github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)) }}
+    name: why this run tested nothing
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "skipped: ${{ github.ref }} is not the default branch (${{ github.event.repository.default_branch }}),"
+          echo "and this run is a ${{ github.event_name }}, not a workflow_dispatch."
+          echo "Dispatch it from the Actions tab to run it on this ref."
