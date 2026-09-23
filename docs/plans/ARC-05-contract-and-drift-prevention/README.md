@@ -89,6 +89,7 @@ Detailed write-ups: [`STORIES.md`](STORIES.md) (11 stories, 15–20 engineer-day
 | ARC-05-S10 | Contract loader for engine tooling and the no-literal-names guard | M | Done (2026-09-08) |
 | ARC-05-S11 | Drift drill and contributor documentation | M | Done (2026-09-08) |
 | ARC-05-S12 | Capabilities pre-flight before a mutating MCP call (ADR-0010): §2.0 in the rule-file generator, T-22 rewritten as the pre-flight refusal, T-22b for the server-refusal path | M | Done (2026-09-23) — owner's decision 2026-09-23 |
+| ARC-05-S13 | Approval granularity (Sitting D1): N distinct records is N questions; the §2.2 ensure+capture pair covered by the write's approval only when the question names it; T-23 | S | Done (2026-09-23) |
 
 ### Acceptance
 

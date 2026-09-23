@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { PREFLIGHT_STOP, PREFLIGHT_UNKNOWN_GATE } from '../../packages/contract/gen/rule-file.mjs';
+import { APPROVAL_PER_RECORD, APPROVAL_WITH_CAPTURE, PREFLIGHT_STOP, PREFLIGHT_UNKNOWN_GATE }
+  from '../../packages/contract/gen/rule-file.mjs';
 
 /**
  * `scripts/gen-governance.mjs`, driven through the CLI.
@@ -84,8 +85,13 @@ test('criterion 1 — the rule file is written, is short, and has no frontmatter
     // what happens to a gate the contract does not define, which is the half of the rule that a
     // reader would otherwise resolve by guessing. Same principle as the move above: the cap sits at
     // the finished section plus two, so prose creep still fails here.
+    //
+    // ARC-05-S13 costs two more (the §2.1 granularity bullet and the §2.2-pair bullet, Sitting D1),
+    // and the file landed EXACTLY on 64 — which is the cap doing nothing, since the next honest
+    // line would fail it. Moved to 66 on the same principle as both moves above: the finished
+    // section plus two, so there is room for one correction and none for prose.
     const lines = text.trimEnd().split('\n').length;
-    assert.ok(lines <= 64, `${lines} lines, budget 64`);
+    assert.ok(lines <= 66, `${lines} lines, budget 66`);
     console.log(`    rule file: ${lines} lines`);
   } finally { cleanup(dir); }
 });
@@ -555,4 +561,33 @@ test('ADR-0010 — T-22 states the same sentence, from the same constant', () =>
   const t22 = doc.slice(doc.indexOf('## T-22'));
   assert.ok(t22.length > 0, 'T-22 is not in tests/VALIDATION-TESTS.md');
   assert.ok(t22.includes(PREFLIGHT_STOP), 'T-22 does not state the generator\'s stop sentence');
+});
+
+test('ARC-05-S13 — the approval-granularity sentences are the generator\'s constants', () => {
+  // Sitting D1's two findings, and the same single-source discipline as ADR-0010's pair: the rule
+  // file tells a session how many questions to ask, T-23 tells a tester how many to count, and the
+  // two disagreeing is a test that fails on correct behaviour or passes on wrong behaviour.
+  //
+  // Remove either bullet from `packages/contract/gen/rule-file.mjs` and this fails by name.
+  const dir = tree();
+  try {
+    assert.equal(run(dir).code, 0);
+    const text = ruleOf(dir);
+    assert.ok(text.includes(APPROVAL_PER_RECORD), 'the per-record sentence is not the constant');
+    assert.ok(text.includes(APPROVAL_WITH_CAPTURE), 'the capture-question template is not the constant');
+    // Both belong to the WRITE GATE, not to the capture protocol: §2.2 describes the four calls,
+    // §2.1 decides how many approvals they cost. A reader who found the granularity rule inside
+    // §2.2 would reasonably apply it only to configuration writes, which is three-quarters of the
+    // tools it must cover.
+    const gate = text.slice(text.indexOf('## §2.1'), text.indexOf('## §2.2'));
+    assert.ok(gate.includes(APPROVAL_PER_RECORD), 'the per-record rule is not in §2.1');
+    assert.ok(gate.includes(APPROVAL_WITH_CAPTURE), 'the capture-question template is not in §2.1');
+  } finally { cleanup(dir); }
+});
+
+test('ARC-05-S13 — T-23 states the same capture question, from the same constant', () => {
+  const doc = readFileSync(join(root, 'tests/VALIDATION-TESTS.md'), 'utf8');
+  const t23 = doc.slice(doc.indexOf('## T-23'), doc.indexOf('## Regression Workflow'));
+  assert.ok(t23.length > 0, 'T-23 is not in tests/VALIDATION-TESTS.md');
+  assert.ok(t23.includes(APPROVAL_WITH_CAPTURE), 'T-23 does not state the generator\'s question');
 });

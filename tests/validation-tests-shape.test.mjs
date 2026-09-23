@@ -271,7 +271,7 @@ const NEGATIVES = [
   ['a retired name reappears inside a code fence', 'criterion 3 — no retired tool or script name, in prose or in a fence',
     (t) => t.replace('```\nStatus\n```', '```\nquery_records(sys_user)\n```')],
   ['a test is added without updating the header count', 'the stated test count is the number of tests',
-    (t) => `${t}\n## T-23 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
+    (t) => `${t}\n## T-24 — added quietly\n\n**Modes:** live\n\n### Prompt\n\n### Expected behaviour\n\n### Pass criteria\n\n### Fail signals\n`],
 ];
 
 for (const [title, checkName, breakIt] of NEGATIVES) {
