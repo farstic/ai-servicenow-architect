@@ -35,6 +35,14 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ---
 
+### Fixed
+
+- **The upgrade offers release candidate 10 to someone on release candidate 9.** Versions were
+  ordered by comparing the text after the dash, where `rc.10` sorts before `rc.9` because `1` comes
+  before `9`. Two things read that order: the release script, which refused to cut rc.10 at all, and
+  `snowarch upgrade`, which would have told a checkout on rc.9 that it was already on the newest
+  release. Ordering now follows the semantic-versioning rules, from one place that both use.
+
 ### Added
 
 - **A session checks whether it may write before it asks you to approve a write.** It used to find

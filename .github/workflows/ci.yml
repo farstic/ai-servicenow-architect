@@ -820,7 +820,8 @@ jobs:
             tests/upgrade/upgrade.e2e.test.mjs \
             tests/upgrade/upgrade-unit.test.mjs \
             tests/upgrade/harness-shape.test.mjs \
-            tests/upgrade/plan-agrees.test.mjs
+            tests/upgrade/plan-agrees.test.mjs \
+            tests/upgrade/tag-order.test.mjs
       - name: ...and the checkout under test is exactly as it was
         run: node scripts/ci/assert-clean.mjs
 

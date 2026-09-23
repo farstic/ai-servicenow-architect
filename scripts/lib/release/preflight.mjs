@@ -13,29 +13,19 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { compareSemver } from '../../../tools/snowarch/lib/semver.mjs';
+
 export const EXIT_PREFLIGHT = 2;
 
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const PRERELEASE = /^\d+\.\d+\.\d+-[0-9A-Za-z.]+$/;
 
-/** `2.0.0` → [2,0,0]; a prerelease compares by its release triple, then as lower. */
-function triple(version) {
-  const [core, pre] = String(version).split('-');
-  const parts = core.split('.').map(Number);
-  return { parts, pre: pre ?? null };
-}
-
 /** -1 / 0 / 1, with a prerelease sorting BELOW the release it precedes (semver §11). */
-export function compareVersions(a, b) {
-  const [x, y] = [triple(a), triple(b)];
-  for (let i = 0; i < 3; i += 1) {
-    if (x.parts[i] !== y.parts[i]) return x.parts[i] < y.parts[i] ? -1 : 1;
-  }
-  if (x.pre === y.pre) return 0;
-  if (x.pre === null) return 1;
-  if (y.pre === null) return -1;
-  return x.pre < y.pre ? -1 : 1;
-}
+// ARC-09-S12 — the comparison is `lib/semver.mjs`'s, not a second implementation. This copy and the
+// engine's were written independently and were wrong identically: the prerelease compared as a
+// string, so `2.0.0-rc.10` was "not greater than" `v2.0.0-rc.9` and the release could not be cut.
+// Kept as a named export because the callers below and the tests read this name.
+export const compareVersions = (a, b) => compareSemver(a, b);
 
 /** The newest `v*` tag, or `null` when none exists — the 2.0.0 case. */
 export function latestTag(tags) {

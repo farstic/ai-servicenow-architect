@@ -205,6 +205,11 @@ test('versions sort the way semver says, prerelease below its release', () => {
   assert.equal(compareVersions('2.0.0', '2.0.0'), 0);
   assert.equal(compareVersions('1.9.0', '2.0.0'), -1);
   assert.equal(compareVersions('2.0.0-rc.1', '2.0.0'), -1);
+  // ARC-09-S12 — every case here was single-digit, which is why a string compare passed it for
+  // nine release candidates and then blocked rc.10. The comparator's own file has the full §11
+  // table; these stay because this is where a reader of the release path looks.
+  assert.equal(compareVersions('2.0.0-rc.10', '2.0.0-rc.9'), 1);
+  assert.equal(latestTag(['v2.0.0-rc.9', 'v2.0.0-rc.10']), 'v2.0.0-rc.10');
   assert.equal(latestTag(['v1.9.0', 'v2.0.0', 'v2.0.0-rc.1', 'not-a-tag']), 'v2.0.0');
   assert.equal(latestTag([]), null, 'the 2.0.0 case: no tag is not an error');
 });
@@ -316,6 +321,28 @@ test('AC 6 — --dry-run prints the tag message verbatim and writes nothing', as
   assert.match(out, /release: --dry-run — nothing was written/);
   assert.equal(git(root, ['status', '--porcelain']).trim(), '');
   assert.equal(git(root, ['tag', '-l']).trim(), '');
+});
+
+test('ARC-09-S12 — rc.10 is cut while rc.9 is the latest tag', async (t) => {
+  // THE MEASUREMENT THAT FOUND THE DEFECT, as a test. `rehearse.sh 2.0.0-rc.10` stopped at step 1
+  // with `release: 2.0.0-rc.10 is not greater than the latest tag v2.0.0-rc.9`, and nothing about
+  // the release path was wrong except the order two versions sort in.
+  //
+  // Driven through `release` rather than through `compareVersions` on purpose: the unit assertion
+  // above proves the comparator, and this proves the CHECK USES IT. Those are different claims, and
+  // the defect lived in the second one for both copies.
+  const root = fixture(t);
+  git(root, ['tag', '-a', 'v2.0.0-rc.9', '-m', 'snowarch v2.0.0-rc.9']);
+  const { code, err, out } = await run(root,
+    ['2.0.0-rc.10', '--yes', '--offline', '--no-install', '--allow-prerelease', '--dry-run']);
+  assert.equal(code, 0, `rc.10 was refused: ${err.trim()}`);
+  assert.doesNotMatch(`${out}${err}`, /is not greater than/,
+    'the ordering check still refuses rc.10 after rc.9');
+  // The opposite direction still holds — this must not have become "everything is greater".
+  const back = await run(root,
+    ['2.0.0-rc.2', '--yes', '--offline', '--no-install', '--allow-prerelease', '--dry-run']);
+  assert.equal(back.code, 2);
+  assert.equal(back.err.trim(), 'release: 2.0.0-rc.2 is not greater than the latest tag v2.0.0-rc.9');
 });
 
 test('AC 7 — a version below the latest tag is refused, naming both', async (t) => {
