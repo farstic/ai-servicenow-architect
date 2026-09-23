@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.0-rc.11 — 2026-09-23
+
+### Notes
+
 This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
 
 #### Migration for snow-mcp 1.0.0 users
@@ -1922,6 +1926,21 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   engine pin and its sha are untouched.
 
 ---
+
+### Added
+
+- contract: N records is N questions, and the capture pair only when named (2bae9ed)
+
+### Fixed
+
+- ci: the nightly live suite tests develop, and a skip says why (43fe44e)
+- release: the whole suite runs on the tree the release commits (42f53e7)
+
+### Internal
+
+- doctor: E-29's "nothing started" clause has a test of its own (2a49db4)
+
+Tag v2.0.0-rc.11 · contract 7273369a795b · docs-pin df4afac
 
 ## The imported engine's header
 
