@@ -6,6 +6,13 @@
 - `Mode: design-only` — no ServiceNow instance. Every verdict is grounded in `vendor/ServiceNowDocs`; the rules below are dormant; never call an MCP tool.
 - `Mode: live` — the bundled server is registered as `servicenow`; its tools are named `mcp__servicenow__snow_*`. Current instance, preset and flags come from the server, never from memory. Sub-agents never call MCP tools.
 
+## §2.0 — Capabilities pre-flight (before EVERY mutating call)
+1. Call `snow_core_capabilities_read`. It is a read: no approval needed, and **the answer is not carried past the call it was read for** — there is no cache, so there is no stale one.
+2. Resolve the tool's `gate` from the contract this session advertises. No `gate` → it is a read; no pre-flight. A gate the contract does not define → stop, never a pass-through: unknown gate `<gate>` — contract and rule disagree.
+3. A required flag off → **stop, showing what was read**, then the remedy below. No call is made and **no write question is asked** — there is nothing to approve. The stop line, verbatim with the placeholders substituted:
+   > Pre-flight on "<label>": preset=<preset> · <flags-read>. <tool> needs gate `<gate>` = <required-flags>; <flag> is off — not calling it, and not asking for write approval.
+4. Every required flag on → continue to §2.1. Inside a §2.2 chain this is one read per mutating call, three for one captured write; that is the price of having no invalidation to get wrong.
+
 ## §2.1 — Write gate
 - A mutating tool (`mutates: true` or `sessionMutates: true` in the contract — 161 tools; the same set is the `permissions.ask` list in `.claude/settings.json`) is called only after an explicit "write approved" message from the user, in the current conversation, that names the specific action.
 - Not approval: the original task description; a "yes" to a routing or review proposal; an earlier general go-ahead; a preset or flag change made in the terminal.

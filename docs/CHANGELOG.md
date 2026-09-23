@@ -37,6 +37,13 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
 
 ### Added
 
+- **A session checks whether it may write before it asks you to approve a write.** It used to find
+  out that a capability was switched off by making the call and reading the refusal — which meant
+  being asked to approve a write the instance was always going to reject. It now reads the
+  instance's capabilities first, and when a required flag is off it says so, shows what it read and
+  prints the remedy, without making the call and without asking. Approval is only ever requested
+  for something that can actually happen.
+
 - **The second release candidate was tested by the plan after all eleven arcs closed their acceptance passes.**
   `docs/validation/2026-09-13-macos.md` is the architect's run of the acceptance plan's RC checks on
   `v2.0.0-rc.2`: the release path end to end with both negative tags refused, the full gates on the tag
