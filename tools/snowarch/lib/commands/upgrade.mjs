@@ -119,23 +119,18 @@ export function classifyGitFetchError(stderr = '', { remote = 'origin' } = {}) {
   return { kind: 'unknown', line: null };
 }
 
-/** `v2.1.0` → `[2,1,0]`, and a prerelease is marked rather than dropped. */
-export function parseSemver(tag) {
-  const m = /^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(String(tag));
-  if (!m) return null;
-  return { tag, parts: [Number(m[1]), Number(m[2]), Number(m[3])], pre: m[4] ?? null };
-}
+// ARC-09-S12 — `parseSemver` and `sortTags` moved to `lib/semver.mjs` and are re-exported here so
+// every existing importer keeps working. The copy that lived here compared the prerelease as a
+// string, so `rc.10` sorted below `rc.9` and this command would have offered a checkout on rc.9 the
+// release it was already on. `checks/host.mjs` imports both from this module; the re-export is what
+// makes moving the rule a one-file change rather than a rename across the tree.
+// A re-export does NOT bind the names locally, and `releaseTags` below calls `sortTags` — the first
+// version of this line was `export { … } from …` and every real tag resolution threw
+// `sortTags is not defined`. Import, then export: one statement for the module's own use, one for
+// the importers that already read these names from here.
+import { parseSemver, sortTags } from '../semver.mjs';
 
-/** Highest first. A prerelease sorts BELOW the release it precedes, as semver says. */
-export function sortTags(tags) {
-  return tags.map(parseSemver).filter(Boolean).sort((a, b) => {
-    for (let i = 0; i < 3; i += 1) if (a.parts[i] !== b.parts[i]) return b.parts[i] - a.parts[i];
-    if (a.pre === b.pre) return 0;
-    if (a.pre === null) return -1;
-    if (b.pre === null) return 1;
-    return a.pre < b.pre ? 1 : -1;
-  });
-}
+export { parseSemver, sortTags };
 
 /** The release tags this checkout knows about, newest first. */
 export function releaseTags(root, { pre = false, opts = {} } = {}) {
