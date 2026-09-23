@@ -88,8 +88,11 @@ test('the live suite never runs on a proposed change, and asks for the branch it
   assert.doesNotMatch(on[1], /pull_request/, 'the live suite would run on a proposed change');
   assert.match(on[1], /schedule:/, 'the live suite is not scheduled');
   assert.match(on[1], /workflow_dispatch:/, 'the live suite cannot be run on demand');
-  // Secrets exist on the default branch; a dispatch from a topic branch would run green and empty.
-  assert.match(text, /if: github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\)/);
+  // ARC-07-S11 / Sitting E2 — the guard admits a DISPATCH on any ref, and keeps the default-branch
+  // requirement for everything else. The owner dispatched this on `develop`; the job was skipped and
+  // the run reported `conclusion=skipped`, which reads as a calm nothing.
+  assert.match(text, /if: github\.event_name == 'workflow_dispatch' \|\| github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\)/,
+    'a dispatch is still refused on a non-default ref');
   // And the artefact is checked before it is published.
   assert.match(text, /Refuse to publish a log that contains a secret/);
   assert.ok(text.indexOf('Refuse to publish') < text.indexOf('upload-artifact'),
@@ -1095,4 +1098,48 @@ test('ARC-08-C25 — the validator is the product\'s, and the exemption is by na
   // …and a real, current report passes, which is the half that proves the rule is satisfiable.
   assert.deepEqual(mod.problemsFor('doctor.json',
     readFileSync(join(root, 'tests/fixtures/doctor/status-design.json'), 'utf8')), []);
+});
+
+/**
+ * ARC-07-S11 / Sitting E2 — which tree the instance actually sees, and why a skip is never silent.
+ *
+ * Two findings from one dispatch. The job was skipped because the guard was the ref alone, and the
+ * run reported `conclusion=skipped` — a calm nothing rather than a refusal with a reason. And the
+ * SCHEDULE runs on the default branch, which is `main`: 289 commits behind `develop` when this was
+ * measured, without a single row of ARC-08 or ARC-09 in it. **No scheduled run has ever tested a
+ * tree with the live-suite rows in it**, and a green nightly on that tree says nothing about the
+ * release candidate.
+ *
+ * Asserted over the TEXT, like every other test in this file. A YAML parser would read better and
+ * would mean depending on one from a test whose whole subject is a file CI reads literally.
+ */
+test('ARC-07-S11 — the schedule tests develop, a dispatch tests the ref it was given', () => {
+  const text = wf('e2e-live.yml');
+  // The checkout's `ref:`, as one line. Both branches of the expression are the claim: what the
+  // schedule resolves to, and what everything else resolves to.
+  assert.match(text,
+    /ref: \$\{\{ github\.event_name == 'schedule' && 'develop' \|\| github\.ref \}\}/,
+    'the schedule would test the default branch, which is not where the work is');
+  // It belongs to the CHECKOUT, not to some later step that happens to mention a ref.
+  const checkout = text.slice(text.indexOf('actions/checkout'), text.indexOf('actions/setup-node'));
+  assert.match(checkout, /ref: \$\{\{ github\.event_name == 'schedule'/,
+    'the ref is set somewhere other than the checkout');
+  // …and the run says which sha it tested, because the two paths resolve differently on purpose.
+  assert.match(text, /The tree this run tests/, 'the run never prints the tree it tested');
+  assert.match(text, /git rev-parse HEAD/, 'the run prints no sha');
+});
+
+test('ARC-07-S11 — a skipped run says why, from a job that is not the skipped one', () => {
+  // A job whose `if` is false runs NONE of its steps, so the reason cannot be printed from inside
+  // `live` — that is exactly how the dispatch produced a completed run, a skipped job, and no
+  // sentence anywhere. The explanation is its own job, carrying the negated condition.
+  const text = wf('e2e-live.yml');
+  const at = text.indexOf('\n  explain-skip:');
+  assert.ok(at > 0, 'nothing explains a skip');
+  const job = text.slice(at);
+  assert.match(job, /if: \$\{\{ !\(github\.event_name == 'workflow_dispatch'/,
+    "the skip job does not carry the guard's negation");
+  assert.match(job, /default_branch/);
+  assert.match(job, /echo "skipped:/, 'the skip job prints no reason');
+  assert.match(job, /\$\{\{ github\.ref \}\}/, 'the reason does not name the ref that was refused');
 });

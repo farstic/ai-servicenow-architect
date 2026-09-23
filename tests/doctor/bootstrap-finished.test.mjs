@@ -95,6 +95,25 @@ test('a step with NO recorded version is not a mismatch', async (t) => {
   assert.equal(r.status, 'ok', r.detail);
 });
 
+test('a recorded mode with no steps yet is nothing started, not something unfinished', async (t) => {
+  // FOUND BY THE rc.10 TAG MEASUREMENT, and the gap was the control's, not the code's. Removing
+  // this clause from `engine-repo.mjs` left THIS FILE — the one named for E-29 — passing 6 of 6.
+  // `npm test` did go red, but in `status-fixture-capture.test.mjs`: a byte comparison against a
+  // committed doctor report, which mentions E-29 nowhere and which a future author would make green
+  // again by regenerating the fixture. A rule held only by a snapshot is a rule with no name.
+  //
+  // The state is real rather than contrived: the mode is written before any step runs, so a run
+  // interrupted between those two points leaves exactly this on disk. E-29's first version reported
+  // it as `B01–B09 never ran` and failed every fixture tree.
+  const root = greenTree(t, { mode: 'live' });
+  writeJson(root, '.local/bootstrap-state.json',
+    { version: 1, product: 'snowarch', mode: 'live', steps: {} });
+
+  const r = await E29.run(ctxFor(root));
+  assert.equal(r.status, 'ok', `a tree that started nothing was reported ${r.status}: ${r.detail}`);
+  assert.match(r.detail, /no steps recorded yet/);
+});
+
 test('no recorded install at all is E-11\'s finding, not this one', async (t) => {
   // Two failures on one cause would send a reader to two remedies. `.local/` absent is the
   // install that never ran, and E-11 already says so with the command that fixes it.

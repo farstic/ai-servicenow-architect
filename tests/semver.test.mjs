@@ -41,12 +41,12 @@ test('semver §11 — the specification\'s own example, every pair', () => {
 
 test('the case that blocked rc.10 — a two-digit prerelease', () => {
   // The whole defect in one line: as strings `"rc.10" < "rc.9"`, as versions it is not.
-  assert.ok(compareSemver('2.0.0-rc.10', '2.0.0-rc.9') > 0, 'rc.10 is not greater than rc.9');
-  assert.ok(compareSemver('2.0.0-rc.9', '2.0.0-rc.2') > 0, 'rc.9 is not greater than rc.2');
-  assert.ok(compareSemver('2.0.0', '2.0.0-rc.10') > 0, 'the release does not beat its prerelease');
+  assert.ok(compareSemver('9.0.0-rc.10', '9.0.0-rc.9') > 0, 'rc.10 is not greater than rc.9');
+  assert.ok(compareSemver('9.0.0-rc.9', '9.0.0-rc.2') > 0, 'rc.9 is not greater than rc.2');
+  assert.ok(compareSemver('9.0.0', '9.0.0-rc.10') > 0, 'the release does not beat its prerelease');
   // …and the next one along, so the fix is not "10 is special".
-  assert.ok(compareSemver('2.0.0-rc.11', '2.0.0-rc.10') > 0);
-  assert.ok(compareSemver('2.0.0-rc.100', '2.0.0-rc.99') > 0);
+  assert.ok(compareSemver('9.0.0-rc.11', '9.0.0-rc.10') > 0);
+  assert.ok(compareSemver('9.0.0-rc.100', '9.0.0-rc.99') > 0);
 });
 
 test('§11.4 — numeric fields rank below alphanumeric, and more fields beat fewer', () => {
@@ -56,9 +56,9 @@ test('§11.4 — numeric fields rank below alphanumeric, and more fields beat fe
 });
 
 test('sortTags puts the newest first, prereleases under their release', () => {
-  const got = sortTags(['v2.0.0-rc.2', 'v2.0.0-rc.10', 'v2.0.0-rc.9', 'v2.0.0', 'v1.9.0', 'rubbish'])
+  const got = sortTags(['v9.0.0-rc.2', 'v9.0.0-rc.10', 'v9.0.0-rc.9', 'v9.0.0', 'v1.9.0', 'rubbish'])
     .map((t) => t.tag);
-  assert.deepEqual(got, ['v2.0.0', 'v2.0.0-rc.10', 'v2.0.0-rc.9', 'v2.0.0-rc.2', 'v1.9.0']);
+  assert.deepEqual(got, ['v9.0.0', 'v9.0.0-rc.10', 'v9.0.0-rc.9', 'v9.0.0-rc.2', 'v1.9.0']);
   // `rubbish` is dropped, not ranked — `parseSemver` returning null is the filter.
   assert.equal(parseSemver('rubbish'), null);
 });
@@ -66,17 +66,17 @@ test('sortTags puts the newest first, prereleases under their release', () => {
 test('the release preflight and the engine now answer with the same function', () => {
   // The point of the story, asserted rather than described: ONE rule. If these two ever disagree
   // again it is because a second copy came back, and this is the test that says so.
-  for (const [a, b] of [['2.0.0-rc.10', '2.0.0-rc.9'], ['2.0.0', '2.0.0-rc.10'],
-    ['1.0.0-alpha.1', '1.0.0-alpha'], ['2.0.0-rc.2', '2.0.0-rc.9']]) {
+  for (const [a, b] of [['9.0.0-rc.10', '9.0.0-rc.9'], ['9.0.0', '9.0.0-rc.10'],
+    ['1.0.0-alpha.1', '1.0.0-alpha'], ['9.0.0-rc.2', '9.0.0-rc.9']]) {
     assert.equal(Math.sign(compareVersions(a, b)), Math.sign(compareSemver(a, b)), `${a} vs ${b}`);
   }
-  assert.equal(latestTag(['v2.0.0-rc.2', 'v2.0.0-rc.9', 'v2.0.0-rc.10']), 'v2.0.0-rc.10');
+  assert.equal(latestTag(['v9.0.0-rc.2', 'v9.0.0-rc.9', 'v9.0.0-rc.10']), 'v9.0.0-rc.10');
 });
 
 test('a version it cannot parse throws instead of ranking', () => {
   // A comparator that returned 0 for an unparsed string would report "the same version", and
   // `Array.sort` would believe it — the damage surfaces as a wrong release order, nowhere near the
   // input that caused it.
-  assert.throws(() => compareSemver('2.0', '2.0.0'), /not a version this product can order/);
-  assert.throws(() => compareSemver('2.0.0', 'latest'), /not a version this product can order/);
+  assert.throws(() => compareSemver('9.0', '9.0.0'), /not a version this product can order/);
+  assert.throws(() => compareSemver('9.0.0', 'latest'), /not a version this product can order/);
 });

@@ -1171,6 +1171,14 @@ artefact, a hand list of staged files, eight hundred lines of changelog silently
 `actions/checkout` peels, and a handful of tests that encode "this is a development tree" and go red
 on the release commit's own pull request. Every one of them would have landed on the real release.
 
+**ARC-09-C49 — and the last of those got through anyway, on rc.10.** `npm test` was in the gate
+plan, and the gate plan runs *before* the writes, so it tested a tree whose `package.json` still
+said `-dev`. `version-literals.test.mjs` exists to catch a test that spells the version of record —
+its own message says *"a literal here fails on the release commit itself"* — and the one tree it was
+never run against was the release commit. rc.10 was cut locally with every gate green and went red
+on all three `verify` cells. `release.mjs` now runs the whole suite **after** the writes as well, so
+what CI refuses cannot be tagged here first.
+
 How, in the order it is done:
 
 ```sh
