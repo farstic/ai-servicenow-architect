@@ -21,7 +21,8 @@
  *   hook reads it. A banner that could fetch would be a banner that could hang a session start.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from '../exit.mjs';
@@ -29,11 +30,14 @@ import { branchState, git, isShallow } from '../git.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { loadConfig, root as defaultRoot } from '../config.mjs';
 import { loadState } from '../state.mjs';
+// ARC-08-C29 — the runner's own step list, so the plan and the run are one computation.
+import { STEPS } from '../steps/index.mjs';
 import { makeExec } from '../steps/B00.mjs';
+import { nodeInfo, stepContext } from '../bootstrap.mjs';
 import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
-import { INPUTS, STEP_IDS } from '../inputs.mjs';
+import { hashFor, INPUTS, STEP_IDS } from '../inputs.mjs';
 
 /**
  * What U7 says about a doctor report — the tally AND the checks it counted, as one list.
@@ -205,6 +209,142 @@ export function stepsThatWillRun(root, tag, { ctx, opts = {} }) {
     .map(([step, files]) => ({ step, title: INPUTS[step].title, files }));
 }
 
+/**
+ * ARC-08-C29 — THE SET THE RUNNER WILL DECIDE, computed before the user says Y.
+ *
+ * `stepsThatWillRun` below answers a DIFFERENT question from the one the bootstrap asks. It maps
+ * CHANGED FILES to steps; the runner compares each step's INPUT HASH against the recorded state
+ * and re-runs anything that differs, has no record, or did not finish. The two agree often enough
+ * to look like one computation and they are not, and the owner's rc.6 → rc.9 upgrade is what that
+ * costs: U4 promised `B04, B05, B08`, U6 ran eight steps, and **B06 — which U4 never mentioned —
+ * started the instance wizard**. The list the user approves was not the list that runs.
+ *
+ * The old function's own comment names the obstacle, and it is real: the plan is read BEFORE U5
+ * moves the tree, so the post-move inputs are not on disk to hash. `git worktree add --detach
+ * <temp> <tag>` puts them there — a real checkout of the tag, sharing the object store, 0.4 s —
+ * and the real `.local/` is symlinked in, because the store and the state do NOT move with the
+ * tag. That tree is what the checkout will be at U6, so hashing it with `hashFor` — the runner's
+ * own function, over the runner's own table — is the runner's decision, taken early.
+ *
+ * If the worktree cannot be made, this returns `null` and the caller says the plan is a
+ * FILE-CHANGE ESTIMATE rather than silently printing a different computation under the same
+ * heading. Two answers wearing one label is the defect this row exists to remove.
+ */
+/**
+ * The ctx the plan asks its questions with — EXPORTED so a test asks them the same way.
+ *
+ * `mode` and `docs` come from the RECORDED state, because that is what the upgrade re-runs under:
+ * an upgrade does not ask the two plan questions again, it repeats the answers already on disk.
+ * `node` is this machine's, because it is this machine that will run the steps. Everything else is
+ * `stepContext`'s, which is what the bootstrap hands its steps.
+ *
+ * Exported because the first version of `plan-agrees.test.mjs` built its own ctx to record the
+ * "current" hashes and then compared them against ones built here — two constructions, disagreeing
+ * about `state.registration`, and the test reported B07 stale on a tree where nothing had changed.
+ * A test that constructs its own version of the thing under test is measuring its own copy.
+ */
+export function planContext({ root, config, ctx = {}, state = null }) {
+  return {
+    ...stepContext({ root, config, env: ctx.env ?? process.env, node: ctx.node ?? nodeInfo(),
+      flags: { yes: true }, state }),
+    mode: state?.mode ?? ctx.mode ?? 'design',
+    docs: state?.docs?.mode ?? ctx.docs ?? 'sparse',
+  };
+}
+
+export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktree = null } = {}) {
+  const scratch = keepWorktree ? null : mkdtempSync(join(tmpdir(), 'snowarch-plan-'));
+  const at = keepWorktree ?? join(scratch, 'at-tag');
+  const added = keepWorktree !== null
+    || run('git', ['worktree', 'add', '--detach', '--quiet', at, tag],
+      { cwd: root, encoding: 'utf8', stdio: 'pipe' })?.status === 0;
+  if (!added) {
+    // The worktree failed, so the directory made for it is rubbish. Removed HERE rather than in
+    // the `finally` below, which the early return never reaches.
+    if (scratch) rmSync(scratch, { recursive: true, force: true });
+    return null;
+  }
+
+  try {
+    // The store and the state are the CHECKOUT's, not the tag's: an upgrade does not move them,
+    // and B06's inputs are mostly about them. A worktree without them would read `storePresent=no`
+    // and call B06 stale on every upgrade — the opposite of this row's point.
+    const local = join(root, '.local');
+    if (existsSync(local)) {
+      try { symlinkSync(local, join(at, '.local'), 'dir'); } catch { /* already there */ }
+    }
+
+    let config = ctx.config;
+    try { config = JSON.parse(readFileSync(join(at, 'engine.config.json'), 'utf8')); } catch { /* the tag's, or ours */ }
+
+    // THE RUNNER'S OWN SHAPE, from the runner's own constructor. A spread of the upgrade
+    // command's `{ root, config }` was missing `env`, and `B04.runsWhen` reads
+    // `ctx.env.SNOWARCH_TEST_FORCE_DEPS` — so every real upgrade crashed at `[U4/7] plan`. A ctx
+    // assembled at a call site is a ctx that drifts from what the steps read.
+    //
+    // `mode` and `docs` come from the RECORDED state, because that is what the upgrade re-runs
+    // under: an upgrade does not ask the two questions again, it repeats the answers already on
+    // disk. `node` is this machine's, because it is this machine that will run the steps.
+    const tagCtx = planContext({ root: at, config, ctx, state });
+
+    const out = new Map();
+    for (const step of STEPS) {
+      if (step.runsWhen(tagCtx) === false) continue;
+      if (step.cacheable === false) continue;   // B00 and B09 run every time and say so elsewhere
+      const recorded = state?.steps?.[step.id];
+      if (!recorded) { out.set(step.id, 'never recorded'); continue; }
+      if (recorded.status !== 'ok') {
+        out.set(step.id, recorded.reason === 'interrupted' ? 'last run interrupted' : 'last run did not finish');
+        continue;
+      }
+      let hash = null;
+      try { hash = hashFor(step.id, tagCtx); } catch { hash = null; }
+      if (hash === null) { out.set(step.id, 'inputs could not be read'); continue; }
+      if (hash !== recorded.inputsHash) out.set(step.id, 'inputs changed');
+    }
+    return out;
+  } finally {
+    if (keepWorktree === null) {
+      run('git', ['worktree', 'remove', '--force', at], { cwd: root, encoding: 'utf8', stdio: 'pipe' });
+      // AND THE DIRECTORY THAT HELD IT. Removing the worktree leaves the `mkdtemp` behind, so
+      // every real plan left one empty `snowarch-plan-*` in the OS temp directory — measured at
+      // five after one test file. `rmSync` after `worktree remove`, in the same `finally`, so an
+      // exception between them still cleans up.
+      if (scratch) rmSync(scratch, { recursive: true, force: true });
+    }
+  }
+}
+
+/**
+ * The list the plan prints: the runner's SET, with the file diff's words where it has them.
+ *
+ * ARC-08-C29. Two computations answered the same heading and disagreed — U4 said `B04, B05, B08`
+ * and the run went on to start B06's wizard. This is the one computation, with the readable half
+ * kept: `rerunAtTag` decides WHICH steps, `stepsThatWillRun` explains WHY for the ones a file
+ * change explains, and a step stale for any other reason carries the hash's own word instead of
+ * vanishing from the line.
+ */
+export function planSteps(root, tag, { ctx, state, opts = {}, run = spawnSync } = {}) {
+  const byFile = new Map(stepsThatWillRun(root, tag, { ctx, opts })
+    .map((s) => [s.step, s]));
+  const decided = rerunAtTag(root, tag, { ctx, state, run });
+
+  // No worktree, no runner comparison: fall back to the file diff and SAY it is an estimate.
+  if (decided === null) {
+    return { steps: [...byFile.values()].map((s) => ({ ...s, why: 'files changed' })), estimate: true };
+  }
+
+  const steps = [...decided.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([step, why]) => ({
+      step,
+      title: INPUTS[step]?.title ?? step,
+      files: byFile.get(step)?.files ?? [],
+      why,
+    }));
+  return { steps, estimate: false };
+}
+
 /** What the store will do, said before it is done. */
 export function storePlan(root, tag, { opts = {} } = {}) {
   const store = join(root, '.local', 'instances.json');
@@ -249,16 +389,30 @@ export function floorCheck(tagInfo, { exec }) {
 const short = (sha) => (sha ? String(sha).slice(0, 7) : '—');
 
 /** The plan block, exactly as the story writes it. */
-export function renderPlan({ from, to, commits, date, tagInfo, floor, steps, store, restart }) {
+export function renderPlan({ from, to, commits, date, tagInfo, floor, steps, store,
+  restart = null, estimate = false }) {
   const lines = [`Upgrade plan: ${from} → ${to}`
     + `${commits === null ? '' : ` (${commits} commit${commits === 1 ? '' : 's'}`
       + `${date ? `, ${date}` : ''})`}`];
   lines.push(`  tag verified: contract ${short(tagInfo?.contract)}… · docs-pin `
     + `${short(tagInfo?.docsPin)} · ${floor.line ?? 'claude-floor not stated'}`);
+  // ARC-08-C29 — the SET is the runner's decision, the REASON is whatever can be said about it.
+  //
+  // `files` is the readable half: `package-lock.json changed` tells a reader what moved. But a
+  // step can be stale for reasons no file diff shows — a literal input, a last run that did not
+  // finish — and those steps used to be absent from this line and present in the run. When the
+  // set comes from the hash, the reason is the diff where there is one and the hash's own word
+  // where there is not.
   lines.push(steps.length === 0
     ? '  steps that will re-run: none (only the preflight and the summary)'
     : `  steps that will re-run: ${steps.map((s) => `${s.step} ${s.title} `
-      + `(${s.files.join(', ')} changed)`).join('; ')}`);
+      + `(${s.files?.length ? `${s.files.join(', ')} changed` : s.why})`).join('; ')}`);
+  // Said out loud when the runner's own comparison could not be made, rather than printing a
+  // different computation under the same heading.
+  if (estimate) {
+    lines.push('  (the list above is a file-change estimate: the tag could not be checked out to '
+      + "compare the runner's own inputs)");
+  }
   lines.push(`  ${store.line}`);
   lines.push('  credentials: untouched (.local/instances.json is never read or written by the upgrade)');
   if (restart) lines.push(`  after the upgrade: ${restart}`);
@@ -372,7 +526,11 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   // ── U4 the plan, computed before anything moves ───────────────────────────────────────────
   log.step(stepLine(4, 'plan'));
   const ctx = { root, config };
-  const steps = stepsThatWillRun(root, target, { ctx, opts });
+  // ARC-08-C29 — ONE COMPUTATION. `planSteps` asks the runner's own question (hash the tag's
+  // inputs, compare with the recorded state) and falls back to the file diff only when the tag
+  // cannot be checked out — in which case the plan says so rather than printing the other answer
+  // under the same heading.
+  const { steps, estimate } = planSteps(root, target, { ctx, state, opts });
   const store = storePlan(root, target, { opts });
   const floor = floorCheck(tagInfo, { exec: probe });
   const commits = Number(git(root, ['rev-list', '--count', `HEAD..${target}`], { ...opts, allowFail: true }) ?? '');
@@ -380,7 +538,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
 
   log.step(renderPlan({
     from: localTag ?? 'an untagged commit', to: target,
-    commits: Number.isFinite(commits) ? commits : null, date, tagInfo, floor, steps, store,
+    commits: Number.isFinite(commits) ? commits : null, date, tagInfo, floor, steps, store, estimate,
     restart: 'restart claude (the MCP server binary changed) — or run /mcp → servicenow → reconnect',
   }));
 

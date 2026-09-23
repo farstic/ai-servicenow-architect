@@ -47,7 +47,10 @@ export const LIVE_YES_WITHOUT_FILE =
   'live mode with --yes needs --instance-file <path>: credentials cannot be typed '
   + 'non-interactively (see docs/INSTALL.md "Operators and CI")';
 
-const nodeInfo = () => {
+/** This machine's Node, as the steps read it. Exported since ARC-08-C29: the plan's dry run needs
+ * the same answer the bootstrap will give, and a second reading of `process.versions` at another
+ * call site is how two callers start disagreeing about the machine they are both on. */
+export const nodeInfo = () => {
   const v = process.versions.node;
   return { present: true, version: v, major: Number(v.split('.')[0]) };
 };
@@ -60,6 +63,37 @@ const countAreas = (root, config) => {
 
 /** One line from stdin, or `null` at end of input — `lib/ask.mjs`, shared with the doctor. */
 const stdinAsker = (input, output) => lineReader(input, output);
+
+/**
+ * THE SHAPE EVERY STEP IS HANDED — one constructor, so a second caller cannot build a near-miss.
+ *
+ * ARC-08-C29's fix-up. `rerunAtTag` needed a ctx to ask `runsWhen` and `hashFor` the runner's
+ * question at the tag, and built one by spreading the upgrade command's `{ root, config }`. That
+ * object has no `env`, and `B04.runsWhen` reads `ctx.env.SNOWARCH_TEST_FORCE_DEPS` — so **every
+ * real `./snowarch upgrade` crashed at `[U4/7] plan`** with `Cannot read properties of undefined`,
+ * on every machine, including the owner's next one. The four plan tests did not see it because
+ * they build their own ctx, and `tests/upgrade/` is outside `npm test`, so a green local run
+ * covered none of it.
+ *
+ * A ctx assembled at a call site is a ctx that drifts from what the steps read. This is what the
+ * bootstrap gives them, and it is now what anybody asking the steps a question gives them too.
+ */
+export function stepContext({ root, config, env = process.env, node, flags = {}, state = null }) {
+  return {
+    root,
+    config,
+    env,
+    node,
+    areaCount: countAreas(root, config),
+    instanceFile: flags['instance-file'] ?? null,
+    skipClaudeCheck: Boolean(flags['skip-claude-check']),
+    // ARC-08-C28 — B06 needs to know it was told not to ask. It decided by TTY alone, so an
+    // upgrade typed at a terminal — which inherits stdio — started the wizard over an instance
+    // the run had been told to keep, with `--yes` invisible to the decision.
+    yes: Boolean(flags.yes),
+    state: state ?? emptyState({ engineVersion: version(root), node }),
+  };
+}
 
 export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = [],
   input = process.stdin, out = process.stdout, err = process.stderr, env = process.env,
@@ -125,19 +159,10 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
 
   const node = nodeInfo();
   const ctx = {
-    root, config, env, node,
-    areaCount: countAreas(root, config),
-    instanceFile: flags['instance-file'] ?? null,
-    skipClaudeCheck: Boolean(flags['skip-claude-check']),
-    // ARC-08-C28 — B06 needs to know it was told not to ask. It decided by TTY alone, so an
-    // upgrade typed at a terminal — which inherits stdio — started the wizard over an instance
-    // the run had been told to keep, with `--yes` invisible to the decision.
-    yes: Boolean(flags.yes),
-
+    ...stepContext({ root, config, env, node, flags, state }),
     // Filled in from the accepted plan below. Present here so a step reading `ctx.mode` before the
     // plan is accepted gets `null` rather than a silently wrong default.
     mode: null, docs: null,
-    state: state ?? emptyState({ engineVersion: version(root), node }),
   };
 
   // B00 runs BEFORE the plan screen, and writes nothing.
