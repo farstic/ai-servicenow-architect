@@ -28,7 +28,24 @@ export const STEPS = Object.freeze([B00, B01, B02, B03, B04, B05, B06, B07, B08,
 export const LAST = STEPS[STEPS.length - 1].id;
 export const stepById = (id) => STEPS.find((s) => s.id === id) ?? null;
 
-/** Steps that a `--yes` design-only run will actually execute, for the plan screen's Steps line. */
+/**
+ * Steps that a `--yes` design-only run will actually execute, for the plan screen's Steps line.
+ *
+ * ARC-08-C29 LOOKED AT B03 AND LEFT IT OUT, which is a decision rather than an omission and is
+ * recorded here so the next reader does not re-open it by accident.
+ *
+ * The owner's upgrade transcript shows `[B03/09] mode … ok (cached)` under a Steps line that does
+ * not name it, and a reader reconciling a list of eight against a run of nine is a real cost. But
+ * this line belongs to the PLAN SCREEN, which asks for two choices — Mode and Docs — and
+ * `bootstrap-plan.test.mjs` states the rule it follows: *"B03 records the answers; it is not a
+ * choice"*. B03 is the step that writes down what the reader just decided; naming it among the
+ * things they are deciding about is a different confusion, not less of one.
+ *
+ * B00 is excluded for a different reason again — it has already run by the time the screen exists.
+ *
+ * So the mismatch is real and the fix is not here: it is that the UPGRADE reuses a screen written
+ * for an interactive install. Raised rather than patched.
+ */
 export function plannedSteps(ctx) {
   return STEPS.filter((s) => s.id !== 'B00' && s.id !== 'B03' && runs(s, ctx));
 }

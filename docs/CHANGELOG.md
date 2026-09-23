@@ -256,6 +256,11 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   the documentation shows carries the doctor's own line, and that line has the day written into it —
   so the suite agreed with the product only on the day the sample was captured.
 
+- **The upgrade plan lists the steps that will actually re-run.** It was computed from which files
+  changed between the two releases, while the installer decides by comparing each step's recorded
+  inputs — so a step could run without ever appearing in the plan you approved. The plan now asks
+  the installer's own question, and says so plainly when it cannot.
+
 - **Upgrading no longer asks you to set up the instance you already have.** On a live checkout the
   upgrade printed "credentials: untouched" and then started the instance wizard anyway, asking for
   a label and a password for an entry already in the store — on a run that had been told not to ask
