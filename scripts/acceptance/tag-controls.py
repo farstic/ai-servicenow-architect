@@ -353,6 +353,13 @@ def resolve(text, clone, path, version_of_record):
     went missing on the very next tree — a FINDING about the harness, reported as one about the tag.
     """
     out = text.replace('@@VERSION_OF_RECORD@@', version_of_record)
+    # THE RELEASE TARGET is the version-of-record with any prerelease dropped — `2.0.1-rc.1` -> `2.0.1`
+    # — which is what the NEXT-release sweep asks about, and `…_ESCAPED` is the spelling a regex
+    # literal carries (`2\.0\.1`). Both derived: a control that spelled either would be right at a
+    # final tag and wrong at an rc, which is exactly how the C49 plant went wrong (ARC-09-C51).
+    target = version_of_record.split('-')[0]
+    out = out.replace('@@RELEASE_TARGET_ESCAPED@@', target.replace('.', r'\.'))
+    out = out.replace('@@RELEASE_TARGET@@', target)
     if '@@SUMMARY_OK' in out:
         ok = json.loads(open(os.path.join(clone, path), encoding='utf-8').read())['summary']['ok']
         out = out.replace('@@SUMMARY_OK_MINUS_1@@', str(ok - 1)).replace('@@SUMMARY_OK@@', str(ok))
@@ -365,6 +372,29 @@ control('ARC-09-C49', "a literal of the tag's own version of record planted in a
                "  assert.ok(compareSemver('@@VERSION_OF_RECORD@@', '9.0.0-rc.10') > 0);")],
         'node --test tests/version-literals.test.mjs',
         'no assertion spells the current version of record')
+
+# ── ARC-09-C52 — the sweep sees a version spelled as a regex ───────────────────────────────────
+#
+# C51's promise is that every row's control is re-measured on a tag, and C52 arrived without one.
+# Both of these are about the SAME hole from opposite sides: the first breaks the mechanism, the
+# second re-plants the regression that proved the hole was real.
+control('ARC-09-C52', 'the escaped spelling dropped from the sweep',
+        [Patch('tests/version-literals.test.mjs',
+               '  const forms = [String(version), escapedSpelling(version)]',
+               '  const forms = [String(version)]')],
+        'node --test tests/version-literals.test.mjs',
+        'the escaped spelling is caught')
+# THE REGRESSION THAT ACTUALLY BIT, re-planted: `install-page` pinned the README head to the record
+# version in an escaped regex and broke on the post-release bump, with the sweep silent. The spelling
+# is DERIVED from the tree's own release target — spelled, it would be right at a final tag and wrong
+# at an rc, which is the C49 mistake this harness already made once.
+control('ARC-09-C52', "a regex literal of the release target planted in a test",
+        [Patch('tests/install-page.test.mjs',
+               "  const rootVersion = JSON.parse(read('package.json')).version;",
+               "  assert.match(read('docs/README-head.md'), /@@RELEASE_TARGET_ESCAPED@@/);\n"
+               "  const rootVersion = JSON.parse(read('package.json')).version;")],
+        'node --test tests/version-literals.test.mjs',
+        'spells the version the NEXT release will carry')
 
 # ── ARC-07-C7 — the nightly live suite ────────────────────────────────────────────────────────
 control('ARC-07-C7', 'the dispatch guard restored to ref-only',
