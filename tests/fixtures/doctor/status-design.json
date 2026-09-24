@@ -488,6 +488,20 @@
       }
     },
     {
+      "id": "E-30",
+      "section": "legacy",
+      "title": "MCP registrations under folders that no longer exist",
+      "status": "skip",
+      "severity": "warn",
+      "detail": "not in the --quick subset",
+      "remedy": null,
+      "command": null,
+      "code": null,
+      "fixable": false,
+      "quick": false,
+      "durationMs": 0
+    },
+    {
       "id": "E-25",
       "section": "host",
       "title": "cloud-sync folder",
@@ -700,7 +714,7 @@
     "ok": 15,
     "warn": 0,
     "fail": 0,
-    "skip": 25,
+    "skip": 26,
     "fixable": 0,
     "notInSection": 0
   }

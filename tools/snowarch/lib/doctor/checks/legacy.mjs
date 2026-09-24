@@ -331,5 +331,102 @@ export function legacyChecks() {
         });
       },
     }),
+    defineCheck({
+      id: 'E-30',
+      section: 'legacy',
+      title: 'MCP registrations under folders that no longer exist',
+      severity: 'warn',
+      // NOT QUICK, and that is the whole reason this is a separate check rather than a branch
+      // inside E-23 (ARC-08-C34). E-23 is `quick: true`, so it runs on the session-start path; this
+      // one stats EVERY project folder in `~/.claude.json` — forty of them on the owner's machine —
+      // and a `stat` against a client folder on a network mount that is not up blocks for the
+      // mount's timeout. A session start is the worst place to inherit that.
+      //
+      // Nothing in this product branches on `ctx.quick` inside a check body: quick-ness is a
+      // DECLARATION the planner acts on, so a check that behaved differently under `--quick` would
+      // be a second definition of what quick means. The honest way off that path is to declare it.
+      quick: false,
+      network: false,
+      spawns: false,
+      // Never. Same rule as E-23: the file is Claude Code's, and the command is the user's to run.
+      fixable: false,
+      run: async (ctx) => {
+        const home = ctx.home ?? null;
+        const path = home ? join(home, CLAUDE_JSON) : null;
+        if (!home || !existsSync(path)) return ok('no ~/.claude.json to read', { entries: [] });
+
+        let parsed = null;
+        try { parsed = JSON.parse(readFileSync(path, 'utf8')); } catch { parsed = null; }
+        // A malformed file is E-23's finding to report, not this one's — two checks naming the same
+        // parse error would tell a user to fix one thing twice.
+        if (parsed === null) return ok('~/.claude.json is not readable as JSON; E-23 reports that',
+          { entries: [] });
+
+        const projects = parsed?.projects && typeof parsed.projects === 'object'
+          ? parsed.projects : {};
+        const entries = [];
+        for (const [project, config] of Object.entries(projects)) {
+          const servers = config?.mcpServers && typeof config.mcpServers === 'object'
+            ? config.mcpServers : {};
+          const names = Object.keys(servers);
+          if (names.length === 0) continue;
+          // THE ONLY QUESTION THIS CHECK ASKS. Not "is this key stale?" — E-23 owns that, and it
+          // cannot reach an entry under this product's own key, because such an entry is a
+          // registration this product made. Under an EXISTING folder that is another checkout and
+          // removing it would delete a working install; under a MISSING folder nothing can start
+          // there and `claude` keeps trying. So: does the folder exist, for ANY key.
+          if (existsSync(project)) continue;
+          for (const name of names) {
+            entries.push({ name, project: tildify(project, home) });
+          }
+        }
+
+        if (entries.length === 0) {
+          return ok('no registration points at a folder that is gone', { entries: [] });
+        }
+
+        const folders = new Set(entries.map((e) => e.project));
+        const byName = new Map();
+        for (const e of entries) byName.set(e.name, (byName.get(e.name) ?? 0) + 1);
+        const named = [...byName].map(([n, c]) => (c > 1 ? `${n} \u00d7${c}` : n)).join(', ');
+
+        // TWO DETAILS, E-23's split reused unchanged (ARC-08 / ARC-10-S10 Sitting A D1). The folder
+        // is what the user needs in order to act, and it is exactly what must never travel: on a
+        // consultant's laptop these are client and engagement folder names, and the name is the
+        // whole of the secret. So the terminal gets the path and `--json` gets counts and keys.
+        //
+        // THE REMOVE COMMAND IS PRINTED; THE FOLDER STEP IS CITED. `claude mcp remove` is keyed on
+        // the absolute folder path, so the folder has to exist for the length of that one command —
+        // and the page (`docs/MIGRATION.md` § 6) carries that recipe for both shells already. It is
+        // not repeated here for two reasons: a second copy of a sentence is the thing this
+        // repository keeps removing, and the sibling test "neither detector file can write, rename
+        // or delete anything" forbids the write vocabulary in these two files by scanning their
+        // source. That guard cannot tell a string a user will type from a call this code makes, and
+        // weakening it so it could would cost more than citing a page section. `removalCommand` is
+        // E-23's, so both checks print one spelling of the same command.
+        const textLines = entries.map(({ name, project }) =>
+          `"${name}" is registered under ${project}, which does not exist`);
+        textLines.push('the folder must exist for the length of one command — re-create it, run the '
+          + 'removal from inside it, then delete it again (docs/MIGRATION.md \u00a7 6, both shells):');
+        for (const { name, project } of entries) {
+          textLines.push(`  (from ${project}, re-created) ${removalCommand(name)}`);
+        }
+
+        return warn(`${entries.length} registration(s) under ${folders.size} folder(s) that no `
+          + `longer exist: ${named}`, {
+          // `command` travels, `project` does not — E-23's split exactly. The command names only
+          // the key, so it carries nothing private; the folder is the secret and stays in the
+          // terminal copy. `tests/migration-doc.test.mjs` reads `command` from here to prove the
+          // page carries every command the legacy checks print.
+          data: {
+            entries: entries.map(({ name }) => ({ name, command: removalCommand(name) })),
+            folders: folders.size,
+          },
+          textDetail: textLines.join('\n'),
+          remedy: 'see docs/MIGRATION.md \u00a7 6 — the folder is re-created for one command, '
+            + 'then removed',
+        });
+      },
+    }),
   ];
 }

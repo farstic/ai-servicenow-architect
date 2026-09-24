@@ -333,7 +333,10 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
       cacheError = e.message;
     }
   }
-  return { report, checks, summary, derived, cacheError, ctx };
+  // `results` is the runner's own, still carrying terminal-only fields (`textDetail`) that
+  // `checkToJson` strips from `report` because they must never travel (ARC-08-C34). The text
+  // renderer needs them; `--json` and the cache are built from `report` and do not see them.
+  return { report, checks, summary, derived, cacheError, ctx, results };
 }
 
 /**
@@ -391,7 +394,8 @@ export async function fixCommand({ root, config, registry, options, env, home, n
   // The same options, so the second report is comparable with the first — and this one caches.
   const second = await runDoctor({ root, config, registry: registry ?? engineRegistry(), ...options,
     env, home, now });
-  return { applied, report: second.report, checks: second.checks, cacheError: second.cacheError };
+  return { applied, report: second.report, checks: second.checks, cacheError: second.cacheError,
+    results: second.results };
 }
 
 /**
@@ -488,6 +492,8 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
   let report;
   let checks;
   let cacheError;
+  // ARC-08-C34 — carried beside the report for the text renderer only.
+  let results = [];
   let fixes = [];
   if (options.fix) {
     // Under `--json`, stdout carries ONE thing: the object. The plan, the prompt and the per-fix
@@ -506,6 +512,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     report = outcome.report;
     checks = outcome.checks;
     cacheError = outcome.cacheError;
+    results = outcome.results ?? [];
     fixes = fixesBlock(outcome.applied ?? []);
     if (fixes.length > 0) report.fixes = fixes;
     // A plan the user declined is a successful run of `--fix`: they asked what it would do, and
@@ -516,7 +523,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
       return EXIT_OK;
     }
   } else {
-    ({ report, checks, cacheError } = await runDoctor({
+    ({ report, checks, cacheError, results } = await runDoctor({
       root, config, registry, ...runOptions, env, home, now,
     }));
   }
@@ -542,7 +549,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     // user's own words; a machine consumer uses the report object, not this string.
     write(JSON.stringify(maskForJson(cacheError ? { ...report, cacheError } : report, { home }), null, 2));
   } else {
-    write(renderText({ report, checks, colour: useColour({ stream: out, env }) }));
+    write(renderText({ report, checks, results, colour: useColour({ stream: out, env }) }));
   }
   if (log?.commit) log.commit();
   return report.summary.fail > 0 ? exitCodeFor(report.summary) : EXIT_OK;
