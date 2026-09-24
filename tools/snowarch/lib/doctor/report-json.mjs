@@ -30,6 +30,20 @@ const CHECK_KEYS = Object.freeze([
 ]);
 
 /**
+ * The keys a check entry MAY carry beyond the required ones — the complete allowance (ARC-08-C35).
+ *
+ * `data` is the check's own payload, the part a consumer actually reads, and `checkToJson` spreads
+ * it conditionally, so it is optional rather than required. Measured on a real 41-check report: it
+ * is the only key outside `CHECK_KEYS`, and it is present on all 41.
+ *
+ * Adding a name here is a decision that the field TRAVELS — into the `--json` an issue template asks
+ * a stranger to paste, and into the doctor cache. `textDetail` is the counter-example that made this
+ * list necessary (ARC-08-C34): a terminal-only string, carrying a folder path, one edit away from
+ * the report with nothing to stop it.
+ */
+const CHECK_OPTIONAL_KEYS = Object.freeze(['data']);
+
+/**
  * One result, in report shape.
  *
  * The check's OWN declaration supplies `section`, `title`, `severity`, `quick` and `fixable`: a
@@ -139,6 +153,17 @@ export function validateReport(report) {
       if (!isObject(c)) { fail(`checks[${i}]`, 'object'); return; }
       for (const key of CHECK_KEYS) {
         if (!(key in c)) fail(`checks[${i}].${key}`, 'missing');
+      }
+      // ...AND THE REVERSE, which this list did not ask until ARC-08-C35. Required-only made
+      // `CHECK_KEYS` one-directional: a field added to `checkToJson`'s literal travelled with
+      // nothing objecting, which is how C34's own control put a terminal-only string — and the
+      // folder path inside it — into the report a stranger is asked to paste. The top level has
+      // had this property since S01; the entries had not.
+      for (const key of Object.keys(c)) {
+        if (!CHECK_KEYS.includes(key) && !CHECK_OPTIONAL_KEYS.includes(key)) {
+          fail(`checks[${i}].${key}`,
+            'unexpected — a key here TRAVELS; add it to CHECK_KEYS or CHECK_OPTIONAL_KEYS if that is meant');
+        }
       }
       if (!['ok', 'warn', 'fail', 'skip'].includes(c.status)) fail(`checks[${i}].status`, 'ok|warn|fail|skip');
       if (typeof c.id !== 'string') fail(`checks[${i}].id`, 'string');
