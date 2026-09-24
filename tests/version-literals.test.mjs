@@ -343,9 +343,16 @@ test('C12a — a reference to a PAST release cannot fire, and that is why it nee
     assert.equal(compareSemver(names, target) < 0, true,
       `${file} names ${names}, which is not behind the version of record ${target} — `
       + 'a reference to an UNRELEASED version must fail the sweep, not be bound here');
+    const content = readFileSync(join(root, file), 'utf8');
+    // THE SITE STILL NAMES IT. Without this the binding is hollow: re-point an entry at a file that
+    // does not mention the version at all and every other assertion here still passes — existence,
+    // a long enough reason, the semver property, and silence at the current target are all true of
+    // a file that has nothing to do with this. That is the stale-binding case the `is gone` check
+    // was written for, one step later, and it is how an exemption outlives its reason.
+    assert.notEqual(literalLines(content, names).length, 0,
+      `${file} no longer names ${names} — this binding is stale`);
     // ...and the sweep really is quiet on it today, which is the claim this test is making.
-    assert.deepEqual(literalLines(readFileSync(join(root, file), 'utf8'), target), [],
-      `${file} is flagged at ${target}`);
+    assert.deepEqual(literalLines(content, target), [], `${file} is flagged at ${target}`);
   }
 });
 
