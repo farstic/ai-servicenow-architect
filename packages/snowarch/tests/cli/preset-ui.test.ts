@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   COLUMNS, ENTRY_DEFAULTS, FLAG_MEANINGS, PROBE_FIELD, annotate, applyingLine, dependencyViolation,
   labelOf, parseFlagsArg, probeNote, probeRecommendsOff, prodRefusal, proposePreset,
-  renderReviewScreen, resolveFlags,
+  recordedSuffix, renderReviewScreen, resolveFlags,
   runReviewScreen, wrapRow,
 } from '../../src/cli/preset-ui.js';
 import {
@@ -546,5 +546,77 @@ describe('ARC-07-C4 — the screen and the non-interactive path share one rule',
     // NON-VACUITY: the loop must actually find both answers, or it proves nothing.
     expect(statuses.filter((s) => probeRecommendsOff(s)).length).toBeGreaterThan(0);
     expect(statuses.filter((s) => !probeRecommendsOff(s)).length).toBeGreaterThan(0);
+  });
+});
+
+// ─── A recorded probe says it is recorded (the owner's 2026-09-23 sitting) ─────────────────────
+//
+// The screen rendered the same `probe: ok` whether the probe had just run or had been read out of
+// the store, and the callers genuinely differ: `instance add`, `instance test` and
+// `import --from-legacy` probe live and pass what they measured, while `set-preset` passes
+// `entry.lastProbe` — a value of any age. The owner's question was the right one: *either the probes
+// are fresh and should be written, or they are the recorded ones and the word should say so.*
+//
+// They are the recorded ones. `set-preset` does not probe, and making it probe would turn a local
+// store edit into a network round trip nobody asked for.
+describe('ARC-07 — probe provenance', () => {
+  const AT = '2026-09-19T08:11:02.000Z';
+  const STATUSES: Array<ProbeStatus | undefined> =
+    ['ok', 'role missing', 'not licensed', 'not installed', 'skipped', undefined];
+
+  it('a fresh probe renders exactly as it always did', () => {
+    // The fresh path is the one every other caller uses, and it must not have moved: this is the
+    // assertion that the change is additive rather than a rewording of everything.
+    expect(annotate('ok')).toBe('probe: ok');
+    expect(annotate('skipped')).toBe('probe: skipped');
+    expect(annotate(undefined)).toBe('probe: not run');
+    expect(annotate('role missing', 'no itil role'))
+      .toBe('probe: role missing — no itil role; keep on? (recommend: off)');
+  });
+
+  it('a recorded probe names the day it was taken, beside the status', () => {
+    expect(annotate('ok', undefined, AT)).toBe('probe: ok (recorded 2026-09-19)');
+    // Beside the STATUS, not after the question: the qualifier belongs to the finding, and a line
+    // ending `keep on? (recommend: off) (recorded …)` reads as a date attached to the advice.
+    expect(annotate('role missing', 'no itil role', AT))
+      .toBe('probe: role missing (recorded 2026-09-19) — no itil role; keep on? (recommend: off)');
+  });
+
+  it('every status is qualified except the one with nothing to date', () => {
+    for (const s of STATUSES) {
+      const fresh = annotate(s, 'hint');
+      const recorded = annotate(s, 'hint', AT);
+      if (s === undefined) {
+        // `not run` has no record, so a provenance would be describing one that does not exist.
+        expect(recorded).toBe(fresh);
+      } else {
+        expect(recorded).not.toBe(fresh);
+        expect(recorded).toContain('(recorded 2026-09-19)');
+      }
+    }
+  });
+
+  it('a DATE, not an age — the sentence stays true in a pasted transcript', () => {
+    expect(recordedSuffix(AT)).toBe(' (recorded 2026-09-19)');
+    expect(recordedSuffix(null)).toBe('');
+    expect(recordedSuffix(undefined)).toBe('');
+    // No "days ago": an age has to be recomputed to stay honest and is wrong the moment it is
+    // copied into a record — which is exactly where these lines end up.
+    expect(recordedSuffix(AT)).not.toMatch(/ago|day/);
+  });
+
+  it('the screen carries the provenance through to every flag row', () => {
+    const probes = { at: AT, auth: 'ok', write: 'ok', scripting: 'ok', cmdb: 'ok', atf: 'ok',
+      nowAssist: 'ok', fluent: 'ok' } as LastProbe;
+    const flags = expandPreset('full') as Flags;
+    const recorded = renderReviewScreen({ label: 'pdi', environment: 'pdi', preset: 'full',
+      flags, probes, probesRecordedAt: AT });
+    const fresh = renderReviewScreen({ label: 'pdi', environment: 'pdi', preset: 'full',
+      flags, probes });
+
+    expect((recorded.match(/\(recorded 2026-09-19\)/g) ?? []).length).toBe(FLAG_NAMES.length);
+    expect(fresh).not.toContain('recorded');
+    // ...and nothing else about the screen moved.
+    expect(recorded.replace(/ \(recorded 2026-09-19\)/g, '')).toBe(fresh);
   });
 });

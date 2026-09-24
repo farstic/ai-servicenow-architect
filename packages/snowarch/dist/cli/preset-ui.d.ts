@@ -62,7 +62,21 @@ export declare const probeRecommendsOff: (status: ProbeStatus | undefined) => bo
  * status and requires them to agree.
  */
 export declare function probeNote(status: ProbeStatus | undefined): string | null;
-export declare function annotate(status: ProbeStatus | undefined, hint?: string): string;
+/**
+ * WHEN THE PROBE WAS TAKEN — `null` for one that has just run.
+ *
+ * The screen renders the same `probe: ok` whether the probe ran a second ago or was read out of the
+ * store, and the two callers differ: `instance add`, `instance test` and `import --from-legacy`
+ * probe live and pass what they measured, while **`set-preset` passes `entry.lastProbe`** — a value
+ * that can be any age. The owner asked the question in the 2026-09-23 sitting: *either the probes
+ * are fresh and should be written, or they are the recorded ones and the word should say so*. They
+ * are the recorded ones, so the word says so.
+ *
+ * A DATE, not an age: "recorded 2026-09-19" stays true tomorrow, where "5 days ago" is a sentence
+ * that has to be recomputed to stay honest and is wrong in a transcript the moment it is pasted.
+ */
+export declare const recordedSuffix: (at: string | null | undefined) => string;
+export declare function annotate(status: ProbeStatus | undefined, hint?: string, recordedAt?: string | null): string;
 /** The `LastProbe` field that carries a flag's result. One mapping, used by the screen and S05. */
 export declare const PROBE_FIELD: Readonly<Record<FlagName, keyof Omit<LastProbe, 'at' | 'auth'>>>;
 export interface ScreenInput {
@@ -71,6 +85,14 @@ export interface ScreenInput {
     preset: PresetName;
     flags: Flags;
     probes?: LastProbe;
+    /**
+     * WHEN the probes in `probes` were taken, or `null`/absent when they have just been measured.
+     *
+     * `set-preset` reads `entry.lastProbe` out of the store, so its screen can be annotating a probe
+     * from days ago; `instance add`, `instance test` and `import --from-legacy` pass what they just
+     * measured. Rendering the two identically is what the owner's sitting flagged.
+     */
+    probesRecordedAt?: string | null;
     /** Per-flag hint text, for `role missing`. */
     hints?: Partial<Record<FlagName, string>>;
     /**
@@ -168,6 +190,14 @@ export interface ResolveInput {
     flags?: string;
     yes?: boolean;
     probes?: LastProbe;
+    /**
+     * WHEN the probes in `probes` were taken, or `null`/absent when they have just been measured.
+     *
+     * `set-preset` reads `entry.lastProbe` out of the store, so its screen can be annotating a probe
+     * from days ago; `instance add`, `instance test` and `import --from-legacy` pass what they just
+     * measured. Rendering the two identically is what the owner's sitting flagged.
+     */
+    probesRecordedAt?: string | null;
     hints?: Partial<Record<FlagName, string>>;
     io?: ReviewIo;
     /** See `ScreenInput.prodAcknowledged` — S06's `--ack-prod`, after the label was typed back. */
