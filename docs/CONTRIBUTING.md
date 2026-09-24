@@ -585,6 +585,19 @@ The same applies to a push. `git push` exiting 0 is not proof the remote moved �
 was a no-op against a stale ref and was reported as done. `git ls-remote origin refs/heads/<branch>`
 is the proof, and it goes in the report.
 
+**A control must not run while uncommitted work sits in a file it will restore.** Every control here
+is degrade → the named test fails → restore, and the restore is usually `git checkout --`, which
+takes the file back to the INDEX. Twice in ARC-09/ARC-07 that silently reverted an unrelated fix
+sitting unstaged in the same file, and the second time `git status` printed the evidence into a
+report nobody read. Commit first — a `wip:` commit folded in afterwards with `git reset --soft` is
+enough — then degrade, then restore. The claim is about the ref either way: `git show <ref>:<path>`,
+not the working tree.
+
+**Write the case at the level a user reaches the code, and let it fail before the mechanism exists.**
+A test written just below the seam you are building proves the seam and not its use: ARC-09-C52's
+binding and ARC-07-C9's wiring both passed every test while their only caller was deleted. Writing
+the site-level case first makes that omission impossible rather than merely findable by review.
+
 ### Never edit `packages/snowarch/dist/` — build it
 
 `dist/` is **committed** (ARC-04-S13), so a clone plus `npm ci` is a runnable live install with no

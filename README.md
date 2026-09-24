@@ -283,17 +283,24 @@ Full detail: [CONTRIBUTING.md](docs/CONTRIBUTING.md#upgrading-the-product).
 
 ### Uninstall
 
-Delete the checkout: it holds the only copy of anything you configured, in `.local/` — credentials
-included. If you used the CLI's own config directory (`~/.config/snowarch/`, `%APPDATA%\snowarch\` on
-Windows), delete that too. Nothing was written to Claude Code's own configuration unless you chose
-the fallback registration above; if you did:
+**Deregister before you delete anything** — `./snowarch mode design` (a no-op on a design-only
+checkout). Going live puts a local-scope entry in Claude Code's own `~/.claude.json`, **keyed by this
+folder's path**: deleting the folder leaves it behind, and `claude` goes on trying to start a server
+from a directory that is gone. It has to run while the checkout still exists.
+
+Then delete the checkout: it holds the only copy of anything you configured, in `.local/` —
+credentials included. If you used the CLI's own config directory (`~/.config/snowarch/`,
+`%APPDATA%\snowarch\` on Windows), delete that too.
+
+Registered at user scope, chose the fallback registration, or already deleted the folder? Undo that
+one by hand, from anywhere:
 
 ```sh
 claude mcp remove servicenow -s local     # or -s user, whichever you chose
 ```
 
-Claude Code keeps its own record that you trusted the folder. It is harmless and refers to a path
-that no longer exists.
+Claude Code keeps its own record that you trusted the folder. That one is harmless and refers to a
+path that no longer exists.
 
 ## What is here
 
