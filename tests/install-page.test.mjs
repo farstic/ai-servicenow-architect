@@ -203,18 +203,22 @@ test('the page stays a page, and the tail stays a tail', () => {
   // neither, and it says that the root is checked on both even though the Node-free launcher speaks
   // only when it fails. Same rule as the five moves above: a cap is worth moving for a fact, and
   // NOTHING WAS DELETED to pay for it.
-  // 295 since ARC-06-C17, and this one was bought by an orphan the owner made in the v2.0.0
-  // as-a-user test: `~/snowarch-v200-test` was deleted, and its local-scope entry stayed in
-  // `~/.claude.json` keyed by a folder that no longer exists, with `claude` still trying to start a
-  // server from it. Seven lines pay for the instruction to run `./snowarch mode design` FIRST, the
-  // reason (the entry is keyed by the folder path, so deleting the folder does not remove it), the
-  // fact that it has to run while the checkout still exists, and the sentence for a reader who has
-  // already deleted the folder. They also pay off a sentence that was WRONG rather than missing —
-  // "Nothing was written to Claude Code's own configuration unless you chose the fallback
-  // registration", which is false for every live install and is why the orphan was a surprise.
-  // Same rule as the six moves above: a cap is worth moving for a fact, and NOTHING WAS DELETED to
-  // pay for it.
-  assert.ok(install <= 295, `${install} lines of install page (criterion: 295)`);
+  // 298 since ARC-06-C17, and it is the most expensive line on this page because the FIRST cut
+  // of it was wrong. The owner's orphan (`~/snowarch-v200-test`, 2026-09-24) came from a
+  // `--register local` run, not from a default install: `state.mjs` defaults `registration:
+  // 'project'`, whose branch in `mode.mjs` never calls `add-json` — the committed `.mcp.json`
+  // lives inside the checkout and dies with it. So the page's old sentence, *nothing was written
+  // to Claude Code's own configuration unless you chose the fallback registration*, was TRUE and
+  // its qualifier was the point. The first cut deleted it, asserted its absence, and wrote a
+  // replacement that is false for every default install.
+  //
+  // These lines buy BOTH halves, which is why they cost more than the wrong version did: the
+  // instruction (unconditionally safe), where the default registration lives and that it writes
+  // nothing to Claude Code, the scoped reason for `--register local|user`, the ordering (it must
+  // run while the checkout exists), and the by-hand line for a reader who has already deleted the
+  // folder or made the entry themselves. Same rule as the six moves above: a cap is worth moving
+  // for a fact, and NOTHING WAS DELETED to pay for it.
+  assert.ok(install <= 298, `${install} lines of install page (criterion: 298)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.
@@ -255,44 +259,60 @@ test('no live page still points at an install guide that was deleted', () => {
   assert.match(guide, /\]\(\.\/INSTALL\.md\)/);
 });
 
-// ─── ARC-06-C17 — deregister before deleting the folder ────────────────────────────────────────
+// ─── ARC-06-C17 — deregister before deleting the folder ───────────────────────────────────────
 //
-// The owner deleted `~/snowarch-v200-test` after the v2.0.0 as-a-user test and left an orphan behind
-// (2026-09-24). `mode live` registers the server with `claude mcp add-json -s local`, and a
-// local-scope entry lives in `~/.claude.json` KEYED BY THE FOLDER PATH — so deleting the folder does
-// not remove it, and `claude` goes on trying to start a server from a directory that is gone.
+// The owner deleted `~/snowarch-v200-test` after the v2.0.0 as-a-user test and left an orphan
+// (2026-09-24). The orphan came from a `--register local` run, NOT from a default install:
 //
-// `./snowarch mode design` is what removes it (`releaseScopedRegistration` in `mode.mjs`), and it
-// has to happen while the checkout still exists: afterwards there is no `./snowarch` to run.
+//   default      `registration: 'project'` (`state.mjs`) — the committed `.mcp.json` INSIDE the
+//                checkout. It dies with the folder, and nothing of ours reaches `~/.claude.json`.
+//   local/user   `claude mcp add-json -s <scope>` (`mode.mjs`) — an entry in Claude Code's own
+//                `~/.claude.json`, KEYED BY THIS FOLDER'S PATH, which deleting the folder leaves
+//                behind while `claude` keeps trying to start a server from a directory that is gone.
 //
-// THIS IS DOCS ONLY, and the row says why: a doctor check inside another checkout cannot see the
-// orphan, because a registration is keyed by ITS OWN folder and the deleted one is a different key.
-// There is no tree left to run a check in. The only place the instruction can live is the page that
-// tells a reader to delete the folder.
+// So the page needs BOTH halves: the instruction (unconditionally safe — a no-op on project and on
+// design-only) and a reason that is SCOPED, because telling every reader the product wrote to their
+// Claude config when it did not is the kind of sentence this row exists to remove.
+//
+// DOCS ONLY: a registration is keyed by its own folder, so a check inside another checkout asks
+// about a different key, and for the deleted one there is no tree left to run a check in.
 test('ARC-06-C17 — Uninstall says to deregister BEFORE deleting, and why', () => {
   for (const page of [README, INSTALL]) {
     const uninstall = read(page).slice(read(page).indexOf('### Uninstall'));
     assert.ok(uninstall.length > 0, `${page} has no Uninstall section`);
-    // The command, and that it comes FIRST — an instruction to run it after the folder is gone is
-    // an instruction nobody can follow.
     assert.match(uninstall, /\.\/snowarch mode design/,
       `${page} does not tell a reader to deregister before deleting`);
     assert.match(uninstall, /before you delete/i,
       `${page} does not say the deregistration comes first`);
-    // ...and WHY, because a reader who does not know what it leaves behind will skip it.
     assert.match(uninstall, /~\/\.claude\.json/,
       `${page} does not name the file the orphan is left in`);
+
+    // ORDER, ASSERTED. The first cut's comment claimed "that it comes FIRST" and checked only
+    // presence — the architect moved the paragraph after the delete step and this test stayed
+    // green. A comment claiming an assertion that does not exist is the hollow-binding shape for
+    // the third time in this arc, so the claim is now a line of code.
+    const deregister = uninstall.indexOf('mode design');
+    const del = uninstall.indexOf('Then delete');
+    assert.notEqual(del, -1, `${page}: the delete step is not where this test expects it`);
+    assert.ok(deregister < del,
+      `${page} tells a reader to delete the checkout before deregistering it`);
   }
 });
 
-test('ARC-06-C17 — Uninstall no longer claims that nothing was written to Claude Code', () => {
-  // THE SENTENCE THAT WAS WRONG, not merely missing. "Nothing was written to Claude Code's own
-  // configuration unless you chose the fallback registration" is false for every LIVE install:
-  // `mode live` registers local scope through `claude mcp add-json`, which is Claude Code's own
-  // configuration. That sentence is why the orphan was a surprise.
+test('ARC-06-C17 — Uninstall states BOTH halves: the default writes nothing, local/user does', () => {
+  // NOT a ban on a sentence. The first cut deleted "Nothing was written to Claude Code's own
+  // configuration unless you chose the fallback registration" and asserted its ABSENCE — but that
+  // sentence was TRUE, and its qualifier was the whole point. The test enforced the removal of a
+  // true statement and replaced it with one false for every default install.
   for (const page of [README, INSTALL]) {
     const uninstall = read(page).slice(read(page).indexOf('### Uninstall'));
-    assert.equal(/Nothing was written to Claude Code's own configuration/.test(uninstall), false,
-      `${page} still claims nothing was written to Claude Code's configuration`);
+    // The default half: the registration lives in the checkout and dies with it.
+    assert.match(uninstall, /\.mcp\.json/,
+      `${page} does not say where the DEFAULT registration lives`);
+    assert.match(uninstall, /nothing (of ours )?was written to Claude Code/i,
+      `${page} no longer says the default writes nothing to Claude Code's configuration`);
+    // The scoped half: the orphan belongs to --register local|user.
+    assert.match(uninstall, /--register local/,
+      `${page} does not scope the orphan to the registration that causes it`);
   }
 });

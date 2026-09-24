@@ -275,21 +275,24 @@ Full detail: [CONTRIBUTING.md](CONTRIBUTING.md#upgrading-the-product).
 
 ### Uninstall
 
-**Deregister before you delete anything** — `./snowarch mode design` (a no-op on a design-only
-checkout). Going live puts a local-scope entry in Claude Code's own `~/.claude.json`, **keyed by this
-folder's path**: deleting the folder leaves it behind, and `claude` goes on trying to start a server
-from a directory that is gone. It has to run while the checkout still exists.
+**Deregister before you delete anything** — `./snowarch mode design`, always safe: with the default
+registration it does nothing. That default goes through the `.mcp.json` committed here, so it lives
+**inside the checkout** and dies with it — nothing of ours was written to Claude Code's own
+configuration. With `--register local` or `--register user` the entry is instead in Claude Code's
+`~/.claude.json`, **keyed by this folder's path**: deleting the folder leaves it there and `claude`
+keeps trying to start a server from a directory that is gone. `mode design` removes it, and must run
+while the checkout still exists.
 
 Then delete the checkout: it holds the only copy of anything you configured, in `.local/` —
 credentials included. If you used the CLI's own config directory (`~/.config/snowarch/`,
 `%APPDATA%\snowarch\` on Windows), delete that too.
 
-Registered at user scope, chose the fallback registration, or already deleted the folder? Undo that
-one by hand, from anywhere:
+Already deleted the folder, or made the entry yourself rather than with `--register`? Remove it by
+hand, from anywhere:
 
 ```sh
-claude mcp remove servicenow -s local     # or -s user, whichever you chose
+claude mcp remove servicenow -s local     # or -s user, whichever you used
 ```
 
-Claude Code keeps its own record that you trusted the folder. That one is harmless and refers to a
-path that no longer exists.
+Claude Code also keeps its own record that you trusted the folder. That one is harmless and refers to
+a path that no longer exists.
