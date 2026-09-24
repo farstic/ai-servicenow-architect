@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.0 — 2026-09-24
+
+### Notes
+
 This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
 
 #### Migration for snow-mcp 1.0.0 users
@@ -1922,6 +1926,23 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   engine pin and its sha are untouched.
 
 ---
+
+### Fixed
+
+- tests: the ARC-10 tripwire answers itself instead of failing the cut (c4da29e)
+- tests: the live suite's pty driver owns its pty (649966f)
+- tests: the live suite reads the probe label from the product (ae773c6)
+- tests: the version sweep matches a version, not a substring of one (77b5287)
+
+### Internal
+
+- the next-release sweep holds at a final version too (968d44f)
+- fixture versions move to the 9.x series before the release needs them (b5f75bb)
+- ARC-07-C8 closed live — e2e-live green on all three runners (00bce3a)
+- the sitting record's §E2 line — e2e-live green on all three runners (5eb295e)
+- the 2026-09-23 macOS Sitting C record on rc.9 and rc.11 (3c9e31f)
+
+Tag v2.0.0 · contract 47e3e1f29b62 · docs-pin df4afac
 
 ## The imported engine's header
 
