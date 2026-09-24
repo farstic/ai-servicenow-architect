@@ -1210,3 +1210,112 @@ test('the acceptance harness says it is hand-run, and can be imported without ru
   assert.match(src, /if __name__ == '__main__':/, 'the harness runs on import');
   assert.equal(/^TAG = sys\.argv/m.test(src), false, 'the harness reads argv at module scope');
 });
+
+test('ARC-09-C57 — the harness counts itself, so a row quotes a number rather than deriving one', () => {
+  // The v2.0.1 measurement (2026-09-24) reported `39 controls / 39 patches / 0 ANCHOR NOT FOUND`
+  // and a 39/5 PASS split — every one of those five numbers reconstructed by importing CONTROLS and
+  // matching (row, name) pairs against the printed table, because the harness printed none of them.
+  //
+  // A number re-derived from the artefact is a SECOND implementation of the count, written by the
+  // reader, at the moment they are least able to check it. `ANCHOR NOT FOUND` was the worst: with
+  // no line to print it, "0" and "I never looked" rendered identically — and that verdict exists
+  // precisely to be loud, since an anchor that stops resolving is a control that silently tests
+  // nothing.
+  //
+  // RUN, not matched against the source. This file asserts the harness's HEADER by regex because a
+  // sentence is all a header is, but a count is behaviour, and a regex proving the arithmetic is
+  // spelled correctly would pass on arithmetic that is wrong.
+  const py = `import importlib.util, sys
+sys.argv = ['h', 'v0.0.0']
+spec = importlib.util.spec_from_file_location('h', ${JSON.stringify(join(root, 'scripts/acceptance/tag-controls.py'))})
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+rows = [(c['row'], c['name'], 't', 'PASS') for c in m.CONTROLS]
+pos = [('ARC-08-C20', 'x', 'y', 'PASS')] * 5
+print(m.totals_line(m.CONTROLS, rows))
+print(m.verdict_line(rows, pos))
+broken = rows[:-2] + [('R', 'x', 'ANCHOR NOT FOUND: foo', 'FINDING'), ('R', 'y', 't', 'FAIL')]
+print(m.totals_line(m.CONTROLS, broken))
+print(m.verdict_line(broken, pos))`;
+  const out = spawnSync('python3', ['-c', py], { encoding: 'utf8' });
+  assert.equal(out.status, 0, `the harness would not import: ${out.stderr}`);
+
+  // CRLF, AND THE ONLY SUBPROCESS IN THIS REPOSITORY THAT PRODUCES IT. This assertion was written
+  // `.trim().split('\n')` and went red on `test (windows-latest, node 24)` while every local gate
+  // was green: Python's text-mode stdout translates `\n` to `\r\n` on Windows, so every line but
+  // the LAST kept a trailing `\r` — `trim()` had cleaned exactly one of four — and a `$`-anchored
+  // match on the first line failed against a string that was otherwise perfectly correct.
+  //
+  // Node writes `\n` on Windows and so does git, which is why the other subprocess splits in this
+  // suite never showed it; this is the one `python3` spawn in the repository. The helper is a
+  // named function rather than an inline split so the CRLF case can be asserted below on a stubbed
+  // string — proving the behaviour on the machine running this, instead of only on Windows.
+  //
+  // ONE MECHANISM, DELIBERATELY. A `.map((l) => l.trim())` here would also strip the `\r` and
+  // would make the control below pass with the split reverted — two mechanisms, one of them
+  // inert, and a control aimed at the wrong half proves nothing. The split owns the line ending.
+  const stdoutLines = (stdout) => String(stdout).split(/\r?\n/).filter(Boolean);
+  assert.deepEqual(stdoutLines('a\r\nb\r\n'), ['a', 'b'],
+    'a CRLF stdout is not split into clean lines — this is the Windows failure, reproduced here');
+
+  const [clean, cleanVerdicts, withFinding, findingVerdicts] = stdoutLines(out.stdout);
+
+  // ASCII, FULL STOP — the second Windows-only defect in this same test, one field over.
+  //
+  // `verdict_line` separated its two tallies with `·` (U+00B7). Python's stdout on the Windows
+  // runner is cp1252, not UTF-8, so the character arrived as `�` and a `$`-anchored match failed
+  // on a line whose NUMBERS were all correct. Same root as the CRLF above: Python's text mode on
+  // Windows, invisible to every gate on this machine.
+  //
+  // These lines are pasted into markdown rows from whatever terminal a maintainer happens to have,
+  // so a line that needs the console's encoding to read back correctly is not a line a row can
+  // quote. The fix is the character, NOT `PYTHONUTF8=1` on this spawn: that would make the test
+  // green while the hand-run harness still emitted a non-portable line — the defect moved out of
+  // sight rather than removed.
+  //
+  // The GUARD, not just the fix: every line the harness prints here is pure printable ASCII, so
+  // the next `·` or em-dash fails here instead of on a Windows runner three PRs later.
+  for (const line of [clean, cleanVerdicts, withFinding, findingVerdicts]) {
+    assert.match(line, /^[\x20-\x7e]+$/,
+      `a totals line is not pure ASCII, so it cannot survive a cp1252 console: ${line}`);
+  }
+
+  // The v2.0.1 shape, which is the line a status row copies.
+  assert.match(clean, /^\d+ controls \/ \d+ patches \/ 0 ANCHOR NOT FOUND$/,
+    `the totals line no longer has the shape a row carries: ${clean}`);
+  assert.match(cleanVerdicts,
+    /^controls: \d+ PASS, 0 FAIL, 0 FINDING \| positive checks: 5 PASS, 0 FAIL$/,
+    `the two tables are no longer tallied apart: ${cleanVerdicts}`);
+
+  // ...AND IT MOVES. A totals line that reports 0 whatever happened would be the defect restated:
+  // one broken anchor and one failing control must both show up, and in the right column.
+  assert.match(withFinding, / 1 ANCHOR NOT FOUND$/,
+    `a broken anchor did not reach the totals line: ${withFinding}`);
+  assert.match(findingVerdicts, /1 FAIL, 1 FINDING/,
+    `a FAIL and a FINDING are not counted separately: ${findingVerdicts}`);
+
+  // The counts are the CONTROLS' own, not a number typed beside them.
+  const n = Number(clean.split(' ')[0]);
+  const src = readFileSync(join(root, 'scripts/acceptance/tag-controls.py'), 'utf8');
+  assert.equal(n, (src.match(/^control\(/gm) ?? []).length,
+    'the controls count disagrees with the number of control() calls in the file');
+
+  // EMITTED, not merely computable — a helper nothing calls is the defect unfixed.
+  assert.match(src, /print\(f'\\n## totals\\n\{totals_line\(CONTROLS, rows\)\}/,
+    'the totals line is computed but never printed');
+
+  // ...AND THE SAME RULE FOR EVERY OTHER LINE THE HARNESS PRINTS, which is what makes the class
+  // impossible rather than findable. The `·` was reported from the totals line, but an em-dash sat
+  // in `gates run with submodules: false — …` one function over, printed by the same run on the
+  // same console and quoted in the same reports — a second instance of the defect that the
+  // behavioural check above would never have reached.
+  //
+  // SOURCE, not output, and deliberately: this asks whether a non-ASCII byte is in a line the
+  // harness can print, which is a question about the file. The behavioural check above already
+  // owns the question the totals lines answer at runtime.
+  const printed = src.split('\n')
+    .map((l, i) => ({ n: i + 1, l }))
+    .filter(({ l }) => /print\(|return \(?f['"]/.test(l))
+    .filter(({ l }) => [...l].some((c) => c.charCodeAt(0) > 126));
+  assert.deepEqual(printed.map(({ n, l }) => `${n}: ${l.trim()}`), [],
+    'a line the harness prints carries a non-ASCII character — it will not survive a cp1252 console');
+});
