@@ -1156,3 +1156,57 @@ test('ARC-07-S11 — a skipped run says why, from a job that is not the skipped 
   assert.match(job, /echo "skipped:/, 'the skip job prints no reason');
   assert.match(job, /\$\{\{ github\.ref \}\}/, 'the reason does not name the ref that was refused');
 });
+
+// ─── The acceptance harness is hand-run, and nothing may schedule it ──────────────────────────
+
+/** Every workflow file, as text, so a reference cannot hide in a job nobody reads. */
+const allWorkflows = () => readdirSync(join(root, '.github/workflows'))
+  .filter((f) => /\.ya?ml$/.test(f))
+  .map((f) => ({ file: f, text: wf(f) }));
+
+test('no workflow references the acceptance harness — it degrades a tree on purpose', () => {
+  // `scripts/acceptance/tag-controls.py` EDITS SOURCE FILES so a named test fails, then restores
+  // them. That is exactly what makes it useful by hand on a tag and unacceptable in CI: a job
+  // running it would be a job that rewrites the repository it is testing, and a job killed halfway
+  // would leave the tree degraded with no one watching. It also clones from the network and runs
+  // the whole suite dozens of times.
+  //
+  // Asserted over the workflow TEXT like every other check in this file, and over EVERY workflow
+  // rather than a list of the ones that exist today — a reference added to a new workflow tomorrow
+  // is the case this is for.
+  const hits = [];
+  for (const { file, text } of allWorkflows()) {
+    text.split('\n').forEach((line, i) => {
+      if (/tag-controls|scripts\/acceptance/.test(line)) hits.push(`${file}:${i + 1}: ${line.trim()}`);
+    });
+  }
+  assert.deepEqual(hits, [], `${hits.length} workflow line(s) reference the hand-run harness`);
+
+  // Not vacuous: there are workflows to scan, and the matcher really does fire.
+  assert.ok(allWorkflows().length >= 5, `only ${allWorkflows().length} workflow(s) scanned`);
+  // `9.9.9` and not the real version: this is fixture text, and a bare literal of the version
+  // the next release carries is exactly what the sweep next door refuses (ARC-09-C12a). It caught
+  // this line on its first full run, which is the sweep earning its place on its author.
+  assert.match('        run: python3 -u scripts/acceptance/tag-controls.py v9.9.9',
+    /tag-controls|scripts\/acceptance/, 'the matcher would not catch a real reference');
+});
+
+test('the acceptance harness says it is hand-run, and can be imported without running', () => {
+  // The header is the only thing standing between a reader and an hour-long networked run that
+  // rewrites files, so the sentences that say so are asserted rather than trusted.
+  const src = readFileSync(join(root, 'scripts/acceptance/tag-controls.py'), 'utf8');
+  // WHITESPACE-COLLAPSED before matching, for the reason `validation-tests-shape` collapses: the
+  // header wraps, so `DELIBERATELY DEGRADES A\nWORKING TREE` contains the sentence and not the
+  // string. This assertion failed on its first run for exactly that, which is the cheapest possible
+  // demonstration that a rule a reflow can break is a rule a reflow will break.
+  const flat = src.replace(/\s+/g, ' ');
+  for (const needed of ['HAND-RUN ONLY', 'NEVER IN CI', 'DELIBERATELY DEGRADES A WORKING TREE',
+    'python3 -u']) {
+    assert.ok(flat.includes(needed), `the harness header no longer says "${needed}"`);
+  }
+  // ARC-08-C25's property, which this file failed while carrying a control that checks it for
+  // everybody else: `main()` ran at module scope and three `sys.argv` reads preceded it, so an
+  // import either raised IndexError or started a network clone.
+  assert.match(src, /if __name__ == '__main__':/, 'the harness runs on import');
+  assert.equal(/^TAG = sys\.argv/m.test(src), false, 'the harness reads argv at module scope');
+});
