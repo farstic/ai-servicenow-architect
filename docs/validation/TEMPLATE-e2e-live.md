@@ -25,7 +25,7 @@
 **The two variable probe results** (an instance without the licence is not a failing test):
 `nowAssist = <ok | not licensed>` · `fluent = <ok | not installed>`
 
-**`script(1)` on this runner:** `<the version line the workflow printed>`
+**Pty driver on this runner (ARC-07-C8 — `pty-driver.py`, not `script(1)`):** `<the python3 version and stdin-tty line the workflow printed>`
 
 **Anything that surprised the runner** — a prompt in a different order, a timing that needed longer
 than the case allowed, a message whose wording has drifted from the story:
