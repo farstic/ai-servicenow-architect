@@ -180,12 +180,27 @@ test('C12a — the next-release sweep is not vacuous, and the target is derived'
   assert.equal(releaseTarget('2.0.0-dev'), '2.0.0');
   assert.equal(releaseTarget('2.0.0-rc.11'), '2.0.0');
   assert.equal(releaseTarget('2.0.0'), '2.0.0');
-  assert.notEqual(releaseTarget(rootVersion), rootVersion,
-    'the target equals the version of record — this sweep is then a duplicate of the one above');
+
+  // ON A PRERELEASE TREE the two sweeps ask about different versions. ON A FINAL ONE they coincide
+  // BY DEFINITION, and that is not a duplicate to be fixed — it is one guard reaching one answer.
+  //
+  // The first version of this line asserted they ALWAYS differ. That is green on `develop` and on
+  // every rc, and red on the single commit that matters: the release commit, where `release.mjs`
+  // writes the final version and then runs this suite (C49) and would refuse to cut. A test that
+  // passes every day and fails the one run that cannot be retried is the exact defect ARC-09-C12a
+  // exists to prevent — written into the test that prevents it. Found by running the tree at the
+  // 2.0.0 final shape, which is now a standing control for anything touching a version test.
+  const target = releaseTarget(rootVersion);
+  if (rootVersion.includes('-')) {
+    assert.notEqual(target, rootVersion,
+      'a prerelease tree must ask about a version other than the one it carries');
+  } else {
+    assert.equal(target, rootVersion,
+      'at a final version the two sweeps legitimately coincide — same guard, same answer');
+  }
 
   // The negative control: a fixture reverted to the 2.x series is caught, and the 9.x convention
   // that replaced it is not.
-  const target = releaseTarget(rootVersion);
   assert.deepEqual(literalLines(`  const block = engineBlock(r, { version: '${target}' });`, target), [1],
     'a fixture spelling the next release is no longer caught');
   assert.deepEqual(literalLines("  const block = engineBlock(r, { version: '9.9.9' });", target), []);
