@@ -404,17 +404,72 @@ export function hostChecks() {
         }
 
         const localTag = describeExact(ctx.root, ctx.exec);
-        const behind = localTag !== latest;
+
+        // AN UNTAGGED HEAD IS A DEVELOPMENT CHECKOUT, NOT A CHECKOUT THAT IS BEHIND.
+        //
+        // This was `const behind = localTag !== latest`, and `describeExact` returns `null` when
+        // HEAD is not exactly on a tag — so every `develop` checkout and every CI bootstrap cell
+        // compared `null !== 'v2.0.0'`, was declared behind, and was told to `./snowarch upgrade`:
+        // to move a development checkout ONTO the release tag, which is the opposite of what the
+        // person wants and would discard what they are working on.
+        //
+        // It was invisible until 2.0.0 existed. Before the cut there was no non-prerelease tag, so
+        // `latest` was null and the check skipped at the branch above — the defect was reachable
+        // only on the one day the product first had a release, and then it reddened every PR.
+        //
+        // `null` is ABSENCE, and a comparison that treats absence as a value is the shape this
+        // programme keeps finding. So absence gets its own answer, in words, with no remedy: there
+        // is nothing to fix on a tree that is deliberately not a release.
+        if (localTag === null) {
+          const head = shortHead(ctx.root, ctx.exec);
+          const written = writeUpgradeCheck(ctx.root,
+            // `behind: false` on purpose: the SessionStart banner nudges on `behind === true` with a
+            // `latestTag`, and a development checkout must not be nagged to upgrade itself away.
+            { latestTag: latest, localTag: null, behind: false, remote, now });
+          return ok(`development checkout${head ? ` at ${head}` : ''}; latest release ${latest}`,
+            { ...written, refreshed: true });
+        }
+
+        // A TAGGED HEAD IS COMPARED BY THE COMPARATOR, NOT BY STRING EQUALITY. `!==` also called a
+        // checkout standing on a tag NEWER than the latest release "behind" — which is what a tag
+        // cut locally before it is pushed is — and ARC-09-S12 exists because string comparison of
+        // versions is wrong in this repository specifically (`rc.10` sorted below `rc.9`).
+        const { compareSemver } = await import('../../semver.mjs');
+        let behind;
+        try {
+          behind = compareSemver(localTag, latest) < 0;
+        } catch {
+          // A tag this product cannot order — someone else's naming on the same commit. Not a
+          // currency answer, and not an invented one: say so and compare nothing.
+          const written = writeUpgradeCheck(ctx.root,
+            { latestTag: latest, localTag, behind: false, remote, now });
+          return skip(`HEAD is at "${localTag}", which is not a version this product can order; `
+            + `latest release ${latest}`, { ...written, refreshed: true });
+        }
         const written = writeUpgradeCheck(ctx.root,
           { latestTag: latest, localTag, behind, remote, now });
 
         return behind
           ? warn(`${latest} available — run ./snowarch upgrade`,
             { command: './snowarch upgrade', data: { ...written, refreshed: true } })
-          : ok(`up to date (${latest})`, { ...written, refreshed: true });
+          : ok(`up to date (${localTag})`, { ...written, refreshed: true });
       },
     }),
   ];
+}
+
+/**
+ * The short sha of HEAD, or `null`.
+ *
+ * Only ever used to SAY WHERE a development checkout is. `null` when git cannot answer — a tarball
+ * with no `.git`, or a repository with no commits — and the sentence then simply omits it rather
+ * than printing `at null`, which is a sentence about this function rather than about the checkout.
+ */
+function shortHead(root, exec = execFileSync) {
+  try {
+    return String(exec('git', ['rev-parse', '--short', 'HEAD'],
+      { cwd: root, encoding: 'utf8', stdio: 'pipe' })).trim() || null;
+  } catch { return null; }
 }
 
 /** The tag this checkout is exactly on, or `null`. Never a guess from a nearby one. */

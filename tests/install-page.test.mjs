@@ -84,7 +84,14 @@ test('criterion 4 — none of P-02\'s words appear on either page', () => {
 });
 
 test('...and the two the README must contain', () => {
-  assert.match(read('docs/README-head.md'), /2\.0\.0/, 'the head carries no version');
+  // READ, NEVER SPELLED (ARC-09-C12a). This was `/2\.0\.0/`, and it failed the moment `develop`
+  // moved to `2.0.1-dev` — the post-release bump, which is the one edit guaranteed to happen after
+  // every release. It was also INVISIBLE to the version sweep: `literalLines` looks for the version
+  // as a literal string, and an escaped-dot regex is not one. That is `predecessor-notice`'s blind
+  // spot in a second file, and the reason the rule is "read it" rather than "spell it carefully".
+  const rootVersion = JSON.parse(read('package.json')).version;
+  assert.ok(read('docs/README-head.md').includes(rootVersion),
+    `the head does not carry the root version ${rootVersion}`);
   // D-02. The licence line is the tail's — it is the README's statement, not an install step — and
   // the head names it too, which is where a reader looks first.
   assert.match(read('docs/README-tail.md'), /Apache-2\.0/);
