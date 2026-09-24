@@ -372,3 +372,123 @@ test('ARC-09-C53 — a cache written AT the start instant counts as this run', a
   const modes = await u7With(t, { cacheAt: '2026-09-24T12:00:00.000Z', modeLine: fresh });
   assert.deepEqual(modes, [fresh]);
 });
+
+// ─── ARC-09-C56 — the non-ok lines come from the same cache, for the same reason ───────────────
+//
+// C53 fixed the Mode line and left the lines under it reading from the masked `--json` stdout. The
+// spike (docs/spikes/nonoklines-mask-options.md) measured what that costs, and the REMEDY is the
+// sharper half — C53 recorded this as a masked *detail*, which under-reported it:
+//
+//   today   SV-03 WARN instances: instances: <label>: … — ./snowarch instance test <label>
+//   truth   SV-03 WARN instances: instances: pdi: …     — ./snowarch instance test pdi
+//
+// A detail that says `<label>` is a fact rendered vaguely. A REMEDY that says `<label>` is a
+// command-shaped string that fails when pasted, in the one place the product is telling somebody
+// what to do next. `./snowarch instance test <label>` is not a command.
+//
+// Same cache, same four-condition binding, ONE definition of freshness — not a second rule. The
+// tally still comes from the parsed stdout, because a tally is a count and carries no label: the
+// split B09 gets right, and the one U7 got wrong twice.
+
+/** A cache whose checks carry what THIS machine's doctor actually saw — labels and all. */
+function treeWithCachedChecks(t, checks, { at = '2026-09-24T12:00:00.000Z' } = {}) {
+  const root = tempDir('snowarch-u7-checks-', t);
+  mkdirSync(join(root, dirname(CACHE_FILE)), { recursive: true });
+  writeFileSync(join(root, CACHE_FILE), JSON.stringify({
+    version: 1, at, writer: 'doctor', mode: 'live', modeLine: REAL,
+    checks, summary: { ok: 14, warn: checks.length, fail: 0, skip: 25 },
+  }));
+  return root;
+}
+
+/** The cached copy: unmasked, and WITHOUT `title` — the cache stores `{id,status,detail,remedy?}`. */
+const CACHED_SV03 = { id: 'SV-03', status: 'warn',
+  detail: 'instances: pdi: flags explicit, preset custom',
+  remedy: './snowarch instance test pdi' };
+
+/** What the doctor's `--json` stdout carries for the same check: masked by value, title included. */
+const MASKED_SV03 = { id: 'SV-03', status: 'warn', title: 'instances',
+  detail: 'instances: <label>: flags explicit, preset custom',
+  remedy: './snowarch instance test <label>' };
+
+/** U7 with a cache and a stdout that DISAGREE — which copy reaches the terminal is the whole test. */
+async function u7Checks(t, { cached = [CACHED_SV03], stdout = [MASKED_SV03],
+  doctorStatus = 0, cacheError = null, at = '2026-09-24T12:00:00.000Z' } = {}) {
+  const root = treeWithCachedChecks(t, cached, { at });
+  const lines = [];
+  const log = { step: (l) => lines.push(l), fail: (l) => lines.push(l), warn: (l) => lines.push(l) };
+  const run = (_cmd, args) => (args.includes('doctor')
+    ? { status: doctorStatus,
+      stdout: doctorStatus === 0
+        ? JSON.stringify({ mode: 'live', modeLine: MASKED,
+          summary: { ok: 14, warn: stdout.length, fail: 0, skip: 25 }, checks: stdout,
+          ...(cacheError ? { cacheError } : {}) })
+        : '' }
+    : { status: 0 });
+  await finish({ root, env: {}, log, run, target: 'v9.1.0', latest: 'v9.1.0', remote: 'origin',
+    now: () => new Date('2026-09-24T12:00:00.000Z'), state: { mode: 'live' } });
+  return lines;
+}
+
+test('ARC-09-C56 — the remedy U7 prints is one a user can paste', async (t) => {
+  const lines = await u7Checks(t);
+  const sv03 = lines.find((l) => l.startsWith('SV-03')) ?? '';
+  assert.notEqual(sv03, '', `U7 printed no SV-03 line at all: ${JSON.stringify(lines)}`);
+
+  // THE POINT OF THE ROW: the remedy is text the reader is meant to TYPE.
+  assert.match(sv03, /— \.\/snowarch instance test pdi$/,
+    `the remedy is not pasteable — it still carries the JSON boundary's mask: ${sv03}`);
+  assert.equal(sv03.includes('<label>'), false,
+    `a mask reached the user's own terminal: ${sv03}`);
+
+  // The title is the registry's, resolved by id, because the cache does not store it.
+  assert.equal(sv03,
+    'SV-03 WARN instances: instances: pdi: flags explicit, preset custom '
+    + '— ./snowarch instance test pdi');
+});
+
+test('ARC-09-C56 — the tally still comes from the run, not from the cache', async (t) => {
+  // A tally is a count and carries no label, so it has no reason to move — and if it did, it would
+  // be the CACHE's tally, which is a different run's. This is the half C53 got right.
+  const lines = await u7Checks(t);
+  assert.ok(lines.includes('DOCTOR: 14 ok, 1 warn, 0 fail (25 skip)'),
+    `the tally moved or changed: ${JSON.stringify(lines.filter((l) => l.startsWith('DOCTOR')))}`);
+});
+
+test('ARC-09-C56 — a check the registry cannot name prints its id, never `undefined`', async (t) => {
+  // The bounded risk the spike measured: `registry.mjs` refuses id reuse, so an unresolvable id can
+  // only ever mean a RETIRED check — never the wrong title. The fallback is one line.
+  const retired = { id: 'SV-99', status: 'warn', detail: 'a check that no longer exists',
+    remedy: './snowarch doctor' };
+  const lines = await u7Checks(t, { cached: [retired], stdout: [{ ...retired, title: 'gone' }] });
+  const sv99 = lines.find((l) => l.startsWith('SV-99')) ?? '';
+  assert.notEqual(sv99, '', `the retired check lost its line entirely: ${JSON.stringify(lines)}`);
+  assert.equal(sv99.includes('undefined'), false, `\`undefined\` reached the terminal: ${sv99}`);
+  assert.equal(sv99, 'SV-99 WARN: a check that no longer exists — ./snowarch doctor');
+});
+
+// The four-condition binding is C53's, reused — not restated. Each case is a way the cached lines
+// could be about a DIFFERENT run, and the answer is the masked stdout rather than a wrong label:
+// a mask is vague, a stale label is false.
+
+test('ARC-09-C56 — a doctor that FAILED does not get yesterday\'s non-ok lines', async (t) => {
+  const lines = await u7Checks(t, { doctorStatus: 1 });
+  assert.equal(lines.some((l) => l.includes('pdi')), false,
+    `a failed doctor printed the cache's labels as this run's: ${JSON.stringify(lines)}`);
+});
+
+test('ARC-09-C56 — a cacheError means the cache is not this run\'s, lines included', async (t) => {
+  const lines = await u7Checks(t, { cacheError: 'EACCES: permission denied' });
+  const sv03 = lines.find((l) => l.startsWith('SV-03')) ?? '';
+  assert.equal(sv03.includes('pdi'), false,
+    `the old cache's labels were printed after a cacheError: ${sv03}`);
+});
+
+test('ARC-09-C56 — a cache older than this run is not this run', async (t) => {
+  const lines = await u7Checks(t, { at: '2026-09-23T09:00:00.000Z' });
+  const sv03 = lines.find((l) => l.startsWith('SV-03')) ?? '';
+  assert.equal(sv03.includes('pdi'), false,
+    `yesterday's labels were printed as this run's measurement: ${sv03}`);
+  // ...and the line is still THERE, from the stdout — silence would lose the check entirely.
+  assert.match(sv03, /^SV-03 WARN/, `the check lost its line instead of falling back: ${sv03}`);
+});

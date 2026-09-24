@@ -36,6 +36,7 @@ import { loadState } from '../state.mjs';
 import { STEPS } from '../steps/index.mjs';
 import { makeExec } from '../steps/B00.mjs';
 import { nodeInfo, stepContext } from '../bootstrap.mjs';
+import { engineChecks } from '../doctor/checks/index.mjs';
 import { nonOkLines } from '../doctor/panel.mjs';
 import { formatVersion, meetsFloor } from '../versions.mjs';
 import { writeUpgradeCheck } from '../upgrade-check.mjs';
@@ -60,35 +61,80 @@ import { hashFor, INPUTS, STEP_IDS } from '../inputs.mjs';
  * recovered, because the tally was all that reached the transcript. A run of this command is
  * evidence about a warning as often as about a failure.
  */
-export function doctorLines(report) {
+export function doctorLines(report, checks = null) {
   if (!report?.summary) return [];
   const { ok = 0, warn = 0, fail = 0, skip = 0 } = report.summary;
-  return [`DOCTOR: ${ok} ok, ${warn} warn, ${fail} fail (${skip} skip)`, ...nonOkLines(report)];
+  // THE TALLY AND THE WORDS COME FROM DIFFERENT PLACES (ARC-09-C56). The tally is a count and
+  // carries no label, so it stays with the run that measured it; taking it from `checks` would be
+  // taking a different run's arithmetic. The words are this terminal's, when we have that copy.
+  const source = checks ? { checks } : report;
+  return [`DOCTOR: ${ok} ok, ${warn} warn, ${fail} fail (${skip} skip)`, ...nonOkLines(source)];
 }
 
 /**
- * The Mode line the doctor wrote for THIS MACHINE, or `null`.
+ * The doctor cache, but only if THIS RUN wrote it — otherwise `null`.
  *
  * Read from `.local/doctor-last.json`, which `doctor/index.mjs` writes from the unmasked report —
- * the `--json` on stdout is masked at the boundary for a different audience. Returns `null` on any
- * unreadable or shapeless cache: a caller that prints nothing is honest, and one that falls back to
- * the masked line prints `<label>` as though it were the instance's name.
+ * the `--json` on stdout is masked at the boundary for a different audience.
+ *
+ * ONE DEFINITION OF FRESHNESS. Both readers below are about the same file, the same run and the
+ * same question, so the age test lives here once. A second freshness rule beside this one is how
+ * two readers of one cache drift into disagreeing about which run they are describing.
  */
-export function readCachedModeLine(root, { read = readFileSync, notBefore = null } = {}) {
+function readCacheThisRun(root, { read = readFileSync, notBefore = null } = {}) {
   try {
     const cache = JSON.parse(read(join(root, CACHE_FILE), 'utf8'));
-    const line = cache?.modeLine;
-    if (typeof line !== 'string' || line.length === 0) return null;
     // WHICH RUN WROTE IT. Every bootstrapped tree has a cache from an earlier doctor, so a read with
-    // no notion of when would hand back yesterday's line — tally and all — as this run's answer.
+    // no notion of when would hand back yesterday's answer — tally and all — as this run's.
     // `>=` and not `>`: the doctor stamps the cache from its own clock, and a run fast enough to
     // land on the start instant is this run, not a stale one.
     if (notBefore !== null) {
       const at = Date.parse(cache?.at ?? '');
       if (!Number.isFinite(at) || at < notBefore) return null;
     }
-    return line;
+    return cache;
   } catch { return null; }
+}
+
+/**
+ * The Mode line the doctor wrote for THIS MACHINE, or `null`.
+ *
+ * Returns `null` on any unreadable or shapeless cache: a caller that prints nothing is honest, and
+ * one that falls back to the masked line prints `<label>` as though it were the instance's name.
+ */
+export function readCachedModeLine(root, { read = readFileSync, notBefore = null } = {}) {
+  const line = readCacheThisRun(root, { read, notBefore })?.modeLine;
+  return typeof line === 'string' && line.length > 0 ? line : null;
+}
+
+/**
+ * The non-ok checks the doctor cached for THIS MACHINE, titled, or `null` (ARC-09-C56).
+ *
+ * The cache stores `{id, status, detail, remedy?}` and DROPS `title`, so the title is resolved by
+ * id from the registry that owns it. A copy of the titles kept beside the registry would be the
+ * second copy of a sentence this repository keeps removing.
+ *
+ * There IS a titled copy in the cache — `payload.report` mirrors the whole stored report — but it
+ * is not in `COMPATIBILITY_KEYS`, which pins `checks` and not `report`. Reading the mirror would
+ * build a user-facing line on a key nothing promises to keep.
+ *
+ * An id the registry cannot name falls back to the id alone. `registry.mjs` refuses id reuse
+ * ("ids are never reused"), so an unresolvable id can only ever mean a RETIRED check — never the
+ * wrong title — and `SV-99 WARN: <detail>` is a true line where `undefined` is a broken one.
+ */
+export function readCachedChecks(root, { read = readFileSync, notBefore = null,
+  titles = checkTitles } = {}) {
+  const checks = readCacheThisRun(root, { read, notBefore })?.checks;
+  if (!Array.isArray(checks) || checks.length === 0) return null;
+  const byId = titles();
+  return checks.map((c) => ({ ...c, title: byId.get(c.id) ?? null }));
+}
+
+/** `id → title`, from the registry that defines them. Built once; the registry is static. */
+let TITLES = null;
+function checkTitles() {
+  if (TITLES === null) TITLES = new Map(engineChecks().map((c) => [c.id, c.title]));
+  return TITLES;
 }
 
 /** `--check` found a newer release. A code, so a script can ask without parsing prose. */
@@ -645,7 +691,6 @@ export async function finish({ root, env, log, run, target, latest, remote, now,
   { cwd: root, encoding: 'utf8', env: childEnv(root, env), stdio: ['ignore', 'pipe', 'pipe'] });
   let report = null;
   try { report = JSON.parse(doctor.stdout ?? ''); } catch { report = null; }
-  for (const line of doctorLines(report)) log.step(line);
 
   // THE MODE LINE COMES FROM THE CACHE, NOT FROM THE `--json` STDOUT WE JUST PARSED.
   //
@@ -673,6 +718,21 @@ export async function finish({ root, env, log, run, target, latest, remote, now,
   // its report parsed, it did not report a `cacheError` (it tried to write and could not), and the
   // file is stamped at or after the moment we started it. Otherwise silence.
   const wroteThisRun = doctor.status === 0 && report !== null && !report.cacheError;
+
+  // ARC-09-C56 — the lines UNDER the tally are this terminal's copy too, under the same binding.
+  //
+  // C53 fixed the Mode line and left these reading the masked stdout, and the REMEDY is the sharper
+  // half of what that costs: a detail saying `<label>` is a fact rendered vaguely, but a remedy
+  // saying `./snowarch instance test <label>` is a command-shaped string that FAILS when pasted —
+  // in the one place the product is telling somebody what to do next.
+  //
+  // Falling back to the stdout rather than to silence, which is the opposite of the Mode line's
+  // answer and deliberately so: a masked LINE still names the check, its status and its remedy's
+  // shape, so it degrades to vague-but-true. A masked Mode line degrades to false, because
+  // `instance=<label>` reads as the instance's name. Silence costs a reader the check entirely.
+  const cachedChecks = wroteThisRun ? readCachedChecks(root, { notBefore: startedAt }) : null;
+  for (const line of doctorLines(report, cachedChecks)) log.step(line);
+
   const cachedModeLine = wroteThisRun ? readCachedModeLine(root, { notBefore: startedAt }) : null;
   if (cachedModeLine) log.step(cachedModeLine);
 
