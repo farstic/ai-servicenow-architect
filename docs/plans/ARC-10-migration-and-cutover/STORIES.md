@@ -25,7 +25,7 @@ Status: Draft (verified 2026-09-04 — cross-ARC story ids corrected, ARC-08 reg
 | ARC-10-S03 | Retire the legacy scaffolding: `scripts/legacy/`, obsolete `.gitignore` lines, empty legacy-name allow-list | S | ARC-02-S12, ARC-04-S01/S14, ARC-09-S02 | A tree with no parked legacy scripts; ratchet test passes with an empty allow-list |
 | ARC-10-S04 | Rewrite the standing rule and the field-notes policy (DR-16) in `CLAUDE.md` and `docs/CONTRIBUTING.md` | S | ARC-02-S08, ARC-02-S10, ARC-04-S14 | The three-way "where a finding goes" rule; the 2026-06-08 exclusion lapses |
 | ARC-10-S05 | `docs/ARCHITECTURE.md` "History" section: import tags, ADR links, scope-cut ledger pointer, old-repository links | S | ARC-01-S12, ARC-00-S03 | The only product page that names the past, with resolvable tags and links |
-| ARC-10-S06 | Author's machine cutover on `v2.0.0`: doctor 0 FAIL, stale entries removed, legacy store gone, engagements untracked | M | S01–S05, ARC-09-S01 (`v2.0.0` tag), ARC-07-S08, ARC-08-S03 | README acceptance criterion 1 met; MIGRATION.md corrected from the dogfood run |
+| ARC-10-S06 | Author's machine cutover on the current release tag: doctor 0 FAIL, stale entries removed, legacy store gone, engagements untracked | M | S01–S05, ARC-09-S01 (`v2.0.0` tag), ARC-07-S08, ARC-08-S03 | README acceptance criterion 1 met; MIGRATION.md corrected from the dogfood run |
 | ARC-10-S07 | Validation-record template, redaction lint and the cutover test list (T-01…T-18 + `AUTHENTICATION_FAILED` + design-only) | M | ARC-02-S13, ARC-08-S10 (T-19/T-20), ARC-01-S11 | `docs/validation/TEMPLATE.md`; `tests/validation-records.test.mjs`; the exact list of tests each machine runs |
 | ARC-10-S08 | Clean-machine validation runs: macOS, Ubuntu, Windows in `design-only`; one `live` (`pdi-developer`); one proxied laptop | L | S06, S07, ARC-09-S03 (release assets) & S08 (CI matrix), ARC-07-S02, ARC-04-S11 | Committed records under `docs/validation/`; README acceptance criterion 2 met; Q-B outcome recorded |
 | ARC-10-S09 | Deprecation notices in `farstic/claude-servicenow-live` and `farstic/snow-mcp`; archive checklist for the owner | S | S08, ARC-09-S01, ARC-04-S14 (CHANGELOG 2.0.0 section the notice links) | Notices live on GitHub; owner checklist with the two-week archive date; npm record untouched |
@@ -426,7 +426,7 @@ Test: `tests/architecture-history.test.mjs` — runs `git tag -l 'import/*'` and
 
 ---
 
-### ARC-10-S06 — Author's machine cutover on `v2.0.0`: doctor 0 FAIL, stale entries removed, legacy store gone, engagements untracked
+### ARC-10-S06 — Author's machine cutover on the current release tag: doctor 0 FAIL, stale entries removed, legacy store gone, engagements untracked
 
 **As** the author (first user) **I want** to follow `docs/MIGRATION.md` literally on my own machine, from the real old setup to the tagged product **so that** the page is proven on the one machine that has every leftover the plan describes, and the acceptance criterion for an existing user's machine is met before anyone else is asked to migrate.
 
@@ -464,8 +464,23 @@ Context-mode: the author decides; either outcome is recorded in the run log as "
 
 Run log: `docs/validation/<date>-author-cutover.md` using the S07 template, section "Existing-user cutover" — counts and check outcomes only; no path under the home directory, no hostname, no username.
 
+**OPEN OWNER DECISION — which stale registrations S06 actually removes.** Recorded here rather than resolved: it is the owner's, and it is taken at the sitting.
+
+On 2026-09-24 the owner ruled that the five registrations under OTHER folders — three `nowaikit`, one `servicenow-mcp` under a test folder, one `context-mode` — **stay as they are**.
+
+The two sides, quoted rather than paraphrased:
+
+- **`docs/MIGRATION.md` step 6** is imperative — *"Remove the stale registrations"* — and gives the `cd <folder> && claude mcp remove <key> -s local` commands for each.
+- **README acceptance criterion 1** is NOT: *"…lists no entry for the new checkout and the old entries **the author chose to remove** are gone"*. Acceptance criterion 2 of this story is the same shape, and goes further — *"the run log states how many were removed and how many, if any, were **deliberately kept**"*.
+
+**So the plan already provides for a deliberate keep, and the conflict is narrower than it looks**: nothing in the acceptance criteria is violated by keeping an entry, provided the run log says which and how many. What is genuinely open is the page's imperative against the owner's ruling, and that is a question about which entries — not about whether the criteria permit any to survive.
+
+**The architect's recommendation, as a recommendation and not a default:** remove the three `nowaikit` entries and the `servicenow-mcp` one during S06 — they are the P-34 residue this arc exists to clear, and removing a registration edits `~/.claude.json`, never the folders themselves — and keep `context-mode`, which is a different product. Conditional on the owner still using none of those folders as MCP hosts.
+
+Whatever is decided, the run log records the count removed and the count kept, which is what acceptance criterion 2 asks for either way.
+
 **Acceptance criteria.**
-1. Given the author's machine in its pre-state, when `docs/MIGRATION.md` is followed on `v2.0.0`, then `./snowarch doctor` exits 0 with `0 fail` in the `DOCTOR:` line, E-23 and E-24 report ok, and `./snowarch doctor --json | jq '.stale'` shows `claudeJsonEntries: []` and `legacyStore: null`.
+1. Given the author's machine in its pre-state, when `docs/MIGRATION.md` is followed on the current release tag (`v2.0.2` at the time of writing — the run is on whatever tag is current on the day, not on `v2.0.0`, which is two releases back), then `./snowarch doctor` exits 0 with `0 fail` in the `DOCTOR:` line, E-23 and E-24 report ok, and `./snowarch doctor --json | jq '.stale'` shows `claudeJsonEntries: []` and `legacyStore: null`.
 2. `jq '.projects | to_entries[] | select(.value.mcpServers != null) | .key' ~/.claude.json` lists no entry for the new checkout, and every old entry the author chose to remove is absent (the run log states how many were removed and how many, if any, were deliberately kept).
 3. `~/.config/servicenow-mcp/` is absent; `~/.claude.json.bak-*` count is 0.
 4. Engagement folders are present under `clients/` (`ls clients/` non-empty), `git status --porcelain clients/` prints nothing and `git status --porcelain --ignored clients/` prints exactly `!! clients/`; `diff ~/clients-before.sha256 ~/clients-after.sha256` (Windows: `Compare-Object` on the two CSVs) prints nothing.
@@ -473,7 +488,20 @@ Run log: `docs/validation/<date>-author-cutover.md` using the S07 template, sect
 6. Every deviation from the page needed during the run is either fixed in `docs/MIGRATION.md` (follow-up PR merged) or filed as an issue against the owning ARC; the run log lists them.
 7. The run log passes `tests/validation-records.test.mjs` (S07 redaction lint).
 
-**Tasks.** 1. Rehearse in a temporary `HOME` on the RC. 2. Fix the page. 3. Tag lands (ARC-09). 4. Real run; tick the checklist. 5. Post-state checks; write the run log. 6. Follow-up PR for page corrections.
+**Rehearsal (the architect's, before the owner's run).** The page is rehearsed on the tag in a COPIED home — `HOME=$(mktemp -d)` holding copies of `~/.claude.json` and, if present, `~/.config/servicenow-mcp` — so the owner's real file is never the thing being learned on, and **every deviation found is a PR against the page before the sitting, not a note read out during it**. The copy is deleted afterwards: it holds env credential keys, and nothing from it is recorded anywhere.
+
+Rehearsed 2026-09-24 on `develop` c69f9da. **No page defect found; steps 2, 5 and 6 were followed as written with zero deviations.**
+
+- **Step 3 does not apply on this machine.** `~/.config/servicenow-mcp` is absent, so there is no legacy store to migrate and the instance is added fresh at the sitting. That is this machine's shape, not a defect in the page.
+- **The copied home moves exactly one check: E-00.** Under it, B00 warns `Claude Code is not logged in`, because login state does not live in `.claude.json` alone. No other check moves. `./bootstrap.sh --yes`: B01 ok, docs 28.5 s (pin df4afac, sparse, complete), B03/B05/B07/B09 ok, `DOCTOR: 14 ok, 1 warn, 0 fail`, `Mode: design-only`. Without `--yes` and with no TTY it stops at the plan prompt, which is the prompt behaving correctly.
+- **Step 6 is rehearsable without a login.** `claude mcp remove <key> -s local`, run from each entry's own folder, edits the copied file (`File modified: <copy>/.claude.json`) despite the E-00 warning. Four old-name entries removed — `nowaikit` ×3 from three old folders, `servicenow-mcp` from one.
+- **Doctor across the rehearsal:** 28 ok / 2 warn (E-00 + E-23) / 0 fail after bootstrap; **29 ok / 1 warn (E-00 only) / 0 fail** after step 6, with E-23 ok. The copy went 6 → 5 → 1 entries, the survivor being `context-mode`.
+- **The owner's real file was never touched.** `~/.claude.json` stayed at 6 entries throughout, verified after every step.
+- **One finding, and it is a doctor row rather than a page defect** (ARC-08): E-23 does not report an orphan registration under the product's OWN key. The copy carried a `servicenow` entry under a folder that no longer exists, and E-23 named the four old-name entries and never mentioned it. The page's re-create-the-folder recipe removed it exactly as written — the page is right; the check is blind to the case.
+
+Steps 1, 4, 7, 8, 9 and the Verify section are the owner's real run and are not rehearsable: they need the owner's own machine and a live instance.
+
+**Tasks.** 1. Rehearse in a copied `HOME` on the tag (architect; done 2026-09-24, above). 2. Fix the page. 3. Tag lands (ARC-09). 4. Real run; tick the checklist. 5. Post-state checks; write the run log. 6. Follow-up PR for page corrections.
 
 **Test strategy.** Manual end-to-end on macOS (the author's machine); the run log is the evidence; the redaction lint runs in CI on the log.
 
