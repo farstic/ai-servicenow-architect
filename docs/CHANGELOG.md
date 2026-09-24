@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.2 — 2026-09-24
+
+### Notes
+
 A patch release, and a small one. Nothing here changes how the product is installed or configured,
 and there is no migration step.
 
@@ -59,6 +63,21 @@ Named while fixing the row above and queued as its own row rather than added to 
 - **ARC-09-C55** — the `E-28` development-checkout fix from v2.0.1 gains the status row the standing
   rule requires in the same pull request as the fix. The fix shipped without one; the row says so
   rather than filling the gap quietly.
+
+### Fixed
+
+- doctor: E-30 reports an orphan registration, and its detail reaches the terminal (e547dff)
+- tests: the harness prints ASCII, and a guard makes the class impossible (a8b228c)
+- engine: U7 prints a remedy a user can paste, not the JSON boundary's mask (dc06fbe)
+
+### Internal
+
+- changelog: the 2.0.2 release notes (05fbf23)
+- doctor: name the mechanism that keeps textDetail out of the report (7ca141e)
+- plan: ARC-10's remaining halves get dates, and S06 records its rehearsal (4db34ac)
+- plan: ARC-09-C55 records the E-28 development-checkout fix and its control (0ed4f1d)
+
+Tag v2.0.2 · contract 07b2f19343f5 · docs-pin df4afac
 
 ## 2.0.1 — 2026-09-24
 
