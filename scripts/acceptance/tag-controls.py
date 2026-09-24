@@ -411,6 +411,44 @@ control('ARC-07-C7', "the schedule's checkout ref removed (back to aiming at mai
         'the schedule tests develop')
 
 
+def totals_line(controls, rows):
+    """`39 controls / 39 patches / 0 ANCHOR NOT FOUND` — the run's own count of itself.
+
+    ARC-09-C57. These three numbers are what a status row carries, and until now none of them was
+    printed: the v2.0.1 measurement got them by importing CONTROLS and matching (row, name) pairs
+    against the emitted table. A number arrived at by re-deriving it from the artefact is not the
+    artefact's answer — it is a second implementation of the count, written by the reader, at the
+    moment they are least able to check it. ANCHOR NOT FOUND was the worst of the three: it was
+    observable only as the ABSENCE of a verdict nobody had listed, so "0" and "I did not look"
+    rendered identically.
+
+    Counted from `rows` rather than tracked in a parallel tally, for the reason `summarise()` counts
+    the checks it was handed: a count kept beside the thing it counts is a count that can disagree.
+    """
+    patches = sum(len(c['patches']) for c in controls)
+    missing = len([r for r in rows if str(r[2]).startswith('ANCHOR NOT FOUND')])
+    return f'{len(controls)} controls / {patches} patches / {missing} ANCHOR NOT FOUND'
+
+
+def verdict_line(rows, positives):
+    """`controls: 39 PASS, 0 FAIL, 0 FINDING · positive checks: 5 PASS, 0 FAIL`.
+
+    The same argument as above, for the same reason: the two tables are printed separately and were
+    tallied by hand. The split matters — a positive check and a control failing mean different
+    things — so the line keeps them apart rather than reporting one number for both.
+    """
+    def tally(rs):
+        seen = {}
+        for r in rs:
+            seen[r[3]] = seen.get(r[3], 0) + 1
+        return seen
+
+    c, p = tally(rows), tally(positives)
+    return (f"controls: {c.get('PASS', 0)} PASS, {c.get('FAIL', 0)} FAIL, "
+            f"{c.get('FINDING', 0)} FINDING"
+            f" | positive checks: {p.get('PASS', 0)} PASS, {p.get('FAIL', 0)} FAIL")
+
+
 def main(TAG, SOURCE, KEEP):
     work = tempfile.mkdtemp(prefix='rc-controls-')
     clone = os.path.join(work, 'clone')
@@ -451,7 +489,7 @@ def main(TAG, SOURCE, KEEP):
     version_of_record = json.loads(
         open(os.path.join(clone, 'package.json'), encoding='utf-8').read())['version']
     print(f'version of record on this tree: {version_of_record}')
-    print('gates run with submodules: false — the condition release.yml verify uses\n')
+    print('gates run with submodules: false -- the condition release.yml verify uses\n')
     code, out = run('npm ci --ignore-scripts', clone, env, 3600)
     print(f'npm ci: exit {code}\n')
     if code:
@@ -608,6 +646,9 @@ def main(TAG, SOURCE, KEEP):
     print(f'|---|---|---|---|')
     for r in rows:
         print(f'| {r[0]} | {r[1]} | `{r[2]}` | **{r[3]}** |')
+
+    # ARC-09-C57 — the run counts itself, so a status row quotes a number rather than deriving one.
+    print(f'\n## totals\n{totals_line(CONTROLS, rows)}\n{verdict_line(rows, positives)}')
 
     c, o = run(['git', 'status', '--porcelain'], clone)
     n = len([l for l in o.splitlines() if l.strip()])

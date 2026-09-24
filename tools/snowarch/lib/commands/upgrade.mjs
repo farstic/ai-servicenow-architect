@@ -118,9 +118,12 @@ export function readCachedModeLine(root, { read = readFileSync, notBefore = null
  * is not in `COMPATIBILITY_KEYS`, which pins `checks` and not `report`. Reading the mirror would
  * build a user-facing line on a key nothing promises to keep.
  *
- * An id the registry cannot name falls back to the id alone. `registry.mjs` refuses id reuse
- * ("ids are never reused"), so an unresolvable id can only ever mean a RETIRED check — never the
- * wrong title — and `SV-99 WARN: <detail>` is a true line where `undefined` is a broken one.
+ * An id the registry cannot name is left WITHOUT a title, and `nonOkLines` is what omits it from
+ * the line — the `?? null` below is a normalisation, not the fallback, and degrading it proves
+ * nothing because `undefined` is as falsy as `null` at the template that reads it. `registry.mjs`
+ * refuses id reuse ("ids are never reused"), so an unresolvable id can only ever mean a RETIRED
+ * check — never the wrong title — and `SV-99 WARN: <detail>` is a true line where `undefined` is
+ * a broken one.
  */
 export function readCachedChecks(root, { read = readFileSync, notBefore = null,
   titles = checkTitles } = {}) {

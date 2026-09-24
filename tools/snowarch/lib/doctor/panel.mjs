@@ -202,7 +202,9 @@ export function nonOkLines(parsed, statuses = ['fail', 'warn']) {
   const checks = parsed?.checks ?? [];
   return statuses.flatMap((status) => checks
     .filter((c) => c.status === status)
-    // A TITLE MAY BE ABSENT (ARC-09-C56). U7 reads these from the doctor cache, which stores
+    // A TITLE MAY BE ABSENT, AND THIS CONDITIONAL IS THE FALLBACK (ARC-09-C56) — not the `?? null`
+    // at the caller's lookup, which only normalises `undefined` to `null` and is equally falsy
+    // here. U7 reads these from the doctor cache, which stores
     // `{id,status,detail,remedy?}` and drops `title`; its caller resolves what it can by id and
     // leaves `null` for a retired check. `SV-99 WARN: <detail>` is a true line — the id and the
     // detail are the check — where `SV-99 WARN undefined: <detail>` is a broken one.
