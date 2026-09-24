@@ -1359,6 +1359,16 @@ The checklist, verbatim — paste it into the release pull request's description
 >    `tests/version-consistency.test.mjs` is the check that every carrier agreed; run it before
 >    committing. One commit, `chore(release): develop to <next>-dev`, straight to a pull request
 >    like any other.
+>
+>    **And port the release commit's `docs/CHANGELOG.md` back in the same pull request.**
+>    `release.mjs` writes the released section on the release branch, which is not an ancestor of
+>    `develop`; bringing back the version bump alone leaves the released notes sitting under
+>    `## Unreleased`, where `writeChangelog` carries them into the NEXT release's section. Preparing
+>    v2.0.1 found exactly that: `develop` had no `## 2.0.0` section at all, and its `## Unreleased`
+>    → `### Notes` was byte-identical to v2.0.0's, so the cut would have published 2.0.0's notes
+>    under 2.0.1's heading and a changelog with no 2.0.0 in it. `tests/changelog.test.mjs`'s
+>    *a released version has its section here, and its notes left Unreleased* is the guard, and it
+>    defers when the clone has no tags rather than passing quietly.
 
 **Step 2 is two-phase because it has to be.** `main` is protected by required status checks with
 `strict: true` — **54** of them after this milestone, generated into

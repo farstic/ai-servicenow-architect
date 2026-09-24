@@ -8,7 +8,7 @@
 // touched at all.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -506,4 +506,54 @@ test('FROZEN_HEADING has at least one importer, so the constant is not dead on e
     + 'this test exists to prevent');
   // ...and this file is one of them, or the count is about somebody else's discipline.
   assert.ok(importers.includes('tests/changelog.test.mjs'), importers.join(', '));
+});
+
+// ─── A released version has a section here, and its notes did not stay under Unreleased ───────
+//
+// THE 2.0.1 INCIDENT, found while preparing that cut. `release.mjs` writes the released section on
+// the release branch — for v2.0.0 that was `rehearsal/v2.0.0` at c15c9c4, which is NOT an ancestor
+// of `develop` — and runbook step 9 brought back only the version bump. So develop carried:
+//
+//   * NO `## 2.0.0 — 2026-09-24` section at all, and
+//   * a `## Unreleased` → `### Notes` block byte-identical to that section's notes.
+//
+// `writeChangelog` carries `extractUnreleased(text)` into the new section, so cutting 2.0.1 from
+// that tree would have labelled 2.0.0's notes as 2.0.1's AND published a changelog with no 2.0.0
+// section. Two wrongs from one missing back-port, and neither visible in a diff of the cut.
+//
+// CONDITIONAL, like the ARC-10 tripwire: the question needs the tag, and CI's `test` job clones
+// shallow without tags. No tag, no claim — deferred with the reason printed, never a pass in
+// disguise.
+test('a released version has its section here, and its notes left Unreleased', () => {
+  const latest = (() => {
+    const r = spawnSync('git', ['tag', '--list', 'v*', '--sort=-v:refname'],
+      { cwd: REAL_ROOT, encoding: 'utf8' });
+    if (r.status !== 0) return null;
+    return (r.stdout ?? '').split('\n').map((s) => s.trim())
+      .filter((t) => /^v\d+\.\d+\.\d+$/.test(t))[0] ?? null;
+  })();
+
+  if (!latest) {
+    console.log('    deferred: no release tag in this clone (a shallow checkout without tags) — '
+      + 'the released section cannot be checked here');
+    return;
+  }
+
+  const version = latest.replace(/^v/, '');
+  const text = readReal('docs/CHANGELOG.md');
+  const section = sectionFor(text, version);
+  assert.notEqual(section, null,
+    `docs/CHANGELOG.md has no "## ${version} — <date>" section, but ${latest} is tagged — `
+    + 'the release commit\'s changelog was never brought back to this branch');
+
+  // ...and the notes moved rather than being copied: `writeChangelog` CARRIES the Unreleased block
+  // into the new section, so a block still equal to the released one is the next release's notes
+  // already written for it.
+  const unreleasedNotes = (extractNotes(text) ?? '').trim();
+  const releasedNotes = (extractNotes(`## Unreleased\n${section}`) ?? '').trim();
+  if (unreleasedNotes.length > 0 && releasedNotes.length > 0) {
+    assert.notEqual(unreleasedNotes, releasedNotes,
+      `## Unreleased's Notes are byte-identical to ${version}'s — the next cut would publish `
+      + `${version}'s notes under the next version's heading`);
+  }
 });

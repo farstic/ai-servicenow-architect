@@ -9,6 +9,63 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+A patch release. Nothing here changes how the product is installed or configured: every entry is
+either a line a user reads or a guard that keeps one honest. There is no migration step.
+
+The six findings all come from the owner's 2026-09-23 sitting on a real install, and each was
+measured on one before it was fixed. Two of them are the same shape twice — a value that was
+recorded earlier being shown as though it had just been measured — which is why the fixes say *when*
+rather than only *what*.
+
+**Not in this release:** the `nonOkLines` masked-detail row. A non-ok check that names the instance
+still reaches the terminal with `<label>` in it, and so does its remedy, which makes
+`./snowarch instance test <label>` a command that cannot be pasted. Measured, with options and a
+recommendation, in `docs/spikes/nonoklines-mask-options.md`; queued rather than rushed into a patch.
+
+### Fixed
+
+- **ARC-08-C32** — `E-29` reported the step that was running it as never having run. It was the
+  first thing a new user saw, and its remedy would have re-run the install that had just finished.
+- **ARC-08-C33** — a committed `doctor.json` at the repository root turned the documented snapshot
+  recipe into a command that silently deleted three checks. The file is gone and ignored, and
+  `--write` now refuses a report that is missing checks the snapshot carries.
+- **ARC-06-C17** — Uninstall now says to run `./snowarch mode design` **before** deleting the folder,
+  and scopes the reason to the registration that actually leaves an orphan behind in
+  `~/.claude.json`. The page's claim that nothing was written to Claude Code's configuration was
+  true of the default and is kept.
+- **ARC-07-C9** — `set-preset` showed `probe: ok` for a probe it never took. A recorded probe now
+  says which day it was recorded, on the review screen and on the `--yes` line a transcript pastes.
+- **ARC-09-C53** — the upgrade's closing `Mode:` line printed the JSON boundary's redaction mask
+  (`instance=<label>`) to the user's own terminal, and then had to learn that a cached line is only
+  worth printing when it is *this* run's.
+- **ARC-06-C18** — `B06` decided to keep an existing instance and its console line said only `ok`.
+  It now names the instance and why the wizard did not run.
+- `E-28` treats an untagged HEAD as a **development checkout** rather than one that is *behind*.
+  Until v2.0.0 existed there was no release to compare against, so the check had never answered;
+  the day it did, it told every developer to upgrade their own working tree onto the release tag.
+
+### Internal
+
+- **ARC-09-C51** — the tag-measurement harness is in the repository as
+  `scripts/acceptance/tag-controls.py`: hand-run, never in CI, and carrying the four defects found
+  by using it on v2.0.0.
+- **ARC-09-C52** — the version sweep sees a version spelled as a regex. It had missed one twice,
+  and a version literal fails on the release commit, which is the one run that cannot be retried.
+- **ARC-10-C6** — the history suite reads the repository it runs in instead of fetching into it. On
+  a clone without the import tags, `npm test` used to write two refs into the developer's own tree.
+- `docs/CONTRIBUTING.md` gains the two rules this arc paid for, beside the existing push-evidence
+  line: a control must not run while uncommitted work sits in a file it will restore, and the case
+  goes at the level a user reaches the code, written before the mechanism exists. Both were learned
+  by losing work and by shipping a mechanism whose only caller nothing tested.
+- The release runbook's step 9 now says to port the release commit's `docs/CHANGELOG.md` back to
+  `develop` in the bump pull request. Bringing back the version bump alone leaves the released notes
+  under `## Unreleased`, where the next cut re-publishes them under its own heading — which is
+  exactly what this release had to repair before it could be made.
+
+## 2.0.0 — 2026-09-24
+
+### Notes
+
 This release supersedes engine v2.8.0 (farstic/claude-servicenow-live) and snow-mcp 1.0.0 (farstic/snow-mcp); both histories are preserved under the import tags.
 
 #### Migration for snow-mcp 1.0.0 users
@@ -1922,6 +1979,23 @@ there is no HTTP transport, REST API, dashboard or A2A endpoint — stdio only.
   engine pin and its sha are untouched.
 
 ---
+
+### Fixed
+
+- tests: the ARC-10 tripwire answers itself instead of failing the cut (c4da29e)
+- tests: the live suite's pty driver owns its pty (649966f)
+- tests: the live suite reads the probe label from the product (ae773c6)
+- tests: the version sweep matches a version, not a substring of one (77b5287)
+
+### Internal
+
+- the next-release sweep holds at a final version too (968d44f)
+- fixture versions move to the 9.x series before the release needs them (b5f75bb)
+- ARC-07-C8 closed live — e2e-live green on all three runners (00bce3a)
+- the sitting record's §E2 line — e2e-live green on all three runners (5eb295e)
+- the 2026-09-23 macOS Sitting C record on rc.9 and rc.11 (3c9e31f)
+
+Tag v2.0.0 · contract 47e3e1f29b62 · docs-pin df4afac
 
 ## The imported engine's header
 
