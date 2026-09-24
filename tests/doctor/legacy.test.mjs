@@ -423,7 +423,10 @@ test('E-30 is ok when ~/.claude.json has no projects at all, and never crashes o
 // `result.textDetail ?? result.detail`, and its comment says why: "E-23 needs to name the other
 // project folders here, where the user goes and runs the command". That branch has never been
 // taken on the real path. `doctor/index.mjs` builds `report` through `buildReport` — which copies
-// `CHECK_KEYS`, a fixed list with no `textDetail` — and then renders the terminal FROM that report.
+// each entry from an explicit literal with no `textDetail` — and then renders the terminal FROM that
+// report. (`CHECK_KEYS` is NOT that mechanism: it is the validator's required-keys list, and adding
+// a name to it makes `validate-report` DEMAND the field rather than keep it out. Measured both ways
+// while writing control (5), which had credited the wrong one of the two.)
 // So the JSON boundary's field list is applied before the terminal renderer, not only to the copy
 // that travels, and E-23's Sitting A D1 property was dead from the day it was written.
 //

@@ -101,14 +101,19 @@ export function renderText({ report, checks = [], results = [], colour = false }
   const byId = new Map(checks.map((c) => [c.id, c]));
   // ARC-08-C34 — THE TERMINAL-ONLY DETAIL ARRIVES HERE, OR IT ARRIVES NOWHERE.
   //
-  // `report.checks` has already been through `checkToJson`, whose `CHECK_KEYS` is the list of what
-  // TRAVELS and deliberately excludes `textDetail`. Reading it off the report was reading it off
-  // the copy built to omit it, so the `?? result.detail` below always won and E-23's promise to
-  // name the folder here — the whole reason the field exists — was dead from the day it was
+  // `report.checks` has already been through `checkToJson`, which builds each entry from an
+  // EXPLICIT OBJECT LITERAL that has no `textDetail`. Reading the field off the report was reading
+  // it off the copy built to omit it, so the `?? result.detail` below always won and E-23's promise
+  // to name the folder here — the whole reason the field exists — was dead from the day it was
   // written. The runner's own results still carry it, so they are passed in beside the report.
   //
-  // The report is untouched: `--json` and the doctor cache are both built from it, and
-  // `CHECK_KEYS` stays the authority on what a stranger can be asked to paste.
+  // THE LITERAL IS THE MECHANISM, not `CHECK_KEYS`. Measured: adding `textDetail` to `CHECK_KEYS`
+  // alone changes nothing that travels, because that list is the VALIDATOR's required-keys contract
+  // — it asserts every consumer-visible key is PRESENT and never forbids an extra one. Adding a
+  // field to it without producing the field makes `validate-report` demand it (`textDetail:
+  // missing`), which is the opposite direction. So the one place that decides what a stranger can be
+  // asked to paste is `checkToJson`'s literal, and the report itself is untouched here: `--json` and
+  // the doctor cache are both built from it.
   const terminal = new Map(results.map((r) => [r.id, r]));
   const idWidth = Math.max(0, ...report.checks.map((c) => String(c.id).length));
   const lines = [headerLine(report), ''];
