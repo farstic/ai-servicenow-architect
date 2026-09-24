@@ -305,3 +305,70 @@ test('ARC-09-C53 — with no cached line, U7 says nothing rather than printing a
   assert.equal(lines.some((l) => l.includes('<label>')), false,
     `a mask reached the user's terminal with no cache to read: ${JSON.stringify(lines)}`);
 });
+
+// ─── ARC-09-C53, second half — the cached line must be THIS run's ─────────────────────────────
+//
+// Reading the cache fixed the mask and introduced the defect one layer down: `readCachedModeLine`
+// had no notion of WHICH run wrote the file. Every bootstrapped tree carries a cache from an earlier
+// doctor, so when U7's own doctor FAILED — the upgrade that broke something, the moment the closing
+// line matters most — U7 closed with yesterday's line, tally and all, as if it had just been
+// measured:
+//
+//     Mode: live — instance=old-pdi (old-pdi) preset=custom — doctor 2026-09-23 12 ok
+//
+// That is ARC-07-C9's class exactly (a recorded value rendered as fresh), one step from where it was
+// just fixed — and the same split B09 gets right and U7 got wrong. So the read is bound to this run:
+// the doctor exited 0, its report parsed, it reported no `cacheError`, and the cache was written at
+// or after the moment U7 started it. Anything else is silence, because a stale line reads as a
+// measurement.
+
+/** U7 with a cache of a given age and a doctor of a given outcome. */
+async function u7With(t, { cacheAt, modeLine, doctorStatus = 0, cacheError = null,
+  startedAt = '2026-09-24T12:00:00.000Z' }) {
+  const root = tempDir('snowarch-u7-age-', t);
+  mkdirSync(join(root, dirname(CACHE_FILE)), { recursive: true });
+  writeFileSync(join(root, CACHE_FILE), JSON.stringify({
+    version: 1, at: cacheAt, writer: 'doctor', mode: 'live', modeLine,
+    checks: [], summary: { ok: 12, warn: 0, fail: 0, skip: 0 },
+  }));
+  const lines = [];
+  const log = { step: (l) => lines.push(l), fail: (l) => lines.push(l), warn: (l) => lines.push(l) };
+  const run = (_cmd, args) => (args.includes('doctor')
+    ? { status: doctorStatus,
+      stdout: doctorStatus === 0
+        ? JSON.stringify({ mode: 'live', modeLine: MASKED, summary: { ok: 14, warn: 0, fail: 0, skip: 0 },
+          checks: [], ...(cacheError ? { cacheError } : {}) })
+        : '' }
+    : { status: 0 });
+  await finish({ root, env: {}, log, run, target: 'v9.1.0', latest: 'v9.1.0', remote: 'origin',
+    now: () => new Date(startedAt), state: { mode: 'live' } });
+  return lines.filter((l) => l.startsWith('Mode:'));
+}
+
+const YESTERDAY = 'Mode: live — instance=old-pdi (old-pdi) preset=custom — doctor 2026-09-23 12 ok';
+
+test('ARC-09-C53 — a doctor that FAILED does not get to print yesterday\'s Mode line', async (t) => {
+  const modes = await u7With(t, { cacheAt: '2026-09-23T09:00:00.000Z', modeLine: YESTERDAY,
+    doctorStatus: 1 });
+  assert.deepEqual(modes, [],
+    `U7 closed a failed upgrade with a stale line as if measured now: ${modes.join(' | ')}`);
+});
+
+test('ARC-09-C53 — a doctor that could not write its cache does not print the old one', async (t) => {
+  const modes = await u7With(t, { cacheAt: '2026-09-23T09:00:00.000Z', modeLine: YESTERDAY,
+    cacheError: 'EACCES: permission denied' });
+  assert.deepEqual(modes, [], `a stale line was printed after a cacheError: ${modes.join(' | ')}`);
+});
+
+test('ARC-09-C53 — a cache older than this run is not this run, even with a healthy doctor', async (t) => {
+  const modes = await u7With(t, { cacheAt: '2026-09-23T09:00:00.000Z', modeLine: YESTERDAY });
+  assert.deepEqual(modes, [], `a cache from yesterday was printed as this run: ${modes.join(' | ')}`);
+});
+
+test('ARC-09-C53 — a cache written AT the start instant counts as this run', async (t) => {
+  // Equality matters: the doctor stamps the cache from its own clock, and a run fast enough to land
+  // on the same millisecond must not be discarded as stale.
+  const fresh = 'Mode: live — instance=pdi (pdi) preset=custom — doctor 2026-09-24 14 ok';
+  const modes = await u7With(t, { cacheAt: '2026-09-24T12:00:00.000Z', modeLine: fresh });
+  assert.deepEqual(modes, [fresh]);
+});

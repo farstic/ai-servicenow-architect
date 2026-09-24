@@ -74,10 +74,20 @@ export function doctorLines(report) {
  * unreadable or shapeless cache: a caller that prints nothing is honest, and one that falls back to
  * the masked line prints `<label>` as though it were the instance's name.
  */
-export function readCachedModeLine(root, { read = readFileSync } = {}) {
+export function readCachedModeLine(root, { read = readFileSync, notBefore = null } = {}) {
   try {
-    const line = JSON.parse(read(join(root, CACHE_FILE), 'utf8'))?.modeLine;
-    return typeof line === 'string' && line.length > 0 ? line : null;
+    const cache = JSON.parse(read(join(root, CACHE_FILE), 'utf8'));
+    const line = cache?.modeLine;
+    if (typeof line !== 'string' || line.length === 0) return null;
+    // WHICH RUN WROTE IT. Every bootstrapped tree has a cache from an earlier doctor, so a read with
+    // no notion of when would hand back yesterday's line — tally and all — as this run's answer.
+    // `>=` and not `>`: the doctor stamps the cache from its own clock, and a run fast enough to
+    // land on the start instant is this run, not a stale one.
+    if (notBefore !== null) {
+      const at = Date.parse(cache?.at ?? '');
+      if (!Number.isFinite(at) || at < notBefore) return null;
+    }
+    return line;
   } catch { return null; }
 }
 
@@ -627,6 +637,9 @@ export async function finish({ root, env, log, run, target, latest, remote, now,
 
   // ── U7 the doctor, and the cache ──────────────────────────────────────────────────────────
   log.step(stepLine(7, 'doctor'));
+  // Taken BEFORE the spawn, from the injected clock: the cache is only this run's if it was written
+  // at or after this instant.
+  const startedAt = Number(now());
   const doctor = run(process.execPath, [join(root, 'tools/snowarch/bin/snowarch.mjs'),
     'doctor', '--json', '--no-cache', '--write-cache'],
   { cwd: root, encoding: 'utf8', env: childEnv(root, env), stdio: ['ignore', 'pipe', 'pipe'] });
@@ -650,7 +663,17 @@ export async function finish({ root, env, log, run, target, latest, remote, now,
   // know and must not invent.
   //
   // A MASK IS WORSE THAN SILENCE, so there is no fallback to `report.modeLine`: it reads as a value.
-  const cachedModeLine = readCachedModeLine(root);
+  // ...AND IT HAS TO BE THIS RUN'S. Reading the cache fixed the mask and opened this one step down:
+  // the file is there on every bootstrapped tree, so a failed doctor — the upgrade that broke
+  // something, when the closing line matters most — would be closed with yesterday's line as though
+  // it had just been measured. ARC-07-C9's class (a recorded value rendered as fresh) one step from
+  // where it was fixed, and the split B09 gets right.
+  //
+  // Four conditions, and each is a way the line could be about a different run: the doctor exited 0,
+  // its report parsed, it did not report a `cacheError` (it tried to write and could not), and the
+  // file is stamped at or after the moment we started it. Otherwise silence.
+  const wroteThisRun = doctor.status === 0 && report !== null && !report.cacheError;
+  const cachedModeLine = wroteThisRun ? readCachedModeLine(root, { notBefore: startedAt }) : null;
   if (cachedModeLine) log.step(cachedModeLine);
 
   // ARC-09-C47 — NO CURRENCY VERDICT HERE. This used to write `behind: false` as a literal,
