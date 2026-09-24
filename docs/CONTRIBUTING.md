@@ -1319,6 +1319,33 @@ The checklist, verbatim — paste it into the release pull request's description
 > 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
 > 7. Update the install page's metrics link if the numbers moved; announce.
 > 8. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
+> 9. **Move `develop` to the next `-dev` version.** This step was missing, and its absence has a
+>    cost that only appears once a release exists: every version-of-record reader — the
+>    NEXT-release sweep in `tests/version-literals.test.mjs`, `./snowarch version`, E-28 — goes on
+>    pointing at the version just shipped. Do it **with the release tooling's own writers**, in
+>    ARC-09-C12(b)'s order, because `dist/contract.json` embeds the version and the pin records
+>    its sha:
+>
+>    ```sh
+>    npm version <next>-dev --no-git-tag-version --workspaces --include-workspace-root
+>    node scripts/build-dist.mjs
+>    node packages/contract/pin.mjs --yes
+>    # CLAUDE.md's marker and docs/README-head.md, through writers.mjs rather than by hand:
+>    node --input-type=module -e "import {readFileSync,writeFileSync} from 'node:fs';\
+>      import {writeMarker,writeHead} from './scripts/lib/release/writers.mjs';\
+>      const v=JSON.parse(readFileSync('package.json','utf8')).version;\
+>      for (const [f,fn] of [['CLAUDE.md',writeMarker],['docs/README-head.md',writeHead]]) {\
+>        const r=fn(readFileSync(f,'utf8'),v); if(!r.ok) throw new Error(r.message);\
+>        writeFileSync(f,r.text); }"
+>    npm run gen
+>    ```
+>
+>    **Not `applyWrites` and not `release.mjs`:** both also cut a changelog section, and a `-dev`
+>    bump is not a release — there is nothing to describe. Everything else is the same sequence
+>    they run, which is why it goes through the same writers rather than an editor.
+>    `tests/version-consistency.test.mjs` is the check that every carrier agreed; run it before
+>    committing. One commit, `chore(release): develop to <next>-dev`, straight to a pull request
+>    like any other.
 
 **Step 2 is two-phase because it has to be.** `main` is protected by required status checks with
 `strict: true` — **54** of them after this milestone, generated into

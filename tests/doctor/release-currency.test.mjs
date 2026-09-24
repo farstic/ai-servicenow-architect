@@ -25,21 +25,34 @@ const lsRemote = (tags) => tags
 /** THE RUNNER'S REAL CLOCK: epoch milliseconds, which is what crashed the check. */
 const realClock = () => Date.now();
 
-async function e28(t, { tags = [], now = realClock, cache = null, noNetwork = false } = {}) {
+/**
+ * The stub, answering each command it is GIVEN — `ls-remote`, `describe`, `rev-parse`.
+ *
+ * ARC-09-C47's lesson, met a THIRD time by this fixture. It already carried a comment saying a stub
+ * must answer the command it is given, because a `describe` answered with ls-remote output had once
+ * told the check this tree was on a tag called "0000…\trefs/tags/v9.1.0". E-28 now also asks
+ * `git rev-parse --short HEAD`, to say WHERE a development checkout is, and the two-branch stub
+ * answered that with ls-remote output too — producing `development checkout at 0000…refs/tags/v9.1.0`.
+ * A stub with a default branch will keep doing this every time the check learns a new question, so
+ * this one answers by command and returns '' for anything it was not taught.
+ */
+const gitStub = ({ tags = [], localTag = null, head = 'abc1234' } = {}) => (_cmd, args) => {
+  if (args.includes('ls-remote')) return lsRemote(tags);
+  if (args.includes('describe')) return localTag ? `${localTag}\n` : '';
+  if (args.includes('rev-parse')) return `${head}\n`;
+  return '';
+};
+
+async function e28(t, { tags = [], localTag = null, head = 'abc1234', now = realClock,
+  cache = null, noNetwork = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   if (cache) writeUpgradeCheck(root, { ...cache, now: () => new Date() });
-  // ARC-09-C47 — the stub must answer the command it is GIVEN. E-28 now also asks
-  // `git describe --tags --exact-match`, and a stub that returned ls-remote output to that
-  // question was telling the check this tree is on a tag called
-  // "0000…\trefs/tags/v9.1.0" — which no checkout is. Empty is the honest fixture answer:
-  // these cases are about tags and caching, and their tree is not on a tag.
-  const exec = (_cmd, args) => (args.includes('describe') ? '' : lsRemote(tags));
-  return E28.run({ root, noNetwork, now, exec });
+  return E28.run({ root, noNetwork, now, exec: gitStub({ tags, localTag, head }) });
 }
 
 test('C31 — a newer release tag is a warn, with the clock the runner actually passes', async (t) => {
-  const r = await e28(t, { tags: ['v9.1.0'] });
+  const r = await e28(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' });
   assert.equal(r.status, 'warn', `crashed or skipped instead: ${r.detail}`);
   assert.match(r.detail, /v9\.1\.0 available/);
   assert.match(r.detail, /\.\/snowarch upgrade/);
@@ -59,7 +72,7 @@ test('C31 — a PRERELEASE on its own is not "available", and that is the decisi
 });
 
 test('C31 — a prerelease BESIDE a release reports the release', async (t) => {
-  const r = await e28(t, { tags: ['v9.0.0', 'v9.1.0-rc.3'] });
+  const r = await e28(t, { tags: ['v9.0.0', 'v9.1.0-rc.3'], localTag: 'v8.9.0' });
   assert.equal(r.status, 'warn');
   assert.match(r.detail, /v9\.0\.0 available/);
   assert.doesNotMatch(r.detail, /rc\.3/);
@@ -237,7 +250,10 @@ test('C32 — the window expiring asks again, and a release that appeared is fou
 
   let calls = 0;
   const r = await E28.run({ root, noNetwork: false, now: realClock,
-    exec: (cmd, args) => { if (args[0] === 'ls-remote') calls += 1; return lsRemote(['v9.1.0']); } });
+    exec: (cmd, args) => {
+      if (args[0] === 'ls-remote') calls += 1;
+      return gitStub({ tags: ['v9.1.0'], localTag: 'v9.0.0' })(cmd, args);
+    } });
 
   assert.equal(calls, 1, 'an expired cache did not cost a remote call');
   assert.equal(r.status, 'warn', `an expired empty outcome pinned the check: ${r.detail}`);
@@ -258,7 +274,7 @@ test('C32 — the window expiring asks again, and a release that appeared is fou
 test('C32 — the release-tag paths are unchanged, in both directions', async (t) => {
   // The half that stops this chore from quietly turning a warn into a skip. A release still warns,
   // a matching one is still ok, and both still say what they always said.
-  const behind = await e28(t, { tags: ['v9.1.0'] });
+  const behind = await e28(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' });
   assert.equal(behind.status, 'warn');
   assert.match(behind.detail, /^v9\.1\.0 available — run \.\/snowarch upgrade$/);
 
@@ -268,7 +284,7 @@ test('C32 — the release-tag paths are unchanged, in both directions', async (t
   // The tree IS on v9.0.0 in this scenario, so `describe` says so; a stub that answered
   // ls-remote output to that question would be describing a tree nobody has.
   const r = await E28.run({ root: current, noNetwork: false, now: realClock,
-    exec: (_cmd, args) => (args.includes('describe') ? 'v9.0.0\n' : lsRemote(['v9.0.0'])) });
+    exec: gitStub({ tags: ['v9.0.0'], localTag: 'v9.0.0' }) });
   assert.equal(r.status, 'ok');
   assert.match(r.detail, /^up to date \(v9\.0\.0\) · last checked /);
 });
@@ -382,4 +398,71 @@ test('ARC-09-C47 — a real measurement is still trusted, and still answers offl
   });
   assert.equal(uptodate.status, 'ok');
   assert.match(uptodate.detail, /up to date \(v9\.0\.0\)/);
+});
+
+// ─── The three shapes a checkout can be in, once a release exists ──────────────────────────────
+//
+// E-28 was written when this product had no release, so `latest` was always null and the check
+// always skipped. The day v2.0.0 was tagged it started answering — and answered wrongly for the
+// commonest shape of all, because `behind` was `localTag !== latest` and `describeExact` returns
+// `null` on an untagged HEAD. Every `develop` checkout and every CI bootstrap cell was declared
+// behind and told to `./snowarch upgrade`, which would move a development checkout onto the tag and
+// discard what the person was working on. It reddened every pull request in the repository.
+//
+// Three shapes, one test each, so the next reader does not have to infer which is which.
+
+test('E-28 — an untagged HEAD is a development checkout, not a checkout that is behind', async (t) => {
+  const r = await e28(t, { tags: ['v9.1.0'], localTag: null, head: 'deadbee' });
+  assert.equal(r.status, 'ok', `an untagged checkout is not a problem to fix: ${r.detail}`);
+  assert.match(r.detail, /^development checkout at deadbee; latest release v9\.1\.0$/);
+  // NO REMEDY. The remedy was the harm: it told a developer to upgrade the tree they are working in.
+  assert.equal(r.command ?? null, null, 'a development checkout was handed an upgrade remedy');
+  assert.doesNotMatch(r.detail, /available|upgrade/, 'the sentence still reads as a nudge');
+});
+
+test('E-28 — a tagged HEAD older than the latest release IS behind, and says so', async (t) => {
+  const r = await e28(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' });
+  assert.equal(r.status, 'warn');
+  assert.match(r.detail, /^v9\.1\.0 available — run \.\/snowarch upgrade$/);
+});
+
+test('E-28 — a tagged HEAD at the latest release is up to date', async (t) => {
+  const r = await e28(t, { tags: ['v9.1.0'], localTag: 'v9.1.0' });
+  assert.equal(r.status, 'ok');
+  assert.match(r.detail, /^up to date \(v9\.1\.0\)$/);
+});
+
+test('E-28 — the comparison is the comparator, not string equality (ARC-09-S12)', async (t) => {
+  // `!==` called a checkout standing on a tag NEWER than the latest release "behind" — which is
+  // what a tag cut locally before it is pushed is — and it is the same class as rc.10 sorting below
+  // rc.9. A newer local tag is not behind, and the sentence names the tag the tree is actually on.
+  const ahead = await e28(t, { tags: ['v9.1.0'], localTag: 'v9.2.0' });
+  assert.equal(ahead.status, 'ok', `a newer local tag was called behind: ${ahead.detail}`);
+  assert.match(ahead.detail, /^up to date \(v9\.2\.0\)$/);
+
+  // ...and a prerelease of the latest IS behind it, which string equality also got right only by
+  // accident: §11.3, a release outranks every prerelease of the same triple.
+  const pre = await e28(t, { tags: ['v9.1.0'], localTag: 'v9.1.0-rc.4' });
+  assert.equal(pre.status, 'warn', `a prerelease of the release was not behind it: ${pre.detail}`);
+  assert.match(pre.detail, /v9\.1\.0 available/);
+});
+
+test('E-28 — a tag this product cannot order is a named skip, not an invented answer', async (t) => {
+  // Somebody else's naming on the same commit. A comparator that threw here would crash the doctor;
+  // one that guessed would report a currency answer it does not have.
+  const r = await e28(t, { tags: ['v9.1.0'], localTag: 'release-2026-09' });
+  assert.equal(r.status, 'skip', `crashed or guessed instead: ${r.detail}`);
+  assert.match(r.detail, /not a version this product can order/);
+  assert.match(r.detail, /latest release v9\.1\.0/, 'the skip does not say what it could not compare to');
+});
+
+test('E-28 — a development checkout writes behind:false, so the banner does not nag', async (t) => {
+  // The SessionStart banner nudges on `behind === true` with a `latestTag`. A development checkout
+  // that cached `behind: true` would be told to upgrade itself away at the top of every session,
+  // which is the same harm one layer further out.
+  const r = await e28(t, { tags: ['v9.1.0'], localTag: null });
+  assert.equal(r.status, 'ok');
+  assert.equal(r.data?.behind, false, 'a development checkout cached behind:true');
+  assert.equal(r.data?.latestTag, 'v9.1.0', 'the latest release was not recorded');
+  assert.equal(r.data?.localTag ?? null, null);
 });
