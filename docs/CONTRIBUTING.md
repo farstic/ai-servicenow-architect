@@ -1302,13 +1302,20 @@ The checklist, verbatim — paste it into the release pull request's description
 > 2. `git switch main && git pull --ff-only` · CI green on HEAD · the corpus present — `git submodule status vendor/ServiceNowDocs` shows no leading `-`; if it does, `git submodule update --init vendor/ServiceNowDocs`. A missing corpus is a **dirty tree** to the preflight (` D vendor/ServiceNowDocs`) and the release refuses before it writes anything.
 > 3. `git switch -c release/vX.Y.Z main` · `node scripts/release.mjs X.Y.Z --yes --allow-branch release/vX.Y.Z` (writes + commit, **no tag**) · open a pull request to `main` · merge it **without squashing** · then, on `main`, at the merge commit: `node scripts/release.mjs X.Y.Z --tag-only`.
 > 4. `git push origin main --follow-tags` (or pass `--push`).
-> 5. **Answer the ARC-10 tripwire.** `tests/architecture-history.test.mjs` asserts that the
->    release tag does **not** exist — `AC — the History section names both tags, and the
->    release-tag half is deferred`. That is deliberate: `docs/ARCHITECTURE.md`'s History section
->    makes a `git log … ..v<x.y.z>` claim that cannot be evaluated until the tag is real, so the
->    test defers it and goes red the moment the tag exists. It is a step, not a failure — replace
->    the deferral with the assertion the section's claim now allows, in its own commit. The tag
->    is read from `package.json`, never spelled, so nothing else needs editing.
+> 5. **Nothing to do for the ARC-10 tripwire — it answers itself.** `tests/architecture-history.test.mjs`
+>    (`AC — the History section names both tags, and the cross-boundary claim holds at the tag`) is
+>    CONDITIONAL: while `v<x.y.z>` does not resolve it defers, and the moment it does — which is
+>    exactly what `release.yml`'s verify job produces, since it checks the tag out at
+>    `fetch-depth: 0` and runs `npm test` — it evaluates `docs/ARCHITECTURE.md`'s cross-boundary
+>    claim instead: both import tags are ancestors of the release, and each `git log -- <path>`
+>    the History section prints reaches the date it says it reaches, with no `--follow`. The paths
+>    and dates are PARSED from the section, and the tag is read from `package.json`, so no commit
+>    is needed at cut time and nothing here is spelled.
+>    *It was a swap until it was nearly fatal:* the earlier form asserted the tag does NOT exist,
+>    which is fine on `develop` and red on the release run itself — verify fails, publish is
+>    skipped, and the final tag is dead. A rehearsal cannot catch it, because a rehearsal makes no
+>    tag. If you fetched the tag into a **shallow** clone the case skips with the reason named
+>    rather than failing.
 > 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
 > 7. Update the install page's metrics link if the numbers moved; announce.
 > 8. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).

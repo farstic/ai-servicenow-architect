@@ -82,24 +82,86 @@ test('AC — both import tags exist and carry history', () => {
   }
 });
 
-test('AC — the History section names both tags, and the release-tag half is deferred', () => {
+/** The release tag this checkout is heading for. Derived, never spelled (ARC-09-C12a). */
+export const releaseTagOf = (version) => `v${String(version).replace(/-.*$/, '')}`;
+
+/**
+ * The cross-boundary claim, READ FROM THE SECTION rather than retyped.
+ *
+ * "Reading across the import boundary" states it as two runnable commands with their answers:
+ *
+ *     git log -- CLAUDE.md                            # reaches 2026-05-28, the engine's first commit
+ *     git log -- packages/snowarch/src/server.ts      # reaches 2026-06-06, the server's
+ *
+ * Parsed, so the assertion is about what the document SAYS. Retyping the paths and dates here would
+ * make this a test of a second copy — and a section edited to claim something else would keep
+ * passing, which is the failure mode this whole file exists to prevent.
+ */
+export function crossBoundaryClaims(doc) {
+  const region = historyRegion(doc) ?? '';
+  return [...region.matchAll(/^git log -- (\S+)\s+# reaches (\d{4}-\d{2}-\d{2})/gm)]
+    .map((m) => ({ path: m[1], reaches: m[2] }));
+}
+
+test('AC — the History section names both tags, and the cross-boundary claim holds at the tag', () => {
   // This half needs no network: what the SECTION says is checkable whatever the clone looks like.
   const region = historyRegion(read('docs/ARCHITECTURE.md'));
   assert.ok(region, 'no `## History` heading — L05 depends on that exact text');
   for (const tag of IMPORT_TAGS) {
     assert.ok(region.includes(tag), `the History section does not name ${tag}`);
   }
-  // THE ARC-10 TRIPWIRE. The `git log … ..v<release>` claim is evaluated at the tag (ARC-10-S06/S08)
-  // and not here: the tag does not exist yet, and a test that asserted it would be asserting the
-  // future. When the release IS tagged this case goes red on purpose — that is the point of it, and
-  // the cut runbook carries the step that answers it.
+
+  // THE ARC-10 TRIPWIRE, and it is CONDITIONAL rather than a swap.
   //
-  // The tag is DERIVED, never spelled (ARC-09-C12a). Spelling it would put this file in the version
-  // sweep's way for the one line whose whole job is to name the release that has not happened —
-  // and the sweep would then be flagging the tripwire rather than the literals it exists to catch.
-  const releaseTag = `v${rootVersion.replace(/-.*$/, '')}`;
-  assert.equal(git(['rev-parse', '--verify', '--quiet', `${releaseTag}^{commit}`]).status === 0, false,
-    `${releaseTag} exists — the cross-boundary claim is now evaluable and this case should assert it`);
+  // It used to assert the release tag does NOT exist, so that the cut would trip it and somebody
+  // would come and write the real assertion. That is fine on `develop` and fatal at the tag:
+  // `release.yml`'s verify job checks the TAG out and runs `npm test`, so on the release run the
+  // deferral fails by design, verify goes red, publish is skipped and the final tag is dead. A
+  // rehearsal cannot see it — no tag exists in a rehearsal — so it would have been found by cutting.
+  //
+  // So the case answers itself instead of asking to be rewritten: deferred while the tag does not
+  // resolve, and evaluating the claim the moment it does. Nothing has to land at cut time.
+  const releaseTag = releaseTagOf(rootVersion);
+  if (git(['rev-parse', '--verify', '--quiet', `${releaseTag}^{commit}`]).status !== 0) {
+    console.log(`    deferred: ${releaseTag} does not exist here — the cross-boundary claim is `
+      + 'evaluated at the tag');
+    return;
+  }
+
+  // THE TAG RESOLVES. Everything below is about `<import-tag>..<release-tag>`, which needs the
+  // history to be present — `release.yml` checks out at `fetch-depth: 0`, but a developer who
+  // fetched just the tag into a shallow clone must get the file's own shallow-clone treatment
+  // (a named skip) rather than a failure about how their clone was made.
+  const shallow = git(['rev-parse', '--is-shallow-repository']).stdout.trim() === 'true';
+  const missing = IMPORT_TAGS.filter((t) =>
+    git(['rev-parse', '--verify', '--quiet', `${t}^{commit}`]).status !== 0);
+  if (shallow || missing.length > 0) {
+    console.log(`    skipped: ${releaseTag} resolves but the range cannot be walked here `
+      + `(${shallow ? 'shallow clone' : `not in this clone: ${missing.join(', ')}`})`);
+    return;
+  }
+
+  // 1. The range the section's claim is about is non-empty in both directions that matter: each
+  //    import tag is an ANCESTOR of the release, so `git log <import-tag>..<release>` has commits.
+  for (const tag of IMPORT_TAGS) {
+    assert.equal(git(['merge-base', '--is-ancestor', tag, releaseTag]).status, 0,
+      `${tag} is not an ancestor of ${releaseTag} — the History claims the imports were merged in`);
+    const count = Number(git(['rev-list', '--count', `${tag}..${releaseTag}`]).stdout.trim());
+    assert.ok(count > 0, `git log ${tag}..${releaseTag} is empty`);
+  }
+
+  // 2. ...and the two commands the section prints, run AT THE TAG, answer what it says they answer:
+  //    the log reaches the named date WITH NO `--follow`, which is the whole point of the sentence.
+  const claims = crossBoundaryClaims(read('docs/ARCHITECTURE.md'));
+  assert.equal(claims.length, 2, `the section states ${claims.length} cross-boundary command(s), expected 2`);
+  for (const { path, reaches } of claims) {
+    const dates = git(['log', releaseTag, '--format=%ad', '--date=short', '--', path])
+      .stdout.trim().split('\n').filter(Boolean);
+    assert.ok(dates.length > 0, `git log ${releaseTag} -- ${path} reaches nothing`);
+    assert.equal(dates[dates.length - 1], reaches,
+      `the History says \`git log -- ${path}\` reaches ${reaches}; at ${releaseTag} it reaches `
+      + `${dates[dates.length - 1]}`);
+  }
 });
 
 test('AC — every ADR the History links resolves, and the link check is not vacuous', () => {
