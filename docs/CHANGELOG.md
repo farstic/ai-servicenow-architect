@@ -9,6 +9,57 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+A patch release, and a small one. Nothing here changes how the product is installed or configured,
+and there is no migration step.
+
+Every entry is a line a user reads, or a guard that keeps one honest. Two of them were found by
+using the product rather than by reading it: the remedy that could not be pasted came from the
+owner's own terminal, and the registration under a deleted folder came from rehearsing
+`docs/MIGRATION.md` on a real configuration before asking the owner to follow it.
+
+One fix is older than it looks. `E-23` has promised since ARC-08 to name the folder a removal command
+must be run from, and the line that would have printed it was never reached: the terminal was being
+rendered from the copy built for `--json`, which omits that field on purpose. It printed *"run from
+that folder"* while naming no folder, for as long as the field has existed.
+
+**Not in this release:** a `--json` check that refuses an unexpected key. The list a consumer reads
+is asserted to be *present*, never to be *complete*, so a field added to the report's builder travels
+with nothing objecting — today only the two boundary cases in the legacy section stand against it.
+Named while fixing the row above and queued as its own row rather than added to a patch.
+
+### Fixed
+
+- **ARC-09-C56** — the upgrade's `DOCTOR:` block printed the JSON boundary's redaction mask to the
+  user's own terminal, so a non-ok check read `instances: <label>: …` and its remedy read
+  `./snowarch instance test <label>` — a command shaped like a command that fails when pasted, in
+  the one place the product says what to do next. The lines now come from this machine's own copy;
+  `--json` is unchanged, because that is the copy a stranger is asked to paste.
+- **ARC-08-C34** — `E-30` reports a registration pointing at a folder that no longer exists, under
+  any server key. `E-23` could not: an entry under this product's own key is a registration this
+  product made, which is correct to leave alone while the folder exists and dead once it does not.
+  The check names it and prints the removal; it removes nothing. Acting on it means re-creating the
+  folder for the length of one command, because a local-scope registration is keyed on the folder's
+  absolute path — `docs/MIGRATION.md` § 6 carries that recipe for both shells, and the check points
+  at it rather than repeating it.
+- **ARC-08-C34** — and the detail meant for the terminal now reaches the terminal, for `E-23` as
+  well. See the note above: `--json` and the cache are untouched, and still carry no folder.
+
+### Internal
+
+- **ARC-09-C57** — the tag-measurement harness prints the three numbers a status row quotes —
+  `N controls / N patches / M ANCHOR NOT FOUND` — instead of leaving a reader to reconstruct them.
+  With nothing printing the count, `0` and *"I never looked"* read identically. Its output is ASCII:
+  a separator that depended on the console's encoding arrived as a replacement character on Windows
+  and broke the line it was in.
+- **ARC-10** — the migration arc's remaining sittings carry dates rather than dashes, and the S06
+  story records the rehearsal of the install page in a copied home: what it proved, the one check
+  that behaves differently there, and the steps that are the owner's real run and cannot be
+  rehearsed. The open decision about which stale registrations that sitting removes is recorded as
+  the owner's, not resolved.
+- **ARC-09-C55** — the `E-28` development-checkout fix from v2.0.1 gains the status row the standing
+  rule requires in the same pull request as the fix. The fix shipped without one; the row says so
+  rather than filling the gap quietly.
+
 ## 2.0.1 — 2026-09-24
 
 ### Notes
