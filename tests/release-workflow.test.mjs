@@ -14,6 +14,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { buildTagMessage, isPrerelease } from '../scripts/lib/release/tag.mjs';
+import { FROZEN_HEADING } from '../scripts/lib/release/changelog.mjs';
 import { collect, directorySize, megabytes, seconds, table } from '../scripts/ci/install-metrics.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { composeBody, RELEASE_BODY_MAX } from '../scripts/ci/release-notes.mjs';
@@ -269,7 +270,7 @@ test('C19: E-00 beside another FAIL is still refused, and names the other one', 
 test('the release body is the changelog section, and a missing one stops the release', (t) => {
   const root = tempDir('snowarch-notes-', t);
   write(root, 'docs/CHANGELOG.md',
-    '# C\n\n## Unreleased\n\n### Notes\n\n## 2.0.0 — 2026-10-01\n\n### Added\n\n- a thing (abc1234)\n\nTag v2.0.0\n\n## Before 2.0.0\n\nold\n');
+    `# C\n\n## Unreleased\n\n### Notes\n\n## 2.0.0 — 2026-10-01\n\n### Added\n\n- a thing (abc1234)\n\nTag v2.0.0\n\n${FROZEN_HEADING}\n\nold\n`);
   const script = join(REAL_ROOT, 'scripts/ci/release-notes.mjs');
   const run = (tag) => {
     try {
@@ -281,7 +282,7 @@ test('the release body is the changelog section, and a missing one stops the rel
   const ok = run('v2.0.0');
   assert.equal(ok.code, 0, ok.err);
   assert.match(ok.out, /### Added\n\n- a thing \(abc1234\)/);
-  assert.equal(ok.out.includes('## Before 2.0.0'), false, 'the body ran into the frozen region');
+  assert.equal(ok.out.includes(FROZEN_HEADING), false, 'the body ran into the frozen region');
 
   const missing = run('v3.0.0');
   assert.equal(missing.code, 1);

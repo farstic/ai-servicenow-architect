@@ -304,7 +304,7 @@ test('ARC-08-C27 — a release commit produces the same bytes as develop',
     //
     // The version is injected, the way the clock and the separator are, so the condition is tested
     // in this world rather than waited for in the next one.
-    for (const version of ['9.9.9-rc.1', '2.0.0', '0.0.1-alpha.0']) {
+    for (const version of ['9.9.9-rc.1', '9.0.0', '0.0.1-alpha.0']) {
       assert.deepEqual(await capture('live', { asVersion: version }), committed('live'),
         `a checkout whose package version reads ${version} produced different bytes`);
     }

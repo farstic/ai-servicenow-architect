@@ -141,6 +141,71 @@ test('no assertion spells the current version of record (ARC-09-C12a)', () => {
     + 'fails on the release commit itself (ARC-09-C12, found by a release rehearsal)');
 });
 
+/**
+ * The version the NEXT release will carry — `2.0.0-dev` → `2.0.0` — derived, never spelled.
+ *
+ * ARC-09-C12a's sweep asks about the version of record, which on a development checkout is
+ * `<x.y.z>-dev`: a string no assertion would write by accident, so the sweep passed while the tree
+ * was full of literals spelling the release it is heading for. Those cost nothing until the release
+ * script writes the new version and runs the post-write gates — the exact moment the original
+ * defect was found, and the one moment the fix must not need.
+ *
+ * So the same rule is asked one release EARLY. Measured on d90f5bd before this pass: 12 governed
+ * files and 72 lines would have failed the 2.0.0 cut; 0 after it.
+ */
+export const releaseTarget = (version) => String(version).replace(/-.*$/, '');
+
+test('no test file spells the version the NEXT release will carry (ARC-09-C12a)', () => {
+  const target = releaseTarget(rootVersion);
+  const offenders = [];
+  for (const rel of [...testFiles(join(root, 'tests')), ...testFiles(join(root, 'packages'))]) {
+    if (rel in FIXTURE_FILES || rel === SELF || rel.startsWith(HARNESS)) continue;
+    const lines = literalLines(readFileSync(join(root, rel), 'utf8'), target);
+    if (lines.length > 0) offenders.push(`${rel}:${lines.join(',')}`);
+  }
+  assert.deepEqual(offenders, [], `these spell "${target}", the version the next release writes — `
+    + 'move fixture versions to the 9.x series, or read the version from package.json. A literal '
+    + 'here passes today and fails the release commit, which is the one run that cannot be retried');
+
+  // THE EXEMPTION LIST IS THE EXISTING ONE AND NOTHING MORE. A sweep that grew its own list would
+  // be a sweep whose list is where inconvenient lines go; growth is a deliberate edit with a bound
+  // reason, and there is nothing to bind today — `tests/predecessor-notice.test.mjs` was the only
+  // candidate and its failure MESSAGE was reworded instead, because a message is not evidence.
+  assert.equal(Object.keys(FIXTURE_FILES).length, 3, 'the fixture allow-list grew without a reason');
+});
+
+test('C12a — the next-release sweep is not vacuous, and the target is derived', () => {
+  // Both halves of the derivation, including the one that matters at the cut: once the release
+  // script has written `2.0.0`, the target is that same string and the sweep keeps its meaning.
+  assert.equal(releaseTarget('2.0.0-dev'), '2.0.0');
+  assert.equal(releaseTarget('2.0.0-rc.11'), '2.0.0');
+  assert.equal(releaseTarget('2.0.0'), '2.0.0');
+
+  // ON A PRERELEASE TREE the two sweeps ask about different versions. ON A FINAL ONE they coincide
+  // BY DEFINITION, and that is not a duplicate to be fixed — it is one guard reaching one answer.
+  //
+  // The first version of this line asserted they ALWAYS differ. That is green on `develop` and on
+  // every rc, and red on the single commit that matters: the release commit, where `release.mjs`
+  // writes the final version and then runs this suite (C49) and would refuse to cut. A test that
+  // passes every day and fails the one run that cannot be retried is the exact defect ARC-09-C12a
+  // exists to prevent — written into the test that prevents it. Found by running the tree at the
+  // 2.0.0 final shape, which is now a standing control for anything touching a version test.
+  const target = releaseTarget(rootVersion);
+  if (rootVersion.includes('-')) {
+    assert.notEqual(target, rootVersion,
+      'a prerelease tree must ask about a version other than the one it carries');
+  } else {
+    assert.equal(target, rootVersion,
+      'at a final version the two sweeps legitimately coincide — same guard, same answer');
+  }
+
+  // The negative control: a fixture reverted to the 2.x series is caught, and the 9.x convention
+  // that replaced it is not.
+  assert.deepEqual(literalLines(`  const block = engineBlock(r, { version: '${target}' });`, target), [1],
+    'a fixture spelling the next release is no longer caught');
+  assert.deepEqual(literalLines("  const block = engineBlock(r, { version: '9.9.9' });", target), []);
+});
+
 test('the sweep would catch a planted literal, and ignores one in a comment (ARC-09-C12a)', () => {
   // The negative control. Without it this file passes for ever the moment the scan stops finding
   // anything — including if `rootVersion` were read wrongly and became an empty string.

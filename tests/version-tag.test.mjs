@@ -29,7 +29,7 @@ const write = (root, rel, text) => {
 };
 
 /** A checkout the command can describe: the four files it reads, a corpus gitlink, one commit. */
-function checkout(t, { version = '2.0.0', contract = '{"schema":1,"tools":[]}' } = {}) {
+function checkout(t, { version = '9.0.0', contract = '{"schema":1,"tools":[]}' } = {}) {
   const root = tempDir('snowarch-version-', t);
   const sha = createHash('sha256').update(contract).digest('hex');
   write(root, 'package.json', `${JSON.stringify({ name: 'fixture', version }, null, 2)}\n`);
@@ -45,7 +45,7 @@ function checkout(t, { version = '2.0.0', contract = '{"schema":1,"tools":[]}' }
   assert.equal(git(root, ['config', 'user.name']).trim(), 'fixture', 'the fixture identity did not take');
   git(root, ['add', 'package.json', 'engine.config.json', 'packages']);
   git(root, ['update-index', '--add', '--cacheinfo', `160000,${PIN},vendor/ServiceNowDocs`]);
-  git(root, ['commit', '-qm', 'chore(release): v2.0.0']);
+  git(root, ['commit', '-qm', 'chore(release): v9.0.0']);
   return { root, sha, version };
 }
 
@@ -69,16 +69,16 @@ const lineFor = (root, prefix) => lines(root).find((l) => l.startsWith(prefix));
 test('AC 1 — on the tag, the tag line says exact and the shas are the tag\'s own', (t) => {
   const f = checkout(t);
   assert.equal(git(f.root, ['tag', '-l']).trim(), '', 'the fixture already carries a tag');
-  tagAt(f.root, 'v2.0.0', buildTagMessage({
-    version: '2.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
+  tagAt(f.root, 'v9.0.0', buildTagMessage({
+    version: '9.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
 
   const info = versionInfo(f.root);
-  assert.equal(info.tag.name, 'v2.0.0');
+  assert.equal(info.tag.name, 'v9.0.0');
   assert.equal(info.tag.exact, true);
   assert.equal(info.tag.distance, 0);
-  assert.equal(lineFor(f.root, 'tag:'), 'tag:        v2.0.0 (exact)');
+  assert.equal(lineFor(f.root, 'tag:'), 'tag:        v9.0.0 (exact)');
 
-  // The values the tag records ARE the values the tree has — which is what `git show v2.0.0` says.
+  // The values the tag records ARE the values the tree has — which is what `git show v9.0.0` says.
   assert.equal(info.tag.message.contract, info.contractSha);
   assert.equal(info.tag.message.docsPin, info.docsPinGitlink);
   assert.match(lineFor(f.root, 'tag says:'), /^tag says:   contract [0-9a-f]{4}…[0-9a-f]{4} · docs-pin [0-9a-f]{7}$/);
@@ -87,8 +87,8 @@ test('AC 1 — on the tag, the tag line says exact and the shas are the tag\'s o
 
 test('a tag whose message describes a DIFFERENT tree says so', (t) => {
   const f = checkout(t);
-  tagAt(f.root, 'v2.0.0', buildTagMessage({
-    version: '2.0.0', contract: 'a'.repeat(64), docsPin: PIN, floors: CONFIG.floors }));
+  tagAt(f.root, 'v9.0.0', buildTagMessage({
+    version: '9.0.0', contract: 'a'.repeat(64), docsPin: PIN, floors: CONFIG.floors }));
   assert.match(lineFor(f.root, 'tag says:'), /\(differs — checkout is not the release\)$/);
 });
 
@@ -96,23 +96,23 @@ test('a tag whose message describes a DIFFERENT tree says so', (t) => {
 
 test('AC 2 — two commits past the tag, the distance is named twice over', (t) => {
   const f = checkout(t);
-  tagAt(f.root, 'v2.0.0', buildTagMessage({
-    version: '2.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
+  tagAt(f.root, 'v9.0.0', buildTagMessage({
+    version: '9.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
   commitOn(f.root, 'feat(engine): one');
   commitOn(f.root, 'feat(engine): two');
-  assert.equal(git(f.root, ['rev-list', '--count', 'v2.0.0..HEAD']).trim(), '2',
+  assert.equal(git(f.root, ['rev-list', '--count', 'v9.0.0..HEAD']).trim(), '2',
     'the fixture is not two commits past — the case would be measuring something else');
 
   const info = versionInfo(f.root);
   assert.equal(info.tag.distance, 2);
   assert.equal(info.tag.exact, false);
-  assert.equal(lineFor(f.root, 'tag:'), 'tag:        v2.0.0+2 (2 commits past v2.0.0)');
+  assert.equal(lineFor(f.root, 'tag:'), 'tag:        v9.0.0+2 (2 commits past v9.0.0)');
 
   // One commit past is singular — the kind of thing nobody notices until a user reads it.
   commitOn(f.root, 'feat(engine): three');
-  git(f.root, ['tag', '-a', 'v2.1.0', '-m', 'snowarch v2.1.0']);
+  git(f.root, ['tag', '-a', 'v9.1.0', '-m', 'snowarch v9.1.0']);
   commitOn(f.root, 'feat(engine): four');
-  assert.equal(lineFor(f.root, 'tag:'), 'tag:        v2.1.0+1 (1 commit past v2.1.0)');
+  assert.equal(lineFor(f.root, 'tag:'), 'tag:        v9.1.0+1 (1 commit past v9.1.0)');
 });
 
 test('an import/* tag is not a release — the --match filter is the whole point', (t) => {
@@ -173,8 +173,8 @@ test('AC 3 — a checkout says which of the two it is, and means it', () => {
 
 test('a shallow clone says WHY it cannot name a tag', (t) => {
   const f = checkout(t);
-  tagAt(f.root, 'v2.0.0', buildTagMessage({
-    version: '2.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
+  tagAt(f.root, 'v9.0.0', buildTagMessage({
+    version: '9.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
   commitOn(f.root, 'feat(engine): after the tag');
 
   const shallow = tempDir('snowarch-shallow-', t);
@@ -271,8 +271,8 @@ test('AC 4a — the doctor\'s engine header is this command\'s answer, not a sec
 
 test('the header costs less than the command — and says the same thing', (t) => {
   const f = checkout(t);
-  tagAt(f.root, 'v2.0.0', buildTagMessage({
-    version: '2.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
+  tagAt(f.root, 'v9.0.0', buildTagMessage({
+    version: '9.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
   const full = versionInfo(f.root);
   const header = versionInfo(f.root, { full: false });
 
@@ -359,15 +359,15 @@ test('C17: the released-tree branch of AC 3 is reachable, and asserts the releas
   // otherwise be unrun until the next release — which is precisely how the OLD assertion survived
   // to fail on a release commit. A tagged fixture exercises it here instead.
   const f = checkout(t);
-  tagAt(f.root, 'v2.0.0', buildTagMessage({
-    version: '2.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
+  tagAt(f.root, 'v9.0.0', buildTagMessage({
+    version: '9.0.0', contract: f.sha, docsPin: PIN, floors: CONFIG.floors }));
 
   const info = versionInfo(f.root);
   assert.ok(info.tag, 'the fixture is not tagged — the control proves nothing');
   assert.equal(info.tag.exact, true);
   assert.equal(info.tag.distance, 0);
   const rendered = renderVersion(info);
-  assert.match(rendered[1], /^tag: {8}v2\.0\.0 \(exact\)$/);
+  assert.match(rendered[1], /^tag: {8}v9\.0\.0 \(exact\)$/);
   // ARC-09-C17b: seven lines on a tagged tree, and the seventh is the tag-message comparison. This
   // fixture is the only place that shape is exercised until a release happens.
   assert.equal(rendered.length, 7, `a tagged fixture prints seven lines:\n${rendered.join('\n')}`);

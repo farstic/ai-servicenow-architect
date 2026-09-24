@@ -18,7 +18,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CLI = join(root, 'scripts', 'gen-roster.mjs');
 
 const SKILLS = [
-  ['alpha-specialist', 'gateway', 'Phase 1 Step 5 (before any builder dispatch).', '2.0.0'],
+  ['alpha-specialist', 'gateway', 'Phase 1 Step 5 (before any builder dispatch).', '9.9.9'],
   ['beta-writer', 'builder', 'On dispatch from the Chief Architect after routing approval.', '1.0.0'],
   ['gamma-reviewer', 'post-build consult', 'Post-build per taxonomy §6.2, and on demand.', '1.1.0'],
 ];
@@ -80,7 +80,7 @@ test('the generated block is exactly this, and the text around it survives', () 
       '',
       '| Skill | Fires as | Sub-agent | Version |',
       '|---|---|---|---|',
-      '| `alpha-specialist` | gateway | — | 2.0.0 |',
+      '| `alpha-specialist` | gateway | — | 9.9.9 |',
       '| `beta-writer` | builder | yes | 1.0.0 |',
       '| `gamma-reviewer` | post-build consult | — | 1.1.0 |',
       '',
@@ -166,7 +166,7 @@ test('ruling 1 — a missing Fires line is a failure, never "unknown"', () => {
   const dir = tree(({ write }) => {
     write('.claude/skills/alpha-specialist/SKILL.md',
       ['---', 'name: alpha-specialist', 'description: No triggers section at all.',
-        'metadata:', '  version: 2.0.0', '---', '', '# Alpha', ''].join('\n'));
+        'metadata:', '  version: 9.9.9', '---', '', '# Alpha', ''].join('\n'));
   });
   try {
     const r = run(dir);
@@ -181,7 +181,7 @@ test('a Fires line nobody can classify fails too, and prints the line', () => {
   const dir = tree(({ write }) => {
     write('.claude/skills/alpha-specialist/SKILL.md',
       ['---', 'name: alpha-specialist', 'description: Unclassifiable.', 'metadata:',
-        '  version: 2.0.0', '---', '', '## Triggers', '', '**Fires:** Whenever it feels like it.', ''].join('\n'));
+        '  version: 9.9.9', '---', '', '## Triggers', '', '**Fires:** Whenever it feels like it.', ''].join('\n'));
   });
   try {
     const r = run(dir);

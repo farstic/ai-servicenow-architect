@@ -1302,9 +1302,16 @@ The checklist, verbatim — paste it into the release pull request's description
 > 2. `git switch main && git pull --ff-only` · CI green on HEAD · the corpus present — `git submodule status vendor/ServiceNowDocs` shows no leading `-`; if it does, `git submodule update --init vendor/ServiceNowDocs`. A missing corpus is a **dirty tree** to the preflight (` D vendor/ServiceNowDocs`) and the release refuses before it writes anything.
 > 3. `git switch -c release/vX.Y.Z main` · `node scripts/release.mjs X.Y.Z --yes --allow-branch release/vX.Y.Z` (writes + commit, **no tag**) · open a pull request to `main` · merge it **without squashing** · then, on `main`, at the merge commit: `node scripts/release.mjs X.Y.Z --tag-only`.
 > 4. `git push origin main --follow-tags` (or pass `--push`).
-> 5. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
-> 6. Update the install page's metrics link if the numbers moved; announce.
-> 7. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
+> 5. **Answer the ARC-10 tripwire.** `tests/architecture-history.test.mjs` asserts that the
+>    release tag does **not** exist — `AC — the History section names both tags, and the
+>    release-tag half is deferred`. That is deliberate: `docs/ARCHITECTURE.md`'s History section
+>    makes a `git log … ..v<x.y.z>` claim that cannot be evaluated until the tag is real, so the
+>    test defers it and goes red the moment the tag exists. It is a step, not a failure — replace
+>    the deferral with the assertion the section's claim now allows, in its own commit. The tag
+>    is read from `package.json`, never spelled, so nothing else needs editing.
+> 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
+> 7. Update the install page's metrics link if the numbers moved; announce.
+> 8. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).
 
 **Step 2 is two-phase because it has to be.** `main` is protected by required status checks with
 `strict: true` — **54** of them after this milestone, generated into

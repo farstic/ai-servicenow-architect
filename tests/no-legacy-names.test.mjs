@@ -95,7 +95,7 @@ const EXEMPT_FILES = new Set([
   // History. The imported changelog below `## Before 2.0.0` records what things were called at the
   // time, and the fixture exists to BE that file — rewriting either would falsify the record.
   'docs/CHANGELOG.md',
-  'tests/fixtures/changelog-before-2.0.0.md',
+  'tests/fixtures/changelog-frozen-region.md',
 ]);
 const isExempt = (f) => EXEMPT_FILES.has(f) || EXEMPT_PREFIXES.some((p) => f.startsWith(p));
 
@@ -278,7 +278,7 @@ test('ARC-10-S03 — the allow-list is what is still owed, not what is permanent
   // The ten that moved must still MATCH — they are exempt because they carry the names on purpose,
   // and an exemption for a file that stopped carrying them is an exemption nobody can justify.
   for (const f of ['packages/contract/retired-names.json', 'scripts/ci/assert-publish-target.mjs',
-    'tests/fixtures/changelog-before-2.0.0.md', 'docs/CHANGELOG.md']) {
+    'tests/fixtures/changelog-frozen-region.md', 'docs/CHANGELOG.md']) {
     const text = readFileSync(join(root, f), 'utf8');
     assert.ok(FORBIDDEN.some((p) => compile(p).test(text)),
       `${f} is exempt and carries no retired name — the exemption is stale`);

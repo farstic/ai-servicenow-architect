@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 
 import { historyStartsAt, isHistory } from './helpers/changelog-history.mjs';
+import { FROZEN_HEADING } from '../scripts/lib/release/changelog.mjs';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -292,7 +293,7 @@ test('C17: history starts at the newest release heading, not at the frozen one',
   // will ever carry; `9.9.9` is the convention here, and the upgrade harness already uses `v9.x`.
   const released = ['# Changelog', '', '## Unreleased', '', '### Notes', '',
     '## 9.9.9 — 2026-01-01', '', 'a sentence naming an old path', '',
-    '## Before 2.0.0', '', 'the frozen region', ''];
+    FROZEN_HEADING, '', 'the frozen region', ''];
   // The released section is history: its index is the first `## <version>` line, not the frozen one.
   assert.equal(historyStartsAt(released), 6);
   assert.equal(isHistory(released, 5), false, 'the Unreleased skeleton is not history');
