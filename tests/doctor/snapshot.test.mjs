@@ -10,7 +10,9 @@
 // snapshot for that platform, which is the half that needs an install to exist.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { diff, EXPECTED_FAIL_ON_RUNNERS, normalise, PLATFORMS, snapshotPath, WINDOWS_DIFFERS,
@@ -209,4 +211,76 @@ test('C33: a NEW check is not a reason to refuse — writing it in is what --wri
 test('C33: an identical report drops nothing', () => {
   const snapshot = load(present[0]);
   assert.deepEqual(wouldDrop(snapshot, snapshot), []);
+});
+
+// ─── …and the REFUSAL AT THE CALL SITE, which is where the trap actually lives ─────────────────
+//
+// The three cases above drive `wouldDrop()` and prove the helper. They do NOT prove the command:
+// neutralising the `die` in `doctor-snapshot.mjs --write` left them 8/8 green, and the thing a
+// committed `doctor.json` armed was the COMMAND — `--write` from a stale capture, silently deleting
+// checks. The only measurement of that was taken by hand (`-19 +4` on snapshot-darwin.json), and a
+// finding that can only be measured by hand is a test that has not been written yet.
+//
+// So this spawns the real CLI. `--root` and `--platform` keep every byte inside a temp tree: a test
+// that exercised `--write` against the committed fixtures would be the hazard it is testing for.
+
+/** A temp root with one snapshot in it, plus a stale report that is missing `drop` ids. */
+function staleTree(t, drop) {
+  const root = mkdtempSync(join(tmpdir(), 'snowarch-snapwrite-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'tests/fixtures/doctor'), { recursive: true });
+  const snapshot = normalise(REPORT);
+  const target = join(root, 'tests/fixtures/doctor/snapshot-linux.json');
+  writeFileSync(target, `${JSON.stringify(snapshot, null, 2)}\n`);
+  const stale = { ...REPORT, checks: REPORT.checks.filter((c) => !drop.includes(c.id)) };
+  const inPath = join(root, 'stale.json');
+  writeFileSync(inPath, JSON.stringify(stale));
+  return { root, target, inPath, before: readFileSync(target, 'utf8') };
+}
+
+const runCli = (args) => spawnSync(process.execPath,
+  [join(REAL_ROOT, 'scripts/ci/doctor-snapshot.mjs'), ...args],
+  { encoding: 'utf8', cwd: REAL_ROOT });
+
+test('C33: the CLI refuses --write from a stale report, and writes nothing', (t) => {
+  const ids = normalise(REPORT).checks.map((c) => c.id);
+  assert.ok(ids.length >= 4, 'the report fixture is too small for this case to mean anything');
+  const drop = ids.slice(0, 3);
+
+  const { root, target, inPath, before } = staleTree(t, drop);
+  const r = runCli(['--in', inPath, '--write', '--root', root, '--platform', 'linux']);
+
+  assert.notEqual(r.status, 0, `--write accepted a stale report: ${r.stdout}${r.stderr}`);
+  const out = `${r.stdout}${r.stderr}`;
+  assert.match(out, /is missing 3 check\(s\) the snapshot has/);
+  for (const id of drop) assert.ok(out.includes(id), `the refusal does not name ${id}`);
+  assert.match(out, /Nothing was written/);
+  // THE BYTES. The message could say anything; what matters is that the snapshot did not move.
+  assert.equal(readFileSync(target, 'utf8'), before, 'the snapshot was written despite the refusal');
+});
+
+test('C33: --allow-dropping-checks means it, and only then', (t) => {
+  const ids = normalise(REPORT).checks.map((c) => c.id);
+  const drop = ids.slice(0, 3);
+  const { root, target, inPath, before } = staleTree(t, drop);
+
+  const r = runCli(['--in', inPath, '--write', '--root', root, '--platform', 'linux',
+    '--allow-dropping-checks']);
+  assert.equal(r.status, 0, `the escape hatch did not work: ${r.stdout}${r.stderr}`);
+  const after = readFileSync(target, 'utf8');
+  assert.notEqual(after, before, 'nothing was written with the removal allowed');
+  const written = JSON.parse(after);
+  for (const id of drop) {
+    assert.equal(written.checks.some((c) => c.id === id), false, `${id} survived a deliberate drop`);
+  }
+});
+
+test('C33: a report that drops nothing is written without the flag', (t) => {
+  // The other direction, so the refusal is not merely "--write never works": a complete report is
+  // written exactly as before, which is what every CI run does.
+  const { root, target, inPath, before } = staleTree(t, []);
+  const r = runCli(['--in', inPath, '--write', '--root', root, '--platform', 'linux']);
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  assert.match(`${r.stdout}${r.stderr}`, /wrote .*snapshot-linux\.json/);
+  assert.equal(readFileSync(target, 'utf8'), before, 'a complete report changed the snapshot');
 });
