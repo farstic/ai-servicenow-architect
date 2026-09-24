@@ -195,7 +195,9 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
 
     if (result.next) next = result.next;
     summary[result.status === 'warn' ? 'warn' : 'ok'] += 1;
-    onLine(stepLine({ id: step.id, title: step.title, status: result.status, durationMs, last: lastId }));
+    onLine(stepLine({ id: step.id, title: step.title, status: result.status, durationMs,
+      ...(result.showDetail && result.detail ? { detail: result.detail, showDetail: true } : {}),
+      last: lastId }));
     // Saved after EVERY step, not at the end: the whole point of the state file is that a run which
     // does not reach the end still knows where it got to.
     save(root, state);

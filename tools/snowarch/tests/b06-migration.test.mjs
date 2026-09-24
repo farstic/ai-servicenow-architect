@@ -325,7 +325,11 @@ test('ARC-08-C28 — an interactive --yes run keeps the instance and never promp
   }));
 
   assert.equal(result.status, 'ok');
-  assert.equal(result.detail, 'kept instance "pdi"');
+  // The PREFIX, not the whole sentence. These three cases are about the keep-path FIRING; the
+  // reason clause that now follows it is pinned once, in `b06-kept-instance.test.mjs`, where the
+  // subject is the console line. Three copies of a sentence is three places to update when it
+  // improves, and the first person to improve it would have weakened whichever they did not find.
+  assert.match(result.detail, /^kept instance "pdi"/);
   assert.equal(result.data.kept, true);
   assert.equal(result.data.saved, 0, 'a kept instance was counted as a save');
 });
@@ -335,7 +339,11 @@ test('ARC-08-C28 — a non-interactive --yes run keeps it too (C16 unchanged)', 
   const result = await runB06(ctxFor(root, {
     mode: 'live', isTTY: false, yes: true, spawn: refuseToSpawn(t),
   }));
-  assert.equal(result.detail, 'kept instance "pdi"');
+  // The PREFIX, not the whole sentence. These three cases are about the keep-path FIRING; the
+  // reason clause that now follows it is pinned once, in `b06-kept-instance.test.mjs`, where the
+  // subject is the console line. Three copies of a sentence is three places to update when it
+  // improves, and the first person to improve it would have weakened whichever they did not find.
+  assert.match(result.detail, /^kept instance "pdi"/);
 });
 
 test('ARC-08-C28 — interactive WITHOUT --yes keeps it as well', async (t) => {
@@ -346,7 +354,11 @@ test('ARC-08-C28 — interactive WITHOUT --yes keeps it as well', async (t) => {
   const result = await runB06(ctxFor(root, {
     mode: 'live', isTTY: true, yes: false, spawn: refuseToSpawn(t),
   }));
-  assert.equal(result.detail, 'kept instance "pdi"');
+  // The PREFIX, not the whole sentence. These three cases are about the keep-path FIRING; the
+  // reason clause that now follows it is pinned once, in `b06-kept-instance.test.mjs`, where the
+  // subject is the console line. Three copies of a sentence is three places to update when it
+  // improves, and the first person to improve it would have weakened whichever they did not find.
+  assert.match(result.detail, /^kept instance "pdi"/);
 });
 
 test('ARC-08-C28 — a --yes run with nothing to keep REFUSES rather than asking', async (t) => {

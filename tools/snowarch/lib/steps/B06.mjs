@@ -385,7 +385,13 @@ export const run = async (ctx) => {
   const { readDefaultSummary } = await import('../../../../packages/snowarch/dist/store/label.js');
   const kept = readDefaultSummary(join(ctx.root, '.local', 'instances.json'));
   if (kept) {
-    return { status: 'ok', detail: `kept instance "${kept.label}"`,
+    // ON THE LINE, not only in the state file. A person watching an upgrade reads the step line and
+    // nothing else, and this step line said `ok` while the decision underneath it was the keep-path
+    // ARC-08-C28 was raised over — the one where the wizard used to re-prompt over an existing
+    // instance. "kept" without the reason reads as a status; with it, it reads as a choice. `data`
+    // is untouched, so every JSON consumer sees exactly what it saw before.
+    return { status: 'ok', showDetail: true,
+      detail: `kept instance "${kept.label}"; the store already has one, so the wizard did not run`,
       data: { saved: 0, defaultInstance: kept.label, instance: kept, kept: true } };
   }
 

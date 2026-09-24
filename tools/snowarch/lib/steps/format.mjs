@@ -56,7 +56,8 @@ export const withoutDuration = (line, placeholder = '(time)') =>
  * The denominator is derived from the last step's id, never typed: a tenth step would otherwise
  * leave nine printed on every line of a ten-step run.
  */
-export function stepLine({ id, title, status, detail = null, note = null, durationMs = null, last }) {
+export function stepLine({ id, title, status, detail = null, note = null, durationMs = null,
+  showDetail = false, last }) {
   // `[B02/09]` — the id keeps its letter, the denominator does not. That asymmetry is the
   // conventions block's, not a slip: the left half is a name you can grep for in the state file and
   // in `--from B06`, the right half is a count.
@@ -74,7 +75,13 @@ export function stepLine({ id, title, status, detail = null, note = null, durati
 
   const d = humanDuration(durationMs);
   const suffix = d ? ` (${d})` : '';
-  return `${head}${status === 'warn' ? WORDING.warn : WORDING.ok}${suffix}`;
+  // `showDetail` is OPT-IN, and the opt-in is the point rather than caution. Nine ok/warn results
+  // across five steps carry a `detail`; printing all of them would reshape every bootstrap's output
+  // for the sake of one line, and printing B06's by NAME here would put a step's id in the shared
+  // renderer. So a step says when its detail is the decision a reader needs on the line — B06's
+  // keep-path does, because "ok" alone hides the choice ARC-08-C28 was raised over.
+  const shown = showDetail && detail ? ` — ${detail}` : '';
+  return `${head}${status === 'warn' ? WORDING.warn : WORDING.ok}${suffix}${shown}`;
 }
 
 /**
