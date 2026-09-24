@@ -314,7 +314,10 @@ cd <other-old-folder>;    claude mcp remove nowaikit -s local
 ```
 
 **If the folder no longer exists**, re-create it for the length of one command rather than editing
-`~/.claude.json` by hand:
+`~/.claude.json` by hand. This is the case `E-30` reports: it names every registration whose folder
+is gone, under any server key — including this product's own, which `E-23` deliberately leaves alone
+because under a folder that EXISTS such an entry is another working checkout. `E-30` is not in the
+`--quick` subset, so it appears in `./snowarch doctor` rather than at session start:
 
 ```sh
 mkdir -p <path> && cd <path> && claude mcp remove servicenow-mcp -s local && cd - && rmdir <path>

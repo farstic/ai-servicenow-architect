@@ -97,8 +97,19 @@ export const sectionNote = (section, reason) => (section === 'server'
   ? 'server (skipped — design-only)'
   : null);
 
-export function renderText({ report, checks = [], colour = false }) {
+export function renderText({ report, checks = [], results = [], colour = false }) {
   const byId = new Map(checks.map((c) => [c.id, c]));
+  // ARC-08-C34 — THE TERMINAL-ONLY DETAIL ARRIVES HERE, OR IT ARRIVES NOWHERE.
+  //
+  // `report.checks` has already been through `checkToJson`, whose `CHECK_KEYS` is the list of what
+  // TRAVELS and deliberately excludes `textDetail`. Reading it off the report was reading it off
+  // the copy built to omit it, so the `?? result.detail` below always won and E-23's promise to
+  // name the folder here — the whole reason the field exists — was dead from the day it was
+  // written. The runner's own results still carry it, so they are passed in beside the report.
+  //
+  // The report is untouched: `--json` and the doctor cache are both built from it, and
+  // `CHECK_KEYS` stays the authority on what a stranger can be asked to paste.
+  const terminal = new Map(results.map((r) => [r.id, r]));
   const idWidth = Math.max(0, ...report.checks.map((c) => String(c.id).length));
   const lines = [headerLine(report), ''];
 
@@ -135,8 +146,15 @@ export function renderText({ report, checks = [], colour = false }) {
       // exactly one reason: E-23 needs to name the other project folders here, where the user goes
       // and runs the command, and must not name them in the `--json` a stranger pastes into a
       // public tracker. `checkToJson` copies a fixed list of fields and does not copy this one.
+      // A MULTI-LINE terminal detail keeps the report's shape: E-30 prints one line per orphan
+      // plus a command per orphan, and continuation lines that started in column 0 read as
+      // output from something else. They are indented to the remedy's column, which is where
+      // everything below a check line already sits.
+      const shown = String(terminal.get(result.id)?.textDetail
+        ?? result.textDetail ?? result.detail ?? '').split('\n');
       lines.push(`  ${result.id.padEnd(idWidth)} ${paint(label, colour)}${padding} `
-        + `${title}: ${result.textDetail ?? result.detail ?? ''}`);
+        + `${title}: ${shown[0]}`);
+      for (const extra of shown.slice(1)) lines.push(`             ${extra.trim()}`);
       // The remedy is indented UNDER its check rather than beside it: it is often the longest
       // string in the report, and a wrapped remedy that starts mid-line is the part people stop
       // reading.
