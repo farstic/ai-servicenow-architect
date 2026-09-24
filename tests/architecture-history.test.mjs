@@ -7,14 +7,16 @@
  *
  * THE SHALLOW-CLONE RULE (ARC-09-S02's lesson, applied before it costs nine cells). CI's `test` job
  * checks out at `--depth 1` WITHOUT tags, so an object this file needs may simply not be in the
- * clone. It fetches what it needs; if the fetch is impossible — no network, or a clone with no
- * remote — the tag cases SKIP WITH THE REASON NAMED rather than failing. A test that fails because
- * the runner was configured differently teaches people to ignore failures.
+ * clone. It fetches what it needs INTO A TEMPORARY REPOSITORY — never into the checkout it is
+ * running in, which it only reads (see `resolveTag`) — and if the fetch is impossible, no network
+ * or no remote, the tag cases SKIP WITH THE REASON NAMED rather than failing. A test that fails
+ * because the runner was configured differently teaches people to ignore failures.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,31 +45,68 @@ export function historyRegion(doc) {
   return lines.slice(start, end).join('\n');
 }
 
+/** `git` in a NAMED directory, so every call site has to say which repository it means. */
+const gitIn = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
+
 /**
- * Make a tag available, or say why not.
+ * A tag's commit count, or a named reason it could not be measured here.
  *
- * Returns the reason to skip, or `null` when the object is present.
+ * THIS TEST USED TO FETCH INTO THE DEVELOPER'S OWN REPOSITORY. `ensureTag` ran
+ * `git fetch --depth=1 origin tag <tag>` with `cwd` set to REAL_ROOT — the checkout the suite is
+ * running in — so on any clone lacking the import tags, running `npm test` WROTE two refs into the
+ * repository under test. It was invisible on a clone that already had them, which is every clone
+ * that had run the suite once, and it is the same class as a generator that writes on import: a
+ * test may read the tree it runs in and must not change it.
+ *
+ * So the local repository is only ever READ. When the tag is not there, the fetch happens in a
+ * TEMPORARY repository built for the purpose and removed afterwards — CI's `--depth 1` checkout
+ * still gets a real answer, and nothing lands in anybody's refs. The remote URL is read from the
+ * local clone, which is a read.
+ *
+ * `run` and `mkTemp` are injected so the guarantee is testable: a case can assert that no `fetch`
+ * was ever issued with `cwd` equal to the repository under test. A promise in a comment is not one.
  */
-function ensureTag(tag) {
-  if (git(['rev-parse', '--verify', '--quiet', `${tag}^{commit}`]).status === 0) return null;
-  const fetched = git(['fetch', '--depth=1', 'origin', 'tag', tag]);
-  if (fetched.status === 0
-    && git(['rev-parse', '--verify', '--quiet', `${tag}^{commit}`]).status === 0) return null;
-  return `${tag} is not in this clone and could not be fetched `
-    + `(shallow checkout without tags, or no remote): ${String(fetched.stderr).trim().slice(0, 80)}`;
+export function resolveTag(tag, { at = root, run = gitIn,
+  mkTemp = () => mkdtempSync(join(tmpdir(), 'snowarch-tagcheck-')),
+  cleanup = (dir) => rmSync(dir, { recursive: true, force: true }) } = {}) {
+  const countIn = (dir) => Number(String(run(dir, ['rev-list', '--count', tag]).stdout ?? '').trim());
+
+  if (run(at, ['rev-parse', '--verify', '--quiet', `${tag}^{commit}`]).status === 0) {
+    return { count: countIn(at), where: 'local' };
+  }
+
+  const url = String(run(at, ['remote', 'get-url', 'origin']).stdout ?? '').trim();
+  if (!url) {
+    return { skipped: `${tag} is not in this clone and could not be fetched `
+      + '(no origin remote to fetch it from)' };
+  }
+
+  const tmp = mkTemp();
+  try {
+    // `-b main` because `init.defaultBranch` is a MACHINE setting (ARC-09-C14): this repository
+    // never checks out a branch here — it fetches one tag — but a fixture whose branch name
+    // differs between a laptop and a runner is how that rule was learned, and the sweep in
+    // `precondition-asserts.test.mjs` caught this line before it left the branch.
+    if (run(tmp, ['init', '-q', '-b', 'main']).status !== 0) {
+      return { skipped: `${tag} is not in this clone and could not be fetched `
+        + '(a temporary repository could not be created)' };
+    }
+    const fetched = run(tmp, ['fetch', '--depth=1', url, `+refs/tags/${tag}:refs/tags/${tag}`]);
+    if (fetched.status !== 0) {
+      return { skipped: `${tag} is not in this clone and could not be fetched `
+        + `(shallow checkout without tags, or no network): ${String(fetched.stderr).trim().slice(0, 80)}` };
+    }
+    return { count: countIn(tmp), where: 'temporary clone' };
+  } finally {
+    cleanup(tmp);
+  }
 }
 
 test('AC — both import tags exist and carry history', () => {
   // One ANSWER per tag: a commit count, or a named reason it could not be checked here. The first
   // version of this ended in `missing.length < N || missing.length === N`, which is true of every
   // number — a tautology dressed as a guard, and exactly the shape this suite exists to catch.
-  const answers = IMPORT_TAGS.map((tag) => {
-    const why = ensureTag(tag);
-    if (why) return { tag, skipped: why };
-    const count = Number(execFileSync('git', ['rev-list', '--count', tag],
-      { cwd: root, encoding: 'utf8' }).trim());
-    return { tag, count };
-  });
+  const answers = IMPORT_TAGS.map((tag) => ({ tag, ...resolveTag(tag) }));
   assert.equal(answers.length, IMPORT_TAGS.length);
 
   const checked = answers.filter((a) => a.count !== undefined);
@@ -215,4 +254,84 @@ test('AC — the retired names appear only inside the history region', () => {
   assert.ok(names.length >= 4, `only ${names.length} marked glossary row(s) — the parse is stale`);
   const leaked = names.filter((n) => outside.includes(n));
   assert.deepEqual(leaked, [], `${leaked.length} retired name(s) outside the History region`);
+});
+
+// ─── The repository under test is READ, never written ──────────────────────────────────────────
+//
+// `ensureTag` used to run `git fetch --depth=1 origin tag <tag>` with `cwd` set to REAL_ROOT, so on
+// any clone lacking the import tags, `npm test` wrote two refs into the developer's own repository.
+// Invisible on a clone that already had them — which is every clone that had run the suite once —
+// and the same class as a generator that writes on import: a test may read the tree it runs in and
+// must not change it.
+//
+// The guarantee is asserted rather than promised: `run` is injected, every invocation is recorded,
+// and the cases below ask what was issued and WHERE.
+
+/** A recording stub: answers by command, and keeps every `(cwd, args)` it was given. */
+function recorder({ has = false, url = 'git@example.invalid:o/r.git', fetchOk = true } = {}) {
+  const calls = [];
+  const run = (cwd, args) => {
+    calls.push({ cwd, args });
+    if (args[0] === 'rev-parse') return { status: has ? 0 : 1, stdout: '' };
+    if (args[0] === 'remote') return { status: 0, stdout: `${url}\n` };
+    if (args[0] === 'init') return { status: 0, stdout: '' };
+    if (args[0] === 'fetch') return { status: fetchOk ? 0 : 128, stdout: '', stderr: 'fatal: no' };
+    if (args[0] === 'rev-list') return { status: 0, stdout: '412\n' };
+    return { status: 0, stdout: '' };
+  };
+  return { run, calls, fetches: () => calls.filter((c) => c.args[0] === 'fetch') };
+}
+
+const TMP = '/tmp/a-temporary-repository';
+const opts = (r, over = {}) => ({ at: '/the/repo/under/test', run: r.run,
+  mkTemp: () => TMP, cleanup: () => {}, ...over });
+
+test('ARC-10 — a tag that is already here is COUNTED, and nothing is fetched at all', () => {
+  const r = recorder({ has: true });
+  const got = resolveTag('import/x', opts(r));
+  assert.equal(got.count, 412);
+  assert.equal(got.where, 'local');
+  assert.deepEqual(r.fetches(), [], 'a tag that is present was fetched anyway');
+});
+
+test('ARC-10 — a missing tag is fetched into a TEMPORARY repository, never the one under test', () => {
+  const r = recorder({ has: false });
+  const got = resolveTag('import/x', opts(r));
+  assert.equal(got.count, 412);
+  assert.equal(got.where, 'temporary clone');
+
+  // THE GUARANTEE, and the reason this test exists: a fetch happened, and not here.
+  assert.equal(r.fetches().length, 1, 'the missing tag was not fetched at all');
+  assert.equal(r.fetches()[0].cwd, TMP);
+  for (const c of r.calls) {
+    if (c.cwd === '/the/repo/under/test') {
+      assert.ok(['rev-parse', 'remote', 'rev-list'].includes(c.args[0]),
+        `the repository under test was given a write command: git ${c.args.join(' ')}`);
+    }
+  }
+});
+
+test('ARC-10 — no remote is a named skip, and still writes nothing', () => {
+  const r = recorder({ has: false, url: '' });
+  const got = resolveTag('import/x', opts(r));
+  assert.match(got.skipped, /could not be fetched/, 'the skip does not match the caller\'s guard');
+  assert.match(got.skipped, /no origin remote/);
+  assert.deepEqual(r.fetches(), [], 'a fetch was attempted with no remote to fetch from');
+});
+
+test('ARC-10 — a fetch that fails is deferred with the reason, not a failure', () => {
+  const r = recorder({ has: false, fetchOk: false });
+  const got = resolveTag('import/x', opts(r));
+  assert.equal(got.count, undefined, 'a failed fetch produced a count');
+  assert.match(got.skipped, /could not be fetched/);
+  assert.match(got.skipped, /no network/);
+});
+
+test('ARC-10 — the temporary repository is removed, including when the fetch fails', () => {
+  for (const fetchOk of [true, false]) {
+    const removed = [];
+    const r = recorder({ has: false, fetchOk });
+    resolveTag('import/x', opts(r, { cleanup: (d) => removed.push(d) }));
+    assert.deepEqual(removed, [TMP], `the temp repository leaked with fetchOk=${fetchOk}`);
+  }
 });
