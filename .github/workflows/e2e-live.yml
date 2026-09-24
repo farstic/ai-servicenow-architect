@@ -77,14 +77,17 @@ jobs:
           echo "sha:    $(git rev-parse HEAD)"
           echo "subject: $(git log -1 --format=%s)"
 
-      # The story ASSUMED `script(1)` is on the hosted images. This step is the citation it lacked:
-      # it prints which dialect the runner has, and the pty cases depend on it. On Windows there is
-      # no `script(1)` and none is wanted — that job runs the `--password-stdin` cases.
-      - name: Is script(1) here, and which one
+      # ARC-07-C8 — `script(1)` is gone: it called `tcgetattr` on ITS OWN stdin, which Node's default
+      # spawn makes a socketpair on darwin, and that call fails there no matter which of `script`'s
+      # two dialects is used. The pty cases now go through `tests/helpers/pty-driver.py`
+      # (`os.forkpty`), which needs only python3 — already a doctor prerequisite, and on every
+      # hosted image — and never calls `tcgetattr` on its own stdio. On Windows there is no
+      # `forkpty` and none is wanted — that job runs the `--password-stdin` cases.
+      - name: The pty driver, and whether this step's own stdin is a tty
         if: runner.os != 'Windows'
         run: |
-          command -v script
-          script --version 2>&1 | head -1 || echo "BSD script: no --version"
+          python3 --version
+          if [ -t 0 ]; then echo "stdin: tty"; else echo "stdin: not a tty"; fi
 
       - name: The suite
         env:

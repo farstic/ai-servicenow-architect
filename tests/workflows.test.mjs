@@ -1129,6 +1129,19 @@ test('ARC-07-S11 — the schedule tests develop, a dispatch tests the ref it was
   assert.match(text, /git rev-parse HEAD/, 'the run prints no sha');
 });
 
+test('ARC-07-C8 — the pty driver is python3, and the run says so', () => {
+  // The step this replaces printed `script(1)`'s dialect, which was the citation the story lacked.
+  // `script(1)` is gone — it called `tcgetattr` on its own stdin, and Node's default child stdio is
+  // a socketpair on darwin — so the citation now has to be about the driver that IS used. A missing
+  // step would leave a macOS failure unreadable again, which is how this row was found.
+  const text = wf('e2e-live.yml');
+  assert.match(text, /python3 --version/, 'the run never names the pty driver it used');
+  assert.match(text, /if \[ -t 0 \]; then echo "stdin: tty"/,
+    'the run never says whether its own stdin was a tty — the fact the whole row turned on');
+  assert.equal(/command -v script\b/.test(text), false,
+    'the workflow still proves script(1) is present, which nothing drives any more');
+});
+
 test('ARC-07-S11 — a skipped run says why, from a job that is not the skipped one', () => {
   // A job whose `if` is false runs NONE of its steps, so the reason cannot be printed from inside
   // `live` — that is exactly how the dispatch produced a completed run, a skipped job, and no
