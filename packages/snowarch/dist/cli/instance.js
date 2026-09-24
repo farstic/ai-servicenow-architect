@@ -1067,7 +1067,11 @@ export async function runSetPreset(options, io, deps = {}) {
         environment: entry.environment,
         preset,
         ...(options.yes ? { yes: true } : { io }),
+        // THE PROBES HERE ARE THE STORE'S, not this command's: `set-preset` never probes. So the
+        // screen is told WHEN they were taken and says so beside each flag, rather than rendering a
+        // value from days ago exactly like one measured a second ago (owner's sitting, 2026-09-23).
         ...(readProbe(entry.lastProbe) ? { probes: readProbe(entry.lastProbe) } : {}),
+        ...(readProbe(entry.lastProbe)?.at ? { probesRecordedAt: readProbe(entry.lastProbe)?.at } : {}),
         ...(gate.confirmedVia ? { prodAcknowledged: true } : {}),
     });
     if (!decision.ok) {

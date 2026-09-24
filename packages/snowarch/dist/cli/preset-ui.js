@@ -74,33 +74,64 @@ export const probeRecommendsOff = (status) => status === 'role missing' || statu
  * exactly the statuses `probeRecommendsOff` rejects, so the two cannot drift — a test walks every
  * status and requires them to agree.
  */
-export function probeNote(status) {
+export function probeNote(status, recordedAt = null) {
     if (!probeRecommendsOff(status))
         return null;
+    // THE SAME PROVENANCE AS THE SCREEN, and for a sharper reason: this is the `--yes` line, which is
+    // what a transcript pastes into a sitting record. `set-preset --yes` passes the STORE's probes, so
+    // without this the one line most likely to be quoted rendered a days-old measurement exactly like
+    // a fresh one. Beside the status, as on the screen (ARC-07-C9).
+    const when = recordedSuffix(recordedAt);
     switch (status) {
         case 'role missing':
-            return 'probe: role missing — those tools will fail until the account has the role';
+            return `probe: role missing${when} — those tools will fail until the account has the role`;
         case 'not licensed':
-            return 'probe: no Now Assist licence detected — those tools will fail until licensed';
+            return `probe: no Now Assist licence detected${when} — those tools will fail until licensed`;
         default:
-            return 'probe: not installed — tools will fail until @servicenow/sdk is on PATH';
+            return `probe: not installed${when} — tools will fail until @servicenow/sdk is on PATH`;
     }
 }
-export function annotate(status, hint) {
+/**
+ * WHEN THE PROBE WAS TAKEN — `null` for one that has just run.
+ *
+ * The screen renders the same `probe: ok` whether the probe ran a second ago or was read out of the
+ * store, and the two callers differ: `instance add`, `instance test` and `import --from-legacy`
+ * probe live and pass what they measured, while **`set-preset` passes `entry.lastProbe`** — a value
+ * that can be any age. The owner asked the question in the 2026-09-23 sitting: *either the probes
+ * are fresh and should be written, or they are the recorded ones and the word should say so*. They
+ * are the recorded ones, so the word says so.
+ *
+ * A DATE, not an age: "recorded 2026-09-19" stays true tomorrow, where "5 days ago" is a sentence
+ * that has to be recomputed to stay honest and is wrong in a transcript the moment it is pasted.
+ */
+export const recordedSuffix = (at) => (at ? ` (recorded ${String(at).slice(0, 10)})` : '');
+/**
+ * The status phrase, split from what follows it so the provenance can sit beside the STATUS rather
+ * than at the end of a sentence that is already asking a question — `probe: role missing (recorded
+ * 2026-09-19) — …; keep on?` reads; the same qualifier after `(recommend: off)` does not.
+ */
+function annotationParts(status, hint) {
     switch (status) {
-        case 'ok': return 'probe: ok';
+        case 'ok': return { head: 'ok', tail: '' };
         case 'role missing':
-            return `probe: role missing — ${hint ?? 'the account cannot read that table family'}; `
-                + 'keep on? (recommend: off)';
+            return { head: 'role missing',
+                tail: ` — ${hint ?? 'the account cannot read that table family'}; keep on? (recommend: off)` };
         case 'not licensed':
-            return 'probe: no Now Assist licence detected — tools will fail until licensed; keep on? '
-                + '(recommend: off)';
+            return { head: 'no Now Assist licence detected',
+                tail: ' — tools will fail until licensed; keep on? (recommend: off)' };
         case 'not installed':
-            return 'probe: @servicenow/sdk not on PATH — keep on? (recommend: off)';
-        case 'skipped': return 'probe: skipped';
-        case undefined: return 'probe: not run';
-        default: return `probe: ${status}`;
+            return { head: '@servicenow/sdk not on PATH', tail: ' — keep on? (recommend: off)' };
+        case 'skipped': return { head: 'skipped', tail: '' };
+        case undefined: return { head: 'not run', tail: '' };
+        default: return { head: String(status), tail: '' };
     }
+}
+export function annotate(status, hint, recordedAt = null) {
+    const { head, tail } = annotationParts(status, hint);
+    // `not run` is never qualified: there is no probe, so there is no date to name — a provenance on
+    // an absence would be describing a record that does not exist.
+    const when = status === undefined ? '' : recordedSuffix(recordedAt);
+    return `probe: ${head}${when}${tail}`;
 }
 /** The `LastProbe` field that carries a flag's result. One mapping, used by the screen and S05. */
 export const PROBE_FIELD = Object.freeze({
@@ -172,7 +203,7 @@ export function presetNote(flags) {
     return `${on.length} of ${FLAG_NAMES.length} on`;
 }
 export function renderReviewScreen(input) {
-    const { label, environment, preset, flags, probes, hints } = input;
+    const { label, environment, preset, flags, probes, hints, probesRecordedAt } = input;
     // LOCKED, not "is production": an acknowledged raise is still production — the banner says so —
     // and what the acknowledgement changes is whether the boxes may be touched.
     const locked = environment === 'prod' && input.prodAcknowledged !== true;
@@ -193,7 +224,7 @@ export function renderReviewScreen(input) {
         const name = labelOf(flag).padEnd(LABEL_WIDTH + 2);
         const note = locked
             ? 'locked on production'
-            : annotate(probes?.[PROBE_FIELD[flag]], hints?.[flag]);
+            : annotate(probes?.[PROBE_FIELD[flag]], hints?.[flag], probesRecordedAt ?? null);
         lines.push(...wrapRow(`  ${box} ${name} `, note));
     }
     // The story's footer is 111 characters and the budget is 100, so it WRAPS — the same rule as a
@@ -429,7 +460,7 @@ export async function resolveFlags(input) {
         for (const flag of FLAG_NAMES) {
             if (flags[flag] !== 'true')
                 continue;
-            const note = probeNote(input.probes?.[PROBE_FIELD[flag]]);
+            const note = probeNote(input.probes?.[PROBE_FIELD[flag]], input.probesRecordedAt ?? null);
             if (note)
                 because[flag] = note;
         }
@@ -438,6 +469,7 @@ export async function resolveFlags(input) {
     const reviewed = await runReviewScreen({
         label, environment, preset, flags,
         ...(input.probes ? { probes: input.probes } : {}),
+        ...(input.probesRecordedAt ? { probesRecordedAt: input.probesRecordedAt } : {}),
         ...(input.hints ? { hints: input.hints } : {}),
         ...(input.prodAcknowledged ? { prodAcknowledged: true } : {}),
     }, io);

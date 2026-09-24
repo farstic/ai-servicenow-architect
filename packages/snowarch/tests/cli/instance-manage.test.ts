@@ -690,3 +690,60 @@ describe('ARC-07-C6 — the probe column shows every fact the record holds', () 
     } finally { none.cleanup(); }
   });
 });
+
+// ─── ARC-07-C9 — the wiring, at the one site that has it ──────────────────────────────────────
+//
+// The provenance mechanism lives in `annotate`/`probeNote` and is tested there. Its ONLY caller is
+// `runSetPreset`, and the architect measured that deleting the wiring line
+//
+//     ...(readProbe(entry.lastProbe)?.at ? { probesRecordedAt: readProbe(entry.lastProbe)?.at } : {})
+//
+// left preset-ui + instance-manage + instance-manage-server + prod-ack at 101 passed, 0 failed:
+// every test sat below the seam, so the mechanism was proven and its use was not. Same class as
+// #254's hollow binding — and the reason both surfaces are covered here is that a user meets them
+// through this command, not through `annotate`.
+describe('ARC-07-C9 — set-preset says when its probes were taken', () => {
+  const AT = '2026-09-19T08:11:02.000Z';
+  const RECORDED = '(recorded 2026-09-19)';
+  /** A stored probe with one failing flag, so BOTH the screen and the `--yes` line have to speak. */
+  const probed = () => entry({
+    lastProbe: { at: AT, auth: 'ok', write: 'role missing', scripting: 'ok', cmdb: 'ok',
+      atf: 'ok', nowAssist: 'ok', fluent: 'ok' },
+  });
+
+  it('the review screen qualifies every flag row with the day the probe was recorded', async () => {
+    const ws = workspace({ pdi: probed() });
+    try {
+      // Enter = accept as shown, which is the path a reader takes after reading the rows.
+      const terminal = io(['']);
+      expect(await runSetPreset({ label: 'pdi', preset: 'full' }, terminal, deps(ws))).toBe(0);
+      const screen = terminal.written();
+      // Every flag row carries it — six flags, six qualifiers.
+      expect((screen.match(/\(recorded 2026-09-19\)/g) ?? []).length).toBe(6);
+      // ...and the recommendation it is qualifying is on the same line as the date.
+      expect(screen).toContain(`probe: role missing ${RECORDED} —`);
+    } finally { ws.cleanup(); }
+  });
+
+  it('--yes says it too, which is the line a transcript pastes', async () => {
+    const ws = workspace({ pdi: probed() });
+    try {
+      const terminal = io([]);
+      expect(await runSetPreset({ label: 'pdi', preset: 'full', yes: true }, terminal, deps(ws)))
+        .toBe(0);
+      const applying = terminal.written().split('\n').find((l) => l.startsWith('Applying:')) ?? '';
+      expect(applying).toContain(`probe: role missing ${RECORDED} —`);
+    } finally { ws.cleanup(); }
+  });
+
+  it('an entry with no recorded probe says nothing about when — there is nothing to date', async () => {
+    // The negative: no `lastProbe`, so no provenance, and the line must not invent one.
+    const ws = workspace({ pdi: entry() });
+    try {
+      const terminal = io([]);
+      expect(await runSetPreset({ label: 'pdi', preset: 'full', yes: true }, terminal, deps(ws)))
+        .toBe(0);
+      expect(terminal.written()).not.toContain('recorded');
+    } finally { ws.cleanup(); }
+  });
+});
