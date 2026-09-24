@@ -43,3 +43,10 @@ Thumbs.db
 # without racing tests/contract.test.ts, which reads the real one in a parallel worker. Removed
 # in a finally; listed so a killed run leaves nothing tracked.
 packages/snowarch/.tmp-doctor-dist/
+
+# Python's bytecode cache. `scripts/acceptance/tag-controls.py` is IMPORTABLE BY DESIGN — its
+# controls are data, and re-verifying every anchor against a tree is a read of `CONTROLS` rather
+# than an hour-long run — and an import is what writes one of these. A hand-run script alone never
+# does, which is why the two older `.py` files here never needed the rule.
+__pycache__/
+*.pyc
