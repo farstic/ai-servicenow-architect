@@ -49,8 +49,13 @@ test('the snow-mcp variant carries the npm sentence, and its link target exists'
   // (The path is written on its own here: L05 reads a trailing `§ <version>` as part of it and
   // reports the whole string as a dead path, which is correct of the string and wrong about the
   // file.)
+  // The MESSAGE does not spell the version the regex looks for. A failure message is not evidence
+  // and needs no literal: spelling one here put this file in the version sweep's way for a sentence
+  // nobody asserts on, and an exemption for a message is an exemption that teaches the next reader
+  // that the list is where inconvenient lines go.
   assert.match(read('packages/snowarch/CHANGELOG.md'), /^## 2\.0\.0/m,
-    'packages/snowarch/CHANGELOG.md has no 2.0.0 section for the notice to link');
+    'packages/snowarch/CHANGELOG.md has no section for the successor\'s first release '
+    + 'for the notice to link');
 });
 
 test('the checklist is six numbered items, and the wait is one of them', () => {

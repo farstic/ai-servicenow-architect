@@ -174,8 +174,8 @@ test('the contract sha is the prefix the rest of the product prints', () => {
   // stores twelve; the SKILL.md sample showed seven and was the only one of the four. A reader
   // comparing the panel against `./snowarch version` must not have to notice that one is shorter.
   assert.equal(SHA_PREFIX, 12);
-  assert.equal(engineLine({ version: '2.0.0', tag: 'v2.0.0', contractSha: 'a'.repeat(64) }),
-    `Engine: snowarch 2.0.0 · tag v2.0.0 · contract ${'a'.repeat(12)}`);
+  assert.equal(engineLine({ version: '9.9.9', tag: 'v9.9.9', contractSha: 'a'.repeat(64) }),
+    `Engine: snowarch 9.9.9 · tag v9.9.9 · contract ${'a'.repeat(12)}`);
   // A development checkout has no tag and says nothing rather than inventing one. The version is
   // a made-up one, not this checkout's: `tests/version-literals.test.mjs` forbids spelling the
   // version of record anywhere in the suite, because the release script writes the new version

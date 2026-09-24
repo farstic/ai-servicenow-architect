@@ -21,6 +21,8 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8').replace(/\r/g, '');
 const git = (args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+/** Read, never spelled: the tripwire below names the release tag this checkout is heading for. */
+const rootVersion = JSON.parse(read('package.json')).version;
 
 export const IMPORT_TAGS = ['import/engine-v2.8.0-worktree', 'import/snow-mcp-1.0.0'];
 
@@ -80,17 +82,24 @@ test('AC — both import tags exist and carry history', () => {
   }
 });
 
-test('AC — the History section names both tags, and the `v2.0.0` half is deferred', () => {
+test('AC — the History section names both tags, and the release-tag half is deferred', () => {
   // This half needs no network: what the SECTION says is checkable whatever the clone looks like.
   const region = historyRegion(read('docs/ARCHITECTURE.md'));
   assert.ok(region, 'no `## History` heading — L05 depends on that exact text');
   for (const tag of IMPORT_TAGS) {
     assert.ok(region.includes(tag), `the History section does not name ${tag}`);
   }
-  // The `git log … ..v2.0.0` claim is evaluated at the tag (ARC-10-S06/S08), not here: the tag does
-  // not exist yet, and a test that asserted it would be asserting the future.
-  assert.equal(git(['rev-parse', '--verify', '--quiet', 'v2.0.0^{commit}']).status === 0, false,
-    'v2.0.0 exists — the cross-boundary claim is now evaluable and this case should assert it');
+  // THE ARC-10 TRIPWIRE. The `git log … ..v<release>` claim is evaluated at the tag (ARC-10-S06/S08)
+  // and not here: the tag does not exist yet, and a test that asserted it would be asserting the
+  // future. When the release IS tagged this case goes red on purpose — that is the point of it, and
+  // the cut runbook carries the step that answers it.
+  //
+  // The tag is DERIVED, never spelled (ARC-09-C12a). Spelling it would put this file in the version
+  // sweep's way for the one line whose whole job is to name the release that has not happened —
+  // and the sweep would then be flagging the tripwire rather than the literals it exists to catch.
+  const releaseTag = `v${rootVersion.replace(/-.*$/, '')}`;
+  assert.equal(git(['rev-parse', '--verify', '--quiet', `${releaseTag}^{commit}`]).status === 0, false,
+    `${releaseTag} exists — the cross-boundary claim is now evaluable and this case should assert it`);
 });
 
 test('AC — every ADR the History links resolves, and the link check is not vacuous', () => {

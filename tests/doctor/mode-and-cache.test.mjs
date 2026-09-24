@@ -214,7 +214,7 @@ test('the engine block is assembled from what the checks already found', () => {
     { id: 'E-16', data: { checked: 289, dead: 0 } },
     { id: 'E-17', data: { skills: 28, agents: 9 } },
   ];
-  const block = engineBlock(results, { version: '2.0.0', contractSha: 'abc' });
+  const block = engineBlock(results, { version: '9.9.9', contractSha: 'abc' });
   assert.equal(block.node, '22.1.0');
   assert.equal(block.docs.citations, 289);
   assert.deepEqual(block.roster, { skills: 28, agents: 9 });

@@ -10,12 +10,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { buildFile, classify, extractNotes, extractUnreleased, readCommits, renderGroups, sectionFor, trailerLine,
-  writeChangelog } from '../scripts/lib/release/changelog.mjs';
+import { buildFile, classify, extractNotes, extractUnreleased, FROZEN_HEADING, readCommits, renderGroups,
+  sectionFor, trailerLine, writeChangelog } from '../scripts/lib/release/changelog.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,7 +36,7 @@ const readReal = (p) => readFileSync(join(REAL_ROOT, p), 'utf8');
  * name`. A test that needs history to say anything says nothing on most machines.
  *
  * So the region is a COMMITTED FIXTURE, written once from that commit:
- * `tests/fixtures/changelog-before-2.0.0.md`, sha256
+ * `tests/fixtures/changelog-frozen-region.md`, sha256
  * 65943e7086d5c9618f7c24c13c4a4ae895a2185d8657fe196110fddf57b09beb. Comparing against a file rather
  * than against a hash is the difference between a failure that says "these two lines changed" and
  * one that says "the hash is different" — and this is a region whose failure mode is somebody
@@ -46,10 +46,10 @@ const readReal = (p) => readFileSync(join(REAL_ROOT, p), 'utf8');
  * is what that commit actually holds.
  */
 const FROZEN_SINCE = 'bcd4dcd';
-const FROZEN_FIXTURE = 'tests/fixtures/changelog-before-2.0.0.md';
+const FROZEN_FIXTURE = 'tests/fixtures/changelog-frozen-region.md';
 
 const HEADER = '# Changelog\n\nA rule.\n\n---\n\n';
-const FROZEN = '## Before 2.0.0\n\nimported history, untouched\n';
+const FROZEN = `${FROZEN_HEADING}\n\nimported history, untouched\n`;
 
 /** A repository with the story's four commits, plus a merge and a release commit to be skipped. */
 function fixture(t, { notes = 'A hand-written note.\n\nAnd a second paragraph.' } = {}) {
@@ -108,9 +108,9 @@ const run = (f, version, date, over = {}) => writeChangelog({
 test('AC 1 — the four commits become the right groups, with the breaking footer and the fallback', (t) => {
   const f = fixture(t);
   const before = f.read('docs/CHANGELOG.md');
-  assert.ok(!before.includes('## 2.0.0'), 'the fixture already has a 2.0.0 section');
+  assert.ok(!before.includes('## 9.1.0'), 'the fixture already has a 9.1.0 section');
 
-  const result = run(f, '2.0.0', '2026-10-01');
+  const result = run(f, '9.1.0', '2026-10-01');
   assert.equal(result.ok, true, result.message);
   const section = result.section;
 
@@ -137,12 +137,12 @@ test('AC 1 — the four commits become the right groups, with the breaking foote
   const order = [...section.matchAll(/^### (\w+)$/gm)].map((m) => m[1]).filter((g) => g !== 'Notes');
   assert.deepEqual(order, ['Breaking', 'Added', 'Fixed', 'Internal']);
   // ...and the trailer.
-  assert.ok(section.includes(`Tag v2.0.0 · contract ${'a'.repeat(12)} · docs-pin ${'b'.repeat(7)}`), section);
+  assert.ok(section.includes(`Tag v9.1.0 · contract ${'a'.repeat(12)} · docs-pin ${'b'.repeat(7)}`), section);
 });
 
 test('AC 6 — the release commit and the merge are not in the output', (t) => {
   const f = fixture(t);
-  const { section } = run(f, '2.0.0', '2026-10-01');
+  const { section } = run(f, '9.1.0', '2026-10-01');
   assert.equal(section.includes('chore(release)'), false, 'a release commit reached the changelog');
   assert.equal(section.includes('Merge pull request'), false, 'a merge commit reached the changelog');
   // The side commit came in THROUGH the merge and is a real commit of its own — it belongs.
@@ -156,27 +156,27 @@ test('AC 2 — the Notes block moves down byte-identical, and a fresh empty one 
   const f = fixture(t, { notes });
   assert.equal(extractNotes(f.read('docs/CHANGELOG.md')), notes, 'the fixture Notes did not round-trip');
 
-  run(f, '2.0.0', '2026-10-01');
+  run(f, '9.1.0', '2026-10-01');
   const after = f.read('docs/CHANGELOG.md');
 
   // In the release section, verbatim.
-  const section = sectionFor(after, '2.0.0');
+  const section = sectionFor(after, '9.1.0');
   assert.ok(section.includes(`### Notes\n\n${notes}`), section);
   // ...and gone from Unreleased, which now has an empty Notes waiting for the next change.
   assert.equal(extractNotes(after), '');
-  assert.match(after, /^## Unreleased\n\n### Notes\n\n## 2\.0\.0 — 2026-10-01$/m);
+  assert.match(after, /^## Unreleased\n\n### Notes\n\n## 9\.1\.0 — 2026-10-01$/m);
 });
 
 // ── AC 3 ───────────────────────────────────────────────────────────────────────────────────────
 
 test('AC 3 — the same version twice is refused, and the file is not touched', (t) => {
   const f = fixture(t);
-  run(f, '2.0.0', '2026-10-01');
+  run(f, '9.1.0', '2026-10-01');
   const after = f.read('docs/CHANGELOG.md');
 
-  const second = run(f, '2.0.0', '2026-10-02');
+  const second = run(f, '9.1.0', '2026-10-02');
   assert.equal(second.ok, false);
-  assert.equal(second.message, 'changelog: section 2.0.0 already exists');
+  assert.equal(second.message, 'changelog: section 9.1.0 already exists');
   assert.equal(f.read('docs/CHANGELOG.md'), after, 'the refused run wrote anyway');
 });
 
@@ -184,15 +184,15 @@ test('AC 3 — the same version twice is refused, and the file is not touched', 
 
 test('AC 7 — the frozen region is not touched, in the fixture and in this repository', (t) => {
   const f = fixture(t);
-  run(f, '2.0.0', '2026-10-01');
+  run(f, '9.1.0', '2026-10-01');
   const after = f.read('docs/CHANGELOG.md');
   assert.ok(after.endsWith(FROZEN), 'the generator rewrote the imported history');
 
   // The real file, against the committed fixture. Works at any clone depth, and a failure prints
   // the lines that moved rather than two hashes.
   const region = (text) => {
-    const at = text.indexOf('\n## Before 2.0.0');
-    assert.notEqual(at, -1, 'the "## Before 2.0.0" heading is gone');
+    const at = text.indexOf(`\n${FROZEN_HEADING}`);
+    assert.notEqual(at, -1, `the "${FROZEN_HEADING}" heading is gone`);
     return text.slice(at).replace(/^\n/, '');
   };
   const current = region(readReal('docs/CHANGELOG.md'));
@@ -212,7 +212,7 @@ test('AC 7 (history) — the fixture is what bcd4dcd holds, where the object is 
   } catch {
     return t.skip(`${FROZEN_SINCE} is not in this clone (shallow) — the fixture comparison stands alone`);
   }
-  const at = base.indexOf('\n## Before 2.0.0');
+  const at = base.indexOf(`\n${FROZEN_HEADING}`);
   assert.notEqual(at, -1);
   assert.equal(base.slice(at).replace(/^\n/, ''), readReal(FROZEN_FIXTURE),
     `${FROZEN_FIXTURE} is not what ${FROZEN_SINCE} holds`);
@@ -253,8 +253,8 @@ test('AC 4 — the supersedes sentence and the migration bullets are in the comm
 test('the changelog still has exactly one Unreleased and one frozen heading', () => {
   const text = readReal('docs/CHANGELOG.md');
   assert.equal((text.match(/^## Unreleased$/gm) ?? []).length, 1);
-  assert.equal((text.match(/^## Before 2\.0\.0$/gm) ?? []).length, 1);
-  assert.ok(text.indexOf('## Unreleased') < text.indexOf('## Before 2.0.0'),
+  assert.equal((text.match(new RegExp(`^${FROZEN_HEADING}$`, 'gm')) ?? []).length, 1);
+  assert.ok(text.indexOf('## Unreleased') < text.indexOf(FROZEN_HEADING),
     'Unreleased must sit above the imported history — the generator inserts between them');
 });
 
@@ -262,7 +262,7 @@ test('the changelog still has exactly one Unreleased and one frozen heading', ()
 
 test('classify: merges and release commits are dropped, everything else is placed', () => {
   assert.equal(classify({ sha: 'a'.repeat(40), subject: 'anything', parents: ['x', 'y'] }), null);
-  assert.equal(classify({ sha: 'a'.repeat(40), subject: 'chore(release): v2.0.0', parents: ['x'] }), null);
+  assert.equal(classify({ sha: 'a'.repeat(40), subject: 'chore(release): v9.1.0', parents: ['x'] }), null);
   const perf = classify({ sha: 'b'.repeat(40), subject: 'perf(engine): faster', body: '', parents: ['x'] });
   assert.equal(perf.group, 'Changed');
   const bang = classify({ sha: 'c'.repeat(40), subject: 'feat(api)!: drop v1', body: '', parents: ['x'] });
@@ -278,17 +278,17 @@ test('renderGroups emits only the groups that have something in them', () => {
 
 test('sectionFor returns one release and stops at the next heading', (t) => {
   const f = fixture(t);
-  run(f, '2.0.0', '2026-10-01');
+  run(f, '9.1.0', '2026-10-01');
   const text = f.read('docs/CHANGELOG.md');
-  const section = sectionFor(text, '2.0.0');
+  const section = sectionFor(text, '9.1.0');
   assert.ok(section.includes('### Added'));
-  assert.equal(section.includes('## Before 2.0.0'), false, 'the section ran into the frozen region');
+  assert.equal(section.includes(FROZEN_HEADING), false, 'the section ran into the frozen region');
   assert.equal(sectionFor(text, '9.9.9'), null);
 });
 
 test('buildFile refuses a file with no Unreleased heading rather than guessing where to insert', () => {
-  const built = buildFile({ text: '# C\n\nnothing\n', version: '2.0.0', date: '2026-10-01',
-    notes: '', body: '', trailer: trailerLine('2.0.0', {}) });
+  const built = buildFile({ text: '# C\n\nnothing\n', version: '9.1.0', date: '2026-10-01',
+    notes: '', body: '', trailer: trailerLine('9.1.0', {}) });
   assert.equal(built.ok, false);
   assert.equal(built.message, 'changelog: no "## Unreleased" heading');
 });
@@ -362,9 +362,9 @@ test('C17: the released-tree branch is reachable, and asserts the released shape
   // The negative control for the branch above: a file in the released shape, put through the same
   // reasoning. Without this, the branch is code nobody has run until the next release.
   const released = ['# Changelog', '', '## Unreleased', '', '### Notes', '',
-    '## 2.0.0 — 2026-09-11', '', '### Notes', '', 'a note somebody wrote', '',
+    '## 9.1.0 — 2026-09-11', '', '### Notes', '', 'a note somebody wrote', '',
     '### Added', '', '- a hand-written entry', '', '_trailer_', '',
-    '## Before 2.0.0', '', '- old', ''].join('\n');
+    FROZEN_HEADING, '', '- old', ''].join('\n');
   assert.equal(extractUnreleased(released), SKELETON_BODY,
     'the fixture is not in the released shape this branch is for');
   assert.match(released, /\n## Unreleased\n\n### Notes\n\n## /);
@@ -386,14 +386,14 @@ test('C12c: nothing inside the block is treated as a boundary', () => {
     '### Added', '', '- a hand-written entry', '',
     '### Notes', '', 'a second Notes heading, deliberately',
   ].join('\n');
-  const text = `# Changelog\n\n## Unreleased\n\n${block}\n\n## Before 2.0.0\n\n- old\n`;
+  const text = `# Changelog\n\n## Unreleased\n\n${block}\n\n${FROZEN_HEADING}\n\n- old\n`;
   assert.equal(extractUnreleased(text), block);
 
   const built = buildFile({ text, version: '9.9.9', date: '2026-01-01',
     carried: extractUnreleased(text), body: '', trailer: '_t_' });
   assert.ok(built.section.includes(block), 'a boundary was invented inside the block');
   // The frozen tail is untouched, as ever.
-  assert.match(built.text, /## Before 2\.0\.0\n\n- old\n$/);
+  assert.match(built.text, new RegExp(`${FROZEN_HEADING}\n\n- old\n$`));
 });
 
 test('C12c: the old narrow reader is what the defect was, kept only as the narrow question', () => {
@@ -442,7 +442,7 @@ test('C15: the file starts with its title and the one rule', () => {
 
 test('C15: the imported header is history, below the live sections and above the frozen one', () => {
   const text = readFileSync(join(REAL_ROOT, 'docs/CHANGELOG.md'), 'utf8');
-  const frozenAt = text.indexOf('\n## Before 2.0.0');
+  const frozenAt = text.indexOf(`\n${FROZEN_HEADING}`);
   const prefaceAt = text.indexOf("\n## The imported engine's header");
   assert.ok(frozenAt > 0, 'the frozen region is gone');
   assert.ok(prefaceAt > 0, 'the imported header was deleted rather than moved — provenance is the point');
@@ -472,4 +472,38 @@ test('C15: the imported header is history, below the live sections and above the
   assert.equal(titleBlock.includes(IMPORTED), false,
     `the title block still names the imported repository:\n${titleBlock}`);
   assert.ok(titleBlock.split('\n').length < 8, 'the title block grew — it is a title and one rule');
+});
+
+/** Every `tests/**` file that IMPORTS `what` from the release changelog module. */
+const IMPORTS_FROZEN = /import \{[^}]*\bFROZEN_HEADING\b[^}]*\} from '[^']*release\/changelog\.mjs'/s;
+function importersOf(re, dir = join(REAL_ROOT, 'tests'), out = []) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name === 'fixtures') continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) { importersOf(re, full, out); continue; }
+    if (!/\.test\.mjs$/.test(entry.name)) continue;
+    if (re.test(readFileSync(full, 'utf8'))) out.push(relative(REAL_ROOT, full).split('\\').join('/'));
+  }
+  return out;
+}
+
+test('FROZEN_HEADING has at least one importer, so the constant is not dead on export', () => {
+  // ARC-09 (9.x migration). The heading was retyped in five test files and imported by NONE —
+  // measured at zero on d90f5bd — so exporting it fixed nothing until the retypings went. A
+  // constant nobody imports is a second definition wearing the word "single".
+  //
+  // COUNTED BY THE IMPORT, not by the name. The first version counted files CONTAINING the string
+  // and could never fail: this file names FROZEN_HEADING in its own test title, so it always
+  // counted itself and the assertion was true no matter what the tree did. Found by its own
+  // control — every importer removed, and the count stayed at one.
+  //
+  // The COMMENTS that name the heading are deliberately left as prose: the sweep ignores a comment
+  // because in a comment it is the lesson, and an interpolated constant inside an explanatory
+  // sentence is a sentence nobody can read.
+  const importers = importersOf(IMPORTS_FROZEN);
+  assert.ok(importers.length >= 1,
+    'nothing imports FROZEN_HEADING — the constant is exported and unused, which is the state '
+    + 'this test exists to prevent');
+  // ...and this file is one of them, or the count is about somebody else's discipline.
+  assert.ok(importers.includes('tests/changelog.test.mjs'), importers.join(', '));
 });

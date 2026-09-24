@@ -226,7 +226,7 @@ test('the renderer: FAIL shouts, the Mode line is last, colour only on a TTY', (
   assert.ok(!text.includes(ESC), 'a piped report must carry no escape codes');
   assert.ok(renderText({ report, checks, colour: true }).includes(ESC));
 
-  assert.match(headerLine({ version: '2.0.0', ranAt: '2026-09-10T10:00:12Z', options: { quick: true } }),
+  assert.match(headerLine({ version: '9.9.9', ranAt: '2026-09-10T10:00:12Z', options: { quick: true } }),
     /quick: yes · network: yes · section: all/);
   assert.equal(summaryLine({ ok: 1, warn: 0, fail: 0, skip: 2, fixable: 0 }),
     'DOCTOR: 1 ok, 0 warn, 0 fail, 2 skipped');
