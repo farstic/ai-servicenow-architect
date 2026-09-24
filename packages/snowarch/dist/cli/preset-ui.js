@@ -74,16 +74,21 @@ export const probeRecommendsOff = (status) => status === 'role missing' || statu
  * exactly the statuses `probeRecommendsOff` rejects, so the two cannot drift — a test walks every
  * status and requires them to agree.
  */
-export function probeNote(status) {
+export function probeNote(status, recordedAt = null) {
     if (!probeRecommendsOff(status))
         return null;
+    // THE SAME PROVENANCE AS THE SCREEN, and for a sharper reason: this is the `--yes` line, which is
+    // what a transcript pastes into a sitting record. `set-preset --yes` passes the STORE's probes, so
+    // without this the one line most likely to be quoted rendered a days-old measurement exactly like
+    // a fresh one. Beside the status, as on the screen (ARC-07-C9).
+    const when = recordedSuffix(recordedAt);
     switch (status) {
         case 'role missing':
-            return 'probe: role missing — those tools will fail until the account has the role';
+            return `probe: role missing${when} — those tools will fail until the account has the role`;
         case 'not licensed':
-            return 'probe: no Now Assist licence detected — those tools will fail until licensed';
+            return `probe: no Now Assist licence detected${when} — those tools will fail until licensed`;
         default:
-            return 'probe: not installed — tools will fail until @servicenow/sdk is on PATH';
+            return `probe: not installed${when} — tools will fail until @servicenow/sdk is on PATH`;
     }
 }
 /**
@@ -455,7 +460,7 @@ export async function resolveFlags(input) {
         for (const flag of FLAG_NAMES) {
             if (flags[flag] !== 'true')
                 continue;
-            const note = probeNote(input.probes?.[PROBE_FIELD[flag]]);
+            const note = probeNote(input.probes?.[PROBE_FIELD[flag]], input.probesRecordedAt ?? null);
             if (note)
                 because[flag] = note;
         }

@@ -61,7 +61,7 @@ export declare const probeRecommendsOff: (status: ProbeStatus | undefined) => bo
  * exactly the statuses `probeRecommendsOff` rejects, so the two cannot drift — a test walks every
  * status and requires them to agree.
  */
-export declare function probeNote(status: ProbeStatus | undefined): string | null;
+export declare function probeNote(status: ProbeStatus | undefined, recordedAt?: string | null): string | null;
 /**
  * WHEN THE PROBE WAS TAKEN — `null` for one that has just run.
  *
