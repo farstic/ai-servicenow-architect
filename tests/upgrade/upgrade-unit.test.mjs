@@ -8,9 +8,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import {
   classifyGitFetchError, doctorLines, parseSemver, renderPlan, sortTags,
@@ -227,4 +227,148 @@ test('ARC-09-C46 — B09 keeps the output it had, which is why the renderer coul
 
   // The two views share one implementation, so the fail line must be the same string in both.
   assert.equal(failureLines(REPORT)[0], doctorLines(REPORT)[1]);
+});
+
+// ─── ARC-09-C53 — U7's Mode line is the user's words, not the JSON boundary's mask ─────────────
+//
+// U7 printed `Mode: live — instance=<label> (<label>) preset=custom …` while `./snowarch doctor`
+// a second later printed `instance=pdi (pdi)` (owner's sitting, 2026-09-23).
+//
+// `<label>` is NOT an unfilled template. It is `LABEL_MASK` from `doctor/json-boundary.mjs`, and the
+// masking is deliberate and correct: `--json` is the form that TRAVELS — an issue template asks a
+// stranger to paste it — so labels and hosts leave as `<label>` / `<host>`. The bug is that U7 runs
+// `doctor --json`, parses the masked stdout, and prints its `modeLine` to the user's own terminal,
+// where the mask is not wanted and the reader owns the words.
+//
+// The unmasked line is already on disk: `doctor/index.mjs` caches the report at line 331 BEFORE
+// `maskForJson` is applied at 514/543, and U7 already passes `--write-cache`. So this is a matter of
+// reading the line from the copy meant for this machine rather than the copy meant to be pasted.
+import { finish } from '../../tools/snowarch/lib/commands/upgrade.mjs';
+import { CACHE_FILE } from '../../tools/snowarch/lib/doctor-cache.mjs';
+
+const MASKED = 'Mode: live — instance=<label> (<label>) preset=custom — doctor 2026-09-24 14 ok';
+const REAL = 'Mode: live — instance=pdi (pdi) preset=custom — doctor 2026-09-24 14 ok';
+
+/** A throwaway tree, removed when the case ends. */
+function tempDir(prefix, t) {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
+
+/** A tree whose doctor cache carries the UNMASKED line, as the real doctor writes it. */
+function treeWithCache(t, modeLine = REAL) {
+  const root = tempDir('snowarch-u7-', t);
+  mkdirSync(join(root, dirname(CACHE_FILE)), { recursive: true });
+  writeFileSync(join(root, CACHE_FILE), JSON.stringify({
+    version: 1, at: '2026-09-24T12:00:00.000Z', writer: 'doctor', mode: 'live',
+    modeLine, checks: [], summary: { ok: 14, warn: 1, fail: 0, skip: 25 },
+  }));
+  return root;
+}
+
+/** U7 with the doctor stubbed: bootstrap succeeds, the doctor prints MASKED json on stdout. */
+async function runU7(root, { modeLine = MASKED } = {}) {
+  const lines = [];
+  const log = { step: (l) => lines.push(l), fail: (l) => lines.push(l), warn: (l) => lines.push(l) };
+  const run = (_cmd, args) => (args.includes('doctor')
+    ? { status: 0, stdout: JSON.stringify({ mode: 'live', modeLine,
+      summary: { ok: 14, warn: 1, fail: 0, skip: 25 }, checks: [] }) }
+    : { status: 0 });
+  await finish({ root, env: {}, log, run, target: 'v9.1.0', latest: 'v9.1.0',
+    remote: 'origin', now: () => new Date('2026-09-24T12:00:00.000Z'), state: { mode: 'live' } });
+  return lines;
+}
+
+test('ARC-09-C53 — U7 prints the label the user owns, not the JSON boundary\'s mask', async (t) => {
+  const root = treeWithCache(t);
+  const lines = await runU7(root);
+  const mode = lines.find((l) => l.startsWith('Mode:')) ?? '';
+  assert.notEqual(mode, '', `U7 printed no Mode line at all: ${JSON.stringify(lines)}`);
+  assert.equal(mode.includes('<label>'), false,
+    `U7 printed the JSON boundary's mask to the user's terminal: ${mode}`);
+  assert.match(mode, /instance=pdi \(pdi\)/,
+    'U7 did not print the instance label the doctor cached for this machine');
+});
+
+test('ARC-09-C53 — with no cached line, U7 says nothing rather than printing a mask', async (t) => {
+  // The degradation that matters: a masked line is worse than no line, because it reads as a value.
+  const root = tempDir('snowarch-u7-nocache-', t);
+  const lines = [];
+  const log = { step: (l) => lines.push(l), fail: (l) => lines.push(l), warn: (l) => lines.push(l) };
+  const run = (_cmd, args) => (args.includes('doctor')
+    ? { status: 0, stdout: JSON.stringify({ mode: 'live', modeLine: MASKED,
+      summary: { ok: 1, warn: 0, fail: 0, skip: 0 }, checks: [] }) }
+    : { status: 0 });
+  await finish({ root, env: {}, log, run, target: 'v9.1.0', latest: 'v9.1.0', remote: 'origin',
+    now: () => new Date('2026-09-24T12:00:00.000Z'), state: { mode: 'live' } });
+  assert.equal(lines.some((l) => l.includes('<label>')), false,
+    `a mask reached the user's terminal with no cache to read: ${JSON.stringify(lines)}`);
+});
+
+// ─── ARC-09-C53, second half — the cached line must be THIS run's ─────────────────────────────
+//
+// Reading the cache fixed the mask and introduced the defect one layer down: `readCachedModeLine`
+// had no notion of WHICH run wrote the file. Every bootstrapped tree carries a cache from an earlier
+// doctor, so when U7's own doctor FAILED — the upgrade that broke something, the moment the closing
+// line matters most — U7 closed with yesterday's line, tally and all, as if it had just been
+// measured:
+//
+//     Mode: live — instance=old-pdi (old-pdi) preset=custom — doctor 2026-09-23 12 ok
+//
+// That is ARC-07-C9's class exactly (a recorded value rendered as fresh), one step from where it was
+// just fixed — and the same split B09 gets right and U7 got wrong. So the read is bound to this run:
+// the doctor exited 0, its report parsed, it reported no `cacheError`, and the cache was written at
+// or after the moment U7 started it. Anything else is silence, because a stale line reads as a
+// measurement.
+
+/** U7 with a cache of a given age and a doctor of a given outcome. */
+async function u7With(t, { cacheAt, modeLine, doctorStatus = 0, cacheError = null,
+  startedAt = '2026-09-24T12:00:00.000Z' }) {
+  const root = tempDir('snowarch-u7-age-', t);
+  mkdirSync(join(root, dirname(CACHE_FILE)), { recursive: true });
+  writeFileSync(join(root, CACHE_FILE), JSON.stringify({
+    version: 1, at: cacheAt, writer: 'doctor', mode: 'live', modeLine,
+    checks: [], summary: { ok: 12, warn: 0, fail: 0, skip: 0 },
+  }));
+  const lines = [];
+  const log = { step: (l) => lines.push(l), fail: (l) => lines.push(l), warn: (l) => lines.push(l) };
+  const run = (_cmd, args) => (args.includes('doctor')
+    ? { status: doctorStatus,
+      stdout: doctorStatus === 0
+        ? JSON.stringify({ mode: 'live', modeLine: MASKED, summary: { ok: 14, warn: 0, fail: 0, skip: 0 },
+          checks: [], ...(cacheError ? { cacheError } : {}) })
+        : '' }
+    : { status: 0 });
+  await finish({ root, env: {}, log, run, target: 'v9.1.0', latest: 'v9.1.0', remote: 'origin',
+    now: () => new Date(startedAt), state: { mode: 'live' } });
+  return lines.filter((l) => l.startsWith('Mode:'));
+}
+
+const YESTERDAY = 'Mode: live — instance=old-pdi (old-pdi) preset=custom — doctor 2026-09-23 12 ok';
+
+test('ARC-09-C53 — a doctor that FAILED does not get to print yesterday\'s Mode line', async (t) => {
+  const modes = await u7With(t, { cacheAt: '2026-09-23T09:00:00.000Z', modeLine: YESTERDAY,
+    doctorStatus: 1 });
+  assert.deepEqual(modes, [],
+    `U7 closed a failed upgrade with a stale line as if measured now: ${modes.join(' | ')}`);
+});
+
+test('ARC-09-C53 — a doctor that could not write its cache does not print the old one', async (t) => {
+  const modes = await u7With(t, { cacheAt: '2026-09-23T09:00:00.000Z', modeLine: YESTERDAY,
+    cacheError: 'EACCES: permission denied' });
+  assert.deepEqual(modes, [], `a stale line was printed after a cacheError: ${modes.join(' | ')}`);
+});
+
+test('ARC-09-C53 — a cache older than this run is not this run, even with a healthy doctor', async (t) => {
+  const modes = await u7With(t, { cacheAt: '2026-09-23T09:00:00.000Z', modeLine: YESTERDAY });
+  assert.deepEqual(modes, [], `a cache from yesterday was printed as this run: ${modes.join(' | ')}`);
+});
+
+test('ARC-09-C53 — a cache written AT the start instant counts as this run', async (t) => {
+  // Equality matters: the doctor stamps the cache from its own clock, and a run fast enough to land
+  // on the same millisecond must not be discarded as stale.
+  const fresh = 'Mode: live — instance=pdi (pdi) preset=custom — doctor 2026-09-24 14 ok';
+  const modes = await u7With(t, { cacheAt: '2026-09-24T12:00:00.000Z', modeLine: fresh });
+  assert.deepEqual(modes, [fresh]);
 });
