@@ -123,6 +123,8 @@ console line, which said only `ok`.
   script's negative audit control could not fire there; the bogus-table add above replaced it.
 - §D4 (catalog unchanged by discover) and §D5 (ARC-02-S10's two open questions) were not run.
 - §E (the live E2E suite), §F and §G had not started when this record was written.
+- §E2 — e2e-live run 35964429588 on develop d90f5bd, dispatched with allow-writes off after
+  ARC-07-C7 and ARC-07-C8: windows, ubuntu and macOS all green; §E4 (one scheduled night) pending.
 
 ## Observer notes
 
