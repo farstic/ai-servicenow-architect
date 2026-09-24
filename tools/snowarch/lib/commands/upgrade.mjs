@@ -22,6 +22,8 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+
+import { CACHE_FILE } from '../doctor-cache.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -62,6 +64,21 @@ export function doctorLines(report) {
   if (!report?.summary) return [];
   const { ok = 0, warn = 0, fail = 0, skip = 0 } = report.summary;
   return [`DOCTOR: ${ok} ok, ${warn} warn, ${fail} fail (${skip} skip)`, ...nonOkLines(report)];
+}
+
+/**
+ * The Mode line the doctor wrote for THIS MACHINE, or `null`.
+ *
+ * Read from `.local/doctor-last.json`, which `doctor/index.mjs` writes from the unmasked report —
+ * the `--json` on stdout is masked at the boundary for a different audience. Returns `null` on any
+ * unreadable or shapeless cache: a caller that prints nothing is honest, and one that falls back to
+ * the masked line prints `<label>` as though it were the instance's name.
+ */
+export function readCachedModeLine(root, { read = readFileSync } = {}) {
+  try {
+    const line = JSON.parse(read(join(root, CACHE_FILE), 'utf8'))?.modeLine;
+    return typeof line === 'string' && line.length > 0 ? line : null;
+  } catch { return null; }
 }
 
 /** `--check` found a newer release. A code, so a script can ask without parsing prose. */
@@ -595,7 +612,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
  * first, and a RE-RUN after a step failed, where the tree is already at the target and planning a
  * move that has happened would be a lie in a box. Both end here, so both end the same way.
  */
-async function finish({ root, env, log, run, target, latest, remote, now, state }) {
+export async function finish({ root, env, log, run, target, latest, remote, now, state }) {
   log.step(stepLine(6, 'bootstrap (only the steps whose inputs changed)'));
   const mode = state?.mode === 'live' ? 'live' : 'design';
   const bootstrap = run(process.execPath, [join(root, 'tools/snowarch/bin/snowarch.mjs'),
@@ -616,7 +633,25 @@ async function finish({ root, env, log, run, target, latest, remote, now, state 
   let report = null;
   try { report = JSON.parse(doctor.stdout ?? ''); } catch { report = null; }
   for (const line of doctorLines(report)) log.step(line);
-  if (report?.modeLine) log.step(report.modeLine);
+
+  // THE MODE LINE COMES FROM THE CACHE, NOT FROM THE `--json` STDOUT WE JUST PARSED.
+  //
+  // `<label>` is not an unfilled template: it is `LABEL_MASK` from `doctor/json-boundary.mjs`, and
+  // masking `--json` is deliberate and right — that is the form which TRAVELS, an issue template
+  // asks a stranger to paste it, so labels and hosts leave as `<label>` / `<host>`. U7 was printing
+  // that copy to the user's own terminal, which is the one audience that owns the words: the owner
+  // saw `instance=<label> (<label>)` here and `instance=pdi (pdi)` from `./snowarch doctor` a
+  // second later (sitting, 2026-09-23).
+  //
+  // The unmasked line is already on disk and we already asked for it: `doctor/index.mjs` caches the
+  // report BEFORE `maskForJson` runs, and the spawn above passes `--write-cache`. So this reads the
+  // copy meant for this machine. No second doctor run, and no reconstruction of a line the doctor
+  // owns — `modeLine` carries the preset and the doctor's own tally, which this command does not
+  // know and must not invent.
+  //
+  // A MASK IS WORSE THAN SILENCE, so there is no fallback to `report.modeLine`: it reads as a value.
+  const cachedModeLine = readCachedModeLine(root);
+  if (cachedModeLine) log.step(cachedModeLine);
 
   // ARC-09-C47 — NO CURRENCY VERDICT HERE. This used to write `behind: false` as a literal,
   // because an upgrade had just finished, and overwrite the measurement U7's doctor had made
