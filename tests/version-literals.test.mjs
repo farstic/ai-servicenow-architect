@@ -23,9 +23,11 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { compareSemver } from '../tools/snowarch/lib/semver.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const rootVersion = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
@@ -118,13 +120,39 @@ function testFiles(dir, out = []) {
  * The same rule holds when the record is itself a prerelease — `2.0.0-rc.11` does not match inside
  * `2.0.0-rc.110`.
  */
+/**
+ * THE SAME VERSION, SPELLED AS A REGEX. `/^## 2\\.0\\.0/m` names the version as surely as `'2.0.0'`
+ * does, and the plain search could not see it: the characters on the line are `2\\.0\\.0`, which does
+ * not contain the string `2.0.0`.
+ *
+ * It bit twice before it was closed. `tests/predecessor-notice.test.mjs` pinned the record version in
+ * an escaped regex and was invisible; then `tests/install-page.test.mjs` asserted the README head
+ * matched `/2\\.0\\.0/` — the CURRENT version, which the post-release bump is guaranteed to move —
+ * and broke the moment `develop` went to `2.0.1-dev`, with the sweep silent through both. Two bites
+ * make it a class; a third would be a dead tag.
+ *
+ * Built from the version's own parts rather than by escaping a pattern twice, because "the escaped
+ * spelling of a version" is easy to write wrongly and impossible to misread when it is derived.
+ */
+export const escapedSpelling = (version) => String(version).split('.').join('\\.');
+
+/** A string, as a pattern that matches exactly itself. */
+const asPattern = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 export function literalLines(text, version) {
-  const escaped = String(version).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const whole = new RegExp(`(?<![\\d.])${escaped}(?![-\\d])`);
+  // TWO SPELLINGS OF ONE VERSION — `2.0.0` and the `2\.0\.0` a regex literal carries — each turned
+  // into a pattern that matches itself. `escapedSpelling` returns the TEXT a source file contains,
+  // not a pattern: the first version of it returned the pattern, and the control built from it
+  // planted the wrong characters and passed for the wrong reason.
+  //
+  // Same boundaries for both, and they hold on the escaped one for the same reasons: `12\.0\.0` is
+  // a different version (digit before), `2\.0\.10` is (digit after), `2\.0\.0-rc\.6` is (a `-`).
+  const forms = [String(version), escapedSpelling(version)]
+    .map((f) => new RegExp(`(?<![\\d.])${asPattern(f)}(?![-\\d])`));
   const hits = [];
   text.split('\n').forEach((line, i) => {
     if (/^\s*(\/\/|\*|\/\*|#)/.test(line)) return;      // in a comment it is the lesson
-    if (whole.test(line)) hits.push(i + 1);
+    if (forms.some((re) => re.test(line))) hits.push(i + 1);
   });
   return hits;
 }
@@ -280,4 +308,62 @@ test('C17b: a fixture spelling the current version is caught, even in a heading'
   assert.deepEqual(literalLines(planted, rootVersion), [1]);
   // And the convention passes: a fixture version no release will carry.
   assert.deepEqual(literalLines(`  const released = ['## 9.9.9 — 2026-01-01'];`, rootVersion), []);
+});
+
+// ─── A reference to a PAST release, and why it needs no exemption ──────────────────────────────
+
+/**
+ * The four sites that name `2.0.0` as a RELEASED FACT rather than as this tree's version.
+ *
+ * Each is bound to its reason here rather than to an allow-list, because an allow-list for these
+ * would be a mechanism that can never fire — and a place to park the one reference that SHOULD.
+ */
+export const RELEASED_FACTS = Object.freeze([
+  { file: 'tests/predecessor-notice.test.mjs', names: '2.0.0',
+    why: "the successor's first release: the notice links `packages/snowarch/CHANGELOG.md` at its "
+      + '`## 2.0.0` heading, and that heading is history the moment it exists' },
+  { file: 'tests/validation-tests-shape.test.mjs', names: '2.0.0',
+    why: '`## Before 2.0.0` is the FROZEN HEADING — the imported engine\'s history begins there and '
+      + 'the string is a constant of the file format, not a version this tree is on' },
+]);
+
+test('C12a — a reference to a PAST release cannot fire, and that is why it needs no exemption', () => {
+  // THE PROPERTY, not a promise: `scripts/lib/release/preflight.mjs` refuses a version that is not
+  // greater than the latest tag, so the version of record only ever moves FORWARD. A line naming a
+  // release that has already happened can therefore never be the version the sweep is asking about.
+  //
+  // This is deliberately not an allow-list. An allow-list here could never fire — and it would be
+  // exactly the place somebody parks a reference to the version being cut, which is the one case
+  // that must fail. The escaped-form extension above made these four lines visible for the first
+  // time; they are safe for a reason, and the reason is written down rather than switched off.
+  const target = releaseTarget(rootVersion);
+  for (const { file, names, why } of RELEASED_FACTS) {
+    assert.ok(why.length > 20, `${file}: a reason that short is not a reason`);
+    assert.ok(existsSync(join(root, file)), `${file} is gone — this binding is stale`);
+    assert.equal(compareSemver(names, target) < 0, true,
+      `${file} names ${names}, which is not behind the version of record ${target} — `
+      + 'a reference to an UNRELEASED version must fail the sweep, not be bound here');
+    const content = readFileSync(join(root, file), 'utf8');
+    // THE SITE STILL NAMES IT. Without this the binding is hollow: re-point an entry at a file that
+    // does not mention the version at all and every other assertion here still passes — existence,
+    // a long enough reason, the semver property, and silence at the current target are all true of
+    // a file that has nothing to do with this. That is the stale-binding case the `is gone` check
+    // was written for, one step later, and it is how an exemption outlives its reason.
+    assert.notEqual(literalLines(content, names).length, 0,
+      `${file} no longer names ${names} — this binding is stale`);
+    // ...and the sweep really is quiet on it today, which is the claim this test is making.
+    assert.deepEqual(literalLines(content, target), [], `${file} is flagged at ${target}`);
+  }
+});
+
+test('C12a — the escaped spelling is caught, and the control is a regex literal', () => {
+  const target = releaseTarget(rootVersion);
+  // THE CONTROL the row asks for: a regex literal of the record version planted in a test.
+  const planted = `  assert.match(read('CHANGELOG.md'), /^## ${escapedSpelling(target)}/m);`;
+  assert.deepEqual(literalLines(planted, target), [1],
+    'a regex literal of the version of record is not caught — the blind spot is back');
+  // The same line with the 9.x convention is not a finding.
+  assert.deepEqual(literalLines(`  assert.match(x, /^## ${escapedSpelling('9.9.9')}/m);`, target), []);
+  // ...and a PRERELEASE of the record version still is not, in the escaped form either (C50).
+  assert.deepEqual(literalLines(`  assert.match(x, /v${escapedSpelling(target)}-rc\\.6/);`, target), []);
 });
