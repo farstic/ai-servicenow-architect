@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.1 — 2026-09-24
+
+### Notes
+
 A patch release. Nothing here changes how the product is installed or configured: every entry is
 either a line a user reads or a guard that keeps one honest. There is no migration step.
 
@@ -61,6 +65,31 @@ recommendation, in `docs/spikes/nonoklines-mask-options.md`; queued rather than 
   `develop` in the bump pull request. Bringing back the version bump alone leaves the released notes
   under `## Unreleased`, where the next cut re-publishes them under its own heading — which is
   exactly what this release had to repair before it could be made.
+
+### Fixed
+
+- bootstrap: B06's line says which instance it kept, and why (d401b28)
+- engine: the cached Mode line U7 prints has to be this run's (7573a61)
+- engine: U7 prints the label the user owns, not the JSON boundary's mask (26d35b3)
+- wizard: --yes says it too, and the wiring is tested at its one site (b34a7bb)
+- wizard: a recorded probe says it is recorded (4e95270)
+- tests: the history suite reads the repository it runs in, never writes it (780b6a4)
+- tests: the version sweep sees a version spelled as a regex (c2aa679)
+- doctor: E-29 no longer reports the step that is running it as never run (f3bb42d)
+- doctor: an untagged HEAD is a development checkout, not one that is behind (0bfb124)
+
+### Internal
+
+- bring v2.0.0's changelog section back to develop, and guard the gap (c03a2d4)
+- the nonOkLines mask — measurement, options and a recommendation (003078c)
+- the Uninstall reason is scoped — the default writes nothing, local/user does (eac15e0)
+- deregister before deleting a checkout, and stop claiming nothing was written (76133bf)
+- the released-fact binding proves its site (the fix 9e1210c described) (f3e5871)
+- the released-fact binding proves its site, and the harness gains C52 (9e1210c)
+- the refusal is proved at the call site, not only in its helper (8cd0ad2)
+- the tag-measurement harness, committed with the four defects it had (fe4b3d2)
+
+Tag v2.0.1 · contract 3d1e0ef6daf3 · docs-pin df4afac
 
 ## 2.0.0 — 2026-09-24
 
