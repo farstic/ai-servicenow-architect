@@ -16,6 +16,7 @@ import { plannedSteps } from '../../steps/index.mjs';
 import { version as engineVersionOf } from '../../config.mjs';
 import { defineCheck } from '../registry.mjs';
 import { projectEntryEnabled } from '../../settings-local.mjs';
+import { RUNNING_STEP_ENV } from '../../spawn-env.mjs';
 
 import { credentialKeys, credentialLines, CREDENTIAL_EXT } from './credential-shape.mjs';
 import { fail, ok, warn } from './result.mjs';
@@ -590,11 +591,31 @@ export function engineRepoChecks() {
           root: ctx.root,
         });
 
+        // THE STEP RUNNING THIS CHECK IS NOT A STEP THAT NEVER RAN.
+        //
+        // B09's job includes spawning `doctor --quick --json` for the summary it prints, and the
+        // runner records a step only AFTER its `run()` returns. So on every first design-only
+        // bootstrap this check ran from inside B09, found B09 absent, and printed
+        // `bootstrap incomplete since <version>: B09 never ran` — the first FAIL a new user ever
+        // sees, under the very step that was running it, with a remedy that would re-run an install
+        // that had just finished. The install was fine; the sentence was false.
+        //
+        // The running step names ITSELF in the child environment (`RUNNING_STEP_ENV`), so this is
+        // "the step that is running me", never "B09": a future step that asks the doctor for a
+        // summary is covered without this check learning its name. It is deliberately not a marker
+        // in the state file — that would survive a `SIGKILL` and make a genuinely unfinished install
+        // read as in progress for ever, which is this check's own defect facing the other way.
+        const runningStep = (ctx.env ?? {})[RUNNING_STEP_ENV] || null;
         const problems = [];
         const stale = [];
+        let inProgress = null;
         for (const step of expected) {
           const recorded = state.steps?.[step.id];
-          if (!recorded) { problems.push({ id: step.id, why: 'never ran' }); continue; }
+          if (!recorded) {
+            if (step.id === runningStep) { inProgress = step.id; continue; }
+            problems.push({ id: step.id, why: 'never ran' });
+            continue;
+          }
           if (recorded.status === 'failed' || recorded.status === 'fail') {
             problems.push({ id: step.id, why: recorded.reason === 'interrupted' ? 'interrupted' : 'failed' });
             continue;
@@ -612,7 +633,11 @@ export function engineRepoChecks() {
         }
 
         if (problems.length === 0 && stale.length === 0) {
-          return ok(`${expected.length} steps recorded, all current`);
+          // The count is of what IS recorded, and the sentence says why one is not — a reader who
+          // sees a number one short of the plan should not have to wonder which.
+          return inProgress
+            ? ok(`${expected.length - 1} steps recorded, all current; ${inProgress} is running this check`)
+            : ok(`${expected.length} steps recorded, all current`);
         }
 
         const parts = [];

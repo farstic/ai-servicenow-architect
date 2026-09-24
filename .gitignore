@@ -50,3 +50,11 @@ packages/snowarch/.tmp-doctor-dist/
 # does, which is why the two older `.py` files here never needed the rule.
 __pycache__/
 *.pyc
+
+# A doctor report at the root is a TRANSIENT INPUT, never an asset. `docs/CONTRIBUTING.md` spells the
+# snapshot recipe as `doctor-snapshot.mjs --in doctor.json`, and CI writes `doctor.json`,
+# `doctor-quick.json` and `doctor-ps.json` per platform — so the obvious thing to do locally is
+# produce one here. A committed one sat at this root for a fortnight, read by nothing, and turned the
+# documented `--write` into a command that silently dropped three checks from a snapshot.
+/doctor.json
+/doctor-*.json

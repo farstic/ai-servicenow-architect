@@ -1563,8 +1563,20 @@ Three files, in this order, and the tests will tell you if you stop after the fi
 2. **The three snapshots.** `tests/fixtures/doctor/snapshot-{linux,darwin,win32}.json` record what
    a design-only install answers, per check. A new id is red in `tests/doctor/snapshot.test.mjs`
    with the id named — on every cell, not only after a bootstrap. Produce the rows from a real run
-   rather than by hand: `node scripts/ci/doctor-snapshot.mjs --in doctor.json --write` on the
-   platform, or from that platform's `doctor-<label>` artifact on a green CI run. If Windows
+   rather than by hand — take that platform's `doctor-<label>` artifact from a green CI run, or
+   capture one yourself first and then write it:
+
+   ```sh
+   ./snowarch doctor --json --no-cache > doctor.json     # /doctor.json is git-ignored, on purpose
+   node scripts/ci/doctor-snapshot.mjs --in doctor.json --write
+   ```
+
+   **`--write` refuses a report that is missing checks the snapshot already has**, naming them, and
+   writes nothing — because a snapshot is only worth having if it encodes a real run of the CURRENT
+   checks. A committed `doctor.json` lived at this root from 2026-09-11 to 2026-09-24 (a local run
+   from the 10th, added beside the script, read by nothing), so this very command used to succeed
+   from it and would have silently deleted E-28, E-29 and SV-09 from the snapshot and inverted three
+   statuses. If a check really has been retired, say so: `--allow-dropping-checks`. If Windows
    answers differently, add the id to `WINDOWS_DIFFERS` in `scripts/ci/doctor-snapshot.mjs` **with
    the reason** — an undocumented difference fails the test that compares the platforms.
 3. **The mapping table.** `docs/ARCHITECTURE.md`'s generated appendix maps every legacy check to

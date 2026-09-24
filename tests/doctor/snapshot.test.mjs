@@ -10,10 +10,13 @@
 // snapshot for that platform, which is the half that needs an install to exist.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { diff, EXPECTED_FAIL_ON_RUNNERS, normalise, PLATFORMS, snapshotPath, WINDOWS_DIFFERS }
+import { diff, EXPECTED_FAIL_ON_RUNNERS, normalise, PLATFORMS, snapshotPath, WINDOWS_DIFFERS,
+  wouldDrop }
   from '../../scripts/ci/doctor-snapshot.mjs';
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
@@ -156,4 +159,128 @@ test('each snapshot\'s summary is the tally of its own rows', () => {
       `${platform}: summary.fixable says ${snapshot.summary.fixable} and the repairable findings `
       + `are ${repairable}`);
   }
+});
+
+// ─── `--write` refuses a stale capture ─────────────────────────────────────────────────────────
+//
+// THE TRAP THIS CLOSES, exactly as it was found. `docs/CONTRIBUTING.md` spells the snapshot recipe
+// as `node scripts/ci/doctor-snapshot.mjs --in doctor.json --write`, and a **committed** `doctor.json`
+// sat at the repository root from 2026-09-11 to 2026-09-24: a real local run from the 10th, added in
+// the same commit as this script, read by nothing. Six ways it was a leftover, and one way it was
+// dangerous — that command SUCCEEDED from it instead of failing for a missing input. Measured against
+// the darwin snapshot on the day it was found:
+//
+//     E-00: status fail → ok          E-29: in the snapshot, MISSING from this run
+//     E-21: status ok → fail          E-28: in the snapshot, MISSING from this run
+//     E-27: status skip → ok          SV-09: in the snapshot, MISSING from this run
+//
+// So `--write` would have deleted three checks added after the capture and inverted three statuses,
+// silently. Removing the file disarms it once; this refuses it for ever, which is the half that
+// survives the next person running `./snowarch doctor --json > doctor.json` and forgetting when.
+//
+// The stale report is BUILT FROM THE COMMITTED SNAPSHOT here rather than committed as a fixture —
+// committing a stale laptop capture to test the guard against stale laptop captures would be the
+// defect wearing the test's clothes, and a pasted fixture would rot the moment a check is added.
+
+test('C33: --write refuses a report missing checks the snapshot carries, and names them', () => {
+  const platform = present[0];
+  const snapshot = load(platform);
+  // IN THE SNAPSHOT'S OWN ORDER, which is the order `diff` reports in and the order a reader
+  // comparing the two files scans. Deriving it from the snapshot rather than typing the three names
+  // is also what keeps this case honest if one of them is ever retired.
+  const wanted = new Set(['E-28', 'E-29', 'SV-09']);
+  const dropped = snapshot.checks.map((c) => c.id).filter((id) => wanted.has(id));
+  assert.ok(dropped.length >= 1, 'none of the three ids is in the snapshot — the case is vacuous');
+
+  // The stale capture's shape: the same run, minus the checks that did not exist when it was taken.
+  const stale = { ...snapshot, checks: snapshot.checks.filter((c) => !dropped.includes(c.id)) };
+  assert.deepEqual(wouldDrop(snapshot, stale), dropped,
+    'the guard does not name exactly the checks a --write would delete');
+});
+
+test('C33: a NEW check is not a reason to refuse — writing it in is what --write is for', () => {
+  const snapshot = load(present[0]);
+  const withNew = { ...snapshot,
+    checks: [...snapshot.checks, { id: 'E-99', status: 'ok', fixable: false }] };
+  assert.deepEqual(wouldDrop(snapshot, withNew), [],
+    'a report carrying a new check was refused, which would block every added check');
+  // ...and the reverse direction is still caught, so the asymmetry is the point rather than an oversight.
+  assert.deepEqual(wouldDrop(withNew, snapshot), ['E-99']);
+});
+
+test('C33: an identical report drops nothing', () => {
+  const snapshot = load(present[0]);
+  assert.deepEqual(wouldDrop(snapshot, snapshot), []);
+});
+
+// ─── …and the REFUSAL AT THE CALL SITE, which is where the trap actually lives ─────────────────
+//
+// The three cases above drive `wouldDrop()` and prove the helper. They do NOT prove the command:
+// neutralising the `die` in `doctor-snapshot.mjs --write` left them 8/8 green, and the thing a
+// committed `doctor.json` armed was the COMMAND — `--write` from a stale capture, silently deleting
+// checks. The only measurement of that was taken by hand (`-19 +4` on snapshot-darwin.json), and a
+// finding that can only be measured by hand is a test that has not been written yet.
+//
+// So this spawns the real CLI. `--root` and `--platform` keep every byte inside a temp tree: a test
+// that exercised `--write` against the committed fixtures would be the hazard it is testing for.
+
+/** A temp root with one snapshot in it, plus a stale report that is missing `drop` ids. */
+function staleTree(t, drop) {
+  const root = mkdtempSync(join(tmpdir(), 'snowarch-snapwrite-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'tests/fixtures/doctor'), { recursive: true });
+  const snapshot = normalise(REPORT);
+  const target = join(root, 'tests/fixtures/doctor/snapshot-linux.json');
+  writeFileSync(target, `${JSON.stringify(snapshot, null, 2)}\n`);
+  const stale = { ...REPORT, checks: REPORT.checks.filter((c) => !drop.includes(c.id)) };
+  const inPath = join(root, 'stale.json');
+  writeFileSync(inPath, JSON.stringify(stale));
+  return { root, target, inPath, before: readFileSync(target, 'utf8') };
+}
+
+const runCli = (args) => spawnSync(process.execPath,
+  [join(REAL_ROOT, 'scripts/ci/doctor-snapshot.mjs'), ...args],
+  { encoding: 'utf8', cwd: REAL_ROOT });
+
+test('C33: the CLI refuses --write from a stale report, and writes nothing', (t) => {
+  const ids = normalise(REPORT).checks.map((c) => c.id);
+  assert.ok(ids.length >= 4, 'the report fixture is too small for this case to mean anything');
+  const drop = ids.slice(0, 3);
+
+  const { root, target, inPath, before } = staleTree(t, drop);
+  const r = runCli(['--in', inPath, '--write', '--root', root, '--platform', 'linux']);
+
+  assert.notEqual(r.status, 0, `--write accepted a stale report: ${r.stdout}${r.stderr}`);
+  const out = `${r.stdout}${r.stderr}`;
+  assert.match(out, /is missing 3 check\(s\) the snapshot has/);
+  for (const id of drop) assert.ok(out.includes(id), `the refusal does not name ${id}`);
+  assert.match(out, /Nothing was written/);
+  // THE BYTES. The message could say anything; what matters is that the snapshot did not move.
+  assert.equal(readFileSync(target, 'utf8'), before, 'the snapshot was written despite the refusal');
+});
+
+test('C33: --allow-dropping-checks means it, and only then', (t) => {
+  const ids = normalise(REPORT).checks.map((c) => c.id);
+  const drop = ids.slice(0, 3);
+  const { root, target, inPath, before } = staleTree(t, drop);
+
+  const r = runCli(['--in', inPath, '--write', '--root', root, '--platform', 'linux',
+    '--allow-dropping-checks']);
+  assert.equal(r.status, 0, `the escape hatch did not work: ${r.stdout}${r.stderr}`);
+  const after = readFileSync(target, 'utf8');
+  assert.notEqual(after, before, 'nothing was written with the removal allowed');
+  const written = JSON.parse(after);
+  for (const id of drop) {
+    assert.equal(written.checks.some((c) => c.id === id), false, `${id} survived a deliberate drop`);
+  }
+});
+
+test('C33: a report that drops nothing is written without the flag', (t) => {
+  // The other direction, so the refusal is not merely "--write never works": a complete report is
+  // written exactly as before, which is what every CI run does.
+  const { root, target, inPath, before } = staleTree(t, []);
+  const r = runCli(['--in', inPath, '--write', '--root', root, '--platform', 'linux']);
+  assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+  assert.match(`${r.stdout}${r.stderr}`, /wrote .*snapshot-linux\.json/);
+  assert.equal(readFileSync(target, 'utf8'), before, 'a complete report changed the snapshot');
 });
