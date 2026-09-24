@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { contractSha, version as engineVersion } from '../config.mjs';
 import { recordedInstance } from '../state.mjs';
 import { writeDoctorCache } from '../doctor-cache.mjs';
-import { childEnv } from '../spawn-env.mjs';
+import { RUNNING_STEP_ENV, childEnv } from '../spawn-env.mjs';
 import { EXPECTED_DIALOGS, summaryBlock } from '../text.mjs';
 // ARC-08-C18 — `nonOkLines`/`failureLines` moved to the doctor's human renderer, which is where
 // their other two readers already live. Same definition, imported rather than copied: B09's
@@ -36,7 +36,8 @@ export const DESIGN_CACHE_STEPS = Object.freeze(['B01', 'B02', 'B05', 'B07']);
  * placeholder for the doctor — it is the honest answer to "what does this run know", and it is
  * replaced the moment there is something better to ask.
  */
-export function doctorCounts(state, { root, run = spawnSync, hasDoctor = null } = {}) {
+export function doctorCounts(state, { root, run = spawnSync, hasDoctor = null,
+  runningStep = id } = {}) {
   // ARC-08 (Sitting A) — GATE ON WHAT THE SPAWN NEEDS, which is the launcher in THIS checkout.
   //
   // This used to ask `which('snowarch')` — whether the command is on PATH — while the spawn below
@@ -52,7 +53,13 @@ export function doctorCounts(state, { root, run = spawnSync, hasDoctor = null } 
   if (available) {
     const r = run(process.execPath, [join(root, 'tools/snowarch/bin/snowarch.mjs'),
       'doctor', '--quick', '--json'],
-    { encoding: 'utf8', stdio: 'pipe', cwd: root, env: childEnv(root) });
+    // THE CHILD IS TOLD WHICH STEP IS ASKING. The runner records a step only after its `run()`
+    // returns, so while this spawn is in flight `runningStep` is absent from the state file — and
+    // E-29, which checks that every planned step is recorded, reported it as "never ran" under the
+    // step that was running it. The id travels rather than being spelled in the reader, so a future
+    // step that asks the doctor for a summary gets the same treatment without E-29 learning its name.
+    { encoding: 'utf8', stdio: 'pipe', cwd: root,
+      env: childEnv(root, { [RUNNING_STEP_ENV]: runningStep }) });
     try {
       const parsed = JSON.parse(r.stdout ?? '{}');
       // The failing checks travel WITH the count. They were already in this JSON and were thrown

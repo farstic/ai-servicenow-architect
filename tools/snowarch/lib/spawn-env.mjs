@@ -25,3 +25,28 @@ export const SESSION_VARIABLES = Object.freeze(['CLAUDE_PROJECT_DIR']);
 export function childEnv(root, extra = {}, base = process.env) {
   return { ...base, ...extra, CLAUDE_PROJECT_DIR: root };
 }
+
+/**
+ * The step whose `run()` is in flight, told to its own child processes.
+ *
+ * ARC-08-C32 (E-29's false FAIL). B09's job includes spawning `doctor --quick --json`, and the runner
+ * records a step only AFTER its `run()` returns — so while the doctor is being asked for the summary
+ * B09 will print, B09 is not in `.local/bootstrap-state.json`. E-29 checks that every planned step
+ * is recorded, so on every first design-only bootstrap it reported
+ *
+ *     E-29 FAIL the bootstrap finished: bootstrap incomplete since <version>: B09 never ran
+ *
+ * under the very step that was running it — the first FAIL a new user ever sees, with a remedy
+ * (`./bootstrap.sh`) that would re-run an install which had just finished. The install was fine; the
+ * sentence was false.
+ *
+ * WHY AN ENVIRONMENT VARIABLE AND NOT A MARKER IN THE STATE FILE. A persisted `running` entry
+ * survives the process that wrote it: a `SIGKILL` mid-step would leave it behind, and E-29 would
+ * then treat a genuinely unfinished install as "in progress" for ever — the defect this check exists
+ * to catch, facing the other way. This variable exists only inside the children of a step that is
+ * actually running, so there is nothing to go stale and no clock to get wrong.
+ *
+ * The VALUE is the step's own id, passed by the step rather than spelled in the reader: E-29 excludes
+ * "the step running me", not "B09".
+ */
+export const RUNNING_STEP_ENV = 'SNOW_BOOTSTRAP_RUNNING_STEP';

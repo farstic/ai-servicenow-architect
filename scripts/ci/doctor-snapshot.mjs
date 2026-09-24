@@ -20,6 +20,7 @@
  * Usage:
  *   node scripts/ci/doctor-snapshot.mjs --in doctor.json            compare (exit 1 on a difference)
  *   node scripts/ci/doctor-snapshot.mjs --in doctor.json --write    write this platform's snapshot
+ *       …--write refuses a report missing checks the snapshot has; --allow-dropping-checks means it
  *   node scripts/ci/doctor-snapshot.mjs --in doctor.json --summary  ...and append to the job summary
  *
  * Exit 0 same (or written) · 1 different · 2 cannot run.
@@ -101,6 +102,27 @@ export const WINDOWS_DIFFERS = Object.freeze([]);
 
 const idsOf = (snapshot) => snapshot.checks.map((c) => c.id);
 
+/**
+ * The ids a `--write` would DELETE from the snapshot it overwrites, or `[]`.
+ *
+ * `--write` replaces a platform's snapshot with whatever report it is handed, and the recipe in
+ * `docs/CONTRIBUTING.md` spells the input as `--in doctor.json`. A committed `doctor.json` sat at the
+ * repository root for a fortnight — a real local run from 2026-09-10, added alongside this script and
+ * read by nothing — so that command SUCCEEDED from a stale capture instead of failing for a missing
+ * input. Measured on it: E-28, E-29 and SV-09 were all absent from the report and present in the
+ * snapshot, so a `--write` would have silently deleted three checks and inverted three statuses.
+ *
+ * Deleting the file disarms that once. This refuses it for ever, which is the half that survives
+ * somebody running `./snowarch doctor --json > doctor.json` again and forgetting when.
+ *
+ * A check the snapshot does not have is NOT a reason to refuse: that is a new check, and writing it
+ * in is exactly what `--write` is for.
+ */
+export function wouldDrop(expected, actual) {
+  const after = new Set(idsOf(actual));
+  return idsOf(expected).filter((id) => !after.has(id));
+}
+
 /** A per-id diff, in the words a reader needs: which check, what changed. */
 export function diff(expected, actual) {
   const lines = [];
@@ -150,6 +172,18 @@ if (isMain) {
   const body = `${JSON.stringify(actual, null, 2)}\n`;
 
   if (flag('--write')) {
+    // REFUSE A STALE CAPTURE. See `wouldDrop`: the recipe's own default input used to be a committed
+    // file older than three of the checks it would have removed.
+    if (existsSync(expectedPath)) {
+      const dropped = flag('--allow-dropping-checks')
+        ? [] : wouldDrop(JSON.parse(readFileSync(expectedPath, 'utf8')), actual);
+      if (dropped.length > 0) {
+        die(`the report is missing ${dropped.length} check(s) the snapshot has: ${dropped.join(', ')}`
+          + ` — is ${inPath} a stale capture? Nothing was written.`
+          + ' Re-run ./snowarch doctor --json --no-cache, or take the platform\'s doctor-<label>'
+          + ' artifact from a green CI run. Pass --allow-dropping-checks if the removal is intended.');
+      }
+    }
     mkdirSync(dirname(expectedPath), { recursive: true });
     writeFileSync(expectedPath, body);
     writeSync(1, `doctor-snapshot: wrote ${expectedPath} (${actual.checks.length} checks)\n`);

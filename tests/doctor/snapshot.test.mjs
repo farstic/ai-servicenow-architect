@@ -13,7 +13,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { diff, EXPECTED_FAIL_ON_RUNNERS, normalise, PLATFORMS, snapshotPath, WINDOWS_DIFFERS }
+import { diff, EXPECTED_FAIL_ON_RUNNERS, normalise, PLATFORMS, snapshotPath, WINDOWS_DIFFERS,
+  wouldDrop }
   from '../../scripts/ci/doctor-snapshot.mjs';
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
@@ -156,4 +157,56 @@ test('each snapshot\'s summary is the tally of its own rows', () => {
       `${platform}: summary.fixable says ${snapshot.summary.fixable} and the repairable findings `
       + `are ${repairable}`);
   }
+});
+
+// ─── `--write` refuses a stale capture ─────────────────────────────────────────────────────────
+//
+// THE TRAP THIS CLOSES, exactly as it was found. `docs/CONTRIBUTING.md` spells the snapshot recipe
+// as `node scripts/ci/doctor-snapshot.mjs --in doctor.json --write`, and a **committed** `doctor.json`
+// sat at the repository root from 2026-09-11 to 2026-09-24: a real local run from the 10th, added in
+// the same commit as this script, read by nothing. Six ways it was a leftover, and one way it was
+// dangerous — that command SUCCEEDED from it instead of failing for a missing input. Measured against
+// the darwin snapshot on the day it was found:
+//
+//     E-00: status fail → ok          E-29: in the snapshot, MISSING from this run
+//     E-21: status ok → fail          E-28: in the snapshot, MISSING from this run
+//     E-27: status skip → ok          SV-09: in the snapshot, MISSING from this run
+//
+// So `--write` would have deleted three checks added after the capture and inverted three statuses,
+// silently. Removing the file disarms it once; this refuses it for ever, which is the half that
+// survives the next person running `./snowarch doctor --json > doctor.json` and forgetting when.
+//
+// The stale report is BUILT FROM THE COMMITTED SNAPSHOT here rather than committed as a fixture —
+// committing a stale laptop capture to test the guard against stale laptop captures would be the
+// defect wearing the test's clothes, and a pasted fixture would rot the moment a check is added.
+
+test('C33: --write refuses a report missing checks the snapshot carries, and names them', () => {
+  const platform = present[0];
+  const snapshot = load(platform);
+  // IN THE SNAPSHOT'S OWN ORDER, which is the order `diff` reports in and the order a reader
+  // comparing the two files scans. Deriving it from the snapshot rather than typing the three names
+  // is also what keeps this case honest if one of them is ever retired.
+  const wanted = new Set(['E-28', 'E-29', 'SV-09']);
+  const dropped = snapshot.checks.map((c) => c.id).filter((id) => wanted.has(id));
+  assert.ok(dropped.length >= 1, 'none of the three ids is in the snapshot — the case is vacuous');
+
+  // The stale capture's shape: the same run, minus the checks that did not exist when it was taken.
+  const stale = { ...snapshot, checks: snapshot.checks.filter((c) => !dropped.includes(c.id)) };
+  assert.deepEqual(wouldDrop(snapshot, stale), dropped,
+    'the guard does not name exactly the checks a --write would delete');
+});
+
+test('C33: a NEW check is not a reason to refuse — writing it in is what --write is for', () => {
+  const snapshot = load(present[0]);
+  const withNew = { ...snapshot,
+    checks: [...snapshot.checks, { id: 'E-99', status: 'ok', fixable: false }] };
+  assert.deepEqual(wouldDrop(snapshot, withNew), [],
+    'a report carrying a new check was refused, which would block every added check');
+  // ...and the reverse direction is still caught, so the asymmetry is the point rather than an oversight.
+  assert.deepEqual(wouldDrop(withNew, snapshot), ['E-99']);
+});
+
+test('C33: an identical report drops nothing', () => {
+  const snapshot = load(present[0]);
+  assert.deepEqual(wouldDrop(snapshot, snapshot), []);
 });
