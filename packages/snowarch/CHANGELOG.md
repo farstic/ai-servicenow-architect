@@ -3,11 +3,11 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org).
 
-## 2.0.0 — Unreleased
+## 2.0.0 — 2026-09-24
 
 Supersedes `snow-mcp` 1.0.0. Relicensed to Apache-2.0 and renamed to `@farstic/snowarch`; the old
-npm record is neither referenced nor touched (D-01, D-02). The package version is `2.0.0-dev` until
-the release is cut, so a development checkout cannot be mistaken for a release.
+npm record is neither referenced nor touched (D-01, D-02). The package version was `2.0.0-dev` until
+this release was cut, so a development checkout could not be mistaken for a release.
 
 The sections below are grouped **Breaking · Added · Fixed · Tests · Migration from snow-mcp 1.0.0**.
 The per-story detail follows them, in reverse story order.
