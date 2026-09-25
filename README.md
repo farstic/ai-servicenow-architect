@@ -1,8 +1,8 @@
 # AI ServiceNow Architect
 
-**v2.0.5-dev** · Apache-2.0 · Claude Code ≥ 2.1.214
+**v2.0.5** · Apache-2.0 · Claude Code ≥ 2.1.214
 
-![version](https://img.shields.io/badge/version-2.0.5--dev-blue)
+![version](https://img.shields.io/badge/version-2.0.5-blue)
 
 A virtual ServiceNow consulting team that runs inside Claude Code. You describe what you need; a Chief
 Architect routes the request to the right specialist, reviews what comes back, and hands you the
@@ -36,7 +36,7 @@ the doctor, the live wizard and the MCP server are what wait for Node.
 ### Path A — terminal first
 
 ```sh
-git clone --branch v2.0.4 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
+git clone --branch v2.0.5 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
 ```
 
 **The `--branch` is not optional, and it names a release.** A plain `git clone` checks out this repository's default branch, which is not a release line and is a long way behind — cloning it installs a development tree with none of the released fixes. The tag above is the current release, and it is written by the release itself, so this page never names a version that has not shipped.
@@ -49,7 +49,7 @@ you have one.
 On Windows, three lines instead — or double-click `bootstrap.cmd` in the folder:
 
 ```bat
-git clone --branch v2.0.4 https://github.com/farstic/ai-servicenow-architect.git
+git clone --branch v2.0.5 https://github.com/farstic/ai-servicenow-architect.git
 cd ai-servicenow-architect
 .\bootstrap.cmd
 ```
@@ -116,7 +116,7 @@ Accept the workspace-trust dialog, then paste exactly this:
 > Install the AI ServiceNow Architect from https://github.com/farstic/ai-servicenow-architect into
 > this folder, from release tag v2.0.2.
 
-Claude runs two commands — `git clone --branch v2.0.4 https://github.com/farstic/ai-servicenow-architect.git .` and
+Claude runs two commands — `git clone --branch v2.0.5 https://github.com/farstic/ai-servicenow-architect.git .` and
 `./bootstrap.sh --mode design --yes --skip-claude-check` — asking your permission for each unless the
 session already allows them. They are written out here for a reason: if Claude proposes anything else
 — cloning into a *subfolder* is the common variation — paste them yourself and you are back on the
