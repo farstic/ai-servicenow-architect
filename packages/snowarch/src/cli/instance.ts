@@ -99,6 +99,14 @@ export const authFailedRetry = (attempt: number): string =>
 /** The registry's sentence, used by the re-entry question and by the nothing-saved line. */
 export const authFailedReason = (): string => remedyFor('AUTHENTICATION_FAILED').meaning;
 
+/**
+ * The label prompt's exhausted line (ARC-07-C10), shaped like `AUTH_EXHAUSTED` because it is the
+ * same event: an interactive answer the wizard asked for, refused, re-asked, and did not get.
+ */
+export const LABEL_EXHAUSTED =
+  `No valid label after ${MAX_ATTEMPTS} attempts — nothing saved. The rule is lower case, starting `
+  + 'with a letter, up to 32 characters of a-z 0-9 _ -; run the command again when you have one.';
+
 export const AUTH_EXHAUSTED =
   `AUTHENTICATION_FAILED after ${MAX_ATTEMPTS} attempts — nothing saved. Check the account in the `
   + 'instance (System Security › Users) and run the command again.';

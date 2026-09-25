@@ -50,6 +50,9 @@ const CLI = join('packages', 'snowarch', 'dist', 'cli', 'index.js');
 // deliberately does not re-export the CLI's; this is the one value B06 needs to read back from a
 // child, so it is named here once with the reason attached.
 const EXIT_USAGE_CODE = 2;
+// ARC-07-C10 — the wizard's own "nothing saved" code: a refusal, an abort, three failed attempts,
+// or a probe that failed. Every one of those is the operator's answer rather than a broken build.
+const EXIT_FAILED_CODE = 1;
 
 /**
  * The argv this step hands the wizard — EXPORTED so a test can drive the real CLI with it.
@@ -123,6 +126,9 @@ export const WIZARD = Object.freeze({
   // ARC-07-C2 — the class C5 did not have, because nothing had ever seen it: the wizard RAN and
   // refused its own arguments. It is the one an operator actually hit.
   USAGE: 'usage',
+  // ARC-07-C10 — the wizard ran, asked, and did not get an answer it could save. Distinct from
+  // USAGE because the remedy is the opposite: nothing is broken and the operator can finish it.
+  REFUSED: 'refused',
 });
 
 /**
@@ -144,9 +150,29 @@ export function wizardExitFailure(status) {
     return { status: 'fail', klass: WIZARD.USAGE,
       detail: `the wizard rejected its arguments (exit ${EXIT_USAGE_CODE}) — ${nothingSaved}. `
         + 'Its own message is above, in this terminal',
-      remedy: 'this is a defect in the bootstrap, not in what you typed: run '
-        + '`./snowarch instance add <label>` to finish the install, and please report the line above '
-        + 'with the log from .local/logs/' };
+      // The claim is narrower than it was. This said "a defect in the bootstrap, not in what you
+      // typed" — which was false for the owner at the S06 sitting, where it WAS what they typed:
+      // exit 2 covered both a bad argv and a rejected interactive answer. The answer path returns
+      // 1 now, so exit 2 really is argv B06 built; the sentence can be confident again because the
+      // code it is reading finally means one thing.
+      remedy: 'the arguments B06 passed were refused, which is a defect in the bootstrap rather '
+        + 'than in anything you typed: run `./snowarch instance add <label>` to finish the install, '
+        + 'and please report the line above with the log from .local/logs/' };
+  }
+  // ARC-07-C10 — EXIT 1 IS THE USER'S ANSWER, NOT A DEFECT, and it used to carry no remedy at all.
+  //
+  // The wizard documents 1 as "nothing saved — a refusal, an abort, three failed attempts, or a
+  // probe that failed": every one of those is something the operator did or something their
+  // instance did, and all of them are recoverable by running the wizard again. Printing only
+  // `the instance wizard exited 1` left the most common real failure with no next step, while the
+  // exit-2 branch above — the one that CANNOT happen from a typed answer any more — had two.
+  if (status === EXIT_FAILED_CODE) {
+    return { status: 'fail', klass: WIZARD.REFUSED,
+      detail: `the wizard did not save an instance (exit ${EXIT_FAILED_CODE}) — ${nothingSaved}. `
+        + 'Its own message is above, in this terminal',
+      remedy: 'nothing here is broken: the wizard asked, and the answer it got was refused, '
+        + 'abandoned, or could not be verified. Run `./snowarch instance add <label>` when you have '
+        + 'what it asked for — a valid label, or credentials the instance accepts' };
   }
   return { status: 'fail', remedy: null,
     detail: `the instance wizard exited ${status ?? 'abnormally'} — ${nothingSaved}` };

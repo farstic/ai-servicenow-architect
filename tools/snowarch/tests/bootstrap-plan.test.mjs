@@ -27,7 +27,11 @@ test('the plan proposes the safe thing, and says what live would need', () => {
   assert.equal(plan.docs, 'sparse');
 
   const text = formatPlan(plan, ctxOf(root));
-  assert.match(text, /^Plan — Enter runs it as shown · type a number to change that line · q quits$/m);
+  // ARC-07-C10 — "toggle", not "change": at the S06 sitting the owner pressed 1 seven times
+  // expecting a sub-prompt, while each press flipped Mode and redrew the plan.
+  assert.match(text, /^Plan — Enter runs it as shown · type a number to toggle that line · q quits$/m);
+  assert.equal(/to change that line/.test(text), false,
+    'the header says "change", which reads as a sub-prompt the plan never opens');
   assert.match(text, /^ {2}1 {2}Mode {3}design-only/m);
   assert.match(text, /live needs a ServiceNow instance/);
   assert.match(text, /Node 22\.11\.0 found/);

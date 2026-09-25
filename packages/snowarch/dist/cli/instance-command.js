@@ -12,7 +12,7 @@
  */
 import { CANCELLED, promptLine, promptSecret } from './tty.js';
 import { instanceSubCommandLines, SUB_COMMANDS } from './help-tables.js';
-import { addHelp, parseAddArgs, runAdd, runList, runRemove, runSetCredentials, runSetDefault, runSetFlags, runSetPreset, runTest, EXIT_CODES, EXIT_OK, EXIT_USAGE, } from './instance.js';
+import { addHelp, parseAddArgs, runAdd, runList, runRemove, runSetCredentials, runSetDefault, runSetFlags, runSetPreset, runTest, EXIT_CODES, EXIT_FAILED, EXIT_OK, EXIT_USAGE, LABEL_EXHAUSTED, MAX_ATTEMPTS, } from './instance.js';
 import { runImport } from './import-legacy.js';
 // ARC-08-C22 — the table moved to `help-tables.js` (which imports nothing, so the generator can
 // read it without dependencies) and is re-exported here, where its consumers already look for it.
@@ -190,14 +190,42 @@ export async function runInstance(argv, io = terminalIo()) {
         // Without a terminal, or with --yes, the usage error stands exactly as it was: a run that
         // cannot ask must not hang waiting for an answer nobody can type.
         if (!parsed.ok && parsed.needsLabel === true && io.isTty === true && !rest.includes('--yes')) {
-            const typed = (await io.ask(`Label for this instance [${DEFAULT_LABEL}]: `))?.trim();
-            if (typed === undefined) {
-                io.write(`${CANCELLED}\n`);
-                return EXIT_USAGE;
+            // ARC-07-C10 — IT ASKS AGAIN, because the label was the one interactive answer in this wizard
+            // that did not.
+            //
+            // The owner typed `testPDI` at the S06 sitting (2026-09-25). The validation sentence was
+            // right; the consequence was not: one bad answer ended the wizard at exit 2, B06 reported
+            // `the wizard rejected its arguments`, and its remedy told the owner this was a defect in the
+            // bootstrap and asked them to file a bug — for a capital letter in a name they had just been
+            // asked for.
+            //
+            // The convention is already here, six hundred lines down: the credential prompt re-asks up to
+            // `MAX_ATTEMPTS`, prints an `…after N attempts — nothing saved` line and returns
+            // `EXIT_FAILED`, which `EXIT_CODES` documents as "nothing saved — a refusal, an abort, three
+            // failed attempts…". So this needed no new exit code and no new constant; it needed the loop
+            // the prompt next to it already had.
+            //
+            // EXIT_FAILED AND NOT EXIT_USAGE on exhaustion, which is the second half of the finding: B06
+            // cannot see anything but the status, so as long as a rejected ANSWER and a bad ARGV both
+            // exited 2, B06's message had to guess — and it guessed "defect in the bootstrap". Exit 2 now
+            // means what it says.
+            for (let attempt = 1;; attempt += 1) {
+                const typed = (await io.ask(`Label for this instance [${DEFAULT_LABEL}]: `))?.trim();
+                if (typed === undefined) {
+                    io.write(`${CANCELLED}\n`);
+                    return EXIT_USAGE;
+                }
+                // Re-parsed rather than patched in: the label goes through the SAME validation as one typed
+                // on the command line, so `LABEL_RULE` has one enforcement point and its sentence one author.
+                parsed = parseAddArgs([typed === '' ? DEFAULT_LABEL : typed, ...rest]);
+                if (parsed.ok)
+                    break;
+                io.write(`${parsed.message}\n`);
+                if (attempt >= MAX_ATTEMPTS) {
+                    io.write(`${LABEL_EXHAUSTED}\n`);
+                    return EXIT_FAILED;
+                }
             }
-            // Re-parsed rather than patched in: the label goes through the SAME validation as one typed
-            // on the command line, so `LABEL_RULE` has one enforcement point and its sentence one author.
-            parsed = parseAddArgs([typed === '' ? DEFAULT_LABEL : typed, ...rest]);
         }
         if (!parsed.ok) {
             io.write(`${parsed.message}\n`);

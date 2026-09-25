@@ -147,7 +147,14 @@ test('ARC-07-C2 — exit 2 is classified as usage and carries a remedy', () => {
   assert.match(usage.detail, /rejected its arguments \(exit 2\)/);
   assert.match(usage.detail, /nothing was saved by B06/);
   assert.ok(usage.remedy, 'exit 2 still says "none recorded" — the C2 defect');
-  assert.match(usage.remedy, /defect in the bootstrap, not in what you typed/);
+  // ARC-07-C10 reworded this, and the claim is NARROWER than it was. It said "not in what you
+  // typed", which was false at the S06 sitting — exit 2 covered a rejected interactive answer as
+  // well as a bad argv, so B06 was telling an operator their own typing was a bootstrap defect.
+  // The answer path returns 1 now, so exit 2 really is argv B06 built, and the sentence may be
+  // confident again. It still has to name the caller as the culprit, which is what C2 was for.
+  assert.match(usage.remedy, /defect in the bootstrap rather than in anything you typed/);
+  assert.match(usage.remedy, /arguments B06 passed/,
+    'the remedy no longer says WHOSE arguments were refused');
   assert.match(usage.remedy, /instance add <label>/, 'the remedy does not say how to finish the install');
 
   // WHAT IT DOES NOT CLAIM. The wizard is spawned `stdio: 'inherit'` so it can mask a password on
@@ -157,10 +164,31 @@ test('ARC-07-C2 — exit 2 is classified as usage and carries a remedy', () => {
   assert.match(usage.detail, /above, in this terminal/);
 });
 
+test('ARC-07-C10 — exit 1 is the operator\'s answer, and it carries a remedy', () => {
+  // The half C2 left undone. The wizard documents 1 as "nothing saved — a refusal, an abort, three
+  // failed attempts, or a probe that failed": all recoverable, none a broken build. It printed
+  // `the instance wizard exited 1` with `remedy: null`, so the most common real failure had no next
+  // step while exit 2 — which cannot happen from a typed answer any more — had two.
+  const refused = wizardExitFailure(1);
+  assert.equal(refused.klass, WIZARD.REFUSED);
+  assert.match(refused.detail, /did not save an instance \(exit 1\)/);
+  assert.match(refused.detail, /nothing was saved by B06/);
+  assert.match(refused.detail, /above, in this terminal/);
+  assert.ok(refused.remedy, 'exit 1 still says "none recorded" — the C10 defect');
+  assert.match(refused.remedy, /nothing here is broken/,
+    'the remedy still reads as though the build were at fault');
+  assert.match(refused.remedy, /valid label, or credentials/,
+    'the remedy does not name what the wizard was actually waiting for');
+  // NOT the usage class: the two remedies say opposite things about whose fault it is, so a merge
+  // of the two would make one of them wrong.
+  assert.notEqual(refused.klass, WIZARD.USAGE);
+});
+
 test('ARC-07-C2 — every other non-zero exit keeps the sentence it had', () => {
-  // Both directions: the new class must not swallow the failures it was not written for. A crash
-  // nobody anticipated still reads "none recorded", which is honest for a cause nobody has named.
-  for (const status of [1, 3, 130, null]) {
+  // Both directions: the new classes must not swallow the failures they were not written for. A
+  // crash nobody anticipated still reads "none recorded", which is honest for a cause nobody has
+  // named. 1 left this list at ARC-07-C10 and has the case above.
+  for (const status of [3, 130, null]) {
     const r = wizardExitFailure(status);
     assert.equal(r.status, 'fail');
     assert.equal(r.klass, undefined, `exit ${status} was classified as something it is not`);
