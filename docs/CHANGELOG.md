@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.4 — 2026-09-25
+
+### Notes
+
 A patch release, and the three entries come from one afternoon with the product's first real user —
 the owner, following the install and migration pages on their own machine. Nothing here changes how
 the product is configured, and there is no migration step.
@@ -62,6 +66,18 @@ owner, and this release makes no promise about it.
   `develop`, so `develop` named the previous release the moment a new one existed. The pages are
   brought back with the changelog now, and a guard refuses any user page naming a clone tag older
   than the newest release in the checkout.
+
+### Fixed
+
+- tests: the install-page guard allows the release it guards (6546241)
+- doctor: a cached step is current, and the step running the check is not stale (ad75134)
+- wizard: the plan screen explains its options and acknowledges a press (8146f17)
+
+### Internal
+
+- changelog: the 2.0.4 release notes (51d14de)
+
+Tag v2.0.4 · contract 672bb8aae585 · docs-pin df4afac
 
 ## 2.0.3 — 2026-09-25
 
