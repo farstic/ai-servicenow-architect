@@ -20,6 +20,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { release } from '../scripts/release.mjs';
+import { allowedCloneTags, cloneTagsIn } from './lib/install-tag.mjs';
 import { buildTagMessage, parseTagMessage, tagIsComplete } from '../scripts/lib/release/tag.mjs';
 import { compareVersions, latestTag } from '../scripts/lib/release/preflight.mjs';
 import { badgeLine, writeHead, writeMarker } from '../scripts/lib/release/writers.mjs';
@@ -733,4 +734,43 @@ test('C14: a branch that is current passes the remote check', async (t) => {
   // this assertion is about what it does NOT say.
   const { err } = await run(root, ['2.0.1', '--yes', '--dry-run']);
   assert.equal(/HEAD is behind|does not exist/.test(err), false, err);
+});
+
+test('ARC-09-C61 — the install-page guard passes at the shape a release commit HAS', async (t) => {
+  // THE CUT THIS GUARD REFUSED. `rehearse.sh 2.0.4` was stopped by
+  // `ARC-09-C61 — the pinned clone names the newest release that exists`, with
+  // `actual: 'v2.0.4', expected: 'v2.0.3'`, before any tag was created. On the release commit
+  // `writeInstallTag` has correctly written `--branch v2.0.4` to the pages, and the newest tag in the
+  // clone is still v2.0.3 — `--tag-only` runs AFTER the post-write suite the guard lives in. So the
+  // rule "the page names the newest tag that EXISTS" was false at the one shape every release passes
+  // through. Nothing was committed: ARC-09-C49's post-write suite refused and rolled back, which is
+  // the machinery working exactly as that row intended.
+  //
+  // TAGGED BEHIND ON PURPOSE. The fixture starts with no tags, and with none the decision DEFERS —
+  // so a case that did not tag first would assert nothing about the release shape at all.
+  const root = fixture(t);
+  git(root, ['tag', '-a', 'v1.9.0', '-m', 'snowarch v1.9.0']);
+
+  const { code, out } = await run(root, ['2.0.0', '--yes', '--offline', '--no-install']);
+  assert.equal(code, 0, out);
+
+  // The written tree: version 2.0.0 final, pages naming v2.0.0, newest existing tag v1.9.0 at the
+  // moment the suite ran. The guard's own decision, on exactly that input.
+  const treeVersion = JSON.parse(read(root, 'package.json')).version;
+  assert.equal(treeVersion, '2.0.0', 'the fixture no longer releases a final version');
+  const allowed = allowedCloneTags({ tags: ['v1.9.0'], treeVersion });
+  assert.deepEqual(allowed, ['v1.9.0', 'v2.0.0'],
+    'the release commit\'s own version is not allowed on its pages — this is the refusal');
+
+  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md']) {
+    const named = cloneTagsIn(read(root, page));
+    assert.ok(named.length > 0, `${page} names no clone tag after the release wrote it`);
+    for (const tag of named) {
+      assert.ok(allowed.includes(tag),
+        `${page} names ${tag}, which the guard would refuse at the release shape (allowed: ${allowed.join(', ')})`);
+    }
+    // ...and it really is the version just cut, or this case would pass on a page nothing rewrote.
+    assert.ok(named.includes(`v${treeVersion}`),
+      `${page} does not name v${treeVersion} — writeInstallTag did not run on the release commit`);
+  }
 });

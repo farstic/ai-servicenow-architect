@@ -7,6 +7,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compose, dialogsParagraph } from '../scripts/gen-readme.mjs';
+import { allowedCloneTags } from './lib/install-tag.mjs';
+
+/** Positional adapter for the shape table below — the module's own call form is an object. */
+const allowedCloneTagsFor = (tags, treeVersion) => allowedCloneTags({ tags, treeVersion });
 
 /**
  * ARC-06-S13 — the install page, and the words that must not be in it.
@@ -381,30 +385,55 @@ test('ARC-09-C61 — the pinned clone names the newest release that exists', asy
   // clone with no tags there is no newest release to compare against, and a green run there would be
   // a guard that never fired where it matters.
   const { execFileSync } = await import('node:child_process');
+  const { allowedCloneTags, cloneTagsIn } = await import('./lib/install-tag.mjs');
   const tags = (() => {
     try {
-      return execFileSync('git', ['tag', '--list', 'v*'], { cwd: root, encoding: 'utf8' })
-        .split('\n').map((t) => t.trim()).filter((t) => /^v\d+\.\d+\.\d+$/.test(t));
+      return execFileSync('git', ['tag', '--list', 'v*'], { cwd: root, encoding: 'utf8' }).split('\n');
     } catch { return []; }
   })();
-  if (tags.length === 0) {
+
+  // ONE IMPLEMENTATION, shared with the release fixture (ARC-09-C61's second half). The decision
+  // lived inline here, and the shape it had never been asked about — the release commit, where the
+  // page names a tag that does not exist yet — is the shape that refused the v2.0.4 cut.
+  const allowed = allowedCloneTags({ tags, treeVersion: JSON.parse(read('package.json')).version });
+  if (allowed === null) {
     assert.ok(true, 'no release tags in this clone — nothing to compare the pages against');
     return;
   }
-  const num = (t) => t.slice(1).split('.').map(Number);
-  const newest = tags.sort((a, b) => {
-    const [x, y] = [num(a), num(b)];
-    return (y[0] - x[0]) || (y[1] - x[1]) || (y[2] - x[2]);
-  })[0];
 
   for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md']) {
-    const named = [...read(rel).matchAll(/git clone --branch (v\d+\.\d+\.\d+)/g)].map((m) => m[1]);
+    const named = cloneTagsIn(read(rel));
     assert.ok(named.length > 0, `${rel} names no release tag in a clone command`);
-    for (const tag of new Set(named)) {
-      assert.equal(tag, newest,
-        `${rel} tells a reader to clone ${tag}, but ${newest} is the newest release in this clone `
-        + '— the release wrote it on a branch that is not an ancestor of develop, and the bump PR '
+    for (const tag of named) {
+      assert.ok(allowed.includes(tag),
+        `${rel} tells a reader to clone ${tag}, but this tree allows ${allowed.join(' or ')} — the `
+        + 'release writes the tag on a branch that is not an ancestor of develop, and the bump PR '
         + 'has to bring it back');
     }
   }
+});
+
+test('ARC-09-C61 — the decision by shape: develop, the release commit, and a hand-edited page', () => {
+  // THE SHAPE THAT REFUSED THE RELEASE, asserted directly, because the real-tree guard above can
+  // only ever see the shape the checkout happens to be in. The v2.0.4 cut was refused before any tag
+  // existed: `writeInstallTag` had correctly written `--branch v2.0.4`, and the newest tag in the
+  // clone was still v2.0.3, because `--tag-only` runs AFTER the post-write suite.
+  // 9.x THROUGHOUT, not the versions this repository is actually on: ARC-09-C12a's sweep refuses a
+  // test that spells the version of record or the one the next release will carry, and it caught this
+  // table on its first run. The shapes are what matter, and they are the same at any numbers.
+  const tags = ['v9.0.1', 'v9.0.2', 'v9.0.3'];
+
+  // develop after a bump: the page must name the release that EXISTS, not the one being prepared.
+  assert.deepEqual(allowedCloneTagsFor(tags, '9.0.4-dev'), ['v9.0.3']);
+  // the release commit: this tree IS that release, so its page must name it — and the previous tag
+  // stays allowed, because the pages are ported from it on the bump.
+  assert.deepEqual(allowedCloneTagsFor(tags, '9.0.4'), ['v9.0.3', 'v9.0.4']);
+  // a released tree: nothing is ahead of the tags.
+  assert.deepEqual(allowedCloneTagsFor(tags, '9.0.3'), ['v9.0.3']);
+  // A PRERELEASE AHEAD OF EVERY TAG IS STILL REFUSED, which is the half that keeps the guard worth
+  // having: only a FINAL version can be the release being cut. A `-dev` or `-rc` tree naming a
+  // version no tag has is a hand-edited page.
+  assert.deepEqual(allowedCloneTagsFor(tags, '9.0.4-rc.1'), ['v9.0.3']);
+  // ...and no tags is a deferral, never a pass.
+  assert.equal(allowedCloneTagsFor([], '9.0.4'), null);
 });
