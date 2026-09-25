@@ -45,6 +45,11 @@ export declare const labelExists: (label: string) => string;
 export declare const authFailedRetry: (attempt: number) => string;
 /** The registry's sentence, used by the re-entry question and by the nothing-saved line. */
 export declare const authFailedReason: () => string;
+/**
+ * The label prompt's exhausted line (ARC-07-C10), shaped like `AUTH_EXHAUSTED` because it is the
+ * same event: an interactive answer the wizard asked for, refused, re-asked, and did not get.
+ */
+export declare const LABEL_EXHAUSTED: string;
 export declare const AUTH_EXHAUSTED: string;
 export declare const NEXT_LINE = "Next: in Claude Code run  /snowarch setup-instance --resume  (or restart claude).";
 export declare const AUTH_QUESTION = "Authentication?";

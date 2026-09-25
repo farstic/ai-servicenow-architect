@@ -21,6 +21,9 @@ import { WIZARD_ARGV } from '../lib/steps/B06.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const CLI = pathToFileURL(join(root, 'packages/snowarch/dist/cli/instance-command.js')).href;
+// The module that owns the wizard's constants and sentences (ARC-07-C10). The dispatcher above
+// re-exports neither, so reading them from it yields `undefined`.
+const WIZARD_MODULE = pathToFileURL(join(root, 'packages/snowarch/dist/cli/instance.js')).href;
 
 /**
  * B06 passes the whole argv to the CLI BINARY, whose commander strips the command word and hands
@@ -85,10 +88,64 @@ test('ARC-07-C2 — Enter accepts the proposed label, and a typed one wins', asy
 
   // A typed label that breaks the rule is refused by the SAME validator as one typed on the command
   // line, which is why the label is re-parsed rather than patched into the options.
+  //
+  // ARC-07-C10 — AND IT IS ASKED AGAIN. This case used to assert `code === 2` after ONE bad answer
+  // and stop, which is the behaviour the owner met at the S06 sitting: `testPDI` ended the wizard,
+  // and B06 reported it as a bootstrap defect. The assertion was true of the defect, so it held it
+  // in place — the exit code alone cannot tell "gave up immediately" from "asked again and then ran
+  // out of input", which is why the count is asserted here and not just the code.
   const bad = io({ isTty: true, answers: ['NOT A LABEL'] });
   const code = await runInstance([...SUB_ARGV], bad);
-  assert.equal(code, 2);
   assert.match(bad.written, /is not a valid label/);
+  assert.equal(bad.prompts.filter((p) => /Label for this instance/.test(p)).length, 2,
+    'a bad label did not produce a second question — the wizard still gives up on one answer');
+  assert.equal(code, 2, 'running out of input is still a cancel, not a save');
+});
+
+test('ARC-07-C10 — a bad label then a good one installs, and the wizard gets past the question', async () => {
+  // THE CASE THE OWNER SHOULD HAVE HAD. One typo must cost a re-type, not the install.
+  const { runInstance } = await import(CLI);
+  const t = io({ isTty: true, answers: ['testPDI', 'pdi'] });
+  await runInstance([...SUB_ARGV], t);
+
+  assert.match(t.written, /"testPDI" is not a valid label/,
+    'the rejection sentence is gone — the reader needs to know WHY it was refused');
+  assert.equal(t.prompts.filter((p) => /Label for this instance/.test(p)).length, 2,
+    'the label was not asked exactly twice for one bad answer and one good one');
+  // PAST the label: the next thing it asks is the wizard's own question, not this one a third time.
+  assert.equal(t.written.includes('No valid label after'), false,
+    'a valid second answer was treated as an exhausted prompt');
+});
+
+test('ARC-07-C10 — three bad labels exit 1, the code that means the operator\'s answer', async () => {
+  // BOUNDED, and bounded at the wizard's own `MAX_ATTEMPTS` — the credential prompt six hundred
+  // lines down has re-asked three times and returned EXIT_FAILED since ARC-07, and `EXIT_CODES`
+  // documents 1 as "nothing saved — a refusal, an abort, three failed attempts, or a probe that
+  // failed". The label prompt was the one interactive answer not following that convention.
+  //
+  // EXIT 1 AND NOT 2 is the half B06 needs: it sees only the status, so while a rejected ANSWER and
+  // a bad ARGV both exited 2 its message had to guess, and it guessed "a defect in the bootstrap,
+  // not in what you typed".
+  // `MAX_ATTEMPTS` and the give-up sentence come from `instance.js`, which OWNS them; `CLI` is the
+  // dispatcher and re-exports neither. Read from the wrong module they arrive as `undefined`, and a
+  // comparison against `undefined` is the shape that has produced three confident wrong answers in
+  // this programme — so this asserts the value rather than using it bare.
+  const { runInstance } = await import(CLI);
+  const { MAX_ATTEMPTS, LABEL_EXHAUSTED } = await import(WIZARD_MODULE);
+  assert.equal(MAX_ATTEMPTS, 3, 'the retry bound moved — this case drives the wizard\'s own constant');
+  assert.match(LABEL_EXHAUSTED, /No valid label after 3 attempts/,
+    'the give-up sentence moved — this case quotes the product\'s own words');
+
+  const t = io({ isTty: true, answers: ['BAD', 'alsoBad', '9nope'] });
+  const code = await runInstance([...SUB_ARGV], t);
+
+  assert.equal(code, 1, 'exhausted attempts still exit 2 — B06 cannot tell them from bad argv');
+  assert.equal(t.prompts.filter((p) => /Label for this instance/.test(p)).length, MAX_ATTEMPTS,
+    `the label was not asked exactly ${MAX_ATTEMPTS} times`);
+  assert.match(t.written, /No valid label after 3 attempts — nothing saved/,
+    'the give-up line does not say how many attempts were spent, or that nothing was saved');
+  assert.match(t.written, /lower case, starting with a letter/,
+    'the give-up line does not restate the rule the reader kept missing');
 });
 
 test('ARC-07-C2 — --yes with no label never asks, on a terminal or without one', async () => {

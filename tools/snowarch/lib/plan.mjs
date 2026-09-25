@@ -25,7 +25,10 @@ export const MODES = Object.freeze(['design-only', 'live']);
 export const DOCS = Object.freeze([MODE.sparse, MODE.full, 'skip']);
 
 export const HEADER =
-  'Plan — Enter runs it as shown · type a number to change that line · q quits';
+  // ARC-07-C10 (S06 sitting) — "change" read as "open a sub-prompt for that line": the owner
+  // pressed 1 seven times waiting to be asked something, and each press silently TOGGLED Mode and
+  // redrew the plan. The verb is the whole of the fix; the behaviour was right.
+  'Plan — Enter runs it as shown · type a number to toggle that line · q quits';
 
 /**
  * The plan, before any of it is applied.
