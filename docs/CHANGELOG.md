@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.5 — 2026-09-25
+
+### Notes
+
 Two entries, and the first is the third attempt at the same defect. Nothing here changes how the
 product is configured, and there is no migration step.
 
@@ -59,6 +63,17 @@ instance's own name rather than the redaction mask.
   48 and 44 lines — each grown to satisfy a number. It now requires what the structure actually is: a
   `Notes` block with prose and at least one group heading carrying a bullet, **any** group, since the
   list it checked left out the one this file uses most.
+
+### Fixed
+
+- wizard: a number on the plan opens that line's choices, the wizard's way (4ebfd79)
+- tests: the changelog guard asserts a shape, not a line count (ef40cbf)
+
+### Internal
+
+- changelog: the 2.0.5 release notes (165a8fa)
+
+Tag v2.0.5 · contract f4128e086f5e · docs-pin df4afac
 
 ## 2.0.4 — 2026-09-25
 
