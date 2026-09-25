@@ -9,6 +9,60 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+A patch release, and the three entries come from one afternoon with the product's first real user —
+the owner, following the install and migration pages on their own machine. Nothing here changes how
+the product is configured, and there is no migration step.
+
+**Two of the three were loops with no exit**, which is what makes this a patch rather than a wait.
+After an upgrade the closing doctor reported the bootstrap as incomplete and told you to run the
+bootstrap again — which changed nothing and reported the same thing. And the plan screen answered a
+keystroke with a silent redraw, so the owner pressed the same key fourteen times asking why it kept
+asking again.
+
+**Both had been reachable for a while, and one had been failing in this repository's own tests on
+every run.** The upgrade suite looked at the doctor afterwards and asserted that its failure count
+was not negative — which a count cannot be — so the check that would have caught the first entry had
+been failing behind an assertion that could not. It asserts the count is zero now.
+
+**A checkout that met the first one corrects itself.** The stamps it was judged on are refreshed
+as the steps are visited, so the next `./bootstrap.sh` or `./snowarch upgrade` leaves the state
+saying what is true and the doctor stops reporting it. Nothing to undo, and nothing to edit by hand.
+
+**And the plan screen's `?` is worth knowing about**, because it answers a question the screen used
+not to take: it lists what each line means, what Enter will run, what a number does, and what `q`
+does. The header says it is there.
+
+**Not in this release:** whether the default branch becomes the release line, so that a plain
+`git clone` is correct rather than guarded against. Still an open decision for the repository's
+owner, and this release makes no promise about it.
+
+### Fixed
+
+- **ARC-08-C36** — `E-29` no longer reports a finished bootstrap as incomplete. A step whose inputs
+  have not moved is skipped and kept, and the run now records that its answer is current for the
+  build that is here; the step that is running the check is not reported by it either, in the sentence
+  or in the tally. `./snowarch upgrade` was affected the same way, because it runs the same bootstrap.
+  What it used to say, on an install that had just finished:
+
+  ```
+  E-29 FAIL the bootstrap finished: bootstrap incomplete since 2.0.3-dev:
+       B01 recorded under 2.0.2, B02 recorded under 2.0.2 — ./bootstrap.sh
+  ```
+- **ARC-07-C11** — the plan screen explains itself. `?` describes each line and each key, the header
+  offers it, and after a press the prompt says what changed and what Enter will now run. It used to
+  redraw in silence, which reads as a prompt that did nothing. Pressing `1` now answers:
+
+  ```
+  Mode → live · Enter runs it · 1 toggles back · q quits
+  ```
+
+### Internal
+
+- **ARC-09-C61** — a release writes the install pages' clone tag on a branch that never returns to
+  `develop`, so `develop` named the previous release the moment a new one existed. The pages are
+  brought back with the changelog now, and a guard refuses any user page naming a clone tag older
+  than the newest release in the checkout.
+
 ## 2.0.3 — 2026-09-25
 
 ### Notes
