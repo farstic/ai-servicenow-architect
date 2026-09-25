@@ -104,3 +104,47 @@ test('B05-07 — the summary line the RC run order quotes is the one the gate wo
   assert.equal(fromPlan, expectedSummary,
     'the plan line no longer reconstructs the summary the RC run order quotes');
 });
+
+test('ARC-09-C59 — the server step\'s remedy does not name the command it just ran', () => {
+  // THE DEFECT, measured during the 2.0.3-dev bump. The gate failed with a one-line
+  // `dist/contract.json` diff and said `dist/ is stale — run node scripts/build-dist.mjs and commit
+  // the result`. Running `build-dist` changed nothing, because step 1's own `run()` spawns it and
+  // THEN diffs the result against what is committed — so the first half of that sentence asks the
+  // reader to repeat the thing that produced the diff in front of them. The real cause was an
+  // uncommitted version bump: HEAD carried 2.0.2-dev while the source built 2.0.3-dev.
+  //
+  // A remedy that sends a reader to re-run a no-op is worse than none: it costs them the minutes
+  // before they stop believing it, and it points away from the only action that fixes the state.
+  //
+  // ASSERTED ON THE SOURCE, and that is the right level twice over. The remedy is a string, so
+  // whether it says the right thing is a question about the file. And the alternative — executing
+  // step 1 to read its printed remedy — is exactly what ARC-05-C3 forbids in this file: `run()`
+  // removes and rebuilds the committed `packages/snowarch/dist` of the tree the tests run in, which
+  // raced other suites to ENOENT. The gate's execution is proven by CI's `contract` cell.
+  // COMMENTS STRIPPED FIRST, the way this repository's other source scanners do it. My first cut
+  // did not, and an apostrophe inside the comment I had just written (`the gen-* scripts'`) opened a
+  // quote region that swallowed the literals — the test failed against a remedy that was already
+  // correct. A scanner that reads prose as code is measuring the wrong file.
+  const src = readFileSync(GATE, 'utf8');
+  const code = src.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+  const step = code.slice(code.indexOf("id: 'server'"), code.indexOf("id: 'dist'"));
+  assert.ok(step.includes('remedy:'),
+    'the server step no longer carries a remedy — find it and re-point this test');
+
+  // The whole remedy, however it is wrapped across concatenated string literals.
+  const text = [...step.matchAll(/'([^']*)'/g)].map((m) => m[1]).join('');
+
+  assert.doesNotMatch(text, /run node scripts\/build-dist\.mjs and commit the result/,
+    'the remedy still tells the reader to run the command this step already ran');
+  assert.match(text, /COMMIT/,
+    'the remedy does not name the one action that resolves the diff');
+  assert.match(text, /bump/i,
+    'the remedy does not mention the case that produces this diff most often — an uncommitted bump');
+
+  // NOT VACUOUS, and the distinction the row turns on: the `generated` step's version of this
+  // sentence IS correct, because `gen:check` does not run the generator first. So the rule is not
+  // "never say run X" — it is "never say run X when this step just ran X".
+  const generated = code.slice(code.indexOf("id: 'generated'"), code.indexOf("id: 'engine'"));
+  assert.match(generated, /run npm run gen and commit the result/,
+    'the generated step\'s remedy changed — it is correct as it stands and this test relies on it');
+});
