@@ -79,16 +79,18 @@ Get-ChildItem memory, scratchpad, deliverables, diagram-preview -ErrorAction Sil
 
 ## 2. Clone and bootstrap the new repository
 
+**Clone the release tag, not the default branch.** A plain `git clone` takes this repository's default branch, which is not a release line and is a long way behind — you would migrate onto a development tree with none of the released fixes. The tag below is the current release and is written here by the release itself.
+
 macOS / Linux:
 
 ```sh
-git clone https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
+git clone --branch v2.0.2 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-git clone https://github.com/farstic/ai-servicenow-architect.git
+git clone --branch v2.0.2 https://github.com/farstic/ai-servicenow-architect.git
 cd ai-servicenow-architect
 .\bootstrap.cmd
 ```

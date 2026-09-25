@@ -59,6 +59,13 @@ function fixture(t, { version = '2.0.0-dev', contract = null } = {}) {
   write(root, 'tools/snowarch/package.json', manifest('@fixture/tools'));
   write(root, 'CLAUDE.md', `# Fixture\n\n**Version:** ${version} — the version of record is the root package.json; this line is written by scripts/release.mjs.\n\nBody.\n`);
   write(root, 'docs/README-head.md', `# Fixture\n\n**v${version}** · Apache-2.0 · Claude Code ≥ ${CONFIG.floors.claudeCode}\n\nA description.\n`);
+  // ARC-09-C60 — the two user pages carry the pinned clone command the release rewrites. A
+  // fixture without them would make `applyWrites` fail on a missing file, which is the writer
+  // doing its job; the tree it models has these pages.
+  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md']) {
+    write(root, page, `# Fixture page\n\n\`\`\`sh\ngit clone --branch v${version} `
+      + `https://github.com/farstic/ai-servicenow-architect.git\n\`\`\`\n`);
+  }
   write(root, 'docs/CHANGELOG.md', '# Changelog\n\n## Unreleased\n\n- something\n');
   write(root, 'engine.config.json', `${JSON.stringify(CONFIG, null, 2)}\n`);
   write(root, 'packages/snowarch/dist/contract.json', contract);
@@ -263,6 +270,18 @@ test('AC 1/2 — a green run commits once, tags once, and the tag carries the tw
     assert.equal(JSON.parse(read(root, p)).version, '2.0.0', p);
   }
   assert.match(read(root, 'CLAUDE.md'), /^\*\*Version:\*\* 2\.0\.0 —/m);
+  // ARC-09-C60 — and the clone command a new user is told to run names the version just cut. The
+  // fixture seeds these pages at the PRE-release version, so this asserts the release moved them:
+  // the literal that went stale by two releases was one nothing rewrote.
+  // `(?![-\d.])` and NOT `\b`, for the reason ARC-09-C12a spells it that way: the fixture seeds
+  // these pages at `v2.0.0-dev`, and `\b` matches after the `0` in `v2.0.0-dev` too — so the first
+  // cut of this assertion passed with the writer neutralised. Caught by running that control.
+  for (const page of ['docs/INSTALL.md', 'docs/MIGRATION.md']) {
+    assert.match(read(root, page), /--branch v2\.0\.0(?![-\d.])/,
+      `${page} does not name the version just cut`);
+    assert.equal(/--branch v2\.0\.0-dev/.test(read(root, page)), false,
+      `${page} still carries the pre-release tag — the writer did not rewrite it`);
+  }
   assert.match(read(root, 'docs/README-head.md'), /\*\*v2\.0\.0\*\* · /);
   assert.match(read(root, 'docs/CHANGELOG.md'), /## 2\.0\.0 — 2026-09-11/);
   assert.equal(git(root, ['status', '--porcelain']).trim(), '', 'the release left the tree dirty');

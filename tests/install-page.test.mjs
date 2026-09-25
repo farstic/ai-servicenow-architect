@@ -316,3 +316,52 @@ test('ARC-06-C17 — Uninstall states BOTH halves: the default writes nothing, l
       `${page} does not scope the orphan to the registration that causes it`);
   }
 });
+
+// ─── ARC-09-C60 — the command a new user runs must land on a release ───────────────────────────
+//
+// Found at the ARC-10-S06 sitting, before the owner had typed anything, and it is the same class
+// this file exists for: a sentence that was true of an intention.
+//
+// The repository's default branch is `main`. It has not moved since M1 — 359 commits behind
+// `develop`, `package.json` still `2.0.0-dev`, from before the first release existed. A plain
+// `git clone` checks out the default branch, so the PRIMARY command on the install page, on the
+// migration page, and in the README those pages generate, installed a pre-release tree carrying
+// none of the three releases' fixes.
+//
+// AND THE PAGE EXPLAINED WHY IT WAS RIGHT. "That installs the latest release. `main` is whatever
+// was released last" — both sentences false, and they are the reason a reader would not think to
+// check. A wrong command with a confident justification is worse than a wrong command.
+//
+// The tag form existed as the SECONDARY option and said `--branch v2.0.0`: a hand-written literal
+// that nothing updated, stale by two releases on the day it was read. So this row moves the pinned
+// form to primary AND gives it a writer, because a version in a page that no writer owns is a
+// version that goes stale — this page is the evidence.
+
+const USER_PAGES = ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md'];
+
+test('ARC-09-C60 — no user page tells a reader to clone without pinning a release', () => {
+  const offenders = [];
+  for (const rel of USER_PAGES) {
+    read(rel).split('\n').forEach((line, i) => {
+      // A COMMAND, not prose about one. The page legitimately discusses `git clone` refusing a
+      // non-empty directory, and names the two commands Claude Code runs; neither is a line a
+      // reader copies. A command line is one that carries the clone URL and no `--branch`.
+      if (!/git clone\s+https:\/\/github\.com\/\S+/.test(line)) return;
+      if (line.includes('--branch')) return;
+      offenders.push(`${rel}:${i + 1}: ${line.trim()}`);
+    });
+  }
+  assert.deepEqual(offenders, [],
+    `${offenders.length} clone command(s) would land a user on the default branch, which is not a `
+    + 'release:\n' + offenders.join('\n'));
+});
+
+test('ARC-09-C60 — and the page does not claim the default branch is the latest release', () => {
+  // The justification, asserted separately from the command: fixing one and leaving the other is
+  // how the page came to explain a wrong command convincingly.
+  for (const rel of USER_PAGES) {
+    const text = read(rel);
+    assert.equal(/`main` is whatever was released last/.test(text), false,
+      `${rel} still tells the reader that \`main\` is the latest release`);
+  }
+});

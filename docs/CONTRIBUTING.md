@@ -1371,6 +1371,11 @@ The checklist, verbatim — paste it into the release pull request's description
 >    npm run gen
 >    ```
 >
+>    **`writeInstallTag` is deliberately NOT in that list (ARC-09-C60).** The install pages name the
+>    clone tag a new user should use, and after a bump the newest thing that EXISTS is still the
+>    release just cut — calling it here would tell every reader to clone `--branch v<next>-dev`,
+>    which is not a tag. The release writes it; the bump leaves it alone.
+>
 >    **Not `applyWrites` and not `release.mjs`:** both also cut a changelog section, and a `-dev`
 >    bump is not a release — there is nothing to describe. Everything else is the same sequence
 >    they run, which is why it goes through the same writers rather than an editor.
