@@ -774,3 +774,39 @@ test('ARC-09-C61 — the install-page guard passes at the shape a release commit
       `${page} does not name v${treeVersion} — writeInstallTag did not run on the release commit`);
   }
 });
+
+test('ARC-09-C63 — a rolled-back release restores what the GENERATORS wrote too', async (t) => {
+  // THE REFUSED v2.0.4 CUT. `release.mjs` said "rolled back, nothing was committed" and the tree it
+  // left behind carried three modified files — `.claude/rules/00-mode-and-mcp-gate.md`,
+  // `docs/TROUBLESHOOTING.md` and `governance/mcp-protocols.md` — the `gen` outputs whose headers
+  // embed the new version and contract sha. The version carriers and the changelog were restored;
+  // the generated files were not. So "rolled back" was true of the files `release.mjs` writes itself
+  // and false of the files its generators write.
+  //
+  // On a maintainer's checkout that leftover goes into the next commit unnoticed, carrying a
+  // release's version into `develop`.
+  //
+  // WHY C12b's ROLLBACK TEST DID NOT CATCH IT, which is the part worth keeping: that test asserts
+  // `git status --porcelain` is empty, and the assertion is real — but it runs WITHOUT `gen: true`,
+  // so the fixture's `npm run gen` never writes the extra file, and the assertion had nothing of that
+  // shape to be wrong about. The fixture already models the case for the GREEN path (C12c stages it);
+  // the refusal path had never been asked.
+  const root = fixture(t);
+  write(root, 'docs/TROUBLESHOOTING.md', '# Troubleshooting\n\n<!-- GENERATED sha256 old -->\n');
+  git(root, ['add', 'docs/TROUBLESHOOTING.md']);
+  git(root, ['commit', '-qm', 'fixture: a generated file']);
+  const before = read(root, 'docs/TROUBLESHOOTING.md');
+
+  // The same refusal C12b uses, with the generator writing the file only it knows about.
+  const { code, err } = await run(root, ['2.0.0', '--yes', '--offline'],
+    { fail: 'version-consistency', gen: true });
+  assert.equal(code, 1);
+  assert.match(err, /rolled back, nothing was committed/);
+
+  // THE SENTENCE HAS TO BE TRUE OF EVERY PATH THE RUN TOUCHED, not only the ones it writes by hand.
+  assert.equal(read(root, 'docs/TROUBLESHOOTING.md'), before,
+    'the generated file kept the release\'s bytes after a rollback that said nothing was committed');
+  assert.equal(git(root, ['status', '--porcelain']).trim(), '',
+    'the rollback left the tree dirty — the next commit would carry a release\'s version into develop');
+  assert.equal(git(root, ['tag', '-l']).trim(), '', 'a tag survived a rolled-back release');
+});

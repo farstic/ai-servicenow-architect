@@ -217,7 +217,17 @@ export function applyWrites({ root, version, date, run, from = null, tag = {}, g
   // lint that the release PR will face.
   const gen = run(['npm', 'run', 'gen']);
   if (gen !== 0) return { ok: false, message: `release: gen-all exited ${gen}`, touched };
-  touched.push('README.md');
+  // EVERY GENERATOR'S OUTPUT, not the README alone (ARC-09-C63). The comment above has said "every
+  // generator, not only the README" since C12b, and the line below it pushed exactly one file — so
+  // the ROLLBACK, which restores `touched`, restored the version carriers and the changelog and left
+  // the generated files behind. The refused v2.0.4 cut printed "rolled back, nothing was committed"
+  // over a tree carrying three modified `gen` outputs, whose headers embed the new version and
+  // contract sha; on a maintainer's checkout that goes into the next commit unnoticed.
+  //
+  // From `GENERATORS` rather than a hand list, which is the same source `STAGED` is derived from:
+  // a generator added tomorrow is rolled back without anyone remembering this line exists. That is
+  // the property C12c established for STAGING, applied to the undo.
+  touched.push('README.md', ...GENERATORS.flatMap((g) => g.targets ?? []));
 
   // The changelog LAST, because its trailer quotes the contract sha that only now exists.
   const log = generateChangelog({ root, version, date, from,
