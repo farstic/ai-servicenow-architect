@@ -9,6 +9,59 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+A patch release, cut for one entry. Nothing here changes how the product is configured, and there is
+no migration step.
+
+**The command on the install page did not install a release.** A plain `git clone` takes this
+repository's default branch, which is not a release line and has not moved since before the first
+release existed — so anyone following either user page installed a development tree with none of the
+released fixes. The page said *"That installs the latest release"* and explained why, and both
+sentences were false, which is the reason a reader would not have thought to check. That is the
+release: the pinned clone is now the primary command on every path, and it has a writer, so it cannot
+go stale again the way the one hand-written tag on that page had.
+
+**If you already installed with a plain clone, you are on that development tree**, and the doctor
+will say so rather than leaving you to guess: `E-28` reports `development checkout at <sha>; latest
+release v2.0.3` instead of naming a release you are on. `./snowarch upgrade` is the tool for moving a
+checkout you already have — that sentence was on the install page before this release and is the one
+thing on it that was true.
+
+The other entries come from the same afternoon. Two were found by using the product rather than
+reading it — the install command and the wizard's label prompt were both met by a person, not by a
+test — and two are guards over the places where a previous fix had left the door open.
+
+**Not in this release:** whether the default branch becomes the release line, so that a plain clone is
+correct rather than merely guarded against. That is an open decision for the repository's owner and
+this release makes no promise about it; the pinned command above is right either way.
+
+### Fixed
+
+- **ARC-09-C60** — the install page, the migration page and the README generated from them now clone
+  a release tag. The plain form is gone from every command a reader copies, including the two commands
+  Claude Code runs on the paste-a-prompt path, where the reader types nothing at all. The page no
+  longer claims the default branch is the latest release.
+- **ARC-07-C10** — the instance wizard asks for the label again when the answer breaks the rule,
+  instead of ending the install. One typed capital letter used to stop a bootstrap and be reported as
+  a defect in the bootstrap, with a request to file a bug. It re-asks up to three times, like the
+  credential prompt beside it, and a run that gets no valid label exits with the code that means *the
+  operator's answer* — so the step above it stops guessing whose fault it was. `B06` gains a remedy
+  for that case, which had none.
+- **ARC-07-C10** — the plan's header says `type a number to toggle that line`. It said *change*, which
+  reads as a prompt that never comes; the number has always toggled the line and redrawn the plan.
+
+### Internal
+
+- **ARC-08-C35** — the report's key list is authoritative in both directions. It said what a check
+  entry must contain and never what it may not, so a field added to the report's builder travelled
+  into the `--json` a stranger is asked to paste, carrying whatever was in it. `data` is the one thing
+  allowed beyond the required set, and it is named as such.
+- **ARC-09-C58** — the release rehearsal's deliberately-invalid tags are shaped so that nothing keyed
+  on the latest release notices them. For three minutes during the last cut they were shaped like real
+  releases, and they turned another pull request's checks red.
+- **ARC-09-C59** — the contract gate no longer tells you to run the command it has just run. Its
+  stale-`dist/` remedy named a rebuild the gate performs itself, so the one action that resolves the
+  state — committing it — was the half it left out.
+
 ## 2.0.2 — 2026-09-24
 
 ### Notes
