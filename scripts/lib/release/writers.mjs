@@ -54,6 +54,34 @@ export function writeMarker(text, version) {
  * that puts it there — and the head is kept short, because it is the part of the README a reader
  * sees before deciding whether to keep reading.
  */
+/**
+ * The install pages' clone tag (ARC-09-C60).
+ *
+ * WHY A WRITER AND NOT A LITERAL. The pinned clone existed on the install page as the SECONDARY
+ * option, hand-written as `--branch v2.0.0`, and nothing updated it — by the ARC-10-S06 sitting it
+ * was stale by two releases while the PRIMARY command, a plain `git clone`, was landing readers on a
+ * default branch 359 commits behind at `2.0.0-dev`. A version in a page that no writer owns is a
+ * version that goes stale, and this page is the evidence.
+ *
+ * NOT CALLED BY THE `-dev` BUMP, deliberately. The runbook's bump step calls `writeMarker` and
+ * `writeHead` and stops, so after a release `develop` keeps pointing at the release that exists
+ * rather than at a `-dev` version that was never tagged. Adding this to the bump would tell every
+ * reader to clone `--branch v2.0.3-dev`, which is not a tag at all.
+ *
+ * EVERY occurrence, and it refuses when it finds none: the pages carry the command more than once
+ * (macOS/Linux, Windows, and the two commands Claude Code runs on the paste-a-prompt path), and a
+ * writer that silently updated a subset would leave one of those paths on an older release.
+ */
+export function writeInstallTag(text, version, file = 'the install page') {
+  const PIN = /--branch v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?/g;
+  const found = text.match(PIN);
+  if (!found) {
+    return { ok: false,
+      message: `release: ${file} has no "--branch v<x.y.z>" clone command to update` };
+  }
+  return { ok: true, text: text.replace(PIN, `--branch v${version}`), count: found.length };
+}
+
 export function writeHead(text, version) {
   let out = text;
   if (HEAD_VERSION.test(out)) {
@@ -111,6 +139,10 @@ const WRITTEN_HERE = Object.freeze([
   'README.md',
   'docs/README-head.md',
   'docs/CHANGELOG.md',
+  // ARC-09-C60 — the clone tag a new user is told to use. `README.md` is generated from
+  // `docs/INSTALL.md`, so the install page is the source and the README follows it.
+  'docs/INSTALL.md',
+  'docs/MIGRATION.md',
 ]);
 
 export const STAGED = Object.freeze([...new Set([
@@ -170,6 +202,9 @@ export function applyWrites({ root, version, date, run, from = null, tag = {}, g
   for (const [file, fn] of [
     ['CLAUDE.md', (t) => writeMarker(t, version)],
     ['docs/README-head.md', (t) => writeHead(t, version)],
+    // ARC-09-C60 — the pinned clone command on both user-facing install paths.
+    ['docs/INSTALL.md', (t) => writeInstallTag(t, version, 'docs/INSTALL.md')],
+    ['docs/MIGRATION.md', (t) => writeInstallTag(t, version, 'docs/MIGRATION.md')],
   ]) {
     const result = fn(read(file));
     if (!result.ok) return { ok: false, message: result.message, touched };
