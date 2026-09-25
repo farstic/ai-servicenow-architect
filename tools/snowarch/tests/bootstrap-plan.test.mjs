@@ -29,7 +29,11 @@ test('the plan proposes the safe thing, and says what live would need', () => {
   const text = formatPlan(plan, ctxOf(root));
   // ARC-07-C10 — "toggle", not "change": at the S06 sitting the owner pressed 1 seven times
   // expecting a sub-prompt, while each press flipped Mode and redrew the plan.
-  assert.match(text, /^Plan — Enter runs it as shown · type a number to toggle that line · q quits$/m);
+  // ARC-07-C11 added `"?" explains` to this header. The C10 wording guard stays — "change" was
+  // the reading that cost seven presses — and the offer is asserted because an explanation the
+  // screen never mentions is not available on demand.
+  assert.match(text,
+    /^Plan — Enter runs it as shown · type a number to toggle that line · "\?" explains · q quits$/m);
   assert.equal(/to change that line/.test(text), false,
     'the header says "change", which reads as a sub-prompt the plan never opens');
   assert.match(text, /^ {2}1 {2}Mode {3}design-only/m);
@@ -79,7 +83,9 @@ test('the parser: Enter runs, q quits, 1 and 2 cycle, anything else is refused b
 
   const bad = applyChoice(plan, '9');
   assert.equal(bad.action, 'reprint');
-  assert.match(bad.message, /"9" is not one of 1, 2, q or Enter\./);
+  // ARC-07-C11 added `?`, and the refusal lists what is accepted — so it has to list that too,
+  // or the one key a confused user is most likely to try is the one the error omits.
+  assert.match(bad.message, /"9" is not one of 1, 2, \?, q or Enter\./);
 });
 
 test('choosing live rewrites the Steps line to include the three live steps', () => {
@@ -300,5 +306,121 @@ test('ARC-06-C16 — the predicate is one rule, and both callers get the same an
           false);
       }
     }
+  }
+});
+
+// ─── ARC-07-C11 — a redraw that says nothing reads as a prompt that did nothing ────────────────
+//
+// TWICE IN ONE SITTING, with two different headers, which is what makes this the prompt's fault and
+// not the wording's. At the S06 sitting the owner pressed `1` seven times while the header read
+// "type a number to change that line"; ARC-07-C10 reworded it to "toggle"; on the same clone with
+// the new wording they pressed `1` FOURTEEN times and asked "why does it ask me again when I press
+// 1".
+//
+// The behaviour was right both times. What the screen gave back was a full redraw and a bare `> `,
+// which answers neither question a person has after pressing a key: *did that do anything*, and
+// *what does Enter do now*. A numbered list invites the model "the number is my choice"; this one is
+// "the number flips a line and Enter runs it", and nothing on screen said so at the moment it
+// mattered — the moment after a press.
+//
+// The fix is one line of acknowledgement, and the row it replaces is the evidence that rewording the
+// header was not enough: my own C10 change is the failed first attempt.
+
+test('ARC-07-C11 — a toggle is acknowledged: what changed, and what Enter does now', async () => {
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['1', '']).ask, write: out.write });
+  assert.equal(r.action, 'run');
+  assert.equal(r.plan.mode, 'live');
+
+  // WHAT CHANGED, in the plan's own words for that line — `Mode`, and the value it now shows.
+  assert.match(out.text(), /Mode → live/,
+    `the redraw does not say what the press changed:\n${out.text()}`);
+  // ...AND WHAT ENTER DOES NOW, which is the second question and the one that cost fourteen presses.
+  assert.match(out.text(), /Enter runs it/,
+    'the acknowledgement does not say what Enter does now');
+  assert.match(out.text(), /1 toggles back/,
+    'the acknowledgement does not say how to undo the press just made');
+
+  // NOT a bare prompt after a toggle — and the property is that the acknowledgement IMMEDIATELY
+  // PRECEDES the prompt, not that `> ` is absent: `> ` is where the cursor waits and always follows.
+  // My first cut asserted its absence and failed against a correct fix, which is the right way round
+  // for a mistake in an assertion to go.
+  assert.match(out.text(), /Mode → live · Enter runs it · 1 toggles back · q quits\n> $/,
+    `the prompt the user faces after a press is not the acknowledgement:\n${JSON.stringify(out.text().slice(-120))}`);
+});
+
+test('ARC-07-C11 — pressing it twice acknowledges each press, with the value it lands on', async () => {
+  // The owner's actual sequence was the same key repeated. Two presses return Mode to where it
+  // started, and a screen that said nothing would look identical after both — which is exactly how
+  // fourteen presses happen.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['1', '1', '']).ask, write: out.write });
+  assert.equal(r.action, 'run');
+  assert.equal(r.plan.mode, 'design-only', 'two presses did not return Mode to where it started');
+
+  assert.equal((out.text().match(/Mode → live/g) ?? []).length, 1,
+    'the first press was not acknowledged exactly once');
+  assert.equal((out.text().match(/Mode → design-only/g) ?? []).length, 1,
+    'the second press was not acknowledged with the value it landed on');
+});
+
+test('ARC-07-C11 — the first draw has no acknowledgement, because nothing has happened', async () => {
+  // Both directions. An acknowledgement on the first screen would be a claim about a press nobody
+  // made, which is the same class of untruth as the silence it replaces.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['q']).ask, write: out.write });
+  assert.equal(/Mode →/.test(out.text()), false,
+    'the first draw claims a change nobody made');
+  assert.equal(/toggles back/.test(out.text()), false,
+    'the first draw offers to undo a press that did not happen');
+});
+
+test('ARC-07-C11 — "?" explains each line and what the keys do, like the preset screen', async (t) => {
+  // THE OWNER'S RULING, not an inference from the presses: "everything very easy and understandable;
+  // there can even be information for each option so the user knows what it is instead of
+  // wondering". The pattern already exists one screen over — the preset editor's footer offers
+  // `"?" explains the flags` and prints a line per flag — so this mirrors it rather than inventing a
+  // second convention for the same question.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['?', 'q']).ask, write: out.write });
+
+  // OFFERED on the screen, because an explanation nobody is told about is not available on demand.
+  assert.match(out.text(), /"\?" explains/,
+    `the plan never offers the explanation:\n${out.text()}`);
+
+  // A line per toggleable option, named as the plan names it.
+  for (const label of ['Mode', 'Docs']) {
+    assert.match(out.text(), new RegExp(`${label} — `),
+      `"?" does not explain ${label}`);
+  }
+  // ...and what the three keys do, which is the half the header could not carry.
+  assert.match(out.text(), /Enter — /, '"?" does not say what Enter does');
+  assert.match(out.text(), /q — /, '"?" does not say what q does');
+
+  // It EXPLAINS rather than acting: the plan is unchanged and the screen comes back.
+  assert.equal(/Mode →/.test(out.text()), false, '"?" toggled something');
+  assert.ok(out.text().split('Plan —').length - 1 >= 2, 'the screen was not redrawn after "?"');
+
+  // WITHIN THE BUDGET every other line here is written to. The engine has no wrapper — the one in
+  // `preset-ui.ts` belongs to the server package, which this must not depend on — so the only thing
+  // keeping these readable is their length, and the doctor's renderer already ruled that a line
+  // folding mid-word is the part people stop reading. Asserted rather than trusted, because prose
+  // grows.
+  const { COLUMNS, explainLines } = await import('../lib/plan.mjs');
+  for (const line of explainLines()) {
+    assert.ok(line.length <= COLUMNS,
+      `an explanation is ${line.length} columns, over the ${COLUMNS} budget: ${line}`);
   }
 });
