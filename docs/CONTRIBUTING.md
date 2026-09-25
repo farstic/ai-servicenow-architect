@@ -1205,7 +1205,25 @@ git push origin vX.Y.Z-rc.N
 Then watch `release.yml`: green on all three OSes, seven assets on the Release (three
 `doctor-<os>.json`, three `install-metrics-<os>.json`, the merged `install-metrics.md`), and the two
 negatives refused. Afterwards delete the Release, the tag and the branch — locally and on the
-remote — and record what the run showed in the fields below. They are per-release: a rehearsal that
+remote — and record what the run showed in the fields below.
+
+**The negatives are tagged `v9.9.8-negative.1` (lightweight) and `v9.9.7-negative.1` (annotated,
+one hex digit of `contract:` edited), and the `-negative.1` suffix is load-bearing (ARC-09-C58).**
+They were `v9.9.7`/`v9.9.8` until a v2.0.2 negative sat on `origin` for three minutes and reddened
+two in-flight `release-dryrun` cells on another pull request: a tag shaped like a FINAL release is
+picked up by every guard keyed on the latest final tag. A prerelease suffix is invisible to them —
+`tests/changelog.test.mjs` filters on `/^v\d+\.\d+\.\d+$/`, and `E-28` takes
+`sortTags(names).filter((t) => t.pre === null)[0]` at `tools/snowarch/lib/doctor/checks/host.mjs`,
+so it is the prerelease **filter** that protects it and not the comparator, which ranks a `9.9.x`
+prerelease above the real release either way. Both refusals still fire on the new shape: `release.yml`
+triggers on `tags: ['v*']` and `scripts/ci/verify-tag.mjs` is its first substantive step, so nothing
+gates the tag's NAME upstream of the refusal being exercised.
+
+**Quote BOTH lines for the contract negative, and say which one is under test.** `verify-tag.mjs`
+prints every problem before it exits, and a tag naming a version the tree does not carry always
+produces a second one — `the tree carries <version>, not 9.9.7` — so the refusal under test is the
+first line and not the whole output. Recording one line of two reads as "it refused for this reason"
+when it refused for two. They are per-release: a rehearsal that
 is not written down is a rehearsal nobody can compare the next one against.
 
 - **Run URL:** https://github.com/farstic/ai-servicenow-architect/actions/runs/34660381461 — the
