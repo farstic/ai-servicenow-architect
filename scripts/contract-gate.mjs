@@ -63,7 +63,16 @@ const STEPS = [
         { cwd: root, encoding: 'utf8' });
       return diff;
     },
-    remedy: 'dist/ is stale — run node scripts/build-dist.mjs and commit the result',
+    // THE REMEDY MUST NOT NAME THE COMMAND THIS STEP JUST RAN (ARC-09-C59). `run()` above spawns
+    // `build-dist.mjs` itself and then diffs the result against what is COMMITTED, so "run
+    // build-dist" asks the reader to repeat the thing that produced the diff they are looking at.
+    // Measured during the 2.0.3-dev bump: the gate failed with a one-line `dist/contract.json`
+    // diff, `build-dist` was re-run and changed nothing, and the actual cause was an uncommitted
+    // version bump — HEAD carried 2.0.2-dev while the source built 2.0.3-dev. The gen-* scripts'
+    // version of this sentence is right for them because they do NOT run the generator first.
+    remedy: 'dist/ is not what the source builds — this step already rebuilt it, so COMMIT the '
+      + 'change shown above rather than running build-dist again. Mid version bump, that commit is '
+      + 'the bump itself.',
   },
   {
     id: 'dist',
