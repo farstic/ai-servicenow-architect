@@ -1381,6 +1381,19 @@ The checklist, verbatim — paste it into the release pull request's description
 >    from the install page. The newest thing that EXISTS is the release just cut, and that is what
 >    the pages must name.
 >
+>    **AND WHEN THIS PULL REQUEST LANDS, REBASE EVERY OPEN BRANCH ONTO IT IN THE SAME SITTING.**
+>    Between the tag and this merge, `develop` carries a released tag with no matching changelog
+>    section and install pages naming the release before it — so two guards are correctly red on
+>    every branch cut or open inside that window: `tests/changelog.test.mjs`'s *a released version
+>    has its section here* and `ARC-09-C61`. Measured three times: ARC-08-C35's branch, the C63
+>    rollback branch cut inside the window, and the C62 row-note branch whose CI happened to run in
+>    the same minute the tag was pushed — each red on exactly those two, each cleared by a rebase,
+>    each on work that was fine. ARC-09-C58's rule (this pull request goes up and merges immediately
+>    after the tag, before any other branch is cut) shortens the window; it cannot close it for
+>    branches already open. Rebasing them here costs one command each and is cheaper than the thing
+>    it prevents, which is a reader learning to discount two guards that have each caught a real
+>    defect.
+>
 >    **Not `applyWrites` and not `release.mjs`:** both also cut a changelog section, and a `-dev`
 >    bump is not a release — there is nothing to describe. Everything else is the same sequence
 >    they run, which is why it goes through the same writers rather than an editor.
