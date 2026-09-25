@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DOCS, MODES, applyChoice, buildPlan, formatPlan, runPlanScreen } from '../lib/plan.mjs';
+import { DOCS, LINES, MODES, applyChoice, buildPlan, formatPlan, resolveChoice, runPlanScreen }
+  from '../lib/plan.mjs';
 import { LIVE_YES_WITHOUT_FILE, USAGE, bootstrapCommand,
   liveYesNeedsInstanceFile } from '../lib/bootstrap.mjs';
 import { loadState, statePath } from '../lib/state.mjs';
@@ -33,9 +34,9 @@ test('the plan proposes the safe thing, and says what live would need', () => {
   // the reading that cost seven presses — and the offer is asserted because an explanation the
   // screen never mentions is not available on demand.
   assert.match(text,
-    /^Plan — Enter runs it as shown · type a number to toggle that line · "\?" explains · q quits$/m);
-  assert.equal(/to change that line/.test(text), false,
-    'the header says "change", which reads as a sub-prompt the plan never opens');
+    /^Plan — Enter runs it as shown · type a number to choose that line's value · "\?" explains · q quits$/m);
+  assert.equal(/to toggle that line/.test(text), false,
+    'the header still says a number toggles — ARC-07-C12 made it a choice');
   assert.match(text, /^ {2}1 {2}Mode {3}design-only/m);
   assert.match(text, /live needs a ServiceNow instance/);
   assert.match(text, /Node 22\.11\.0 found/);
@@ -71,15 +72,28 @@ test('the parser: Enter runs, q quits, 1 and 2 cycle, anything else is refused b
   assert.equal(applyChoice(plan, 'Q').action, 'quit');
   assert.equal(applyChoice(plan, 'quit').action, 'quit');
 
-  assert.equal(applyChoice(plan, '1').plan.mode, 'live');
-  assert.equal(applyChoice(applyChoice(plan, '1').plan, '1').plan.mode, 'design-only', 'cycles back');
+  // ARC-07-C12 — A NUMBER NO LONGER CYCLES; it OPENS that line's question. This asserted the toggle
+  // the owner read as a choice three screens running, so it asserts the new contract: the parser
+  // hands back the line, changes nothing itself, and the caller asks the question because the parser
+  // has no io.
+  const opened = applyChoice(plan, '1');
+  assert.equal(opened.action, 'choose');
+  assert.equal(opened.line.label, 'Mode');
+  assert.deepEqual(opened.line.values, MODES);
+  assert.equal(opened.plan.mode, plan.mode, 'the parser changed a value while opening a line');
   assert.deepEqual(MODES, ['design-only', 'live']);
 
-  let p = plan;
-  const seen = [];
-  for (let i = 0; i < 4; i += 1) { p = applyChoice(p, '2').plan; seen.push(p.docs); }
-  assert.deepEqual(seen, ['full', 'skip', 'sparse', 'full']);
+  const openedDocs = applyChoice(plan, '2');
+  assert.equal(openedDocs.action, 'choose');
+  assert.deepEqual(openedDocs.line.values, DOCS);
+  assert.equal(openedDocs.plan.docs, plan.docs);
   assert.deepEqual(DOCS, ['sparse', 'full', 'skip']);
+
+  // ...and the answer is resolved by number or by name, the wizard's two spellings.
+  assert.equal(resolveChoice(opened.line, '2'), 'live');
+  assert.equal(resolveChoice(opened.line, 'live'), 'live');
+  assert.equal(resolveChoice(opened.line, ''), null, 'Enter must mean leave it, not run');
+  assert.equal(resolveChoice(opened.line, 'nope'), undefined, 'an unknown answer is not a value');
 
   const bad = applyChoice(plan, '9');
   assert.equal(bad.action, 'reprint');
@@ -91,7 +105,9 @@ test('the parser: Enter runs, q quits, 1 and 2 cycle, anything else is refused b
 test('choosing live rewrites the Steps line to include the three live steps', () => {
   const root = makeCheckout();
   const ctx = ctxOf(root);
-  const plan = applyChoice(buildPlan({ ctx, state: null, flags: {} }), '1').plan;
+  // ARC-07-C12 — set through the line's own setter, since `applyChoice` now opens rather than sets.
+  const base = buildPlan({ ctx, state: null, flags: {} });
+  const plan = LINES[1].set(base, 'live');
   const steps = /^ {2}Steps {2}(.+)$/m.exec(formatPlan(plan, ctx))[1];
   for (const id of ['B04 deps', 'B06 instance', 'B08 verify']) {
     assert.ok(steps.includes(id), `${id} missing from: ${steps}`);
@@ -104,8 +120,10 @@ test('the screen re-prints after every change and only then runs', async () => {
   const root = makeCheckout();
   const ctx = ctxOf(root);
   const out = sink();
+  // ARC-07-C12 — `['1', '2', '']`: open Mode, choose live, run. It was `['1', '']` when a number
+  // flipped the value.
   const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
-    ask: scripted(['1', '']).ask, write: out.write });
+    ask: scripted(['1', '2', '']).ask, write: out.write });
   assert.equal(r.action, 'run');
   assert.equal(r.plan.mode, 'live');
   assert.equal(out.text().split('Plan —').length - 1, 2, 'the screen must be shown again after a change');
@@ -330,8 +348,11 @@ test('ARC-07-C11 — a toggle is acknowledged: what changed, and what Enter does
   const root = makeCheckout();
   const ctx = ctxOf(root);
   const out = sink();
+  // ARC-07-C12 — the sequence is now `1` to open Mode and `2` to choose live; the PROPERTY this case
+  // asserts is unchanged, which is why it keeps its name. What changed is how a value is set, not
+  // that a change is acknowledged.
   const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
-    ask: scripted(['1', '']).ask, write: out.write });
+    ask: scripted(['1', '2', '']).ask, write: out.write });
   assert.equal(r.action, 'run');
   assert.equal(r.plan.mode, 'live');
 
@@ -341,14 +362,14 @@ test('ARC-07-C11 — a toggle is acknowledged: what changed, and what Enter does
   // ...AND WHAT ENTER DOES NOW, which is the second question and the one that cost fourteen presses.
   assert.match(out.text(), /Enter runs it/,
     'the acknowledgement does not say what Enter does now');
-  assert.match(out.text(), /1 toggles back/,
-    'the acknowledgement does not say how to undo the press just made');
+  assert.match(out.text(), /1 changes it again/,
+    'the acknowledgement does not say how to change the line again');
 
   // NOT a bare prompt after a toggle — and the property is that the acknowledgement IMMEDIATELY
   // PRECEDES the prompt, not that `> ` is absent: `> ` is where the cursor waits and always follows.
   // My first cut asserted its absence and failed against a correct fix, which is the right way round
   // for a mistake in an assertion to go.
-  assert.match(out.text(), /Mode → live · Enter runs it · 1 toggles back · q quits\n> $/,
+  assert.match(out.text(), /Mode → live · Enter runs it · 1 changes it again · q quits\n> $/,
     `the prompt the user faces after a press is not the acknowledgement:\n${JSON.stringify(out.text().slice(-120))}`);
 });
 
@@ -359,10 +380,13 @@ test('ARC-07-C11 — pressing it twice acknowledges each press, with the value i
   const root = makeCheckout();
   const ctx = ctxOf(root);
   const out = sink();
+  // ARC-07-C12 — two CHOICES now: open Mode and pick live, then open it again and pick design-only.
+  // Under the toggle this was `['1','1','']`, and that sequence is exactly what the owner typed
+  // while expecting to be asked something.
   const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
-    ask: scripted(['1', '1', '']).ask, write: out.write });
+    ask: scripted(['1', '2', '1', '1', '']).ask, write: out.write });
   assert.equal(r.action, 'run');
-  assert.equal(r.plan.mode, 'design-only', 'two presses did not return Mode to where it started');
+  assert.equal(r.plan.mode, 'design-only', 'the second choice did not take');
 
   assert.equal((out.text().match(/Mode → live/g) ?? []).length, 1,
     'the first press was not acknowledged exactly once');
@@ -423,4 +447,170 @@ test('ARC-07-C11 — "?" explains each line and what the keys do, like the prese
     assert.ok(line.length <= COLUMNS,
       `an explanation is ${line.length} columns, over the ${COLUMNS} budget: ${line}`);
   }
+});
+
+// ─── ARC-07-C12 — the plan asks the way the wizard asks ────────────────────────────────────────
+//
+// THIRD OCCURRENCE, THREE DIFFERENT SCREENS. The owner met this at S06 on v2.0.2 ("change that
+// line", seven presses of `1`), on develop after ARC-07-C10 reworded it to "toggle" (fourteen
+// presses), and on **v2.0.4 with the whole ARC-07-C11 redesign rendering exactly as built** — the
+// header offering `"?"`, the five explanations printing, and `Mode → live · Enter runs it · 1 toggles
+// back · q quits` appearing after the press. Their words the third time: *"I press 1 and get the
+// message again, I choose 1 again and nothing happens."*
+//
+// So it is not the wording, and it is not the acknowledgement. **`1` is being read as a CHOICE**, and
+// ours was a toggle: "I choose 1" is what the owner wrote, twice, about a key that flipped a value.
+//
+// THE COUNTER-MEASUREMENT IS THE EVIDENCE, and it is on the same run: the wizard's own numbered
+// questions — `What is this instance?  [1] pdi  [2] dev  [3] test  [4] prod` and
+// `Authentication?  [1] basic  [2] oauth_ropc` — were answered first time, on both dry runs, with no
+// confusion at all. The pattern this user reads correctly already exists one screen later. So the
+// plan adopts it rather than explaining itself a fourth time.
+//
+// `?` stays, Enter-runs stays. What goes is a number silently flipping a value.
+
+test('ARC-07-C12 — a number opens that line\'s choices, the way the wizard asks', async (t) => {
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  // `1` opens Mode; `2` picks live from ITS list; Enter runs.
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['1', '2', '']).ask, write: out.write });
+
+  assert.equal(r.action, 'run');
+  assert.equal(r.plan.mode, 'live', 'choosing [2] from Mode\'s list did not set live');
+
+  // THE ASSERTION THAT DISTINGUISHES THE TWO MODELS, and the first cut of this case did not have it:
+  // under a toggle, `1` flips Mode and `2` flips DOCS, so `['1','2','']` reaches `mode: live` either
+  // way and the case passed against the behaviour it was written to replace. Under choices the `2`
+  // answers Mode's question, so Docs is untouched — which only the new model can produce.
+  assert.equal(r.plan.docs, 'sparse',
+    'Docs moved — the `2` was read as a second line rather than as Mode\'s answer');
+
+  // THE WIZARD'S SHAPE, asserted as a shape rather than a sentence: the label, then numbered options.
+  assert.match(out.text(), /Mode:\s+\[1\] design-only[^\n]*\[2\] live/,
+    `the number did not open Mode's choices:\n${out.text()}`);
+  // EACH OPTION'S MEANING BESIDE IT, per the owner's ruling: the question is the moment the meaning
+  // is wanted, and a reader who has opened the line should not have to go back out to `?` for it.
+  assert.match(out.text(), /\[2\] live — configures one/, 'the options carry no meaning beside them');
+  assert.match(out.text(), /\(current\)/, 'the current value is not marked');
+});
+
+test('ARC-07-C12 — the owner\'s sequence: a number is a choice, not a flip', async (t) => {
+  // THE EXACT SEQUENCE, and the property that makes the model right. Under a toggle, `1 1 1` lands
+  // on live (odd number of flips) and the user who "chose 1" three times gets a value they never
+  // named. Under choices, `1` opens Mode and `1` picks design-only — so choosing option 1 twice
+  // leaves design-only both times, which is what "nothing happens" SHOULD mean when you keep
+  // choosing the same thing.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['1', '1', '1', '1', '']).ask, write: out.write });
+
+  assert.equal(r.action, 'run');
+  assert.equal(r.plan.mode, 'design-only',
+    'choosing [1] design-only twice did not leave design-only — the number is still a flip');
+  // AND THE SEQUENCE HAS TO BE READ AS CHOICES, not merely end in the same place: four flips also
+  // land on design-only, so without this the case would pass against the toggle it replaces.
+  assert.equal((out.text().match(/Mode:\s+\[1\] design-only/g) ?? []).length, 2,
+    'Mode\'s choices were not opened twice — the two odd-numbered answers were read as flips');
+});
+
+test('ARC-07-C12 — the option can be typed by name too, as the wizard allows', async (t) => {
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['1', 'live', '']).ask, write: out.write });
+  assert.equal(r.plan.mode, 'live', 'the value spelled out was not accepted');
+  // Distinguishing again: under a toggle `live` is an unrecognised answer and the mode reached live
+  // from the `1` alone, so the shape is what proves the name was read as an answer.
+  assert.match(out.text(), /Mode:\s+\[1\] design-only/, 'the choices were never offered');
+  assert.doesNotMatch(out.text(), /"live" is not one of/, '`live` was refused rather than accepted');
+});
+
+test('ARC-07-C12 — Enter at a line\'s choices keeps the value and returns to the plan', async (t) => {
+  // Enter runs the PLAN, and only at the plan's own prompt. At a line's choices it must mean "leave
+  // this as it is" — otherwise opening a line by mistake would start the install.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['1', '', '']).ask, write: out.write });
+
+  assert.equal(r.action, 'run', 'the run did not start from the plan prompt afterwards');
+  assert.equal(r.plan.mode, 'design-only', 'Enter at the choices changed the value');
+  assert.ok(out.text().split('Plan —').length - 1 >= 2, 'the plan was not shown again after the choices');
+});
+
+test('ARC-07-C12 — `?` and Enter-runs are unchanged', async (t) => {
+  // The two things ARC-07-C11 added that this row keeps. A redesign that quietly dropped them would
+  // be the third screen all over again.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['?', 'q']).ask, write: out.write });
+  assert.match(out.text(), /"\?" explains/);
+  assert.match(out.text(), /Mode — /, '`?` no longer explains the lines');
+
+  const out2 = sink();
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['']).ask, write: out2.write });
+  assert.equal(r.action, 'run', 'Enter at the plan prompt no longer runs it');
+});
+
+test('ARC-07-C12 — `?` then a choice, which is the sitting\'s own sequence', async (t) => {
+  // The owner pressed `1`, then `?`, then `1`, then Enter. `?` must not lose the screen's place, and
+  // a choice after it must still take.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['?', '1', '2', '']).ask, write: out.write });
+
+  assert.equal(r.action, 'run');
+  assert.equal(r.plan.mode, 'live', 'a choice made after `?` did not take');
+  assert.match(out.text(), /Mode — /, '`?` no longer explains the lines');
+  assert.match(out.text(), /Mode:\s+\[1\] design-only/, 'the choice after `?` never opened the line');
+});
+
+test('ARC-07-C12 — --yes still asks nothing at all', async (t) => {
+  // The path a CI run and a scripted install take. A redesign of the interactive screen must not
+  // reach it: `accepted` returns before the loop, and `ask` throwing is how that is proven.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: () => { throw new Error('--yes must not read stdin'); }, write: out.write,
+    accepted: '--yes' });
+
+  assert.equal(r.action, 'run');
+  assert.match(out.text(), /\(accepted: --yes\)/);
+  assert.equal(/Mode:\s+\[1\]/.test(out.text()), false, 'a line\'s choices were printed on the --yes path');
+});
+
+test('ARC-07-C12 — stdin closing at a line\'s choices is a quit, never an accept', async (t) => {
+  // The same rule the plan prompt already has, at the new prompt. An install must not start because
+  // input ended.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['1']).ask, write: out.write });
+  assert.equal(r.action, 'quit', 'end of input at the choices was treated as a yes');
+});
+
+test('ARC-07-C12 — an answer that is not an option says so, and the plan comes back', async (t) => {
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const out = sink();
+  const r = await runPlanScreen({ plan: buildPlan({ ctx, state: null, flags: {} }), ctx,
+    ask: scripted(['1', 'nope', '']).ask, write: out.write });
+
+  assert.equal(r.action, 'run');
+  assert.equal(r.plan.mode, 'design-only', 'an unrecognised answer changed the value');
+  assert.match(out.text(), /"nope" is not one of \[1\] design-only\s+\[2\] live/,
+    `the refusal does not list the options: ${out.text().slice(-200)}`);
 });

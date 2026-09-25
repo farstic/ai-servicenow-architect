@@ -28,7 +28,7 @@ export const HEADER =
   // ARC-07-C10 (S06 sitting) — "change" read as "open a sub-prompt for that line": the owner
   // pressed 1 seven times waiting to be asked something, and each press silently TOGGLED Mode and
   // redrew the plan. The verb is the whole of the fix; the behaviour was right.
-  'Plan — Enter runs it as shown · type a number to toggle that line · "?" explains · q quits';
+  'Plan — Enter runs it as shown · type a number to choose that line\'s value · "?" explains · q quits';
 
 /**
  * What each line and each key is for (ARC-07-C11) — the owner's ruling, and the pattern is the
@@ -56,7 +56,7 @@ export const EXPLANATIONS = Object.freeze([
   ['Mode', 'design-only skips ServiceNow; live also configures an instance and needs Node.js 20+.'],
   ['Docs', 'how much of the documentation corpus to fetch — sparse, full, or skip it for now.'],
   ['Enter', 'runs the plan exactly as shown above. Nothing is written before that.'],
-  ['a number', 'moves that line to its next value and redraws. It asks nothing further.'],
+  ['a number', 'asks what that line should be, the way the instance wizard asks its questions.'],
   ['q', 'quits without writing anything.'],
 ]);
 
@@ -79,7 +79,7 @@ export const explainLines = () => EXPLANATIONS.map(([label, text]) => `  ${label
  * on screen would be a third way to describe one fact.
  */
 export const ackLine = ({ label, to, key }) =>
-  `${label} → ${to} · Enter runs it · ${key} toggles back · q quits`;
+  `${label} → ${to} · Enter runs it · ${key} changes it again · q quits`;
 
 /**
  * The plan, before any of it is applied.
@@ -133,6 +133,61 @@ export function formatPlan(plan, ctx, { accepted = null } = {}) {
  * and exited could only be tested through a terminal, and the interactive path is the one part of
  * this story a test cannot drive end to end.
  */
+/**
+ * The two lines a number opens, and what each may be set to (ARC-07-C12).
+ *
+ * THE WIZARD'S PATTERN, because it is the one this user reads correctly. At the S06 sitting the
+ * owner answered `What is this instance?  [1] pdi  [2] dev  [3] test  [4] prod` and
+ * `Authentication?  [1] basic  [2] oauth_ropc` first time, on both dry runs — while pressing `1` on
+ * THIS screen seven times, then fourteen, then a third time with the whole explanation redesign in
+ * place, writing "I press 1 and get the message again, I choose 1 again and nothing happens".
+ *
+ * "I choose 1" is the sentence. A number in a numbered list is a CHOICE, and ours was a toggle; no
+ * wording on the screen overrides that, which is what three screens proved.
+ */
+export const LINES = Object.freeze({
+  1: { label: 'Mode',
+    values: MODES,
+    // ONE LINE EACH, beside the option, because the question is the moment the meaning is wanted —
+    // `?` explains the whole screen, and a reader who has already opened this line should not have
+    // to go back out to learn what the two answers are. Short enough not to wrap at `COLUMNS`.
+    // "no instance" and not the phrase ARC-08-C7 reserves for the unconfigured STATE — the same
+    // trap C11's Mode explanation hit. Short, because this line must not wrap at `COLUMNS`.
+    meaning: { 'design-only': 'no instance', live: 'configures one, needs Node 20+' },
+    of: (plan) => plan.mode,
+    set: (plan, v) => ({ ...plan, mode: v }) },
+  2: { label: 'Docs',
+    values: DOCS,
+    meaning: { sparse: 'this engagement\'s areas', full: 'all of it', skip: 'none for now' },
+    of: (plan) => plan.docs,
+    set: (plan, v) => ({ ...plan, docs: v }) },
+});
+
+/**
+ * `Mode:  [1] design-only — no ServiceNow instance  [2] live — configures one, needs Node.js 20+`
+ *
+ * The wizard's own shape (`What is this instance?  [1] pdi  [2] dev`), with each option's meaning
+ * beside it and the current value marked.
+ */
+export const choicesLine = (line, plan) => `${line.label}:  ${line.values
+  .map((v, i) => `[${i + 1}] ${v}${line.meaning?.[v] ? ` — ${line.meaning[v]}` : ''}`
+    + `${v === line.of(plan) ? ' (current)' : ''}`)
+  .join('  ')}`;
+
+/**
+ * One answer to a line's question: a number, the value spelled out, or nothing.
+ *
+ * `null` means "leave it as it is and go back to the plan" — Enter runs the PLAN, and only at the
+ * plan's own prompt. Opening a line by mistake must not start an install.
+ */
+export function resolveChoice(line, input) {
+  const answer = String(input ?? '').trim().toLowerCase();
+  if (answer === '') return null;
+  const byNumber = line.values[Number(answer) - 1];
+  if (byNumber) return byNumber;
+  return line.values.includes(answer) ? answer : undefined;   // undefined: not an option
+}
+
 export function applyChoice(plan, input) {
   const answer = String(input ?? '').trim().toLowerCase();
   if (answer === '') return { plan, action: 'run' };
@@ -140,19 +195,15 @@ export function applyChoice(plan, input) {
   // ARC-07-C11 — a QUESTION, not a choice: it changes nothing and the screen comes back.
   if (answer === '?' || answer === 'help') return { plan, action: 'reprint', help: true };
 
-  if (answer === '1') {
-    if (plan.nodeFixed) {
+  // ARC-07-C12 — a number OPENS that line rather than flipping it. The value is decided by the
+  // answer to the line's own question, which the caller asks, because this function has no io.
+  const line = LINES[answer];
+  if (line) {
+    if (answer === '1' && plan.nodeFixed) {
       return { plan, action: 'reprint',
         message: 'Mode is fixed at design-only until Node.js 20+ is installed.' };
     }
-    const next = MODES[(MODES.indexOf(plan.mode) + 1) % MODES.length];
-    const after = { ...plan, mode: next };
-    return { plan: after, action: 'reprint', changed: { key: '1', label: 'Mode', to: modeValue(after) } };
-  }
-  if (answer === '2') {
-    const next = DOCS[(DOCS.indexOf(plan.docs) + 1) % DOCS.length];
-    const after = { ...plan, docs: next };
-    return { plan: after, action: 'reprint', changed: { key: '2', label: 'Docs', to: docsValue(after) } };
+    return { plan, action: 'choose', key: answer, line };
   }
   return { plan, action: 'reprint',
     message: `"${answer}" is not one of 1, 2, ?, q or Enter.` };
@@ -181,6 +232,29 @@ export async function runPlanScreen({ plan, ctx, ask, write, accepted = null }) 
     if (answer === null) return { plan: current, action: 'quit' };   // stdin closed: not a yes
     const next = applyChoice(current, answer);
     current = next.plan;
+
+    // ARC-07-C12 — A NUMBER ASKS THAT LINE'S QUESTION, the way the wizard does. The parser has no
+    // io, so the question is asked here: it prints the line's options, reads one answer, and sets
+    // the value the answer names. Nothing is flipped, and the plan comes back with the value on it.
+    if (next.action === 'choose') {
+      write(`${choicesLine(next.line, current)}\n> `);
+      const picked = await ask();
+      if (picked === null) return { plan: current, action: 'quit' };   // stdin closed: still not a yes
+      const value = resolveChoice(next.line, picked);
+      if (value === null) {                    // Enter: leave it, and back to the plan
+        ack = null;
+      } else if (value === undefined) {
+        write(`${redact(`"${String(picked).trim()}" is not one of `
+          + next.line.values.map((v, i) => `[${i + 1}] ${v}`).join('  '))}\n`);
+        ack = null;
+      } else {
+        current = next.line.set(current, value);
+        ack = ackLine({ key: next.key, label: next.line.label,
+          to: next.key === '1' ? modeValue(current) : docsValue(current) });
+      }
+      continue;
+    }
+
     if (next.action !== 'reprint') return { plan: current, action: next.action };
     if (next.help) write(`${explainLines().join('\n')}\n`);
     ack = next.changed ? ackLine(next.changed) : null;
