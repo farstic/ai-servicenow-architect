@@ -9,6 +9,57 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+Two entries, and the first is the third attempt at the same defect. Nothing here changes how the
+product is configured, and there is no migration step.
+
+**The plan screen asks its questions now, instead of explaining itself.** When the installer shows you
+what it is about to do, typing a line's number used to move that line to its next value and redraw the
+screen. Three people-sittings in a row read that as a menu — the number is my choice, then continue —
+and the same user pressed `1` seven times, then fourteen, and then a third time with a redesign in
+place that explained every line, offered `?`, and printed what had just changed. Their words the third
+time: *"I press 1 and get the message again, I choose 1 again and nothing happens."*
+
+**Two earlier fixes were the wrong kind.** The first reworded the header from *change* to *toggle*; the
+second added an explanation for every option and an acknowledgement after every press. Both rendered
+exactly as built, and neither helped, because the problem was never what the screen said — it was what
+a number in a numbered list means.
+
+**What decided the fix was a measurement, not a theory.** On the same run, the instance wizard's own
+numbered questions — `What is this instance?  [1] pdi  [2] dev  [3] test  [4] prod` — were answered
+correctly first time, twice. The pattern this reader understood already existed one screen later, so
+the plan adopts it rather than being explained a fourth time.
+
+A number now opens that line's question, with each option's meaning beside it:
+
+```
+> 1
+Mode:  [1] design-only — no instance (current)  [2] live — configures one, needs Node 20+
+> 2
+```
+
+The answer sets the value, by number or by name, and the plan comes back showing it. `?` still
+explains the screen, Enter still runs the plan exactly as shown, and Enter at a line's question means
+*leave this as it is* — opening a line by mistake cannot start an install.
+
+**The 2.0.4 sitting also confirmed three earlier fixes on a real machine**, which is the first time any
+of them has been seen outside a test: the wizard re-asking for a rejected instance label, the doctor no
+longer calling a finished bootstrap incomplete after a cached run, and the upgrade printing the
+instance's own name rather than the redaction mask.
+
+### Fixed
+
+- **ARC-07-C12** — a number on the plan screen opens that line's choices in the instance wizard's
+  style, rather than flipping the value and redrawing. Answer by number or by name; `?` and
+  Enter-runs are unchanged; `--yes` and a run with no terminal are untouched.
+
+### Internal
+
+- **ARC-09-C62** — the guard on these notes asserts their shape rather than their length. It asked for
+  more than fifty lines, standing in for a structure, and the last three releases' notes arrived at 49,
+  48 and 44 lines — each grown to satisfy a number. It now requires what the structure actually is: a
+  `Notes` block with prose and at least one group heading carrying a bullet, **any** group, since the
+  list it checked left out the one this file uses most.
+
 ## 2.0.4 — 2026-09-25
 
 ### Notes
