@@ -14,6 +14,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { shapeProblems } from './lib/changelog-shape.mjs';
 import { buildFile, classify, extractNotes, extractUnreleased, FROZEN_HEADING, readCommits, renderGroups,
   sectionFor, trailerLine, writeChangelog } from '../scripts/lib/release/changelog.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
@@ -339,11 +340,18 @@ test('C12c: the real Unreleased block survives a release byte-identical', () => 
     return;
   }
 
-  assert.ok(carried.split('\n').length > 50,
-    `the real Unreleased block is ${carried.split('\n').length} lines — this test needs the real shape`);
-  // The thing that was lost: hand-written groups BELOW the Notes sub-block.
-  assert.match(carried, /^### (Added|Fixed|Changed)/m,
-    'the real block no longer carries a hand-written group — the regression this guards is unreachable');
+  // ARC-09-C62 — THE SHAPE, NOT A LINE COUNT. This asked for `> 50 lines`, which is a proxy for the
+  // structure the defect needs: a `### Notes` block with prose and at least one `### <Group>` heading
+  // carrying a bullet below it. The proxy began failing honest work — the 2.0.2 notes arrived at 49
+  // lines, 2.0.3 at 48, 2.0.4 at 44, and three patches in a row had to grow to satisfy a number
+  // standing in for a structure. The structure is asserted directly now.
+  //
+  // ANY group, not the enumerated three that used to sit here: `/^### (Added|Fixed|Changed)/m` left
+  // out `Internal`, which is the group this file uses most. Every shipped block passed it only
+  // because each happened to carry a `Fixed` entry, and 2.0.3 was one entry away from being
+  // Internal-only — so the first Internal-only release would have failed for the wrong reason.
+  assert.deepEqual(shapeProblems(carried), [],
+    `the real Unreleased block is not the shape a release carries:\n${carried.slice(0, 300)}`);
 
   const built = buildFile({ text: real, version: '9.9.9', date: '2026-01-01', carried,
     body: '### Internal\n\n- something', trailer: '_trailer_' });
@@ -556,4 +564,44 @@ test('a released version has its section here, and its notes left Unreleased', (
       `## Unreleased's Notes are byte-identical to ${version}'s — the next cut would publish `
       + `${version}'s notes under the next version's heading`);
   }
+});
+
+test('ARC-09-C62 — the shape is what a release block has, on every block that has shipped', () => {
+  // THE THIRD CONTROL, and it needs real blocks rather than fixtures: the point of retiring the line
+  // count is that the shape passes on work that actually shipped. All three of these were written
+  // under the count and each brushed it — 49, 48 and 44 lines — so each had to grow to be accepted
+  // by a number. The shape accepts them as they are.
+  const real = readFileSync(join(REAL_ROOT, 'docs/CHANGELOG.md'), 'utf8');
+  const sections = [...real.matchAll(/^## (\d+\.\d+\.\d+) — [^\n]*$/gm)];
+  const shipped = sections.slice(0, 3).map((m, i) => {
+    const end = i + 1 < sections.length ? sections[i + 1].index : real.length;
+    return { version: m[1], block: real.slice(m.index, end) };
+  });
+  assert.equal(shipped.length, 3, 'fewer than three released sections — this control needs them');
+
+  for (const { version, block } of shipped) {
+    assert.deepEqual(shapeProblems(block), [],
+      `the ${version} section, which shipped, is not the shape this guard now requires`);
+  }
+
+  // NOT VACUOUS in the direction that matters: at least one of them carries a group the old
+  // enumerated list would have missed, which is the finding that retired the list.
+  assert.ok(shipped.some(({ block }) => /^### Internal$/m.test(block)),
+    'no shipped section uses `### Internal` — the closed-list finding is no longer demonstrable here');
+});
+
+test('ARC-09-C62 — and it refuses the stand-ins the line count was there to refuse', () => {
+  // Both directions, and each is a shape a short stand-in actually takes.
+  assert.deepEqual(shapeProblems('### Notes\n\nprose, and nothing else.\n'),
+    ['no `### <Group>` heading below `### Notes` — the shape the dropped-groups defect needs']);
+  assert.deepEqual(shapeProblems('### Notes\n\nprose.\n\n### Fixed\n\nstill not a bullet.\n'),
+    ['no `### <Group>` heading carries a bullet']);
+  assert.deepEqual(shapeProblems('### Notes\n\n### Fixed\n\n- a bullet\n'),
+    ['the `### Notes` block has no prose']);
+  assert.deepEqual(shapeProblems('### Fixed\n\n- a bullet\n'), ['no `### Notes` heading']);
+
+  // AN `Internal`-ONLY BLOCK PASSES, which the enumerated list would have refused. This is the case
+  // the line count was hiding: with the count gone and the list kept, the first Internal-only
+  // release would have failed a guard for a reason that has nothing to do with the defect.
+  assert.deepEqual(shapeProblems('### Notes\n\nprose.\n\n### Internal\n\n- a thing\n'), []);
 });
