@@ -1371,10 +1371,15 @@ The checklist, verbatim — paste it into the release pull request's description
 >    npm run gen
 >    ```
 >
->    **`writeInstallTag` is deliberately NOT in that list (ARC-09-C60).** The install pages name the
->    clone tag a new user should use, and after a bump the newest thing that EXISTS is still the
->    release just cut — calling it here would tell every reader to clone `--branch v<next>-dev`,
->    which is not a tag. The release writes it; the bump leaves it alone.
+>    **`writeInstallTag` is deliberately NOT called with the `-dev` version (ARC-09-C60), and the
+>    install pages are PORTED instead (ARC-09-C61).** Calling it here would tell every reader to
+>    clone `--branch v<next>-dev`, which is not a tag. But leaving the pages alone is wrong too, and
+>    the first version of this note said exactly that: the release writes the tag on the release
+>    branch, which is not an ancestor of `develop`, so the write never comes back — `develop` sat at
+>    `v2.0.2` the moment `v2.0.3` existed. Bring `docs/INSTALL.md` and `docs/MIGRATION.md` back from
+>    the tag byte-identically, exactly as the changelog is brought back, and regenerate `README.md`
+>    from the install page. The newest thing that EXISTS is the release just cut, and that is what
+>    the pages must name.
 >
 >    **Not `applyWrites` and not `release.mjs`:** both also cut a changelog section, and a `-dev`
 >    bump is not a release — there is nothing to describe. Everything else is the same sequence

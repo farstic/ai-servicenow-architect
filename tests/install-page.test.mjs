@@ -365,3 +365,46 @@ test('ARC-09-C60 — and the page does not claim the default branch is the lates
       `${rel} still tells the reader that \`main\` is the latest release`);
   }
 });
+
+test('ARC-09-C61 — the pinned clone names the newest release that exists', async () => {
+  // THE SECOND PLACE THE RELEASE'S WRITES DO NOT COME BACK. `writeInstallTag` runs during the
+  // release, on the release branch, which is not an ancestor of `develop` — so `develop` sat at
+  // `--branch v2.0.2` from the moment `v2.0.3` was tagged, and the bump PR is the only thing that
+  // can bring it back. Exactly the shape ARC-09-C12c found for the changelog, in a file nobody had
+  // checked for it.
+  //
+  // My own C60 runbook note made it worse by being half right: "the release writes it; the bump
+  // leaves it alone". The first half — never write a `-dev` version here — is correct; the second
+  // left every reader of `develop` pointed at the previous release.
+  //
+  // DEFERS WITHOUT TAGS rather than passing quietly, which is ARC-10's conditional-guard shape: on a
+  // clone with no tags there is no newest release to compare against, and a green run there would be
+  // a guard that never fired where it matters.
+  const { execFileSync } = await import('node:child_process');
+  const tags = (() => {
+    try {
+      return execFileSync('git', ['tag', '--list', 'v*'], { cwd: root, encoding: 'utf8' })
+        .split('\n').map((t) => t.trim()).filter((t) => /^v\d+\.\d+\.\d+$/.test(t));
+    } catch { return []; }
+  })();
+  if (tags.length === 0) {
+    assert.ok(true, 'no release tags in this clone — nothing to compare the pages against');
+    return;
+  }
+  const num = (t) => t.slice(1).split('.').map(Number);
+  const newest = tags.sort((a, b) => {
+    const [x, y] = [num(a), num(b)];
+    return (y[0] - x[0]) || (y[1] - x[1]) || (y[2] - x[2]);
+  })[0];
+
+  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md']) {
+    const named = [...read(rel).matchAll(/git clone --branch (v\d+\.\d+\.\d+)/g)].map((m) => m[1]);
+    assert.ok(named.length > 0, `${rel} names no release tag in a clone command`);
+    for (const tag of new Set(named)) {
+      assert.equal(tag, newest,
+        `${rel} tells a reader to clone ${tag}, but ${newest} is the newest release in this clone `
+        + '— the release wrote it on a branch that is not an ancestor of develop, and the bump PR '
+        + 'has to bring it back');
+    }
+  }
+});

@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.3 — 2026-09-25
+
+### Notes
+
 A patch release, cut for one entry. Nothing here changes how the product is configured, and there is
 no migration step.
 
@@ -61,6 +65,21 @@ this release makes no promise about it; the pinned command above is right either
 - **ARC-09-C59** — the contract gate no longer tells you to run the command it has just run. Its
   stale-`dist/` remedy named a rebuild the gate performs itself, so the one action that resolves the
   state — committing it — was the half it left out.
+
+### Fixed
+
+- wizard: the label prompt asks again, and exit 1 says whose answer it was (d1e031e)
+- docs: the install command clones a release, not the default branch (36322c2)
+- ci: the contract gate's stale-dist remedy names the action that works (9bd76e1)
+- doctor: the report's key list is authoritative in both directions (cc283a7)
+
+### Internal
+
+- changelog: the 2.0.3 release notes (aac4a26)
+- plan: ARC-07-C10 records that its controls need a dist rebuild (91b2385)
+- release: the negatives get a tag shape the guards ignore (4c6c06d)
+
+Tag v2.0.3 · contract dce40e97b55f · docs-pin df4afac
 
 ## 2.0.2 — 2026-09-24
 
