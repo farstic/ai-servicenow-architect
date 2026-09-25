@@ -13,6 +13,7 @@ import { mkdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'no
 import { join } from 'node:path';
 
 import { humanDuration, withoutDuration } from '../lib/steps/format.mjs';
+import { version as engineVersionOf } from '../lib/config.mjs';
 import { INPUTS, KINDS, STEP_IDS, alwaysRuns, hashFor, storeStamp, storeVersion } from '../lib/inputs.mjs';
 import { staleSteps, explainStale, emptyState } from '../lib/state.mjs';
 import { STEPS, runSteps } from '../lib/steps/index.mjs';
@@ -482,4 +483,52 @@ test('C18: every duration the formatter can print is normalised, and only durati
   assert.equal(withoutDuration('[B05/09] server … ok (cached)'), '[B05/09] server … ok (cached)');
   assert.equal(withoutDuration('[B02/09] docs … skipped (--docs skip)'),
     '[B02/09] docs … skipped (--docs skip)');
+});
+
+test('ARC-08-C36 — a cached step is re-stamped with the version that accepted its answer', async (t) => {
+  // THE OWNER'S CASE, at the level it happens. They bootstrapped at v2.0.2, moved the checkout to
+  // 2.0.3-dev and ran `./bootstrap.sh` again. The resumed run printed `[B01/09] workspace … ok
+  // (cached)` — the inputs hash matched, so the runner skipped the step and left its recorded entry
+  // untouched, including its 2.0.2 stamp. E-29 then read an older stamp as "bootstrap incomplete"
+  // and offered `./bootstrap.sh` as the remedy, on a bootstrap that had just finished.
+  //
+  // Reproduced in this repository's own upgrade e2e, where it had been failing every run behind an
+  // assertion a count cannot fail (`summary.fail >= 0`).
+  //
+  // THE STAMP ANSWERS "IS THIS ANSWER CURRENT", and for a cached step the inputs hash has just
+  // answered yes — more precisely than a version can. So the run records that: the answer is current
+  // for this build. `finishedAt` is NOT touched, because the step genuinely did not re-run and the
+  // resume rule's own test asserts that it keeps its timestamp.
+  const root = makeCheckout({}, t);
+  const ctx = ctxFor(root);
+  const state = fresh(root, ctx);
+  const OLDER = '0.9.0';
+  for (const id of Object.keys(state.steps)) state.steps[id].engineVersion = OLDER;
+  const before = JSON.parse(JSON.stringify(state.steps));
+
+  const lines = [];
+  const r = await runSteps({
+    root,
+    ctx: { ...ctx, env: process.env, mode: 'design-only', docs: 'sparse', cwd: root, areaCount: 2,
+      skipClaudeCheck: true, probe: async () => ({ ok: true }), state },
+    state, steps: STEPS, last: 'B09', onLine: (l) => lines.push(l), save: () => {},
+  });
+
+  // Not vacuous: steps really were cached on this run, or there is nothing to re-stamp.
+  assert.ok(r.summary.cached > 0, `no step was cached: ${lines.filter((l) => /^\[B/.test(l)).join(' | ')}`);
+
+  const current = engineVersionOf(root);
+  assert.notEqual(current, OLDER, 'the fixture no longer crosses a version boundary');
+  const cachedIds = lines.filter((l) => /ok \(cached\)/.test(l))
+    .map((l) => /\[(B\d\d)/.exec(l)?.[1]).filter(Boolean);
+  assert.ok(cachedIds.length > 0, 'the renderer no longer says which steps were cached');
+
+  for (const id of cachedIds) {
+    assert.equal(state.steps[id].engineVersion, current,
+      `${id} was cached and kept its ${OLDER} stamp — E-29 will call this install incomplete`);
+    // ...and it did NOT re-run, which is the property the resume rule promises and this must not break.
+    assert.equal(state.steps[id].finishedAt, before[id].finishedAt,
+      `${id} was re-run, not re-stamped`);
+    assert.equal(state.steps[id].inputsHash, before[id].inputsHash, `${id}'s recorded hash moved`);
+  }
 });

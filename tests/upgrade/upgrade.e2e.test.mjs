@@ -65,8 +65,20 @@ test('AC 1 — a release that moves one declared input re-runs exactly that step
 
   assert.equal(sha256(storePath(w.user)), storeBefore, 'the upgrade touched the credential store');
   assert.deepEqual(backups(w.user), [], 'a backup was written by an upgrade with no migration');
-  assert.equal(JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'))
-    .summary.fail >= 0, true);
+  // ARC-08-C36 — THIS ASSERTION USED TO BE `summary.fail >= 0`, WHICH A COUNT CANNOT FAIL.
+  //
+  // It is the only look this suite takes at the doctor after an upgrade, and it could not fail: a
+  // count is never negative. So the one place an upgrade's own report is inspected proved nothing,
+  // and E-29 has been FAILING here — this world upgrades 9.0.0 → 9.1.0, every step whose inputs did
+  // not move stays cached and keeps its 9.0.0 stamp, and E-29 read an older stamp as "bootstrap
+  // incomplete". The owner met exactly that at the S06 sitting on a bootstrap that had just
+  // finished and said so.
+  const report = JSON.parse(readFileSync(join(w.user, '.local/doctor-last.json'), 'utf8'));
+  const failing = (report.checks ?? []).filter((c) => c.status === 'fail').map((c) => c.id);
+  assert.deepEqual(failing, [],
+    `the doctor FAILS after a clean upgrade: ${failing.join(', ')} — `
+    + JSON.stringify((report.checks ?? []).filter((c) => c.status === 'fail')
+      .map((c) => `${c.id}: ${c.detail}`)));
   assert.match(snowarch(w.user, ['version'], { bin: w.bin }).stdout, /tag:\s+v9\.1\.0 \(exact\)/);
 }, MINUTES);
 
