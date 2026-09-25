@@ -240,3 +240,88 @@ test('C32: a step recorded as interrupted is a FAIL even while another step is r
   assert.equal(r.status, 'fail', `an interrupted step was forgiven: ${r.detail}`);
   assert.match(r.detail, /B02 interrupted/);
 });
+
+// ─── ARC-08-C36 — a step whose inputs still match is complete, whatever version stamped it ─────
+//
+// Live at the ARC-10-S06 sitting, on a bootstrap that had just finished and said so:
+//
+//   DOCTOR: 13 ok, 1 warn, 1 fail, 26 skipped
+//   E-29 FAIL the bootstrap finished: bootstrap incomplete since 2.0.3-dev:
+//        B01 recorded under 2.0.2, B02 recorded under 2.0.2 — ./bootstrap.sh
+//
+// The owner bootstrapped at v2.0.2, moved the checkout to 2.0.3-dev and ran `./bootstrap.sh` again.
+// The resumed run printed `[B01/09] workspace … ok (cached)`: the runner skipped those steps because
+// their INPUTS HASH matched, and the cached branch leaves the recorded entry untouched, so they kept
+// their 2.0.2 stamp. E-29 read an older stamp as "incomplete".
+//
+// REPRODUCED IN THIS REPOSITORY'S OWN e2e, where it had been failing on every run: the upgrade world
+// goes 9.0.0 → 9.1.0, and `E-29: bootstrap incomplete since 9.1.0: B01 recorded under 9.0.0, B05
+// recorded under 9.0.0, B07 recorded under 9.0.0, B09 recorded under 9.0.0`. Nothing noticed, because
+// the only look that suite took at the doctor after an upgrade was `summary.fail >= 0` — an assertion
+// a count cannot fail.
+//
+// AND B09 IS IN THAT LIST, which is a second defect and not the caching one: B09 is
+// `cacheable === false`, it runs every time, and it is the step that spawns the doctor. ARC-08-C32
+// excluded "the step running me" from `never ran` — but only in the branch where it has NO recorded
+// entry. With a prior entry from an earlier install it falls through to the version comparison, so on
+// any version change the step asking the question is reported stale by the answer.
+
+/** A finished install whose cached steps were stamped by an EARLIER version of the checkout. */
+function cachedUnderOlder(root, { older = '0.9.0', runningId = null } = {}) {
+  const current = engineVersionOf(root);
+  const state = readJson(root, '.local/bootstrap-state.json');
+  const steps = {};
+  for (const id of ['B01', 'B02', 'B03', 'B05', 'B07', 'B09']) {
+    steps[id] = { status: 'ok', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
+      durationMs: 0, engineVersion: id === 'B02' ? current : older };
+  }
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  return { root, platform: 'darwin', config: readJson(root, 'engine.config.json'),
+    env: runningId ? { [RUNNING_STEP_ENV]: runningId } : {} };
+}
+
+test('ARC-08-C36 — the step running this check is not stale either, even with a prior entry', async (t) => {
+  // ARC-08-C32's exclusion reached only the `never ran` branch. This is the same step, the same
+  // check, and the same false sentence — reached through the other branch because the step had been
+  // recorded by an earlier install.
+  const root = greenTree(t, { mode: 'design' });
+  const r = await E29.run(cachedUnderOlder(root, { runningId: 'B09' }));
+
+  // THE PROPERTY IS ABOUT B09 ALONE, and the status is deliberately not asserted: this fixture
+  // writes B01 and B07 with old stamps directly, with no bootstrap in between, so they ARE stale by
+  // the definition ARC-08-C30 gave the field and the check is right to say so. A blanket `status ===
+  // 'ok'` here would have been asserting away someone else's deliberate verdict to make my own case
+  // pass — it failed on exactly that, which is the useful way round.
+  assert.doesNotMatch(r.detail, /B09 recorded under/,
+    'the step asking the question is named in the answer it is asking for');
+  assert.equal((r.data?.stale ?? []).some((x) => x.id === 'B09'), false,
+    'B09 is still in the travelling stale list');
+  // ...AND THE FAIL PATH SAYS SO TOO. `inProgress` was rendered only in the two `ok` returns, so a
+  // reader whose install has a real problem — this fixture has two genuinely stale steps — saw a
+  // tally one short of the plan and no word about the step that was running. Same principle, same
+  // reader, one line.
+  assert.match(r.detail, /B09 is running this check/,
+    'the FAIL sentence does not say why the tally is one short');
+});
+
+test('ARC-08-C36 — a step that genuinely did not finish is still a FAIL', async (t) => {
+  // BOTH DIRECTIONS, and this is the half that matters: the check exists because an unfinished
+  // install used to pass silently. Loosening the version comparison must not loosen that.
+  const root = greenTree(t, { mode: 'design' });
+  const current = engineVersionOf(root);
+  const state = readJson(root, '.local/bootstrap-state.json');
+  const steps = {};
+  for (const id of ['B01', 'B02', 'B03', 'B05', 'B07']) {
+    steps[id] = { status: 'ok', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
+      durationMs: 0, engineVersion: current };
+  }
+  steps.B09 = { status: 'failed', inputsHash: 'x', finishedAt: '2026-09-24T09:00:00.000Z',
+    durationMs: 0, engineVersion: '0.9.0' };
+  writeJson(root, '.local/bootstrap-state.json', { ...state, mode: 'design', steps });
+  const r = await E29.run({ root, platform: 'darwin', env: {},
+    config: readJson(root, 'engine.config.json') });
+
+  assert.equal(r.status, 'fail', 'a failed step is no longer reported');
+  assert.match(r.detail, /B09 failed/, 'the sentence no longer says which step failed, or how');
+  assert.ok(r.command, 'a genuinely unfinished install lost its remedy');
+});

@@ -627,6 +627,14 @@ export function engineRepoChecks() {
           // ABSENT IS NOT A MISMATCH. States written before ARC-08-C30 carry no per-step version,
           // and reporting that as "recorded under another version" would turn every older install
           // into a finding — the defect this check exists to catch, facing the other way.
+          // ...AND NEITHER IS THE STEP RUNNING THIS CHECK (ARC-08-C36). ARC-08-C32 excluded it from
+          // `never ran`, but only in the branch above, where it has no recorded entry at all. On a
+          // checkout that has been bootstrapped before, the running step DOES have one — from the
+          // earlier install, under the earlier version — so it fell through to here and the step
+          // asking the question was named in the answer. B09 appeared in the e2e's own stale list
+          // for exactly this reason, and B09 is not even cacheable: it runs every time, and its
+          // entry is rewritten the moment it finishes, which is after this check.
+          if (step.id === runningStep) { inProgress = step.id; continue; }
           if (recorded.engineVersion && current && recorded.engineVersion !== current) {
             stale.push({ id: step.id, was: recorded.engineVersion });
           }
@@ -643,6 +651,11 @@ export function engineRepoChecks() {
         const parts = [];
         for (const [why, ids] of groupByReason(problems)) parts.push(`${ranges(ids)} ${why}`);
         for (const { id, was } of stale) parts.push(`${id} recorded under ${was}`);
+        // ARC-08-C36 — AND THE SAME COURTESY ON THE FAIL PATH. `inProgress` was rendered only in the
+        // two `ok` returns, so a reader whose install has a real problem saw a tally one short of the
+        // plan with no word about the step that is running — the very thing the `ok` sentence exists
+        // to prevent. It is the same principle and the same reader.
+        if (inProgress) parts.push(`${inProgress} is running this check`);
         return fail(`bootstrap incomplete since ${current ?? 'this version'}: ${parts.join(', ')}`, {
           remedy: ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh',
           command: ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh',

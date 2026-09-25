@@ -126,6 +126,24 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
     if (cached) {
       summary.cached += 1;
       summary.ok += 1;
+      // ARC-08-C36 — RE-STAMPED, because the answer has just been accepted as current for THIS
+      // build. The inputs hash matched, which is a stronger statement about currency than a version
+      // is: nothing this step depends on has moved. Leaving the old stamp is what sent the owner a
+      // FAIL reading `bootstrap incomplete since 2.0.3-dev: B01 recorded under 2.0.2` on a bootstrap
+      // that had just finished, and it had been failing in this repository's own upgrade e2e on every
+      // run behind an assertion a count cannot fail.
+      //
+      // `finishedAt`, `durationMs` and `inputsHash` are NOT touched: the step did not re-run, the
+      // resume rule promises exactly that, and its own test asserts the timestamp is unchanged. What
+      // moves is the one field whose question is "does this answer belong to the build that is here
+      // now" — and for a cached step the answer is yes.
+      recorded.engineVersion = engineVersionOf(root);
+      state.steps[step.id] = recorded;
+      // AND SAVED, or the re-stamp only reaches disk if a LATER step happens to run. My first cut of
+      // this fix `continue`d straight past the `save` below, so a cached step's new stamp lived in
+      // memory only — and the doctor E-29 runs in reads the FILE. The e2e still reported one step
+      // stale after the fix for exactly that reason.
+      save(root, state);
       onLine(stepLine({ id: step.id, title: step.title, status: 'cached', last: lastId }));
       continue;
     }
