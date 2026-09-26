@@ -96,7 +96,17 @@ const LAUNCHER_PATTERNS = Object.freeze([
   [/usage: snowarch\b/, 'a BARE `usage: snowarch` — the name is never on PATH'],
 ]);
 
-/** The two files that ARE the definitions, and the only ones allowed to spell a launcher. */
+/**
+ * The two files that ARE the definitions, and the only ones allowed to spell a launcher.
+ *
+ * EXEMPT FOR WHAT THEY DEFINE, NOT FOR WHAT THEY SAY — and `text.mjs` says quite a lot. Besides the
+ * definition itself and `ADD_INSTANCE`'s POSIX default, it carries SIX messages with the launcher
+ * spelled by hand: the banner's `upgrade`, `staleRegistration` and `doctorFail`, the `staleSuffix`, and
+ * `MODE_VARIANTS`' `timedOut` and `failed`. A Windows reader is shown a spelling their shell refuses in
+ * all six, and this guard cannot see them because reading that file is what the exemption prevents.
+ * They belong to ARC-07-C31's sweep and are named in that row so nobody reads the exemption as meaning
+ * the file is settled.
+ */
 const DEFINITIONS = Object.freeze([
   'tools/snowarch/lib/text.mjs',
   'packages/snowarch/src/cli/tty.ts',

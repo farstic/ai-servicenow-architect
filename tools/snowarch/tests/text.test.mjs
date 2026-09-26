@@ -171,10 +171,15 @@ test('the add-an-instance remedy is one string, in every place that offers it', 
   // renders `spellings().cli`, which is `.\\snowarch.cmd` on Windows, so comparing it against the
   // `./snowarch` default was the test choosing a platform and then checking a different one — it
   // passed on macOS and failed on every Windows cell.
+  // ARC-07-W17, rule 5 — ONE SOURCE FOR BOTH SIDES. `ADD_INSTANCE()` defaults to the POSIX spelling,
+  // so comparing a variant rendered for THIS shell against that default failed under pwsh: the Mode
+  // line said `.\snowarch.cmd mode live` and the expectation said `./snowarch mode live`. Both sides
+  // now take the same spelling, which is what makes this a test of ONE STRING rather than of two.
+  const spell = spellings();
   const surfaces = {
-    'the doctor Mode line': [MODE_VARIANTS.unconfigured(spellings()), ADD_INSTANCE()],
+    'the doctor Mode line': [MODE_VARIANTS.unconfigured(spell), ADD_INSTANCE(spell.cli)],
     'the bootstrap Next block': [nextBlock({ mode: 'design-only', serverKey: 'servicenow' }),
-      ADD_INSTANCE(spellings().cli)],
+      ADD_INSTANCE(spell.cli)],
   };
   for (const [where, [text, expected]] of Object.entries(surfaces)) {
     assert.ok(text.includes(expected), `${where} does not carry the one remedy verbatim:\n${text}`);

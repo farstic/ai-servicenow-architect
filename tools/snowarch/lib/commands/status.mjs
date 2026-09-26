@@ -52,14 +52,18 @@ export const USAGE = [
  * When the state file is missing or unreadable the panel says THAT, rather than a mode it does not
  * have. A remedy for the wrong problem costs the reader the time they spend following it.
  */
-export function fallbackPanel(root, cause, { read = readFileSync, exists = existsSync } = {}) {
+export function fallbackPanel(root, cause,
+  // ARC-07-W17 — TOLD, not read. `statusCommand` is what `make-status-fixtures.mjs` drives with
+  // `platform: 'linux'` so a COMMITTED fixture renders identically on every runner; a `spellings()` in
+  // here reads the machine instead and the fixture then depends on the shell that captured it.
+  { read = readFileSync, exists = existsSync, platform, env } = {}) {
   const path = join(root, '.local', 'bootstrap-state.json');
   if (!exists(path)) {
     // ARC-07-W17 — one spelling, the reader's. This named both by hand and the Windows one was BARE,
     // which PowerShell refuses; the sentence that tells somebody their checkout is not bootstrapped
     // handed a Windows reader a command their shell rejects.
     return `Mode: unknown — doctor unavailable ${cause}, and .local/bootstrap-state.json is`
-      + ` absent — run ${spellings().bootstrap}`;
+      + ` absent — run ${spellings({ platform, env }).bootstrap}`;
   }
   try {
     const state = JSON.parse(read(path, 'utf8'));
@@ -71,7 +75,10 @@ export function fallbackPanel(root, cause, { read = readFileSync, exists = exist
 }
 
 export async function statusCommand({ flags = {}, log, out = process.stdout, env = process.env,
-  cwd = process.cwd(), home = '', now = () => Date.now(), registry = undefined } = {}) {
+  cwd = process.cwd(), home = '', now = () => Date.now(), registry = undefined,
+  // ARC-07-W17 — like `doctorCommand`'s, and for the same reason: `make-status-fixtures.mjs` pins it so
+  // the committed fixtures stop depending on the capturing machine's shell (rule 4).
+  platform = process.platform } = {}) {
   const write = (text) => out.write(`${text}\n`);
 
   const checkout = resolveCheckout({ cwd, who: 'STATUS' });
@@ -90,6 +97,8 @@ export async function statusCommand({ flags = {}, log, out = process.stdout, env
     ({ report } = await runDoctor({
       root,
       config,
+      // The shell this run was TOLD about, so the Mode line inside the report is pinned too.
+      platform,
       ...(registry ? { registry } : {}),
       quick: true,
       // `--quick` implies no network in `doctorCommand`, and the implication is the point rather
@@ -108,7 +117,8 @@ export async function statusCommand({ flags = {}, log, out = process.stdout, env
   } catch (e) {
     // It ran and failed. The CLASS, never the message: a message can carry a path or a value, and
     // this line is pasted into conversations.
-    write(fallbackPanel(root, `after it failed (${e?.constructor?.name ?? 'Error'})`));
+    write(fallbackPanel(root, `after it failed (${e?.constructor?.name ?? 'Error'})`,
+      { platform, env }));
     if (log?.commit) log.commit();
     return EXIT_FAIL;
   }
@@ -118,7 +128,7 @@ export async function statusCommand({ flags = {}, log, out = process.stdout, env
   } else {
     // ARC-07-W17 — the panel is PURE (its import graph is walked and must reach no environment), so
     // the launcher is supplied here, where reading the shell is allowed.
-    write(renderPanel(report, spellings().cli));
+    write(renderPanel(report, spellings({ platform, env }).cli));
   }
   if (log?.commit) log.commit();
   // The doctor's verdict, so a script can branch on it. The panel is on the screen either way.

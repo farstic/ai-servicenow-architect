@@ -12,6 +12,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spellings } from '../lib/text.mjs';
 
 import { CLI_PATH, NOT_INSTALLED, buildArgv, forwardToServerCli } from '../lib/instance.mjs';
 import { USAGE, storeCommand } from '../lib/store.mjs';
@@ -64,7 +65,10 @@ test('a bare --help is this frame\'s, and everything else is the server\'s', asy
     const log = recorder();
     let spawned = null;
     assert.equal(await storeCommand({ log, argv: ['--help'], root: dir }), EXIT_OK);
-    assert.ok(log.lines.join('\n').includes('usage: ./snowarch store'));
+    // ARC-07-W17 — DERIVED: this is the SERVER's usage line (`store-command.ts`), which now reads
+  // `cliSpelling()`, so under pwsh it prints `.\snowarch.cmd store` and a POSIX literal fails. Not on
+  // the architect's list — found by auditing every asserted launcher literal against its product source.
+  assert.ok(log.lines.join('\n').includes(`usage: ${spellings().cli} store`));
 
     // `migrate --help` is NOT: the server CLI prints the exit-code table with it.
     await forwardToServerCli('store', { log, argv: ['migrate', '--help'], root: dir,

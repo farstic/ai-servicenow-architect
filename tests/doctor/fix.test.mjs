@@ -557,7 +557,11 @@ test('an outdated store schema is REFUSED with its command, never repaired', () 
 
   const text = renderPlan(plan);
   assert.match(text, /REFUSED \(1\)/);
-  assert.match(text, /SV-09.*run: \.\/snowarch store migrate/);
+  // ARC-07-W17, rule 2 — DERIVED AND ESCAPED, from the same source the fixture above used. The plan
+  // echoes the command it was given, so a POSIX regex here contradicted this case's own fixture: green
+  // on a mac, red under pwsh, and about nothing.
+  assert.match(text,
+    new RegExp(`SV-09.*run: ${SPELLED_CLI.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} store migrate`));
   // And the whitelist has no fixer that could ever touch it: the kinds are a closed set, and
   // "store-schema" is deliberately not one of them.
   assert.equal(KINDS.includes('store-schema'), false);
