@@ -75,6 +75,11 @@ test('no renderer builds a CLI command out of a literal path', () => {
   const renderers = [
     'tools/snowarch/lib/text.mjs',
     'tools/snowarch/lib/steps/B06.mjs',
+    // ARC-07-W14 — the plan screen started spelling a command (`docs sync`, in the `skip` meaning),
+    // so it joins the list the moment it does. ARC-07-C21's whole lesson was that C1 named four
+    // sources and the same defect sat in four more it never reached; a renderer added to this list
+    // when it gains its first command is how a fifth does not arrive later.
+    'tools/snowarch/lib/plan.mjs',
     'packages/snowarch/src/cli/tty.ts',
     'packages/snowarch/src/cli/preset-ui.ts',
   ];

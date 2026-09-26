@@ -3,12 +3,17 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { COLUMNS, DOCS, EXPLANATIONS, HEADER, LINES, MODES, ORIENTATION, applyChoice, buildPlan,
-  explainLines, formatPlan, resolveChoice, runPlanScreen }
+  choicesLine, explainLines, formatPlan, resolveChoice, runPlanScreen }
   from '../lib/plan.mjs';
 import { LIVE_YES_WITHOUT_FILE, USAGE, bootstrapCommand,
   liveYesNeedsInstanceFile } from '../lib/bootstrap.mjs';
 import { loadState, statePath } from '../lib/state.mjs';
 import { commandArgs, makeCheckout, recorder } from './helpers/workspace.mjs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/** This repository's root — ARC-07-W14 reads the install page for the figure it must agree with. */
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const ctxOf = (root, { present = true } = {}) => ({
   root, env: {}, areaCount: 19,
@@ -494,11 +499,33 @@ test('ARC-07-C12 — a number opens that line\'s choices, the way the wizard ask
     'Docs moved — the `2` was read as a second line rather than as Mode\'s answer');
 
   // THE WIZARD'S SHAPE, asserted as a shape rather than a sentence: the label, then numbered options.
-  assert.match(out.text(), /Mode:\s+\[1\] design-only[^\n]*\[2\] live/,
-    `the number did not open Mode's choices:\n${out.text()}`);
+  // ARC-07-W14 RE-ANCHORED THIS, and the reason is the lesson this programme keeps paying for. The
+  // matcher was `/Mode:\s+\[1\] design-only[^\n]*\[2\] live/`, whose `[^\n]*` required both options on
+  // ONE line — so it was bound to a LAYOUT, and W14's fold (one option per line when the row will not
+  // fit the budget) invalidated it. The property was never the layout: it is that opening a line
+  // prints the label and then the numbered options in order. Asserted that way, it holds whichever
+  // layout the widths produce, so trimming a meaning later cannot turn this case red.
+  // `Mode:` is not at the start of its line — the screen writes the `> ` prompt first — so the
+  // matcher spans the gap instead of anchoring on it, and accepts EITHER layout: a newline and an
+  // indent when the fold is in effect, or spaces when the options fit one line.
+  const opened = out.text();
+  assert.match(opened, /Mode:(\s*\n\s*|\s+)\[1\] design-only/,
+    `the number did not open Mode's choices:\n${opened}`);
+  const first = opened.indexOf('[1] design-only');
+  const second = opened.indexOf('[2] live');
+  assert.ok(first > -1 && second > first,
+    `the numbered options are missing or out of order:\n${opened}`);
   // EACH OPTION'S MEANING BESIDE IT, per the owner's ruling: the question is the moment the meaning
   // is wanted, and a reader who has opened the line should not have to go back out to `?` for it.
-  assert.match(out.text(), /\[2\] live — configures one/, 'the options carry no meaning beside them');
+  // ARC-07-W14 — DERIVED, and the division of labour is deliberate. This matcher read
+  // `/\[2\] live — configures one/`, quoting a meaning W14 rewrote, so it was the sixth
+  // matcher-bound-to-product-text this programme has found. THIS case's property is STRUCTURAL —
+  // that a meaning is printed beside the option at all — so deriving it from `LINES` is right, and
+  // the derivation's blindness to WORDING is not a gap here: ARC-07-W14's own case asserts the words
+  // by name. One case for the shape, one for the content, and neither pretending to be the other.
+  const live = LINES[1].meaning.live;
+  assert.ok(out.text().includes(`[2] live — ${live}`),
+    `the options carry no meaning beside them:\n${out.text()}`);
   assert.match(out.text(), /\(current\)/, 'the current value is not marked');
 });
 
@@ -688,4 +715,95 @@ test('ARC-07-W13 — the two retitled steps say what they do, and their ids are 
   // step check, nine `[Bnn/09]` lines — and this row does not touch them.
   for (const id of ['B01', 'B02', 'B05', 'B07', 'B09']) assert.match(steps, new RegExp(`${id} `));
   assert.doesNotMatch(steps, /contract|toggles/, 'the old titles are still on the screen');
+});
+
+/**
+ * ARC-07-W14 — each option says what choosing it gives you.
+ *
+ * `[1] design-only — no instance  [2] live — configures one, needs Node 20+` described the mode most
+ * readers should pick by what it LACKS, and described the other by a Node version. Neither says what
+ * Claude will actually be able to do, which is the only thing the choice is about.
+ */
+test('ARC-07-W14 — each option says what it gives you, and the corpus cost is on the line', () => {
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const plan = buildPlan({ ctx });
+  const mode = choicesLine(LINES[1], plan);
+  const docs = choicesLine(LINES[2], plan);
+
+  // WHAT DESIGN-ONLY IS, not what it is missing — and "no instance" is kept, because it is the fact
+  // that distinguishes the two answers.
+  assert.match(mode,
+    /design-only — works from the ServiceNow docs and the specialist skills; no instance/);
+  // ...and live says what it ADDS, plus when the asking happens, so the wizard is not a surprise.
+  assert.match(mode, /live — also connects one ServiceNow instance/);
+  assert.match(mode, /the wizard asks for URL and login/);
+
+  assert.match(docs, /sparse — the documentation the specialists cite/);
+  assert.match(docs, /\(recommended\)/);
+  assert.match(docs, /full — all of it/);
+  assert.match(docs, /skip — none for now; the health check reports FAIL until/);
+
+  // NO SECOND `(current)`: this renderer appends its own and the ruled text carried one too, which
+  // would have read `design-only — … (current) (current)`.
+  for (const text of [...Object.values(LINES[1].meaning), ...Object.values(LINES[2].meaning)]) {
+    assert.doesNotMatch(text, /\(current\)/, 'a meaning spells (current), which the renderer appends');
+  }
+  assert.equal((mode.match(/\(current\)/g) ?? []).length, 1);
+});
+
+test('ARC-07-W14 — the corpus figure is what the disk loses, not what you read', () => {
+  // THE BRIEF SAID ~180 MB AND THE PAGE SAYS WHY THAT IS THE WRONG NUMBER. `docs/INSTALL.md` states
+  // both: the working tree is 179 MB (183 on Windows) and tree plus `.git` is 302 MB, and then
+  // *"the first is what you read, the second is what the disk loses."* At the moment somebody decides
+  // whether to fetch it, what the disk loses is the figure that matters — 180 would understate the
+  // cost by 40% on the one line where the cost is being chosen.
+  const page = readFileSync(join(repoRoot, 'docs', 'INSTALL.md'), 'utf8');
+  const onDisk = Number(/about (\d+) MB on disk/.exec(page)?.[1]);
+  assert.ok(onDisk > 0, 'the install page no longer states the corpus cost on disk');
+
+  const sparse = LINES[2].meaning.sparse;
+  const stated = Number(/~(\d+) MB/.exec(sparse)?.[1]);
+  assert.ok(stated > 0, `the sparse option names no size: ${sparse}`);
+  assert.ok(Math.abs(stated - onDisk) <= 10,
+    `the screen says ~${stated} MB and the page says ${onDisk} MB on disk`);
+  // ...and it is NOT the working-tree figure, which is the number the brief reached for.
+  for (const tree of [179, 180, 183]) {
+    assert.notEqual(stated, tree,
+      `~${tree} MB is the working tree — the page says that is not what the disk loses`);
+  }
+});
+
+test('ARC-07-W14 — one option per line when the row will not fit, measured on the rendered text', () => {
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  for (const key of [1, 2]) {
+    const line = LINES[key];
+    // EVERY value taken as current in turn, because ` (current)` is appended by the renderer and adds
+    // ten columns to exactly one row. `design-only` is 96 columns when it is not current and 106 when
+    // it is — so a check that measured the meanings, or only the default plan, would call it safe on
+    // the very run where the user watches it wrap.
+    for (const value of line.values) {
+      const plan = line.set(buildPlan({ ctx }), value);
+      const rendered = choicesLine(line, plan);
+      const rows = rendered.split('\n');
+      for (const row of rows) {
+        assert.ok(row.length <= COLUMNS, `${row.length} > ${COLUMNS} with ${value} current: ${row}`);
+      }
+      if (rows.length > 1) {
+        assert.equal(rows[0], `${line.label}:`);
+        assert.equal(rows.length, line.values.length + 1, 'the fold did not give each option a line');
+        rows.slice(1).forEach((row, i) => assert.match(row, new RegExp(`^ {2}\\[${i + 1}\\] `)));
+      }
+    }
+  }
+});
+
+test('ARC-07-W14 — the launcher in the skip option is spelled by the definition', async () => {
+  // The `skip` meaning names a command, so it is the plan screen's first — which is why `plan.mjs`
+  // joined the ARC-07-W7 renderer guard in this row, and why that guard immediately found a literal
+  // `./snowarch mode live` sitting in the Node-free branch since it was written.
+  const { spellings } = await import('../lib/text.mjs');
+  assert.ok(LINES[2].meaning.skip.includes(`${spellings().cli} docs sync`),
+    `the skip option does not spell the launcher through spellings(): ${LINES[2].meaning.skip}`);
 });

@@ -11,6 +11,7 @@
 import { MODE } from './docs/sync.mjs';
 import { plannedSteps } from './steps/index.mjs';
 import { redact } from './redact.mjs';
+import { spellings } from './text.mjs';
 
 export const MODES = Object.freeze(['design-only', 'live']);
 /**
@@ -91,6 +92,9 @@ export const EXPLANATIONS = Object.freeze([
 /** The budget every other line on this screen is written to. */
 export const COLUMNS = 100;
 
+/** The launcher for THIS shell, read once — ARC-07-W7's rule, B06's shape. */
+const SPELL = spellings();
+
 /** The explanation block, one row per entry, in the plan's own label column. */
 export const explainLines = () => EXPLANATIONS.map(([label, text]) => `  ${label} — ${text}`);
 
@@ -135,7 +139,7 @@ const modeHint = (plan) => (plan.nodeFixed
     + `Node ${plan.nodeVersion} found`);
 
 const modeValue = (plan) => (plan.nodeFixed
-  ? 'design-only (fixed — Node.js 20+ not found; add live mode later with ./snowarch mode live)'
+  ? `design-only (fixed — Node.js 20+ not found; add live mode later with ${SPELL.cli} mode live)`  // ARC-07-W14: was a literal
   : plan.mode);
 
 const docsValue = (plan) => (plan.docs === 'sparse' ? `sparse (${plan.areas} areas)` : plan.docs);
@@ -182,12 +186,37 @@ export const LINES = Object.freeze({
     // to go back out to learn what the two answers are. Short enough not to wrap at `COLUMNS`.
     // "no instance" and not the phrase ARC-08-C7 reserves for the unconfigured STATE — the same
     // trap C11's Mode explanation hit. Short, because this line must not wrap at `COLUMNS`.
-    meaning: { 'design-only': 'no instance', live: 'configures one, needs Node 20+' },
+    meaning: {
+      // ARC-07-W14 — WHAT EACH ANSWER GIVES YOU, not what it lacks. `no instance` said only what
+      // design-only is missing, which is a strange way to describe the mode most readers should pick:
+      // it is the whole product minus one connection. `Claude` is dropped from the ruled sentence for
+      // one reason, measured — see WIDTH below.
+      'design-only': 'works from the ServiceNow docs and the specialist skills; no instance',
+      // "in a moment" came off for width — 108 columns WITH the renderer's ` (current)` appended,
+      // and only a check that takes each value as current in turn can see that. It is also the phrase
+      // ARC-07-W13's orientation line already carries ("live adds a short wizard"), so once more what
+      // was dropped is a second author rather than a fact. 96 columns, four of headroom.
+      live: 'also connects one ServiceNow instance (the wizard asks for URL and login)',
+    },
     of: (plan) => plan.mode,
     set: (plan, v) => ({ ...plan, mode: v }) },
   2: { label: 'Docs',
     values: DOCS,
-    meaning: { sparse: 'this engagement\'s areas', full: 'all of it', skip: 'none for now' },
+    meaning: {
+      // ~300 MB, AND THE BRIEF SAID ~180 — measured on the page that already states it.
+      // `docs/INSTALL.md` gives BOTH figures and says which is which: the working tree is 179 MB
+      // (183 on Windows) and tree plus `.git` is 302 MB, and *"the first is what you read, the second
+      // is what the disk loses."* At the moment somebody is deciding whether to fetch it, what the
+      // disk loses is the number that matters, so 180 would understate the cost by 40% on the one
+      // line where it is being chosen.
+      sparse: 'the documentation the specialists cite, ~300 MB (recommended)',
+      full: 'all of it',
+      // The launcher is spelled by the definition, never here — ARC-07-W7's rule. Read at module
+      // load like B06's eight sites, and correct for the same reason: a process's platform does not
+      // change, and a function here would turn the assertions below into comparisons of a value
+      // with itself.
+      skip: `none for now; the health check reports FAIL until ${SPELL.cli} docs sync`,
+    },
     of: (plan) => plan.docs,
     set: (plan, v) => ({ ...plan, docs: v }) },
 });
@@ -198,10 +227,26 @@ export const LINES = Object.freeze({
  * The wizard's own shape (`What is this instance?  [1] pdi  [2] dev`), with each option's meaning
  * beside it and the current value marked.
  */
-export const choicesLine = (line, plan) => `${line.label}:  ${line.values
-  .map((v, i) => `[${i + 1}] ${v}${line.meaning?.[v] ? ` — ${line.meaning[v]}` : ''}`
-    + `${v === line.of(plan) ? ' (current)' : ''}`)
-  .join('  ')}`;
+export const choicesLine = (line, plan) => {
+  const rows = line.values.map((v, i) => `[${i + 1}] ${v}`
+    + `${line.meaning?.[v] ? ` — ${line.meaning[v]}` : ''}`
+    + `${v === line.of(plan) ? ' (current)' : ''}`);
+  const joined = `${line.label}:  ${rows.join('  ')}`;
+  // ARC-07-W14 — ONE OPTION PER LINE WHEN THE ROW WILL NOT FIT, and the decision is made on the
+  // RENDERED text rather than on the meanings alone: ` (current)` is appended by this function, so
+  // whether a row fits depends on which value is current. The `design-only` row is 96 columns when
+  // it is not the current value and 106 when it is, and a check that measured the meaning would have
+  // called it safe on the exact run where the user sees it overflow.
+  //
+  // WRAPPING IS NOT THIS, DELIBERATELY. `preset-ui.ts` has `wrapRow`, which folds a long note across
+  // lines — and it lives in the server package, which this must never import. What happens here is a
+  // LAYOUT change: each option keeps its own whole line, indented under the label, so a reader still
+  // sees one option per number. Nothing is broken mid-phrase, which is the property the doctor's
+  // renderer already ruled on: "a wrapped remedy that starts mid-line is the part people stop
+  // reading". A row still too long for the budget is a WORDING defect and the case says so.
+  if (joined.length <= COLUMNS) return joined;
+  return [`${line.label}:`, ...rows.map((r) => `  ${r}`)].join('\n');
+};
 
 /**
  * One answer to a line's question: a number, the value spelled out, or nothing.
