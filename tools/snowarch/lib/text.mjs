@@ -199,11 +199,21 @@ export function instanceKeptNote({ label, platform, env } = {}) {
  * not be spawned, `doctorCounts` falls back to tallying `state.steps` and there is no `checks` key
  * at all — which is the honest case the default covers.
  */
-export function doctorLine({ ok = 0, warn = 0, fail = 0, skip = 0, fixable = 0,
-  nodeUsable = true, checks = null } = {}) {
-  return nodeUsable
-    ? renderSummaryLine({ ok, warn, fail, skip, fixable }, checks)
-    : 'DOCTOR: unavailable until Node 20+ is installed (design-only is complete)';
+export function doctorLine({ ok = 0, warn = 0, fail = 0, skip = 0, fixable = 0, notInQuick = 0,
+  nodeUsable = true, checks = null, source = null, platform, env } = {}) {
+  if (!nodeUsable) return 'DOCTOR: unavailable until Node 20+ is installed (design-only is complete)';
+  // ARC-07-W15 — THE QUICK LINE ONLY WHEN THE DOCTOR ACTUALLY RAN, and `source` is how that is known
+  // rather than guessed. `doctorCounts` returns `source: 'doctor'` when it spawned one and
+  // `'bootstrap'` when it could not and tallied `state.steps` instead. That fallback is not a health
+  // check at all — it counts the install's own steps — so calling it "Health check (quick)" would put
+  // a name on it that it cannot earn, and there is no subset of checks it left out to point at.
+  //
+  // `notInQuick` is named in the parameter list because this function REBUILDS the summary object
+  // from five fields rather than passing `counts` through: a new field that is not named here is
+  // silently dropped, which is how the number would have arrived as 0 with every unit test green.
+  const quick = source === 'doctor';
+  return renderSummaryLine({ ok, warn, fail, skip, fixable, notInQuick }, checks,
+    { quick, cli: spellings({ platform, env }).cli });
 }
 
 /**
@@ -289,7 +299,7 @@ export function nextBlock({ mode, dialogs = EXPECTED_DIALOGS, serverKey, platfor
 export function summaryBlock({ mode, instance = null, counts = {}, nodeUsable = true,
   dialogs = EXPECTED_DIALOGS, serverKey, platform, env, warnings = [], failures = [] } = {}) {
   const lines = [
-    doctorLine({ ...counts, nodeUsable }),
+    doctorLine({ ...counts, nodeUsable, platform, env }),
     // ARC-08-C? (Sitting A) — every FAIL, in full, directly under the count that announced it.
     // The summary used to print `DOCTOR: 8 ok, 0 warn, 1 fail` and stop, and by the time anybody ran
     // the full doctor the failure was gone: a count with nothing named is a number nobody can act

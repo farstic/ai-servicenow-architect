@@ -10,6 +10,7 @@
 // building a registry of their own, because `--section` and `--quick` are answers about ONE
 // registry.
 import { createRegistry } from '../registry.mjs';
+import { NOT_IN_QUICK, NOT_IN_SECTION } from '../report-text.mjs';
 
 import { engineContractChecks } from './engine-contract.mjs';
 import { engineDocsChecks } from './engine-docs.mjs';
@@ -160,7 +161,7 @@ export function dedupeKeyFor(result) {
 /** The summary, with each de-duplicated condition counted once. */
 export function summariseMerged(results, checks) {
   const byId = new Map(checks.map((c) => [c.id, c]));
-  const summary = { ok: 0, warn: 0, fail: 0, skip: 0, fixable: 0, notInSection: 0 };
+  const summary = { ok: 0, warn: 0, fail: 0, skip: 0, fixable: 0, notInSection: 0, notInQuick: 0 };
   const seen = new Set();
   for (const r of results) {
     const key = dedupeKeyFor(r);
@@ -172,7 +173,13 @@ export function summariseMerged(results, checks) {
     // ARC-08 (Sitting A) — counted separately, and as a SUBSET of `skip`, never an addition to it.
     // "You did not ask for this check" is not a fact about the machine, and listing 37 of them as
     // findings buried the 2 that were.
-    if (r.status === 'skip' && r.detail === 'not in --section') summary.notInSection += 1;
+    if (r.status === 'skip' && r.detail === NOT_IN_SECTION) summary.notInSection += 1;
+    // ARC-07-W15 — the same subset rule for `--quick`, and THIS is the summariser that reaches the
+    // report, so the bootstrap's line gets its number from here. The literal above was the FOURTH
+    // author of `not in --section`: the runner wrote it, the runner's own tally matched on it, this
+    // tally matched on it, and `NOT_IN_SECTION` sat exported and unused. Rewording any one of them
+    // would have zeroed a count with every rendered-line test still green.
+    if (r.status === 'skip' && r.detail === NOT_IN_QUICK) summary.notInQuick += 1;
     // The result's own answer first — see `checkToJson`. A check that can be fixable in general
     // still produces findings that are not.
     const fixable = r.fixable ?? byId.get(r.id)?.fixable ?? false;

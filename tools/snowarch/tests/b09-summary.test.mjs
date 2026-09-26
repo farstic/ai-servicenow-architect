@@ -88,7 +88,7 @@ test('ARC-08-C37 — a doctor warning is named in the block, not just counted', 
   const state = stateWith({ B01: { status: 'ok' }, B05: { status: 'ok' } });
   const counts = doctorCounts(state, { root: '/repo', hasDoctor: true,
     run: () => ({ stdout: JSON.stringify({
-      summary: { ok: 14, warn: 1, fail: 0, skip: 26 },
+      summary: { ok: 14, warn: 1, fail: 0, skip: 26, notInQuick: 26 },
       checks: [
         { id: 'E-23', status: 'warn', title: 'stale MCP registrations in ~/.claude.json',
           // A PLACEHOLDER name, not the one this machine's store happens to hold: the real remedy
@@ -105,7 +105,11 @@ test('ARC-08-C37 — a doctor warning is named in the block, not just counted', 
     dialogs: EXPECTED_DIALOGS, serverKey: 'servicenow', platform: 'linux', env: {},
     warnings: warningsFrom(state), failures: counts.failures ?? [] });
   const lines = block.split('\n');
-  assert.equal(lines[0], 'DOCTOR: 14 ok, 1 warn (E-23), 0 fail, 26 skipped');
+  // ARC-07-W15 — the bootstrap's line, and C37's property is untouched: the warning is still NAMED.
+  // `26 skipped` became `26 more run with ./snowarch doctor`, which is the same number answering the
+  // question a reader actually has at the end of an install — what have I not been told?
+  assert.equal(lines[0],
+    'Health check (quick): 14 ok · 1 warn (E-23) · 0 fail · 26 more run with ./snowarch doctor');
   // NAMED, NOT LISTED: the warning's own remedy line stays out of the block, exactly as the panel
   // keeps it out. E-23's remedy is several `claude mcp remove …` continuations and this block is
   // already the longest thing a first install prints.
@@ -284,4 +288,34 @@ test('ARC-08 control — without the doctor, the tally is the persisted steps, a
   assert.equal(fallback.source, 'bootstrap');
   assert.equal(fallback.fail, 1,
     'the fallback counts state.steps, which persists — which is why it must not be the usual path');
+});
+
+test('ARC-07-W15 — a doctor payload without `notInQuick` prints no tail, never `undefined more`', () => {
+  // THE MISMATCHED-CHECKOUT CASE. The count comes from the spawned doctor's JSON, and that doctor is
+  // this checkout's — but an upgrade in flight, or a `dist` from before this row, can answer without
+  // the field. `notInQuick ?? 0` then suppresses the tail rather than printing a number nobody
+  // computed. Measured as a shape: the counts are true, and the sentence that would have been a guess
+  // is simply absent.
+  const state = stateWith({ B01: { status: 'ok' } });
+  const counts = doctorCounts(state, { root: '/repo', hasDoctor: true,
+    run: () => ({ stdout: JSON.stringify({ summary: { ok: 14, warn: 0, fail: 0, skip: 26 } }) }) });
+  const block = summaryBlock({ mode: 'design', counts, nodeUsable: true,
+    dialogs: EXPECTED_DIALOGS, serverKey: 'servicenow', platform: 'linux', env: {} });
+  const first = block.split('\n')[0];
+  assert.equal(first, 'Health check (quick): 14 ok · 0 warn · 0 fail');
+  assert.doesNotMatch(first, /undefined|NaN|null/);
+  assert.doesNotMatch(first, /more run with/, 'a tail was printed from a count the payload never gave');
+});
+
+test('ARC-07-W15 — the fallback tally is not called a health check', () => {
+  // `doctorCounts` returns `source: 'bootstrap'` when it could not spawn a doctor and tallied the
+  // install's own steps instead. That is not a health check and has no subset it left out, so it
+  // keeps the old wording — the alternative is a line whose name it cannot earn.
+  const counts = doctorCounts(stateWith({ B01: { status: 'ok' }, B05: { status: 'fail' } }),
+    { root: '/repo', hasDoctor: false });
+  assert.equal(counts.source, 'bootstrap');
+  const block = summaryBlock({ mode: 'design', counts, nodeUsable: true,
+    dialogs: EXPECTED_DIALOGS, serverKey: 'servicenow', platform: 'linux', env: {} });
+  assert.match(block.split('\n')[0], /^DOCTOR: /);
+  assert.doesNotMatch(block, /Health check/);
 });
