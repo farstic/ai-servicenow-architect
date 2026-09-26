@@ -377,11 +377,13 @@ describe('criterion 6 — unreachable, and a role that cannot read', () => {
   it('ARC-07-W1 — re-enter the URL re-asks the URL and probes again', async () => {
     const w = workspace();
     try {
-      const { url: _asked, ...interactive } = baseOptions;
+      // `url: undefined` is what reaches the prompt — `runAdd` asks when `options.url` is absent,
+      // and spelling it is clearer than destructuring a value only to discard it.
+      const interactive = { ...baseOptions, url: undefined };
       const { probe, urls } = probeLog('servicenow.com');
       // The last '' is Enter on the permissions screen: this run is interactive, so it gets one.
       const terminal = io([TYPO, '1', URL_PDI, '']);
-      const result = await runAdd({ ...interactive }, terminal,
+      const result = await runAdd(interactive, terminal,
         { storePath: w.store, makeClient: client([200]).make, reachability: probe, env: {} });
       const text = terminal.written();
 
@@ -405,11 +407,13 @@ describe('criterion 6 — unreachable, and a role that cannot read', () => {
   it('...and a re-entered URL that is also unreachable offers the menu again, bounded', async () => {
     const w = workspace();
     try {
-      const { url: _asked, ...interactive } = baseOptions;
+      // `url: undefined` is what reaches the prompt — `runAdd` asks when `options.url` is absent,
+      // and spelling it is clearer than destructuring a value only to discard it.
+      const interactive = { ...baseOptions, url: undefined };
       // Every host fails, so the only way out is the bound.
       const { probe, urls } = probeLog('.');
       const terminal = io([TYPO, '1', TYPO, '1', TYPO]);
-      const result = await runAdd({ ...interactive }, terminal,
+      const result = await runAdd(interactive, terminal,
         { storePath: w.store, makeClient: client([200]).make, reachability: probe, env: {} });
 
       expect(result.exitCode).toBe(EXIT_FAILED);
