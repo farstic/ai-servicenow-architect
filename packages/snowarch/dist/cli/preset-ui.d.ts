@@ -31,9 +31,9 @@ export declare const ENTRY_DEFAULTS: Readonly<{
 }>;
 /** The proposal. The environment, and nothing else — see the note at the top of this file. */
 export declare function proposePreset(environment: Environment): PresetName;
-export declare const PROD_LOCKED: (label: string, flag: FlagName) => string;
+export declare const PROD_LOCKED: (label: string, flag: FlagName, cli?: string) => string;
 /** The refusal, in the story's words. Exit 3 — a policy answer, not a usage mistake. */
-export declare const prodRefusal: (label: string) => string;
+export declare const prodRefusal: (label: string, cli?: string) => string;
 /**
  * The probe annotation for one flag.
  *

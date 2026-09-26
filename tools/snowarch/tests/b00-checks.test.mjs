@@ -101,9 +101,15 @@ test('check 1 — the root check agrees with git, and names the platform\'s own 
   assert.equal(wrongCwd.status, 'fail');
   assert.equal(wrongCwd.detail, 'not at the repository root — run: cd "/repo" && ./bootstrap.sh');
 
+  // ARC-07-C1, closed by W7. This was `cd /d "C:\repo" && .\bootstrap.cmd` — cmd.exe syntax, and a
+  // PARSE ERROR in PowerShell 5.1, which is the shell a Windows reader is most likely pasting into:
+  // `cd /d` is cmd-only and `&&` arrived in PowerShell 7. No single line runs in both (`&` is
+  // PowerShell's call operator), so it is two steps, and `pushd` is the one that changes drive in
+  // both shells. The POSIX line above is untouched and still asserted, which is how this case shows
+  // the change is confined to the platform it names.
   const onWindows = checkRoot({ root: 'C:\\repo', cwd: 'C:\\repo\\clients', exec, plat: 'win32' });
   assert.equal(onWindows.detail,
-    'not at the repository root — run: cd /d "C:\\repo" && .\\bootstrap.cmd');
+    'not at the repository root — run: pushd "C:\\repo" then .\\bootstrap.cmd');
 
   // git disagreeing about the toplevel is also a failure — a checkout inside another checkout.
   const nested = checkRoot({ root: '/repo', cwd: '/repo',

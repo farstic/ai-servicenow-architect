@@ -41,6 +41,13 @@ const NOT_OURS = new Set([
   // set either would be this package reaching outside its own contract.
   'HOME', 'USERPROFILE', 'APPDATA', 'PATH', 'Path', 'PATHEXT', 'NODE_ENV', 'NODE_EXTRA_CA_CERTS',
   'XDG_CONFIG_HOME', 'OneDrive', 'OneDriveCommercial', 'OneDriveConsumer',
+  // `SHELL` and `MSYSTEM` are how a bash ON WINDOWS announces itself, and ARC-07-C1 (closed by W7)
+  // is why they are read: the launcher's spelling is `.\snowarch.cmd` for PowerShell and cmd, and
+  // `./snowarch` for Git Bash — which runs the POSIX form perfectly well, so telling that user to
+  // type the Windows form would be telling them to type something that does not work. The SHELL sets
+  // these, not the user, and a project `.env` inviting anyone to set `SHELL` would be this package
+  // reaching outside its contract in the most confusing way available.
+  'SHELL', 'MSYSTEM',
   // Set by Claude Code for a project-scoped server.
   'CLAUDE_PROJECT_DIR',
   // Standard proxy variables. Documented in .env.example's prose (they are not `KEY=` lines

@@ -74,8 +74,13 @@ test('AC 2 — from a subdirectory: the root sentence, exit 3, and no .local/', 
   const code = await bootstrapCommand({ ...a, cwd: nested, ...noNetwork });
 
   assert.equal(code, 3, 'a missing prerequisite is exit 3, not exit 1');
+  // ARC-07-C1, closed by W7: the win32 remedy was `cd /d "<root>" && .\bootstrap.cmd`, which is
+  // cmd.exe syntax — `cd /d` is cmd-only and `&&` is not in PowerShell 5.1, so the line a Windows
+  // reader is most likely to paste was a PARSE ERROR. There is no single line that runs in both
+  // shells (`&&` is PowerShell 7+, `&` is PowerShell's call operator), so it is two steps, and
+  // `pushd` is the one that changes drive in both. The POSIX branch is untouched.
   assert.ok(a.log.lines.some((l) => l === `FAIL B00: not at the repository root — run: `
-    + `${isWindows ? `cd /d "${root}" && .\\bootstrap.cmd` : `cd "${root}" && ./bootstrap.sh`}`),
+    + `${isWindows ? `pushd "${root}" then .\\bootstrap.cmd` : `cd "${root}" && ./bootstrap.sh`}`),
   a.log.lines.join('\n'));
   assert.equal(existsSync(join(root, '.local')), false, 'a preflight failure writes nothing at all');
   assert.ok(!a.log.lines.some((l) => l.startsWith('Plan —')), 'the plan must not be offered');

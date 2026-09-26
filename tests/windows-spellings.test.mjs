@@ -33,6 +33,16 @@ import { spellings } from '../tools/snowarch/lib/text.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8');
 
+/**
+ * A bare `snowarch.cmd` that is being INVOKED — not merely named.
+ *
+ * One definition, two readers (the sweep and its negative), so the rule cannot be stated twice and
+ * drift. The verb list is explicit rather than `\w+`: a sentence like "`snowarch.cmd` is the CLI
+ * wrapper" must not match, and a pattern loose enough to catch every invocation would catch that too.
+ */
+const BARE_INVOCATION =
+  /(?<!\.\\)snowarch\.cmd\s+(?:…|--|status|doctor|mode|instance|upgrade|store|version|docs|help)/;
+
 /** The Windows shell, stated rather than inherited. */
 const WIN = { platform: 'win32', env: {} };
 
@@ -97,9 +107,15 @@ test('no user-facing page tells a Windows reader to type a command their shell r
     if (rel.startsWith('docs/plans/') || rel.startsWith('docs/validation/')
       || rel.startsWith('docs/spikes/') || rel === 'docs/CHANGELOG.md') continue;
     read(rel).split('\n').forEach((line, i) => {
-      // A BARE `snowarch.cmd` is one not preceded by `.\`. The lookbehind is the whole check: the
-      // correct spelling CONTAINS the wrong one, so a plain `includes` would report all 104.
-      if (/(?<!\.\\)snowarch\.cmd/.test(line)) {
+      // TWO CONDITIONS, AND THE SECOND IS THE ONE THAT TOOK THE WORK. A bare `snowarch.cmd` is one
+      // not preceded by `.\` — the lookbehind matters because the correct spelling CONTAINS the wrong
+      // one, so `includes` would report all 104. But a bare name is only WRONG when it is being
+      // INVOKED: `docs/ARCHITECTURE.md`'s file tree, its component table and two sentences about what
+      // the wrapper does all name `snowarch.cmd` as a FILE, and `.\snowarch.cmd` would be wrong there
+      // — that is the file's name. `docs/PLATFORM-NOTES.md` names the artifact S-04 tested. So the
+      // rule fires only when a subcommand or a flag follows, which is what makes it a command
+      // somebody types. The first version of this check reported all five of those as defects.
+      if (BARE_INVOCATION.test(line)) {
         offences.push(`${rel}:${i + 1}: bare snowarch.cmd — PowerShell refuses it`);
       }
       if (line.includes('cd /d ')) {
@@ -114,9 +130,17 @@ test('...and the negative: the check sees a planted bare spelling', () => {
   // The instrument is tested, because a guard that cannot see is indistinguishable from a tree that
   // is clean — the defect this programme keeps finding in checks that cannot tell absence from
   // failure. Both patterns, and the correct spelling must NOT be reported.
-  const bare = (line) => /(?<!\.\\)snowarch\.cmd/.test(line);
-  assert.equal(bare('run snowarch.cmd doctor'), true, 'a bare spelling must be seen');
+  const bare = (line) => BARE_INVOCATION.test(line);
+  assert.equal(bare('run snowarch.cmd doctor'), true, 'a bare invocation must be seen');
   assert.equal(bare('run .\\snowarch.cmd doctor'), false, 'the correct spelling must not be reported');
   assert.equal(bare('(Windows: snowarch.cmd mode live)'), true);
+  assert.equal(bare('snowarch.cmd instance add <label>'), true);
+  assert.equal(bare('snowarch.cmd --help'), true);
+  // ...AND THE OTHER DIRECTION, which is the half that needed measuring: naming the FILE is not a
+  // defect, and a check that flagged it would have had five false positives and an allow-list.
+  assert.equal(bare('├── snowarch · snowarch.cmd    post-install launcher'), false, 'a file tree');
+  assert.equal(bare('`snowarch.cmd` is the CLI wrapper, and prints the Node sentence'), false,
+    'a sentence about the file');
+  assert.equal(bare('`bootstrap.cmd` · `snowarch` · `snowarch.cmd` · `.mcp.json`'), false, 'a list');
   assert.equal('cd /d "{root}" && .\\bootstrap.cmd'.includes('cd /d '), true);
 });

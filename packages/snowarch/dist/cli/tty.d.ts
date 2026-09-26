@@ -17,7 +17,21 @@ export declare const ARGV_SECRET: string;
  * and the command they invent is usually `echo`, which puts the secret in shell history — the
  * exact thing this whole file exists to prevent.
  */
-export declare function noTtyMessage(platform?: NodeJS.Platform): string;
+/**
+ * The launcher's spelling, by shell — ARC-07-C1, closed by W7.
+ *
+ * A SECOND COPY, DELIBERATELY. The engine's `tools/snowarch/lib/text.mjs` has `spellings()`, and the
+ * engine may import the server's `dist/` (`cloud-sync.mjs` does) while the server must never import
+ * the engine — so this cannot be that function, and re-stating it is the same trade `resolveOption`
+ * makes against the plan screen's `resolveChoice`. A test walks both over the same four shells.
+ *
+ * NOT `platform === 'win32'` ALONE, and that is the whole care this needs: Git Bash on Windows runs
+ * `./snowarch` perfectly well, so `SHELL` and `MSYSTEM` keep the POSIX spelling. `spellings()` has
+ * carried that condition since it was written; a copy that dropped it would tell a Git Bash user to
+ * type something that does not work.
+ */
+export declare const cliSpelling: (platform?: NodeJS.Platform, env?: NodeJS.ProcessEnv) => string;
+export declare function noTtyMessage(platform?: NodeJS.Platform, env?: NodeJS.ProcessEnv): string;
 /**
  * Windows console combinations where raw mode is known NOT to work.
  *

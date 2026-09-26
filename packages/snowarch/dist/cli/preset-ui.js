@@ -13,6 +13,7 @@
  * happens while you are doing something else.
  */
 import { FLAG_NAMES, PRESETS, applyDependencyRule, dependentsOf, expandPreset, matchPreset, requiresOf, } from '../utils/permissions.js';
+import { cliSpelling } from './tty.js';
 /** Every line this screen prints fits here. A wrapped hint is indented under its annotation. */
 export const COLUMNS = 100;
 /** The short label a reader sees, derived from the flag key — never a second list to maintain. */
@@ -41,11 +42,14 @@ export const ENTRY_DEFAULTS = Object.freeze({ toolPackage: 'full', maxRecords: 1
 export function proposePreset(environment) {
     return environment === 'prod' ? 'read-only' : 'full';
 }
-export const PROD_LOCKED = (label, flag) => `${labelOf(flag)} is locked on production — raise it later with: ./snowarch instance set-preset `
+// ARC-07-C1, closed by W7: the spelling comes from `cliSpelling`, so a Windows reader is not handed
+// a POSIX command. `cli` is a parameter with a default rather than a read inside the string, so a
+// test can state the platform instead of mocking `process`.
+export const PROD_LOCKED = (label, flag, cli = cliSpelling()) => `${labelOf(flag)} is locked on production — raise it later with: ${cli} instance set-preset `
     + `${label} <preset> --ack-prod`;
 /** The refusal, in the story's words. Exit 3 — a policy answer, not a usage mistake. */
-export const prodRefusal = (label) => `PROD_WRITE_NOT_ACKNOWLEDGED — "${label}" is a production instance; the wizard caps production `
-    + `at read-only (D-05). Save it read-only now and raise it later with: ./snowarch instance `
+export const prodRefusal = (label, cli = cliSpelling()) => `PROD_WRITE_NOT_ACKNOWLEDGED — "${label}" is a production instance; the wizard caps production `
+    + `at read-only (D-05). Save it read-only now and raise it later with: ${cli} instance `
     + `set-preset ${label} full --ack-prod`;
 /**
  * The probe annotation for one flag.
@@ -267,7 +271,7 @@ export function renderReviewScreen(input) {
     // long hint, and for the same reason: a terminal that folds it in the middle of a word is
     // harder to read than one continuation line.
     const footer = locked
-        ? `Enter = accept · to raise this instance later: ./snowarch instance set-preset ${label} `
+        ? `Enter = accept · to raise this instance later: ${cliSpelling()} instance set-preset ${label} `
             + '<preset> --ack-prod'
         : 'Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains';
     lines.push(...wrapRow('', footer));
