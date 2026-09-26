@@ -147,8 +147,9 @@ Proposed preset for "pdi" (pdi): full  — non-production: everything on
   [x] SCRIPTING    probe: ok
   [x] ATF          probe: ok
   [x] NOW_ASSIST   probe: no Now Assist licence detected — tools will fail until licensed; keep on?
-                   (recommend: off)
-  [x] FLUENT       probe: @servicenow/sdk not on PATH — keep on? (recommend: off)
+                   (recommend: off — type NOW_ASSIST to turn it off)
+  [x] FLUENT       probe: @servicenow/sdk not on PATH — keep on? (recommend: off — type FLUENT to
+                   turn it off)
 Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset · "?"
 explains the flags
 ```

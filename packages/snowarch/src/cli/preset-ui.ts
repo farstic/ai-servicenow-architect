@@ -132,17 +132,38 @@ export const recordedSuffix = (at: string | null | undefined): string =>
  * than at the end of a sentence that is already asking a question — `probe: role missing (recorded
  * 2026-09-19) — …; keep on?` reads; the same qualifier after `(recommend: off)` does not.
  */
-function annotationParts(status: ProbeStatus | undefined, hint?: string): { head: string; tail: string } {
+/**
+ * How to take the recommendation, named on the line that makes it (ARC-07-C13).
+ *
+ * The owner met the FLUENT line on v2.0.5, read `keep on? (recommend: off)` over a footer saying
+ * `Enter = accept as shown`, pressed Enter, and got `FLUENT=on`. Both sentences are true and together
+ * they mislead: the line ASKS a question and recommends an answer, and the only way to give that
+ * answer is to already know the footer's "type a flag name" applies to it.
+ *
+ * THE TOGGLE STAYS ON. ADR-0005 — owner-decided 2026-09-04 — pre-sets every flag ON and rules that
+ * "a failing probe changes only the recommendation text on that line, never the toggle"; ARC-07-C4
+ * asserts it on the `--yes` path, where applying silently would overrule a user on the path whose
+ * whole promise is "no review screen". So the text is the only thing this may change, and it is
+ * exactly what the ADR leaves open.
+ *
+ * The LABEL, not the flag constant: `labelOf` strips `_ENABLED`, the box shows that label, and the
+ * loop matches it case-insensitively — so the word printed here is the word that works.
+ */
+const howToTakeIt = (label?: string): string => (label ? ` — type ${label} to turn it off` : '');
+
+function annotationParts(status: ProbeStatus | undefined, hint?: string,
+  label?: string): { head: string; tail: string } {
+  const recommendOff = `(recommend: off${howToTakeIt(label)})`;
   switch (status) {
     case 'ok': return { head: 'ok', tail: '' };
     case 'role missing':
       return { head: 'role missing',
-        tail: ` — ${hint ?? 'the account cannot read that table family'}; keep on? (recommend: off)` };
+        tail: ` — ${hint ?? 'the account cannot read that table family'}; keep on? ${recommendOff}` };
     case 'not licensed':
       return { head: 'no Now Assist licence detected',
-        tail: ' — tools will fail until licensed; keep on? (recommend: off)' };
+        tail: ` — tools will fail until licensed; keep on? ${recommendOff}` };
     case 'not installed':
-      return { head: '@servicenow/sdk not on PATH', tail: ' — keep on? (recommend: off)' };
+      return { head: '@servicenow/sdk not on PATH', tail: ` — keep on? ${recommendOff}` };
     case 'skipped': return { head: 'skipped', tail: '' };
     case undefined: return { head: 'not run', tail: '' };
     default: return { head: String(status), tail: '' };
@@ -150,8 +171,8 @@ function annotationParts(status: ProbeStatus | undefined, hint?: string): { head
 }
 
 export function annotate(status: ProbeStatus | undefined, hint?: string,
-  recordedAt: string | null = null): string {
-  const { head, tail } = annotationParts(status, hint);
+  recordedAt: string | null = null, label?: string): string {
+  const { head, tail } = annotationParts(status, hint, label);
   // `not run` is never qualified: there is no probe, so there is no date to name — a provenance on
   // an absence would be describing a record that does not exist.
   const when = status === undefined ? '' : recordedSuffix(recordedAt);
@@ -281,7 +302,8 @@ export function renderReviewScreen(input: ScreenInput): string {
     const name = labelOf(flag).padEnd(LABEL_WIDTH + 2);
     const note = locked
       ? 'locked on production'
-      : annotate(probes?.[PROBE_FIELD[flag]], hints?.[flag], probesRecordedAt ?? null);
+      : annotate(probes?.[PROBE_FIELD[flag]], hints?.[flag], probesRecordedAt ?? null,
+        labelOf(flag));
     lines.push(...wrapRow(`  ${box} ${name} `, note));
   }
 

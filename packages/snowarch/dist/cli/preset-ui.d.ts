@@ -76,7 +76,7 @@ export declare function probeNote(status: ProbeStatus | undefined, recordedAt?: 
  * that has to be recomputed to stay honest and is wrong in a transcript the moment it is pasted.
  */
 export declare const recordedSuffix: (at: string | null | undefined) => string;
-export declare function annotate(status: ProbeStatus | undefined, hint?: string, recordedAt?: string | null): string;
+export declare function annotate(status: ProbeStatus | undefined, hint?: string, recordedAt?: string | null, label?: string): string;
 /** The `LastProbe` field that carries a flag's result. One mapping, used by the screen and S05. */
 export declare const PROBE_FIELD: Readonly<Record<FlagName, keyof Omit<LastProbe, 'at' | 'auth'>>>;
 export interface ScreenInput {
