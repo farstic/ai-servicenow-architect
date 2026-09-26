@@ -49,9 +49,13 @@ import { readStoreSummaries } from '../../../../packages/snowarch/dist/store/lab
  * fails to import. Forty cases went red on exactly that before this was lazy.
  *
  * `cli.mjs` resolves a `usage` that is a function, so every command may spell its launcher lazily.
+ *
+ * IT TAKES AN OPTIONAL SHELL so a case can assert the Windows rendering without forcing
+ * `process.platform`, which ARC-07 already measured as unusable locally — `win32.resolve` on POSIX
+ * paths makes everything fail. `cli.mjs` calls it with nothing, which is the running process.
  */
-export const USAGE = () => [
-  `usage: ${spellings().cli} doctor [--json] [--quick] [--no-network] [--fix] [--section <a,b>] [--no-cache]`,
+export const USAGE = (where) => [
+  `usage: ${spellings(where).cli} doctor [--json] [--quick] [--no-network] [--fix] [--section <a,b>] [--no-cache]`,
   '',
   `  --section <a,b>   only these sections: ${SECTIONS.join(', ')} (server = every SV- check)`,
   '  --quick           the fast subset; implies --no-network and skips anything that spawns',

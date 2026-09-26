@@ -94,3 +94,43 @@ test('the frame keeps its own sentence, which the dispatcher has no reason to kn
   assert.match(INSTANCE_USAGE, /Everything after `instance` is passed to the server CLI unchanged\./);
   assert.match(STORE_USAGE, /Everything after `store` is passed to the server CLI unchanged\./);
 });
+
+/**
+ * ARC-07-W17 — the doctor's usage is a FUNCTION, and something has to run it.
+ *
+ * The architect's control found this: with `cli.mjs`'s `usageOf` degraded to a bare `c.usage`, every
+ * `tests/doctor` file and this one stayed green — 386 pass, 0 fail. So nothing exercised the function
+ * path, and a regression would print the function's SOURCE on `doctor --help` while no test noticed.
+ * That is the shape this programme keeps finding: a mechanism with no reader.
+ */
+test('ARC-07-W17 — the doctor\'s usage resolves to text, through the path cli.mjs takes', async () => {
+  const { USAGE: DOCTOR_USAGE } = await import('../tools/snowarch/lib/doctor/index.mjs');
+  const { spellings } = await import('../tools/snowarch/lib/text.mjs');
+
+  // THROUGH `cli.mjs`'s OWN PATH, not a restatement of it. My first version defined its own
+  // `typeof usage === 'function' ? usage() : usage` here — which would have stayed green under exactly
+  // the degradation this case exists to catch, because it never touched the code being degraded. A
+  // control that cannot fail, in the case written to close a control that could not fail.
+  const { main } = await import('../tools/snowarch/lib/cli.mjs');
+  const captured = [];
+  const sink = { write: (t) => { captured.push(t); return true; } };
+  const code = await main(['doctor', '--help'], { out: sink, err: sink });
+  assert.equal(code, 0);
+  const text = captured.join('');
+
+  assert.equal(typeof text, 'string');
+  // A function printed by `${}` leaves its source in the output — the exact regression.
+  assert.doesNotMatch(text, /=>/, 'the usage printed a function body, not its text');
+  assert.doesNotMatch(text, /\bfunction\b/, 'the usage printed a function body, not its text');
+  assert.match(text, /^usage: /);
+  assert.ok(text.includes(`${spellings().cli} doctor`), `the launcher is missing:\n${text}`);
+  assert.match(text, /--section/);
+
+  // ...AND THE WINDOWS RENDERING, driven by argument rather than by forcing `process.platform` —
+  // ARC-07 measured that as unusable locally, because `win32.resolve` on POSIX paths fails everything.
+  // `env: {}` is load-bearing: `isWindowsShell` reads SHELL and MSYSTEM, and `env` defaults to
+  // `process.env`, so `{ platform: 'win32' }` alone renders POSIX on any machine with SHELL set.
+  const win = DOCTOR_USAGE({ platform: 'win32', env: {} });
+  assert.ok(win.includes('.\\snowarch.cmd doctor'), `the Windows rendering is missing:\n${win}`);
+  assert.doesNotMatch(win.split('\n')[0], /\.\/snowarch/, 'a POSIX launcher on a Windows shell');
+});
