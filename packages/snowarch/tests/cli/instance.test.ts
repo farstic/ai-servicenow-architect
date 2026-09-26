@@ -411,30 +411,51 @@ describe('ARC-07-W2 — the URL prompt re-asks', () => {
  * from `STEPS`, or swap two, and nothing else in the suite notices.
  */
 describe('ARC-07-W9 — the numbered sequence', () => {
-  it('ARC-07-W9 — every step in order, with its number and the total', async () => {
+  /**
+   * THE ONE PLACE THE STEP NUMBERS ARE WRITTEN DOWN, and it has two readers.
+   *
+   * Every other assertion derives through `stepHeader(id)`, which is what makes inserting a step an
+   * edit to one list. But a derived assertion agrees with itself whatever position an id holds: it
+   * cannot see ORDER and it cannot see the TOTAL.
+   *
+   * SO BOTH READERS COMPARE AGAINST THIS LITERAL, never against each other. An earlier draft had the
+   * live case assert `STEPS.slice(1).map(stepHeader)` — derived on both sides, so swapping two steps
+   * moved the expectation with the product and the case was inert. That is the same failure this
+   * programme has met four times now, and it nearly reached the one case built to prevent it.
+   */
+  const SEQUENCE = [
+    '[1/7] Label',
+    '[2/7] Instance URL',
+    '[3/7] Environment',
+    '[4/7] Authentication',
+    '[5/7] Credentials',
+    '[6/7] Checking the login and what this account may do (read-only, a few seconds) …',
+    '[7/7] Permissions',
+  ];
+
+  it('ARC-07-W9 — the list renders exactly this sequence', () => {
+    expect(STEPS.map((step, i) => `[${i + 1}/${STEPS.length}] ${step.title}`)).toEqual(SEQUENCE);
+  });
+
+  it('...and a run prints them in that order, every one after the label', async () => {
+    // `runAdd` starts at the URL: the label is asked by `runInstance` one level up, which has no
+    // injection seam, so the live half covers steps two to seven and the list half covers all seven.
     const w = workspace();
     try {
       const terminal = io(['']);
       await runAdd({ ...baseOptions }, terminal,
         { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
 
-      // The skipped-step suffix (ARC-08-C23) is trimmed, because what this case is about is the
-      // NUMBERING — the suffix has its own cases and its own reasons to change.
+      // The skipped-step suffix (ARC-08-C23) is trimmed: this case is about the NUMBERING, and the
+      // suffix has its own cases and its own reasons to change.
       const headers = terminal.written().split('\n')
         .filter((line) => /^\[\d+\/\d+\]/.test(line))
         .map((line) => line.replace(/ … .*$/, ''));
 
-      expect(headers).toEqual([
-        '[1/6] Instance URL',
-        '[2/6] Environment',
-        '[3/6] Authentication',
-        '[4/6] Credentials',
-        '[5/6] Checking the login and what this account may do (read-only, a few seconds) …',
-        '[6/6] Permissions',
-      ]);
-      // ...and the total in the headers IS the list's length, so a step added without a header — or a
-      // header printed for a step not in the list — cannot pass this.
-      expect(headers).toHaveLength(STEPS.length);
+      expect(headers).toEqual(SEQUENCE.slice(1));
+      // ...and the total every line prints IS the list's length, so a header for a step not in the
+      // list — or a step added with no header — cannot pass.
+      expect(headers).toHaveLength(STEPS.length - 1);
     } finally { w.cleanup(); }
   });
 });
@@ -1186,9 +1207,17 @@ describe('ARC-08-C23 — the numbering has no silent gaps', () => {
 
       const out = terminal.written();
       expect(out).toContain(stepHeader('auth', ' … basic (default; --yes asked nothing)'));
-      // Every step from 1 to 6 appears, in order, with none missing.
-      const steps = [...out.matchAll(/\[(\d)\/6\]/g)].map((m) => Number(m[1]));
-      expect([...new Set(steps)]).toEqual([1, 2, 3, 4, 5, 6]);
+      // ARC-07-W9 DERIVED BOTH HALVES, and the second assertion is new. This read
+      // `/\[(\d)\/6\]/g` and expected `[1, 2, 3, 4, 5, 6]` — the total hardcoded in the PATTERN, so
+      // it could only ever match lines that already agreed with it: a header printed with a stale
+      // total was unfindable by the case whose job is the numbering. The total is captured now and
+      // asserted against the list, which is what makes a stale one fail.
+      //
+      // From 2: `runAdd` starts at the URL, and the label is asked one level up.
+      const printed = [...out.matchAll(/\[(\d+)\/(\d+)\]/g)];
+      expect([...new Set(printed.map((m) => Number(m[1])))])
+        .toEqual(STEPS.slice(1).map((_, i) => i + 2));
+      expect([...new Set(printed.map((m) => Number(m[2])))]).toEqual([STEPS.length]);
     } finally { w.cleanup(); }
   });
 

@@ -66,6 +66,19 @@ export const EXIT_CODES: ReadonlyArray<{ code: number; meaning: string }> = Obje
 export const MAX_ATTEMPTS = 3;
 export const LABEL_RULE = /^[a-z][a-z0-9_-]{0,31}$/;
 
+/**
+ * The label rule IN WORDS, once — ARC-07-W9.
+ *
+ * It was spelled twice, identically: in `parseAddArgs`' refusal and in `LABEL_EXHAUSTED`. W9's brief
+ * would have added a THIRD copy to the step header, and an incomplete one — "(lower case, a-z 0-9 _
+ * -)", missing *starting with a letter* and the 32-character cap. A partial rule offered up front is
+ * worse than none: it is the answer ARC-07-C10 was about, where the owner typed `testPDI` and met a
+ * refusal for something the prompt had not told them. So the header says what a label IS and the
+ * COMPLETE rule arrives from here, at the two moments it is needed.
+ */
+export const LABEL_RULE_WORDS =
+  'lower case, starting with a letter, up to 32 characters of a-z 0-9 _ -';
+
 export const NOTHING_SAVED = 'Nothing saved.';
 
 /**
@@ -104,8 +117,8 @@ export const authFailedReason = (): string => remedyFor('AUTHENTICATION_FAILED')
  * same event: an interactive answer the wizard asked for, refused, re-asked, and did not get.
  */
 export const LABEL_EXHAUSTED =
-  `No valid label after ${MAX_ATTEMPTS} attempts — nothing saved. The rule is lower case, starting `
-  + 'with a letter, up to 32 characters of a-z 0-9 _ -; run the command again when you have one.';
+  `No valid label after ${MAX_ATTEMPTS} attempts — nothing saved. The rule is ${LABEL_RULE_WORDS}; `
+  + 'run the command again when you have one.';
 
 export const AUTH_EXHAUSTED =
   `AUTHENTICATION_FAILED after ${MAX_ATTEMPTS} attempts — nothing saved. Check the account in the `
@@ -250,7 +263,7 @@ export const AUTH_QUESTION = 'Authentication?';
  * ARC-07-W5 — what each environment MEANS, in the words a first-time reader needs.
  *
  * `pdi` is undefined to somebody who has not met ServiceNow's developer programme, and the reason the
- * answer matters — production is saved read-only — surfaced four steps later at `[6/6]`, where it
+ * answer matters — production is saved read-only — surfaced at the permissions step, where it
  * reads as a surprise rather than as the consequence of a choice already made.
  *
  * TWO LISTS, HELD TOGETHER BY A TEST. `ENVIRONMENTS` decides what exists and this decides what each
@@ -415,7 +428,7 @@ export const storeLine = (path: string, platform: NodeJS.Platform = process.plat
 };
 
 /**
- * Why `[3/6]` did not ask. Named from what was actually observed, never a default sentence.
+ * Why the authentication step did not ask. Named from what was actually observed, never a default sentence.
  *
  * `--auth` and `--yes` are two different reasons a question goes unasked, and a reader deciding
  * whether the answer is theirs needs to know which: one is what they typed, the other is what the
@@ -438,6 +451,7 @@ export const storeLine = (path: string, platform: NodeJS.Platform = process.plat
  * only place the numbers are written down.
  */
 export const STEPS = Object.freeze([
+  { id: 'label', title: 'Label' },
   { id: 'url', title: 'Instance URL' },
   { id: 'environment', title: 'Environment' },
   { id: 'auth', title: 'Authentication' },
@@ -449,9 +463,9 @@ export const STEPS = Object.freeze([
 export type StepId = typeof STEPS[number]['id'];
 
 /**
- * `[2/6] Environment`, and `[3/6] Authentication … basic (from --auth)` with a suffix.
+ * `Environment`, and `Authentication … basic (from --auth)` when a suffix is given.
  *
- * It THROWS on an unknown id rather than rendering `[0/6]`: a typo'd step is a programming error, and
+ * It THROWS on an unknown id rather than rendering a header numbered zero: a typo'd step is a programming error, and
  * a header numbered zero is the kind of output that reaches a user before anyone notices.
  */
 export function stepHeader(id: StepId, suffix = ''): string {
@@ -513,8 +527,8 @@ export function parseAddArgs(argv: readonly string[]):
     return { ok: false, message: 'instance add needs a label', needsLabel: true };
   }
   if (!LABEL_RULE.test(options.label)) {
-    return { ok: false, message: `"${options.label}" is not a valid label — lower case, starting `
-      + 'with a letter, up to 32 characters of a-z 0-9 _ -' };
+    return { ok: false,
+      message: `"${options.label}" is not a valid label — ${LABEL_RULE_WORDS}` };
   }
   if (options.preset !== undefined && options.flags !== undefined) {
     return { ok: false, message: '--preset and --flags say the same thing two ways; pass one' };
@@ -658,7 +672,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
       ...(gate.warning ? { warnings: [gate.warning] } : {}) };
   }
 
-  // ── [1/6] the URL ────────────────────────────────────────────────────────────────────────
+  // ── the URL ────────────────────────────────────────────────────────────────────────
   io.write(`${stepHeader('url')}\n`);
   const url = options.url;
   if (url === undefined && options.yes) {
@@ -670,7 +684,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   /**
    * One raw answer → a usable URL, or the normaliser's own message.
    *
-   * A FUNCTION BECAUSE ARC-07-W1 NEEDS IT TWICE: here at `[1/6]`, and again when the reachability
+   * A FUNCTION BECAUSE ARC-07-W1 NEEDS IT TWICE: here at the URL step, and again when the reachability
    * menu's `[1] re-enter the URL` is taken. Two copies would let the notes, the `Proposed URL` step
    * and the `!options.yes` condition drift between the first URL a user types and the second.
    *
@@ -744,7 +758,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   // client, the probes, the saved entry) must use the URL that actually answered.
   let instanceUrl = normalised.url;
 
-  // ── [2/6] the environment, then the network ──────────────────────────────────────────────
+  // ── the environment, then the network ──────────────────────────────────────────────
   io.write(`${stepHeader('environment')}\n`);
   // ARC-07-W5 — WAS THE ANSWER ASKED, OR DECIDED? Measured: for a `devNNNNNN` host
   // `resolveEnvironment` returns `pdi` without calling `ask` and without printing, so this step
@@ -815,7 +829,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     for (const line of formatFailure(reach)) io.write(`${line}\n`);
     const choice = options.yes || round >= MAX_REACH_ROUNDS ? 'abort' : await askMenu(io);
     if (choice === 'reenter') {
-      // ARC-07-W2 — the SAME loop as `[1/6]`, which is why W1 extracted the seam: a URL re-entered
+      // ARC-07-W2 — the SAME loop as the URL step's, which is why W1 extracted the seam: a URL re-entered
       // here is re-asked on a typo exactly as the first one is, rather than ending the run.
       const again = await askUrl(URL_PROMPT);
       if (!again.ok) {
@@ -834,7 +848,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     reach = await (deps.reachability ?? probeReachability)(instanceUrl, { env });
   }
 
-  // ── [3/6] and [4/6]: how to authenticate, and with what ──────────────────────────────────
+  // ── how to authenticate, and with what ──────────────────────────────────
   let method: 'basic' | 'oauth_ropc' = options.auth ?? 'basic';
   if (options.auth === undefined && !options.yes) {
     io.write(`${stepHeader('auth')}\n`);
@@ -848,8 +862,8 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     }
     method = chosen.key;
   } else {
-    // ARC-08-C23 — A SKIPPED STEP SAYS SO. `[3/6]` printed nothing when the question was already
-    // answered, so a run went `[2/6] … [4/6]` and the reader was left to work out whether a step
+    // ARC-08-C23 — A SKIPPED STEP SAYS SO. the authentication step printed nothing when the question was already
+    // answered, so a run jumped from the environment step to credentials and the reader was left to work out whether a step
     // had failed, been dropped, or scrolled past. It is six numbered steps: the numbering is a
     // promise that all six are accounted for, and a silent gap breaks it in the direction that
     // worries people. The line names the ANSWER and where it came from, because "skipped" alone
@@ -921,7 +935,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     attempt += 1;
   }
 
-  // ── [6/6] the flags ──────────────────────────────────────────────────────────────────────
+  // ── the flags ──────────────────────────────────────────────────────────────────────
   io.write(`${stepHeader('permissions')}\n`);
   const decision = await resolveFlags({
     label,
@@ -954,7 +968,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     flags: completeFlags(decision.flags as Flags),
     ...ENTRY_DEFAULTS,
     prodWriteAck: false,
-    // ARC-07-C5 — KEEP THE PROBES THIS RUN JUST TOOK. `add` probed at [5/6], printed the results
+    // ARC-07-C5 — KEEP THE PROBES THIS RUN JUST TOOK. `add` probed at the login step, printed the results
     // in the Saved line and reported them in `--json`, and then built an entry without them — so
     // `instance list` showed `LAST PROBE —` for an instance probed seconds earlier. The gap was
     // invisible on the interactive path because the next `./snowarch doctor` runs SV-04, which

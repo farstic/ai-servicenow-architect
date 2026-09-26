@@ -21,6 +21,17 @@ export declare const EXIT_CODES: ReadonlyArray<{
 }>;
 export declare const MAX_ATTEMPTS = 3;
 export declare const LABEL_RULE: RegExp;
+/**
+ * The label rule IN WORDS, once — ARC-07-W9.
+ *
+ * It was spelled twice, identically: in `parseAddArgs`' refusal and in `LABEL_EXHAUSTED`. W9's brief
+ * would have added a THIRD copy to the step header, and an incomplete one — "(lower case, a-z 0-9 _
+ * -)", missing *starting with a letter* and the 32-character cap. A partial rule offered up front is
+ * worse than none: it is the answer ARC-07-C10 was about, where the owner typed `testPDI` and met a
+ * refusal for something the prompt had not told them. So the header says what a label IS and the
+ * COMPLETE rule arrives from here, at the two moments it is needed.
+ */
+export declare const LABEL_RULE_WORDS = "lower case, starting with a letter, up to 32 characters of a-z 0-9 _ -";
 export declare const NOTHING_SAVED = "Nothing saved.";
 /**
  * The duplicate-label refusal, rendered FROM the registry.
@@ -129,7 +140,7 @@ export declare const AUTH_QUESTION = "Authentication?";
  * ARC-07-W5 — what each environment MEANS, in the words a first-time reader needs.
  *
  * `pdi` is undefined to somebody who has not met ServiceNow's developer programme, and the reason the
- * answer matters — production is saved read-only — surfaced four steps later at `[6/6]`, where it
+ * answer matters — production is saved read-only — surfaced at the permissions step, where it
  * reads as a surprise rather than as the consequence of a choice already made.
  *
  * TWO LISTS, HELD TOGETHER BY A TEST. `ENVIRONMENTS` decides what exists and this decides what each
@@ -241,7 +252,7 @@ export declare const savedLine: (label: string, entry: MaskedEntry, isDefault: b
  */
 export declare const storeLine: (path: string, platform?: NodeJS.Platform) => string;
 /**
- * Why `[3/6]` did not ask. Named from what was actually observed, never a default sentence.
+ * Why the authentication step did not ask. Named from what was actually observed, never a default sentence.
  *
  * `--auth` and `--yes` are two different reasons a question goes unasked, and a reader deciding
  * whether the answer is theirs needs to know which: one is what they typed, the other is what the
@@ -264,6 +275,9 @@ export declare const storeLine: (path: string, platform?: NodeJS.Platform) => st
  * only place the numbers are written down.
  */
 export declare const STEPS: readonly [{
+    readonly id: "label";
+    readonly title: "Label";
+}, {
     readonly id: "url";
     readonly title: "Instance URL";
 }, {
@@ -284,9 +298,9 @@ export declare const STEPS: readonly [{
 }];
 export type StepId = typeof STEPS[number]['id'];
 /**
- * `[2/6] Environment`, and `[3/6] Authentication … basic (from --auth)` with a suffix.
+ * `Environment`, and `Authentication … basic (from --auth)` when a suffix is given.
  *
- * It THROWS on an unknown id rather than rendering `[0/6]`: a typo'd step is a programming error, and
+ * It THROWS on an unknown id rather than rendering a header numbered zero: a typo'd step is a programming error, and
  * a header numbered zero is the kind of output that reaches a user before anyone notices.
  */
 export declare function stepHeader(id: StepId, suffix?: string): string;
