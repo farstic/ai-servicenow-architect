@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { instanceSchema } from '../../src/store/schema.js';
 import type { LastProbe } from '../../src/servicenow/probes.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
+import { cliSpelling } from '../../src/cli/tty.js';
 
 /**
  * ARC-07-S04 — propose, review, apply.
@@ -72,6 +73,12 @@ describe('proposePreset — the proposal is the environment, and nothing else', 
 
 describe('criterion 1 — the non-production screen', () => {
   const screen = () => renderReviewScreen({
+    // THE PLATFORM IS STATED, because this is a byte-for-byte case against a fixed snapshot. A screen
+    // that reads the platform inside itself renders one thing on a mac and another on the Windows
+    // runner, and an equality assertion has no way to say which it meant — which is exactly how the
+    // locked-production case went red on four Windows cells after ARC-07-W7. The spelling is DERIVED
+    // from the platform rather than typed, so it follows `cliSpelling` if that ever changes.
+    cli: cliSpelling('darwin', {}),
     label: 'pdi',
     environment: 'pdi',
     preset: 'full',
@@ -173,8 +180,10 @@ describe('criterion 1 — the non-production screen', () => {
 });
 
 describe('criterion 4 — the production screen', () => {
+  // The platform is stated for the same reason as the non-production screen above: the locked footer
+  // names the launcher, and `docs/snippets/review-screen-prod.txt` is the POSIX rendering.
   const input = { label: 'prod-acme', environment: 'prod' as const, preset: 'read-only' as const,
-    flags: expandPreset('read-only') };
+    flags: expandPreset('read-only'), cli: cliSpelling('darwin', {}) };
 
   it('matches the snapshot, with six locked lines', () => {
     const expected = readFileSync(resolve(SNAPSHOTS, 'review-screen-prod.txt'), 'utf8').trimEnd();
@@ -186,8 +195,12 @@ describe('criterion 4 — the production screen', () => {
   it('typing a flag prints the locked message and asks again', async () => {
     const tty = scriptedTty(['WRITE', '']);
     const result = await runReviewScreen(input, tty);
+    // ARC-07-W7 made this spelling platform-dependent, so the POSIX literal was a LATENT Windows
+    // failure — latent only because `npm test` is `node tests/run.mjs && npm test --workspaces`, and
+    // B06's failure stopped the chain before vitest ran at all. Derived from the same function the
+    // product reads, so it states the property rather than one platform's answer.
     expect(tty.written).toContain(
-      'WRITE is locked on production — raise it later with: ./snowarch instance set-preset '
+      `WRITE is locked on production — raise it later with: ${cliSpelling()} instance set-preset `
       + 'prod-acme <preset> --ack-prod');
     // Re-prompted rather than exited: the user did not do anything wrong, they asked for
     // something the wizard will not do.

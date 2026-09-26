@@ -31,9 +31,9 @@ export declare const ENTRY_DEFAULTS: Readonly<{
 }>;
 /** The proposal. The environment, and nothing else — see the note at the top of this file. */
 export declare function proposePreset(environment: Environment): PresetName;
-export declare const PROD_LOCKED: (label: string, flag: FlagName) => string;
+export declare const PROD_LOCKED: (label: string, flag: FlagName, cli?: string) => string;
 /** The refusal, in the story's words. Exit 3 — a policy answer, not a usage mistake. */
-export declare const prodRefusal: (label: string) => string;
+export declare const prodRefusal: (label: string, cli?: string) => string;
 /**
  * The probe annotation for one flag.
  *
@@ -80,6 +80,16 @@ export declare function annotate(status: ProbeStatus | undefined, hint?: string,
 /** The `LastProbe` field that carries a flag's result. One mapping, used by the screen and S05. */
 export declare const PROBE_FIELD: Readonly<Record<FlagName, keyof Omit<LastProbe, 'at' | 'auth'>>>;
 export interface ScreenInput {
+    /**
+     * The launcher spelling this screen should print (ARC-07-C1, second Windows round).
+     *
+     * OPTIONAL, defaulting to `cliSpelling()` — so production behaviour is unchanged and a Windows
+     * user sees `.\snowarch.cmd`. It exists because the locked-production screen is asserted BYTE FOR
+     * BYTE against `docs/snippets/review-screen-prod.txt`, and a snapshot is a fixed answer: a screen
+     * that reads the platform inside itself renders one thing on a mac and another on Windows, and the
+     * equality fails on the runner with no way for the case to say which platform it meant. Now it can.
+     */
+    cli?: string;
     label: string;
     environment: Environment;
     preset: PresetName;

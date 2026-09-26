@@ -3,7 +3,7 @@
   "root": {
     "darwin": "cd \"{root}\" && ./bootstrap.sh",
     "linux": "cd \"{root}\" && ./bootstrap.sh",
-    "win32": "cd /d \"{root}\" && .\\bootstrap.cmd",
+    "win32": "pushd \"{root}\"\n.\\bootstrap.cmd",
     "default": "cd \"{root}\" && ./bootstrap.sh"
   },
   "git": {

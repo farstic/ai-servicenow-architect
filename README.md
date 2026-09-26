@@ -149,7 +149,7 @@ toggles) are gitignored. Everyone runs their own `./bootstrap.sh`, and live mode
 ### Adding live mode later
 
 ```sh
-./snowarch mode live            # Windows: snowarch.cmd mode live
+./snowarch mode live            # Windows: .\snowarch.cmd mode live
 ```
 
 That turns a design-only checkout into a live one — no re-clone, no re-registration — and
@@ -162,7 +162,7 @@ terminal, because a credential must never pass through a chat transcript:
 Next step happens in YOUR terminal (credentials never pass through this chat).
 1. Open a terminal at this checkout: <absolute path>
 2. Run:   ./snowarch instance add <label> --url <url> --env <env> --auth <auth> --preset <preset> --default
-   (Windows PowerShell/cmd:  snowarch.cmd instance add <label> --url <url> --env <env> --auth <auth> --preset <preset> --default)
+   (Windows PowerShell/cmd:  .\snowarch.cmd instance add <label> --url <url> --env <env> --auth <auth> --preset <preset> --default)
 3. The wizard proposes the environment and preset and shows a per-flag review — press Enter to accept, or edit any line.
 4. Type your username and password when prompted (masked; nothing is echoed).
 5. When it prints "Saved instance …", come back here and type:  /snowarch setup-instance --resume
@@ -228,7 +228,8 @@ Every preflight failure prints its own remedy. These are those sentences:
 <!-- generated:remedies -->
 | If | macOS / Linux | Windows |
 |---|---|---|
-| You are not at the checkout root | `cd "{root}" && ./bootstrap.sh` | `cd /d "{root}" && .\bootstrap.cmd` |
+| You are not at the checkout root | `cd "{root}" && ./bootstrap.sh` | `pushd "{root}"
+.\bootstrap.cmd` |
 | git is missing or too old | `xcode-select --install (or: brew install git)` | `winget install Git.Git` |
 | Claude Code is missing or too old | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` |
 | Not enough disk space | `free up {needed} on {mount}` | `free up {needed} on {mount}` |

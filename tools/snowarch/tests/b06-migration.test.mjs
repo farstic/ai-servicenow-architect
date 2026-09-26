@@ -14,6 +14,10 @@ import { join } from 'node:path';
 import { MIGRATION_FAILED, NO_TERMINAL, migrateIfBehind, run as runB06, runsWhen,
   storeExists } from '../lib/steps/B06.mjs';
 import { INPUTS, hashFor } from '../lib/inputs.mjs';
+import { spellings } from '../lib/text.mjs';
+
+/** The launcher as THIS platform spells it — B06 reads the same function. */
+const CLI = spellings().cli;
 import { loadConfig } from '../lib/config.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
 
@@ -111,7 +115,13 @@ test('a migration that fails stops the step with a named remedy, not a stack', a
   // The child's own answer is appended (ARC-09-S07): "exit 1" and "killed by SIGTERM" send a
   // reader to different places, and a message saying neither sends them to guess.
   assert.match(result.detail, new RegExp(`^${MIGRATION_FAILED.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(exit 1\\)$`));
-  assert.match(result.detail, /\.\/snowarch store migrate/);
+  // ARC-07-W7 made this spelling PLATFORM-DEPENDENT, and this line spelled the POSIX form — so it
+  // passed on every mac and Linux cell and failed on all four Windows ones, where `SHELL` is unset and
+  // B06 renders `.\snowarch.cmd`. THE MIRROR OF THE TRAP THAT ROW RECORDED: it noted that
+  // `spellings({ platform: 'win32' })` renders POSIX on a mac, and missed that `spellings()` renders
+  // WINDOWS on Windows. Derived now, so it states the property — the remedy names the launcher — on
+  // whichever platform is running it.
+  assert.match(result.detail, new RegExp(`${CLI.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} store migrate`));
 });
 
 test('a store AHEAD of the build warns and points at upgrade — it is not downgraded', async (t) => {
@@ -122,7 +132,7 @@ test('a store AHEAD of the build warns and points at upgrade — it is not downg
   const result = await migrateIfBehind(ctxFor(root, { spawn }));
   assert.equal(result.status, 'warn');
   assert.match(result.detail, /newer than this build's v2/);
-  assert.match(result.detail, /\.\/snowarch upgrade/);
+  assert.match(result.detail, new RegExp(`${CLI.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} upgrade`));
 });
 
 test('an unbuilt checkout has no opinion about the schema, and says nothing', async (t) => {

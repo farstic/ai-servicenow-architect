@@ -37,7 +37,11 @@ export const isWindowsShell = ({ platform = process.platform, env = process.env 
 /** The command spellings, by shell. */
 export function spellings(where = {}) {
   return isWindowsShell(where)
-    ? { bootstrap: '.\\bootstrap.cmd', cli: 'snowarch.cmd' }
+    // ARC-07-C1, closed by W7. The line above prefixed the bootstrap and NOT the cli, while the POSIX
+    // branch below prefixes both — the author knew the rule and applied it to one of the two.
+    // PowerShell does not resolve a command from the current directory, and nothing in the bootstrap
+    // puts the checkout on PATH, so a bare `snowarch.cmd` is the one spelling PowerShell refuses.
+    ? { bootstrap: '.\\bootstrap.cmd', cli: '.\\snowarch.cmd' }
     : { bootstrap: './bootstrap.sh', cli: './snowarch' };
 }
 

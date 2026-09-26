@@ -60,7 +60,7 @@ test('AC 4 — the spellings follow the SHELL, not only the platform', () => {
   assert.deepEqual(spellings({ platform: 'linux', env: {} }),
     { bootstrap: './bootstrap.sh', cli: './snowarch' });
   assert.deepEqual(spellings({ platform: 'win32', env: {} }),
-    { bootstrap: '.\\bootstrap.cmd', cli: 'snowarch.cmd' });
+    { bootstrap: '.\\bootstrap.cmd', cli: '.\\snowarch.cmd' });
   assert.deepEqual(spellings({ platform: 'win32', env: { SHELL: '/usr/bin/bash' } }),
     { bootstrap: './bootstrap.sh', cli: './snowarch' }, 'Git Bash');
   assert.deepEqual(spellings({ platform: 'win32', env: { MSYSTEM: 'MINGW64' } }),
@@ -166,7 +166,7 @@ test('the add-an-instance remedy is one string, in every place that offers it', 
     '`instance add` is the wizard alone: it leaves a live instance with design toggles around it');
 
   // Each surface is checked against the remedy AS THAT SURFACE SPELLS THE LAUNCHER. The Next block
-  // renders `spellings().cli`, which is `snowarch.cmd` on Windows, so comparing it against the
+  // renders `spellings().cli`, which is `.\\snowarch.cmd` on Windows, so comparing it against the
   // `./snowarch` default was the test choosing a platform and then checking a different one — it
   // passed on macOS and failed on every Windows cell.
   const surfaces = {
@@ -186,7 +186,11 @@ test('the add-an-instance remedy is one string, in every place that offers it', 
   // the Next block against the `./snowarch` default and was green here and red on four Windows
   // cells for three pushes. `spellings()` takes the platform, so the case can simply be stated.
   const win = spellings({ platform: 'win32', env: {} });
-  assert.equal(win.cli, 'snowarch.cmd', 'the premise moved: Windows no longer spells the launcher this way');
+  // ARC-07-C1, closed by W7: the premise MOVED, deliberately, and this tripwire is what brought me
+  // here. PowerShell does not resolve a command from the current directory and nothing puts the
+  // checkout on PATH, so the bare name was the one spelling it refuses. The assertion stays a
+  // premise rather than becoming a wildcard, so the next move trips it too.
+  assert.equal(win.cli, '.\\snowarch.cmd', 'the premise moved: Windows no longer spells the launcher this way');
   const winBlock = nextBlock({ mode: 'design-only', serverKey: 'servicenow', platform: 'win32', env: {} });
   assert.ok(winBlock.includes(ADD_INSTANCE(win.cli)),
     `the Windows Next block does not carry the one remedy:\n${winBlock}`);

@@ -17,6 +17,7 @@ import { readInstanceFile, SENTENCE } from '../instance-file.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
+import { spellings } from '../text.mjs';
 
 export const id = 'B06';
 export const title = 'instance';
@@ -31,18 +32,31 @@ export const needsNode = true;
  * would leave the store a version behind and the next `mode live` would meet a schema it cannot
  * read, in the place least able to explain it.
  */
+/**
+ * ARC-07-C1, closed by W7 — EVERY CLI SPELLING IN THIS FILE COMES FROM HERE.
+ *
+ * Seven remedies and one bootstrap reference spelled `./snowarch` / `./bootstrap.sh` as literals, so
+ * a Windows reader was handed a command their shell refuses. Read at module load, which is correct
+ * because a process's platform does not change — and it keeps these as STRINGS. Making them functions
+ * would have turned the existing `detail === NO_TERMINAL` assertions into comparisons of a value with
+ * itself: green forever, and blind to the spelling they look like they check. The spelling is guarded
+ * where it belongs instead — by the bare-spelling check over renderer sources.
+ */
+const SPELL = spellings();
+
+
 export const runsWhen = (ctx) => ctx.mode === 'live' || storeExists(ctx.root);
 export const skipReason = 'design-only';
 
 export const MIGRATION_FAILED =
-  'the store migration did not complete — run ./snowarch store migrate to see why; '
+  `the store migration did not complete — run ${SPELL.cli} store migrate to see why; `
   + 'nothing was changed and a backup was written if the migration had started';
 
 export const NO_TERMINAL =
-  'no terminal for the instance wizard — run ./snowarch instance add in an interactive terminal, '
+  `no terminal for the instance wizard — run ${SPELL.cli} instance add in an interactive terminal, `
   + 'or pass --instance-file <path> (see docs/INSTALL.md "Operators and CI")';
 export const WIZARD_ABSENT =
-  'instance wizard not available in this build — run ./bootstrap.sh again after upgrading';
+  `instance wizard not available in this build — run ${SPELL.bootstrap} again after upgrading`;
 
 const CLI = join('packages', 'snowarch', 'dist', 'cli', 'index.js');
 
@@ -156,7 +170,7 @@ export function wizardExitFailure(status) {
       // 1 now, so exit 2 really is argv B06 built; the sentence can be confident again because the
       // code it is reading finally means one thing.
       remedy: 'the arguments B06 passed were refused, which is a defect in the bootstrap rather '
-        + 'than in anything you typed: run `./snowarch instance add <label>` to finish the install, '
+        + `than in anything you typed: run \`${SPELL.cli} instance add <label>\` to finish the install, `
         + 'and please report the line above with the log from .local/logs/' };
   }
   // ARC-07-C10 — EXIT 1 IS THE USER'S ANSWER, NOT A DEFECT, and it used to carry no remedy at all.
@@ -171,7 +185,7 @@ export function wizardExitFailure(status) {
       detail: `the wizard did not save an instance (exit ${EXIT_FAILED_CODE}) — ${nothingSaved}. `
         + 'Its own message is above, in this terminal',
       remedy: 'nothing here is broken: the wizard asked, and the answer it got was refused, '
-        + 'abandoned, or could not be verified. Run `./snowarch instance add <label>` when you have '
+        + `abandoned, or could not be verified. Run \`${SPELL.cli} instance add <label>\` when you have `
         + 'what it asked for — a valid label, or credentials the instance accepts' };
   }
   return { status: 'fail', remedy: null,
@@ -202,10 +216,10 @@ export function wizardExitFailure(status) {
 export function wizardProbeFailure(probe) {
   switch (probe.klass) {
     case WIZARD.SPAWN_ERROR:
-      return { status: 'fail', remedy: 'run ./snowarch mode live again',
+      return { status: 'fail', remedy: `run ${SPELL.cli} mode live again`,
         detail: `the wizard probe could not be started (${probe.detail}) — the build was never asked` };
     case WIZARD.SIGNAL:
-      return { status: 'fail', remedy: 'run ./snowarch mode live again, and report this if it repeats',
+      return { status: 'fail', remedy: `run ${SPELL.cli} mode live again, and report this if it repeats`,
         detail: `the wizard probe was killed by ${probe.signal} before it answered` };
     case WIZARD.CRASHED:
       return { status: 'fail', remedy: 'run: npm ci --omit=dev --ignore-scripts   (at the repository root)',
@@ -342,7 +356,7 @@ export async function migrateIfBehind(ctx) {
     // whatever the newer build added. The doctor's SV-09 says the same thing with the command.
     return { status: 'warn', remedy: null,
       detail: `store schema v${shape.version} is newer than this build's v${current} — `
-        + 'run ./snowarch upgrade' };
+        + `run ${SPELL.cli} upgrade` };
   }
 
   const spawn = ctx.spawn ?? spawnSync;

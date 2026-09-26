@@ -60,7 +60,7 @@ Instances are the store's own records; nothing was probed.
    you did not check. A remedy for the wrong problem costs the user the time they spend following
    it.
 5. **On Windows without Git for Windows** the Bash tool is unavailable, so say:
-   `On Windows without Git for Windows I cannot run ./snowarch from here — run snowarch.cmd status in PowerShell and paste the Mode line.`
+   `On Windows without Git for Windows I cannot run ./snowarch from here — run .\snowarch.cmd status in PowerShell and paste the Mode line.`
 6. **Never infer the mode** from `~/.claude.json`, from `/mcp`, from memory, or from which tools
    appear in the tool list. A disabled family is still advertised, so the tool list says nothing
    about mode. The panel's line is the only answer; if it cannot run, say the mode is unverified
@@ -143,7 +143,7 @@ because the wizard needs a real terminal to mask what you type.
    Next step happens in YOUR terminal (credentials never pass through this chat).
    1. Open a terminal at this checkout: <absolute path>
    2. Run:   ./snowarch instance add <label> --url <url> --env <env> --auth <auth> --preset <preset> --default
-      (Windows PowerShell/cmd:  snowarch.cmd instance add <label> --url <url> --env <env> --auth <auth> --preset <preset> --default)
+      (Windows PowerShell/cmd:  .\snowarch.cmd instance add <label> --url <url> --env <env> --auth <auth> --preset <preset> --default)
    3. The wizard proposes the environment and preset and shows a per-flag review — press Enter to accept, or edit any line.
    4. Type your username and password when prompted (masked; nothing is echoed).
    5. When it prints "Saved instance …", come back here and type:  /snowarch setup-instance --resume
@@ -151,7 +151,7 @@ because the wizard needs a real terminal to mask what you type.
    ```
 
    Choose the spelling from the prereqs report: `./snowarch …` for `os` `darwin`/`linux`, and on
-   `win32` for `shell` `bash`/`zsh` (Git Bash); `snowarch.cmd …` for `powershell`/`cmd`. When the
+   `win32` for `shell` `bash`/`zsh` (Git Bash); `.\snowarch.cmd …` for `powershell`/`cmd`. When the
    shell is `unknown`, print **both**, labelled `Git Bash:` and `PowerShell / cmd:` — a reader can
    tell which shell they are in, and a wrong guess hands them a line that does not run.
 
