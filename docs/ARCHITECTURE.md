@@ -1350,7 +1350,7 @@ server
              → the doctor writes the missing ones as "false"   [fixable: ./snowarch doctor --fix]
 
 DOCTOR: 1 ok, 1 warn (SV-03), 1 fail (E-12) (2 fixable — run ./snowarch doctor --fix)
-Mode: design-only — () => `no ServiceNow instance configured; run ${ADD_INSTANCE(spellings().cli)}`
+Mode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude
 ```
 <!-- /generated:doctor-text -->
 
@@ -1372,7 +1372,7 @@ consumer must not have to ask which version of the doctor produced its input.
     "section": null
   },
   "mode": null,
-  "modeLine": "Mode: design-only — () => `no ServiceNow instance configured; run ${ADD_INSTANCE(spellings().cli)}`",
+  "modeLine": "Mode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude",
   "modeLineDetailed": null,
   "engine": null,
   "server": null,

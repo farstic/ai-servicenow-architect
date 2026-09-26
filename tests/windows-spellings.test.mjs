@@ -117,9 +117,62 @@ const DEFINITIONS = Object.freeze([
  * I attempted it in this row with a `{cli}` placeholder and reverted: the engine reads remedies through
  * `packages/contract/lib/contract.mjs`, whose `remedyFor` does no substitution, so the placeholder would
  * have printed `{cli}` to users. It needs a second substitution point and a contract-sha bump, which is
- * its own row rather than a 1am addition to this one.
+ * ARC-07-C32, target 2.0.7 — a contract change does not enter a release in its last hours.
  */
 const DATA_EXEMPT = Object.freeze(['packages/snowarch/src/errors/codes.ts']);
+
+/**
+ * THE SWEEP REMAINDER — ARC-07-C31, dated 2026-09-27, target 2.0.7.
+ *
+ * WHY AN EXEMPTION AT ALL, and it is not taste: a red assertion here fails the release-dryrun cells on
+ * mac and ubuntu, so a guard left red blocks `release.mjs` itself. The sweep is 76 sites in 34 files and
+ * three of them — `steps/B02.mjs`, `bootstrap.mjs`, `commands/upgrade.mjs` — are e2e trigger files,
+ * where a hurried mistake is not a red test but a broken install on the platform a mac cannot check. So
+ * it lands in 2.0.7 under ARC-07-C31 rather than in the last hours of this one.
+ *
+ * AN EXACT COUNT PER FILE, ASSERTED EQUAL AND NEVER `<=`, so this cannot become a place new defects
+ * hide: adding a literal to a listed file fails exactly as loudly as adding one to an unlisted file,
+ * and REMOVING one fails too — which is deliberate, because the count coming down means the sweep has
+ * started and the list must shrink with it rather than drift out of date silently.
+ *
+ * The numbers are the measurement at this head, not an estimate; the row carries the same table.
+ */
+const SWEEP_REMAINDER = Object.freeze(new Map([
+  ['packages/snowarch/src/cli/format.ts', 2],
+  ['packages/snowarch/src/cli/import-legacy.ts', 3],
+  ['packages/snowarch/src/cli/store-command.ts', 3],
+  ['packages/snowarch/src/doctor/checks.ts', 8],
+  ['packages/snowarch/src/doctor/probes-binding.ts', 1],
+  ['packages/snowarch/src/doctor/types.ts', 1],
+  ['packages/snowarch/src/no-instance.ts', 1],
+  ['packages/snowarch/src/store/index.ts', 1],
+  ['packages/snowarch/src/store/migrations/index.ts', 3],
+  ['packages/snowarch/src/store/schema.ts', 2],
+  ['packages/snowarch/src/tools/updateset.ts', 2],
+  ['packages/snowarch/src/utils/permissions.ts', 3],
+  ['scripts/ci/doctor-snapshot.mjs', 2],
+  ['scripts/gen-cli-help.mjs', 1],
+  ['scripts/gen-doctor-docs.mjs', 1],
+  ['scripts/lib/release/preflight.mjs', 1],
+  ['tools/snowarch/lib/bootstrap.mjs', 3],
+  ['tools/snowarch/lib/cli.mjs', 6],
+  ['tools/snowarch/lib/commands/status.mjs', 1],
+  ['tools/snowarch/lib/commands/upgrade.mjs', 4],
+  ['tools/snowarch/lib/docs/family.mjs', 3],
+  ['tools/snowarch/lib/docs/status.mjs', 2],
+  ['tools/snowarch/lib/docs/upstream.mjs', 1],
+  ['tools/snowarch/lib/docs/verify.mjs', 2],
+  ['tools/snowarch/lib/instance.mjs', 2],
+  ['tools/snowarch/lib/mode.mjs', 2],
+  ['tools/snowarch/lib/net-sentences.mjs', 1],
+  ['tools/snowarch/lib/state.mjs', 3],
+  ['tools/snowarch/lib/steps/B02.mjs', 4],
+  ['tools/snowarch/lib/steps/B04.mjs', 1],
+  ['tools/snowarch/lib/steps/format.mjs', 4],
+  ['tools/snowarch/lib/steps/index.mjs', 1],
+  ['tools/snowarch/lib/store.mjs', 1],
+  ['tools/snowarch/lib/version-info.mjs', 1]
+]));
 
 /**
  * Comments stripped: prose ABOUT the defect is not the defect.
@@ -146,15 +199,31 @@ test('ARC-07-W17 — no shipped file spells the launcher except the two definiti
     .filter((f) => !DEFINITIONS.includes(f) && !DATA_EXEMPT.includes(f));
 
   const offences = [];
+  const counted = new Map();
   for (const rel of files) {
+    const here = [];
     codeOf(read(rel)).split('\n').forEach((line, i) => {
       for (const [pattern, why] of LAUNCHER_PATTERNS) {
-        if (pattern.test(line)) offences.push(`${rel}:${i + 1}: ${why}`);
+        if (pattern.test(line)) here.push(`${rel}:${i + 1}: ${why}`);
       }
     });
+    if (SWEEP_REMAINDER.has(rel)) counted.set(rel, here.length);
+    else offences.push(...here);
   }
   assert.deepEqual(offences, [],
     `${offences.length} site(s) spell a launcher instead of reading it:\n  ${offences.join('\n  ')}`);
+
+  // ...AND THE LISTED FILES ARE HELD TO THEIR EXACT COUNT. Equal, not `<=`: a new literal in a listed
+  // file must fail as loudly as one anywhere else, and a count that has come DOWN must fail too, so the
+  // list shrinks with the sweep instead of quietly outliving it.
+  const drift = [];
+  for (const [rel, expected] of SWEEP_REMAINDER) {
+    const actual = counted.get(rel);
+    if (actual === undefined) drift.push(`${rel} is listed but was not read — has it moved or gone?`);
+    else if (actual !== expected) drift.push(`${rel}: ${actual} site(s), the list says ${expected}`);
+  }
+  assert.deepEqual(drift, [],
+    `ARC-07-C31's list no longer matches the tree:\n  ${drift.join('\n  ')}`);
 });
 
 test('...and the negative: the widened guard sees a planted spelling in any shipped file', () => {

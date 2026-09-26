@@ -24,6 +24,10 @@ import { join } from 'node:path';
 
 import { engineRepoChecks } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { engineDocsChecks } from '../../tools/snowarch/lib/doctor/checks/engine-docs.mjs';
+import { hostChecks } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
+import { serverChecks } from '../../tools/snowarch/lib/doctor/checks/server.mjs';
+import { legacyChecks } from '../../tools/snowarch/lib/doctor/checks/legacy.mjs';
+import { engineContractChecks } from '../../tools/snowarch/lib/doctor/checks/engine-contract.mjs';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
 const WIN = { platform: 'win32', env: {} };
@@ -54,9 +58,27 @@ async function remediesOf(checks, root) {
   return out;
 }
 
+/**
+ * ONE ENTRY PER FIXED CHECK FAMILY — the architect's condition, and all six rather than the two I
+ * started with. A family whose remedies were swept and whose rendering is unasserted is a family where
+ * reverting one line fails only the spelling guard, and that guard is red by design until the sweep
+ * finishes: the control would land on an already-red test and say nothing.
+ */
 for (const [name, checks] of [
   ['engine-repo', engineRepoChecks()],
   ['engine-docs', engineDocsChecks()],
+  ['server', serverChecks()],
+  ['engine-contract', engineContractChecks()],
+  // `host` AND `legacy` ARE NOT HERE, and the FLOOR is what said so rather than my judgement: on a
+  // bare root neither reaches a remedy branch — host's need a cached release check or a registration
+  // state, legacy's need a legacy store — so both came back with no launcher-bearing remedy at all and
+  // the floor refused to certify them. That is the assertion working: a family this loop cannot
+  // exercise must not be listed as covered.
+  //
+  // THEY ARE COVERED, by their own files under the mirror rule: `host.test.mjs` and `legacy.test.mjs`
+  // assert their remedies against `spellings()` with no fixture, so on the three Windows cells those
+  // cases hold `.\snowarch.cmd` and on a mac they hold `./snowarch`. What is missing is win32 coverage
+  // from a MAC, which is a fixture job and goes with the rest of the sweep.
 ]) {
   test(`ARC-07-W17 — ${name}'s remedies read the Windows spelling on a Windows shell`, async () => {
     const lines = await remediesOf(checks, bareRoot());

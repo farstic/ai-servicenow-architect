@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
 import { banner, MAX_AGE_MS, UPGRADE_MAX_AGE_MS, WATCHDOG_MS } from '../../tools/snowarch/hooks/session-start.mjs';
 import { BANNER } from '../../tools/snowarch/lib/text.mjs';
@@ -293,6 +294,40 @@ test('a checkout that was never bootstrapped says so, and runs no doctor', async
   assert.equal(ran, 0, 'a doctor ran on a checkout with no state');
   assert.equal(r.path, 'unbootstrapped');
   assert.match(r.lines[0], /^Mode: unknown — this checkout has not been bootstrapped/);
+  // ARC-07-W17 — the launcher is the READER'S, not both shells spelled by hand. This sentence used to
+  // say `run ./bootstrap.sh (Windows: bootstrap.cmd)`, and the Windows half was BARE — the one spelling
+  // PowerShell refuses — in the message whose whole job is to say how to bootstrap.
+  assert.ok(r.lines[0].includes(spellings().bootstrap), `the bootstrap spelling is missing: ${r.lines[0]}`);
+});
+
+test('ARC-07-W17 — nothing the hook prints is a function body', async (t) => {
+  // THE CLASS, CLOSED FOR EVERY VARIANT RATHER THAN THE ONE THAT BIT. Making `MODE_VARIANTS`'
+  // members functions (they must be: `text.mjs` sits in the `panel -> text -> report-text -> panel`
+  // import cycle, so a module-load `spellings()` throws) left TWO consumers calling them as values —
+  // this hook, and `gen-doctor-docs.mjs`. The hook printed
+  // `Mode: unknown — () => 'this checkout has not been bootstrapped; run ' + …` as the Mode line, on
+  // the one checkout state where a user most needs that sentence; the generator would have written the
+  // same into a committed page. Neither was caught by a test that asserted a PREFIX.
+  //
+  // So this asserts the property over every line of every path, not one sentence: a template that
+  // interpolated a function leaves `=>` or `function` in the output, and nothing the hook prints ever
+  // legitimately contains either.
+  const paths = [];
+  for (const [name, prepare] of [
+    ['unbootstrapped', (root) => rmSync(join(root, '.local'), { recursive: true, force: true })],
+    ['design', () => {}],
+  ]) {
+    const root = greenTree(t, { mode: 'design' });
+    prepare(root);
+    const r = await banner({ root, run: async () => ({ report: {} }) });
+    paths.push([name, r.lines]);
+  }
+  for (const [name, lines] of paths) {
+    for (const line of lines) {
+      assert.doesNotMatch(line, /=>/, `${name}: a function body reached the banner: ${line}`);
+      assert.doesNotMatch(line, /\bfunction\b/, `${name}: a function body reached the banner: ${line}`);
+    }
+  }
 });
 
 test('the hook prints with no stdin at all', async (t) => {

@@ -57,7 +57,7 @@ export async function sample() {
     // ARC-08-C7 — RENDERED, not retyped. This file's whole promise is that the page shows what the
     // doctor prints; a hardcoded copy here was a fourth wording of "there is no instance yet", and
     // the one that reached the published docs.
-    modeLine: `Mode: design-only — ${MODE_VARIANTS.unconfigured}`,
+    modeLine: `Mode: design-only — ${MODE_VARIANTS.unconfigured()}`,
     // The version is pinned in the SAMPLE rather than read: a documentation block that changed on
     // every version bump would be a diff in every release commit and a page nobody trusts.
     root: null,

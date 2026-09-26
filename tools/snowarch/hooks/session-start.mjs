@@ -174,7 +174,7 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   // state answers a question nobody asked and costs a second doing it.
   if (!existsSync(join(root, '.local', 'bootstrap-state.json'))) {
     const { MODE_VARIANTS, modeLine } = await import('../lib/text.mjs');
-    say(modeLine({ mode: 'unknown', qualifier: MODE_VARIANTS.notBootstrapped }));
+    say(modeLine({ mode: 'unknown', qualifier: MODE_VARIANTS.notBootstrapped() }));
     return { path: 'unbootstrapped', lines: out };
   }
 
