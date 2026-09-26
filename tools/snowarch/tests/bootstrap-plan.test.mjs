@@ -9,6 +9,7 @@ import { LIVE_YES_WITHOUT_FILE, USAGE, bootstrapCommand,
   liveYesNeedsInstanceFile } from '../lib/bootstrap.mjs';
 import { loadState, statePath } from '../lib/state.mjs';
 import { commandArgs, makeCheckout, recorder } from './helpers/workspace.mjs';
+import { spellings } from '../lib/text.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,7 +61,15 @@ test('with no Node the mode is fixed, and the line says how to add live later', 
   const ctx = ctxOf(root, { present: false });
   const plan = buildPlan({ ctx, state: null, flags: { mode: 'live' } });
   assert.equal(plan.mode, 'design-only', '--mode live cannot win against an absent Node');
-  assert.match(formatPlan(plan, ctx), /design-only \(fixed — Node\.js 20\+ not found; add live mode later with \.\/snowarch mode live\)/);
+  // ARC-07-W14 — DERIVED, and this is why. The expectation was the POSIX literal
+  // `add live mode later with ./snowarch mode live`, and W14 made `modeValue` read the launcher from
+  // `spellings()` — so on the Windows runner the product correctly renders `.\snowarch.cmd` and the
+  // literal failed all four Windows cells while every mac and Linux cell passed. That is the ARC-07-W7
+  // shape exactly: a test that spells a platform-dependent string picks a platform and then checks a
+  // different one. `RegExp.escape` is not available on Node 20, so the escape is explicit.
+  const escaped = spellings().cli.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  assert.match(formatPlan(plan, ctx),
+    new RegExp(`design-only \\(fixed — Node\\.js 20\\+ not found; add live mode later with ${escaped} mode live\\)`));
 
   const after = applyChoice(plan, '1');
   assert.equal(after.plan.mode, 'design-only', 'the fixed line must not change');
