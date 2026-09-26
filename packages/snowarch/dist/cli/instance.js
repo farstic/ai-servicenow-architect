@@ -136,7 +136,12 @@ async function askOption(io, question, options, opts) {
             return null; // EOF, as everywhere else in this file
         const chosen = resolveOption(typed, options, opts.defaultKey);
         if (chosen) {
-            io.write(`${opts.ack(chosen)}\n`);
+            // AN EMPTY ACK PRINTS NOTHING. The cloud-sync gate's `stop` needs no ack of its own: its caller
+            // prints `Nothing saved.`, and two consecutive lines saying the same thing is the mistake
+            // ARC-07-W2 already removed once from the reachability bound.
+            const ack = opts.ack(chosen);
+            if (ack)
+                io.write(`${ack}\n`);
             return chosen;
         }
         io.write(`${notOneOf(String(typed).trim(), options)}\n`);
@@ -200,6 +205,18 @@ export const ENV_CHOICES = Object.freeze([
     { key: 'prod', text: 'real users; the wizard saves it read-only' },
 ]);
 export const ENV_QUESTION = 'What is this instance?';
+/**
+ * ARC-07-W6 — the cloud-sync gate as a numbered question, asked before anything is typed.
+ *
+ * `Continue and write the store here anyway? [y/N]` hid the consequence in a convention: `[y/N]`
+ * tells a reader the default is No only if they already know that convention, and the thing the
+ * default DOES — abandon the run — was written nowhere. Both options are named now, and the one Enter
+ * picks says what it costs.
+ */
+export const CLOUD_SYNC_CHOICES = Object.freeze([
+    { key: 'stop', text: 'nothing is saved; clone outside the synced folder and start again' },
+    { key: 'continue', text: 'write the store here anyway' },
+]);
 export const AUTH_CHOICES = Object.freeze([
     { key: 'basic', text: 'username + password (recommended for PDI; no instance-side setup)' },
     // "legacy" is not a tone, it is the label D-04 and P-38 require: the grant is deprecated and
@@ -424,11 +441,16 @@ export async function cloudSyncGate(storePath, options, io, env = process.env) {
         : fillRemedy('STORE_IN_CLOUD_SYNC_FOLDER', values);
     const warning = `WARN STORE_IN_CLOUD_SYNC_FOLDER: ${meaning} Options: ${remedy}.`;
     io.write(`${warning}\n`);
+    // MEASURED, because the brief guessed the other way: `--yes` does NOT refuse here, it PROCEEDS with
+    // the warning — and `MODES-AND-PRESETS.md` says so too ("`--yes` also answers §6's cloud-sync
+    // question yes"). Unchanged: there is nobody to ask, and the warning is the record.
     if (options.yes)
         return { ok: true, warning };
-    // Default NO: Enter, end-of-input and anything but `y` all decline.
-    const answer = ((await io.ask('Continue and write the store here anyway? [y/N] ')) ?? '').trim().toLowerCase();
-    return answer === 'y' || answer === 'yes' ? { ok: true, warning } : { ok: false, warning };
+    // Default STOP, named rather than implied by `[y/N]`. EOF stops as well: it always did.
+    const chosen = await askOption(io, `This folder is inside ${hit.provider} — the saved password `
+        + 'file would sync with it.', CLOUD_SYNC_CHOICES, { defaultKey: 'stop',
+        ack: (c) => (c.key === 'continue' ? 'Continuing — the store is written in this folder.' : '') });
+    return chosen?.key === 'continue' ? { ok: true, warning } : { ok: false, warning };
 }
 /**
  * The whole command. Seven steps, and every one of them can end it.
@@ -482,6 +504,22 @@ export async function runAdd(options, terminal, deps = {}) {
             io.write(`${message}\n`);
             return { saved: false, exitCode: EXIT_POLICY, message };
         }
+    }
+    // ── the cloud-sync gate, BEFORE anything is typed ────────────────────────────────────────
+    //
+    // ARC-07-W6. It used to run last among the questions and first among the writes, which is a
+    // defensible place for a WRITE gate and the wrong place for a QUESTION: declining it cost the user
+    // the password they had typed and the six permissions they had just reviewed, and on macOS —
+    // where Desktop and Documents are in iCloud by default — declining is what Enter did.
+    //
+    // Nothing above this line asks for anything, so the only thing a `stop` now costs is the label.
+    // The warning is still printed again after the save (the `warnings` loop below), so the last thing
+    // on screen for somebody who continued is still the reason they should not have.
+    const gate = await cloudSyncGate(storePath, options, io, env);
+    if (!gate.ok) {
+        io.write(`${NOTHING_SAVED}\n`);
+        return { saved: false, exitCode: EXIT_POLICY, message: NOTHING_SAVED,
+            ...(gate.warning ? { warnings: [gate.warning] } : {}) };
     }
     // ── [1/6] the URL ────────────────────────────────────────────────────────────────────────
     io.write('[1/6] Instance URL\n');
@@ -760,17 +798,6 @@ export async function runAdd(options, terminal, deps = {}) {
     }
     io.write(`${decision.applying}\n`);
     // ── the save ─────────────────────────────────────────────────────────────────────────────
-    //
-    // THE CLOUD-SYNC GATE COMES LAST AMONG THE QUESTIONS AND FIRST AMONG THE WRITES: everything above
-    // is questions and probes, and this is the point where a file appears on disk. Declining here
-    // costs the user the password they typed, which is why the warning is worded to be decided in
-    // one reading — and why exit 3 says POLICY rather than failure.
-    const gate = await cloudSyncGate(storePath, options, io, env);
-    if (!gate.ok) {
-        io.write(`${NOTHING_SAVED}\n`);
-        return { saved: false, exitCode: EXIT_POLICY, message: NOTHING_SAVED,
-            ...(gate.warning ? { warnings: [gate.warning] } : {}) };
-    }
     const firstEver = Object.keys(store.instances).length === 0;
     let isDefault = options.makeDefault === true || firstEver;
     if (!options.makeDefault && !firstEver && !options.yes) {

@@ -138,6 +138,15 @@ export declare const AUTH_QUESTION = "Authentication?";
  */
 export declare const ENV_CHOICES: ReadonlyArray<Option>;
 export declare const ENV_QUESTION = "What is this instance?";
+/**
+ * ARC-07-W6 — the cloud-sync gate as a numbered question, asked before anything is typed.
+ *
+ * `Continue and write the store here anyway? [y/N]` hid the consequence in a convention: `[y/N]`
+ * tells a reader the default is No only if they already know that convention, and the thing the
+ * default DOES — abandon the run — was written nowhere. Both options are named now, and the one Enter
+ * picks says what it costs.
+ */
+export declare const CLOUD_SYNC_CHOICES: ReadonlyArray<Option>;
 export declare const AUTH_CHOICES: ReadonlyArray<{
     key: 'basic' | 'oauth_ropc';
     text: string;

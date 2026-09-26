@@ -203,14 +203,14 @@ server reads here. Plain `list` shows the store in use and a footer naming what 
 **A store inside a cloud-sync folder** (OneDrive, Dropbox, Google Drive, iCloud Drive) is warned about BEFORE anything
 is written: `0600` is a *local* permission and the sync client runs as the same user, so the mode does not stop the
 file leaving the machine (D-04, `docs/decisions/ADR-0004-credential-policy.md`). The warning names the provider and
-the exact folder, and the question defaults to **No**:
+the exact folder, and the option Enter picks is **stop**, which says what it costs (ARC-07-W6):
 
 ```
 WARN STORE_IN_CLOUD_SYNC_FOLDER: this checkout is under Dropbox (~/Dropbox/work/repo). File mode 0600
-does not stop synchronisation — the credential store would be uploaded to that service. Options: move
-the checkout outside the synced folder, or keep credentials in the global store with `--global`
-(~/.config/snowarch is not synced by default).
-Continue and write the store here anyway? [y/N]
+does not stop synchronisation … Options: move the checkout outside the synced folder, or `--global`.
+This folder is inside Dropbox — the saved password file would sync with it.
+  [1] stop — nothing is saved; clone outside the synced folder and start again · Enter picks this
+  [2] continue — write the store here anyway
 ```
 
 Enterprise "Known Folder Move" — `Documents` redirected into OneDrive with the word OneDrive nowhere in the path — is
@@ -242,8 +242,9 @@ pass show snow/pdi | ./snowarch instance add pdi --url https://dev12345.service-
 Get-Secret -Name snow-pdi -AsPlainText | .\snowarch.cmd instance add pdi --url https://dev12345.service-now.com --env pdi --auth basic --username admin --preset full --password-stdin --yes
 ```
 
-`--password-stdin` reads stdin to its end, so every later question — the review screen, make-default, cloud-sync — has
-nothing to read and the run saves nothing. Pass `--yes` with it (name `--preset` or `--flags`; add `--default` if
+`--password-stdin` reads stdin to its end, so every later question — the review screen and make-default — has
+nothing to read and the run saves nothing. (The cloud-sync question is no longer among them: ARC-07-W6 moved it
+ahead of every other question, so it is asked before the pipe is read.) Pass `--yes` with it (name `--preset` or `--flags`; add `--default` if
 wanted), and `--username` too, or `add` stops at the Username prompt and `set-credentials` takes the password as the
 username.
 `--yes` also answers §6's cloud-sync question yes, so use `--global` if that applies. The pipe is for `--auth basic`:

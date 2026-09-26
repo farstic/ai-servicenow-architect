@@ -1915,6 +1915,11 @@ instead, in `packages/contract/lint/lib/scan.mjs`, with the reason beside it.
 
 ## The contract gate
 
+The script is **`npm run build:dist`** — there is no `npm run build`, and this page told you there was
+until ARC-07-W6. In practice you rarely need it: the gate's first step rebuilds `dist/` itself and then
+fails with *"this step already rebuilt it, so COMMIT the change shown above"*, so running `npm run
+contract` and committing what it leaves is the shorter path.
+
 `npm run contract` is four checks in one command, and the same command runs in CI, before a release
 tag, and on your machine — a gate that exists in only one of those is a gate somebody meets for the
 first time at the worst moment.
@@ -2096,7 +2101,7 @@ To change the store's shape:
    they can check: "add lastUpgradeCheck to every instance", not "v2".
 3. **`up` is pure.** Its input is deep-frozen — a migration that mutates in place throws rather
    than passing — and it returns a new object.
-4. `npm run build` and commit `dist/`, then `node packages/contract/pin.mjs --yes`: the contract
+4. `npm run build:dist` and commit `dist/`, then `node packages/contract/pin.mjs --yes`: the contract
    carries `storeSchemaVersion`, so a schema bump moves the contract sha. That is the mechanism by
    which S05's input table makes exactly B06 stale on the next `bootstrap`, and by which `upgrade`
    can read a tag's contract and warn about a migration before checking anything out.
