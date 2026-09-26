@@ -50,13 +50,39 @@ export const ARGV_SECRET =
  * and the command they invent is usually `echo`, which puts the secret in shell history — the
  * exact thing this whole file exists to prevent.
  */
-export function noTtyMessage(platform: NodeJS.Platform = process.platform): string {
+/**
+ * The launcher's spelling, by shell — ARC-07-C1, closed by W7.
+ *
+ * A SECOND COPY, DELIBERATELY. The engine's `tools/snowarch/lib/text.mjs` has `spellings()`, and the
+ * engine may import the server's `dist/` (`cloud-sync.mjs` does) while the server must never import
+ * the engine — so this cannot be that function, and re-stating it is the same trade `resolveOption`
+ * makes against the plan screen's `resolveChoice`. A test walks both over the same four shells.
+ *
+ * NOT `platform === 'win32'` ALONE, and that is the whole care this needs: Git Bash on Windows runs
+ * `./snowarch` perfectly well, so `SHELL` and `MSYSTEM` keep the POSIX spelling. `spellings()` has
+ * carried that condition since it was written; a copy that dropped it would tell a Git Bash user to
+ * type something that does not work.
+ */
+export const cliSpelling = (platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env): string =>
+  (platform === 'win32' && !env.SHELL && !env.MSYSTEM ? '.\\snowarch.cmd' : './snowarch');
+
+export function noTtyMessage(platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env): string {
+  // ARC-07-C1, closed by W7. TWO defects in one message: the win32 line appended a bare
+  // `snowarch.cmd`, and the sentence it appended to carried `./snowarch` — so a Windows reader was
+  // shown a POSIX example AND a spelling PowerShell refuses. One spelling now, from one place, and
+  // the win32 branch no longer has a second command to get wrong.
+  const cli = cliSpelling(platform, env);
   const base = 'NO_TTY: stdin is not a terminal, so the password cannot be typed with masking. '
     + 'Pipe it with --password-stdin (for example from a password manager: op read '
-    + '"op://vault/item/password" | ./snowarch instance add …) or run the command in an '
+    + `"op://vault/item/password" | ${cli} instance add …) or run the command in an `
     + 'interactive terminal.';
   return platform === 'win32'
-    ? `${base}\nOn PowerShell/cmd use: snowarch.cmd instance add … --password-stdin`
+    // THE WORDING IS UNCHANGED. The row also reported this sentence as "naming the wrong shell";
+    // measured, it names PowerShell and cmd, which is right. The defect here was only ever the two
+    // spellings, so that is all this changes — the prose rows own prose.
+    ? `${base}\nOn PowerShell/cmd use: ${cli} instance add … --password-stdin`
     : base;
 }
 
@@ -121,13 +147,13 @@ export async function promptSecret(text: string, {
   if (bad) {
     // Not an attempt-and-hope: the spike recorded that this console does not restore, and a
     // hung terminal is worse than a refusal that names the way through.
-    io.stdout.write(`${noTtyMessage(platform)}\n`);
+    io.stdout.write(`${noTtyMessage(platform, env)}\n`);
     io.stdout.write(`(this console is a combination S-04 recorded as unusable: ${bad.id})\n`);
     return exit(EXIT_USAGE);
   }
 
   if (!io.stdin.isTTY || typeof io.stdin.setRawMode !== 'function') {
-    io.stdout.write(`${noTtyMessage(platform)}\n`);
+    io.stdout.write(`${noTtyMessage(platform, env)}\n`);
     return exit(EXIT_USAGE);
   }
 

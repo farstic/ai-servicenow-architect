@@ -17,6 +17,7 @@ import {
   type FlagName, type Flags, type PresetName,
 } from '../utils/permissions.js';
 import type { LastProbe, ProbeStatus } from '../servicenow/probes.js';
+import { cliSpelling } from './tty.js';
 
 /** Every line this screen prints fits here. A wrapped hint is indented under its annotation. */
 export const COLUMNS = 100;
@@ -54,14 +55,17 @@ export function proposePreset(environment: Environment): PresetName {
   return environment === 'prod' ? 'read-only' : 'full';
 }
 
-export const PROD_LOCKED = (label: string, flag: FlagName): string =>
-  `${labelOf(flag)} is locked on production — raise it later with: ./snowarch instance set-preset `
+// ARC-07-C1, closed by W7: the spelling comes from `cliSpelling`, so a Windows reader is not handed
+// a POSIX command. `cli` is a parameter with a default rather than a read inside the string, so a
+// test can state the platform instead of mocking `process`.
+export const PROD_LOCKED = (label: string, flag: FlagName, cli = cliSpelling()): string =>
+  `${labelOf(flag)} is locked on production — raise it later with: ${cli} instance set-preset `
   + `${label} <preset> --ack-prod`;
 
 /** The refusal, in the story's words. Exit 3 — a policy answer, not a usage mistake. */
-export const prodRefusal = (label: string): string =>
+export const prodRefusal = (label: string, cli = cliSpelling()): string =>
   `PROD_WRITE_NOT_ACKNOWLEDGED — "${label}" is a production instance; the wizard caps production `
-  + `at read-only (D-05). Save it read-only now and raise it later with: ./snowarch instance `
+  + `at read-only (D-05). Save it read-only now and raise it later with: ${cli} instance `
   + `set-preset ${label} full --ack-prod`;
 
 /**
@@ -327,7 +331,7 @@ export function renderReviewScreen(input: ScreenInput): string {
   // long hint, and for the same reason: a terminal that folds it in the middle of a word is
   // harder to read than one continuation line.
   const footer = locked
-    ? `Enter = accept · to raise this instance later: ./snowarch instance set-preset ${label} `
+    ? `Enter = accept · to raise this instance later: ${cliSpelling()} instance set-preset ${label} `
       + '<preset> --ack-prod'
     : 'Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains';
   lines.push(...wrapRow('', footer));

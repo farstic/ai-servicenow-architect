@@ -24,9 +24,9 @@
   "windows": {
     "spellings": {
       "bootstrap": ".\\bootstrap.cmd",
-      "cli": "snowarch.cmd"
+      "cli": ".\\snowarch.cmd"
     },
-    "nextDesign": "Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.\n      (If you are already inside Claude Code in this folder: exit it and start `claude` again.)\n      Add a live instance later: run snowarch.cmd mode live, or /snowarch setup-instance inside Claude.",
+    "nextDesign": "Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.\n      (If you are already inside Claude Code in this folder: exit it and start `claude` again.)\n      Add a live instance later: run .\\snowarch.cmd mode live, or /snowarch setup-instance inside Claude.",
     "nextLive": "Next: run `claude` here. You will see one workspace-trust dialog — answer Yes.\n      (If you are already inside Claude Code in this folder: exit it and start `claude` again.)\n      In Claude, /mcp should show: servicenow ✔ connected · /snowarch status quotes the Mode line above."
   }
 }

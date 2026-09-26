@@ -187,7 +187,11 @@ describe('promptSecret', () => {
     stdin.isTTY = false;
     const { exit } = recordingExit();
     await promptSecret('Password:', { io, exit, env: {}, platform: 'win32' });
-    expect(stdout.written).toContain('On PowerShell/cmd use: snowarch.cmd instance add … --password-stdin');
+    // ARC-07-C1, closed by W7: `.\\snowarch.cmd`. The wording is unchanged — the defect was the
+    // spelling, and this line is still the one a PowerShell reader copies.
+    expect(stdout.written).toContain('On PowerShell/cmd use: .\\snowarch.cmd instance add … --password-stdin');
+    // ...and the POSIX message carries the POSIX spelling, not a Windows one dressed as help.
+    expect(noTtyMessage('linux', {})).toContain('./snowarch instance add');
     expect(noTtyMessage('linux')).not.toContain('snowarch.cmd');
   });
 

@@ -18,7 +18,11 @@ export const FRAGMENT = 'docs/snippets/terminal-handoff.md';
 /** The POSIX and Windows template lines, exactly as the fragment writes them. */
 export function templates(text = readFileSync(join(root, FRAGMENT), 'utf8')) {
   const posix = /^\s*2\. Run:\s+(\.\/snowarch instance add .+)$/m.exec(text);
-  const windows = /\(Windows PowerShell\/cmd:\s+(snowarch\.cmd instance add .+?)\)$/m.exec(text);
+  // ARC-07-C1, closed by W7: the prefix is OPTIONAL here on purpose. This regex used to spell
+  // `snowarch.cmd` exactly, so correcting the snippet to `.\snowarch.cmd` made extraction throw
+  // "no command template found" — a strict matcher failing closed on the one change it exists to
+  // carry. The spelling is enforced by the bare-spelling guard instead; this only has to FIND it.
+  const windows = /\(Windows PowerShell\/cmd:\s+((?:\.\\)?snowarch\.cmd instance add .+?)\)$/m.exec(text);
   if (!posix || !windows) throw new Error(`${FRAGMENT}: no command template found`);
   return { posix: posix[1].trim(), windows: windows[1].trim() };
 }

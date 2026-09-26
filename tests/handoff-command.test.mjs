@@ -33,7 +33,8 @@ test('the Windows spelling is the same command with the runnable name', () => {
     shell: 'powershell',
   });
   // `./snowarch` is not a command in PowerShell or cmd; everything after the name is identical.
-  assert.equal(windows, AC1.replace('./snowarch', 'snowarch.cmd'));
+  // ARC-07-C1, closed by W7: `.\\snowarch.cmd`, because PowerShell refuses the bare name.
+  assert.equal(windows, AC1.replace('./snowarch', '.\\snowarch.cmd'));
   assert.equal(handoffCommand({ label: 'pdi', url: 'u', env: 'pdi', auth: 'basic', preset: 'full', shell: 'cmd' }),
     handoffCommand({ label: 'pdi', url: 'u', env: 'pdi', auth: 'basic', preset: 'full', shell: 'powershell' }));
 });
