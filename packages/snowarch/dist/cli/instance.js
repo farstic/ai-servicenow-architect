@@ -87,14 +87,53 @@ export const LABEL_EXHAUSTED = `No valid label after ${MAX_ATTEMPTS} attempts �
     + 'with a letter, up to 32 characters of a-z 0-9 _ -; run the command again when you have one.';
 export const AUTH_EXHAUSTED = `AUTHENTICATION_FAILED after ${MAX_ATTEMPTS} attempts — nothing saved. Check the account in the `
     + 'instance (System Security › Users) and run the command again.';
+/** `"production" is not one of [1] pdi  [2] dev  [3] test  [4] prod` */
+export const notOneOf = (answer, options) => `"${answer}" is not one of ${options.map((o, i) => `[${i + 1}] ${o.key}`).join('  ')}`;
 /**
- * The URL prompt's exhausted line (ARC-07-W2) — the third of the family, shaped like the other two.
+ * A number, the option's own name, one of its aliases, or Enter when something is marked default.
  *
- * The family matters more than the sentence: all three are "the wizard asked, refused, re-asked and
- * did not get an answer", all three end the run at `EXIT_FAILED`, and `EXIT_CODES` already documents
- * that as *"nothing saved — a refusal, an abort, three failed attempts"*. So no new exit code and no
- * new constant for the count; the loop the prompt beside it already had.
+ * `undefined` means "not one of them" — the same three-way answer `resolveFlagAnswer` gives, so a
+ * caller cannot confuse "they chose nothing" with "they chose wrongly". A question with NO default
+ * treats Enter as a wrong answer on purpose: `askEnvironment` has carried that decision in a comment
+ * since it was written, because the environment decides which preset a write is checked against.
  */
+export function resolveOption(input, options, defaultKey) {
+    const answer = String(input ?? '').trim().toLowerCase();
+    if (answer === '')
+        return defaultKey ? options.find((o) => o.key === defaultKey) : undefined;
+    // The digits are checked before the lookup: `Number('basic')` is NaN, and an index built from it
+    // would be a silent miss rather than a name match.
+    if (/^\d+$/.test(answer))
+        return options[Number(answer) - 1];
+    return options.find((o) => o.key.toLowerCase() === answer
+        || (o.aliases ?? []).some((a) => a.toLowerCase() === answer));
+}
+/**
+ * Ask it, list the options once, re-ask until one of them is chosen, then say what was chosen.
+ *
+ * The default's marker is DERIVED from `defaultKey` and never written into an option's text — the
+ * ARC-07-C14 rule, for the same reason: a marker spelled in the words drifts the day the default
+ * moves. It is appended with ` · ` rather than folded into the text's own parenthesis, which would
+ * nest one bracket inside another.
+ */
+async function askOption(io, question, options, opts) {
+    io.write(`${question}\n`);
+    for (const [i, option] of options.entries()) {
+        const marked = option.key === opts.defaultKey ? ' · Enter picks this' : '';
+        io.write(`  [${i + 1}] ${option.key} — ${option.text}${marked}\n`);
+    }
+    for (;;) {
+        const typed = await io.ask('> ');
+        if (typed === null)
+            return null; // EOF, as everywhere else in this file
+        const chosen = resolveOption(typed, options, opts.defaultKey);
+        if (chosen) {
+            io.write(`${opts.ack(chosen)}\n`);
+            return chosen;
+        }
+        io.write(`${notOneOf(String(typed).trim(), options)}\n`);
+    }
+}
 /**
  * ARC-07-W3 — the credential prompts, and what a non-answer is told.
  *
@@ -139,8 +178,10 @@ export const AUTH_CHOICES = Object.freeze([
     { key: 'basic', text: 'username + password (recommended for PDI; no instance-side setup)' },
     // "legacy" is not a tone, it is the label D-04 and P-38 require: the grant is deprecated and
     // instances disable it, and a user choosing it should know that before they type a secret.
-    { key: 'oauth_ropc', text: 'OAuth password grant (legacy; needs client id + secret AND a user '
-            + 'password; instances can disable it)' },
+    // `oauth` is the word a reader types for it (ARC-07-W4). An alias rather than a second option:
+    // the list shows one name per row, and the grammar accepts the short form people reach for.
+    { key: 'oauth_ropc', aliases: ['oauth'], text: 'OAuth password grant (legacy; needs client id + '
+            + 'secret AND a user password; instances can disable it)' },
 ]);
 /**
  * ARC-04-S02's masker, re-exported rather than reimplemented.
@@ -562,12 +603,15 @@ export async function runAdd(options, terminal, deps = {}) {
     // ── [3/6] and [4/6]: how to authenticate, and with what ──────────────────────────────────
     let method = options.auth ?? 'basic';
     if (options.auth === undefined && !options.yes) {
-        io.write(`[3/6] Authentication\n${AUTH_QUESTION}\n`);
-        for (const [i, choice] of AUTH_CHOICES.entries()) {
-            io.write(`  [${i + 1}] ${choice.key} — ${choice.text}\n`);
+        io.write('[3/6] Authentication\n');
+        // ARC-07-W4 — `answer === '2' ? 'oauth_ropc' : 'basic'` read every other answer as agreement with
+        // the option the user had not chosen: `oauth_ropc`, `oauth`, `02` and a typo all became basic.
+        const chosen = await askOption(io, AUTH_QUESTION, AUTH_CHOICES, { defaultKey: 'basic', ack: (c) => `Authentication → ${c.key}` });
+        if (chosen === null) {
+            io.write(`${NOTHING_SAVED}\n`);
+            return { saved: false, exitCode: EXIT_FAILED, message: NOTHING_SAVED };
         }
-        const answer = ((await io.ask('> ')) ?? '').trim();
-        method = answer === '2' ? 'oauth_ropc' : 'basic';
+        method = chosen.key;
     }
     else {
         // ARC-08-C23 — A SKIPPED STEP SAYS SO. `[3/6]` printed nothing when the question was already

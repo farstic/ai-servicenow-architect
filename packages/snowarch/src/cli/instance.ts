@@ -25,7 +25,7 @@ import { CANCELLED,EXIT_INTERRUPTED, EXIT_USAGE, readSecretFromStdin, type Io } 
 export { EXIT_USAGE, EXIT_INTERRUPTED };
 import { ENVIRONMENTS, normalizeInstanceUrl, resolveEnvironment, type Environment } from './url.js';
 import { remedyFor } from '../errors/codes.js';
-import {
+import { wrapRow,
   applyingLine, dependencyViolation, ENTRY_DEFAULTS, labelOf, prodRefusal, resolveFlags,
   toggleFlag, type ReviewIo,
 } from './preset-ui.js';
@@ -169,7 +169,15 @@ async function askOption<T extends Option>(io: AddIo, question: string, options:
   io.write(`${question}\n`);
   for (const [i, option] of options.entries()) {
     const marked = option.key === opts.defaultKey ? ' · Enter picks this' : '';
-    io.write(`  [${i + 1}] ${option.key} — ${option.text}${marked}\n`);
+    // WRAPPED AT THE BUDGET, in the one place option rows are rendered. The `oauth_ropc` row is 120
+    // columns and WAS 120 before this row — the text is unchanged — but this is now the code that
+    // prints it, and 100 columns is a hard constraint rather than a preference. `wrapRow` is the
+    // repository's own definition of folding (it folds rather than truncates, deliberately: the part
+    // a truncation removes is the part that says what to do), so W5's environment meanings and any
+    // later wording row inherit this instead of each retrofitting it.
+    for (const line of wrapRow(`  [${i + 1}] ${option.key} — `, `${option.text}${marked}`)) {
+      io.write(`${line}\n`);
+    }
   }
   for (;;) {
     const typed = await io.ask('> ');

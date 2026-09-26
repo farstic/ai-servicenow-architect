@@ -11,7 +11,7 @@ import {
   parseAddArgs, probeSummary, resolveOption, runAdd, savedLine, storeLine, type AddIo,
 } from '../../src/cli/instance.js';
 import { EXIT_USAGE } from '../../src/cli/tty.js';
-import { resolveFlagAnswer } from '../../src/cli/preset-ui.js';
+import { COLUMNS, resolveFlagAnswer } from '../../src/cli/preset-ui.js';
 import { remedyFor } from '../../src/errors/codes.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import { loadStore, saveStore } from '../../src/store/index.js';
@@ -570,6 +570,40 @@ describe('ARC-07-W4 — the authentication question', () => {
       expect(text).toContain('Authentication → basic');
       // ...and choosing the default is not an error.
       expect(text).not.toContain('is not one of');
+    } finally { w.cleanup(); }
+  });
+
+  it('...and every line of the question fits the terminal budget', async () => {
+    // THE `oauth_ropc` ROW WAS 120 COLUMNS, and was 120 before this row too — the text is unchanged.
+    // But `askOption` is now the one place option rows are rendered, and 100 columns is a hard
+    // constraint rather than a preference, so it folds here and every later question inherits that.
+    // `wrapRow` FOLDS rather than truncates, deliberately: the part a truncation removes is the part
+    // that says what to do about it.
+    const w = workspace();
+    try {
+      const terminal = io(['', '']);
+      await runAdd({ ...baseOptions, auth: undefined }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      // SCOPED TO THE QUESTION THIS ROW OWNS, and the scope is a measurement. Asserting the whole
+      // transcript found three OTHER over-budget lines, all pre-existing and none this row's:
+      // `Applying: …` at 101, `Saved instance … Probes: …` at 166, and the `Store: <path> …` line,
+      // whose length depends on where the checkout is. ARC-07-W16 owns the Saved and Store wording,
+      // so those are reported there rather than fixed here under a row about accepting an answer.
+      const lines = terminal.written().split('\n');
+      const from = lines.findIndex((l) => l.startsWith('[3/6] Authentication'));
+      const to = lines.findIndex((l) => l.startsWith('Authentication → '));
+      expect(from, 'the question was not printed').toBeGreaterThan(-1);
+      expect(to, 'the ack was not printed').toBeGreaterThan(from);
+      const over = lines.slice(from, to + 1).filter((l) => l.length > COLUMNS);
+      expect(over, `over ${COLUMNS}:\n${over.join('\n')}`).toEqual([]);
+      // ...and the folded row is still ONE logical option: the continuation is indented to the
+      // prefix's own width, DERIVED rather than spelled — my first version asserted 21 spaces where
+      // the prefix is 19, which is the ARC-07-C13 lesson again: assert the logical row, not a
+      // column somebody counted by hand.
+      const at = lines.findIndex((l) => l.includes('[2] oauth_ropc — OAuth password grant'));
+      expect(at, 'the oauth row was not printed').toBeGreaterThan(-1);
+      const indent = lines[at].indexOf('[2] oauth_ropc — ') + '[2] oauth_ropc — '.length;
+      expect(lines[at + 1]).toBe(`${' '.repeat(indent)}instances can disable it)`);
     } finally { w.cleanup(); }
   });
 
