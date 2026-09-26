@@ -53,7 +53,27 @@ export declare const labelExists: (label: string) => string;
  *
  * The question is the wizard's own: only the terminal is in a position to offer another attempt.
  */
+/**
+ * ARC-07-W10 — the question above the retry menu.
+ *
+ * It was `Re-enter? (attempt 2 of 3) [Y/n] ` — one question with two answers where there are three
+ * things a user might want, and `[Y/n]` left what the default DID unwritten, as the cloud-sync gate's
+ * did before ARC-07-W6.
+ *
+ * THE REASON IS UNCHANGED, and deliberately: ARC-08-S10 ruled it must be the REGISTRY's sentence
+ * rather than a second, narrower one written here, and a case forbids the old narrower wording by
+ * name. W10's brief proposed *"the instance rejected the credentials (wrong, expired, or locked)"* —
+ * which is exactly that second sentence — so the brief is not followed on this point.
+ */
 export declare const authFailedRetry: (attempt: number) => string;
+/**
+ * What a user might want after a rejected login — ARC-07-W10.
+ *
+ * Three things, and `[Y/n]` could express two of them: re-enter the password for the SAME account
+ * (the common case, and Enter picks it), change the account, or stop. `Y` used to mean the first and
+ * then ask for the username from blank anyway.
+ */
+export declare const AUTH_RETRY_CHOICES: ReadonlyArray<Option>;
 /** The registry's sentence, used by the re-entry question and by the nothing-saved line. */
 export declare const authFailedReason: () => string;
 /**

@@ -210,19 +210,98 @@ describe('the happy path', () => {
   });
 });
 
+/**
+ * ARC-07-W10 — a failed login offers the wizard's own menu, not `[Y/n]`.
+ *
+ * `Re-enter? (attempt 2 of 3) [Y/n]` asked one question with two answers where there are three
+ * things a user might want, and `Y` then re-asked the USERNAME FROM BLANK — so the account name
+ * already typed had to be typed again. ARC-07-W3 made that prompt *required*, which means an empty
+ * answer became a refusal rather than a shortcut: **W3 improved the first pass and made the retry
+ * worse.** That regression is mine and it heads this row.
+ *
+ * The shape is not invented here. `runSetCredentials` has printed `Username [a***]:` with Enter
+ * keeping the current account since it was written, and its comment says why the mask is the store's:
+ * *"what is shown here and what `list` shows cannot disagree."* This borrows that line.
+ */
+describe('ARC-07-W10 — the failed-login menu', () => {
+  it('ARC-07-W10 — `[1]` asks only for the password, never the username again', async () => {
+    const w = workspace();
+    try {
+      // No `--username`, so the first pass asks for it; the retry must not.
+      const interactive = { ...baseOptions, username: undefined };
+      const c = client([401, 200]);
+      const terminal = io([USERNAME, '1', ''], [PASSWORD, OTHER_PASSWORD]);
+      const result = await runAdd(interactive, terminal,
+        { storePath: w.store, makeClient: c.make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      // ONE username prompt in the whole run. This is the assertion the regression would fail.
+      expect(terminal.asked().filter((q) => q.startsWith('Username'))).toHaveLength(1);
+      expect(terminal.written()).toContain('Attempt 2 of 3');
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.auth.username).toBe(USERNAME);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and Enter picks it, so the commonest recovery is one keystroke', async () => {
+    const w = workspace();
+    try {
+      const interactive = { ...baseOptions, username: undefined };
+      const terminal = io([USERNAME, '', ''], [PASSWORD, OTHER_PASSWORD]);
+      const result = await runAdd(interactive, terminal,
+        { storePath: w.store, makeClient: client([401, 200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(terminal.written()).toMatch(/\[1\] password — re-enter the password .* · Enter picks this/);
+      expect(terminal.asked().filter((q) => q.startsWith('Username'))).toHaveLength(1);
+    } finally { w.cleanup(); }
+  });
+
+  it('...`[2]` asks the account again, defaulted to the one already given', async () => {
+    const w = workspace();
+    try {
+      const interactive = { ...baseOptions, username: undefined };
+      // `2` then Enter at the username: Enter keeps the account, exactly as set-credentials does.
+      const terminal = io([USERNAME, '2', '', ''], [PASSWORD, OTHER_PASSWORD]);
+      const result = await runAdd(interactive, terminal,
+        { storePath: w.store, makeClient: client([401, 200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      // THE MASK IS THE STORE'S, so this prompt and `list` cannot disagree about the account.
+      expect(terminal.asked()).toContain(`Username [${maskUsername(USERNAME)}]: `);
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.auth.username).toBe(USERNAME);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and the reason stays the REGISTRY\'s sentence, not a second one', () => {
+    // ARC-08-S10's ruling, and W10's brief proposed breaking it: it wanted "the instance rejected
+    // the credentials (wrong, expired, or locked)" written into this line. That is a second, narrower
+    // reason beside the registry's, which the existing case forbids by name. Kept as it was.
+    expect(authFailedRetry(2)).toContain(remedyFor('AUTHENTICATION_FAILED').meaning);
+    expect(authFailedRetry(2)).not.toContain('wrong, expired, or locked');
+    expect(authFailedRetry(2)).toContain(`Attempt 2 of ${MAX_ATTEMPTS}`);
+    // ...and the `[Y/n]` it replaces is gone.
+    expect(authFailedRetry(2)).not.toContain('[Y/n]');
+  });
+});
+
 describe('criterion 3 — three attempts, then nothing', () => {
   it('asks twice, exhausts, exits 1, and leaves no store behind', async () => {
     const w = workspace();
     try {
       const c = client([401, 401, 401]);
-      const terminal = io(['y', 'y'], [PASSWORD, OTHER_PASSWORD, PASSWORD]);
+      // ARC-07-W10 — `1` is "re-enter the password" where `y` was the whole of `[Y/n]`. Every
+      // property this case guards is unchanged: two retries offered, three login attempts and not
+      // one more, the exhaustion line, and no store.
+      const terminal = io(['1', '1'], [PASSWORD, OTHER_PASSWORD, PASSWORD]);
       const result = await runAdd({ ...baseOptions }, terminal,
         { storePath: w.store, makeClient: c.make, reachability: reachable, env: {} });
 
       expect(result.exitCode).toBe(EXIT_FAILED);
       // The exact strings the story fixes, in order.
-      expect(terminal.asked()).toContain(authFailedRetry(2));
-      expect(terminal.asked()).toContain(authFailedRetry(3));
+      // The question is WRITTEN now and the prompt is `askOption`'s `> `, so it is asserted where it
+      // is printed rather than where it used to be passed.
+      expect(terminal.written()).toContain(authFailedRetry(2));
+      expect(terminal.written()).toContain(authFailedRetry(3));
       // ...and the REASON inside them is the REGISTRY's sentence, not a second, narrower one
       // written here (ruled by the ARC-08-S10 review). Read from the registry rather than pinned as
       // a literal: the day the meaning is reworded this test follows it instead of holding the old
@@ -255,7 +334,8 @@ describe('criterion 3 — three attempts, then nothing', () => {
     try {
       const c = client([401, 200]);
       // `y` to re-enter, then Enter at the review screen — the run does not end at the password.
-      const terminal = io(['y', ''], [OTHER_PASSWORD, PASSWORD]);
+      // `1` for "re-enter the password", then Enter at the review screen.
+      const terminal = io(['1', ''], [OTHER_PASSWORD, PASSWORD]);
       const result = await runAdd({ ...baseOptions, makeDefault: true }, terminal,
         { storePath: w.store, makeClient: c.make, reachability: reachable, env: {} });
       expect(result.exitCode).toBe(EXIT_OK);
@@ -1012,7 +1092,10 @@ describe('criterion 6 — unreachable, and a role that cannot read', () => {
     const w = workspace();
     try {
       const c = client([403, 401, 403]);
-      const terminal = io(['y', 'y', 'y'], [PASSWORD, OTHER_PASSWORD, PASSWORD]);
+      // A 403 asks `askRoleMissing`'s own `[y/N]` — unchanged by W10, because a missing role is not a
+      // wrong password and that question is about the ACCOUNT. A 401 asks the new menu, where `1` is
+      // "re-enter the password". So the answers differ by status, which is the point of the case.
+      const terminal = io(['y', '1', 'y'], [PASSWORD, OTHER_PASSWORD, PASSWORD]);
       const result = await runAdd({ ...baseOptions }, terminal,
         { storePath: w.store, makeClient: c.make, reachability: reachable, env: {} });
       expect(result.exitCode).toBe(EXIT_FAILED);

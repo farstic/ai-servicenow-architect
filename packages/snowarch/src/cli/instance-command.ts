@@ -211,9 +211,9 @@ export async function runInstance(argv: readonly string[], io: AddIo = terminalI
       // COUNTS IN WORDS, because `docs/INSTALL.md` spells them that way ("two commands", "three
       // lines", "one dialog") and that page quotes this block. The attempt counts elsewhere stay
       // numerals: a limit you are counting down against reads as a number.
-      io.write('Instance wizard — seven steps (six questions and a login check). Have ready: the '
-        + 'instance URL and a\n');
-      io.write('username + password for it. Nothing is saved until the end.\n');
+      io.write('Instance wizard — seven steps (six questions and a login check).\n');
+      io.write('Have ready: the instance URL and a username + password for it. Nothing is saved '
+        + 'until the end.\n');
       // The header is numbered from `STEPS`, like every other step. The rule is NOT restated here:
       // `LABEL_RULE_WORDS` is the complete one and it arrives on the refusal, where it is needed.
       io.write(`${stepHeader('label', ' — a short name you will type in commands, e.g. pdi, acme-dev')}\n`);
