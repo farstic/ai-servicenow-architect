@@ -593,6 +593,16 @@ report nobody read. Commit first — a `wip:` commit folded in afterwards with `
 enough — then degrade, then restore. The claim is about the ref either way: `git show <ref>:<path>`,
 not the working tree.
 
+**It happened a THIRD time in ARC-07-W12, with the paragraph above already on this page**, so the
+rule is restated as an ORDER rather than a caution: the first control of a row runs *after* the
+commit, and the commit is of work already green. What went wrong was not forgetting to checkpoint —
+it was running controls on a row that felt too unfinished to commit, so there was no index to restore
+to, and `git checkout --` took two product files back to the state before the row began while the
+test file, untouched by the restore, stayed green enough to hide it. The tell is `git status` showing
+only the test file. A rule read three times and broken three times wants a mechanism, not a fourth
+reading: a `scripts/ci/control.mjs` that refuses to degrade a file `git status --porcelain` reports as
+dirty would make the ordering unbreakable, and is worth its own row.
+
 **Write the case at the level a user reaches the code, and let it fail before the mechanism exists.**
 A test written just below the seam you are building proves the seam and not its use: ARC-09-C52's
 binding and ARC-07-C9's wiring both passed every test while their only caller was deleted. Writing
