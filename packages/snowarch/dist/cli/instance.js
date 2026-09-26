@@ -379,7 +379,14 @@ export const storeLine = (path, platform = process.platform, project = projectSt
         const tail = path.split(/[\\/]/).slice(-2).join(sepChar);
         return `Saved to ${tail} in this folder — ${modes}.`;
     }
-    return `Saved to ${maskPath(path, { sepChar })} — ${modes}.`;
+    // ANY OTHER STORE GETS THE PATH ON ITS OWN LINE, and the budget case is what found this: a store
+    // that is neither this checkout's nor under the reader's home is not masked to `~`, and one inside a
+    // client folder measured 119 columns. A PATH CANNOT BE FOLDED — it is atomic in the same way a
+    // command is, and half of it is worse than a long line — so the sentence takes one line and the path
+    // takes the next, whole. `--global` normally masks to `~/.config/snowarch/instances.json` and would
+    // have fitted; the case used a real deep path instead of the short one, which is the only reason
+    // this was found rather than shipped.
+    return `Saved to this file — ${modes}:\n${maskPath(path, { sepChar })}`;
 };
 /**
  * Why the authentication step did not ask. Named from what was actually observed, never a default sentence.

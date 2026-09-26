@@ -14,7 +14,8 @@ import {
 import { cliSpelling, EXIT_USAGE } from '../../src/cli/tty.js';
 import { runInstance } from '../../src/cli/instance-command.js';
 import { ENVIRONMENTS } from '../../src/cli/url.js';
-import { COLUMNS, resolveFlagAnswer } from '../../src/cli/preset-ui.js';
+import { applyingLine, COLUMNS, probeNote, resolveFlagAnswer, wrapText }
+  from '../../src/cli/preset-ui.js';
 import { remedyFor } from '../../src/errors/codes.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import { loadStore, saveStore } from '../../src/store/index.js';
@@ -1294,6 +1295,53 @@ describe('the summary lines', () => {
     expect(line).toContain('scripting: role missing');
     expect(line).toContain('NOW_ASSIST: off');
     expect(line).toContain('FLUENT: off');
+  });
+});
+
+describe('ARC-07-W16 — every line the wizard ends with fits the terminal', () => {
+  // THE INSTRUMENT ARC-07-W4 DID NOT LEAVE BEHIND. W4 measured three over-budget lines — Applying
+  // 101, Saved 166, Store 112 — and the numbers went into a row; nothing asserted them, so they
+  // stayed over budget for twelve rows. A wording row can fix a line once; only a case keeps it
+  // fixed, and these lines GROW with every flag and every probe field added later.
+  //
+  // REAL VALUES, not short ones: the long label and the deep path are the point. A 4-character label
+  // and `/tmp/x` pass at any width, which is how a budget case comes to certify nothing.
+  const LONG = 'acme-prod-emea';
+  const DEEP = '/Users/somebody/work/clients/acme/ai-servicenow-architect/.local/instances.json';
+  const probe = { at: '2026-09-26T12:00:00Z', auth: 'ok', write: 'role missing', cmdb: 'ok',
+    scripting: 'ok', atf: 'ok', nowAssist: 'not licensed', fluent: 'not installed' } as never;
+
+  it('the Saved line, the probes summary, the Store line and Applying are each under the budget', () => {
+    const entry = { environment: 'prod', auth: { method: 'basic', username: 's***' },
+      preset: 'read-only', flags: expandPreset('read-only') } as never;
+    const lines = [
+      savedLine(LONG, entry, true),
+      ...wrapText(probeSummary(probe, expandPreset('full'), false), COLUMNS),
+      // The store line can be TWO lines (a path is atomic and gets its own), so each is checked and
+      // the path line is exempted by name rather than by being short enough today.
+      ...storeLine(DEEP, 'darwin').split('\n').filter((l) => !l.startsWith('/')),
+      ...storeLine(DEEP, 'win32').split('\n').filter((l) => !l.startsWith('/')),
+      storeLine('/repo/.local/instances.json', 'darwin', '/repo/.local/instances.json'),
+      ...wrapText(applyingLine('full', expandPreset('full'), {
+        // `?? undefined` rather than a cast: `probeNote` returns null for a status that needs no
+        // note, and `applyingLine` takes an optional string. These three all produce one.
+        WRITE_ENABLED: probeNote('role missing') ?? undefined,
+        NOW_ASSIST_ENABLED: probeNote('not licensed') ?? undefined,
+        FLUENT_ENABLED: probeNote('not installed') ?? undefined,
+      }), COLUMNS),
+    ];
+    for (const line of lines) {
+      expect(line.length, `${line.length} > ${COLUMNS}: ${line}`).toBeLessThanOrEqual(COLUMNS);
+    }
+  });
+
+  it('...and the probes summary is its own line, never appended to the Saved line', () => {
+    // The 165-column line was ONE line because two statements were joined with a space. This asserts
+    // the seam rather than the width, so a future field cannot quietly rejoin them under the budget.
+    const entry = { environment: 'pdi', auth: { method: 'basic', username: 's***' },
+      preset: 'full', flags: expandPreset('full') } as never;
+    expect(savedLine('pdi', entry, true)).not.toContain('Probes:');
+    expect(savedLine('pdi', entry, true).endsWith('.')).toBe(true);
   });
 });
 
