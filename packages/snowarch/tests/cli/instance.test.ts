@@ -385,6 +385,131 @@ describe('ARC-07-W2 — the URL prompt re-asks', () => {
   });
 });
 
+/**
+ * ARC-07-W3 — an empty username or password is re-asked, and the prompts say what is expected.
+ *
+ * `readCredentials` returned `null` for an empty answer to either prompt, and the caller turned that
+ * into `Nothing saved.` — so a stray Enter threw away the label, the URL, the environment and the
+ * auth method the user had already given. **And an empty answer was the ONLY way out of the prompt**,
+ * which is the sharper half: the gesture that abandons the wizard and the gesture of pressing Enter
+ * by mistake were the same gesture, so neither could be told from the other. `q` gives the prompt its
+ * first real exit and the empty answer stops being one; both directions are asserted here so they
+ * cannot be confused again.
+ */
+describe('ARC-07-W3 — the credential prompts re-ask', () => {
+  const noCredentials = { ...baseOptions, username: undefined };
+
+  it('ARC-07-W3 — an empty username is re-asked, and the run continues', async () => {
+    const w = workspace();
+    try {
+      const terminal = io(['', USERNAME, '']);
+      const result = await runAdd(noCredentials, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(text).toContain('Username is required');
+      expect(existsSync(w.store)).toBe(true);
+      // The prompt says WHOSE account, because "Username" alone does not say whether it is the
+      // instance's or this machine's.
+      expect(terminal.asked().some((q) => q.includes('a ServiceNow user on this instance'))).toBe(true);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and an empty password is re-asked too', async () => {
+    const w = workspace();
+    try {
+      // Two secrets: the first empty, then the real one. The queue hands them out in order.
+      const terminal = io([''], ['', PASSWORD]);
+      const result = await runAdd({ ...baseOptions }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(terminal.written()).toContain('Password is required');
+      expect(existsSync(w.store)).toBe(true);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and `q` at the username abandons, which is the prompt\'s first real exit', async () => {
+    const w = workspace();
+    try {
+      const terminal = io(['q']);
+      const result = await runAdd(noCredentials, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_FAILED);
+      expect(terminal.written()).toContain(NOTHING_SAVED);
+      expect(existsSync(w.store)).toBe(false);
+      // ...and it did NOT complain that the answer was empty: `q` is an answer, not a non-answer.
+      expect(terminal.written()).not.toContain('Username is required');
+    } finally { w.cleanup(); }
+  });
+
+  it('...and a password of `q` is a password, not a request to quit', async () => {
+    // THE REASON THE PASSWORD HAS NO `q` CASE. The prompt is invisible, so a user whose password is
+    // `q` would be told nothing was saved with no way to see why. Ctrl-C is the password's exit and
+    // `promptSecret` already ends the process on it.
+    const w = workspace();
+    try {
+      const terminal = io([''], ['q']);
+      const result = await runAdd({ ...baseOptions }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(existsSync(w.store)).toBe(true);
+      expect(terminal.written()).not.toContain(NOTHING_SAVED);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and an input that can only answer empty ends, rather than spinning', async () => {
+    // THE HANG GUARD, and it is about the input source rather than the user. `io.secret` has no
+    // end-of-input value — `promptSecret` handles Ctrl-C and Ctrl-D by ending the process from inside
+    // itself — so a stub or a closed pipe that answers `''` forever would spin in an unbounded loop.
+    // Measured before the bound was written: this is the difference between a failing assertion and a
+    // hung CI cell, which is why the secret loop is bounded and the echoed one is not.
+    const w = workspace();
+    try {
+      const terminal = io([''], ['']);
+      const result = await runAdd({ ...baseOptions }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_FAILED);
+      expect(existsSync(w.store)).toBe(false);
+      // It asked, and said why, up to the bound — rather than asking forever or giving up silently.
+      expect(terminal.written().match(/Password is required/g) ?? []).toHaveLength(MAX_ATTEMPTS);
+    } finally { w.cleanup(); }
+  });
+
+  it('...while --username and --password-stdin never reach the loop', async () => {
+    // THE ARGV SPLIT, the same one W2 drew: a piped secret has no terminal to re-ask, so an empty one
+    // must still abort rather than spin. Without this the password loop could hang a CI cell.
+    const w = workspace();
+    try {
+      const terminal = io([], [''], '');
+      const result = await runAdd({ ...baseOptions, passwordStdin: true }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_FAILED);
+      expect(terminal.written()).toContain(NOTHING_SAVED);
+      expect(terminal.written()).not.toContain('Password is required');
+      expect(existsSync(w.store)).toBe(false);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and the login check says what it is doing and that it only reads', async () => {
+    const w = workspace();
+    try {
+      const terminal = io(['']);
+      await runAdd({ ...baseOptions }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      // `[5/6] Probing` named the machine's activity, not the user's question. The user's question is
+      // "is it doing anything to my instance?", and the answer is no.
+      expect(terminal.written()).toContain('[5/6] Checking the login and what this account may do');
+      expect(terminal.written()).toContain('read-only');
+    } finally { w.cleanup(); }
+  });
+});
+
 describe('criterion 6 — unreachable, and a role that cannot read', () => {
   it('an unreachable host with the menu answered `abort` exits 1, nothing saved', async () => {
     const w = workspace();
