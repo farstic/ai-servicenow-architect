@@ -67,6 +67,18 @@ export function headerLine({ version, ranAt, options = {} }) {
 export const NOT_IN_SECTION = 'not in --section';
 
 /**
+ * ...and for one `--quick` left out — ARC-07-W15.
+ *
+ * THESE TWO STRINGS ARE MATCHED ON, WHICH IS WHY THEY ARE CONSTANTS. `summarise` counts a skip as
+ * "not in section" by comparing `r.detail` to the sentence, so the tally and the wording are the
+ * same string doing two jobs. `NOT_IN_SECTION` already existed here and `runner.mjs` spelled the
+ * literal anyway — in BOTH places, the one that writes the reason and the one that counts it — so
+ * there were three authors, and rewording any one of them would have silently zeroed a count while
+ * every test that reads the rendered line stayed green. The quick reason had no constant at all.
+ */
+export const NOT_IN_QUICK = 'not in the --quick subset';
+
+/**
  * ARC-08-C37 — `checks` is OPTIONAL, and a caller that omits it gets the line it always got.
  *
  * Three callers, and only two of them can name anything: `renderText` below has the report, and
@@ -75,9 +87,28 @@ export const NOT_IN_SECTION = 'not in --section';
  * check ids in that world — so the default is silence rather than a bracket it would have to fill
  * with a guess. `idsFor` is the panel's helper, not a second copy of the rule.
  */
-export function summaryLine(summary, checks = null) {
+export function summaryLine(summary, checks = null, { quick = false, cli = './snowarch' } = {}) {
   const parts = [`${summary.ok} ok`, `${summary.warn} warn${idsFor(checks, 'warn')}`,
     `${summary.fail} fail${idsFor(checks, 'fail')}`];
+  // ARC-07-W15 — THE BOOTSTRAP'S LINE, and it is a different line because it answers a different
+  // question. `DOCTOR: 13 ok, 1 warn (E-23), 1 fail` told a reader at the end of an install that
+  // something had been checked, without saying that MOST OF IT HAD NOT BEEN: the bootstrap spawns
+  // `doctor --quick`, which runs 15 of 41 checks. The counts were true and the impression was not.
+  //
+  // `notInQuick` rather than `skip`, and that distinction is measured rather than tidy: in a quick
+  // run today all 26 skips are quick-exclusions, so `skip` would give the same number — but a
+  // quick-subset check that cannot answer is skipped for its own reason, and then `skip` mixes the
+  // two and the sentence overstates what running the full doctor would add. The `--section` split
+  // three lines down is the same rule, and this reuses it rather than inventing a second one.
+  //
+  // The launcher is PASSED IN, never read here: `text.mjs` imports this module, so importing
+  // `spellings` back would be a cycle. A POSIX default, threaded by every caller that knows the
+  // shell — the shape `ADD_INSTANCE` already uses for the same reason.
+  if (quick) {
+    const more = summary.notInQuick ?? 0;
+    return `Health check (quick): ${parts.join(' · ')}`
+      + `${more > 0 ? ` · ${more} more run with ${cli} doctor` : ''}`;
+  }
   // `--section` splits the skipped count in two, because the two mean different things: "this
   // checkout could not answer" and "you did not ask". Only the first is about the machine.
   if (summary.notInSection > 0) {

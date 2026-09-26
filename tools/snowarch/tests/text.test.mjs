@@ -340,3 +340,55 @@ test('ARC-07-W12 — the set-flags example is the one the server\'s own help pri
     assert.ok(changeLaterBlock({ label: 'pdi' }).includes(pair));
   }
 });
+
+test('ARC-07-W15 — the full doctor\'s own line is byte-identical, and the quick one is not it', async () => {
+  // THE HALF THAT MUST NOT MOVE. `summaryLine` is shared: the full doctor renders through it with no
+  // options, so the default path has to produce exactly what it produced before this row — including
+  // the `--section` split and the fixable suffix, neither of which the bootstrap's line ever shows.
+  const { summaryLine } = await import('../lib/doctor/report-text.mjs');
+  const checks = [{ id: 'E-23', status: 'warn' }, { id: 'E-29', status: 'fail' }];
+  assert.equal(summaryLine({ ok: 32, warn: 3, fail: 2, skip: 4, fixable: 0 }, checks),
+    'DOCTOR: 32 ok, 3 warn (E-23), 2 fail (E-29), 4 skipped');
+  assert.equal(summaryLine({ ok: 5, warn: 0, fail: 1, skip: 37, notInSection: 37, fixable: 1 }, null),
+    'DOCTOR: 5 ok, 0 warn, 1 fail, 37 not in section (1 fixable — run ./snowarch doctor --fix)');
+
+  // ...and the quick form, from the SAME function, is a different line rather than a reworded one.
+  assert.equal(
+    summaryLine({ ok: 13, warn: 1, fail: 1, skip: 26, notInQuick: 26 }, checks, { quick: true }),
+    'Health check (quick): 13 ok · 1 warn (E-23) · 1 fail (E-29) · 26 more run with ./snowarch doctor');
+});
+
+test('ARC-07-W15 — the quick line takes the launcher from its caller, never from this module', async () => {
+  // NO CYCLE, BY CONSTRUCTION. `text.mjs` imports `report-text.mjs`, so `report-text.mjs` importing
+  // `spellings` back would be a circular import — and a `const` evaluated inside a cycle is
+  // `undefined`, which here would have printed "undefined doctor" on the one line the reader is
+  // meant to type. So the spelling is a PARAMETER with a POSIX default, the shape `ADD_INSTANCE`
+  // already uses, and `doctorLine` threads the real one.
+  const { summaryLine } = await import('../lib/doctor/report-text.mjs');
+  const s = { ok: 1, warn: 0, fail: 0, skip: 2, notInQuick: 2 };
+  assert.match(summaryLine(s, null, { quick: true, cli: '.\\snowarch.cmd' }),
+    /2 more run with \.\\snowarch\.cmd doctor$/);
+  // ...and through the real caller, on a Windows shell — the empty env is load-bearing, as ever.
+  assert.match(doctorLine({ ...s, source: 'doctor', platform: 'win32', env: {} }),
+    /\.\\snowarch\.cmd doctor$/);
+  assert.match(doctorLine({ ...s, source: 'doctor', platform: 'darwin', env: {} }),
+    /\.\/snowarch doctor$/);
+});
+
+test('ARC-07-W15 — one author for each skip reason, and the tally matches on it', async () => {
+  // The string is MATCHED ON, so the wording and the count are one string doing two jobs. Before this
+  // row `not in --section` was written in four places — the runner's skip, the runner's tally,
+  // `summariseMerged`'s tally, and an exported `NOT_IN_SECTION` nobody used — and rewording any one
+  // would have zeroed a count with every rendered-line test still green.
+  const { NOT_IN_QUICK, NOT_IN_SECTION } = await import('../lib/doctor/report-text.mjs');
+  const runner = readFileSync(join(repoRoot, 'tools/snowarch/lib/doctor/runner.mjs'), 'utf8');
+  const merged = readFileSync(join(repoRoot, 'tools/snowarch/lib/doctor/checks/index.mjs'), 'utf8');
+  for (const [where, code] of [['runner.mjs', runner], ['checks/index.mjs', merged]]) {
+    const stripped = code.replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
+    for (const reason of [NOT_IN_SECTION, NOT_IN_QUICK]) {
+      assert.ok(!stripped.includes(`'${reason}'`),
+        `${where} spells "${reason}" instead of importing the constant`);
+    }
+  }
+});
