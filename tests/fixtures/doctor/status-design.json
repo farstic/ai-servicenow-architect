@@ -716,6 +716,7 @@
     "fail": 0,
     "skip": 26,
     "fixable": 0,
-    "notInSection": 0
+    "notInSection": 0,
+    "notInQuick": 26
   }
 }
