@@ -18,6 +18,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { WIZARD_ARGV } from '../lib/steps/B06.mjs';
+// ARC-07-W9 — the prompt is DERIVED, after five assertions here were bound to its old text and went
+// red on nine CI cells. These cases read the built `dist`, which is why `tests/cli` could not see them.
+import { LABEL_PROMPT } from '../../../packages/snowarch/dist/cli/instance-command.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const CLI = pathToFileURL(join(root, 'packages/snowarch/dist/cli/instance-command.js')).href;
@@ -56,7 +59,7 @@ test('ARC-07-C2 — B06\'s argv on a terminal asks for the label instead of refu
   const code = await runInstance([...SUB_ARGV], t);
 
   assert.equal(t.prompts.length >= 1, true, 'it refused without asking anything — the C2 defect');
-  assert.match(t.prompts[0], /Label for this instance \[pdi\]/,
+  assert.equal(t.prompts[0], LABEL_PROMPT,
     `the first question is not the label: ${JSON.stringify(t.prompts[0])}`);
   assert.doesNotMatch(t.written, /instance add needs a label/,
     'the usage error was printed on a terminal that could have been asked');
@@ -83,7 +86,7 @@ test('ARC-07-C2 — Enter accepts the proposed label, and a typed one wins', asy
   const accepted = io({ isTty: true, answers: [''] });
   await runInstance([...SUB_ARGV], accepted);
   assert.doesNotMatch(accepted.written, /instance add needs a label/);
-  assert.equal(accepted.prompts.filter((p) => /Label for this instance/.test(p)).length, 1,
+  assert.equal(accepted.prompts.filter((p) => p === LABEL_PROMPT).length, 1,
     'the label was asked more than once — the answer did not take');
 
   // A typed label that breaks the rule is refused by the SAME validator as one typed on the command
@@ -97,7 +100,7 @@ test('ARC-07-C2 — Enter accepts the proposed label, and a typed one wins', asy
   const bad = io({ isTty: true, answers: ['NOT A LABEL'] });
   const code = await runInstance([...SUB_ARGV], bad);
   assert.match(bad.written, /is not a valid label/);
-  assert.equal(bad.prompts.filter((p) => /Label for this instance/.test(p)).length, 2,
+  assert.equal(bad.prompts.filter((p) => p === LABEL_PROMPT).length, 2,
     'a bad label did not produce a second question — the wizard still gives up on one answer');
   assert.equal(code, 2, 'running out of input is still a cancel, not a save');
 });
@@ -110,7 +113,7 @@ test('ARC-07-C10 — a bad label then a good one installs, and the wizard gets p
 
   assert.match(t.written, /"testPDI" is not a valid label/,
     'the rejection sentence is gone — the reader needs to know WHY it was refused');
-  assert.equal(t.prompts.filter((p) => /Label for this instance/.test(p)).length, 2,
+  assert.equal(t.prompts.filter((p) => p === LABEL_PROMPT).length, 2,
     'the label was not asked exactly twice for one bad answer and one good one');
   // PAST the label: the next thing it asks is the wizard's own question, not this one a third time.
   assert.equal(t.written.includes('No valid label after'), false,
@@ -140,7 +143,7 @@ test('ARC-07-C10 — three bad labels exit 1, the code that means the operator\'
   const code = await runInstance([...SUB_ARGV], t);
 
   assert.equal(code, 1, 'exhausted attempts still exit 2 — B06 cannot tell them from bad argv');
-  assert.equal(t.prompts.filter((p) => /Label for this instance/.test(p)).length, MAX_ATTEMPTS,
+  assert.equal(t.prompts.filter((p) => p === LABEL_PROMPT).length, MAX_ATTEMPTS,
     `the label was not asked exactly ${MAX_ATTEMPTS} times`);
   assert.match(t.written, /No valid label after 3 attempts — nothing saved/,
     'the give-up line does not say how many attempts were spent, or that nothing was saved');

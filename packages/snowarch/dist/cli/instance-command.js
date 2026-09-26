@@ -12,7 +12,7 @@
  */
 import { CANCELLED, promptLine, promptSecret } from './tty.js';
 import { instanceSubCommandLines, SUB_COMMANDS } from './help-tables.js';
-import { addHelp, parseAddArgs, runAdd, runList, runRemove, runSetCredentials, runSetDefault, runSetFlags, runSetPreset, runTest, EXIT_CODES, EXIT_FAILED, EXIT_OK, EXIT_USAGE, LABEL_EXHAUSTED, MAX_ATTEMPTS, } from './instance.js';
+import { stepHeader, addHelp, parseAddArgs, runAdd, runList, runRemove, runSetCredentials, runSetDefault, runSetFlags, runSetPreset, runTest, EXIT_CODES, EXIT_FAILED, EXIT_OK, EXIT_USAGE, LABEL_EXHAUSTED, MAX_ATTEMPTS, } from './instance.js';
 import { runImport } from './import-legacy.js';
 // ARC-08-C22 — the table moved to `help-tables.js` (which imports nothing, so the generator can
 // read it without dependencies) and is re-exported here, where its consumers already look for it.
@@ -28,6 +28,16 @@ export const terminalIo = () => ({
 });
 /** The label the prompt proposes. ADR-0005: propose, do not impose — Enter accepts, typing wins. */
 export const DEFAULT_LABEL = 'pdi';
+/**
+ * The label prompt — ARC-07-W9, after five matchers were bound to its old text.
+ *
+ * It read `Label for this instance [pdi]: ` until the step header started saying what a label is, and
+ * **five assertions in `b06-wizard-argv.test.mjs` matched that sentence**. They read the built `dist`,
+ * not `src`, so `tests/cli` could not see them and my push would have gone red on nine cells — the
+ * fifth matcher-bound-to-text this programme has met, and the first where the bound matchers were
+ * tests rather than a guard. Exported so a case can state the prompt instead of quoting it.
+ */
+export const LABEL_PROMPT = `Label [${DEFAULT_LABEL}]: `;
 /** `instance --help` — every sub-command, then the exit table. ARC-06-S08's B08 reads this. */
 export function instanceHelp() {
     // ARC-08-C22 — the table and the layout come from `help-tables.ts`, which imports nothing, so
@@ -209,8 +219,22 @@ export async function runInstance(argv, io = terminalIo()) {
             // cannot see anything but the status, so as long as a rejected ANSWER and a bad ARGV both
             // exited 2, B06's message had to guess — and it guessed "defect in the bootstrap". Exit 2 now
             // means what it says.
+            // ARC-07-W9 — THE WIZARD SAYS WHAT IT IS BEFORE IT ASKS ANYTHING. It began at `Label for this
+            // instance [pdi]` with no announcement that a wizard had started, what followed, what to have
+            // ready, or that nothing is saved until the end — and "label" was undefined until a refusal
+            // explained it, which cost the owner a turn at the S06 sitting.
+            //
+            // COUNTS IN WORDS, because `docs/INSTALL.md` spells them that way ("two commands", "three
+            // lines", "one dialog") and that page quotes this block. The attempt counts elsewhere stay
+            // numerals: a limit you are counting down against reads as a number.
+            io.write('Instance wizard — seven steps (six questions and a login check). Have ready: the '
+                + 'instance URL and a\n');
+            io.write('username + password for it. Nothing is saved until the end.\n');
+            // The header is numbered from `STEPS`, like every other step. The rule is NOT restated here:
+            // `LABEL_RULE_WORDS` is the complete one and it arrives on the refusal, where it is needed.
+            io.write(`${stepHeader('label', ' — a short name you will type in commands, e.g. pdi, acme-dev')}\n`);
             for (let attempt = 1;; attempt += 1) {
-                const typed = (await io.ask(`Label for this instance [${DEFAULT_LABEL}]: `))?.trim();
+                const typed = (await io.ask(LABEL_PROMPT))?.trim();
                 if (typed === undefined) {
                     io.write(`${CANCELLED}\n`);
                     return EXIT_USAGE;

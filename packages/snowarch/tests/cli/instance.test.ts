@@ -8,10 +8,11 @@ import {
   AUTH_EXHAUSTED, EXIT_FAILED, EXIT_OK, EXIT_POLICY, MAX_ATTEMPTS, NEXT_LINE, NOTHING_SAVED,
   REACH_EXHAUSTED, URL_EXHAUSTED,
   addInstance, addHelp, authFailedRetry, EXIT_CODES, labelExists, maskEntry, maskUsername,
-  ENV_CHOICES, parseAddArgs, probeSummary, resolveOption, runAdd, savedLine, storeLine,
+  ENV_CHOICES, STEPS, stepHeader, parseAddArgs, probeSummary, resolveOption, runAdd, savedLine, storeLine,
   type AddIo,
 } from '../../src/cli/instance.js';
 import { EXIT_USAGE } from '../../src/cli/tty.js';
+import { runInstance } from '../../src/cli/instance-command.js';
 import { ENVIRONMENTS } from '../../src/cli/url.js';
 import { COLUMNS, resolveFlagAnswer } from '../../src/cli/preset-ui.js';
 import { remedyFor } from '../../src/errors/codes.js';
@@ -399,6 +400,93 @@ describe('ARC-07-W2 — the URL prompt re-asks', () => {
  * first real exit and the empty answer stops being one; both directions are asserted here so they
  * cannot be confused again.
  */
+/**
+ * ARC-07-W9 — THE ONE PLACE THE STEP NUMBERS ARE WRITTEN DOWN.
+ *
+ * Every other assertion in this suite derives its header through `stepHeader(id)`, which is what makes
+ * inserting a step an edit to one list. But a derived assertion agrees with itself whatever position
+ * the id holds: it cannot see ORDER, and it cannot see the TOTAL. `stepHeader('auth')` is correct at
+ * `[3/6]` and equally correct at `[5/9]`.
+ *
+ * So the sequence is spelled out here, once, and this is the case the controls aim at: remove a step
+ * from `STEPS`, or swap two, and nothing else in the suite notices.
+ */
+describe('ARC-07-W9 — the numbered sequence', () => {
+  /**
+   * THE ONE PLACE THE STEP NUMBERS ARE WRITTEN DOWN, and it has two readers.
+   *
+   * Every other assertion derives through `stepHeader(id)`, which is what makes inserting a step an
+   * edit to one list. But a derived assertion agrees with itself whatever position an id holds: it
+   * cannot see ORDER and it cannot see the TOTAL.
+   *
+   * SO BOTH READERS COMPARE AGAINST THIS LITERAL, never against each other. An earlier draft had the
+   * live case assert `STEPS.slice(1).map(stepHeader)` — derived on both sides, so swapping two steps
+   * moved the expectation with the product and the case was inert. That is the same failure this
+   * programme has met four times now, and it nearly reached the one case built to prevent it.
+   */
+  const SEQUENCE = [
+    '[1/7] Label',
+    '[2/7] Instance URL',
+    '[3/7] Environment',
+    '[4/7] Authentication',
+    '[5/7] Credentials',
+    '[6/7] Checking the login and what this account may do (read-only, a few seconds) …',
+    '[7/7] Permissions',
+  ];
+
+  it('ARC-07-W9 — the wizard introduces itself, and the label is step one', async () => {
+    // THE CONTROL FOUND THIS MISSING. Removing the intro left 270 cases green: I had written the
+    // renumber and forgotten the case for the thing the row is named after. `runInstance` takes an
+    // `io`, so the live path IS drivable — three invalid labels exhaust ARC-07-C10's loop and it
+    // returns before `runAdd` is reached, so nothing touches a store.
+    const terminal = io(['Bad Label', '9lives', 'x'.repeat(33)]);
+    // `isTty: true` is load-bearing: ARC-07-C10's re-ask loop is gated on a real terminal, because a
+    // re-ask needs somebody to ask. Without it `runInstance` falls straight through to EXIT_USAGE and
+    // the intro never prints — which is what my first version of this case measured.
+    const code = await runInstance(['add'], { ...terminal, isTty: true });
+    const text = terminal.written();
+
+    expect(code).toBe(EXIT_FAILED);
+    expect(text.startsWith('Instance wizard — seven steps (six questions and a login check).')).toBe(true);
+    expect(text).toContain('Have ready: the instance URL and a');
+    expect(text).toContain('Nothing is saved until the end.');
+    // The label is step one, numbered from the list like every other step.
+    expect(text).toContain(SEQUENCE[0]);
+    expect(text).toContain('a short name you will type in commands, e.g. pdi, acme-dev');
+    // ...and the prompt is the short one now: the step header carries what a label IS.
+    expect(terminal.asked()).toContain(`Label [${'pdi'}]: `);
+    // THE COMPLETE RULE ARRIVES ON REFUSAL, not on the header — the header offering a partial rule
+    // is the ARC-07-C10 defect, and this is the assertion that keeps the two apart.
+    expect(text).toContain('lower case, starting with a letter, up to 32 characters of a-z 0-9 _ -');
+  });
+
+  it('ARC-07-W9 — the list renders exactly this sequence', () => {
+    expect(STEPS.map((step, i) => `[${i + 1}/${STEPS.length}] ${step.title}`)).toEqual(SEQUENCE);
+  });
+
+  it('...and a run prints them in that order, every one after the label', async () => {
+    // `runAdd` starts at the URL: the label is asked by `runInstance` one level up, which has no
+    // injection seam, so the live half covers steps two to seven and the list half covers all seven.
+    const w = workspace();
+    try {
+      const terminal = io(['']);
+      await runAdd({ ...baseOptions }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      // The skipped-step suffix (ARC-08-C23) is trimmed: this case is about the NUMBERING, and the
+      // suffix has its own cases and its own reasons to change.
+      const headers = terminal.written().split('\n')
+        .filter((line) => /^\[\d+\/\d+\]/.test(line))
+        .map((line) => line.replace(/ … .*$/, ''));
+
+      expect(headers).toEqual(SEQUENCE.slice(1));
+      // ...and the total every line prints IS the list's length, so a header for a step not in the
+      // list — or a step added with no header — cannot pass.
+      expect(headers).toHaveLength(STEPS.length - 1);
+    } finally { w.cleanup(); }
+  });
+});
+
 describe('ARC-07-W3 — the credential prompts re-ask', () => {
   const noCredentials = { ...baseOptions, username: undefined };
 
@@ -507,7 +595,7 @@ describe('ARC-07-W3 — the credential prompts re-ask', () => {
         { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
       // `[5/6] Probing` named the machine's activity, not the user's question. The user's question is
       // "is it doing anything to my instance?", and the answer is no.
-      expect(terminal.written()).toContain('[5/6] Checking the login and what this account may do');
+      expect(terminal.written()).toContain(stepHeader('login'));
       expect(terminal.written()).toContain('read-only');
     } finally { w.cleanup(); }
   });
@@ -592,7 +680,7 @@ describe('ARC-07-W4 — the authentication question', () => {
       // whose length depends on where the checkout is. ARC-07-W16 owns the Saved and Store wording,
       // so those are reported there rather than fixed here under a row about accepting an answer.
       const lines = terminal.written().split('\n');
-      const from = lines.findIndex((l) => l.startsWith('[3/6] Authentication'));
+      const from = lines.findIndex((l) => l.startsWith(stepHeader('auth')));
       const to = lines.findIndex((l) => l.startsWith('Authentication → '));
       expect(from, 'the question was not printed').toBeGreaterThan(-1);
       expect(to, 'the ack was not printed').toBeGreaterThan(from);
@@ -639,7 +727,7 @@ describe('ARC-07-W4 — the authentication question', () => {
       await runAdd({ ...baseOptions }, terminal,
         { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
       // ARC-08-C23's skipped-step line, unchanged by this row.
-      expect(terminal.written()).toContain('[3/6] Authentication … basic');
+      expect(terminal.written()).toContain(stepHeader('auth', ' … basic'));
       expect(terminal.written()).not.toContain('is not one of');
     } finally { w.cleanup(); }
   });
@@ -869,7 +957,7 @@ describe('criterion 6 — unreachable, and a role that cannot read', () => {
       // THE SECOND PROBE USED THE NEW URL. Without this the ack could be printed over a re-probe of
       // the typo, which would look correct in a transcript and fail forever.
       expect(urls).toEqual([TYPO, URL_PDI]);
-      expect(text).toContain('[3/6] Authentication');
+      expect(text).toContain(stepHeader('auth'));
       expect(result.exitCode).toBe(EXIT_OK);
       // AND THE ENTRY CARRIES THE URL THAT ANSWERED, not the typo. `instanceUrl` feeds the client,
       // the probes and the saved record; had it stayed `const`, the run would have reached this line
@@ -1145,10 +1233,18 @@ describe('ARC-08-C23 — the numbering has no silent gaps', () => {
       });
 
       const out = terminal.written();
-      expect(out).toContain('[3/6] Authentication … basic (default; --yes asked nothing)');
-      // Every step from 1 to 6 appears, in order, with none missing.
-      const steps = [...out.matchAll(/\[(\d)\/6\]/g)].map((m) => Number(m[1]));
-      expect([...new Set(steps)]).toEqual([1, 2, 3, 4, 5, 6]);
+      expect(out).toContain(stepHeader('auth', ' … basic (default; --yes asked nothing)'));
+      // ARC-07-W9 DERIVED BOTH HALVES, and the second assertion is new. This read
+      // `/\[(\d)\/6\]/g` and expected `[1, 2, 3, 4, 5, 6]` — the total hardcoded in the PATTERN, so
+      // it could only ever match lines that already agreed with it: a header printed with a stale
+      // total was unfindable by the case whose job is the numbering. The total is captured now and
+      // asserted against the list, which is what makes a stale one fail.
+      //
+      // From 2: `runAdd` starts at the URL, and the label is asked one level up.
+      const printed = [...out.matchAll(/\[(\d+)\/(\d+)\]/g)];
+      expect([...new Set(printed.map((m) => Number(m[1])))])
+        .toEqual(STEPS.slice(1).map((_, i) => i + 2));
+      expect([...new Set(printed.map((m) => Number(m[2])))]).toEqual([STEPS.length]);
     } finally { w.cleanup(); }
   });
 
@@ -1161,7 +1257,7 @@ describe('ARC-08-C23 — the numbering has no silent gaps', () => {
       await runAdd({ ...baseOptions, makeDefault: true, yes: true, auth: 'basic' }, terminal, {
         storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {},
       });
-      expect(terminal.written()).toContain('[3/6] Authentication … basic (from --auth)');
+      expect(terminal.written()).toContain(stepHeader('auth', ' … basic (from --auth)'));
     } finally { w.cleanup(); }
   });
 });

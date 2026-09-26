@@ -6,6 +6,16 @@ export type { SubCommand };
 export declare const terminalIo: () => AddIo;
 /** The label the prompt proposes. ADR-0005: propose, do not impose — Enter accepts, typing wins. */
 export declare const DEFAULT_LABEL = "pdi";
+/**
+ * The label prompt — ARC-07-W9, after five matchers were bound to its old text.
+ *
+ * It read `Label for this instance [pdi]: ` until the step header started saying what a label is, and
+ * **five assertions in `b06-wizard-argv.test.mjs` matched that sentence**. They read the built `dist`,
+ * not `src`, so `tests/cli` could not see them and my push would have gone red on nine cells — the
+ * fifth matcher-bound-to-text this programme has met, and the first where the bound matchers were
+ * tests rather than a guard. Exported so a case can state the prompt instead of quoting it.
+ */
+export declare const LABEL_PROMPT = "Label [pdi]: ";
 /** `instance --help` — every sub-command, then the exit table. ARC-06-S08's B08 reads this. */
 export declare function instanceHelp(): string;
 /**
