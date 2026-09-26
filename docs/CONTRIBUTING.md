@@ -593,6 +593,17 @@ report nobody read. Commit first — a `wip:` commit folded in afterwards with `
 enough — then degrade, then restore. The claim is about the ref either way: `git show <ref>:<path>`,
 not the working tree.
 
+**`git add -A` can commit the corpus submodule, and it did.** `.gitmodules` pins
+`branch = australia` and the submodule's URL is HTTPS, which this machine cannot reach — so
+`git submodule update --checkout --quiet` FAILS SILENTLY here, leaves the working tree on whatever
+commit it was already on, and the next `git add -A` stages that gitlink into an unrelated commit. In
+ARC-09-C64's PR it shipped `df4afacf` in place of the pinned `68c0d112` and failed **25 CI cells** on a
+change that touched one Markdown file. `tests/engine-config.test.mjs` catches it — and the local gate
+skipped it, because the commit was "docs only" and I never looked at the file list. So: **the gate is
+chosen from `git diff --cached --name-only`, never from what the change was meant to be.** Read the
+staged list before every commit; `vendor/ServiceNowDocs` appearing in it means the full suite, not
+`lint`. Never pass `--quiet` to a submodule update — the failure is the whole message.
+
 **It happened a THIRD time in ARC-07-W12, with the paragraph above already on this page**, so the
 rule is restated as an ORDER rather than a caution: the first control of a row runs *after* the
 commit, and the commit is of work already green. What went wrong was not forgetting to checkpoint —
