@@ -355,7 +355,13 @@ describe('AC 4 — a checkout inside a synced folder', () => {
     const src = readFileSync(resolve(here, '../../src/cli/instance.ts'), 'utf8');
     const calls = [...src.matchAll(/await cloudSyncGate\(/g)].map((m) => m.index as number);
     expect(calls, 'exactly two callers: `add` and `set-credentials`').toHaveLength(2);
-    const firstStep = src.indexOf("io.write('[1/6] Instance URL");
+    // ARC-07-W9 RE-ANCHORED THIS, and the reason is the row's own lesson. It searched for
+    // `io.write('[1/6] Instance URL` — a literal the STEPS list then removed, so it found -1 and the
+    // case failed with "expected -1 to be greater than -1": a structural assertion bound so tightly
+    // to the text it inspects that the refactor it should have survived invalidated it. Third time
+    // this programme has met that shape (ARC-07-C1's handoff extractor, ARC-07-C22's clone pattern).
+    // The durable anchor is the CALL, not the string it used to contain.
+    const firstStep = src.indexOf("stepHeader('url')");
     expect(firstStep).toBeGreaterThan(-1);
     // `add`'s gate is BEFORE the wizard's first question...
     expect(calls[0]).toBeLessThan(firstStep);

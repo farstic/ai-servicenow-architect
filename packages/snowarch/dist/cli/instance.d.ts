@@ -247,6 +247,49 @@ export declare const storeLine: (path: string, platform?: NodeJS.Platform) => st
  * whether the answer is theirs needs to know which: one is what they typed, the other is what the
  * flag chose for them.
  */
+/**
+ * THE WIZARD'S STEPS, in the order they are asked — ARC-07-W9.
+ *
+ * `[1/6] Instance URL` … `[6/6] Permissions` were seven printed literals with the number and the
+ * TOTAL spelled in each, plus eleven more in section banners and prose. Adding one step meant editing
+ * every one of them and twenty assertions besides, and the programme has now paid three times for
+ * exactly that shape: a page advertising a verb the tool had stopped printing (ARC-07-C22), 88
+ * hand-spelled launcher names (ARC-07-C1), and a plan header nothing held to its source.
+ *
+ * So the number is the INDEX and the total is the LENGTH. Inserting a step is an edit to this list,
+ * and every header, the total, and ARC-08-C23's skipped-step line follow from it.
+ *
+ * WHAT A DERIVED ASSERTION CANNOT SEE IS ORDER: `stepHeader('auth')` agrees with itself whatever
+ * position `auth` holds. One literal snapshot of the whole sequence is kept for that, and it is the
+ * only place the numbers are written down.
+ */
+export declare const STEPS: readonly [{
+    readonly id: "url";
+    readonly title: "Instance URL";
+}, {
+    readonly id: "environment";
+    readonly title: "Environment";
+}, {
+    readonly id: "auth";
+    readonly title: "Authentication";
+}, {
+    readonly id: "credentials";
+    readonly title: "Credentials";
+}, {
+    readonly id: "login";
+    readonly title: "Checking the login and what this account may do (read-only, a few seconds) …";
+}, {
+    readonly id: "permissions";
+    readonly title: "Permissions";
+}];
+export type StepId = typeof STEPS[number]['id'];
+/**
+ * `[2/6] Environment`, and `[3/6] Authentication … basic (from --auth)` with a suffix.
+ *
+ * It THROWS on an unknown id rather than rendering `[0/6]`: a typo'd step is a programming error, and
+ * a header numbered zero is the kind of output that reaches a user before anyone notices.
+ */
+export declare function stepHeader(id: StepId, suffix?: string): string;
 export declare const skipReason: (options: {
     auth?: string;
     yes?: boolean;

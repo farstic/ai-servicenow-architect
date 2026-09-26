@@ -421,6 +421,45 @@ export const storeLine = (path: string, platform: NodeJS.Platform = process.plat
  * whether the answer is theirs needs to know which: one is what they typed, the other is what the
  * flag chose for them.
  */
+/**
+ * THE WIZARD'S STEPS, in the order they are asked — ARC-07-W9.
+ *
+ * `[1/6] Instance URL` … `[6/6] Permissions` were seven printed literals with the number and the
+ * TOTAL spelled in each, plus eleven more in section banners and prose. Adding one step meant editing
+ * every one of them and twenty assertions besides, and the programme has now paid three times for
+ * exactly that shape: a page advertising a verb the tool had stopped printing (ARC-07-C22), 88
+ * hand-spelled launcher names (ARC-07-C1), and a plan header nothing held to its source.
+ *
+ * So the number is the INDEX and the total is the LENGTH. Inserting a step is an edit to this list,
+ * and every header, the total, and ARC-08-C23's skipped-step line follow from it.
+ *
+ * WHAT A DERIVED ASSERTION CANNOT SEE IS ORDER: `stepHeader('auth')` agrees with itself whatever
+ * position `auth` holds. One literal snapshot of the whole sequence is kept for that, and it is the
+ * only place the numbers are written down.
+ */
+export const STEPS = Object.freeze([
+  { id: 'url', title: 'Instance URL' },
+  { id: 'environment', title: 'Environment' },
+  { id: 'auth', title: 'Authentication' },
+  { id: 'credentials', title: 'Credentials' },
+  { id: 'login', title: 'Checking the login and what this account may do (read-only, a few seconds) …' },
+  { id: 'permissions', title: 'Permissions' },
+] as const);
+
+export type StepId = typeof STEPS[number]['id'];
+
+/**
+ * `[2/6] Environment`, and `[3/6] Authentication … basic (from --auth)` with a suffix.
+ *
+ * It THROWS on an unknown id rather than rendering `[0/6]`: a typo'd step is a programming error, and
+ * a header numbered zero is the kind of output that reaches a user before anyone notices.
+ */
+export function stepHeader(id: StepId, suffix = ''): string {
+  const at = STEPS.findIndex((step) => step.id === id);
+  if (at < 0) throw new Error(`no wizard step "${id}" — the ids are ${STEPS.map((s) => s.id).join(', ')}`);
+  return `[${at + 1}/${STEPS.length}] ${STEPS[at].title}${suffix}`;
+}
+
 export const skipReason = (options: { auth?: string; yes?: boolean }): string =>
   (options.auth !== undefined ? 'from --auth' : 'default; --yes asked nothing');
 
@@ -620,7 +659,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   }
 
   // ── [1/6] the URL ────────────────────────────────────────────────────────────────────────
-  io.write('[1/6] Instance URL\n');
+  io.write(`${stepHeader('url')}\n`);
   const url = options.url;
   if (url === undefined && options.yes) {
     // The registry's sentence, not a second one written here: one condition, one text.
@@ -706,7 +745,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   let instanceUrl = normalised.url;
 
   // ── [2/6] the environment, then the network ──────────────────────────────────────────────
-  io.write('[2/6] Environment\n');
+  io.write(`${stepHeader('environment')}\n`);
   // ARC-07-W5 — WAS THE ANSWER ASKED, OR DECIDED? Measured: for a `devNNNNNN` host
   // `resolveEnvironment` returns `pdi` without calling `ask` and without printing, so this step
   // printed its header and nothing else and the value was never stated. The behaviour is kept — the
@@ -798,7 +837,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   // ── [3/6] and [4/6]: how to authenticate, and with what ──────────────────────────────────
   let method: 'basic' | 'oauth_ropc' = options.auth ?? 'basic';
   if (options.auth === undefined && !options.yes) {
-    io.write('[3/6] Authentication\n');
+    io.write(`${stepHeader('auth')}\n`);
     // ARC-07-W4 — `answer === '2' ? 'oauth_ropc' : 'basic'` read every other answer as agreement with
     // the option the user had not chosen: `oauth_ropc`, `oauth`, `02` and a typo all became basic.
     const chosen = await askOption(io, AUTH_QUESTION, AUTH_CHOICES,
@@ -815,7 +854,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     // promise that all six are accounted for, and a silent gap breaks it in the direction that
     // worries people. The line names the ANSWER and where it came from, because "skipped" alone
     // would tell a reader that something did not happen without telling them what was used.
-    io.write(`[3/6] Authentication … ${method} (${skipReason(options)})\n`);
+    io.write(`${stepHeader('auth', ` … ${method} (${skipReason(options)})`)}\n`);
   }
 
   let attempt = 1;
@@ -823,7 +862,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   let probeResult: { auth: AuthProbe; last: LastProbe | null } | null = null;
 
   for (;;) {
-    io.write(`[4/6] Credentials\n`);
+    io.write(`${stepHeader('credentials')}\n`);
     const credentials = await readCredentials(method, options, io, attempt);
     if (!credentials) {
       io.write(`${NOTHING_SAVED}\n`);
@@ -833,7 +872,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
 
     // ARC-07-W3 — `Probing` named the machine's activity; the user's question is "is it doing
     // anything to my instance?", and the answer is no.
-    io.write('[5/6] Checking the login and what this account may do (read-only, a few seconds) …\n');
+    io.write(`${stepHeader('login')}\n`);
     if (options.noProbes) { probeResult = { auth: { status: 'ok' }, last: null }; break; }
 
     const client = (deps.makeClient ?? probeClientFor)({ url: instanceUrl, auth });
@@ -883,7 +922,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   }
 
   // ── [6/6] the flags ──────────────────────────────────────────────────────────────────────
-  io.write('[6/6] Permissions\n');
+  io.write(`${stepHeader('permissions')}\n`);
   const decision = await resolveFlags({
     label,
     environment: environment.environment as Environment,
