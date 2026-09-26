@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   AUTH_EXHAUSTED, EXIT_FAILED, EXIT_OK, EXIT_POLICY, MAX_ATTEMPTS, NEXT_LINE, NOTHING_SAVED,
+  REACH_EXHAUSTED, URL_EXHAUSTED,
   addInstance, addHelp, authFailedRetry, EXIT_CODES, labelExists, maskEntry, maskUsername,
   parseAddArgs, probeSummary, runAdd, savedLine, storeLine, type AddIo,
 } from '../../src/cli/instance.js';
@@ -307,6 +308,83 @@ describe('criterion 5 — production', () => {
   });
 });
 
+/**
+ * ARC-07-W2 — a URL typed at the prompt is re-asked, not exit 2.
+ *
+ * ARC-07-C10 fixed this class for the LABEL: re-ask up to `MAX_ATTEMPTS`, exit 1 on exhaustion, exit
+ * 2 only for argv. The URL prompt was left on the exit-2 path, so a typo made B06 print *"a defect
+ * in the bootstrap rather than in anything you typed … please report"* — the wizard blaming itself
+ * for the user's typing, which is the same finding C10 recorded one prompt earlier.
+ *
+ * THE INPUTS ARE MEASURED, not taken from the brief: `foo` is a BARE-HOST PROPOSAL
+ * (`https://foo.service-now.com`, `proposed: true`), not a rejection, so a case built on it would
+ * have exercised the `Proposed URL` step and never the re-ask. `not a url` is `URL_INVALID`.
+ */
+describe('ARC-07-W2 — the URL prompt re-asks', () => {
+  const INVALID = 'not a url';
+  const INSECURE = 'http://x.service-now.com';
+  const GOOD = 'https://x.service-now.com';
+
+  it('ARC-07-W2 — a rejected URL is re-asked, and the run continues', async () => {
+    const w = workspace();
+    try {
+      const interactive = { ...baseOptions, url: undefined };
+      // Three answers: invalid, insecure, then good. The third is accepted AT the bound, which is
+      // the boundary worth driving — the bound fires only on a rejected third answer.
+      const terminal = io([INVALID, INSECURE, GOOD, '']);
+      const result = await runAdd(interactive, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      // BOTH normaliser messages reached the reader, each once — the scheme one is the whole reason
+      // this prompt is worth re-asking rather than failing.
+      expect(text).toContain('"not a url" is not a URL — enter https://<host>');
+      expect(text).toContain('ServiceNow instances are served over https only');
+      // ...and the accepted answer is what got saved.
+      const loaded = loadStore(w.store);
+      expect('store' in loaded).toBe(true);
+      expect((loaded as { store: Store }).store.instances.pdi?.url).toBe(GOOD);
+      // The prompt says what shape is wanted, so the first answer is likelier to be right.
+      expect(terminal.asked().some((q) => q.includes('https://<host>, no path'))).toBe(true);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and three rejected answers exhaust with exit 1, not exit 2', async () => {
+    const w = workspace();
+    try {
+      const interactive = { ...baseOptions, url: undefined };
+      const terminal = io([INVALID, INVALID, INVALID]);
+      const result = await runAdd(interactive, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      // EXIT_FAILED, not EXIT_USAGE: that is the half B06 reads. Exit 2 makes it print "a defect in
+      // the bootstrap"; exit 1 makes it print "nothing here is broken, run it again".
+      expect(result.exitCode).toBe(EXIT_FAILED);
+      expect(terminal.written()).toContain(URL_EXHAUSTED);
+      expect(existsSync(w.store)).toBe(false);
+      // The message is shown for every refusal, including the last one.
+      expect(terminal.written().match(/is not a URL/g) ?? []).toHaveLength(MAX_ATTEMPTS);
+    } finally { w.cleanup(); }
+  });
+
+  it('...while --url on argv keeps exit 2 and the normaliser\'s own message', async () => {
+    // THE ARGV PATH IS THE CONTROL THAT LIVES IN THE SUITE. A loop written one level too high would
+    // re-ask a value that came from the command line, where there is nobody to ask and exit 2 is the
+    // right answer — so the two paths are asserted apart rather than assumed to differ.
+    const w = workspace();
+    try {
+      const terminal = io([]);
+      const result = await runAdd({ ...baseOptions, url: INVALID, yes: true }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      expect(result.exitCode).toBe(EXIT_USAGE);
+      expect(terminal.written()).toContain('"not a url" is not a URL — enter https://<host>');
+      expect(terminal.written()).not.toContain(URL_EXHAUSTED);
+      expect(existsSync(w.store)).toBe(false);
+    } finally { w.cleanup(); }
+  });
+});
+
 describe('criterion 6 — unreachable, and a role that cannot read', () => {
   it('an unreachable host with the menu answered `abort` exits 1, nothing saved', async () => {
     const w = workspace();
@@ -316,7 +394,10 @@ describe('criterion 6 — unreachable, and a role that cannot read', () => {
         { storePath: w.store, makeClient: client([200]).make, reachability: unreachable, env: {} });
       expect(result.exitCode).toBe(EXIT_FAILED);
       expect(terminal.written()).toContain('reachability: FAIL DNS_FAILURE');
+      // AND STILL THE BARE LINE on an explicit abort — ARC-07-W2's exhaustion sentence is for running
+      // out of rounds, not for a user who chose to stop. The two are asserted apart.
       expect(terminal.written()).toContain(NOTHING_SAVED);
+      expect(terminal.written()).not.toContain(REACH_EXHAUSTED);
       expect(existsSync(w.store)).toBe(false);
       // Still exactly one: the line is printed before the probe, so a FAILING probe prints it too —
       // "it worked" and "it failed behind a proxy" are the two facts it exists to tell apart.
@@ -417,7 +498,9 @@ describe('criterion 6 — unreachable, and a role that cannot read', () => {
         { storePath: w.store, makeClient: client([200]).make, reachability: probe, env: {} });
 
       expect(result.exitCode).toBe(EXIT_FAILED);
-      expect(terminal.written()).toContain(NOTHING_SAVED);
+      // ARC-07-W2 gave the bound its own sentence: reaching it is an exhaustion, and it now reads
+      // like the label's and the login's rather than ending on a bare `Nothing saved.`
+      expect(terminal.written()).toContain(REACH_EXHAUSTED);
       expect(existsSync(w.store)).toBe(false);
       // THREE ROUNDS, then it stops. Unbounded would mean a stdin that always answers `1` never ends,
       // which in a test is a hang and in CI is a timeout nobody can read.
