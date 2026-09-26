@@ -60,6 +60,34 @@ export declare const AUTH_EXHAUSTED: string;
  * new constant for the count; the loop the prompt beside it already had.
  */
 /**
+ * ARC-07-W4 — ONE NUMBERED QUESTION, for every question that has a list of answers.
+ *
+ * THE PERMISSIONS SCREEN'S SEMANTICS, DELIBERATELY NOT ITS CODE. `resolveFlagAnswer` and the plan
+ * screen's `resolveChoice` already settle this grammar — a number, or the value's own name, and Enter
+ * accepts what is marked — and the plan screen's copy lives in the ENGINE, which this package must not
+ * import and which must not import this. So the rule is re-stated here and the shape is asserted to
+ * match, which is the same trade this repository already makes for the review screen.
+ *
+ * The option list prints ONCE. A wrong answer prints WHY and returns to the `> ` prompt; it does not
+ * reprint the question, which is what made the environment question look frozen (ARC-07-W5).
+ */
+export interface Option {
+    readonly key: string;
+    readonly text: string;
+    readonly aliases?: readonly string[];
+}
+/** `"production" is not one of [1] pdi  [2] dev  [3] test  [4] prod` */
+export declare const notOneOf: (answer: string, options: readonly Option[]) => string;
+/**
+ * A number, the option's own name, one of its aliases, or Enter when something is marked default.
+ *
+ * `undefined` means "not one of them" — the same three-way answer `resolveFlagAnswer` gives, so a
+ * caller cannot confuse "they chose nothing" with "they chose wrongly". A question with NO default
+ * treats Enter as a wrong answer on purpose: `askEnvironment` has carried that decision in a comment
+ * since it was written, because the environment decides which preset a write is checked against.
+ */
+export declare function resolveOption<T extends Option>(input: string | null, options: readonly T[], defaultKey?: string): T | undefined;
+/**
  * ARC-07-W3 — the credential prompts, and what a non-answer is told.
  *
  * `Username: ` did not say WHOSE account — the instance's, or this machine's — and an empty answer
@@ -100,6 +128,7 @@ export declare const AUTH_QUESTION = "Authentication?";
 export declare const AUTH_CHOICES: ReadonlyArray<{
     key: 'basic' | 'oauth_ropc';
     text: string;
+    aliases?: readonly string[];
 }>;
 export interface AddOptions {
     label?: string;

@@ -8,9 +8,10 @@ import {
   AUTH_EXHAUSTED, EXIT_FAILED, EXIT_OK, EXIT_POLICY, MAX_ATTEMPTS, NEXT_LINE, NOTHING_SAVED,
   REACH_EXHAUSTED, URL_EXHAUSTED,
   addInstance, addHelp, authFailedRetry, EXIT_CODES, labelExists, maskEntry, maskUsername,
-  parseAddArgs, probeSummary, runAdd, savedLine, storeLine, type AddIo,
+  parseAddArgs, probeSummary, resolveOption, runAdd, savedLine, storeLine, type AddIo,
 } from '../../src/cli/instance.js';
 import { EXIT_USAGE } from '../../src/cli/tty.js';
+import { COLUMNS, resolveFlagAnswer } from '../../src/cli/preset-ui.js';
 import { remedyFor } from '../../src/errors/codes.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import { loadStore, saveStore } from '../../src/store/index.js';
@@ -506,6 +507,138 @@ describe('ARC-07-W3 — the credential prompts re-ask', () => {
       // "is it doing anything to my instance?", and the answer is no.
       expect(terminal.written()).toContain('[5/6] Checking the login and what this account may do');
       expect(terminal.written()).toContain('read-only');
+    } finally { w.cleanup(); }
+  });
+});
+
+/**
+ * ARC-07-W4 — the authentication question accepts what it lists, and re-asks otherwise.
+ *
+ * `method = answer === '2' ? 'oauth_ropc' : 'basic'` — so `oauth_ropc`, `oauth`, `02`, a typo and
+ * Enter all became BASIC, silently. The question listed two options by name and then accepted exactly
+ * one string; every other answer was read as agreement with the option the user had not chosen.
+ * Nothing said Enter picked `[1]`, and nothing confirmed what had been chosen.
+ */
+describe('ARC-07-W4 — the authentication question', () => {
+  const noAuth = { ...baseOptions, auth: undefined };
+
+  it('ARC-07-W4 — the option can be answered by its own name', async () => {
+    const w = workspace();
+    try {
+      // `oauth` is the name a reader types for `oauth_ropc`; before this row it meant `basic`.
+      const terminal = io(['oauth', 'cid', '']);
+      const result = await runAdd(noAuth, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      const loaded = loadStore(w.store);
+      expect((loaded as { store: Store }).store.instances.pdi?.auth.method).toBe('oauth_ropc');
+      expect(terminal.written()).toContain('Authentication → oauth_ropc');
+    } finally { w.cleanup(); }
+  });
+
+  it('...an answer that is not an option says so, once, and re-asks', async () => {
+    const w = workspace();
+    try {
+      const terminal = io(['x', '1', '']);
+      const result = await runAdd(noAuth, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(text).toContain('"x" is not one of [1] basic  [2] oauth_ropc');
+      // ONCE. The environment question's defect was reprinting with no message; the opposite mistake
+      // is saying it twice for one wrong answer.
+      expect(text.match(/is not one of/g) ?? []).toHaveLength(1);
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.auth.method).toBe('basic');
+    } finally { w.cleanup(); }
+  });
+
+  it('...and Enter picks the marked default, which the question says out loud', async () => {
+    const w = workspace();
+    try {
+      const terminal = io(['', '']);
+      const result = await runAdd(noAuth, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.auth.method).toBe('basic');
+      // The marker is DERIVED from the default, not spelled in the option's text — the ARC-07-C14
+      // rule: a marker that is written into the words drifts the day the default moves.
+      expect(text).toContain('Enter picks this');
+      expect(text).toContain('Authentication → basic');
+      // ...and choosing the default is not an error.
+      expect(text).not.toContain('is not one of');
+    } finally { w.cleanup(); }
+  });
+
+  it('...and every line of the question fits the terminal budget', async () => {
+    // THE `oauth_ropc` ROW WAS 120 COLUMNS, and was 120 before this row too — the text is unchanged.
+    // But `askOption` is now the one place option rows are rendered, and 100 columns is a hard
+    // constraint rather than a preference, so it folds here and every later question inherits that.
+    // `wrapRow` FOLDS rather than truncates, deliberately: the part a truncation removes is the part
+    // that says what to do about it.
+    const w = workspace();
+    try {
+      const terminal = io(['', '']);
+      await runAdd({ ...baseOptions, auth: undefined }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      // SCOPED TO THE QUESTION THIS ROW OWNS, and the scope is a measurement. Asserting the whole
+      // transcript found three OTHER over-budget lines, all pre-existing and none this row's:
+      // `Applying: …` at 101, `Saved instance … Probes: …` at 166, and the `Store: <path> …` line,
+      // whose length depends on where the checkout is. ARC-07-W16 owns the Saved and Store wording,
+      // so those are reported there rather than fixed here under a row about accepting an answer.
+      const lines = terminal.written().split('\n');
+      const from = lines.findIndex((l) => l.startsWith('[3/6] Authentication'));
+      const to = lines.findIndex((l) => l.startsWith('Authentication → '));
+      expect(from, 'the question was not printed').toBeGreaterThan(-1);
+      expect(to, 'the ack was not printed').toBeGreaterThan(from);
+      const over = lines.slice(from, to + 1).filter((l) => l.length > COLUMNS);
+      expect(over, `over ${COLUMNS}:\n${over.join('\n')}`).toEqual([]);
+      // ...and the folded row is still ONE logical option: the continuation is indented to the
+      // prefix's own width, DERIVED rather than spelled — my first version asserted 21 spaces where
+      // the prefix is 19, which is the ARC-07-C13 lesson again: assert the logical row, not a
+      // column somebody counted by hand.
+      const at = lines.findIndex((l) => l.includes('[2] oauth_ropc — OAuth password grant'));
+      expect(at, 'the oauth row was not printed').toBeGreaterThan(-1);
+      const indent = lines[at].indexOf('[2] oauth_ropc — ') + '[2] oauth_ropc — '.length;
+      expect(lines[at + 1]).toBe(`${' '.repeat(indent)}instances can disable it)`);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and the grammar IS the permissions screen\'s, asserted rather than assumed', () => {
+    // The plan screen's `resolveChoice` lives in the ENGINE, which this package must not import, so
+    // the rule is re-stated in `resolveOption` — and a re-statement with nothing holding it to the
+    // original is how two surfaces come to answer the same keystroke differently. `resolveFlagAnswer`
+    // is the copy inside THIS package, so the two are walked over the same answers.
+    const options = [{ key: 'on', text: '' }, { key: 'off', text: '' }] as const;
+    for (const [input, flag, key] of [
+      ['1', 'true', 'on'], ['on', 'true', 'on'], ['ON', 'true', 'on'],
+      ['2', 'false', 'off'], ['off', 'false', 'off'], ['OFF', 'false', 'off'],
+      ['x', undefined, undefined], ['3', undefined, undefined], ['0', undefined, undefined],
+    ] as const) {
+      expect(resolveFlagAnswer(input), `flag: ${input}`).toBe(flag);
+      expect(resolveOption(input, options)?.key, `option: ${input}`).toBe(key);
+    }
+    // ENTER IS THE ONE PLACE THEY DIFFER, and the difference is the point. The flag answer says
+    // "nothing chosen" (null) because the screen's own default is the box as shown; an option list
+    // with no default says "not one of them" (undefined), because there is nothing to accept. Give it
+    // a default and Enter resolves to that — which is what marks `basic` on the auth question.
+    expect(resolveFlagAnswer('')).toBeNull();
+    expect(resolveOption('', options)).toBeUndefined();
+    expect(resolveOption('', options, 'off')?.key).toBe('off');
+  });
+
+  it('...while --auth on argv asks nothing and still says what it used', async () => {
+    const w = workspace();
+    try {
+      const terminal = io(['']);
+      await runAdd({ ...baseOptions }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      // ARC-08-C23's skipped-step line, unchanged by this row.
+      expect(terminal.written()).toContain('[3/6] Authentication … basic');
+      expect(terminal.written()).not.toContain('is not one of');
     } finally { w.cleanup(); }
   });
 });
