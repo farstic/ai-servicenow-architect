@@ -86,8 +86,31 @@ export const labelExists = (label) => {
  *
  * The question is the wizard's own: only the terminal is in a position to offer another attempt.
  */
-export const authFailedRetry = (attempt) => `AUTHENTICATION_FAILED — ${authFailedReason()} Re-enter? (attempt ${attempt} of `
-    + `${MAX_ATTEMPTS}) [Y/n] `;
+/**
+ * ARC-07-W10 — the question above the retry menu.
+ *
+ * It was `Re-enter? (attempt 2 of 3) [Y/n] ` — one question with two answers where there are three
+ * things a user might want, and `[Y/n]` left what the default DID unwritten, as the cloud-sync gate's
+ * did before ARC-07-W6.
+ *
+ * THE REASON IS UNCHANGED, and deliberately: ARC-08-S10 ruled it must be the REGISTRY's sentence
+ * rather than a second, narrower one written here, and a case forbids the old narrower wording by
+ * name. W10's brief proposed *"the instance rejected the credentials (wrong, expired, or locked)"* —
+ * which is exactly that second sentence — so the brief is not followed on this point.
+ */
+export const authFailedRetry = (attempt) => `AUTHENTICATION_FAILED — ${authFailedReason()} Attempt ${attempt} of ${MAX_ATTEMPTS}.`;
+/**
+ * What a user might want after a rejected login — ARC-07-W10.
+ *
+ * Three things, and `[Y/n]` could express two of them: re-enter the password for the SAME account
+ * (the common case, and Enter picks it), change the account, or stop. `Y` used to mean the first and
+ * then ask for the username from blank anyway.
+ */
+export const AUTH_RETRY_CHOICES = Object.freeze([
+    { key: 'password', text: 're-enter the password (same account)' },
+    { key: 'account', text: 'change the account' },
+    { key: 'abort', text: 'abort (nothing is saved)' },
+]);
 /** The registry's sentence, used by the re-entry question and by the nothing-saved line. */
 export const authFailedReason = () => remedyFor('AUTHENTICATION_FAILED').meaning;
 /**
@@ -760,18 +783,21 @@ export async function runAdd(options, terminal, deps = {}) {
     else {
         // ARC-08-C23 — A SKIPPED STEP SAYS SO. the authentication step printed nothing when the question was already
         // answered, so a run jumped from the environment step to credentials and the reader was left to work out whether a step
-        // had failed, been dropped, or scrolled past. It is six numbered steps: the numbering is a
+        // had failed, been dropped, or scrolled past. The steps are numbered: the numbering is a
         // promise that all six are accounted for, and a silent gap breaks it in the direction that
         // worries people. The line names the ANSWER and where it came from, because "skipped" alone
         // would tell a reader that something did not happen without telling them what was used.
         io.write(`${stepHeader('auth', ` … ${method} (${skipReason(options)})`)}\n`);
     }
     let attempt = 1;
+    // ARC-07-W10 — the account this run has already used, and whether the next attempt keeps it. Absent
+    // on the first pass: there is nothing to reuse and nothing to default to.
+    let prior;
     let auth = null;
     let probeResult = null;
     for (;;) {
         io.write(`${stepHeader('credentials')}\n`);
-        const credentials = await readCredentials(method, options, io, attempt);
+        const credentials = await readCredentials(method, options, io, attempt, prior);
         if (!credentials) {
             io.write(`${NOTHING_SAVED}\n`);
             return { saved: false, exitCode: EXIT_FAILED, message: NOTHING_SAVED };
@@ -820,9 +846,22 @@ export async function runAdd(options, terminal, deps = {}) {
             io.write(`${AUTH_EXHAUSTED}\n`);
             return { saved: false, exitCode: EXIT_FAILED, message: AUTH_EXHAUSTED };
         }
-        const again = all.auth.status === 'role missing'
-            ? await askRoleMissing(io, all.auth)
-            : !isNo(await io.ask(authFailedRetry(attempt + 1)));
+        // ARC-07-W10 — THREE ANSWERS, because there are three things a user might want. `[Y/n]` could
+        // express two of them, and `Y` then asked for the username from blank — so the account name just
+        // typed had to be typed again, and after ARC-07-W3 made that prompt required an empty answer was
+        // a refusal rather than a shortcut. The role-missing branch keeps its own question: a role is not
+        // a wrong password, and `askRoleMissing` asks about the ACCOUNT, which is the right question there.
+        let again;
+        if (all.auth.status === 'role missing') {
+            again = await askRoleMissing(io, all.auth);
+            prior = again ? { username: auth.username, reuse: false } : undefined;
+        }
+        else {
+            const chosen = await askOption(io, authFailedRetry(attempt + 1), AUTH_RETRY_CHOICES, { defaultKey: 'password', ack: () => '' });
+            again = chosen !== null && chosen.key !== 'abort';
+            // `[1]` keeps the account without asking; `[2]` asks with it as the default.
+            prior = again ? { username: auth.username, reuse: chosen?.key === 'password' } : undefined;
+        }
         if (!again) {
             io.write(`${NOTHING_SAVED}\n`);
             return { saved: false, exitCode: EXIT_FAILED, message: NOTHING_SAVED };
@@ -1020,7 +1059,16 @@ async function askRequiredSecret(io, prompt, missing) {
     }
 }
 /** The credentials for one attempt, or null when the user gave up. */
-async function readCredentials(method, options, io, attempt) {
+async function readCredentials(method, options, io, attempt, 
+/**
+ * The account this run already used, and whether to keep it without asking — ARC-07-W10.
+ *
+ * `reuse: true` is `[1] password`: the username is not asked at all, which is the regression this
+ * row fixes. `reuse: false` is `[2] account`: it IS asked, with the current one as the default, the
+ * same `Username [a***]:` line `set-credentials` prints — the mask is the store's, so this prompt
+ * and `list` cannot disagree about which account is meant.
+ */
+prior) {
     // The caller's streams, never `process.stdin` implicitly: a test that did not own the stream
     // would hang on a pipe nobody closes, which is exactly what happened the first time.
     const fromStdin = options.passwordStdin && attempt === 1
@@ -1029,7 +1077,20 @@ async function readCredentials(method, options, io, attempt) {
     // ARC-07-W3 — INTERACTIVE ONLY. A `--username` from argv keeps today's behaviour exactly, and a
     // piped empty secret still aborts: neither has a terminal to re-ask, which is the same split W2
     // drew between the URL prompt and `--url`.
-    const username = options.username ?? await askRequired(io, USERNAME_PROMPT, USERNAME_REQUIRED);
+    let username;
+    if (options.username !== undefined) {
+        username = options.username;
+    }
+    else if (prior?.reuse === true) {
+        username = prior.username;
+    }
+    else if (prior) {
+        const typed = (await io.ask(`Username [${maskUsername(prior.username)}]: `)) ?? '';
+        username = typed.trim() === '' ? prior.username : typed.trim();
+    }
+    else {
+        username = await askRequired(io, USERNAME_PROMPT, USERNAME_REQUIRED);
+    }
     if (username === null || username.trim() === '')
         return null;
     const password = fromStdin
