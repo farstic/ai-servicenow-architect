@@ -17,6 +17,7 @@ import { readInstanceFile, SENTENCE } from '../instance-file.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { TEXT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
+import { spellings } from '../text.mjs';
 
 export const id = 'B06';
 export const title = 'instance';
@@ -43,7 +44,6 @@ export const needsNode = true;
  */
 const SPELL = spellings();
 
-import { spellings } from '../text.mjs';
 
 export const runsWhen = (ctx) => ctx.mode === 'live' || storeExists(ctx.root);
 export const skipReason = 'design-only';

@@ -80,7 +80,7 @@ test('AC 2 — from a subdirectory: the root sentence, exit 3, and no .local/', 
   // shells (`&&` is PowerShell 7+, `&` is PowerShell's call operator), so it is two steps, and
   // `pushd` is the one that changes drive in both. The POSIX branch is untouched.
   assert.ok(a.log.lines.some((l) => l === `FAIL B00: not at the repository root — run: `
-    + `${isWindows ? `pushd "${root}" then .\\bootstrap.cmd` : `cd "${root}" && ./bootstrap.sh`}`),
+    + `${isWindows ? `pushd "${root}"\n.\\bootstrap.cmd` : `cd "${root}" && ./bootstrap.sh`}`),
   a.log.lines.join('\n'));
   assert.equal(existsSync(join(root, '.local')), false, 'a preflight failure writes nothing at all');
   assert.ok(!a.log.lines.some((l) => l.startsWith('Plan —')), 'the plan must not be offered');

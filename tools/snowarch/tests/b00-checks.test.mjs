@@ -109,7 +109,26 @@ test('check 1 — the root check agrees with git, and names the platform\'s own 
   // the change is confined to the platform it names.
   const onWindows = checkRoot({ root: 'C:\\repo', cwd: 'C:\\repo\\clients', exec, plat: 'win32' });
   assert.equal(onWindows.detail,
-    'not at the repository root — run: pushd "C:\\repo" then .\\bootstrap.cmd');
+    'not at the repository root — run: pushd "C:\\repo"\n.\\bootstrap.cmd');
+
+  // EVERY LINE OF THE WIN32 REMEDY IS A COMMAND, and this is the assertion the first two attempts
+  // needed. `cd /d "<root>" && .\bootstrap.cmd` was cmd.exe syntax and a parse error in PowerShell
+  // 5.1; my replacement said `pushd "<root>" then .\bootstrap.cmd`, which put PROSE inside a command
+  // — a PowerShell user copying it gets `pushd : A positional parameter cannot be found that accepts
+  // argument 'then'`. That is the same defect class this row closes, committed while closing it.
+  //
+  // Two lines is the only form both shells run: `&&` arrived in PowerShell 7, `&` is its call
+  // operator, and `;` is not a separator in cmd. So the shape is asserted rather than the string
+  // alone — no prose, no cmd-only syntax, and each line something you can paste.
+  const winRemedy = remedyFor('root', { platform: 'win32', values: { root: 'C:\\repo' } });
+  for (const forbidden of [' then ', '&&', 'cd /d']) {
+    assert.ok(!winRemedy.includes(forbidden), `the win32 remedy contains "${forbidden}": ${winRemedy}`);
+  }
+  const lines = winRemedy.split('\n');
+  assert.equal(lines.length, 2, `two steps, one per line: ${JSON.stringify(winRemedy)}`);
+  for (const line of lines) {
+    assert.match(line, /^(?:pushd "|\.\\)/, `not a command on its own: ${JSON.stringify(line)}`);
+  }
 
   // git disagreeing about the toplevel is also a failure — a checkout inside another checkout.
   const nested = checkRoot({ root: '/repo', cwd: '/repo',

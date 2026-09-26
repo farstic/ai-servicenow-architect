@@ -220,7 +220,8 @@ Every preflight failure prints its own remedy. These are those sentences:
 <!-- generated:remedies -->
 | If | macOS / Linux | Windows |
 |---|---|---|
-| You are not at the checkout root | `cd "{root}" && ./bootstrap.sh` | `pushd "{root}" then .\bootstrap.cmd` |
+| You are not at the checkout root | `cd "{root}" && ./bootstrap.sh` | `pushd "{root}"
+.\bootstrap.cmd` |
 | git is missing or too old | `xcode-select --install (or: brew install git)` | `winget install Git.Git` |
 | Claude Code is missing or too old | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` | `install Claude Code from https://code.claude.com/docs/en/setup, then re-run` |
 | Not enough disk space | `free up {needed} on {mount}` | `free up {needed} on {mount}` |
