@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   COLUMNS, ENTRY_DEFAULTS, FLAG_MEANINGS, PROBE_FIELD, annotate, applyingLine, dependencyViolation,
-  labelOf, parseFlagsArg, probeNote, probeRecommendsOff, prodRefusal, proposePreset,
+  flagQuestion, labelOf, parseFlagsArg, probeNote, probeRecommendsOff, prodRefusal, proposePreset,
   recordedSuffix, renderReviewScreen, resolveFlags,
   runReviewScreen, wrapRow,
 } from '../../src/cli/preset-ui.js';
@@ -697,6 +697,34 @@ describe('ARC-07-C14 — a number opens that flag, and Enter applies', () => {
       'FLUENT:  [1] on (current)  [2] off — recommended: @servicenow/sdk not on PATH');
     // ...AND THE ACK, naming what changed, what Enter does now, and the number that reopens it.
     expect(tty.written).toContain('FLUENT → off · Enter applies · 6 changes it again · q quits');
+  });
+
+  /**
+   * THE REASON, ON ITS OWN WITNESS.
+   *
+   * Case (a) asserts the reason and the ack in one transcript, so dropping either turned (a) red and
+   * neither could be told from the other. This case answers only "does the question say why", across
+   * every status that recommends off — and it reads the answer off the ROW rather than spelling it,
+   * so the question and the row cannot describe one probe in two ways. `annotationParts` is private;
+   * comparing the two rendered surfaces is the same guarantee without widening the export.
+   */
+  it('the question names the probe\'s reason, in the row\'s own words', () => {
+    const cases = [
+      ['fluent', 'FLUENT_ENABLED', 'not installed'],
+      ['nowAssist', 'NOW_ASSIST_ENABLED', 'not licensed'],
+      ['scripting', 'SCRIPTING_ENABLED', 'role missing'],
+    ] as const;
+    for (const [field, flag, status] of cases) {
+      const probed = probes({ [field]: status } as Partial<LastProbe>);
+      const question = flagQuestion(flag, expandPreset('full'), status);
+      const reason = /— recommended: (.+)$/.exec(question)?.[1];
+      expect(reason, `${flag}: the question carries no reason`).toBeTruthy();
+      // The same words the row prints for the same probe — one definition, two surfaces.
+      const screen = renderReviewScreen({ ...input(), probes: probed });
+      expect(screen, `${flag}: row and question disagree`).toContain(reason as string);
+    }
+    // ...and a probe that is fine attaches no reason at all: there is nothing to recommend.
+    expect(flagQuestion('WRITE_ENABLED', expandPreset('full'), 'ok')).not.toContain('recommended:');
   });
 
   it('(b) a number then Enter leaves the flag alone and applies nothing yet', async () => {
