@@ -14,6 +14,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+
+/**
+ * The launcher the panel is told to print — ARC-07-W17.
+ *
+ * `renderPanel` takes it as an argument now, because its import graph is walked for purity and may not
+ * reach `process.env`. DERIVED from the definition rather than typed: a POSIX literal here would fail
+ * the four Windows cells while every mac and Linux cell passed, which is the shape that took #308 red.
+ */
+const CLI = spellings().cli;
 
 import {
   docsLine, doctorLine, engineLine, instancesLine, notProbedLine, ranAtLine, renderPanel, SHA_PREFIX,
@@ -36,7 +46,7 @@ test('the live fixture renders to exactly these bytes', () => {
   // appearing in a test at all — the release script writes the new version before the post-write
   // gates run, so a literal here fails the release commit itself. Everything the renderer DECIDES
   // is still spelled out in full, which is what this assertion is for.
-  assert.equal(renderPanel(LIVE), [
+  assert.equal(renderPanel(LIVE, CLI), [
     LIVE.modeLineDetailed,
     `Engine: snowarch ${LIVE.engine.version} · contract ${LIVE.engine.contractSha.slice(0, 12)}`,
     `Docs: vendor/ServiceNowDocs @ ${LIVE.engine.docs.pin.slice(0, 12)} (australia) · sparse`,
@@ -56,7 +66,7 @@ test('the Mode line is first, and is the report\'s own', () => {
   // `doctor/mode.mjs` has the only definition. A renderer that re-derived it would be a second
   // answer to "is this checkout live", and the two would disagree the day one of them changed.
   for (const report of [LIVE, DESIGN]) {
-    assert.equal(renderPanel(report).split('\n')[0], report.modeLineDetailed);
+    assert.equal(renderPanel(report, CLI).split('\n')[0], report.modeLineDetailed);
   }
   assert.match(LIVE.modeLineDetailed, /^Mode: /);
 });
@@ -65,7 +75,7 @@ test('a line whose key is null is omitted, never guessed', () => {
   // The rule SKILL.md stated and a model applied by hand, once per line, every session.
   const bare = { ...DESIGN, engine: { version: null, tag: null, contractSha: null,
     node: null, capabilities: null, docs: null, roster: null }, server: null };
-  const lines = renderPanel(bare).split('\n');
+  const lines = renderPanel(bare, CLI).split('\n');
   for (const prefix of ['Engine:', 'Docs:', 'Roster:', 'Capabilities:', 'Instances:']) {
     assert.equal(lines.filter((l) => l.startsWith(prefix)).length, 0, `${prefix} was guessed`);
   }
@@ -85,13 +95,13 @@ test('the same report renders identically under a different ambient environment'
   // the only reason "verbatim" is worth anything, so it is asserted rather than hoped for.
   const before = { TZ: process.env.TZ, LANG: process.env.LANG, LC_ALL: process.env.LC_ALL };
   const cwd = process.cwd();
-  const first = renderPanel(LIVE);
+  const first = renderPanel(LIVE, CLI);
   try {
     process.env.TZ = 'Pacific/Kiritimati';        // UTC+14, and on the other side of the date line
     process.env.LANG = 'de_DE.UTF-8';
     process.env.LC_ALL = 'de_DE.UTF-8';
     process.chdir(REAL_ROOT === cwd ? join(REAL_ROOT, 'tools') : REAL_ROOT);
-    assert.equal(renderPanel(LIVE), first);
+    assert.equal(renderPanel(LIVE, CLI), first);
   } finally {
     process.chdir(cwd);
     for (const [k, v] of Object.entries(before)) {
@@ -158,7 +168,7 @@ test('FAILs are listed with their remedy; warnings are not', () => {
       { id: 'E-25', status: 'warn', title: 'cloud-synced checkout', detail: 'iCloud' },
       { id: 'E-01', status: 'ok', title: 'fine' },
     ] };
-  const lines = renderPanel(report).split('\n');
+  const lines = renderPanel(report, CLI).split('\n');
   assert.ok(lines.includes('E-10 FAIL settings.local toggles match the recorded mode: '
     + 'mode is live but servicenow is disabled — ./snowarch mode live'));
   for (const warned of ['E-23', 'E-25']) {
@@ -166,7 +176,7 @@ test('FAILs are listed with their remedy; warnings are not', () => {
   }
   assert.ok(lines.includes('Run ./snowarch doctor --fix for the fixable ones (1).'));
   // A clean run says neither.
-  assert.equal(renderPanel(LIVE).includes('--fix'), false);
+  assert.equal(renderPanel(LIVE, CLI).includes('--fix'), false);
 });
 
 test('ARC-08-C37 — the count names which check it is talking about', () => {
@@ -184,22 +194,22 @@ test('ARC-08-C37 — the count names which check it is talking about', () => {
       { id: 'E-25', status: 'warn', title: 'cloud-synced checkout', detail: 'iCloud' },
       { id: 'E-01', status: 'ok', title: 'fine' },
     ] };
-  assert.match(doctorLine(report), /^Doctor: 20 ok, 2 warn \(E-23, E-25\), 1 fail \(E-10\) — /);
+  assert.match(doctorLine(report, CLI), /^Doctor: 20 ok, 2 warn \(E-23, E-25\), 1 fail \(E-10\) — /);
 
   // A zero count gets no brackets at all: there is nothing to name, and `0 fail ()` is noise.
-  assert.match(doctorLine(LIVE), /^Doctor: \d+ ok, 0 warn, 0 fail — /);
+  assert.match(doctorLine(LIVE, CLI), /^Doctor: \d+ ok, 0 warn, 0 fail — /);
 
   // THE IDS ARE READ FROM THE REPORT, never from a remembered list. Drop a check and the line
   // drops it, while the COUNT — which the runner owns — is untouched. That divergence is the
   // honest one: `notProbedLine` learned this when a fixed sentence went on describing the quick
   // subset it was written for after a check moved out of it.
   const narrowed = { ...report, checks: report.checks.filter((c) => c.id !== 'E-25') };
-  assert.match(doctorLine(narrowed), /2 warn \(E-23\), 1 fail \(E-10\)/);
+  assert.match(doctorLine(narrowed, CLI), /2 warn \(E-23\), 1 fail \(E-10\)/);
 
   // ABSENCE IS SILENCE. B09 falls back to counting `state.steps` when the doctor could not be
   // spawned at all, and that path has no `checks` to read — so `2 warn` with nothing in brackets is
   // a true line there, where `2 warn (unknown)` would be a made-up one.
-  assert.match(doctorLine({ ...report, checks: undefined }), /^Doctor: 20 ok, 2 warn, 1 fail — /);
+  assert.match(doctorLine({ ...report, checks: undefined }, CLI), /^Doctor: 20 ok, 2 warn, 1 fail — /);
 });
 
 test('the contract sha is the prefix the rest of the product prints', () => {
@@ -224,13 +234,13 @@ test('a missing segment drops the segment, not the line', () => {
   // whole line would hide the release family, which is the fact a grounding decision turns on.
   const PIN = '11b39be17307dd4b21df15a54e8011ae68f64dba';
   assert.equal(docsLine({ present: true, mode: 'sparse', pin: PIN, family: 'australia',
-    citations: null, dead: null }),
+    citations: null, dead: null }, CLI),
   'Docs: vendor/ServiceNowDocs @ 11b39be17307 (australia) · sparse');
   assert.equal(docsLine({ present: true, mode: 'sparse', pin: PIN, family: 'australia',
-    citations: 181, dead: 0 }),
+    citations: 181, dead: 0 }, CLI),
   'Docs: vendor/ServiceNowDocs @ 11b39be17307 (australia) · sparse · citations checked: 181 | dead: 0');
-  assert.equal(docsLine({ present: false }), 'Docs: not installed');
-  assert.equal(docsLine(null), null);
+  assert.equal(docsLine({ present: false }, CLI), 'Docs: not installed');
+  assert.equal(docsLine(null, CLI), null);
 });
 
 test('what a quick run did not probe is read off the report, not remembered', () => {
@@ -241,19 +251,19 @@ test('what a quick run did not probe is read off the report, not remembered', ()
   // — which is not what governs it — so a design-only quick run, where only `capabilities` is null,
   // printed "Capability packs is not probed". Both subjects are plural nouns, so all three
   // assertions below pin `are`, and the one-key cases are the ones that were wrong.
-  assert.equal(notProbedLine(LIVE),
+  assert.equal(notProbedLine(LIVE, CLI),
     'Capability packs, citation counts and the corpus branch are not probed on a quick run'
     + ' — ./snowarch doctor reports them.');
 
   const withPacks = { ...LIVE, engine: { ...LIVE.engine, capabilities: { docx: { present: true } } } };
-  assert.equal(notProbedLine(withPacks),
+  assert.equal(notProbedLine(withPacks, CLI),
     'citation counts and the corpus branch are not probed on a quick run'
     + ' — ./snowarch doctor reports them.');
 
   // The case the owner hit on a design-only clone: capabilities null, citations present.
   const withCitations = { ...LIVE,
     engine: { ...LIVE.engine, docs: { ...LIVE.engine.docs, citations: 181, dead: 0 } } };
-  assert.equal(notProbedLine(withCitations),
+  assert.equal(notProbedLine(withCitations, CLI),
     'Capability packs and the corpus branch are not probed on a quick run'
     + ' — ./snowarch doctor reports them.');
 
@@ -261,12 +271,12 @@ test('what a quick run did not probe is read off the report, not remembered', ()
   // missing from a corpus that is not there, they are not a fact about this checkout.
   const noDocs = { ...withPacks, engine: { ...withPacks.engine, docs: null } };
   assert.equal(noDocs.engine.capabilities !== null, true);
-  assert.equal(notProbedLine(noDocs), null);
+  assert.equal(notProbedLine(noDocs, CLI), null);
   // Everything measured: capabilities resolved, citations counted, and the branch compared — the
   // last of which only a full run does.
   const full = { ...LIVE, engine: { ...LIVE.engine, capabilities: { docx: { present: true } },
     docs: { ...LIVE.engine.docs, citations: 181, familyMatches: true } } };
-  assert.equal(notProbedLine(full), null);
+  assert.equal(notProbedLine(full, CLI), null);
 });
 
 test('the instances line prints what the report carries and no more', () => {
@@ -306,7 +316,7 @@ test('the instances line comes from the store when no server answered', () => {
       { label: 'pdi', environment: 'pdi', preset: 'custom' },
       { label: 'uat', environment: 'test', preset: 'read-only' },
     ] } };
-  const lines = renderPanel(quick).split('\n');
+  const lines = renderPanel(quick, CLI).split('\n');
   assert.ok(lines.includes('Instances: pdi (pdi, custom) · uat (test, read-only)'));
   // …and WHERE they came from, because the line looks identical either way and the difference is
   // the whole of what a store read does not know.
@@ -316,7 +326,7 @@ test('the instances line comes from the store when no server answered', () => {
 test('a server-answered list says nothing about the store', () => {
   const answered = { ...DESIGN,
     instances: { source: 'server', entries: [{ label: 'pdi', environment: 'pdi', preset: 'custom' }] } };
-  const text = renderPanel(answered);
+  const text = renderPanel(answered, CLI);
   assert.ok(text.includes('Instances: pdi (pdi, custom)'));
   assert.equal(text.includes("the store's own records"), false);
 });
@@ -328,20 +338,20 @@ test('the docs line survives a quick run, and names the drift when there is drif
   const agreeing = { ...DESIGN, engine: { ...DESIGN.engine, docs: { present: true, mode: 'sparse',
     pin: 'a'.repeat(40), family: 'australia', head: 'a'.repeat(40), headMatchesPin: true,
     citations: null, dead: null, familyMatches: null } } };
-  assert.equal(docsLine(agreeing.engine.docs),
+  assert.equal(docsLine(agreeing.engine.docs, CLI),
     `Docs: vendor/ServiceNowDocs @ ${'a'.repeat(12)} (australia) · sparse`);
 
   // A line that announced agreement on every healthy run is a line readers learn to skip, so
   // `true` says nothing and `false` says it loudly.
   const drifted = { ...agreeing.engine.docs, head: 'b'.repeat(40), headMatchesPin: false };
-  assert.equal(docsLine(drifted),
+  assert.equal(docsLine(drifted, CLI),
     `Docs: vendor/ServiceNowDocs @ ${'a'.repeat(12)} (australia) · sparse`
     + ` · corpus is on ${'b'.repeat(12)}, NOT the pin — ./snowarch docs sync`);
 
   // Not compared is not "agrees": a quick run that could not reach the submodule says nothing
   // rather than implying the corpus is fine.
   const uncompared = { ...agreeing.engine.docs, head: null, headMatchesPin: null };
-  assert.equal(docsLine(uncompared).includes('NOT the pin'), false);
+  assert.equal(docsLine(uncompared, CLI).includes('NOT the pin'), false);
 });
 
 test('the not-probed sentence names the branch too, and reads as a list of three', () => {
@@ -352,7 +362,7 @@ test('the not-probed sentence names the branch too, and reads as a list of three
     docs: { present: true, mode: 'sparse', pin: 'a'.repeat(40), family: 'australia',
       head: 'a'.repeat(40), headMatchesPin: true, citations: null, dead: null,
       familyMatches: null } } };
-  assert.equal(notProbedLine(quick),
+  assert.equal(notProbedLine(quick, CLI),
     'Capability packs, citation counts and the corpus branch are not probed on a quick run'
     + ' — ./snowarch doctor reports them.');
 
@@ -360,5 +370,5 @@ test('the not-probed sentence names the branch too, and reads as a list of three
   const full = { ...quick, engine: { ...quick.engine,
     docs: { ...quick.engine.docs, familyMatches: true, citations: 181, dead: 0 },
     capabilities: { docx: { present: true } } } };
-  assert.equal(notProbedLine(full), null);
+  assert.equal(notProbedLine(full, CLI), null);
 });

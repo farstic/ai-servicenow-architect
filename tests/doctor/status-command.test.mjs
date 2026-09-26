@@ -11,6 +11,17 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+
+/**
+ * The launcher these renderers are told to print — ARC-07-W17.
+ *
+ * `summaryLine` and `renderText` take it with NO DEFAULT: they are pure of the environment (the purity
+ * walker in `panel.test.mjs` uses `report-text.mjs` as its positive control and allows it exactly one
+ * `process.env`, through `useColour`), and a POSIX default would be the literal that row removes.
+ * DERIVED here rather than typed, so the four Windows cells compare against their own spelling.
+ */
+const CLI = spellings().cli;
 
 import { createRegistry, defineCheck } from '../../tools/snowarch/lib/doctor/registry.mjs';
 import { fallbackPanel, statusCommand } from '../../tools/snowarch/lib/commands/status.mjs';
@@ -471,7 +482,7 @@ describe('ARC-08-C24 — the capability packs appear under one key', () => {
       checks: [], results: [],
     });
 
-    const text = renderText({ report, checks: [] });
+    const text = renderText({ report, checks: [], cli: CLI });
     assert.match(text, /Capabilities: docx yes \(python3\)/);
     // And it is not reading the old key: a report with packs ONLY under `prereqs` prints no line.
     const stale = buildReport({
@@ -479,7 +490,7 @@ describe('ARC-08-C24 — the capability packs appear under one key', () => {
       prereqs: { os: 'darwin', shell: 'bash', capabilities: packs },
       checks: [], results: [],
     });
-    assert.equal(/Capabilities:/.test(renderText({ report: stale, checks: [] })), false,
+    assert.equal(/Capabilities:/.test(renderText({ report: stale, checks: [], cli: CLI })), false,
       'the renderer is still reading prereqs.capabilities');
   });
 });

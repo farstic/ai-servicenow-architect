@@ -9,6 +9,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+
+/**
+ * The launcher these renderers are told to print — ARC-07-W17.
+ *
+ * `summaryLine` and `renderText` take it with NO DEFAULT: they are pure of the environment (the purity
+ * walker in `panel.test.mjs` uses `report-text.mjs` as its positive control and allows it exactly one
+ * `process.env`, through `useColour`), and a POSIX default would be the literal that row removes.
+ * DERIVED here rather than typed, so the four Windows cells compare against their own spelling.
+ */
+const CLI = spellings().cli;
 
 import { toggleProblems } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { projectEntryEnabled } from '../../tools/snowarch/lib/settings-local.mjs';
@@ -198,12 +209,17 @@ test('the Capabilities line names a provider per pack', () => {
 
 test('one summary renderer: the bootstrap\'s line and the doctor\'s are the same function', () => {
   const counts = { ok: 41, warn: 0, fail: 0 };
-  assert.equal(doctorLine(counts), summaryLine({ ...counts, skip: 0, fixable: 0 }));
+  // ARC-07-W17 — `null` for `checks`, then the options: `cli` is the THIRD argument, and passing it
+  // second makes it the checks list, which leaves `cli` undefined and prints `undefined doctor --fix`.
+  // My sweep of these call sites made exactly that mistake and the required parameter shouted.
+  assert.equal(doctorLine(counts),
+    summaryLine({ ...counts, skip: 0, fixable: 0 }, null, { cli: CLI }));
   assert.equal(renderSummaryLine, summaryLine);
   assert.equal(doctorLine({ ...counts, nodeUsable: false }),
     'DOCTOR: unavailable until Node 20+ is installed (design-only is complete)');
-  assert.match(summaryLine({ ok: 1, warn: 0, fail: 1, skip: 2, fixable: 1 }),
-    /^DOCTOR: 1 ok, 0 warn, 1 fail, 2 skipped \(1 fixable — run \.\/snowarch doctor --fix\)$/);
+  // ...and the expectation DERIVES the launcher: a POSIX literal here fails the four Windows cells.
+  assert.equal(summaryLine({ ok: 1, warn: 0, fail: 1, skip: 2, fixable: 1 }, null, { cli: CLI }),
+    `DOCTOR: 1 ok, 0 warn, 1 fail, 2 skipped (1 fixable — run ${CLI} doctor --fix)`);
 });
 
 test('the engine block is assembled from what the checks already found', () => {

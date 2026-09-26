@@ -9,6 +9,7 @@
 // answered a check that said "the server has no proxy" would be asserting something nobody has
 // measured. Saying which environment was inspected costs one clause and is true today.
 import { execFileSync } from 'node:child_process';
+import { bootstrapOf, cliOf } from '../spell.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 
 import { cloudSyncProvider } from '../../cloud-sync.mjs';
@@ -225,7 +226,7 @@ export function hostChecks() {
           if (entry.scope === 'user' || entry.scope === 'local') {
             return fail(`design-only is not in force: a ${entry.scope}-scope entry keeps the server `
               + `loaded${entry.scope === 'user' ? ' in every project on this machine' : ''}`, {
-              remedy: './snowarch mode design   (removes an entry snowarch created), or: '
+              remedy: `${cliOf(ctx)} mode design   (removes an entry snowarch created), or: `
                 + `claude mcp remove ${serverKey} -s ${entry.scope}`,
               data,
             });
@@ -236,17 +237,17 @@ export function hostChecks() {
           // rewrites the toggles and leaves the `claude mcp` entry exactly where it was — the very
           // entry that keeps the server visible. The scope decides the sentence, and it is said once.
           const remedy = entry.scope === 'local'
-            ? './snowarch mode design --register project   (or: claude mcp remove '
+            ? `${cliOf(ctx)} mode design --register project   (or: claude mcp remove `
               + `${serverKey} -s local)`
-            : './snowarch mode design';
+            : `${cliOf(ctx)} mode design`;
           return warn('server is not disabled in Claude Code although the recorded mode is '
             + 'design-only', { remedy, data });
         }
         if (live && approved !== true) {
           return warn(`server is ${kind === 'rejected' ? 'rejected' : 'unapproved'} in Claude Code `
             + 'although the recorded mode is live', {
-            remedy: './snowarch mode live, then answer Yes once in claude (S-01)',
-            command: './snowarch mode live',
+            remedy: `${cliOf(ctx)} mode live, then answer Yes once in claude (S-01)`,
+            command: `${cliOf(ctx)} mode live`,
             data,
           });
         }
@@ -367,8 +368,8 @@ export function hostChecks() {
               + `${cached.checkedAt}`, { data: { ...cached, refreshed: false } });
           }
           return cached.behind
-            ? warn(`${cached.latestTag} available — run ./snowarch upgrade`,
-              { command: './snowarch upgrade', data: { ...cached, refreshed: false } })
+            ? warn(`${cached.latestTag} available — run ${cliOf(ctx)} upgrade`,
+              { command: `${cliOf(ctx)} upgrade`, data: { ...cached, refreshed: false } })
             : ok(`up to date (${cached.localTag ?? cached.latestTag}) · last checked `
               + `${cached.checkedAt}`, { ...cached, refreshed: false });
         }
@@ -450,8 +451,8 @@ export function hostChecks() {
           { latestTag: latest, localTag, behind, remote, now });
 
         return behind
-          ? warn(`${latest} available — run ./snowarch upgrade`,
-            { command: './snowarch upgrade', data: { ...written, refreshed: true } })
+          ? warn(`${latest} available — run ${cliOf(ctx)} upgrade`,
+            { command: `${cliOf(ctx)} upgrade`, data: { ...written, refreshed: true } })
           : ok(`up to date (${localTag})`, { ...written, refreshed: true });
       },
     }),

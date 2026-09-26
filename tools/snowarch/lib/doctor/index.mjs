@@ -12,6 +12,8 @@
 // included; exit 2 is a usage error, which is a fact about the command line rather than the
 // checkout.
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { bootstrapOf, cliOf } from './spell.mjs';
+import { spellings } from '../text.mjs';
 import { loadState } from '../state.mjs';
 import { dirname, join, resolve } from 'node:path';
 
@@ -37,8 +39,19 @@ import { exitCodeFor, runChecks, selectSections } from './runner.mjs';
 import { maskForJson } from './json-boundary.mjs';
 import { readStoreSummaries } from '../../../../packages/snowarch/dist/store/label.js';
 
-export const USAGE = [
-  'usage: ./snowarch doctor [--json] [--quick] [--no-network] [--fix] [--section <a,b>] [--no-cache]',
+/**
+ * ARC-07-W17 — A FUNCTION, and the reason is a cycle rather than a preference.
+ *
+ * This was `export const USAGE = [...].join('\n')` with the launcher spelled `./snowarch`. Deriving it
+ * needs `spellings()`, and calling that at MODULE LOAD from here throws: `panel.mjs` imports
+ * `text.mjs`, `text.mjs` imports `doctor/report-text.mjs`, `report-text.mjs` imports `panel.mjs`, and
+ * this module sits in that graph — so `isWindowsShell` is not initialised yet and the whole doctor
+ * fails to import. Forty cases went red on exactly that before this was lazy.
+ *
+ * `cli.mjs` resolves a `usage` that is a function, so every command may spell its launcher lazily.
+ */
+export const USAGE = () => [
+  `usage: ${spellings().cli} doctor [--json] [--quick] [--no-network] [--fix] [--section <a,b>] [--no-cache]`,
   '',
   `  --section <a,b>   only these sections: ${SECTIONS.join(', ')} (server = every SV- check)`,
   '  --quick           the fast subset; implies --no-network and skips anything that spawns',
@@ -549,7 +562,13 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     // user's own words; a machine consumer uses the report object, not this string.
     write(JSON.stringify(maskForJson(cacheError ? { ...report, cacheError } : report, { home }), null, 2));
   } else {
-    write(renderText({ report, checks, results, colour: useColour({ stream: out, env }) }));
+    // ARC-07-W17 — the renderer is pure and takes the spelling; this command may read the shell.
+    // `doctorCommand` has no `ctx` — it BUILDS one for the checks — so the platform and the command's
+    // own `env` are passed directly. `env` rather than `process.env`: the command already takes it as
+    // an argument so a caller can drive a shell, and threading it is what makes Git Bash on Windows
+    // keep the POSIX spelling.
+    write(renderText({ report, checks, results, colour: useColour({ stream: out, env }),
+      cli: cliOf({ platform: process.platform, env }) }));
   }
   if (log?.commit) log.commit();
   return report.summary.fail > 0 ? exitCodeFor(report.summary) : EXIT_OK;

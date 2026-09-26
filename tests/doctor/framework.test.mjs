@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
 import { createRegistry, defineCheck, SECTIONS } from '../../tools/snowarch/lib/doctor/registry.mjs';
 import { applyContractRemedy, planRun, runChecks, summarise } from '../../tools/snowarch/lib/doctor/runner.mjs';
@@ -27,6 +28,19 @@ import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
  */
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CLI = join(root, 'tools/snowarch/bin/snowarch.mjs');
+
+/**
+ * The launcher the renderers PRINT — ARC-07-W17, and it is not `CLI` above.
+ *
+ * `CLI` is the absolute path this file SPAWNS; the renderers take the spelling a reader would type.
+ * My sweep reused the name and the summary line came out as
+ * `run /Users/…/tools/snowarch/bin/snowarch.mjs doctor --fix`, which is true of nothing a user types.
+ * DERIVED from the definition, so the four Windows cells compare against their own spelling.
+ */
+const LAUNCHER = spellings().cli;
+
+/** ...and the same spelling, escaped for a RegExp: `RegExp.escape` is not on Node 20. */
+const ESCAPED = LAUNCHER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const ESC = String.fromCharCode(27);
 
 const check = (over = {}) => defineCheck({
@@ -209,10 +223,10 @@ test('the renderer: FAIL shouts, the Mode line is last, colour only on a TTY', (
     ranAt: '2026-09-10T10:00:12Z',
     modeLine: 'Mode: design-only',
   });
-  const text = renderText({ report, checks, colour: false });
+  const text = renderText({ report, checks, colour: false, cli: LAUNCHER });
   const lines = text.split('\n');
   assert.match(text, /E-00 FAIL {2}a check: broken/);
-  assert.match(text, /→ run the thing {3}\[fixable: \.\/snowarch doctor --fix\]/);
+  assert.match(text, new RegExp(`→ run the thing {3}\\[fixable: ${ESCAPED} doctor --fix\\]`));
   assert.equal(lines.at(-1), 'Mode: design-only', 'the Mode line must be the last line');
   // ARC-08-C37 moved this line: the tally now names the failing check. Kept as a full-string
   // assertion rather than loosened to a regex, because this is the one case that reads the whole
@@ -228,11 +242,11 @@ test('the renderer: FAIL shouts, the Mode line is last, colour only on a TTY', (
   assert.equal(useColour({ stream: { isTTY: true }, env: {} }), true);
   assert.equal(useColour({ stream: { isTTY: true }, env: { NO_COLOR: '1' } }), false);
   assert.ok(!text.includes(ESC), 'a piped report must carry no escape codes');
-  assert.ok(renderText({ report, checks, colour: true }).includes(ESC));
+  assert.ok(renderText({ report, checks, colour: true, cli: LAUNCHER }).includes(ESC));
 
   assert.match(headerLine({ version: '9.9.9', ranAt: '2026-09-10T10:00:12Z', options: { quick: true } }),
     /quick: yes · network: yes · section: all/);
-  assert.equal(summaryLine({ ok: 1, warn: 0, fail: 0, skip: 2, fixable: 0 }),
+  assert.equal(summaryLine({ ok: 1, warn: 0, fail: 0, skip: 2, fixable: 0 }, null, { cli: LAUNCHER }),
     'DOCTOR: 1 ok, 0 warn, 0 fail, 2 skipped');
 });
 
@@ -281,11 +295,11 @@ test('ARC-08 — with --section, out-of-section checks are counted but not liste
   assert.equal(summary.skip, 3, 'all three skips are still counted');
   assert.equal(summary.notInSection, 2, '...and the out-of-section ones are counted separately');
 
-  const line = summaryLine(summary);
+  const line = summaryLine(summary, null, { cli: LAUNCHER });
   assert.match(line, /1 skipped/, 'a genuine skip — the machine could not answer — is still a skip');
   assert.match(line, /2 not in section/, '...and "you did not ask" is named as what it is');
 
-  const text = renderText({ report: { checks: results, summary, version: '0', ranAt: '2026-01-01' }, checks: [] });
+  const text = renderText({ report: { checks: results, summary, version: '0', ranAt: '2026-01-01' }, checks: [], cli: LAUNCHER });
   assert.match(text, /E-25/, 'the section asked for is listed');
   assert.match(text, /E-28/, '...including its genuine skip, which IS about this checkout');
   assert.doesNotMatch(text, /E-01/, 'an out-of-section check must not be listed as a finding');
@@ -294,8 +308,8 @@ test('ARC-08 — with --section, out-of-section checks are counted but not liste
   // Both directions: with no --section, nothing is filtered and the old wording is unchanged.
   const plain = summariseMerged(results.slice(0, 3), []);
   assert.equal(plain.notInSection, 0);
-  assert.match(summaryLine(plain), /1 skipped/);
-  assert.doesNotMatch(summaryLine(plain), /not in section/);
+  assert.match(summaryLine(plain, null, { cli: LAUNCHER }), /1 skipped/);
+  assert.doesNotMatch(summaryLine(plain, null, { cli: LAUNCHER }), /not in section/);
 });
 
 /**
@@ -311,24 +325,24 @@ test('ARC-08-C37 — the doctor\'s summary names its non-ok checks', () => {
     { id: 'E-23', status: 'warn' }, { id: 'E-30', status: 'warn' },
     { id: 'E-29', status: 'fail' }, { id: 'E-01', status: 'ok' },
   ];
-  assert.equal(summaryLine({ ok: 14, warn: 2, fail: 1, skip: 26, fixable: 0 }, checks),
+  assert.equal(summaryLine({ ok: 14, warn: 2, fail: 1, skip: 26, fixable: 0 }, checks, { cli: LAUNCHER }),
     'DOCTOR: 14 ok, 2 warn (E-23, E-30), 1 fail (E-29), 26 skipped');
 
   // `skipped` and `(n fixable — …)` are NOT touched by this row: both are their own wording
   // questions and neither has been ordered. The two brackets sit side by side, which is truthful
   // and slightly awkward; changing it would be changing the fixable wording.
   assert.equal(
-    summaryLine({ ok: 1, warn: 0, fail: 1, skip: 0, fixable: 1 }, [{ id: 'E-29', status: 'fail' }]),
+    summaryLine({ ok: 1, warn: 0, fail: 1, skip: 0, fixable: 1 }, [{ id: 'E-29', status: 'fail' }], { cli: LAUNCHER }),
     'DOCTOR: 1 ok, 0 warn, 1 fail (E-29) (1 fixable — run ./snowarch doctor --fix)');
 
   // CALLED WITH NO CHECKS — the shape every existing caller passes — the line is byte-identical to
   // what it printed before this row. That is what keeps B09's fallback tally honest: it counts
   // `state.steps` when the doctor could not be spawned and has no checks to name.
-  assert.equal(summaryLine({ ok: 1, warn: 1, fail: 0, skip: 2, fixable: 0 }),
+  assert.equal(summaryLine({ ok: 1, warn: 1, fail: 0, skip: 2, fixable: 0 }, null, { cli: LAUNCHER }),
     'DOCTOR: 1 ok, 1 warn, 0 fail, 2 skipped');
 
   // AND THE SITE, not just the helper. The unit assertions above passed while `renderText` was
-  // still calling `summaryLine(report.summary)` with no second argument — the whole change was
+  // still calling `summaryLine(report.summary, null, { cli: LAUNCHER })` with no second argument — the whole change was
   // inert in the report a person actually reads, and only this assertion could see it.
   const results = [
     { id: 'E-23', status: 'warn', detail: 'stale registrations', section: 'host' },
@@ -336,7 +350,27 @@ test('ARC-08-C37 — the doctor\'s summary names its non-ok checks', () => {
   ];
   const report = { checks: results, summary: summariseMerged(results, []), version: '0',
     ranAt: '2026-01-01' };
-  const rendered = renderText({ report, checks: [] }).split('\n');
+  const rendered = renderText({ report, checks: [], cli: LAUNCHER }).split('\n');
   const tally = rendered.find((l) => l.startsWith('DOCTOR: '));
   assert.match(tally, /1 warn \(E-23\), 1 fail \(E-29\)/, 'the rendered report does not name them');
+});
+
+test('ARC-07-W17 — a renderer with no launcher THROWS rather than printing `undefined`', () => {
+  // THE ARCHITECT'S CONDITION, and the reason it is a condition: `cli` has no default, so a caller
+  // that forgets it used to render `run undefined doctor --fix` — a line that reads plausibly, passes
+  // review, and is wrong on every platform. My own sweep made that mistake three times in one sitting
+  // (twice by putting the options in the `checks` slot, once by reusing a `CLI` constant that meant
+  // the absolute spawn path), and each time a rendered string was the only evidence.
+  const summary = { ok: 1, warn: 0, fail: 0, skip: 0, fixable: 1 };
+  assert.throws(() => summaryLine(summary), { name: 'TypeError', message: /`cli` spelling/ });
+  assert.throws(() => summaryLine(summary, null, {}), { name: 'TypeError', message: /third argument/ });
+  // ...and the commonest slip of all: the options passed where `checks` belongs.
+  assert.throws(() => summaryLine(summary, { cli: LAUNCHER }), { name: 'TypeError' });
+
+  const report = { checks: [], summary, version: '0', ranAt: '2026-01-01T00:00:00Z' };
+  assert.throws(() => renderText({ report, checks: [] }), { name: 'TypeError', message: /`cli`/ });
+
+  // The positive direction, so the guard is not merely refusing everything.
+  assert.match(summaryLine(summary, null, { cli: LAUNCHER }), /1 fixable/);
+  assert.equal(typeof renderText({ report, checks: [], cli: LAUNCHER }), 'string');
 });

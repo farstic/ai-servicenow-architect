@@ -87,9 +87,25 @@ export const NOT_IN_QUICK = 'not in the --quick subset';
  * check ids in that world — so the default is silence rather than a bracket it would have to fill
  * with a guess. `idsFor` is the panel's helper, not a second copy of the rule.
  */
-export function summaryLine(summary, checks = null, { quick = false, cli = './snowarch' } = {}) {
+export function summaryLine(summary, checks = null, { quick = false, cli } = {}) {
+  // ARC-07-W17 — LOUD, NOT `undefined`. A required parameter that renders `undefined doctor --fix` is
+  // the same silent wrong-spelling this row removes: the line still reads plausibly, so a reviewer and
+  // a green test both miss it. `cli` is named in the message because the caller's next question is
+  // which argument, and it is the THIRD — passing it second makes it the checks list.
+  if (typeof cli !== 'string' || cli === '') {
+    throw new TypeError('summaryLine needs a `cli` spelling (the third argument\'s `cli` key) — '
+      + 'this module is pure of the environment and cannot read one');
+  }
   const parts = [`${summary.ok} ok`, `${summary.warn} warn${idsFor(checks, 'warn')}`,
     `${summary.fail} fail${idsFor(checks, 'fail')}`];
+  // ARC-07-W17 — `cli` HAS NO DEFAULT, and that is the row's rule rather than an oversight. A POSIX
+  // default would be the literal this sweep removes, and it would render the wrong spelling on Windows
+  // for any caller that forgot to pass one — silently, because the line still reads plausibly. Absent,
+  // a forgetful caller prints `undefined doctor`, which no reviewer or test misses. This module cannot
+  // read `spellings()` itself: `text.mjs` imports it, so the reverse edge is a cycle, and the purity
+  // walker in `tests/doctor/panel.test.mjs` uses this file as its POSITIVE CONTROL — it must reach
+  // `process.env` exactly once, through `useColour`, and no further.
+  //
   // ARC-07-W15 — THE BOOTSTRAP'S LINE, and it is a different line because it answers a different
   // question. `DOCTOR: 13 ok, 1 warn (E-23), 1 fail` told a reader at the end of an install that
   // something had been checked, without saying that MOST OF IT HAD NOT BEEN: the bootstrap spawns
@@ -117,7 +133,7 @@ export function summaryLine(summary, checks = null, { quick = false, cli = './sn
     parts.push(`${summary.notInSection} not in section`);
   } else if (summary.skip > 0) parts.push(`${summary.skip} skipped`);
   const fixable = summary.fixable > 0
-    ? ` (${summary.fixable} fixable — run ./snowarch doctor --fix)`
+    ? ` (${summary.fixable} fixable — run ${cli} doctor --fix)`
     : '';
   return `DOCTOR: ${parts.join(', ')}${fixable}`;
 }
@@ -142,7 +158,12 @@ export const sectionNote = (section, reason) => (section === 'server'
   ? 'server (skipped — design-only)'
   : null);
 
-export function renderText({ report, checks = [], results = [], colour = false }) {
+export function renderText({ report, checks = [], results = [], colour = false, cli }) {
+  // Same rule as `summaryLine` above, for the same reason: this renderer prints the launcher and
+  // cannot look it up.
+  if (typeof cli !== 'string' || cli === '') {
+    throw new TypeError('renderText needs a `cli` spelling — this module is pure of the environment');
+  }
   const byId = new Map(checks.map((c) => [c.id, c]));
   // ARC-08-C34 — THE TERMINAL-ONLY DETAIL ARRIVES HERE, OR IT ARRIVES NOWHERE.
   //
@@ -209,7 +230,7 @@ export function renderText({ report, checks = [], results = [], colour = false }
       // string in the report, and a wrapped remedy that starts mid-line is the part people stop
       // reading.
       if (result.remedy) {
-        const fixable = byId.get(result.id)?.fixable ? '   [fixable: ./snowarch doctor --fix]' : '';
+        const fixable = byId.get(result.id)?.fixable ? `   [fixable: ${cli} doctor --fix]` : '';
         lines.push(`             → ${result.remedy}${fixable}`);
       }
       // ARC-08 (Sitting A D1) — not a SECOND time. `command` duplicates one of the remedy's lines
@@ -233,7 +254,7 @@ export function renderText({ report, checks = [], results = [], colour = false }
   // definitions) and `results` (the runner's) are both in scope here and are the wrong two: the
   // first carries no status at all, and the second is the pre-`checkToJson` shape whose ids would
   // agree today and drift the day a check is filtered on its way into the report.
-  lines.push(summaryLine(report.summary, report.checks));
+  lines.push(summaryLine(report.summary, report.checks, { cli }));
   if (report.modeLine) lines.push(report.modeLine);
   return lines.join('\n');
 }

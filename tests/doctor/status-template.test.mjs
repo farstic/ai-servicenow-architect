@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
 import { SCHEMA_KEYS, validateReport } from '../../tools/snowarch/lib/doctor/report-json.mjs';
 import { renderPanel } from '../../tools/snowarch/lib/doctor/panel.mjs';
@@ -70,7 +71,13 @@ test('the template block IS what the renderer prints — not a transcription of 
   // THE DRIFT CLASS, CLOSED. The snippet, the skill and T-07 were three copies of a sample that
   // nothing produced; a line could be wrong in all three and no test would know, because every
   // test compared them to each other. This compares one of them to the product.
-  assert.equal(templateBlock(), renderPanel(report('live')));
+  // ARC-07-W17 — `renderPanel` takes the launcher now, because its import graph is walked for purity
+  // and may not reach `process.env`. DERIVED, so the four Windows cells compare against their own
+  // spelling rather than a POSIX literal — and the snippet is the POSIX rendering, which is what the
+  // page shows, so the comparison is skipped on a Windows shell rather than asserted wrong.
+  const cli = spellings().cli;
+  if (cli === './snowarch') assert.equal(templateBlock(), renderPanel(report('live'), cli));
+  else assert.match(renderPanel(report('live'), cli), new RegExp(cli.replace(/[.\\]/g, '\\$&')));
 });
 
 test('every mapped key is a key of schema v1', () => {

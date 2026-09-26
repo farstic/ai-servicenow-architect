@@ -8,6 +8,7 @@
 // command is printed for a human to run after they have looked at their own diff, and S06 refuses
 // to run it for them.
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import { bootstrapOf, cliOf } from '../spell.mjs';
 import { join } from 'node:path';
 
 import { makeExec, samePath } from '../../steps/B00.mjs';
@@ -395,7 +396,7 @@ export function engineRepoChecks() {
           ? ok('no credential-shaped key or literal', { scanned: tracked.ok ? 'tracked files' : 'settings only' })
           : fail(problems.join('; '), {
             remedy: 'remove the key; credentials live only in .local/instances.json '
-              + '(`./snowarch instance set-credentials <label>`)',
+              + `(\`${cliOf(ctx)} instance set-credentials <label>\`)`,
             data: { problems },
           });
       },
@@ -415,8 +416,8 @@ export function engineRepoChecks() {
         try { state = loadState(ctx.root); } catch { state = null; }
         if (!existsSync(join(ctx.root, SETTINGS_LOCAL))) {
           return fail('.claude/settings.local.json is absent — the mode toggle is unset', {
-            remedy: './snowarch mode design (or ./snowarch mode live)',
-            command: './snowarch mode design',
+            remedy: `${cliOf(ctx)} mode design (or ${cliOf(ctx)} mode live)`,
+            command: `${cliOf(ctx)} mode design`,
             data: { mode: state?.mode ?? null,
               fix: { kind: 'toggles-mismatch', mode: state?.mode ?? 'design' } },
           });
@@ -424,7 +425,7 @@ export function engineRepoChecks() {
         let settings;
         try { settings = readJson(ctx.root, SETTINGS_LOCAL); } catch (e) {
           return fail(`.claude/settings.local.json is not valid JSON — ${e.message}`, {
-            remedy: 'fix the JSON, then ./snowarch mode design or ./snowarch mode live',
+            remedy: `fix the JSON, then ${cliOf(ctx)} mode design or ${cliOf(ctx)} mode live`,
             data: { mode: state?.mode ?? null },
           });
         }
@@ -440,8 +441,8 @@ export function engineRepoChecks() {
           fix: { kind: 'toggles-mismatch', mode: mode ?? 'design' } };
         if (problems.length > 0) {
           return fail(problems.join('; '), {
-            remedy: mode === 'live' ? './snowarch mode live' : './snowarch mode design',
-            command: mode === 'live' ? './snowarch mode live' : './snowarch mode design',
+            remedy: mode === 'live' ? `${cliOf(ctx)} mode live` : `${cliOf(ctx)} mode design`,
+            command: mode === 'live' ? `${cliOf(ctx)} mode live` : `${cliOf(ctx)} mode design`,
             data,
           });
         }
@@ -514,8 +515,8 @@ export function engineRepoChecks() {
           state = loadState(ctx.root);
         } catch (e) {
           return fail(e.message, {
-            remedy: './snowarch bootstrap --reset',
-            command: './snowarch bootstrap --reset',
+            remedy: `${cliOf(ctx)} bootstrap --reset`,
+            command: `${cliOf(ctx)} bootstrap --reset`,
             fixable: false,
             data: { mode, fix: null },
           });

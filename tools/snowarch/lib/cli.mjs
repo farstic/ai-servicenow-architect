@@ -193,12 +193,16 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
   const { flags, positional, errors } = command.raw
     ? { flags: Object.create(null), positional: [], errors: [] }
     : parseArgs(rest, { booleans: command.booleans ?? [] });
-  if (flags.help) { out.write(`${command.usage}\n`); return EXIT_OK; }
+  // ARC-07-W17 — A USAGE MAY BE A FUNCTION. The doctor's has to be: deriving its launcher through
+  // `spellings()` at module load throws inside the `panel -> text -> report-text -> panel` cycle, so
+  // it is evaluated when it is printed. Resolved in one place, so every command may do the same.
+  const usageOf = (c) => (typeof c.usage === 'function' ? c.usage() : c.usage);
+  if (flags.help) { out.write(`${usageOf(command)}\n`); return EXIT_OK; }
   if (errors.length > 0 && name !== 'docs') {
     // `docs` parses its own arguments — it has sub-commands of its own — so the frame does not
     // second-guess a flag it has no table for.
     for (const e of errors) err.write(`snowarch ${name}: ${e}\n`);
-    err.write(`${command.usage}\n`);
+    err.write(`${usageOf(command)}\n`);
     return EXIT_USAGE;
   }
 

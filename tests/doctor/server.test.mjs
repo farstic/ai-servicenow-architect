@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
 import {
   adopt, availability, DEPS_MISSING, DESIGN_ONLY_HEADER, DIST_MISSING, DOCTOR_ENTRY,
@@ -71,6 +72,9 @@ test('with no dependencies every SV check skips, nothing fails, and the header s
     report: { checks: results.map((r) => ({ ...r, section: 'server', title: 'x' })),
       summary: { ok: 0, warn: 0, fail: 0, skip: results.length }, options: {}, ranAt: '', version: '0' },
     checks,
+    // ARC-07-W17 — required and derived: the renderer is pure of the environment and this file's
+    // assertions must compare against the Windows spelling on the Windows cells.
+    cli: spellings().cli,
   });
   assert.match(text, /server \(skipped — design-only\)/);
 });

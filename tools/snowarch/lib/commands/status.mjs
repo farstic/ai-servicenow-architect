@@ -17,6 +17,7 @@
  * and the first consumer to read the wrong one would be reading a shape nothing maintains.
  */
 import { existsSync, readFileSync } from 'node:fs';
+import { spellings } from '../text.mjs';
 import { join } from 'node:path';
 
 import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ } from '../exit.mjs';
@@ -112,7 +113,9 @@ export async function statusCommand({ flags = {}, log, out = process.stdout, env
   if (flags.json) {
     write(JSON.stringify(maskForJson(report, { home }), null, 2));
   } else {
-    write(renderPanel(report));
+    // ARC-07-W17 — the panel is PURE (its import graph is walked and must reach no environment), so
+    // the launcher is supplied here, where reading the shell is allowed.
+    write(renderPanel(report, spellings().cli));
   }
   if (log?.commit) log.commit();
   // The doctor's verdict, so a script can branch on it. The panel is on the screen either way.

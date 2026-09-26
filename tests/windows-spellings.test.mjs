@@ -102,9 +102,18 @@ const DEFINITIONS = Object.freeze([
   'packages/snowarch/src/cli/tty.ts',
 ]);
 
-/** Comments stripped: prose ABOUT the defect is not the defect. */
+/**
+ * Comments stripped: prose ABOUT the defect is not the defect.
+ *
+ * BLOCK COMMENTS ARE BLANKED, NOT REMOVED, and that distinction is the whole reason this helper has a
+ * comment. Deleting a block comment deletes its NEWLINES, so every line number after the first one
+ * shifts — and a guard whose message tells a maintainer `engine-docs.mjs:54` when the site is at 59
+ * sends them to the wrong line, which for a 163-site sweep is most of the cost of using it. The counts
+ * were right the whole time, which is exactly why it went unnoticed until the numbers were read back
+ * against the file. The same bug was in the sweeper I wrote to fix these sites, caught there first.
+ */
 const codeOf = (text) => text
-  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/\/\*[\s\S]*?\*\//g, (block) => '\n'.repeat((block.match(/\n/g) ?? []).length))
   .split('\n')
   .map((line) => line.replace(/(^|[^:])\/\/.*$/, '$1'))
   .join('\n');
