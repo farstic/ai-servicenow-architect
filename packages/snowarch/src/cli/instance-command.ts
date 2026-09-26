@@ -38,6 +38,17 @@ export const terminalIo = (): AddIo => ({
 /** The label the prompt proposes. ADR-0005: propose, do not impose — Enter accepts, typing wins. */
 export const DEFAULT_LABEL = 'pdi';
 
+/**
+ * The label prompt — ARC-07-W9, after five matchers were bound to its old text.
+ *
+ * It read `Label for this instance [pdi]: ` until the step header started saying what a label is, and
+ * **five assertions in `b06-wizard-argv.test.mjs` matched that sentence**. They read the built `dist`,
+ * not `src`, so `tests/cli` could not see them and my push would have gone red on nine cells — the
+ * fifth matcher-bound-to-text this programme has met, and the first where the bound matchers were
+ * tests rather than a guard. Exported so a case can state the prompt instead of quoting it.
+ */
+export const LABEL_PROMPT = `Label [${DEFAULT_LABEL}]: `;
+
 
 /** `instance --help` — every sub-command, then the exit table. ARC-06-S08's B08 reads this. */
 export function instanceHelp(): string {
@@ -207,7 +218,7 @@ export async function runInstance(argv: readonly string[], io: AddIo = terminalI
       // `LABEL_RULE_WORDS` is the complete one and it arrives on the refusal, where it is needed.
       io.write(`${stepHeader('label', ' — a short name you will type in commands, e.g. pdi, acme-dev')}\n`);
       for (let attempt = 1; ; attempt += 1) {
-        const typed = (await io.ask(`Label [${DEFAULT_LABEL}]: `))?.trim();
+        const typed = (await io.ask(LABEL_PROMPT))?.trim();
         if (typed === undefined) { io.write(`${CANCELLED}\n`); return EXIT_USAGE; }
         // Re-parsed rather than patched in: the label goes through the SAME validation as one typed
         // on the command line, so `LABEL_RULE` has one enforcement point and its sentence one author.
