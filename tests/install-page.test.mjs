@@ -125,6 +125,41 @@ test('...and the dialogs paragraph is generated from the number, with its caveat
   assert.match(dialogsParagraph({ ...text, expectedDialogs: 2 }, '2.1.214'), /\*\*two dialogs\*\*/);
 });
 
+/**
+ * ARC-07-W8 — the page's plan block is the plan screen's own words.
+ *
+ * `docs/INSTALL.md` showed `type a number to change that line`, a header the tool stopped printing at
+ * ARC-07-C10 — where "change" was the defect: the owner pressed `1` seven times waiting to be asked
+ * something, and each press silently toggled Mode. The page kept advertising the verb that was fixed.
+ */
+test('ARC-07-W8 — the plan header on the page is the one the tool prints', async () => {
+  const { HEADER } = await import('../tools/snowarch/lib/plan.mjs');
+  for (const rel of ['docs/INSTALL.md', 'README.md']) {
+    assert.ok(read(rel).includes(HEADER),
+      `${rel} does not carry the plan header the tool prints:\n  ${HEADER}`);
+  }
+  // ...and the retired verb is gone, so a copy that drifted back would be caught by name.
+  for (const rel of ['docs/INSTALL.md', 'README.md']) {
+    assert.equal(read(rel).includes('type a number to change that line'), false,
+      `${rel} still shows the verb ARC-07-C10 removed`);
+  }
+});
+
+test('ARC-07-W8 — every clone command on a user page quiets the detached-HEAD advice', () => {
+  // A release tag is a TAG, so a correct clone earns fourteen lines of git advice about being in a
+  // state the reader did not choose and cannot act on. The option is on every clone line, and the
+  // page says once what the note means for anyone who clones another way.
+  for (const rel of ['docs/INSTALL.md', 'docs/MIGRATION.md', 'README.md']) {
+    const clones = [...read(rel).matchAll(/git\b[^\n]*?\bclone --branch v\d/g)].map((m) => m[0]);
+    assert.ok(clones.length > 0, `${rel} names no pinned clone`);
+    for (const line of clones) {
+      assert.match(line, /-c advice\.detachedHead=false/,
+        `${rel}: a clone without the option — ${line}`);
+    }
+  }
+  assert.match(read('docs/INSTALL.md'), /detached HEAD" state|"detached HEAD"/);
+});
+
 test('every POSIX command that has a Windows spelling shows it', () => {
   const install = read(INSTALL);
   for (const [posix, windows] of [

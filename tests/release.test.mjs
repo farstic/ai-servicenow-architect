@@ -23,7 +23,7 @@ import { release } from '../scripts/release.mjs';
 import { allowedCloneTags, cloneTagsIn } from './lib/install-tag.mjs';
 import { buildTagMessage, parseTagMessage, tagIsComplete } from '../scripts/lib/release/tag.mjs';
 import { compareVersions, latestTag } from '../scripts/lib/release/preflight.mjs';
-import { badgeLine, writeHead, writeMarker } from '../scripts/lib/release/writers.mjs';
+import { badgeLine, writeHead, writeInstallTag, writeMarker } from '../scripts/lib/release/writers.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { STAGED } from '../scripts/lib/release/writers.mjs';
 import { writeGitattributes } from './helpers/gitattributes.mjs';
@@ -773,6 +773,42 @@ test('ARC-09-C61 — the install-page guard passes at the shape a release commit
     assert.ok(named.includes(`v${treeVersion}`),
       `${page} does not name v${treeVersion} — writeInstallTag did not run on the release commit`);
   }
+});
+
+/**
+ * ARC-07-W8 — the release writes BOTH spellings of the tag, or neither is trustworthy.
+ *
+ * `writeInstallTag`'s pattern was `--branch v<x.y.z>`, so the paste-a-prompt path's prose — *"from
+ * release tag v2.0.2"* — was invisible to it and to ARC-09-C61's guard. It went stale three releases
+ * ago and nothing noticed, on the one path where a reader is asked to paste a sentence into Claude
+ * rather than run a command they can see.
+ */
+test('ARC-07-W8 — writeInstallTag rewrites the prose spelling as well as the clone command', () => {
+  const page = [
+    'git clone --branch v1.0.0 https://example.invalid/x.git',
+    '> Clone the repository into this folder, from release tag v1.0.0.',
+    'git clone --branch v1.0.0 https://example.invalid/x.git .',
+  ].join('\n');
+
+  const out = writeInstallTag(page, '2.3.4');
+  assert.equal(out.ok, true, out.message);
+  assert.match(out.text, /--branch v2\.3\.4 https/);
+  assert.match(out.text, /from release tag v2\.3\.4\./);
+  assert.equal(/v1\.0\.0/.test(out.text), false, 'a v1.0.0 survived the rewrite');
+  // BOTH spellings counted, so a page that lost one of them cannot report a full rewrite.
+  assert.equal(out.count, 3);
+});
+
+test('...and a page with only the prose spelling is still rewritten, not refused', () => {
+  // The refusal exists for a page that names NO tag at all (ARC-09-C60). A page that names one only
+  // in prose is exactly the case that went stale, so it must be written rather than rejected.
+  const out = writeInstallTag('> from release tag v1.0.0.', '2.3.4');
+  assert.equal(out.ok, true, out.message);
+  assert.match(out.text, /release tag v2\.3\.4/);
+
+  const refused = writeInstallTag('nothing here names a tag', '2.3.4');
+  assert.equal(refused.ok, false);
+  assert.match(refused.message, /no .*clone command|names no release tag/);
 });
 
 test('ARC-09-C63 — a rolled-back release restores what the GENERATORS wrote too', async (t) => {

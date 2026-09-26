@@ -73,13 +73,35 @@ export function writeMarker(text, version) {
  * writer that silently updated a subset would leave one of those paths on an older release.
  */
 export function writeInstallTag(text, version, file = 'the install page') {
-  const PIN = /--branch v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?/g;
-  const found = text.match(PIN);
-  if (!found) {
+  // ARC-07-W8 — TWO SPELLINGS, because a page names the tag in two grammars and only one of them is
+  // a command. `--branch v2.0.5` sits in a clone line a reader can see and check; *"from release tag
+  // v2.0.2"* sits in the sentence the paste-a-prompt path asks them to give Claude. This writer knew
+  // only the first, so the prose went stale three releases back and neither this nor ARC-09-C61's
+  // page guard could see it — on the one path where the reader never sees the command at all.
+  const PINS = [
+    /--branch v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?/g,
+    /release tag v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?/g,
+  ];
+  const replacements = [`--branch v${version}`, `release tag v${version}`];
+
+  let out = text;
+  let count = 0;
+  PINS.forEach((pin, i) => {
+    const found = out.match(pin);
+    if (!found) return;
+    count += found.length;
+    out = out.replace(pin, replacements[i]);
+  });
+
+  // The refusal is for a page that names NO tag in either grammar — ARC-09-C60's finding, that a
+  // writer reporting success on a page it did not change is how the stale tag shipped. A page that
+  // names one only in prose is the case that WENT stale, so it is written rather than rejected.
+  if (count === 0) {
     return { ok: false,
-      message: `release: ${file} has no "--branch v<x.y.z>" clone command to update` };
+      message: `release: ${file} names no release tag — no "--branch v<x.y.z>" and no "release tag `
+        + 'v<x.y.z>" to update' };
   }
-  return { ok: true, text: text.replace(PIN, `--branch v${version}`), count: found.length };
+  return { ok: true, text: out, count };
 }
 
 export function writeHead(text, version) {
