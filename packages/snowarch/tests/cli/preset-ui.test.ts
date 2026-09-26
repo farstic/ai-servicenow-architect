@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { instanceSchema } from '../../src/store/schema.js';
 import type { LastProbe } from '../../src/servicenow/probes.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
+import { cliSpelling } from '../../src/cli/tty.js';
 
 /**
  * ARC-07-S04 — propose, review, apply.
@@ -186,8 +187,12 @@ describe('criterion 4 — the production screen', () => {
   it('typing a flag prints the locked message and asks again', async () => {
     const tty = scriptedTty(['WRITE', '']);
     const result = await runReviewScreen(input, tty);
+    // ARC-07-W7 made this spelling platform-dependent, so the POSIX literal was a LATENT Windows
+    // failure — latent only because `npm test` is `node tests/run.mjs && npm test --workspaces`, and
+    // B06's failure stopped the chain before vitest ran at all. Derived from the same function the
+    // product reads, so it states the property rather than one platform's answer.
     expect(tty.written).toContain(
-      'WRITE is locked on production — raise it later with: ./snowarch instance set-preset '
+      `WRITE is locked on production — raise it later with: ${cliSpelling()} instance set-preset `
       + 'prod-acme <preset> --ack-prod');
     // Re-prompted rather than exited: the user did not do anything wrong, they asked for
     // something the wizard will not do.
