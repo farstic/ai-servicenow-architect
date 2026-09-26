@@ -165,6 +165,18 @@ test('AC 2 — the live block names the instance and one dialog per expected dia
   assert.match(r.next, new RegExp(`/mcp should show: ${config(root).mcp.serverKey} ✔ connected`));
   // Nothing that identifies a host or an account reaches the block.
   assert.ok(!r.next.includes('service-now') && !r.next.includes('admin'));
+
+  // ARC-07-W12 — END TO END, because the unit case proves the renderer and this proves the ROUTE.
+  // `changeLaterBlock` takes a label and defaults to `<label>` when it has none, so a B09 that
+  // passed `instance: null` in live mode would render a block full of placeholders and every unit
+  // case would still be green. What is asserted here is that the label the handshake recorded is
+  // the label a real run prints.
+  assert.match(r.next, /^Change later, /m);
+  assert.match(r.next, /instance set-preset pdi <preset>/);
+  assert.doesNotMatch(r.next, /<label>/, 'the label did not reach the block through B09');
+  // ...and the design-only run above has no such block: four of its five rows name an instance.
+  const design = await runB09(ctxFor(root, { state: stateWith({ B01: { status: 'ok' } }) }));
+  assert.doesNotMatch(design.next, /Change later/);
 });
 
 test('a design-only run leaves the banner a cache; a live run\'s is not overwritten', async () => {
