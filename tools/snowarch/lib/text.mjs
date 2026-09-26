@@ -187,10 +187,18 @@ export function instanceKeptNote({ label, platform, env } = {}) {
  * `(2 fixable — …)`. What stays here is the sentence for a machine with no Node — which the
  * doctor, by definition, cannot print.
  */
+/**
+ * ARC-08-C37 — `checks` rides along on the counts object, so `summaryBlock` gains no parameter.
+ *
+ * B09 spreads whatever `doctorCounts` returned into `summaryBlock`, which spreads it again into
+ * here, so the ids reach the renderer by the route the counts already take. When the doctor could
+ * not be spawned, `doctorCounts` falls back to tallying `state.steps` and there is no `checks` key
+ * at all — which is the honest case the default covers.
+ */
 export function doctorLine({ ok = 0, warn = 0, fail = 0, skip = 0, fixable = 0,
-  nodeUsable = true } = {}) {
+  nodeUsable = true, checks = null } = {}) {
   return nodeUsable
-    ? renderSummaryLine({ ok, warn, fail, skip, fixable })
+    ? renderSummaryLine({ ok, warn, fail, skip, fixable }, checks)
     : 'DOCTOR: unavailable until Node 20+ is installed (design-only is complete)';
 }
 

@@ -44,14 +44,16 @@ Docs: vendor/ServiceNowDocs @ ba513f2 (australia) · sparse · citations checked
 Roster: 28 skills / 9 agents                                                                 [engine.roster]
 Capabilities: docx yes (python3) · PDF QA no · draw.io yes · Mermaid no                       [engine.capabilities]
 Instances: pdi (pdi, custom, default) · uat (test, read-only)                                 [server.instances]
-Doctor: 41 ok, 1 warn, 0 fail — quick run 2026-09-10 10:00 · full report: ./snowarch doctor   [summary, ranAt, options.quick]
+Doctor: 41 ok, 1 warn (E-23), 0 fail — quick run 2026-09-10 10:00 · full report: ./snowarch doctor  [summary, checks, ranAt, options.quick]
 ```
 
 A line whose key is empty is left out rather than guessed. Two usually are: capability packs and
 citation counts come from checks that spawn a process or walk the whole corpus, so a quick run —
 which is what a session always does — leaves them out and says so. `./snowarch doctor` reports
 them. `Instances:` is absent in design-only, and when anything failed, one line per failure follows
-with its remedy.
+with its remedy. A warning is **named but not listed** — its id appears in the count, as `1 warn
+(E-23)` above, and its remedy stays in `./snowarch doctor`, because a panel that printed every
+warning's remedy would be a report rather than a panel.
 
 ### Reading the Mode line
 

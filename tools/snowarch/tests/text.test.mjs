@@ -84,6 +84,41 @@ test('the DOCTOR line says what it does not know', () => {
   assert.match(doctorLine({ nodeUsable: false }), /design-only is complete/);
 });
 
+/**
+ * ARC-08-C37 — the line at the END of a bootstrap names which check it counted.
+ *
+ * B09 already prints every FAIL in full underneath this line (`failures`, from ARC-08 Sitting A),
+ * but its warnings come from `warningsFrom(state)` — the bootstrap STEPS' own warnings — so a
+ * doctor warning was counted here and named nowhere. The owner met that twice: once on this line
+ * and once on `/snowarch status`'s. The ids travel on the counts object, so `summaryBlock` needs no
+ * new parameter and B09's call site is unchanged apart from what `doctorCounts` puts in it.
+ */
+test('ARC-08-C37 — B09\'s DOCTOR line names the checks it counted', () => {
+  const checks = [{ id: 'E-23', status: 'warn' }, { id: 'E-29', status: 'fail' }];
+  assert.equal(doctorLine({ ok: 14, warn: 1, fail: 1, skip: 26, checks }),
+    'DOCTOR: 14 ok, 1 warn (E-23), 1 fail (E-29), 26 skipped');
+
+  // THE FALLBACK TALLY HAS NOTHING TO NAME. When the doctor could not be spawned at all, B09 counts
+  // `state.steps` instead, and those are bootstrap steps rather than checks — so the line says
+  // nothing rather than filling a bracket with a guess.
+  assert.equal(doctorLine({ ok: 14, warn: 1, fail: 1, skip: 26 }),
+    'DOCTOR: 14 ok, 1 warn, 1 fail, 26 skipped');
+
+  // AND THE SITE: the closing block a reader actually sees at the end of `./bootstrap.sh`.
+  const block = summaryBlock({ mode: 'design', counts: { ok: 14, warn: 1, fail: 1, skip: 26, checks },
+    serverKey: 'servicenow', platform: 'darwin', env: {} });
+  assert.match(block.split('\n')[0], /^DOCTOR: 14 ok, 1 warn \(E-23\), 1 fail \(E-29\), 26 skipped$/);
+
+  // THE COUNT AND THE IDS HAVE DIFFERENT SOURCES, and when they disagree the line shows both.
+  // Decided rather than stumbled into: in production they cannot disagree — `summary` and `checks`
+  // are two fields of one report — so a `0 fail (E-29)` line means the REPORT is inconsistent, and
+  // a renderer that quietly dropped the id would hide an upstream defect instead of showing it. My
+  // first draft of the case above asserted exactly this by accident, with `fail: 0` beside a
+  // failing check, which is how the question got asked at all.
+  assert.equal(doctorLine({ ok: 1, warn: 0, fail: 0, skip: 0, checks }),
+    'DOCTOR: 1 ok, 0 warn (E-23), 0 fail (E-29)');
+});
+
 test('the summary block is five lines, and the warnings recap comes after them', () => {
   const clean = summaryBlock({ mode: 'design-only', counts: { ok: 7, warn: 0, fail: 0 },
     serverKey: KEY, platform: 'linux', env: {} });

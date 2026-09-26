@@ -214,7 +214,11 @@ test('the renderer: FAIL shouts, the Mode line is last, colour only on a TTY', (
   assert.match(text, /E-00 FAIL {2}a check: broken/);
   assert.match(text, /→ run the thing {3}\[fixable: \.\/snowarch doctor --fix\]/);
   assert.equal(lines.at(-1), 'Mode: design-only', 'the Mode line must be the last line');
-  assert.equal(lines.at(-2), 'DOCTOR: 0 ok, 0 warn, 1 fail (1 fixable — run ./snowarch doctor --fix)');
+  // ARC-08-C37 moved this line: the tally now names the failing check. Kept as a full-string
+  // assertion rather than loosened to a regex, because this is the one case that reads the whole
+  // rendered report and it is where the two bracketed groups sit side by side.
+  assert.equal(lines.at(-2),
+    'DOCTOR: 0 ok, 0 warn, 1 fail (E-00) (1 fixable — run ./snowarch doctor --fix)');
   assert.equal(statusLabel('fail'), 'FAIL');
   assert.equal(statusLabel('ok'), 'ok');
 
@@ -292,4 +296,47 @@ test('ARC-08 — with --section, out-of-section checks are counted but not liste
   assert.equal(plain.notInSection, 0);
   assert.match(summaryLine(plain), /1 skipped/);
   assert.doesNotMatch(summaryLine(plain), /not in section/);
+});
+
+/**
+ * ARC-08-C37 — the doctor's own tally names which check it counted.
+ *
+ * The same rule as the panel's `Doctor:` line, from the same helper, because the owner met the
+ * unnamed `1 warn` on both surfaces. An out-of-section check cannot reach these brackets: the
+ * section filter records it as `skip` with `not in --section`, so it is never a warn or a fail —
+ * measured on the case above rather than assumed.
+ */
+test('ARC-08-C37 — the doctor\'s summary names its non-ok checks', () => {
+  const checks = [
+    { id: 'E-23', status: 'warn' }, { id: 'E-30', status: 'warn' },
+    { id: 'E-29', status: 'fail' }, { id: 'E-01', status: 'ok' },
+  ];
+  assert.equal(summaryLine({ ok: 14, warn: 2, fail: 1, skip: 26, fixable: 0 }, checks),
+    'DOCTOR: 14 ok, 2 warn (E-23, E-30), 1 fail (E-29), 26 skipped');
+
+  // `skipped` and `(n fixable — …)` are NOT touched by this row: both are their own wording
+  // questions and neither has been ordered. The two brackets sit side by side, which is truthful
+  // and slightly awkward; changing it would be changing the fixable wording.
+  assert.equal(
+    summaryLine({ ok: 1, warn: 0, fail: 1, skip: 0, fixable: 1 }, [{ id: 'E-29', status: 'fail' }]),
+    'DOCTOR: 1 ok, 0 warn, 1 fail (E-29) (1 fixable — run ./snowarch doctor --fix)');
+
+  // CALLED WITH NO CHECKS — the shape every existing caller passes — the line is byte-identical to
+  // what it printed before this row. That is what keeps B09's fallback tally honest: it counts
+  // `state.steps` when the doctor could not be spawned and has no checks to name.
+  assert.equal(summaryLine({ ok: 1, warn: 1, fail: 0, skip: 2, fixable: 0 }),
+    'DOCTOR: 1 ok, 1 warn, 0 fail, 2 skipped');
+
+  // AND THE SITE, not just the helper. The unit assertions above passed while `renderText` was
+  // still calling `summaryLine(report.summary)` with no second argument — the whole change was
+  // inert in the report a person actually reads, and only this assertion could see it.
+  const results = [
+    { id: 'E-23', status: 'warn', detail: 'stale registrations', section: 'host' },
+    { id: 'E-29', status: 'fail', detail: 'bootstrap incomplete', section: 'host' },
+  ];
+  const report = { checks: results, summary: summariseMerged(results, []), version: '0',
+    ranAt: '2026-01-01' };
+  const rendered = renderText({ report, checks: [] }).split('\n');
+  const tally = rendered.find((l) => l.startsWith('DOCTOR: '));
+  assert.match(tally, /1 warn \(E-23\), 1 fail \(E-29\)/, 'the rendered report does not name them');
 });

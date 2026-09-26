@@ -22,6 +22,10 @@ import { SECTIONS } from './registry.mjs';
 // full report, B09's install summary, the upgrade block and the panel print a capability set and
 // a failing check identically.
 import { capabilitiesLine, nonOkLines } from './panel.mjs';
+// ARC-08-C37 — from the leaf, not from the panel that also imports it: the helper's home is the
+// thing both summary lines share, and reading it through `panel.mjs` would make the panel look like
+// its owner. This file already depends on the panel, so there is no cycle either way.
+import { idsFor } from './check-ids.mjs';
 
 export { capabilitiesLine, nonOkLines };
 
@@ -62,8 +66,18 @@ export function headerLine({ version, ranAt, options = {} }) {
 /** The runner's wording for a check the `--section` flag excluded (`doctor/runner.mjs`). */
 export const NOT_IN_SECTION = 'not in --section';
 
-export function summaryLine(summary) {
-  const parts = [`${summary.ok} ok`, `${summary.warn} warn`, `${summary.fail} fail`];
+/**
+ * ARC-08-C37 — `checks` is OPTIONAL, and a caller that omits it gets the line it always got.
+ *
+ * Three callers, and only two of them can name anything: `renderText` below has the report, and
+ * B09 passes the doctor's `checks` through `text.mjs`'s `doctorLine` when it managed to spawn one.
+ * B09's OTHER path counts `state.steps` because the doctor could not run at all, and there are no
+ * check ids in that world — so the default is silence rather than a bracket it would have to fill
+ * with a guess. `idsFor` is the panel's helper, not a second copy of the rule.
+ */
+export function summaryLine(summary, checks = null) {
+  const parts = [`${summary.ok} ok`, `${summary.warn} warn${idsFor(checks, 'warn')}`,
+    `${summary.fail} fail${idsFor(checks, 'fail')}`];
   // `--section` splits the skipped count in two, because the two mean different things: "this
   // checkout could not answer" and "you did not ask". Only the first is about the machine.
   if (summary.notInSection > 0) {
@@ -184,7 +198,11 @@ export function renderText({ report, checks = [], results = [], colour = false }
   // either site to change.
   const capabilities = capabilitiesLine(report.engine?.capabilities ?? null);
   if (capabilities) lines.push(capabilities);
-  lines.push(summaryLine(report.summary));
+  // ARC-08-C37 — the REPORT's own checks, which is where the statuses are. `checks` (the
+  // definitions) and `results` (the runner's) are both in scope here and are the wrong two: the
+  // first carries no status at all, and the second is the pre-`checkToJson` shape whose ids would
+  // agree today and drift the day a check is filtered on its way into the report.
+  lines.push(summaryLine(report.summary, report.checks));
   if (report.modeLine) lines.push(report.modeLine);
   return lines.join('\n');
 }

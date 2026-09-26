@@ -18,7 +18,15 @@
  * renders to the same bytes for every reader: no clock (`ranAt` is in the report), no `process.env`,
  * no cwd, and `ranAt` printed in UTC rather than local time, because two people comparing pasted
  * output in two timezones is the only reason "verbatim" is worth anything.
+ *
+ * IT IMPORTS ONE THING (ARC-08-C37), and the choice of what is the whole story. `idsFor` is shared
+ * with the doctor's own summary line, and `report-text.mjs` — where that line lives — is the purity
+ * walker's POSITIVE CONTROL, because `useColour` reads `process.env`. Importing the helper from
+ * there would have made this module impure by association and turned the walker red. So the helper
+ * is its own pure leaf and both renderers import it, which is the same move the walker forced the
+ * last time it caught `report-text.mjs` on the way in: the code moved, not the test.
  */
+import { idsFor } from './check-ids.mjs';
 
 /**
  * The contract sha, shortened to the prefix the rest of the product already uses.
@@ -122,7 +130,11 @@ export function doctorLine(report) {
   if (!s) return null;
   const kind = report.options?.quick ? 'quick run' : 'full run';
   const when = ranAtLine(report.ranAt);
-  return `Doctor: ${s.ok} ok, ${s.warn} warn, ${s.fail} fail`
+  // ARC-08-C37 — WHICH check, named where the count is. The remedy stays in `./snowarch doctor`;
+  // `failureLines` below is untouched, so a FAIL is still spelled out in full underneath and this
+  // adds the id to the tally rather than a second copy of the failure.
+  return `Doctor: ${s.ok} ok, ${s.warn} warn${idsFor(report.checks, 'warn')}`
+    + `, ${s.fail} fail${idsFor(report.checks, 'fail')}`
     + `${when ? ` — ${kind} ${when}` : ` — ${kind}`}`
     + ' · full report: ./snowarch doctor';
 }
