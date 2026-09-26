@@ -31,8 +31,21 @@ import { join } from 'node:path';
  * No `env` fixture, deliberately: the mirror rule applies, so the case asserts whatever THIS shell
  * renders — POSIX on a mac, `.\snowarch.cmd` on the Windows runner.
  */
-const SPELLED_CLI = spellings().cli;
-const SPELLED_BOOTSTRAP = spellings().bootstrap;
+/**
+ * THE SAME SOURCE THE PRODUCT LINE USES — ARC-07-W17, corrected.
+ *
+ * `ctxFor` pins `platform: 'darwin'`, and E-29's command is
+ * `spellings({ platform: ctx.platform, env: ctx.env }).bootstrap` — so the PRODUCT renders the darwin
+ * spelling whatever machine runs the case. My first sweep derived these from `spellings()`, the
+ * PROCESS, which is the same thing on a mac and `.\bootstrap.cmd` on the Windows runner: the test then
+ * expected Windows while the product correctly rendered POSIX, and all three Windows cells went red.
+ *
+ * The rule, stated because the next sweep will need it: an assertion derives from the same source the
+ * product line derives from — here the ctx's platform, not the process's.
+ */
+const CTX = Object.freeze({ platform: 'darwin', env: {} });
+const SPELLED_CLI = spellings(CTX).cli;
+const SPELLED_BOOTSTRAP = spellings(CTX).bootstrap;
 
 import { engineRepoChecks } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { version as engineVersionOf } from '../../tools/snowarch/lib/config.mjs';

@@ -66,7 +66,9 @@ test('a failing check exits 1 AND still prints the panel', async (t) => {
   const out = sink();
   const code = await statusCommand({ out, cwd: root, registry: registry({
     id: 'E-00', title: 'a check', fixable: true,
-    run: async () => ({ status: 'fail', detail: 'it did not', remedy: './snowarch fix-it' }),
+    // ARC-07-W17 — the fixture derives, for the same reason as `panel.test.mjs`'s: the panel prints a
+    // remedy verbatim, so the supplied string and the asserted one must come from one source.
+    run: async () => ({ status: 'fail', detail: 'it did not', remedy: `${CLI} fix-it` }),
   }) });
 
   assert.equal(code, 1);

@@ -188,10 +188,16 @@ test('report order is REGISTRY order, whatever order the run took', async () => 
 });
 
 test("a check may set `code` OR `remedy`, never both — a code's remedy is the contract's", () => {
-  const contract = { errorCodes: [{ code: 'X_FAILED', remedy: 'do the thing', command: './snowarch x' }] };
+  // ARC-07-W17 — THE EXPECTATION IS THE CONTRACT'S OWN VALUE, which is also this case's property: a
+  // code's remedy is the contract's. `applyContractRemedy` copies it verbatim, so asserting a DERIVED
+  // spelling made the test disagree with its own fixture — green on a mac, red on all three Windows
+  // cells, and about nothing. Contract remedies stay POSIX by the 2026-09-27 ruling until ARC-07-C32
+  // gives them a runtime substitution point; until then, comparing to the source is the honest form.
+  const entry = { code: 'X_FAILED', remedy: 'do the thing', command: './snowarch x' };
+  const contract = { errorCodes: [entry] };
   const filled = applyContractRemedy({ id: 'E-00', status: 'fail', detail: 'd', code: 'X_FAILED' }, contract);
-  assert.equal(filled.remedy, 'do the thing');
-  assert.equal(filled.command, `${LAUNCHER} x`);
+  assert.equal(filled.remedy, entry.remedy);
+  assert.equal(filled.command, entry.command);
   assert.throws(
     () => applyContractRemedy({ id: 'E-00', code: 'X_FAILED', remedy: 'my own words' }, contract),
     /may set `code` or `remedy`, not both/);

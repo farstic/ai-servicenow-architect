@@ -163,7 +163,10 @@ test('FAILs are listed with their remedy; warnings are not', () => {
     summary: { ...DESIGN.summary, ok: 20, warn: 2, fail: 1, fixable: 1 },
     checks: [
       { id: 'E-10', status: 'fail', title: 'settings.local toggles match the recorded mode',
-        detail: 'mode is live but servicenow is disabled', remedy: './snowarch mode live' },
+        // ARC-07-W17 — the FIXTURE derives too. The panel echoes a remedy verbatim, so a POSIX literal
+        // here against a derived expectation two lines down is a test disagreeing with itself: green on
+        // a mac, red on all three Windows cells, and about nothing.
+        detail: 'mode is live but servicenow is disabled', remedy: `${CLI} mode live` },
       { id: 'E-23', status: 'warn', title: 'stale registrations', detail: 'two found' },
       { id: 'E-25', status: 'warn', title: 'cloud-synced checkout', detail: 'iCloud' },
       { id: 'E-01', status: 'ok', title: 'fine' },

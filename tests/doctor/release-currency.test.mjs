@@ -7,10 +7,21 @@
  * successful one was reading the cache that one wrote rather than the state it meant to set up.
  */
 import { test } from 'node:test';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+/**
+ * The launcher these regexes hold, DERIVED AND ESCAPED — ARC-07-W17.
+ *
+ * `host.mjs`'s release-currency remedy reads `${cliOf(ctx)} upgrade`, and this file's ctx comes from
+ * `contextFor`, which defaults to the process — so on the Windows runner the product correctly renders
+ * `.\snowarch.cmd upgrade` and a POSIX regex fails. `RegExp.escape` is not on Node 20, so the escape is
+ * explicit: the spelling contains `.` and `\`, both of which mean something else in a pattern.
+ */
+const ESCAPED_CLI = spellings().cli.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 import { hostChecks } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
 import { runChecks } from '../../tools/snowarch/lib/doctor/runner.mjs';
@@ -276,7 +287,7 @@ test('C32 — the release-tag paths are unchanged, in both directions', async (t
   // a matching one is still ok, and both still say what they always said.
   const behind = await e28(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' });
   assert.equal(behind.status, 'warn');
-  assert.match(behind.detail, /^v9\.1\.0 available — run \.\/snowarch upgrade$/);
+  assert.match(behind.detail, new RegExp(`^v9\\.1\\.0 available — run ${ESCAPED_CLI} upgrade$`));
 
   const current = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
   t.after(() => rmSync(current, { recursive: true, force: true }));
@@ -423,7 +434,7 @@ test('E-28 — an untagged HEAD is a development checkout, not a checkout that i
 test('E-28 — a tagged HEAD older than the latest release IS behind, and says so', async (t) => {
   const r = await e28(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' });
   assert.equal(r.status, 'warn');
-  assert.match(r.detail, /^v9\.1\.0 available — run \.\/snowarch upgrade$/);
+  assert.match(r.detail, new RegExp(`^v9\\.1\\.0 available — run ${ESCAPED_CLI} upgrade$`));
 });
 
 test('E-28 — a tagged HEAD at the latest release is up to date', async (t) => {

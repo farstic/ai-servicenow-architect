@@ -366,6 +366,9 @@ export async function capture(mode, { pin = true, onCheckout = null, asVersion =
       // second one written here.
       home: root,
       env: {},
+      // ARC-07-W17 — PINNED, both here and in the comparison: a committed fixture must not depend on the
+      // capturing machine's shell. Linux is the POSIX rendering the committed files hold.
+      platform: 'linux',
     });
     const text = chunks.join('');
     if (!text.trimStart().startsWith('{')) die(`${mode}: status did not print a report (exit ${code})\n${text}`);

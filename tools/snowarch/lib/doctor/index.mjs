@@ -468,6 +468,12 @@ export function resolveCheckout({ cwd = process.cwd(), who = 'DOCTOR', node = pr
 }
 
 export async function doctorCommand({ flags = {}, log, out = process.stdout, env = process.env,
+  // ARC-07-W17 — the PLATFORM is an argument so a FIXTURE CAPTURE can pin it. `make-status-fixtures.mjs`
+  // writes `tests/fixtures/doctor/status-*.json` into the repository, and a fixture whose content depends
+  // on the runner's shell is not a fixture: captured on Windows it holds `.\snowarch.cmd` and the
+  // committed one holds `./snowarch`, so the re-capture case fails on one platform for no defect. #299
+  // settled the same question for the locked-production snapshot.
+  platform = process.platform,
   err = process.stderr, cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(),
   home = '', input = process.stdin, ask = null, fixDeps = {} } = {}) {
   const started = now();
@@ -572,7 +578,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     // an argument so a caller can drive a shell, and threading it is what makes Git Bash on Windows
     // keep the POSIX spelling.
     write(renderText({ report, checks, results, colour: useColour({ stream: out, env }),
-      cli: cliOf({ platform: process.platform, env }) }));
+      cli: cliOf({ platform, env }) }));
   }
   if (log?.commit) log.commit();
   return report.summary.fail > 0 ? exitCodeFor(report.summary) : EXIT_OK;

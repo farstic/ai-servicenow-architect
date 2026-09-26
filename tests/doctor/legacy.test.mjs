@@ -205,8 +205,19 @@ test('E-24\'s command is the one docs/snippets/import-from-legacy.md prints', as
   // The snippet is the one definition of the migration step (ARC-10-S01 includes it, and the
   // server's import test asserts its plan block). This check quotes it; the two must agree, and a
   // runtime read of a document is not how a check on a user's machine should learn its own remedy.
+  // ARC-07-W17 — THE SNIPPET IS A COMMITTED PAGE, so it holds the POSIX rendering and only that: a
+  // committed file cannot know the reader's shell, and the ruling (2026-09-27) is that such pages carry
+  // the POSIX spelling plus one line telling a PowerShell reader what to substitute. The CHECK, by
+  // contrast, renders for the shell it is running in — so on the Windows cells `r.command` is
+  // `.\snowarch.cmd …` and the snippet still says `./snowarch …`, and comparing them directly failed
+  // there for no defect. What the two must agree on is the COMMAND, so the comparison is made in the
+  // page's own rendering, pinned.
   const snippet = readFileSync(join(REAL_ROOT, 'docs/snippets/import-from-legacy.md'), 'utf8');
-  assert.ok(snippet.includes(r.command), `the snippet does not print "${r.command}"`);
+  const posix = spellings({ platform: 'linux', env: {} }).cli;
+  const asPage = r.command.replace(spellings().cli, posix);
+  assert.ok(snippet.includes(asPage), `the snippet does not print "${asPage}"`);
+  // ...and the check's own rendering is this shell's, which is the half the page cannot carry.
+  assert.ok(r.command.startsWith(spellings().cli), `the check did not render this shell: ${r.command}`);
 });
 
 test('tildify shortens a home path and leaves everything else alone', () => {
