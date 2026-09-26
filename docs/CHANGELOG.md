@@ -9,6 +9,87 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+Almost all of this release is one thing: the questions the installer asks a person, and the sentences
+it answers them with. Nothing here changes how the product is configured, and there is no migration
+step — an existing checkout keeps its instance store, its preset and its flags untouched.
+
+**The wizard asks, and takes an answer it can use.** Every question is numbered and says what it is
+asking; a mistyped answer is re-asked instead of ending the install. Before this release, typing an
+invalid label ended the run and the bootstrap then told you your typing was a defect in the bootstrap
+and asked you to file a bug; a URL typed at the prompt that did not normalise exited with the code
+that means *this tool is broken*; and `[1] re-enter the URL` — the one advertised way back from a typo
+— threw the run away. The label is step one now, named and explained, so the first thing you are asked
+is no longer a word the tool has not defined. A failed login offers three answers rather than one:
+keep the account and retype the password, change the account, or stop — and the account you just typed
+is kept, where it used to be asked for again from blank.
+
+**The screens say what they are for before they say what they propose.** The plan screen opens with
+what is being installed, into this folder only, and roughly how long it takes. Each of its two choices
+says what choosing it gives you, with the corpus cost on the line where the cost is being chosen. The
+permissions screen names the instance it governs and what Claude's tools may do there; a probe that
+found nothing says so in words — *ServiceNow SDK not installed* rather than a package name and a shell
+concept — and prints the command that fixes it on its own line, where it can be copied whole.
+
+**The question that could throw an install away is asked first.** The cloud-sync warning used to
+arrive after a URL, an environment, an auth method, a password and six reviewed permissions had been
+given, and answering it wrongly discarded all of them. It now runs before the first question, so the
+most a wrong answer costs is one word.
+
+**The ending tells you what you can still change.** A live install used to end with two ways to check
+that it worked and no way to change anything; it now names the command for the preset, the flags, the
+credentials, the docs corpus, and going back to design-only. When a wizard runs out of attempts it
+prints the exact command to resume with, carrying every answer you already gave — and never a password.
+
+**Windows readers get commands their shell will run.** PowerShell does not resolve a command from the
+current directory, and nothing puts this checkout on `PATH`, so `snowarch.cmd` and `cd /d … &&` were
+instructions a Windows user could not follow. Both spellings now come from one definition per package,
+across the installer, the doctor's remedies, the permissions screen and the pages — including six
+doctor remedies that already branched on the platform and put the refused spelling in the Windows arm.
+That sweep is not finished: 77 sites still spell the POSIX form, tracked as `ARC-07-C31`, and the error
+remedies the server hands back keep their POSIX spelling at runtime until `ARC-07-C32`. The
+always-loaded rules page carries one line telling a PowerShell reader what to substitute.
+
+**The health check at the end of an install says how much of it ran.** It reports 15 of 41 checks,
+because that is what the quick run does, and names how many more the full `doctor` covers — where it
+used to print counts that were true and an impression that was not. The doctor's summary also names
+which checks it is counting, so a warning is no longer a number with nothing to act on.
+
+**Two fixes to what the tool prints about itself.** The session banner printed the source of a
+function as its `Mode:` line on a checkout that had never been bootstrapped, and the documentation
+generator wrote the same into a committed page; both are fixed, and both now refuse the class rather
+than the instance. And the release rollback restores what the generators wrote, not only what was
+committed by hand.
+
+The bundled ServiceNow documentation corpus moves to `68c0d11`.
+
+### Added
+
+- The plan screen opens with what is being installed and roughly how long it takes, and each choice
+  says what choosing it gives you, with the corpus cost on the line where it is chosen.
+- A live install ends by naming the command for the preset, the flags, the credentials, the docs
+  corpus, and going back to design-only.
+- When the wizard runs out of attempts it prints the command to resume with, carrying every answer
+  already given and never a password.
+- The health check at the end of an install says how many of the 41 checks the quick run covered, and
+  how many more the full `doctor` runs.
+
+### Fixed
+
+- A mistyped answer is re-asked instead of ending the install: an invalid label no longer reports the
+  bootstrap as defective, and a URL typed at the prompt no longer exits with the code that means the
+  tool is broken.
+- `[1] re-enter the URL` re-asks the URL, where it used to discard the run.
+- A failed login offers three answers and keeps the account already typed.
+- The cloud-sync question is asked before the first question rather than after a password and six
+  reviewed permissions, so a wrong answer costs one word.
+- Windows readers are given commands PowerShell will run: both spellings come from one definition per
+  package, including six doctor remedies that branched on the platform and put the refused spelling in
+  the Windows arm. The remaining 77 sites are tracked as `ARC-07-C31`, and the server's runtime error
+  remedies as `ARC-07-C32`.
+- The session banner printed a function's source as its `Mode:` line on a checkout that had never been
+  bootstrapped, and the documentation generator wrote the same into a committed page.
+- The release rollback restores what the generators wrote, not only what was committed by hand.
+
 ## 2.0.5 — 2026-09-25
 
 ### Notes
