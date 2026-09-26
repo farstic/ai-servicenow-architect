@@ -55,8 +55,11 @@ export const USAGE = [
 export function fallbackPanel(root, cause, { read = readFileSync, exists = existsSync } = {}) {
   const path = join(root, '.local', 'bootstrap-state.json');
   if (!exists(path)) {
+    // ARC-07-W17 — one spelling, the reader's. This named both by hand and the Windows one was BARE,
+    // which PowerShell refuses; the sentence that tells somebody their checkout is not bootstrapped
+    // handed a Windows reader a command their shell rejects.
     return `Mode: unknown — doctor unavailable ${cause}, and .local/bootstrap-state.json is`
-      + ' absent — run ./bootstrap.sh (Windows: bootstrap.cmd)';
+      + ` absent — run ${spellings().bootstrap}`;
   }
   try {
     const state = JSON.parse(read(path, 'utf8'));

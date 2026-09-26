@@ -72,8 +72,8 @@ test('a failing check exits 1 AND still prints the panel', async (t) => {
   assert.equal(code, 1);
   const text = out.text();
   assert.match(text, /^Mode: /);
-  assert.ok(text.includes('E-00 FAIL a check: it did not — ./snowarch fix-it'));
-  assert.ok(text.includes('Run ./snowarch doctor --fix for the fixable ones (1).'));
+  assert.ok(text.includes(`E-00 FAIL a check: it did not — ${CLI} fix-it`));
+  assert.ok(text.includes(`Run ${CLI} doctor --fix for the fixable ones (1).`));
 });
 
 test('--json emits the doctor report, unchanged, and nothing else on stdout', async (t) => {
@@ -149,7 +149,7 @@ test('the fallback says what it does not know rather than inventing a mode', asy
   const root = tempDir('snowarch-no-state-', t);
   assert.equal(fallbackPanel(root, 'after it failed (Error)'),
     'Mode: unknown — doctor unavailable after it failed (Error), and .local/bootstrap-state.json'
-    + ' is absent — run ./bootstrap.sh (Windows: bootstrap.cmd)');
+    + ` is absent — run ${spellings().bootstrap}`);
 
   mkdirSync(join(root, '.local'), { recursive: true });
   writeFileSync(join(root, '.local', 'bootstrap-state.json'), '{ not json');

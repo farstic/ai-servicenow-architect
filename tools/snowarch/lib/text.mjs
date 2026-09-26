@@ -68,14 +68,28 @@ export function spellings(where = {}) {
 export const ADD_INSTANCE = (cli = './snowarch') =>
   `${cli} mode live, or /snowarch setup-instance inside Claude`;
 
+/**
+ * ARC-07-W17 — these name the READER'S shell, not both shells.
+ *
+ * `notBootstrapped` said `run ./bootstrap.sh (Windows: bootstrap.cmd)` — two spellings by hand, and the
+ * Windows one BARE, which is the one PowerShell refuses: it does not resolve a command from the current
+ * directory and nothing here is on PATH. So the message that tells a user their checkout is not
+ * bootstrapped gave a Windows reader a command their shell rejects, with the POSIX one beside it as a
+ * distraction. One spelling, for the shell doing the reading.
+ *
+ * FUNCTIONS, because `spellings()` must not be read at module load here: this file's own
+ * `isWindowsShell` is a `const`, and `text.mjs` sits in the `panel -> text -> report-text -> panel`
+ * import cycle ARC-07-W17 measured — a load-time read throws
+ * `Cannot access 'isWindowsShell' before initialization`.
+ */
 export const MODE_VARIANTS = Object.freeze({
-  unconfigured: `no ServiceNow instance configured; run ${ADD_INSTANCE()}`,
+  unconfigured: () => `no ServiceNow instance configured; run ${ADD_INSTANCE(spellings().cli)}`,
   serverDisabled: (label) => `server disabled in .claude/settings.local.json although instance `
-    + `"${label}" is configured; run ./snowarch mode live`,
-  noInstanceLoaded: 'server enabled but no instance is loaded (see SV-02/SV-03); run '
+    + `"${label}" is configured; run ${spellings().cli} mode live`,
+  noInstanceLoaded: () => 'server enabled but no instance is loaded (see SV-02/SV-03); run '
     + '/snowarch setup-instance',
-  notBootstrapped: 'this checkout has not been bootstrapped; run ./bootstrap.sh '
-    + '(Windows: bootstrap.cmd)',
+  notBootstrapped: () => 'this checkout has not been bootstrapped; run '
+    + `${spellings().bootstrap}`,
 });
 
 /**

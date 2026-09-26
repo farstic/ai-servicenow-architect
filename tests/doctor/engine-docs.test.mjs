@@ -6,6 +6,21 @@
 // the only way to assert the absent-corpus cases without deleting the developer's own checkout.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+
+/**
+ * The launcher these expectations hold — ARC-07-W17.
+ *
+ * DERIVED, never typed. The doctor's remedies read the spelling from the definitions now, so a POSIX
+ * literal here passes on a mac and fails all three Windows cells the moment the renderer is fixed —
+ * which is exactly what happened on the head before this one, and on #299 and #308 before that. The
+ * rule: an assertion holding a launcher must derive it in the SAME commit as the product change.
+ *
+ * `env: {}` is not passed, deliberately: with no fixture the mirror rule applies — the case asserts
+ * whatever THIS shell renders, which is POSIX on a mac and `.\snowarch.cmd` on the Windows runner.
+ */
+const SPELLED_CLI = spellings().cli;
+const SPELLED_BOOTSTRAP = spellings().bootstrap;
 
 import { docsFor, engineDocsChecks } from '../../tools/snowarch/lib/doctor/checks/engine-docs.mjs';
 import { E12_ABSENT } from '../../tools/snowarch/lib/docs/status.mjs';
@@ -66,7 +81,7 @@ test('E-12 fails a corpus that is present but missing a root file, and names it'
   assert.equal(r.status, 'fail', 'a corpus missing LICENSE was reported as present and well');
   assert.match(r.detail, /on disk but incomplete/);
   assert.match(r.detail, /LICENSE/, 'the report does not say WHICH file is missing');
-  assert.equal(r.command, './snowarch docs sync');
+  assert.equal(r.command, `${SPELLED_CLI} docs sync`);
   assert.deepEqual(r.data.rootMissing, ['LICENSE']);
   assert.equal(r.data.fix.kind, 'corpus-missing', 'the fix route does not reach `docs sync`');
   // ...and that kind is one the fixer actually knows. A `fix` naming a kind nothing handles is a
@@ -106,7 +121,7 @@ test('E-12 fails an absent corpus with ARC-03-S11\'s sentence, and never warns o
   assert.equal(r.status, 'fail');
   assert.ok(E12_ABSENT('skip').endsWith(r.detail),
     `the sentence is not ARC-03-S11's: ${JSON.stringify(r.detail)}`);
-  assert.equal(r.command, './snowarch docs sync');
+  assert.equal(r.command, `${SPELLED_CLI} docs sync`);
   assert.equal(checks.find((c) => c.id === 'E-12').severity, 'fail');
 });
 
@@ -147,7 +162,7 @@ test('E-16 is excluded from --quick — the walk is most of the quick budget', (
 test('E-13 separates the user\'s mismatch from the maintainer\'s', async (t) => {
   const moved = await run(t, 'E-13', { status: { head: 'b'.repeat(40), headMatchesPin: false } });
   assert.equal(moved.status, 'fail');
-  assert.equal(moved.command, './snowarch docs sync');
+  assert.equal(moved.command, `${SPELLED_CLI} docs sync`);
   assert.equal(moved.data.fix.kind, 'head-off-pin');
 
   const repinned = await run(t, 'E-13', {

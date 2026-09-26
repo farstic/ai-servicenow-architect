@@ -11,6 +11,21 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+
+/**
+ * The launcher these expectations hold — ARC-07-W17.
+ *
+ * DERIVED, never typed. The doctor's remedies read the spelling from the definitions now, so a POSIX
+ * literal here passes on a mac and fails all three Windows cells the moment the renderer is fixed —
+ * which is exactly what happened on the head before this one, and on #299 and #308 before that. The
+ * rule: an assertion holding a launcher must derive it in the SAME commit as the product change.
+ *
+ * `env: {}` is not passed, deliberately: with no fixture the mirror rule applies — the case asserts
+ * whatever THIS shell renders, which is POSIX on a mac and `.\snowarch.cmd` on the Windows runner.
+ */
+const SPELLED_CLI = spellings().cli;
+const SPELLED_BOOTSTRAP = spellings().bootstrap;
 
 import { backupFiles, countLegacyInstances, envSummary, isStaleEntry, legacyChecks, removalCommand,
   STALE, tildify } from '../../tools/snowarch/lib/doctor/checks/legacy.mjs';
@@ -147,7 +162,7 @@ test('E-24 counts the legacy store and prints the import command', async (t) => 
   const r = await run('E-24', root, home);
   assert.equal(r.status, 'warn');
   assert.match(r.detail, /legacy wizard store ~\/\.config\/servicenow-mcp\/instances\.json present \(2 instance/);
-  assert.equal(r.command, './snowarch instance import --from-legacy');
+  assert.equal(r.command, `${SPELLED_CLI} instance import --from-legacy`);
   assert.equal(r.data.instances, 2);
   assert.deepEqual(staleBlock([{ id: 'E-24', ...r }]).legacyStore,
     { path: '~/.config/servicenow-mcp/instances.json', instances: 2 });

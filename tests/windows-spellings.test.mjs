@@ -103,6 +103,25 @@ const DEFINITIONS = Object.freeze([
 ]);
 
 /**
+ * ...and one DATA file, exempt by the architect's ruling rather than by convenience.
+ *
+ * `errors/codes.ts` is the source of `.claude/rules/00-mode-and-mcp-gate.md`, which is GENERATED AND
+ * COMMITTED: it cannot know the reader's shell, so it must render one spelling on every machine or
+ * `gen:check` fails on either a maintainer's mac or the Windows cell. The ruling (2026-09-27) is that
+ * the page keeps the POSIX spelling and carries ONE line at the top telling a PowerShell reader what to
+ * substitute — because doubling would spell every command twice on nineteen lines.
+ *
+ * WHAT THIS EXEMPTION DOES NOT COVER, said plainly so the next reader does not assume it does: the
+ * RUNTIME half. When the server or the engine prints one of these remedies to a terminal it should
+ * derive the spelling, and today it does not — both `remedyFor` implementations return the stored text.
+ * I attempted it in this row with a `{cli}` placeholder and reverted: the engine reads remedies through
+ * `packages/contract/lib/contract.mjs`, whose `remedyFor` does no substitution, so the placeholder would
+ * have printed `{cli}` to users. It needs a second substitution point and a contract-sha bump, which is
+ * its own row rather than a 1am addition to this one.
+ */
+const DATA_EXEMPT = Object.freeze(['packages/snowarch/src/errors/codes.ts']);
+
+/**
  * Comments stripped: prose ABOUT the defect is not the defect.
  *
  * BLOCK COMMENTS ARE BLANKED, NOT REMOVED, and that distinction is the whole reason this helper has a
@@ -124,7 +143,7 @@ test('ARC-07-W17 — no shipped file spells the launcher except the two definiti
     { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
     .split('\n')
     .filter((f) => /\.(mjs|ts|js)$/.test(f) && !/\.test\./.test(f) && !/\.d\.ts$/.test(f))
-    .filter((f) => !DEFINITIONS.includes(f));
+    .filter((f) => !DEFINITIONS.includes(f) && !DATA_EXEMPT.includes(f));
 
   const offences = [];
   for (const rel of files) {

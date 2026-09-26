@@ -12,6 +12,8 @@
  * that drift and the things a reader cannot check.
  */
 
+import { spellings } from '../../../tools/snowarch/lib/text.mjs';
+
 /**
  * Named because the trap is its old behaviour: it sets `is_default`, which does nothing for REST.
  * The two script-execution stubs beside it in that sentence are NOT named here — they come from the
@@ -156,6 +158,8 @@ export function render(ctx) {
 
   return `${header}
 # Mode and MCP write gate
+
+On Windows PowerShell, type \`${spellings({ platform: 'win32', env: {} }).cli}\` wherever this page says \`${spellings({ platform: 'linux', env: {} }).cli}\`.
 
 ## Mode
 - The authoritative mode is the \`Mode:\` line printed at session start by the SessionStart hook. Quote it (\`/snowarch status\` does); never infer mode from any other file.

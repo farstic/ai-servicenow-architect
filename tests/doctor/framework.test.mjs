@@ -191,7 +191,7 @@ test("a check may set `code` OR `remedy`, never both — a code's remedy is the 
   const contract = { errorCodes: [{ code: 'X_FAILED', remedy: 'do the thing', command: './snowarch x' }] };
   const filled = applyContractRemedy({ id: 'E-00', status: 'fail', detail: 'd', code: 'X_FAILED' }, contract);
   assert.equal(filled.remedy, 'do the thing');
-  assert.equal(filled.command, './snowarch x');
+  assert.equal(filled.command, `${LAUNCHER} x`);
   assert.throws(
     () => applyContractRemedy({ id: 'E-00', code: 'X_FAILED', remedy: 'my own words' }, contract),
     /may set `code` or `remedy`, not both/);
@@ -232,7 +232,7 @@ test('the renderer: FAIL shouts, the Mode line is last, colour only on a TTY', (
   // assertion rather than loosened to a regex, because this is the one case that reads the whole
   // rendered report and it is where the two bracketed groups sit side by side.
   assert.equal(lines.at(-2),
-    'DOCTOR: 0 ok, 0 warn, 1 fail (E-00) (1 fixable — run ./snowarch doctor --fix)');
+    `DOCTOR: 0 ok, 0 warn, 1 fail (E-00) (1 fixable — run ${LAUNCHER} doctor --fix)`);
   assert.equal(statusLabel('fail'), 'FAIL');
   assert.equal(statusLabel('ok'), 'ok');
 
@@ -333,7 +333,7 @@ test('ARC-08-C37 — the doctor\'s summary names its non-ok checks', () => {
   // and slightly awkward; changing it would be changing the fixable wording.
   assert.equal(
     summaryLine({ ok: 1, warn: 0, fail: 1, skip: 0, fixable: 1 }, [{ id: 'E-29', status: 'fail' }], { cli: LAUNCHER }),
-    'DOCTOR: 1 ok, 0 warn, 1 fail (E-29) (1 fixable — run ./snowarch doctor --fix)');
+    `DOCTOR: 1 ok, 0 warn, 1 fail (E-29) (1 fixable — run ${LAUNCHER} doctor --fix)`);
 
   // CALLED WITH NO CHECKS — the shape every existing caller passes — the line is byte-identical to
   // what it printed before this row. That is what keeps B09's fallback tally honest: it counts

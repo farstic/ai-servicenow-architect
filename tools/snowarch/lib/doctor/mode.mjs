@@ -56,7 +56,7 @@ export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
 
   if (!bootstrapped) {
     return { mode: 'unknown', variant: 'notBootstrapped',
-      qualifier: MODE_VARIANTS.notBootstrapped, instance: null, loaded, serverEnabled };
+      qualifier: MODE_VARIANTS.notBootstrapped(), instance: null, loaded, serverEnabled };
   }
   if (serverEnabled && loaded.length > 0) {
     const first = loaded[0];
@@ -89,14 +89,14 @@ export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
     // which SV-02/SV-03 have already said in detail. The Mode line points at them rather than
     // repeating them.
     return { mode: 'design-only', variant: 'noInstanceLoaded', loaded, serverEnabled,
-      qualifier: MODE_VARIANTS.noInstanceLoaded, instance: null };
+      qualifier: MODE_VARIANTS.noInstanceLoaded(), instance: null };
   }
   if (serverEnabled) {
     return { mode: 'design-only', variant: 'noInstanceLoaded', loaded, serverEnabled,
-      qualifier: MODE_VARIANTS.noInstanceLoaded, instance: null };
+      qualifier: MODE_VARIANTS.noInstanceLoaded(), instance: null };
   }
   return { mode: 'design-only', variant: 'unconfigured', loaded, serverEnabled,
-    qualifier: MODE_VARIANTS.unconfigured, instance: null };
+    qualifier: MODE_VARIANTS.unconfigured(), instance: null };
 }
 
 /**

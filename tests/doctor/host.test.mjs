@@ -10,6 +10,21 @@ import assert from 'node:assert/strict';
 import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+
+/**
+ * The launcher these expectations hold — ARC-07-W17.
+ *
+ * DERIVED, never typed. The doctor's remedies read the spelling from the definitions now, so a POSIX
+ * literal here passes on a mac and fails all three Windows cells the moment the renderer is fixed —
+ * which is exactly what happened on the head before this one, and on #299 and #308 before that. The
+ * rule: an assertion holding a launcher must derive it in the SAME commit as the product change.
+ *
+ * `env: {}` is not passed, deliberately: with no fixture the mirror rule applies — the case asserts
+ * whatever THIS shell renders, which is POSIX on a mac and `.\snowarch.cmd` on the Windows runner.
+ */
+const SPELLED_CLI = spellings().cli;
+const SPELLED_BOOTSTRAP = spellings().bootstrap;
 
 import { which } from '../../tools/snowarch/lib/which.mjs';
 
@@ -294,7 +309,7 @@ test('E-27 warns when the recorded mode is live but Claude Code has rejected the
   const r = await run('E-27', root, over);
   assert.equal(r.status, 'warn');
   assert.match(r.detail, /rejected in Claude Code although the recorded mode is live/);
-  assert.equal(r.command, './snowarch mode live');
+  assert.equal(r.command, `${SPELLED_CLI} mode live`);
 });
 
 test('E-27 warns when the recorded mode is design-only but the server is not disabled', async (t) => {
@@ -302,7 +317,7 @@ test('E-27 warns when the recorded mode is design-only but the server is not dis
   const r = await run('E-27', root, over);
   assert.equal(r.status, 'warn');
   assert.match(r.detail, /not disabled in Claude Code although the recorded mode is design-only/);
-  assert.equal(r.remedy, './snowarch mode design');
+  assert.equal(r.remedy, `${SPELLED_CLI} mode design`);
   assert.equal(r.data.approved, true);
   // Sitting A: the remedy used to be duplicated into `command`, and the report prints both — so the
   // same line arrived twice. One remedy, said once.
@@ -330,7 +345,7 @@ test('E-27 — a live LOCAL entry in design mode is a FAIL, with a remedy that c
   const project = withClaude(t, { statusLine: CONNECTED, mode: 'design', scope: 'project' });
   const p = await run('E-27', project.root, project.over);
   assert.equal(p.status, 'warn', 'a project entry is covered by the toggle — not the same defect');
-  assert.equal(p.remedy, './snowarch mode design',
+  assert.equal(p.remedy, `${SPELLED_CLI} mode design`,
     'a project registration must NOT be sent to --register project — it is already there');
 });
 

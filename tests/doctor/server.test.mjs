@@ -11,6 +11,9 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
+/** Derived — a POSIX literal here is red on Windows the moment the renderer is fixed. */
+const SPELLED_CLI = spellings().cli;
+
 import {
   adopt, availability, DEPS_MISSING, DESIGN_ONLY_HEADER, DIST_MISSING, DOCTOR_ENTRY,
   SERVER_CHECK_IDS, serverChecks,
@@ -89,7 +92,7 @@ test('in live mode the missing dependencies are SV-01\'s failure, and fixable', 
   const sv01 = await adopt(ctx, 'SV-01');
   assert.equal(sv01.status, 'fail');
   assert.match(sv01.detail, new RegExp(DEPS_MISSING));
-  assert.equal(sv01.command, './snowarch doctor --fix');
+  assert.equal(sv01.command, `${SPELLED_CLI} doctor --fix`);
   assert.deepEqual(sv01.data.fix, { kind: 'deps-missing' });
   assert.equal(checks.find((c) => c.id === 'SV-01').fixable, true);
 

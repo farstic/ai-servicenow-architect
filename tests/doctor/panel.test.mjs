@@ -56,8 +56,8 @@ test('the live fixture renders to exactly these bytes', () => {
     // read from the fixture's own summary rather than spelled, the way the version and the shas
     // are. What this assertion is for is the SHAPE of the line, not the arithmetic in it.
     `Doctor: ${LIVE.summary.ok} ok, ${LIVE.summary.warn} warn, ${LIVE.summary.fail} fail`
-      + ' — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor',
-    'Capability packs, citation counts and the corpus branch are not probed on a quick run — ./snowarch doctor reports them.',
+      + ` — quick run 2026-09-20 09:00 UTC · full report: ${CLI} doctor`,
+    `Capability packs, citation counts and the corpus branch are not probed on a quick run — ${CLI} doctor reports them.`,
     "Instances are the store's own records; nothing was probed.",
   ].join('\n'));
 });
@@ -170,11 +170,11 @@ test('FAILs are listed with their remedy; warnings are not', () => {
     ] };
   const lines = renderPanel(report, CLI).split('\n');
   assert.ok(lines.includes('E-10 FAIL settings.local toggles match the recorded mode: '
-    + 'mode is live but servicenow is disabled — ./snowarch mode live'));
+    + `mode is live but servicenow is disabled — ${CLI} mode live`));
   for (const warned of ['E-23', 'E-25']) {
     assert.equal(lines.some((l) => l.startsWith(warned)), false, `${warned} was listed`);
   }
-  assert.ok(lines.includes('Run ./snowarch doctor --fix for the fixable ones (1).'));
+  assert.ok(lines.includes(`Run ${CLI} doctor --fix for the fixable ones (1).`));
   // A clean run says neither.
   assert.equal(renderPanel(LIVE, CLI).includes('--fix'), false);
 });
@@ -253,19 +253,19 @@ test('what a quick run did not probe is read off the report, not remembered', ()
   // assertions below pin `are`, and the one-key cases are the ones that were wrong.
   assert.equal(notProbedLine(LIVE, CLI),
     'Capability packs, citation counts and the corpus branch are not probed on a quick run'
-    + ' — ./snowarch doctor reports them.');
+    + ` — ${CLI} doctor reports them.`);
 
   const withPacks = { ...LIVE, engine: { ...LIVE.engine, capabilities: { docx: { present: true } } } };
   assert.equal(notProbedLine(withPacks, CLI),
     'citation counts and the corpus branch are not probed on a quick run'
-    + ' — ./snowarch doctor reports them.');
+    + ` — ${CLI} doctor reports them.`);
 
   // The case the owner hit on a design-only clone: capabilities null, citations present.
   const withCitations = { ...LIVE,
     engine: { ...LIVE.engine, docs: { ...LIVE.engine.docs, citations: 181, dead: 0 } } };
   assert.equal(notProbedLine(withCitations, CLI),
     'Capability packs and the corpus branch are not probed on a quick run'
-    + ' — ./snowarch doctor reports them.');
+    + ` — ${CLI} doctor reports them.`);
 
   // …and a report with no docs block at all names only what it can: the citation counts are not
   // missing from a corpus that is not there, they are not a fact about this checkout.
@@ -346,7 +346,7 @@ test('the docs line survives a quick run, and names the drift when there is drif
   const drifted = { ...agreeing.engine.docs, head: 'b'.repeat(40), headMatchesPin: false };
   assert.equal(docsLine(drifted, CLI),
     `Docs: vendor/ServiceNowDocs @ ${'a'.repeat(12)} (australia) · sparse`
-    + ` · corpus is on ${'b'.repeat(12)}, NOT the pin — ./snowarch docs sync`);
+    + ` · corpus is on ${'b'.repeat(12)}, NOT the pin — ${CLI} docs sync`);
 
   // Not compared is not "agrees": a quick run that could not reach the submodule says nothing
   // rather than implying the corpus is fine.
@@ -364,7 +364,7 @@ test('the not-probed sentence names the branch too, and reads as a list of three
       familyMatches: null } } };
   assert.equal(notProbedLine(quick, CLI),
     'Capability packs, citation counts and the corpus branch are not probed on a quick run'
-    + ' — ./snowarch doctor reports them.');
+    + ` — ${CLI} doctor reports them.`);
 
   // A full run measured the branch, so it is not on the list.
   const full = { ...quick, engine: { ...quick.engine,

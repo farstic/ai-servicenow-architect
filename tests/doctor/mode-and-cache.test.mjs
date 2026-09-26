@@ -86,7 +86,7 @@ test('the four design-only and unknown variants, and live', () => {
 test('the design-only line is exactly the story\'s sentence, and carries no doctor stamp', () => {
   const derived = deriveMode({ toggles: { enabled: false }, instances: [] });
   const line = modeLine(derived, { summary: { ok: 41, warn: 0, fail: 0 } });
-  assert.equal(line, `Mode: design-only — ${MODE_VARIANTS.unconfigured}`);
+  assert.equal(line, `Mode: design-only — ${MODE_VARIANTS.unconfigured()}`);
   assert.equal(/doctor \d{4}-/.test(line), false, 'a stamp was appended to an instruction');
 });
 
