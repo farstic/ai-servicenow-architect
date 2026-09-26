@@ -1800,6 +1800,16 @@ upstream has moved. It never merges anything.
   you would get running it locally. `newly dead (n)` is the whole reason the PR exists.
 - **Remap the citations on the PR's branch**, then push. The `needs-remap` label and the red
   `docs-check` job both clear when `docs verify` reports `dead: 0`.
+- **Four artefacts follow the pin, and `sync --upstream` stages none of them.** The chain is
+  **pin → fixtures → snippet → two quoting copies**, and every link has a test, so a bump that
+  stops at the five staged files is caught by CI rather than by its author:
+    1. `node scripts/make-status-fixtures.mjs` — the doctor's `status-{design,live}.json` embed the
+       pin. *"the committed fixtures are what the capture produces, today"*.
+    2. `docs/snippets/status-template.md` — regenerate it from `renderPanel()` over the recaptured
+       live fixture. *"the template block IS what the renderer prints — not a transcription of it"*.
+    3. `.claude/skills/snowarch/SKILL.md` — it quotes that snippet byte for byte.
+    4. `tests/VALIDATION-TESTS.md` T-07 — it quotes the same template.
+  Only the pin changes in all four, which is why the diff looks trivial and the omission does not.
 - **Two repository settings this depends on.** Settings → Actions → General → **"Allow GitHub
   Actions to create and approve pull requests"** must be on; without it the run moves the pin, pushes
   the branch and then fails at `gh pr create`. And the first CI run on each bot-authored pull request
