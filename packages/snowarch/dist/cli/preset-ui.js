@@ -125,7 +125,11 @@ export const recordedSuffix = (at) => (at ? ` (recorded ${String(at).slice(0, 10
  * exactly what the ADR leaves open.
  *
  * The LABEL, not the flag constant: `labelOf` strips `_ENABLED`, the box shows that label, and the
- * loop matches it case-insensitively — so the word printed here is the word that works.
+ * loop matches it case-insensitively — so the word printed here was the word that works.
+ *
+ * ARC-07-C14 moved what this line PRINTS to the row number. The label still resolves at the prompt
+ * as a deliberately undocumented alias (the dispatch below), so no existing habit broke — but the
+ * footer and the recommendation now name one grammar, and it is the number.
  */
 /**
  * The row number that opens this flag's question (ARC-07-C14), or nothing when there is no row.
