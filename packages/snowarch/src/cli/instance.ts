@@ -864,7 +864,7 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   } else {
     // ARC-08-C23 — A SKIPPED STEP SAYS SO. the authentication step printed nothing when the question was already
     // answered, so a run jumped from the environment step to credentials and the reader was left to work out whether a step
-    // had failed, been dropped, or scrolled past. It is six numbered steps: the numbering is a
+    // had failed, been dropped, or scrolled past. The steps are numbered: the numbering is a
     // promise that all six are accounted for, and a silent gap breaks it in the direction that
     // worries people. The line names the ANSWER and where it came from, because "skipped" alone
     // would tell a reader that something did not happen without telling them what was used.
