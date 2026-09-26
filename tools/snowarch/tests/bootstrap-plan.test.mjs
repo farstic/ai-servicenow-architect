@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { DOCS, LINES, MODES, applyChoice, buildPlan, formatPlan, resolveChoice, runPlanScreen }
+import { COLUMNS, DOCS, EXPLANATIONS, HEADER, LINES, MODES, ORIENTATION, applyChoice, buildPlan,
+  explainLines, formatPlan, resolveChoice, runPlanScreen }
   from '../lib/plan.mjs';
 import { LIVE_YES_WITHOUT_FILE, USAGE, bootstrapCommand,
   liveYesNeedsInstanceFile } from '../lib/bootstrap.mjs';
@@ -41,7 +42,12 @@ test('the plan proposes the safe thing, and says what live would need', () => {
   assert.match(text, /live needs a ServiceNow instance/);
   assert.match(text, /Node 22\.11\.0 found/);
   assert.match(text, /^ {2}2 {2}Docs {3}sparse \(19 areas\)/m);
-  assert.match(text, /^ {2}Steps {2}B01 workspace · B02 docs · B05 contract · B07 toggles · B09 summary$/m);
+  // A LITERAL, AND IT STAYS ONE. Deriving this from `plannedSteps` would make it agree with itself
+  // whatever the titles say — the ARC-07-C23 trap, where an assertion derived on both sides could
+  // not see a step move. This is the one place the five titles are written out, so a retitle shows
+  // up here and nowhere else has to be hunted for.
+  assert.match(text,
+    /^ {2}Steps {2}B01 workspace · B02 docs · B05 tool list · B07 Claude settings · B09 summary$/m);
 });
 
 test('with no Node the mode is fixed, and the line says how to add live later', () => {
@@ -613,4 +619,73 @@ test('ARC-07-C12 — an answer that is not an option says so, and the plan comes
   assert.equal(r.plan.mode, 'design-only', 'an unrecognised answer changed the value');
   assert.match(out.text(), /"nope" is not one of \[1\] design-only\s+\[2\] live/,
     `the refusal does not list the options: ${out.text().slice(-200)}`);
+});
+
+
+/**
+ * ARC-07-W13 — the screen says what is being installed and how long it takes, before any option.
+ *
+ * It opened on `Plan — Enter runs it as shown …`: what the KEYS do, and nothing about what is being
+ * decided or whether the reader is going to be sitting there. Both facts were in the code already.
+ */
+test('ARC-07-W13 — the two orientation lines come first, in order, above the header', () => {
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const lines = formatPlan(buildPlan({ ctx }), ctx).split('\n');
+
+  // ORDER AND POSITION, not mere presence: a reader gets the scope before the clock before the keys,
+  // and a block that renders them under the option rows would satisfy an `includes` and read wrong.
+  assert.deepEqual(lines.slice(0, 2), [...ORIENTATION], 'the screen does not open with the two lines');
+  assert.equal(lines[2], HEADER, 'the header is no longer the third line');
+
+  // THE CLAIM EACH ONE MAKES, named, so a rewrite that drops the load-bearing half is caught. "this
+  // folder only" is the promise the whole design rests on — B07 is the one step that could falsify
+  // it, and it writes Claude Code's settings per-checkout, which is why the sentence is true.
+  assert.match(lines[0], /this folder only/);
+  assert.match(lines[0], /nothing else on the machine changes/);
+  assert.match(lines[1], /about a minute/);
+  assert.match(lines[1], /live adds a short wizard/);
+});
+
+test('ARC-07-W13 — every line of the screen, and of `?`, is inside the column budget', () => {
+  // The budget caught my own work twice in this row: the second orientation line as ruled was 103
+  // columns, and the `this folder` explanation was 101. Both were trimmed by removing a phrase the
+  // screen already prints elsewhere rather than by cutting the fact.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  for (const line of [...ORIENTATION, HEADER, ...explainLines()]) {
+    assert.ok(line.length <= COLUMNS, `${line.length} > ${COLUMNS}: ${line}`);
+  }
+  // ...and the Steps line, which the retitle lengthened.
+  const steps = formatPlan(buildPlan({ ctx }), ctx).split('\n').find((l) => l.startsWith('  Steps'));
+  assert.ok(steps.length <= COLUMNS, `${steps.length} > ${COLUMNS}: ${steps}`);
+});
+
+test('ARC-07-W13 — `?` explains the lines the screen grew, because it claims to explain the screen', () => {
+  // The header offers `"?" explains`. A screen that gained two lines and left them unexplained makes
+  // that offer false — so the two new claims get an entry each: where the writes land, and where the
+  // minute goes. Keyed by the words the orientation lines use, not by new vocabulary.
+  const keys = EXPLANATIONS.map(([label]) => label);
+  assert.ok(keys.includes('this folder'), '`this folder` is claimed above and explained nowhere');
+  assert.ok(keys.includes('the minute'), '`the minute` is claimed above and explained nowhere');
+  const text = explainLines().join('\n');
+  assert.match(text, /lands in this checkout/);
+  assert.match(text, /fetching the documentation corpus/);
+});
+
+test('ARC-07-W13 — the two retitled steps say what they do, and their ids are untouched', () => {
+  // ONE TITLE PER STEP, TWO READERS: the plan screen's Steps line and the runner's `[B05/09] … ok`.
+  // `contract` and `toggles` are this repository's words for them; `tool list` and `Claude settings`
+  // are what a first-time reader can act on. Changing the shared constant changes BOTH surfaces,
+  // which is the right answer — a second title for the plan screen would be two names for one step,
+  // the defect this programme keeps closing.
+  const root = makeCheckout();
+  const ctx = ctxOf(root);
+  const steps = formatPlan(buildPlan({ ctx }), ctx).split('\n').find((l) => l.startsWith('  Steps'));
+  assert.match(steps, /B05 tool list/);
+  assert.match(steps, /B07 Claude settings/);
+  // The ids are the contract with every other surface — the cache, the state file, the doctor's
+  // step check, nine `[Bnn/09]` lines — and this row does not touch them.
+  for (const id of ['B01', 'B02', 'B05', 'B07', 'B09']) assert.match(steps, new RegExp(`${id} `));
+  assert.doesNotMatch(steps, /contract|toggles/, 'the old titles are still on the screen');
 });

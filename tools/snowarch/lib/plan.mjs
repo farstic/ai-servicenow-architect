@@ -24,6 +24,29 @@ export const MODES = Object.freeze(['design-only', 'live']);
  */
 export const DOCS = Object.freeze([MODE.sparse, MODE.full, 'skip']);
 
+/**
+ * THE TWO LINES ABOVE THE PLAN — ARC-07-W13.
+ *
+ * The screen opened on `Plan — Enter runs it as shown …`, which tells a reader what the KEYS do and
+ * nothing about what is being decided or how long it takes. Somebody running an unfamiliar installer
+ * wants two things before they read any option: what this is about to touch, and whether they are
+ * going to be sitting here. Both were answerable from the code and neither was on the screen.
+ *
+ * "into this folder only — nothing else on the machine changes" is the claim the whole design is
+ * built on, and B07 is the one step that could make it false: it writes Claude Code settings. It
+ * writes them per-checkout, which is why the sentence is true and why it is safe to print.
+ *
+ * WIDTH, AND A RULED PHRASE DROPPED FOR A REASON. The second line as ruled ended "… live adds a
+ * short wizard in this terminal" and measured 103 columns against `COLUMNS` = 100. The phrase that
+ * came off is the one already printed three rows below it — the Mode line's own
+ * "(wizard runs in this terminal)" — so the trim removes a SECOND author for that fact rather than a
+ * fact, and the line lands at 86. Same resolution as ARC-07-W12's aside, one row earlier.
+ */
+export const ORIENTATION = Object.freeze([
+  'Installing the AI ServiceNow Architect into this folder only — nothing else on the machine changes.',
+  'Two choices below, then it runs on its own (about a minute; live adds a short wizard).',
+]);
+
 export const HEADER =
   // ARC-07-C10 (S06 sitting) — "change" read as "open a sub-prompt for that line": the owner
   // pressed 1 seven times waiting to be asked something, and each press silently TOGGLED Mode and
@@ -58,6 +81,11 @@ export const EXPLANATIONS = Object.freeze([
   ['Enter', 'runs the plan exactly as shown above. Nothing is written before that.'],
   ['a number', 'asks what that line should be, the way the instance wizard asks its questions.'],
   ['q', 'quits without writing anything.'],
+  // ARC-07-W13 — `?` claims to explain THE SCREEN, so a screen that grew two lines and left them
+  // unexplained makes the header's own offer false. These two answer the questions the orientation
+  // lines raise rather than restating them: WHERE the writes go, and WHERE the minute goes.
+  ['this folder', 'everything written lands in this checkout — settings, docs corpus, instance store.'],
+  ['the minute', 'mostly fetching the documentation corpus; sparse is quicker than full.'],
 ]);
 
 /** The budget every other line on this screen is written to. */
@@ -118,6 +146,7 @@ export function formatPlan(plan, ctx, { accepted = null } = {}) {
     .map((s) => `${s.id} ${s.title}`).join(' · ');
   const pad = (s, w) => s.padEnd(w);
   return [
+    ...ORIENTATION,
     `${HEADER}${accepted ? `  (accepted: ${accepted})` : ''}`,
     `  1  Mode   ${pad(modeValue(plan), 20)} ${modeHint(plan)}`.trimEnd(),
     `  2  Docs   ${pad(docsValue(plan), 20)} `

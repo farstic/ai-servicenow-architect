@@ -66,24 +66,25 @@ Five preflight checks print a line each on every path — git, Claude Code, disk
 
 ```
 [B00/09] preflight … ok (0.7 s)
+Installing the AI ServiceNow Architect into this folder only — nothing else on the machine changes.
+Two choices below, then it runs on its own (about a minute; live adds a short wizard).
 Plan — Enter runs it as shown · type a number to choose that line's value · "?" explains · q quits
   1  Mode   design-only          live needs a ServiceNow instance (wizard runs in this terminal); Node 24.16.0 found
   2  Docs   sparse (19 areas)    full = whole corpus · skip = none (the doctor will report FAIL)
-  Steps  B01 workspace · B02 docs · B05 contract · B07 toggles · B09 summary
+  Steps  B01 workspace · B02 docs · B05 tool list · B07 Claude settings · B09 summary
 [B01/09] workspace … ok (0.1 s)
 [docs] 31.5 s · pin 11b39be · sparse · complete
 [B02/09] docs … ok (32 s)
 [B03/09] mode … ok (0.0 s)
 [B04/09] deps … skipped (design-only)
-[B05/09] contract … ok (0.0 s)
+[B05/09] tool list … ok (0.0 s)
 [B06/09] instance … skipped (design-only)
-[B07/09] toggles … ok (0.0 s)
+[B07/09] Claude settings … ok (0.0 s)
 [B08/09] verify … skipped (design-only)
 [B09/09] summary … ok (0.0 s)
 ```
 
-Enter accepts; a number changes that line; `q` quits and writes nothing at all. It ends with the
-block below — the tool's own text, inserted here from its source:
+It ends with the block below — the tool's own text, inserted here from its source:
 
 <!-- generated:closing-block -->
 ```

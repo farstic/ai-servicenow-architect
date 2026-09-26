@@ -138,10 +138,27 @@ test('ARC-07-W8 — the plan header on the page is the one the tool prints', asy
     assert.ok(read(rel).includes(HEADER),
       `${rel} does not carry the plan header the tool prints:\n  ${HEADER}`);
   }
-  // ...and the retired verb is gone, so a copy that drifted back would be caught by name.
+  // ...and the retired verb is gone. BY SHAPE, NOT BY THE ONE LITERAL — ARC-07-W13 found this
+  // assertion's original form was blind: it matched the header sentence `type a number to change
+  // that line`, and both pages carried a SECOND spelling three lines below the corrected header —
+  // *"Enter accepts; a number changes that line"* — which survived ARC-07-W8 untouched. A guard
+  // bound to one wording cannot see a paraphrase of the thing it forbids, which is the lesson
+  // ARC-07-C22 and ARC-07-C1 both recorded about matchers. So: a number and "change" in one
+  // sentence about this screen, however it is spelled.
   for (const rel of ['docs/INSTALL.md', 'README.md']) {
-    assert.equal(read(rel).includes('type a number to change that line'), false,
-      `${rel} still shows the verb ARC-07-C10 removed`);
+    for (const line of read(rel).split('\n')) {
+      assert.doesNotMatch(line, /a number (to )?chang(e|es) that line/,
+        `${rel} still shows the verb ARC-07-C10 removed: ${line}`);
+    }
+  }
+
+  // ARC-07-W13 — the two lines above the header are the tool's, on both pages, for the reason the
+  // header is: a page showing a screen the tool no longer prints is ARC-07-C22's defect.
+  const { ORIENTATION } = await import('../tools/snowarch/lib/plan.mjs');
+  for (const rel of ['docs/INSTALL.md', 'README.md']) {
+    for (const line of ORIENTATION) {
+      assert.ok(read(rel).includes(line), `${rel} is missing the orientation line:\n  ${line}`);
+    }
   }
 });
 
@@ -257,7 +274,14 @@ test('the page stays a page, and the tail stays a tail', () => {
   // run while the checkout exists), and the by-hand line for a reader who has already deleted the
   // folder or made the entry themselves. Same rule as the six moves above: a cap is worth moving
   // for a fact, and NOTHING WAS DELETED to pay for it.
-  assert.ok(install <= 298, `${install} lines of install page (criterion: 298)`);
+  // ARC-07-W13 moves it 298 → 299, and the accounting is the whole of the justification: the plan
+  // screen gained TWO lines the tool actually prints — what is being installed and where, and how
+  // long it takes — so a page that did not show them would be advertising a screen that no longer
+  // exists, which is ARC-07-C22's defect. ONE line was paid back out of the page's own prose, and it
+  // was a defect rather than a sacrifice: *"Enter accepts; a number changes that line"* restated the
+  // header in the verb ARC-07-C10 retired. Net +1, nothing deleted for space, same rule as the six
+  // moves above.
+  assert.ok(install <= 299, `${install} lines of install page (criterion: 299)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.

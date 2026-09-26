@@ -1,4 +1,4 @@
-// B05 contract — is this checkout internally consistent?
+// B05 tool list — is this checkout internally consistent?
 //
 // Three questions, all about the same worry: a partial pull, an interrupted merge, or a maintainer
 // who regenerated one file and not the other. ARC-05's CI proves this on every commit; B05 proves
@@ -12,7 +12,7 @@ import { FILE } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B05';
-export const title = 'contract';
+export const title = 'tool list';
 export const needsNode = true;
 export const runsWhen = (ctx) => ctx.node.present;
 export const skipReason = 'Node.js 20+ not found';

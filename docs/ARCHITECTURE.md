@@ -340,7 +340,7 @@ failing tool's knob first (`GIT_SSL_CAINFO` or `NODE_EXTRA_CA_CERTS`) and the ot
 a corporate bundle is always needed by both. A proxy URL is masked to `***@host:port` where the
 sentence is built, not on the way to the terminal.
 
-### B01 workspace and B07 toggles — what the bootstrap writes
+### B01 workspace and B07 Claude settings — what the bootstrap writes
 
 Four files, all of them gitignored, and **nothing outside the checkout**: `~/.claude.json` and
 `~/.claude/settings.json` are never touched.
