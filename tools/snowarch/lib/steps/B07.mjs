@@ -1,4 +1,4 @@
-// B07 toggles — the two Claude Code settings, and the per-checkout config that mirrors them.
+// B07 Claude settings — the two Claude Code settings, and the per-checkout config that mirrors them.
 //
 // The whole step is "write two array members into a file that belongs to someone else", which is
 // why the writing lives in `settings-local.mjs` and this only decides WHAT to ask for and reports
@@ -14,7 +14,7 @@ import { TEXT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
 
 export const id = 'B07';
-export const title = 'toggles';
+export const title = 'Claude settings';
 export const needsNode = false;
 export const runsWhen = () => true;
 // ARC-09-S05: the declaration lives in `lib/inputs.mjs`. Ten steps answering "what are my
