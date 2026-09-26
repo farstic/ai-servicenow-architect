@@ -120,6 +120,27 @@ export const AUTH_EXHAUSTED =
  * new constant for the count; the loop the prompt beside it already had.
  */
 /**
+ * ARC-07-W3 — the credential prompts, and what a non-answer is told.
+ *
+ * `Username: ` did not say WHOSE account — the instance's, or this machine's — and an empty answer
+ * ended the run. Worse, an empty answer was the prompt's ONLY exit, so abandoning the wizard and
+ * pressing Enter by mistake were the same gesture and neither could be told from the other.
+ *
+ * `q` IS THE USERNAME'S EXIT AND NOT THE PASSWORD'S. A password may legitimately BE `q`, and the
+ * prompt is invisible: a user whose password is `q` would be told nothing was saved with no way to
+ * see why. So the password names Ctrl-C, which `promptSecret` already handles by ending the process.
+ */
+export const USERNAME_PROMPT = 'Username (a ServiceNow user on this instance — admin on a PDI): ';
+export const USERNAME_REQUIRED =
+  'Username is required — type the account name, or q to abandon the wizard (nothing is saved)';
+export const CLIENT_ID_PROMPT = 'Client ID: ';
+export const CLIENT_ID_REQUIRED =
+  'Client ID is required for OAuth — type it, or q to abandon the wizard (nothing is saved)';
+export const PASSWORD_PROMPT = 'Password (nothing is shown while you type):';
+export const PASSWORD_REQUIRED =
+  'Password is required — type it, or press Ctrl-C to abandon the wizard (nothing is saved)';
+
+/**
  * ARC-07-W2 — the prompt SAYS THE SHAPE, so the first answer is likelier to be right.
  *
  * `Instance URL: ` named the thing and not the form of it, and the two commonest wrong answers are
@@ -638,7 +659,9 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     }
     auth = credentials;
 
-    io.write('[5/6] Probing\n');
+    // ARC-07-W3 — `Probing` named the machine's activity; the user's question is "is it doing
+    // anything to my instance?", and the answer is no.
+    io.write('[5/6] Checking the login and what this account may do (read-only, a few seconds) …\n');
     if (options.noProbes) { probeResult = { auth: { status: 'ok' }, last: null }; break; }
 
     const client = (deps.makeClient ?? probeClientFor)({ url: instanceUrl, auth });
@@ -853,6 +876,45 @@ async function askRoleMissing(io: AddIo, auth: AuthProbe): Promise<boolean> {
   return answer === 'y' || answer === 'yes';
 }
 
+/**
+ * A required, ECHOED answer, re-asked while it is empty (ARC-07-W3).
+ *
+ * UNBOUNDED, and safely so: a non-answer costs nothing — no network call, no failed login, no step
+ * closer to a lockout — so there is nothing for a bound to protect. The exits are `q` and EOF, and
+ * `io.ask` resolves to `string | null`, so EOF is NULL here. That is the ARC-07-W2 lesson: the label
+ * loop compares against `undefined` because it reads `(await io.ask(...))?.trim()`, and copying that
+ * idiom to a prompt read without `?.trim()` writes a guard that can never fire.
+ */
+async function askRequired(io: AddIo, prompt: string, missing: string): Promise<string | null> {
+  for (;;) {
+    const typed = await io.ask(prompt);
+    if (typed === null) return null;
+    const value = typed.trim();
+    if (value.toLowerCase() === 'q') return null;
+    if (value !== '') return value;
+    io.write(`${missing}\n`);
+  }
+}
+
+/**
+ * The same for a MASKED answer — and this one is bounded, for a reason that is not the user's.
+ *
+ * `io.secret` has no end-of-input value: it resolves to a string, and `promptSecret` handles Ctrl-C
+ * and Ctrl-D by ENDING THE PROCESS from inside itself (`exit(EXIT_INTERRUPTED)`). So a real user
+ * always has a way out and the bound is not it. What the bound terminates is an input source that
+ * can only ever answer empty — a closed pipe, or a test stub — where an unbounded loop would spin
+ * instead of asking. Measured: the stub returns `''` forever, so this guard is the difference
+ * between a failing assertion and a hung CI cell.
+ */
+async function askRequiredSecret(io: AddIo, prompt: string, missing: string): Promise<string> {
+  for (let attempt = 1; ; attempt += 1) {
+    const value = await io.secret(prompt);
+    if (value) return value;
+    io.write(`${missing}\n`);
+    if (attempt >= MAX_ATTEMPTS) return '';
+  }
+}
+
 /** The credentials for one attempt, or null when the user gave up. */
 async function readCredentials(
   method: 'basic' | 'oauth_ropc',
@@ -866,16 +928,24 @@ async function readCredentials(
     ? await readSecretFromStdin(io.io ? { io: io.io } : {})
     : null;
 
-  const username = options.username ?? (await io.ask('Username: ')) ?? '';
-  if (username.trim() === '') return null;
+  // ARC-07-W3 — INTERACTIVE ONLY. A `--username` from argv keeps today's behaviour exactly, and a
+  // piped empty secret still aborts: neither has a terminal to re-ask, which is the same split W2
+  // drew between the URL prompt and `--url`.
+  const username = options.username ?? await askRequired(io, USERNAME_PROMPT, USERNAME_REQUIRED);
+  if (username === null || username.trim() === '') return null;
 
-  const password = fromStdin ? (fromStdin[0] ?? '') : await io.secret('Password:');
+  const password = fromStdin
+    ? (fromStdin[0] ?? '')
+    : await askRequiredSecret(io, PASSWORD_PROMPT, PASSWORD_REQUIRED);
   if (!password) return null;
 
   if (method === 'basic') return { method, username, password };
 
   // The client id is an IDENTIFIER and is echoed; the secret is not.
-  const clientId = ((await io.ask('Client ID: ')) ?? '').trim();
+  // Required, like the username: an empty client id cannot authenticate, and accepting one only
+  // moved the failure to the probe, where the reason is harder to read.
+  const clientId = await askRequired(io, CLIENT_ID_PROMPT, CLIENT_ID_REQUIRED);
+  if (clientId === null) return null;
   const clientSecret = fromStdin ? (fromStdin[1] ?? '') : await io.secret('Client secret:');
   return { method, username, password, clientId, clientSecret };
 }
