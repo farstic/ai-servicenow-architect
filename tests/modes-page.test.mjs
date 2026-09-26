@@ -132,8 +132,11 @@ test('the load-bearing sentences survive, and the page names the three runtime c
   // section around it): a probe informs, and never decides.
   assert.ok(page.includes('A probe that fails downgrades the recommendation shown on that line; '
     + 'it never flips the toggle by itself'));
-  assert.ok(page.includes('Enter = accept as shown · type a flag name to toggle · '
-    + '"preset <name>" to switch preset'));
+  // ARC-07-C14 moved the unlocked screen from typing a flag name to typing its row number, so the
+  // footer this page shows changed with it. The locked (prod) footer is deliberately NOT here: a
+  // locked screen has no toggle to open, so `Enter = accept` is still the whole of its offer.
+  assert.ok(page.includes('Enter = apply as shown · a number opens that flag · '
+    + '"preset <name>" switches · "?" explains'));
   for (const code of Object.keys(RUNTIME)) {
     assert.ok(read('docs/TROUBLESHOOTING.md').includes(`### ${code}`), `TROUBLESHOOTING has no ${code} entry`);
   }

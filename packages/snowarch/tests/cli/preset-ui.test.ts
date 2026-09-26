@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   COLUMNS, ENTRY_DEFAULTS, FLAG_MEANINGS, PROBE_FIELD, annotate, applyingLine, dependencyViolation,
-  labelOf, parseFlagsArg, probeNote, probeRecommendsOff, prodRefusal, proposePreset,
+  flagQuestion, labelOf, parseFlagsArg, probeNote, probeRecommendsOff, prodRefusal, proposePreset,
   recordedSuffix, renderReviewScreen, resolveFlags,
   runReviewScreen, wrapRow,
 } from '../../src/cli/preset-ui.js';
@@ -88,7 +88,9 @@ describe('criterion 1 — the non-production screen', () => {
     // The line advises `off` and the toggle says `on`: a recommendation the user is free to
     // ignore is the entire shape of this screen.
     const lines = screen().split('\n');
-    expect(lines.filter((l) => l.trim().startsWith('[x]'))).toHaveLength(FLAG_NAMES.length);
+    // ARC-07-C14 numbered the rows, so a row now reads `1  [x] WRITE`. This case is the ADR-0005
+    // guard and its property is unchanged: every box starts [x] however the row is prefixed.
+    expect(lines.filter((l) => /^\s+\d+\s+\[x\]/.test(l))).toHaveLength(FLAG_NAMES.length);
     expect(screen()).toContain('[x] NOW_ASSIST');
     expect(screen()).toContain('recommend: off');
   });
@@ -122,7 +124,10 @@ describe('criterion 1 — the non-production screen', () => {
       expect(row).toContain('recommend: off');
       // THE LABEL THE SCREEN ITSELF SHOWS, and the word the loop accepts — measured, not assumed:
       // `labelOf` strips `_ENABLED`, and the toggle matches that label case-insensitively.
-      expect(row).toContain(`type ${label} to turn it off`);
+      // ARC-07-C14 re-pointed this: the documented way to act is the ROW NUMBER, derived from the
+      // flag's index, so the line names `(type 6)` rather than the label. C13's property — a
+      // recommendation says how to take it — is unchanged; only the word it names moved.
+      expect(row).toContain(`(type ${FLAG_NAMES.indexOf(flag) + 1})`);
       expect(labelOf(flag)).toBe(label);
     }
     // ...and a flag whose probe is fine is not told how to turn itself off.
@@ -149,7 +154,7 @@ describe('criterion 1 — the non-production screen', () => {
     // The first implementation wrapped the whole row as one string, and the padding — consecutive
     // spaces — was eaten by the word wrapper: NOW_ASSIST sat one space from its annotation while
     // every other row lined up. The prefix is never wrapped now.
-    const rows = screen().split('\n').filter((l) => l.trim().startsWith('[x]'));
+    const rows = screen().split('\n').filter((l) => /^\s+\d+\s+\[x\]/.test(l));   // ARC-07-C14: numbered
     const columns = new Set(rows.map((l) => l.indexOf('probe:')));
     expect(columns.size, `annotations start at ${[...columns].join(', ')}`).toBe(1);
     const wrapped = wrapRow('  [x] NOW_ASSIST   ', 'a '.repeat(80).trim());
@@ -301,7 +306,8 @@ describe('the rest of the grammar', () => {
   it('an unrecognised line says what IS recognised', async () => {
     const tty = scriptedTty(['sudo make me a sandwich', '']);
     await runReviewScreen(base, tty);
-    expect(tty.written).toContain('is not a flag or a command');
+    // ARC-07-C14 — the screen documents the number, so its refusal names that.
+    expect(tty.written).toContain('is not a row number or a command');
   });
 
   it('`q` and end-of-input both cancel, and cancelling decides nothing', async () => {
@@ -569,7 +575,10 @@ describe('ARC-07-C4 — the screen and the non-interactive path share one rule',
     const statuses: ProbeStatus[] = ['ok', 'auth failed', 'role missing', 'unreachable', 'error',
       'not licensed', 'not installed', 'skipped'];
     for (const status of statuses) {
-      const annotated = annotate(status).includes('(recommend: off)');
+      // ARC-07-C14 changed the SHAPE of the advice — `— recommend: off (type n)` rather than
+      // `keep on? (recommend: off)` — so the marker moves with it. The PROPERTY is untouched: the
+      // screen and the non-interactive path must recommend off for exactly the same statuses.
+      const annotated = annotate(status).includes('recommend: off');
       expect(probeRecommendsOff(status)).toBe(annotated);
       // ...and the non-interactive phrasing exists for exactly the same set.
       expect(probeNote(status) !== null).toBe(annotated);
@@ -607,15 +616,15 @@ describe('ARC-07 — probe provenance', () => {
     expect(annotate('skipped')).toBe('probe: skipped');
     expect(annotate(undefined)).toBe('probe: not run');
     expect(annotate('role missing', 'no itil role'))
-      .toBe('probe: role missing — no itil role; keep on? (recommend: off)');
+      .toBe('probe: role missing — no itil role — recommend: off');
   });
 
   it('a recorded probe names the day it was taken, beside the status', () => {
     expect(annotate('ok', undefined, AT)).toBe('probe: ok (recorded 2026-09-19)');
     // Beside the STATUS, not after the question: the qualifier belongs to the finding, and a line
-    // ending `keep on? (recommend: off) (recorded …)` reads as a date attached to the advice.
+    // ending `— recommend: off (recorded …)` would read as a date attached to the advice.
     expect(annotate('role missing', 'no itil role', AT))
-      .toBe('probe: role missing (recorded 2026-09-19) — no itil role; keep on? (recommend: off)');
+      .toBe('probe: role missing (recorded 2026-09-19) — no itil role — recommend: off');
   });
 
   it('every status is qualified except the one with nothing to date', () => {
@@ -654,5 +663,149 @@ describe('ARC-07 — probe provenance', () => {
     expect(fresh).not.toContain('recorded');
     // ...and nothing else about the screen moved.
     expect(recorded.replace(/ \(recorded 2026-09-19\)/g, '')).toBe(fresh);
+  });
+});
+
+/**
+ * ARC-07-C14 — the review screen adopts the plan screen's interaction.
+ *
+ * OWNER RULING, 2026-09-26, in their own words: *"by giving the numbers of the rows I choose whether
+ * it is on or off and so I set what rights it has."* The third screen in this product to be told that
+ * a number in a list is a choice — the plan screen learned it at ARC-07-C12 after three sittings, and
+ * this one is the same reader meeting the same grammar one screen later.
+ *
+ * ADR-0005 IS UNCHANGED AND IS THE REASON THE BOXES STILL START `[x]`: every flag is pre-set ON and
+ * "a failing probe changes only the recommendation text on that line, never the toggle". This is an
+ * interaction change, not a policy change — the user now has a documented way to *act* on the
+ * recommendation, and the recommendation still does not act on its own.
+ */
+describe('ARC-07-C14 — a number opens that flag, and Enter applies', () => {
+  const input = () => ({
+    label: 'pdi', environment: 'pdi' as const, preset: 'full' as const,
+    flags: expandPreset('full'),
+    probes: probes({ fluent: 'not installed' }),
+  });
+
+  it('(a) a number, an answer, Enter — the flag is off and the transcript says so', async () => {
+    const tty = scriptedTty(['6', '2', '']);
+    const result = await runReviewScreen(input(), tty);
+
+    expect(result.flags.FLUENT_ENABLED).toBe('false');
+    expect(result.preset).toBe('custom');
+    // THE QUESTION, in the wizard's shape, with the reason the probe gave.
+    expect(tty.written).toContain(
+      'FLUENT:  [1] on (current)  [2] off — recommended: @servicenow/sdk not on PATH');
+    // ...AND THE ACK, naming what changed, what Enter does now, and the number that reopens it.
+    expect(tty.written).toContain('FLUENT → off · Enter applies · 6 changes it again · q quits');
+  });
+
+  /**
+   * THE REASON, ON ITS OWN WITNESS.
+   *
+   * Case (a) asserts the reason and the ack in one transcript, so dropping either turned (a) red and
+   * neither could be told from the other. This case answers only "does the question say why", across
+   * every status that recommends off — and it reads the answer off the ROW rather than spelling it,
+   * so the question and the row cannot describe one probe in two ways. `annotationParts` is private;
+   * comparing the two rendered surfaces is the same guarantee without widening the export.
+   */
+  it('the question names the probe\'s reason, in the row\'s own words', () => {
+    const cases = [
+      ['fluent', 'FLUENT_ENABLED', 'not installed'],
+      ['nowAssist', 'NOW_ASSIST_ENABLED', 'not licensed'],
+      ['scripting', 'SCRIPTING_ENABLED', 'role missing'],
+    ] as const;
+    for (const [field, flag, status] of cases) {
+      const probed = probes({ [field]: status } as Partial<LastProbe>);
+      const question = flagQuestion(flag, expandPreset('full'), status);
+      const reason = /— recommended: (.+)$/.exec(question)?.[1];
+      expect(reason, `${flag}: the question carries no reason`).toBeTruthy();
+      // The same words the row prints for the same probe — one definition, two surfaces.
+      const screen = renderReviewScreen({ ...input(), probes: probed });
+      expect(screen, `${flag}: row and question disagree`).toContain(reason as string);
+    }
+    // ...and a probe that is fine attaches no reason at all: there is nothing to recommend.
+    expect(flagQuestion('WRITE_ENABLED', expandPreset('full'), 'ok')).not.toContain('recommended:');
+  });
+
+  it('(b) a number then Enter leaves the flag alone and applies nothing yet', async () => {
+    // Enter APPLIES at the screen's own prompt and means "leave it" at a flag's question — opening a
+    // row by mistake must not change a permission.
+    const tty = scriptedTty(['6', '', '']);
+    const result = await runReviewScreen(input(), tty);
+    expect(result.flags.FLUENT_ENABLED).toBe('true');
+    expect(tty.written).not.toContain('FLUENT → off');
+  });
+
+  it('(c) an answer that is not an option says so and changes nothing', async () => {
+    const tty = scriptedTty(['6', 'x', '']);
+    const result = await runReviewScreen(input(), tty);
+    expect(tty.written).toContain('"x" is not one of [1] on  [2] off');
+    expect(result.flags.FLUENT_ENABLED).toBe('true');
+  });
+
+  it('...and the option can be answered by name', async () => {
+    const tty = scriptedTty(['6', 'off', '']);
+    const result = await runReviewScreen(input(), tty);
+    expect(result.flags.FLUENT_ENABLED).toBe('false');
+  });
+
+  it('the rows are numbered in flag order, and the recommendation names its own number', async () => {
+    const text = renderReviewScreen(input());
+    const rows = text.split('\n').filter((l) => /^\s+\d+\s+\[[x ]\]/.test(l));
+    expect(rows).toHaveLength(FLAG_NAMES.length);
+    FLAG_NAMES.forEach((flag, i) => {
+      expect(rows[i]).toContain(`${i + 1}  [x] ${labelOf(flag)}`);
+    });
+    // DERIVED from the row index, never spelled: the FLUENT row is the sixth, so its recommendation
+    // says `(type 6)`. This replaces ARC-07-C13's `type FLUENT to turn it off`.
+    const fluentAt = FLAG_NAMES.indexOf('FLUENT_ENABLED') + 1;
+    expect(text).toContain(`recommend: off (type ${fluentAt})`);
+    expect(text).not.toContain('type FLUENT to turn it off');
+  });
+
+  it('the footer documents the number, and every line fits the budget', async () => {
+    const text = renderReviewScreen(input());
+    expect(text).toContain('Enter = apply as shown · a number opens that flag · "preset <name>" '
+      + 'switches · "?" explains');
+    expect(text).not.toContain('Enter = accept as shown');
+    expect(text).not.toContain('type a flag name to toggle');
+    for (const line of text.split('\n')) expect(line.length).toBeLessThanOrEqual(100);
+  });
+
+  it('a flag whose probe is ok offers off with no reason attached', async () => {
+    const tty = scriptedTty(['1', '', '']);
+    await runReviewScreen({ ...input(), probes: probes() }, tty);
+    expect(tty.written).toContain('WRITE:  [1] on (current)  [2] off');
+    expect(tty.written).not.toContain('WRITE:  [1] on (current)  [2] off — recommended');
+  });
+
+  it('typing a flag name still works, as an undocumented alias', async () => {
+    // The footer names one way on purpose; the grammar keeps the other so nobody's habit breaks.
+    const tty = scriptedTty(['fluent', '']);
+    const result = await runReviewScreen(input(), tty);
+    expect(result.flags.FLUENT_ENABLED).toBe('false');
+  });
+
+  it('a number-driven change runs the dependency conversation, exactly as a name-driven one does', async () => {
+    // WRITE is row 1 and CMDB_WRITE/SCRIPTING depend on it: turning it off by number must ask the
+    // same question, because it is the same function underneath.
+    const tty = scriptedTty(['1', '2', 'n', '']);
+    const result = await runReviewScreen(input(), tty);
+    expect(tty.prompts.join(' ')).toContain('require WRITE — turn them off as well?');
+    // `n` keeps the needed flag ON, which is the story's own answer in that direction.
+    expect(result.flags.WRITE_ENABLED).toBe('true');
+  });
+
+  it('"?" explains the number as well as the flags', async () => {
+    const tty = scriptedTty(['?', '']);
+    await runReviewScreen(input(), tty);
+    // THE KEY FIRST, then the flags. A short distinctive fragment of each, not the whole sentence:
+    // `wrapRow` folds at the budget, so asserting a full meaning fails on a correct screen — the
+    // third time in this row that a long string met the fold.
+    expect(tty.written).toContain('a number — opens that flag');
+    expect(tty.written).toContain('WRITE — ');
+    expect(tty.written).toContain(FLAG_MEANINGS.WRITE_ENABLED.split(' ').slice(0, 4).join(' '));
+    // ...and the number is explained BEFORE the flags, which is the order a reader needs.
+    expect(tty.written.indexOf('a number — opens')).toBeLessThan(tty.written.indexOf('WRITE — '));
   });
 });

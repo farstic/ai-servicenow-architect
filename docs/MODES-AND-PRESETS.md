@@ -83,16 +83,14 @@ per-flag review screen, each flag pre-set ON and annotated with its live probe r
 <!-- generated:review-screen-nonprod -->
 ```
 Proposed preset for "pdi" (pdi): full  — non-production: everything on
-  [x] WRITE        probe: ok
-  [x] CMDB_WRITE   probe: ok
-  [x] SCRIPTING    probe: ok
-  [x] ATF          probe: ok
-  [x] NOW_ASSIST   probe: no Now Assist licence detected — tools will fail until licensed; keep on?
-                   (recommend: off — type NOW_ASSIST to turn it off)
-  [x] FLUENT       probe: @servicenow/sdk not on PATH — keep on? (recommend: off — type FLUENT to
-                   turn it off)
-Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset · "?"
-explains the flags
+  1  [x] WRITE        probe: ok
+  2  [x] CMDB_WRITE   probe: ok
+  3  [x] SCRIPTING    probe: ok
+  4  [x] ATF          probe: ok
+  5  [x] NOW_ASSIST   probe: no Now Assist licence detected — tools will fail until licensed —
+                      recommend: off (type 5)
+  6  [x] FLUENT       probe: @servicenow/sdk not on PATH — recommend: off (type 6)
+Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains
 ```
 <!-- /generated:review-screen-nonprod -->
 
@@ -109,12 +107,12 @@ command that raises it:
 <!-- generated:review-screen-prod -->
 ```
 Proposed preset for "prod-acme" (prod): read-only  — production is capped at read-only (D-05)
-  [ ] WRITE        locked on production
-  [ ] CMDB_WRITE   locked on production
-  [ ] SCRIPTING    locked on production
-  [ ] ATF          locked on production
-  [ ] NOW_ASSIST   locked on production
-  [ ] FLUENT       locked on production
+  1  [ ] WRITE        locked on production
+  2  [ ] CMDB_WRITE   locked on production
+  3  [ ] SCRIPTING    locked on production
+  4  [ ] ATF          locked on production
+  5  [ ] NOW_ASSIST   locked on production
+  6  [ ] FLUENT       locked on production
 Enter = accept · to raise this instance later: ./snowarch instance set-preset prod-acme <preset>
 --ack-prod
 ```

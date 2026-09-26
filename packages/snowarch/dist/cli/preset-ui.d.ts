@@ -76,7 +76,7 @@ export declare function probeNote(status: ProbeStatus | undefined, recordedAt?: 
  * that has to be recomputed to stay honest and is wrong in a transcript the moment it is pasted.
  */
 export declare const recordedSuffix: (at: string | null | undefined) => string;
-export declare function annotate(status: ProbeStatus | undefined, hint?: string, recordedAt?: string | null, label?: string): string;
+export declare function annotate(status: ProbeStatus | undefined, hint?: string, recordedAt?: string | null, row?: number): string;
 /** The `LastProbe` field that carries a flag's result. One mapping, used by the screen and S05. */
 export declare const PROBE_FIELD: Readonly<Record<FlagName, keyof Omit<LastProbe, 'at' | 'auth'>>>;
 export interface ScreenInput {
@@ -174,6 +174,26 @@ export interface ReviewResult {
  * everyone. `q` and end-of-input both cancel, and cancelling saves nothing — which is why the
  * result says so rather than returning a preset the caller might write.
  */
+/**
+ * `FLUENT:  [1] on (current)  [2] off — recommended: @servicenow/sdk not on PATH` (ARC-07-C14).
+ *
+ * The reason appears only when the probe recommends off, and it is `annotationParts`' own head — one
+ * definition, so the question and the row cannot describe the same probe differently.
+ */
+export declare function flagQuestion(flag: FlagName, flags: Flags, status?: ProbeStatus, hint?: string): string;
+/**
+ * One answer to a flag's question: `1`/`2`, `on`/`off`, or nothing.
+ *
+ * `null` means leave it and go back to the screen — Enter APPLIES at the screen's own prompt, and a
+ * row opened by mistake must not change a permission. `undefined` is an answer that is not an option.
+ *
+ * THE PLAN SCREEN'S SEMANTICS, DELIBERATELY NOT ITS CODE: `resolveChoice` lives in
+ * `tools/snowarch/lib/plan.mjs`, and the engine and the server are separate packages — `plan.mjs`'s
+ * own comment records that the engine must not depend on the server, and nothing depends the other
+ * way either. Importing across that line to share four lines would buy consistency with a coupling
+ * neither package has today, so the grammar is shared and the function is not.
+ */
+export declare function resolveFlagAnswer(input: string | null): 'true' | 'false' | null | undefined;
 export declare function runReviewScreen(input: ScreenInput, io: ReviewIo): Promise<ReviewResult>;
 /**
  * One toggle, and the conversation the dependency rule needs.

@@ -552,7 +552,10 @@ test('ARC-02-S09 criteria 1 and 2 — the Modes and presets page says what it mu
     // incidentally while two did not appear at all — so a reader could not map a bullet to the key.
     'WRITE_ENABLED', 'CMDB_WRITE_ENABLED', 'SCRIPTING_ENABLED',
     'ATF_ENABLED', 'NOW_ASSIST_ENABLED', 'FLUENT_ENABLED',
-    'Enter = accept as shown', String.raw`^https://dev\d+\.service-now\.com`,
+    // ARC-07-C14: the row number IS the mechanism now, so the page has to say so — a page that
+    // kept only the accept half would leave a reader with no way to change anything.
+    'Enter = apply as shown', 'a number opens that flag',
+    String.raw`^https://dev\d+\.service-now\.com`,
     '--ack-prod', 'prodWriteAck', '.local/instances.json', '0600',
     'OneDrive', 'Dropbox', 'iCloud Drive', 'Google Drive',
     '--yes', "Propose, don't impose",
