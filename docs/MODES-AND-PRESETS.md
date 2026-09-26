@@ -244,7 +244,8 @@ Get-Secret -Name snow-pdi -AsPlainText | .\snowarch.cmd instance add pdi --url h
 
 `--password-stdin` reads stdin to its end, so every later question — the review screen, make-default, cloud-sync — has
 nothing to read and the run saves nothing. Pass `--yes` with it (name `--preset` or `--flags`; add `--default` if
-wanted), and `--username` too, or `add` stops at `Username:` and `set-credentials` takes the password as the username.
+wanted), and `--username` too, or `add` stops at the Username prompt and `set-credentials` takes the password as the
+username.
 `--yes` also answers §6's cloud-sync question yes, so use `--global` if that applies. The pipe is for `--auth basic`:
 `oauth_ropc` must still ask for the Client ID after the pipe is read, so add or rotate those interactively. Rotating:
 `… | ./snowarch instance set-credentials pdi --username admin --password-stdin`, saved only after the instance answers

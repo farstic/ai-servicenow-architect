@@ -60,6 +60,23 @@ export declare const AUTH_EXHAUSTED: string;
  * new constant for the count; the loop the prompt beside it already had.
  */
 /**
+ * ARC-07-W3 — the credential prompts, and what a non-answer is told.
+ *
+ * `Username: ` did not say WHOSE account — the instance's, or this machine's — and an empty answer
+ * ended the run. Worse, an empty answer was the prompt's ONLY exit, so abandoning the wizard and
+ * pressing Enter by mistake were the same gesture and neither could be told from the other.
+ *
+ * `q` IS THE USERNAME'S EXIT AND NOT THE PASSWORD'S. A password may legitimately BE `q`, and the
+ * prompt is invisible: a user whose password is `q` would be told nothing was saved with no way to
+ * see why. So the password names Ctrl-C, which `promptSecret` already handles by ending the process.
+ */
+export declare const USERNAME_PROMPT = "Username (a ServiceNow user on this instance \u2014 admin on a PDI): ";
+export declare const USERNAME_REQUIRED = "Username is required \u2014 type the account name, or q to abandon the wizard (nothing is saved)";
+export declare const CLIENT_ID_PROMPT = "Client ID: ";
+export declare const CLIENT_ID_REQUIRED = "Client ID is required for OAuth \u2014 type it, or q to abandon the wizard (nothing is saved)";
+export declare const PASSWORD_PROMPT = "Password (nothing is shown while you type):";
+export declare const PASSWORD_REQUIRED = "Password is required \u2014 type it, or press Ctrl-C to abandon the wizard (nothing is saved)";
+/**
  * ARC-07-W2 — the prompt SAYS THE SHAPE, so the first answer is likelier to be right.
  *
  * `Instance URL: ` named the thing and not the form of it, and the two commonest wrong answers are
