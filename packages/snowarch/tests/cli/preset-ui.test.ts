@@ -5,10 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  COLUMNS, ENTRY_DEFAULTS, FLAG_MEANINGS, PROBE_FIELD, annotate, applyingLine, dependencyViolation,
-  flagQuestion, labelOf, parseFlagsArg, probeNote, probeRecommendsOff, prodRefusal, proposePreset,
-  recordedSuffix, renderReviewScreen, resolveFlags,
-  runReviewScreen, wrapRow,
+  COLUMNS, ENTRY_DEFAULTS, FLAG_MEANINGS, PROBE_FIELD, annotate, annotationCommand, applyingLine, dependencyViolation, flagQuestion, labelOf, parseFlagsArg, probeNote, probeRecommendsOff, prodRefusal, proposePreset, recordedSuffix, renderReviewScreen, resolveFlags, runReviewScreen, wrapRow,
 } from '../../src/cli/preset-ui.js';
 import {
   DEPENDENCIES, FLAG_NAMES, PRESETS, applyDependencyRule, dependentsOf, expandPreset, matchPreset,
@@ -66,7 +63,10 @@ describe('proposePreset — the proposal is the environment, and nothing else', 
     // decides nothing more, which is the distinction the criterion is about.
     expect(withProbes.applying).toContain('WRITE=on (probe: role missing');
     expect(withProbes.applying).toContain('NOW_ASSIST=on (probe: no Now Assist licence');
-    expect(withProbes.applying).toContain('FLUENT=on (probe: not installed');
+    // ARC-07-W16 — the words, not the property: `not installed` became `ServiceNow SDK not
+    // installed`, one definition shared with the Saved line. Criterion 7's three assertions above
+    // are untouched.
+    expect(withProbes.applying).toContain('FLUENT=on (probe: ServiceNow SDK not installed');
     expect(withProbes.applying).toMatch(/^Applying: preset full — WRITE=on /);
   });
 });
@@ -172,7 +172,13 @@ describe('criterion 1 — the non-production screen', () => {
   it('the annotations are the story\'s, one per probe status', () => {
     expect(annotate('ok')).toBe('probe: ok');
     expect(annotate('not licensed')).toContain('no Now Assist licence detected');
-    expect(annotate('not installed')).toContain('@servicenow/sdk not on PATH');
+    // ARC-07-W16 — a package name and a shell concept became words, and the COMMAND left this
+    // string entirely: it is returned by `annotationCommand` and printed on its own line, because a
+    // wrapped note folded `npm i -g @servicenow/sdk` in half.
+    expect(annotate('not installed')).toContain('ServiceNow SDK not installed');
+    expect(annotate('not installed')).not.toContain('npm i -g');
+    expect(annotationCommand('not installed')).toBe('npm i -g @servicenow/sdk');
+    expect(annotationCommand('ok')).toBe(null);
     expect(annotate('role missing', 'no itil role')).toContain('role missing — no itil role');
     expect(annotate('skipped')).toBe('probe: skipped');
     expect(annotate(undefined)).toBe('probe: not run');
@@ -546,8 +552,12 @@ describe('ARC-07-C4 — the non-interactive path annotates, and never toggles', 
     expect(r.preset).toBe('full');
     // THE DEFECT, closed: the line explains itself, so the Saved line's `fluent not installed`
     // confirms a stated choice instead of contradicting one.
+    // ARC-07-W16 — the words moved and the COMMAND left this line: the caller wraps it (341 columns
+    // with three probe reasons), so a command inside it folds wherever the words land. It has one
+    // home, `annotationCommand`, printed on its own line where it stays whole.
     expect(r.applying).toContain(
-      'FLUENT=on (probe: not installed — tools will fail until @servicenow/sdk is on PATH)');
+      'FLUENT=on (probe: ServiceNow SDK not installed — those tools will fail until it is installed)');
+    expect(r.applying).not.toContain('npm i -g');
     // Only the failing one is annotated.
     expect(r.applying).toContain('WRITE=on ');
     expect(r.applying).not.toContain('WRITE=on (');
@@ -706,8 +716,10 @@ describe('ARC-07-C14 — a number opens that flag, and Enter applies', () => {
     expect(result.flags.FLUENT_ENABLED).toBe('false');
     expect(result.preset).toBe('custom');
     // THE QUESTION, in the wizard's shape, with the reason the probe gave.
+    // ARC-07-W16 — the question's `— recommended: …` follows from `statusWords`, the one definition
+    // the screen's annotation and the Saved line also read, so the three cannot disagree again.
     expect(tty.written).toContain(
-      'FLUENT:  [1] on (current)  [2] off — recommended: @servicenow/sdk not on PATH');
+      'FLUENT:  [1] on (current)  [2] off — recommended: ServiceNow SDK not installed');
     // ...AND THE ACK, naming what changed, what Enter does now, and the number that reopens it.
     expect(tty.written).toContain('FLUENT → off · Enter applies · 6 changes it again · q quits');
   });

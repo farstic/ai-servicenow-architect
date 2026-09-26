@@ -169,7 +169,9 @@ describe('the happy path', () => {
       // The summary is what gets pasted into a ticket.
       const out = terminal.written();
       expect(out).toContain('Saved instance "pdi" (pdi · basic · preset pdi-developer · default).');
-      expect(out).toContain('Probes: auth ok');
+      // ARC-07-W16 — its own line now (the two were one line of 165 columns), and a colon per field.
+      expect(out).toContain('Probes: auth: ok');
+      expect(out).toMatch(/^Saved instance "pdi" \(pdi · basic · preset [a-z-]+( · default)?\)\.$/m);
       expect(out).toContain(NEXT_LINE);
       expect(out).not.toContain(PASSWORD);
       expect(out).not.toContain(USERNAME);
@@ -1258,20 +1260,40 @@ describe('the summary lines', () => {
   });
 
   it('name the platform\'s own file-mode truth', () => {
-    expect(storeLine('/tmp/x/instances.json', 'darwin')).toContain('mode 0600, dir 0700');
-    // Windows has no chmod worth the name, and claiming one would be a lie in a line a support
-    // reader trusts.
-    expect(storeLine('C:\\x\\instances.json', 'win32')).toContain('file modes: ACL-inherited (Windows)');
+    // ARC-07-W16 — the PROPERTY is unchanged: each platform states its own truth and never the
+    // other's. `mode 0600, dir 0700` was two numbers a reader has no reason to know, so it says who
+    // can read the file; Windows still refuses to claim a chmod it does not have.
+    expect(storeLine('/tmp/x/instances.json', 'darwin')).toContain('readable only by you (0600)');
+    expect(storeLine('/tmp/x/instances.json', 'darwin')).not.toContain('Windows');
+    expect(storeLine('C:\\x\\instances.json', 'win32'))
+      .toContain('permissions are inherited from the folder (Windows)');
+    expect(storeLine('C:\\x\\instances.json', 'win32')).not.toContain('0600');
+
+    // ...AND THE HALF THAT IS NEW: the relative form is only true for THIS checkout's store, so the
+    // global store — which `--global` writes to `~/.config/snowarch/instances.json` — says where it
+    // actually went. A line claiming "in this folder" for a per-user store would be false on the one
+    // path a support reader is most likely to be reading it for.
+    const project = '/repo/.local/instances.json';
+    expect(storeLine(project, 'darwin', project)).toBe(
+      'Saved to .local/instances.json in this folder — readable only by you (0600).');
+    expect(storeLine('/home/someone/.config/snowarch/instances.json', 'darwin', project))
+      .not.toContain('in this folder');
   });
 
   it('report each enabled flag and print `off` for the rest', () => {
     const probe = { at: 'now', auth: 'ok', write: 'ok', scripting: 'role missing', cmdb: 'ok',
       atf: 'ok', nowAssist: 'not licensed', fluent: 'not installed' } as never;
     const line = probeSummary(probe, expandPreset('pdi-developer'), false);
-    expect(line).toContain('auth ok');
-    expect(line).toContain('scripting role missing');
-    expect(line).toContain('NOW_ASSIST off');
-    expect(line).toContain('FLUENT off');
+    // ARC-07-W16 — a colon per field, because the values are phrases now rather than single words
+    // (`atf: no licence detected` without one reads as a fragment), and the status WORDS come from
+    // `preset-ui.ts`'s `statusWords` — the same definition the permissions screen's annotation reads.
+    // This line said `fluent not installed` while the screen said `@servicenow/sdk not on PATH` for
+    // the identical measurement. The properties asserted here are unchanged: every enabled flag is
+    // reported, and a disabled one prints `off` under its upper-cased name.
+    expect(line).toContain('auth: ok');
+    expect(line).toContain('scripting: role missing');
+    expect(line).toContain('NOW_ASSIST: off');
+    expect(line).toContain('FLUENT: off');
   });
 });
 

@@ -13,7 +13,7 @@
  * happens while you are doing something else.
  */
 import { type FlagName, type Flags, type PresetName } from '../utils/permissions.js';
-import type { LastProbe, ProbeStatus } from '../servicenow/probes.js';
+import { type LastProbe, type ProbeStatus } from '../servicenow/probes.js';
 /** Every line this screen prints fits here. A wrapped hint is indented under its annotation. */
 export declare const COLUMNS = 100;
 export type Environment = 'pdi' | 'dev' | 'test' | 'prod';
@@ -76,6 +76,8 @@ export declare function probeNote(status: ProbeStatus | undefined, recordedAt?: 
  * that has to be recomputed to stay honest and is wrong in a transcript the moment it is pasted.
  */
 export declare const recordedSuffix: (at: string | null | undefined) => string;
+/** The command that clears this probe result, if naming one helps — ARC-07-W16. One definition. */
+export declare const annotationCommand: (status: ProbeStatus | undefined) => string | null;
 export declare function annotate(status: ProbeStatus | undefined, hint?: string, recordedAt?: string | null, row?: number): string;
 /** The `LastProbe` field that carries a flag's result. One mapping, used by the screen and S05. */
 export declare const PROBE_FIELD: Readonly<Record<FlagName, keyof Omit<LastProbe, 'at' | 'auth'>>>;

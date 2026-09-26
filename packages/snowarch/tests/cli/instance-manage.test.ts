@@ -613,13 +613,18 @@ describe('ARC-07-C6 — the probe column shows every fact the record holds', () 
     try {
       const table = listTable(listJson(ws.store, read(ws)));
       const cell = table.split('\n')[1]?.split('  ').at(-1);
-      expect(cell).toBe('auth ok · write ok · cmdb_write ok · scripting ok · atf ok'
-        + ' · now_assist not licensed · fluent not installed');
+      // ARC-07-W16 — the ORDER and the NAMES are exactly C6's property and are unchanged; the VALUES
+      // now come from `probeFieldText`, which the wizard's Saved line and the permissions screen also
+      // read. C6 made the order and the names shared and left the values formatted per caller; that
+      // is what let this column say `fluent not installed` while the screen said
+      // `@servicenow/sdk not on PATH` for one measurement.
+      expect(cell).toBe('auth: ok · write: ok · cmdb_write: ok · scripting: ok · atf: ok'
+        + ' · now_assist: no licence detected · fluent: ServiceNow SDK not installed');
 
       // The two that were dropped are the two a reader most needs: a capability that is OFF is the
       // reason a tool will refuse, and refusing is what sends them to this table.
-      expect(cell).toContain('now_assist not licensed');
-      expect(cell).toContain('fluent not installed');
+      expect(cell).toContain('now_assist: no licence detected');
+      expect(cell).toContain('fluent: ServiceNow SDK not installed');
     } finally { ws.cleanup(); }
   });
 
@@ -642,7 +647,7 @@ describe('ARC-07-C6 — the probe column shows every fact the record holds', () 
       scripting: 'ok', cmdb: 'ok', atf: 'ok' } }) });
     try {
       const cell = listTable(listJson(ws.store, read(ws))).split('\n')[1]?.split('  ').at(-1);
-      expect(cell).toBe('auth ok · write ok · cmdb_write ok · scripting ok · atf ok');
+      expect(cell).toBe('auth: ok · write: ok · cmdb_write: ok · scripting: ok · atf: ok');
       expect(cell).not.toContain('undefined');
       expect(cell).not.toContain('—');
     } finally { ws.cleanup(); }

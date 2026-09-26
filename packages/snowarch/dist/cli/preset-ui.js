@@ -13,6 +13,7 @@
  * happens while you are doing something else.
  */
 import { FLAG_NAMES, PRESETS, applyDependencyRule, dependentsOf, expandPreset, matchPreset, requiresOf, } from '../utils/permissions.js';
+import { statusWords } from '../servicenow/probes.js';
 import { cliSpelling } from './tty.js';
 /** Every line this screen prints fits here. A wrapped hint is indented under its annotation. */
 export const COLUMNS = 100;
@@ -90,9 +91,16 @@ export function probeNote(status, recordedAt = null) {
         case 'role missing':
             return `probe: role missing${when} — those tools will fail until the account has the role`;
         case 'not licensed':
-            return `probe: no Now Assist licence detected${when} — those tools will fail until licensed`;
+            return `probe: no Now Assist licence detected${when} — tools will fail until licensed`;
         default:
-            return `probe: not installed${when} — tools will fail until @servicenow/sdk is on PATH`;
+            // ARC-07-W16 — the same words as the screen's annotation, and the same command. This is the
+            // `--yes` line: nobody is asked, so it states the consequence and the fix and stops.
+            // NO COMMAND IN THIS SENTENCE, and for the same reason the screen's annotation has none: the
+            // caller WRAPS this line (341 columns with three probe reasons), so a command inside it would
+            // fold wherever the words happen to land. It survived by luck in the case I measured, which is
+            // not a property. The command has one home — `annotationCommand`, printed on its own line — and
+            // the `--yes` transcript says what is wrong, which is what a non-interactive run can act on.
+            return `probe: ${statusWords(status)}${when} — those tools will fail until it is installed`;
     }
 }
 /**
@@ -150,18 +158,36 @@ function annotationParts(status, hint, row) {
     switch (status) {
         case 'ok': return { head: 'ok', tail: '' };
         case 'role missing':
-            return { head: 'role missing',
+            return { head: statusWords(status),
                 tail: ` — ${hint ?? 'the account cannot read that table family'} — ${recommendOff}` };
         case 'not licensed':
-            return { head: 'no Now Assist licence detected',
+            return { head: `no Now Assist licence detected`,
                 tail: ` — tools will fail until licensed — ${recommendOff}` };
         case 'not installed':
-            return { head: '@servicenow/sdk not on PATH', tail: ` — ${recommendOff}` };
+            // ARC-07-W16 — `@servicenow/sdk not on PATH` is a package name and a shell concept, and the
+            // line offered no way to change it. It now says WHAT is missing in words and names the command
+            // that installs it, which is the same shape the licence line above already had.
+            //
+            // WHAT IT DOES NOT SAY IS "on is harmless", and that is a deliberate departure from the brief:
+            // this line also carries `recommend: off`, and a line reading "on is harmless … recommend: off"
+            // is two true sentences that together mislead — precisely the ARC-07-C13 defect this annotation
+            // exists to fix. Reversing the recommendation instead would be a behaviour change, not wording,
+            // and `probeRecommendsOff` is asserted to agree with `probeNote` across every status.
+            // THE COMMAND IS NOT IN THE NOTE, and that is ARC-07-C26's rule rather than a preference. The
+            // note WRAPS — the row's prefix is 24 columns and a recorded date leaves under 60 for the text —
+            // and my first version put `npm i -g @servicenow/sdk` inside it, which folded as
+            // `… until you run: npm` / `i -g @servicenow/sdk`: a command broken in half, on a line a reader
+            // selects and pastes. So it is returned separately and printed on its own aligned line, which is
+            // exactly what ARC-07-C26 did with the change-later asides one row earlier.
+            return { head: statusWords(status), tail: ` — ${recommendOff}`,
+                command: 'npm i -g @servicenow/sdk' };
         case 'skipped': return { head: 'skipped', tail: '' };
         case undefined: return { head: 'not run', tail: '' };
         default: return { head: String(status), tail: '' };
     }
 }
+/** The command that clears this probe result, if naming one helps — ARC-07-W16. One definition. */
+export const annotationCommand = (status) => annotationParts(status).command ?? null;
 export function annotate(status, hint, recordedAt = null, row) {
     const { head, tail } = annotationParts(status, hint, row);
     // `not run` is never qualified: there is no probe, so there is no date to name — a provenance on
@@ -246,17 +272,30 @@ export function renderReviewScreen(input) {
     // and what the acknowledgement changes is whether the boxes may be touched.
     const locked = environment === 'prod' && input.prodAcknowledged !== true;
     const lines = [];
-    lines.push(locked
-        ? `Proposed preset for "${label}" (${environment}): ${preset}  — production is capped at `
-            + 'read-only (D-05)'
+    // ARC-07-W16 — WHAT THIS SCREEN IS FOR, before what it proposes.
+    //
+    // `Proposed preset for "pdi" (pdi): full  — non-production: everything on` names a preset, a bare
+    // environment in brackets, and a permission grade, and never says what any of it GOVERNS. The
+    // owner's screens repeatedly show that the first line has to answer "what am I looking at" before
+    // it answers "what is proposed": the plan screen's orientation lines are ARC-07-C27, one row back,
+    // and this is the same lesson one step later. `environment pdi` rather than `(pdi)` because a bare
+    // duplicate of the label reads as a typo.
+    //
+    // WRAPPED, through the same `wrapRow` the footer beside it already uses. The new header is 115
+    // columns with a short label and 133 with a real one, and folding it is right where trimming is
+    // not: every clause in it is load-bearing, and the footer three lines down established that this
+    // screen folds rather than truncates.
+    // TWO LINES, DELIBERATELY, rather than one that folds. What this screen is and what it proposes are
+    // two statements, and the fold put the break inside `full (everything on)` — the same reason
+    // ARC-07-C26's asides took their own line instead of trusting where a wrap would land. The first is
+    // 84 columns with a short label, so `wrapRow` still carries it for a long one.
+    lines.push(...wrapRow('', `Permissions for instance "${label}" (environment ${environment}) — what Claude's tools may do `
+        + 'there.'));
+    lines.push(...wrapRow('', locked
+        ? 'Production is capped at read-only (D-05), so the boxes cannot be changed here.'
         : environment === 'prod'
-            ? `Preset for "${label}" (${environment}): ${preset}  — PRODUCTION, raise acknowledged`
-            // `non-production:` is the ENVIRONMENT half and stays — it is why everything MAY be on.
-            // What follows it is now the proposal's own description instead of a repetition of that
-            // permission, so `full` renders exactly as it always did and `read-only` stops claiming the
-            // opposite of the word beside it.
-            : `Proposed preset for "${label}" (${environment}): ${preset}  `
-                + `— non-production: ${presetNote(flags)}`);
+            ? `Proposed: ${preset} — PRODUCTION, raise acknowledged`
+            : `Proposed: ${preset} (${presetNote(flags)})`));
     // ARC-07-C14 — A NUMBER PER ROW, in the existing flag order, because that is what the user types.
     // The plan screen numbers its lines and the owner read those correctly; this screen is the same
     // grammar one step later, and the number is the only thing the footer documents.
@@ -267,16 +306,28 @@ export function renderReviewScreen(input) {
         const note = locked
             ? 'locked on production'
             : annotate(probes?.[PROBE_FIELD[flag]], hints?.[flag], probesRecordedAt ?? null, row);
-        lines.push(...wrapRow(`  ${row}  ${box} ${name} `, note));
+        const prefix = `  ${row}  ${box} ${name} `;
+        lines.push(...wrapRow(prefix, note));
+        // ...and the command, whole, on its own line under the note it belongs to.
+        const command = locked ? null : annotationCommand(probes?.[PROBE_FIELD[flag]]);
+        if (command)
+            lines.push(`${' '.repeat(prefix.length)}${command}`);
     });
     // The story's footer is 111 characters and the budget is 100, so it WRAPS — the same rule as a
     // long hint, and for the same reason: a terminal that folds it in the middle of a word is
     // harder to read than one continuation line.
-    const footer = locked
-        ? `Enter = accept · to raise this instance later: ${cli} instance set-preset ${label} `
-            + '<preset> --ack-prod'
-        : 'Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains';
-    lines.push(...wrapRow('', footer));
+    // ARC-07-W16 — THE LOCKED FOOTER'S COMMAND GETS ITS OWN LINE, for the reason the FLUENT row's does.
+    // `Enter = accept · to raise this instance later: ./snowarch instance set-preset acme-prod-emea` was
+    // 92 columns with a real label, so `<preset> --ack-prod` folded onto the next line and the command a
+    // reader pastes arrived in two pieces — on the PRODUCTION screen, where the cost of a half-pasted
+    // command is highest. The sentence and the command are now separate lines, each whole.
+    if (locked) {
+        lines.push('Enter = accept. To raise this instance later:');
+        lines.push(`${cli} instance set-preset ${label} <preset> --ack-prod`);
+    }
+    else {
+        lines.push(...wrapRow('', 'Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains'));
+    }
     return lines.join('\n');
 }
 /** `Applying: preset custom — WRITE=on CMDB_WRITE=on …` — printed before anything is saved. */
