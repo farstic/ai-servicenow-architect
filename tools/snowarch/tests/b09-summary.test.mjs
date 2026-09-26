@@ -43,7 +43,12 @@ test('the counts come from this run when no doctor exists, and from the doctor w
 
   const fromDoctor = doctorCounts(state, { root: '/repo', hasDoctor: true,
     run: () => ({ stdout: JSON.stringify({ summary: { ok: 41, warn: 0, fail: 0 } }) }) });
-  assert.deepEqual(fromDoctor, { ok: 41, warn: 0, fail: 0, source: 'doctor', failures: [] });
+  // ARC-08-C37 added `checks`, and `null` here is the measurement: this stub's JSON has a `summary`
+  // and no `checks` at all, so there is nothing to name and the key says so rather than being
+  // absent. `deepEqual` is kept — it is what caught the new key, and a loosened assertion would
+  // stop noticing the next one.
+  assert.deepEqual(fromDoctor,
+    { ok: 41, warn: 0, fail: 0, source: 'doctor', failures: [], checks: null });
 
   // Sitting A — the FAILING CHECKS travel with the count. The summary printed `1 fail` and named
   // nothing, and by the time anyone ran the full doctor the failure had gone: the only run that
@@ -68,6 +73,44 @@ test('the counts come from this run when no doctor exists, and from the doctor w
   const unparsable = doctorCounts(state, { root: '/repo', hasDoctor: true,
     run: () => ({ stdout: 'not json' }) });
   assert.equal(unparsable.source, 'bootstrap');
+});
+
+/**
+ * ARC-08-C37 — the WARNING the owner met at the end of a bootstrap, named.
+ *
+ * `failures` above is Sitting A's fix and covers FAILs. A doctor WARNING had no route to this block
+ * at all: `warnings` in `summaryBlock` is `warningsFrom(state)`, which is the bootstrap STEPS' own
+ * warnings — a different source, deliberately not conflated with the doctor's checks. So `1 warn`
+ * was counted here and named nowhere, and the owner had to run a second command to learn it was
+ * E-23. The id rides on the counts object; the remedy still lives in `./snowarch doctor`.
+ */
+test('ARC-08-C37 — a doctor warning is named in the block, not just counted', () => {
+  const state = stateWith({ B01: { status: 'ok' }, B05: { status: 'ok' } });
+  const counts = doctorCounts(state, { root: '/repo', hasDoctor: true,
+    run: () => ({ stdout: JSON.stringify({
+      summary: { ok: 14, warn: 1, fail: 0, skip: 26 },
+      checks: [
+        { id: 'E-23', status: 'warn', title: 'stale MCP registrations in ~/.claude.json',
+          // A PLACEHOLDER name, not the one this machine's store happens to hold: the real remedy
+          // names a retired product, and P-06's ratchet caught it here — correctly.
+          detail: '4 stale registration(s)', remedy: 'claude mcp remove <name> -s local' },
+        { id: 'SV-02', status: 'ok', title: 'store' },
+      ],
+    }) }) });
+  assert.deepEqual(counts.checks?.map((c) => c.id), ['E-23', 'SV-02'],
+    'the checks did not travel with the counts');
+  assert.deepEqual(counts.failures, [], 'a warning is not a failure and must not be listed as one');
+
+  const block = summaryBlock({ mode: 'design', counts, nodeUsable: true,
+    dialogs: EXPECTED_DIALOGS, serverKey: 'servicenow', platform: 'linux', env: {},
+    warnings: warningsFrom(state), failures: counts.failures ?? [] });
+  const lines = block.split('\n');
+  assert.equal(lines[0], 'DOCTOR: 14 ok, 1 warn (E-23), 0 fail, 26 skipped');
+  // NAMED, NOT LISTED: the warning's own remedy line stays out of the block, exactly as the panel
+  // keeps it out. E-23's remedy is several `claude mcp remove …` continuations and this block is
+  // already the longest thing a first install prints.
+  assert.equal(lines.some((l) => l.startsWith('E-23')), false, 'the warning was listed in full');
+  assert.equal(block.includes('claude mcp remove'), false, 'the remedy leaked into the block');
 });
 
 test('the doctor is spawned through childEnv, like every other child', () => {

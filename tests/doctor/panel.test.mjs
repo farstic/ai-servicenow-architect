@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
-  docsLine, engineLine, instancesLine, notProbedLine, ranAtLine, renderPanel, SHA_PREFIX,
+  docsLine, doctorLine, engineLine, instancesLine, notProbedLine, ranAtLine, renderPanel, SHA_PREFIX,
 } from '../../tools/snowarch/lib/doctor/panel.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
 
@@ -167,6 +167,39 @@ test('FAILs are listed with their remedy; warnings are not', () => {
   assert.ok(lines.includes('Run ./snowarch doctor --fix for the fixable ones (1).'));
   // A clean run says neither.
   assert.equal(renderPanel(LIVE).includes('--fix'), false);
+});
+
+test('ARC-08-C37 — the count names which check it is talking about', () => {
+  // The owner met `1 warn` twice — on this line and on B09's closing block — and had to run a
+  // second command to learn which check it was. The ID answers that inside the space the count
+  // already occupies. The REMEDY deliberately stays in `./snowarch doctor`: E-23's is four physical
+  // lines of `claude mcp remove …` continuations, and every other row of this panel is one
+  // `key: value` line. The case above — warnings are not listed — is unchanged and still green,
+  // which is the point: this names the warning without listing it.
+  const report = { ...DESIGN,
+    summary: { ...DESIGN.summary, ok: 20, warn: 2, fail: 1, fixable: 0 },
+    checks: [
+      { id: 'E-10', status: 'fail', title: 'settings.local toggles match the recorded mode' },
+      { id: 'E-23', status: 'warn', title: 'stale registrations', detail: 'two found' },
+      { id: 'E-25', status: 'warn', title: 'cloud-synced checkout', detail: 'iCloud' },
+      { id: 'E-01', status: 'ok', title: 'fine' },
+    ] };
+  assert.match(doctorLine(report), /^Doctor: 20 ok, 2 warn \(E-23, E-25\), 1 fail \(E-10\) — /);
+
+  // A zero count gets no brackets at all: there is nothing to name, and `0 fail ()` is noise.
+  assert.match(doctorLine(LIVE), /^Doctor: \d+ ok, 0 warn, 0 fail — /);
+
+  // THE IDS ARE READ FROM THE REPORT, never from a remembered list. Drop a check and the line
+  // drops it, while the COUNT — which the runner owns — is untouched. That divergence is the
+  // honest one: `notProbedLine` learned this when a fixed sentence went on describing the quick
+  // subset it was written for after a check moved out of it.
+  const narrowed = { ...report, checks: report.checks.filter((c) => c.id !== 'E-25') };
+  assert.match(doctorLine(narrowed), /2 warn \(E-23\), 1 fail \(E-10\)/);
+
+  // ABSENCE IS SILENCE. B09 falls back to counting `state.steps` when the doctor could not be
+  // spawned at all, and that path has no `checks` to read — so `2 warn` with nothing in brackets is
+  // a true line there, where `2 warn (unknown)` would be a made-up one.
+  assert.match(doctorLine({ ...report, checks: undefined }), /^Doctor: 20 ok, 2 warn, 1 fail — /);
 });
 
 test('the contract sha is the prefix the rest of the product prints', () => {

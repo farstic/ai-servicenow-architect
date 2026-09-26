@@ -64,7 +64,14 @@ export function doctorCounts(state, { root, run = spawnSync, hasDoctor = null,
       const parsed = JSON.parse(r.stdout ?? '{}');
       // The failing checks travel WITH the count. They were already in this JSON and were thrown
       // away with it, which is how a `1 fail` reached a user with nothing to act on.
-      if (parsed?.summary) return { ...parsed.summary, source: 'doctor', failures: failureLines(parsed) };
+      // ARC-08-C37 — `checks` travels so the DOCTOR line can name the warning it counted. `failures`
+      // above already spells every FAIL out underneath; a doctor WARNING was counted here and named
+      // nowhere, because `warnings` in the block below is `warningsFrom(state)` — the bootstrap
+      // steps' own warnings, a different source that must not be conflated with these.
+      if (parsed?.summary) {
+        return { ...parsed.summary, source: 'doctor', failures: failureLines(parsed),
+          checks: parsed.checks ?? null };
+      }
     } catch { /* fall through to this run's own tally */ }
   }
   const counts = { ok: 0, warn: 0, fail: 0, source: 'bootstrap' };

@@ -1349,7 +1349,7 @@ server
   SV-03 warn  instance flags: instance "pdi": 4/6 flags explicit
              → the doctor writes the missing ones as "false"   [fixable: ./snowarch doctor --fix]
 
-DOCTOR: 1 ok, 1 warn, 1 fail (2 fixable — run ./snowarch doctor --fix)
+DOCTOR: 1 ok, 1 warn (SV-03), 1 fail (E-12) (2 fixable — run ./snowarch doctor --fix)
 Mode: design-only — no ServiceNow instance configured; run ./snowarch mode live, or /snowarch setup-instance inside Claude
 ```
 <!-- /generated:doctor-text -->
