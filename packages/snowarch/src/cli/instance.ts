@@ -18,7 +18,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { EXIT_INTERRUPTED, EXIT_USAGE, readSecretFromStdin, type Io } from './tty.js';
+import { CANCELLED,EXIT_INTERRUPTED, EXIT_USAGE, readSecretFromStdin, type Io } from './tty.js';
 
 // Re-exported so the exit-code table has ONE home: `instance-command.ts` and the tests read the
 // same constants the behaviour uses, rather than importing 2 from one file and 0 from another.
@@ -110,6 +110,40 @@ export const LABEL_EXHAUSTED =
 export const AUTH_EXHAUSTED =
   `AUTHENTICATION_FAILED after ${MAX_ATTEMPTS} attempts — nothing saved. Check the account in the `
   + 'instance (System Security › Users) and run the command again.';
+
+/**
+ * The URL prompt's exhausted line (ARC-07-W2) — the third of the family, shaped like the other two.
+ *
+ * The family matters more than the sentence: all three are "the wizard asked, refused, re-asked and
+ * did not get an answer", all three end the run at `EXIT_FAILED`, and `EXIT_CODES` already documents
+ * that as *"nothing saved — a refusal, an abort, three failed attempts"*. So no new exit code and no
+ * new constant for the count; the loop the prompt beside it already had.
+ */
+/**
+ * ARC-07-W2 — the prompt SAYS THE SHAPE, so the first answer is likelier to be right.
+ *
+ * `Instance URL: ` named the thing and not the form of it, and the two commonest wrong answers are
+ * a browser URL with a path and an `http://` one. Both are refused with a good message; neither
+ * needed to happen.
+ */
+export const URL_PROMPT = 'Instance URL (https://<host>, no path): ';
+
+export const URL_EXHAUSTED =
+  `No valid URL after ${MAX_ATTEMPTS} attempts — nothing saved. Enter the instance origin, `
+  + 'e.g. https://dev123456.service-now.com, and run the command again.';
+
+/**
+ * The reachability bound's exhausted line (ARC-07-W2, at the architect's request on W1).
+ *
+ * ARC-07-W1 bounded the probe loop at three rounds and ended it with the bare `Nothing saved.`, which
+ * says what happened and not why it stopped. It REPLACES `NOTHING_SAVED` rather than preceding it,
+ * because that is what the two siblings above do — the goal was that the exhaustion paths read alike,
+ * and two consecutive lines both saying "nothing saved" would not. An explicit `[3] abort` still
+ * prints `NOTHING_SAVED`: that is a decision, not an exhaustion.
+ */
+export const REACH_EXHAUSTED =
+  `No reachable host after ${MAX_ATTEMPTS} attempts — nothing saved. Check the host name, and the `
+  + 'network or proxy if the name is right, then run the command again.';
 
 export const NEXT_LINE =
   'Next: in Claude Code run  /snowarch setup-instance --resume  (or restart claude).';
@@ -431,15 +465,12 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
 
   // ── [1/6] the URL ────────────────────────────────────────────────────────────────────────
   io.write('[1/6] Instance URL\n');
-  let url = options.url;
-  if (url === undefined) {
-    if (options.yes) {
-      // The registry's sentence, not a second one written here: one condition, one text.
-      const message = `URL_REQUIRED — ${fillRemedy('URL_REQUIRED')}.`;
-      io.write(`${message}\n`);
-      return { saved: false, exitCode: EXIT_USAGE, message };
-    }
-    url = (await io.ask('Instance URL: ')) ?? '';
+  const url = options.url;
+  if (url === undefined && options.yes) {
+    // The registry's sentence, not a second one written here: one condition, one text.
+    const message = `URL_REQUIRED — ${fillRemedy('URL_REQUIRED')}.`;
+    io.write(`${message}\n`);
+    return { saved: false, exitCode: EXIT_USAGE, message };
   }
   /**
    * One raw answer → a usable URL, or the normaliser's own message.
@@ -470,10 +501,49 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     return { ok: true, url: resolved };
   };
 
-  const normalised = await resolveUrl(String(url ?? ''));
+  /**
+   * ARC-07-W2 — ASK UNTIL IT IS A URL, the loop the label prompt beside it already had.
+   *
+   * ARC-07-C10 fixed this class for the label — re-ask up to `MAX_ATTEMPTS`, `EXIT_FAILED` on
+   * exhaustion, `EXIT_USAGE` only for argv — and the URL prompt was left on the exit-2 path. Exit 2
+   * is what makes B06 print *"a defect in the bootstrap rather than in anything you typed … please
+   * report"*, so a typo here had the wizard blaming itself for the user's typing.
+   *
+   * INTERACTIVE ONLY, and that is the whole care this function needs: a value from `--url` has nobody
+   * to re-ask, so it stays on `resolveUrl` below and keeps exit 2. The two are asserted apart.
+   */
+  const askUrl = async (prompt: string): Promise<
+  { ok: true; url: string } | { ok: false; exitCode: number; message: string }> => {
+    for (let attempt = 1; ; attempt += 1) {
+      const typed = await io.ask(prompt);
+      // EOF is not a wrong answer, it is the end of the conversation — the label loop's own rule.
+      // `io.ask` resolves to `string | null`, so EOF is NULL here. The label loop reads
+      // `(await io.ask(...))?.trim()` and compares against `undefined`, which is right for THAT
+      // shape and wrong for this one — the compiler caught a check that could never have fired.
+      if (typed === null) return { ok: false, exitCode: EXIT_USAGE, message: CANCELLED };
+      const resolved = await resolveUrl(typed);
+      if (resolved.ok) return resolved;
+      // The refusal is shown for EVERY attempt, the last one included: the reader has to see why the
+      // third answer was refused as well, or the exhaustion line arrives unexplained.
+      io.write(`${resolved.message}\n`);
+      // The LAST message is returned, not written, because the one caller writes whatever comes back
+      // — the argv path needs that write, and two write sites would double-print this line.
+      if (attempt >= MAX_ATTEMPTS) {
+        return { ok: false, exitCode: EXIT_FAILED, message: URL_EXHAUSTED };
+      }
+    }
+  };
+
+  // A value from `--url` keeps exit 2: there is nobody to re-ask. One shape for both paths, so the
+  // caller has exactly one write and one exit code rather than a branch at the point of failure.
+  const fromArgv = async (raw: string) => {
+    const one = await resolveUrl(raw);
+    return one.ok ? one : { ok: false as const, exitCode: EXIT_USAGE, message: one.message };
+  };
+  const normalised = url === undefined ? await askUrl(URL_PROMPT) : await fromArgv(String(url));
   if (!normalised.ok) {
     io.write(`${normalised.message}\n`);
-    return { saved: false, exitCode: EXIT_USAGE, message: normalised.message };
+    return { saved: false, exitCode: normalised.exitCode, message: normalised.message };
   }
   // ARC-07-W1 — MUTABLE, because `[1] re-enter the URL` replaces it and everything downstream (the
   // client, the probes, the saved entry) must use the URL that actually answered.
@@ -517,16 +587,21 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     for (const line of formatFailure(reach)) io.write(`${line}\n`);
     const choice = options.yes || round >= MAX_REACH_ROUNDS ? 'abort' : await askMenu(io);
     if (choice === 'reenter') {
-      const again = await resolveUrl((await io.ask('Instance URL: ')) ?? '');
+      // ARC-07-W2 — the SAME loop as `[1/6]`, which is why W1 extracted the seam: a URL re-entered
+      // here is re-asked on a typo exactly as the first one is, rather than ending the run.
+      const again = await askUrl(URL_PROMPT);
       if (!again.ok) {
         io.write(`${again.message}\n`);
-        return { saved: false, exitCode: EXIT_USAGE, message: again.message };
+        return { saved: false, exitCode: again.exitCode, message: again.message };
       }
       instanceUrl = again.url;
       io.write(`URL → ${instanceUrl} · probing again\n`);
     } else if (choice !== 'retry') {
-      io.write(`${NOTHING_SAVED}\n`);
-      return { saved: false, exitCode: EXIT_FAILED, message: NOTHING_SAVED };
+      // ARC-07-W2 — WHY it stopped, when it stopped because it ran out of rounds. An explicit
+      // `[3] abort` still prints the bare `Nothing saved.`: that is a decision, not an exhaustion.
+      const ended = round >= MAX_REACH_ROUNDS ? REACH_EXHAUSTED : NOTHING_SAVED;
+      io.write(`${ended}\n`);
+      return { saved: false, exitCode: EXIT_FAILED, message: ended };
     }
     reach = await (deps.reachability ?? probeReachability)(instanceUrl, { env });
   }

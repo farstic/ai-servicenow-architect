@@ -51,6 +51,33 @@ export declare const authFailedReason: () => string;
  */
 export declare const LABEL_EXHAUSTED: string;
 export declare const AUTH_EXHAUSTED: string;
+/**
+ * The URL prompt's exhausted line (ARC-07-W2) — the third of the family, shaped like the other two.
+ *
+ * The family matters more than the sentence: all three are "the wizard asked, refused, re-asked and
+ * did not get an answer", all three end the run at `EXIT_FAILED`, and `EXIT_CODES` already documents
+ * that as *"nothing saved — a refusal, an abort, three failed attempts"*. So no new exit code and no
+ * new constant for the count; the loop the prompt beside it already had.
+ */
+/**
+ * ARC-07-W2 — the prompt SAYS THE SHAPE, so the first answer is likelier to be right.
+ *
+ * `Instance URL: ` named the thing and not the form of it, and the two commonest wrong answers are
+ * a browser URL with a path and an `http://` one. Both are refused with a good message; neither
+ * needed to happen.
+ */
+export declare const URL_PROMPT = "Instance URL (https://<host>, no path): ";
+export declare const URL_EXHAUSTED: string;
+/**
+ * The reachability bound's exhausted line (ARC-07-W2, at the architect's request on W1).
+ *
+ * ARC-07-W1 bounded the probe loop at three rounds and ended it with the bare `Nothing saved.`, which
+ * says what happened and not why it stopped. It REPLACES `NOTHING_SAVED` rather than preceding it,
+ * because that is what the two siblings above do — the goal was that the exhaustion paths read alike,
+ * and two consecutive lines both saying "nothing saved" would not. An explicit `[3] abort` still
+ * prints `NOTHING_SAVED`: that is a decision, not an exhaustion.
+ */
+export declare const REACH_EXHAUSTED: string;
 export declare const NEXT_LINE = "Next: in Claude Code run  /snowarch setup-instance --resume  (or restart claude).";
 export declare const AUTH_QUESTION = "Authentication?";
 export declare const AUTH_CHOICES: ReadonlyArray<{
