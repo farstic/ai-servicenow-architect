@@ -208,6 +208,16 @@ export const PROBE_FIELD: Readonly<Record<FlagName, keyof Omit<LastProbe, 'at' |
   });
 
 export interface ScreenInput {
+  /**
+   * The launcher spelling this screen should print (ARC-07-C1, second Windows round).
+   *
+   * OPTIONAL, defaulting to `cliSpelling()` — so production behaviour is unchanged and a Windows
+   * user sees `.\snowarch.cmd`. It exists because the locked-production screen is asserted BYTE FOR
+   * BYTE against `docs/snippets/review-screen-prod.txt`, and a snapshot is a fixed answer: a screen
+   * that reads the platform inside itself renders one thing on a mac and another on Windows, and the
+   * equality fails on the runner with no way for the case to say which platform it meant. Now it can.
+   */
+  cli?: string;
   label: string;
   environment: Environment;
   preset: PresetName;
@@ -297,6 +307,8 @@ export function presetNote(flags: Flags): string {
 
 export function renderReviewScreen(input: ScreenInput): string {
   const { label, environment, preset, flags, probes, hints, probesRecordedAt } = input;
+  // The DEFAULT keeps production behaviour: a Windows user still sees `.\snowarch.cmd`.
+  const cli = input.cli ?? cliSpelling();
   // LOCKED, not "is production": an acknowledged raise is still production — the banner says so —
   // and what the acknowledgement changes is whether the boxes may be touched.
   const locked = environment === 'prod' && input.prodAcknowledged !== true;
@@ -331,7 +343,7 @@ export function renderReviewScreen(input: ScreenInput): string {
   // long hint, and for the same reason: a terminal that folds it in the middle of a word is
   // harder to read than one continuation line.
   const footer = locked
-    ? `Enter = accept · to raise this instance later: ${cliSpelling()} instance set-preset ${label} `
+    ? `Enter = accept · to raise this instance later: ${cli} instance set-preset ${label} `
       + '<preset> --ack-prod'
     : 'Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains';
   lines.push(...wrapRow('', footer));

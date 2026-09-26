@@ -240,6 +240,8 @@ export function presetNote(flags) {
 }
 export function renderReviewScreen(input) {
     const { label, environment, preset, flags, probes, hints, probesRecordedAt } = input;
+    // The DEFAULT keeps production behaviour: a Windows user still sees `.\snowarch.cmd`.
+    const cli = input.cli ?? cliSpelling();
     // LOCKED, not "is production": an acknowledged raise is still production — the banner says so —
     // and what the acknowledgement changes is whether the boxes may be touched.
     const locked = environment === 'prod' && input.prodAcknowledged !== true;
@@ -271,7 +273,7 @@ export function renderReviewScreen(input) {
     // long hint, and for the same reason: a terminal that folds it in the middle of a word is
     // harder to read than one continuation line.
     const footer = locked
-        ? `Enter = accept · to raise this instance later: ${cliSpelling()} instance set-preset ${label} `
+        ? `Enter = accept · to raise this instance later: ${cli} instance set-preset ${label} `
             + '<preset> --ack-prod'
         : 'Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains';
     lines.push(...wrapRow('', footer));

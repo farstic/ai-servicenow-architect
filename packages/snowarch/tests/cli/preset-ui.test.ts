@@ -73,6 +73,12 @@ describe('proposePreset — the proposal is the environment, and nothing else', 
 
 describe('criterion 1 — the non-production screen', () => {
   const screen = () => renderReviewScreen({
+    // THE PLATFORM IS STATED, because this is a byte-for-byte case against a fixed snapshot. A screen
+    // that reads the platform inside itself renders one thing on a mac and another on the Windows
+    // runner, and an equality assertion has no way to say which it meant — which is exactly how the
+    // locked-production case went red on four Windows cells after ARC-07-W7. The spelling is DERIVED
+    // from the platform rather than typed, so it follows `cliSpelling` if that ever changes.
+    cli: cliSpelling('darwin', {}),
     label: 'pdi',
     environment: 'pdi',
     preset: 'full',
@@ -174,8 +180,10 @@ describe('criterion 1 — the non-production screen', () => {
 });
 
 describe('criterion 4 — the production screen', () => {
+  // The platform is stated for the same reason as the non-production screen above: the locked footer
+  // names the launcher, and `docs/snippets/review-screen-prod.txt` is the POSIX rendering.
   const input = { label: 'prod-acme', environment: 'prod' as const, preset: 'read-only' as const,
-    flags: expandPreset('read-only') };
+    flags: expandPreset('read-only'), cli: cliSpelling('darwin', {}) };
 
   it('matches the snapshot, with six locked lines', () => {
     const expected = readFileSync(resolve(SNAPSHOTS, 'review-screen-prod.txt'), 'utf8').trimEnd();
