@@ -70,8 +70,13 @@ const addInPty = (args: readonly string[], password: string, onStart?: (pid: num
     env: env(),
     script: [
       { waitFor: /Password:/, send: `${password}\n` },
-      // The review screen: Enter accepts the proposal as shown.
-      { waitFor: /Enter = accept as shown|Applying:/, send: '\n' },
+      // The review screen: Enter applies the proposal as shown.
+      //
+      // ARC-07-C14 renamed the footer, and the `|Applying:` alternative this line used to carry is
+      // GONE rather than updated: the only call site is an `--env pdi` add with no `--yes`, so the
+      // unlocked screen always prints: matching the line after it meant the footer could change --
+      // as it just did -- while the case still passed. One witness, and it is the real one.
+      { waitFor: /Enter = apply as shown/, send: '\n' },
     ],
     ...(onStart ? { onStart } : {}),
   });

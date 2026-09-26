@@ -127,26 +127,35 @@ export const recordedSuffix = (at) => (at ? ` (recorded ${String(at).slice(0, 10
  * The LABEL, not the flag constant: `labelOf` strips `_ENABLED`, the box shows that label, and the
  * loop matches it case-insensitively — so the word printed here is the word that works.
  */
-const howToTakeIt = (label) => (label ? ` — type ${label} to turn it off` : '');
-function annotationParts(status, hint, label) {
-    const recommendOff = `(recommend: off${howToTakeIt(label)})`;
+/**
+ * The row number that opens this flag's question (ARC-07-C14), or nothing when there is no row.
+ *
+ * DERIVED from the row index and never spelled: the number is a property of where the flag sits in
+ * `FLAG_NAMES`, so a flag inserted tomorrow renumbers every line below it and this text follows.
+ * ARC-07-C13 named the label here (`type FLUENT to turn it off`) because the label was then the only
+ * way to act on the line; the owner's ruling makes the number the documented way, so the text names
+ * what the footer documents.
+ */
+const howToTakeIt = (row) => (row ? ` (type ${row})` : '');
+function annotationParts(status, hint, row) {
+    const recommendOff = `recommend: off${howToTakeIt(row)}`;
     switch (status) {
         case 'ok': return { head: 'ok', tail: '' };
         case 'role missing':
             return { head: 'role missing',
-                tail: ` — ${hint ?? 'the account cannot read that table family'}; keep on? ${recommendOff}` };
+                tail: ` — ${hint ?? 'the account cannot read that table family'} — ${recommendOff}` };
         case 'not licensed':
             return { head: 'no Now Assist licence detected',
-                tail: ` — tools will fail until licensed; keep on? ${recommendOff}` };
+                tail: ` — tools will fail until licensed — ${recommendOff}` };
         case 'not installed':
-            return { head: '@servicenow/sdk not on PATH', tail: ` — keep on? ${recommendOff}` };
+            return { head: '@servicenow/sdk not on PATH', tail: ` — ${recommendOff}` };
         case 'skipped': return { head: 'skipped', tail: '' };
         case undefined: return { head: 'not run', tail: '' };
         default: return { head: String(status), tail: '' };
     }
 }
-export function annotate(status, hint, recordedAt = null, label) {
-    const { head, tail } = annotationParts(status, hint, label);
+export function annotate(status, hint, recordedAt = null, row) {
+    const { head, tail } = annotationParts(status, hint, row);
     // `not run` is never qualified: there is no probe, so there is no date to name — a provenance on
     // an absence would be describing a record that does not exist.
     const when = status === undefined ? '' : recordedSuffix(recordedAt);
@@ -238,22 +247,25 @@ export function renderReviewScreen(input) {
             // opposite of the word beside it.
             : `Proposed preset for "${label}" (${environment}): ${preset}  `
                 + `— non-production: ${presetNote(flags)}`);
-    for (const flag of FLAG_NAMES) {
+    // ARC-07-C14 — A NUMBER PER ROW, in the existing flag order, because that is what the user types.
+    // The plan screen numbers its lines and the owner read those correctly; this screen is the same
+    // grammar one step later, and the number is the only thing the footer documents.
+    FLAG_NAMES.forEach((flag, i) => {
+        const row = i + 1;
         const box = !locked && flags[flag] === 'true' ? '[x]' : '[ ]';
         const name = labelOf(flag).padEnd(LABEL_WIDTH + 2);
         const note = locked
             ? 'locked on production'
-            : annotate(probes?.[PROBE_FIELD[flag]], hints?.[flag], probesRecordedAt ?? null, labelOf(flag));
-        lines.push(...wrapRow(`  ${box} ${name} `, note));
-    }
+            : annotate(probes?.[PROBE_FIELD[flag]], hints?.[flag], probesRecordedAt ?? null, row);
+        lines.push(...wrapRow(`  ${row}  ${box} ${name} `, note));
+    });
     // The story's footer is 111 characters and the budget is 100, so it WRAPS — the same rule as a
     // long hint, and for the same reason: a terminal that folds it in the middle of a word is
     // harder to read than one continuation line.
     const footer = locked
         ? `Enter = accept · to raise this instance later: ./snowarch instance set-preset ${label} `
             + '<preset> --ack-prod'
-        : 'Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset · '
-            + '"?" explains the flags';
+        : 'Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains';
     lines.push(...wrapRow('', footer));
     return lines.join('\n');
 }
@@ -322,6 +334,39 @@ export function dependencyViolation(flags) {
  * everyone. `q` and end-of-input both cancel, and cancelling saves nothing — which is why the
  * result says so rather than returning a preset the caller might write.
  */
+/**
+ * `FLUENT:  [1] on (current)  [2] off — recommended: @servicenow/sdk not on PATH` (ARC-07-C14).
+ *
+ * The reason appears only when the probe recommends off, and it is `annotationParts`' own head — one
+ * definition, so the question and the row cannot describe the same probe differently.
+ */
+export function flagQuestion(flag, flags, status, hint) {
+    const on = flags[flag] === 'true';
+    const why = probeRecommendsOff(status) ? ` — recommended: ${annotationParts(status, hint).head}` : '';
+    return `${labelOf(flag)}:  [1] on${on ? ' (current)' : ''}  [2] off${on ? '' : ' (current)'}${why}`;
+}
+/**
+ * One answer to a flag's question: `1`/`2`, `on`/`off`, or nothing.
+ *
+ * `null` means leave it and go back to the screen — Enter APPLIES at the screen's own prompt, and a
+ * row opened by mistake must not change a permission. `undefined` is an answer that is not an option.
+ *
+ * THE PLAN SCREEN'S SEMANTICS, DELIBERATELY NOT ITS CODE: `resolveChoice` lives in
+ * `tools/snowarch/lib/plan.mjs`, and the engine and the server are separate packages — `plan.mjs`'s
+ * own comment records that the engine must not depend on the server, and nothing depends the other
+ * way either. Importing across that line to share four lines would buy consistency with a coupling
+ * neither package has today, so the grammar is shared and the function is not.
+ */
+export function resolveFlagAnswer(input) {
+    const answer = String(input ?? '').trim().toLowerCase();
+    if (answer === '')
+        return null;
+    if (answer === '1' || answer === 'on')
+        return 'true';
+    if (answer === '2' || answer === 'off')
+        return 'false';
+    return undefined;
+}
 export async function runReviewScreen(input, io) {
     const prod = input.environment === 'prod' && input.prodAcknowledged !== true;
     let flags = { ...input.flags };
@@ -340,6 +385,11 @@ export async function runReviewScreen(input, io) {
         if (lower === 'q')
             return { preset, flags, cancelled: true };
         if (lower === '?' || lower === 'help') {
+            // ARC-07-C14 — the KEYS first, then the flags. The plan screen's `?` explains both for the same
+            // reason: a footer long enough to say what a number, Enter and q each do is a footer nobody
+            // finishes, and the number is the one thing a reader has to be told about.
+            io.write(`${wrapRow('  a number — ', 'opens that flag and asks whether it should be on or off; '
+                + 'nothing is applied until you press Enter.').join('\n')}\n`);
             for (const flag of FLAG_NAMES) {
                 io.write(`${wrapRow(`  ${labelOf(flag)} — `, FLAG_MEANINGS[flag]).join('\n')}\n`);
             }
@@ -361,14 +411,46 @@ export async function runReviewScreen(input, io) {
             flags = expandPreset(preset);
             continue;
         }
-        const flag = FLAG_NAMES.find((f) => labelOf(f).toLowerCase() === lower || f.toLowerCase() === lower);
+        // ARC-07-C14 — A NUMBER OPENS THAT FLAG'S QUESTION. A flag NAME still works and is deliberately
+        // undocumented: the footer names one way so the screen teaches one grammar, and nobody's habit
+        // breaks. `byRow` is the documented path; `byName` is the alias.
+        const byRow = /^\d+$/.test(lower) ? FLAG_NAMES[Number(lower) - 1] : undefined;
+        const byName = FLAG_NAMES.find((f) => labelOf(f).toLowerCase() === lower || f.toLowerCase() === lower);
+        const flag = byRow ?? byName;
         if (!flag) {
-            io.write(`"${line}" is not a flag or a command — Enter to accept, a flag name to toggle, `
-                + '"preset <name>" to switch, "?" for help\n');
+            io.write(`"${line}" is not a row number or a command — Enter to apply, a number to open a `
+                + 'flag, "preset <name>" to switch, "?" for help\n');
             continue;
         }
         if (prod) {
             io.write(`${PROD_LOCKED(input.label, flag)}\n`);
+            continue;
+        }
+        if (byRow) {
+            const row = Number(lower);
+            io.write(`${flagQuestion(flag, flags, input.probes?.[PROBE_FIELD[flag]], input.hints?.[flag])}\n`);
+            const picked = await io.ask('> ');
+            if (picked === null)
+                return { preset, flags, cancelled: true }; // stdin closed: not an apply
+            const want = resolveFlagAnswer(picked);
+            if (want === undefined) {
+                io.write(`"${String(picked).trim()}" is not one of [1] on  [2] off\n`);
+                continue;
+            }
+            if (want === null)
+                continue; // leave it, back to the screen
+            // THE SAME FUNCTION AS THE NAME PATH, so the dependency conversation is not a second copy:
+            // the flags are binary, so asking `toggleFlag` for a value it already holds is a no-op and
+            // asking for the other one is exactly the toggle the name path performs.
+            if (flags[flag] !== want) {
+                const before = flags;
+                flags = await toggleFlag(flags, flag, io);
+                preset = matchPreset(flags);
+                if (flags[flag] !== before[flag]) {
+                    io.write(`${labelOf(flag)} → ${flags[flag] === 'true' ? 'on' : 'off'} · Enter applies · `
+                        + `${row} changes it again · q quits\n`);
+                }
+            }
             continue;
         }
         flags = await toggleFlag(flags, flag, io);

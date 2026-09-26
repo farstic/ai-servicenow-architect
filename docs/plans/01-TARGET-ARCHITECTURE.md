@@ -280,17 +280,18 @@ Every preset writes **all six** flags as the byte-exact strings the server compa
 | `full` | true | true | true | true | true | true | Everything on; **the system's proposal for every `pdi` / `dev` / `test` instance (D-05)**; NOW_ASSIST needs a licence, FLUENT needs `@servicenow/sdk` — both are probed and annotated before the user confirms |
 | `custom` | six explicit toggles | | | | | | Anything else; dependency rule enforced |
 
-**Proposal and review flow (D-05 as decided, applying principle 10).** The wizard never silently applies a preset. For a `pdi` / `dev` / `test` instance it *proposes* `full` — the owner's directive is that non-production environments start with every capability available — then shows a per-flag review screen in which each of the six flags is pre-set ON, annotated with the live probe result, and individually toggleable:
+**Proposal and review flow (D-05 as decided, applying principle 10).** The wizard never silently applies a preset. For a `pdi` / `dev` / `test` instance it *proposes* `full` — the owner's directive is that non-production environments start with every capability available — then shows a per-flag review screen in which each of the six flags is pre-set ON, annotated with the live probe result, and individually toggleable by the row number printed beside it:
 
 ```
 Proposed preset for "pdi" (pdi): full  — non-production: everything on
-  [x] WRITE        probe: ok
-  [x] CMDB_WRITE   probe: ok
-  [x] SCRIPTING    probe: ok
-  [x] ATF          probe: ok
-  [x] NOW_ASSIST   probe: no Now Assist licence detected — tools will fail until licensed; keep on? (recommend: off)
-  [x] FLUENT       probe: @servicenow/sdk not on PATH — keep on? (recommend: off)
-Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset
+  1  [x] WRITE        probe: ok
+  2  [x] CMDB_WRITE   probe: ok
+  3  [x] SCRIPTING    probe: ok
+  4  [x] ATF          probe: ok
+  5  [x] NOW_ASSIST   probe: no Now Assist licence detected — tools will fail until licensed —
+                      recommend: off (type 5)
+  6  [x] FLUENT       probe: @servicenow/sdk not on PATH — recommend: off (type 6)
+Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains
 ```
 
 A probe that fails downgrades the *recommendation* shown on that line; it never flips the toggle by itself — the user decides. Whatever leaves this screen is written as six explicit strings. For a `prod` instance the proposal is `read-only` and the review screen shows the write flags greyed out with the `--ack-prod` instruction. Environment detection: a URL matching `^https://dev\d+\.service-now\.com` is proposed as `pdi`; any other host is *asked* ("What is this instance? pdi / dev / test / prod"), never guessed. All of this is re-runnable later via `./snowarch instance set-preset`, `set-flags`, or `/snowarch setup-instance`.

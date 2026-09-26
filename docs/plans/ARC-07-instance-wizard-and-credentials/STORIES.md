@@ -881,6 +881,12 @@ Mapping to the README's original titles-only list: 1 → S01 · 2 → S02 (R-3 f
 > the D-05 sentence *"A probe that fails downgrades the recommendation shown on that line; it never
 > flips the toggle by itself"*, which must survive verbatim — a paraphrase is how that guarantee gets
 > softened. The preset table between the `PRESETS:` markers belongs to ARC-05-S05, not to this story.
+>
+> **Superseded in part by ARC-07-C14 (owner ruling 2026-09-26).** The footer quoted above is the one
+> this story shipped and is left standing as the record; the line `no-legacy-surfaces` asserts today
+> is `Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains`,
+> because a row number rather than a flag name is now how a reader opens a flag. **The D-05 sentence
+> is unchanged and still verbatim** — C14 moved the grammar of the prompt, never the guarantee.
 
 **As** an individual practitioner (and the engine reading the generated rule file) **I want** one page that explains Mode, the four presets, the six flags, the review screen, production rules, where credentials live and how to use a password manager, plus a troubleshooting entry for every error the wizard can print, and a runtime rule that makes the engine stop on `AUTHENTICATION_FAILED` **so that** nobody has to read source code or a transcript to recover.
 

@@ -714,7 +714,7 @@ describe('ARC-07-C9 — set-preset says when its probes were taken', () => {
   it('the review screen qualifies every flag row with the day the probe was recorded', async () => {
     const ws = workspace({ pdi: probed() });
     try {
-      // Enter = accept as shown, which is the path a reader takes after reading the rows.
+      // Enter = apply as shown, which is the path a reader takes after reading the rows.
       const terminal = io(['']);
       expect(await runSetPreset({ label: 'pdi', preset: 'full' }, terminal, deps(ws))).toBe(0);
       const screen = terminal.written();

@@ -142,16 +142,14 @@ each probe found:
 <!-- snippet:review-screen-nonprod — byte-identical to docs/snippets/review-screen-nonprod.txt; asserted by tests/migration-doc.test.mjs -->
 ```
 Proposed preset for "pdi" (pdi): full  — non-production: everything on
-  [x] WRITE        probe: ok
-  [x] CMDB_WRITE   probe: ok
-  [x] SCRIPTING    probe: ok
-  [x] ATF          probe: ok
-  [x] NOW_ASSIST   probe: no Now Assist licence detected — tools will fail until licensed; keep on?
-                   (recommend: off — type NOW_ASSIST to turn it off)
-  [x] FLUENT       probe: @servicenow/sdk not on PATH — keep on? (recommend: off — type FLUENT to
-                   turn it off)
-Enter = accept as shown · type a flag name to toggle · "preset <name>" to switch preset · "?"
-explains the flags
+  1  [x] WRITE        probe: ok
+  2  [x] CMDB_WRITE   probe: ok
+  3  [x] SCRIPTING    probe: ok
+  4  [x] ATF          probe: ok
+  5  [x] NOW_ASSIST   probe: no Now Assist licence detected — tools will fail until licensed —
+                      recommend: off (type 5)
+  6  [x] FLUENT       probe: @servicenow/sdk not on PATH — recommend: off (type 6)
+Enter = apply as shown · a number opens that flag · "preset <name>" switches · "?" explains
 ```
 <!-- /snippet:review-screen-nonprod -->
 
