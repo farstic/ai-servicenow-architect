@@ -184,9 +184,17 @@ export function wizardExitFailure(status) {
     return { status: 'fail', klass: WIZARD.REFUSED,
       detail: `the wizard did not save an instance (exit ${EXIT_FAILED_CODE}) — ${nothingSaved}. `
         + 'Its own message is above, in this terminal',
+      // ARC-07-W11 — IT POINTS AT THE WIZARD'S OWN LINE rather than naming a command itself. This
+      // said `instance add <label>`, which is (a) a second author for the same advice and (b) the
+      // half-install: `instance add` alone skips B07 (toggles) and B08 (verify). The wizard now
+      // prints the exact command including every non-secret answer already given, plus the bootstrap
+      // alternative — so B06 has nothing left to guess. The exit-2 branch above keeps its own
+      // command, because exit 2 means the wizard refused ARGV and never asked, so there is no line
+      // of its own to point at.
       remedy: 'nothing here is broken: the wizard asked, and the answer it got was refused, '
-        + `abandoned, or could not be verified. Run \`${SPELL.cli} instance add <label>\` when you have `
-        + 'what it asked for — a valid label, or credentials the instance accepts' };
+        + 'abandoned, or could not be verified. It printed the command to resume with, above in '
+        + 'this terminal — run that when you have what it asked for: a valid label, or credentials '
+        + 'the instance accepts' };
   }
   return { status: 'fail', remedy: null,
     detail: `the instance wizard exited ${status ?? 'abnormally'} — ${nothingSaved}` };

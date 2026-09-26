@@ -8,10 +8,10 @@ import {
   AUTH_EXHAUSTED, EXIT_FAILED, EXIT_OK, EXIT_POLICY, MAX_ATTEMPTS, NEXT_LINE, NOTHING_SAVED,
   REACH_EXHAUSTED, URL_EXHAUSTED,
   addInstance, addHelp, authFailedRetry, EXIT_CODES, labelExists, maskEntry, maskUsername,
-  ENV_CHOICES, STEPS, stepHeader, parseAddArgs, probeSummary, resolveOption, runAdd, savedLine, storeLine,
+  ENV_CHOICES, STEPS, resumeCommand, stepHeader, parseAddArgs, probeSummary, resolveOption, runAdd, savedLine, storeLine,
   type AddIo,
 } from '../../src/cli/instance.js';
-import { EXIT_USAGE } from '../../src/cli/tty.js';
+import { cliSpelling, EXIT_USAGE } from '../../src/cli/tty.js';
 import { runInstance } from '../../src/cli/instance-command.js';
 import { ENVIRONMENTS } from '../../src/cli/url.js';
 import { COLUMNS, resolveFlagAnswer } from '../../src/cli/preset-ui.js';
@@ -223,6 +223,79 @@ describe('the happy path', () => {
  * keeping the current account since it was written, and its comment says why the mask is the store's:
  * *"what is shown here and what `list` shows cannot disagree."* This borrows that line.
  */
+/**
+ * ARC-07-W11 — on exhaustion the wizard prints the command that resumes it.
+ *
+ * The three exhaustion lines all ended *"run the command again"* — generic, and never saying WHICH
+ * command. B06's exit-1 remedy named `instance add <label>` itself, so the advice had two authors and
+ * one of them was guessing. And `instance add` alone **skips B07 (toggles) and B08 (verify)** — the
+ * MCP registration and the stdio handshake — so following B06's remedy left a half-finished install
+ * with an instance in the store and the server possibly unregistered.
+ *
+ * WHAT IS KNOWN DIFFERS BY SITE, measured rather than assumed. At the URL exhaustion the wizard has
+ * the label and whatever came from argv — the environment, the auth method and the username have not
+ * been asked yet. At the login exhaustion it has all of them. So the builder emits what it HAS and
+ * invents nothing.
+ */
+describe('ARC-07-W11 — the command that resumes the wizard', () => {
+  it('ARC-07-W11 — the login exhaustion names every non-secret answer, and no secret', async () => {
+    const w = workspace();
+    try {
+      const interactive = { ...baseOptions, username: undefined };
+      const terminal = io([USERNAME, '1', '1'], [PASSWORD, OTHER_PASSWORD, PASSWORD]);
+      const result = await runAdd(interactive, terminal,
+        { storePath: w.store, makeClient: client([401, 401, 401]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(result.exitCode).toBe(EXIT_FAILED);
+      expect(text).toContain(AUTH_EXHAUSTED);
+      // The command carries what the user already answered, so nothing is retyped.
+      expect(text).toContain(resumeCommand({
+        label: 'pdi', url: URL_PDI, environment: 'pdi', auth: 'basic', username: USERNAME,
+      }));
+      // NO SECRET, EVER — asserted on the whole transcript, not on the line, because a leak that
+      // reached any other line would be just as bad.
+      expect(text).not.toContain(PASSWORD);
+      expect(text).not.toContain(OTHER_PASSWORD);
+      expect(text).not.toContain('--password');
+      // ...and the bootstrap alternative says WHY it is the fuller answer.
+      expect(text).toMatch(/toggles and verify/);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and the URL exhaustion names only what it knows by then', async () => {
+    const w = workspace();
+    try {
+      const interactive = { ...baseOptions, url: undefined };
+      const terminal = io(['not a url', 'not a url', 'not a url']);
+      const result = await runAdd(interactive, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(result.exitCode).toBe(EXIT_FAILED);
+      expect(text).toContain(URL_EXHAUSTED);
+      // The environment and auth came from argv here, so they ARE known; the URL is not, and no
+      // `--url` is invented for it.
+      expect(text).toContain(`${resumeCommand({ label: 'pdi', environment: 'pdi', auth: 'basic', username: USERNAME })}`);
+      expect(text).not.toContain('--url');
+    } finally { w.cleanup(); }
+  });
+
+  it('...the builder emits only the flags it has, and never a secret', () => {
+    // A unit case beside the live ones, because "invents nothing" is a property of the builder and
+    // reading it off a transcript proves it only for the answers that transcript happened to carry.
+    expect(resumeCommand({ label: 'pdi' })).toBe(`${cliSpelling()} instance add pdi`);
+    expect(resumeCommand({})).toContain('<label>');
+    const full = resumeCommand({
+      label: 'x', url: 'https://h', environment: 'dev', auth: 'oauth_ropc', username: 'u',
+    });
+    expect(full).toBe(`${cliSpelling()} instance add x --url https://h --env dev --auth oauth_ropc --username u`);
+    // The shape that would leak: a caller passing a secret-looking key must not be able to.
+    expect(Object.keys({ label: '', url: '', environment: '', auth: '', username: '' }))
+      .not.toContain('password');
+  });
+});
+
 describe('ARC-07-W10 — the failed-login menu', () => {
   it('ARC-07-W10 — `[1]` asks only for the password, never the username again', async () => {
     const w = workspace();

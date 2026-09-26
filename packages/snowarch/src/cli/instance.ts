@@ -18,7 +18,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-import { CANCELLED,EXIT_INTERRUPTED, EXIT_USAGE, readSecretFromStdin, type Io } from './tty.js';
+import { bootstrapSpelling, CANCELLED, cliSpelling, EXIT_INTERRUPTED, EXIT_USAGE,
+  readSecretFromStdin, type Io } from './tty.js';
 
 // Re-exported so the exit-code table has ONE home: `instance-command.ts` and the tests read the
 // same constants the behaviour uses, rather than importing 2 from one file and 0 from another.
@@ -127,6 +128,50 @@ export const authFailedRetry = (attempt: number): string =>
  * (the common case, and Enter picks it), change the account, or stop. `Y` used to mean the first and
  * then ask for the username from blank anyway.
  */
+/**
+ * The command that resumes this wizard — ARC-07-W11.
+ *
+ * The exhaustion lines said *"run the command again"* without saying which, and B06's exit-1 remedy
+ * named `instance add <label>` itself, so the advice had two authors and one was guessing.
+ *
+ * IT EMITS WHAT IT HAS AND INVENTS NOTHING, because what is known differs by site: at the URL
+ * exhaustion the environment, the auth method and the username have not been asked yet, while at the
+ * login exhaustion all of them have. A `--url` printed for a URL nobody accepted would be worse than
+ * no flag at all.
+ *
+ * THERE IS NO SECRET PARAMETER, and that is the design rather than a discipline: this signature cannot
+ * carry a password, so no caller can leak one through it. P-34 — argv is forever — and a resume line
+ * is the most likely thing in this wizard to be pasted into a ticket.
+ */
+export function resumeCommand(known: {
+  label?: string;
+  url?: string;
+  environment?: string;
+  auth?: string;
+  username?: string;
+}, cli = cliSpelling()): string {
+  const flags = [
+    known.url ? `--url ${known.url}` : null,
+    known.environment ? `--env ${known.environment}` : null,
+    known.auth ? `--auth ${known.auth}` : null,
+    known.username ? `--username ${known.username}` : null,
+  ].filter((f): f is string => f !== null);
+  return `${cli} instance add ${known.label ?? '<label>'}${flags.length > 0 ? ` ${flags.join(' ')}` : ''}`;
+}
+
+/**
+ * The two lines an exhausted wizard leaves behind.
+ *
+ * The bootstrap is offered as the FULLER answer with the reason stated: `instance add` alone skips
+ * B07 (toggles) and B08 (verify) — the MCP registration and the stdio handshake — so a user who runs
+ * only the wizard has an instance in the store and a server that may be unregistered and was never
+ * verified. Measured, not inferred: those two steps do not run under `instance add`.
+ */
+export const resumeLines = (known: Parameters<typeof resumeCommand>[0],
+  cli = cliSpelling(), bootstrap = bootstrapSpelling()): string =>
+  `When it works, run: ${resumeCommand(known, cli)}\n`
+  + `(or ${bootstrap} again, which also runs the toggles and verify steps that this command skips)`;
+
 export const AUTH_RETRY_CHOICES: ReadonlyArray<Option> = Object.freeze([
   { key: 'password', text: 're-enter the password (same account)' },
   { key: 'account', text: 'change the account' },
@@ -762,6 +807,13 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
       // The LAST message is returned, not written, because the one caller writes whatever comes back
       // — the argv path needs that write, and two write sites would double-print this line.
       if (attempt >= MAX_ATTEMPTS) {
+        // ARC-07-W11 — NO `--url` HERE, on purpose: the environment, the auth method and the username
+        // may have come from argv, but the URL is the one thing this run failed to obtain, and a flag
+        // naming a URL nobody accepted would be worse than no flag at all.
+        io.write(`${resumeLines({
+          label: options.label, environment: options.environment, auth: options.auth,
+          username: options.username,
+        })}\n`);
         return { ok: false, exitCode: EXIT_FAILED, message: URL_EXHAUSTED };
       }
     }
@@ -949,7 +1001,11 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
       return { saved: false, exitCode: EXIT_FAILED, message: NOTHING_SAVED };
     }
     if (attempt >= MAX_ATTEMPTS) {
-      io.write(`${AUTH_EXHAUSTED}\n`);
+      // ARC-07-W11 — every non-secret answer this run collected, so nothing is retyped.
+      io.write(`${AUTH_EXHAUSTED}\n${resumeLines({
+        label: options.label, url: instanceUrl, environment: environment.environment,
+        auth: method, username: auth.username,
+      })}\n`);
       return { saved: false, exitCode: EXIT_FAILED, message: AUTH_EXHAUSTED };
     }
     // ARC-07-W10 — THREE ANSWERS, because there are three things a user might want. `[Y/n]` could

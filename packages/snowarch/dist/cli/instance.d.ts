@@ -73,6 +73,37 @@ export declare const authFailedRetry: (attempt: number) => string;
  * (the common case, and Enter picks it), change the account, or stop. `Y` used to mean the first and
  * then ask for the username from blank anyway.
  */
+/**
+ * The command that resumes this wizard — ARC-07-W11.
+ *
+ * The exhaustion lines said *"run the command again"* without saying which, and B06's exit-1 remedy
+ * named `instance add <label>` itself, so the advice had two authors and one was guessing.
+ *
+ * IT EMITS WHAT IT HAS AND INVENTS NOTHING, because what is known differs by site: at the URL
+ * exhaustion the environment, the auth method and the username have not been asked yet, while at the
+ * login exhaustion all of them have. A `--url` printed for a URL nobody accepted would be worse than
+ * no flag at all.
+ *
+ * THERE IS NO SECRET PARAMETER, and that is the design rather than a discipline: this signature cannot
+ * carry a password, so no caller can leak one through it. P-34 — argv is forever — and a resume line
+ * is the most likely thing in this wizard to be pasted into a ticket.
+ */
+export declare function resumeCommand(known: {
+    label?: string;
+    url?: string;
+    environment?: string;
+    auth?: string;
+    username?: string;
+}, cli?: string): string;
+/**
+ * The two lines an exhausted wizard leaves behind.
+ *
+ * The bootstrap is offered as the FULLER answer with the reason stated: `instance add` alone skips
+ * B07 (toggles) and B08 (verify) — the MCP registration and the stdio handshake — so a user who runs
+ * only the wizard has an instance in the store and a server that may be unregistered and was never
+ * verified. Measured, not inferred: those two steps do not run under `instance add`.
+ */
+export declare const resumeLines: (known: Parameters<typeof resumeCommand>[0], cli?: string, bootstrap?: string) => string;
 export declare const AUTH_RETRY_CHOICES: ReadonlyArray<Option>;
 /** The registry's sentence, used by the re-entry question and by the nothing-saved line. */
 export declare const authFailedReason: () => string;
