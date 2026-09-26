@@ -441,25 +441,43 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     }
     url = (await io.ask('Instance URL: ')) ?? '';
   }
-  const normalised = normalizeInstanceUrl(String(url ?? ''));
+  /**
+   * One raw answer → a usable URL, or the normaliser's own message.
+   *
+   * A FUNCTION BECAUSE ARC-07-W1 NEEDS IT TWICE: here at `[1/6]`, and again when the reachability
+   * menu's `[1] re-enter the URL` is taken. Two copies would let the notes, the `Proposed URL` step
+   * and the `!options.yes` condition drift between the first URL a user types and the second.
+   *
+   * Behaviour is today's, exactly: the notes print, the proposal is offered only interactively, and a
+   * rejected answer yields the message its caller returns as `EXIT_USAGE`. ARC-07-W2 turns that last
+   * part into a bounded re-ask — in this one function, so both callers gain it together.
+   */
+  const resolveUrl = async (raw: string): Promise<
+  { ok: true; url: string } | { ok: false; message: string }> => {
+    const first = normalizeInstanceUrl(String(raw ?? ''));
+    if (!first.ok) return { ok: false, message: first.message };
+    for (const note of first.notes) io.write(`  ${note}\n`);
+    let resolved = first.url;
+    if (first.proposed && !options.yes) {
+      io.write(`Proposed URL: ${resolved} — Enter to accept, or type the full URL\n`);
+      const typed = (await io.ask('> ')) ?? '';
+      if (typed.trim() !== '') {
+        const again = normalizeInstanceUrl(typed);
+        if (!again.ok) return { ok: false, message: again.message };
+        resolved = again.url;
+      }
+    }
+    return { ok: true, url: resolved };
+  };
+
+  const normalised = await resolveUrl(String(url ?? ''));
   if (!normalised.ok) {
     io.write(`${normalised.message}\n`);
     return { saved: false, exitCode: EXIT_USAGE, message: normalised.message };
   }
-  for (const note of normalised.notes) io.write(`  ${note}\n`);
-  if (normalised.proposed && !options.yes) {
-    io.write(`Proposed URL: ${normalised.url} — Enter to accept, or type the full URL\n`);
-    const typed = (await io.ask('> ')) ?? '';
-    if (typed.trim() !== '') {
-      const again = normalizeInstanceUrl(typed);
-      if (!again.ok) {
-        io.write(`${again.message}\n`);
-        return { saved: false, exitCode: EXIT_USAGE, message: again.message };
-      }
-      normalised.url = again.url;
-    }
-  }
-  const instanceUrl = normalised.url;
+  // ARC-07-W1 — MUTABLE, because `[1] re-enter the URL` replaces it and everything downstream (the
+  // client, the probes, the saved entry) must use the URL that actually answered.
+  let instanceUrl = normalised.url;
 
   // ── [2/6] the environment, then the network ──────────────────────────────────────────────
   io.write('[2/6] Environment\n');
@@ -477,20 +495,40 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   // ONCE PER RUN, whether the probe succeeds or not: "it worked" and "it worked through a proxy
   // with a corporate CA" are different facts, and only one explains a colleague's failure.
   io.write(`${describeNetworkEnv(env)}\n`);
-  const reach = await (deps.reachability ?? probeReachability)(instanceUrl, { env });
-  if (!reach.ok) {
+  /**
+   * ARC-07-W1 — the menu's THREE choices, not one of them.
+   *
+   * `reachabilityMenu()` has offered `[1] re-enter the URL` since it was written, and this branch
+   * tested `if (choice !== 'retry')` — so the one advertised way back from a mistyped host printed
+   * `Nothing saved.` and exited 1. The most likely thing a user does with a typo was the one answer
+   * that threw the run away. The retry test in `instance.test.ts` records the encounter: its comment
+   * says an earlier version chose `[1]`, measured one probe instead of two, and switched to `[2]`.
+   *
+   * BOUNDED AT THREE PROBES. Both `[1]` and `[2]` loop now, so a stdin that keeps answering has to
+   * stop somewhere — unbounded is a hang in a test and an unreadable timeout in CI. `--yes` aborts on
+   * the first failure exactly as before: there is nobody to ask.
+   *
+   * Nothing is saved from here except by succeeding, which is P-23 and unchanged: the wizard this
+   * replaced let a user keep an instance that had never answered.
+   */
+  const MAX_REACH_ROUNDS = 3;
+  let reach = await (deps.reachability ?? probeReachability)(instanceUrl, { env });
+  for (let round = 1; !reach.ok; round += 1) {
     for (const line of formatFailure(reach)) io.write(`${line}\n`);
-    const choice = options.yes ? 'abort' : await askMenu(io);
-    if (choice !== 'retry') {
+    const choice = options.yes || round >= MAX_REACH_ROUNDS ? 'abort' : await askMenu(io);
+    if (choice === 'reenter') {
+      const again = await resolveUrl((await io.ask('Instance URL: ')) ?? '');
+      if (!again.ok) {
+        io.write(`${again.message}\n`);
+        return { saved: false, exitCode: EXIT_USAGE, message: again.message };
+      }
+      instanceUrl = again.url;
+      io.write(`URL → ${instanceUrl} · probing again\n`);
+    } else if (choice !== 'retry') {
       io.write(`${NOTHING_SAVED}\n`);
       return { saved: false, exitCode: EXIT_FAILED, message: NOTHING_SAVED };
     }
-    const again = await (deps.reachability ?? probeReachability)(instanceUrl, { env });
-    if (!again.ok) {
-      for (const line of formatFailure(again)) io.write(`${line}\n`);
-      io.write(`${NOTHING_SAVED}\n`);
-      return { saved: false, exitCode: EXIT_FAILED, message: NOTHING_SAVED };
-    }
+    reach = await (deps.reachability ?? probeReachability)(instanceUrl, { env });
   }
 
   // ── [3/6] and [4/6]: how to authenticate, and with what ──────────────────────────────────
