@@ -335,7 +335,7 @@ Create an incident on the live instance for the outage.
    ```
    Mode: live — pdi (pdi) · preset custom · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=on FLUENT=off · 397 tools (contract)
    Engine: snowarch 9.9.9 · contract deadbeefdead
-   Docs: vendor/ServiceNowDocs @ df4afacf9bce (australia) · sparse
+   Docs: vendor/ServiceNowDocs @ 68c0d1123adf (australia) · sparse
    Roster: 28 skills / 9 agents
    Instances: pdi (pdi, custom)
    Doctor: 15 ok, 0 warn, 0 fail — quick run 2026-09-20 09:00 UTC · full report: ./snowarch doctor
