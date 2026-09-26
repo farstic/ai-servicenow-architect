@@ -357,7 +357,13 @@ export const savedLine = (label, entry, isDefault) => `Saved instance "${label}"
  * account name in it. One surface, two redaction levels, and the leakier one was on the line most
  * likely to be quoted.
  */
-export const storeLine = (path, platform = process.platform, project = projectStorePath()) => {
+export const storeLine = (path, platform = process.platform, 
+// ARC-07-W16 — NO DEFAULT, and that is deliberate. This was `project = projectStorePath()`, which
+// reads `CLAUDE_PROJECT_DIR` or `process.cwd()` — so a renderer's output depended on ambient state,
+// and which form it chose varied with whatever a test had set. The caller resolves the store path
+// already and knows what the project one is; making it an argument is how this stays a pure
+// function of its inputs, which every other line on this screen is.
+project) => {
     // ARC-08-C23 — the mask follows the PLATFORM ARGUMENT, not the running process. The line already
     // renders the Windows mode sentence when told `win32`; masking with POSIX rules at the same time
     // meant a function that had been given a platform honoured it in one half and ignored it in the
@@ -1011,7 +1017,7 @@ export async function runAdd(options, terminal, deps = {}) {
     for (const line of wrapText(probeSummary(probeResult?.last ?? null, masked.flags, options.noProbes === true), COLUMNS)) {
         io.write(`${line}\n`);
     }
-    io.write(`${storeLine(storePath, platform)}\n`);
+    io.write(`${storeLine(storePath, platform, projectStorePath())}\n`);
     // The warning is REPEATED after the save, not only before it: the line that matters is the one
     // still on screen when the command ends.
     for (const w of warnings)

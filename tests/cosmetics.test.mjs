@@ -34,6 +34,9 @@ test('[3/6] says what it used and why, instead of leaving a gap in the numbering
   // line reaches the screen, and the defect WAS a line that was never written.
 });
 
+/** A project store path no case here uses, so the masked form is the one under test. */
+const NOT_PROJECT = '/nowhere/.local/instances.json';
+
 test('the Store line is masked, like every other path this CLI prints', () => {
   // `precedenceNote` masks its two store paths, `listJson` masks the store it reports, the audit
   // writer masks the file it could not open — and this line, in the block a user pastes when an
@@ -50,7 +53,7 @@ test('the Store line is masked, like every other path this CLI prints', () => {
       join(home, 'checkout', '.local', 'instances.json'),
       `${home}/checkout/.local/instances.json`,
     ]) {
-      const line = storeLine(path);
+      const line = storeLine(path, undefined, '/nowhere/.local/instances.json');
       assert.equal(line.includes(home), false,
         `the home directory survived into the Store line for ${path}`);
       // ARC-07-W16 — THE MASKING PROPERTY IS UNCHANGED and is the whole point of this case; what
@@ -73,11 +76,11 @@ test('the Store line is masked, like every other path this CLI prints', () => {
   // ...and the mode half still states each platform's own truth and never the other's — the words
   // changed (`mode 0600, dir 0700` was two numbers a reader has no reason to know), the property did
   // not: POSIX names the mode, Windows refuses to claim a chmod it does not have.
-  assert.match(storeLine('/tmp/x/instances.json', 'darwin'), /readable only by you \(0600\)/);
-  assert.doesNotMatch(storeLine('/tmp/x/instances.json', 'darwin'), /Windows/);
-  assert.match(storeLine('/tmp/x/instances.json', 'win32'),
+  assert.match(storeLine('/tmp/x/instances.json', 'darwin', NOT_PROJECT), /readable only by you \(0600\)/);
+  assert.doesNotMatch(storeLine('/tmp/x/instances.json', 'darwin', NOT_PROJECT), /Windows/);
+  assert.match(storeLine('/tmp/x/instances.json', 'win32', NOT_PROJECT),
     /permissions are inherited from the folder \(Windows\)/);
-  assert.doesNotMatch(storeLine('/tmp/x/instances.json', 'win32'), /0600/);
+  assert.doesNotMatch(storeLine('/tmp/x/instances.json', 'win32', NOT_PROJECT), /0600/);
 });
 
 test('the review screen describes the preset it is proposing, not the environment', () => {

@@ -301,7 +301,7 @@ export declare const savedLine: (label: string, entry: MaskedEntry, isDefault: b
  * account name in it. One surface, two redaction levels, and the leakier one was on the line most
  * likely to be quoted.
  */
-export declare const storeLine: (path: string, platform?: NodeJS.Platform, project?: string) => string;
+export declare const storeLine: (path: string, platform: NodeJS.Platform | undefined, project: string) => string;
 /**
  * Why the authentication step did not ask. Named from what was actually observed, never a default sentence.
  *

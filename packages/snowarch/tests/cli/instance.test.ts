@@ -1247,6 +1247,9 @@ describe('criterion 9 — addInstance(), the programmatic entry', () => {
   });
 });
 
+/** A project store path that is deliberately nothing any case under test uses. */
+const NOT_PROJECT = '/nowhere/.local/instances.json';
+
 describe('the summary lines', () => {
   it('mask the username and never carry a secret', () => {
     expect(maskUsername('admin')).toBe('a***');
@@ -1264,11 +1267,11 @@ describe('the summary lines', () => {
     // ARC-07-W16 — the PROPERTY is unchanged: each platform states its own truth and never the
     // other's. `mode 0600, dir 0700` was two numbers a reader has no reason to know, so it says who
     // can read the file; Windows still refuses to claim a chmod it does not have.
-    expect(storeLine('/tmp/x/instances.json', 'darwin')).toContain('readable only by you (0600)');
-    expect(storeLine('/tmp/x/instances.json', 'darwin')).not.toContain('Windows');
-    expect(storeLine('C:\\x\\instances.json', 'win32'))
+    expect(storeLine('/tmp/x/instances.json', 'darwin', NOT_PROJECT)).toContain('readable only by you (0600)');
+    expect(storeLine('/tmp/x/instances.json', 'darwin', NOT_PROJECT)).not.toContain('Windows');
+    expect(storeLine('C:\\x\\instances.json', 'win32', NOT_PROJECT))
       .toContain('permissions are inherited from the folder (Windows)');
-    expect(storeLine('C:\\x\\instances.json', 'win32')).not.toContain('0600');
+    expect(storeLine('C:\\x\\instances.json', 'win32', NOT_PROJECT)).not.toContain('0600');
 
     // ...AND THE HALF THAT IS NEW: the relative form is only true for THIS checkout's store, so the
     // global store — which `--global` writes to `~/.config/snowarch/instances.json` — says where it
@@ -1319,8 +1322,8 @@ describe('ARC-07-W16 — every line the wizard ends with fits the terminal', () 
       ...wrapText(probeSummary(probe, expandPreset('full'), false), COLUMNS),
       // The store line can be TWO lines (a path is atomic and gets its own), so each is checked and
       // the path line is exempted by name rather than by being short enough today.
-      ...storeLine(DEEP, 'darwin').split('\n').filter((l) => !l.startsWith('/')),
-      ...storeLine(DEEP, 'win32').split('\n').filter((l) => !l.startsWith('/')),
+      ...storeLine(DEEP, 'darwin', NOT_PROJECT).split('\n').filter((l) => !l.startsWith('/')),
+      ...storeLine(DEEP, 'win32', NOT_PROJECT).split('\n').filter((l) => !l.startsWith('/')),
       storeLine('/repo/.local/instances.json', 'darwin', '/repo/.local/instances.json'),
       ...wrapText(applyingLine('full', expandPreset('full'), {
         // `?? undefined` rather than a cast: `probeNote` returns null for a status that needs no
