@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   EXIT_OK, EXIT_POLICY, cloudSyncGate, runAdd, runList, runRemove, runTest,
@@ -10,6 +11,8 @@ import {
 import { globalStorePath, projectStorePath } from '../../src/store/paths.js';
 import { otherStoreFooter, precedenceNote } from '../../src/cli/format.js';
 import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
+
+const here = dirname(fileURLToPath(import.meta.url));
 import { fakeRest } from '../helpers/fake-rest.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
 
@@ -277,22 +280,32 @@ describe('AC 4 — a checkout inside a synced folder', () => {
     return join(dir, '.local', 'instances.json');
   };
 
-  it('the default is NO: Enter writes nothing and exits 3', async () => {
+  it('the default is STOP: Enter writes nothing, exits 3, and asks nothing else', async () => {
     const store = syncedCheckout();
-    // Two answers: Enter accepts the S04 review screen, Enter again declines the gate. The
-    // second one is the subject — the default really is No, not merely absent.
-    const terminal = io(['', '']);
+    // ARC-07-W6 moved the gate to the FRONT, so this needs ONE answer where it needed two: the review
+    // screen is never reached. The property is unchanged and is still the subject — the default really
+    // does decline, rather than merely being absent.
+    const terminal = io(['']);
     const result = await runAdd(addOptions({ yes: false, noProbes: true }), terminal, addDeps());
     expect(result.exitCode).toBe(EXIT_POLICY);
     expect(existsSync(store), 'nothing was written').toBe(false);
     expect(terminal.written()).toContain('WARN STORE_IN_CLOUD_SYNC_FOLDER');
     expect(terminal.written()).toContain('Dropbox');
-    expect(terminal.asked()).toContain('Continue and write the store here anyway? [y/N] ');
+    // THE DEFAULT SAYS WHAT IT COSTS, where `[y/N]` left that to a convention the reader may not know.
+    expect(terminal.written()).toMatch(/\[1\] stop — nothing is saved.* · Enter picks this/);
+    expect(terminal.written()).toContain('[2] continue — write the store here anyway');
+    // AND THIS IS THE WHOLE POINT OF THE ROW: declining costs nothing that was typed, because
+    // nothing had been asked yet. Before W6 the user had given a URL, an environment, an auth
+    // method, a password and six permissions by the time this question arrived.
+    expect(terminal.written()).not.toContain('[1/6] Instance URL');
+    expect(terminal.asked()).toEqual(['> ']);
   });
 
   it('`y` writes it, and the WARN is still on screen at the end', async () => {
     const store = syncedCheckout();
-    const terminal = io(['', 'y']);          // the review screen, then the gate
+    // `2` is continue, and it comes FIRST now; the trailing Enter is the review screen. The order of
+    // these two answers is the whole behaviour change, so it is spelled rather than shuffled.
+    const terminal = io(['2', ''])
     const result = await runAdd(addOptions({ yes: false, noProbes: true }), terminal, addDeps());
     expect(result.exitCode).toBe(EXIT_OK);
     expect(existsSync(store)).toBe(true);
@@ -311,6 +324,43 @@ describe('AC 4 — a checkout inside a synced folder', () => {
     const parsed = JSON.parse(terminal.written()) as { warnings: string[]; instance: { auth: { secret: string } } };
     expect(parsed.warnings).toEqual(['STORE_IN_CLOUD_SYNC_FOLDER']);
     expect(terminal.written()).not.toContain(PASSWORD);
+  });
+
+  it('ARC-07-W6 — `--yes` PROCEEDS with the warning; it does not refuse', async () => {
+    // MEASURED, and the row's own text guessed the other way ("today it refuses? keep exactly that").
+    // It does not refuse: `cloudSyncGate` returns `{ ok: true, warning }` for `--yes`, and
+    // `MODES-AND-PRESETS.md` says the same ("`--yes` also answers §6's cloud-sync question yes").
+    // Asserted explicitly, because "keep exactly that" is only safe once "that" is written down.
+    const store = syncedCheckout();
+    const terminal = io([]);
+    const result = await runAdd(addOptions({ noProbes: true }), terminal, addDeps());
+
+    expect(result.exitCode).toBe(EXIT_OK);
+    expect(existsSync(store), '--yes writes the store').toBe(true);
+    expect(result.warnings).toEqual([expect.stringContaining('STORE_IN_CLOUD_SYNC_FOLDER')]);
+    // Nothing was asked: there is nobody to ask, which is why it proceeds rather than declining.
+    expect(terminal.asked()).toEqual([]);
+    expect(terminal.written()).not.toContain('[1] stop');
+  });
+
+  it('...and `set-credentials` keeps its gate where it was: the move was for `add` only', () => {
+    // STRUCTURAL, and that is the right instrument here: the property is WHERE each call sits, and both
+    // commands share one `cloudSyncGate`. `runSetCredentials` has no `[6/6]` after it and no six
+    // permissions to lose, so an early gate protects nothing there — and moving both from a single
+    // shared function would have altered a command this row never mentions.
+    //
+    // MEASURED WHILE WRITING THIS: `set-credentials` has no cloud-sync test of its own anywhere in the
+    // suite, so nothing else would notice if its call moved. This is that guard, and it is honest
+    // about being structural rather than behavioural.
+    const src = readFileSync(resolve(here, '../../src/cli/instance.ts'), 'utf8');
+    const calls = [...src.matchAll(/await cloudSyncGate\(/g)].map((m) => m.index as number);
+    expect(calls, 'exactly two callers: `add` and `set-credentials`').toHaveLength(2);
+    const firstStep = src.indexOf("io.write('[1/6] Instance URL");
+    expect(firstStep).toBeGreaterThan(-1);
+    // `add`'s gate is BEFORE the wizard's first question...
+    expect(calls[0]).toBeLessThan(firstStep);
+    // ...and `set-credentials`' is still after it, i.e. untouched, in its own command further down.
+    expect(calls[1]).toBeGreaterThan(firstStep);
   });
 
   it('a quiet checkout asks nothing at all', async () => {
