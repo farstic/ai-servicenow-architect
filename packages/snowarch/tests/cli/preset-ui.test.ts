@@ -93,6 +93,42 @@ describe('criterion 1 — the non-production screen', () => {
     expect(screen()).toContain('recommend: off');
   });
 
+  it('ARC-07-C13 — a recommendation says how to take it, on the line that makes it', () => {
+    // THE OWNER'S v2.0.5 DRY RUN. The FLUENT line read `probe: @servicenow/sdk not on PATH — tools
+    // will fail until licensed; keep on? (recommend: off)` over a footer reading `Enter = accept as
+    // shown`, they pressed Enter, and the Applying line printed `FLUENT=on`. Both sentences are
+    // literally true and together they mislead: the line ASKS A QUESTION and recommends an answer,
+    // and the only way to give that answer is to already know you must type the flag's name.
+    //
+    // THE TOGGLE STAYS ON, and that is not a bug. ADR-0005 — owner-decided 2026-09-04 — says each
+    // flag is pre-set ON and "a failing probe changes only the recommendation text on that line,
+    // never the toggle", and ARC-07-C4 asserts it on the `--yes` path. So the fix is the text, which
+    // is exactly what the ADR leaves open: the recommendation names the word that acts on it.
+    // THE LOGICAL ROW, not one physical line. `wrapRow` folds at the 100-column budget — the same
+    // rule the footer is written to, deliberately — so a row is its `[x]` line plus the indented
+    // continuations that follow it. My first cut asserted against a single line and failed on a
+    // correct fix, with the instruction split across the fold.
+    const lines = screen().split('\n');
+    const rowFor = (label: string): string => {
+      const at = lines.findIndex((l) => l.includes(`[x] ${label}`));
+      expect(at, `no row for ${label}`).toBeGreaterThan(-1);
+      const rest: string[] = [];
+      for (let i = at + 1; i < lines.length && !/^\s*\[[x ]\] |^\S/.test(lines[i]); i += 1) rest.push(lines[i]);
+      return [lines[at], ...rest].join(' ').replace(/\s+/g, ' ');
+    };
+
+    for (const [flag, label] of [['FLUENT_ENABLED', 'FLUENT'], ['NOW_ASSIST_ENABLED', 'NOW_ASSIST']] as const) {
+      const row = rowFor(label);
+      expect(row).toContain('recommend: off');
+      // THE LABEL THE SCREEN ITSELF SHOWS, and the word the loop accepts — measured, not assumed:
+      // `labelOf` strips `_ENABLED`, and the toggle matches that label case-insensitively.
+      expect(row).toContain(`type ${label} to turn it off`);
+      expect(labelOf(flag)).toBe(label);
+    }
+    // ...and a flag whose probe is fine is not told how to turn itself off.
+    expect(rowFor('WRITE')).not.toContain('to turn it off');
+  });
+
   it('no line exceeds the terminal budget, and a long hint wraps rather than truncates', () => {
     // The part of a hint that a truncation removes is the part that says what to do about it.
     const long = 'the account cannot read that table family: on a PDI use the admin account, and '
