@@ -4,9 +4,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  ADD_INSTANCE, EXPECTED_DIALOGS, MODE_VARIANTS, doctorLine, exportable, isWindowsShell, modeLine,
-  nextBlock, restartSentence, spellings, summaryBlock,
+  ADD_INSTANCE, EXPECTED_DIALOGS, MODE_DESIGN_NOTE, MODE_VARIANTS, changeLaterBlock, doctorLine,
+  exportable, isWindowsShell, modeLine, nextBlock, restartSentence, spellings, summaryBlock,
 } from '../lib/text.mjs';
+import { COLUMNS } from '../lib/plan.mjs';
+import { USAGE as MODE_USAGE } from '../lib/mode.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const config = JSON.parse(readFileSync(join(repoRoot, 'engine.config.json'), 'utf8'));
@@ -212,4 +214,129 @@ test('ARC-06 — the restart sentence follows the mode being switched TO', () =>
 
   // The default stays `live`, so every existing caller keeps its wording.
   assert.equal(restartSentence('servicenow'), live);
+});
+
+
+/**
+ * ARC-07-W12 — the live ending says what can still be changed.
+ *
+ * THE FIXTURE IS `{ platform, env: {} }` AND THE EMPTY ENV IS LOAD-BEARING, for the reason
+ * `tests/windows-spellings.test.mjs` writes out at length: `isWindowsShell` reads `env.SHELL` and
+ * `env.MSYSTEM`, and `env` defaults to `process.env`, so `{ platform: 'win32' }` alone renders the
+ * POSIX spellings on this machine and a case written that way passes against unfixed code.
+ */
+const LIVE = Object.freeze({
+  mode: 'live',
+  instance: { label: 'pdi', environment: 'pdi', preset: 'pdi-developer' },
+  counts: { ok: 9, warn: 0, fail: 0 },
+  serverKey: 'servicenow',
+  platform: 'darwin',
+  env: {},
+});
+
+test('ARC-07-W12 — the live ending names what can still be changed, with the label just saved', () => {
+  const block = summaryBlock(LIVE);
+
+  // The five subjects a live run has just decided. Named by what they change, not by their command:
+  // a reader scanning this block is looking for a word, and finds the command on the same row.
+  for (const subject of ['preset', 'flags', 'credentials', 'docs', 'design-only']) {
+    assert.match(block, new RegExp(`^ +${subject} `, 'm'), `no row for ${subject}`);
+  }
+
+  // ARC-07-W11's rule, one row later: the command carries the answer the run already has. A block
+  // that said `set-preset <label>` when the label is `pdi` is a command with a hole in it.
+  assert.match(block, /instance set-preset pdi <preset>/);
+  assert.match(block, /instance set-credentials pdi/);
+  assert.doesNotMatch(block, /<label>/, 'the live ending knows the label; it must not print a hole');
+
+  // The architect's ruling for this row, and the docs mode is the one that needs both names.
+  assert.match(block, /docs sync --mode full/);
+  assert.match(block, /--mode sparse/);
+
+  // ...and `mode design`'s own sentence, QUOTED. Not paraphrased: see the constant's guard below.
+  assert.ok(block.includes(MODE_DESIGN_NOTE), 'the design switch is described in new words');
+});
+
+test('ARC-07-W12 — a line that carries a command carries nothing else', () => {
+  // THE SHAPE, NOT THE STRING — ARC-07-W7, where two wrong forms passed a string-equality
+  // assertion. My first draft of this block wrote `mode design   — switch back to design-only …`:
+  // prose inside a command, the identical defect the architect caught in that row's `pushd "{root}"
+  // then .\bootstrap.cmd`. A reader selects the row and pastes it, and the shell sees the prose.
+  for (const where of [{ platform: 'darwin', env: {} }, { platform: 'win32', env: {} }]) {
+    const cli = spellings(where).cli;
+    for (const line of changeLaterBlock({ label: 'pdi', ...where }).split('\n')) {
+      if (!line.includes(cli)) continue;
+      assert.doesNotMatch(line, / — /, `prose on a command line: ${line}`);
+      assert.doesNotMatch(line, /\(/, `an aside on a command line: ${line}`);
+      // Everything after the subject word is the command, so the row is pasteable from the launcher
+      // to the end of the line.
+      assert.ok(line.trimEnd().endsWith(line.slice(line.indexOf(cli)).trimEnd()),
+        `something follows the command: ${line}`);
+    }
+  }
+});
+
+test('ARC-07-W12 — the block fits the column budget on both shells', () => {
+  // The inline form was 100 columns on POSIX and 104 on Windows against a budget of 100, which is
+  // why the aside became a third column rather than a suffix: one change fixed the paste hazard and
+  // the width together.
+  for (const where of [{ platform: 'darwin', env: {} }, { platform: 'win32', env: {} }]) {
+    for (const line of changeLaterBlock({ label: 'pdi', ...where }).split('\n')) {
+      assert.ok(line.length <= COLUMNS, `${line.length} > ${COLUMNS}: ${line}`);
+    }
+  }
+});
+
+test('ARC-07-W12 — the launcher is spelled by the definition, and `<label>` is the honest default', () => {
+  const win = changeLaterBlock({ label: 'pdi', platform: 'win32', env: {} });
+  assert.match(win, /\.\\snowarch\.cmd instance set-preset pdi/);
+  assert.doesNotMatch(win, /\.\/snowarch instance/, 'a POSIX spelling reached a Windows block');
+
+  // No instance to name — the caller that has none gets a placeholder rather than an invented label.
+  const bare = changeLaterBlock({ platform: 'darwin', env: {} });
+  assert.match(bare, /instance set-preset <label> <preset>/);
+});
+
+test('ARC-07-W12 — the design-only ending is unchanged, and the asymmetry is deliberate', () => {
+  // FOUR OF THE FIVE ROWS NAME AN INSTANCE, and design-only has none. The design ending already
+  // ends with a command that CHANGES what that reader chose — `Add a live instance later: run
+  // ./snowarch mode live` — which is the asymmetry this row closes from the other side: the reader
+  // who had chosen nothing was told how to change it, and the reader who had chosen six things was
+  // told how to verify them. The three five-line assertions in this file and `b09-summary` are all
+  // design-only, and they stay green untouched, which is the evidence that nothing moved there.
+  const design = summaryBlock({ mode: 'design-only', counts: { ok: 7, warn: 0, fail: 0 },
+    serverKey: KEY, platform: 'linux', env: {} });
+  assert.equal(design.split('\n').length, 5);
+  assert.doesNotMatch(design, /Change later/);
+});
+
+test('ARC-07-W12 — the warning is still the last thing on screen', () => {
+  // The block goes BEFORE the warnings recap. The wizard's save path states the rule and this is
+  // the same one: the line that matters is the one still there when the command ends.
+  const warned = summaryBlock({ ...LIVE, warnings: ['STORE_IN_CLOUD_SYNC_FOLDER'] });
+  assert.equal(warned.split('\n').at(-1), '      STORE_IN_CLOUD_SYNC_FOLDER');
+  assert.match(warned, /Change later/);
+});
+
+test('ARC-07-W12 — one sentence about the design switch, and two readers of it', () => {
+  // `mode --help` and the live ending. Two copies of "the instance store is kept" is how one of
+  // them comes to say the opposite, and the question a reader hesitates over is exactly that.
+  assert.ok(MODE_USAGE.includes(MODE_DESIGN_NOTE), 'mode --help no longer quotes the constant');
+  assert.ok(changeLaterBlock({ label: 'pdi' }).includes(MODE_DESIGN_NOTE));
+  // The help line's shape is unchanged: the sentence is the tail of the `design` row.
+  const row = MODE_USAGE.split('\n').find((l) => l.trimStart().startsWith('design '));
+  assert.ok(row.endsWith(MODE_DESIGN_NOTE), `the design row was reshaped: ${row}`);
+});
+
+test('ARC-07-W12 — the set-flags example is the one the server\'s own help prints', async () => {
+  // The engine MAY read the server's `dist/` — `cloud-sync.mjs` does — and this is the direction
+  // that is allowed. `set-flags` has an unusual argument shape, so the block shows an example; a
+  // second example written here would drift from the one `instance --help` prints, which is the
+  // defect this programme has met in every surface that re-spelled something.
+  const { SUB_COMMANDS } = await import('../../../packages/snowarch/dist/cli/help-tables.js');
+  const summary = SUB_COMMANDS['set-flags'].summary;
+  for (const pair of ['WRITE=on', 'CMDB_WRITE=off']) {
+    assert.ok(summary.includes(pair), `the help no longer shows ${pair} — the block's example is stale`);
+    assert.ok(changeLaterBlock({ label: 'pdi' }).includes(pair));
+  }
 });

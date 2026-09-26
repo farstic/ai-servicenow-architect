@@ -207,6 +207,64 @@ export function doctorLine({ ok = 0, warn = 0, fail = 0, skip = 0, fixable = 0,
 }
 
 /**
+ * ARC-07-W12 — the one sentence `mode design` prints about itself.
+ *
+ * `mode --help` has described the design switch as *"switch back to design-only; the instance store
+ * is kept"* since it was written, and the second half is the half a reader needs: what somebody
+ * hesitates over is whether going back throws the instance away. The live ending now says the same
+ * thing, and it QUOTES this rather than paraphrasing it — a second sentence about whether a store
+ * survives is how one of the two comes to be wrong.
+ */
+export const MODE_DESIGN_NOTE = 'switch back to design-only; the instance store is kept';
+
+/**
+ * WHAT A LIVE CHECKOUT CAN STILL CHANGE — ARC-07-W12.
+ *
+ * THE ASYMMETRY THIS CLOSES, MEASURED RATHER THAN ASSERTED. The design-only ending ends with a
+ * command that CHANGES the one thing that reader has chosen: `Add a live instance later: run
+ * ./snowarch mode live`. The live ending ended with two ways to VERIFY — `/mcp should show …` and
+ * `/snowarch status quotes the Mode line above` — and named nothing that could be changed. So the
+ * reader who chose nothing was told how to change it, and the reader who had just chosen an
+ * environment, an auth method, a preset, six permission flags and a docs corpus mode was told how to
+ * confirm that the thing they could no longer change was working.
+ *
+ * EACH ROW NAMES THE SUBJECT, NOT THE COMMAND, so a reader scanning for a word finds the command on
+ * the same line — and the label is the one just saved rather than a placeholder, which is
+ * ARC-07-W11's rule one row later: a command carrying the answers beats a command with holes in it.
+ * `<label>` is the honest default for a caller that has no instance, spelled rather than invented.
+ *
+ * The launcher comes from `spellings()` — ARC-07-W7's rule, applied here at the start rather than
+ * retrofitted, which is the whole point of having the rule.
+ */
+export function changeLaterBlock({ label, platform, env } = {}) {
+  const s = spellings({ platform, env });
+  const name = label ?? '<label>';
+  const rows = [
+    ['preset', `${s.cli} instance set-preset ${name} <preset>`],
+    ['flags', `${s.cli} instance set-flags ${name} WRITE=on CMDB_WRITE=off`],
+    ['credentials', `${s.cli} instance set-credentials ${name}`],
+    ['docs', `${s.cli} docs sync --mode full`, 'or --mode sparse, for the smaller corpus'],
+    ['design-only', `${s.cli} mode design`, MODE_DESIGN_NOTE],
+  ];
+  const width = Math.max(...rows.map(([key]) => key.length));
+  const gutter = ' '.repeat(6 + width + 2);
+  // A LINE THAT CARRIES A COMMAND CARRIES NOTHING ELSE, and that is ARC-07-W7's lesson applied
+  // rather than re-learnt: my first draft of this block wrote `mode design   — switch back to
+  // design-only …`, which is prose inside a command — the identical defect the architect caught in
+  // W7's `pushd "{root}" then .\bootstrap.cmd`. A reader who selects the line and pastes it gets an
+  // error, and the two rows with something to say were exactly the two that would break. So an aside
+  // goes on its own line, aligned under the command and parenthesised. It fixes the width at the same
+  // time: with the note inline, `design-only` was 100 columns on POSIX and 104 on Windows against a
+  // budget of 100 — one change for both, which is why the aside is a third column and not a suffix.
+  const out = ['Change later, one command each — the bootstrap does not need re-running:'];
+  for (const [key, cmd, aside] of rows) {
+    out.push(`      ${key.padEnd(width)}  ${cmd}`);
+    if (aside) out.push(`${gutter}(${aside})`);
+  }
+  return out.join('\n');
+}
+
+/**
  * The `Next:` block — what to type, and what will happen when they do.
  *
  * One sentence per dialog, always. The alternative — one sentence saying "you may see one or two" —
@@ -240,6 +298,11 @@ export function summaryBlock({ mode, instance = null, counts = {}, nodeUsable = 
     modeLine({ mode, instance }),
     nextBlock({ mode, dialogs, serverKey, platform, env }),
   ];
+  // ARC-07-W12 — LIVE ONLY, and not for tidiness: four of the five rows name an instance, and in
+  // design-only there is none. The design ending already carries its own change line, which is the
+  // asymmetry this block was written to remove. It goes BEFORE the warnings recap, because the
+  // warning has to be the last thing on screen — the same rule the wizard's save path states.
+  if (mode === 'live') lines.push(changeLaterBlock({ label: instance?.label, platform, env }));
   if (warnings.length > 0) {
     lines.push(`Warnings: ${warnings.length}`, ...warnings.map((w) => `      ${w}`));
   }

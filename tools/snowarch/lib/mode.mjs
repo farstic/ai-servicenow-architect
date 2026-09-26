@@ -26,14 +26,15 @@ import { CREATED_BY_US, SCOPES, resolveClaude, register as registerServer, serve
 import { LAST, STEPS, interrupt, runSteps } from './steps/index.mjs';
 import { readDefaultLabel } from '../../../packages/snowarch/dist/store/label.js';
 import { StateError, loadState, recordedInstance, saveState } from './state.mjs';
-import { instanceKeptNote, modeLine, registrationLine, restartSentence } from './text.mjs';
+import { MODE_DESIGN_NOTE, instanceKeptNote, modeLine, registrationLine, restartSentence }
+  from './text.mjs';
 
 export const USAGE = [
   'usage: ./snowarch mode [live|design] [options]',
   '',
   '  (no argument)             print the Mode line and the registration kind',
   '  live                      switch this checkout to live: B04–B09, B01–B03 cached',
-  '  design                    switch back to design-only; the instance store is kept',
+  `  design                    ${MODE_DESIGN_NOTE}`,
   '',
   '  --register project|local|user   where the MCP server is registered (default: unchanged)',
   '  --ack-user-scope          required by --register user; it affects every project',
