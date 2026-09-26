@@ -47,6 +47,26 @@ export function allowedCloneTags({ tags, treeVersion }) {
     : [newest];
 }
 
-/** Every release tag a page tells a reader to clone. */
-export const cloneTagsIn = (text) =>
-  [...new Set([...String(text).matchAll(/git clone --branch (v\d+\.\d+\.\d+)/g)].map((m) => m[1]))];
+/**
+ * Every release tag a page names to a reader — in EITHER grammar (ARC-07-W8).
+ *
+ * It matched only `git clone --branch v…`, so the paste-a-prompt path's sentence — *"from release tag
+ * v2.0.2"* — was invisible to this guard exactly as it was to `writeInstallTag`. The tag there had
+ * been stale for three releases: the one path where a reader is asked to paste a sentence into Claude
+ * rather than run a command they can read, and the one place nothing was watching.
+ *
+ * Still named `cloneTagsIn`'s job — which tags a page points a reader at — so both callers get the
+ * prose for free, and the release's own "did the writer run" assertion now covers it too.
+ */
+export const tagsNamedIn = (text) => [...new Set([
+  // `git -c advice.detachedHead=false clone --branch …` is still a clone command, and ARC-07-W8 put
+  // that option on every one of them. A pattern anchored on `git clone` would have found NOTHING and
+  // failed with "names no release tag" — blind in the direction that reads like a page defect. This is
+  // the same shape as the handoff extractor in ARC-07-C1: a matcher too strict to survive the change
+  // it exists to carry. Options are tolerated between `git` and `clone`, on one line.
+  ...[...String(text).matchAll(/git\b[^\n]*?\bclone --branch (v\d+\.\d+\.\d+)/g)].map((m) => m[1]),
+  ...[...String(text).matchAll(/release tag (v\d+\.\d+\.\d+)/g)].map((m) => m[1]),
+])];
+
+/** The former name, kept so a reader of ARC-09-C61 finds what that row described. */
+export const cloneTagsIn = tagsNamedIn;
