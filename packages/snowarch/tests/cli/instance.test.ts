@@ -12,6 +12,7 @@ import {
   type AddIo,
 } from '../../src/cli/instance.js';
 import { EXIT_USAGE } from '../../src/cli/tty.js';
+import { runInstance } from '../../src/cli/instance-command.js';
 import { ENVIRONMENTS } from '../../src/cli/url.js';
 import { COLUMNS, resolveFlagAnswer } from '../../src/cli/preset-ui.js';
 import { remedyFor } from '../../src/errors/codes.js';
@@ -432,6 +433,32 @@ describe('ARC-07-W9 — the numbered sequence', () => {
     '[6/7] Checking the login and what this account may do (read-only, a few seconds) …',
     '[7/7] Permissions',
   ];
+
+  it('ARC-07-W9 — the wizard introduces itself, and the label is step one', async () => {
+    // THE CONTROL FOUND THIS MISSING. Removing the intro left 270 cases green: I had written the
+    // renumber and forgotten the case for the thing the row is named after. `runInstance` takes an
+    // `io`, so the live path IS drivable — three invalid labels exhaust ARC-07-C10's loop and it
+    // returns before `runAdd` is reached, so nothing touches a store.
+    const terminal = io(['Bad Label', '9lives', 'x'.repeat(33)]);
+    // `isTty: true` is load-bearing: ARC-07-C10's re-ask loop is gated on a real terminal, because a
+    // re-ask needs somebody to ask. Without it `runInstance` falls straight through to EXIT_USAGE and
+    // the intro never prints — which is what my first version of this case measured.
+    const code = await runInstance(['add'], { ...terminal, isTty: true });
+    const text = terminal.written();
+
+    expect(code).toBe(EXIT_FAILED);
+    expect(text.startsWith('Instance wizard — seven steps (six questions and a login check).')).toBe(true);
+    expect(text).toContain('Have ready: the instance URL and a');
+    expect(text).toContain('Nothing is saved until the end.');
+    // The label is step one, numbered from the list like every other step.
+    expect(text).toContain(SEQUENCE[0]);
+    expect(text).toContain('a short name you will type in commands, e.g. pdi, acme-dev');
+    // ...and the prompt is the short one now: the step header carries what a label IS.
+    expect(terminal.asked()).toContain(`Label [${'pdi'}]: `);
+    // THE COMPLETE RULE ARRIVES ON REFUSAL, not on the header — the header offering a partial rule
+    // is the ARC-07-C10 defect, and this is the assertion that keeps the two apart.
+    expect(text).toContain('lower case, starting with a letter, up to 32 characters of a-z 0-9 _ -');
+  });
 
   it('ARC-07-W9 — the list renders exactly this sequence', () => {
     expect(STEPS.map((step, i) => `[${i + 1}/${STEPS.length}] ${step.title}`)).toEqual(SEQUENCE);
