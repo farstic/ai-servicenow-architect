@@ -12,7 +12,7 @@
  */
 import { maskPath, maskUsername } from '../store/paths.js';
 import { completeFlags, type Store, type StoreInstance } from '../store/schema.js';
-import { PROBE_FIELDS, type LastProbe } from '../servicenow/probes.js';
+import { PROBE_FIELDS, probeFieldText, type LastProbe } from '../servicenow/probes.js';
 import type { Flags } from '../utils/permissions.js';
 import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
 
@@ -97,7 +97,10 @@ export function probeCell(probe: LastProbe | null): string {
   if (!probe) return NEVER_PROBED;
   return PROBE_FIELDS
     .filter(({ key }) => probe[key] !== undefined && probe[key] !== null)
-    .map(({ label, key }) => `${label} ${probe[key]}`)
+    // ARC-07-W16 — the shared renderer, so this cell and the wizard's Saved line cannot describe one
+    // measurement in two vocabularies. ARC-07-C6 made the ORDER and the NAMES shared and left the
+    // VALUES to each caller; this finishes it.
+    .map(({ label, key }) => probeFieldText(label, probe[key] as string | undefined))
     .join(' · ');
 }
 

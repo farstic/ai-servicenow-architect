@@ -27,7 +27,8 @@ export { EXIT_USAGE, EXIT_INTERRUPTED };
 import { proposeEnvironment, ENVIRONMENTS, normalizeInstanceUrl, resolveEnvironment, type Environment } from './url.js';
 import { remedyFor } from '../errors/codes.js';
 import { wrapRow,
-  applyingLine, dependencyViolation, ENTRY_DEFAULTS, labelOf, prodRefusal, resolveFlags,
+  applyingLine, COLUMNS, dependencyViolation, ENTRY_DEFAULTS, labelOf, prodRefusal, resolveFlags,
+  wrapText,
   toggleFlag, type ReviewIo,
 } from './preset-ui.js';
 import {
@@ -41,7 +42,7 @@ import {
 } from '../store/paths.js';
 import { describeNetworkEnv, formatFailure, probeReachability, reachabilityMenu } from '../servicenow/reachability.js';
 import { fillMeaning, fillRemedy } from '../servicenow/net-errors.js';
-import { probeAll, PROBE_FIELDS, toLastProbe, type AuthProbe, type LastProbe,
+import { probeAll, PROBE_FIELDS, probeFieldText, toLastProbe, type AuthProbe, type LastProbe,
   type ProbeClient } from '../servicenow/probes.js';
 import { probeClientFor, probeOptionsFor } from '../servicenow/probe-client.js';
 import { loadStore, projectStorePath, resolveStorePath, saveStore } from '../store/index.js';
@@ -464,9 +465,16 @@ export function maskEntry(entry: StoreInstance): MaskedEntry {
 export function probeSummary(probe: LastProbe | null, flags: Flags, noProbes: boolean): string {
   if (noProbes) return 'Probes: skipped (--no-probes)';
   if (!probe) return 'Probes: not run';
+  // ARC-07-W16 — the STATUS WORDS come from `preset-ui.ts`, which the permissions screen also reads.
+  // This line said `fluent not installed` while the screen three lines earlier said
+  // `@servicenow/sdk not on PATH` for the identical measurement. A colon per field because the values
+  // are now phrases rather than single words, and `atf no licence detected` without one reads as a
+  // sentence fragment.
   const parts = PROBE_FIELDS.map(({ label, key, flag }) => {
-    if (flag === null) return `${label} ${probe[key]}`;
-    return flags[flag] === 'true' ? `${label} ${probe[key]}` : `${label.toUpperCase()} off`;
+    if (flag === null) return probeFieldText(label, probe[key] as string | undefined);
+    return flags[flag] === 'true'
+      ? probeFieldText(label, probe[key] as string | undefined)
+      : `${label.toUpperCase()}: off`;
   });
   return `Probes: ${parts.join(' · ')}.`;
 }
@@ -485,15 +493,42 @@ export const savedLine = (label: string, entry: MaskedEntry, isDefault: boolean)
  * account name in it. One surface, two redaction levels, and the leakier one was on the line most
  * likely to be quoted.
  */
-export const storeLine = (path: string, platform: NodeJS.Platform = process.platform): string => {
+export const storeLine = (path: string, platform: NodeJS.Platform = process.platform,
+  // ARC-07-W16 — NO DEFAULT, and that is deliberate. This was `project = projectStorePath()`, which
+  // reads `CLAUDE_PROJECT_DIR` or `process.cwd()` — so a renderer's output depended on ambient state,
+  // and which form it chose varied with whatever a test had set. The caller resolves the store path
+  // already and knows what the project one is; making it an argument is how this stays a pure
+  // function of its inputs, which every other line on this screen is.
+  project: string): string => {
   // ARC-08-C23 — the mask follows the PLATFORM ARGUMENT, not the running process. The line already
   // renders the Windows mode sentence when told `win32`; masking with POSIX rules at the same time
   // meant a function that had been given a platform honoured it in one half and ignored it in the
   // other — and it is the half that decides whether an account name reaches the screen.
-  const masked = maskPath(path, { sepChar: platform === 'win32' ? '\\' : '/' });
-  return platform === 'win32'
-    ? `Store: ${masked} (file modes: ACL-inherited (Windows))`
-    : `Store: ${masked} (mode 0600, dir 0700)`;
+  const sepChar = platform === 'win32' ? '\\' : '/';
+  // ARC-07-W16 — `Store: ~/work/checkout/.local/instances.json (mode 0600, dir 0700)` was 112 columns
+  // on a real path and said "mode 0600" to a reader who has no reason to know what that is. Both
+  // halves are now the sentence a person needs: WHERE it went, and WHO can read it.
+  const modes = platform === 'win32'
+    ? 'permissions are inherited from the folder (Windows)'
+    : 'readable only by you (0600)';
+  // THE RELATIVE FORM IS ONLY TRUE FOR THIS CHECKOUT'S STORE, and `--global` writes
+  // `~/.config/snowarch/instances.json`, which is not in this folder at all — so the two cases say
+  // different things rather than one convenient thing. Measured: `resolveStorePath({ global: true })`
+  // is what `runAdd` uses under that flag. The relative spelling is DERIVED from the path's own last
+  // two segments, never spelled here, so a store that moves cannot leave this line describing the
+  // old place.
+  if (path === project) {
+    const tail = path.split(/[\\/]/).slice(-2).join(sepChar);
+    return `Saved to ${tail} in this folder — ${modes}.`;
+  }
+  // ANY OTHER STORE GETS THE PATH ON ITS OWN LINE, and the budget case is what found this: a store
+  // that is neither this checkout's nor under the reader's home is not masked to `~`, and one inside a
+  // client folder measured 119 columns. A PATH CANNOT BE FOLDED — it is atomic in the same way a
+  // command is, and half of it is worse than a long line — so the sentence takes one line and the path
+  // takes the next, whole. `--global` normally masks to `~/.config/snowarch/instances.json` and would
+  // have fitted; the case used a real deep path instead of the short one, which is the only reason
+  // this was found rather than shipped.
+  return `Saved to this file — ${modes}:\n${maskPath(path, { sepChar })}`;
 };
 
 /**
@@ -1097,9 +1132,17 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
     }, null, 2)}\n`);
     return { saved: true, exitCode: EXIT_OK, entry: masked, lastProbe: probeResult?.last ?? null, warnings };
   }
-  io.write(`${savedLine(label, masked, isDefault)} `
-    + `${probeSummary(probeResult?.last ?? null, masked.flags, options.noProbes === true)}\n`);
-  io.write(`${storeLine(storePath, platform)}\n`);
+  // ARC-07-W16 — TWO LINES, because they were one line of 165 columns. `Saved instance …` and
+  // `Probes: …` are two different statements — what was written, and what was measured — and the
+  // second grows with every flag while the first does not. The probes summary FOLDS through the same
+  // `wrapText` the permissions screen uses, so it cannot silently exceed the budget again as fields
+  // are added; the saved line is 59 columns and needs no help.
+  io.write(`${savedLine(label, masked, isDefault)}\n`);
+  for (const line of wrapText(
+    probeSummary(probeResult?.last ?? null, masked.flags, options.noProbes === true), COLUMNS)) {
+    io.write(`${line}\n`);
+  }
+  io.write(`${storeLine(storePath, platform, projectStorePath())}\n`);
   // The warning is REPEATED after the save, not only before it: the line that matters is the one
   // still on screen when the command ends.
   for (const w of warnings) io.write(`${w}\n`);
@@ -1803,7 +1846,10 @@ export async function runSetFlags(options: ManageOptions, io: AddIo, deps: Manag
   // Production without an acknowledgement cannot arrive here with a flag on — `prodGate` refused —
   // but a `--yes` run that turned everything OFF is legitimate and lands as `read-only`.
   const preset = matchPreset(flags);
-  io.write(`${applyingLine(preset, flags)}\n`);
+  // ARC-07-W16 — 90 columns bare and 144 once two probes explain themselves, on the `--yes` path
+  // whose output is what a sitting record pastes. Folded rather than trimmed: the reasons are the
+  // part worth keeping.
+  for (const line of wrapText(applyingLine(preset, flags), COLUMNS)) io.write(`${line}\n`);
   return applyPermissions(opened.opened, label, entry, preset, flags, 'set-flags',
     gate.confirmedVia, io, deps);
 }

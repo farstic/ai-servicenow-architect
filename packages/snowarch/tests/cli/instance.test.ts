@@ -14,7 +14,8 @@ import {
 import { cliSpelling, EXIT_USAGE } from '../../src/cli/tty.js';
 import { runInstance } from '../../src/cli/instance-command.js';
 import { ENVIRONMENTS } from '../../src/cli/url.js';
-import { COLUMNS, resolveFlagAnswer } from '../../src/cli/preset-ui.js';
+import { applyingLine, COLUMNS, probeNote, resolveFlagAnswer, wrapText }
+  from '../../src/cli/preset-ui.js';
 import { remedyFor } from '../../src/errors/codes.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import { loadStore, saveStore } from '../../src/store/index.js';
@@ -169,7 +170,9 @@ describe('the happy path', () => {
       // The summary is what gets pasted into a ticket.
       const out = terminal.written();
       expect(out).toContain('Saved instance "pdi" (pdi · basic · preset pdi-developer · default).');
-      expect(out).toContain('Probes: auth ok');
+      // ARC-07-W16 — its own line now (the two were one line of 165 columns), and a colon per field.
+      expect(out).toContain('Probes: auth: ok');
+      expect(out).toMatch(/^Saved instance "pdi" \(pdi · basic · preset [a-z-]+( · default)?\)\.$/m);
       expect(out).toContain(NEXT_LINE);
       expect(out).not.toContain(PASSWORD);
       expect(out).not.toContain(USERNAME);
@@ -1244,6 +1247,9 @@ describe('criterion 9 — addInstance(), the programmatic entry', () => {
   });
 });
 
+/** A project store path that is deliberately nothing any case under test uses. */
+const NOT_PROJECT = '/nowhere/.local/instances.json';
+
 describe('the summary lines', () => {
   it('mask the username and never carry a secret', () => {
     expect(maskUsername('admin')).toBe('a***');
@@ -1258,20 +1264,87 @@ describe('the summary lines', () => {
   });
 
   it('name the platform\'s own file-mode truth', () => {
-    expect(storeLine('/tmp/x/instances.json', 'darwin')).toContain('mode 0600, dir 0700');
-    // Windows has no chmod worth the name, and claiming one would be a lie in a line a support
-    // reader trusts.
-    expect(storeLine('C:\\x\\instances.json', 'win32')).toContain('file modes: ACL-inherited (Windows)');
+    // ARC-07-W16 — the PROPERTY is unchanged: each platform states its own truth and never the
+    // other's. `mode 0600, dir 0700` was two numbers a reader has no reason to know, so it says who
+    // can read the file; Windows still refuses to claim a chmod it does not have.
+    expect(storeLine('/tmp/x/instances.json', 'darwin', NOT_PROJECT)).toContain('readable only by you (0600)');
+    expect(storeLine('/tmp/x/instances.json', 'darwin', NOT_PROJECT)).not.toContain('Windows');
+    expect(storeLine('C:\\x\\instances.json', 'win32', NOT_PROJECT))
+      .toContain('permissions are inherited from the folder (Windows)');
+    expect(storeLine('C:\\x\\instances.json', 'win32', NOT_PROJECT)).not.toContain('0600');
+
+    // ...AND THE HALF THAT IS NEW: the relative form is only true for THIS checkout's store, so the
+    // global store — which `--global` writes to `~/.config/snowarch/instances.json` — says where it
+    // actually went. A line claiming "in this folder" for a per-user store would be false on the one
+    // path a support reader is most likely to be reading it for.
+    const project = '/repo/.local/instances.json';
+    expect(storeLine(project, 'darwin', project)).toBe(
+      'Saved to .local/instances.json in this folder — readable only by you (0600).');
+    expect(storeLine('/home/someone/.config/snowarch/instances.json', 'darwin', project))
+      .not.toContain('in this folder');
   });
 
   it('report each enabled flag and print `off` for the rest', () => {
     const probe = { at: 'now', auth: 'ok', write: 'ok', scripting: 'role missing', cmdb: 'ok',
       atf: 'ok', nowAssist: 'not licensed', fluent: 'not installed' } as never;
     const line = probeSummary(probe, expandPreset('pdi-developer'), false);
-    expect(line).toContain('auth ok');
-    expect(line).toContain('scripting role missing');
-    expect(line).toContain('NOW_ASSIST off');
-    expect(line).toContain('FLUENT off');
+    // ARC-07-W16 — a colon per field, because the values are phrases now rather than single words
+    // (`atf: no licence detected` without one reads as a fragment), and the status WORDS come from
+    // `preset-ui.ts`'s `statusWords` — the same definition the permissions screen's annotation reads.
+    // This line said `fluent not installed` while the screen said `@servicenow/sdk not on PATH` for
+    // the identical measurement. The properties asserted here are unchanged: every enabled flag is
+    // reported, and a disabled one prints `off` under its upper-cased name.
+    expect(line).toContain('auth: ok');
+    expect(line).toContain('scripting: role missing');
+    expect(line).toContain('NOW_ASSIST: off');
+    expect(line).toContain('FLUENT: off');
+  });
+});
+
+describe('ARC-07-W16 — every line the wizard ends with fits the terminal', () => {
+  // THE INSTRUMENT ARC-07-W4 DID NOT LEAVE BEHIND. W4 measured three over-budget lines — Applying
+  // 101, Saved 166, Store 112 — and the numbers went into a row; nothing asserted them, so they
+  // stayed over budget for twelve rows. A wording row can fix a line once; only a case keeps it
+  // fixed, and these lines GROW with every flag and every probe field added later.
+  //
+  // REAL VALUES, not short ones: the long label and the deep path are the point. A 4-character label
+  // and `/tmp/x` pass at any width, which is how a budget case comes to certify nothing.
+  const LONG = 'acme-prod-emea';
+  const DEEP = '/Users/somebody/work/clients/acme/ai-servicenow-architect/.local/instances.json';
+  const probe = { at: '2026-09-26T12:00:00Z', auth: 'ok', write: 'role missing', cmdb: 'ok',
+    scripting: 'ok', atf: 'ok', nowAssist: 'not licensed', fluent: 'not installed' } as never;
+
+  it('the Saved line, the probes summary, the Store line and Applying are each under the budget', () => {
+    const entry = { environment: 'prod', auth: { method: 'basic', username: 's***' },
+      preset: 'read-only', flags: expandPreset('read-only') } as never;
+    const lines = [
+      savedLine(LONG, entry, true),
+      ...wrapText(probeSummary(probe, expandPreset('full'), false), COLUMNS),
+      // The store line can be TWO lines (a path is atomic and gets its own), so each is checked and
+      // the path line is exempted by name rather than by being short enough today.
+      ...storeLine(DEEP, 'darwin', NOT_PROJECT).split('\n').filter((l) => !l.startsWith('/')),
+      ...storeLine(DEEP, 'win32', NOT_PROJECT).split('\n').filter((l) => !l.startsWith('/')),
+      storeLine('/repo/.local/instances.json', 'darwin', '/repo/.local/instances.json'),
+      ...wrapText(applyingLine('full', expandPreset('full'), {
+        // `?? undefined` rather than a cast: `probeNote` returns null for a status that needs no
+        // note, and `applyingLine` takes an optional string. These three all produce one.
+        WRITE_ENABLED: probeNote('role missing') ?? undefined,
+        NOW_ASSIST_ENABLED: probeNote('not licensed') ?? undefined,
+        FLUENT_ENABLED: probeNote('not installed') ?? undefined,
+      }), COLUMNS),
+    ];
+    for (const line of lines) {
+      expect(line.length, `${line.length} > ${COLUMNS}: ${line}`).toBeLessThanOrEqual(COLUMNS);
+    }
+  });
+
+  it('...and the probes summary is its own line, never appended to the Saved line', () => {
+    // The 165-column line was ONE line because two statements were joined with a space. This asserts
+    // the seam rather than the width, so a future field cannot quietly rejoin them under the budget.
+    const entry = { environment: 'pdi', auth: { method: 'basic', username: 's***' },
+      preset: 'full', flags: expandPreset('full') } as never;
+    expect(savedLine('pdi', entry, true)).not.toContain('Probes:');
+    expect(savedLine('pdi', entry, true).endsWith('.')).toBe(true);
   });
 });
 

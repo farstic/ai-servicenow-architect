@@ -12,7 +12,7 @@
  */
 import { maskPath, maskUsername } from '../store/paths.js';
 import { completeFlags } from '../store/schema.js';
-import { PROBE_FIELDS } from '../servicenow/probes.js';
+import { PROBE_FIELDS, probeFieldText } from '../servicenow/probes.js';
 import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
 /**
  * A secret, described rather than shown: `set (len 12)`.
@@ -74,7 +74,10 @@ export function probeCell(probe) {
         return NEVER_PROBED;
     return PROBE_FIELDS
         .filter(({ key }) => probe[key] !== undefined && probe[key] !== null)
-        .map(({ label, key }) => `${label} ${probe[key]}`)
+        // ARC-07-W16 — the shared renderer, so this cell and the wizard's Saved line cannot describe one
+        // measurement in two vocabularies. ARC-07-C6 made the ORDER and the NAMES shared and left the
+        // VALUES to each caller; this finishes it.
+        .map(({ label, key }) => probeFieldText(label, probe[key]))
         .join(' · ');
 }
 /**

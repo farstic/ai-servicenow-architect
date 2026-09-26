@@ -55,6 +55,28 @@ export interface ProbeField {
     /** The flag that turns the capability on — `null` for `auth`, which no flag gates. */
     flag: FlagName | null;
 }
+/**
+ * WHAT A PROBE RESULT IS CALLED, in one place — ARC-07-W16.
+ *
+ * THREE SURFACES RENDER THE SAME MEASUREMENT: the permissions screen's annotation, the wizard's Saved
+ * line, and `instance list`'s probe column. The screen said `@servicenow/sdk not on PATH`, the other
+ * two said `not installed`, and a user who saw two of them saw two findings where there was one.
+ *
+ * ARC-07-C6 already noticed half of this — it made the ORDER and the NAMES come from `PROBE_FIELDS`
+ * for exactly this reason — and left the VALUES formatted separately in each place. Putting the words
+ * here finishes that row's argument: `probeFieldText` is now the one renderer, and C6's assertion that
+ * the Saved line equals the list cell holds by construction rather than by two functions agreeing.
+ *
+ * `ok`, `skipped` and an unknown status pass through as themselves; there is nothing to translate.
+ */
+export declare const statusWords: (status: string | undefined) => string;
+/**
+ * One probe field, as every surface prints it — `auth: ok`, `fluent: ServiceNow SDK not installed`.
+ *
+ * The colon arrived with the words: the values are phrases now, and `atf no licence detected` without
+ * one reads as a sentence fragment rather than a field and its value.
+ */
+export declare const probeFieldText: (label: string, status: string | undefined) => string;
 export declare const PROBE_FIELDS: readonly ProbeField[];
 /** What a probe needs of a client. `ServiceNowClient` satisfies it; a fake can too. */
 export interface ProbeClient {
