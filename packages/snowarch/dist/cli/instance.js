@@ -575,10 +575,32 @@ export async function runAdd(options, terminal, deps = {}) {
     // `resolveEnvironment` returns `pdi` without calling `ask` and without printing, so this step
     // printed its header and nothing else and the value was never stated. The behaviour is kept — the
     // question is still not asked for a PDI host — and the decision is now said out loud.
-    const proposedFromUrl = options.environment === undefined && proposeEnvironment(instanceUrl);
+    //
+    // THE ARCHITECT RULED (2026-09-26) THAT THE PROPOSAL IS ASKED, not just stated. The reasons are the
+    // owner's own: there is no `set-env`, so the environment is the ONE wizard choice with no later
+    // edit (only `remove` then `add`); it decides the production cap; and the owner's rule is that a
+    // choice must be easy to make AND to change — so the moment it is made has to be a question. It is
+    // the same `askOption`, one Enter more on the happy path, in the C12 shape the owner approved.
+    //
+    // `resolveEnvironment` IS LEFT ALONE. It is a resolver, not a conversation: asking inside it would
+    // put an interaction behind a function whose other answers are pure. So the proposal is asked here
+    // and the answer handed to it as though it had come from `--env`, which is also why an answer that
+    // is not an environment still fails the resolver's own validation rather than a second copy of it.
+    const proposedFromUrl = options.environment === undefined
+        ? proposeEnvironment(instanceUrl)
+        : null;
+    let answeredEnv = options.environment;
+    if (proposedFromUrl && !options.yes) {
+        const picked = await askOption(io, ENV_QUESTION, ENV_CHOICES, { defaultKey: proposedFromUrl, ack: (c) => `Environment → ${c.key}` });
+        if (picked === null) {
+            io.write(`${NOTHING_SAVED}\n`);
+            return { saved: false, exitCode: EXIT_FAILED, message: NOTHING_SAVED };
+        }
+        answeredEnv = picked.key;
+    }
     const environment = await resolveEnvironment({
         url: instanceUrl,
-        ...(options.environment ? { env: options.environment } : {}),
+        ...(answeredEnv ? { env: answeredEnv } : {}),
         ...(options.yes ? { yes: true } : {}),
         ...(options.yes ? {} : { ask: async () => askEnvironment(io) }),
     });
@@ -586,8 +608,11 @@ export async function runAdd(options, terminal, deps = {}) {
         io.write(`${environment.message}\n`);
         return { saved: false, exitCode: EXIT_USAGE, message: environment.message };
     }
-    if (proposedFromUrl)
+    // `--yes` still decides silently — there is nobody to ask — so it SAYS what it decided. On the
+    // interactive path `askOption` has already printed the ack, and printing both would say it twice.
+    if (proposedFromUrl && options.yes) {
         io.write(`Environment → ${environment.environment} (from the URL)\n`);
+    }
     // ONCE PER RUN, whether the probe succeeds or not: "it worked" and "it worked through a proxy
     // with a corporate CA" are different facts, and only one explains a colleague's failure.
     io.write(`${describeNetworkEnv(env)}\n`);
