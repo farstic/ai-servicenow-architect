@@ -48,7 +48,13 @@ export const ARGV_SECRET = 'Secrets are never accepted on the command line (they
  * carried that condition since it was written; a copy that dropped it would tell a Git Bash user to
  * type something that does not work.
  */
-export const cliSpelling = (platform = process.platform, env = process.env) => (platform === 'win32' && !env.SHELL && !env.MSYSTEM ? '.\\snowarch.cmd' : './snowarch');
+const windowsShell = (platform, env) => (platform === 'win32' && !env.SHELL && !env.MSYSTEM);
+export const cliSpelling = (platform = process.platform, env = process.env) => (windowsShell(platform, env) ? '.\\snowarch.cmd' : './snowarch');
+/**
+ * The bootstrap's spelling — ARC-07-W11, needed because the resume line offers it as the fuller
+ * answer. One predicate with `cliSpelling`, so the two cannot disagree about which shell this is.
+ */
+export const bootstrapSpelling = (platform = process.platform, env = process.env) => (windowsShell(platform, env) ? '.\\bootstrap.cmd' : './bootstrap.sh');
 export function noTtyMessage(platform = process.platform, env = process.env) {
     // ARC-07-C1, closed by W7. TWO defects in one message: the win32 line appended a bare
     // `snowarch.cmd`, and the sentence it appended to carried `./snowarch` — so a Windows reader was

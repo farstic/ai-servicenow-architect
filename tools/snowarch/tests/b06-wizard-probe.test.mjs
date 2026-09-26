@@ -182,6 +182,20 @@ test('ARC-07-C10 — exit 1 is the operator\'s answer, and it carries a remedy',
   // NOT the usage class: the two remedies say opposite things about whose fault it is, so a merge
   // of the two would make one of them wrong.
   assert.notEqual(refused.klass, WIZARD.USAGE);
+
+  // ARC-07-W11 — ONE AUTHOR FOR THE ADVICE. This remedy used to name `instance add <label>` itself,
+  // which was a second author for the same instruction and, worse, the half-install: `instance add`
+  // alone skips B07 (toggles) and B08 (verify). The wizard now prints the exact command with every
+  // non-secret answer already given, so B06 points at that and guesses nothing.
+  assert.doesNotMatch(refused.remedy, /instance add/,
+    'B06 is naming a resume command again — the wizard prints the one that carries the answers');
+  assert.match(refused.remedy, /printed the command to resume with/);
+
+  // The EXIT-2 branch keeps its own command, and that is the distinction: exit 2 means the wizard
+  // refused the argv B06 built and never asked anything, so there is no line of its own to point at.
+  const usage = wizardExitFailure(2);
+  assert.match(usage.remedy, /instance add <label>/,
+    'exit 2 has no wizard output to point at and must still name a command');
 });
 
 test('ARC-07-C2 — every other non-zero exit keeps the sentence it had', () => {

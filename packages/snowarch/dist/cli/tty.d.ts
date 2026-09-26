@@ -10,27 +10,12 @@ export declare const EXIT_INTERRUPTED = 130;
 export declare const CANCELLED = "Cancelled \u2014 nothing saved.";
 /** The argv rule's sentence. Exported so the CLI and its test cannot paraphrase it. */
 export declare const ARGV_SECRET: string;
-/**
- * The no-TTY sentence, with the example that makes it actionable.
- *
- * It names a password manager on purpose: "pipe it" is advice a user has to turn into a command,
- * and the command they invent is usually `echo`, which puts the secret in shell history — the
- * exact thing this whole file exists to prevent.
- */
-/**
- * The launcher's spelling, by shell — ARC-07-C1, closed by W7.
- *
- * A SECOND COPY, DELIBERATELY. The engine's `tools/snowarch/lib/text.mjs` has `spellings()`, and the
- * engine may import the server's `dist/` (`cloud-sync.mjs` does) while the server must never import
- * the engine — so this cannot be that function, and re-stating it is the same trade `resolveOption`
- * makes against the plan screen's `resolveChoice`. A test walks both over the same four shells.
- *
- * NOT `platform === 'win32'` ALONE, and that is the whole care this needs: Git Bash on Windows runs
- * `./snowarch` perfectly well, so `SHELL` and `MSYSTEM` keep the POSIX spelling. `spellings()` has
- * carried that condition since it was written; a copy that dropped it would tell a Git Bash user to
- * type something that does not work.
- */
 export declare const cliSpelling: (platform?: NodeJS.Platform, env?: NodeJS.ProcessEnv) => string;
+/**
+ * The bootstrap's spelling — ARC-07-W11, needed because the resume line offers it as the fuller
+ * answer. One predicate with `cliSpelling`, so the two cannot disagree about which shell this is.
+ */
+export declare const bootstrapSpelling: (platform?: NodeJS.Platform, env?: NodeJS.ProcessEnv) => string;
 export declare function noTtyMessage(platform?: NodeJS.Platform, env?: NodeJS.ProcessEnv): string;
 /**
  * Windows console combinations where raw mode is known NOT to work.

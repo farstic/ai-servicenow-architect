@@ -63,9 +63,20 @@ export const ARGV_SECRET =
  * carried that condition since it was written; a copy that dropped it would tell a Git Bash user to
  * type something that does not work.
  */
+const windowsShell = (platform: NodeJS.Platform, env: NodeJS.ProcessEnv): boolean =>
+  (platform === 'win32' && !env.SHELL && !env.MSYSTEM);
+
 export const cliSpelling = (platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env): string =>
-  (platform === 'win32' && !env.SHELL && !env.MSYSTEM ? '.\\snowarch.cmd' : './snowarch');
+  (windowsShell(platform, env) ? '.\\snowarch.cmd' : './snowarch');
+
+/**
+ * The bootstrap's spelling — ARC-07-W11, needed because the resume line offers it as the fuller
+ * answer. One predicate with `cliSpelling`, so the two cannot disagree about which shell this is.
+ */
+export const bootstrapSpelling = (platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env): string =>
+  (windowsShell(platform, env) ? '.\\bootstrap.cmd' : './bootstrap.sh');
 
 export function noTtyMessage(platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env): string {
