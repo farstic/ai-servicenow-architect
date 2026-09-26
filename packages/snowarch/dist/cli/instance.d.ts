@@ -125,6 +125,19 @@ export declare const URL_EXHAUSTED: string;
 export declare const REACH_EXHAUSTED: string;
 export declare const NEXT_LINE = "Next: in Claude Code run  /snowarch setup-instance --resume  (or restart claude).";
 export declare const AUTH_QUESTION = "Authentication?";
+/**
+ * ARC-07-W5 — what each environment MEANS, in the words a first-time reader needs.
+ *
+ * `pdi` is undefined to somebody who has not met ServiceNow's developer programme, and the reason the
+ * answer matters — production is saved read-only — surfaced four steps later at `[6/6]`, where it
+ * reads as a surprise rather than as the consequence of a choice already made.
+ *
+ * TWO LISTS, HELD TOGETHER BY A TEST. `ENVIRONMENTS` decides what exists and this decides what each
+ * one means; a test asserts they are the same keys in the same order, so a fifth environment cannot
+ * arrive with no words or leave one behind.
+ */
+export declare const ENV_CHOICES: ReadonlyArray<Option>;
+export declare const ENV_QUESTION = "What is this instance?";
 export declare const AUTH_CHOICES: ReadonlyArray<{
     key: 'basic' | 'oauth_ropc';
     text: string;
