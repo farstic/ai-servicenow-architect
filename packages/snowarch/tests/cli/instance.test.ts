@@ -349,6 +349,82 @@ describe('criterion 6 — unreachable, and a role that cannot read', () => {
     } finally { w.cleanup(); }
   });
 
+  /**
+   * ARC-07-W1 — the menu's first choice does what it says.
+   *
+   * `reachabilityMenu()` has offered `[1] re-enter the URL` since it was written, and `runAdd` tested
+   * `if (choice !== 'retry')` — so the ONE advertised way back from a mistyped host printed
+   * `Nothing saved.` and exited. The retry case above records the encounter: its comment says the
+   * first version of that test chose `[1]`, measured one probe instead of two, and switched to `[2]`.
+   * The workaround was right for that test and the defect stayed.
+   *
+   * THE PROBE LOG IS THE WITNESS, not the transcript alone: a case that only read the ack would pass
+   * against a handler that printed it and re-probed the OLD url, which is the mistake available here.
+   */
+  const probeLog = (failing: string) => {
+    const urls: string[] = [];
+    const probe = async (url: string) => {
+      urls.push(String(url));
+      return String(url).includes(failing)
+        ? { ok: false as const, code: 'DNS_FAILURE' as const, cause: 'ENOTFOUND',
+          remedy: 'the name does not resolve', latencyMs: 1 }
+        : { ok: true as const, status: 200, latencyMs: 1 };
+    };
+    return { probe, urls };
+  };
+  const TYPO = 'https://dev12345.servicenow.com';        // a real typo: `servicenow`, not `service-now`
+
+  it('ARC-07-W1 — re-enter the URL re-asks the URL and probes again', async () => {
+    const w = workspace();
+    try {
+      // `url: undefined` is what reaches the prompt — `runAdd` asks when `options.url` is absent,
+      // and spelling it is clearer than destructuring a value only to discard it.
+      const interactive = { ...baseOptions, url: undefined };
+      const { probe, urls } = probeLog('servicenow.com');
+      // The last '' is Enter on the permissions screen: this run is interactive, so it gets one.
+      const terminal = io([TYPO, '1', URL_PDI, '']);
+      const result = await runAdd(interactive, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: probe, env: {} });
+      const text = terminal.written();
+
+      expect(text).toContain(`URL → ${URL_PDI} · probing again`);
+      // THE SECOND PROBE USED THE NEW URL. Without this the ack could be printed over a re-probe of
+      // the typo, which would look correct in a transcript and fail forever.
+      expect(urls).toEqual([TYPO, URL_PDI]);
+      expect(text).toContain('[3/6] Authentication');
+      expect(result.exitCode).toBe(EXIT_OK);
+      // AND THE ENTRY CARRIES THE URL THAT ANSWERED, not the typo. `instanceUrl` feeds the client,
+      // the probes and the saved record; had it stayed `const`, the run would have reached this line
+      // having saved an instance nobody can reach — the exact outcome P-23 exists to prevent.
+      const loaded = loadStore(w.store);
+      expect('store' in loaded).toBe(true);
+      expect((loaded as { store: Store }).store.instances.pdi?.url).toBe(URL_PDI);
+      // Still once per run, the invariant the retry case guards: one network line, two probes.
+      expect(text.match(/^network: /gm) ?? []).toHaveLength(1);
+    } finally { w.cleanup(); }
+  });
+
+  it('...and a re-entered URL that is also unreachable offers the menu again, bounded', async () => {
+    const w = workspace();
+    try {
+      // `url: undefined` is what reaches the prompt — `runAdd` asks when `options.url` is absent,
+      // and spelling it is clearer than destructuring a value only to discard it.
+      const interactive = { ...baseOptions, url: undefined };
+      // Every host fails, so the only way out is the bound.
+      const { probe, urls } = probeLog('.');
+      const terminal = io([TYPO, '1', TYPO, '1', TYPO]);
+      const result = await runAdd(interactive, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: probe, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_FAILED);
+      expect(terminal.written()).toContain(NOTHING_SAVED);
+      expect(existsSync(w.store)).toBe(false);
+      // THREE ROUNDS, then it stops. Unbounded would mean a stdin that always answers `1` never ends,
+      // which in a test is a hang and in CI is a timeout nobody can read.
+      expect(urls).toHaveLength(3);
+    } finally { w.cleanup(); }
+  });
+
   it('a 403 on sys_user prints the hint and, on the default N, exits 1', async () => {
     const w = workspace();
     try {
