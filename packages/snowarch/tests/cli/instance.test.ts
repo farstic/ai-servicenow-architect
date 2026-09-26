@@ -8,9 +8,11 @@ import {
   AUTH_EXHAUSTED, EXIT_FAILED, EXIT_OK, EXIT_POLICY, MAX_ATTEMPTS, NEXT_LINE, NOTHING_SAVED,
   REACH_EXHAUSTED, URL_EXHAUSTED,
   addInstance, addHelp, authFailedRetry, EXIT_CODES, labelExists, maskEntry, maskUsername,
-  parseAddArgs, probeSummary, resolveOption, runAdd, savedLine, storeLine, type AddIo,
+  ENV_CHOICES, parseAddArgs, probeSummary, resolveOption, runAdd, savedLine, storeLine,
+  type AddIo,
 } from '../../src/cli/instance.js';
 import { EXIT_USAGE } from '../../src/cli/tty.js';
+import { ENVIRONMENTS } from '../../src/cli/url.js';
 import { COLUMNS, resolveFlagAnswer } from '../../src/cli/preset-ui.js';
 import { remedyFor } from '../../src/errors/codes.js';
 import { expandPreset } from '../../src/utils/permissions.js';
@@ -640,6 +642,143 @@ describe('ARC-07-W4 — the authentication question', () => {
       expect(terminal.written()).toContain('[3/6] Authentication … basic');
       expect(terminal.written()).not.toContain('is not one of');
     } finally { w.cleanup(); }
+  });
+});
+
+/**
+ * ARC-07-W5 — the environment question explains its options and never reprints silently.
+ *
+ * `askEnvironment` looped, reprinting the identical `What is this instance?  [1] pdi  [2] dev …` line
+ * with **no message**, so Enter, `production` or `5` made the screen look frozen: the same words
+ * appeared again and nothing said why. The four values were bare — `pdi` is undefined to a first-time
+ * reader — and why the answer matters (prod is capped read-only) surfaced only at `[6/6]`.
+ *
+ * MEASURED: for a `devNNNNNN` host the environment is decided SILENTLY — `resolveEnvironment` returns
+ * `pdi` without calling `ask` and without printing anything, so `[2/6] Environment` was followed by
+ * nothing at all. For that path this row is "say it at all", not "say more".
+ */
+describe('ARC-07-W5 — the environment question', () => {
+  const SHARED = 'https://acme-dev.service-now.com';       // not devNNNNNN, so it is asked
+  const asked = { ...baseOptions, url: SHARED, environment: undefined };
+
+  it('ARC-07-W5 — each option carries its meaning, one per line', async () => {
+    const w = workspace();
+    try {
+      const terminal = io(['dev', '']);
+      const result = await runAdd(asked, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(text).toContain('[1] pdi — your personal developer instance');
+      expect(text).toContain('[2] dev — a shared development instance');
+      expect(text).toContain('[3] test — a test / UAT instance');
+      // WHY THE ANSWER MATTERS, at the moment it is asked rather than four steps later at [6/6].
+      expect(text).toContain('[4] prod — real users; the wizard saves it read-only');
+      expect(text).toContain('Environment → dev');
+    } finally { w.cleanup(); }
+  });
+
+  it('...an unknown answer says so and re-asks, instead of reprinting in silence', async () => {
+    const w = workspace();
+    try {
+      // `2` rather than `4`: choosing prod pulls in the read-only cap and its own [Y/n], which is
+      // covered by criterion 5 and would make this case about two things. My first version answered
+      // `4` and asserted EXIT_POLICY — wrong, because the cap OFFERS read-only and the trailing
+      // Enter accepted it, so the run saved and exited 0. The case is about the message, so it uses
+      // an answer with no policy attached.
+      const terminal = io(['production', '2', '']);
+      const result = await runAdd(asked, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(text).toContain('"production" is not one of [1] pdi  [2] dev  [3] test  [4] prod');
+      // The QUESTION is not printed twice: the old loop reprinted it with no message, which is what
+      // made the screen look frozen. One question, one message per wrong answer.
+      expect(text.match(/What is this instance\?/g) ?? []).toHaveLength(1);
+      expect(text.match(/is not one of/g) ?? []).toHaveLength(1);
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.environment).toBe('dev');
+    } finally { w.cleanup(); }
+  });
+
+  it('...Enter is not a default here, and the reason is older than this row', async () => {
+    // `askEnvironment` has carried the decision in a comment since it was written: "No default: `pdi`
+    // is right often enough to be tempting and wrong in exactly the case that matters, because the
+    // environment decides which preset a write is checked against." So Enter is an unknown answer.
+    const w = workspace();
+    try {
+      const terminal = io(['', 'dev', '']);
+      const result = await runAdd(asked, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(terminal.written()).toContain('"" is not one of');
+      expect(terminal.written()).not.toContain('Enter picks this');
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.environment).toBe('dev');
+    } finally { w.cleanup(); }
+  });
+
+  it('...and a devNNNNNN host ASKS, with pdi marked, and Enter accepts it', async () => {
+    // THE ARCHITECT'S RULING, on the measurement that this path decided in total silence: the one
+    // wizard choice with no later edit (there is no `set-env`) must be a question at the moment it is
+    // made. Enter accepts the proposal, so the happy path costs one keystroke and shows what it did.
+    const w = workspace();
+    try {
+      const terminal = io(['', '']);                        // Enter at the question, Enter at [6/6]
+      const result = await runAdd({ ...baseOptions, environment: undefined }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(text).toContain('What is this instance?');
+      expect(text).toContain('[1] pdi — your personal developer instance');
+      // MARKED, and derived from the proposal rather than spelled — so the marker follows the URL.
+      expect(text).toMatch(/\[1\] pdi — .* · Enter picks this/);
+      expect(text).toContain('Environment → pdi');
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.environment).toBe('pdi');
+    } finally { w.cleanup(); }
+  });
+
+  it('...and a number at that prompt overrides the proposal', async () => {
+    // The whole reason for asking: a PDI used as a team's shared dev is a real case, and before this
+    // it was unchangeable without removing the instance.
+    const w = workspace();
+    try {
+      const terminal = io(['2', '']);
+      const result = await runAdd({ ...baseOptions, environment: undefined }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(terminal.written()).toContain('Environment → dev');
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.environment).toBe('dev');
+    } finally { w.cleanup(); }
+  });
+
+  it('...while --yes still decides silently, and says what it decided', async () => {
+    // There is nobody to ask, so the behaviour is unchanged — and the decision is stated, which is
+    // the half that was missing before this row. The `(from the URL)` suffix is what distinguishes a
+    // decision from an answer, and it appears on THIS path only.
+    const w = workspace();
+    try {
+      const terminal = io([]);
+      const result = await runAdd({ ...baseOptions, environment: undefined, yes: true }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(text).toContain('Environment → pdi (from the URL)');
+      expect(text).not.toContain('What is this instance?');
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.environment).toBe('pdi');
+    } finally { w.cleanup(); }
+  });
+
+  it('...and every environment has a meaning, so a new one cannot arrive without words', () => {
+    // ONE DEFINITION. `ENVIRONMENTS` decides what exists; `ENV_CHOICES` decides what each one means.
+    // Two lists, so this asserts they are the same list in the same order — otherwise adding a fifth
+    // environment would print a row with no meaning, or drop one silently.
+    expect(ENV_CHOICES.map((c) => c.key)).toEqual([...ENVIRONMENTS]);
+    for (const choice of ENV_CHOICES) expect(choice.text.length, choice.key).toBeGreaterThan(0);
   });
 });
 

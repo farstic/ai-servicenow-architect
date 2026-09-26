@@ -23,7 +23,7 @@ import { CANCELLED,EXIT_INTERRUPTED, EXIT_USAGE, readSecretFromStdin, type Io } 
 // Re-exported so the exit-code table has ONE home: `instance-command.ts` and the tests read the
 // same constants the behaviour uses, rather than importing 2 from one file and 0 from another.
 export { EXIT_USAGE, EXIT_INTERRUPTED };
-import { ENVIRONMENTS, normalizeInstanceUrl, resolveEnvironment, type Environment } from './url.js';
+import { proposeEnvironment, ENVIRONMENTS, normalizeInstanceUrl, resolveEnvironment, type Environment } from './url.js';
 import { remedyFor } from '../errors/codes.js';
 import { wrapRow,
   applyingLine, dependencyViolation, ENTRY_DEFAULTS, labelOf, prodRefusal, resolveFlags,
@@ -242,6 +242,26 @@ export const NEXT_LINE =
   'Next: in Claude Code run  /snowarch setup-instance --resume  (or restart claude).';
 
 export const AUTH_QUESTION = 'Authentication?';
+/**
+ * ARC-07-W5 — what each environment MEANS, in the words a first-time reader needs.
+ *
+ * `pdi` is undefined to somebody who has not met ServiceNow's developer programme, and the reason the
+ * answer matters — production is saved read-only — surfaced four steps later at `[6/6]`, where it
+ * reads as a surprise rather than as the consequence of a choice already made.
+ *
+ * TWO LISTS, HELD TOGETHER BY A TEST. `ENVIRONMENTS` decides what exists and this decides what each
+ * one means; a test asserts they are the same keys in the same order, so a fifth environment cannot
+ * arrive with no words or leave one behind.
+ */
+export const ENV_CHOICES: ReadonlyArray<Option> = Object.freeze([
+  { key: 'pdi', text: 'your personal developer instance (devNNNNNN.service-now.com)' },
+  { key: 'dev', text: 'a shared development instance' },
+  { key: 'test', text: 'a test / UAT instance' },
+  { key: 'prod', text: 'real users; the wizard saves it read-only' },
+]);
+
+export const ENV_QUESTION = 'What is this instance?';
+
 export const AUTH_CHOICES: ReadonlyArray<
 { key: 'basic' | 'oauth_ropc'; text: string; aliases?: readonly string[] }> = Object.freeze([
   { key: 'basic', text: 'username + password (recommended for PDI; no instance-side setup)' },
@@ -647,15 +667,48 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
 
   // ── [2/6] the environment, then the network ──────────────────────────────────────────────
   io.write('[2/6] Environment\n');
+  // ARC-07-W5 — WAS THE ANSWER ASKED, OR DECIDED? Measured: for a `devNNNNNN` host
+  // `resolveEnvironment` returns `pdi` without calling `ask` and without printing, so this step
+  // printed its header and nothing else and the value was never stated. The behaviour is kept — the
+  // question is still not asked for a PDI host — and the decision is now said out loud.
+  //
+  // THE ARCHITECT RULED (2026-09-26) THAT THE PROPOSAL IS ASKED, not just stated. The reasons are the
+  // owner's own: there is no `set-env`, so the environment is the ONE wizard choice with no later
+  // edit (only `remove` then `add`); it decides the production cap; and the owner's rule is that a
+  // choice must be easy to make AND to change — so the moment it is made has to be a question. It is
+  // the same `askOption`, one Enter more on the happy path, in the C12 shape the owner approved.
+  //
+  // `resolveEnvironment` IS LEFT ALONE. It is a resolver, not a conversation: asking inside it would
+  // put an interaction behind a function whose other answers are pure. So the proposal is asked here
+  // and the answer handed to it as though it had come from `--env`, which is also why an answer that
+  // is not an environment still fails the resolver's own validation rather than a second copy of it.
+  const proposedFromUrl = options.environment === undefined
+    ? proposeEnvironment(instanceUrl)
+    : null;
+  let answeredEnv: string | undefined = options.environment;
+  if (proposedFromUrl && !options.yes) {
+    const picked = await askOption(io, ENV_QUESTION, ENV_CHOICES,
+      { defaultKey: proposedFromUrl, ack: (c) => `Environment → ${c.key}` });
+    if (picked === null) {
+      io.write(`${NOTHING_SAVED}\n`);
+      return { saved: false, exitCode: EXIT_FAILED, message: NOTHING_SAVED };
+    }
+    answeredEnv = picked.key;
+  }
   const environment = await resolveEnvironment({
     url: instanceUrl,
-    ...(options.environment ? { env: options.environment } : {}),
+    ...(answeredEnv ? { env: answeredEnv } : {}),
     ...(options.yes ? { yes: true } : {}),
     ...(options.yes ? {} : { ask: async () => askEnvironment(io) }),
   });
   if (!environment.ok) {
     io.write(`${environment.message}\n`);
     return { saved: false, exitCode: EXIT_USAGE, message: environment.message as string };
+  }
+  // `--yes` still decides silently — there is nobody to ask — so it SAYS what it decided. On the
+  // interactive path `askOption` has already printed the ack, and printing both would say it twice.
+  if (proposedFromUrl && options.yes) {
+    io.write(`Environment → ${environment.environment} (from the URL)\n`);
   }
 
   // ONCE PER RUN, whether the probe succeeds or not: "it worked" and "it worked through a proxy
@@ -928,16 +981,23 @@ export function addHelp(): string {
 const isNo = (answer: string | null): boolean =>
   ['n', 'no'].includes(String(answer ?? '').trim().toLowerCase());
 
+/**
+ * ARC-07-W5 — the same numbered question as every other one, and no silent reprint.
+ *
+ * The old loop reprinted the identical line with NO message, so a wrong answer looked like a screen
+ * that had frozen. `askOption` prints the question once and answers a wrong answer with a reason.
+ *
+ * NO DEFAULT, and the reason is older than this row: `pdi` is right often enough to be tempting and
+ * wrong in exactly the case that matters, because the environment decides which preset a write is
+ * checked against. So Enter is an unknown answer here, which is what `resolveOption` does when no
+ * `defaultKey` is given — the one place its grammar differs from the permissions screen's.
+ */
 async function askEnvironment(io: AddIo): Promise<string> {
-  for (;;) {
-    io.write(`What is this instance?  ${ENVIRONMENTS.map((e, i) => `[${i + 1}] ${e}`).join('  ')}\n`);
-    const answer = ((await io.ask('> ')) ?? '').trim().toLowerCase();
-    const byNumber = ENVIRONMENTS[Number(answer) - 1];
-    if (byNumber) return byNumber;
-    if ((ENVIRONMENTS as readonly string[]).includes(answer)) return answer;
-    // No default: `pdi` is right often enough to be tempting and wrong in exactly the case that
-    // matters, because the environment decides which preset a write is checked against.
-  }
+  const chosen = await askOption(io, ENV_QUESTION, ENV_CHOICES,
+    { ack: (c) => `Environment → ${c.key}` });
+  // EOF leaves the caller to decide, as it did before: this returned a string and never threw, and
+  // `resolveEnvironment` treats the answer as the environment. An empty string fails its validation.
+  return chosen?.key ?? '';
 }
 
 async function askMenu(io: AddIo): Promise<string> {
