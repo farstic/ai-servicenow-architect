@@ -53,7 +53,13 @@ test('the Store line is masked, like every other path this CLI prints', () => {
       const line = storeLine(path);
       assert.equal(line.includes(home), false,
         `the home directory survived into the Store line for ${path}`);
-      assert.match(line, /^Store: ~/);
+      // ARC-07-W16 — THE MASKING PROPERTY IS UNCHANGED and is the whole point of this case; what
+      // moved is where the path sits. A path cannot be folded, so a store that is not this
+      // checkout's now gets the sentence on one line and the path, whole and masked, on the next —
+      // found by that row's budget case, which measured 119 columns for a deep client path.
+      const [sentence, shown] = line.split('\n');
+      assert.match(sentence, /^Saved to this file — /);
+      assert.match(shown, /^~[/\\]/, `the path line is not masked: ${shown}`);
     }
   }
   // WHAT THIS TEST CANNOT SEE, said rather than left for the next reader to discover. A masker can
@@ -64,8 +70,14 @@ test('the Store line is masked, like every other path this CLI prints', () => {
   // checkable on every platform, with the separator injected.
   //
   // The mode half is untouched: it is a fact about the file, not about who owns it.
-  assert.match(storeLine('/tmp/x/instances.json', 'darwin'), /\(mode 0600, dir 0700\)$/);
-  assert.match(storeLine('/tmp/x/instances.json', 'win32'), /ACL-inherited \(Windows\)\)$/);
+  // ...and the mode half still states each platform's own truth and never the other's — the words
+  // changed (`mode 0600, dir 0700` was two numbers a reader has no reason to know), the property did
+  // not: POSIX names the mode, Windows refuses to claim a chmod it does not have.
+  assert.match(storeLine('/tmp/x/instances.json', 'darwin'), /readable only by you \(0600\)/);
+  assert.doesNotMatch(storeLine('/tmp/x/instances.json', 'darwin'), /Windows/);
+  assert.match(storeLine('/tmp/x/instances.json', 'win32'),
+    /permissions are inherited from the folder \(Windows\)/);
+  assert.doesNotMatch(storeLine('/tmp/x/instances.json', 'win32'), /0600/);
 });
 
 test('the review screen describes the preset it is proposing, not the environment', () => {
@@ -86,18 +98,20 @@ test('the review screen describes the preset it is proposing, not the environmen
   // only `presetNote`, so reverting the render left it green — the helper proved, the line
   // unproved, which is the reader-vs-writer split this arc keeps finding. `renderReviewScreen` is
   // the writer.
-  const header = (preset) => renderReviewScreen({
+  // ARC-07-W16 — THE PROPOSAL IS THE SECOND LINE NOW. The header became two statements — what the
+  // screen is, then what it proposes — because one line of 115 columns folded inside
+  // `full (everything on)`. This case's property is untouched and still the one that matters: the
+  // sentence beside the preset describes THE PRESET, not the environment. Line 1 is where that
+  // sentence lives, and line 0 is asserted too so a future edit cannot quietly swap them.
+  const lines = (preset) => renderReviewScreen({
     label: 'pdi', environment: 'pdi', preset, flags: expandPreset(preset),
-  }).split('\n')[0];
-
-  assert.equal(header('read-only'),
-    'Proposed preset for "pdi" (pdi): read-only  — non-production: nothing on');
-  assert.equal(header('pdi-developer'),
-    'Proposed preset for "pdi" (pdi): pdi-developer  — non-production: 4 of 6 on');
-  // `full` is byte-identical to the snapshot three documents quote: only the contradicting cases
-  // moved, which is what keeps this a fix rather than a rewording.
-  assert.equal(header('full'),
-    'Proposed preset for "pdi" (pdi): full  — non-production: everything on');
+  }).split('\n');
+  assert.equal(lines('full')[0],
+    'Permissions for instance "pdi" (environment pdi) — what Claude\'s tools may do there.');
+  assert.equal(lines('read-only')[1], 'Proposed: read-only (nothing on)');
+  assert.equal(lines('pdi-developer')[1], 'Proposed: pdi-developer (4 of 6 on)');
+  // `full` is byte-identical to the snapshot three documents quote.
+  assert.equal(lines('full')[1], 'Proposed: full (everything on)');
 });
 
 /**
