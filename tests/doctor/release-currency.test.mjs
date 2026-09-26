@@ -66,7 +66,9 @@ test('C31 — a newer release tag is a warn, with the clock the runner actually 
   const r = await e28(t, { tags: ['v9.1.0'], localTag: 'v9.0.0' });
   assert.equal(r.status, 'warn', `crashed or skipped instead: ${r.detail}`);
   assert.match(r.detail, /v9\.1\.0 available/);
-  assert.match(r.detail, /\.\/snowarch upgrade/);
+  // ARC-07-W17, rule 2 — derived and escaped. `contextFor` defaults to the process, so on the Windows
+  // cells the product renders `.\snowarch.cmd upgrade` and a POSIX literal here fails for no defect.
+  assert.match(r.detail, new RegExp(`${ESCAPED_CLI} upgrade`));
 });
 
 test('C31 — a PRERELEASE on its own is not "available", and that is the decision', async (t) => {

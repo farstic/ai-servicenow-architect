@@ -241,6 +241,26 @@ test('...and the negative: the widened guard sees a planted spelling in any ship
   assert.equal(seen('  `usage: ${cli} instance <command>`,'), false);
 });
 
+test('ARC-07-W17 — a MODE_VARIANT with no spelling THROWS rather than printing one', async () => {
+  // THE SECOND TIME THIS ROW LEARNED THE SAME RULE. Making these variants read `spellings()` from the
+  // PROCESS satisfied the SessionStart hook and broke the other two consumers across TWELVE Windows
+  // cells: `gen-doctor-docs.mjs` rendered `.\snowarch.cmd` into a committed page, so `gen:check` went
+  // stale and failed `lint`, `contract`, the release rehearsal and E-21 in the doctor itself.
+  //
+  // Three consumers, three different shells — the doctor's ctx, a pinned POSIX page, the person at the
+  // terminal — so there is no default that can be right, and the miss must be loud.
+  const { MODE_VARIANTS } = await import('../tools/snowarch/lib/text.mjs');
+  for (const name of ['unconfigured', 'noInstanceLoaded', 'notBootstrapped']) {
+    assert.throws(() => MODE_VARIANTS[name](), { name: 'TypeError', message: /needs a spellings object/ },
+      `${name} accepted no spelling`);
+  }
+  assert.throws(() => MODE_VARIANTS.serverDisabled('pdi'), { name: 'TypeError' });
+  // ...and the positive direction, so the guard is not merely refusing everything.
+  const win = { cli: '.\\snowarch.cmd', bootstrap: '.\\bootstrap.cmd' };
+  assert.match(MODE_VARIANTS.notBootstrapped(win), /\.\\bootstrap\.cmd$/);
+  assert.match(MODE_VARIANTS.unconfigured(win), /\.\\snowarch\.cmd mode live/);
+});
+
 test('no renderer builds a CLI command out of a literal path', () => {
   // THE C60 SHAPE: the fix is one thing, and this is what stops the eighty-ninth arriving. A literal
   // `./snowarch` inside a string that a renderer prints is the defect C1 named; a literal in a COMMENT
@@ -321,4 +341,41 @@ test('...and the negative: the check sees a planted bare spelling', () => {
     'a sentence about the file');
   assert.equal(bare('`bootstrap.cmd` · `snowarch` · `snowarch.cmd` · `.mcp.json`'), false, 'a list');
   assert.equal('cd /d "{root}" && .\\bootstrap.cmd'.includes('cd /d '), true);
+});
+
+test('ARC-07-W17 — no generator can render a launcher for the machine it runs on', () => {
+  // EVERY GENERATED TARGET IS COMMITTED, so its bytes must be identical on every runner or `gen:check`
+  // fails on one of them — and that failure is not cosmetic: on the twelve red Windows cells it took
+  // down `lint`, `contract`, the release rehearsal and E-21 in the doctor, because all four read the
+  // generated tree. The cause was one generator calling a spelling that read the PROCESS.
+  //
+  // So the rule is checked rather than remembered: a generator that spells a launcher must PIN the
+  // shell it is spelling for. `spellings({ platform: 'linux', env: {} })` says which rendering it means;
+  // a bare `spellings()` or `cliSpelling()` means "whatever this machine is", which for a committed file
+  // is never right. I cannot force `process.platform` locally — ARC-07 measured that as unusable, since
+  // `win32.resolve` on POSIX paths fails everything — so the property is asserted structurally instead.
+  const generators = execFileSync('git', ['ls-files', 'scripts', 'packages/contract/gen'],
+    { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+    .split('\n').filter((f) => /\.mjs$/.test(f) && !/\.test\./.test(f));
+
+  const offences = [];
+  for (const rel of generators) {
+    codeOf(read(rel)).split('\n').forEach((line, i) => {
+      // A call with no argument at all, or with a platform that is not pinned to a literal.
+      if (/\b(spellings|cliSpelling|bootstrapSpelling)\(\s*\)/.test(line)) {
+        offences.push(`${rel}:${i + 1}: an unpinned spelling — a generated file would differ per runner`);
+      }
+    });
+  }
+  assert.deepEqual(offences, [],
+    `${offences.length} generator line(s) spell a launcher for the running machine:\n  `
+    + offences.join('\n  '));
+});
+
+test('...and the negative: the generator check sees an unpinned call', () => {
+  const unpinned = (line) => /\b(spellings|cliSpelling|bootstrapSpelling)\(\s*\)/.test(line);
+  assert.equal(unpinned('  const cli = spellings().cli;'), true);
+  assert.equal(unpinned('  cliSpelling()'), true);
+  assert.equal(unpinned("  spellings({ platform: 'linux', env: {} }).cli"), false, 'a pinned call');
+  assert.equal(unpinned("  spellings({ platform, env })"), false, 'a threaded call is the caller\'s');
 });

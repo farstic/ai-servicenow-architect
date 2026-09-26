@@ -12,7 +12,7 @@
 // included; exit 2 is a usage error, which is a fact about the command line rather than the
 // checkout.
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { bootstrapOf, cliOf } from './spell.mjs';
+import { bootstrapOf, cliOf, spellFor } from './spell.mjs';
 import { spellings } from '../text.mjs';
 import { loadState } from '../state.mjs';
 import { dirname, join, resolve } from 'node:path';
@@ -184,7 +184,11 @@ function storeSummaries(root, config) {
 
 export async function runDoctor({ root, config, registry = engineRegistry(), sections = null,
   quick = false, noNetwork = false, fix = false, section = null, writeCache = 'auto',
-  env = process.env, home = '', now = () => Date.now(), started = null } = {}) {
+  env = process.env, home = '', now = () => Date.now(), started = null,
+  // ARC-07-W17 — the PLATFORM, so the Mode line's spelling is the one this run was TOLD about rather
+  // than the machine's. A fixture capture pins it (`make-status-fixtures.mjs` passes `linux`), which is
+  // what stops a committed fixture depending on the shell that captured it.
+  platform = process.platform } = {}) {
   const startedAt = started ?? now();
   const options = { quick, noNetwork: noNetwork || quick, fix, section, sections };
 
@@ -251,6 +255,9 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     // `bootstrap-state.json`; NOT `~/.claude.json`, which this module promises never to read.
     registration: (() => { try { return loadState(root)?.registration ?? 'project'; }
       catch { return 'project'; } })(),
+    // ARC-07-W17 — the doctor renders for the shell it was TOLD about, so a fixture capture can pin it
+    // and a committed fixture stops depending on the capturing machine.
+    spell: spellFor({ platform, env }),
   });
   const data = (id) => results.find((r) => r.id === id)?.data ?? null;
   const toolCount = data('SV-05')?.toolCount ?? null;
@@ -364,11 +371,14 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
  * report they read are the RE-RUN's, and the fixes are listed above it.
  */
 export async function fixCommand({ root, config, registry, options, env, home, now, write, ask,
+  // ARC-07-W17 — threaded through the fix path too: both its `runDoctor` passes render a Mode line, and
+  // a fix run on Windows must spell the launcher the way that shell does.
+  platform = process.platform,
   yes = false, deps = {} }) {
   // `write` here is the NARRATION channel, not stdout. Under `--json` the caller hands us stderr:
   // a plan printed above the object made `JSON.parse(stdout)` fail on the first character, which
   // is the whole contract `--json` has with a script.
-  const first = await runDoctor({ root, config, registry, ...options, env, home, now,
+  const first = await runDoctor({ root, config, registry, ...options, env, home, now, platform,
     // The first pass never writes the cache: it describes a checkout that is about to change.
     writeCache: false });
 
@@ -410,6 +420,7 @@ export async function fixCommand({ root, config, registry, options, env, home, n
 
   // The same options, so the second report is comparable with the first — and this one caches.
   const second = await runDoctor({ root, config, registry: registry ?? engineRegistry(), ...options,
+    platform,
     env, home, now });
   return { applied, report: second.report, checks: second.checks, cacheError: second.cacheError,
     results: second.results };
@@ -527,7 +538,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     // `--fix` prints what it would do and stops, which is the safe half of the interaction.
     const interactive = Boolean(input?.isTTY) || Boolean(ask);
     const outcome = await fixCommand({
-      root, config, registry, options: runOptions, env, home, now, write: narrate,
+      root, config, registry, options: runOptions, env, home, now, write: narrate, platform,
       yes: flags.yes === true,
       ask: ask ?? (interactive ? defaultAsk(input) : null),
       deps: fixDeps,
@@ -547,7 +558,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     }
   } else {
     ({ report, checks, cacheError, results } = await runDoctor({
-      root, config, registry, ...runOptions, env, home, now,
+      root, config, registry, ...runOptions, env, home, now, platform,
     }));
   }
 

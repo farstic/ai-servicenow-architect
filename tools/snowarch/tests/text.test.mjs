@@ -172,7 +172,7 @@ test('the add-an-instance remedy is one string, in every place that offers it', 
   // `./snowarch` default was the test choosing a platform and then checking a different one — it
   // passed on macOS and failed on every Windows cell.
   const surfaces = {
-    'the doctor Mode line': [MODE_VARIANTS.unconfigured(), ADD_INSTANCE()],
+    'the doctor Mode line': [MODE_VARIANTS.unconfigured(spellings()), ADD_INSTANCE()],
     'the bootstrap Next block': [nextBlock({ mode: 'design-only', serverKey: 'servicenow' }),
       ADD_INSTANCE(spellings().cli)],
   };

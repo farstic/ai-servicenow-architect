@@ -173,8 +173,9 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   // 3. Never bootstrapped — checked BEFORE the re-run, because a doctor on a checkout with no
   // state answers a question nobody asked and costs a second doing it.
   if (!existsSync(join(root, '.local', 'bootstrap-state.json'))) {
-    const { MODE_VARIANTS, modeLine } = await import('../lib/text.mjs');
-    say(modeLine({ mode: 'unknown', qualifier: MODE_VARIANTS.notBootstrapped() }));
+    // The hook renders for the person in front of it, so the PROCESS is the right shell here.
+    const { MODE_VARIANTS, modeLine, spellings } = await import('../lib/text.mjs');
+    say(modeLine({ mode: 'unknown', qualifier: MODE_VARIANTS.notBootstrapped(spellings()) }));
     return { path: 'unbootstrapped', lines: out };
   }
 

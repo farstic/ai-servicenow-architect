@@ -57,7 +57,10 @@ export async function sample() {
     // ARC-08-C7 — RENDERED, not retyped. This file's whole promise is that the page shows what the
     // doctor prints; a hardcoded copy here was a fourth wording of "there is no instance yet", and
     // the one that reached the published docs.
-    modeLine: `Mode: design-only — ${MODE_VARIANTS.unconfigured()}`,
+    // ARC-07-W17 — PINNED POSIX: this writes a COMMITTED page, so the block must be identical on every
+    // runner or `gen:check` fails on one of them — which is exactly what happened across twelve Windows
+    // cells when the variant read the process.
+    modeLine: `Mode: design-only — ${MODE_VARIANTS.unconfigured(spellings({ platform: 'linux', env: {} }))}`,
     // The version is pinned in the SAMPLE rather than read: a documentation block that changed on
     // every version bump would be a diff in every release commit and a page nobody trusts.
     root: null,
