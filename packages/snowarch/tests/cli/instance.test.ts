@@ -719,18 +719,57 @@ describe('ARC-07-W5 — the environment question', () => {
     } finally { w.cleanup(); }
   });
 
-  it('...and a devNNNNNN host SAYS what it decided, instead of deciding in silence', async () => {
+  it('...and a devNNNNNN host ASKS, with pdi marked, and Enter accepts it', async () => {
+    // THE ARCHITECT'S RULING, on the measurement that this path decided in total silence: the one
+    // wizard choice with no later edit (there is no `set-env`) must be a question at the moment it is
+    // made. Enter accepts the proposal, so the happy path costs one keystroke and shows what it did.
     const w = workspace();
     try {
-      const terminal = io(['']);
-      await runAdd({ ...baseOptions, environment: undefined }, terminal,
+      const terminal = io(['', '']);                        // Enter at the question, Enter at [6/6]
+      const result = await runAdd({ ...baseOptions, environment: undefined }, terminal,
         { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
       const text = terminal.written();
 
-      // Measured before the change: `[2/6] Environment` was followed by nothing, and the value was
-      // never stated. The question is still not asked — that is the behaviour this row keeps.
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(text).toContain('What is this instance?');
+      expect(text).toContain('[1] pdi — your personal developer instance');
+      // MARKED, and derived from the proposal rather than spelled — so the marker follows the URL.
+      expect(text).toMatch(/\[1\] pdi — .* · Enter picks this/);
+      expect(text).toContain('Environment → pdi');
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.environment).toBe('pdi');
+    } finally { w.cleanup(); }
+  });
+
+  it('...and a number at that prompt overrides the proposal', async () => {
+    // The whole reason for asking: a PDI used as a team's shared dev is a real case, and before this
+    // it was unchangeable without removing the instance.
+    const w = workspace();
+    try {
+      const terminal = io(['2', '']);
+      const result = await runAdd({ ...baseOptions, environment: undefined }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+
+      expect(result.exitCode).toBe(EXIT_OK);
+      expect(terminal.written()).toContain('Environment → dev');
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.environment).toBe('dev');
+    } finally { w.cleanup(); }
+  });
+
+  it('...while --yes still decides silently, and says what it decided', async () => {
+    // There is nobody to ask, so the behaviour is unchanged — and the decision is stated, which is
+    // the half that was missing before this row. The `(from the URL)` suffix is what distinguishes a
+    // decision from an answer, and it appears on THIS path only.
+    const w = workspace();
+    try {
+      const terminal = io([]);
+      const result = await runAdd({ ...baseOptions, environment: undefined, yes: true }, terminal,
+        { storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {} });
+      const text = terminal.written();
+
+      expect(result.exitCode).toBe(EXIT_OK);
       expect(text).toContain('Environment → pdi (from the URL)');
       expect(text).not.toContain('What is this instance?');
+      expect((loadStore(w.store) as { store: Store }).store.instances.pdi?.environment).toBe('pdi');
     } finally { w.cleanup(); }
   });
 
