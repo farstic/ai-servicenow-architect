@@ -68,6 +68,82 @@ test('the launcher is spelled the way Windows can run it, in both packages', asy
   }
 });
 
+/**
+ * ARC-07-W17 — THE LAUNCHER IS NEVER SPELLED EXCEPT BY THE DEFINITIONS.
+ *
+ * ARC-07-C1 named four sources. ARC-07-C21 found the same defect in four more it never reached and
+ * built the guard below over a hand-kept list of renderers — which is an allow-list by another name:
+ * ARC-07-W14 added `plan.mjs` to it and the guard immediately found an eighty-ninth site that had sat
+ * in the Node-free branch since it was written. A list somebody has to remember to extend is a guard
+ * that finds what its author already knew.
+ *
+ * So this reads EVERY shipped source file instead, and the two definitions are the only exemptions.
+ * The first measurement of it found **164 non-definition sites across 48 files** — against the 79 in
+ * 19 that my own first inventory reported, because that inventory's pattern required a quote
+ * immediately before the path and so saw only launchers that START a string. The instrument
+ * under-reported by more than half, which is why the guard is a guard and not a list.
+ */
+const LAUNCHER_PATTERNS = Object.freeze([
+  [/\.\/snowarch\b/, 'a literal ./snowarch'],
+  [/\.\/bootstrap\.sh\b/, 'a literal ./bootstrap.sh'],
+  // TWO LOOKBEHINDS, and the second is the one my own negative case caught. In a DOC the correct
+  // spelling is `.\snowarch.cmd` — one backslash — but in SOURCE it is written `'.\\snowarch.cmd'`,
+  // and this guard reads source. A single `(?<!\.\\)` therefore FIRED on the correct spelling, which
+  // would have made the sweep replace right answers with right answers forever. ARC-07-C21 recorded
+  // the same shape from the other side: the correct spelling CONTAINS the wrong one.
+  [/(?<!\.\\)(?<!\.\\\\)\bsnowarch\.cmd\b/, 'a BARE snowarch.cmd — PowerShell refuses it'],
+  [/(?<!\.\\)(?<!\.\\\\)\bbootstrap\.cmd\b/, 'a BARE bootstrap.cmd — PowerShell refuses it'],
+  [/usage: snowarch\b/, 'a BARE `usage: snowarch` — the name is never on PATH'],
+]);
+
+/** The two files that ARE the definitions, and the only ones allowed to spell a launcher. */
+const DEFINITIONS = Object.freeze([
+  'tools/snowarch/lib/text.mjs',
+  'packages/snowarch/src/cli/tty.ts',
+]);
+
+/** Comments stripped: prose ABOUT the defect is not the defect. */
+const codeOf = (text) => text
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .split('\n')
+  .map((line) => line.replace(/(^|[^:])\/\/.*$/, '$1'))
+  .join('\n');
+
+test('ARC-07-W17 — no shipped file spells the launcher except the two definitions', () => {
+  const files = execFileSync('git',
+    ['ls-files', 'tools/snowarch/lib', 'tools/snowarch/bin', 'packages/snowarch/src', 'scripts'],
+    { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+    .split('\n')
+    .filter((f) => /\.(mjs|ts|js)$/.test(f) && !/\.test\./.test(f) && !/\.d\.ts$/.test(f))
+    .filter((f) => !DEFINITIONS.includes(f));
+
+  const offences = [];
+  for (const rel of files) {
+    codeOf(read(rel)).split('\n').forEach((line, i) => {
+      for (const [pattern, why] of LAUNCHER_PATTERNS) {
+        if (pattern.test(line)) offences.push(`${rel}:${i + 1}: ${why}`);
+      }
+    });
+  }
+  assert.deepEqual(offences, [],
+    `${offences.length} site(s) spell a launcher instead of reading it:\n  ${offences.join('\n  ')}`);
+});
+
+test('...and the negative: the widened guard sees a planted spelling in any shipped file', () => {
+  // The instrument is tested, because a guard that cannot see is indistinguishable from a clean tree.
+  const seen = (line) => LAUNCHER_PATTERNS.some(([p]) => p.test(line));
+  assert.equal(seen("  remedy: './snowarch upgrade',"), true);
+  assert.equal(seen("  remedy: './bootstrap.sh',"), true);
+  assert.equal(seen("  const launcher = 'snowarch.cmd';"), true);
+  assert.equal(seen("  win32 ? 'bootstrap.cmd' : x"), true);
+  assert.equal(seen("  'usage: snowarch instance <command>',"), true);
+  // ...and the correct forms are NOT reported: the definitions' own output, and a derived spelling.
+  assert.equal(seen('  remedy: `${SPELL.cli} upgrade`,'), false);
+  assert.equal(seen("  remedy: `${cliSpelling()} upgrade`,"), false);
+  assert.equal(seen("  win32 ? '.\\\\bootstrap.cmd' : x"), false, 'the correct Windows spelling');
+  assert.equal(seen('  `usage: ${cli} instance <command>`,'), false);
+});
+
 test('no renderer builds a CLI command out of a literal path', () => {
   // THE C60 SHAPE: the fix is one thing, and this is what stops the eighty-ninth arriving. A literal
   // `./snowarch` inside a string that a renderer prints is the defect C1 named; a literal in a COMMENT

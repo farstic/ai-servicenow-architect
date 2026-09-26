@@ -6,6 +6,7 @@
  * checks. The prompt is a function here for the same reason the wizard's is.
  */
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { cliSpelling } from '../../src/cli/tty.js';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -109,7 +110,9 @@ describe('the sub-command surface', () => {
 
   it('no sub-command prints the help and exits 2', async () => {
     expect(await runStore([], io())).toBe(2);
-    expect(said()).toContain('usage: snowarch store');
+    // ARC-07-W17 — DERIVED: the usage line names the launcher through `cliSpelling` now, because a
+    // bare `snowarch` is the convention for a command on PATH and this one never is.
+    expect(said()).toContain(`usage: ${cliSpelling()} store`);
   });
 });
 
