@@ -20,6 +20,8 @@ import { readFileSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
+
 const argv = process.argv.slice(2);
 const rootArg = argv.indexOf('--root');
 const root = rootArg === -1
@@ -61,7 +63,14 @@ export function region(lines, word) {
   const quote = (s) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
   return [
     BEGIN,
-    `  ${quote(`usage: ./snowarch ${word} <command> [options]`)},`,
+    // ARC-07-C31 — PINNED POSIX, and `POSIX` rather than an inline `spellings({…})` because this
+    // is the named constant for exactly this job. The region is written INTO a committed source
+    // file, so it must be identical on every runner or `gen:check` fails on the next machine —
+    // the `gen-doctor-docs` rule applied to a second surface. The product line a Windows reader
+    // sees is therefore POSIX; `tests/windows-spellings.test.mjs` asserts that this is what the
+    // region holds, which is what lets it skip these lines in the sweep instead of blaming the
+    // frame for a literal the frame did not write.
+    `  ${quote(`usage: ${POSIX.cli} ${word} <command> [options]`)},`,
     "  '',",
     ...lines.map((l) => `  ${quote(l)},`),
     END,

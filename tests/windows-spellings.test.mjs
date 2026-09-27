@@ -29,6 +29,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
+// The markers come from the generator that WRITES them — ARC-07-C31. A copy here would be a
+// second declaration of the region's shape, and the guard would go quietly blind the day the
+// generator changed it.
+import { BEGIN as HELP_BEGIN, END as HELP_END } from '../scripts/gen-cli-help.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8');
@@ -171,7 +176,6 @@ const SWEEP_REMAINDER = Object.freeze(new Map([
   ['packages/snowarch/src/tools/updateset.ts', 2],
   ['packages/snowarch/src/utils/permissions.ts', 3],
   ['scripts/ci/doctor-snapshot.mjs', 2],
-  ['scripts/gen-cli-help.mjs', 1],
   ['scripts/gen-doctor-docs.mjs', 1],
   ['scripts/lib/release/preflight.mjs', 1],
   ['tools/snowarch/lib/bootstrap.mjs', 3],
@@ -182,7 +186,7 @@ const SWEEP_REMAINDER = Object.freeze(new Map([
   ['tools/snowarch/lib/docs/status.mjs', 2],
   ['tools/snowarch/lib/docs/upstream.mjs', 1],
   ['tools/snowarch/lib/docs/verify.mjs', 2],
-  ['tools/snowarch/lib/instance.mjs', 2],
+  ['tools/snowarch/lib/instance.mjs', 1],
   ['tools/snowarch/lib/mode.mjs', 2],
   ['tools/snowarch/lib/net-sentences.mjs', 1],
   ['tools/snowarch/lib/state.mjs', 3],
@@ -190,7 +194,6 @@ const SWEEP_REMAINDER = Object.freeze(new Map([
   ['tools/snowarch/lib/steps/B04.mjs', 1],
   ['tools/snowarch/lib/steps/format.mjs', 4],
   ['tools/snowarch/lib/steps/index.mjs', 1],
-  ['tools/snowarch/lib/store.mjs', 1],
   ['tools/snowarch/lib/version-info.mjs', 1]
 ]));
 
@@ -204,8 +207,30 @@ const SWEEP_REMAINDER = Object.freeze(new Map([
  * were right the whole time, which is exactly why it went unnoticed until the numbers were read back
  * against the file. The same bug was in the sweeper I wrote to fix these sites, caught there first.
  */
-const codeOf = (text) => text
-  .replace(/\/\*[\s\S]*?\*\//g, (block) => '\n'.repeat((block.match(/\n/g) ?? []).length))
+const blankLines = (block) => '\n'.repeat((block.match(/\n/g) ?? []).length);
+
+/**
+ * A GENERATED REGION IS NOT THE FILE'S LINE — ARC-07-C31, and it is blanked rather than read.
+ *
+ * `instance.mjs` and `store.mjs` each carry a `help-begin`/`help-end` region written by
+ * `scripts/gen-cli-help.mjs`. The `usage:` line inside it spells the launcher POSIX, and editing it in
+ * the product file is undone by the next `gen:check` — so blaming the frame for it sends a maintainer
+ * to a line they must not change. The literal's owner is the generator, which is held to the pinned
+ * spelling by the `no generator can render a launcher for the machine it runs on` case AND by the
+ * `a generated region holds the pinned POSIX rendering` case below.
+ *
+ * BLANKED BEFORE THE COMMENTS ARE, because the markers are themselves `//` comments: stripping first
+ * would leave two blank lines and nothing to find. Line-count preserving, for the reason the block
+ * comment above is — a guard that reports the wrong line number is most of the cost of using it.
+ */
+const withoutGeneratedRegions = (text) => {
+  const pattern = new RegExp(`${HELP_BEGIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?`
+    + `${HELP_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
+  return text.replace(pattern, blankLines);
+};
+
+const codeOf = (text) => withoutGeneratedRegions(text)
+  .replace(/\/\*[\s\S]*?\*\//g, blankLines)
   .split('\n')
   .map((line) => line.replace(/(^|[^:])\/\/.*$/, '$1'))
   .join('\n');
@@ -378,6 +403,40 @@ test('...and the negative: the check sees a planted bare spelling', () => {
     'a sentence about the file');
   assert.equal(bare('`bootstrap.cmd` · `snowarch` · `snowarch.cmd` · `.mcp.json`'), false, 'a list');
   assert.equal('cd /d "{root}" && .\\bootstrap.cmd'.includes('cd /d '), true);
+});
+
+/**
+ * The pair to `withoutGeneratedRegions` — ARC-07-C31, and without it that blanking IS a blind spot.
+ *
+ * The sweep skips a `help-begin`/`help-end` region because its literal belongs to the generator. That
+ * is only honest while the region actually holds what the generator pins, so this reads the committed
+ * regions back and asserts exactly that. Together the two are the whole rule: the frame is not blamed
+ * for a line it must not edit, and nobody may hand-write a different launcher inside the markers and
+ * have it skipped.
+ *
+ * READ FROM THE PRODUCT FILES, not from the generator's output in memory: `gen:check` already proves
+ * the generator and the files agree, and a case that re-ran the generator would prove the same thing
+ * twice while proving nothing about what is committed.
+ */
+test('ARC-07-C31 — a generated help region holds the PINNED POSIX rendering', () => {
+  const regions = [
+    ['tools/snowarch/lib/instance.mjs', 'instance'],
+    ['tools/snowarch/lib/store.mjs', 'store'],
+  ];
+  for (const [rel, word] of regions) {
+    const text = read(rel);
+    const from = text.indexOf(HELP_BEGIN);
+    const to = text.indexOf(HELP_END, from);
+    assert.ok(from !== -1 && to !== -1,
+      `${rel} has no ${HELP_BEGIN} / ${HELP_END} region — has the generator's marker changed?`);
+    const body = text.slice(from, to);
+    assert.ok(body.includes(`usage: ${POSIX.cli} ${word} <command> [options]`),
+      `${rel}'s generated region is not the pinned POSIX rendering:\n${body}`);
+    // And the Windows spelling is NOT in it, which is the direction that fails if a Windows runner
+    // ever regenerates and commits: the assertion above would still pass on a second usage line.
+    assert.equal(body.includes('snowarch.cmd'), false,
+      `${rel}'s generated region carries a Windows spelling — it is committed, so it must be POSIX`);
+  }
 });
 
 test('ARC-07-W17 — no generator can render a launcher for the machine it runs on', () => {
