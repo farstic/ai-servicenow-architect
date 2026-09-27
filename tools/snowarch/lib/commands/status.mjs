@@ -26,8 +26,17 @@ import { resolveCheckout, runDoctor } from '../doctor/index.mjs';
 import { maskForJson } from '../doctor/json-boundary.mjs';
 import { renderPanel } from '../doctor/panel.mjs';
 
-export const USAGE = [
-  'usage: ./snowarch status [--json]',
+/**
+ * ARC-07-C31 — A FUNCTION OF THE READER'S SHELL, the shape `doctor/index.mjs` already uses.
+ *
+ * `cli.mjs` resolves a `usage` that is a function and threads the one `where` it built, so this
+ * renders the shell in front of the person who typed `--help`. It takes the shell as an ARGUMENT so a
+ * case can drive the Windows rendering without forcing `process.platform` — measured as unusable
+ * locally: 550 of 1271 root cases fail under it, because faking the platform breaks path handling,
+ * executable resolution and fixture creation.
+ */
+export const USAGE = (where) => [
+  `usage: ${spellings(where).cli} status [--json]`,
   '',
   '  The one-screen panel: mode, engine, docs, roster, capabilities, instances and the quick',
   '  doctor. `--json` prints the doctor report itself, exactly as `doctor --quick --json` does.',

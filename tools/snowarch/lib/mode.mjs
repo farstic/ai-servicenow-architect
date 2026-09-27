@@ -26,11 +26,20 @@ import { CREATED_BY_US, SCOPES, resolveClaude, register as registerServer, serve
 import { LAST, STEPS, interrupt, runSteps } from './steps/index.mjs';
 import { readDefaultLabel } from '../../../packages/snowarch/dist/store/label.js';
 import { StateError, loadState, recordedInstance, saveState } from './state.mjs';
-import { MODE_DESIGN_NOTE, instanceKeptNote, modeLine, registrationLine, restartSentence }
+import { MODE_DESIGN_NOTE, instanceKeptNote, modeLine, registrationLine, restartSentence, spellings }
   from './text.mjs';
 
-export const USAGE = [
-  'usage: ./snowarch mode [live|design] [options]',
+/**
+ * ARC-07-C31 — A FUNCTION OF THE READER'S SHELL, the shape `doctor/index.mjs` already uses.
+ *
+ * `cli.mjs` resolves a `usage` that is a function and threads the one `where` it built, so this
+ * renders the shell in front of the person who typed `--help`. It takes the shell as an ARGUMENT so a
+ * case can drive the Windows rendering without forcing `process.platform` — measured as unusable
+ * locally: 550 of 1271 root cases fail under it, because faking the platform breaks path handling,
+ * executable resolution and fixture creation.
+ */
+export const USAGE = (where) => [
+  `usage: ${spellings(where).cli} mode [live|design] [options]`,
   '',
   '  (no argument)             print the Mode line and the registration kind',
   '  live                      switch this checkout to live: B04–B09, B01–B03 cached',

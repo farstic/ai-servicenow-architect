@@ -326,10 +326,15 @@ test('ARC-07-W12 — the warning is still the last thing on screen', () => {
 test('ARC-07-W12 — one sentence about the design switch, and two readers of it', () => {
   // `mode --help` and the live ending. Two copies of "the instance store is kept" is how one of
   // them comes to say the opposite, and the question a reader hesitates over is exactly that.
-  assert.ok(MODE_USAGE.includes(MODE_DESIGN_NOTE), 'mode --help no longer quotes the constant');
+  // ARC-07-C31 — `MODE_USAGE` is a function of the reader's shell now, and this case is CALLED WITH
+  // A PINNED POSIX shell on purpose: what it asserts is the design NOTE, which carries no launcher,
+  // so a bare `MODE_USAGE()` would make a launcher-free assertion quietly platform-dependent for no
+  // reason. Pinning says the case does not care which shell, rather than picking one by accident.
+  const usage = MODE_USAGE({ platform: 'linux', env: {} });
+  assert.ok(usage.includes(MODE_DESIGN_NOTE), 'mode --help no longer quotes the constant');
   assert.ok(changeLaterBlock({ label: 'pdi' }).includes(MODE_DESIGN_NOTE));
   // The help line's shape is unchanged: the sentence is the tail of the `design` row.
-  const row = MODE_USAGE.split('\n').find((l) => l.trimStart().startsWith('design '));
+  const row = usage.split('\n').find((l) => l.trimStart().startsWith('design '));
   assert.ok(row.endsWith(MODE_DESIGN_NOTE), `the design row was reshaped: ${row}`);
 });
 
