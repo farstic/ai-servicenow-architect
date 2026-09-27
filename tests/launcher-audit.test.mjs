@@ -480,6 +480,17 @@ test('C35b — a container contributes its prose (item 5)', () => {
   assert.match(join[0].sentence, /the corpus is missing/);
   assert.match(join[0].sentence, /run .* docs sync/);
 
+  // A BARE ARRAY LITERAL, and an inert control is why this assertion exists: `.join(sep)` takes its own path
+  // in `proseOf` (the separator is part of the sentence), so degrading the array arm left the `.join` case
+  // above passing and the control reported INERT. The arm is reached by an array asserted directly.
+  const bare = assertedLaunchers('tests/planted.test.mjs', [
+    "const CLI = spellings({ platform: 'linux', env: {} }).cli;",
+    "assert.deepEqual(lines, ['the corpus is missing', `run ${CLI} docs sync`]);",
+  ].join('\n'));
+  assert.equal(bare.length, 1);
+  assert.match(bare[0].sentence, /the corpus is missing/);
+  assert.match(bare[0].sentence, /run .* docs sync/);
+
   // An object's property values, and an arrow's expression body, for the same reason.
   const obj = assertedLaunchers('tests/planted.test.mjs', [
     "const CLI = spellings({ platform: 'linux', env: {} }).cli;",
