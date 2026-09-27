@@ -28,7 +28,7 @@ const SCRIPT = resolve(HERE, '..', 'scripts', 'ci', 'control.mjs');
 const EXIT = { ok: 0, inert: 1, refused: 2, restoreFailed: 3 };
 
 /** A repository with one committed file, and nothing else. */
-function repo(t, { content = 'export const answer = 42;\n', autocrlf = null } = {}) {
+function repo(t, { content = 'export const answer = 42;\n', autocrlf = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'control-script-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
@@ -39,14 +39,25 @@ function repo(t, { content = 'export const answer = 42;\n', autocrlf = null } = 
   git('config', 'user.email', 'test@example.invalid');
   git('config', 'user.name', 'test');
   git('config', 'commit.gpgsign', 'false');
-  // `core.autocrlf` is the Windows runner's default, and it is what broke the first version of this
-  // tool: a fixture that never sets it cannot reproduce the cell that failed.
-  if (autocrlf !== null) git('config', 'core.autocrlf', String(autocrlf));
+  // `core.autocrlf` IS PINNED IN EVERY FIXTURE, false by default and true in the case that wants it.
+  // Inheriting it is what made three of these cases red on the Windows runner and green here: the
+  // runner's global config is `true`, so a checkout wrote CRLF and the byte assertions below compared
+  // it with an LF literal. Same class as ARC-09-C14's `init.defaultBranch` — a test that inherits a
+  // machine setting tests the machine.
+  git('config', 'core.autocrlf', String(autocrlf));
   mkdirSync(join(dir, 'lib'), { recursive: true });
   writeFileSync(join(dir, 'lib', 'thing.mjs'), content);
   git('add', '-A');
   git('commit', '-q', '-m', 'the checkpoint');
   return { dir, git, file: 'lib/thing.mjs',
+    /**
+     * Does git consider the working tree's copy identical to `sha`? — the tool's own `sameAsCommit`
+     * shape, for the same reason: `git diff` applies the filters git applied on the way in, so the
+     * answer is the one git would give on any platform. Comparing bytes here made the assertion say
+     * "the restore failed" about a restore git calls perfect.
+     */
+    matchesCommit: (sha, f = 'lib/thing.mjs') =>
+      spawnSync('git', ['diff', '--quiet', sha, '--', f], { cwd: dir }).status === 0,
     read: () => readFileSync(join(dir, 'lib', 'thing.mjs'), 'utf8'),
     sha: () => git('rev-parse', 'HEAD').trim() };
 }
@@ -107,8 +118,10 @@ test('ARC-07-C34 — a VALID control: it prints the checkpoint sha, and restores
   // restore to the wrong commit looked exactly like a restore to the right one.
   assert.ok(got.out.includes(sha.slice(0, 12)),
     `the checkpoint sha is not in the output:\n${got.out}`);
-  // ...and the file is back, byte for byte.
-  assert.equal(r.read(), 'export const answer = 42;\n');
+  // ...and the file is back — ASKED OF GIT, not compared as bytes. The runner's `autocrlf=true`
+  // checkout writes CRLF, so an LF literal here fails on a restore git considers perfect. That is the
+  // same defect as the tool's own, one layer up, and it took three Windows cells twice.
+  assert.ok(r.matchesCommit(sha), 'git says the restored file differs from the checkpoint');
 });
 
 test('ARC-07-C34 — an INERT control is reported as a failure of the control, not a pass', (t) => {
@@ -124,7 +137,7 @@ test('ARC-07-C34 — an INERT control is reported as a failure of the control, n
   assert.match(got.out, /INERT/);
   assert.match(got.out, /does not\s+see that degradation|does not see that degradation/);
   // ...and it still restored and verified, so an inert result costs nothing but the knowledge.
-  assert.equal(r.read(), 'export const answer = 42;\n');
+  assert.ok(r.matchesCommit(r.sha()), 'the inert path left the file changed');
 });
 
 test('ARC-07-C34 — it restores by the SHA, so a commit made mid-run cannot move the target', (t) => {
@@ -142,9 +155,12 @@ test('ARC-07-C34 — it restores by the SHA, so a commit made mid-run cannot mov
 
   assert.equal(got.code, EXIT.ok, got.out);
   assert.notEqual(r.sha(), checkpoint, 'the fixture did not actually move HEAD');
-  // Restored to the CHECKPOINT's content, not to the new HEAD's.
-  assert.equal(r.read(), 'export const answer = 42;\n',
+  // Restored to the CHECKPOINT's content, not to the new HEAD's — and the DIFFERENCE between the two
+  // is the claim, so this one compares against each sha rather than against a literal.
+  assert.ok(r.matchesCommit(checkpoint),
     'the restore followed HEAD instead of the checkpoint sha');
+  assert.equal(r.matchesCommit(r.sha()), false,
+    'the file matches the NEW head too, so this case could not tell the two apart');
 });
 
 test('ARC-07-C34 — it refuses without --file, --degrade or --test rather than guessing', (t) => {
@@ -176,8 +192,9 @@ test('ARC-07-C34 — several files are one checkpoint, and all of them are verif
     test: 'false' });
 
   assert.equal(got.code, EXIT.ok, got.out);
-  assert.equal(r.read(), 'export const answer = 42;\n');
-  assert.equal(readFileSync(join(r.dir, 'lib', 'other.mjs'), 'utf8'), 'export const second = 1;\n');
+  const sha = r.sha();
+  assert.ok(r.matchesCommit(sha, 'lib/thing.mjs'));
+  assert.ok(r.matchesCommit(sha, 'lib/other.mjs'), 'the second file was not restored');
   assert.match(got.out, /2 file\(s\)/);
 });
 
