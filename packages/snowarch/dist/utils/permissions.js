@@ -12,7 +12,7 @@
  */
 import { ServiceNowError } from './errors.js';
 import { currentInstance, FLAG_NAMES } from '../servicenow/context.js';
-import { cliSpelling } from '../cli/tty.js';
+import { cliSpelling, needCli } from '../cli/tty.js';
 export { FLAG_NAMES };
 const all = (v) => Object.fromEntries(FLAG_NAMES.map((f) => [f, v]));
 /**
@@ -125,6 +125,7 @@ export function checkPresetMismatch(preset, stored, label = 'unknown') {
  */
 /** `cli` REQUIRED: five product callers, and the rule is a count rather than a judgement. */
 export function checkProdPosture(entry, cli) {
+    needCli(cli, 'checkProdPosture');
     if (entry.environment !== 'prod')
         return { ok: true };
     const raised = FLAG_NAMES.filter((f) => entry.effectiveFlags[f] === 'true');

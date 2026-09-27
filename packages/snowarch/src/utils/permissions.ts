@@ -13,7 +13,7 @@
 import { ServiceNowError } from './errors.js';
 import type { ErrorCodeName } from '../errors/codes.js';
 import { currentInstance, FLAG_NAMES, type FlagName, type Flags } from '../servicenow/context.js';
-import { cliSpelling } from '../cli/tty.js';
+import { cliSpelling, needCli } from '../cli/tty.js';
 
 export { FLAG_NAMES };
 export type { FlagName, Flags };
@@ -150,6 +150,7 @@ export interface ProdPosture {
 export function checkProdPosture(entry: {
   label: string; environment: string; preset: string; effectiveFlags: Flags; prodWriteAck: boolean;
 }, cli: string): ProdPosture {
+  needCli(cli, 'checkProdPosture');
   if (entry.environment !== 'prod') return { ok: true };
   const raised = FLAG_NAMES.filter((f) => entry.effectiveFlags[f] === 'true');
   if (raised.length === 0 || entry.prodWriteAck === true) return { ok: true };

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { ErrorCodeName } from '../../src/errors/codes.js';
 import { ServiceNowError } from '../../src/utils/errors.js';
 import { cliSpelling } from '../../src/cli/tty.js';
+import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
+import { neverProbedNote } from '../../src/cli/format.js';
 
 /**
  * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
@@ -406,5 +408,36 @@ describe('criterion 8 — the environment does not reach a store-defined instanc
     } finally {
       if (saved === undefined) delete process.env.WRITE_ENABLED; else process.env.WRITE_ENABLED = saved;
     }
+  });
+});
+
+describe('ARC-07-C31 slice 3 — the required spellings refuse rather than defaulting', () => {
+  // THIS SUITE EXISTS BECAUSE A CONTROL WAS INERT. TypeScript stops a caller OMITTING a required
+  // parameter, so the compiler already holds that half. What it does not stop is somebody relaxing the
+  // parameter to `cli = cliSpelling()` later: backwards-compatible, breaks nothing, and the process
+  // quietly answers for a caller that knew better. Adding exactly that default to `NO_INSTANCE_MESSAGE`
+  // left the whole package suite green.
+  //
+  // The cast is deliberate and is the only way to write the case: the call is a compile error without
+  // it, which is the compiler doing its job. What is being tested is the RUNTIME guard that survives a
+  // future relaxation.
+  const withNoSpelling = <T>(fn: T): (() => unknown) => (fn as unknown as () => unknown);
+
+  it('NO_INSTANCE_MESSAGE refuses', () => {
+    expect(withNoSpelling(NO_INSTANCE_MESSAGE)).toThrow(/^NO_INSTANCE_MESSAGE needs the launcher/);
+  });
+
+  it('checkProdPosture refuses', () => {
+    // Its own entry, not the `base` an inner describe holds: reaching for a name that is not in scope
+    // here is the slip this row has now made ten times, and the compiler caught this one.
+    const entry = { label: 'prod', environment: 'prod', preset: 'full',
+      effectiveFlags: expandPreset('full'), prodWriteAck: false };
+    expect(() => (checkProdPosture as unknown as (e: unknown) => unknown)(entry))
+      .toThrow(/^checkProdPosture needs the launcher/);
+  });
+
+  it('neverProbedNote refuses', () => {
+    expect(() => (neverProbedNote as unknown as (i: unknown) => unknown)([]))
+      .toThrow(/^neverProbedNote needs the launcher/);
   });
 });

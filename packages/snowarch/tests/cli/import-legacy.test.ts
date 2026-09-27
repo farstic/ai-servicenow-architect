@@ -13,6 +13,7 @@ import { FLAG_NAMES } from '../../src/utils/permissions.js';
 import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
 import { fakeRest } from '../helpers/fake-rest.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
+import { cliSpelling } from '../../src/cli/tty.js';
 
 /**
  * ARC-07-S08 — the migration, and the three promises it makes.
@@ -270,13 +271,24 @@ describe('AC 6 — the advice, and the deletion this command never performs', ()
   it('names the directory and tokens.json, per platform', () => {
     // Rendered for a named platform, on whichever platform the runner happens to be: the advice is
     // a line the reader pastes, so its separators follow the system it describes.
-    const unix = deletionAdvice(1, 2, '/home/me', 'linux');
+    const unix = deletionAdvice(1, 2, '/home/me', 'linux', {});
     expect(unix).toContain('rm -r /home/me/.config/servicenow-mcp');
     expect(unix).toContain('tokens.json');
     expect(unix).toContain('Imported 1 of 2');
-    const windows = deletionAdvice(2, 2, 'C:\\Users\\me', 'win32');
+    const windows = deletionAdvice(2, 2, 'C:\\Users\\me', 'win32', {});
     expect(windows).toContain('Remove-Item -Recurse');
     expect(windows).toContain('\\.config\\servicenow-mcp');
+
+    // ARC-07-C31 slice 3 — THE LAUNCHER, ASSERTED, and a control is why it is here. Dropping the `env`
+    // from this sentence's `cliSpelling(platform, env)` left the whole package suite green, because
+    // nothing here checked the launcher at all — only the separators. Both directions, and `{}` for the
+    // env because a named platform means a named SHELL too: `cliSpelling('win32')` on a mac reads the
+    // runner's SHELL and renders POSIX, which would make this case assert the POSIX spelling while
+    // claiming to check the Windows one.
+    expect(windows).toContain(`${cliSpelling('win32', {})} doctor`);
+    expect(windows).not.toContain('./snowarch');
+    expect(unix).toContain(`${cliSpelling('linux', {})} doctor`);
+    expect(unix).not.toContain('snowarch.cmd');
   });
 
   it('has no removal call anywhere in its source — the promise, greppable', () => {

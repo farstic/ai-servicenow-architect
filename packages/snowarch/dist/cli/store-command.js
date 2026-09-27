@@ -14,7 +14,7 @@
  * one into `process.exit`, so the whole surface is testable twice in one process.
  */
 import { statSync } from 'node:fs';
-import { cliSpelling, promptLine } from './tty.js';
+import { cliSpelling, needCli, promptLine } from './tty.js';
 import { EXIT_OK, EXIT_FAILED, EXIT_USAGE } from './instance.js';
 import { maskPath, resolveStorePath } from '../store/paths.js';
 import { STORE_SUB_COMMANDS, storeSubCommandLines, storeSubCommandList } from './help-tables.js';
@@ -50,6 +50,7 @@ export function storeHelp() {
  * imports the engine, so the two share the semantics and not the code.
  */
 function storePath(io, cli) {
+    needCli(cli, 'storePath');
     const res = resolveStorePath();
     if (res.path === null) {
         io.error(`store: no store found — run ${cli} instance add <label> first\n`);

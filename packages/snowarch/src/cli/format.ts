@@ -15,7 +15,7 @@ import { completeFlags, type Store, type StoreInstance } from '../store/schema.j
 import { PROBE_FIELDS, probeFieldText, type LastProbe } from '../servicenow/probes.js';
 import type { Flags } from '../utils/permissions.js';
 import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
-import { cliSpelling } from './tty.js';
+import { cliSpelling, needCli } from './tty.js';
 
 /**
  * A secret, described rather than shown: `set (len 12)`.
@@ -142,11 +142,16 @@ export const NEVER_PROBED = '—';
  * ARC-07-C31 slice 3 — `cli` REQUIRED: two callers, both in this file (lines 168 and 291). Two is
  * not one, and the rule is a COUNT rather than a judgement about whether two callers feel like one.
  */
-export const neverProbedNote = (instances: readonly MaskedInstance[], cli: string): string | null =>
-  (instances.some((i) => !i.lastProbe)
+export const neverProbedNote = (instances: readonly MaskedInstance[],
+  cli: string): string | null => {
+  // A BLOCK BODY, because the guard has to run before the ternary and `&&` would have turned a `null`
+  // return into the guard's own string — which is the kind of quiet type change an expression body hides.
+  needCli(cli, 'neverProbedNote');
+  return instances.some((i) => !i.lastProbe)
     ? `${NEVER_PROBED} = never probed. ${cli} instance test <label> probes one; `
       + '--all probes every one.'
-    : null);
+    : null;
+};
 
 const HEADERS = ['LABEL', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER'] as const;
 

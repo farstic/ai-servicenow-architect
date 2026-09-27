@@ -1,3 +1,4 @@
+import { needCli } from './cli/tty.js';
 /**
  * ARC-08-C7 — ONE answer, in this package, to "there is no instance configured".
  *
@@ -34,5 +35,5 @@
  * shell — the honest position, and the one ARC-07-C38 improves.
  */
 export const NO_INSTANCE_MESSAGE = (cli: string): string =>
-  `No ServiceNow instance is configured for this checkout. Run ${cli} mode live, `
-  + 'or /snowarch setup-instance inside Claude.';
+  `No ServiceNow instance is configured for this checkout. Run ${needCli(cli, 'NO_INSTANCE_MESSAGE')} `
+  + 'mode live, or /snowarch setup-instance inside Claude.';
