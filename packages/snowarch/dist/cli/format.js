@@ -134,7 +134,7 @@ const HEADERS = ['LABEL', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER'];
  */
 export function listTable(list, cli = cliSpelling()) {
     if (list.instances.length === 0)
-        return NO_INSTANCES;
+        return NO_INSTANCES(cli);
     const rows = list.instances.map((i) => [
         i.label, i.environment, i.auth.method, i.preset,
         list.defaultInstance === i.label ? '*' : '', i.auth.username,
@@ -230,7 +230,7 @@ const ALL_HEADERS = ['LABEL', 'STORE', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER
  */
 export function listAllTable(list, cli = cliSpelling()) {
     if (list.instances.length === 0)
-        return NO_INSTANCES;
+        return NO_INSTANCES(cli);
     const rows = list.instances
         .map((i) => [
         i.label, i.store, i.environment, i.auth.method, i.preset,

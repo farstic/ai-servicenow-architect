@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { ErrorCodeName } from '../../src/errors/codes.js';
 import { ServiceNowError } from '../../src/utils/errors.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * The lines asserted below leave the SERVER through `cliSpelling()` (`cli/tty.ts`), so the
+ * expectation derives from the same source. A POSIX literal here is green on a mac and red on all
+ * three Windows cells, which is this row's own "62 expectations" trap.
+ */
+const SERVER_CLI = cliSpelling();
 import {
   outsideInstance, runWithInstance, FLAG_NAMES, type Flags, type InstanceRuntime,
 } from '../../src/servicenow/context.js';
@@ -154,32 +164,34 @@ describe('checkProdPosture — D-05, criterion 2', () => {
   const base = { label: 'prod', environment: 'prod', preset: 'full', prodWriteAck: false };
 
   it('prod raised above read-only without the acknowledgement is refused, with the --ack-prod remedy', () => {
-    const r = checkProdPosture({ ...base, effectiveFlags: expandPreset('full') });
+    const r = checkProdPosture({ ...base, effectiveFlags: expandPreset('full') }, SERVER_CLI);
     expect(r.ok).toBe(false);
     expect(r.code).toBe('PROD_WRITE_NOT_ACKNOWLEDGED');
-    expect(r.message).toContain('./snowarch instance set-preset prod full --ack-prod');
+    expect(r.message).toContain(`${SERVER_CLI} instance set-preset prod full --ack-prod`);
     expect(r.message).toContain('PROD_WRITE_NOT_ACKNOWLEDGED');
   });
 
   it('ANY flag counts, not only WRITE — an ATF-only custom instance still runs tests against production', () => {
     const r = checkProdPosture({
       ...base, preset: 'custom', effectiveFlags: flags({ ATF_ENABLED: 'true' }),
-    });
+    }, SERVER_CLI);
     expect(r.ok).toBe(false);
     expect(r.message).toContain('set-preset prod custom --ack-prod');
   });
 
   it('prod at read-only is fine without any acknowledgement', () => {
-    expect(checkProdPosture({ ...base, preset: 'read-only', effectiveFlags: expandPreset('read-only') }).ok).toBe(true);
+    expect(checkProdPosture({ ...base, preset: 'read-only', effectiveFlags: expandPreset('read-only') },
+      SERVER_CLI).ok).toBe(true);
   });
 
   it('prod with the acknowledgement loads', () => {
-    expect(checkProdPosture({ ...base, prodWriteAck: true, effectiveFlags: expandPreset('full') }).ok).toBe(true);
+    expect(checkProdPosture({ ...base, prodWriteAck: true, effectiveFlags: expandPreset('full') },
+      SERVER_CLI).ok).toBe(true);
   });
 
   it('a non-prod environment is never gated by this rule', () => {
     for (const environment of ['pdi', 'dev', 'test']) {
-      expect(checkProdPosture({ ...base, environment, effectiveFlags: expandPreset('full') }).ok).toBe(true);
+      expect(checkProdPosture({ ...base, environment, effectiveFlags: expandPreset('full') }, SERVER_CLI).ok).toBe(true);
     }
   });
 });

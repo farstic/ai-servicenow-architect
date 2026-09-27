@@ -1,5 +1,6 @@
 import { ServiceNowError } from '../utils/errors.js';
 import { requireScripting, requireWrite } from '../utils/permissions.js';
+import { cliSpelling } from '../cli/tty.js';
 export function updateSetToolManifest() {
     return [
         {
@@ -135,6 +136,9 @@ export function updateSetToolManifest() {
     ];
 }
 export async function dispatchUpdateSetAction(client, name, args) {
+    // ARC-07-C31 slice 3 — resolved once for this dispatcher and threaded to both remedies below, so
+    // two `AUTHENTICATION_FAILED` sentences in one call cannot render two different shells.
+    const cli = cliSpelling();
     switch (name) {
         case 'snow_us_current_update_set_read': {
             const resp = await client.queryRecords({
@@ -255,7 +259,7 @@ export async function dispatchUpdateSetAction(client, name, args) {
             const captureUser = client.getAuthUsername();
             if (!captureUser) {
                 throw new ServiceNowError('the instance is configured without a user name, so the capture preference cannot be resolved. '
-                    + 'Run: ./snowarch instance set-credentials <label>', 'AUTHENTICATION_FAILED');
+                    + `Run: ${cli} instance set-credentials <label>`, 'AUTHENTICATION_FAILED');
             }
             const users = await client.queryRecords({
                 table: 'sys_user', query: `user_name=${captureUser}`, limit: 1, fields: 'sys_id,user_name',
@@ -311,7 +315,7 @@ export async function dispatchUpdateSetAction(client, name, args) {
             const ensureUser = client.getAuthUsername();
             if (!ensureUser) {
                 throw new ServiceNowError('the instance is configured without a user name, so an update set cannot be scoped to the '
-                    + 'caller. Run: ./snowarch instance set-credentials <label>', 'AUTHENTICATION_FAILED');
+                    + `caller. Run: ${cli} instance set-credentials <label>`, 'AUTHENTICATION_FAILED');
             }
             // sys_created_by holds the user_name string, so this is scoped to the caller's own
             // in-progress sets — not to anyone else's with the same name.

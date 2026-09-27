@@ -12,6 +12,7 @@
  */
 import { ServiceNowError } from './errors.js';
 import { currentInstance, FLAG_NAMES } from '../servicenow/context.js';
+import { cliSpelling } from '../cli/tty.js';
 export { FLAG_NAMES };
 const all = (v) => Object.fromEntries(FLAG_NAMES.map((f) => [f, v]));
 /**
@@ -114,7 +115,16 @@ export function checkPresetMismatch(preset, stored, label = 'unknown') {
  * stricter. A `custom` instance with only `ATF_ENABLED` still runs tests against
  * production, and the acknowledgement is about the operator having chosen that on purpose.
  */
-export function checkProdPosture(entry) {
+/**
+ * ARC-07-C31 slice 3 — RENDERED INTO CHAT, AND STILL THE OPERATOR'S OWN SHELL.
+ *
+ * This sentence leaves as a `ServiceNowError` and reaches the MCP client, which is Claude, which
+ * renders it into a conversation rather than into a terminal. That invites the conclusion that no
+ * shell is involved and the spelling does not matter. It is the wrong conclusion: the operator reads
+ * it and types it on the machine THIS SERVER IS RUNNING ON, so `cliSpelling()` is the right source.
+ */
+/** `cli` REQUIRED: five product callers, and the rule is a count rather than a judgement. */
+export function checkProdPosture(entry, cli) {
     if (entry.environment !== 'prod')
         return { ok: true };
     const raised = FLAG_NAMES.filter((f) => entry.effectiveFlags[f] === 'true');
@@ -125,7 +135,7 @@ export function checkProdPosture(entry) {
         code: 'PROD_WRITE_NOT_ACKNOWLEDGED',
         message: `instance "${entry.label}": environment=prod with preset ${entry.preset} but prodWriteAck `
             + `is not true — not loaded. Raise it deliberately with: `
-            + `./snowarch instance set-preset ${entry.label} ${entry.preset} --ack-prod `
+            + `${cli} instance set-preset ${entry.label} ${entry.preset} --ack-prod `
             + `(code PROD_WRITE_NOT_ACKNOWLEDGED)`,
     };
 }
@@ -198,14 +208,23 @@ export function remedyPreset(missing = []) {
  * changes it. A prod instance gets the stronger sentence: the cap is deliberate, and
  * raising it needs an explicit acknowledgement rather than a preset change.
  */
-export function gateError(result) {
+/**
+ * ARC-07-C31 slice 3 — RENDERED INTO CHAT, AND STILL THE OPERATOR'S OWN SHELL.
+ *
+ * This sentence leaves as a `ServiceNowError` and reaches the MCP client, which is Claude, which
+ * renders it into a conversation rather than into a terminal. That invites the conclusion that no
+ * shell is involved and the spelling does not matter. It is the wrong conclusion: the operator reads
+ * it and types it on the machine THIS SERVER IS RUNNING ON, so `cliSpelling()` is the right source.
+ */
+/** A default is within the rule here: exactly one product caller, and it is named at that site. */
+export function gateError(result, cli = cliSpelling()) {
     const rt = currentInstance();
     const code = result.code ?? 'WRITE_NOT_ENABLED';
     const what = HUMAN[code] ?? 'Operation is disabled';
     const remedy = rt.environment === 'prod'
         ? `Instance "${rt.label}" is tagged prod and capped at read-only. `
-            + `Raising it requires: ./snowarch instance set-preset ${rt.label} <preset> --ack-prod`
-        : `Run: ./snowarch instance set-preset ${rt.label} ${remedyPreset(result.missing)}`;
+            + `Raising it requires: ${cli} instance set-preset ${rt.label} <preset> --ack-prod`
+        : `Run: ${cli} instance set-preset ${rt.label} ${remedyPreset(result.missing)}`;
     return new ServiceNowError(`${what} for instance "${rt.label}" (preset ${rt.preset}). ${remedy}`, code);
 }
 function gate(name, mutates = false) {

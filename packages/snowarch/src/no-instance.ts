@@ -17,6 +17,22 @@
  * `ADD_INSTANCE`, which is what this repository already does for server-side strings such as
  * `AUTHENTICATION_FAILED`: one definition per side, and a gate that fails when they disagree.
  */
-export const NO_INSTANCE_MESSAGE =
-  'No ServiceNow instance is configured for this checkout. Run ./snowarch mode live, '
+/**
+ * ARC-07-C31 slice 3 — RENDERED INTO CHAT, AND STILL THE OPERATOR'S OWN SHELL.
+ *
+ * This sentence leaves as a `ServiceNowError` and reaches the MCP client, which is Claude, which
+ * renders it into a conversation rather than into a terminal. That invites the conclusion that no
+ * shell is involved and the spelling does not matter. It is the wrong conclusion: the operator reads
+ * it and types it on the machine THIS SERVER IS RUNNING ON, so `cliSpelling()` is the right source.
+ *
+ *
+ * A FUNCTION WITH A REQUIRED SPELLING, not a const: SIX sites use its value — `tools/status.ts`,
+ * `servicenow/context.ts`, `servicenow/instances.ts` twice, and `cli/format.ts` twice. I counted four
+ * from a grep and the type checker found the other two, which is the same lesson this row keeps
+ * learning: an exhaustive search inside a scope I chose is not exhaustive. The two in `format.ts` have
+ * a spelling in scope already; the other four call `cliSpelling()` because none of them is TOLD a
+ * shell — the honest position, and the one ARC-07-C38 improves.
+ */
+export const NO_INSTANCE_MESSAGE = (cli: string): string =>
+  `No ServiceNow instance is configured for this checkout. Run ${cli} mode live, `
   + 'or /snowarch setup-instance inside Claude.';

@@ -162,7 +162,7 @@ const HEADERS = ['LABEL', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER'] as const;
  * `cli/instance.ts:1525`. Its other call sites are tests, the same shape the engine's `formatStatus` has.
  */
 export function listTable(list: ListJson, cli: string = cliSpelling()): string {
-  if (list.instances.length === 0) return NO_INSTANCES;
+  if (list.instances.length === 0) return NO_INSTANCES(cli);
 
   const rows = list.instances.map((i) => [
     i.label, i.environment, i.auth.method, i.preset,
@@ -294,7 +294,7 @@ const ALL_HEADERS = ['LABEL', 'STORE', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER
  * `cli/instance.ts:1520`. Its other call sites are tests, the same shape the engine's `formatStatus` has.
  */
 export function listAllTable(list: CombinedListJson, cli: string = cliSpelling()): string {
-  if (list.instances.length === 0) return NO_INSTANCES;
+  if (list.instances.length === 0) return NO_INSTANCES(cli);
   const rows = (list.instances as Array<MaskedInstance & { store: StoreLabel; default: boolean }>)
     .map((i) => [
       i.label, i.store, i.environment, i.auth.method, i.preset,

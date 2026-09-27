@@ -6,6 +6,18 @@ import {
 import { expandPreset, isWriteEnabled, requireWrite } from '../../src/utils/permissions.js';
 import type { ServiceNowError } from '../../src/utils/errors.js';
 import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * `NO_INSTANCE_MESSAGE` is a FUNCTION now, and `toContain(NO_INSTANCE_MESSAGE)` type-checked: the
+ * matcher accepts anything, so TypeScript did not catch the assertion comparing a string to a
+ * function's source. The runtime did — five cases, all reading `to include [Function
+ * NO_INSTANCE_MESSAGE]`. That is the same defect the engine's required-argument rule exists for, and
+ * it is worth knowing that the compiler is not a complete audit for it.
+ */
+const SERVER_CLI = cliSpelling();
 
 /**
  * Criterion 6 — two calls in flight at once each see their own instance.
@@ -111,7 +123,7 @@ describe('currentInstance outside a run', () => {
         expect((e as ServiceNowError).code).toBe('NO_INSTANCE_CONFIGURED');
         // ARC-08-C7 — the ONE remedy, from its definition; a retyped copy here would be a surface
         // that drifts exactly the way the six in the product did.
-        expect((e as ServiceNowError).message).toBe(NO_INSTANCE_MESSAGE);
+        expect((e as ServiceNowError).message).toBe(NO_INSTANCE_MESSAGE(SERVER_CLI));
       }
     });
   });

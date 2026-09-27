@@ -17,6 +17,18 @@ import { CORE_TOOLS_UNCONFIGURED } from '../../src/tools/status.js';
 import type { Store } from '../../src/store/schema.js';
 import { fakeRest } from '../helpers/fake-rest.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * `NO_INSTANCE_MESSAGE` is a FUNCTION now, and `toContain(NO_INSTANCE_MESSAGE)` type-checked: the
+ * matcher accepts anything, so TypeScript did not catch the assertion comparing a string to a
+ * function's source. The runtime did — five cases, all reading `to include [Function
+ * NO_INSTANCE_MESSAGE]`. That is the same defect the engine's required-argument rule exists for, and
+ * it is worth knowing that the compiler is not a complete audit for it.
+ */
+const SERVER_CLI = cliSpelling();
 
 /**
  * ARC-07-S06 — the seven maintenance commands.
@@ -175,8 +187,8 @@ describe('AC 1 — list', () => {
     try {
       const terminal = io([]);
       expect(runList({}, terminal, deps(ws))).toBe(EXIT_OK);
-      expect(terminal.written()).toContain(NO_INSTANCES);
-      expect(listTable(listJson(ws.store, { version: 1, instances: {} } as Store))).toBe(NO_INSTANCES);
+      expect(terminal.written()).toContain(NO_INSTANCES(SERVER_CLI));
+      expect(listTable(listJson(ws.store, { version: 1, instances: {} } as Store))).toBe(NO_INSTANCES(SERVER_CLI));
     } finally { ws.cleanup(); }
   });
 
@@ -546,7 +558,7 @@ describe('AC 8 — remove', () => {
 
       const listing = io([]);
       runList({}, listing, deps(ws));
-      expect(listing.written()).toContain(NO_INSTANCES);
+      expect(listing.written()).toContain(NO_INSTANCES(SERVER_CLI));
     } finally { ws.cleanup(); }
   });
 

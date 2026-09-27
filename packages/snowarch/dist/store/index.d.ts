@@ -50,8 +50,17 @@ export declare function loadStore(path: string): {
  */
 /** Keys a caller may never patch through `updateInstance`. Credentials are set, not edited. */
 export declare const CREDENTIAL_KEYS: readonly string[];
+/**
+ * ARC-07-C31 slice 3 — RENDERED INTO CHAT, AND STILL THE OPERATOR'S OWN SHELL.
+ *
+ * This sentence leaves as a `ServiceNowError` and reaches the MCP client, which is Claude, which
+ * renders it into a conversation rather than into a terminal. That invites the conclusion that no
+ * shell is involved and the spelling does not matter. It is the wrong conclusion: the operator reads
+ * it and types it on the machine THIS SERVER IS RUNNING ON, so `cliSpelling()` is the right source.
+ */
+/** One caller, `line 144` below, so a default is within the rule and named. */
 export declare class CredentialPatchRefused extends Error {
-    constructor(key: string);
+    constructor(key: string, cli?: string);
 }
 /**
  * Change ONE entry's non-credential fields, atomically.

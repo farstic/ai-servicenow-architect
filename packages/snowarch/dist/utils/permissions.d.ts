@@ -78,13 +78,22 @@ export interface ProdPosture {
  * stricter. A `custom` instance with only `ATF_ENABLED` still runs tests against
  * production, and the acknowledgement is about the operator having chosen that on purpose.
  */
+/**
+ * ARC-07-C31 slice 3 — RENDERED INTO CHAT, AND STILL THE OPERATOR'S OWN SHELL.
+ *
+ * This sentence leaves as a `ServiceNowError` and reaches the MCP client, which is Claude, which
+ * renders it into a conversation rather than into a terminal. That invites the conclusion that no
+ * shell is involved and the spelling does not matter. It is the wrong conclusion: the operator reads
+ * it and types it on the machine THIS SERVER IS RUNNING ON, so `cliSpelling()` is the right source.
+ */
+/** `cli` REQUIRED: five product callers, and the rule is a count rather than a judgement. */
 export declare function checkProdPosture(entry: {
     label: string;
     environment: string;
     preset: string;
     effectiveFlags: Flags;
     prodWriteAck: boolean;
-}): ProdPosture;
+}, cli: string): ProdPosture;
 export interface GateResult {
     ok: boolean;
     code?: ErrorCodeName;
@@ -116,7 +125,16 @@ export declare function remedyPreset(missing?: FlagName[]): Exclude<PresetName, 
  * changes it. A prod instance gets the stronger sentence: the cap is deliberate, and
  * raising it needs an explicit acknowledgement rather than a preset change.
  */
-export declare function gateError(result: GateResult): ServiceNowError;
+/**
+ * ARC-07-C31 slice 3 — RENDERED INTO CHAT, AND STILL THE OPERATOR'S OWN SHELL.
+ *
+ * This sentence leaves as a `ServiceNowError` and reaches the MCP client, which is Claude, which
+ * renders it into a conversation rather than into a terminal. That invites the conclusion that no
+ * shell is involved and the spelling does not matter. It is the wrong conclusion: the operator reads
+ * it and types it on the machine THIS SERVER IS RUNNING ON, so `cliSpelling()` is the right source.
+ */
+/** A default is within the rule here: exactly one product caller, and it is named at that site. */
+export declare function gateError(result: GateResult, cli?: string): ServiceNowError;
 export declare function requireWrite(): void;
 export declare function requireCmdbWrite(): void;
 export declare function requireScripting(): void;

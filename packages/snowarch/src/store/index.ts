@@ -10,6 +10,7 @@ import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { parseStore, type Store, type StoreError } from './schema.js';
 import { maskPath, shellRemedy } from './paths.js';
+import { cliSpelling } from '../cli/tty.js';
 
 export * from './paths.js';
 export * from './schema.js';
@@ -118,10 +119,19 @@ export function loadStore(path: string): { store: Store; warning?: string } | { 
 /** Keys a caller may never patch through `updateInstance`. Credentials are set, not edited. */
 export const CREDENTIAL_KEYS = Object.freeze(['auth', 'password', 'clientSecret', 'clientId']);
 
+/**
+ * ARC-07-C31 slice 3 — RENDERED INTO CHAT, AND STILL THE OPERATOR'S OWN SHELL.
+ *
+ * This sentence leaves as a `ServiceNowError` and reaches the MCP client, which is Claude, which
+ * renders it into a conversation rather than into a terminal. That invites the conclusion that no
+ * shell is involved and the spelling does not matter. It is the wrong conclusion: the operator reads
+ * it and types it on the machine THIS SERVER IS RUNNING ON, so `cliSpelling()` is the right source.
+ */
+/** One caller, `line 144` below, so a default is within the rule and named. */
 export class CredentialPatchRefused extends Error {
-  constructor(key: string) {
+  constructor(key: string, cli: string = cliSpelling()) {
     super(`updateInstance refuses a patch containing "${key}" — credentials are written by `
-      + './snowarch instance set-credentials, never by a patch');
+      + `${cli} instance set-credentials, never by a patch`);
     this.name = 'CredentialPatchRefused';
   }
 }

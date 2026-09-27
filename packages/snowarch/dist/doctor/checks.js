@@ -20,6 +20,7 @@ import { FLAG_NAMES, checkProdPosture } from '../utils/permissions.js';
 import { checkFluent } from '../servicenow/probes.js';
 import { resolveAuditPath } from '../audit/writer.js';
 import { storeEntry } from './store-entry.js';
+import { cliSpelling } from '../cli/tty.js';
 const isWindows = process.platform === 'win32';
 /**
  * The flag names this check reasons ABOUT, taken from the contract's own list rather than typed.
@@ -219,7 +220,9 @@ export const svInstances = {
                     : `${i.name}: FLUENT_NOT_INSTALLED — ${FLUENT_FLAG} is on and @servicenow/sdk is not `
                         + 'resolvable');
             }
-            const posture = checkProdPosture(entry);
+            // ARC-07-C31 slice 3 — `cliSpelling()`, because `CheckContext` carries no platform (measured:
+            // `doctor/types.ts` has five fields and none of them is one). ARC-07-C38 threads one.
+            const posture = checkProdPosture(entry, cliSpelling());
             if (!posture.ok) {
                 problems.push(posture.message ?? `${i.name}: prod posture`);
                 remedy ??= `./snowarch instance set-preset ${i.name} ${entry.preset} --ack-prod`;

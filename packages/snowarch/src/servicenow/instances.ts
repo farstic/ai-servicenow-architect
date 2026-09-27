@@ -18,6 +18,7 @@ import {
   type StoreError, type StoreInstance, type StoreSource,
 } from '../store/index.js';
 import { FLAG_NAMES, type FlagName, type Flags, type InstanceRuntime } from './context.js';
+import { cliSpelling } from '../cli/tty.js';
 import {
   applyDependencyRule, checkPresetMismatch, checkProdPosture, expandPreset, type PresetName,
 } from '../utils/permissions.js';
@@ -231,7 +232,7 @@ class InstanceManager {
     const posture = checkProdPosture({
       label: name, environment: meta.environment, preset: meta.preset,
       effectiveFlags: effective, prodWriteAck: meta.prodWriteAck,
-    });
+    }, cliSpelling());
     if (!posture.ok) {
       this.report.notLoaded.push({ label: name, code: posture.code as string, message: posture.message as string });
       return false;
@@ -261,7 +262,7 @@ class InstanceManager {
     if (!entry) {
       const available = this.listNames();
       throw new Error(available.length === 0
-        ? NO_INSTANCE_MESSAGE
+        ? NO_INSTANCE_MESSAGE(cliSpelling())
         : `Unknown instance "${target}". Available: ${available.join(', ')}`);
     }
     return entry.client;
@@ -340,7 +341,7 @@ class InstanceManager {
       const refused = this.report.notLoaded.find((n) => n.label === this.currentName);
       throw new Error(refused
         ? `Instance "${this.currentName}" is not loaded — ${refused.code}: ${refused.message}`
-        : NO_INSTANCE_MESSAGE);
+        : NO_INSTANCE_MESSAGE(cliSpelling()));
     }
     return rt;
   }

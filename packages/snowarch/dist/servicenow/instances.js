@@ -14,6 +14,7 @@ import { ServiceNowClient } from './client.js';
 import { ServiceNowError } from '../utils/errors.js';
 import { loadStore, maskPath, resolveStorePath, } from '../store/index.js';
 import { FLAG_NAMES } from './context.js';
+import { cliSpelling } from '../cli/tty.js';
 import { applyDependencyRule, checkPresetMismatch, checkProdPosture, expandPreset, } from '../utils/permissions.js';
 /** Byte-exact "true". Anything else — including "TRUE", "1", "yes" — is false, as it always was. */
 function envFlag(name) {
@@ -187,7 +188,7 @@ class InstanceManager {
         const posture = checkProdPosture({
             label: name, environment: meta.environment, preset: meta.preset,
             effectiveFlags: effective, prodWriteAck: meta.prodWriteAck,
-        });
+        }, cliSpelling());
         if (!posture.ok) {
             this.report.notLoaded.push({ label: name, code: posture.code, message: posture.message });
             return false;
@@ -215,7 +216,7 @@ class InstanceManager {
         if (!entry) {
             const available = this.listNames();
             throw new Error(available.length === 0
-                ? NO_INSTANCE_MESSAGE
+                ? NO_INSTANCE_MESSAGE(cliSpelling())
                 : `Unknown instance "${target}". Available: ${available.join(', ')}`);
         }
         return entry.client;
@@ -286,7 +287,7 @@ class InstanceManager {
             const refused = this.report.notLoaded.find((n) => n.label === this.currentName);
             throw new Error(refused
                 ? `Instance "${this.currentName}" is not loaded — ${refused.code}: ${refused.message}`
-                : NO_INSTANCE_MESSAGE);
+                : NO_INSTANCE_MESSAGE(cliSpelling()));
         }
         return rt;
     }

@@ -17,6 +17,7 @@ import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { ServiceNowError } from '../utils/errors.js';
 import type { ServiceNowClient } from './client.js';
+import { cliSpelling } from '../cli/tty.js';
 
 export const FLAG_NAMES = [
   'WRITE_ENABLED', 'CMDB_WRITE_ENABLED', 'SCRIPTING_ENABLED',
@@ -55,7 +56,7 @@ export function currentInstance(): InstanceRuntime {
   const rt = als.getStore();
   if (!rt) {
     throw new ServiceNowError(
-      NO_INSTANCE_MESSAGE,
+      NO_INSTANCE_MESSAGE(cliSpelling()),
       'NO_INSTANCE_CONFIGURED',
     );
   }

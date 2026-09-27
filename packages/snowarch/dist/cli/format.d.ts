@@ -39,7 +39,7 @@ export declare function listJson(storePath: string, store: Store): ListJson;
  * `instance add` is the wizard alone, and it would leave them one step into a live mode the toggles
  * do not reflect, in a terminal where `mode live` is just as available.
  */
-export declare const NO_INSTANCES: string;
+export declare const NO_INSTANCES: (cli: string) => string;
 /**
  * One probe as the table shows it: `auth ok · write ok · …`, or a dash when none has run.
  *
