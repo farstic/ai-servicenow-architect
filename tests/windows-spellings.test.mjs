@@ -661,3 +661,53 @@ test('ARC-07-C31 — the six that became required refuse to render without a spe
       `${name} rendered without a spelling instead of refusing`);
   }
 });
+
+/**
+ * ARC-07-C31 slice 4 — the STEPS' sentences, driven, and one refusal a control asked for.
+ *
+ * The refusal half exists because a control was INERT: putting `failureBlock`'s POSIX default back broke
+ * nothing, since its one caller passes a launcher either way. A default only bites the caller that
+ * forgets, so the property to hold is that forgetting REFUSES — and `failureBlock` is the case that
+ * earned it, because the caller which never passed one is exactly how a Windows reader resuming an
+ * install was shown `./bootstrap.sh`.
+ */
+test('ARC-07-C31 — the steps\' sentences render the reader\'s shell, and refuse without one', async () => {
+  const WIN = { platform: 'win32', env: {} };
+  const win = spellings(WIN);
+  const posix = spellings({ platform: 'linux', env: {} });
+
+  const { failureBlock, CORPUS_TEXT } = await import('../tools/snowarch/lib/steps/format.mjs');
+  const { mapSyncFailure } = await import('../tools/snowarch/lib/steps/B02.mjs');
+  const { nextText } = await import('../tools/snowarch/lib/bootstrap.mjs');
+
+  const rendered = [
+    ['failureBlock', failureBlock({ id: 'B04', cause: 'x', remedy: null, launcher: win.bootstrap })
+      .join('\n'),
+    failureBlock({ id: 'B04', cause: 'x', remedy: null, launcher: posix.bootstrap }).join('\n')],
+    ['CORPUS_TEXT.skipConsequence', CORPUS_TEXT.skipConsequence(win), CORPUS_TEXT.skipConsequence(posix)],
+    ['CORPUS_TEXT.areaMissing', CORPUS_TEXT.areaMissing('itsm', win), CORPUS_TEXT.areaMissing('itsm', posix)],
+    ['mapSyncFailure', mapSyncFailure({ code: 999, message: 'x' }, win).remedy,
+      mapSyncFailure({ code: 999, message: 'x' }, posix).remedy],
+    ['nextText', nextText({ stoppedAt: 'B02' }, { mode: 'design-only' }, win),
+      nextText({ stoppedAt: 'B02' }, { mode: 'design-only' }, posix)],
+  ];
+  for (const [name, w, p] of rendered) {
+    assert.doesNotMatch(w, /\.\/snowarch|\.\/bootstrap\.sh/,
+      `${name} renders a POSIX launcher on a Windows shell:\n${w}`);
+    assert.equal(/\.\\snowarch\.cmd|\.\\bootstrap\.cmd/.test(w), true,
+      `${name} renders no Windows launcher at all:\n${w}`);
+    assert.doesNotMatch(p, /snowarch\.cmd|bootstrap\.cmd/,
+      `${name} renders a Windows launcher on a POSIX shell:\n${p}`);
+  }
+
+  // ...and the refusals. `failureBlock` takes a plain string rather than a spellings object, so its
+  // message is its own; the other two carry `needSpell`'s.
+  assert.throws(() => failureBlock({ id: 'B04', cause: 'x', remedy: null }),
+    { name: 'TypeError', message: /^failureBlock needs a launcher spelling/ });
+  assert.throws(() => CORPUS_TEXT.areaMissing('itsm'),
+    { name: 'TypeError', message: /^CORPUS_TEXT\.areaMissing needs/ });
+  assert.throws(() => mapSyncFailure({ code: 999, message: 'x' }),
+    { name: 'TypeError', message: /^mapSyncFailure needs/ });
+  assert.throws(() => nextText({ stoppedAt: 'B02' }, { mode: 'design-only' }),
+    { name: 'TypeError', message: /^nextText needs/ });
+});
