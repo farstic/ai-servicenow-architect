@@ -644,3 +644,85 @@ test('C35b — a platform WORD in the case does not excuse a hard-coded launcher
   assert.equal(r2.unresolved.length, 1);
   assert.match(r2.unresolved[0].why, /needs dataflow this audit does not do/);
 });
+
+/* ── ARC-07-C35c — the smallest of the recorded shapes ─────────────────────────────────────────── */
+
+test('C35c — a pinned shell is one whose PLATFORM is named, not one that avoids the word `process`', () => {
+  // `pinsShell` asked "does this call have an argument, and does that argument avoid mentioning `process`",
+  // which is a proxy for the question, and it broke BOTH ways. Measured on planted cases:
+  //
+  //   - `const plat = process.platform; const S = spellings({ platform: plat, env: {} })` with a hard-coded
+  //     `./snowarch` asserted against `render(S)` came back EXPECTED_RENDERING — the audit vouching for a
+  //     POSIX literal that follows the RUNNER's shell, which is red on any Windows cell. A FALSE NEGATIVE.
+  //   - the same spelling asserted as `${S.cli}` came back PINNED, so a deriving expectation against a
+  //     deriving product line would have been reported as a disagreement. A FALSE POSITIVE, same breath.
+  //
+  // Both directions are asserted, because a rule that fixed one and not the other would look right from
+  // whichever side was measured first.
+  const kindOf = (lines) => assertedLaunchers('tests/planted.test.mjs', lines.join('\n'))[0]?.expectation;
+
+  // THE FALSE NEGATIVE. The shell is the runner's, so the literal is a pinned expectation to be compared.
+  assert.equal(kindOf([
+    'const plat = process.platform;',
+    'const S = spellings({ platform: plat, env: {} });',
+    "assert.equal(render(S), 'run ./snowarch doctor now please');",
+  ]), 'PINNED');
+
+  // THE FALSE POSITIVE. The expectation follows the runner, exactly as the product does.
+  assert.equal(kindOf([
+    'const plat = process.platform;',
+    'const S = spellings({ platform: plat, env: {} });',
+    'assert.equal(out, `run ${S.cli} doctor now please`);',
+  ]), 'DERIVED');
+
+  // ...and everything that WAS pinned stays pinned: a platform named directly, named one hop away, a named
+  // ctx (the idiom in four test files), and a positional platform.
+  assert.equal(kindOf([
+    "const S = spellings({ platform: 'linux', env: {} });",
+    'assert.equal(out, `run ${S.cli} doctor now please`);',
+  ]), 'PINNED');
+  assert.equal(kindOf([
+    "const PLAT = 'win32';",
+    'const S = spellings({ platform: PLAT, env: {} });',
+    'assert.equal(out, `run ${S.cli} doctor now please`);',
+  ]), 'PINNED');
+  assert.equal(kindOf([
+    "const WIN = { platform: 'win32', env: {} };",
+    'const S = spellings(WIN);',
+    'assert.equal(out, `run ${S.cli} doctor now please`);',
+  ]), 'PINNED');
+  assert.equal(kindOf([
+    "const S = cliSpelling('win32', {});",
+    'assert.equal(out, `run ${S} doctor now please`);',
+  ]), 'PINNED');
+
+  // ...and the two that must stay DERIVED: the process spelled out longhand, and no argument at all.
+  assert.equal(kindOf([
+    'const S = spellings({ platform: process.platform, env: process.env });',
+    'assert.equal(out, `run ${S.cli} doctor now please`);',
+  ]), 'DERIVED');
+  assert.equal(kindOf([
+    'const S = spellings();',
+    'assert.equal(out, `run ${S.cli} doctor now please`);',
+  ]), 'DERIVED');
+});
+
+test('C35c — and the audit REPORTS the false negative, which is what the bar is about', () => {
+  // A false negative is a mismatch that never arrives, so the label alone proves nothing: the hard-coded
+  // POSIX literal must reach `mismatches` against a product line that derives.
+  const text = [
+    "test('runner shell', () => {",
+    '  const plat = process.platform;',
+    '  const S = spellings({ platform: plat, env: {} });',
+    "  assert.equal(render(S), 'run ./snowarch doctor now please');",
+    '});',
+  ].join('\n');
+  // The product line carries THIS sentence — `DERIVING_PRODUCT` above says something else, and a sentence
+  // that matches nothing resolves to nothing, which would have passed for the wrong reason.
+  const product = [{ file: 'tools/snowarch/lib/planted.mjs',
+    text: 'export const render = (spell) => `run ${spell.cli} doctor now please`;\n' }];
+  const r = audit({ tests: [{ file: 'tests/planted.test.mjs', text }], product, baseline: EMPTY });
+  assert.equal(r.mismatches.length, 1, JSON.stringify(r));
+  assert.equal(r.mismatches[0].expectation, 'PINNED');
+  assert.equal(r.mismatches[0].kind, 'DERIVED');
+});

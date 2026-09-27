@@ -229,14 +229,16 @@ function carriesLauncher(node, spellings) {
  * DERIVED against its own "PINNED POSIX" comment, because the kind was only ever read from a NAMED constant
  * and a template span has no name. `mentionsPinned` already knew how to read a call; the expectation did not.
  */
-function inlineKind(node) {
+function inlineKind(node, sf, from) {
   let kind = null;
   const walk = (n) => {
     if (kind) return;
     if (ts.isCallExpression(n)) {
       const name = ts.isIdentifier(n.expression) ? n.expression.text
         : (ts.isPropertyAccessExpression(n.expression) ? n.expression.name.text : null);
-      if (name && READS_THE_PROCESS.has(name)) { kind = pinsShell(n) ? 'PINNED' : 'DERIVED'; return; }
+      if (name && READS_THE_PROCESS.has(name)) {
+        kind = pinsShell(n, sf, from) ? 'PINNED' : 'DERIVED'; return;
+      }
     }
     ts.forEachChild(n, walk);
   };
@@ -294,22 +296,56 @@ export function spellingConstants(sf) {
 }
 
 /**
- * Does this spelling call PIN a shell? Read the argument, never the count.
+ * Does this spelling call PIN a shell? Read what the PLATFORM VALUE IS — ARC-07-C35c.
  *
- * `spellings({ platform: process.platform, env: process.env })` has an argument and derives from the process
- * anyway — it is the process spelled out longhand. Counting arguments called it pinned, which would let a
- * case that reads the runner's platform be treated as one that named it.
+ * The first rule was "an argument, and no mention of `process`", which is a proxy and it broke both ways.
+ * Measured on planted cases:
+ *
+ *   - `const plat = process.platform; const S = spellings({ platform: plat, env: {} });` then a hard-coded
+ *     `./snowarch` asserted against `render(S)` came back **EXPECTED_RENDERING** — the audit vouching for a
+ *     POSIX literal that follows the RUNNER's shell, which is red on any Windows cell. A false negative, which
+ *     is the bar this whole arc merges on.
+ *   - the same spelling asserted as `${S.cli}` came back **PINNED**, so a deriving expectation against a
+ *     deriving product line would have been reported as a disagreement. A false positive in the same breath.
+ *
+ * Both came from asking about the word `process` instead of about the value. The value is what decides: a
+ * platform NAMED as a string is pinned, and anything else — a property off `process`, a variable, a call — is
+ * the runner's. One hop through a local declaration, because `const WIN = { platform: 'win32', env: {} }` is
+ * this repository's idiom and `spellings(WIN)` is the same thing said in two lines.
+ *
+ * `sf` and `from` are optional: `spellingConstants` walks a whole file and has no assertion to resolve from,
+ * and without them an identifier is simply not resolvable, which is the safe answer — not pinned.
  */
-export function pinsShell(call) {
+export function pinsShell(call, sf = null, from = null) {
   if (!call || call.arguments.length === 0) return false;
-  let readsProcess = false;
-  const walk = (n) => {
-    if (readsProcess) return;
-    if (ts.isIdentifier(n) && n.text === 'process') { readsProcess = true; return; }
-    ts.forEachChild(n, walk);
-  };
-  for (const arg of call.arguments) walk(arg);
-  return !readsProcess;
+  const [first] = call.arguments;
+
+  // `cliSpelling('win32', {})` — the platform is positional.
+  if (ts.isStringLiteralLike(first)) return PLATFORMS.has(first.text);
+
+  // `spellings({ platform: … })`, or `spellings(WIN)` one hop away.
+  const object = ts.isObjectLiteralExpression(first) ? first : resolveObject(first, sf, from);
+  if (!object) return false;
+  const platform = object.properties.find((prop) => ts.isPropertyAssignment(prop)
+    && ts.isIdentifier(prop.name) && prop.name.text === 'platform');
+  if (!platform || !ts.isPropertyAssignment(platform)) return false;
+  return namesPlatform(platform.initializer, sf, from);
+}
+
+/** An object literal reached through one local declaration, or null. */
+function resolveObject(node, sf, from) {
+  if (!sf || !from || !ts.isIdentifier(node)) return null;
+  const decl = declarationInScope(sf, from, node.text);
+  return decl?.initializer && ts.isObjectLiteralExpression(decl.initializer) ? decl.initializer : null;
+}
+
+/** A platform NAMED as a string, directly or one local declaration away. */
+function namesPlatform(node, sf, from) {
+  if (ts.isStringLiteralLike(node)) return PLATFORMS.has(node.text);
+  if (!sf || !from || !ts.isIdentifier(node)) return false;
+  const decl = declarationInScope(sf, from, node.text);
+  return Boolean(decl?.initializer && ts.isStringLiteralLike(decl.initializer)
+    && PLATFORMS.has(decl.initializer.text));
 }
 
 /**
@@ -330,7 +366,7 @@ function kindInScope(sf, assertion, name, fileWide) {
       if (n !== scope && ts.isFunctionLike(n)) return;
       if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === name && n.initializer) {
         const call = findSpellingCall(n.initializer);
-        if (call) found = pinsShell(call) ? 'PINNED' : 'DERIVED';
+        if (call) found = pinsShell(call, sf, n) ? 'PINNED' : 'DERIVED';
         return;
       }
       ts.forEachChild(n, scan);
@@ -591,7 +627,7 @@ function mentionsPinned(node, isPinnedName, sf, from) {
     if (ts.isCallExpression(n)) {
       const name = ts.isIdentifier(n.expression) ? n.expression.text
         : (ts.isPropertyAccessExpression(n.expression) ? n.expression.name.text : null);
-      if (name && READS_THE_PROCESS.has(name) && pinsShell(n)) { hit = true; return; }
+      if (name && READS_THE_PROCESS.has(name) && pinsShell(n, sf, from)) { hit = true; return; }
     }
     ts.forEachChild(n, walk);
   };
@@ -831,7 +867,7 @@ export function assertedLaunchers(file, text) {
           && pinnedDrivenSomewhereInCase(sf, node, isPinnedName(node), carriers);
         // The kind stated INLINE wins over a named constant, and a named constant is resolved in the
         // NEAREST scope rather than file-wide.
-        const stated = bearing.map((a) => inlineKind(a)).find(Boolean) ?? null;
+        const stated = bearing.map((a) => inlineKind(a, sf, node)).find(Boolean) ?? null;
         const scoped = named ? kindInScope(sf, node, named, spellings) : null;
         sites.push({
           file,
