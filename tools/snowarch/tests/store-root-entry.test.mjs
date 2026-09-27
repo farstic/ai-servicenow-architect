@@ -58,14 +58,30 @@ test('the server CLI can run from this checkout — the precondition for every r
  *
  * When C31 sweeps that generator, this pin flips with it — one line, in the same commit.
  */
-const CLI = spellings({ platform: 'linux', env: {} }).cli.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const esc = (cli) => cli.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * TWO SPELLINGS, BECAUSE TWO PACKAGES PRINT HERE — ARC-07-W17, rule 6.
+ *
+ * My first version used one, pinned POSIX, with a comment claiming "both usage lines come from the
+ * ENGINE's frame". Only the first does. `store --help` is answered by the frame,
+ * `tools/snowarch/lib/store.mjs:16`, a POSIX literal still on ARC-07-C31's list — so it prints POSIX on
+ * every platform and its expectation is pinned. `store migrate --help` is answered by the SERVER,
+ * `packages/snowarch/src/cli/store-command.ts:48`, which reads `cliSpelling()` — so under pwsh it prints
+ * `.\snowarch.cmd store <command>` and a pinned expectation fails there.
+ *
+ * THE RULE THIS COST: classify per ASSERTED LINE, by the product line that prints it — not per file, and
+ * not per test. One test can print from both packages in two commands, and this one does.
+ */
+const FRAME_CLI = esc(spellings({ platform: 'linux', env: {} }).cli);
+const SERVER_CLI = esc(spellings().cli);
 
 for (const entry of ENTRIES) {
 
   test(`${entry.name}: a bare --help is the ENGINE's one-liner`, () => {
     const r = run(entry, ['store', '--help']);
     assert.equal(r.status, 0);
-    assert.match(r.text, new RegExp(`usage: ${CLI} store <command>`));
+    assert.match(r.text, new RegExp(`usage: ${FRAME_CLI} store <command>`));
   });
 
   test(`${entry.name}: \`migrate --help\` is the SERVER's help, with the exit table`, () => {
@@ -79,7 +95,7 @@ for (const entry of ENTRIES) {
     // goes green when the defect is fixed only if its discriminator moves, and this one had two
     // better ones already: `exit codes:` and the backup sentence exist ONLY in the server CLI, and
     // the header comment at the top of this file says exactly that.
-    assert.match(r.text, new RegExp(`usage: ${CLI} store <command>`));
+    assert.match(r.text, new RegExp(`usage: ${SERVER_CLI} store <command>`));
     assert.match(r.text, /exit codes:/);
     assert.match(r.text, /never pruned automatically/);
   });
