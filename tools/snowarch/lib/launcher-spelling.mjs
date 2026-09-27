@@ -54,3 +54,23 @@ export function spellings(where = {}) {
  * POSIX in its name rather than hiding it behind `spellings()`.
  */
 export const POSIX = Object.freeze(spellings({ platform: 'linux', env: {} }));
+
+/**
+ * The refusal every sentence that takes a spelling shares — ARC-07-C31.
+ *
+ * IT LIVES IN THE LEAF so a low-level module can use it without importing `text.mjs` and, with it, the
+ * `panel -> text -> report-text -> panel` graph. `state.mjs` is the case that moved it here: it is read
+ * by the bootstrap, the doctor and the upgrade, and none of those needs a renderer to validate an
+ * argument.
+ *
+ * `who` is the caller's own name, passed rather than inferred: this guards a dozen sentences across
+ * five modules now, and a message that named the wrong one sent a reader to the wrong file once.
+ */
+export const needSpell = (spell, who) => {
+  if (!spell || typeof spell.cli !== 'string' || typeof spell.bootstrap !== 'string') {
+    throw new TypeError(`${who} needs a spellings object — the launcher is spelled from the `
+      + 'definition and never defaulted here, because a default is how the process leaks into a '
+      + 'sentence rendered for somebody else\'s shell');
+  }
+  return spell;
+};

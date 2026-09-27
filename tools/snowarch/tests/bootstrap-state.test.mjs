@@ -7,6 +7,16 @@ import {
   loadState, resetState, saveState, sensitiveValue, statePath,
 } from '../lib/state.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
+import { spellings } from '../lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
 
 const isWindows = process.platform === 'win32';
 const fresh = () => emptyState({ engineVersion: '2.0.0-test', platform: 'darwin' });
@@ -37,7 +47,7 @@ test('save then load round-trips, and the write is atomic and private', () => {
   s.docs = { mode: 'sparse', pin: 'b'.repeat(40) };
   saveState(root, s);
 
-  const back = loadState(root);
+  const back = loadState(root, SPELL);
   assert.equal(back.mode, 'design-only');
   assert.equal(back.docs.mode, 'sparse', 'docsStatus() reads exactly this path');
   assert.match(back.updatedAt, /^\d{4}-\d\d-\d\dT/);
@@ -50,16 +60,16 @@ test('save then load round-trips, and the write is atomic and private', () => {
 });
 
 test('loadState returns null when there is no state, rather than inventing one', () => {
-  assert.equal(loadState(makeCheckout()), null);
+  assert.equal(loadState(makeCheckout(), SPELL), null);
 });
 
 test('a state from a newer snowarch is refused with the upgrade sentence', () => {
   const root = makeCheckout();
   mkdirSync(join(root, '.local'), { recursive: true });
   writeFileSync(statePath(root), JSON.stringify({ version: STATE_VERSION + 1 }));
-  assert.throws(() => loadState(root), (e) => {
+  assert.throws(() => loadState(root, SPELL), (e) => {
     assert.ok(e instanceof StateError);
-    assert.equal(e.message, 'state file is from a newer snowarch — run ./snowarch upgrade');
+    assert.equal(e.message, `state file is from a newer snowarch — run ${SPELL.cli} upgrade`);
     assert.equal(e.code, 1);
     return true;
   });
@@ -71,14 +81,14 @@ test('a state with no version gets a DIFFERENT sentence, because it is a differe
   const root = makeCheckout();
   mkdirSync(join(root, '.local'), { recursive: true });
   writeFileSync(statePath(root), JSON.stringify({ mode: 'design-only' }));
-  assert.throws(() => loadState(root), /no usable schema version/);
+  assert.throws(() => loadState(root, SPELL), /no usable schema version/);
 });
 
 test('unreadable JSON is a named refusal, not a stack trace', () => {
   const root = makeCheckout();
   mkdirSync(join(root, '.local'), { recursive: true });
   writeFileSync(statePath(root), '{ not json');
-  assert.throws(() => loadState(root), /is not valid JSON/);
+  assert.throws(() => loadState(root, SPELL), /is not valid JSON/);
 });
 
 test('the write-time guard refuses a secret-shaped KEY, at any depth', () => {

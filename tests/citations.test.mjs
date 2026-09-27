@@ -9,6 +9,19 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { verifyCitations, formatResult, EXIT } from '../tools/snowarch/lib/docs/verify.mjs';
+import { spellings } from '../tools/snowarch/lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
+// `RegExp.escape` is not on Node 20, and the spelling contains `.` and `\\` — both of which mean
+// something else in a pattern. ARC-07-C31 rule 2: derive AND escape.
+const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_CORPUS = resolve(here, 'fixtures/docs-corpus');
@@ -32,16 +45,17 @@ test('criterion 2 — an absent corpus is `missing`, exit 3, and never says SKIP
   withTree('see markdown/alpha/a.md\n', (dir) => {
     const r = verifyCitations({ root: dir });
     assert.equal(r.status, 'missing');
-    const { text, code } = formatResult(r);
+    const { text, code } = formatResult(r, SPELL);
     assert.equal(code, EXIT.missing);
-    assert.match(text, /corpus missing — run \.\/bootstrap\.sh --docs/);
+    assert.match(text,
+      new RegExp(`corpus missing — run ${esc(SPELL.bootstrap)} --docs`));
     assert.doesNotMatch(text, /SKIP/i, 'the word SKIP must appear nowhere — that was the old defect');
   });
 });
 
 test('criterion 3 — --allow-missing exits 0 with its own wording, still not SKIP', () => {
   withTree('see markdown/alpha/a.md\n', (dir) => {
-    const { text, code } = formatResult(verifyCitations({ root: dir, allowMissing: true }));
+    const { text, code } = formatResult(verifyCitations({ root: dir, allowMissing: true }), SPELL);
     assert.equal(code, EXIT.ok);
     assert.equal(text, 'citations: not verified until the corpus is present');
     assert.doesNotMatch(text, /SKIP/i);
@@ -55,7 +69,7 @@ test('criterion 4 — a brace citation with one missing member is ONE dead entry
     assert.equal(r.checked, 1, 'a brace citation is ONE distinct path before expansion');
     assert.equal(r.dead.length, 1);
     assert.equal(r.dead[0].member, 'x-two.md');
-    assert.match(formatResult(r).text, /^DEAD \(brace member\) /m);
+    assert.match(formatResult(r, SPELL).text, /^DEAD \(brace member\) /m);
   });
 });
 
@@ -71,7 +85,7 @@ test('all citations resolving gives status ok and exit 0', () => {
   withTree('markdown/alpha/a.md and markdown/beta/c.md\n', (dir) => {
     const r = verifyCitations({ root: dir, corpusDir: withCorpus(dir) });
     assert.equal(r.status, 'ok');
-    const { text, code } = formatResult(r);
+    const { text, code } = formatResult(r, SPELL);
     assert.equal(code, EXIT.ok);
     assert.equal(text, 'checked: 2 | dead: 0');
   });

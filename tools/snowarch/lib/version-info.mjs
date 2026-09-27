@@ -112,9 +112,11 @@ export const floorLine = (floors) => Object.entries(floors)
  *
  * Line 1 is ARC-06-S02's, byte for byte — four programs quote it and a test pins it.
  */
-  // ARC-07-C31 — the shell as a PARAMETER defaulting to the process: this renders for a
-  // terminal, so the reader's own shell is the right answer, and the parameter is what lets a
-  // case assert the Windows sentence by argument rather than by forcing `process.platform`.
+  // ARC-07-C31 — A DEFAULT IS ALLOWED HERE BECAUSE THERE IS EXACTLY ONE CALLER, NAMED: `tools/snowarch/lib/cli.mjs:82`, the `version` command.
+  // The rule this row settled is that a default needs literally one caller and a comment saying
+  // which; everything else takes the spelling required. `loadState` is why the rule is that
+  // narrow — it had ten callers and seven held a ctx, and a default would have handed each the
+  // process.
 export function renderVersion(info, spell = spellings()) {
   const lines = [];
 

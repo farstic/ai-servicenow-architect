@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { CORPUS_DIR, EXIT, SyncError, classifyGitFailure } from './sync.mjs';
 import { applyAllTargets } from './recipe-block.mjs';
 import { verifyCitations } from './verify.mjs';
-import { spellings } from '../launcher-spelling.mjs';
+import { needSpell, spellings } from '../launcher-spelling.mjs';
 
 const raw = (args, cwd) => execFileSync('git', args, {
   cwd, encoding: 'utf8', stdio: 'pipe', maxBuffer: 64 * 1024 * 1024,
@@ -63,14 +63,24 @@ const keyOf = (d) => `${d.file}:${d.line} ${d.path}`;
  * before the checkout because "which citations BECAME dead" is a difference between two states, and
  * the first state stops existing the moment the corpus moves.
  */
-  // ARC-07-C31 — the shell as a PARAMETER defaulting to the process: this renders for a
-  // terminal, so the reader's own shell is the right answer, and the parameter is what lets a
-  // case assert the Windows sentence by argument rather than by forcing `process.platform`.
+/**
+ * ARC-07-C31 — REQUIRED, THREE callers, and one of them is not a terminal at all.
+ *
+ * `tools/snowarch/lib/docs/cli.mjs:56` and `tools/snowarch/lib/docs/family.mjs:230` print to a
+ * terminal. `scripts/docs-bump.mjs:98` does NOT: it puts this sentence into a GitHub Actions
+ * annotation (`::error::`) and into a PR body written with `--body-out`, read later by a maintainer.
+ * That third audience is the whole reason the default had to go — it was hiding a second shell shape
+ * behind a parameter that looked settled. `docs-bump.yml` is `runs-on: ubuntu-latest`, so the process
+ * rendering happens to be POSIX there today, and "happens to be" is not a property to rest on.
+ */
 export function syncUpstream({ root = process.cwd(), config, to = null, verify = true,
-  log = console.log, spell = spellings() } = {}) {
+  log = console.log, spell } = {}) {
+  needSpell(spell, 'syncUpstream');
   const { docs } = config;
   const corpus = join(root, CORPUS_DIR);
-  const ctx = { upstream: docs.upstream, pin: docs.pin };
+  // ARC-07-C31 — the spelling travels IN the ctx `classifyGitFailure` already takes, so its four call
+  // sites need no new argument and cannot disagree about which shell this run is speaking to.
+  const ctx = { upstream: docs.upstream, pin: docs.pin, spell };
 
   // 1. Dirty check, outside `vendor/` only: the corpus itself is about to move, and its own
   //    modified state is `sync`'s business (exit 4 there), not this command's.

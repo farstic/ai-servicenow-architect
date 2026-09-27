@@ -20,6 +20,7 @@ import { remedyFor } from '../../../../../packages/contract/lib/contract.mjs';
 import { defineCheck } from '../registry.mjs';
 
 import { fail, ok, skip, warn } from './result.mjs';
+import { spellFor } from '../spell.mjs';
 
 /** The four variables, in both spellings. POSIX tools read either; Windows sets the upper form. */
 export const PROXY_VARS = Object.freeze([
@@ -194,7 +195,9 @@ export function hostChecks() {
           ...(ctx.exec ? { exec: ctx.exec } : {}) });
         const statusLine = entry.status ?? null;
         const { kind, approved } = classifyStatus(statusLine);
-        const state = (() => { try { return loadState(ctx.root); } catch { return null; } })();
+        const state = (() => {
+          try { return loadState(ctx.root, spellFor(ctx)); } catch { return null; }
+        })();
         const live = state?.mode === 'live';
         const data = { statusLine, scope: entry.scope ?? null, approved,
           registration: state?.registration ?? null, mode: state?.mode ?? null };

@@ -11,6 +11,16 @@ import { EXIT_OK } from '../lib/exit.mjs';
 import { emptyState, loadState, saveState } from '../lib/state.mjs';
 import { tempDir } from './helpers/temp.mjs';
 import { makeCheckout, recorder } from './helpers/workspace.mjs';
+import { spellings } from '../lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
 
 /**
  * ARC-06-S12 — the `--register` fallback, driven by a fake `claude`.
@@ -81,7 +91,7 @@ const runRegister = async (root, flags, { fake = fakeClaude(), state = {} } = {}
     registry: [{ id: 'B00', title: 'preflight', needsNode: false, runsWhen: () => true,
       cacheable: false, inputs: () => [], run: async () => ({ status: 'fail', detail: 'stub stop' }) }],
   });
-  return { code, log, fake, text: log.lines.join('\n'), state: loadState(root) };
+  return { code, log, fake, text: log.lines.join('\n'), state: loadState(root, SPELL) };
 };
 
 test('criterion 4 — add-json gets the scope, the cwd, and the entry as ONE argv element', async () => {
@@ -157,7 +167,7 @@ test('a successful local registration reaches the state, the config and the togg
     claudePath: '/fake/bin/claude', execClaude: fake.exec,
   });
   assert.equal(code, EXIT_OK, log.lines.join('\n'));
-  const state = loadState(root);
+  const state = loadState(root, SPELL);
   assert.equal(state.registration, 'local');
   assert.equal(state.registrationReason, CREATED_BY_US);
   const config = JSON.parse(readFileSync(join(root, '.local', 'config.json'), 'utf8'));
@@ -427,7 +437,7 @@ const runDesign = async (root, { fake = fakeClaude(), state = {} } = {}) => {
     registry: [{ id: 'B00', title: 'preflight', needsNode: false, runsWhen: () => true,
       cacheable: false, inputs: () => [], run: async () => ({ status: 'fail', detail: 'stub stop' }) }],
   });
-  return { code, log, fake, text: log.lines.join('\n'), state: loadState(root) };
+  return { code, log, fake, text: log.lines.join('\n'), state: loadState(root, SPELL) };
 };
 
 test('ARC-06 — mode design REMOVES a user-scope entry snowarch created, and says so', async () => {
@@ -500,7 +510,7 @@ const runToFailure = async (root, { fake = fakeClaude(), steps } = {}) => {
     claudePath: '/fake/bin/claude', execClaude: fake.exec,
     registry: steps ?? [stub('B00', 'ok'), stub('B06', 'fail', 'needs a label')],
   });
-  return { code, log, fake, text: log.lines.join('\n'), state: loadState(root) };
+  return { code, log, fake, text: log.lines.join('\n'), state: loadState(root, SPELL) };
 };
 
 test('ARC-06-C14 — the wizard fails, and the local entry it was registered for is taken back', async () => {

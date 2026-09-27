@@ -10,6 +10,16 @@ import { bypassesProxy, classifyNetFailure, probeNetwork, proxyFor } from '../li
 import { classifyGitFailure } from '../lib/docs/sync.mjs';
 import * as SENTENCE from '../lib/net-sentences.mjs';
 import { redact } from '../lib/redact.mjs';
+import { spellings } from '../lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
 
 /**
  * No real network in any of these.
@@ -32,13 +42,14 @@ async function closedPort() {
 test('one vocabulary: git and the probe say the same sentence for the same wall', () => {
   const proxy = 'http://proxy.example:8080';
   const gitSaid = classifyGitFailure('fatal: unable to access: Could not resolve proxy: proxy.example',
-    { upstream: 'https://github.com/x/y', env: { HTTPS_PROXY: proxy } });
+    { upstream: 'https://github.com/x/y', spell: SPELL, env: { HTTPS_PROXY: proxy } });
   const probeSaid = classifyNetFailure({ code: 'ECONNREFUSED' }, { host: 'github.com', proxy });
   assert.equal(gitSaid, probeSaid, 'two transports, two sentences — that is the drift this prevents');
 
   // DNS, likewise.
   assert.equal(
-    classifyGitFailure('fatal: could not resolve host: github.com', { upstream: 'https://github.com/' }),
+    classifyGitFailure('fatal: could not resolve host: github.com',
+      { upstream: 'https://github.com/', spell: SPELL }),
     classifyNetFailure({ code: 'ENOTFOUND' }, { host: 'github.com' }));
 });
 
@@ -47,7 +58,7 @@ test('the TLS sentence names the failing tool\'s knob first, and the other secon
   // when Node fails it is Node's. Both are named either way — finding out you needed the second
   // one after fixing the first is a bad afternoon.
   const fromGit = classifyGitFailure('fatal: SSL certificate problem: self signed certificate',
-    { upstream: 'https://github.com/' });
+    { upstream: 'https://github.com/', spell: SPELL });
   const fromNode = classifyNetFailure({ code: 'SELF_SIGNED_CERT_IN_CHAIN' }, { host: 'github.com' });
   assert.notEqual(fromGit, fromNode);
   assert.match(fromGit, /^TLS interception detected — set GIT_SSL_CAINFO/);

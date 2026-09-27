@@ -136,7 +136,7 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
   }
 
   let state;
-  try { state = loadState(root); } catch (e) {
+  try { state = loadState(root, spellings({ platform, env })); } catch (e) {
     if (!(e instanceof StateError)) throw e;
     return refuse(e.message, e.code);
   }

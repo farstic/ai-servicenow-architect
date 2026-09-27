@@ -19,6 +19,7 @@ import { which } from '../../which.mjs';
 import { defineCheck } from '../registry.mjs';
 
 import { fail, fromStep, ok } from './result.mjs';
+import { spellFor } from '../spell.mjs';
 
 /**
  * draw.io Desktop, in the order `scripts/render-drawio.sh` looks for it.
@@ -88,10 +89,18 @@ export function capabilityPacks({ env = process.env, platform = process.platform
 const packLine = (name, pack) => `${name} ${pack.how ? 'yes' : 'no'}`;
 
 /** `live` when the recorded mode says so; anything else — including no state — is design-only. */
-export function recordedMode(root, { load = loadState } = {}) {
+export function recordedMode(root, spell, { load = loadState } = {}) {
   try {
-    return load(root)?.mode ?? null;
-  } catch {
+    return load(root, spell)?.mode ?? null;
+  } catch (e) {
+    // ARC-07-C31 — A TypeError IS RETHROWN, and finding this call site is why. `loadState`'s spelling
+    // became required and this site was invisible to a grep for `loadState(`, because the call goes
+    // through the injected default and reads `load(root)`. The `catch` below then turned the missing
+    // argument into a silent `null`, and the only thing that noticed was a behavioural assertion two
+    // files away — `E-03 reads the mode from the recorded state`, which went from `fail` to `warn`.
+    // An unreadable state file is a finding about the CHECKOUT; a TypeError is a finding about this
+    // code, and swallowing the second to be tolerant of the first is how a defect gets a hiding place.
+    if (e instanceof TypeError) throw e;
     // An unreadable state file is E-11's finding, not this one's. Reporting it twice would have
     // the operator fix one problem and read two lines about it.
     return null;
@@ -180,7 +189,7 @@ export function enginePrereqChecks() {
       // installed without it. Same fact, two consequences — so the mode is read, not assumed.
       run: async (ctx) => {
         const exec = ctx.exec ?? makeExec({ env: ctx.env, plat: ctx.platform });
-        const mode = ctx.mode ?? recordedMode(ctx.root);
+        const mode = ctx.mode ?? recordedMode(ctx.root, spellFor(ctx));
         const r = exec('npm', ['--version']);
         if (r.found && r.ok) return ok(r.stdout.trim(), { version: r.stdout.trim(), mode });
         const detail = r.found

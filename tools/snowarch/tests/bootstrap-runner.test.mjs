@@ -8,6 +8,16 @@ import { failureBlock, humanDuration, stepLine, stopLine } from '../lib/steps/fo
 import { EXIT_MEANING } from '../lib/exit.mjs';
 import { emptyState, loadState } from '../lib/state.mjs';
 import { makeCheckout, stub } from './helpers/workspace.mjs';
+import { spellings } from '../lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
 
 const base = (root) => ({ root, mode: 'design-only', docs: 'sparse', env: {},
   node: { present: true, version: '22.11.0', major: 22 } });
@@ -326,7 +336,7 @@ test('the state is written after every step, not only at the end', async () => {
   const s = state();
   const steps = [stub('B01'), stub('B02', { result: { status: 'fail', detail: 'x' } })];
   await runSteps({ root, ctx: base(root), state: s, steps, hash: fakeHash });
-  const onDisk = loadState(root);
+  const onDisk = loadState(root, SPELL);
   assert.equal(onDisk.steps.B01.status, 'ok', 'B01 must survive a later failure');
   assert.equal(onDisk.steps.B02.status, 'fail');
   assert.ok(existsSync(join(root, '.local', 'bootstrap-state.json')));

@@ -205,6 +205,7 @@ export function classifyGitFetchError(stderr = '', { remote = 'origin' } = {}) {
 // `sortTags is not defined`. Import, then export: one statement for the module's own use, one for
 // the importers that already read these names from here.
 import { parseSemver, sortTags } from '../semver.mjs';
+import { spellings } from '../launcher-spelling.mjs';
 
 export { parseSemver, sortTags };
 
@@ -508,7 +509,10 @@ export function failedStep(state) {
 const stepLine = (n, title) => `[U${n}/7] ${title}`;
 
 export async function upgradeCommand({ flags = {}, positional = [], log, root = defaultRoot,
-  env = process.env, cwd = process.cwd(), exec = undefined, run = spawnSync,
+  // ARC-07-C31 — `platform` for `loadState`'s spelling, and the ARGUMENT is all that changes here:
+  // this file's own four launcher sites stay with the e2e-trigger slice.
+  env = process.env, platform = process.platform,
+  cwd = process.cwd(), exec = undefined, run = spawnSync,
   now = () => new Date(), ask = null, input = process.stdin } = {}) {
   if (positional.length > 0) {
     log.fail(`upgrade takes no positional arguments; did you mean --to ${positional[0]}?`);
@@ -522,7 +526,9 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
 
   // ── U1 preflight ──────────────────────────────────────────────────────────────────────────
   log.step(stepLine(1, 'preflight'));
-  const state = (() => { try { return loadState(root); } catch { return null; } })();
+  const state = (() => {
+    try { return loadState(root, spellings({ platform, env })); } catch { return null; }
+  })();
   const dirty = git(root, ['status', '--porcelain', '--untracked-files=no'], { ...opts, allowFail: true });
   if (dirty === null) {
     log.fail('upgrade: this is not a git checkout — the upgrade moves a tree, and there is none');

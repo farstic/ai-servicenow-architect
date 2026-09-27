@@ -17,6 +17,16 @@ import { buildTagMessage } from '../scripts/lib/release/tag.mjs';
 import { describe as gitDescribe, isShallow, resetGitBinary } from '../tools/snowarch/lib/git.mjs';
 import { renderVersion, versionInfo } from '../tools/snowarch/lib/version-info.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
+import { spellings } from '../tools/snowarch/lib/text.mjs';
+
+/**
+ * ARC-07-C31 — DERIVED, and `esc` with it, because the spelling contains `.` and `\\`.
+ *
+ * The product lines below render for the terminal, so the process is the source they use.
+ * `RegExp.escape` is not on Node 20, which is why the escaping is written out.
+ */
+const SPELL = spellings();
+const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
@@ -243,7 +253,8 @@ test('a moved corpus gitlink is reported against engine.config.json', (t) => {
   assert.equal(versionInfo(f.root).docsPinGitlink, moved, 'the gitlink did not move');
   const info = versionInfo(f.root);
   assert.equal(info.docsPinMatches, false);
-  assert.match(lineFor(f.root, 'docs-pin:'), /gitlink bbbbbbb ≠ engine\.config\.json \(run \.\/snowarch docs verify\)$/);
+  assert.match(lineFor(f.root, 'docs-pin:'),
+    new RegExp(`gitlink bbbbbbb ≠ engine\\.config\\.json \\(run ${esc(SPELL.cli)} docs verify\\)$`));
 });
 
 // ── AC 4a ──────────────────────────────────────────────────────────────────────────────────────

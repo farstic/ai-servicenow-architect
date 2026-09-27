@@ -13,6 +13,15 @@ import { spellings } from '../lib/text.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
+
 /** This repository's root — ARC-07-W14 reads the install page for the figure it must agree with. */
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -207,7 +216,7 @@ test('AC 1 — a design-only run writes the state the other consumers read', asy
     out: sink(), err: sink() });
 
   assert.equal(code, 0);
-  const s = loadState(root);
+  const s = loadState(root, SPELL);
   assert.equal(s.mode, 'design-only');
   assert.equal(s.steps.B09.status, 'ok');
   assert.equal(s.docs.mode, 'skip', 'the accepted plan\'s docs mode reaches the state');
@@ -291,7 +300,7 @@ test('a state file from a newer snowarch stops the run with the upgrade sentence
   const code = await bootstrapCommand({ ...commandArgs(root, { mode: 'design', yes: true }), log,
     out: sink(), err: sink() });
   assert.equal(code, 1);
-  assert.ok(log.lines.includes('state file is from a newer snowarch — run ./snowarch upgrade'));
+  assert.ok(log.lines.includes(`state file is from a newer snowarch — run ${SPELL.cli} upgrade`));
 });
 
 /**

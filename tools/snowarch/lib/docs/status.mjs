@@ -298,11 +298,11 @@ const mb = (b) => (b === null ? '—' : `${Math.round(b / 1_000_000)} MB`);
  * One line per fact with its verdict in the last column and, when it is not `ok`, the remedy on the
  * next line. The wording is reused verbatim by the doctor, so it is written once here.
  */
-/**
- * ARC-07-C31 — `spell` DEFAULTS to the process here, unlike `E12_ABSENT` above, and the difference is
- * the consumer count: this renderer has one caller, `tools/snowarch/lib/docs/cli.mjs`, printing to a terminal. The
- * parameter is still there so a case can drive the Windows rendering by argument.
- */
+  // ARC-07-C31 — A DEFAULT IS ALLOWED HERE BECAUSE THERE IS EXACTLY ONE CALLER, NAMED: `tools/snowarch/lib/docs/cli.mjs:159`, printing to a terminal.
+  // The rule this row settled is that a default needs literally one caller and a comment saying
+  // which; everything else takes the spelling required. `loadState` is why the rule is that
+  // narrow — it had ten callers and seven held a ctx, and a default would have handed each the
+  // process.
 export function formatStatus(s, spell = spellings()) {
   if (!s.present) {
     return {

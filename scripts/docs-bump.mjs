@@ -14,6 +14,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CORPUS_DIR, EXIT, SyncError } from '../tools/snowarch/lib/docs/sync.mjs';
 import { syncUpstream, formatUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
+import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
 
 /**
  * The repository to act on: the working directory when it is one, else this script's own.
@@ -95,7 +96,15 @@ function main() {
 
   let report;
   try {
-    report = syncUpstream({ root, config, to: value('--to') ?? null, verify: true, log: null });
+    // ARC-07-C31 — PINNED POSIX, because this caller's audience is not a terminal. The sentence
+    // `syncUpstream` throws is written into a GitHub Actions annotation (`::error::` below) and
+    // into the PR body `--body-out` writes, both read later by a maintainer. `docs-bump.yml` is
+    // `runs-on: ubuntu-latest`, so the process rendering happens to be POSIX here today — and
+    // "happens to be" is what the pin removes. It is NOT a committed artefact, so it is not a
+    // third committed surface after `codes.ts` and `text.json`; it is a durable CI surface, which
+    // wants one rendering for the same reason.
+    report = syncUpstream({ root, config, to: value('--to') ?? null, verify: true, log: null,
+      spell: POSIX });
   } catch (e) {
     if (!(e instanceof SyncError)) throw e;
     writeSync(2, `${e.message}\n`);

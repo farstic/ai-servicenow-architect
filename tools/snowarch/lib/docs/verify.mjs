@@ -6,7 +6,7 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { scanRepo } from './citations.mjs';
-import { spellings } from '../launcher-spelling.mjs';
+import { needSpell, spellings } from '../launcher-spelling.mjs';
 
 export const EXIT = { ok: 0, dead: 1, missing: 3 };
 
@@ -65,10 +65,14 @@ export function verifyCitations({ root = process.cwd(), corpusDir = 'vendor/Serv
   };
 }
 
-  // ARC-07-C31 — the shell as a PARAMETER defaulting to the process: this renders for a
-  // terminal, so the reader's own shell is the right answer, and the parameter is what lets a
-  // case assert the Windows sentence by argument rather than by forcing `process.platform`.
-export function formatResult(r, spell = spellings()) {
+/**
+ * ARC-07-C31 — REQUIRED, because there are TWO callers. Both are in
+ * `tools/snowarch/lib/docs/cli.mjs`, both print to a terminal, and a default would still have been
+ * within a hair of the rule — which is exactly why the rule is a COUNT and not a judgement about
+ * whether two callers feel like one consumer.
+ */
+export function formatResult(r, spell) {
+  needSpell(spell, 'formatResult');
   const lines = [];
   if (r.status === 'missing') {
     lines.push(r.allowMissing

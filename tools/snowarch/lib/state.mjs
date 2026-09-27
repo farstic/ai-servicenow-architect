@@ -17,7 +17,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, wri
 import { join } from 'node:path';
 import { EXIT_FAIL } from './exit.mjs';
 import { isSecretKey, redact } from './redact.mjs';
-import { spellings } from './launcher-spelling.mjs';
+import { needSpell, spellings } from './launcher-spelling.mjs';
 
 export const STATE_VERSION = 1;
 export const PRODUCT = 'snowarch';
@@ -114,10 +114,24 @@ export function emptyState({ engineVersion, platform = process.platform, node = 
  * A version this build does not know is an error, not something to migrate on the fly: the file may
  * have been written by a newer snowarch whose fields this one would silently drop on the next save.
  */
-  // ARC-07-C31 — the shell as a PARAMETER defaulting to the process: this renders for a
-  // terminal, so the reader's own shell is the right answer, and the parameter is what lets a
-  // case assert the Windows sentence by argument rather than by forcing `process.platform`.
-export function loadState(root, spell = spellings()) {
+/**
+ * ARC-07-C31 — THESE THREE SENTENCES ARE DELIBERATELY STILL POSIX, and the reason is the slice
+ * boundary rather than an oversight.
+ *
+ * REQUIRED, and the ten callers are why. SEVEN are inside the doctor (`doctor/index.mjs` twice,
+ * `doctor/fix.mjs`, `checks/host.mjs`, `checks/engine-repo.mjs` three times), every one holding a ctx
+ * that carries a platform — so a DEFAULT would hand each of them the process. That is `E12_ABSENT`'s
+ * situation exactly, and what cost twelve Windows cells when `MODE_VARIANTS` read the process. Most
+ * of those sites currently discard the message in a `catch`, which hides the defect rather than
+ * excusing it; that swallowing is ARC-07-C37's finding, not a reason to default here.
+ *
+ * It threads through `bootstrap.mjs` and `commands/upgrade.mjs`, both e2e TRIGGER FILES, so this
+ * change carries the five `tests/upgrade` files at `--test-concurrency=2` plus `assert-clean`. Those
+ * two files keep their OWN launcher sites for the trigger slice: what is added here is the argument,
+ * nothing else.
+ */
+export function loadState(root, spell) {
+  needSpell(spell, 'loadState');
   const p = statePath(root);
   if (!existsSync(p)) return null;
 
