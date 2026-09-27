@@ -17,8 +17,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { audit, byKey, bySentence, UNRESOLVED_BASELINE } from '../scripts/ci/launcher-audit.mjs';
-import { answeredBy, assertedLaunchers, MARK, productLines } from '../scripts/ci/launcher-extract.mjs';
+import { audit, byKey, bySentence, testSources, UNRESOLVED_BASELINE } from '../scripts/ci/launcher-audit.mjs';
+import { answeredBy, assertedLaunchers, LAUNCHER, MARK, productLines } from '../scripts/ci/launcher-extract.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -278,4 +278,86 @@ test('C35b — every baseline entry carries a reason, which is what "done" means
   }
   assert.ok(UNRESOLVED_BASELINE.size > 0,
     'the baseline is empty — delete this case with it, and say so in the row');
+});
+
+/* ── ARC-07-C35b, second head — two under-reports the architect measured ───────────────────────── */
+
+test('C35b — a comment cannot delete code: a `/*` in a line comment and a `*/` in a later regex', () => {
+  // DEFECT 1, as the architect's control specifies it. `codeOf` blanked comments with a REGEX before the
+  // parser saw the text, and a regex cannot tell a comment from a string: on
+  // `tests/contract/gen-governance.test.mjs` the `/*` inside the line comment `rules/*.md` paired with a
+  // `*/` inside a regex literal 443 lines later and blanked 452 lines, taking that file's two asserted
+  // launchers to zero. Measured over 223 tracked test files: raw parse 114 sites, after `codeOf` 112.
+  const text = [
+    "// the rules live in .claude/rules/*.md and are generated",
+    "const CLI = spellings({ platform: 'linux', env: {} }).cli;",
+    'assert.equal(r.text, `run ${CLI} docs sync to fetch the corpus`);',
+    "const SPLIT = /^[^*]*\\*\\/[a-z]+$/;",
+    'assert.ok(SPLIT.test(x));',
+  ].join('\n');
+  const sites = assertedLaunchers('tests/planted.test.mjs', text);
+  assert.equal(sites.length, 1,
+    `the asserted launcher between a "/*" in a comment and a "*/" in a regex was lost: ${
+      JSON.stringify(sites)}`);
+  assert.match(sites[0].sentence, /^run .* docs sync to fetch the corpus$/);
+});
+
+test('C35b — and the file that found it: gen-governance\'s two sites are in the audit\'s output', () => {
+  // THE SAME DEFECT AGAINST THE REAL TREE, which is what the architect asked for. Two sites, from the file
+  // whose comment and regex happened to pair up. A fixture proves the mechanism; this proves the repository.
+  const file = 'tests/contract/gen-governance.test.mjs';
+  const sites = assertedLaunchers(file, readFileSync(resolve(root, file), 'utf8'));
+  assert.equal(sites.length, 2, `${file} has ${sites.length} asserted launcher(s), expected 2`);
+});
+
+test('C35b — a WINDOWS-spelled literal is a target: the cooked value, never the source text', () => {
+  // DEFECT 2, the architect's fixture verbatim in shape. `'.\\snowarch.cmd'` is written with TWO backslashes
+  // in source and IS one backslash once cooked; `LAUNCHER` describes the cooked form, and the target rule
+  // was testing `getText()`. Every Windows-spelled literal in the repository was therefore invisible —
+  // including the seven engine literals ARC-07-C31 slice 2 fixed and the seventeen server ones from slice 3,
+  // so `EXPECTED_RENDERING`, whose entire purpose is the win32 cell, had only ever seen POSIX.
+  const win = ['test("w", () => {',
+    '  const out = render({ platform: "win32" });',
+    '  assert.equal(out, ".\\\\snowarch.cmd doctor");',
+    '});'].join('\n');
+  const winSites = assertedLaunchers('tests/planted.test.mjs', win);
+  assert.equal(winSites.length, 1, `the Windows spelling was not seen: ${JSON.stringify(winSites)}`);
+  // ...and it is an EXPECTED RENDERING, because the case DROVE win32 — by a platform literal, which is how
+  // this repository drives the other platform since forcing `process.platform` was measured unusable.
+  assert.equal(winSites[0].expectation, 'EXPECTED_RENDERING');
+
+  // The POSIX twin was always seen; it is asserted beside it so the two cannot drift apart again.
+  const posix = ['test("p", () => {',
+    '  const out = render({ platform: "linux" });',
+    '  assert.equal(out, "./snowarch doctor");',
+    '});'].join('\n');
+  assert.equal(assertedLaunchers('tests/planted.test.mjs', posix).length, 1);
+
+  // AND THE REAL TREE: 13 asserted launchers are Windows-spelled, where before this fix there were ZERO.
+  // A floor rather than an exact count — the number moves as cases are written — but zero is the defect.
+  const WIN_SOURCE = [String.raw`.\\snowarch.cmd`, String.raw`.\\bootstrap.cmd`];
+  let seen = 0;
+  for (const { file, text } of testSources()) {
+    const lines = text.split('\n');
+    for (const s of assertedLaunchers(file, text)) {
+      const near = lines.slice(Math.max(0, s.line - 1), s.line + 3).join('\n');
+      if (WIN_SOURCE.some((w) => near.includes(w))) seen += 1;
+    }
+  }
+  assert.ok(seen >= 10,
+    `only ${seen} Windows-spelled asserted launcher(s) are visible to the audit — it was 0 before the `
+    + 'cooked-value fix, and a count that has fallen back to nothing is that defect returning');
+});
+
+test('C35b — one definition of LAUNCHER, exported, because the two had already diverged', () => {
+  // `launcher-audit.mjs` carried its own copy with the source-escaped form while the extractor's carried
+  // the cooked one — two regexes for "what a launcher looks like", in the file whose job is catching exactly
+  // that kind of drift. The audit's copy is gone; this asserts it cannot come back.
+  const auditSource = readFileSync(resolve(root, 'scripts/ci/launcher-audit.mjs'), 'utf8');
+  assert.doesNotMatch(auditSource, /^const LAUNCHER =/m,
+    'launcher-audit.mjs has its own LAUNCHER again — import it from launcher-extract.mjs instead');
+  assert.doesNotMatch(auditSource, /^const codeOf =/m,
+    'codeOf is back in front of the parser — it can only subtract, and it deleted 452 lines once');
+  assert.ok(LAUNCHER.test('./snowarch') && LAUNCHER.test('.\\snowarch.cmd'),
+    'the one definition no longer covers both spellings of the cooked value');
 });

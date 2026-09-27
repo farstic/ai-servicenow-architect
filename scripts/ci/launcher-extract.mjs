@@ -92,7 +92,14 @@ const regexProse = (raw) => raw
  * what it replaced at exactly the shape this repository writes most.
  */
 const spellsLauncher = (node) => {
-  if (ts.isStringLiteralLike(node)) return LAUNCHER.test(node.getText());
+  // `node.text`, THE COOKED VALUE — never `getText()`, which is the SOURCE. A Windows launcher is written
+  // `'.\\snowarch.cmd'` in a source file and IS `.\snowarch.cmd` once cooked, and `LAUNCHER` describes the
+  // cooked form. Testing the source meant every Windows-spelled literal in the repository was invisible to
+  // this audit: 24 lines across 11 test files, including the seven engine literals ARC-07-C31 slice 2 fixed
+  // and the seventeen server ones slice 3 fixed — so `EXPECTED_RENDERING`, whose whole purpose is the
+  // win32 cell, had only ever seen POSIX. Measured: the fixture
+  // `assert.equal(out, '.\\snowarch.cmd doctor')` yielded 0 sites and `'./snowarch doctor'` yielded 1.
+  if (ts.isStringLiteralLike(node)) return LAUNCHER.test(node.text);
   // A REGEX IS NOT READ HERE, and that is a scope decision with a measurement behind it rather than an
   // oversight. `/run \.\/snowarch doctor/` holds `\.\/snowarch`, so unescaping it first — which
   // `regexProse` below does, and which ARC-07-C35's line-based version did — detects 45 more asserted
@@ -288,12 +295,23 @@ function subjectPinsShell(sf, assertion, subject, pinned) {
   return Boolean(scope && mentionsPinned(scope, pinned));
 }
 
-/** A spelling that NAMED its platform: a pinned constant, or `cliSpelling('win32', {})`. */
+/**
+ * A spelling that NAMED its platform: a pinned constant, `cliSpelling('win32', {})`, or a PLATFORM LITERAL.
+ *
+ * `DOCTOR_USAGE({ platform: 'win32', env: {} })` pins the shell without naming a spelling at all, and it is
+ * how most of this repository drives the other platform — ARC-07 measured that forcing `process.platform`
+ * is unusable locally, so every case since drives by argument. Without this arm, `cli-help.test.mjs:134`
+ * asserted `.\snowarch.cmd doctor` against a deriving product line and was reported as a defect.
+ */
 function mentionsPinned(node, pinned) {
   let hit = false;
   const walk = (n) => {
     if (hit) return;
     if (ts.isIdentifier(n) && pinned.has(n.text)) { hit = true; return; }
+    if (ts.isPropertyAssignment(n) && ts.isIdentifier(n.name) && n.name.text === 'platform'
+      && ts.isStringLiteralLike(n.initializer)) {
+      hit = true; return;
+    }
     if (ts.isCallExpression(n)) {
       const name = ts.isIdentifier(n.expression) ? n.expression.text
         : (ts.isPropertyAccessExpression(n.expression) ? n.expression.name.text : null);
@@ -303,6 +321,33 @@ function mentionsPinned(node, pinned) {
   };
   walk(node);
   return hit;
+}
+
+/**
+ * Assertions whose FIRST argument is the value under test rather than the expectation.
+ *
+ * `assert.equal(bare('run .\\snowarch.cmd doctor'), false)` in `tests/windows-spellings.test.mjs` feeds a
+ * launcher to the instrument it is testing: the launcher is INPUT, and the expectation is `false`. Treating
+ * argument 0 as an expectation reported that case as a pinned expectation against a deriving product line —
+ * a defect in a case whose whole subject is launcher spellings.
+ *
+ * `assert.ok(text.includes(`${CLI} doctor`))` is the other shape and must keep working: there is no separate
+ * expected value, so argument 0 IS the expectation. The split is by assertion name, which is the only place
+ * the difference is stated.
+ */
+const SUBJECT_FIRST = new Set(['equal', 'notEqual', 'strictEqual', 'notStrictEqual', 'deepEqual',
+  'notDeepEqual', 'deepStrictEqual', 'match', 'doesNotMatch', 'include', 'notInclude']);
+
+/** The arguments that carry what the assertion EXPECTS, with the subject dropped where there is one. */
+function expectationArgs(node) {
+  const { expression } = node;
+  if (ts.isPropertyAccessExpression(expression)) {
+    const root = rootIdentifier(expression);
+    // `expect(subject).toContain(expected)` — the outer call's arguments are already the expectation.
+    if (root === 'expect') return node.arguments;
+    if (root === 'assert' && SUBJECT_FIRST.has(expression.name.text)) return node.arguments.slice(1);
+  }
+  return node.arguments;
 }
 
 /** An assertion: `assert.*(…)`, `expect(…).*(…)`, or a bare `assert(…)`. */
@@ -403,7 +448,7 @@ export function assertedLaunchers(file, text) {
   const walk = (node) => {
     const args = assertionArgs(node);
     if (args && args.length > 0) {
-      const bearing = args.filter((a) => carriesLauncher(a, spellings));
+      const bearing = expectationArgs(node).filter((a) => carriesLauncher(a, spellings));
       if (bearing.length > 0) {
         const literal = bearing.some((a) => hasLauncherLiteral(a));
         const named = bearing.map((a) => namedSpelling(a, spellings)).find(Boolean) ?? null;
