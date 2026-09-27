@@ -4,6 +4,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { instanceManager } from '../../src/servicenow/instances.js';
 import type { ServiceNowError } from '../../src/utils/errors.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * These assertions are in the SERVER's own suite, against sentences slice 3 made derive, and this is
+ * the THIRD test tree — the one my sweep of `tests/` and `tools/snowarch/tests/` did not look at, and
+ * the one C35's audit did not either. Seventeen POSIX literals here were green on a mac and red on
+ * every Windows cell.
+ */
+const SERVER_CLI = cliSpelling();
 
 /**
  * D-05 end to end, through the store: a prod instance raised above read-only without an
@@ -61,7 +72,7 @@ describe('criterion 2 - prod acknowledgement', () => {
     expect(r.loaded).toEqual([]);
     expect(r.notLoaded).toHaveLength(1);
     expect(r.notLoaded[0].code).toBe('PROD_WRITE_NOT_ACKNOWLEDGED');
-    expect(r.notLoaded[0].message).toContain('./snowarch instance set-preset prod full --ack-prod');
+    expect(r.notLoaded[0].message).toContain(`${SERVER_CLI} instance set-preset prod full --ack-prod`);
   });
 
   it('the same instance loads with prodWriteAck true', () => {

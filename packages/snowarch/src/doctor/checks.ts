@@ -21,6 +21,7 @@ import { checkFluent } from '../servicenow/probes.js';
 import { resolveAuditPath } from '../audit/writer.js';
 import { storeEntry } from './store-entry.js';
 import type { Check, CheckContext, CheckResult } from './types.js';
+import { cliSpelling } from '../cli/tty.js';
 
 const isWindows = process.platform === 'win32';
 
@@ -110,6 +111,12 @@ export const svStore: Check = {
   severity: 'fail',
   network: false,
   async run() {
+    // ARC-07-C31 slice 3 — `cliSpelling()` and NOT a ctx, because MEASURED: `CheckContext` carries
+    // `noNetwork`, `cwd`, `probes`, `fluent?` and `storeEntry?` — five fields, no platform and no
+    // env. So there is nothing to thread, and an assumed ctx would be the defect this row keeps
+    // finding. ARC-07-C38 gives the contract a platform; until then these remedies are held by the
+    // source sweep and the three Windows cells, which the plan row says out loud.
+    const cli = cliSpelling();
     const res = resolveStorePath();
     if (res.path === null) {
       // Not an error: an unconfigured checkout is a legitimate state, and the server starts in
@@ -164,7 +171,7 @@ export const svStore: Check = {
       const errors = instanceManager.getReport().configErrors;
       if (errors.length > 0) {
         return fail('SV-02', 'store', `${notes.join('; ')}; ${errors[0]!.code}: ${errors[0]!.message}`,
-          'correct the store file; ./snowarch instance list shows what loaded');
+          `correct the store file; ${cli} instance list shows what loaded`);
       }
     }
 
@@ -182,6 +189,12 @@ export const svInstances: Check = {
   severity: 'fail',
   network: false,
   async run(ctx: CheckContext) {
+    // ARC-07-C31 slice 3 — `cliSpelling()` and NOT a ctx, because MEASURED: `CheckContext` carries
+    // `noNetwork`, `cwd`, `probes`, `fluent?` and `storeEntry?` — five fields, no platform and no
+    // env. So there is nothing to thread, and an assumed ctx would be the defect this row keeps
+    // finding. ARC-07-C38 gives the contract a platform; until then these remedies are held by the
+    // source sweep and the three Windows cells, which the plan row says out loud.
+    const cli = cliSpelling();
     const report = instanceManager.getReport();
     const loaded = instanceManager.listAll().filter((i) => i.status === 'loaded');
 
@@ -192,7 +205,7 @@ export const svInstances: Check = {
     if (prodRefusals.length > 0) {
       const first = prodRefusals[0]!;
       return fail('SV-03', 'instances', first.message,
-        `./snowarch instance set-preset ${first.label} <preset> --ack-prod`);
+        `${cli} instance set-preset ${first.label} <preset> --ack-prod`);
     }
 
     if (loaded.length === 0 && report.notLoaded.length === 0) {
@@ -212,7 +225,7 @@ export const svInstances: Check = {
 
       if (!/^https:\/\/[^/]+$/.test(entry.url)) {
         problems.push(`${i.name}: url is not a bare https origin`);
-        remedy ??= `./snowarch instance set-url ${i.name} https://<host>`;
+        remedy ??= `${cli} instance set-url ${i.name} https://<host>`;
       }
 
       // THE FILE's flags, not the loaded entry's: `completeFlags` fills every absent flag from the
@@ -251,10 +264,12 @@ export const svInstances: Check = {
             + 'resolvable');
       }
 
-      const posture = checkProdPosture(entry);
+      // ARC-07-C31 slice 3 — `cliSpelling()`, because `CheckContext` carries no platform (measured:
+      // `doctor/types.ts` has five fields and none of them is one). ARC-07-C38 threads one.
+      const posture = checkProdPosture(entry, cliSpelling());
       if (!posture.ok) {
         problems.push(posture.message ?? `${i.name}: prod posture`);
-        remedy ??= `./snowarch instance set-preset ${i.name} ${entry.preset} --ack-prod`;
+        remedy ??= `${cli} instance set-preset ${i.name} ${entry.preset} --ack-prod`;
       }
 
       if (entry.toolPackage !== 'full') {
@@ -269,7 +284,7 @@ export const svInstances: Check = {
 
     for (const n of report.notLoaded) {
       problems.push(`${n.label}: ${n.code}`);
-      remedy ??= 'read the reason in ./snowarch instance list';
+      remedy ??= `read the reason in ${cli} instance list`;
     }
 
     if (problems.length > 0) {
@@ -278,7 +293,7 @@ export const svInstances: Check = {
     const warnings = notes.filter((n) => /FLAGS_INCOMPLETE|FLAG_DEPENDENCY_VIOLATION|toolPackage|FLUENT_NOT_INSTALLED/.test(n));
     if (warnings.length === 0) return ok('SV-03', 'instances', notes.join('; '));
     const result = warn('SV-03', 'instances', notes.join('; '),
-      'set every flag explicitly: ./snowarch instance set-preset <label> <preset>');
+      `set every flag explicitly: ${cli} instance set-preset <label> <preset>`);
     // `fixable` is a FLAG here (ARC-08-S06 owns the repair); the hint says which entry and which
     // flags, so the fixer never has to re-derive what this check already knew.
     return fixable
@@ -651,6 +666,12 @@ export const svStoreSchema: Check = {
   severity: 'fail',
   network: false,
   async run() {
+    // ARC-07-C31 slice 3 — `cliSpelling()` and NOT a ctx, because MEASURED: `CheckContext` carries
+    // `noNetwork`, `cwd`, `probes`, `fluent?` and `storeEntry?` — five fields, no platform and no
+    // env. So there is nothing to thread, and an assumed ctx would be the defect this row keeps
+    // finding. ARC-07-C38 gives the contract a platform; until then these remedies are held by the
+    // source sweep and the three Windows cells, which the plan row says out loud.
+    const cli = cliSpelling();
     const res = resolveStorePath();
     if (res.path === null || !existsSync(res.path)) {
       return skip('SV-09', 'store schema', 'no store to check');
@@ -669,12 +690,12 @@ export const svStoreSchema: Check = {
     if (typeof version === 'number' && version > CURRENT_SCHEMA_VERSION) {
       return { id: 'SV-09', title: 'store schema', status: 'fail', fixable: false,
         detail: `store schema v${version} > server v${CURRENT_SCHEMA_VERSION}`,
-        code: 'STORE_SCHEMA_NEWER', command: './snowarch upgrade' };
+        code: 'STORE_SCHEMA_NEWER', command: `${cli} upgrade` };
     }
     return { id: 'SV-09', title: 'store schema', status: 'fail', fixable: false,
       detail: `store schema v${typeof version === 'number' ? version : JSON.stringify(version)} `
         + `< server v${CURRENT_SCHEMA_VERSION}`,
-      code: 'STORE_SCHEMA_OUTDATED', command: './snowarch store migrate' };
+      code: 'STORE_SCHEMA_OUTDATED', command: `${cli} store migrate` };
   },
 };
 

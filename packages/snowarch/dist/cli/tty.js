@@ -49,6 +49,26 @@ export const ARGV_SECRET = 'Secrets are never accepted on the command line (they
  * type something that does not work.
  */
 const windowsShell = (platform, env) => (platform === 'win32' && !env.SHELL && !env.MSYSTEM);
+/**
+ * The refusal a sentence with a REQUIRED spelling shares — ARC-07-C31 slice 3, and a control is why.
+ *
+ * TypeScript makes a required parameter unomittable, so the compiler already stops a caller forgetting
+ * one. What it does NOT stop is somebody later relaxing the parameter to `cli = cliSpelling()`, which
+ * is backwards-compatible, breaks nothing, and quietly lets the process answer for a caller that knew
+ * better. Measured: adding exactly that default to `NO_INSTANCE_MESSAGE` left the whole package suite
+ * green — the control was INERT, which is how this function came to exist.
+ *
+ * With the guard, one case can call each of these with no spelling and require a named throw, so the
+ * relaxation fails a test rather than passing review. It is the engine's `needSpell`, in the language
+ * that needed a different reason for it.
+ */
+export const needCli = (cli, who) => {
+    if (typeof cli !== 'string' || cli === '') {
+        throw new TypeError(`${who} needs the launcher spelling — the server spells it from `
+            + '`cliSpelling()` at the boundary that knows the shell, never from a default here');
+    }
+    return cli;
+};
 export const cliSpelling = (platform = process.platform, env = process.env) => (windowsShell(platform, env) ? '.\\snowarch.cmd' : './snowarch');
 /**
  * The bootstrap's spelling — ARC-07-W11, needed because the resume line offers it as the fuller

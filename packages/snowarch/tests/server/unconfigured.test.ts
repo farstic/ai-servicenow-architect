@@ -10,6 +10,18 @@ import { fileURLToPath } from 'node:url';
 import { collectToolCatalog } from '../../src/tools/index.js';
 import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * `NO_INSTANCE_MESSAGE` is a FUNCTION now, and `toContain(NO_INSTANCE_MESSAGE)` type-checked: the
+ * matcher accepts anything, so TypeScript did not catch the assertion comparing a string to a
+ * function's source. The runtime did — five cases, all reading `to include [Function
+ * NO_INSTANCE_MESSAGE]`. That is the same defect the engine's required-argument rule exists for, and
+ * it is worth knowing that the compiler is not a complete audit for it.
+ */
+const SERVER_CLI = cliSpelling();
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
@@ -136,7 +148,7 @@ describe('criterion 1 and 2 - the server starts with no instance', () => {
       expect(text(r)).toContain('NO_INSTANCE_CONFIGURED');
       expect(text(r)).toContain('/snowarch setup-instance');
       // ARC-08-C7 — one remedy, asserted from its definition rather than retyped.
-      expect(text(r)).toContain(NO_INSTANCE_MESSAGE);
+      expect(text(r)).toContain(NO_INSTANCE_MESSAGE(SERVER_CLI));
     } finally { await client.close(); }
   }, 40_000);
 

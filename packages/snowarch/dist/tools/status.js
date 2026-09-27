@@ -26,6 +26,7 @@ export const CORE_TOOLS_UNCONFIGURED = [
 ];
 export { NO_INSTANCE_MESSAGE } from '../no-instance.js';
 import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
+import { cliSpelling } from '../cli/tty.js';
 /**
  * Why an instance tool is refusing, in the words of the ACTUAL reason.
  *
@@ -40,7 +41,7 @@ export function unconfiguredRefusal(configErrors) {
     const schema = configErrors.find((e) => SCHEMA_CONFIG_ERRORS.includes(e.code));
     return schema
         ? { code: schema.code, message: schema.message }
-        : { code: 'NO_INSTANCE_CONFIGURED', message: NO_INSTANCE_MESSAGE };
+        : { code: 'NO_INSTANCE_CONFIGURED', message: NO_INSTANCE_MESSAGE(cliSpelling()) };
 }
 /** Set by the server so the status tool can report the real number without importing it. */
 let advertisedCount = CORE_TOOLS_UNCONFIGURED.length;

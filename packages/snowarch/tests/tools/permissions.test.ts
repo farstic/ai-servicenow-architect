@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import type { ErrorCodeName } from '../../src/errors/codes.js';
 import { ServiceNowError } from '../../src/utils/errors.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
+import { neverProbedNote } from '../../src/cli/format.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * The lines asserted below leave the SERVER through `cliSpelling()` (`cli/tty.ts`), so the
+ * expectation derives from the same source. A POSIX literal here is green on a mac and red on all
+ * three Windows cells, which is this row's own "62 expectations" trap.
+ */
+const SERVER_CLI = cliSpelling();
 import {
   outsideInstance, runWithInstance, FLAG_NAMES, type Flags, type InstanceRuntime,
 } from '../../src/servicenow/context.js';
@@ -154,32 +166,34 @@ describe('checkProdPosture — D-05, criterion 2', () => {
   const base = { label: 'prod', environment: 'prod', preset: 'full', prodWriteAck: false };
 
   it('prod raised above read-only without the acknowledgement is refused, with the --ack-prod remedy', () => {
-    const r = checkProdPosture({ ...base, effectiveFlags: expandPreset('full') });
+    const r = checkProdPosture({ ...base, effectiveFlags: expandPreset('full') }, SERVER_CLI);
     expect(r.ok).toBe(false);
     expect(r.code).toBe('PROD_WRITE_NOT_ACKNOWLEDGED');
-    expect(r.message).toContain('./snowarch instance set-preset prod full --ack-prod');
+    expect(r.message).toContain(`${SERVER_CLI} instance set-preset prod full --ack-prod`);
     expect(r.message).toContain('PROD_WRITE_NOT_ACKNOWLEDGED');
   });
 
   it('ANY flag counts, not only WRITE — an ATF-only custom instance still runs tests against production', () => {
     const r = checkProdPosture({
       ...base, preset: 'custom', effectiveFlags: flags({ ATF_ENABLED: 'true' }),
-    });
+    }, SERVER_CLI);
     expect(r.ok).toBe(false);
     expect(r.message).toContain('set-preset prod custom --ack-prod');
   });
 
   it('prod at read-only is fine without any acknowledgement', () => {
-    expect(checkProdPosture({ ...base, preset: 'read-only', effectiveFlags: expandPreset('read-only') }).ok).toBe(true);
+    expect(checkProdPosture({ ...base, preset: 'read-only', effectiveFlags: expandPreset('read-only') },
+      SERVER_CLI).ok).toBe(true);
   });
 
   it('prod with the acknowledgement loads', () => {
-    expect(checkProdPosture({ ...base, prodWriteAck: true, effectiveFlags: expandPreset('full') }).ok).toBe(true);
+    expect(checkProdPosture({ ...base, prodWriteAck: true, effectiveFlags: expandPreset('full') },
+      SERVER_CLI).ok).toBe(true);
   });
 
   it('a non-prod environment is never gated by this rule', () => {
     for (const environment of ['pdi', 'dev', 'test']) {
-      expect(checkProdPosture({ ...base, environment, effectiveFlags: expandPreset('full') }).ok).toBe(true);
+      expect(checkProdPosture({ ...base, environment, effectiveFlags: expandPreset('full') }, SERVER_CLI).ok).toBe(true);
     }
   });
 });
@@ -296,7 +310,7 @@ describe('the refusal message names the instance and the remedy — criterion 5 
       try { requireWrite(); } catch (e) {
         const m = (e as ServiceNowError).message;
         expect(m).toBe('Write operations are disabled for instance "prod-lookalike" (preset read-only). '
-          + 'Run: ./snowarch instance set-preset prod-lookalike pdi-developer');
+          + `Run: ${SERVER_CLI} instance set-preset prod-lookalike pdi-developer`);
       }
     });
   });
@@ -306,7 +320,7 @@ describe('the refusal message names the instance and the remedy — criterion 5 
       try { requireWrite(); } catch (e) {
         const m = (e as ServiceNowError).message;
         expect(m).toContain('Instance "prod" is tagged prod and capped at read-only');
-        expect(m).toContain('./snowarch instance set-preset prod <preset> --ack-prod');
+        expect(m).toContain(`${SERVER_CLI} instance set-preset prod <preset> --ack-prod`);
       }
     });
   });
@@ -394,5 +408,36 @@ describe('criterion 8 — the environment does not reach a store-defined instanc
     } finally {
       if (saved === undefined) delete process.env.WRITE_ENABLED; else process.env.WRITE_ENABLED = saved;
     }
+  });
+});
+
+describe('ARC-07-C31 slice 3 — the required spellings refuse rather than defaulting', () => {
+  // THIS SUITE EXISTS BECAUSE A CONTROL WAS INERT. TypeScript stops a caller OMITTING a required
+  // parameter, so the compiler already holds that half. What it does not stop is somebody relaxing the
+  // parameter to `cli = cliSpelling()` later: backwards-compatible, breaks nothing, and the process
+  // quietly answers for a caller that knew better. Adding exactly that default to `NO_INSTANCE_MESSAGE`
+  // left the whole package suite green.
+  //
+  // The cast is deliberate and is the only way to write the case: the call is a compile error without
+  // it, which is the compiler doing its job. What is being tested is the RUNTIME guard that survives a
+  // future relaxation.
+  const withNoSpelling = <T>(fn: T): (() => unknown) => (fn as unknown as () => unknown);
+
+  it('NO_INSTANCE_MESSAGE refuses', () => {
+    expect(withNoSpelling(NO_INSTANCE_MESSAGE)).toThrow(/^NO_INSTANCE_MESSAGE needs the launcher/);
+  });
+
+  it('checkProdPosture refuses', () => {
+    // Its own entry, not the `base` an inner describe holds: reaching for a name that is not in scope
+    // here is the slip this row has now made ten times, and the compiler caught this one.
+    const entry = { label: 'prod', environment: 'prod', preset: 'full',
+      effectiveFlags: expandPreset('full'), prodWriteAck: false };
+    expect(() => (checkProdPosture as unknown as (e: unknown) => unknown)(entry))
+      .toThrow(/^checkProdPosture needs the launcher/);
+  });
+
+  it('neverProbedNote refuses', () => {
+    expect(() => (neverProbedNote as unknown as (i: unknown) => unknown)([]))
+      .toThrow(/^neverProbedNote needs the launcher/);
   });
 });

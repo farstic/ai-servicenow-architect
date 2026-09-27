@@ -23,5 +23,10 @@ export declare function runStoreMigrate(argv: readonly string[], io?: StoreIo, c
     current?: number;
 }): Promise<number>;
 export declare function runStoreBackups(io?: StoreIo): number;
+/**
+ * ARC-07-C31 slice 3 — the spelling is resolved ONCE at the top of this command and threaded, the
+ * shape `runDocs` uses in the engine: a command is the boundary where reading the process is right,
+ * and resolving it once means three lines below cannot render three different shells in one run.
+ */
 export declare function runStoreRestore(argv: readonly string[], io?: StoreIo): Promise<number>;
 export declare function runStore(args: readonly string[], io?: StoreIo): Promise<number>;

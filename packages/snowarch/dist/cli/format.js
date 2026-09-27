@@ -14,6 +14,7 @@ import { maskPath, maskUsername } from '../store/paths.js';
 import { completeFlags } from '../store/schema.js';
 import { PROBE_FIELDS, probeFieldText } from '../servicenow/probes.js';
 import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
+import { cliSpelling, needCli } from './tty.js';
 /**
  * A secret, described rather than shown: `set (len 12)`.
  *
@@ -111,10 +112,19 @@ export const NEVER_PROBED = '—';
  * Conditional on purpose: a table where every instance has been probed gets no footnote, because a
  * sentence explaining a glyph that is not on the screen is a line a reader has to rule out.
  */
-export const neverProbedNote = (instances) => (instances.some((i) => !i.lastProbe)
-    ? `${NEVER_PROBED} = never probed. ./snowarch instance test <label> probes one; `
-        + '--all probes every one.'
-    : null);
+/**
+ * ARC-07-C31 slice 3 — `cli` REQUIRED: two callers, both in this file (lines 168 and 291). Two is
+ * not one, and the rule is a COUNT rather than a judgement about whether two callers feel like one.
+ */
+export const neverProbedNote = (instances, cli) => {
+    // A BLOCK BODY, because the guard has to run before the ternary and `&&` would have turned a `null`
+    // return into the guard's own string — which is the kind of quiet type change an expression body hides.
+    needCli(cli, 'neverProbedNote');
+    return instances.some((i) => !i.lastProbe)
+        ? `${NEVER_PROBED} = never probed. ${cli} instance test <label> probes one; `
+            + '--all probes every one.'
+        : null;
+};
 const HEADERS = ['LABEL', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER'];
 /**
  * The table. Columns are as wide as their widest cell, never wider.
@@ -123,9 +133,13 @@ const HEADERS = ['LABEL', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER'];
  * row's own time would repeat a 20-character timestamp per line to say what one header says once,
  * and a table nobody can read across is a table nobody reads.
  */
-export function listTable(list) {
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED BECAUSE THERE IS EXACTLY ONE PRODUCT CALLER, NAMED:
+ * `cli/instance.ts:1525`. Its other call sites are tests, the same shape the engine's `formatStatus` has.
+ */
+export function listTable(list, cli = cliSpelling()) {
     if (list.instances.length === 0)
-        return NO_INSTANCES;
+        return NO_INSTANCES(cli);
     const rows = list.instances.map((i) => [
         i.label, i.environment, i.auth.method, i.preset,
         list.defaultInstance === i.label ? '*' : '', i.auth.username,
@@ -133,7 +147,7 @@ export function listTable(list) {
     const probeHeader = probeColumnHeader(list.instances);
     const width = HEADERS.map((h, c) => Math.max(h.length, ...rows.map((r) => r[c]?.length ?? 0)));
     const line = (cells, last) => `${cells.map((cell, c) => cell.padEnd(width[c])).join('  ')}  ${last}`.trimEnd();
-    const note = neverProbedNote(list.instances);
+    const note = neverProbedNote(list.instances, cli);
     return [line(HEADERS, probeHeader),
         ...rows.map((r, n) => line(r, probeCell(list.instances[n]?.lastProbe ?? null))),
         ...(note ? ['', note] : [])].join('\n');
@@ -168,7 +182,12 @@ export const precedenceNote = (label, firstPath, globalPath, source = 'project')
         + 'global entry is ignored here.';
 };
 /** The footer `list` prints when the OTHER store is not empty. */
-export const otherStoreFooter = (count) => `(+ ${count} instance${count === 1 ? '' : 's'} in the global store — ./snowarch instance list --all)`;
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED HERE BECAUSE THERE IS EXACTLY ONE CALLER, NAMED:
+ * `cli/instance.ts:1532`. Its other three call sites are tests, which is the same shape
+ * `formatStatus` has in the engine.
+ */
+export const otherStoreFooter = (count, cli = cliSpelling()) => `(+ ${count} instance${count === 1 ? '' : 's'} in the global store — ${cli} instance list --all)`;
 export const storeLabelFor = (source) => (source === 'env' ? 'SNOW_STORE' : source === 'global' ? 'global' : 'project');
 /**
  * Both stores, side by side, with every row saying where it came from.
@@ -210,9 +229,13 @@ export function combinedListJson(first, globalStore) {
 }
 const ALL_HEADERS = ['LABEL', 'STORE', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER'];
 /** `list --all`: the table with a STORE column, then the precedence note for anything in both. */
-export function listAllTable(list) {
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED BECAUSE THERE IS EXACTLY ONE PRODUCT CALLER, NAMED:
+ * `cli/instance.ts:1520`. Its other call sites are tests, the same shape the engine's `formatStatus` has.
+ */
+export function listAllTable(list, cli = cliSpelling()) {
     if (list.instances.length === 0)
-        return NO_INSTANCES;
+        return NO_INSTANCES(cli);
     const rows = list.instances
         .map((i) => [
         i.label, i.store, i.environment, i.auth.method, i.preset,
@@ -223,7 +246,7 @@ export function listAllTable(list) {
     // ARC-07-C6 — the same header and the same footnote as `list`. This table showed a bare
     // `LAST PROBE` and no explanation of the dash, so the one view that spans two stores was the one
     // that said least about the column both of them share.
-    const note = neverProbedNote(list.instances);
+    const note = neverProbedNote(list.instances, cli);
     return [
         line(ALL_HEADERS, probeColumnHeader(list.instances)),
         ...rows.map((r, n) => line(r, probeCell(list.instances[n]?.lastProbe ?? null))),

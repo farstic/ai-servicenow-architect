@@ -39,7 +39,7 @@ export declare function listJson(storePath: string, store: Store): ListJson;
  * `instance add` is the wizard alone, and it would leave them one step into a live mode the toggles
  * do not reflect, in a terminal where `mode live` is just as available.
  */
-export declare const NO_INSTANCES: string;
+export declare const NO_INSTANCES: (cli: string) => string;
 /**
  * One probe as the table shows it: `auth ok · write ok · …`, or a dash when none has run.
  *
@@ -79,7 +79,11 @@ export declare const NEVER_PROBED = "\u2014";
  * Conditional on purpose: a table where every instance has been probed gets no footnote, because a
  * sentence explaining a glyph that is not on the screen is a line a reader has to rule out.
  */
-export declare const neverProbedNote: (instances: readonly MaskedInstance[]) => string | null;
+/**
+ * ARC-07-C31 slice 3 — `cli` REQUIRED: two callers, both in this file (lines 168 and 291). Two is
+ * not one, and the rule is a COUNT rather than a judgement about whether two callers feel like one.
+ */
+export declare const neverProbedNote: (instances: readonly MaskedInstance[], cli: string) => string | null;
 /**
  * The table. Columns are as wide as their widest cell, never wider.
  *
@@ -87,7 +91,11 @@ export declare const neverProbedNote: (instances: readonly MaskedInstance[]) => 
  * row's own time would repeat a 20-character timestamp per line to say what one header says once,
  * and a table nobody can read across is a table nobody reads.
  */
-export declare function listTable(list: ListJson): string;
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED BECAUSE THERE IS EXACTLY ONE PRODUCT CALLER, NAMED:
+ * `cli/instance.ts:1525`. Its other call sites are tests, the same shape the engine's `formatStatus` has.
+ */
+export declare function listTable(list: ListJson, cli?: string): string;
 export interface ProbesJson {
     store: string;
     instances: Record<string, LastProbe>;
@@ -110,7 +118,12 @@ export declare function probesJson(storePath: string, probes: Record<string, Las
  */
 export declare const precedenceNote: (label: string, firstPath: string, globalPath: string, source?: StoreLabel) => string;
 /** The footer `list` prints when the OTHER store is not empty. */
-export declare const otherStoreFooter: (count: number) => string;
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED HERE BECAUSE THERE IS EXACTLY ONE CALLER, NAMED:
+ * `cli/instance.ts:1532`. Its other three call sites are tests, which is the same shape
+ * `formatStatus` has in the engine.
+ */
+export declare const otherStoreFooter: (count: number, cli?: string) => string;
 /**
  * What the STORE column says — the thing that SELECTED the file, in the words a reader can check.
  *
@@ -140,4 +153,8 @@ export declare function combinedListJson(first: {
     store: Store | null;
 }): CombinedListJson;
 /** `list --all`: the table with a STORE column, then the precedence note for anything in both. */
-export declare function listAllTable(list: CombinedListJson): string;
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED BECAUSE THERE IS EXACTLY ONE PRODUCT CALLER, NAMED:
+ * `cli/instance.ts:1520`. Its other call sites are tests, the same shape the engine's `formatStatus` has.
+ */
+export declare function listAllTable(list: CombinedListJson, cli?: string): string;

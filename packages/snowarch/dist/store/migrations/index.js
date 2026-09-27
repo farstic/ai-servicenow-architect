@@ -143,7 +143,13 @@ export function backupName(at) {
  * before the decision, and nothing is applied before the backup exists — so every failure mode
  * leaves either the original file or the original file plus a copy of itself.
  */
-export function migrateStore(path, { backup = true, dryRun = false, migrations = MIGRATIONS, current = CURRENT_SCHEMA_VERSION, now = () => new Date(), } = {}) {
+/**
+ * ARC-07-C31 slice 3 — `cli` REQUIRED: TWO product callers (`cli/store-command.ts:101` and `:135`),
+ * and the rule this row settled is a count rather than a judgement. Both of them sit inside a command
+ * that has already resolved the spelling, so requiring it makes them pass what they know instead of
+ * letting this function read the process behind them.
+ */
+export function migrateStore(path, { backup = true, dryRun = false, migrations = MIGRATIONS, current = CURRENT_SCHEMA_VERSION, now = () => new Date(), cli, }) {
     const shown = maskPath(path);
     if (!existsSync(path)) {
         throw new StoreMigrationError('STORE_NOT_FOUND', `store not found: ${shown}`);
@@ -156,7 +162,7 @@ export function migrateStore(path, { backup = true, dryRun = false, migrations =
     catch {
         // The parse error's own message is not repeated: it names an offset, which sends a reader
         // into a credential file with an editor. The remedy is a backup, and `store backups` lists them.
-        throw new StoreMigrationError('STORE_UNREADABLE', `${shown} is not valid JSON — restore a backup (./snowarch store backups)`);
+        throw new StoreMigrationError('STORE_UNREADABLE', `${shown} is not valid JSON — restore a backup (${cli} store backups)`);
     }
     const from = raw?.version;
     if (typeof from !== 'number' || !Number.isInteger(from) || from < 1) {
@@ -165,8 +171,8 @@ export function migrateStore(path, { backup = true, dryRun = false, migrations =
     if (from === current)
         return { migrated: false, from, to: current, steps: [] };
     if (from > current) {
-        throw new StoreMigrationError('STORE_SCHEMA_NEWER', `store schema ${from} is newer than this server supports (${current}) — run ./snowarch upgrade, `
-            + 'or restore a backup (./snowarch store backups)');
+        throw new StoreMigrationError('STORE_SCHEMA_NEWER', `store schema ${from} is newer than this server supports (${current}) — run ${cli} upgrade, `
+            + `or restore a backup (${cli} store backups)`);
     }
     const pending = migrations.filter((m) => m.from >= from);
     const problems = checkRegistry(migrations, current);

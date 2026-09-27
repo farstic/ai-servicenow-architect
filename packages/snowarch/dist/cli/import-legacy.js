@@ -35,6 +35,7 @@ import { STORE_VERSION, completeFlags } from '../store/schema.js';
 import { maskPath } from '../store/paths.js';
 import { applyDependencyRule, matchPreset, FLAG_NAMES } from '../utils/permissions.js';
 import { remedyFor } from '../errors/codes.js';
+import { cliSpelling } from './tty.js';
 /**
  * Where snow-mcp 1.x kept its store, ON EVERY OPERATING SYSTEM.
  *
@@ -160,7 +161,10 @@ export function normaliseLabel(name) {
         ? { label }
         : { label, note: `label "${name}" normalised to "${label}"` };
 }
-const skipAdd = (label, url, environment, reason) => `${reason} — add it fresh with: ./snowarch instance add ${label} --url ${url} --env ${environment}`;
+/**
+ * ARC-07-C31 slice 3 — one caller, `line 472` below, so a default is within the rule and named.
+ */
+const skipAdd = (label, url, environment, reason, cli = cliSpelling()) => `${reason} — add it fresh with: ${cli} instance add ${label} --url ${url} --env ${environment}`;
 /**
  * One legacy entry, mapped. Nothing here touches the network or the disk.
  *
@@ -168,7 +172,10 @@ const skipAdd = (label, url, environment, reason) => `${reason} — add it fresh
  * change: a migration whose output differs from its input without saying so is how somebody ends
  * up with a production instance that can write.
  */
-export function planEntry(entry, taken) {
+/**
+ * ARC-07-C31 slice 3 — one PRODUCT caller, `line 425` below; its other call site is a test.
+ */
+export function planEntry(entry, taken, cli = cliSpelling()) {
     const notes = [];
     const { label, note } = normaliseLabel(String(entry.name ?? ''));
     if (note)
@@ -234,7 +241,7 @@ export function planEntry(entry, taken) {
     if (environment === 'prod' && FLAG_NAMES.some((f) => flags[f] === 'true')) {
         flags = completeFlags({});
         notes.push('production capped at read-only (D-05) — raise with: '
-            + `./snowarch instance set-preset ${label} <preset> --ack-prod`);
+            + `${cli} instance set-preset ${label} <preset> --ack-prod`);
     }
     if (entry.toolPackage !== undefined && entry.toolPackage !== 'full') {
         notes.push(`tool package "${entry.toolPackage}" not carried — 2.0.0 uses full (P-25)`);
@@ -289,7 +296,16 @@ export function renderPlan(plan) {
     return lines.join('\n');
 }
 /** The closing advice. It NAMES the files; it never removes one. */
-export function deletionAdvice(imported, total, home = homedir(), platform = process.platform) {
+/**
+ * ARC-07-C31 slice 3 — `env` JOINS THE `platform` THIS ALREADY HAD, and it is not symmetry.
+ *
+ * `cliSpelling(platform, env)` is `platform === 'win32' && !env.SHELL && !env.MSYSTEM`, so
+ * `cliSpelling('win32')` alone reads the RUNNER's `SHELL` and renders POSIX on any mac — the fixture
+ * trap that cost this programme three sittings. This function's contract is already "render for the
+ * platform I was told", and its own test drives `'win32'` from a mac, so the shell has to be told
+ * too or the test would assert the POSIX spelling while claiming to check the Windows one.
+ */
+export function deletionAdvice(imported, total, home = homedir(), platform = process.platform, env = process.env) {
     // The separator follows the PLATFORM THIS ADVICE IS FOR, not the one the process happens to run
     // on: `join()` uses the host's, so a Windows command rendered on a POSIX runner (and the reverse,
     // which is how this was found) came out with the wrong slashes in a line the reader will paste.
@@ -298,7 +314,8 @@ export function deletionAdvice(imported, total, home = homedir(), platform = pro
     const remove = platform === 'win32' ? `Remove-Item -Recurse ${dir}` : `rm -r ${dir}`;
     return `Imported ${imported} of ${total}. The legacy files were left in place. When you are `
         + `satisfied, delete them: ${remove}   (contains instances.json and tokens.json with plaintext `
-        + 'secrets). Then remove stale Claude Code registrations: ./snowarch doctor lists the exact '
+        + `secrets). Then remove stale Claude Code registrations: ${cliSpelling(platform, env)} doctor `
+        + 'lists the exact '
         + 'claude mcp remove commands.';
 }
 const defaultClient = (entry) => new ServiceNowClient({

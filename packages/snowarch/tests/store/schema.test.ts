@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { completeFlags, parseStore, STORE_VERSION } from '../../src/store/schema.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * These assertions are in the SERVER's own suite, against sentences slice 3 made derive, and this is
+ * the THIRD test tree — the one my sweep of `tests/` and `tools/snowarch/tests/` did not look at, and
+ * the one C35's audit did not either. Seventeen POSIX literals here were green on a mac and red on
+ * every Windows cell.
+ */
+const SERVER_CLI = cliSpelling();
 
 const base = {
   version: 1,
@@ -68,14 +79,14 @@ describe('version', () => {
     const e = err(s);
     expect(e.code).toBe('STORE_SCHEMA_NEWER');
     expect(e.message).toContain(`newer than this server supports (${STORE_VERSION})`);
-    expect(e.message).toContain('./snowarch upgrade');
+    expect(e.message).toContain(`${SERVER_CLI} upgrade`);
   });
   it('an OLDER version says to migrate, and never mentions upgrading', () => {
     const s = clone(); s.version = 0;
     const e = err(s);
     expect(e.code).toBe('STORE_SCHEMA_OUTDATED');
     expect(e.message).toContain(`older than this server (${STORE_VERSION})`);
-    expect(e.message).toContain('./snowarch store migrate');
+    expect(e.message).toContain(`${SERVER_CLI} store migrate`);
     expect(e.message).not.toContain('upgrade');
   });
   it('an unsupported version is not reported as a malformed store', () => {

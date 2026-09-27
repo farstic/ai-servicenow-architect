@@ -10,6 +10,7 @@
  *    would store a client id and secret the client code has no branch to use.
  */
 import { z } from 'zod';
+import { cliSpelling } from '../cli/tty.js';
 
 export const STORE_VERSION = 1;
 
@@ -100,17 +101,21 @@ export function issuePath(issue: z.ZodIssue): string {
  * at all, and the file the user needed to migrate sits there through it. The two directions have
  * two remedies and now say so.
  */
-export function parseStore(raw: unknown): { store: Store } | { error: StoreError } {
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED: exactly one product caller, `store/index.ts:94`.
+ */
+export function parseStore(raw: unknown,
+  cli: string = cliSpelling()): { store: Store } | { error: StoreError } {
   if (raw && typeof raw === 'object' && 'version' in raw) {
     const v = (raw as { version: unknown }).version;
     if (typeof v === 'number' && v !== STORE_VERSION) {
       return v > STORE_VERSION
         ? { error: { code: 'STORE_SCHEMA_NEWER',
           message: `store schema ${v} is newer than this server supports (${STORE_VERSION}) — `
-            + 'run ./snowarch upgrade, or restore a backup (./snowarch store backups)' } }
+            + `run ${cli} upgrade, or restore a backup (${cli} store backups)` } }
         : { error: { code: 'STORE_SCHEMA_OUTDATED',
           message: `store schema ${v} is older than this server (${STORE_VERSION}) — `
-            + 'run ./snowarch store migrate' } };
+            + `run ${cli} store migrate` } };
     }
   }
   const parsed = storeSchema.safeParse(raw);

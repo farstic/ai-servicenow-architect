@@ -10,6 +10,20 @@ export declare const EXIT_INTERRUPTED = 130;
 export declare const CANCELLED = "Cancelled \u2014 nothing saved.";
 /** The argv rule's sentence. Exported so the CLI and its test cannot paraphrase it. */
 export declare const ARGV_SECRET: string;
+/**
+ * The refusal a sentence with a REQUIRED spelling shares — ARC-07-C31 slice 3, and a control is why.
+ *
+ * TypeScript makes a required parameter unomittable, so the compiler already stops a caller forgetting
+ * one. What it does NOT stop is somebody later relaxing the parameter to `cli = cliSpelling()`, which
+ * is backwards-compatible, breaks nothing, and quietly lets the process answer for a caller that knew
+ * better. Measured: adding exactly that default to `NO_INSTANCE_MESSAGE` left the whole package suite
+ * green — the control was INERT, which is how this function came to exist.
+ *
+ * With the guard, one case can call each of these with no spelling and require a named throw, so the
+ * relaxation fails a test rather than passing review. It is the engine's `needSpell`, in the language
+ * that needed a different reason for it.
+ */
+export declare const needCli: (cli: string | undefined, who: string) => string;
 export declare const cliSpelling: (platform?: NodeJS.Platform, env?: NodeJS.ProcessEnv) => string;
 /**
  * The bootstrap's spelling — ARC-07-W11, needed because the resume line offers it as the fuller

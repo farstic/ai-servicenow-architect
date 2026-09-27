@@ -13,6 +13,17 @@ import { FLAG_NAMES } from '../../src/utils/permissions.js';
 import { removeTempDir, trackTempDir } from '../helpers/server-child.js';
 import { fakeRest } from '../helpers/fake-rest.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * These assertions are in the SERVER's own suite, against sentences slice 3 made derive, and this is
+ * the THIRD test tree — the one my sweep of `tests/` and `tools/snowarch/tests/` did not look at, and
+ * the one C35's audit did not either. Seventeen POSIX literals here were green on a mac and red on
+ * every Windows cell.
+ */
+const SERVER_CLI = cliSpelling();
 
 /**
  * ARC-07-S08 — the migration, and the three promises it makes.
@@ -45,7 +56,21 @@ const SECRETS = fixture.instances.flatMap((e) =>
 const everything: string[] = [];
 
 /** Separators normalised. A Windows path is a right answer, not a different plan. */
-const posix = (text: string): string => text.split('\\').join('/');
+/**
+ * Normalise a rendered string INTO the committed page's rendering — ARC-07-C31 slice 3, rule 3.
+ *
+ * `docs/snippets/import-from-legacy.md` is documentation for both platforms and is written POSIX. The
+ * plan is rendered by the product for the shell it is running in, so on a Windows cell it carries
+ * `.\\snowarch.cmd` and the separators the host uses. Comparing the two means normalising one of them,
+ * and the page is the fixed side: it cannot know the reader's shell.
+ *
+ * The launcher replacement DERIVES both spellings rather than hard-coding either, so it follows the
+ * definition instead of restating it.
+ */
+const posix = (text: string): string => text
+  .split('\\').join('/')
+  .split(cliSpelling('win32', {}).split('\\').join('/'))
+  .join(cliSpelling('linux', {}));
 
 const REAL = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE,
   CLAUDE_PROJECT_DIR: process.env.CLAUDE_PROJECT_DIR, SNOW_STORE: process.env.SNOW_STORE };
@@ -210,7 +235,7 @@ describe('AC 3 — an entry whose credentials no longer work', () => {
     const out = terminal.written();
     expect(out).toContain('Imported 1 of 2');
     expect(out).toContain('auth failed');
-    expect(out).toContain('./snowarch instance add prod --url https://acme.service-now.com --env prod');
+    expect(out).toContain(`${SERVER_CLI} instance add prod --url https://acme.service-now.com --env prod`);
     expect(Object.keys(readStore().instances)).toEqual(['pdi']);
     // One request per entry, even the one that failed: a migration never retries a login.
     expect(d.calls).toHaveLength(2);
@@ -270,13 +295,24 @@ describe('AC 6 — the advice, and the deletion this command never performs', ()
   it('names the directory and tokens.json, per platform', () => {
     // Rendered for a named platform, on whichever platform the runner happens to be: the advice is
     // a line the reader pastes, so its separators follow the system it describes.
-    const unix = deletionAdvice(1, 2, '/home/me', 'linux');
+    const unix = deletionAdvice(1, 2, '/home/me', 'linux', {});
     expect(unix).toContain('rm -r /home/me/.config/servicenow-mcp');
     expect(unix).toContain('tokens.json');
     expect(unix).toContain('Imported 1 of 2');
-    const windows = deletionAdvice(2, 2, 'C:\\Users\\me', 'win32');
+    const windows = deletionAdvice(2, 2, 'C:\\Users\\me', 'win32', {});
     expect(windows).toContain('Remove-Item -Recurse');
     expect(windows).toContain('\\.config\\servicenow-mcp');
+
+    // ARC-07-C31 slice 3 — THE LAUNCHER, ASSERTED, and a control is why it is here. Dropping the `env`
+    // from this sentence's `cliSpelling(platform, env)` left the whole package suite green, because
+    // nothing here checked the launcher at all — only the separators. Both directions, and `{}` for the
+    // env because a named platform means a named SHELL too: `cliSpelling('win32')` on a mac reads the
+    // runner's SHELL and renders POSIX, which would make this case assert the POSIX spelling while
+    // claiming to check the Windows one.
+    expect(windows).toContain(`${cliSpelling('win32', {})} doctor`);
+    expect(windows).not.toContain('./snowarch');
+    expect(unix).toContain(`${cliSpelling('linux', {})} doctor`);
+    expect(unix).not.toContain('snowarch.cmd');
   });
 
   it('has no removal call anywhere in its source — the promise, greppable', () => {

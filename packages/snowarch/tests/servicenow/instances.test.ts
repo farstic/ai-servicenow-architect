@@ -4,6 +4,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { instanceManager } from '../../src/servicenow/instances.js';
 import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * The lines asserted below leave the SERVER through `cliSpelling()` (`cli/tty.ts`), so the
+ * expectation derives from the same source. A POSIX literal here is green on a mac and red on all
+ * three Windows cells, which is this row's own "62 expectations" trap.
+ */
+const SERVER_CLI = cliSpelling();
 
 /**
  * The precedence, end to end.
@@ -186,6 +196,6 @@ describe('the store carries the metadata the flag gate (S03) will need', () => {
   it('getClient names the remedy when nothing is configured', () => {
     instanceManager.reload();
     // ARC-08-C7 — the remedy is `mode live` now, and it comes from the one definition.
-    expect(() => instanceManager.getClient()).toThrow(NO_INSTANCE_MESSAGE);
+    expect(() => instanceManager.getClient()).toThrow(NO_INSTANCE_MESSAGE(SERVER_CLI));
   });
 });

@@ -7,6 +7,18 @@ import { fileURLToPath } from 'node:url';
 
 import { EXIT_CODES, labelExists } from '../../src/cli/instance.js';
 import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * `NO_INSTANCE_MESSAGE` is a FUNCTION now, and `toContain(NO_INSTANCE_MESSAGE)` type-checked: the
+ * matcher accepts anything, so TypeScript did not catch the assertion comparing a string to a
+ * function's source. The runtime did — five cases, all reading `to include [Function
+ * NO_INSTANCE_MESSAGE]`. That is the same defect the engine's required-argument rule exists for, and
+ * it is worth knowing that the compiler is not a complete audit for it.
+ */
+const SERVER_CLI = cliSpelling();
 
 /**
  * ARC-07-S05 — the BUILT CLI, run as a process.
@@ -91,7 +103,7 @@ describe('the built CLI', () => {
       const r = run(['instance', 'list'], { SNOW_STORE: join(dir, 'instances.json') });
       expect(r.status).toBe(0);
       // ARC-08-C7 — one remedy, from its definition.
-      expect(r.stdout).toContain(NO_INSTANCE_MESSAGE);
+      expect(r.stdout).toContain(NO_INSTANCE_MESSAGE(SERVER_CLI));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

@@ -10,6 +10,7 @@
 // only in the server CLI; the one-line usage exists only in the engine.
 import assert from 'node:assert/strict';
 import { spellings } from '../lib/text.mjs';
+import { cliSpelling } from '../../../packages/snowarch/dist/cli/tty.js';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -74,7 +75,18 @@ const esc = (cli) => cli.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * not per test. One test can print from both packages in two commands, and this one does.
  */
 const FRAME_CLI = esc(spellings({ platform: 'linux', env: {} }).cli);
-const SERVER_CLI = esc(spellings().cli);
+/**
+ * ARC-07-C31 slice 3 — REPOINTED AT THE SERVER'S OWN DEFINITION, because that is what prints these
+ * lines.
+ *
+ * It derived from the engine's `spellings()`, which computes the same answer from the same process, so
+ * it agreed and nothing failed. Agreement is not the property: rule 1 is that a test derives from the
+ * SAME SOURCE the product line used, and a server line is spelled by `cliSpelling()` in
+ * `packages/snowarch/src/cli/tty.ts`. Reading it from the server's `dist/` is the one direction the
+ * package boundary allows, and it means the day the two definitions disagree this file follows the
+ * one that is actually printing.
+ */
+const SERVER_CLI = esc(cliSpelling());
 
 for (const entry of ENTRIES) {
 
@@ -122,7 +134,10 @@ for (const entry of ENTRIES) {
       const r = run(entry, ['store', 'migrate', '--yes'], { SNOW_STORE: store });
       assert.equal(r.status, 1, r.text);
       assert.match(r.text, /STORE_UNREADABLE/);
-      assert.match(r.text, /\.\/snowarch store backups/);
+      // ARC-07-C31 slice 3 — the SERVER's `parseStore` sentence, which derives now. A POSIX literal
+      // here was green on a mac and red on two Windows cells: `…restore a backup
+      // (.\snowarch.cmd store backups)`. Escaped, because the spelling contains `.` and `\`.
+      assert.match(r.text, new RegExp(`${SERVER_CLI} store backups`));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 

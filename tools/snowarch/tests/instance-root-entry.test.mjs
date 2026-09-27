@@ -20,6 +20,18 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { CLI_PATH, preconditions, USAGE } from '../lib/instance.mjs';
 import { NO_INSTANCE_MESSAGE } from '../../../packages/snowarch/dist/no-instance.js';
+import { cliSpelling } from '../../../packages/snowarch/dist/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — `SERVER_CLI`, named for the package that PRINTS the line.
+ *
+ * This is an engine test asserting a sentence the SERVER renders, and it reads both the sentence and
+ * the spelling from the server's `dist/` — the one direction the package boundary allows. Deriving it
+ * from the engine's `spellings()` would be a second answer to "which shell is this", which is the
+ * mistake the naming rule exists to make visible: the source of a printed line is invisible at the
+ * assertion, and a comment claiming it can be wrong.
+ */
+const SERVER_CLI = cliSpelling();
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -108,7 +120,7 @@ for (const entry of ENTRIES) {
       assert.equal(plain.status, 0, plain.text);
       // ARC-08-C7 — the empty-store line is the ONE remedy now, asserted from its definition so
       // this test cannot become another copy of it.
-      assert.ok(plain.text.includes(NO_INSTANCE_MESSAGE), plain.text);
+      assert.ok(plain.text.includes(NO_INSTANCE_MESSAGE(SERVER_CLI)), plain.text);
 
       const json = run(entry, ['instance', 'list', '--all', '--json'], { SNOW_STORE: store });
       assert.equal(json.status, 0, json.text);

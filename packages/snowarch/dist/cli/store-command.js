@@ -14,7 +14,7 @@
  * one into `process.exit`, so the whole surface is testable twice in one process.
  */
 import { statSync } from 'node:fs';
-import { cliSpelling, promptLine } from './tty.js';
+import { cliSpelling, needCli, promptLine } from './tty.js';
 import { EXIT_OK, EXIT_FAILED, EXIT_USAGE } from './instance.js';
 import { maskPath, resolveStorePath } from '../store/paths.js';
 import { STORE_SUB_COMMANDS, storeSubCommandLines, storeSubCommandList } from './help-tables.js';
@@ -43,10 +43,17 @@ export function storeHelp() {
     ].join('\n');
 }
 /** Where the store is, or the reason there is nothing to act on. */
-function storePath(io) {
+/**
+ * ARC-07-C31 slice 3 — `cli` REQUIRED: three callers (lines 90, 141 and 163 below), so the narrow
+ * rule this row settled applies — a default only where there is literally one caller and the comment
+ * names it. `cliSpelling()` comes from `cli/tty.ts`, the SERVER's own definition: the server never
+ * imports the engine, so the two share the semantics and not the code.
+ */
+function storePath(io, cli) {
+    needCli(cli, 'storePath');
     const res = resolveStorePath();
     if (res.path === null) {
-        io.error('store: no store found — run ./snowarch instance add <label> first\n');
+        io.error(`store: no store found — run ${cli} instance add <label> first\n`);
         return null;
     }
     return res.path;
@@ -65,14 +72,17 @@ async function confirm(io, question) {
  * a real pending migration; production passes nothing and gets `MIGRATIONS`.
  */
 export async function runStoreMigrate(argv, io = defaultStoreIo(), chain = {}) {
+    // ARC-07-C31 slice 3 — resolved ONCE for this command and threaded into both `migrateStore` calls,
+    // so the plan and the applied run cannot render two different shells in one invocation.
+    const cli = cliSpelling();
     const dryRun = argv.includes('--dry-run');
     const yes = argv.includes('--yes');
-    const path = storePath(io);
+    const path = storePath(io, cliSpelling());
     if (path === null)
         return EXIT_FAILED;
     let plan;
     try {
-        plan = migrateStore(path, { ...chain, dryRun: true });
+        plan = migrateStore(path, { ...chain, dryRun: true, cli });
     }
     catch (e) {
         // Every refusal this can produce is a NAMED code with a remedy of its own, and printing the
@@ -103,7 +113,7 @@ export async function runStoreMigrate(argv, io = defaultStoreIo(), chain = {}) {
         return EXIT_OK;
     }
     try {
-        const result = migrateStore(path, chain);
+        const result = migrateStore(path, { ...chain, cli });
         io.write(`store: migrated schema v${result.from} → v${result.to}`
             + `${result.backup ? ` (backup ${maskPath(result.backup)})` : ''}\n`);
         return EXIT_OK;
@@ -115,7 +125,7 @@ export async function runStoreMigrate(argv, io = defaultStoreIo(), chain = {}) {
     }
 }
 export function runStoreBackups(io = defaultStoreIo()) {
-    const path = storePath(io);
+    const path = storePath(io, cliSpelling());
     if (path === null)
         return EXIT_FAILED;
     const backups = listBackups(path);
@@ -130,13 +140,19 @@ export function runStoreBackups(io = defaultStoreIo()) {
         + 'never pruned automatically; delete the ones you no longer want\n');
     return EXIT_OK;
 }
+/**
+ * ARC-07-C31 slice 3 — the spelling is resolved ONCE at the top of this command and threaded, the
+ * shape `runDocs` uses in the engine: a command is the boundary where reading the process is right,
+ * and resolving it once means three lines below cannot render three different shells in one run.
+ */
 export async function runStoreRestore(argv, io = defaultStoreIo()) {
+    const cli = cliSpelling();
     const file = argv.find((a) => !a.startsWith('--'));
     if (!file) {
-        io.error('store restore: name a backup file (./snowarch store backups lists them)\n');
+        io.error(`store restore: name a backup file (${cli} store backups lists them)\n`);
         return EXIT_USAGE;
     }
-    const path = storePath(io);
+    const path = storePath(io, cliSpelling());
     if (path === null)
         return EXIT_FAILED;
     let size = 0;
@@ -160,7 +176,7 @@ export async function runStoreRestore(argv, io = defaultStoreIo()) {
         // so the next step is named rather than left to be discovered on the next server start.
         if (version !== CURRENT_SCHEMA_VERSION) {
             io.write(`store: schema v${version} is not this build's v${CURRENT_SCHEMA_VERSION} — `
-                + 'run ./snowarch store migrate\n');
+                + `run ${cli} store migrate\n`);
         }
         return EXIT_OK;
     }

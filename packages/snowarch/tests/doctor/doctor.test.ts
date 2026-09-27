@@ -10,6 +10,17 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHECK_IDS } from '../../src/doctor/types.js';
 import { pollutingAncestors } from '../../src/doctor/checks.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * These assertions are in the SERVER's own suite, against sentences slice 3 made derive, and this is
+ * the THIRD test tree — the one my sweep of `tests/` and `tools/snowarch/tests/` did not look at, and
+ * the one C35's audit did not either. Seventeen POSIX literals here were green on a mac and red on
+ * every Windows cell.
+ */
+const SERVER_CLI = cliSpelling();
 
 /**
  * The doctor as a user runs it: the built CLI, in a child process, against a fixture store.
@@ -138,7 +149,7 @@ describe('SV-09 — the store schema (ARC-09-S06)', () => {
     expect(sv09.detail).toMatch(/store schema v0 < server v\d+/);
     // The command is what `--fix` reports under REFUSED, and `fixable: false` is what keeps the
     // whitelist away from the credential file. Both, because either alone would let the other move.
-    expect(sv09.command).toBe('./snowarch store migrate');
+    expect(sv09.command).toBe(`${SERVER_CLI} store migrate`);
     expect(sv09.fixable).toBe(false);
   }, 120_000);
 
@@ -151,7 +162,7 @@ describe('SV-09 — the store schema (ARC-09-S06)', () => {
     const sv09 = check(r, 'SV-09') as { status: string; detail: string; command?: string };
     expect(sv09.status).toBe('fail');
     expect(sv09.detail).toMatch(/> server v\d+/);
-    expect(sv09.command).toBe('./snowarch upgrade');
+    expect(sv09.command).toBe(`${SERVER_CLI} upgrade`);
   }, 120_000);
 
   it('no store means nothing to check — a skip, not a failure', async () => {

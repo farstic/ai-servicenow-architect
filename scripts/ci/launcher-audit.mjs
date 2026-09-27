@@ -84,7 +84,7 @@ const sentence = (line) => line
   .replace(new RegExp(LAUNCHER.source, 'g'), MARK)
   .replace(/\$\{[^}]*\}/g, MARK)
   .replace(/\\([.\/\\()[\]{}^$*+?|-])/g, '$1')
-  .replace(/new RegExp\(|assert\.\w+\(/g, ' ')
+  .replace(/new RegExp\(|assert\.\w+\(|expect\(|\.(toContain|toBe|toMatch|toEqual|not)\(/g, ' ')
   // THE ASSERTION'S FIRST ARGUMENT IS AN EXPRESSION, NOT PROSE, and leaving it in was why nothing
   // resolved. `assert.equal(r.text, 'corpus missing — run …')` normalised to `r.text, corpus missing …`,
   // and no product line can carry `r.text,`. Stripping a leading identifier chain followed by a comma
@@ -107,7 +107,12 @@ const keyOf = (text) => text.split(MARK)
   .sort((a, b) => b.length - a.length)[0] ?? null;
 
 const PRODUCT_PATHS = ['tools/snowarch/lib', 'tools/snowarch/bin', 'packages/snowarch/src', 'scripts'];
-const TEST_PATHS = ['tests', 'tools/snowarch/tests'];
+// THREE TEST TREES, and the third was found by three red Windows cells rather than by this file.
+// ARC-07-C31 slice 3 made the SERVER's sentences derive, and seventeen expectations in
+// `packages/snowarch/tests` still held the POSIX spelling — a tree neither my hand sweep nor this
+// audit's original scope looked at. The lesson is the audit's own: a scope I choose is not a scope
+// that is complete, so the list is the trees that EXIST rather than the ones I remembered.
+const TEST_PATHS = ['tests', 'tools/snowarch/tests', 'packages/snowarch/tests'];
 
 /**
  * THE UNRESOLVED BASELINE — ARC-07-C35, measured 2026-09-27, target for C35b.
@@ -123,6 +128,16 @@ const TEST_PATHS = ['tests', 'tools/snowarch/tests'];
  * change to those fixtures fails here and gets looked at, which is what should happen.
  */
 const UNRESOLVED_BASELINE = Object.freeze(new Map([
+  ['packages/snowarch/tests/cli/import-legacy.test.ts', 2],
+  ['packages/snowarch/tests/cli/store-command.test.ts', 2],
+  ['packages/snowarch/tests/cli/tty.test.ts', 1],
+  ['packages/snowarch/tests/doctor/doctor.test.ts', 2],
+  ['packages/snowarch/tests/server/store-schema.test.ts', 3],
+  ['packages/snowarch/tests/servicenow/prod-ack.test.ts', 1],
+  ['packages/snowarch/tests/store/migrations.test.ts', 1],
+  ['packages/snowarch/tests/store/schema.test.ts', 2],
+  ['packages/snowarch/tests/tools/gate-split.test.ts', 1],
+  ['packages/snowarch/tests/tools/permissions.test.ts', 2],
   ['tests/cli-help.test.mjs', 1],
   ['tests/doctor/bootstrap-finished.test.mjs', 2],
   ['tests/doctor/engine-docs.test.mjs', 3],
@@ -155,7 +170,11 @@ export const productSources = (paths = PRODUCT_PATHS) => ls(...paths)
   .map((file) => ({ file, text: read(file) }));
 
 export const testSources = (paths = TEST_PATHS) => ls(...paths)
-  .filter((f) => /\.test\.mjs$/.test(f))
+  // `.ts` AS WELL AS `.mjs`, and this was the THIRD layer of the same fake widening: I added the
+  // server's test path, then taught the detector to see `expect(` as well as `assert`, and the file
+  // filter still said `.test.mjs` — so the audit reported success over a tree it was not reading. Each
+  // layer looked like the fix and the measurement is what said otherwise.
+  .filter((f) => /\.test\.(mjs|ts)$/.test(f))
   .map((file) => ({ file, text: read(file) }));
 
 /**
@@ -201,7 +220,11 @@ export function audit({ tests = testSources(), product: productFiles = productSo
     });
 
     src.split('\n').forEach((line, i) => {
-      if (!/assert/.test(line)) return;
+      // `assert` OR `expect`: the engine's suites use `node:assert`, the server's use vitest. Adding
+      // `packages/snowarch/tests` to the paths without this matched almost nothing there — 1 target
+      // in 18 literals — which would have been a widening in name only, and the baseline would have
+      // recorded the blindness as success.
+      if (!/\bassert\b|\bexpect\s*\(/.test(line)) return;
       const literal = hasLauncher(line);
       const named = [...kinds.keys()].find((k) => new RegExp(`\\$\\{[^}]*\\b${k}\\b`).test(line));
       if (!literal && !named) return;

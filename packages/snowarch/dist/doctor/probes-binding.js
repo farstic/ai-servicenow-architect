@@ -14,6 +14,7 @@
 import { probeClientFor, probeOptionsFor } from '../servicenow/probe-client.js';
 import { probeAll } from '../servicenow/probes.js';
 import { storeEntry } from './store-entry.js';
+import { cliSpelling } from '../cli/tty.js';
 /** `auth ok · write ok · scripting role missing (…)` — one line, statuses only. */
 export function describeProbes(result) {
     const parts = [`auth ${result.auth.status}`];
@@ -56,7 +57,9 @@ export function makeProbes(deps = {}) {
                 return {
                     status: 'skip',
                     detail: `no store entry for "${label}" — nothing to probe`,
-                    remedy: 'add one with ./snowarch instance add',
+                    // ARC-07-C31 slice 3 — `cliSpelling()`, not a ctx: `CheckContext` carries no platform
+                    // (measured — five fields, none of them one). ARC-07-C38 threads one.
+                    remedy: `add one with ${cliSpelling()} instance add`,
                 };
             }
             const client = makeClient({ url: entry.url, auth: entry.auth });
