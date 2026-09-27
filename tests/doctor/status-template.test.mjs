@@ -13,6 +13,7 @@ import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
 import { SCHEMA_KEYS, validateReport } from '../../tools/snowarch/lib/doctor/report-json.mjs';
 import { renderPanel } from '../../tools/snowarch/lib/doctor/panel.mjs';
+import { summaryLine } from '../../tools/snowarch/lib/doctor/report-text.mjs';
 import { statusCommand } from '../../tools/snowarch/lib/commands/status.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
 
@@ -246,4 +247,42 @@ test('a report the CURRENT product produces is valid, key for key', async () => 
     const top = key.split('.')[0];
     assert.ok(top in fresh, `${key} is not in a report the current product produces`);
   }
+});
+
+/**
+ * ARC-07-C40 — the relay template names the ids the line carries.
+ *
+ * ARC-07-W15 put the check ids on the summary line, and the skill's `## doctor` section still told a session
+ * to relay `DOCTOR: n ok, n warn, n fail` — a shape the product stopped printing. A template that omits a
+ * field is a session that drops it, and then the reader is sent to run the doctor again to learn something
+ * the first line already said.
+ *
+ * THE IDS COME FROM THE LINE, never from a literal here: pinning `E-23` would measure today's fixture rather
+ * than the rule that the template agrees with the renderer.
+ */
+test('ARC-07-C40 — the doctor section relays the ids, and the renderer puts them there', () => {
+  const checks = [{ id: 'E-01', status: 'ok' }, { id: 'E-23', status: 'warn' }, { id: 'E-11', status: 'fail' }];
+  const summary = { ok: 13, warn: 1, fail: 1, skip: 0, notInQuick: 0, notInSection: 0, fixable: 0 };
+  const line = summaryLine(summary, checks, { quick: false, cli: './snowarch' });
+
+  // The renderer's own output is the source of the shape this template must describe.
+  const warned = checks.find((c) => c.status === 'warn').id;
+  const failed = checks.find((c) => c.status === 'fail').id;
+  assert.ok(line.includes(`(${warned})`) && line.includes(`(${failed})`),
+    `the summary line no longer names its ids, so this case is asserting a shape the product dropped: ${line}`);
+
+  const doctorSection = (() => {
+    const text = read(SKILL);
+    const start = text.indexOf('\n## doctor\n');
+    assert.ok(start > 0, 'the skill has no ## doctor section');
+    const next = text.indexOf('\n## ', start + 5);
+    return text.slice(start, next === -1 ? undefined : next);
+  })();
+
+  assert.match(doctorSection, /n warn \(ids\), n fail \(ids\)/,
+    'the relay template still omits the ids the line carries');
+  assert.match(doctorSection, /--section/,
+    'the follow-up does not name a section, so it sends the reader on a full run for one remedy');
+  assert.doesNotMatch(doctorSection, /does not say what it is|doesn't say what it is/,
+    'the prose still tells the reader the line does not name the check — W15 made that false');
 });
