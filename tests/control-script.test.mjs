@@ -32,7 +32,10 @@ function repo(t, { content = 'export const answer = 42;\n' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'control-script-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
-  git('init', '-q');
+  // `-b main` because `init.defaultBranch` is a MACHINE setting (ARC-09-C14): a fixture whose branch
+  // name comes from the operator's git config is a fixture that behaves differently per machine, and
+  // `precondition-asserts.test.mjs` scans for exactly this. It caught my first version.
+  git('init', '-q', '-b', 'main');
   git('config', 'user.email', 'test@example.invalid');
   git('config', 'user.name', 'test');
   git('config', 'commit.gpgsign', 'false');
