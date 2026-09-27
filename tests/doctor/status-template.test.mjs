@@ -231,6 +231,11 @@ test('a report the CURRENT product produces is valid, key for key', async () => 
     out: { write: (t) => out.push(t) },
     cwd: REAL_ROOT,
     flags: { json: true },
+    // ARC-07-C33 — REAL_ROOT is the point of this case (it proves what the doctor produces NOW, not
+    // what a fixture captured a fortnight ago), so the cwd cannot move to a temp root without
+    // changing what is being asserted. What CAN go is the write: this case does not care about
+    // caching, and leaving two files in the repository root let it change the next test's answer.
+    writeCache: false,
   });
   const fresh = JSON.parse(out.join(''));
   assert.deepEqual(validateReport(fresh), [], 'the doctor no longer produces a valid report');

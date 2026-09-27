@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -197,16 +197,51 @@ test('the plan leaves no temp directory behind', { timeout: 120_000 }, (t) => {
   recordCurrent(root, ctx);
   const state = JSON.parse(readFileSync(join(root, '.local', 'bootstrap-state.json'), 'utf8'));
 
-  const before = readdirSync(tmpdir()).filter((n) => n.startsWith('snowarch-plan-')).length;
+  // ARC-07-C36 — A PRIVATE TEMP ROOT, because counting the SHARED one measured the neighbours.
+  //
+  // This read `readdirSync(tmpdir())` before and after and compared the counts. That is not a property
+  // of the plan: it is a property of the plan AND everything else touching `os.tmpdir()` while the case
+  // runs. The five `tests/upgrade` files run at `--test-concurrency=2`, so it was unreliable in BOTH
+  // directions — a neighbour creating a plan directory between the readings failed a correct product,
+  // and one removing a leaked directory could make the difference zero and mask a real leak. Observed
+  // rather than argued: it went red inside `node --test tests/**/*.test.mjs` (whose glob picks up
+  // `tests/upgrade/` at DEFAULT concurrency, so more neighbours than CI gives it) and passed 3 of 3
+  // when this file ran alone.
+  //
+  // With TMPDIR pointed at a directory this case made, everything inside it IS what this case created,
+  // so "count only mine" and "the root is empty" are the same assertion — and no neighbour can reach it.
+  // TEMP and TMP as well as TMPDIR: `os.tmpdir()` reads TMPDIR on POSIX and TEMP/TMP on Windows, and the
+  // Windows e2e cell runs this file too.
+  const privateTmp = mkdtempSync(join(tmpdir(), 'c36-plan-root-'));
+  const saved = { TMPDIR: process.env.TMPDIR, TEMP: process.env.TEMP, TMP: process.env.TMP };
+  t.after(() => {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    rmSync(privateTmp, { recursive: true, force: true });
+  });
+  process.env.TMPDIR = privateTmp;
+  process.env.TEMP = privateTmp;
+  process.env.TMP = privateTmp;
+
   for (let i = 0; i < 3; i += 1) {
     planSteps(root, 'v9.9.9-target', { ctx, state, run: spawnSync });
   }
   // …and the failing path too, which returns early and must clean up on the way out.
   rerunAtTag(root, 'v0.0.0-no-such-tag', { ctx, state });
-  const after = readdirSync(tmpdir()).filter((n) => n.startsWith('snowarch-plan-')).length;
 
-  assert.equal(after, before,
-    `${after - before} snowarch-plan-* director(ies) left in ${tmpdir()} after four plans`);
+  const mine = readdirSync(privateTmp).filter((n) => n.startsWith('snowarch-plan-'));
+  assert.deepEqual(mine, [],
+    `${mine.length} snowarch-plan-* director(ies) left in this case's own temp root after four plans: `
+    + `${mine.join(', ')}`);
+
+  // ...AND THE ROOT IS REACHED AT ALL, which is the floor this needs. If `os.tmpdir()` ignored the
+  // environment — a different Node line, or a platform reading something else — every plan would go to
+  // the real TMPDIR, `mine` would be empty for the wrong reason, and the assertion above would pass
+  // over a leak it never looked at.
+  assert.equal(tmpdir(), privateTmp,
+    'os.tmpdir() did not follow the environment, so the assertion above counted an empty directory');
 
   // The worktree register is clean too: a removed directory with a registered worktree still
   // shows in `git worktree list` and makes the next `add` at that path fail.

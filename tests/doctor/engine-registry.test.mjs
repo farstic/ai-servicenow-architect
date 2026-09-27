@@ -128,8 +128,22 @@ test('nothing in the legacy or host sections offers itself to --fix', () => {
  * `--json` is what S09 reads, so the shape is asserted from the CLI rather than from the library:
  * a report that is right in memory and wrong on stdout is wrong.
  */
+/**
+ * ARC-07-C33 — `--no-cache` IN THE HELPER, exactly ONCE, and never at a call site too.
+ *
+ * Two of the four calls below already passed it and two did not, so the run left
+ * `.local/doctor-last.json` and `.local/doctor-last.inputs.json` in the repository root. Putting it
+ * here fixes both and stops the next call reintroducing the leak — a flag every caller must remember
+ * is a flag somebody will forget. `cwd` stays REAL_ROOT because this case is about the real registry.
+ *
+ * AND EXACTLY ONCE MATTERS, which I found by passing it twice. `parseArgs` collects a repeated flag
+ * into an ARRAY, and `doctorCommand` asks `flags['no-cache'] === true` — so `--no-cache --no-cache`
+ * silently WRITES the cache. My first version added it in the helper while two call sites still
+ * passed their own, and the leak survived a fix that looked correct. The general defect — five
+ * `flags[...] === true` checks that a repeated flag turns off — is ARC-07-C42.
+ */
 const cli = (args) => spawnSync(process.execPath,
-  [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', ...args],
+  [join(REAL_ROOT, 'tools/snowarch/bin/snowarch.mjs'), 'doctor', '--no-cache', ...args],
   { cwd: REAL_ROOT, encoding: 'utf8' });
 
 test('--json reports every id with a status each', () => {
@@ -161,7 +175,7 @@ test('--section nonsense is a usage error, not a report', () => {
  * runner that stopped honouring them.
  */
 test('--quick membership is the same set in the registry and in a real run', () => {
-  const r = cli(['--json', '--quick', '--no-cache']);
+  const r = cli(['--json', '--quick']);
   const report = JSON.parse(r.stdout);
   const ran = report.checks.filter((c) => c.detail !== 'not in the --quick subset').map((c) => c.id);
   const { selected } = planRun(checks, { quick: true });
@@ -196,7 +210,7 @@ test('--quick membership is the same set in the registry and in a real run', () 
 });
 
 test('a quick run says so in the report a consumer reads', () => {
-  const report = JSON.parse(cli(['--json', '--quick', '--no-cache']).stdout);
+  const report = JSON.parse(cli(['--json', '--quick']).stdout);
   assert.equal(report.options.quick, true);
   assert.equal(report.options.noNetwork, true, '--quick must imply --no-network');
   assert.match(report.modeLine, /^Mode: /);
