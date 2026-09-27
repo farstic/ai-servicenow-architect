@@ -49,6 +49,7 @@ export function makeProbes(deps = {}) {
     const probe = deps.probe ?? probeAll;
     const makeClient = deps.makeClient ?? probeClientFor;
     const env = deps.env ?? process.env;
+    const platform = deps.platform ?? process.platform;
     const readEntry = deps.readEntry ?? storeEntry;
     return {
         async runAll(label) {
@@ -57,9 +58,9 @@ export function makeProbes(deps = {}) {
                 return {
                     status: 'skip',
                     detail: `no store entry for "${label}" — nothing to probe`,
-                    // ARC-07-C31 slice 3 — `cliSpelling()`, not a ctx: `CheckContext` carries no platform
-                    // (measured — five fields, none of them one). ARC-07-C38 threads one.
-                    remedy: `add one with ${cliSpelling()} instance add`,
+                    // ARC-07-C38 — from the shell the doctor was told about, threaded in when the probes were
+                    // bound. The comment this replaces said `CheckContext` carries no platform; now it does.
+                    remedy: `add one with ${cliSpelling(platform, env)} instance add`,
                 };
             }
             const client = makeClient({ url: entry.url, auth: entry.auth });

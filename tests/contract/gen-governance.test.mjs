@@ -5,6 +5,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { fillLauncher } from '../../packages/contract/lib/contract.mjs';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
 import { APPROVAL_PER_RECORD, APPROVAL_WITH_CAPTURE, PREFLIGHT_STOP, PREFLIGHT_UNKNOWN_GATE }
   from '../../packages/contract/gen/rule-file.mjs';
@@ -315,8 +317,14 @@ test("ARC-05-S06 criterion 3 — one remedy string, three documents", () => {
   const contract = realContract();
   const auth = contract.errorCodes.find((e) => e.code === 'AUTHENTICATION_FAILED');
   assert.ok(auth?.remedy, 'AUTHENTICATION_FAILED left the registry');
+  // ARC-07-C32 — IN THE PAGE'S RENDERING. The registry holds `<cli>` now and every committed page fills
+  // it with the pinned POSIX spelling, so "the exact bytes" means the registry's value AFTER that fill.
+  // Comparing to the raw value would assert that these pages do NOT substitute, which is the opposite of
+  // the property — and would be satisfied only by shipping a placeholder to a reader.
+  const onPage = (t) => fillLauncher(t, spellings({ platform: 'linux', env: {} }));
   for (const f of [RULE, 'docs/TROUBLESHOOTING.md', 'governance/mcp-protocols.md']) {
-    assert.ok(readFileSync(join(root, f), 'utf8').includes(auth.remedy), `${f} paraphrases the remedy`);
+    assert.ok(readFileSync(join(root, f), 'utf8').includes(onPage(auth.remedy)),
+      `${f} paraphrases the remedy`);
   }
   console.log(`    one remedy string in three documents: ${JSON.stringify(auth.remedy).slice(0, 56)}…`);
 });

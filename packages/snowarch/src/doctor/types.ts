@@ -50,6 +50,23 @@ export interface CheckResult {
 export interface CheckContext {
   /** `--no-network` was passed, or the runner is otherwise offline. */
   noNetwork: boolean;
+  /**
+   * The shell the remedies are being spelled FOR — ARC-07-C38.
+   *
+   * Before this, every launcher a server check printed came from `cliSpelling()` reading the process,
+   * so no case could drive the other platform: the server's own doctor tests read `process.platform`
+   * and SKIPPED rather than driving one, and ARC-07-C31 slice 3 had to record ten remedies as held by
+   * the source sweep and the three Windows cells alone. The engine's ctx has carried a platform since
+   * ARC-07-W17; this is the same move, arriving late because a sweep does not change a contract.
+   *
+   * BOTH, and `env` is not symmetry: `windowsShell` is
+   * `platform === 'win32' && !env.SHELL && !env.MSYSTEM`, so a ctx carrying only a platform renders
+   * POSIX on any machine whose SHELL is set — the fixture trap that cost this programme three
+   * sittings. The RUNNER fills them from the process, which is the one place that legitimately reads
+   * it.
+   */
+  platform: NodeJS.Platform;
+  env: NodeJS.ProcessEnv;
   /** The directory to walk up from for SV-08. Injected so tests need no real checkout. */
   cwd: string;
   probes: Probes;
@@ -119,18 +136,26 @@ export interface Probes {
  * doctor RENDERS. This stub stays as the unconfigured answer rather than being deleted: "there is
  * no instance to probe" is a real state, and `skip` is its honest report.
  */
-export const stubProbes: Probes = {
+/**
+ * ARC-07-C38 — A FACTORY, because a `const` cannot read a ctx.
+ *
+ * It was an object whose remedy called `cliSpelling()`, which is the shape that made the stub render
+ * one shell while the ctx said another. The doctor builds it with the shell it was given.
+ */
+export const stubProbesFor = ({ platform, env }:
+  { platform: NodeJS.Platform; env: NodeJS.ProcessEnv }): Probes => ({
   async runAll() {
     return {
       status: 'skip',
       detail: 'no instance configured, so there is nothing to probe',
-      // ARC-07-C31 slice 3 — the STUB's remedy, and it derives for the same reason the real one does:
-      // a stub that rendered a different shell from the thing it stands in for would make a test pass
-      // against a sentence the product never prints.
-      remedy: `add one with ${cliSpelling()} instance add, then run ${cliSpelling()} instance test`,
+      // ARC-07-C38 — from the shell the doctor was TOLD about. A stub that rendered a different shell
+      // from the thing it stands in for would let a case pass against a sentence the product never
+      // prints, which is the whole reason the stub exists rather than being deleted.
+      remedy: `add one with ${cliSpelling(platform, env)} instance add, `
+        + `then run ${cliSpelling(platform, env)} instance test`,
     };
   },
-};
+});
 
 export interface DoctorReport {
   product: 'snowarch';

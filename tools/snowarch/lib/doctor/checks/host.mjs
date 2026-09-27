@@ -148,7 +148,9 @@ export function hostChecks() {
         // section cannot give different advice about one failure.
         const code = ctx.networkCode ?? null;
         if (code) {
-          const entry = ctx.contract ? remedyFor(ctx.contract, code) : null;
+          // ARC-07-C32 — the ctx's shell, so a contract remedy quoted here spells what this reader
+          // can type. `spellFor` carries both platform and env.
+          const entry = ctx.contract ? remedyFor(ctx.contract, code, spellFor(ctx)) : null;
           problems.push(`the live probe reported ${code}${entry ? ` — ${entry.remedy}` : ''}`);
           data.networkCode = code;
         }

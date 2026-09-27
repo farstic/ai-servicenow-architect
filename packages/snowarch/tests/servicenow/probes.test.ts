@@ -338,8 +338,10 @@ describe('criterion 7 — the doctor can bind this without the CLI', () => {
   it('probeAll has the shape ARC-04-S12\'s Probes interface asks for', async () => {
     // A type-level binding, exercised: `runAll` returns a status the doctor renders. If the
     // signature drifts, this stops compiling — which is the point of writing it as a value.
-    const { stubProbes } = await import('../../src/doctor/types.js');
-    expect(typeof stubProbes.runAll).toBe('function');
+    const { stubProbesFor } = await import('../../src/doctor/types.js');
+    // ARC-07-C38 — a FACTORY now, because a const could not read the ctx's shell. The binding this
+    // case exercises is unchanged: `runAll` still returns a status the doctor renders.
+    expect(typeof stubProbesFor({ platform: 'linux', env: {} }).runAll).toBe('function');
     const bound = {
       async runAll(): Promise<{ status: 'ok'; detail: string }> {
         const rest = fakeRest({ sys_user: { status: 200 } });

@@ -12,6 +12,18 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { applyContractRemedy } from '../../tools/snowarch/lib/doctor/runner.mjs';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+import { fillLauncher } from '../../packages/contract/lib/contract.mjs';
+
+/**
+ * ARC-07-C32 — the PAGE's rendering, which is what these cases must compare in.
+ *
+ * The registry holds `<cli>` now and every committed page fills it with the pinned POSIX spelling,
+ * so "character for character" means the contract's value AFTER that fill. Comparing a page to the
+ * raw registry would assert that the page does NOT substitute — the opposite of the property.
+ */
+const PAGE_SPELL = spellings({ platform: 'linux', env: {} });
+const onPage = (t) => fillLauncher(t, PAGE_SPELL);
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const RULE = '.claude/rules/00-mode-and-mcp-gate.md';
@@ -65,8 +77,10 @@ test('criterion 1 — every rendered remedy is the contract\'s, character for ch
     const code = /^- `([^`]+)`/.exec(l)[1];
     if (code === '*_NOT_ENABLED') continue;
     const e = byCode.get(code);
-    assert.ok(l.includes(e.remedy), `${code}: the rule file paraphrases the registry`);
-    if (e.command) assert.ok(l.includes(`\`${e.command}\``), `${code}: the command is not rendered as code`);
+    assert.ok(l.includes(onPage(e.remedy)), `${code}: the rule file paraphrases the registry`);
+    if (e.command) {
+      assert.ok(l.includes(`\`${onPage(e.command)}\``), `${code}: the command is not rendered as code`);
+    }
   }
 });
 
@@ -106,17 +120,22 @@ test('criterion 2 — the AUTHENTICATION_FAILED remedy is one string in four pla
   assert.ok(auth?.remedy && auth.meaning, 'AUTHENTICATION_FAILED left the registry');
 
   for (const f of [RULE, 'docs/TROUBLESHOOTING.md', 'governance/mcp-protocols.md']) {
-    assert.ok(read(f).includes(auth.remedy), `${f} paraphrases the remedy`);
+    assert.ok(read(f).includes(onPage(auth.remedy)), `${f} paraphrases the remedy`);
   }
   // The meaning travels with it in the two prose documents; the rule file renders the instruction
   // only, because a session needs to know what to DO and the file is always loaded.
   for (const f of ['docs/TROUBLESHOOTING.md', 'governance/mcp-protocols.md']) {
-    assert.ok(read(f).includes(auth.meaning), `${f} paraphrases the meaning`);
+    assert.ok(read(f).includes(onPage(auth.meaning)), `${f} paraphrases the meaning`);
   }
   // The doctor: SV-04 returns the CODE and the runner fills the remedy from the contract, which is
   // the mechanism that makes the fourth place identical rather than similar.
-  const filled = applyContractRemedy({ id: 'SV-04', code: 'AUTHENTICATION_FAILED' }, c);
-  assert.equal(filled.remedy, auth.remedy);
+  // ARC-07-C32 — the contract's remedy now carries `<cli>`, so the fourth place is identical to the
+  // contract's value AFTER substitution. Both sides fill from the same spelling: comparing a filled
+  // string to a raw one would assert that substitution does not happen, which is the opposite of the
+  // property this case is for.
+  const spell = spellings();
+  const filled = applyContractRemedy({ id: 'SV-04', code: 'AUTHENTICATION_FAILED' }, c, spell);
+  assert.equal(filled.remedy, fillLauncher(auth.remedy, spell));
 });
 
 test('criterion 2 — the wizard states the code and never a second remedy', () => {

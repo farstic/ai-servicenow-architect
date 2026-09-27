@@ -113,7 +113,39 @@ export const alsoRequires = (c, name) => c.tools.find((t) => t.name === name)?.a
 export const errorCodes = (c) => c.errorCodes;
 
 /** The registry entry for a code — meaning, remedy, and a command when one exists. */
-export const remedyFor = (c, code) => c.errorCodes.find((e) => e.code === code);
+/**
+ * The launcher placeholders `codes.ts` carries, filled in for one reader — ARC-07-C32.
+ *
+ * `codes.ts` is read by three audiences and cannot hold a literal for all of them: the generated rules
+ * page is COMMITTED and must be one spelling on every machine, while the server and the engine's doctor
+ * print to whoever is reading. So the table holds `<cli>` and `<bootstrap>` and every reader fills them
+ * in — the generators with a PINNED POSIX spelling, the runtime with the shell in front of it.
+ *
+ * `spell` IS REQUIRED. ARC-07-W17's first attempt at this defaulted, and the engine's reader substituted
+ * nothing, so `{cli}` reached users verbatim; that is why C32 became a row rather than a fix. A missing
+ * spelling now throws instead of printing a placeholder to somebody.
+ */
+export function fillLauncher(text, spell) {
+  if (typeof text !== 'string') return text;
+  if (!spell || typeof spell.cli !== 'string' || typeof spell.bootstrap !== 'string') {
+    throw new TypeError('fillLauncher needs a spellings object — a placeholder printed verbatim is '
+      + 'the defect ARC-07-C32 exists to close, so there is no default here');
+  }
+  return text.replaceAll('<cli>', spell.cli).replaceAll('<bootstrap>', spell.bootstrap);
+}
+
+/**
+ * One error-code entry, with its launchers filled in for the reader asking — ARC-07-C32.
+ *
+ * `spell` is required for the same reason `fillLauncher`'s is: the two engine callers are doctor paths
+ * that hold a ctx, and a default would let the process answer for a run that was told its platform.
+ */
+export const remedyFor = (c, code, spell) => {
+  const entry = c.errorCodes.find((e) => e.code === code);
+  if (!entry) return entry;
+  return { ...entry, remedy: fillLauncher(entry.remedy, spell),
+    ...(entry.command ? { command: fillLauncher(entry.command, spell) } : {}) };
+};
 
 /**
  * The tool-name prefix, from `engine.config.json`.

@@ -1,3 +1,14 @@
+import { spellings } from '../../../tools/snowarch/lib/text.mjs';
+import { fillLauncher } from '../lib/contract.mjs';
+
+/**
+ * ARC-07-C32 — this page is COMMITTED, so the launcher placeholders fill in as PINNED POSIX: its
+ * bytes must be identical on every runner or `gen:check` fails on the next machine. The rules page
+ * carries the one-line Windows note that tells a PowerShell reader what to substitute.
+ */
+const PAGE_SPELL = spellings({ platform: 'linux', env: {} });
+const fill = (t) => fillLauncher(t, PAGE_SPELL);
+
 /**
  * `docs/TROUBLESHOOTING.md` — one section per error code, from the registry.
  *
@@ -76,8 +87,8 @@ export function render(ctx) {
   const section = (e) => {
     const out = [`### ${e.code}`, ''];
     out.push(`**Meaning.** ${e.meaning}${e.httpStatus ? ` The instance returned HTTP ${e.httpStatus}.` : ''}`, '');
-    out.push(`**Remedy.** ${e.remedy}`);
-    if (e.command) out.push('', '```', e.command, '```');
+    out.push(`**Remedy.** ${fill(e.remedy)}`);
+    if (e.command) out.push('', '```', fill(e.command), '```');
     out.push('', `**Also reported by:** ${reportedBy(e)}`);
     return out.join('\n');
   };

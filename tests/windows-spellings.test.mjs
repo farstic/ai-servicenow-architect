@@ -130,23 +130,18 @@ const DEFINITIONS = Object.freeze([
 ]);
 
 /**
- * ...and one DATA file, exempt by the architect's ruling rather than by convenience.
+ * THE DATA EXEMPTION IS GONE — ARC-07-C32, and this comment is its record.
  *
- * `errors/codes.ts` is the source of `.claude/rules/00-mode-and-mcp-gate.md`, which is GENERATED AND
- * COMMITTED: it cannot know the reader's shell, so it must render one spelling on every machine or
- * `gen:check` fails on either a maintainer's mac or the Windows cell. The ruling (2026-09-27) is that
- * the page keeps the POSIX spelling and carries ONE line at the top telling a PowerShell reader what to
- * substitute — because doubling would spell every command twice on nineteen lines.
+ * `packages/snowarch/src/errors/codes.ts` was exempt because it sources a GENERATED, COMMITTED page
+ * that cannot know its reader's shell, so the table held POSIX literals and every runtime reader
+ * printed them to whoever was looking — a Windows user meeting `STORE_SCHEMA_NEWER` was told
+ * `run ./snowarch upgrade`. C32 gave the table `<cli>`/`<bootstrap>` placeholders and every reader a
+ * substitution point: the generators fill with a pinned POSIX spelling, the server and the engine's
+ * doctor fill with the shell in front of them. With no literal left there is no reason to exempt it,
+ * and `tests/contract/launcher-placeholder.test.mjs` is what stops the exemption coming back.
  *
- * WHAT THIS EXEMPTION DOES NOT COVER, said plainly so the next reader does not assume it does: the
- * RUNTIME half. When the server or the engine prints one of these remedies to a terminal it should
- * derive the spelling, and today it does not — both `remedyFor` implementations return the stored text.
- * I attempted it in this row with a `{cli}` placeholder and reverted: the engine reads remedies through
- * `packages/contract/lib/contract.mjs`, whose `remedyFor` does no substitution, so the placeholder would
- * have printed `{cli}` to users. It needs a second substitution point and a contract-sha bump, which is
- * ARC-07-C32, target 2.0.7 — a contract change does not enter a release in its last hours.
+ * The guard now has ONE exemption class: the two DEFINITIONS above.
  */
-const DATA_EXEMPT = Object.freeze(['packages/snowarch/src/errors/codes.ts']);
 
 /**
  * THE SWEEP REMAINDER IS GONE — ARC-07-C31, closed 2026-09-27, and this comment is its record.
@@ -154,7 +149,7 @@ const DATA_EXEMPT = Object.freeze(['packages/snowarch/src/errors/codes.ts']);
  * It was a frozen `Map` of 34 files and 163 sites, asserted EQUAL per file so it could only shrink.
  * Four slices took it to zero: the definition itself, the engine's non-trigger files, the server's
  * thirty, and the e2e-trigger files with the three scripts. There is no exemption left but the two
- * DEFINITIONS above and `codes.ts`, which is `DATA_EXEMPT` until ARC-07-C32 gives the contract a
+ * DEFINITIONS above — `codes.ts` left with ARC-07-C32, which gave the contract a
  * substitution point.
  *
  * WHY THE LIST IS WORTH REMEMBERING RATHER THAN JUST DELETING: it was asserted EQUAL and never
@@ -208,7 +203,7 @@ test('ARC-07-W17 — no shipped file spells the launcher except the two definiti
     { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
     .split('\n')
     .filter((f) => /\.(mjs|ts|js)$/.test(f) && !/\.test\./.test(f) && !/\.d\.ts$/.test(f))
-    .filter((f) => !DEFINITIONS.includes(f) && !DATA_EXEMPT.includes(f));
+    .filter((f) => !DEFINITIONS.includes(f));
 
   const offences = [];
   for (const rel of files) {

@@ -23,7 +23,6 @@ import { storeEntry } from './store-entry.js';
 import type { Check, CheckContext, CheckResult } from './types.js';
 import { cliSpelling } from '../cli/tty.js';
 
-const isWindows = process.platform === 'win32';
 
 /**
  * The flag names this check reasons ABOUT, taken from the contract's own list rather than typed.
@@ -110,13 +109,11 @@ export const svStore: Check = {
   title: 'store',
   severity: 'fail',
   network: false,
-  async run() {
-    // ARC-07-C31 slice 3 — `cliSpelling()` and NOT a ctx, because MEASURED: `CheckContext` carries
-    // `noNetwork`, `cwd`, `probes`, `fluent?` and `storeEntry?` — five fields, no platform and no
-    // env. So there is nothing to thread, and an assumed ctx would be the defect this row keeps
-    // finding. ARC-07-C38 gives the contract a platform; until then these remedies are held by the
-    // source sweep and the three Windows cells, which the plan row says out loud.
-    const cli = cliSpelling();
+  async run(ctx: CheckContext) {
+    // ARC-07-C38 — FROM THE CTX now, which is exactly what the comment here used to say was
+    // missing. The contract carries `platform` and `env`, the runner fills them from the process
+    // as the one legitimate read, and a win32 case drives every remedy below by argument.
+    const cli = cliSpelling(ctx.platform, ctx.env);
     const res = resolveStorePath();
     if (res.path === null) {
       // Not an error: an unconfigured checkout is a legitimate state, and the server starts in
@@ -131,7 +128,12 @@ export const svStore: Check = {
     let remedy: string | undefined;
     let fix: Record<string, unknown> | null = null;
 
-    if (isWindows) {
+    // ARC-07-C38's second item — this was `const isWindows = process.platform === 'win32'` at
+    // MODULE LOAD, which fixed the platform at import and left nothing able to drive it. Said
+    // precisely, because my first note on it overstated the case: the use is a POSIX-permission-bit
+    // skip message, not a launcher, and nothing committed depends on it. What it shared with the
+    // launcher defect is only the part that mattered here — undrivability.
+    if (ctx.platform === 'win32') {
       notes.push('mode check skipped (Windows: permissions are ACL-inherited, not POSIX bits)');
     } else if (existsSync(res.path)) {
       const fileMode = statSync(res.path).mode & 0o777;
@@ -189,12 +191,10 @@ export const svInstances: Check = {
   severity: 'fail',
   network: false,
   async run(ctx: CheckContext) {
-    // ARC-07-C31 slice 3 — `cliSpelling()` and NOT a ctx, because MEASURED: `CheckContext` carries
-    // `noNetwork`, `cwd`, `probes`, `fluent?` and `storeEntry?` — five fields, no platform and no
-    // env. So there is nothing to thread, and an assumed ctx would be the defect this row keeps
-    // finding. ARC-07-C38 gives the contract a platform; until then these remedies are held by the
-    // source sweep and the three Windows cells, which the plan row says out loud.
-    const cli = cliSpelling();
+    // ARC-07-C38 — FROM THE CTX now, which is exactly what the comment here used to say was
+    // missing. The contract carries `platform` and `env`, the runner fills them from the process
+    // as the one legitimate read, and a win32 case drives every remedy below by argument.
+    const cli = cliSpelling(ctx.platform, ctx.env);
     const report = instanceManager.getReport();
     const loaded = instanceManager.listAll().filter((i) => i.status === 'loaded');
 
@@ -264,9 +264,8 @@ export const svInstances: Check = {
             + 'resolvable');
       }
 
-      // ARC-07-C31 slice 3 — `cliSpelling()`, because `CheckContext` carries no platform (measured:
-      // `doctor/types.ts` has five fields and none of them is one). ARC-07-C38 threads one.
-      const posture = checkProdPosture(entry, cliSpelling());
+      // ARC-07-C38 — the ctx's shell, threaded like every other remedy in this file.
+      const posture = checkProdPosture(entry, cliSpelling(ctx.platform, ctx.env));
       if (!posture.ok) {
         problems.push(posture.message ?? `${i.name}: prod posture`);
         remedy ??= `${cli} instance set-preset ${i.name} ${entry.preset} --ack-prod`;
@@ -665,13 +664,11 @@ export const svStoreSchema: Check = {
   title: 'store schema',
   severity: 'fail',
   network: false,
-  async run() {
-    // ARC-07-C31 slice 3 — `cliSpelling()` and NOT a ctx, because MEASURED: `CheckContext` carries
-    // `noNetwork`, `cwd`, `probes`, `fluent?` and `storeEntry?` — five fields, no platform and no
-    // env. So there is nothing to thread, and an assumed ctx would be the defect this row keeps
-    // finding. ARC-07-C38 gives the contract a platform; until then these remedies are held by the
-    // source sweep and the three Windows cells, which the plan row says out loud.
-    const cli = cliSpelling();
+  async run(ctx: CheckContext) {
+    // ARC-07-C38 — FROM THE CTX now, which is exactly what the comment here used to say was
+    // missing. The contract carries `platform` and `env`, the runner fills them from the process
+    // as the one legitimate read, and a win32 case drives every remedy below by argument.
+    const cli = cliSpelling(ctx.platform, ctx.env);
     const res = resolveStorePath();
     if (res.path === null || !existsSync(res.path)) {
       return skip('SV-09', 'store schema', 'no store to check');

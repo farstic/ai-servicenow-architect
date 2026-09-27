@@ -25,6 +25,8 @@ export interface ProbeBindingDeps {
     probe?: typeof probeAll;
     makeClient?: (entry: Parameters<typeof probeClientFor>[0]) => ProbeClient;
     env?: NodeJS.ProcessEnv;
+    /** ARC-07-C38 — beside the `env` this already took, for the remedy below. */
+    platform?: NodeJS.Platform;
     /** The store, injected: a test supplies an entry without writing credentials to a disk. */
     readEntry?: (label: string) => StoreInstance | undefined;
 }

@@ -14,7 +14,7 @@ import { join } from 'node:path';
 // the `src/` imports would be. The first version suppressed errors that do not exist, and
 // `tsc --noEmit` said so — TS2578, an unused directive, which is its own kind of wrong answer.
 import { ALL_CHECKS, resetHandshakeCache } from '../../dist/doctor/checks.js';
-import { stubProbes } from '../../dist/doctor/types.js';
+import { stubProbesFor } from '../../dist/doctor/types.js';
 import { instanceManager } from '../../dist/servicenow/instances.js';
 
 /**
@@ -75,7 +75,13 @@ const runCheck = async (id: string) => {
   try {
     instanceManager.reload();
     return await ALL_CHECKS.find((c) => c.id === id)!.run({
-      noNetwork: true, cwd: home, probes: stubProbes, fluent: () => ({ installed: false }),
+      noNetwork: true, cwd: home,
+      // ARC-07-C38 — the ctx carries the shell now, and these helpers PIN it: what they assert is
+      // the check's verdict, not its spelling, so a bare process read would make a verdict case
+      // quietly platform-dependent. `tests/doctor/win32-remedies.test.ts` is where the spelling is
+      // driven, and it pins the other direction.
+      platform: 'linux' as NodeJS.Platform, env: {},
+      probes: stubProbesFor({ platform: 'linux', env: {} }), fluent: () => ({ installed: false }),
     });
   } finally {
     for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];

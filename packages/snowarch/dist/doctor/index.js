@@ -10,7 +10,7 @@ import { maskUsername } from '../store/paths.js';
 import { getPackageVersion } from '../utils/version.js';
 import { ALL_CHECKS, resetHandshakeCache } from './checks.js';
 import { makeProbes, storeEntry } from './probes-binding.js';
-import { stubProbes } from './types.js';
+import { stubProbesFor } from './types.js';
 export * from './types.js';
 export { ALL_CHECKS, pollutingAncestors, resetHandshakeCache } from './checks.js';
 export async function runServerDoctor(opts = {}) {
@@ -23,10 +23,14 @@ export async function runServerDoctor(opts = {}) {
     // configured", which is a state rather than an absence — ARC-08-S04 is the story that chooses,
     // because it is the story that owns what the doctor renders.
     const configured = instanceManager.loadedCount() > 0;
+    const platform = opts.platform ?? process.platform;
+    const env = opts.env ?? process.env;
     const ctx = {
         noNetwork: opts.noNetwork === true,
         cwd: opts.cwd ?? process.cwd(),
-        probes: opts.probes ?? (configured ? makeProbes() : stubProbes),
+        platform,
+        env,
+        probes: opts.probes ?? (configured ? makeProbes({ platform, env }) : stubProbesFor({ platform, env })),
         ...(opts.fluent ? { fluent: opts.fluent } : {}),
     };
     const checks = [];

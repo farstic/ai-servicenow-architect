@@ -13,6 +13,15 @@ export interface DoctorOptions {
     };
     /** Reserved for ARC-08's merged report; only `server` exists today. */
     section?: 'server';
+    /**
+     * The shell the remedies are spelled for — ARC-07-C38, and the runner is the ONE legitimate read.
+     *
+     * Optional here and required on `CheckContext`: a caller that does not care gets the process, and
+     * every check downstream is handed an answer rather than reaching for one. That asymmetry is the
+     * point — the read happens once, where it can be overridden, instead of in ten remedies.
+     */
+    platform?: NodeJS.Platform;
+    env?: NodeJS.ProcessEnv;
 }
 export declare function runServerDoctor(opts?: DoctorOptions): Promise<DoctorReport>;
 /** 0 = nothing failed, 1 = at least one FAIL, 3 = the run itself could not complete. */

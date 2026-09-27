@@ -1,3 +1,14 @@
+import { spellings } from '../../../tools/snowarch/lib/text.mjs';
+import { fillLauncher } from '../lib/contract.mjs';
+
+/**
+ * ARC-07-C32 — this page is COMMITTED, so the launcher placeholders fill in as PINNED POSIX: its
+ * bytes must be identical on every runner or `gen:check` fails on the next machine. The rules page
+ * carries the one-line Windows note that tells a PowerShell reader what to substitute.
+ */
+const PAGE_SPELL = spellings({ platform: 'linux', env: {} });
+const fill = (t) => fillLauncher(t, PAGE_SPELL);
+
 /**
  * `governance/mcp-protocols.md` — the long form of §2.1 and §2.2.
  *
@@ -152,6 +163,6 @@ Every code has one meaning and one remedy, in the registry the server, the wizar
 this document all render from. The full list is \`docs/TROUBLESHOOTING.md\`. These ${ruleCodes.length} are in the
 always-loaded rule file, because a session can act on them mid-task:
 
-${ruleCodes.map((e) => `- \`${e.code}\` — ${e.meaning} ${e.remedy}${e.command ? ` \`${e.command}\`` : ''}`).join('\n')}
+${ruleCodes.map((e) => `- \`${e.code}\` — ${e.meaning} ${fill(e.remedy)}${e.command ? ` \`${fill(e.command)}\`` : ''}`).join('\n')}
 `;
 }

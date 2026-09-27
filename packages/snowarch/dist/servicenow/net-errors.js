@@ -9,7 +9,8 @@
  * sends people to the wrong place — usually to their credentials, which are fine.
  */
 /** The six codes this classifier can produce. Registered in `src/errors/codes.ts`. */
-import { ERROR_CODES } from '../errors/codes.js';
+import { ERROR_CODES, remedyFor } from '../errors/codes.js';
+import { bootstrapSpelling, cliSpelling } from '../cli/tty.js';
 const DNS = new Set(['ENOTFOUND', 'EAI_AGAIN']);
 const TLS_UNTRUSTED = new Set([
     'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
@@ -90,7 +91,15 @@ const substitute = (text, { provider, root, global: globalStore }) => text.repla
     .replaceAll('<global>', globalStore ?? 'the global store');
 export function fillRemedy(code, values = {}) {
     const { host, proxy, proxyVar, issuer } = values;
-    const entry = ERROR_CODES.find((e) => e.code === code);
+    // ARC-07-C32 — this reads the table directly rather than through `remedyFor`, so it fills the
+    // launcher placeholders itself. `<cli>` joins `<host>`, `<proxy>` and `<issuer>` as a token the CODE
+    // substitutes, rather than `<label>` and `<preset>`, which survive for the reader to fill in.
+    // ARC-07-C32 — this file RESOLVES the shell and hands `remedyFor` the two strings, because the
+    // registry may not import anything (see its header: `probe-auth` loads it before B04 has run).
+    const entry = remedyFor(code, {
+        cli: cliSpelling(values.platform, values.env),
+        bootstrap: bootstrapSpelling(values.platform, values.env),
+    });
     let text = substitute(entry?.remedy ?? '', values);
     // A PARENTHETICAL whose subject is absent goes with it. `(a proxy is configured — …)` reads as
     // a fact when one is, and as noise when none is; `(issuer: )` invites a reader to look for

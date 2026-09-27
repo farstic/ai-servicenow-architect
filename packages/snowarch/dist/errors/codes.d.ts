@@ -22,6 +22,24 @@
  *                wrong password
  *   httpStatus   the status the instance returned, where the code maps to one
  */
+/**
+ * THE LAUNCHER IS A PLACEHOLDER HERE — ARC-07-C32, and `<cli>` rather than `{cli}` on purpose.
+ *
+ * This table is read by three things that render for three different audiences: the generated rules
+ * page `.claude/rules/00-mode-and-mcp-gate.md`, which is COMMITTED and so must be one spelling on
+ * every machine; the server at runtime, printing to whoever is reading; and the engine's doctor
+ * through `packages/contract/lib/contract.mjs`. A literal served the page and lied to the other two —
+ * a Windows user who met `STORE_SCHEMA_NEWER` was told `run ./snowarch upgrade`.
+ *
+ * `<cli>` AND NOT `{cli}` because this file already has a placeholder convention and it is `<…>`:
+ * `fillRemedy` substitutes `<host>`, `<proxy>`, `<proxyVar>` and `<issuer>` today. ARC-07-W17's first
+ * attempt at this used `{cli}`, which was a second convention AND printed literally to users because
+ * the engine's reader substituted nothing — the reason C32 became a row instead of a fix.
+ *
+ * Note the two KINDS of `<…>` here, because they read alike and behave oppositely: `<cli>` and
+ * `<bootstrap>` are substituted by the code, while `<label>` and `<preset>` are meant to SURVIVE for
+ * the reader to fill in. A new placeholder belongs to one group or the other, never both.
+ */
 export interface ErrorCode {
     code: string;
     /** What happened, in the reader's terms. */
@@ -39,37 +57,37 @@ export declare const ERROR_CODES: readonly [{
     readonly code: "WRITE_NOT_ENABLED";
     readonly meaning: "The instance's preset does not enable WRITE_ENABLED.";
     readonly remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`";
-    readonly command: "./snowarch instance set-preset <label> pdi-developer";
+    readonly command: "<cli> instance set-preset <label> pdi-developer";
     readonly showInRule: true;
 }, {
     readonly code: "CMDB_WRITE_NOT_ENABLED";
     readonly meaning: "The instance's preset does not enable CMDB_WRITE_ENABLED.";
     readonly remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`";
-    readonly command: "./snowarch instance set-preset <label> pdi-developer";
+    readonly command: "<cli> instance set-preset <label> pdi-developer";
     readonly showInRule: true;
 }, {
     readonly code: "SCRIPTING_NOT_ENABLED";
     readonly meaning: "The instance's preset does not enable SCRIPTING_ENABLED.";
     readonly remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`";
-    readonly command: "./snowarch instance set-preset <label> pdi-developer";
+    readonly command: "<cli> instance set-preset <label> pdi-developer";
     readonly showInRule: true;
 }, {
     readonly code: "ATF_NOT_ENABLED";
     readonly meaning: "The instance's preset does not enable ATF_ENABLED.";
     readonly remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`";
-    readonly command: "./snowarch instance set-preset <label> pdi-developer";
+    readonly command: "<cli> instance set-preset <label> pdi-developer";
     readonly showInRule: true;
 }, {
     readonly code: "NOW_ASSIST_NOT_ENABLED";
     readonly meaning: "The instance's preset does not enable NOW_ASSIST_ENABLED.";
     readonly remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`";
-    readonly command: "./snowarch instance set-preset <label> full";
+    readonly command: "<cli> instance set-preset <label> full";
     readonly showInRule: true;
 }, {
     readonly code: "FLUENT_NOT_ENABLED";
     readonly meaning: "The instance's preset does not enable FLUENT_ENABLED.";
     readonly remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`";
-    readonly command: "./snowarch instance set-preset <label> full";
+    readonly command: "<cli> instance set-preset <label> full";
     readonly showInRule: true;
 }, {
     readonly code: "NO_INSTANCE_CONFIGURED";
@@ -81,30 +99,30 @@ export declare const ERROR_CODES: readonly [{
     readonly code: "INSTANCE_NOT_LOADED";
     readonly meaning: "The instance is in the store but was not loaded, and the store carries the reason.";
     readonly remedy: "read the reason in the instance listing; a `prod` instance without `prodWriteAck` needs the acknowledgement";
-    readonly command: "./snowarch instance list";
+    readonly command: "<cli> instance list";
     readonly showInRule: true;
 }, {
     readonly code: "UNKNOWN_INSTANCE";
     readonly meaning: "No instance in the store carries that label.";
     readonly remedy: "the listing prints the labels that exist";
-    readonly command: "./snowarch instance list";
+    readonly command: "<cli> instance list";
     readonly showInRule: false;
 }, {
     readonly code: "FLAGS_INCOMPLETE";
     readonly meaning: "A store entry does not state all six capability flags. An absent flag is off, so the entry works — but nobody can tell an intended `false` from a forgotten one, and the next preset change starts from a guess.";
     readonly remedy: "state every flag explicitly by re-applying a preset — the review screen shows what changes before anything is written";
-    readonly command: "./snowarch instance set-preset <label> <preset>";
+    readonly command: "<cli> instance set-preset <label> <preset>";
     readonly showInRule: false;
 }, {
     readonly code: "FLAG_DEPENDENCY_VIOLATION";
     readonly meaning: "A flag that requires `WRITE_ENABLED` is on while `WRITE_ENABLED` is off. The tools gated on it are refused at run time and the refusal names WRITE first, so the entry promises a capability it cannot deliver.";
     readonly remedy: "decide which one was meant: turn WRITE on, or turn the dependent flag off. Neither is guessable from the store, so this is never repaired automatically";
-    readonly command: "./snowarch instance set-preset <label> <preset>";
+    readonly command: "<cli> instance set-preset <label> <preset>";
     readonly showInRule: false;
 }, {
     readonly code: "PROD_WRITE_NOT_ACKNOWLEDGED";
     readonly meaning: "The instance is tagged `environment: prod` and holds a write preset without `prodWriteAck: true`.";
-    readonly remedy: "A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal";
+    readonly remedy: "A production instance is capped at read-only. Do not suggest editing the store; the user raises it with <cli> instance set-preset <label> <preset> --ack-prod in their terminal";
     readonly showInRule: true;
 }, {
     readonly code: "STORE_NOT_FOUND";
@@ -126,13 +144,13 @@ export declare const ERROR_CODES: readonly [{
     readonly code: "STORE_SCHEMA_OUTDATED";
     readonly meaning: string;
     readonly remedy: "migrate it; a 0600 backup is written first and credential values are never touched";
-    readonly command: "./snowarch store migrate";
+    readonly command: "<cli> store migrate";
     readonly showInRule: true;
 }, {
     readonly code: "STORE_SCHEMA_NEWER";
     readonly meaning: string;
     readonly remedy: string;
-    readonly command: "./snowarch upgrade";
+    readonly command: "<cli> upgrade";
     readonly showInRule: true;
 }, {
     readonly code: "STORE_PERMISSIONS_TOO_OPEN";
@@ -143,7 +161,7 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "AUTHENTICATION_FAILED";
     readonly meaning: "The instance rejected the credentials — wrong, expired, or the account is locked.";
-    readonly remedy: "If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed — and then call snow_core_instances_reload before you retry, because this server still holds the credentials it read at startup and a retry without it is a second failed login";
+    readonly remedy: "If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run <cli> instance test <label> and, if it fails, <cli> instance set-credentials <label>. Continue only after the user says the credentials were fixed — and then call snow_core_instances_reload before you retry, because this server still holds the credentials it read at startup and a retry without it is a second failed login";
     readonly showInRule: true;
     readonly httpStatus: 401;
 }, {
@@ -172,7 +190,7 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "TLS_CA_UNTRUSTED";
     readonly meaning: "The certificate was not signed by a CA this machine trusts — normal on a network that intercepts TLS.";
-    readonly remedy: "the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it";
+    readonly remedy: "the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs <cli> and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it";
     readonly command: "export NODE_EXTRA_CA_CERTS=<path to the PEM>";
     readonly showInRule: true;
 }, {
@@ -330,8 +348,8 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "LEGACY_STORE_NOT_FOUND";
     readonly meaning: "There is no snow-mcp 1.x store at the path the import was pointed at.";
-    readonly remedy: "check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `./snowarch doctor` reports where it looked";
-    readonly command: "./snowarch instance import --from-legacy --path <file> --dry-run";
+    readonly remedy: "check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `<cli> doctor` reports where it looked";
+    readonly command: "<cli> instance import --from-legacy --path <file> --dry-run";
     readonly showInRule: false;
 }, {
     readonly code: "LEGACY_STORE_UNREADABLE";
@@ -342,19 +360,19 @@ export declare const ERROR_CODES: readonly [{
     readonly code: "LABEL_NOT_FOUND";
     readonly meaning: "No instance with that label is in the store this checkout resolves.";
     readonly remedy: "run `instance list` to see the labels this checkout has, or `instance add <label>` to add one";
-    readonly command: "./snowarch instance list";
+    readonly command: "<cli> instance list";
     readonly showInRule: false;
 }, {
     readonly code: "LABEL_EXISTS";
     readonly meaning: "An instance with that label is already in the store.";
     readonly remedy: "use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it";
-    readonly command: "./snowarch instance add <label> --url <url> --env <env> --replace";
+    readonly command: "<cli> instance add <label> --url <url> --env <env> --replace";
     readonly showInRule: false;
 }, {
     readonly code: "ENV_REQUIRED";
     readonly meaning: "The environment could not be proposed and none was given, in a run that cannot ask.";
     readonly remedy: "pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do";
-    readonly command: "./snowarch instance add <label> --url <url> --env <pdi|dev|test|prod> --yes";
+    readonly command: "<cli> instance add <label> --url <url> --env <pdi|dev|test|prod> --yes";
     readonly showInRule: false;
 }, {
     readonly code: "URL_REQUIRED";
@@ -422,5 +440,23 @@ export type ErrorCodeName = (typeof ERROR_CODES)[number]['code'];
  * `ErrorCodeName` makes a removed key a compile error at the call site first, which is what makes
  * the narrower signature true rather than convenient.
  */
-export declare function remedyFor(code: ErrorCodeName): ErrorCode;
-export declare function remedyFor(code: string): ErrorCode | undefined;
+/**
+ * The launcher placeholders, filled in for the reader asking — ARC-07-C32.
+ *
+ * THE SPELLINGS ARRIVE AS STRINGS, and that is forced rather than chosen. This module may have NO
+ * static imports at all: `probe-auth` loads the error registry before B04 has installed anything, so
+ * an import here would make `./snowarch bootstrap --mode design` fail on a fresh clone —
+ * `tools/snowarch/tests/b04-deps.test.mjs` asserts `dist/errors/codes.js` has zero imports, and it
+ * is what caught my first version importing `cli/tty.js`. So the caller resolves the shell with
+ * `cliSpelling`/`bootstrapSpelling` and hands the answers in; this does pure string work.
+ *
+ * ABSENT means unfilled rather than guessed: a caller that supplies nothing gets the placeholder
+ * back and `tests/contract/launcher-placeholder.test.mjs` fails on it, which is better than this
+ * module inventing a shell it has no way to know.
+ */
+export interface LauncherSpelling {
+    cli: string;
+    bootstrap: string;
+}
+export declare function remedyFor(code: ErrorCodeName, spell?: LauncherSpelling): ErrorCode;
+export declare function remedyFor(code: string, spell?: LauncherSpelling): ErrorCode | undefined;
