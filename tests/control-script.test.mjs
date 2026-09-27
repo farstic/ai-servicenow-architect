@@ -196,7 +196,11 @@ test('ARC-07-C34 — a CRLF-converting checkout still verifies, which the Window
   const r = repo(t, { autocrlf: true });
 
   const got = control({ dir: r.dir, files: [r.file],
-    degrade: `node -e "const {writeFileSync}=require('fs');writeFileSync('lib/thing.mjs','x\n')"`,
+    // `\\n` and not `\n`: this is a template literal, so a single backslash-n becomes a REAL newline
+    // inside the JS string the child parses, which is a SyntaxError. The degradation then never applied
+    // and this case passed while proving nothing — and the tool SAID SO, in a line I did not read:
+    // "the --degrade command exited non-zero; running --test anyway". Its own warning caught it.
+    degrade: `node -e "const {writeFileSync}=require('fs');writeFileSync('lib/thing.mjs','x\\n')"`,
     test: 'false' });
 
   assert.equal(got.code, EXIT.ok, got.out);
