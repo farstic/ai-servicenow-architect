@@ -10,7 +10,7 @@ import { maskUsername } from '../store/paths.js';
 import { getPackageVersion } from '../utils/version.js';
 import { ALL_CHECKS, resetHandshakeCache } from './checks.js';
 import { makeProbes, storeEntry } from './probes-binding.js';
-import { stubProbes, type CheckResult, type DoctorReport, type Probes } from './types.js';
+import { stubProbesFor, type CheckResult, type DoctorReport, type Probes } from './types.js';
 
 export * from './types.js';
 export { ALL_CHECKS, pollutingAncestors, resetHandshakeCache } from './checks.js';
@@ -23,6 +23,15 @@ export interface DoctorOptions {
   fluent?: () => { installed: boolean; where?: string; version?: string };
   /** Reserved for ARC-08's merged report; only `server` exists today. */
   section?: 'server';
+  /**
+   * The shell the remedies are spelled for — ARC-07-C38, and the runner is the ONE legitimate read.
+   *
+   * Optional here and required on `CheckContext`: a caller that does not care gets the process, and
+   * every check downstream is handed an answer rather than reaching for one. That asymmetry is the
+   * point — the read happens once, where it can be overridden, instead of in ten remedies.
+   */
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
 }
 
 export async function runServerDoctor(opts: DoctorOptions = {}): Promise<DoctorReport> {
@@ -36,10 +45,14 @@ export async function runServerDoctor(opts: DoctorOptions = {}): Promise<DoctorR
   // configured", which is a state rather than an absence — ARC-08-S04 is the story that chooses,
   // because it is the story that owns what the doctor renders.
   const configured = instanceManager.loadedCount() > 0;
+  const platform = opts.platform ?? process.platform;
+  const env = opts.env ?? process.env;
   const ctx = {
     noNetwork: opts.noNetwork === true,
     cwd: opts.cwd ?? process.cwd(),
-    probes: opts.probes ?? (configured ? makeProbes() : stubProbes),
+    platform,
+    env,
+    probes: opts.probes ?? (configured ? makeProbes({ platform, env }) : stubProbesFor({ platform, env })),
     ...(opts.fluent ? { fluent: opts.fluent } : {}),
   };
 

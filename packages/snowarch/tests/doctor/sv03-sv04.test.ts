@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 import { runServerDoctor } from '../../src/doctor/index.js';
 import { ALL_CHECKS } from '../../src/doctor/checks.js';
-import { stubProbes } from '../../src/doctor/types.js';
+import { stubProbesFor } from '../../src/doctor/types.js';
 import { instanceManager } from '../../src/servicenow/instances.js';
 import { makeProbes, describeProbes, statusOf } from '../../src/doctor/probes-binding.js';
 import { ROPC_ERROR_TABLE } from '../../src/servicenow/probes.js';
@@ -97,7 +97,13 @@ const runCheck = async (id: string, opts: { fluent?: () => { installed: boolean;
   try {
     instanceManager.reload();
     return await ALL_CHECKS.find((c) => c.id === id)!.run({
-      noNetwork: true, cwd: home, probes: stubProbes,
+      noNetwork: true, cwd: home,
+      // ARC-07-C38 — the ctx carries the shell now, and these helpers PIN it: what they assert is
+      // the check's verdict, not its spelling, so a bare process read would make a verdict case
+      // quietly platform-dependent. `tests/doctor/win32-remedies.test.ts` is where the spelling is
+      // driven, and it pins the other direction.
+      platform: 'linux' as NodeJS.Platform, env: {},
+      probes: stubProbesFor({ platform: 'linux', env: {} }),
       fluent: opts.fluent ?? (() => ({ installed: false })),
     });
   } finally {

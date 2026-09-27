@@ -24,15 +24,22 @@ export const CHECK_IDS = [
  * doctor RENDERS. This stub stays as the unconfigured answer rather than being deleted: "there is
  * no instance to probe" is a real state, and `skip` is its honest report.
  */
-export const stubProbes = {
+/**
+ * ARC-07-C38 — A FACTORY, because a `const` cannot read a ctx.
+ *
+ * It was an object whose remedy called `cliSpelling()`, which is the shape that made the stub render
+ * one shell while the ctx said another. The doctor builds it with the shell it was given.
+ */
+export const stubProbesFor = ({ platform, env }) => ({
     async runAll() {
         return {
             status: 'skip',
             detail: 'no instance configured, so there is nothing to probe',
-            // ARC-07-C31 slice 3 — the STUB's remedy, and it derives for the same reason the real one does:
-            // a stub that rendered a different shell from the thing it stands in for would make a test pass
-            // against a sentence the product never prints.
-            remedy: `add one with ${cliSpelling()} instance add, then run ${cliSpelling()} instance test`,
+            // ARC-07-C38 — from the shell the doctor was TOLD about. A stub that rendered a different shell
+            // from the thing it stands in for would let a case pass against a sentence the product never
+            // prints, which is the whole reason the stub exists rather than being deleted.
+            remedy: `add one with ${cliSpelling(platform, env)} instance add, `
+                + `then run ${cliSpelling(platform, env)} instance test`,
         };
     },
-};
+});
