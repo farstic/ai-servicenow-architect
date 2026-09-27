@@ -3,6 +3,17 @@ import { collectToolCatalog, routeToolInvocation } from '../../src/tools/index.j
 import { runWithInstance, FLAG_NAMES, type Flags, type InstanceRuntime } from '../../src/servicenow/context.js';
 import { expandPreset } from '../../src/utils/permissions.js';
 import type { ServiceNowClient } from '../../src/servicenow/client.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * These assertions are in the SERVER's own suite, against sentences slice 3 made derive, and this is
+ * the THIRD test tree — the one my sweep of `tests/` and `tools/snowarch/tests/` did not look at, and
+ * the one C35's audit did not either. Seventeen POSIX literals here were green on a mac and red on
+ * every Windows cell.
+ */
+const SERVER_CLI = cliSpelling();
 
 /**
  * The SCRIPTING gate split: SCRIPTING means *writing* those objects, not reading them.
@@ -165,7 +176,7 @@ describe('criterion 1 - the refusal names the instance and a preset that would w
         const err = e as { code?: string; message?: string };
         expect(err.code).toBe('WRITE_NOT_ENABLED');
         expect(err.message).toContain('for instance "pdi" (preset read-only)');
-        expect(err.message).toContain('./snowarch instance set-preset pdi pdi-developer');
+        expect(err.message).toContain(`${SERVER_CLI} instance set-preset pdi pdi-developer`);
       }
     });
   });

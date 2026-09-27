@@ -310,7 +310,7 @@ describe('the refusal message names the instance and the remedy — criterion 5 
       try { requireWrite(); } catch (e) {
         const m = (e as ServiceNowError).message;
         expect(m).toBe('Write operations are disabled for instance "prod-lookalike" (preset read-only). '
-          + 'Run: ./snowarch instance set-preset prod-lookalike pdi-developer');
+          + `Run: ${SERVER_CLI} instance set-preset prod-lookalike pdi-developer`);
       }
     });
   });
@@ -320,7 +320,7 @@ describe('the refusal message names the instance and the remedy — criterion 5 
       try { requireWrite(); } catch (e) {
         const m = (e as ServiceNowError).message;
         expect(m).toContain('Instance "prod" is tagged prod and capped at read-only');
-        expect(m).toContain('./snowarch instance set-preset prod <preset> --ack-prod');
+        expect(m).toContain(`${SERVER_CLI} instance set-preset prod <preset> --ack-prod`);
       }
     });
   });

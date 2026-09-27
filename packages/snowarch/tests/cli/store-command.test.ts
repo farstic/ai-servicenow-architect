@@ -11,6 +11,16 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+/**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * These assertions are in the SERVER's own suite, against sentences slice 3 made derive, and this is
+ * the THIRD test tree — the one my sweep of `tests/` and `tools/snowarch/tests/` did not look at, and
+ * the one C35's audit did not either. Seventeen POSIX literals here were green on a mac and red on
+ * every Windows cell.
+ */
+const SERVER_CLI = cliSpelling();
+
 import {
   NOTHING_CHANGED, runStore, runStoreBackups, runStoreMigrate, runStoreRestore, storeHelp,
   type StoreIo,
@@ -129,7 +139,7 @@ describe('AC 5 — migrate: a current store, a dry run, a yes and a no', () => {
     const before = readFileSync(store);
     expect(await runStoreMigrate(['--dry-run'], io())).toBe(1);
     expect(complained()).toContain('STORE_SCHEMA_NEWER');
-    expect(complained()).toContain('./snowarch upgrade');
+    expect(complained()).toContain(`${SERVER_CLI} upgrade`);
     expect(readFileSync(store)).toEqual(before);
   });
 
@@ -188,7 +198,7 @@ describe('AC 5 — migrate: a current store, a dry run, a yes and a no', () => {
     expect(await runStoreMigrate(['--yes'], io())).toBe(1);
     expect(complained()).toContain('STORE_UNREADABLE');
     expect(complained()).toContain('is not valid JSON');
-    expect(complained()).toContain('./snowarch store backups');
+    expect(complained()).toContain(`${SERVER_CLI} store backups`);
     expect(readFileSync(store)).toEqual(before);
   });
 });
@@ -212,7 +222,7 @@ describe('backups', () => {
 describe('restore', () => {
   it('without a file it is a usage error that names how to find one', async () => {
     expect(await runStoreRestore([], io())).toBe(2);
-    expect(complained()).toContain('./snowarch store backups');
+    expect(complained()).toContain(`${SERVER_CLI} store backups`);
   });
 
   it('a file that is not there is named, not an ENOENT stack', async () => {
@@ -249,6 +259,6 @@ describe('restore', () => {
     const bak = join(checkout, '.local', 'instances.json.bak-20260101T000000Z');
     writeFileSync(bak, `${JSON.stringify({ ...storeAt(CURRENT_SCHEMA_VERSION), version: CURRENT_SCHEMA_VERSION + 1 })}\n`);
     expect(await runStoreRestore([bak, '--yes'], io())).toBe(0);
-    expect(said()).toContain('./snowarch store migrate');
+    expect(said()).toContain(`${SERVER_CLI} store migrate`);
   });
 });

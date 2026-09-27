@@ -7,11 +7,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import {
-  ARGV_SECRET, CANCELLED, EXIT_INTERRUPTED, EXIT_USAGE, argvCarriesSecret, knownBadConsole,
-  noTtyMessage, promptChoice, promptLine, promptSecret, readSecretFromStdin,
-  WINDOWS_KNOWN_BAD, type Io,
-} from '../../src/cli/tty.js';
+import { ARGV_SECRET, CANCELLED, EXIT_INTERRUPTED, EXIT_USAGE, WINDOWS_KNOWN_BAD, argvCarriesSecret, cliSpelling, knownBadConsole, noTtyMessage, promptChoice, promptLine, promptSecret, readSecretFromStdin, type Io } from '../../src/cli/tty.js';
 
 /**
  * ARC-07-S01 — the credential boundary, driven by a fake terminal.
@@ -191,7 +187,10 @@ describe('promptSecret', () => {
     // spelling, and this line is still the one a PowerShell reader copies.
     expect(stdout.written).toContain('On PowerShell/cmd use: .\\snowarch.cmd instance add … --password-stdin');
     // ...and the POSIX message carries the POSIX spelling, not a Windows one dressed as help.
-    expect(noTtyMessage('linux', {})).toContain('./snowarch instance add');
+    // ARC-07-C31 — DERIVED FROM THE PLATFORM THIS CASE DRIVES, not from a literal: the call pins
+    // `'linux', {}`, so the expectation pins the same thing. A literal agreed today and would have
+    // stopped agreeing the moment the POSIX spelling changed, which is the drift rule 1 prevents.
+    expect(noTtyMessage('linux', {})).toContain(`${cliSpelling('linux', {})} instance add`);
     expect(noTtyMessage('linux')).not.toContain('snowarch.cmd');
   });
 

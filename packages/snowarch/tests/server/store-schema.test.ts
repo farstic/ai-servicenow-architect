@@ -130,7 +130,7 @@ describe('AC 4 — a store from the PAST', () => {
       }) as { isError?: boolean; content: Array<{ text: string }> };
       expect(refusal.isError).toBe(true);
       expect(refusal.content[0]!.text).toContain('STORE_SCHEMA_OUTDATED');
-      expect(refusal.content[0]!.text).toContain('./snowarch store migrate');
+      expect(refusal.content[0]!.text).toContain(`${SERVER_CLI} store migrate`);
       expect(refusal.content[0]!.text).not.toContain('instance add');
     } finally { await client.close(); }
   }, 40_000);
@@ -146,7 +146,7 @@ describe('AC 3 — a store from the FUTURE', () => {
       }))) as { mode: string; configErrors: Array<{ code: string; message: string }> };
       expect(status.mode).toBe('unconfigured');
       expect(status.configErrors[0]?.code).toBe('STORE_SCHEMA_NEWER');
-      expect(status.configErrors[0]?.message).toContain('./snowarch upgrade');
+      expect(status.configErrors[0]?.message).toContain(`${SERVER_CLI} upgrade`);
 
       const refusal = await client.callTool({
         name: 'snow_core_records_query', arguments: { table: 'incident' },

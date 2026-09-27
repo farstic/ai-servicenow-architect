@@ -16,6 +16,16 @@ import { scriptedTty } from '../helpers/scripted-tty.js';
 import { cliSpelling } from '../../src/cli/tty.js';
 
 /**
+ * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
+ *
+ * These assertions are in the SERVER's own suite, against sentences slice 3 made derive, and this is
+ * the THIRD test tree — the one my sweep of `tests/` and `tools/snowarch/tests/` did not look at, and
+ * the one C35's audit did not either. Seventeen POSIX literals here were green on a mac and red on
+ * every Windows cell.
+ */
+const SERVER_CLI = cliSpelling();
+
+/**
  * ARC-07-S08 — the migration, and the three promises it makes.
  *
  * NOTHING IS DELETED: a grep over the command's own source asserts there is no removal call in it
@@ -46,7 +56,21 @@ const SECRETS = fixture.instances.flatMap((e) =>
 const everything: string[] = [];
 
 /** Separators normalised. A Windows path is a right answer, not a different plan. */
-const posix = (text: string): string => text.split('\\').join('/');
+/**
+ * Normalise a rendered string INTO the committed page's rendering — ARC-07-C31 slice 3, rule 3.
+ *
+ * `docs/snippets/import-from-legacy.md` is documentation for both platforms and is written POSIX. The
+ * plan is rendered by the product for the shell it is running in, so on a Windows cell it carries
+ * `.\\snowarch.cmd` and the separators the host uses. Comparing the two means normalising one of them,
+ * and the page is the fixed side: it cannot know the reader's shell.
+ *
+ * The launcher replacement DERIVES both spellings rather than hard-coding either, so it follows the
+ * definition instead of restating it.
+ */
+const posix = (text: string): string => text
+  .split('\\').join('/')
+  .split(cliSpelling('win32', {}).split('\\').join('/'))
+  .join(cliSpelling('linux', {}));
 
 const REAL = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE,
   CLAUDE_PROJECT_DIR: process.env.CLAUDE_PROJECT_DIR, SNOW_STORE: process.env.SNOW_STORE };
@@ -211,7 +235,7 @@ describe('AC 3 — an entry whose credentials no longer work', () => {
     const out = terminal.written();
     expect(out).toContain('Imported 1 of 2');
     expect(out).toContain('auth failed');
-    expect(out).toContain('./snowarch instance add prod --url https://acme.service-now.com --env prod');
+    expect(out).toContain(`${SERVER_CLI} instance add prod --url https://acme.service-now.com --env prod`);
     expect(Object.keys(readStore().instances)).toEqual(['pdi']);
     // One request per entry, even the one that failed: a migration never retries a login.
     expect(d.calls).toHaveLength(2);

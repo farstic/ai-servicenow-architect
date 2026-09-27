@@ -672,7 +672,7 @@ describe('ARC-07-C6 — the probe column shows every fact the record holds', () 
     });
     try {
       const table = listTable(listJson(both.store, read(both)));
-      expect(table).toContain('— = never probed. ./snowarch instance test <label> probes one;'
+      expect(table).toContain(`— = never probed. ${SERVER_CLI} instance test <label> probes one;`
         + ' --all probes every one.');
       // The dash means never probed — never "probed, nothing to report", which is the reading a
       // reader would otherwise have to guess at and the only one that would be alarming.
