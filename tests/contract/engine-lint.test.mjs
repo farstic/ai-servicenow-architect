@@ -412,6 +412,14 @@ test('L05 answers from git in THIS repository — the fallback is for fixture tr
   // The filesystem fallback exists because a temp fixture is not a work tree. If it ever answered
   // here, the check would be back to reporting one machine's disk, which is the whole defect.
   const r = lintAt(root, ['--only', 'L05']);
+  // THE CHILD'S OWN FAILURE IS REPORTED BEFORE ITS OUTPUT IS MATCHED — ARC-07-C36, after this case
+  // went red on macos-latest node 22 on 6dfa27e with an EMPTY output and nothing else to go on.
+  // `lintAt` catches a non-zero exit and returns the code AND the stderr; this case then matched
+  // `stdout` first, so a child that died reported a pattern mismatch against '' and threw both away.
+  // The exit code is NOT asserted to be 0 — `L05 fail (n)` is a legitimate answer the pattern below
+  // accepts — so what is asserted is that the lint SPOKE, with the code and stderr in the message.
+  assert.notEqual(r.stdout.trim(), '',
+    `the lint printed nothing on stdout: exit ${r.code}\n${r.stderr ?? '(no stderr captured)'}`);
   assert.match(r.stdout, /L05 (ok|fail \(\d+\)) \[\d+ citations, tracked\]/);
   // Non-vacuous: this repository cites hundreds of paths, not two.
   const [, n] = /\[(\d+) citations/.exec(r.stdout);
