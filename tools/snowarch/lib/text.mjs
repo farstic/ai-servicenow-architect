@@ -68,14 +68,62 @@ export function spellings(where = {}) {
 export const ADD_INSTANCE = (cli = './snowarch') =>
   `${cli} mode live, or /snowarch setup-instance inside Claude`;
 
+/**
+ * ARC-07-W17 — these name the READER'S shell, not both shells.
+ *
+ * `notBootstrapped` said `run ./bootstrap.sh (Windows: bootstrap.cmd)` — two spellings by hand, and the
+ * Windows one BARE, which is the one PowerShell refuses: it does not resolve a command from the current
+ * directory and nothing here is on PATH. So the message that tells a user their checkout is not
+ * bootstrapped gave a Windows reader a command their shell rejects, with the POSIX one beside it as a
+ * distraction. One spelling, for the shell doing the reading.
+ *
+ * FUNCTIONS, because `spellings()` must not be read at module load here: this file's own
+ * `isWindowsShell` is a `const`, and `text.mjs` sits in the `panel -> text -> report-text -> panel`
+ * import cycle ARC-07-W17 measured — a load-time read throws
+ * `Cannot access 'isWindowsShell' before initialization`.
+ */
+/**
+ * The spelling a variant was given, or a refusal — ARC-07-W17.
+ *
+ * NO PROCESS DEFAULT, and this is the second time this row has had to learn it. Reading `spellings()`
+ * here made every variant render for the machine it ran on, and THREE consumers need three different
+ * answers: the doctor renders for the ctx it was given, `gen-doctor-docs.mjs` writes a COMMITTED page
+ * that must be identical on every runner, and the SessionStart hook renders for the person in front of
+ * it. A process default satisfied the hook and broke the other two — twelve Windows cells, because a
+ * generated page rendered `.\snowarch.cmd` on Windows and `gen:check` then failed `lint`, `contract`,
+ * the release rehearsal and E-21 in the doctor itself.
+ *
+ * So the spelling is required, and a miss THROWS rather than printing `undefined` — the same rule
+ * `summaryLine` and `renderText` carry, for the same reason: a plausible-looking wrong line passes
+ * review and a green test.
+ */
+const needSpell = (spell, who) => {
+  if (!spell || typeof spell.cli !== 'string' || typeof spell.bootstrap !== 'string') {
+    throw new TypeError(`MODE_VARIANTS.${who} needs a spellings object — this module has no process `
+      + 'default, because its three consumers render for three different shells');
+  }
+  return spell;
+};
+
+/**
+ * EVERY VARIANT TAKES ONE, including the one that does not use it.
+ *
+ * `noInstanceLoaded` names a slash command and no launcher, so it has nothing to spell — and it demands
+ * the argument anyway, because a UNIFORM call shape is what stops the defect this row already shipped
+ * once: a consumer that called one variant as a value printed the function's source as a Mode line, and
+ * the only reason it was not caught is that some variants took an argument and others did not.
+ */
 export const MODE_VARIANTS = Object.freeze({
-  unconfigured: `no ServiceNow instance configured; run ${ADD_INSTANCE()}`,
-  serverDisabled: (label) => `server disabled in .claude/settings.local.json although instance `
-    + `"${label}" is configured; run ./snowarch mode live`,
-  noInstanceLoaded: 'server enabled but no instance is loaded (see SV-02/SV-03); run '
-    + '/snowarch setup-instance',
-  notBootstrapped: 'this checkout has not been bootstrapped; run ./bootstrap.sh '
-    + '(Windows: bootstrap.cmd)',
+  unconfigured: (spell) =>
+    `no ServiceNow instance configured; run ${ADD_INSTANCE(needSpell(spell, 'unconfigured').cli)}`,
+  serverDisabled: (label, spell) => `server disabled in .claude/settings.local.json although instance `
+    + `"${label}" is configured; run ${needSpell(spell, 'serverDisabled').cli} mode live`,
+  noInstanceLoaded: (spell) => {
+    needSpell(spell, 'noInstanceLoaded');
+    return 'server enabled but no instance is loaded (see SV-02/SV-03); run /snowarch setup-instance';
+  },
+  notBootstrapped: (spell) => 'this checkout has not been bootstrapped; run '
+    + `${needSpell(spell, 'notBootstrapped').bootstrap}`,
 });
 
 /**

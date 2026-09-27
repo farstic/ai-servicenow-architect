@@ -171,10 +171,15 @@ test('the add-an-instance remedy is one string, in every place that offers it', 
   // renders `spellings().cli`, which is `.\\snowarch.cmd` on Windows, so comparing it against the
   // `./snowarch` default was the test choosing a platform and then checking a different one — it
   // passed on macOS and failed on every Windows cell.
+  // ARC-07-W17, rule 5 — ONE SOURCE FOR BOTH SIDES. `ADD_INSTANCE()` defaults to the POSIX spelling,
+  // so comparing a variant rendered for THIS shell against that default failed under pwsh: the Mode
+  // line said `.\snowarch.cmd mode live` and the expectation said `./snowarch mode live`. Both sides
+  // now take the same spelling, which is what makes this a test of ONE STRING rather than of two.
+  const spell = spellings();
   const surfaces = {
-    'the doctor Mode line': [MODE_VARIANTS.unconfigured, ADD_INSTANCE()],
+    'the doctor Mode line': [MODE_VARIANTS.unconfigured(spell), ADD_INSTANCE(spell.cli)],
     'the bootstrap Next block': [nextBlock({ mode: 'design-only', serverKey: 'servicenow' }),
-      ADD_INSTANCE(spellings().cli)],
+      ADD_INSTANCE(spell.cli)],
   };
   for (const [where, [text, expected]] of Object.entries(surfaces)) {
     assert.ok(text.includes(expected), `${where} does not carry the one remedy verbatim:\n${text}`);
@@ -342,20 +347,24 @@ test('ARC-07-W12 — the set-flags example is the one the server\'s own help pri
 });
 
 test('ARC-07-W15 — the full doctor\'s own line is byte-identical, and the quick one is not it', async () => {
-  // THE HALF THAT MUST NOT MOVE. `summaryLine` is shared: the full doctor renders through it with no
-  // options, so the default path has to produce exactly what it produced before this row — including
-  // the `--section` split and the fixable suffix, neither of which the bootstrap's line ever shows.
+  // THE HALF THAT MUST NOT MOVE — restated for ARC-07-W17 as the architect ruled: **identical except
+  // the launcher spelling**. W15 asserted these bytes against a POSIX default; W17 removed the default
+  // (a default is the literal that row sweeps, and it renders the wrong spelling on Windows silently),
+  // so the launcher is DERIVED here and everything around it is unchanged — including the `--section`
+  // split and the fixable suffix, neither of which the bootstrap's line ever shows.
   const { summaryLine } = await import('../lib/doctor/report-text.mjs');
+  const cli = spellings().cli;
   const checks = [{ id: 'E-23', status: 'warn' }, { id: 'E-29', status: 'fail' }];
-  assert.equal(summaryLine({ ok: 32, warn: 3, fail: 2, skip: 4, fixable: 0 }, checks),
+  assert.equal(summaryLine({ ok: 32, warn: 3, fail: 2, skip: 4, fixable: 0 }, checks, { cli }),
     'DOCTOR: 32 ok, 3 warn (E-23), 2 fail (E-29), 4 skipped');
-  assert.equal(summaryLine({ ok: 5, warn: 0, fail: 1, skip: 37, notInSection: 37, fixable: 1 }, null),
-    'DOCTOR: 5 ok, 0 warn, 1 fail, 37 not in section (1 fixable — run ./snowarch doctor --fix)');
+  assert.equal(
+    summaryLine({ ok: 5, warn: 0, fail: 1, skip: 37, notInSection: 37, fixable: 1 }, null, { cli }),
+    `DOCTOR: 5 ok, 0 warn, 1 fail, 37 not in section (1 fixable — run ${cli} doctor --fix)`);
 
   // ...and the quick form, from the SAME function, is a different line rather than a reworded one.
   assert.equal(
-    summaryLine({ ok: 13, warn: 1, fail: 1, skip: 26, notInQuick: 26 }, checks, { quick: true }),
-    'Health check (quick): 13 ok · 1 warn (E-23) · 1 fail (E-29) · 26 more run with ./snowarch doctor');
+    summaryLine({ ok: 13, warn: 1, fail: 1, skip: 26, notInQuick: 26 }, checks, { quick: true, cli }),
+    `Health check (quick): 13 ok · 1 warn (E-23) · 1 fail (E-29) · 26 more run with ${cli} doctor`);
 });
 
 test('ARC-07-W15 — the quick line takes the launcher from its caller, never from this module', async () => {

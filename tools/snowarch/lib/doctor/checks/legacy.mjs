@@ -12,6 +12,7 @@
 // credential across the old layout, and the `.bak-*` files Claude Code writes keep every secret the
 // original had. A user who deletes the registration and stops there still has the password on disk.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { bootstrapOf, cliOf } from '../spell.mjs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -324,9 +325,9 @@ export function legacyChecks() {
         // enforced by a check, rather than a runtime read of a document that may not be beside the
         // code on a user's machine.
         return warn(`legacy wizard store ${shown} present (${count}; never read by this product)`, {
-          remedy: './snowarch instance import --from-legacy      '
+          remedy: `${cliOf(ctx)} instance import --from-legacy      `
             + '(migrates entries, then advises deleting the directory)',
-          command: './snowarch instance import --from-legacy',
+          command: `${cliOf(ctx)} instance import --from-legacy`,
           data: { path: shown, present: true, instances },
         });
       },

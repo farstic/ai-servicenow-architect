@@ -11,6 +11,7 @@
 // exists after `npm ci` — which a design-only checkout never runs. The specifier stays the public
 // API for other consumers, and a test asserts both resolve to the same module when it can.
 import { existsSync, readFileSync } from 'node:fs';
+import { bootstrapOf, cliOf } from '../spell.mjs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -163,7 +164,7 @@ export async function adopt(ctx, id) {
       // `fixable: false` on the RESULT: `--fix` installs dependencies, it does not restore a
       // committed artefact — that is one `git checkout` a human runs after looking at their diff.
       ? fail(`${DIST_MISSING} — ${join(answer.packageDir, ...DOCTOR_ENTRY)} is not there`, {
-        remedy: 'git checkout -- packages/snowarch/dist, or ./snowarch upgrade',
+        remedy: `git checkout -- packages/snowarch/dist, or ${cliOf(ctx)} upgrade`,
         command: 'git checkout -- packages/snowarch/dist',
         fixable: false,
         data: { state: answer.state },
@@ -174,8 +175,8 @@ export async function adopt(ctx, id) {
   // check skips and nothing fails. In live mode the server cannot start, which is SV-01's to say.
   if (id === 'SV-01' && isLive(ctx)) {
     return fail(`${DEPS_MISSING}${answer.error ? ` (${answer.error})` : ''}`, {
-      remedy: './snowarch doctor --fix',
-      command: './snowarch doctor --fix',
+      remedy: `${cliOf(ctx)} doctor --fix`,
+      command: `${cliOf(ctx)} doctor --fix`,
       data: { state: 'no-deps', fix: { kind: 'deps-missing' } },
     });
   }

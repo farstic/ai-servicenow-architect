@@ -12,6 +12,8 @@
 // included; exit 2 is a usage error, which is a fact about the command line rather than the
 // checkout.
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
+import { bootstrapOf, cliOf, spellFor } from './spell.mjs';
+import { spellings } from '../text.mjs';
 import { loadState } from '../state.mjs';
 import { dirname, join, resolve } from 'node:path';
 
@@ -37,8 +39,23 @@ import { exitCodeFor, runChecks, selectSections } from './runner.mjs';
 import { maskForJson } from './json-boundary.mjs';
 import { readStoreSummaries } from '../../../../packages/snowarch/dist/store/label.js';
 
-export const USAGE = [
-  'usage: ./snowarch doctor [--json] [--quick] [--no-network] [--fix] [--section <a,b>] [--no-cache]',
+/**
+ * ARC-07-W17 — A FUNCTION, and the reason is a cycle rather than a preference.
+ *
+ * This was `export const USAGE = [...].join('\n')` with the launcher spelled `./snowarch`. Deriving it
+ * needs `spellings()`, and calling that at MODULE LOAD from here throws: `panel.mjs` imports
+ * `text.mjs`, `text.mjs` imports `doctor/report-text.mjs`, `report-text.mjs` imports `panel.mjs`, and
+ * this module sits in that graph — so `isWindowsShell` is not initialised yet and the whole doctor
+ * fails to import. Forty cases went red on exactly that before this was lazy.
+ *
+ * `cli.mjs` resolves a `usage` that is a function, so every command may spell its launcher lazily.
+ *
+ * IT TAKES AN OPTIONAL SHELL so a case can assert the Windows rendering without forcing
+ * `process.platform`, which ARC-07 already measured as unusable locally — `win32.resolve` on POSIX
+ * paths makes everything fail. `cli.mjs` calls it with nothing, which is the running process.
+ */
+export const USAGE = (where) => [
+  `usage: ${spellings(where).cli} doctor [--json] [--quick] [--no-network] [--fix] [--section <a,b>] [--no-cache]`,
   '',
   `  --section <a,b>   only these sections: ${SECTIONS.join(', ')} (server = every SV- check)`,
   '  --quick           the fast subset; implies --no-network and skips anything that spawns',
@@ -167,7 +184,11 @@ function storeSummaries(root, config) {
 
 export async function runDoctor({ root, config, registry = engineRegistry(), sections = null,
   quick = false, noNetwork = false, fix = false, section = null, writeCache = 'auto',
-  env = process.env, home = '', now = () => Date.now(), started = null } = {}) {
+  env = process.env, home = '', now = () => Date.now(), started = null,
+  // ARC-07-W17 — the PLATFORM, so the Mode line's spelling is the one this run was TOLD about rather
+  // than the machine's. A fixture capture pins it (`make-status-fixtures.mjs` passes `linux`), which is
+  // what stops a committed fixture depending on the shell that captured it.
+  platform = process.platform } = {}) {
   const startedAt = started ?? now();
   const options = { quick, noNetwork: noNetwork || quick, fix, section, sections };
 
@@ -234,6 +255,9 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     // `bootstrap-state.json`; NOT `~/.claude.json`, which this module promises never to read.
     registration: (() => { try { return loadState(root)?.registration ?? 'project'; }
       catch { return 'project'; } })(),
+    // ARC-07-W17 — the doctor renders for the shell it was TOLD about, so a fixture capture can pin it
+    // and a committed fixture stops depending on the capturing machine.
+    spell: spellFor({ platform, env }),
   });
   const data = (id) => results.find((r) => r.id === id)?.data ?? null;
   const toolCount = data('SV-05')?.toolCount ?? null;
@@ -347,11 +371,14 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
  * report they read are the RE-RUN's, and the fixes are listed above it.
  */
 export async function fixCommand({ root, config, registry, options, env, home, now, write, ask,
+  // ARC-07-W17 — threaded through the fix path too: both its `runDoctor` passes render a Mode line, and
+  // a fix run on Windows must spell the launcher the way that shell does.
+  platform = process.platform,
   yes = false, deps = {} }) {
   // `write` here is the NARRATION channel, not stdout. Under `--json` the caller hands us stderr:
   // a plan printed above the object made `JSON.parse(stdout)` fail on the first character, which
   // is the whole contract `--json` has with a script.
-  const first = await runDoctor({ root, config, registry, ...options, env, home, now,
+  const first = await runDoctor({ root, config, registry, ...options, env, home, now, platform,
     // The first pass never writes the cache: it describes a checkout that is about to change.
     writeCache: false });
 
@@ -393,6 +420,7 @@ export async function fixCommand({ root, config, registry, options, env, home, n
 
   // The same options, so the second report is comparable with the first — and this one caches.
   const second = await runDoctor({ root, config, registry: registry ?? engineRegistry(), ...options,
+    platform,
     env, home, now });
   return { applied, report: second.report, checks: second.checks, cacheError: second.cacheError,
     results: second.results };
@@ -451,6 +479,12 @@ export function resolveCheckout({ cwd = process.cwd(), who = 'DOCTOR', node = pr
 }
 
 export async function doctorCommand({ flags = {}, log, out = process.stdout, env = process.env,
+  // ARC-07-W17 — the PLATFORM is an argument so a FIXTURE CAPTURE can pin it. `make-status-fixtures.mjs`
+  // writes `tests/fixtures/doctor/status-*.json` into the repository, and a fixture whose content depends
+  // on the runner's shell is not a fixture: captured on Windows it holds `.\snowarch.cmd` and the
+  // committed one holds `./snowarch`, so the re-capture case fails on one platform for no defect. #299
+  // settled the same question for the locked-production snapshot.
+  platform = process.platform,
   err = process.stderr, cwd = process.cwd(), registry = engineRegistry(), now = () => Date.now(),
   home = '', input = process.stdin, ask = null, fixDeps = {} } = {}) {
   const started = now();
@@ -504,7 +538,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     // `--fix` prints what it would do and stops, which is the safe half of the interaction.
     const interactive = Boolean(input?.isTTY) || Boolean(ask);
     const outcome = await fixCommand({
-      root, config, registry, options: runOptions, env, home, now, write: narrate,
+      root, config, registry, options: runOptions, env, home, now, write: narrate, platform,
       yes: flags.yes === true,
       ask: ask ?? (interactive ? defaultAsk(input) : null),
       deps: fixDeps,
@@ -524,7 +558,7 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     }
   } else {
     ({ report, checks, cacheError, results } = await runDoctor({
-      root, config, registry, ...runOptions, env, home, now,
+      root, config, registry, ...runOptions, env, home, now, platform,
     }));
   }
 
@@ -549,7 +583,13 @@ export async function doctorCommand({ flags = {}, log, out = process.stdout, env
     // user's own words; a machine consumer uses the report object, not this string.
     write(JSON.stringify(maskForJson(cacheError ? { ...report, cacheError } : report, { home }), null, 2));
   } else {
-    write(renderText({ report, checks, results, colour: useColour({ stream: out, env }) }));
+    // ARC-07-W17 — the renderer is pure and takes the spelling; this command may read the shell.
+    // `doctorCommand` has no `ctx` — it BUILDS one for the checks — so the platform and the command's
+    // own `env` are passed directly. `env` rather than `process.env`: the command already takes it as
+    // an argument so a caller can drive a shell, and threading it is what makes Git Bash on Windows
+    // keep the POSIX spelling.
+    write(renderText({ report, checks, results, colour: useColour({ stream: out, env }),
+      cli: cliOf({ platform, env }) }));
   }
   if (log?.commit) log.commit();
   return report.summary.fail > 0 ? exitCodeFor(report.summary) : EXIT_OK;

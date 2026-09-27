@@ -8,12 +8,14 @@
 // command is printed for a human to run after they have looked at their own diff, and S06 refuses
 // to run it for them.
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import { bootstrapOf, cliOf } from '../spell.mjs';
 import { join } from 'node:path';
 
 import { makeExec, samePath } from '../../steps/B00.mjs';
 import { loadState, STATE_VERSION } from '../../state.mjs';
 import { plannedSteps } from '../../steps/index.mjs';
 import { version as engineVersionOf } from '../../config.mjs';
+import { spellings } from '../../text.mjs';
 import { defineCheck } from '../registry.mjs';
 import { projectEntryEnabled } from '../../settings-local.mjs';
 import { RUNNING_STEP_ENV } from '../../spawn-env.mjs';
@@ -394,7 +396,7 @@ export function engineRepoChecks() {
           ? ok('no credential-shaped key or literal', { scanned: tracked.ok ? 'tracked files' : 'settings only' })
           : fail(problems.join('; '), {
             remedy: 'remove the key; credentials live only in .local/instances.json '
-              + '(`./snowarch instance set-credentials <label>`)',
+              + `(\`${cliOf(ctx)} instance set-credentials <label>\`)`,
             data: { problems },
           });
       },
@@ -414,8 +416,8 @@ export function engineRepoChecks() {
         try { state = loadState(ctx.root); } catch { state = null; }
         if (!existsSync(join(ctx.root, SETTINGS_LOCAL))) {
           return fail('.claude/settings.local.json is absent — the mode toggle is unset', {
-            remedy: './snowarch mode design (or ./snowarch mode live)',
-            command: './snowarch mode design',
+            remedy: `${cliOf(ctx)} mode design (or ${cliOf(ctx)} mode live)`,
+            command: `${cliOf(ctx)} mode design`,
             data: { mode: state?.mode ?? null,
               fix: { kind: 'toggles-mismatch', mode: state?.mode ?? 'design' } },
           });
@@ -423,7 +425,7 @@ export function engineRepoChecks() {
         let settings;
         try { settings = readJson(ctx.root, SETTINGS_LOCAL); } catch (e) {
           return fail(`.claude/settings.local.json is not valid JSON — ${e.message}`, {
-            remedy: 'fix the JSON, then ./snowarch mode design or ./snowarch mode live',
+            remedy: `fix the JSON, then ${cliOf(ctx)} mode design or ${cliOf(ctx)} mode live`,
             data: { mode: state?.mode ?? null },
           });
         }
@@ -439,8 +441,8 @@ export function engineRepoChecks() {
           fix: { kind: 'toggles-mismatch', mode: mode ?? 'design' } };
         if (problems.length > 0) {
           return fail(problems.join('; '), {
-            remedy: mode === 'live' ? './snowarch mode live' : './snowarch mode design',
-            command: mode === 'live' ? './snowarch mode live' : './snowarch mode design',
+            remedy: mode === 'live' ? `${cliOf(ctx)} mode live` : `${cliOf(ctx)} mode design`,
+            command: mode === 'live' ? `${cliOf(ctx)} mode live` : `${cliOf(ctx)} mode design`,
             data,
           });
         }
@@ -480,8 +482,16 @@ export function engineRepoChecks() {
           // `fixable: false` on the RESULT: the check can be fixable (a wrong mode is one command),
           // but an absent `.local/` is an install that never ran, and `--fix` does not install.
           return fail('.local/ is absent — not bootstrapped', {
-            remedy: ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh',
-            command: ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh',
+            // ARC-07-W17 — SIX BRANCHES THAT ALREADY KNEW THE PLATFORM AND STILL GOT IT WRONG. Each read
+            // `ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh'`: somebody wrote the win32 arm
+            // and put in it the ONE spelling PowerShell refuses, because it does not resolve a command from
+            // the current directory and nothing here is on PATH. ARC-07-C1's finding, reproduced in code that
+            // branches on platform — and three of these are doctor remedies a Windows user is told to paste
+            // when `.local` permissions or the workspace are wrong, so they fire on the unhappy path where a
+            // reader can least afford to guess. `ctx.env` is threaded, not omitted: `isWindowsShell` reads
+            // SHELL and MSYSTEM so Git Bash on Windows keeps the POSIX spelling.
+            remedy: spellings({ platform: ctx.platform, env: ctx.env }).bootstrap,
+            command: spellings({ platform: ctx.platform, env: ctx.env }).bootstrap,
             fixable: false,
             data: { fix: null },
           });
@@ -505,8 +515,8 @@ export function engineRepoChecks() {
           state = loadState(ctx.root);
         } catch (e) {
           return fail(e.message, {
-            remedy: './snowarch bootstrap --reset',
-            command: './snowarch bootstrap --reset',
+            remedy: `${cliOf(ctx)} bootstrap --reset`,
+            command: `${cliOf(ctx)} bootstrap --reset`,
             fixable: false,
             data: { mode, fix: null },
           });
@@ -527,8 +537,8 @@ export function engineRepoChecks() {
           const fixable = data.fix !== null;
           return fail(problems.join('; '), {
             fixable,
-            remedy: fixable ? 'chmod 700 .local' : (ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh'),
-            command: fixable ? 'chmod 700 .local' : (ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh'),
+            remedy: fixable ? 'chmod 700 .local' : (spellings({ platform: ctx.platform, env: ctx.env }).bootstrap),
+            command: fixable ? 'chmod 700 .local' : (spellings({ platform: ctx.platform, env: ctx.env }).bootstrap),
             data,
           });
         }
@@ -657,8 +667,8 @@ export function engineRepoChecks() {
         // to prevent. It is the same principle and the same reader.
         if (inProgress) parts.push(`${inProgress} is running this check`);
         return fail(`bootstrap incomplete since ${current ?? 'this version'}: ${parts.join(', ')}`, {
-          remedy: ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh',
-          command: ctx.platform === 'win32' ? 'bootstrap.cmd' : './bootstrap.sh',
+          remedy: spellings({ platform: ctx.platform, env: ctx.env }).bootstrap,
+          command: spellings({ platform: ctx.platform, env: ctx.env }).bootstrap,
           data: { expected: expected.map((s) => s.id), problems, stale, engineVersion: current },
         });
       },

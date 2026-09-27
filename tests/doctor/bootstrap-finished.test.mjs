@@ -14,9 +14,38 @@
  * already on disk, which is what makes it worth a check rather than a feature.
  */
 import { test } from 'node:test';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+
+/**
+ * The launcher these expectations hold — ARC-07-W17.
+ *
+ * DERIVED, never typed. The doctor's remedies read the spelling from the definitions now, so a POSIX
+ * literal here passes on a mac and fails all three Windows cells the moment the renderer is fixed —
+ * which is exactly what happened on the head before this one, and on #299 and #308 before that. The
+ * rule this leaves: an assertion holding a launcher must derive it in the SAME commit as the product
+ * change, or the product is right and the test is wrong on one platform only.
+ *
+ * No `env` fixture, deliberately: the mirror rule applies, so the case asserts whatever THIS shell
+ * renders — POSIX on a mac, `.\snowarch.cmd` on the Windows runner.
+ */
+/**
+ * THE SAME SOURCE THE PRODUCT LINE USES — ARC-07-W17, corrected.
+ *
+ * `ctxFor` pins `platform: 'darwin'`, and E-29's command is
+ * `spellings({ platform: ctx.platform, env: ctx.env }).bootstrap` — so the PRODUCT renders the darwin
+ * spelling whatever machine runs the case. My first sweep derived these from `spellings()`, the
+ * PROCESS, which is the same thing on a mac and `.\bootstrap.cmd` on the Windows runner: the test then
+ * expected Windows while the product correctly rendered POSIX, and all three Windows cells went red.
+ *
+ * The rule, stated because the next sweep will need it: an assertion derives from the same source the
+ * product line derives from — here the ctx's platform, not the process's.
+ */
+const CTX = Object.freeze({ platform: 'darwin', env: {} });
+const SPELLED_CLI = spellings(CTX).cli;
+const SPELLED_BOOTSTRAP = spellings(CTX).bootstrap;
 
 import { engineRepoChecks } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { version as engineVersionOf } from '../../tools/snowarch/lib/config.mjs';
@@ -187,7 +216,7 @@ test('C32: the step that spawned this check is not reported as never having run'
   assert.doesNotMatch(r.detail, /incomplete/, 'a finished install is still called incomplete');
   // ...and it SAYS why the count is one short of the plan, rather than leaving a reader to wonder.
   assert.match(r.detail, /B09 is running this check/);
-  assert.equal(r.command ?? null, null, 'a run in progress was handed ./bootstrap.sh as a remedy');
+  assert.equal(r.command ?? null, null, `a run in progress was handed ${SPELLED_BOOTSTRAP} as a remedy`);
 });
 
 test('C32: it excludes the step that is running, not B09 by name', async (t) => {
@@ -216,7 +245,7 @@ test('C32: with no running step named, an absent step is still a FAIL', async (t
   const r = await E29.run(midStep(root, ''));
   assert.equal(r.status, 'fail', 'an unfinished install passed with nothing running');
   assert.match(r.detail, /B09 never ran/);
-  assert.equal(r.command, './bootstrap.sh');
+  assert.equal(r.command, `${SPELLED_BOOTSTRAP}`);
 });
 
 test('C32: a step recorded as interrupted is a FAIL even while another step is running', async (t) => {

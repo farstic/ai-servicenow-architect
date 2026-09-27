@@ -10,6 +10,7 @@
 // claim is that its ServiceNow facts are grounded; reporting the failure of the thing the product
 // is FOR as a note in the margin is the one report that would mislead an operator into shipping.
 import { ALWAYS_DIRS, ROOT_FILES } from '../../docs/sync.mjs';
+import { bootstrapOf, cliOf } from '../spell.mjs';
 import { docsStatus, E12_ABSENT, SPARSE } from '../../docs/status.mjs';
 import { defineCheck } from '../registry.mjs';
 
@@ -56,8 +57,8 @@ export function engineDocsChecks() {
           // second thing to keep in step.
           const text = E12_ABSENT(mode);
           return fail(text.replace(/^E-12 docs corpus: FAIL — /, ''), {
-            remedy: 'run ./snowarch docs sync',
-            command: './snowarch docs sync',
+            remedy: `run ${cliOf(ctx)} docs sync`,
+            command: `${cliOf(ctx)} docs sync`,
             data: { present: false, mode, fix: { kind: 'corpus-missing', mode } },
           });
         }
@@ -76,8 +77,8 @@ export function engineDocsChecks() {
         if (s.rootMissing?.length) {
           const names = s.rootMissing.join(', ');
           return fail(`the corpus is on disk but incomplete — missing ${names}`, {
-            remedy: 'run ./snowarch docs sync',
-            command: './snowarch docs sync',
+            remedy: `run ${cliOf(ctx)} docs sync`,
+            command: `${cliOf(ctx)} docs sync`,
             data: { present: true, mode, rootMissing: s.rootMissing,
               fix: { kind: 'corpus-missing', mode } },
           });
@@ -87,8 +88,8 @@ export function engineDocsChecks() {
           // one fact that disagree. Which is right is not the doctor's to decide, so it reports
           // both and names the command that makes them agree.
           return fail('the corpus is on disk but the recorded docs mode is "skip"', {
-            remedy: 'run ./snowarch docs sync to record the corpus that is there',
-            command: './snowarch docs sync',
+            remedy: `run ${cliOf(ctx)} docs sync to record the corpus that is there`,
+            command: `${cliOf(ctx)} docs sync`,
             data: { present: true, mode, fix: { kind: 'corpus-missing', mode } },
           });
         }
@@ -127,8 +128,8 @@ export function engineDocsChecks() {
         }
         if (s.headMatchesPin === false) {
           return fail(`corpus HEAD ${short(s.head)} ≠ pin ${short(s.pin)}`, {
-            remedy: 'run ./snowarch docs sync',
-            command: './snowarch docs sync',
+            remedy: `run ${cliOf(ctx)} docs sync`,
+            command: `${cliOf(ctx)} docs sync`,
             data: { ...data, fix: { kind: 'head-off-pin' } },
           });
         }
@@ -156,8 +157,8 @@ export function engineDocsChecks() {
           ? ok(s.family, { family: s.family, branch: s.branch })
           : fail(`corpus is on branch "${s.branch ?? 'unknown'}", not the configured family `
             + `"${s.family}"`, {
-            remedy: 'run ./snowarch docs sync',
-            command: './snowarch docs sync',
+            remedy: `run ${cliOf(ctx)} docs sync`,
+            command: `${cliOf(ctx)} docs sync`,
             data: { family: s.family, branch: s.branch },
           });
       },
@@ -196,8 +197,8 @@ export function engineDocsChecks() {
         return problems.length === 0
           ? ok(`${s.sparse} · ${s.areasPresent.length} area(s)`, data)
           : fail(problems.join('; '), {
-            remedy: 'run ./snowarch docs sync',
-            command: './snowarch docs sync',
+            remedy: `run ${cliOf(ctx)} docs sync`,
+            command: `${cliOf(ctx)} docs sync`,
             data,
           });
       },
@@ -219,8 +220,8 @@ export function engineDocsChecks() {
         const c = s.citations ?? { checked: 0, dead: [] };
         if (!s.present) {
           return fail('citations unverifiable — corpus absent (see E-12)', {
-            remedy: 'run ./snowarch docs sync',
-            command: './snowarch docs sync',
+            remedy: `run ${cliOf(ctx)} docs sync`,
+            command: `${cliOf(ctx)} docs sync`,
             data: { checked: 0, dead: 0, present: false },
           });
         }
@@ -228,7 +229,7 @@ export function engineDocsChecks() {
         const lines = c.dead.slice(0, 10)
           .map((d) => `${d.file}:${d.line} → ${d.path}`);
         return fail(`${c.dead.length} dead citation(s): ${lines.join('; ')}`, {
-          remedy: 'maintainer: fix the citation; users: ./snowarch docs sync',
+          remedy: `maintainer: fix the citation; users: ${cliOf(ctx)} docs sync`,
           data: { checked: c.checked, dead: c.dead.length, first: lines },
         });
       },

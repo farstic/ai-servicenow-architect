@@ -10,6 +10,7 @@
 // from the ratchet, and the checkout would pass one and fail the other with no way to tell which
 // was stale.
 import { dirname, resolve } from 'node:path';
+import { bootstrapOf, cliOf } from '../spell.mjs';
 import { fileURLToPath } from 'node:url';
 
 import * as l02 from '../../../../../packages/contract/lint/checks/l02-prefix.mjs';
@@ -191,7 +192,7 @@ export function engineContractChecks() {
         const lint = lintContextFor(ctx);
         if (!lint.ctx) {
           return fail(`the contract could not be read — ${lint.error}`, {
-            remedy: 'users: ./snowarch upgrade · maintainer: node scripts/build-dist.mjs',
+            remedy: `users: ${cliOf(ctx)} upgrade · maintainer: node scripts/build-dist.mjs`,
             command: 'node scripts/build-dist.mjs',
             data: { ran: false },
           });
@@ -204,7 +205,7 @@ export function engineContractChecks() {
           ? ok(`${pinned}… · ${data.required} required of ${data.declared} declared`, data)
           : fail(problems.join(' '), {
             remedy: 'maintainer: node packages/contract/pin.mjs after reviewing the diff; '
-              + 'users: ./snowarch upgrade',
+              + `users: ${cliOf(ctx)} upgrade`,
             data: { ...data, problems },
           });
       },

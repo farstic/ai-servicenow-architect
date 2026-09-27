@@ -9,6 +9,26 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+
+/**
+ * The spelling every MODE_VARIANT now requires — ARC-07-W17.
+ *
+ * No process default in the product: the doctor renders for the ctx it was given, `gen-doctor-docs` for
+ * a committed page, the hook for the person in front of it. A default satisfied the hook and broke the
+ * other two across twelve Windows cells. Derived here, so these cases assert this shell's rendering.
+ */
+const SPELL = spellings();
+
+/**
+ * The launcher these renderers are told to print — ARC-07-W17.
+ *
+ * `summaryLine` and `renderText` take it with NO DEFAULT: they are pure of the environment (the purity
+ * walker in `panel.test.mjs` uses `report-text.mjs` as its positive control and allows it exactly one
+ * `process.env`, through `useColour`), and a POSIX default would be the literal that row removes.
+ * DERIVED here rather than typed, so the four Windows cells compare against their own spelling.
+ */
+const CLI = spellings().cli;
 
 import { toggleProblems } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { projectEntryEnabled } from '../../tools/snowarch/lib/settings-local.mjs';
@@ -62,26 +82,26 @@ test('the four design-only and unknown variants, and live', () => {
     [{ toggles: { enabled: true }, instances: [], bootstrapped: false }, 'notBootstrapped'],
   ];
   for (const [facts, variant] of cases) {
-    const derived = deriveMode(facts);
+    const derived = deriveMode({ ...facts, spell: SPELL });
     assert.equal(derived.variant, variant, JSON.stringify(facts));
     assert.notEqual(derived.mode, 'live');
   }
-  const live = deriveMode({ toggles: { enabled: true }, instances: [loaded()] });
+  const live = deriveMode({ toggles: { enabled: true }, instances: [loaded()], spell: SPELL });
   assert.equal(live.mode, 'live');
   assert.deepEqual(live.instance, { label: 'pdi', environment: 'pdi', preset: 'pdi-developer' });
 });
 
 // AC 2 — the exact sentence, with nothing appended.
 test('the design-only line is exactly the story\'s sentence, and carries no doctor stamp', () => {
-  const derived = deriveMode({ toggles: { enabled: false }, instances: [] });
+  const derived = deriveMode({ toggles: { enabled: false }, instances: [], spell: SPELL });
   const line = modeLine(derived, { summary: { ok: 41, warn: 0, fail: 0 } });
-  assert.equal(line, `Mode: design-only — ${MODE_VARIANTS.unconfigured}`);
+  assert.equal(line, `Mode: design-only — ${MODE_VARIANTS.unconfigured(SPELL)}`);
   assert.equal(/doctor \d{4}-/.test(line), false, 'a stamp was appended to an instruction');
 });
 
 // AC 1 — the live line, with the stamp.
 test('the live line names the instance and when the doctor last looked', () => {
-  const derived = deriveMode({ toggles: { enabled: true }, instances: [loaded()] });
+  const derived = deriveMode({ toggles: { enabled: true }, instances: [loaded()], spell: SPELL });
   const line = modeLine(derived, { summary: { ok: 41, warn: 0, fail: 0 }, at: new Date('2026-09-10T09:00:00Z') });
   assert.equal(line, 'Mode: live — instance=pdi (pdi) preset=pdi-developer — doctor 2026-09-10 41 ok');
   const failing = modeLine(derived, { summary: { ok: 39, warn: 0, fail: 2 }, at: new Date('2026-09-10T09:00:00Z') });
@@ -92,7 +112,7 @@ test('the live line names the instance and when the doctor last looked', () => {
 test('the detailed line derives its flag labels from the contract, never from a list here', () => {
   const contract = { flags: [{ name: 'WRITE_ENABLED' }, { name: 'SCRIPTING_ENABLED' }],
     tools: [{ name: 'a' }, { name: 'b' }] };
-  const derived = deriveMode({ toggles: { enabled: true }, instances: [loaded()] });
+  const derived = deriveMode({ toggles: { enabled: true }, instances: [loaded()], spell: SPELL });
   const line = modeLineDetailed(derived, { contract,
     flags: { WRITE_ENABLED: 'true', SCRIPTING_ENABLED: 'false' },
     toolCount: { count: 398, source: 'server' } });
@@ -117,7 +137,7 @@ test('ARC-08-C21 — flags nobody read do not render as flags that are off', () 
 
   // In live mode that absence is said in WORDS, never dropped: a panel that quietly shortened its
   // line would hide the absence one step later instead of reporting it.
-  const derived = deriveMode({ toggles: { enabled: true }, instances: [loaded()] });
+  const derived = deriveMode({ toggles: { enabled: true }, instances: [loaded()], spell: SPELL });
   const line = modeLineDetailed(derived, { contract, flags: null,
     toolCount: { count: 398, source: 'server' } });
   assert.ok(line.includes('flags unknown (store not read)'), line);
@@ -130,7 +150,7 @@ test('ARC-08-C21 — flags nobody read do not render as flags that are off', () 
 
 test('a tool count from the contract says so, because a number with no provenance is trusted', () => {
   const contract = { flags: [{ name: 'WRITE_ENABLED' }], tools: [{ name: 'a' }] };
-  const derived = deriveMode({ toggles: { enabled: true }, instances: [loaded()] });
+  const derived = deriveMode({ toggles: { enabled: true }, instances: [loaded()], spell: SPELL });
   assert.match(modeLineDetailed(derived, { contract, flags: {},
     toolCount: { count: 397, source: 'contract' } }), /397 tools \(contract\)$/);
 });
@@ -140,7 +160,7 @@ test('a second instance and a refused one are both named', () => {
   const instances = [loaded(), loaded({ label: 'uat', environment: 'uat' }),
     loaded({ label: 'prod', environment: 'prod', status: 'not_loaded',
       reason: 'PROD_WRITE_NOT_ACKNOWLEDGED' })];
-  const derived = deriveMode({ toggles: { enabled: true }, instances });
+  const derived = deriveMode({ toggles: { enabled: true }, instances, spell: SPELL });
   const line = modeLineDetailed(derived, { contract, instances, toolCount: null });
   assert.match(line, /\+1 instance \(uat\)/);
   assert.match(line, /prod: not loaded \(PROD_WRITE_NOT_ACKNOWLEDGED\)/);
@@ -198,12 +218,17 @@ test('the Capabilities line names a provider per pack', () => {
 
 test('one summary renderer: the bootstrap\'s line and the doctor\'s are the same function', () => {
   const counts = { ok: 41, warn: 0, fail: 0 };
-  assert.equal(doctorLine(counts), summaryLine({ ...counts, skip: 0, fixable: 0 }));
+  // ARC-07-W17 — `null` for `checks`, then the options: `cli` is the THIRD argument, and passing it
+  // second makes it the checks list, which leaves `cli` undefined and prints `undefined doctor --fix`.
+  // My sweep of these call sites made exactly that mistake and the required parameter shouted.
+  assert.equal(doctorLine(counts),
+    summaryLine({ ...counts, skip: 0, fixable: 0 }, null, { cli: CLI }));
   assert.equal(renderSummaryLine, summaryLine);
   assert.equal(doctorLine({ ...counts, nodeUsable: false }),
     'DOCTOR: unavailable until Node 20+ is installed (design-only is complete)');
-  assert.match(summaryLine({ ok: 1, warn: 0, fail: 1, skip: 2, fixable: 1 }),
-    /^DOCTOR: 1 ok, 0 warn, 1 fail, 2 skipped \(1 fixable — run \.\/snowarch doctor --fix\)$/);
+  // ...and the expectation DERIVES the launcher: a POSIX literal here fails the four Windows cells.
+  assert.equal(summaryLine({ ok: 1, warn: 0, fail: 1, skip: 2, fixable: 1 }, null, { cli: CLI }),
+    `DOCTOR: 1 ok, 0 warn, 1 fail, 2 skipped (1 fixable — run ${CLI} doctor --fix)`);
 });
 
 test('the engine block is assembled from what the checks already found', () => {
@@ -383,7 +408,7 @@ test('a secret-shaped key is refused by the cache exactly as by the state file',
  */
 test('ARC-08-C16 — a live checkout registered `local` is live, toggle off and all', () => {
   const facts = { toggles: { enabled: false }, instances: [loaded()], registration: 'local' };
-  const derived = deriveMode(facts);
+  const derived = deriveMode({ ...facts, spell: SPELL });
 
   assert.equal(derived.mode, 'live',
     'the owner\'s connected checkout is reported design-only — this is the C16 defect');
@@ -392,24 +417,24 @@ test('ARC-08-C16 — a live checkout registered `local` is live, toggle off and 
   assert.equal(derived.instance.label, 'pdi');
 
   // `user` scope carries the server the same way.
-  assert.equal(deriveMode({ ...facts, registration: 'user' }).mode, 'live');
+  assert.equal(deriveMode({ ...facts, registration: 'user', spell: SPELL }).mode, 'live');
 });
 
 test('ARC-08-C16 — the project path keeps every verdict it had', () => {
   // The paths this change must NOT move. Stays green when the fix is reverted.
   assert.equal(deriveMode({ toggles: { enabled: false }, instances: [loaded()],
-    registration: 'project' }).variant, 'serverDisabled');
+    registration: 'project', spell: SPELL }).variant, 'serverDisabled');
   assert.equal(deriveMode({ toggles: { enabled: false }, instances: [],
-    registration: 'project' }).variant, 'unconfigured');
-  assert.equal(deriveMode({ toggles: { enabled: true }, instances: [] }).variant, 'noInstanceLoaded');
-  assert.equal(deriveMode({ toggles: { enabled: true }, instances: [loaded()] }).mode, 'live');
+    registration: 'project', spell: SPELL }).variant, 'unconfigured');
+  assert.equal(deriveMode({ toggles: { enabled: true }, instances: [], spell: SPELL }).variant, 'noInstanceLoaded');
+  assert.equal(deriveMode({ toggles: { enabled: true }, instances: [loaded()], spell: SPELL }).mode, 'live');
   // The default is `project`, so every existing caller keeps the behaviour it had.
-  assert.equal(deriveMode({ toggles: { enabled: false }, instances: [loaded()] }).mode, 'design-only');
+  assert.equal(deriveMode({ toggles: { enabled: false }, instances: [loaded()], spell: SPELL }).mode, 'design-only');
 });
 
 test('ARC-08-C16 — a local registration with NO loaded instance is still not live', () => {
   // Both directions: the registration makes the server reachable, it does not invent a store.
-  const derived = deriveMode({ toggles: { enabled: false }, instances: [], registration: 'local' });
+  const derived = deriveMode({ toggles: { enabled: false }, instances: [], registration: 'local', spell: SPELL });
   assert.notEqual(derived.mode, 'live');
   assert.equal(derived.variant, 'noInstanceLoaded',
     'with the project toggle no longer deciding, an empty store is the reason and must say so');
@@ -430,7 +455,7 @@ test('ARC-08-C16 — writer, E-10 and the Mode line agree on what a live checkou
       : { disabledMcpjsonServers: ['servicenow'] };
 
     const derived = deriveMode({ toggles: { enabled: writerToggle },
-      instances: [loaded()], registration });
+      instances: [loaded()], registration, spell: SPELL });
     assert.equal(derived.mode, 'live',
       `the Mode line calls the writer's own live state ${derived.mode} (registration=${registration})`);
 
@@ -447,7 +472,7 @@ test('ARC-08-C16 — writer, E-10 and the Mode line agree on what a live checkou
     serverKey: 'servicenow', registration: 'local' });
   assert.match(both.problems[0], /both load/);
   assert.equal(deriveMode({ toggles: { enabled: true }, instances: [loaded()],
-    registration: 'local' }).mode, 'live');
+    registration: 'local', spell: SPELL }).mode, 'live');
 });
 
 /**
@@ -477,12 +502,10 @@ const configured = (over = {}) => ({ label: 'pdi', environment: 'pdi', preset: '
 test('ARC-08-C17 — an unprobed run with a configured store is live', () => {
   // The owner's exact state: local registration, project toggle off by design, one instance in
   // the store, quick run so nothing was probed.
-  const derived = deriveMode({
-    toggles: { enabled: false },
+  const derived = deriveMode({ toggles: { enabled: false },
     registration: 'local',
     instances: [configured()],
-    probed: false,
-  });
+    probed: false, spell: SPELL });
 
   assert.equal(derived.mode, 'live',
     'the hook tells a working checkout it is design-only — this is the C17 defect');
@@ -494,7 +517,7 @@ test('ARC-08-C17 — an unprobed run with a configured store is live', () => {
 test('ARC-08-C17 — an unprobed run with an EMPTY store is still not live', () => {
   // Both directions. The fix must not turn "nobody asked" into "yes" either: with nothing in the
   // store there is nothing to be live against, and the line must keep saying so.
-  const derived = deriveMode({ toggles: { enabled: true }, instances: [], probed: false });
+  const derived = deriveMode({ toggles: { enabled: true }, instances: [], probed: false, spell: SPELL });
   assert.notEqual(derived.mode, 'live');
 });
 
@@ -503,15 +526,13 @@ test('ARC-08-C17 — a PROBED run keeps every verdict it had', () => {
   // nothing about that path moves. An entry the server refused is still not live, and that is the
   // distinction worth keeping: `configured` is what the store knows, `loaded` is what the server
   // answered, and only the second is evidence about whether it works.
-  const refused = deriveMode({
-    toggles: { enabled: true },
-    instances: [{ label: 'pdi', environment: 'pdi', preset: 'custom', status: 'not_loaded' }],
-  });
+  const refused = deriveMode({ toggles: { enabled: true },
+    instances: [{ label: 'pdi', environment: 'pdi', preset: 'custom', status: 'not_loaded' }], spell: SPELL });
   assert.equal(refused.mode, 'design-only');
   assert.equal(refused.variant, 'noInstanceLoaded');
 
   // ...and a probed run that DID load is live through the original branch, not the new one.
-  const ok = deriveMode({ toggles: { enabled: true }, instances: [loaded()] });
+  const ok = deriveMode({ toggles: { enabled: true }, instances: [loaded()], spell: SPELL });
   assert.equal(ok.mode, 'live');
   assert.equal(ok.variant, 'live');
 });
@@ -519,7 +540,7 @@ test('ARC-08-C17 — a PROBED run keeps every verdict it had', () => {
 test('ARC-08-C17 — `probed` defaults to true, so no existing caller changes behaviour', () => {
   // The flag has to be opt-IN. Defaulting it the other way would make every caller that has not
   // been updated start trusting a store it never read.
-  const derived = deriveMode({ toggles: { enabled: true }, instances: [configured()] });
+  const derived = deriveMode({ toggles: { enabled: true }, instances: [configured()], spell: SPELL });
   assert.notEqual(derived.mode, 'live',
     'an unupdated caller would now call a store entry live without the server having loaded it');
 });

@@ -1175,7 +1175,7 @@ export async function addInstance(opts: Omit<AddOptions, 'auth' | 'username'> & 
 /** `--help`, from the same table the behaviour uses. */
 export function addHelp(): string {
   const lines = [
-    'usage: snowarch instance add <label> [options]',
+    `usage: ${cliSpelling()} instance add <label> [options]`,
     '',
     '  --url <origin>            the instance origin, https only',
     `  --env ${ENVIRONMENTS.join('|')}   which environment this is`,

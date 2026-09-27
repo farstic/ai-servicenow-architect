@@ -27,6 +27,22 @@
  * last time it caught `report-text.mjs` on the way in: the code moved, not the test.
  */
 import { idsFor } from './check-ids.mjs';
+/**
+ * ARC-07-W17 — THE LAUNCHER IS AN ARGUMENT HERE, and the purity guard is why.
+ *
+ * `tests/doctor/panel.test.mjs` walks this module's whole import graph and fails if anything in it
+ * reaches `node:fs`, `process.env`, a clock or a random — because the panel is DATA IN, TEXT OUT, so a
+ * report captured on one machine renders identically on another. My first attempt imported
+ * `spellings` from `../text.mjs` and read it at module load, which broke that guard twice over: the
+ * walker found `process.env` through the new edge, and the import created a cycle
+ * (`panel -> text -> report-text -> panel`) that threw `Cannot access 'isWindowsShell' before
+ * initialization` and took 40 cases red.
+ *
+ * So the spelling arrives from the caller, and there is NO POSIX DEFAULT: a default would be the very
+ * literal this row removes, and `undefined` reaching a template would print `undefined doctor` on the
+ * line a reader is meant to type. `commands/status.mjs` is impure and supplies it; ARC-07-W15 reached
+ * the same shape for `summaryLine` from the same constraint.
+ */
 
 /**
  * The contract sha, shortened to the prefix the rest of the product already uses.
@@ -76,7 +92,7 @@ export function engineLine(engine) {
  * family are not. Dropping the whole line for a missing segment would hide the release family,
  * which is the fact a grounding decision turns on.
  */
-export function docsLine(docs) {
+export function docsLine(docs, cli) {
   if (!docs) return null;
   if (docs.present === false) return 'Docs: not installed';
   const head = `vendor/ServiceNowDocs${docs.pin ? ` @ ${shortSha(docs.pin)}` : ''}`
@@ -90,7 +106,7 @@ export function docsLine(docs) {
   // run is a line readers learn to skip.
   if (docs.headMatchesPin === false) {
     parts.push(`corpus is on ${shortSha(docs.head) ?? 'an unknown commit'}, NOT the pin`
-      + ' — ./snowarch docs sync');
+      + ` — ${cli} docs sync`);
   }
   if (docs.citations !== null && docs.citations !== undefined) {
     parts.push(`citations checked: ${docs.citations} | dead: ${docs.dead ?? 0}`);
@@ -125,7 +141,7 @@ export function instancesLine(instances) {
 }
 
 /** `Doctor: 12 ok, 1 warn, 1 fail — quick run 2026-09-19 22:11 UTC · full report: ./snowarch doctor` */
-export function doctorLine(report) {
+export function doctorLine(report, cli) {
   const s = report?.summary;
   if (!s) return null;
   const kind = report.options?.quick ? 'quick run' : 'full run';
@@ -136,7 +152,7 @@ export function doctorLine(report) {
   return `Doctor: ${s.ok} ok, ${s.warn} warn${idsFor(report.checks, 'warn')}`
     + `, ${s.fail} fail${idsFor(report.checks, 'fail')}`
     + `${when ? ` — ${kind} ${when}` : ` — ${kind}`}`
-    + ' · full report: ./snowarch doctor';
+    + ` · full report: ${cli} doctor`;
 }
 
 /**
@@ -146,7 +162,7 @@ export function doctorLine(report) {
  * string and a fixed list of two, so a check moving in or out of the quick subset would have left
  * the sentence describing the old subset. It says what IS missing in the report in front of it.
  */
-export function notProbedLine(report) {
+export function notProbedLine(report, cli) {
   const missing = [];
   if (!report?.engine?.capabilities) missing.push('Capability packs');
   const docs = report?.engine?.docs;
@@ -171,7 +187,7 @@ export function notProbedLine(report) {
   const subject = missing.length > 2
     ? `${missing.slice(0, -1).join(', ')} and ${missing.at(-1)}`
     : missing.join(' and ');
-  return `${subject} are not probed on a quick run — ./snowarch doctor reports them.`;
+  return `${subject} are not probed on a quick run — ${cli} doctor reports them.`;
 }
 
 /**
@@ -241,15 +257,15 @@ export const failureLines = (parsed) => nonOkLines(parsed, ['fail']);
  * list is `failureLines`, the ARC-09-C46 renderer, so the panel, B09's install summary and the
  * upgrade's report print a failing check identically.
  */
-export function renderPanel(report) {
+export function renderPanel(report, cli) {
   const lines = [
     report?.modeLineDetailed ?? null,
     engineLine(report?.engine),
-    docsLine(report?.engine?.docs),
+    docsLine(report?.engine?.docs, cli),
     rosterLine(report?.engine?.roster),
     capabilitiesLine(report?.engine?.capabilities),
     instancesLine(report?.instances ?? report?.server?.instances ?? null),
-    doctorLine(report),
+    doctorLine(report, cli),
     // A line whose key is null is OMITTED, never guessed — the rule SKILL.md stated and a model
     // applied by hand. `filter` is that rule, in one place, for all seven.
   ].filter((line) => line !== null && line !== undefined);
@@ -257,10 +273,10 @@ export function renderPanel(report) {
   const failures = failureLines(report);
   if (failures.length > 0) lines.push(...failures);
   if ((report?.summary?.fixable ?? 0) > 0) {
-    lines.push(`Run ./snowarch doctor --fix for the fixable ones (${report.summary.fixable}).`);
+    lines.push(`Run ${cli} doctor --fix for the fixable ones (${report.summary.fixable}).`);
   }
 
-  const notProbed = notProbedLine(report);
+  const notProbed = notProbedLine(report, cli);
   if (notProbed) lines.push(notProbed);
 
   // ARC-08-C19 — WHERE the instances came from, said out loud when it was the store. A store read

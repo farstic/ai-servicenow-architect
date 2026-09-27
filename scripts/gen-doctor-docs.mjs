@@ -13,6 +13,7 @@
  * Stdlib only — it runs inside `npm run lint`.
  */
 import { readFileSync, writeFileSync, writeSync } from 'node:fs';
+import { spellings } from '../tools/snowarch/lib/text.mjs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,7 +57,10 @@ export async function sample() {
     // ARC-08-C7 — RENDERED, not retyped. This file's whole promise is that the page shows what the
     // doctor prints; a hardcoded copy here was a fourth wording of "there is no instance yet", and
     // the one that reached the published docs.
-    modeLine: `Mode: design-only — ${MODE_VARIANTS.unconfigured}`,
+    // ARC-07-W17 — PINNED POSIX: this writes a COMMITTED page, so the block must be identical on every
+    // runner or `gen:check` fails on one of them — which is exactly what happened across twelve Windows
+    // cells when the variant read the process.
+    modeLine: `Mode: design-only — ${MODE_VARIANTS.unconfigured(spellings({ platform: 'linux', env: {} }))}`,
     // The version is pinned in the SAMPLE rather than read: a documentation block that changed on
     // every version bump would be a diff in every release commit and a page nobody trusts.
     root: null,
@@ -67,7 +71,13 @@ export async function sample() {
   const pinned = { ...report, version: '2.0.0' };
   return {
     json: JSON.stringify(pinned, null, 2),
-    text: renderText({ report: pinned, checks, colour: false }),
+    text: renderText({ report: pinned, checks, colour: false ,
+    // ARC-07-W17 — THE POSIX SPELLING, ASKED FOR RATHER THAN TYPED. This generator writes a COMMITTED
+    // page, so it cannot know the reader's shell and must render one spelling on every machine — or the
+    // block would differ between a maintainer's mac and the Windows cell and `gen:check` would fail on
+    // one of them. Derived from the definition with the platform stated, so it is not a literal and it
+    // says which rendering it means. `docs/MIGRATION.md` names the Windows spelling in prose beside it.
+    cli: spellings({ platform: 'linux', env: {} }).cli }),
   };
 }
 

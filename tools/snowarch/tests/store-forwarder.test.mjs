@@ -12,6 +12,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spellings } from '../lib/text.mjs';
 
 import { CLI_PATH, NOT_INSTALLED, buildArgv, forwardToServerCli } from '../lib/instance.mjs';
 import { USAGE, storeCommand } from '../lib/store.mjs';
@@ -64,7 +65,13 @@ test('a bare --help is this frame\'s, and everything else is the server\'s', asy
     const log = recorder();
     let spawned = null;
     assert.equal(await storeCommand({ log, argv: ['--help'], root: dir }), EXIT_OK);
-    assert.ok(log.lines.join('\n').includes('usage: ./snowarch store'));
+    // ARC-07-W17, rule 6 — PINNED POSIX, and I had this backwards first. `storeCommand` with a bare
+    // `--help` is answered by the ENGINE'S FRAME (`tools/snowarch/lib/store.mjs:16`), a POSIX literal
+    // still on ARC-07-C31's list, so it prints POSIX on every platform. I made it derive on the strength
+    // of the SERVER's usage line deriving — which is the line the NEXT command in this same test prints.
+    // Classify per ASSERTED LINE, by the product line that prints it: one test, two packages.
+    assert.ok(log.lines.join('\n')
+      .includes(`usage: ${spellings({ platform: 'linux', env: {} }).cli} store`));
 
     // `migrate --help` is NOT: the server CLI prints the exit-code table with it.
     await forwardToServerCli('store', { log, argv: ['migrate', '--help'], root: dir,

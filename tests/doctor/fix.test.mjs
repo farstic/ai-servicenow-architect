@@ -22,6 +22,22 @@ import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { contextFor, greenTree, linkInstall, readJson, REAL_ROOT,
   writeJson } from './helpers/tree.mjs';
 
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+
+/**
+ * The launcher these expectations hold — ARC-07-W17.
+ *
+ * DERIVED, never typed. The doctor's remedies read the spelling from the definitions now, so a POSIX
+ * literal here passes on a mac and fails all three Windows cells the moment the renderer is fixed —
+ * which is exactly what happened on the head before this one, and on #299 and #308 before that. The
+ * rule: an assertion holding a launcher must derive it in the SAME commit as the product change.
+ *
+ * `env: {}` is not passed, deliberately: with no fixture the mirror rule applies — the case asserts
+ * whatever THIS shell renders, which is POSIX on a mac and `.\snowarch.cmd` on the Windows runner.
+ */
+const SPELLED_CLI = spellings().cli;
+const SPELLED_BOOTSTRAP = spellings().bootstrap;
+
 const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 
 /** The doctor, in process, against a fixture — the launcher pins to its own checkout. */
@@ -530,18 +546,22 @@ test('an outdated store schema is REFUSED with its command, never repaired', () 
   // A SV-09 result as the server module produces one: failed, carrying a command, and explicitly
   // not fixable. What must come out is a REFUSED line — not an action, and not silence.
   const report = { checks: [
-    { id: 'SV-09', status: 'fail', fixable: false, command: './snowarch store migrate',
+    { id: 'SV-09', status: 'fail', fixable: false, command: `${SPELLED_CLI} store migrate`,
       detail: 'store schema v1 < server v2' },
   ] };
   const plan = buildPlan(report);
 
   assert.deepEqual(plan.actions, [], 'nothing about a store schema may be applied');
   assert.deepEqual(plan.refused, [{ check: 'SV-09', detail: 'store schema v1 < server v2',
-    command: './snowarch store migrate' }]);
+    command: `${SPELLED_CLI} store migrate` }]);
 
   const text = renderPlan(plan);
   assert.match(text, /REFUSED \(1\)/);
-  assert.match(text, /SV-09.*run: \.\/snowarch store migrate/);
+  // ARC-07-W17, rule 2 — DERIVED AND ESCAPED, from the same source the fixture above used. The plan
+  // echoes the command it was given, so a POSIX regex here contradicted this case's own fixture: green
+  // on a mac, red under pwsh, and about nothing.
+  assert.match(text,
+    new RegExp(`SV-09.*run: ${SPELLED_CLI.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} store migrate`));
   // And the whitelist has no fixer that could ever touch it: the kinds are a closed set, and
   // "store-schema" is deliberately not one of them.
   assert.equal(KINDS.includes('store-schema'), false);

@@ -13,7 +13,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { classifyFailure, GENERATORS } from './lib/generators.mjs';
-import { writeSync } from 'node:fs';
+import { existsSync, readFileSync, writeSync } from 'node:fs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const check = process.argv.includes('--check');
@@ -42,6 +42,44 @@ for (const gen of GENERATORS) {
       stale += 1;
     }
   }
+}
+
+/**
+ * ARC-07-W17 — NO GENERATED TARGET MAY CARRY A FUNCTION'S SOURCE.
+ *
+ * `gen-doctor-docs.mjs` interpolated `${MODE_VARIANTS.unconfigured}` without calling it, and wrote
+ *
+ *   Mode: design-only — () => `no ServiceNow instance configured; run ${ADD_INSTANCE(spellings().cli)}`
+ *
+ * into `docs/ARCHITECTURE.md`. **`--check` could never see it**: the generator and the page agreed, so
+ * they were byte-identical and both wrong. A staleness check compares a target to its generator; it
+ * cannot judge whether the generator is producing sense.
+ *
+ * So the output is judged too, on the one property that is always a bug: an arrow or a `function (` in
+ * a generated page is a template that interpolated a callable. The same assertion sits on the
+ * SessionStart banner, which is the other exit — what the tool prints and what the pages carry.
+ *
+ * Every target of every generator, whether the run wrote them or only checked them.
+ */
+const CALLABLE_LEAK = /=>|function \(/;
+const leaked = [];
+for (const gen of GENERATORS) {
+  for (const target of gen.targets ?? []) {
+    // PROSE TARGETS ONLY, and the first run of this check is why: `gen-cli-help` writes into
+    // `tools/snowarch/lib/instance.mjs`, a generated JS file whose `export const buildArgv = (…) => […]`
+    // is an arrow function doing its job. A page cannot legitimately contain one; a module can.
+    if (!/\.(md|txt)$/.test(target)) continue;
+    const path = join(root, target);
+    if (!existsSync(path)) continue;
+    readFileSync(path, 'utf8').split('\n').forEach((line, i) => {
+      if (CALLABLE_LEAK.test(line)) leaked.push(`${target}:${i + 1}: ${line.trim().slice(0, 100)}`);
+    });
+  }
+}
+if (leaked.length > 0) {
+  writeSync(2, `gen-all: ${leaked.length} generated line(s) carry a function's source — `
+    + `a template interpolated a callable instead of calling it:\n  ${leaked.join('\n  ')}\n`);
+  process.exit(1);
 }
 
 if (cannotRun > 0) {

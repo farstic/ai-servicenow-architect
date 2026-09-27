@@ -14,7 +14,7 @@
  * one into `process.exit`, so the whole surface is testable twice in one process.
  */
 import { statSync } from 'node:fs';
-import { promptLine } from './tty.js';
+import { cliSpelling, promptLine } from './tty.js';
 import { EXIT_OK, EXIT_FAILED, EXIT_USAGE } from './instance.js';
 import { maskPath, resolveStorePath } from '../store/paths.js';
 import { STORE_SUB_COMMANDS, storeSubCommandLines, storeSubCommandList } from './help-tables.js';
@@ -29,7 +29,7 @@ export const NOTHING_CHANGED = 'store: nothing changed';
 export { STORE_SUB_COMMANDS, storeSubCommandList };
 export function storeHelp() {
     return [
-        'usage: snowarch store <command> [options]',
+        `usage: ${cliSpelling()} store <command> [options]`,
         '',
         ...storeSubCommandLines(),
         '',

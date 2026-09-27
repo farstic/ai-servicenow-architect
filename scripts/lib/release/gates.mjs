@@ -14,6 +14,7 @@
  * preflight's clean-tree check means the next attempt refuses until it has been dealt with.
  */
 import { lstatSync } from 'node:fs';
+import { spellings } from '../../../tools/snowarch/lib/text.mjs';
 import { join } from 'node:path';
 
 export const EXIT_GATE = 1;
@@ -48,8 +49,17 @@ export function modulesAreLinked(root, lstat = lstatSync) {
  * because that is the command a maintainer would run by hand, and a gate that passes through a path
  * users do not take is a gate that can pass while the product is broken.
  */
-export function gatePlan({ noInstall = false, platform = process.platform } = {}) {
-  const launcher = platform === 'win32' ? 'snowarch.cmd' : './snowarch';
+export function gatePlan({ noInstall = false, platform = process.platform,
+  env = process.env } = {}) {
+  // ARC-07-W17 — a maintainer's PowerShell refuses a bare `snowarch.cmd` exactly as a user's does, and
+  // this line is one a maintainer pastes when a gate fails. `scripts/` may read `tools/snowarch/lib`;
+  // that direction is allowed.
+  // `env` IS THREADED, and omitting it is the trap `tests/windows-spellings.test.mjs` writes out at
+  // length: `isWindowsShell` reads SHELL and MSYSTEM — so Git Bash on Windows keeps the POSIX
+  // spelling — and `env` defaults to `process.env`. `spellings({ platform: 'win32' })` alone therefore
+  // returns `./snowarch` on any machine with SHELL set, and a caller written that way asserts the
+  // POSIX spelling while believing it asked about Windows. Measured here before it could mislead.
+  const launcher = spellings({ platform, env }).cli;
   return [
     ...(noInstall ? [] : [{ name: 'install', argv: ['npm', 'ci', '--ignore-scripts'] }]),
     { name: 'dist', argv: ['node', 'scripts/build-dist.mjs'], then: 'dist-diff' },

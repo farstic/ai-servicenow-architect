@@ -10,7 +10,7 @@
  * arguments, `set-flags` takes a label and a list, the rest take a label. One parser with a table
  * of shapes cannot drift the way eight parsers can.
  */
-import { CANCELLED, promptLine, promptSecret } from './tty.js';
+import { CANCELLED, cliSpelling, promptLine, promptSecret } from './tty.js';
 import { instanceSubCommandLines, SUB_COMMANDS } from './help-tables.js';
 import { stepHeader, addHelp, parseAddArgs, runAdd, runList, runRemove, runSetCredentials, runSetDefault, runSetFlags, runSetPreset, runTest, EXIT_CODES, EXIT_FAILED, EXIT_OK, EXIT_USAGE, LABEL_EXHAUSTED, MAX_ATTEMPTS, } from './instance.js';
 import { runImport } from './import-legacy.js';
@@ -44,7 +44,11 @@ export function instanceHelp() {
     // `scripts/gen-cli-help.mjs` can read them on a clone with no `node_modules` and carry the same
     // lines into the frame's own help.
     const lines = [
-        'usage: snowarch instance <command> [options]',
+        // ARC-07-W17 — `usage: snowarch instance …` was the bare name, which is the CONVENTION for a
+        // command on PATH — and ARC-07-C1's whole argument is that this one never is. A usage line naming
+        // a spelling the reader cannot type is the defect however conventional it looks, and my W7 guard
+        // could not see these three because a bare name contains no path to match.
+        `usage: ${cliSpelling()} instance <command> [options]`,
         '',
         ...instanceSubCommandLines(),
     ];

@@ -37,7 +37,16 @@ export function doctorStamp({ summary = {}, at = new Date() } = {}) {
  * @param {boolean} facts.bootstrapped            a `bootstrap-state.json` exists
  */
 export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
-  registration = 'project', probed = true } = {}) {
+  registration = 'project', probed = true,
+  // ARC-07-W17 — THE SPELLING IS A PARAMETER, because this function has no ctx. I wrote
+  // `spell` here first on the strength of every other file in this directory having one, which
+  // is the third time in this row I have referenced a ctx that is not in scope — and it would have
+  // thrown only when the branch ran, not at import.
+  //
+  // REQUIRED, no process default: the doctor renders for the ctx it was given, `gen-doctor-docs` for a
+  // committed page that must be identical on every runner, and the hook for the person in front of it.
+  // A process default satisfied the hook and broke the other two across twelve Windows cells.
+  spell } = {}) {
   const loaded = instances.filter((i) => i.status === 'loaded');
   const configured = instances.length > 0;
   // ARC-08-C16 — the toggle file decides only when the PROJECT entry is the carrier.
@@ -56,7 +65,7 @@ export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
 
   if (!bootstrapped) {
     return { mode: 'unknown', variant: 'notBootstrapped',
-      qualifier: MODE_VARIANTS.notBootstrapped, instance: null, loaded, serverEnabled };
+      qualifier: MODE_VARIANTS.notBootstrapped(spell), instance: null, loaded, serverEnabled };
   }
   if (serverEnabled && loaded.length > 0) {
     const first = loaded[0];
@@ -82,21 +91,21 @@ export function deriveMode({ toggles = {}, instances = [], bootstrapped = true,
   }
   if (!serverEnabled && configured) {
     return { mode: 'design-only', variant: 'serverDisabled', loaded, serverEnabled,
-      qualifier: MODE_VARIANTS.serverDisabled(instances[0].label), instance: null };
+      qualifier: MODE_VARIANTS.serverDisabled(instances[0].label, spell), instance: null };
   }
   if (serverEnabled && configured) {
     // Entries exist and none of them loaded — the store is there and something in it is wrong,
     // which SV-02/SV-03 have already said in detail. The Mode line points at them rather than
     // repeating them.
     return { mode: 'design-only', variant: 'noInstanceLoaded', loaded, serverEnabled,
-      qualifier: MODE_VARIANTS.noInstanceLoaded, instance: null };
+      qualifier: MODE_VARIANTS.noInstanceLoaded(spell), instance: null };
   }
   if (serverEnabled) {
     return { mode: 'design-only', variant: 'noInstanceLoaded', loaded, serverEnabled,
-      qualifier: MODE_VARIANTS.noInstanceLoaded, instance: null };
+      qualifier: MODE_VARIANTS.noInstanceLoaded(spell), instance: null };
   }
   return { mode: 'design-only', variant: 'unconfigured', loaded, serverEnabled,
-    qualifier: MODE_VARIANTS.unconfigured, instance: null };
+    qualifier: MODE_VARIANTS.unconfigured(spell), instance: null };
 }
 
 /**
