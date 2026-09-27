@@ -1,3 +1,4 @@
+import { cliSpelling } from '../cli/tty.js';
 /**
  * The registry contract, shared with ARC-08's unified doctor.
  *
@@ -28,7 +29,10 @@ export const stubProbes = {
         return {
             status: 'skip',
             detail: 'no instance configured, so there is nothing to probe',
-            remedy: 'add one with ./snowarch instance add, then run ./snowarch instance test',
+            // ARC-07-C31 slice 3 — the STUB's remedy, and it derives for the same reason the real one does:
+            // a stub that rendered a different shell from the thing it stands in for would make a test pass
+            // against a sentence the product never prints.
+            remedy: `add one with ${cliSpelling()} instance add, then run ${cliSpelling()} instance test`,
         };
     },
 };
