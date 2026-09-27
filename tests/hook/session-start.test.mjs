@@ -11,6 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
+import { POSIX } from '../../tools/snowarch/lib/launcher-spelling.mjs';
 
 /** ARC-07-C31 — BANNER's members take the spelling now; the hook renders for the process. */
 const SPELL = spellings();
@@ -355,12 +356,41 @@ test('nothing the hook printed carries the fixture credentials', async (t) => {
 });
 
 test('the nudge strings the hook prints are the ones text.json exports', () => {
+  // `POSIX`, NOT `SPELL`, AND THE DISTINCTION IS THIS FILE'S ONLY EXCEPTION — ARC-07-C31, the three
+  // Windows cells on 6dfa27e. Every other assertion here reads lines the HOOK printed, and the hook
+  // renders for the person in front of it, so `SPELL = spellings()` is the right source for those.
+  // This one compares `text.json`, which is GENERATED AND COMMITTED: `exportable()` pins `POSIX` so
+  // its bytes are identical on every runner, and comparing it to the process asserted POSIX == POSIX
+  // on a mac and `.\snowarch.cmd` == `./snowarch` under pwsh. Rule 3 — a committed surface is POSIX —
+  // and rule 1 — derive from the SAME source the product uses. `POSIX` here is imported from the
+  // module `exportable()` imports it from, so the two sides cannot drift apart: one object, not two
+  // renderings that agree today.
   const text = JSON.parse(readFileSync(join(REAL_ROOT, 'tools/snowarch/lib/text.json'), 'utf8'));
-  assert.equal(text.banner.firstRun, BANNER.firstRun(SPELL));
-  assert.equal(text.banner.staleRegistration, BANNER.staleRegistration(SPELL));
-  assert.equal(text.banner.upgrade, BANNER.upgrade('v2.1.0', SPELL));
-  assert.equal(text.banner.doctorFail, BANNER.doctorFail(2, SPELL));
-  assert.equal(text.banner.timedOut, BANNER.timedOut(SPELL));
+  assert.equal(text.banner.firstRun, BANNER.firstRun(POSIX));
+  assert.equal(text.banner.staleRegistration, BANNER.staleRegistration(POSIX));
+  assert.equal(text.banner.upgrade, BANNER.upgrade('v2.1.0', POSIX));
+  assert.equal(text.banner.doctorFail, BANNER.doctorFail(2, POSIX));
+  assert.equal(text.banner.timedOut, BANNER.timedOut(POSIX));
+
+  // ...AND THE PIN IS ASSERTED, not just used, so the defect is catchable on a mac instead of only on
+  // the Windows cell. A pin that renders POSIX because the runner is POSIX proves nothing; these four
+  // carry a launcher, so a `text.json` written by a Windows runner — or a member that read the
+  // process — makes one of them equal the Windows spelling.
+  const win = spellings({ platform: 'win32', env: {} });
+  for (const [name, rendered] of [
+    ['staleRegistration', BANNER.staleRegistration(win)],
+    ['upgrade', BANNER.upgrade('v2.1.0', win)],
+    ['doctorFail', BANNER.doctorFail(2, win)],
+    ['timedOut', BANNER.timedOut(win)],
+  ]) {
+    assert.notEqual(text.banner[name], rendered,
+      `text.json's ${name} is the WINDOWS rendering — it is committed, so it must be POSIX`);
+  }
+
+  // `firstRun` is excluded from that loop because it names a slash command and no launcher, and that
+  // is asserted rather than assumed — the same reason it takes a spelling it does not use.
+  assert.equal(BANNER.firstRun(win), BANNER.firstRun(POSIX),
+    'firstRun now renders a launcher, so it belongs in the loop above');
 });
 
 // ARC-09-S07 — the freshness rule, and the one number it depends on.
