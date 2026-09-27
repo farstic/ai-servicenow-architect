@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.6 — 2026-09-27
+
+### Notes
+
 Almost all of this release is one thing: the questions the installer asks a person, and the sentences
 it answers them with. Nothing here changes how the product is configured, and there is no migration
 step — an existing checkout keeps its instance store, its preset and its flags untouched.
@@ -89,6 +93,8 @@ The bundled ServiceNow documentation corpus moves to `68c0d11`.
 - The session banner printed a function's source as its `Mode:` line on a checkout that had never been
   bootstrapped, and the documentation generator wrote the same into a committed page.
 - The release rollback restores what the generators wrote, not only what was committed by hand.
+
+Tag v2.0.6 · contract 903f67b6cf41 · docs-pin 68c0d11
 
 ## 2.0.5 — 2026-09-25
 

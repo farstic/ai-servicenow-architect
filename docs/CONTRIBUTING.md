@@ -1219,7 +1219,7 @@ How, in the order it is done:
 git switch -c rehearsal/vX.Y.Z-rc.N <the release candidate>
 git push -u origin rehearsal/vX.Y.Z-rc.N        # BEFORE --tag-only: the preflight compares against origin
 node scripts/release.mjs X.Y.Z-rc.N --yes --allow-prerelease --allow-branch rehearsal/vX.Y.Z-rc.N
-node scripts/release.mjs X.Y.Z-rc.N --tag-only
+node scripts/release.mjs X.Y.Z-rc.N --tag-only --allow-prerelease --allow-branch rehearsal/vX.Y.Z-rc.N
 git push origin vX.Y.Z-rc.N
 ```
 
