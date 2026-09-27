@@ -23,8 +23,23 @@ const UNIVERSAL = ['json', 'quiet', 'verbose', 'help'];
 /**
  * `--flag value`, `--flag=value`, and bare booleans — with repeats kept as an array.
  *
- * A repeated flag is not an error and not last-wins: `--area a --area b` means both, and a parser
- * that silently dropped one would make a wrong command look like a working one.
+ * A repeated VALUE flag is not an error and not last-wins: `--area a --area b` means both, and a
+ * parser that silently dropped one would make a wrong command look like a working one.
+ *
+ * ARC-07-C42 — A REPEATED DECLARED BOOLEAN IS THE ONE EXCEPTION, and it was a defect rather than a
+ * choice. `--no-cache --no-cache` produced `[true, true]`, and `doctorCommand` asks
+ * `flags['no-cache'] === true`; an array is not `true`, so **the doctor WROTE the cache it had twice
+ * been told not to**. Measured, not reasoned: one flag leaves nothing in `.local/`, two leave
+ * `doctor-last.json` and `doctor-last.inputs.json`. Five `=== true` reads in `doctor/index.mjs`
+ * shared that cause, and the flag whose whole job is "do not write" is the worst place for a
+ * silently inverted answer — a shell alias, a script that appends a flag, or typing it twice while
+ * debugging is enough.
+ *
+ * The collapse is here rather than at the five reads because a boolean is only KNOWN to be one here,
+ * in `bool`: `--area a --area b` still means both, and a repeated boolean now means what it says. The
+ * reasoning above does not transfer to it — `--no-cache --no-cache` is not a command whose meaning
+ * was dropped, it is a redundant one, and there is nothing for an array to carry. Nothing counts
+ * repeats either: `cli.mjs`'s own dispatch already reads `Boolean(flags.quiet)`.
  */
 export function parseArgs(argv, { booleans = [] } = {}) {
   const flags = Object.create(null);
@@ -47,7 +62,12 @@ export function parseArgs(argv, { booleans = [] } = {}) {
     else if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) { value = argv[i + 1]; i += 1; }
     else { errors.push(`--${name} needs a value`); continue; }
 
-    if (name in flags) flags[name] = [].concat(flags[name], value);
+    // A declared boolean repeated stays a boolean; anything else accumulates. `bool.has(name)` alone
+    // is not the test — `--json=false` is a declared boolean carrying a STRING, and collapsing repeats
+    // of that to `value` would keep the string, which is what the `=== true` readers already see
+    // today. That `--json=false` enables `--json` is a separate defect and not this row's; this branch
+    // deliberately does not pretend to fix it.
+    if (name in flags) flags[name] = bool.has(name) && value === true ? true : [].concat(flags[name], value);
     else flags[name] = value;
   }
   return { flags, positional, errors };

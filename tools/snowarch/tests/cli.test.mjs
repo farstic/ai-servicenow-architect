@@ -62,6 +62,48 @@ test('the parser: every form, and the errors', () => {
   assert.deepEqual(parseArgs(['--json', '--', '--not-a-flag']).positional, ['--not-a-flag']);
 });
 
+/**
+ * ARC-07-C42 — A REPEATED BOOLEAN MEANT THE OPPOSITE OF WHAT IT SAID.
+ *
+ * `--no-cache --no-cache` produced `[true, true]`, and `doctorCommand` asks
+ * `flags['no-cache'] === true`; an array is not `true`, so the doctor WROTE the cache it had twice been
+ * told not to. Measured end to end before the fix, on the real CLI: one `--no-cache` left nothing in
+ * `.local/`, two left `doctor-last.json` and `doctor-last.inputs.json`. Five `=== true` reads in
+ * `doctor/index.mjs` shared the cause.
+ *
+ * BOTH DIRECTIONS IN ONE CASE, because the two halves of the parser's contract pull against each other:
+ * a repeated VALUE flag must still accumulate (`--area a --area b` means both, which the parser's own
+ * comment has said since ARC-06-S02 and which `--section` relies on), and a repeated DECLARED BOOLEAN
+ * must collapse. A fix that made the parser last-wins everywhere would pass the boolean half and break
+ * the value half silently — which is why the value half is asserted here rather than left to the case
+ * above.
+ */
+test('ARC-07-C42 — a repeated declared boolean is true, and a repeated value flag is still both', () => {
+  const doctor = { booleans: ['quick', 'no-cache', 'fix'] };
+
+  // The defect, exactly: twice-given means the same as once-given, for every reader including `=== true`.
+  assert.equal(parseArgs(['--no-cache', '--no-cache'], doctor).flags['no-cache'], true);
+  assert.equal(parseArgs(['--no-cache', '--no-cache', '--no-cache'], doctor).flags['no-cache'], true);
+  assert.equal(parseArgs(['--quick', '--quick'], doctor).flags.quick, true);
+  // A UNIVERSAL boolean too — `json`, `quiet`, `verbose`, `help` are declared for every sub-command, so
+  // a fix that only covered the per-command list would leave `--json --json` an array.
+  assert.equal(parseArgs(['--json', '--json']).flags.json, true);
+
+  // ...and the half that must NOT change. `--section` is a real value flag on this very command.
+  assert.deepEqual(parseArgs(['--area', 'a', '--area', 'b']).flags.area, ['a', 'b']);
+  assert.deepEqual(parseArgs(['--section', 'repo', '--section', 'host'], doctor).flags.section,
+    ['repo', 'host']);
+  // Three of them, so a fix that special-cased "exactly two" is caught.
+  assert.deepEqual(parseArgs(['--area', 'a', '--area', 'b', '--area', 'c']).flags.area,
+    ['a', 'b', 'c']);
+
+  // A declared boolean given with an explicit VALUE is left alone, and that is deliberate: `--json=false`
+  // carries the STRING 'false', every reader already treats it as truthy, and collapsing repeats of it to
+  // `true` here would quietly change what a wrong command does. `--json=false` enabling `--json` is a
+  // separate defect; this row does not pretend to fix it, and this assertion says so out loud.
+  assert.deepEqual(parseArgs(['--json=false', '--json=false']).flags.json, ['false', 'false']);
+});
+
 test('a boolean flag does not eat the next word', () => {
   // `--json status` must not make `status` the value of `--json`: a parser that did would swallow a
   // sub-command and report "unknown command" for something the user typed correctly.
