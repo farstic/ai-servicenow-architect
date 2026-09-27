@@ -22,6 +22,8 @@
  * `noTtyMessage` call sites passed `platform` and not `env`, so a win32 message rendered `./snowarch`.
  */
 import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -710,4 +712,69 @@ test('ARC-07-C31 — the steps\' sentences render the reader\'s shell, and refus
     { name: 'TypeError', message: /^mapSyncFailure needs/ });
   assert.throws(() => nextText({ stoppedAt: 'B02' }, { mode: 'design-only' }),
     { name: 'TypeError', message: /^nextText needs/ });
+});
+
+/**
+ * ARC-07-C31 slice 4 — the three sites a case reaches through a SEAM, driven by argument.
+ *
+ * The row claimed a case drives each of slice 4's derivations. Control AA showed that was not true of
+ * `runSteps`'s threading, and auditing the rest found three more: `finish`'s two sentences, `interrupt`'s
+ * resume line, and `storePlan`'s unreadable-store line. Each takes its dependencies as parameters, so
+ * each can be driven with a win32 shell and read — no fixture beyond a temp directory.
+ *
+ * What is NOT here is said in the row rather than implied: `B02.run`'s and `B04.run`'s inline remedies
+ * need a corpus and an `npm ci` to reach, so they are held by the source sweep and by `mapSyncFailure`,
+ * which IS driven, rather than by a case of their own.
+ */
+test('ARC-07-C31 — finish, interrupt and storePlan spell the shell they are told', async () => {
+  const WIN = { platform: 'win32', env: {} };
+  const win = spellings(WIN);
+  const posixSpell = spellings({ platform: 'linux', env: {} });
+
+  const { finish } = await import('../tools/snowarch/lib/commands/upgrade.mjs');
+  const { interrupt } = await import('../tools/snowarch/lib/steps/index.mjs');
+
+  // `finish`: its `run` is a seam, so a non-zero bootstrap is one stub away.
+  const said = [];
+  const log = { step: (l) => said.push(l), fail: (l) => said.push(l), ok: (l) => said.push(l),
+    warn: (l) => said.push(l), note: (l) => said.push(l), debug: () => {} };
+  await finish({ root: '/nonexistent', env: {}, platform: 'win32', log,
+    run: () => ({ status: 1 }), target: 'v9.9.9', latest: 'v9.9.9', remote: 'origin',
+    now: () => new Date(0), state: { mode: 'design' } });
+  const finished = said.join('\n');
+  assert.match(finished, /\.\\snowarch\.cmd upgrade/, `finish did not spell win32:\n${finished}`);
+  assert.match(finished, /\.\\bootstrap\.cmd/, `finish's bootstrap spelling:\n${finished}`);
+  assert.doesNotMatch(finished, /\.\/snowarch|\.\/bootstrap\.sh/, finished);
+
+  // `interrupt`: every dependency is a parameter, including the platform it already took and the env
+  // slice 4 added beside it.
+  const interrupted = [];
+  interrupt({ root: '/nonexistent', state: { steps: {} }, live: { step: 'B04' },
+    onLine: (l) => interrupted.push(l), now: () => new Date(0), save: () => {},
+    platform: 'win32', env: {}, spawn: () => ({}) });
+  assert.match(interrupted.join('\n'), /re-run \.\\bootstrap\.cmd to resume at B04/);
+
+  // ...and the POSIX direction for both, so a site that hard-coded the Windows form could not pass.
+  const posixSaid = [];
+  const plog = { ...log, step: (l) => posixSaid.push(l), fail: (l) => posixSaid.push(l) };
+  await finish({ root: '/nonexistent', env: {}, platform: 'linux', log: plog,
+    run: () => ({ status: 1 }), target: 'v9.9.9', latest: 'v9.9.9', remote: 'origin',
+    now: () => new Date(0), state: { mode: 'design' } });
+  assert.doesNotMatch(posixSaid.join('\n'), /snowarch\.cmd|bootstrap\.cmd/);
+  const posixInterrupt = [];
+  interrupt({ root: '/nonexistent', state: { steps: {} }, live: { step: 'B04' },
+    onLine: (l) => posixInterrupt.push(l), now: () => new Date(0), save: () => {},
+    platform: 'linux', env: {}, spawn: () => ({}) });
+  assert.match(posixInterrupt.join('\n'), /re-run \.\/bootstrap\.sh to resume at B04/);
+
+  // `storePlan` reads the store from disk rather than through a seam, so this one costs a temp
+  // directory — which is still cheaper than leaving the site to the sweep alone.
+  const { storePlan } = await import('../tools/snowarch/lib/commands/upgrade.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'c31-storeplan-'));
+  try {
+    mkdirSync(join(dir, '.local'), { recursive: true });
+    writeFileSync(join(dir, '.local', 'instances.json'), '{ not json');
+    assert.match(storePlan(dir, 'v9.9.9', { spell: win }).line, /\.\\snowarch\.cmd store migrate/);
+    assert.match(storePlan(dir, 'v9.9.9', { spell: posixSpell }).line, /\.\/snowarch store migrate/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

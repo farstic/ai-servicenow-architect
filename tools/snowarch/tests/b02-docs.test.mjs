@@ -19,6 +19,8 @@ import { spellings } from '../lib/text.mjs';
  * platform instead, it pins the expectation to the same one.
  */
 const FRAME_SPELL = spellings();
+// `RegExp.escape` is not on Node 20, and the spelling contains `.` and `\\`.
+const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import {
   AREAS, buildUpstream, git, makeWorkspace, writeCitingSkill, CITED_PAGE,
 } from '../../../tests/helpers/docs-fixture.mjs';
@@ -130,7 +132,7 @@ test('AC 3 — skip touches no network, and the corpus is then MISSING to the do
     stepLine({ id: 'B02', title: 'docs', status: 'skipped', detail: skipReason, note: skipNote(FRAME_SPELL),
       last: 'B09' }),
     '[B02/09] docs … skipped (--docs skip) — the doctor will report the corpus as FAIL until you '
-    + 'run ./snowarch docs sync');
+    + `run ${FRAME_SPELL.cli} docs sync`);
   // A skip that costs nothing says nothing extra.
   assert.equal(stepLine({ id: 'B06', title: 'instance', status: 'skipped', detail: 'design-only',
     last: 'B09' }), '[B06/09] instance … skipped (design-only)');
@@ -183,7 +185,10 @@ test('a dead citation is a WARN — the corpus is here, and the fix is a maintai
   const r = await runB02(ctx);
 
   assert.equal(r.status, 'warn', 'a dead citation must never stop an installation');
-  assert.match(r.detail, /^\d+ dead citation\(s\) — see \.\/snowarch docs verify$/);
+  // ARC-07-C31 slice 4 — DERIVED and escaped: B02's run renders this from the ctx's shell now, so a
+  // POSIX literal is green on a mac and red on three Windows cells. `RegExp.escape` is not on Node 20.
+  assert.match(r.detail,
+    new RegExp(`^\\d+ dead citation\\(s\\) — see ${esc(FRAME_SPELL.cli)} docs verify$`));
   assert.ok(r.data.dead > 0);
   assert.match(ctx.lines.join('\n'), /^citations: checked: \d+ \| dead: [1-9]/m);
 });

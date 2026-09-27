@@ -143,6 +143,49 @@ test('--from re-runs its step and everything after it, and caches what came befo
   assert.ok(!lines[1].includes('cached'));
 });
 
+/**
+ * ARC-07-C31 slice 4 — THE THREADING, driven, because a control found it untested.
+ *
+ * `runSteps` passes the ctx's shell into `failureBlock` and into a skip note. Degrading that site from
+ * `spellings({ platform: ctx.platform, env: ctx.env })` to a bare `spellings()` — a process read instead
+ * of the ctx — left `tests/windows-spellings.test.mjs` green at 15/15, and the source guard cannot see it
+ * because there is no literal to find. That case drives `failureBlock` DIRECTLY with a spelling, so it
+ * holds the function and says nothing about the caller.
+ *
+ * This one goes through the runner with a win32 ctx and reads the line a reader would follow. `env: {}`
+ * is load-bearing: `isWindowsShell` reads SHELL and MSYSTEM, so a ctx with only a platform renders POSIX
+ * on any mac.
+ */
+test('ARC-07-C31 — the failure block and the skip note spell the CTX\'s shell, not the process\'s', async () => {
+  const root = makeCheckout();
+  // `runsWhen: () => false` is what makes the runner SKIP it — `stub` has no `skip` option, and my
+  // first version passed one, so the step ran and the note never rendered. `skipNote` is spread on
+  // afterwards rather than added to the shared helper: it is this case's fixture, not a new seam.
+  const steps = [
+    { ...stub('B01', { title: 'docs', runsWhen: () => false, skipReason: 'asked to skip' }),
+      skipNote: (spell) => `the doctor will report it until you run ${spell.cli} docs sync` },
+    stub('B02', { title: 'docs', result: { status: 'fail', detail: 'the corpus is empty',
+      remedy: 'run the sync' } }),
+  ];
+  const lines = [];
+  await runSteps({ root, ctx: { ...base(root), platform: 'win32' }, state: state(), steps,
+    hash: fakeHash, onLine: (l) => lines.push(l), save: () => {} });
+
+  const text = lines.join('\n');
+  assert.match(text, /Re-run \.\\bootstrap\.cmd to resume at B02\./,
+    `the failure block did not spell the ctx's shell:\n${text}`);
+  assert.match(text, /\.\\snowarch\.cmd docs sync/, `the skip note did not:\n${text}`);
+  assert.doesNotMatch(text, /\.\/bootstrap\.sh|\.\/snowarch/,
+    `a POSIX launcher survived a win32 ctx:\n${text}`);
+
+  // ...and the POSIX direction, so a caller that hard-coded the Windows spelling could not pass either.
+  const posixLines = [];
+  await runSteps({ root, ctx: { ...base(root), platform: 'linux' }, state: state(), steps,
+    hash: fakeHash, onLine: (l) => posixLines.push(l), save: () => {} });
+  assert.match(posixLines.join('\n'), /Re-run \.\/bootstrap\.sh to resume at B02\./);
+  assert.doesNotMatch(posixLines.join('\n'), /bootstrap\.cmd|snowarch\.cmd/);
+});
+
 test('a fail stops the run, writes the state, and prints cause, remedy and how to resume', async () => {
   const root = makeCheckout();
   const ran = [];
@@ -163,10 +206,14 @@ test('a fail stops the run, writes the state, and prints cause, remedy and how t
   assert.deepEqual(ran, ['B01'], 'a step after the failure must not run');
   assert.ok(saved > 0, 'the state must be written before the run gives up');
   assert.equal(lines[1], '[B02/03] docs … FAIL');
+  // ARC-07-C31 slice 4 — TWO SOURCES ON PURPOSE, and the difference is the point. The `Remedy:` line
+  // echoes the text THIS TEST SUPPLIED in the stub above, so it stays exactly as supplied (rule 5:
+  // one source for both sides of a fixture). The `Re-run` line is the PRODUCT's, rendered from the
+  // ctx's shell since slice 4, so it derives.
   assert.deepEqual(lines.slice(2, 5), [
     'FAIL B02: the corpus is empty',
     'Remedy: run ./snowarch docs sync',
-    'Re-run ./bootstrap.sh to resume at B02.',
+    `Re-run ${FRAME_SPELL.bootstrap} to resume at B02.`,
   ]);
   // ARC-06-C10 — and the LAST line names the step, what the number means, and the class. The three
   // lines above are what a reader with the whole log has; this is what a reader with only the tail
@@ -315,7 +362,8 @@ test('the interrupt message names the step to resume at, and the state says fail
   const lines = [];
   const r = interrupt({ root: makeCheckout(), state: s, live: { child: null, step: 'B04' },
     save: () => {}, onLine: (l) => lines.push(l) });
-  assert.equal(lines[0], 'interrupted during B04 — re-run ./bootstrap.sh to resume at B04');
+  assert.equal(lines[0],
+    `interrupted during B04 — re-run ${FRAME_SPELL.bootstrap} to resume at B04`);
   assert.equal(s.steps.B04.status, 'failed');
   assert.equal(s.steps.B04.reason, 'interrupted');
   assert.equal(r.code, 130);

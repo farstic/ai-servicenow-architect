@@ -158,7 +158,6 @@ const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ['tools/snowarch/tests/b02-docs.test.mjs', 2],
   ['tools/snowarch/tests/b06-migration.test.mjs', 2],
   ['tools/snowarch/tests/bootstrap-plan.test.mjs', 1],
-  ['tools/snowarch/tests/bootstrap-runner.test.mjs', 1],
   ['tools/snowarch/tests/cli.test.mjs', 2],
   ['tools/snowarch/tests/store-root-entry.test.mjs', 2],
   ['tools/snowarch/tests/text.test.mjs', 2],
