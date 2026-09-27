@@ -32,6 +32,8 @@ const CLI = spellings().cli;
 
 import { toggleProblems } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { projectEntryEnabled } from '../../tools/snowarch/lib/settings-local.mjs';
+// ARC-07-C42 — the parser and the command's own flag declaration, so neither is retyped here.
+import { COMMANDS, parseArgs } from '../../tools/snowarch/lib/cli.mjs';
 import { deriveMode, doctorStamp, flagSummary, flagsUnknown, modeLine,
   modeLineDetailed } from '../../tools/snowarch/lib/doctor/mode.mjs';
 import { MODE_VARIANTS } from '../../tools/snowarch/lib/text.mjs';
@@ -276,6 +278,45 @@ test('--no-cache on a fresh checkout leaves neither file behind', async (t) => {
   await doctorAt(root, { 'no-cache': true });
   assert.equal(existsSync(cachePath(root)), false);
   assert.equal(existsSync(inputsPath(root)), false);
+});
+
+/**
+ * ARC-07-C42 — THE FLAG TWICE, THROUGH THE PARSER THAT MADE IT AN ARRAY.
+ *
+ * The case above passes `{ 'no-cache': true }` as an object, which is the shape the command WANTS and so
+ * cannot see the defect: `parseArgs` collected a repeated flag into `[true, true]`, `doctorCommand` asks
+ * `flags['no-cache'] === true`, and the doctor then WROTE the cache it had twice been told not to.
+ * Measured on the real CLI before the fix — one flag left nothing, two left `doctor-last.json` and
+ * `doctor-last.inputs.json`.
+ *
+ * SO THE ARGV GOES THROUGH THE REAL PARSER, and the command runs against a fixture root. A spawn of the
+ * shipped bin would have been the fuller path and is not available here: `config.mjs` derives the root
+ * from its own file location, never `process.cwd()`, so a spawned doctor writes into the REAL checkout —
+ * which is the leak ARC-07-C33 just closed. Parsing real argv and handing the result to `doctorCommand`
+ * with `cwd` at the fixture drives both halves of the defect; `main`'s one line between them is covered
+ * by the CLI frame's own dispatch cases.
+ *
+ * The booleans come from `COMMANDS.doctor`, not a literal, and that is load-bearing in a second way: if
+ * `no-cache` ever left that list, a bare `--no-cache` would become "needs a value" and this case would
+ * say so instead of quietly testing a flag the command no longer declares.
+ */
+test('ARC-07-C42 — --no-cache twice leaves no cache either, and the parser is what is driven', async (t) => {
+  const root = greenTree(t, { mode: 'design' });
+  const { flags, errors } = parseArgs(['--quick', '--no-cache', '--no-cache'],
+    { booleans: COMMANDS.doctor.booleans });
+  assert.deepEqual(errors, [], 'the doctor no longer declares --no-cache as a boolean');
+  assert.equal(flags['no-cache'], true, 'the parser handed the command something that is not `true`');
+
+  await doctorAt(root, flags);
+  assert.equal(existsSync(cachePath(root)), false,
+    'the doctor wrote the cache it was twice told not to write');
+  assert.equal(existsSync(inputsPath(root)), false);
+
+  // ...and once, for the same command in the same case, so the pair is one measurement rather than two
+  // files apart. This is the half that always passed, which is exactly why it belongs beside the other.
+  const single = parseArgs(['--quick', '--no-cache'], { booleans: COMMANDS.doctor.booleans });
+  await doctorAt(root, single.flags);
+  assert.equal(existsSync(cachePath(root)), false);
 });
 
 test('the staleness rule is one rule: a changed input, a missing file, or an unreadable one', async (t) => {

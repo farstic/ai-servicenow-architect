@@ -1236,7 +1236,13 @@ print(m.verdict_line(rows, pos))
 broken = rows[:-2] + [('R', 'x', 'ANCHOR NOT FOUND: foo', 'FINDING'), ('R', 'y', 't', 'FAIL')]
 print(m.totals_line(m.CONTROLS, broken))
 print(m.verdict_line(broken, pos))`;
-  const out = spawnSync('python3', ['-c', py], { encoding: 'utf8' });
+  // `-B`: ARC-07-C42's second residual. This spawn `importlib`s `scripts/acceptance/tag-controls.py`,
+  // and Python writes the compiled module beside the source — `scripts/acceptance/__pycache__/
+  // tag-controls.cpython-313.pyc` was still in the checkout after `npm test`. The architect's gate reads
+  // leftovers; `assert-clean` does not see it because it is ignored, which is the same blind spot C33's
+  // `.local/` files sat in. `-B` rather than `PYTHONDONTWRITEBYTECODE=1` in the env: it is one flag on
+  // the one spawn that needs it, and it cannot be inherited by anything else.
+  const out = spawnSync('python3', ['-B', '-c', py], { encoding: 'utf8' });
   assert.equal(out.status, 0, `the harness would not import: ${out.stderr}`);
 
   // CRLF, AND THE ONLY SUBPROCESS IN THIS REPOSITORY THAT PRODUCES IT. This assertion was written
