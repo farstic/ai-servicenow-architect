@@ -38,7 +38,10 @@ const FIXTURE = [
   { id: 'E-12', section: 'docs', title: 'docs corpus', severity: 'fail', quick: false,
     network: false, spawns: false, fixable: true,
     run: async () => ({ status: 'fail', detail: 'corpus absent (docs mode "skip")',
-      remedy: 'run ./snowarch docs sync' }) },
+      // ARC-07-C31 slice 4 — PINNED POSIX: this fixture is rendered into a COMMITTED page, so its bytes
+  // must be identical on every runner or `gen:check` fails on the next machine. Same ruling as the
+  // `modeLine` above it, and the twelve Windows cells that taught it.
+  remedy: `run ${spellings({ platform: 'linux', env: {} }).cli} docs sync` }) },
   { id: 'SV-03', section: 'server', title: 'instance flags', severity: 'warn', quick: false,
     network: false, spawns: false, fixable: true,
     run: async () => ({ status: 'warn', detail: 'instance "pdi": 4/6 flags explicit',

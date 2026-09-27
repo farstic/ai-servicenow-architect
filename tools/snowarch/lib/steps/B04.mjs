@@ -19,6 +19,7 @@ import { childEnv } from '../spawn-env.mjs';
 import { which } from '../which.mjs';
 import { FILE, TEXT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
+import { spellings } from '../launcher-spelling.mjs';
 
 export const id = 'B04';
 export const title = 'deps';
@@ -162,7 +163,8 @@ export const run = async (ctx) => {
   const { deps, missing } = resolutionCheck(ctx.root,
     ctx.requireFrom ? { requireFrom: ctx.requireFrom } : {});
   if (missing.length > 0) {
-    return { status: 'fail', remedy: 'run: rm -rf node_modules && ./bootstrap.sh',
+    return { status: 'fail',
+      remedy: `run: rm -rf node_modules && ${spellings({ platform: ctx.platform, env: ctx.env }).bootstrap}`,
       detail: `npm ci finished but ${missing.length} of ${deps.length} server dependencies do not `
         + `resolve from dist/server.js (${missing.slice(0, 3).join(', ')})` };
   }

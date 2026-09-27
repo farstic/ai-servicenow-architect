@@ -15,6 +15,7 @@ import { verifyCitations } from '../docs/verify.mjs';
 import { CORPUS_TEXT } from './format.mjs';
 import { FILE, TEXT, ABSENT } from './inputs.mjs';
 import { INPUTS } from '../inputs.mjs';
+import { needSpell, spellings } from '../launcher-spelling.mjs';
 
 export const id = 'B02';
 export const title = 'docs';
@@ -46,11 +47,17 @@ export function gitlink(root) {
 export const inputs = INPUTS.B02.resolve;
 
 /** The docs family's exit codes → a StepResult, with the remedy each one actually needs. */
-export function mapSyncFailure(error) {
+/**
+ * ARC-07-C31 slice 4 — `spell` REQUIRED. One product caller, which would allow a default, and it is
+ * required anyway because that caller has the ctx's shell: a default here would let the process answer
+ * for a run that was told which platform it is spelling for.
+ */
+export function mapSyncFailure(error, spell) {
+  needSpell(spell, 'mapSyncFailure');
   const message = error?.message ?? String(error);
   switch (error?.code) {
     case DOCS_EXIT.incomplete:
-      return { status: 'fail', detail: message, remedy: 'run ./snowarch docs sync' };
+      return { status: 'fail', detail: message, remedy: `run ${spell.cli} docs sync` };
     case DOCS_EXIT.dirty:
       // ARC-03's own sentence, unaltered: it already says what to do, and re-phrasing it here
       // would give the same situation two descriptions depending on which command hit it.
@@ -59,11 +66,14 @@ export function mapSyncFailure(error) {
     case DOCS_EXIT.upstream:
       return { status: 'fail', detail: message, remedy: null };
     default:
-      return { status: 'fail', detail: message, remedy: 'run ./snowarch docs sync' };
+      return { status: 'fail', detail: message, remedy: `run ${spell.cli} docs sync` };
   }
 }
 
 export const run = async (ctx) => {
+  // ARC-07-C31 slice 4 — from the ctx, which carries BOTH platform and env since `stepContext`
+  // gained a platform: a step spells the shell the RUN was told about, not the machine's.
+  const spell = spellings({ platform: ctx.platform, env: ctx.env });
   // `skip` cannot reach here — `runsWhen` is false for it and the runner prints the skip line — so
   // `syncCorpus`'s own refusal of a "skip" mode is unreachable from this path. Asserted rather than
   // assumed: if it ever became reachable, the operator would see a refusal about a mode they chose.
@@ -77,12 +87,12 @@ export const run = async (ctx) => {
     result = syncCorpus({ root: ctx.root, config: ctx.config, mode, log: (l) => ctx.line?.(l) });
   } catch (e) {
     if (!(e instanceof SyncError)) throw e;
-    return mapSyncFailure(e);
+    return mapSyncFailure(e, spell);
   }
 
   if (!result.completeness.ok) {
     return { status: 'fail',
-      detail: `${CORPUS_DIR} is incomplete after sync`, remedy: 'run ./snowarch docs sync' };
+      detail: `${CORPUS_DIR} is incomplete after sync`, remedy: `run ${spell.cli} docs sync` };
   }
 
   // The size line is `docsStatus`'s measurement, not a second walk of the tree.
@@ -102,7 +112,7 @@ export const run = async (ctx) => {
 
   if (citations.dead.length > 0) {
     return { status: 'warn', data,
-      detail: `${citations.dead.length} dead citation(s) — see ./snowarch docs verify` };
+      detail: `${citations.dead.length} dead citation(s) — see ${spell.cli} docs verify` };
   }
   return { status: 'ok', data,
     detail: `${result.mode}, ${result.areas.length} areas` };

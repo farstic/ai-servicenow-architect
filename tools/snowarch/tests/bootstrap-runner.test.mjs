@@ -11,6 +11,15 @@ import { makeCheckout, stub } from './helpers/workspace.mjs';
 import { spellings } from '../lib/text.mjs';
 
 /**
+ * ARC-07-C31 slice 4 — the launcher these cases assert, DERIVED, and named for what prints it.
+ *
+ * These are the ENGINE's step sentences, rendered from the ctx the run was given. The cases below
+ * drive them through the process, so `FRAME_SPELL` is the process's — and where a case pins a
+ * platform instead, it pins the expectation to the same one.
+ */
+const FRAME_SPELL = spellings();
+
+/**
  * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
  *
  * The product lines here render for the terminal in front of them, so the process is the same
@@ -268,7 +277,7 @@ test('the step line is the conventions block, denominator derived from the list'
   assert.equal(stepLine({ id: 'B04', title: 'deps', status: 'fail', last: 'B09' }),
     '[B04/09] deps … FAIL');
   // A remedy nobody wrote must not print as an empty promise.
-  assert.match(failureBlock({ id: 'B04', cause: 'x', remedy: null })[1], /none recorded/);
+  assert.match(failureBlock({ id: 'B04', cause: 'x', remedy: null, launcher: FRAME_SPELL.bootstrap })[1], /none recorded/);
 });
 
 test('an interrupt ends the child, records the step as interrupted, and exits 130', async () => {

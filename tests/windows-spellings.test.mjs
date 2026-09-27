@@ -147,32 +147,20 @@ const DEFINITIONS = Object.freeze([
 const DATA_EXEMPT = Object.freeze(['packages/snowarch/src/errors/codes.ts']);
 
 /**
- * THE SWEEP REMAINDER — ARC-07-C31, dated 2026-09-27, target 2.0.7.
+ * THE SWEEP REMAINDER IS GONE — ARC-07-C31, closed 2026-09-27, and this comment is its record.
  *
- * WHY AN EXEMPTION AT ALL, and it is not taste: a red assertion here fails the release-dryrun cells on
- * mac and ubuntu, so a guard left red blocks `release.mjs` itself. The sweep is 76 sites in 34 files and
- * three of them — `steps/B02.mjs`, `bootstrap.mjs`, `commands/upgrade.mjs` — are e2e trigger files,
- * where a hurried mistake is not a red test but a broken install on the platform a mac cannot check. So
- * it lands in 2.0.7 under ARC-07-C31 rather than in the last hours of this one.
+ * It was a frozen `Map` of 34 files and 163 sites, asserted EQUAL per file so it could only shrink.
+ * Four slices took it to zero: the definition itself, the engine's non-trigger files, the server's
+ * thirty, and the e2e-trigger files with the three scripts. There is no exemption left but the two
+ * DEFINITIONS above and `codes.ts`, which is `DATA_EXEMPT` until ARC-07-C32 gives the contract a
+ * substitution point.
  *
- * AN EXACT COUNT PER FILE, ASSERTED EQUAL AND NEVER `<=`, so this cannot become a place new defects
- * hide: adding a literal to a listed file fails exactly as loudly as adding one to an unlisted file,
- * and REMOVING one fails too — which is deliberate, because the count coming down means the sweep has
- * started and the list must shrink with it rather than drift out of date silently.
- *
- * The numbers are the measurement at this head, not an estimate; the row carries the same table.
+ * WHY THE LIST IS WORTH REMEMBERING RATHER THAN JUST DELETING: it was asserted EQUAL and never
+ * `<=`, which meant a count coming DOWN failed too. Every slice had to shrink it deliberately, and
+ * three times it caught a miscount of mine — `tools/snowarch/lib/docs/status.mjs` reported 0 against a listed 1 because
+ * one sentence swept two sites, and twice a file I thought I had finished still held one. A list that
+ * only fails upward would have let each of those pass.
  */
-const SWEEP_REMAINDER = Object.freeze(new Map([
-  ['scripts/ci/doctor-snapshot.mjs', 2],
-  ['scripts/gen-doctor-docs.mjs', 1],
-  ['scripts/lib/release/preflight.mjs', 1],
-  ['tools/snowarch/lib/bootstrap.mjs', 3],
-  ['tools/snowarch/lib/commands/upgrade.mjs', 4],
-  ['tools/snowarch/lib/steps/B02.mjs', 4],
-  ['tools/snowarch/lib/steps/B04.mjs', 1],
-  ['tools/snowarch/lib/steps/format.mjs', 4],
-  ['tools/snowarch/lib/steps/index.mjs', 1],
-]));
 
 /**
  * Comments stripped: prose ABOUT the defect is not the defect.
@@ -221,7 +209,6 @@ test('ARC-07-W17 — no shipped file spells the launcher except the two definiti
     .filter((f) => !DEFINITIONS.includes(f) && !DATA_EXEMPT.includes(f));
 
   const offences = [];
-  const counted = new Map();
   for (const rel of files) {
     const here = [];
     codeOf(read(rel)).split('\n').forEach((line, i) => {
@@ -229,23 +216,13 @@ test('ARC-07-W17 — no shipped file spells the launcher except the two definiti
         if (pattern.test(line)) here.push(`${rel}:${i + 1}: ${why}`);
       }
     });
-    if (SWEEP_REMAINDER.has(rel)) counted.set(rel, here.length);
-    else offences.push(...here);
+    offences.push(...here);
   }
   assert.deepEqual(offences, [],
     `${offences.length} site(s) spell a launcher instead of reading it:\n  ${offences.join('\n  ')}`);
 
-  // ...AND THE LISTED FILES ARE HELD TO THEIR EXACT COUNT. Equal, not `<=`: a new literal in a listed
-  // file must fail as loudly as one anywhere else, and a count that has come DOWN must fail too, so the
-  // list shrinks with the sweep instead of quietly outliving it.
-  const drift = [];
-  for (const [rel, expected] of SWEEP_REMAINDER) {
-    const actual = counted.get(rel);
-    if (actual === undefined) drift.push(`${rel} is listed but was not read — has it moved or gone?`);
-    else if (actual !== expected) drift.push(`${rel}: ${actual} site(s), the list says ${expected}`);
-  }
-  assert.deepEqual(drift, [],
-    `ARC-07-C31's list no longer matches the tree:\n  ${drift.join('\n  ')}`);
+  // NOTHING LEFT TO COUNT. The per-file exemption is gone, so the assertion above is the whole rule:
+  // no shipped file spells a launcher except the two definitions, and `codes.ts` until C32.
 });
 
 test('...and the negative: the widened guard sees a planted spelling in any shipped file', () => {
@@ -439,7 +416,25 @@ test('ARC-07-W17 — no generator can render a launcher for the machine it runs 
   // write. That is what "not a generator" MEANS here, so the list cannot quietly grow to cover a file
   // that does generate — the day one of these writes a file, this fails and the exemption has to be
   // argued again.
-  const NOT_GENERATORS = Object.freeze(['scripts/ci/assert-state-readable.mjs']);
+  const NOT_GENERATORS = Object.freeze(['scripts/ci/assert-state-readable.mjs',
+    // ARC-07-C31 slice 4 — a release PREFLIGHT: it answers `{ ok, message }` and writes nothing, so
+    // its message is a maintainer's terminal line and derives. The `WRITES` assertion below is what
+    // holds that claim rather than this comment.
+    'scripts/lib/release/preflight.mjs']);
+
+  /**
+   * ...AND ONE SCRIPT THAT DOES BOTH — ARC-07-C31 slice 4, and the pair above could not cover it.
+   *
+   * `scripts/ci/doctor-snapshot.mjs` WRITES a release asset, so it cannot claim "not a generator",
+   * and two of its lines are `die()` messages read by the maintainer running the capture, so pinning
+   * them would hand a Windows reader a command their shell refuses — the defect this row exists for.
+   * Nothing it spells reaches the asset.
+   *
+   * THE CLAIM IS CHECKED IN THE CODE, not taken from a comment: the file's unpinned spelling must be
+   * assigned to a constant named `TERMINAL_CLI`, and the count is exact. A second unpinned call, or
+   * one that is not named for its audience, fails here.
+   */
+  const TERMINAL_IN_GENERATOR = Object.freeze(new Map([['scripts/ci/doctor-snapshot.mjs', 1]]));
   const WRITES = /\b(writeFileSync|appendFileSync|mkdirSync|rmSync|renameSync|copyFileSync|createWriteStream)\b/;
 
   const all = execFileSync('git', ['ls-files', 'scripts', 'packages/contract/gen'],
@@ -455,7 +450,24 @@ test('ARC-07-W17 — no generator can render a launcher for the machine it runs 
   assert.deepEqual(notGenerators, [],
     `the exemption no longer holds:\n  ${notGenerators.join('\n  ')}`);
 
-  const generators = all.filter((f) => !NOT_GENERATORS.includes(f));
+  const terminalOnly = [];
+  for (const [rel, expected] of TERMINAL_IN_GENERATOR) {
+    assert.ok(all.includes(rel), `${rel} is exempt but is not a tracked script — has it moved?`);
+    const code = codeOf(read(rel));
+    const unpinned = code.match(/\b(spellings|cliSpelling|bootstrapSpelling)\(\s*\)/g) ?? [];
+    const named = code.match(/const TERMINAL_CLI = (spellings|cliSpelling)\(\s*\)/g) ?? [];
+    if (unpinned.length !== expected) {
+      terminalOnly.push(`${rel}: ${unpinned.length} unpinned call(s), the exemption says ${expected}`);
+    } else if (named.length !== expected) {
+      terminalOnly.push(`${rel}: ${named.length} of ${expected} unpinned call(s) are named `
+        + 'TERMINAL_CLI — an unpinned spelling here is exempt only when it says so in its name');
+    }
+  }
+  assert.deepEqual(terminalOnly, [],
+    `the terminal-only exemption no longer holds:\n  ${terminalOnly.join('\n  ')}`);
+
+  const generators = all
+    .filter((f) => !NOT_GENERATORS.includes(f) && !TERMINAL_IN_GENERATOR.has(f));
 
   const offences = [];
   for (const rel of generators) {

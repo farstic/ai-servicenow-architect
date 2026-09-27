@@ -146,8 +146,12 @@ export const EXIT_BEHIND = 4;
 /** The fetch is the one call here that talks to another machine, and it gets its own budget. */
 export const FETCH_TIMEOUT_MS = 120_000;
 
-export const USAGE = [
-  'usage: ./snowarch upgrade [--to vX.Y.Z] [--check] [--yes] [--pre] [--force-floor]',
+/**
+ * ARC-07-C31 slice 4 — a function of the reader's shell, the shape every other usage now has.
+ * `cli.mjs` resolves a `usage` that is a function and threads the one `where` it built.
+ */
+export const USAGE = (where) => [
+  `usage: ${spellings(where).cli} upgrade [--to vX.Y.Z] [--check] [--yes] [--pre] [--force-floor]`,
   '',
   '  --check        fetch the tags, say whether a newer release exists, change nothing (exit 4 when behind)',
   '  --to vX.Y.Z    a specific release tag (checks it out detached; the summary says how to return)',
@@ -418,14 +422,17 @@ export function planSteps(root, tag, { ctx, state, opts = {}, run = spawnSync } 
 }
 
 /** What the store will do, said before it is done. */
-export function storePlan(root, tag, { opts = {} } = {}) {
+/**
+ * ARC-07-C31 slice 4 — one caller, `line 611` below, so a default is within the rule and named.
+ */
+export function storePlan(root, tag, { opts = {}, spell = spellings() } = {}) {
   const store = join(root, '.local', 'instances.json');
   if (!existsSync(store)) return { line: 'store: none (no instance store in this checkout)' };
   let from = null;
   try { from = JSON.parse(readFileSync(store, 'utf8'))?.version ?? null; } catch { from = 'unreadable'; }
   const to = contractAt(root, tag, { opts })?.storeSchemaVersion ?? null;
   if (from === 'unreadable') {
-    return { line: 'store: the store is not valid JSON — run ./snowarch store migrate to see why',
+    return { line: `store: the store is not valid JSON — run ${spell.cli} store migrate to see why`,
       blocked: true };
   }
   if (to === null) return { line: `store: schema v${from} → unknown (the tag ships no contract)` };
@@ -516,7 +523,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   now = () => new Date(), ask = null, input = process.stdin } = {}) {
   if (positional.length > 0) {
     log.fail(`upgrade takes no positional arguments; did you mean --to ${positional[0]}?`);
-    log.step(USAGE);
+    log.step(USAGE({ platform, env }));
     return EXIT_USAGE;
   }
   const opts = { env };
@@ -608,7 +615,7 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   // cannot be checked out — in which case the plan says so rather than printing the other answer
   // under the same heading.
   const { steps, estimate } = planSteps(root, target, { ctx, state, opts });
-  const store = storePlan(root, target, { opts });
+  const store = storePlan(root, target, { opts, spell: spellings({ platform, env }) });
   const floor = floorCheck(tagInfo, { exec: probe });
   const commits = Number(git(root, ['rev-list', '--count', `HEAD..${target}`], { ...opts, allowFail: true }) ?? '');
   const date = git(root, ['log', '-1', '--format=%cs', target], { ...opts, allowFail: true });
@@ -677,7 +684,11 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
  * first, and a RE-RUN after a step failed, where the tree is already at the target and planning a
  * move that has happened would be a lie in a box. Both end here, so both end the same way.
  */
-export async function finish({ root, env, log, run, target, latest, remote, now, state }) {
+export async function finish({ root, env, log, run, target, latest, remote, now, state,
+  // ARC-07-C31 slice 4 — `platform` beside the `env` this already had; the two sentences below are a
+  // terminal's, so the reader's own shell, and both come from ONE spelling rather than two calls.
+  platform = process.platform }) {
+  const spell = spellings({ platform, env });
   log.step(stepLine(6, 'bootstrap (only the steps whose inputs changed)'));
   const mode = state?.mode === 'live' ? 'live' : 'design';
   const bootstrap = run(process.execPath, [join(root, 'tools/snowarch/bin/snowarch.mjs'),
@@ -685,8 +696,8 @@ export async function finish({ root, env, log, run, target, latest, remote, now,
   { cwd: root, stdio: 'inherit', env: childEnv(root, env) });
   if (bootstrap.status !== 0) {
     log.fail(`upgrade: the bootstrap stopped (exit ${bootstrap.status ?? 'abnormally'}) — the tree `
-      + `is at ${target} and the state file records the step; re-run ./snowarch upgrade or `
-      + './snowarch bootstrap');
+      + `is at ${target} and the state file records the step; re-run ${spell.cli} upgrade or `
+      + `${spell.bootstrap}`);
     return EXIT_FAIL;
   }
 

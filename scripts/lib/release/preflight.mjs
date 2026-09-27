@@ -14,6 +14,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { compareSemver } from '../../../tools/snowarch/lib/semver.mjs';
+import { spellings } from '../../../tools/snowarch/lib/launcher-spelling.mjs';
 
 export const EXIT_PREFLIGHT = 2;
 
@@ -111,7 +112,9 @@ export function preflight({ version, root, git, config, flags = {}, platform = p
   // release cut against a different corpus would carry a pin nobody can reproduce.
   const gitlink = /^\d+ commit ([0-9a-f]{40})\t/.exec(git(['ls-tree', 'HEAD', 'vendor/ServiceNowDocs']))?.[1];
   if (!existsSync(join(root, 'vendor/ServiceNowDocs/.git')) || gitlink !== config?.docs?.pin) {
-    return { ok: false, message: 'release: docs pin mismatch or corpus missing — run ./snowarch docs sync' };
+    // ARC-07-C31 slice 4 — a maintainer's terminal during a release, so the reader's own shell.
+    return { ok: false,
+      message: `release: docs pin mismatch or corpus missing — run ${spellings().cli} docs sync` };
   }
 
   // 8. The toolchain. Last, because it is the one a maintainer can least often do anything about

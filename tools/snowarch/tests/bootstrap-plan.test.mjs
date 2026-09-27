@@ -206,7 +206,10 @@ test('a bad --mode, --docs or --from is refused by name, and writes nothing', as
     assert.equal(code, 2, `${JSON.stringify(flags)} should be a usage error`);
     assert.equal(existsSync(join(root, '.local')), false);
   }
-  assert.match(USAGE, /--from BNN/);
+  // ARC-07-C31 slice 4 — CALLED, and with a pinned shell: what this asserts is the `--from` flag,
+  // which carries no launcher, so a bare `USAGE()` would make a launcher-free assertion quietly
+  // platform-dependent. Pinning says the case does not care which shell rather than picking one.
+  assert.match(USAGE({ platform: 'linux', env: {} }), /--from BNN/);
 });
 
 test('AC 1 — a design-only run writes the state the other consumers read', async () => {

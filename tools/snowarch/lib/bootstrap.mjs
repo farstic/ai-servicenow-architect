@@ -13,10 +13,14 @@ import { checkLocation, checkMode } from './instance-file.mjs';
 import { DOCS, buildPlan, runPlanScreen } from './plan.mjs';
 import { LAST, STEPS, interrupt, runSteps, stepById } from './steps/index.mjs';
 import { RESET_MESSAGE, StateError, emptyState, loadState, resetState, saveState } from './state.mjs';
-import { spellings } from './launcher-spelling.mjs';
+import { needSpell, spellings } from './launcher-spelling.mjs';
 
-export const USAGE = [
-  'usage: ./snowarch bootstrap [options]',
+/**
+ * ARC-07-C31 slice 4 — a function of the reader's shell, the shape every other usage now has.
+ * `cli.mjs` resolves a `usage` that is a function and threads the one `where` it built.
+ */
+export const USAGE = (where) => [
+  `usage: ${spellings(where).cli} bootstrap [options]`,
   '',
   '  --mode design|live        what to install for (default: design-only)',
   `  --docs ${DOCS.join('|')}   how much of the documentation corpus to check out`,
@@ -79,11 +83,23 @@ const stdinAsker = (input, output) => lineReader(input, output);
  * A ctx assembled at a call site is a ctx that drifts from what the steps read. This is what the
  * bootstrap gives them, and it is now what anybody asking the steps a question gives them too.
  */
-export function stepContext({ root, config, env = process.env, node, flags = {}, state = null }) {
+/**
+ * ARC-07-C31 slice 4 — `platform` BESIDE THE `env` THIS ALREADY CARRIED, so a step can spell the
+ * launcher for the shell the run was TOLD about rather than the one the process happens to be.
+ *
+ * `env` alone is not enough and that is the whole reason: `isWindowsShell` is
+ * `platform === 'win32' && !env.SHELL && !env.MSYSTEM`, so a ctx with only an env renders by this
+ * machine's SHELL. With both, `tests/upgrade` and the bootstrap's own cases can drive a Windows
+ * rendering by argument — which is what keeps these seventeen sites from being as thinly held as the
+ * server's ten, where there was no context to add one to.
+ */
+export function stepContext({ root, config, env = process.env, platform = process.platform,
+  node, flags = {}, state = null }) {
   return {
     root,
     config,
     env,
+    platform,
     node,
     areaCount: countAreas(root, config),
     instanceFile: flags['instance-file'] ?? null,
@@ -156,8 +172,12 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
     return EXIT_OK;
   }
 
+  // ARC-07-C31 slice 4 — ONE spelling for this command, built once and threaded: `loadState`'s
+  // refusals, the step context the steps render from, and the closing `nextText` all have to be the
+  // same shell or one run prints two answers.
+  const spell = spellings({ platform, env });
   let state;
-  try { state = loadState(root, spellings({ platform, env })); } catch (e) {
+  try { state = loadState(root, spell); } catch (e) {
     if (!(e instanceof StateError)) throw e;
     return refuse(e.message, e.code);
   }
@@ -257,23 +277,29 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
       steps: runState.steps,
       summary: { ok: outcome.summary.ok, warn: outcome.summary.warn,
         fail: outcome.summary.fail, skipped: outcome.summary.skipped },
-      next: nextText(outcome, runState),
+      next: nextText(outcome, runState, spell),
     });
   } else if (!outcome.next) {
-    log.step(nextText(outcome, runState));
+    log.step(nextText(outcome, runState, spell));
   }
   return outcome.code === EXIT_OK ? EXIT_OK : EXIT_FAIL;
 }
 
 /** What to do now. ARC-06-S09 replaces this with B09's own text, dialog budget and all. */
-export function nextText(outcome, state) {
+/**
+ * ARC-07-C31 slice 4 — `spell` REQUIRED: two callers, both below (`next:` in the `--json` object and
+ * the `log.step` beside it), and the rule is a count. Both render for the same terminal, and requiring
+ * it is what stops the two drifting into two renderings of one sentence.
+ */
+export function nextText(outcome, state, spell) {
+  needSpell(spell, 'nextText');
   if (outcome.stoppedAt) {
-    return `stopped at ${outcome.stoppedAt} — fix the cause above and re-run ./bootstrap.sh`;
+    return `stopped at ${outcome.stoppedAt} — fix the cause above and re-run ${spell.bootstrap}`;
   }
   // B09's block, verbatim. `--json`'s `next` and the lines a human read are then the same string
   // rather than two renderings that can drift — which is what criterion 3 asks.
   if (outcome.next) return outcome.next;
   return state.mode === 'live'
     ? `bootstrap complete (${LAST}) — run /snowarch status in Claude Code to confirm the instance`
-    : `bootstrap complete (${LAST}) — design-only; add an instance later with ./snowarch mode live`;
+    : `bootstrap complete (${LAST}) — design-only; add an instance later with ${spell.cli} mode live`;
 }
