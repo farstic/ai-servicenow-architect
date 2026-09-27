@@ -604,6 +604,8 @@ chosen from `git diff --cached --name-only`, never from what the change was mean
 staged list before every commit; `vendor/ServiceNowDocs` appearing in it means the full suite, not
 `lint`. Never pass `--quiet` to a submodule update — the failure is the whole message.
 
+**IT HAPPENED FIVE TIMES IN THE NIGHT OF ARC-07-W17, so there is a tool now: run a control through `node scripts/ci/control.mjs`.** It takes `--file` (repeatable), `--degrade "<command>"` and `--test "<command>"`, and it REFUSES to start if any of those files has uncommitted changes or differs from the checkpoint commit; it PRINTS the checkpoint sha before it changes anything; it restores BY THAT SHA rather than by `HEAD`, so a commit made mid-run cannot move the target; and it VERIFIES the restore, because a restore that silently failed is the same loss again. Exit 0 is a VALID control, **1 is INERT — the test passed while the product was degraded**, which is the result worth knowing and the one this programme keeps meeting — 2 is a refusal, 3 means the restore did not verify and there is work to do by hand. The rule below still stands and the tool is how it is kept.
+
 **It happened a THIRD time in ARC-07-W12, with the paragraph above already on this page**, so the
 rule is restated as an ORDER rather than a caution: the first control of a row runs *after* the
 commit, and the commit is of work already green. What went wrong was not forgetting to checkpoint —
