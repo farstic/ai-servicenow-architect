@@ -439,9 +439,35 @@ test('ARC-07-W17 — no generator can render a launcher for the machine it runs 
   // a bare `spellings()` or `cliSpelling()` means "whatever this machine is", which for a committed file
   // is never right. I cannot force `process.platform` locally — ARC-07 measured that as unusable, since
   // `win32.resolve` on POSIX paths fails everything — so the property is asserted structurally instead.
-  const generators = execFileSync('git', ['ls-files', 'scripts', 'packages/contract/gen'],
+  //
+  // ...AND `scripts/` IS NOT ALL GENERATORS, which ARC-07-C35 found by tripping over it. The rule's
+  // reason — "a generated file would differ per runner" — applies to a script that WRITES a committed
+  // file. `scripts/ci/assert-state-readable.mjs` writes nothing: it is the assertion two `ci.yml` steps
+  // make, and one of those steps exists precisely to check what PowerShell wrote, so the runner's own
+  // shell is the answer it must render. Pinning it would make the Windows step assert the POSIX
+  // spelling, which is the opposite of its purpose.
+  //
+  // THE EXEMPTION IS FALSIFIABLE rather than asserted: each listed file must perform no filesystem
+  // write. That is what "not a generator" MEANS here, so the list cannot quietly grow to cover a file
+  // that does generate — the day one of these writes a file, this fails and the exemption has to be
+  // argued again.
+  const NOT_GENERATORS = Object.freeze(['scripts/ci/assert-state-readable.mjs']);
+  const WRITES = /\b(writeFileSync|appendFileSync|mkdirSync|rmSync|renameSync|copyFileSync|createWriteStream)\b/;
+
+  const all = execFileSync('git', ['ls-files', 'scripts', 'packages/contract/gen'],
     { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
     .split('\n').filter((f) => /\.mjs$/.test(f) && !/\.test\./.test(f));
+
+  const notGenerators = [];
+  for (const rel of NOT_GENERATORS) {
+    assert.ok(all.includes(rel), `${rel} is exempt but is not a tracked script — has it moved?`);
+    const writes = codeOf(read(rel)).match(WRITES);
+    if (writes) notGenerators.push(`${rel}: exempt as "not a generator" but calls ${writes[0]}`);
+  }
+  assert.deepEqual(notGenerators, [],
+    `the exemption no longer holds:\n  ${notGenerators.join('\n  ')}`);
+
+  const generators = all.filter((f) => !NOT_GENERATORS.includes(f));
 
   const offences = [];
   for (const rel of generators) {

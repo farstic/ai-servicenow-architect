@@ -8,9 +8,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { makeExec } from '../../tools/snowarch/lib/steps/B00.mjs';
-import { capabilityPacks, DRAWIO_CANDIDATES, enginePrereqChecks,
+import { capabilityPacks, DRAWIO_CANDIDATES, enginePrereqChecks, recordedMode,
   SOFFICE_CANDIDATES } from '../../tools/snowarch/lib/doctor/checks/engine-prereqs.mjs';
 import { contextFor, greenTree, runById } from './helpers/tree.mjs';
+import { spellings } from '../../tools/snowarch/lib/text.mjs';
+
+/** ARC-07-C37 — any valid spelling: this case is about the THROW, not the rendering. */
+const SPELL = spellings();
 
 const checks = enginePrereqChecks();
 
@@ -90,6 +94,42 @@ test('E-03 warns in design-only and fails in live when npm is absent', async (t)
   assert.match(design.detail, /needed only for live mode/);
   const live = await runById(checks, 'E-03', ctx(root, { exec, mode: 'live' }));
   assert.equal(live.status, 'fail');
+});
+
+/**
+ * ARC-07-C37 — THE RETHROW, HELD IN BOTH DIRECTIONS, and this case exists because a control was inert.
+ *
+ * `recordedMode` wraps its state read in a `catch` so that an unreadable `bootstrap-state.json` is
+ * E-11's finding and not reported twice. That also swallowed a `TypeError` from a programming error:
+ * when `loadState`'s spelling became required, this call site passed one argument, the `catch` turned
+ * the missing one into `null`, and the only symptom was E-03 reporting `warn` where the recorded mode
+ * said `fail` — two files away from the defect.
+ *
+ * ARC-07-C31 added `if (e instanceof TypeError) throw e;` and I claimed a control proved it. IT DID
+ * NOT. That control's degradation changed TWO things at once — it removed the rethrow AND dropped the
+ * argument — so the red it produced was the dropped argument's. Decomposed on 2026-09-27: removing
+ * ONLY the rethrow is INERT across the whole root and engine suite (1266 + 419 cases), and dropping
+ * ONLY the argument fails E-03. A compound degradation proves that at least one of its edits matters,
+ * and says nothing about which — which is a way for a control to look valid while testing nothing.
+ *
+ * BOTH HALVES, so the rethrow cannot be widened into swallowing nothing: a `TypeError` propagates,
+ * and a read error still returns `null`. The second half is the one that keeps E-11 the owner of the
+ * unreadable-file sentence.
+ */
+test('ARC-07-C37 — recordedMode rethrows a TypeError and still swallows a read error', () => {
+  const programmingError = () => { throw new TypeError('loadState needs a spellings object — …'); };
+  assert.throws(() => recordedMode('/nonexistent', SPELL, { load: programmingError }),
+    { name: 'TypeError', message: /needs a spellings object/ },
+    'a TypeError was swallowed — a finding about this code became a silent null');
+
+  // ...and the half that must NOT change: an unreadable state file is E-11's to report, so this
+  // returns `null` rather than throwing, and the doctor prints one sentence about it instead of two.
+  const unreadable = () => { throw new Error('EACCES: permission denied, open \'.local/bootstrap-state.json\''); };
+  assert.equal(recordedMode('/nonexistent', SPELL, { load: unreadable }), null,
+    'a read error now propagates — E-11 is the owner of that sentence, not E-03');
+
+  // A third: a state file with no mode is not an error at all, and must still be `null`.
+  assert.equal(recordedMode('/nonexistent', SPELL, { load: () => ({ steps: {} }) }), null);
 });
 
 test('E-03 reads the mode from the recorded state when the caller does not name one', async (t) => {

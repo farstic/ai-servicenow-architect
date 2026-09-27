@@ -932,15 +932,9 @@ jobs:
           env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin TERM=dumb \
             bash -o posix ./bootstrap.sh --mode design --yes --docs skip --skip-claude-check
       - name: The state it wrote is the one Node reads
-        run: |
-          node --input-type=module -e "
-            import { loadState, assertStorable } from './tools/snowarch/lib/state.mjs';
-            import { spellings } from './tools/snowarch/lib/launcher-spelling.mjs';
-            const s = loadState(process.cwd(), spellings());
-            if (s.writer !== 'bash') { console.error('writer is', s.writer); process.exit(1); }
-            assertStorable(s);
-            console.log('state ok:', s.version, s.writer, Object.keys(s.steps).length, 'steps');
-          "
+        # ARC-07-C35 — this was an inline `node -e` block, which is code covered by no local
+        # instrument: ARC-07-C31 broke it and CI was the first reader. It is a script now.
+        run: node scripts/ci/assert-state-readable.mjs --writer bash
 
   windows-native:
     # ARC-09-S08. A Windows machine used the way a Windows user uses one: `cmd.exe` as the shell
@@ -1220,14 +1214,8 @@ jobs:
           Write-Host ("writer={0} mode={1} fileModes={2}" -f $s.writer, $s.mode, $s.fileModes)
           if ($s.writer -ne 'powershell') { exit 1 }
           if ($s.mode -ne 'design-only') { exit 1 }
-          node --input-type=module -e "
-            import { loadState, assertStorable } from './tools/snowarch/lib/state.mjs';
-            import { spellings } from './tools/snowarch/lib/launcher-spelling.mjs';
-            const s = loadState(process.cwd(), spellings());
-            if (s.writer !== 'powershell') { console.error('writer', s.writer); process.exit(1); }
-            assertStorable(s);
-            console.log('node accepts the powershell-written state:', s.version, Object.keys(s.steps).length, 'steps');
-          "
+          # ARC-07-C35: was an inline node -e block; see scripts/ci/assert-state-readable.mjs
+          node scripts/ci/assert-state-readable.mjs --writer powershell
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: Nothing tracked was modified
         shell: powershell
