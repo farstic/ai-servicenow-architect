@@ -87,7 +87,9 @@ export async function statusCommand({ flags = {}, log, out = process.stdout, env
   cwd = process.cwd(), home = '', now = () => Date.now(), registry = undefined,
   // ARC-07-W17 — like `doctorCommand`'s, and for the same reason: `make-status-fixtures.mjs` pins it so
   // the committed fixtures stop depending on the capturing machine's shell (rule 4).
-  platform = process.platform } = {}) {
+  platform = process.platform,
+  // ARC-07-C33 — a seam, defaulting to the product's behaviour; see the `runDoctor` call below.
+  writeCache = 'auto' } = {}) {
   const write = (text) => out.write(`${text}\n`);
 
   const checkout = resolveCheckout({ cwd, who: 'STATUS' });
@@ -117,7 +119,12 @@ export async function statusCommand({ flags = {}, log, out = process.stdout, env
       fix: false,
       section: null,
       sections: null,
-      writeCache: 'auto',
+      // ARC-07-C33 — a SEAM, defaulting to the product's behaviour. The panel caches because a
+      // session's first line is on a millisecond budget, so `'auto'` is right for every real caller.
+      // What it is wrong for is a TEST that runs this against the real checkout to see what the
+      // doctor produces now: that case does not care about caching and was leaving
+      // `.local/doctor-last.json` and `.local/doctor-last.inputs.json` in the repository root.
+      writeCache,
       started: now(),
       env,
       home,
