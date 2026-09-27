@@ -99,16 +99,26 @@ const LAUNCHER_PATTERNS = Object.freeze([
 /**
  * The two files that ARE the definitions, and the only ones allowed to spell a launcher.
  *
- * EXEMPT FOR WHAT THEY DEFINE, NOT FOR WHAT THEY SAY — and `text.mjs` says quite a lot. Besides the
- * definition itself and `ADD_INSTANCE`'s POSIX default, it carries SIX messages with the launcher
- * spelled by hand: the banner's `upgrade`, `staleRegistration` and `doctorFail`, the `staleSuffix`, and
- * `MODE_VARIANTS`' `timedOut` and `failed`. A Windows reader is shown a spelling their shell refuses in
- * all six, and this guard cannot see them because reading that file is what the exemption prevents.
- * They belong to ARC-07-C31's sweep and are named in that row so nobody reads the exemption as meaning
- * the file is settled.
+ * EXEMPT FOR WHAT THEY DEFINE, NOT FOR WHAT THEY SAY — and that distinction cost this row two rounds
+ * to make TRUE rather than merely written down. `text.mjs` was on this list, and it carried SIX
+ * messages with the launcher spelled by hand on top of the definition: BANNER's `upgrade`,
+ * `staleRegistration` and `doctorFail`, the `staleSuffix`, and `MODE_VARIANTS`' `timedOut` and
+ * `failed`. A Windows reader was shown a spelling their shell refuses in all six, and this guard
+ * structurally could not see them, because reading that file is what an exemption prevents.
+ *
+ * C31's first slice fixed the six and rewrote the comment above to say the exemption covered only the
+ * definition. The BEHAVIOUR still skipped all five hundred lines, and the architect's review proved it
+ * with two controls the guard survived 9/9 green: appending a fresh `export const CONTROL_316 =
+ * './snowarch x';` to the file, and reverting `BANNER.upgrade` to its hand-spelled form. A comment is
+ * not an exemption. So the definition MOVED, to `launcher-spelling.mjs`, which is four lines of
+ * strings and nothing else — `text.mjs` is now read like every other file in the tree, and both of
+ * those controls fail.
+ *
+ * `tty.ts` is the server's own copy, deliberate and documented in its own header: the server must
+ * never import the engine, so the two share the semantics and not the code.
  */
 const DEFINITIONS = Object.freeze([
-  'tools/snowarch/lib/text.mjs',
+  'tools/snowarch/lib/launcher-spelling.mjs',
   'packages/snowarch/src/cli/tty.ts',
 ]);
 
@@ -259,12 +269,29 @@ test('ARC-07-W17 — a MODE_VARIANT with no spelling THROWS rather than printing
   //
   // Three consumers, three different shells — the doctor's ctx, a pinned POSIX page, the person at the
   // terminal — so there is no default that can be right, and the miss must be loud.
-  const { MODE_VARIANTS } = await import('../tools/snowarch/lib/text.mjs');
+  const { BANNER, MODE_VARIANTS } = await import('../tools/snowarch/lib/text.mjs');
   for (const name of ['unconfigured', 'noInstanceLoaded', 'notBootstrapped']) {
     assert.throws(() => MODE_VARIANTS[name](), { name: 'TypeError', message: /needs a spellings object/ },
       `${name} accepted no spelling`);
   }
   assert.throws(() => MODE_VARIANTS.serverDisabled('pdi'), { name: 'TypeError' });
+
+  // EVERY BANNER MEMBER TOO, and the architect's review is why: this case iterated `MODE_VARIANTS`
+  // alone, so ARC-07-C31's slice 1 gave seven new members the same requirement with nothing holding
+  // them to it. Including the two that take a leading argument, where the spelling is the SECOND
+  // parameter and passing it first is the slip — the same shape as `summaryLine`'s options landing in
+  // the `checks` slot, which cost three Windows cells.
+  for (const name of ['firstRun', 'staleRegistration', 'staleSuffix', 'timedOut']) {
+    assert.throws(() => BANNER[name](), { name: 'TypeError', message: /needs a spellings object/ },
+      `BANNER.${name} accepted no spelling`);
+  }
+  assert.throws(() => BANNER.upgrade('v9.9.9'), { name: 'TypeError' }, 'BANNER.upgrade, tag only');
+  assert.throws(() => BANNER.doctorFail(2), { name: 'TypeError' }, 'BANNER.doctorFail, count only');
+  assert.throws(() => BANNER.failed('Error'), { name: 'TypeError' }, 'BANNER.failed, class only');
+  // ...and the message names the OWNER, so a reader is sent to the right object. It said MODE_VARIANTS
+  // for a BANNER member once and sent me to the wrong file.
+  assert.throws(() => BANNER.timedOut(), { message: /^BANNER\.timedOut/ });
+  assert.throws(() => MODE_VARIANTS.unconfigured(), { message: /^MODE_VARIANTS\.unconfigured/ });
   // ...and the positive direction, so the guard is not merely refusing everything.
   const win = { cli: '.\\snowarch.cmd', bootstrap: '.\\bootstrap.cmd' };
   assert.match(MODE_VARIANTS.notBootstrapped(win), /\.\\bootstrap\.cmd$/);
@@ -388,4 +415,46 @@ test('...and the negative: the generator check sees an unpinned call', () => {
   assert.equal(unpinned('  cliSpelling()'), true);
   assert.equal(unpinned("  spellings({ platform: 'linux', env: {} }).cli"), false, 'a pinned call');
   assert.equal(unpinned("  spellings({ platform, env })"), false, 'a threaded call is the caller\'s');
+});
+
+test('ARC-07-C31 — every banner message renders the Windows spelling on a Windows shell', async () => {
+  // THE GAP THE ARCHITECT'S REVIEW FOUND. Slice 1 made six messages take the spelling, and the only
+  // thing holding them was the SOURCE-level guard — which proves no literal remains and says nothing
+  // about what a Windows reader is shown. This drives each one and reads the output, which is the
+  // property: `tests/doctor/win32-remedies.test.mjs` does the same for the doctor's remedies.
+  //
+  // `env: {}` is load-bearing, for the reason that file writes out at length: `isWindowsShell` reads
+  // SHELL and MSYSTEM and `env` defaults to `process.env`, so `{ platform: 'win32' }` alone renders
+  // POSIX on any machine with SHELL set — a case written that way asserts POSIX while believing it
+  // asked about Windows.
+  const { BANNER, spellings } = await import('../tools/snowarch/lib/text.mjs');
+  const win = spellings({ platform: 'win32', env: {} });
+  assert.equal(win.cli, '.\\snowarch.cmd', 'the premise moved: win32 no longer spells it this way');
+
+  const rendered = {
+    upgrade: BANNER.upgrade('v9.9.9', win),
+    staleRegistration: BANNER.staleRegistration(win),
+    doctorFail: BANNER.doctorFail(3, win),
+    staleSuffix: BANNER.staleSuffix(win),
+    timedOut: BANNER.timedOut(win),
+    failed: BANNER.failed('TypeError', win),
+  };
+  for (const [name, line] of Object.entries(rendered)) {
+    assert.ok(line.includes(win.cli), `BANNER.${name} does not render ${win.cli}: ${line}`);
+    // ...and not the POSIX one, which is what a Windows reader was shown before this slice.
+    assert.doesNotMatch(line, /(?<!\.\\snowarch)\.\/snowarch/, `a POSIX launcher survived: ${line}`);
+    // A BARE name is the spelling PowerShell refuses — ARC-07-C1's whole finding.
+    assert.doesNotMatch(line, /(?<!\.\\)\bsnowarch\.cmd\b/, `a bare snowarch.cmd: ${line}`);
+  }
+
+  // `firstRun` names a slash command and no launcher: it must render neither spelling, which is why it
+  // is asserted separately rather than left out — "it has none" is a claim worth holding.
+  const firstRun = BANNER.firstRun(win);
+  assert.doesNotMatch(firstRun, /snowarch\.cmd|\.\/snowarch/, firstRun);
+  assert.match(firstRun, /\/snowarch setup-instance/);
+
+  // ...and the POSIX direction, so a member that hard-coded the WINDOWS spelling would not pass above.
+  const posix = spellings({ platform: 'linux', env: {} });
+  assert.match(BANNER.upgrade('v9.9.9', posix), /\.\/snowarch upgrade\.$/);
+  assert.doesNotMatch(BANNER.timedOut(posix), /snowarch\.cmd/);
 });

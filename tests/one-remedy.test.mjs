@@ -97,7 +97,18 @@ function occurrences() {
       // the remedy is routinely on a different line from the state it answers. Two lines of window
       // is what the longest of them needs; a window of one would have "found" a missing remedy in
       // every wrapped message in the tree.
-      const window = lines.slice(i, i + 3).join(' ');
+      // ARC-07-C31 — ONE LINE OF LOOK-BACK, because a site's IDENTITY can now precede its text.
+      // `BANNER`'s members became functions taking the launcher spelling (the six messages in
+      // `text.mjs` spelled it POSIX by hand, and a Windows reader was shown a command their shell
+      // refuses), so `firstRun:` is on one line and its string on the next. The allowlist keys on the
+      // member name, which is the stable identity; without the look-back the scan reported an
+      // allowlisted occurrence as a violation and then called its own entry dead.
+      //
+      // It widens what an allowlist entry can cover by one line, which is a real cost: an entry could
+      // now shelter an unrelated occurrence directly beneath its needle. Accepted because the entries
+      // are per-FILE and name a member, and because the alternative was to key the allowlist on the
+      // message text — which is the thing this test exists to stop being copied.
+      const window = lines.slice(Math.max(0, i - 1), i + 3).join(' ');
       found.push({ rel, line: i + 1, text: line.trim(), window });
     });
   }
@@ -149,7 +160,8 @@ test('ARC-08-C7 — the allowlist has no dead entries', () => {
   // list stops describing the tree, and the next person trusts it anyway.
   const found = occurrences();
   for (const entry of ALLOWED) {
-    assert.ok(found.some((f) => f.rel === entry.file && f.text.includes(entry.needle)),
+    assert.ok(found.some((f) => f.rel === entry.file
+      && (f.text.includes(entry.needle) || f.window.includes(entry.needle))),
       `allowlist entry no longer matches anything: ${entry.file} — "${entry.needle}"`);
     assert.ok(entry.state && entry.state.length > 20,
       `allowlist entry has no stated reason: ${entry.file}`);

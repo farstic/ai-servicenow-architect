@@ -9,6 +9,7 @@
 // rather than repeating the strings.
 
 import { renderSummaryLine } from './doctor/report-text.mjs';
+import { POSIX, isWindowsShell, spellings } from './launcher-spelling.mjs';
 
 /**
  * How many Claude Code dialogs a first `claude` will show.
@@ -25,25 +26,20 @@ import { renderSummaryLine } from './doctor/report-text.mjs';
 export const EXPECTED_DIALOGS = 1;
 
 /**
- * Are we talking to a shell that spells paths the Windows way?
+ * The spelling itself lives in `launcher-spelling.mjs` — ARC-07-C31, and the move is the row.
  *
- * Not `process.platform === 'win32'` alone: Git Bash on Windows runs `./bootstrap.sh` perfectly
- * well, and telling that user to type `.\bootstrap.cmd` would be telling them to type something
- * that does not work. `SHELL` and `MSYSTEM` are how a bash on Windows announces itself.
+ * RE-EXPORTED, not re-implemented, because some seventy call sites import `spellings` from here and
+ * the definition's address is not what any of them are about. What changed is which file the guard
+ * exempts: it exempted THIS one, whose comment named the definition while its behaviour skipped five
+ * hundred lines of sentences — and those sentences are precisely where a hand-spelled launcher gets
+ * written. Now the exempt file is the definition and nothing else, and this file is read like the
+ * rest of the tree.
  */
-export const isWindowsShell = ({ platform = process.platform, env = process.env } = {}) =>
-  platform === 'win32' && !env.SHELL && !env.MSYSTEM;
-
-/** The command spellings, by shell. */
-export function spellings(where = {}) {
-  return isWindowsShell(where)
-    // ARC-07-C1, closed by W7. The line above prefixed the bootstrap and NOT the cli, while the POSIX
-    // branch below prefixes both — the author knew the rule and applied it to one of the two.
-    // PowerShell does not resolve a command from the current directory, and nothing in the bootstrap
-    // puts the checkout on PATH, so a bare `snowarch.cmd` is the one spelling PowerShell refuses.
-    ? { bootstrap: '.\\bootstrap.cmd', cli: '.\\snowarch.cmd' }
-    : { bootstrap: './bootstrap.sh', cli: './snowarch' };
-}
+// IMPORTED ABOVE AND RE-EXPORTED HERE, which is two lines where `export { … } from` would be one —
+// because that form re-exports WITHOUT binding the name in this module, and three renderers in this
+// file call `spellings` themselves. The one-line version was 55 red cases in the engine suite alone,
+// all of them `ReferenceError: spellings is not defined`.
+export { isWindowsShell, spellings };
 
 /**
  * The four things a design-only or unknown checkout can BE, as sentences.
@@ -65,7 +61,7 @@ export function spellings(where = {}) {
  * rest of the switch around it; `instance add` is the wizard alone, and a user who runs it is one
  * step into a live mode the toggles do not yet reflect.
  */
-export const ADD_INSTANCE = (cli = './snowarch') =>
+export const ADD_INSTANCE = (cli = POSIX.cli) =>
   `${cli} mode live, or /snowarch setup-instance inside Claude`;
 
 /**
@@ -77,10 +73,12 @@ export const ADD_INSTANCE = (cli = './snowarch') =>
  * bootstrapped gave a Windows reader a command their shell rejects, with the POSIX one beside it as a
  * distraction. One spelling, for the shell doing the reading.
  *
- * FUNCTIONS, because `spellings()` must not be read at module load here: this file's own
- * `isWindowsShell` is a `const`, and `text.mjs` sits in the `panel -> text -> report-text -> panel`
- * import cycle ARC-07-W17 measured — a load-time read throws
- * `Cannot access 'isWindowsShell' before initialization`.
+ * FUNCTIONS, and the reason is the THREE CONSUMERS, not the import cycle. It was both until C31 moved
+ * the definition to `launcher-spelling.mjs`: a load-time `spellings()` here used to throw
+ * `Cannot access 'isWindowsShell' before initialization`, because `text.mjs` sits in the
+ * `panel -> text -> report-text -> panel` cycle and the `const` was in this file. A leaf module is
+ * initialised before any cycle is entered, so that hazard is gone — and these are still functions,
+ * because a value would render one shell for a doctor, a committed page and a live terminal alike.
  */
 /**
  * The spelling a variant was given, or a refusal — ARC-07-W17.
@@ -99,7 +97,10 @@ export const ADD_INSTANCE = (cli = './snowarch') =>
  */
 const needSpell = (spell, who) => {
   if (!spell || typeof spell.cli !== 'string' || typeof spell.bootstrap !== 'string') {
-    throw new TypeError(`MODE_VARIANTS.${who} needs a spellings object — this module has no process `
+    // The OWNER is named by the caller, not assumed: this helper guards `MODE_VARIANTS` and `BANNER`
+    // both, and a message that said MODE_VARIANTS for a BANNER member sent the reader to the wrong
+    // object. It did exactly that once, which is why `who` is now the full name.
+    throw new TypeError(`${who} needs a spellings object — this module has no process `
       + 'default, because its three consumers render for three different shells');
   }
   return spell;
@@ -115,15 +116,15 @@ const needSpell = (spell, who) => {
  */
 export const MODE_VARIANTS = Object.freeze({
   unconfigured: (spell) =>
-    `no ServiceNow instance configured; run ${ADD_INSTANCE(needSpell(spell, 'unconfigured').cli)}`,
+    `no ServiceNow instance configured; run ${ADD_INSTANCE(needSpell(spell, 'MODE_VARIANTS.unconfigured').cli)}`,
   serverDisabled: (label, spell) => `server disabled in .claude/settings.local.json although instance `
-    + `"${label}" is configured; run ${needSpell(spell, 'serverDisabled').cli} mode live`,
+    + `"${label}" is configured; run ${needSpell(spell, 'MODE_VARIANTS.serverDisabled').cli} mode live`,
   noInstanceLoaded: (spell) => {
-    needSpell(spell, 'noInstanceLoaded');
+    needSpell(spell, 'MODE_VARIANTS.noInstanceLoaded');
     return 'server enabled but no instance is loaded (see SV-02/SV-03); run /snowarch setup-instance';
   },
   notBootstrapped: (spell) => 'this checkout has not been bootstrapped; run '
-    + `${needSpell(spell, 'notBootstrapped').bootstrap}`,
+    + `${needSpell(spell, 'MODE_VARIANTS.notBootstrapped').bootstrap}`,
 });
 
 /**
@@ -155,19 +156,48 @@ export function modeLine({ mode, instance = null, qualifier = null, stamp = null
  * Each is ONE line. The banner has a budget measured in milliseconds and a reader who has not
  * asked for any of this yet; a nudge that wraps is a nudge that gets skipped.
  */
+/**
+ * ARC-07-C31 — EVERY MEMBER IS A FUNCTION TAKING THE SPELLING, including the two that have no launcher
+ * to spell.
+ *
+ * THIS FILE WAS EXEMPT FROM THE SPELLING GUARD AND I READ THAT AS THE FILE BEING SETTLED. It is exempt
+ * for what it DEFINES — `spellings` on line 45 and `ADD_INSTANCE`'s POSIX default — not for what it
+ * says, and it said six messages with the launcher spelled POSIX by hand. A Windows reader was shown a
+ * spelling their shell refuses in all six, and the guard structurally could not see them, because
+ * reading this file is exactly what the exemption prevents.
+ *
+ * TWO CONSUMERS, TWO RENDERINGS, which is why the spelling is an argument rather than a lazy call: the
+ * SessionStart hook and `/snowarch status` render for the person in front of them, and `exportable()`
+ * below feeds `text.json` — a GENERATED, COMMITTED file that must be byte-identical on every runner or
+ * `gen:check` fails on one of them. A lazy `spellings()` here would satisfy the first and break the
+ * second, which is precisely the mistake ARC-07-W17 made with `MODE_VARIANTS` and paid for across
+ * twelve Windows cells.
+ *
+ * `firstRun` and `staleSuffix`… — the ones with nothing to spell take the argument anyway. A UNIFORM
+ * CALL SHAPE is what stops the defect this programme has already shipped once: a consumer called a
+ * variant as a VALUE and printed the function's source as a Mode line, and the only reason it was not
+ * caught sooner is that some members took an argument and others did not.
+ */
 export const BANNER = Object.freeze({
-  firstRun: 'No ServiceNow instance configured — /snowarch setup-instance adds one '
-    + '(design-only works without it).',
-  upgrade: (tag) => `A newer release is available (${tag}) — run ./snowarch upgrade.`,
-  staleRegistration: 'Stale MCP registrations from the old setup found in ~/.claude.json — run '
-    + './snowarch doctor --section legacy for the removal commands.',
-  doctorFail: (n) => `Doctor: ${n} FAIL — run ./snowarch doctor for remedies.`,
+  firstRun: (spell) => {
+    needSpell(spell, 'BANNER.firstRun');
+    return 'No ServiceNow instance configured — /snowarch setup-instance adds one '
+      + '(design-only works without it).';
+  },
+  upgrade: (tag, spell) =>
+    `A newer release is available (${tag}) — run ${needSpell(spell, 'BANNER.upgrade').cli} upgrade.`,
+  staleRegistration: (spell) => 'Stale MCP registrations from the old setup found in ~/.claude.json '
+    + `— run ${needSpell(spell, 'BANNER.staleRegistration').cli} doctor --section legacy for the removal `
+    + 'commands.',
+  doctorFail: (n, spell) =>
+    `Doctor: ${n} FAIL — run ${needSpell(spell, 'BANNER.doctorFail').cli} doctor for remedies.`,
   /** The cache could not be refreshed in time: the line is still true, just old. */
-  staleSuffix: ' (cache stale — run ./snowarch doctor)',
-  timedOut: 'Mode: unknown — doctor timed out; run ./snowarch doctor',
+  staleSuffix: (spell) => ` (cache stale — run ${needSpell(spell, 'BANNER.staleSuffix').cli} doctor)`,
+  timedOut: (spell) =>
+    `Mode: unknown — doctor timed out; run ${needSpell(spell, 'BANNER.timedOut').cli} doctor`,
   /** Anything unforeseen. The CLASS, never the message: a message can carry a path or a value. */
-  failed: (errorClass) => `Mode: unknown — session banner failed (${errorClass}); run `
-    + './snowarch doctor',
+  failed: (errorClass, spell) => `Mode: unknown — session banner failed (${errorClass}); run `
+    + `${needSpell(spell, 'BANNER.failed').cli} doctor`,
   /**
    * What `/snowarch status` says when the doctor cannot run at all (ARC-08-S09).
    *
@@ -381,13 +411,17 @@ export function exportable({ serverKey }) {
     // the same words. The two that take an argument are rendered with an example one, so the file
     // shows the shape rather than a placeholder nobody can compare against.
     banner: {
-      firstRun: BANNER.firstRun,
-      upgrade: BANNER.upgrade('v2.1.0'),
-      staleRegistration: BANNER.staleRegistration,
-      doctorFail: BANNER.doctorFail(2),
-      staleSuffix: BANNER.staleSuffix,
-      timedOut: BANNER.timedOut,
-      failed: BANNER.failed('Error'),
+      // ARC-07-C31 — PINNED POSIX, because `text.json` is generated AND COMMITTED: its bytes must be
+      // identical on every runner or `gen:check` fails on a mac or on the Windows cell, whichever ran
+      // second. The Node-free launchers read this file, and they cannot know the reader's shell either.
+      // Same form as `gen-doctor-docs.mjs` and the rules page — the platform is STATED, not inherited.
+      firstRun: BANNER.firstRun(POSIX),
+      upgrade: BANNER.upgrade('v2.1.0', POSIX),
+      staleRegistration: BANNER.staleRegistration(POSIX),
+      doctorFail: BANNER.doctorFail(2, POSIX),
+      staleSuffix: BANNER.staleSuffix(POSIX),
+      timedOut: BANNER.timedOut(POSIX),
+      failed: BANNER.failed('Error', POSIX),
       fromState: BANNER.fromState('design-only', '2026-09-10T10:00:00.000Z',
         'until Node 20+ is installed'),
     },
