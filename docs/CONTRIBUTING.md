@@ -786,7 +786,7 @@ re-numbering reflex the rule exists to remove. This one is held by review.
 ```
 npm run lint          # gen:check, the workspace lints, the engine's L01-L11
 npm run type-check    # tsc --noEmit, and again for the test tsconfig
-npm test              # the engine suite, then every workspace's
+npm test              # BOTH halves: the engine suite and every workspace's, whatever either says
 npm run contract      # the contract gate
 claude plugin validate .claude/skills --strict
 claude plugin validate .claude/agents --strict
@@ -801,6 +801,25 @@ does not, and both have let a defect through to CI:
 - The legacy-name ratchet reads the working tree, and until ARC-10-C1 it read the INDEX — a run
   before `git add` scanned neither new file. Staging first is no longer load-bearing, but it is
   still what makes a local run and CI's run ask the same question.
+
+**`npm test` prints a table, and it is there because the gate used to shrink silently (ARC-09-C64).**
+The script was `node tests/run.mjs && npm test --workspaces --if-present`, so a failure in the first
+half withdrew the second — on this machine that is S-13's skill-listing budget, one environment-bound
+case, withdrawing 1463 vitest cases from every run — and nothing in the output said so. It cost the
+programme twice: once here, and once on the Windows cells in ARC-07-W7, where three assertions were red
+and a fourth was latent behind the same `&&`. **A CI log is a list of what broke FIRST, not a list of
+what is broken.** So `npm test` is now `node scripts/ci/test-all.mjs`, which runs every half whatever
+the previous one did, banners each half before it runs, and ends with
+
+```
+npm test — every half ran; here is what each one said
+  engine      node tests/run.mjs                    →  FAIL (exit 1)
+  workspaces  npm test --workspaces --if-present     →  ok
+```
+
+Read it as: a half shown as `ok` RAN and passed, and **a half missing from the table did not run.** When
+you add a suite, add it to `STEPS` in that file — never with `&&`, `||` or `;` in a package script, which
+`tests/test-all.test.mjs` refuses for every script whose name contains `test`.
 
 `actionlint` is a separate job and is NOT installed here: if you edit a workflow, the shell body is
 judged by shellcheck through actionlint on CI. Write the script so `shellcheck -s sh` would pass —

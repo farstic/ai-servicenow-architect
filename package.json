@@ -19,7 +19,7 @@
   "scripts": {
     "bootstrap": "node tools/snowarch/bin/snowarch.mjs bootstrap",
     "doctor": "node tools/snowarch/bin/snowarch.mjs doctor",
-    "test": "node tests/run.mjs && npm test --workspaces --if-present",
+    "test": "node scripts/ci/test-all.mjs",
     "lint": "node scripts/gen-docs-areas.mjs --check && npm run gen:check && npm run lint --workspaces --if-present && npm run lint:contract",
     "type-check": "npm run type-check --workspaces --if-present",
     "build:dist": "node scripts/build-dist.mjs",
