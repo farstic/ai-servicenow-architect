@@ -47,6 +47,9 @@ export interface RemedyValues {
     proxy?: string | undefined;
     proxyVar?: string | undefined;
     issuer?: string | undefined;
+    /** ARC-07-C32 — the shell the launcher placeholders are filled for; the process when absent. */
+    platform?: NodeJS.Platform | undefined;
+    env?: NodeJS.ProcessEnv | undefined;
     /** ARC-07-S07's three, for `STORE_IN_CLOUD_SYNC_FOLDER`. */
     provider?: string | undefined;
     root?: string | undefined;

@@ -18,6 +18,7 @@ import { remedyFor } from '../../../../packages/contract/lib/contract.mjs';
 import { redactResult } from './redact.mjs';
 import { NOT_IN_QUICK, NOT_IN_SECTION } from './report-text.mjs';
 import { isServerCheck, SECTIONS } from './registry.mjs';
+import { spellings } from '../launcher-spelling.mjs';
 
 export const DEFAULT_TIMEOUT_MS = 15_000;
 export const NETWORK_TIMEOUT_MS = 20_000;
@@ -102,13 +103,21 @@ async function runOne(check, ctx, now) {
  * troubleshooting page cannot disagree — they are the same string. A check that hand-wrote one
  * beside a code is the drift this prevents, and it throws in tests rather than quietly winning.
  */
-export function applyContractRemedy(result, contract) {
+/**
+ * ARC-07-C32 — `spell` REQUIRED, because this is the engine's half of the substitution.
+ *
+ * `codes.ts` holds `<cli>` rather than a literal now, so a reader that does not substitute prints the
+ * placeholder to somebody — which is precisely what W17's first attempt did and why C32 became a row.
+ * Required rather than defaulted: the one product caller is `runChecks`, which has the ctx, and a
+ * default would let the process answer for a run that was told its platform.
+ */
+export function applyContractRemedy(result, contract, spell) {
   if (!result.code) return result;
   if (result.remedy !== undefined) {
     throw new Error(`${result.id}: a check may set \`code\` or \`remedy\`, not both — `
       + 'the remedy for a code is the contract\'s');
   }
-  const entry = contract ? remedyFor(contract, result.code) : undefined;
+  const entry = contract ? remedyFor(contract, result.code, spell) : undefined;
   if (!entry) return result;
   return {
     ...result,
@@ -146,7 +155,9 @@ export async function runChecks(checks, ctx, options = {}) {
 
   for (const check of selected) {
     const raw = await runOne(check, ctx, now);
-    results.push(redactResult(applyContractRemedy(raw, ctx?.contract ?? null), options));
+    results.push(redactResult(
+      applyContractRemedy(raw, ctx?.contract ?? null, spellings({ platform: ctx?.platform, env: ctx?.env })),
+      options));
   }
   for (const { check, reason } of skipped) {
     results.push({ id: check.id, status: 'skip', detail: reason, durationMs: 0 });

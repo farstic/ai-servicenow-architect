@@ -7,42 +7,42 @@ export const ERROR_CODES = [
         code: 'WRITE_NOT_ENABLED',
         meaning: "The instance's preset does not enable WRITE_ENABLED.",
         remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
-        command: "./snowarch instance set-preset <label> pdi-developer",
+        command: "<cli> instance set-preset <label> pdi-developer",
         showInRule: true,
     },
     {
         code: 'CMDB_WRITE_NOT_ENABLED',
         meaning: "The instance's preset does not enable CMDB_WRITE_ENABLED.",
         remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
-        command: "./snowarch instance set-preset <label> pdi-developer",
+        command: "<cli> instance set-preset <label> pdi-developer",
         showInRule: true,
     },
     {
         code: 'SCRIPTING_NOT_ENABLED',
         meaning: "The instance's preset does not enable SCRIPTING_ENABLED.",
         remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
-        command: "./snowarch instance set-preset <label> pdi-developer",
+        command: "<cli> instance set-preset <label> pdi-developer",
         showInRule: true,
     },
     {
         code: 'ATF_NOT_ENABLED',
         meaning: "The instance's preset does not enable ATF_ENABLED.",
         remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
-        command: "./snowarch instance set-preset <label> pdi-developer",
+        command: "<cli> instance set-preset <label> pdi-developer",
         showInRule: true,
     },
     {
         code: 'NOW_ASSIST_NOT_ENABLED',
         meaning: "The instance's preset does not enable NOW_ASSIST_ENABLED.",
         remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
-        command: "./snowarch instance set-preset <label> full",
+        command: "<cli> instance set-preset <label> full",
         showInRule: true,
     },
     {
         code: 'FLUENT_NOT_ENABLED',
         meaning: "The instance's preset does not enable FLUENT_ENABLED.",
         remedy: "raise the preset; a `prod` instance additionally needs `--ack-prod`",
-        command: "./snowarch instance set-preset <label> full",
+        command: "<cli> instance set-preset <label> full",
         showInRule: true,
     },
     {
@@ -59,34 +59,34 @@ export const ERROR_CODES = [
         // because "not loaded" has more than one cause and a remedy that named only the common one
         // would send a reader to acknowledge a prod flag on an instance that is not prod.
         remedy: "read the reason in the instance listing; a `prod` instance without `prodWriteAck` needs the acknowledgement",
-        command: "./snowarch instance list",
+        command: "<cli> instance list",
         showInRule: true,
     },
     {
         code: 'UNKNOWN_INSTANCE',
         meaning: "No instance in the store carries that label.",
         remedy: "the listing prints the labels that exist",
-        command: "./snowarch instance list",
+        command: "<cli> instance list",
         showInRule: false,
     },
     {
         code: 'FLAGS_INCOMPLETE',
         meaning: "A store entry does not state all six capability flags. An absent flag is off, so the entry works — but nobody can tell an intended `false` from a forgotten one, and the next preset change starts from a guess.",
         remedy: "state every flag explicitly by re-applying a preset — the review screen shows what changes before anything is written",
-        command: "./snowarch instance set-preset <label> <preset>",
+        command: "<cli> instance set-preset <label> <preset>",
         showInRule: false,
     },
     {
         code: 'FLAG_DEPENDENCY_VIOLATION',
         meaning: "A flag that requires `WRITE_ENABLED` is on while `WRITE_ENABLED` is off. The tools gated on it are refused at run time and the refusal names WRITE first, so the entry promises a capability it cannot deliver.",
         remedy: "decide which one was meant: turn WRITE on, or turn the dependent flag off. Neither is guessable from the store, so this is never repaired automatically",
-        command: "./snowarch instance set-preset <label> <preset>",
+        command: "<cli> instance set-preset <label> <preset>",
         showInRule: false,
     },
     {
         code: 'PROD_WRITE_NOT_ACKNOWLEDGED',
         meaning: "The instance is tagged `environment: prod` and holds a write preset without `prodWriteAck: true`.",
-        remedy: "A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal",
+        remedy: "A production instance is capped at read-only. Do not suggest editing the store; the user raises it with <cli> instance set-preset <label> <preset> --ack-prod in their terminal",
         showInRule: true,
     },
     {
@@ -117,7 +117,7 @@ export const ERROR_CODES = [
         meaning: "The store was written by an older server and this build does not read that schema. "
             + "Nothing migrates on load — an explicit command is what rewrites a credential file.",
         remedy: "migrate it; a 0600 backup is written first and credential values are never touched",
-        command: "./snowarch store migrate",
+        command: "<cli> store migrate",
         // A session must STOP here: the model's job is to tell the user to run the command, never to
         // edit the store itself. That is the whole reason this one is in the always-loaded rule file
         // and `STORE_SCHEMA_INVALID` is not.
@@ -129,7 +129,7 @@ export const ERROR_CODES = [
             + "not a broken file.",
         remedy: "upgrade this checkout, rather than editing the store down; a backup can be restored "
             + "if the newer server wrote one",
-        command: "./snowarch upgrade",
+        command: "<cli> upgrade",
         showInRule: true,
     },
     {
@@ -152,7 +152,7 @@ export const ERROR_CODES = [
         // states that prefix exactly ONCE, rendered from `engine.config.json`'s server key, and
         // ARC-05's own test asserts both the count and the absence of a literal. A second, hard-coded
         // copy here would fail that test and would be wrong the day the key changes.
-        remedy: "If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed — and then call snow_core_instances_reload before you retry, because this server still holds the credentials it read at startup and a retry without it is a second failed login",
+        remedy: "If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run <cli> instance test <label> and, if it fails, <cli> instance set-credentials <label>. Continue only after the user says the credentials were fixed — and then call snow_core_instances_reload before you retry, because this server still holds the credentials it read at startup and a retry without it is a second failed login",
         showInRule: true,
         httpStatus: 401,
     },
@@ -191,7 +191,7 @@ export const ERROR_CODES = [
     {
         code: 'TLS_CA_UNTRUSTED',
         meaning: "The certificate was not signed by a CA this machine trusts — normal on a network that intercepts TLS.",
-        remedy: "the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it",
+        remedy: "the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs <cli> and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it",
         command: "export NODE_EXTRA_CA_CERTS=<path to the PEM>",
         showInRule: true,
     },
@@ -387,8 +387,8 @@ export const ERROR_CODES = [
     {
         code: 'LEGACY_STORE_NOT_FOUND',
         meaning: "There is no snow-mcp 1.x store at the path the import was pointed at.",
-        remedy: "check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `./snowarch doctor` reports where it looked",
-        command: "./snowarch instance import --from-legacy --path <file> --dry-run",
+        remedy: "check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `<cli> doctor` reports where it looked",
+        command: "<cli> instance import --from-legacy --path <file> --dry-run",
         showInRule: false,
     },
     {
@@ -401,21 +401,21 @@ export const ERROR_CODES = [
         code: 'LABEL_NOT_FOUND',
         meaning: "No instance with that label is in the store this checkout resolves.",
         remedy: "run `instance list` to see the labels this checkout has, or `instance add <label>` to add one",
-        command: "./snowarch instance list",
+        command: "<cli> instance list",
         showInRule: false,
     },
     {
         code: 'LABEL_EXISTS',
         meaning: "An instance with that label is already in the store.",
         remedy: "use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it",
-        command: "./snowarch instance add <label> --url <url> --env <env> --replace",
+        command: "<cli> instance add <label> --url <url> --env <env> --replace",
         showInRule: false,
     },
     {
         code: 'ENV_REQUIRED',
         meaning: "The environment could not be proposed and none was given, in a run that cannot ask.",
         remedy: "pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do",
-        command: "./snowarch instance add <label> --url <url> --env <pdi|dev|test|prod> --yes",
+        command: "<cli> instance add <label> --url <url> --env <pdi|dev|test|prod> --yes",
         showInRule: false,
     },
     {
@@ -474,6 +474,16 @@ export const ERROR_CODES = [
     },
 ];
 export const ERROR_CODE_NAMES = new Set(ERROR_CODES.map((e) => e.code));
-export function remedyFor(code) {
-    return ERROR_CODES.find((e) => e.code === code);
+const fillLaunchers = (text, spell) => (spell ? text.replaceAll('<cli>', spell.cli).replaceAll('<bootstrap>', spell.bootstrap) : text);
+export function remedyFor(code, spell) {
+    const entry = ERROR_CODES.find((e) => e.code === code);
+    if (!entry)
+        return entry;
+    // `'command' in entry` rather than `entry.command`: the table is a `const` union and not every
+    // member HAS a command, so the property access does not type-check. The `in` narrowing is the
+    // compiler telling me the shape honestly rather than a cast hiding it.
+    const command = 'command' in entry && typeof entry.command === 'string'
+        ? { command: fillLaunchers(entry.command, spell) }
+        : {};
+    return { ...entry, remedy: fillLaunchers(entry.remedy, spell), ...command };
 }

@@ -188,18 +188,24 @@ test('report order is REGISTRY order, whatever order the run took', async () => 
 });
 
 test("a check may set `code` OR `remedy`, never both — a code's remedy is the contract's", () => {
-  // ARC-07-W17 — THE EXPECTATION IS THE CONTRACT'S OWN VALUE, which is also this case's property: a
-  // code's remedy is the contract's. `applyContractRemedy` copies it verbatim, so asserting a DERIVED
-  // spelling made the test disagree with its own fixture — green on a mac, red on all three Windows
-  // cells, and about nothing. Contract remedies stay POSIX by the 2026-09-27 ruling until ARC-07-C32
-  // gives them a runtime substitution point; until then, comparing to the source is the honest form.
-  const entry = { code: 'X_FAILED', remedy: 'do the thing', command: './snowarch x' };
+  // ARC-07-C32 HAS LANDED, which is what the previous version of this comment was waiting for. It read:
+  // "contract remedies stay POSIX until ARC-07-C32 gives them a runtime substitution point; until then,
+  // comparing to the source is the honest form". They have one now, so the honest form changed — the
+  // expectation is the contract's value WITH its placeholders filled, from the same spelling the call
+  // was given. Comparing to the raw source would now assert that substitution does NOT happen.
+  const entry = { code: 'X_FAILED', remedy: 'do the thing', command: '<cli> x' };
   const contract = { errorCodes: [entry] };
-  const filled = applyContractRemedy({ id: 'E-00', status: 'fail', detail: 'd', code: 'X_FAILED' }, contract);
-  assert.equal(filled.remedy, entry.remedy);
-  assert.equal(filled.command, entry.command);
+  const spell = spellings({ platform: 'win32', env: {} });
+  const filled = applyContractRemedy({ id: 'E-00', status: 'fail', detail: 'd', code: 'X_FAILED' },
+    contract, spell);
+  assert.equal(filled.remedy, entry.remedy, 'a remedy with no placeholder is untouched');
+  assert.equal(filled.command, `${spell.cli} x`, 'the placeholder was not filled for this reader');
+  // ...and the POSIX direction, so a substitution that hard-coded one shell could not pass.
+  const posix = applyContractRemedy({ id: 'E-00', status: 'fail', detail: 'd', code: 'X_FAILED' },
+    contract, spellings({ platform: 'linux', env: {} }));
+  assert.equal(posix.command, './snowarch x');
   assert.throws(
-    () => applyContractRemedy({ id: 'E-00', code: 'X_FAILED', remedy: 'my own words' }, contract),
+    () => applyContractRemedy({ id: 'E-00', code: 'X_FAILED', remedy: 'my own words' }, contract, spell),
     /may set `code` or `remedy`, not both/);
 });
 

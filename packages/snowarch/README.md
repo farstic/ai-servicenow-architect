@@ -350,7 +350,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 |---|---|
 | `ATF_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `ATTACHMENT_UPLOAD_FAILED` | check the file size and that the target record exists |
-| `AUTHENTICATION_FAILED` | If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run ./snowarch instance test <label> and, if it fails, ./snowarch instance set-credentials <label>. Continue only after the user says the credentials were fixed — and then call snow_core_instances_reload before you retry, because this server still holds the credentials it read at startup and a retry without it is a second failed login |
+| `AUTHENTICATION_FAILED` | If a ServiceNow tool returns AUTHENTICATION_FAILED: stop immediately. Do not retry that call or make any other call to the same instance — repeated failed logins can lock the account. Tell the user to run <cli> instance test <label> and, if it fails, <cli> instance set-credentials <label>. Continue only after the user says the credentials were fixed — and then call snow_core_instances_reload before you retry, because this server still holds the credentials it read at startup and a retry without it is a second failed login |
 | `BATCH_FAILED` | the message lists which |
 | `CMDB_WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `CONNECTION_REFUSED` | `<host>` refused the connection — the instance may be hibernated (PDIs sleep after inactivity: wake it at developer.servicenow.com) or blocked by a firewall. Check the URL and its port too |
@@ -376,7 +376,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `INVALID_REQUEST` | the message names the argument |
 | `LABEL_EXISTS` | use `instance set-credentials` or `instance set-preset` to change it, `instance remove` to delete it, or `--replace` to overwrite it |
 | `LABEL_NOT_FOUND` | run `instance list` to see the labels this checkout has, or `instance add <label>` to add one |
-| `LEGACY_STORE_NOT_FOUND` | check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `./snowarch doctor` reports where it looked |
+| `LEGACY_STORE_NOT_FOUND` | check the path, or pass `--path <file>` if the legacy store was kept somewhere else; `<cli> doctor` reports where it looked |
 | `LEGACY_STORE_UNREADABLE` | open it and check it is a complete JSON object; a half-written file from an interrupted 1.x session cannot be migrated and its instances are re-added with `instance add` |
 | `NETWORK_ERROR` | the message carries the underlying cause |
 | `NO_INSTANCE_CONFIGURED` | add an instance, then call the reload tool — Claude Code does not need restarting, the server re-advertises its catalogue in the same session |
@@ -386,7 +386,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `NOW_ASSIST_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 | `OAUTH_CLIENT_INVALID` | check them against the Application Registry entry on the instance |
 | `OAUTH_ROPC_DISABLED` | use basic authentication, or have an administrator enable the grant type |
-| `PROD_WRITE_NOT_ACKNOWLEDGED` | A production instance is capped at read-only. Do not suggest editing the store; the user raises it with ./snowarch instance set-preset <label> <preset> --ack-prod in their terminal |
+| `PROD_WRITE_NOT_ACKNOWLEDGED` | A production instance is capped at read-only. Do not suggest editing the store; the user raises it with <cli> instance set-preset <label> <preset> --ack-prod in their terminal |
 | `PROXY_AUTH_REQUIRED` | the proxy is asking for credentials: put them in the proxy URL (`HTTPS_PROXY=http://user:pass@proxy:port`). NTLM and Kerberos proxies are not supported — the request has to reach the instance through a proxy that accepts basic credentials |
 | `PROXY_UNREACHABLE` | the proxy `<proxyVar>=<proxy>` did not connect to `<host>`. Check the proxy address and credentials, and that `<host>` is not excluded by `NO_PROXY` — or unset the variable if you are not behind a proxy. The proxy is printed with any credentials masked |
 | `QUERY_FAILED` | the message carries the instance response |
@@ -402,7 +402,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `STORE_SCHEMA_NEWER` | upgrade this checkout, rather than editing the store down; a backup can be restored if the newer server wrote one |
 | `STORE_SCHEMA_OUTDATED` | migrate it; a 0600 backup is written first and credential values are never touched |
 | `STORE_UNREADABLE` | repair or recreate it; the message names the parse error |
-| `TLS_CA_UNTRUSTED` | the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs ./snowarch and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it |
+| `TLS_CA_UNTRUSTED` | the certificate presented for `<host>` is not trusted by Node (issuer: `<issuer>`) — typically a TLS-intercepting gateway, or an expired certificate. Export the gateway root CA as PEM, point `NODE_EXTRA_CA_CERTS` at it for the shell that runs <cli> and in `.claude/settings.local.json` → `env` so the server gets it too, and restart — Node reads it once, at process start. Never `NODE_TLS_REJECT_UNAUTHORIZED=0`: it disables verification for the whole process, which on an intercepting network means trusting the interceptor and every other certificate with it |
 | `TLS_CERT_INVALID` | check the instance URL and the certificate; this is not a CA-trust problem |
 | `UNKNOWN_GATE` | report it; no user action can help |
 | `UNKNOWN_INSTANCE` | the listing prints the labels that exist |

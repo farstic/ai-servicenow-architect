@@ -13,6 +13,10 @@
  */
 
 import { spellings } from '../../../tools/snowarch/lib/text.mjs';
+import { fillLauncher } from '../lib/contract.mjs';
+
+/** The page's one rendering — ARC-07-C32. Named, so a reader sees which shell it commits to. */
+const PAGE_SPELL = spellings({ platform: 'linux', env: {} });
 
 /**
  * Named because the trap is its old behaviour: it sets `is_default`, which does nothing for REST.
@@ -125,7 +129,11 @@ export function render(ctx) {
   // A remedy is prose and a command is a command. The renderer sets the command as code and never
   // parses the prose looking for one — most entries have no command, and guessing where a sentence
   // stops being advice is how a half-command ends up in a fenced block.
-  const line = (e) => `- \`${e.code}\` → ${e.remedy}${e.command ? ` — \`${e.command}\`` : ''}.`;
+  // ARC-07-C32 — PINNED POSIX, because this page is COMMITTED: its bytes must be identical on every
+  // runner or `gen:check` fails on the next machine. The one-line Windows note above tells a
+  // PowerShell reader what to substitute, which is the ruling that made this the pinned surface.
+  const fill = (t) => fillLauncher(t, PAGE_SPELL);
+  const line = (e) => `- \`${e.code}\` → ${fill(e.remedy)}${e.command ? ` — \`${fill(e.command)}\`` : ''}.`;
 
   // The six flag gates collapse into one wildcard line: they differ only in which flag is off, and
   // six near-identical lines in a file with a 45-line budget are six not spent on something else.
@@ -198,7 +206,7 @@ Presets: ${presetLine}. A flag is on only when its value is the exact string \`"
 ## Runtime errors — stop and give the remedy, never retry, never propose editing flags from inside Claude
 When a tool result contains \`(Code: <CODE>)\` for one of the codes below: stop the current step, print the remedy line verbatim, and wait. Do not call the tool again with the same or different credentials. Do not suggest editing \`.local/instances.json\`, \`.mcp.json\` or any settings file by hand. After the user reports the remedy done, continue from the interrupted step — for \`AUTHENTICATION_FAILED\` and \`NO_INSTANCE_CONFIGURED\`, call \`${CAPABILITIES_TOOL}\` first to confirm the new state.
 ${ruleCodes.map(line).join('\n')}
-- \`*_NOT_ENABLED\` (${flagList}) → ${wildcard.remedy} — \`${wildcard.command}\`.
+- \`*_NOT_ENABLED\` (${flagList}) → ${fillLauncher(wildcard.remedy, PAGE_SPELL)} — \`${fillLauncher(wildcard.command, PAGE_SPELL)}\`.
 
 A remedy printed with \`<label>\`, \`<host>\` or \`<proxy>\` still in it: substitute what the tool result carried (\`${CAPABILITIES_TOOL}\` has the label), and print the placeholder only when nothing did. If two different runtime errors occur in one session, also say: run \`./snowarch doctor\` in a terminal and paste the FAIL lines.
 

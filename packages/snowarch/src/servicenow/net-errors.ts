@@ -10,7 +10,8 @@
  */
 
 /** The six codes this classifier can produce. Registered in `src/errors/codes.ts`. */
-import { ERROR_CODES } from '../errors/codes.js';
+import { ERROR_CODES, remedyFor } from '../errors/codes.js';
+import { bootstrapSpelling, cliSpelling } from '../cli/tty.js';
 
 export type NetworkErrorCode =
   | 'DNS_FAILURE'
@@ -115,6 +116,9 @@ export interface RemedyValues {
   proxy?: string | undefined;
   proxyVar?: string | undefined;
   issuer?: string | undefined;
+  /** ARC-07-C32 — the shell the launcher placeholders are filled for; the process when absent. */
+  platform?: NodeJS.Platform | undefined;
+  env?: NodeJS.ProcessEnv | undefined;
   /** ARC-07-S07's three, for `STORE_IN_CLOUD_SYNC_FOLDER`. */
   provider?: string | undefined;
   root?: string | undefined;
@@ -140,7 +144,15 @@ const substitute = (text: string, { provider, root, global: globalStore }: Remed
 
 export function fillRemedy(code: string, values: RemedyValues = {}): string {
   const { host, proxy, proxyVar, issuer } = values;
-  const entry = ERROR_CODES.find((e) => (e.code as string) === code);
+  // ARC-07-C32 — this reads the table directly rather than through `remedyFor`, so it fills the
+  // launcher placeholders itself. `<cli>` joins `<host>`, `<proxy>` and `<issuer>` as a token the CODE
+  // substitutes, rather than `<label>` and `<preset>`, which survive for the reader to fill in.
+  // ARC-07-C32 — this file RESOLVES the shell and hands `remedyFor` the two strings, because the
+  // registry may not import anything (see its header: `probe-auth` loads it before B04 has run).
+  const entry = remedyFor(code, {
+    cli: cliSpelling(values.platform, values.env),
+    bootstrap: bootstrapSpelling(values.platform, values.env),
+  });
   let text = substitute(entry?.remedy ?? '', values);
 
   // A PARENTHETICAL whose subject is absent goes with it. `(a proxy is configured — …)` reads as
