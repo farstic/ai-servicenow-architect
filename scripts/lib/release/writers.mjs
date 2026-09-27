@@ -73,6 +73,20 @@ export function writeMarker(text, version) {
  * writer that silently updated a subset would leave one of those paths on an older release.
  */
 export function writeInstallTag(text, version, file = 'the install page') {
+  // ARC-09-C65 — A PRERELEASE LEAVES THE PAGES ALONE, and the reason is semantic rather than a
+  // convenience. `allowedCloneTags` sends a reader of a prerelease tree to the newest FINAL release —
+  // never to an rc, and never to a tag that does not exist yet — and that is the RIGHT rule: an rc is
+  // for the people rehearsing it, not for a stranger cloning from the install page. This writer
+  // disagreed, rewriting the pages to name the prerelease, so the two contradicted each other for
+  // exactly the shape no real cut has. The FIRST rc rehearsal since ARC-09-C61 landed found it, and it
+  // rolled the release back on its own post-write suite.
+  //
+  // The outcome is REPORTED rather than silent — `skipped: 'prerelease'` — because ARC-09-C60's whole
+  // finding was that a writer reporting success on a page it did not change is how a stale tag ships.
+  // Here it did not change the page ON PURPOSE, and that field is how a caller tells the two apart.
+  if (!/^\d+\.\d+\.\d+$/.test(String(version))) {
+    return { ok: true, text, count: 0, skipped: 'prerelease' };
+  }
   // ARC-07-W8 — TWO SPELLINGS, because a page names the tag in two grammars and only one of them is
   // a command. `--branch v2.0.5` sits in a clone line a reader can see and check; *"from release tag
   // v2.0.2"* sits in the sentence the paste-a-prompt path asks them to give Claude. This writer knew
