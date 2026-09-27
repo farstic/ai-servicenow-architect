@@ -27,12 +27,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
-import { loadStateOrReason, StateError } from '../../tools/snowarch/lib/state.mjs';
+import { loadState, loadStateOrReason, StateError } from '../../tools/snowarch/lib/state.mjs';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import { contextFor, greenTree, runById } from './helpers/tree.mjs';
 
@@ -137,27 +137,73 @@ test('ARC-07-C37 — an unreadable file gets its own sentence, not "not valid JS
   // which `loadState` never throws — every file-level failure went through one `try` that also wrapped
   // `JSON.parse`, so a valid file the process could not read was reported as corrupt, with
   // `bootstrap --reset` as the remedy. Reset rewrites a corrupt file; it does nothing about a
-  // permission. Driven here through the real `loadState`, on a real chmod.
+  // permission.
+  //
+  // THE READER IS INJECTED, AND THE WINDOWS CELLS ARE WHY. The first version drove this with
+  // `chmod 000`, which is a POSIX mode bit: on the Windows runner the file read fine — the runner is an
+  // administrator — so all three Windows doctor cells went red on a case whose PREMISE does not hold
+  // there rather than on the behaviour it asserts. A `skip` on win32 would have been cheaper and worse,
+  // because the sentence is not POSIX-only: a Windows reader whose file cannot be read deserves the
+  // same words. So the failure comes through `loadState`'s `read` seam, and the assertion runs on every
+  // cell. The real filesystem is still driven, twice, below.
   const root = greenTree(t);
   const state = join(root, '.local', 'bootstrap-state.json');
   writeFileSync(state, JSON.stringify({ version: 1, mode: 'live', steps: {} }));
-  chmodSync(state, 0o000);
-  // NO `t.after` chmod here: `greenTree` registers the tree's removal first, node runs after-hooks in
-  // registration order, and a chmod on a deleted path is ENOENT — measured. The mode is restored inline
-  // below, and `rmSync` can unlink a 0000 file anyway (the directory's permissions are what matter).
 
-  const { state: read, reason } = loadStateOrReason(root, SPELL);
-  assert.equal(read, null);
-  assert.match(reason, /could not be read \(EACCES/,
-    'an unreadable file is still described as invalid JSON');
-  assert.doesNotMatch(reason, /not valid JSON/);
-  assert.match(reason, /permissions/, 'the sentence does not say what to look at');
-  assert.doesNotMatch(reason, /bootstrap --reset/,
-    'a reset was offered for a permission it cannot fix');
+  const eacces = () => {
+    const e = new Error(`EACCES: permission denied, open '${state}'`);
+    e.code = 'EACCES';
+    throw e;
+  };
+  assert.throws(() => loadState(root, SPELL, { read: eacces }), (e) => {
+    assert.equal(e.name, 'StateError');
+    assert.match(e.message, /could not be read \(EACCES/,
+      'a read failure is still described as invalid JSON');
+    assert.doesNotMatch(e.message, /not valid JSON/);
+    assert.match(e.message, /permissions/, 'the sentence does not say what to look at');
+    assert.doesNotMatch(e.message, /bootstrap --reset/,
+      'a reset was offered for a permission it cannot fix');
+    return true;
+  });
+
+  // ...and the same failure through `loadStateOrReason`, so the pair carries the sentence rather than
+  // only the throw.
+  const viaPair = loadStateOrReason(root, SPELL,
+    { load: (r, sp) => loadState(r, sp, { read: eacces }) });
+  assert.equal(viaPair.state, null);
+  assert.match(viaPair.reason, /could not be read \(EACCES/);
+
+  // THE REAL FILESYSTEM, HALF ONE — a DIRECTORY where the file should be. Unconditional on purpose:
+  // this fails identically on both platforms (EISDIR), so the end-to-end path is proved on every cell
+  // without a seam and without a skip. It is also the architect's sixth control, held as a case.
+  rmSync(state);
+  mkdirSync(state);
+  const asDir = loadStateOrReason(root, SPELL);
+  assert.equal(asDir.state, null);
+  assert.match(asDir.reason, /could not be read \(EISDIR/, asDir.reason);
+  assert.doesNotMatch(asDir.reason, /not valid JSON/);
+  rmSync(state, { recursive: true });
+
+  // THE REAL FILESYSTEM, HALF TWO — a real `chmod 000`, where mode bits decide reads. Skipped by NAME
+  // on win32 rather than quietly: POSIX permission bits do not apply there, and a case that pretends
+  // otherwise reports the platform rather than the product.
+  writeFileSync(state, JSON.stringify({ version: 1, mode: 'live', steps: {} }));
+  if (process.platform === 'win32') {
+    t.diagnostic('chmod half skipped: POSIX permission bits do not apply on win32 '
+      + '(the EISDIR half above covers the real filesystem on this platform)');
+  } else {
+    chmodSync(state, 0o000);
+    // NO `t.after` chmod: `greenTree` registers the tree's removal first, node runs after-hooks in
+    // registration order, and a chmod on a deleted path is ENOENT — measured. Restored inline below.
+    const real = loadStateOrReason(root, SPELL);
+    assert.equal(real.state, null);
+    assert.match(real.reason, /could not be read \(EACCES/, real.reason);
+    chmodSync(state, 0o600);
+  }
 
   // ...and a genuinely corrupt file keeps the sentence it had, so this is a split and not a rename.
-  // The chmod comes FIRST: writing to a 000 file is itself EACCES, which cost a red run here.
-  chmodSync(state, 0o600);
+  // The chmod above comes first for the same reason this write can happen at all: writing to a 0000
+  // file is itself EACCES, which cost a red run here.
   writeFileSync(state, '{ not json');
   const corrupt = loadStateOrReason(root, SPELL);
   assert.match(corrupt.reason, /is not valid JSON/);

@@ -130,7 +130,7 @@ export function emptyState({ engineVersion, platform = process.platform, node = 
  * two files keep their OWN launcher sites for the trigger slice: what is added here is the argument,
  * nothing else.
  */
-export function loadState(root, spell) {
+export function loadState(root, spell, { read = readFileSync } = {}) {
   needSpell(spell, 'loadState');
   const p = statePath(root);
   if (!existsSync(p)) return null;
@@ -147,8 +147,23 @@ export function loadState(root, spell) {
    * `--section prereqs`, E-10 and E-29 instead of dying in a `catch`, so a mislabel that used to be
    * seen once is about to be seen five times.
    */
+  /*
+   * `read` IS A SEAM FOR THE CASE, and it exists because the platform will not cooperate. The
+   * unreadable-file sentence was asserted with `chmod 000`, which is a POSIX mode bit: on the Windows
+   * runner the file read fine — the runner is an administrator — so all three Windows doctor cells went
+   * red on a case whose PREMISE did not hold there, not on the behaviour it was written for.
+   *
+   * A named skip on win32 would have been the cheaper answer and a worse one: the sentence is not
+   * POSIX-only, so a Windows reader whose file cannot be read deserves the same words, and a skip is
+   * how a platform-specific hole survives twelve rows. Injecting the reader asserts what this function
+   * WRAPS — a read failure becomes "could not be read", never "is not valid JSON" — on every cell.
+   *
+   * No product caller passes it. The real-filesystem path keeps its own unconditional case: a
+   * DIRECTORY where the file should be fails identically on both platforms (EISDIR), which is why that
+   * half needs no seam and no skip.
+   */
   let text;
-  try { text = readFileSync(p, 'utf8'); } catch (e) {
+  try { text = read(p, 'utf8'); } catch (e) {
     throw new StateError(`.local/bootstrap-state.json could not be read (${e.message}) — check the `
       + 'permissions on it and on .local/ (snowarch writes the file 0600 and the directory 0700)');
   }
