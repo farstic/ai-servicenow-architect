@@ -770,8 +770,16 @@ test('ARC-09-C61 — the install-page guard passes at the shape a release commit
         `${page} names ${tag}, which the guard would refuse at the release shape (allowed: ${allowed.join(', ')})`);
     }
     // ...and it really is the version just cut, or this case would pass on a page nothing rewrote.
-    assert.ok(named.includes(`v${treeVersion}`),
-      `${page} does not name v${treeVersion} — writeInstallTag did not run on the release commit`);
+    //
+    // ARC-09-C65 — FOR A FINAL RELEASE ONLY. A prerelease leaves the pages naming the newest FINAL tag,
+    // deliberately: `allowedCloneTags` sends a reader of a prerelease tree to the newest final release,
+    // never to an rc and never to a tag that does not exist. Asserting the tree's own version here for
+    // an rc is what rolled the first rc rehearsal back — the two rules contradicted each other on the
+    // one shape no real cut has.
+    if (/^\d+\.\d+\.\d+$/.test(treeVersion)) {
+      assert.ok(named.includes(`v${treeVersion}`),
+        `${page} does not name v${treeVersion} — writeInstallTag did not run on the release commit`);
+    }
   }
 });
 
@@ -845,4 +853,53 @@ test('ARC-09-C63 — a rolled-back release restores what the GENERATORS wrote to
   assert.equal(git(root, ['status', '--porcelain']).trim(), '',
     'the rollback left the tree dirty — the next commit would carry a release\'s version into develop');
   assert.equal(git(root, ['tag', '-l']).trim(), '', 'a tag survived a rolled-back release');
+});
+
+test('ARC-09-C65 — writeInstallTag rewrites a final release and leaves a prerelease alone', () => {
+  // THE FIRST rc REHEARSAL SINCE ARC-09-C61 FOUND THIS, and it is a rehearsal-only failure mode: the
+  // writer rewrote the pages to name `2.0.6-rc.1` while `allowedCloneTags` — correctly — allowed only
+  // the newest FINAL tag, so the release's own post-write suite refused the tree it had just written and
+  // rolled back. Every real cut passed, because a final version is the one shape the two rules agree on.
+  const page = [
+    'git clone -c advice.detachedHead=false --branch v2.0.5 https://example.invalid/x.git',
+    'ask Claude: install this from release tag v2.0.5, into this folder',
+  ].join('\n');
+
+  // A FINAL VERSION: both grammars rewritten, and the count is the evidence it touched both.
+  const fin = writeInstallTag(page, '2.0.6', 'docs/INSTALL.md');
+  assert.equal(fin.ok, true, fin.message);
+  assert.equal(fin.count, 2, 'a final release must rewrite BOTH the clone flag and the prose');
+  assert.match(fin.text, /--branch v2\.0\.6\b/);
+  assert.match(fin.text, /release tag v2\.0\.6\b/);
+  assert.equal(fin.skipped, undefined, 'a final release is not skipped');
+
+  // A PRERELEASE: the page is returned BYTE-IDENTICAL, and the outcome is reported rather than silent —
+  // ARC-09-C60's rule, that a writer reporting success on a page it did not change is how a stale tag
+  // ships. Here it did not change it on purpose, and `skipped` is how the caller tells the two apart.
+  const pre = writeInstallTag(page, '2.0.6-rc.1', 'docs/INSTALL.md');
+  assert.equal(pre.ok, true, pre.message);
+  assert.equal(pre.text, page, 'a prerelease must leave the pages byte-identical');
+  assert.equal(pre.count, 0);
+  assert.equal(pre.skipped, 'prerelease');
+  // ...and the tag it leaves behind is one that EXISTS, which is the whole point.
+  assert.match(pre.text, /--branch v2\.0\.5\b/);
+  assert.doesNotMatch(pre.text, /rc\.1/, 'an rc reached a page a stranger clones from');
+});
+
+test('ARC-09-C65 — the two rules agree on an rc tree, which is what the rehearsal needs', async () => {
+  // THE SHAPE THAT FAILED, asserted directly rather than through a release run: a prerelease tree whose
+  // pages name the newest final tag must be ALLOWED by the same guard that refused it before.
+  const { allowedCloneTags: allowed } = await import('./lib/install-tag.mjs');
+  const rc = allowed({ tags: ['v2.0.5', 'v2.0.4'], treeVersion: '2.0.6-rc.1' });
+  assert.deepEqual(rc, ['v2.0.5'], 'a prerelease tree may only name the newest FINAL release');
+
+  const page = 'git clone --branch v2.0.5 …';
+  const written = writeInstallTag(page, '2.0.6-rc.1', 'docs/INSTALL.md');
+  for (const tag of written.text.match(/--branch (v[\d.]+(?:-[0-9A-Za-z.]+)?)/g) ?? []) {
+    const bare = tag.replace('--branch ', '');
+    assert.ok(rc.includes(bare), `the rc tree's page names ${bare}, which the guard allows: ${rc}`);
+  }
+
+  // ...and a FINAL tree still allows its own version, so this change moved nothing there.
+  assert.deepEqual(allowed({ tags: ['v2.0.5'], treeVersion: '2.0.6' }), ['v2.0.5', 'v2.0.6']);
 });
