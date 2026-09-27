@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { makeExec } from '../../tools/snowarch/lib/steps/B00.mjs';
+import { StateError } from '../../tools/snowarch/lib/state.mjs';
 import { capabilityPacks, DRAWIO_CANDIDATES, enginePrereqChecks, recordedMode,
   SOFFICE_CANDIDATES } from '../../tools/snowarch/lib/doctor/checks/engine-prereqs.mjs';
 import { contextFor, greenTree, runById } from './helpers/tree.mjs';
@@ -112,24 +113,43 @@ test('E-03 warns in design-only and fails in live when npm is absent', async (t)
  * ONLY the argument fails E-03. A compound degradation proves that at least one of its edits matters,
  * and says nothing about which — which is a way for a control to look valid while testing nothing.
  *
- * BOTH HALVES, so the rethrow cannot be widened into swallowing nothing: a `TypeError` propagates,
- * and a read error still returns `null`. The second half is the one that keeps E-11 the owner of the
- * unreadable-file sentence.
+ * BOTH HALVES, so the rethrow cannot be widened into swallowing nothing: a `TypeError` propagates, and
+ * a read error is still tolerated. The second half is what keeps E-11 the owner of the sentence.
+ *
+ * ARC-07-C37 DELIVERED changes two things here. The rule moved into `loadStateOrReason`, so the
+ * tolerated failure is now precisely the one `loadState` RAISES — a `StateError` — and everything else
+ * propagates, which is C31's rethrow generalised rather than repeated at seven sites. And the return is
+ * a PAIR, because swallowing was only half the defect: E-03 turns a missing npm into a `warn` in
+ * design-only and a `fail` in live, so a mode it could not read is a mode it must not assume.
+ *
+ * THE OLD FIXTURE FOR THE SECOND HALF WAS UNFAITHFUL, and finding that out is what produced the
+ * `loadState` change in this PR: it planted a bare `Error('EACCES: …')`, which `loadState` never
+ * throws. Measured — `chmod 000` on a valid state file comes back as a `StateError`, because the read
+ * and the parse were inside one `try`, and the sentence said the file `is not valid JSON` when it was
+ * intact and merely unreadable. So the fixture here plants what the product actually raises, and the
+ * read/parse split gives the unreadable case its own sentence.
  */
-test('ARC-07-C37 — recordedMode rethrows a TypeError and still swallows a read error', () => {
+test('ARC-07-C37 — recordedMode rethrows a TypeError and still tolerates a StateError', () => {
   const programmingError = () => { throw new TypeError('loadState needs a spellings object — …'); };
   assert.throws(() => recordedMode('/nonexistent', SPELL, { load: programmingError }),
     { name: 'TypeError', message: /needs a spellings object/ },
     'a TypeError was swallowed — a finding about this code became a silent null');
 
-  // ...and the half that must NOT change: an unreadable state file is E-11's to report, so this
-  // returns `null` rather than throwing, and the doctor prints one sentence about it instead of two.
-  const unreadable = () => { throw new Error('EACCES: permission denied, open \'.local/bootstrap-state.json\''); };
-  assert.equal(recordedMode('/nonexistent', SPELL, { load: unreadable }), null,
-    'a read error now propagates — E-11 is the owner of that sentence, not E-03');
+  // ...and the half that must NOT change: an unreadable state file is E-11's to report. It is
+  // TOLERATED — no throw — and the reason comes back so a caller in another section can say something
+  // instead of inventing a default. A `StateError`, because that is what `loadState` raises for every
+  // file-level failure: measured on `chmod 000` (EACCES) and on a directory in its place (EISDIR).
+  const unreadable = () => {
+    throw new StateError('.local/bootstrap-state.json could not be read (EACCES: permission denied)');
+  };
+  const read = recordedMode('/nonexistent', SPELL, { load: unreadable });
+  assert.equal(read.mode, null, 'a read error now propagates — E-11 owns that sentence, not E-03');
+  assert.match(read.reason, /could not be read \(EACCES/,
+    'the reason was discarded — a caller outside E-11\'s section then has nothing to say');
 
-  // A third: a state file with no mode is not an error at all, and must still be `null`.
-  assert.equal(recordedMode('/nonexistent', SPELL, { load: () => ({ steps: {} }) }), null);
+  // A third: a state file with no mode is not an error at all, so there is no reason to report.
+  assert.deepEqual(recordedMode('/nonexistent', SPELL, { load: () => ({ steps: {} }) }),
+    { mode: null, reason: null });
 });
 
 test('E-03 reads the mode from the recorded state when the caller does not name one', async (t) => {

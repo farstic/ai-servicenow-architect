@@ -16,7 +16,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { cachePath, cacheStale, inputsPath } from '../doctor-cache.mjs';
-import { loadState, saveState } from '../state.mjs';
+import { loadStateOrReason, saveState } from '../state.mjs';
 import { spellFor } from './spell.mjs';
 
 /** The `data.fix.kind` vocabulary. A kind outside this table is never applied — it is reported. */
@@ -86,11 +86,10 @@ async function fixDeps({ root, ctx, run }) {
  * was told is win32.
  */
 function readState(root, spell) {
-  try {
-    return loadState(root, spell) ?? { steps: {} };
-  } catch {
-    return { steps: {} };
-  }
+  // ARC-07-C37 — an unreadable state file still yields something to mutate (a fix step must be able
+  // to record what it did on a checkout whose record is broken), but a programming error no longer
+  // arrives here disguised as one. The `catch` took both.
+  return loadStateOrReason(root, spell).state ?? { steps: {} };
 }
 
 /** F2 — the corpus, through the bootstrap's docs step. `skip` becomes `sparse`, and says so. */

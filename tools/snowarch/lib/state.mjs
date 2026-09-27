@@ -135,10 +135,27 @@ export function loadState(root, spell) {
   const p = statePath(root);
   if (!existsSync(p)) return null;
 
+  /*
+   * ARC-07-C37 — READING AND PARSING ARE TWO FAILURES, and one `try` around both told the reader the
+   * wrong thing about the more alarming one. Measured: `chmod 000` on a perfectly valid state file
+   * produced `.local/bootstrap-state.json is not valid JSON (EACCES: permission denied, open ...)` — a
+   * file described as corrupt when it is intact and merely unreadable — and a directory in its place
+   * produced the same sentence with `EISDIR`. The remedy was wrong to match: `bootstrap --reset`
+   * rewrites a corrupt file and does nothing about a permission the process does not have.
+   *
+   * It is fixed HERE because C37 is what makes this sentence travel: it now reaches `--section host`,
+   * `--section prereqs`, E-10 and E-29 instead of dying in a `catch`, so a mislabel that used to be
+   * seen once is about to be seen five times.
+   */
+  let text;
+  try { text = readFileSync(p, 'utf8'); } catch (e) {
+    throw new StateError(`.local/bootstrap-state.json could not be read (${e.message}) — check the `
+      + 'permissions on it and on .local/ (snowarch writes the file 0600 and the directory 0700)');
+  }
   let parsed;
   // A leading BOM is stripped before parsing: Notepad adds one to anything it saves, and a
   // user who opened this file to look at it should not be told it is corrupt.
-  try { parsed = JSON.parse(readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); } catch (e) {
+  try { parsed = JSON.parse(text.replace(/^\uFEFF/, '')); } catch (e) {
     throw new StateError(`.local/bootstrap-state.json is not valid JSON (${e.message}) — `
       + `run ${spell.cli} bootstrap --reset to start over`);
   }
@@ -155,6 +172,39 @@ export function loadState(root, spell) {
   }
   if (!parsed.steps || typeof parsed.steps !== 'object') parsed.steps = {};
   return parsed;
+}
+
+/**
+ * The state, or the REASON there is none — ARC-07-C37, and the one place that decides what is
+ * tolerable.
+ *
+ * Seven doctor call sites wrote `try { loadState(...) } catch { return null }`, and that `catch`
+ * cannot tell two different things apart:
+ *
+ *   - `.local/bootstrap-state.json` is unreadable. A fact about the CHECKOUT, which E-11 owns and
+ *     which the other checks tolerate so one cause does not produce seven failures.
+ *   - `loadState` was called wrong. A fact about THIS CODE. ARC-07-C31 found one of those the hard
+ *     way: `recordedMode` reached `loadState` through an injected default, the spelling became
+ *     required, the `catch` turned the `TypeError` into a silent `null`, and E-03 reported `warn`
+ *     where the recorded mode said `fail`. The only thing that noticed was an assertion two files
+ *     away.
+ *
+ * So the tolerated failure is the one `loadState` RAISES DELIBERATELY — a `StateError`, carrying the
+ * sentence a user needs — and everything else propagates. That is C31's rethrow generalised to one
+ * function instead of repeated by hand at seven sites, which is the difference between a rule and a
+ * habit: the eighth site written next year gets it by calling this.
+ *
+ * And the reason is RETURNED rather than logged, because who reports it is the caller's decision:
+ * E-11 prints the sentence, E-10 and E-29 skip and point at E-11, E-27 drops its claim about a mode
+ * it cannot read, and `--section host` stops reporting a checkout as healthier than it is.
+ */
+export function loadStateOrReason(root, spell, { load = loadState } = {}) {
+  try {
+    return { state: load(root, spell), reason: null };
+  } catch (e) {
+    if (!(e instanceof StateError)) throw e;
+    return { state: null, reason: e.message };
+  }
 }
 
 /**
