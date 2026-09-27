@@ -163,16 +163,11 @@ const DATA_EXEMPT = Object.freeze(['packages/snowarch/src/errors/codes.ts']);
  * The numbers are the measurement at this head, not an estimate; the row carries the same table.
  */
 const SWEEP_REMAINDER = Object.freeze(new Map([
-  ['packages/snowarch/src/cli/format.ts', 2],
-  ['packages/snowarch/src/cli/import-legacy.ts', 3],
-  ['packages/snowarch/src/cli/store-command.ts', 3],
   ['packages/snowarch/src/doctor/checks.ts', 8],
   ['packages/snowarch/src/doctor/probes-binding.ts', 1],
   ['packages/snowarch/src/doctor/types.ts', 1],
   ['packages/snowarch/src/no-instance.ts', 1],
   ['packages/snowarch/src/store/index.ts', 1],
-  ['packages/snowarch/src/store/migrations/index.ts', 3],
-  ['packages/snowarch/src/store/schema.ts', 2],
   ['packages/snowarch/src/tools/updateset.ts', 2],
   ['packages/snowarch/src/utils/permissions.ts', 3],
   ['scripts/ci/doctor-snapshot.mjs', 2],

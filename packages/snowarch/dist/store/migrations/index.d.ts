@@ -79,12 +79,19 @@ export interface MigrateResult {
  * before the decision, and nothing is applied before the backup exists — so every failure mode
  * leaves either the original file or the original file plus a copy of itself.
  */
-export declare function migrateStore(path: string, { backup, dryRun, migrations, current, now, }?: {
+/**
+ * ARC-07-C31 slice 3 — `cli` REQUIRED: TWO product callers (`cli/store-command.ts:101` and `:135`),
+ * and the rule this row settled is a count rather than a judgement. Both of them sit inside a command
+ * that has already resolved the spelling, so requiring it makes them pass what they know instead of
+ * letting this function read the process behind them.
+ */
+export declare function migrateStore(path: string, { backup, dryRun, migrations, current, now, cli, }: {
     backup?: boolean;
     dryRun?: boolean;
     migrations?: readonly Migration[];
     current?: number;
     now?: () => Date;
+    cli: string;
 }): MigrateResult;
 /** `instances.json.bak-*` beside the store, newest first. */
 export declare function listBackups(storePath: string): {

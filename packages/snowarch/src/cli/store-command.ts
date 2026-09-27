@@ -60,10 +60,16 @@ export function storeHelp(): string {
 }
 
 /** Where the store is, or the reason there is nothing to act on. */
-function storePath(io: StoreIo): string | null {
+/**
+ * ARC-07-C31 slice 3 — `cli` REQUIRED: three callers (lines 90, 141 and 163 below), so the narrow
+ * rule this row settled applies — a default only where there is literally one caller and the comment
+ * names it. `cliSpelling()` comes from `cli/tty.ts`, the SERVER's own definition: the server never
+ * imports the engine, so the two share the semantics and not the code.
+ */
+function storePath(io: StoreIo, cli: string): string | null {
   const res = resolveStorePath();
   if (res.path === null) {
-    io.error('store: no store found — run ./snowarch instance add <label> first\n');
+    io.error(`store: no store found — run ${cli} instance add <label> first\n`);
     return null;
   }
   return res.path;
@@ -85,14 +91,17 @@ async function confirm(io: StoreIo, question: string): Promise<boolean> {
  */
 export async function runStoreMigrate(argv: readonly string[], io: StoreIo = defaultStoreIo(),
   chain: { migrations?: readonly Migration[]; current?: number } = {}): Promise<number> {
+  // ARC-07-C31 slice 3 — resolved ONCE for this command and threaded into both `migrateStore` calls,
+  // so the plan and the applied run cannot render two different shells in one invocation.
+  const cli = cliSpelling();
   const dryRun = argv.includes('--dry-run');
   const yes = argv.includes('--yes');
-  const path = storePath(io);
+  const path = storePath(io, cliSpelling());
   if (path === null) return EXIT_FAILED;
 
   let plan;
   try {
-    plan = migrateStore(path, { ...chain, dryRun: true });
+    plan = migrateStore(path, { ...chain, dryRun: true, cli });
   } catch (e) {
     // Every refusal this can produce is a NAMED code with a remedy of its own, and printing the
     // code is what lets a user find it in TROUBLESHOOTING. A stack trace here would be the tool
@@ -126,7 +135,7 @@ export async function runStoreMigrate(argv: readonly string[], io: StoreIo = def
   }
 
   try {
-    const result = migrateStore(path, chain);
+    const result = migrateStore(path, { ...chain, cli });
     io.write(`store: migrated schema v${result.from} → v${result.to}`
       + `${result.backup ? ` (backup ${maskPath(result.backup)})` : ''}\n`);
     return EXIT_OK;
@@ -138,7 +147,7 @@ export async function runStoreMigrate(argv: readonly string[], io: StoreIo = def
 }
 
 export function runStoreBackups(io: StoreIo = defaultStoreIo()): number {
-  const path = storePath(io);
+  const path = storePath(io, cliSpelling());
   if (path === null) return EXIT_FAILED;
   const backups = listBackups(path);
   if (backups.length === 0) {
@@ -153,14 +162,20 @@ export function runStoreBackups(io: StoreIo = defaultStoreIo()): number {
   return EXIT_OK;
 }
 
+/**
+ * ARC-07-C31 slice 3 — the spelling is resolved ONCE at the top of this command and threaded, the
+ * shape `runDocs` uses in the engine: a command is the boundary where reading the process is right,
+ * and resolving it once means three lines below cannot render three different shells in one run.
+ */
 export async function runStoreRestore(argv: readonly string[], io: StoreIo = defaultStoreIo()):
 Promise<number> {
+  const cli = cliSpelling();
   const file = argv.find((a) => !a.startsWith('--'));
   if (!file) {
-    io.error('store restore: name a backup file (./snowarch store backups lists them)\n');
+    io.error(`store restore: name a backup file (${cli} store backups lists them)\n`);
     return EXIT_USAGE;
   }
-  const path = storePath(io);
+  const path = storePath(io, cliSpelling());
   if (path === null) return EXIT_FAILED;
 
   let size = 0;
@@ -181,7 +196,7 @@ Promise<number> {
     // so the next step is named rather than left to be discovered on the next server start.
     if (version !== CURRENT_SCHEMA_VERSION) {
       io.write(`store: schema v${version} is not this build's v${CURRENT_SCHEMA_VERSION} — `
-        + 'run ./snowarch store migrate\n');
+        + `run ${cli} store migrate\n`);
     }
     return EXIT_OK;
   } catch (e) {

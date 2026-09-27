@@ -23,6 +23,19 @@ import {
   CURRENT_SCHEMA_VERSION, migrateStore, restoreBackup, type Migration,
 } from '../../src/store/migrations/index.js';
 import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — the launcher these cases assert, DERIVED, and named for the package that
+ * prints it.
+ *
+ * `SERVER_CLI` rather than a bare name: the lines below come from `store/migrations/index.ts` and
+ * `store/schema.ts`, which are the SERVER's, and they read `cliSpelling()` from `cli/tty.ts`. Naming
+ * the constant for the package is ARC-07-C31's rule, because the source of a printed line is
+ * invisible at the assertion and a comment claiming it can be wrong — mine was, in both directions,
+ * two commands apart in one file.
+ */
+const SERVER_CLI = cliSpelling();
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
@@ -107,7 +120,7 @@ describe('AC 4 — a store from the PAST', () => {
       }))) as { mode: string; configErrors: Array<{ code: string; message: string }> };
       expect(status.mode).toBe('unconfigured');
       expect(status.configErrors[0]?.code).toBe('STORE_SCHEMA_OUTDATED');
-      expect(status.configErrors[0]?.message).toContain('./snowarch store migrate');
+      expect(status.configErrors[0]?.message).toContain(`${SERVER_CLI} store migrate`);
 
       // And the refusal a records tool gives is that code — not "no instance is configured",
       // which is true, unhelpful, and sends the reader to the wizard to re-enter credentials
@@ -169,7 +182,7 @@ describe('AC 2 — the server loads a store this framework wrote', () => {
       }),
     };
     const result = migrateStore(path, {
-      migrations: [addField], current: CURRENT_SCHEMA_VERSION + 1,
+      migrations: [addField], current: CURRENT_SCHEMA_VERSION + 1, cli: SERVER_CLI,
     });
     expect(result.migrated).toBe(true);
     expect(result.backup).toBeDefined();

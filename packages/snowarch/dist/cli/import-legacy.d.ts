@@ -101,7 +101,10 @@ export interface ImportPlan {
  * change: a migration whose output differs from its input without saying so is how somebody ends
  * up with a production instance that can write.
  */
-export declare function planEntry(entry: LegacyEntry, taken: ReadonlySet<string>): PlannedEntry;
+/**
+ * ARC-07-C31 slice 3 — one PRODUCT caller, `line 425` below; its other call site is a test.
+ */
+export declare function planEntry(entry: LegacyEntry, taken: ReadonlySet<string>, cli?: string): PlannedEntry;
 export interface ImportOptions {
     path?: string;
     dryRun?: boolean;
@@ -113,7 +116,16 @@ export interface ImportOptions {
 /** The plan, printed before anything is written and in full. */
 export declare function renderPlan(plan: ImportPlan): string;
 /** The closing advice. It NAMES the files; it never removes one. */
-export declare function deletionAdvice(imported: number, total: number, home?: string, platform?: NodeJS.Platform): string;
+/**
+ * ARC-07-C31 slice 3 — `env` JOINS THE `platform` THIS ALREADY HAD, and it is not symmetry.
+ *
+ * `cliSpelling(platform, env)` is `platform === 'win32' && !env.SHELL && !env.MSYSTEM`, so
+ * `cliSpelling('win32')` alone reads the RUNNER's `SHELL` and renders POSIX on any mac — the fixture
+ * trap that cost this programme three sittings. This function's contract is already "render for the
+ * platform I was told", and its own test drives `'win32'` from a mac, so the shell has to be told
+ * too or the test would assert the POSIX spelling while claiming to check the Windows one.
+ */
+export declare function deletionAdvice(imported: number, total: number, home?: string, platform?: NodeJS.Platform, env?: NodeJS.ProcessEnv): string;
 export interface ImportResult {
     exitCode: number;
     imported: number;

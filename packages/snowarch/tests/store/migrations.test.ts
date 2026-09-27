@@ -17,6 +17,19 @@ import {
   type Migration,
 } from '../../src/store/migrations/index.js';
 import { STORE_VERSION } from '../../src/store/schema.js';
+import { cliSpelling } from '../../src/cli/tty.js';
+
+/**
+ * ARC-07-C31 slice 3 — the launcher these cases assert, DERIVED, and named for the package that
+ * prints it.
+ *
+ * `SERVER_CLI` rather than a bare name: the lines below come from `store/migrations/index.ts` and
+ * `store/schema.ts`, which are the SERVER's, and they read `cliSpelling()` from `cli/tty.ts`. Naming
+ * the constant for the package is ARC-07-C31's rule, because the source of a printed line is
+ * invisible at the assertion and a comment claiming it can be wrong — mine was, in both directions,
+ * two commands apart in one file.
+ */
+const SERVER_CLI = cliSpelling();
 
 const isWindows = process.platform === 'win32';
 
@@ -137,7 +150,7 @@ describe('the shipped registry', () => {
 describe('AC 1 — a v1 store migrates, with a byte-identical 0600 backup', () => {
   it('migrates two instances, backs the file up, and leaves every credential alone', () => {
     const before = readFileSync(store);
-    const result = migrateStore(store, { migrations: [addField], current: 2 });
+    const result = migrateStore(store, { migrations: [addField], current: 2, cli: SERVER_CLI });
 
     expect(result.migrated).toBe(true);
     expect(result.from).toBe(1);
@@ -171,7 +184,7 @@ describe('AC 1 — a v1 store migrates, with a byte-identical 0600 backup', () =
 
   it('a store already at the current version is not migrated and nothing is written', () => {
     const before = readFileSync(store);
-    const result = migrateStore(store, { migrations: [], current: 1 });
+    const result = migrateStore(store, { migrations: [], current: 1, cli: SERVER_CLI });
     expect(result).toEqual({ migrated: false, from: 1, to: 1, steps: [] });
     expect(readFileSync(store)).toEqual(before);
     expect(listBackups(store)).toEqual([]);
@@ -182,7 +195,7 @@ describe('AC 7 — a migration that touches a credential cannot ship', () => {
   it('is refused, the store is not written, and the message names no value', () => {
     const before = readFileSync(store);
     try {
-      migrateStore(store, { migrations: [touchesCredentials], current: 2 });
+      migrateStore(store, { migrations: [touchesCredentials], current: 2, cli: SERVER_CLI });
       throw new Error('the bad migration was applied');
     } catch (e) {
       const err = e as StoreMigrationError;
@@ -202,7 +215,7 @@ describe('AC 7 — a migration that touches a credential cannot ship', () => {
       from: 1, to: 2, describe: 'mutates in place',
       up: (s) => { (s as { version: number }).version = 2; return s; },
     };
-    expect(() => migrateStore(store, { migrations: [mutates], current: 2 })).toThrow();
+    expect(() => migrateStore(store, { migrations: [mutates], current: 2, cli: SERVER_CLI })).toThrow();
   });
 
   it('a migration that drops an instance is caught by the same invariant', () => {
@@ -210,7 +223,7 @@ describe('AC 7 — a migration that touches a credential cannot ship', () => {
       from: 1, to: 2, describe: 'drops one',
       up: (s) => ({ ...s, instances: { pdi: (s.instances as Record<string, unknown>).pdi } }),
     };
-    expect(() => migrateStore(store, { migrations: [drops], current: 2 }))
+    expect(() => migrateStore(store, { migrations: [drops], current: 2, cli: SERVER_CLI }))
       .toThrow(/instance "other" was removed/);
   });
 });
@@ -220,13 +233,13 @@ describe('AC 3 — a store from the future is refused, not downgraded', () => {
     write({ ...v1Store(), version: 3 });
     const before = readFileSync(store);
     try {
-      migrateStore(store, { migrations: [addField], current: 2 });
+      migrateStore(store, { migrations: [addField], current: 2, cli: SERVER_CLI });
       throw new Error('a v3 store was migrated by a v2 build');
     } catch (e) {
       const err = e as StoreMigrationError;
       expect(err.code).toBe('STORE_SCHEMA_NEWER');
       expect(err.message).toContain('newer than this server supports (2)');
-      expect(err.message).toContain('./snowarch upgrade');
+      expect(err.message).toContain(`${SERVER_CLI} upgrade`);
     }
     expect(readFileSync(store)).toEqual(before);
     expect(listBackups(store)).toEqual([]);
@@ -238,20 +251,20 @@ describe('AC 6 — an unreadable store is a hard error, never "return empty"', (
     writeFileSync(store, '{ this was hand-edited\n');
     const before = readFileSync(store);
     try {
-      migrateStore(store, { migrations: [addField], current: 2 });
+      migrateStore(store, { migrations: [addField], current: 2, cli: SERVER_CLI });
       throw new Error('an invalid store was accepted');
     } catch (e) {
       const err = e as StoreMigrationError;
       expect(err.code).toBe('STORE_UNREADABLE');
       expect(err.message).toContain('is not valid JSON');
-      expect(err.message).toContain('./snowarch store backups');
+      expect(err.message).toContain(`${SERVER_CLI} store backups`);
     }
     expect(readFileSync(store)).toEqual(before);
   });
 
   it('a version that is not a positive integer is a schema error, not a crash', () => {
     write({ ...v1Store(), version: 'one' });
-    expect(() => migrateStore(store, { migrations: [addField], current: 2 }))
+    expect(() => migrateStore(store, { migrations: [addField], current: 2, cli: SERVER_CLI }))
       .toThrow(/version must be a positive integer/);
   });
 
@@ -259,7 +272,8 @@ describe('AC 6 — an unreadable store is a hard error, never "return empty"', (
     write({ ...v1Store(), version: 1 });
     // A chain that starts at 2 cannot take a v1 store anywhere — and the refusal says so against
     // the FILE, with its version in it, rather than as an abstract complaint about the registry.
-    expect(() => migrateStore(store, { migrations: [{ from: 2, to: 3, describe: 'x', up: (x) => x }], current: 3 }))
+    expect(() => migrateStore(store, { migrations: [{ from: 2, to: 3, describe: 'x', up: (x) => x }], current: 3,
+      cli: SERVER_CLI }))
       .toThrow(/is schema 1, and this build has no migration from it to 3/);
   });
 });
@@ -267,7 +281,7 @@ describe('AC 6 — an unreadable store is a hard error, never "return empty"', (
 describe('AC 5 — dry run', () => {
   it('describes what would happen and writes nothing at all', () => {
     const before = readFileSync(store);
-    const plan = migrateStore(store, { migrations: [addField], current: 2, dryRun: true });
+    const plan = migrateStore(store, { migrations: [addField], current: 2, dryRun: true, cli: SERVER_CLI });
     expect(plan.migrated).toBe(false);
     expect(plan.dryRun).toBe(true);
     expect(plan.steps).toEqual(['1→2 add lastUpgradeCheck to every instance']);
@@ -278,7 +292,7 @@ describe('AC 5 — dry run', () => {
 
 describe('backups and restore', () => {
   it('lists backups newest first and restores one, 0600 and parsed before it is written', () => {
-    migrateStore(store, { migrations: [addField], current: 2 });
+    migrateStore(store, { migrations: [addField], current: 2, cli: SERVER_CLI });
     const backups = listBackups(store);
     expect(backups).toHaveLength(1);
     expect(backups[0]!.path).toMatch(/instances\.json\.bak-\d{8}T\d{6}Z$/);

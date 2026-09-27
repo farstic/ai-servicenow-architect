@@ -15,6 +15,7 @@ import { completeFlags, type Store, type StoreInstance } from '../store/schema.j
 import { PROBE_FIELDS, probeFieldText, type LastProbe } from '../servicenow/probes.js';
 import type { Flags } from '../utils/permissions.js';
 import { NO_INSTANCE_MESSAGE } from '../no-instance.js';
+import { cliSpelling } from './tty.js';
 
 /**
  * A secret, described rather than shown: `set (len 12)`.
@@ -137,9 +138,13 @@ export const NEVER_PROBED = '—';
  * Conditional on purpose: a table where every instance has been probed gets no footnote, because a
  * sentence explaining a glyph that is not on the screen is a line a reader has to rule out.
  */
-export const neverProbedNote = (instances: readonly MaskedInstance[]): string | null =>
+/**
+ * ARC-07-C31 slice 3 — `cli` REQUIRED: two callers, both in this file (lines 168 and 291). Two is
+ * not one, and the rule is a COUNT rather than a judgement about whether two callers feel like one.
+ */
+export const neverProbedNote = (instances: readonly MaskedInstance[], cli: string): string | null =>
   (instances.some((i) => !i.lastProbe)
-    ? `${NEVER_PROBED} = never probed. ./snowarch instance test <label> probes one; `
+    ? `${NEVER_PROBED} = never probed. ${cli} instance test <label> probes one; `
       + '--all probes every one.'
     : null);
 
@@ -152,7 +157,11 @@ const HEADERS = ['LABEL', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER'] as const;
  * row's own time would repeat a 20-character timestamp per line to say what one header says once,
  * and a table nobody can read across is a table nobody reads.
  */
-export function listTable(list: ListJson): string {
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED BECAUSE THERE IS EXACTLY ONE PRODUCT CALLER, NAMED:
+ * `cli/instance.ts:1525`. Its other call sites are tests, the same shape the engine's `formatStatus` has.
+ */
+export function listTable(list: ListJson, cli: string = cliSpelling()): string {
   if (list.instances.length === 0) return NO_INSTANCES;
 
   const rows = list.instances.map((i) => [
@@ -165,7 +174,7 @@ export function listTable(list: ListJson): string {
   const line = (cells: readonly string[], last: string): string =>
     `${cells.map((cell, c) => cell.padEnd(width[c] as number)).join('  ')}  ${last}`.trimEnd();
 
-  const note = neverProbedNote(list.instances);
+  const note = neverProbedNote(list.instances, cli);
   return [line(HEADERS, probeHeader),
     ...rows.map((r, n) => line(r, probeCell(list.instances[n]?.lastProbe ?? null))),
     ...(note ? ['', note] : [])].join('\n');
@@ -210,8 +219,13 @@ export const precedenceNote = (label: string, firstPath: string, globalPath: str
 };
 
 /** The footer `list` prints when the OTHER store is not empty. */
-export const otherStoreFooter = (count: number): string =>
-  `(+ ${count} instance${count === 1 ? '' : 's'} in the global store — ./snowarch instance list --all)`;
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED HERE BECAUSE THERE IS EXACTLY ONE CALLER, NAMED:
+ * `cli/instance.ts:1532`. Its other three call sites are tests, which is the same shape
+ * `formatStatus` has in the engine.
+ */
+export const otherStoreFooter = (count: number, cli: string = cliSpelling()): string =>
+  `(+ ${count} instance${count === 1 ? '' : 's'} in the global store — ${cli} instance list --all)`;
 
 /**
  * What the STORE column says — the thing that SELECTED the file, in the words a reader can check.
@@ -275,7 +289,11 @@ export function combinedListJson(
 const ALL_HEADERS = ['LABEL', 'STORE', 'ENV', 'AUTH', 'PRESET', 'DEFAULT', 'USER'] as const;
 
 /** `list --all`: the table with a STORE column, then the precedence note for anything in both. */
-export function listAllTable(list: CombinedListJson): string {
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED BECAUSE THERE IS EXACTLY ONE PRODUCT CALLER, NAMED:
+ * `cli/instance.ts:1520`. Its other call sites are tests, the same shape the engine's `formatStatus` has.
+ */
+export function listAllTable(list: CombinedListJson, cli: string = cliSpelling()): string {
   if (list.instances.length === 0) return NO_INSTANCES;
   const rows = (list.instances as Array<MaskedInstance & { store: StoreLabel; default: boolean }>)
     .map((i) => [
@@ -288,7 +306,7 @@ export function listAllTable(list: CombinedListJson): string {
   // ARC-07-C6 — the same header and the same footnote as `list`. This table showed a bare
   // `LAST PROBE` and no explanation of the dash, so the one view that spans two stores was the one
   // that said least about the column both of them share.
-  const note = neverProbedNote(list.instances);
+  const note = neverProbedNote(list.instances, cli);
   return [
     line(ALL_HEADERS, probeColumnHeader(list.instances)),
     ...rows.map((r, n) => line(r, probeCell(list.instances[n]?.lastProbe ?? null))),

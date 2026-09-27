@@ -269,7 +269,10 @@ export declare function issuePath(issue: z.ZodIssue): string;
  * at all, and the file the user needed to migrate sits there through it. The two directions have
  * two remedies and now say so.
  */
-export declare function parseStore(raw: unknown): {
+/**
+ * ARC-07-C31 slice 3 — A DEFAULT IS ALLOWED: exactly one product caller, `store/index.ts:94`.
+ */
+export declare function parseStore(raw: unknown, cli?: string): {
     store: Store;
 } | {
     error: StoreError;

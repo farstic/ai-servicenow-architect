@@ -41,6 +41,7 @@ import { STORE_VERSION, completeFlags, type Store, type StoreInstance } from '..
 import { maskPath } from '../store/paths.js';
 import { applyDependencyRule, matchPreset, FLAG_NAMES, type Flags } from '../utils/permissions.js';
 import { remedyFor } from '../errors/codes.js';
+import { cliSpelling } from './tty.js';
 
 /**
  * Where snow-mcp 1.x kept its store, ON EVERY OPERATING SYSTEM.
@@ -212,8 +213,12 @@ export interface ImportPlan {
   defaultInstance?: string;
 }
 
-const skipAdd = (label: string, url: string, environment: string, reason: string): string =>
-  `${reason} — add it fresh with: ./snowarch instance add ${label} --url ${url} --env ${environment}`;
+/**
+ * ARC-07-C31 slice 3 — one caller, `line 472` below, so a default is within the rule and named.
+ */
+const skipAdd = (label: string, url: string, environment: string, reason: string,
+  cli: string = cliSpelling()): string =>
+  `${reason} — add it fresh with: ${cli} instance add ${label} --url ${url} --env ${environment}`;
 
 /**
  * One legacy entry, mapped. Nothing here touches the network or the disk.
@@ -222,7 +227,11 @@ const skipAdd = (label: string, url: string, environment: string, reason: string
  * change: a migration whose output differs from its input without saying so is how somebody ends
  * up with a production instance that can write.
  */
-export function planEntry(entry: LegacyEntry, taken: ReadonlySet<string>): PlannedEntry {
+/**
+ * ARC-07-C31 slice 3 — one PRODUCT caller, `line 425` below; its other call site is a test.
+ */
+export function planEntry(entry: LegacyEntry, taken: ReadonlySet<string>,
+  cli: string = cliSpelling()): PlannedEntry {
   const notes: string[] = [];
   const { label, note } = normaliseLabel(String(entry.name ?? ''));
   if (note) notes.push(note);
@@ -287,7 +296,7 @@ export function planEntry(entry: LegacyEntry, taken: ReadonlySet<string>): Plann
   if (environment === 'prod' && FLAG_NAMES.some((f) => flags[f] === 'true')) {
     flags = completeFlags({});
     notes.push('production capped at read-only (D-05) — raise with: '
-      + `./snowarch instance set-preset ${label} <preset> --ack-prod`);
+      + `${cli} instance set-preset ${label} <preset> --ack-prod`);
   }
 
   if (entry.toolPackage !== undefined && entry.toolPackage !== 'full') {
@@ -355,8 +364,18 @@ export function renderPlan(plan: ImportPlan): string {
 }
 
 /** The closing advice. It NAMES the files; it never removes one. */
+/**
+ * ARC-07-C31 slice 3 — `env` JOINS THE `platform` THIS ALREADY HAD, and it is not symmetry.
+ *
+ * `cliSpelling(platform, env)` is `platform === 'win32' && !env.SHELL && !env.MSYSTEM`, so
+ * `cliSpelling('win32')` alone reads the RUNNER's `SHELL` and renders POSIX on any mac — the fixture
+ * trap that cost this programme three sittings. This function's contract is already "render for the
+ * platform I was told", and its own test drives `'win32'` from a mac, so the shell has to be told
+ * too or the test would assert the POSIX spelling while claiming to check the Windows one.
+ */
 export function deletionAdvice(imported: number, total: number, home: string = homedir(),
-  platform: NodeJS.Platform = process.platform): string {
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env): string {
   // The separator follows the PLATFORM THIS ADVICE IS FOR, not the one the process happens to run
   // on: `join()` uses the host's, so a Windows command rendered on a POSIX runner (and the reverse,
   // which is how this was found) came out with the wrong slashes in a line the reader will paste.
@@ -365,7 +384,8 @@ export function deletionAdvice(imported: number, total: number, home: string = h
   const remove = platform === 'win32' ? `Remove-Item -Recurse ${dir}` : `rm -r ${dir}`;
   return `Imported ${imported} of ${total}. The legacy files were left in place. When you are `
     + `satisfied, delete them: ${remove}   (contains instances.json and tokens.json with plaintext `
-    + 'secrets). Then remove stale Claude Code registrations: ./snowarch doctor lists the exact '
+    + `secrets). Then remove stale Claude Code registrations: ${cliSpelling(platform, env)} doctor `
+    + 'lists the exact '
     + 'claude mcp remove commands.';
 }
 
