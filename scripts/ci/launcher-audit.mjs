@@ -107,82 +107,71 @@ const TEST_PATHS = ['tests', 'tools/snowarch/tests', 'packages/snowarch/tests'];
  * mismatch, and a count that has come DOWN fails too, so the list shrinks with the work instead of quietly
  * outliving it.
  *
- * EVERY ENTRY CARRIES ITS REASON, TAKEN FROM THE AUDIT'S OWN REPORT — not from a second classifier that
- * could disagree with it, which the first version of this list did. Where a file mixes reasons the entry
- * counts them (`5× … ; 2× …`), because "done" for this row is a TRUE annotation and a single label over a
- * mixed file is not one.
+ * EVERY ENTRY'S REASON IS THE ONE THE AUDIT COMPUTED, and a case asserts they are EQUAL — which is the
+ * second bar this row merges on. The third head claimed as much and was wrong: the audit emitted four shapes,
+ * 83 of 86 entries were the same `no product line carries "…"`, and the split beside them was hand-made with
+ * fifteen entries wrong on inspection. A reason nobody can check is a claim, not an annotation.
  *
- * The reasons, with the site counts measured on this head:
+ * `reasonFor` above is the order of what can be DEMONSTRATED, and the counts here are its output on this head:
  *
- *   -  57  the product assembles this sentence. The test asserts a whole command —
- *          `instance set-preset prod full --ack-prod` — that the product never writes as one literal: it
- *          comes from a remedy table filled at runtime. Resolving these needs the audit to evaluate the
- *          assembly, which is a bigger instrument than this row.
- *   -  19  the assertion is about the launcher alone. `expect(windows).not.toContain('./snowarch')` asserts
- *          an ABSENCE; there is no sentence to place it in, and a negative assertion is exactly the shape
- *          that should not be resolved by guessing. This count FELL from 21 as `proseOf` learned to read
- *          containers — ten of those were the extractor dropping a sentence it could see, which made the
- *          reason itself false.
- *   -   4  the product spells a placeholder the fixture fills: `instance test <label>` against
- *          `instance test pdi`.
- *   -   2  the contract holds it with `<cli>` — ARC-07-C32's design, where no launcher-bearing product line
- *          exists because the reader substitutes.
- *   -   1  a pinned and a deriving line both carry it, with no argv to route by.
- *   -   1  the case drives a pinned shell in a different statement from the one asserted, so whether it
- *          reached this sentence needs dataflow this audit does not do. Reported as an UNKNOWN rather than
- *          as agreement or a mismatch — it is the honest answer, and calling it a pinned expectation
- *          reported `tty.test.ts:188`, which is correct code, as a defect.
- *   -   1  the routed package carries no such sentence.
- *   -   1  planted fixture.
+ *   -  25  the product assembles this sentence, EACH NAMING the product line that shares four consecutive
+ *          words with it. "Assembles" was 57 when it was a hand-made label and could be claimed of anything;
+ *          it is 25 now, and every one of them points at a line a reader can open.
+ *   -  20  the assertion is about the launcher alone — no prose to place it in, which is what a negative
+ *          assertion like `expect(out).not.toContain('./snowarch')` is.
+ *   -  17  no product line carries this sentence, said plainly instead of dressed as assembly.
+ *   -   5  outside the product index: the case asserts a committed page (`docs/`, `.claude/`), which is POSIX
+ *          by rule 3 and is not in the product index at all.
+ *   -   5  regex syntax in the sentence: a template passed to `new RegExp` leaves `^`, `\.`, `.*` or `$` in
+ *          the prose, and no product line can carry those. ARC-07-C35c's real blocker, now named per site
+ *          rather than estimated at eight.
+ *   -   2  a pinned and a deriving line both carry it, with no argv to route by.
+ *   -   1  the case drives a pinned shell in another statement, so whether it reached this sentence needs
+ *          dataflow this audit does not do.
  *
- * `tests/launcher-audit.test.mjs` IS BACK IN THIS LIST, at one site rather than the three C35 recorded, and
- * the movement is worth reading. The parser correctly stopped counting its planted fixtures — launchers
- * inside string literals that are DATA, which a line-based detector read as assertions. What it does count
- * is a real one: `assert.ok(LAUNCHER.test('./snowarch') && LAUNCHER.test('.\\snowarch.cmd'))`, the case that
- * holds the single definition of the regex, where the launcher genuinely is inside an assertion. Listing it
- * is deliberate: excluding this file by name would be an allow-list, which is the mistake this whole row
- * exists to stop making, and a change to that case should fail here and be looked at.
+ * `tests/launcher-audit.test.mjs` IS IN THIS LIST at one site, and ARC-07-C35b item 14 was that the entry
+ * called it a "planted fixture" while this file's own header and the row called it the real `LAUNCHER`
+ * self-test. The row was right and the label was wrong — and the fix is not a better label, it is that the
+ * audit COMPUTES the reason now: it says "the assertion is about the launcher alone", which is exactly what
+ * `assert.ok(LAUNCHER.test('./snowarch') && LAUNCHER.test('.\\snowarch.cmd'))` is. Listing the file at all is
+ * deliberate: excluding it by name would be an allow-list, which is the mistake this row exists to stop.
  */
 export const UNRESOLVED_BASELINE = Object.freeze(new Map([
-  ['packages/snowarch/tests/cli/import-legacy.test.ts', { n: 2, why: '1× the product assembles this sentence; 1× the assertion is about the launcher alone' }],
-  ['packages/snowarch/tests/cli/instance-manage.test.ts', { n: 1, why: 'the product spells a placeholder the fixture fills' }],
-  ['packages/snowarch/tests/cli/instance.test.ts', { n: 2, why: 'the product assembles this sentence' }],
-  ['packages/snowarch/tests/cli/preset-ui.test.ts', { n: 1, why: 'the product assembles this sentence' }],
+  ['packages/snowarch/tests/cli/import-legacy.test.ts', { n: 2, why: '1× no product line carries this sentence; 1× the assertion is about the launcher alone' }],
+  ['packages/snowarch/tests/cli/instance-manage.test.ts', { n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/format.ts:151)' }],
+  ['packages/snowarch/tests/cli/instance.test.ts', { n: 2, why: '1× outside the product index; 1× no product line carries this sentence' }],
+  ['packages/snowarch/tests/cli/preset-ui.test.ts', { n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/preset-ui.ts:62)' }],
   ['packages/snowarch/tests/cli/store-command.test.ts', { n: 1, why: 'a pinned and a deriving line both carry it' }],
   ['packages/snowarch/tests/cli/tty.test.ts', { n: 1, why: 'the case drives a pinned shell in another statement' }],
-  ['packages/snowarch/tests/servicenow/prod-ack.test.ts', { n: 1, why: 'the product assembles this sentence' }],
-  ['packages/snowarch/tests/tools/gate-split.test.ts', { n: 1, why: 'the product assembles this sentence' }],
-  ['packages/snowarch/tests/tools/permissions.test.ts', { n: 3, why: '2× the product assembles this sentence; 1× the product spells a placeholder the fixture fills' }],
-  ['tests/cli-help.test.mjs', { n: 2, why: 'the product assembles this sentence' }],
-  ['tests/contract/gen-governance.test.mjs', { n: 2, why: 'the product assembles this sentence' }],
-  ['tests/docs-status.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
+  ['packages/snowarch/tests/servicenow/prod-ack.test.ts', { n: 1, why: 'outside the product index' }],
+  ['packages/snowarch/tests/tools/gate-split.test.ts', { n: 1, why: 'outside the product index' }],
+  ['packages/snowarch/tests/tools/permissions.test.ts', { n: 3, why: '2× outside the product index; 1× the product assembles this sentence (packages/snowarch/src/utils/permissions.ts:257)' }],
+  ['tests/contract/gen-governance.test.mjs', { n: 2, why: 'no product line carries this sentence' }],
+  ['tests/docs-status.test.mjs', { n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' }],
   ['tests/docs-upstream.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tests/doctor/bootstrap-finished.test.mjs', { n: 2, why: '1× the product assembles this sentence; 1× the assertion is about the launcher alone' }],
-  ['tests/doctor/fix.test.mjs', { n: 2, why: '1× the product assembles this sentence; 1× the contract holds it with <cli>' }],
-  ['tests/doctor/framework.test.mjs', { n: 4, why: '2× the assertion is about the launcher alone; 2× the product assembles this sentence' }],
-  ['tests/doctor/legacy.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
-  ['tests/doctor/mode-and-cache.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
-  ['tests/doctor/panel.test.mjs', { n: 8, why: 'the product assembles this sentence' }],
-  ['tests/doctor/release-currency.test.mjs', { n: 2, why: 'the product assembles this sentence' }],
-  ['tests/doctor/status-command.test.mjs', { n: 3, why: 'the product assembles this sentence' }],
-  ['tests/doctor/win32-remedies.test.mjs', { n: 4, why: '1× the product assembles this sentence; 3× the assertion is about the launcher alone' }],
-  ['tests/handoff-command.test.mjs', { n: 2, why: '1× the assertion is about the launcher alone; 1× the product assembles this sentence' }],
+  ['tests/doctor/bootstrap-finished.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
+  ['tests/doctor/fix.test.mjs', { n: 2, why: '1× no product line carries this sentence; 1× regex syntax in the sentence' }],
+  ['tests/doctor/framework.test.mjs', { n: 4, why: '2× the assertion is about the launcher alone; 2× the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' }],
+  ['tests/doctor/mode-and-cache.test.mjs', { n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' }],
+  ['tests/doctor/panel.test.mjs', { n: 8, why: '1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:155); 1× no product line carries this sentence; 1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276); 4× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:190); 1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:109)' }],
+  ['tests/doctor/status-command.test.mjs', { n: 3, why: '1× no product line carries this sentence; 1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276); 1× the product assembles this sentence (tools/snowarch/lib/commands/status.mjs:75)' }],
+  ['tests/doctor/win32-remedies.test.mjs', { n: 3, why: 'the assertion is about the launcher alone' }],
+  ['tests/handoff-command.test.mjs', { n: 2, why: '1× the assertion is about the launcher alone; 1× no product line carries this sentence' }],
   ['tests/hook/session-start.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tests/launcher-audit.test.mjs', { n: 1, why: 'planted fixture' }],
-  ['tests/snowarch-skill.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
-  ['tests/upgrade/upgrade-unit.test.mjs', { n: 4, why: 'the product assembles this sentence' }],
-  ['tests/upgrade/upgrade.e2e.test.mjs', { n: 1, why: 'the routed package carries no such sentence' }],
-  ['tests/version-tag.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
-  ['tests/windows-spellings.test.mjs', { n: 4, why: '3× the assertion is about the launcher alone; 1× the contract holds it with <cli>' }],
-  ['tools/snowarch/tests/b00-checks.test.mjs', { n: 2, why: 'the product assembles this sentence' }],
-  ['tools/snowarch/tests/b02-docs.test.mjs', { n: 3, why: 'the product assembles this sentence' }],
-  ['tools/snowarch/tests/b09-summary.test.mjs', { n: 3, why: 'the product assembles this sentence' }],
-  ['tools/snowarch/tests/bootstrap-plan.test.mjs', { n: 3, why: 'the product assembles this sentence' }],
-  ['tools/snowarch/tests/bootstrap-runner.test.mjs', { n: 2, why: 'the product assembles this sentence' }],
+  ['tests/launcher-audit.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
+  ['tests/snowarch-skill.test.mjs', { n: 1, why: 'no product line carries this sentence' }],
+  ['tests/upgrade/upgrade-unit.test.mjs', { n: 4, why: 'no product line carries this sentence' }],
+  ['tests/upgrade/upgrade.e2e.test.mjs', { n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/text.mjs:178)' }],
+  ['tests/version-tag.test.mjs', { n: 1, why: 'regex syntax in the sentence' }],
+  ['tests/windows-spellings.test.mjs', { n: 3, why: 'the assertion is about the launcher alone' }],
+  ['tools/snowarch/tests/b00-checks.test.mjs', { n: 2, why: 'no product line carries this sentence' }],
+  ['tools/snowarch/tests/b02-docs.test.mjs', { n: 3, why: '2× the product assembles this sentence (scripts/gen-doctor-docs.mjs:44); 1× regex syntax in the sentence' }],
+  ['tools/snowarch/tests/b09-summary.test.mjs', { n: 3, why: '1× no product line carries this sentence; 1× the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126); 1× the product assembles this sentence (tools/snowarch/lib/steps/B02.mjs:115)' }],
+  ['tools/snowarch/tests/bootstrap-runner.test.mjs', { n: 2, why: '1× the product assembles this sentence (scripts/gen-doctor-docs.mjs:44); 1× no product line carries this sentence' }],
   ['tools/snowarch/tests/bootstrap-state.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tools/snowarch/tests/cli.test.mjs', { n: 3, why: '1× the product assembles this sentence; 2× the product spells a placeholder the fixture fills' }],
-  ['tools/snowarch/tests/store-forwarder.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
-  ['tools/snowarch/tests/text.test.mjs', { n: 7, why: '5× the assertion is about the launcher alone; 2× the product assembles this sentence' }],
+  ['tools/snowarch/tests/cli.test.mjs', { n: 3, why: '1× the product assembles this sentence (tools/snowarch/lib/cli.mjs:221); 2× regex syntax in the sentence' }],
+  ['tools/snowarch/tests/store-forwarder.test.mjs', { n: 1, why: 'a pinned and a deriving line both carry it' }],
+  ['tools/snowarch/tests/text.test.mjs', { n: 7, why: '5× the assertion is about the launcher alone; 1× the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175); 1× the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126)' }],
 ]));
 
 /** The tracked files, as `{ file, text }` — the default sources for both halves. */
@@ -255,6 +244,89 @@ export const bySentence = (testProse, productProse) => {
 const sites = (hits) => hits.map((h) => `${h.file}:${h.line}`);
 const cite = (hits) => sites(hits).join(', ');
 
+/**
+ * THE REASON THE AUDIT CAN PROVE — ARC-07-C35b, fourth head, and the second bar this PR merges on.
+ *
+ * The third head's baseline said its reasons were "taken from the audit's own report", and that was FALSE:
+ * the audit emitted four shapes (83 of 86 entries were the same `no product line carries "…"`), and the
+ * 57/19/4/2 split beside them was hand-made — fifteen entries were wrong on inspection. A hand-made reason is
+ * a claim nobody checks, which is the shape of defect this whole arc keeps finding.
+ *
+ * So the reason is COMPUTED, in the order of what can be demonstrated, and the baseline must equal it:
+ *
+ *   1. no prose at all                      → the assertion is about the launcher alone
+ *   2. regex syntax in the sentence          → a template passed to `new RegExp` leaves `^`, `\.`, `.*`, `$`
+ *                                              in the prose, and no product line can carry those
+ *   3. a product line matches once its       → the product spells a placeholder the fixture fills, NAMING
+ *      `<…>` placeholders are wildcarded        that line
+ *   4. a product line shares four or more    → the product assembles this sentence, NAMING that line. This
+ *      consecutive words                        is the ONLY way "assembles" may be claimed now
+ *   5. a committed page carries it           → outside the product index (`docs/`, `.claude/`): the case
+ *                                              asserts an artefact, not a product line
+ *   6. the argv routed it                    → the routed package carries no such sentence
+ *   7. otherwise                             → no product line carries this sentence
+ */
+const RX_SYNTAX = /\\[.\/\\]|\.\*|\[\^|\(\?:|\$$|^\^/;
+
+const squashOne = (text) => text.replace(/\s+/g, ' ').trim();
+
+/** The product sentence with its `<label>`-shaped placeholders treated as wildcards. */
+const placeholderMatch = (productProse, testProse) => {
+  if (!/<[a-z][a-z-]*>/i.test(productProse)) return false;
+  const parts = squashOne(productProse).split(/<[a-z][a-z-]*>/i).map((x) => x.trim()).filter((x) => x.length >= 3);
+  if (parts.length === 0) return false;
+  let at = 0;
+  const hay = squashOne(testProse);
+  for (const part of parts) {
+    const found = hay.indexOf(part, at);
+    if (found === -1) return false;
+    at = found + part.length;
+  }
+  return true;
+};
+
+/** Four consecutive words in common — enough to say the product builds this sentence from parts. */
+const sharesAnchor = (productProse, testProse) => {
+  const words = squashOne(productProse).split(' ').filter((w) => w.length > 0);
+  const hay = ` ${squashOne(testProse)} `;
+  for (let i = 0; i + 4 <= words.length; i += 1) {
+    if (hay.includes(` ${words.slice(i, i + 4).join(' ')} `)) return true;
+  }
+  return false;
+};
+
+/** The committed pages a case may be asserting instead of a product line. */
+let pagesCache = null;
+const committedPages = () => {
+  if (pagesCache) return pagesCache;
+  pagesCache = ls('docs', '.claude', 'README.md')
+    .filter((f) => /\.(md|json)$/.test(f))
+    .map((file) => ({ file, text: read(file) }));
+  return pagesCache;
+};
+
+export function reasonFor({ prose, route }, product) {
+  const bare = prose.replaceAll(MARK, '').trim();
+  if (bare.length < 3) return 'the assertion is about the launcher alone';
+  if (RX_SYNTAX.test(prose)) return 'regex syntax in the sentence';
+
+  const byPlaceholder = product.find((line) => placeholderMatch(line.sentence, prose));
+  if (byPlaceholder) {
+    return `the product spells a placeholder the fixture fills (${byPlaceholder.file}:${byPlaceholder.line})`;
+  }
+  const byAnchor = product.find((line) => sharesAnchor(line.sentence, prose));
+  if (byAnchor) return `the product assembles this sentence (${byAnchor.file}:${byAnchor.line})`;
+
+  // A sentence a committed page carries is a sentence about an ARTEFACT — `docs/INSTALL.md` is POSIX by
+  // rule 3 — and the product index does not contain pages, so no product line ever could.
+  const needle = bare.split(MARK)[0].trim();
+  if (needle.length >= 8 && committedPages().some(({ text }) => text.includes(needle))) {
+    return 'outside the product index';
+  }
+  if (route) return `the routed ${route} package carries no such sentence`;
+  return 'no product line carries this sentence';
+}
+
 export function audit({ tests = testSources(), product: productFiles = productSources(),
   baseline = UNRESOLVED_BASELINE, match = bySentence } = {}) {
   const product = productIndex(productFiles);
@@ -273,7 +345,8 @@ export function audit({ tests = testSources(), product: productFiles = productSo
       // first site with no distinctive sentence.
       const shown = keyOf(prose) ?? squash(prose);
       if (!shown) {
-        unresolved.push({ site, file: rel, why: 'no sentence beside the launcher at all' });
+        unresolved.push({ site, file: rel, why: 'no sentence beside the launcher at all',
+          reason: 'the assertion is about the launcher alone' });
         continue;
       }
 
@@ -286,12 +359,20 @@ export function audit({ tests = testSources(), product: productFiles = productSo
       const hits = routed.filter((p) => match(prose, p.sentence));
       const kinds = [...new Set(hits.map((h) => h.kind))];
       if (hits.length === 0) {
-        unresolved.push({ site, file: rel, why: route
-          ? `no ${route} line carries "${shown.slice(0, 48)}" (argv ${JSON.stringify(argv)})`
-          : `no product line carries "${shown.slice(0, 48)}"` });
+        unresolved.push({ site, file: rel, reason: reasonFor({ prose, route }, product),
+          why: route
+            ? `no ${route} line carries "${shown.slice(0, 48)}" (argv ${JSON.stringify(argv)})`
+            : `no product line carries "${shown.slice(0, 48)}"` });
       } else if (kinds.length > 1) {
-        unresolved.push({ site, file: rel,
+        unresolved.push({ site, file: rel, reason: 'a pinned and a deriving line both carry it',
           why: `"${shown.slice(0, 48)}" matches both a PINNED and a DERIVED product line` });
+      } else if (expectation === 'DERIVED_ON_PINNED_SUBJECT') {
+        // Item 2: the case drove a pinned shell and then asserted the RUNNER's spelling against it. Red on
+        // any machine whose shell differs from the one driven, whatever the product line does.
+        mismatches.push({ site, expectation, product: cite(hits), products: sites(hits), kind: kinds[0],
+          route: route ?? null,
+          why: 'the case drove a pinned shell and asserted a DERIVED spelling against it — the expectation '
+            + 'follows the runner while the value follows the ctx, so the two part company off this machine' });
       } else if (expectation === 'EXPECTED_RENDERING') {
         // The case supplied a pinned shell and asserted that shell's rendering — ARC-07-C31's own pattern.
         // A DERIVING product line is what should be there; a PINNED one means the product spells a
@@ -307,6 +388,7 @@ export function audit({ tests = testSources(), product: productFiles = productSo
         // The case drove a pinned shell, just not into the call it asserts — so whether that shell reached
         // this sentence is unknown here, and an unknown is recorded rather than reported either way.
         unresolved.push({ site, file: rel,
+          reason: 'the case drives a pinned shell in another statement',
           why: 'the case drives a pinned shell in a different statement from the one asserted, so whether '
             + 'it reached this sentence needs dataflow this audit does not do' });
       } else if (kinds[0] !== expectation) {
@@ -334,7 +416,20 @@ export function audit({ tests = testSources(), product: productFiles = productSo
     if (!baseline.has(file)) drift.push(`${file}: ${actual} unresolved site(s), and the file is not in the baseline`);
   }
 
-  return { agreed, mismatches, unresolved, drift,
+  /*
+   * THE REASON STRING PER FILE, computed here so the baseline can be compared to it rather than trusted.
+   * Counts where a file mixes reasons, because one label over a mixed file is not a true annotation.
+   */
+  const reasons = new Map();
+  for (const u of unresolved) {
+    const at = reasons.get(u.file) ?? new Map();
+    at.set(u.reason, (at.get(u.reason) ?? 0) + 1);
+    reasons.set(u.file, at);
+  }
+  const computed = new Map([...reasons].map(([file, counts]) => [file,
+    [...counts].map(([r, n]) => (counts.size === 1 ? r : `${n}× ${r}`)).join('; ')]));
+
+  return { agreed, mismatches, unresolved, drift, computed,
     ok: mismatches.length === 0 && drift.length === 0 };
 }
 

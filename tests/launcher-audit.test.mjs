@@ -266,6 +266,23 @@ test('C35b — matching by SENTENCE resolves what matching by KEY could not', ()
   assert.match(bare.unresolved[0].why, /no sentence beside the launcher|no product line carries/);
 });
 
+test('C35b — every baseline reason EQUALS the reason the audit computed (item 12)', () => {
+  // THE SECOND BAR THIS ROW MERGES ON. The third head's list said its reasons came from the audit's own
+  // report and they did not: the audit emitted four shapes, 83 of 86 entries were the same one, and the split
+  // beside them was hand-made with fifteen entries wrong on inspection. A reason nobody can check is a claim.
+  // `audit()` computes one per file now, and this compares them character for character.
+  const r = audit();
+  for (const [file, why] of r.computed) {
+    const entry = UNRESOLVED_BASELINE.get(file);
+    assert.ok(entry, `${file} is unresolved and not in the baseline`);
+    assert.equal(entry.why, why,
+      `${file}: the baseline reason is not the one the audit computed\n  baseline: ${entry.why}\n  audit:    ${why}`);
+  }
+  for (const [file] of UNRESOLVED_BASELINE) {
+    assert.ok(r.computed.has(file), `${file} is in the baseline with nothing unresolved in it any more`);
+  }
+});
+
 test('C35b — every baseline entry carries a reason, which is what "done" means for this row', () => {
   // The row's own definition: done when the baseline is empty or every remaining entry has a reason
   // written beside it. A count with no reason is a site nobody looked at, and this is what stops one
@@ -333,20 +350,21 @@ test('C35b — a WINDOWS-spelled literal is a target: the cooked value, never th
     '});'].join('\n');
   assert.equal(assertedLaunchers('tests/planted.test.mjs', posix).length, 1);
 
-  // AND THE REAL TREE: 13 asserted launchers are Windows-spelled, where before this fix there were ZERO.
-  // A floor rather than an exact count — the number moves as cases are written — but zero is the defect.
-  const WIN_SOURCE = [String.raw`.\\snowarch.cmd`, String.raw`.\\bootstrap.cmd`];
-  let seen = 0;
+  // AND THE REAL TREE, STRICTLY COUNTED — ARC-07-C35b item 13. The first version of this assertion scanned a
+  // FOUR-LINE NEIGHBOURHOOD and got 13 where the strict answer, counting only the assertion's OWN literals,
+  // is 11 — and its floor of ten hid the difference. `site.spelled` is computed from the launcher-bearing
+  // literals themselves, so these are numbers rather than estimates, and they must be updated deliberately.
+  const spelledWindows = [];
   for (const { file, text } of testSources()) {
-    const lines = text.split('\n');
-    for (const s of assertedLaunchers(file, text)) {
-      const near = lines.slice(Math.max(0, s.line - 1), s.line + 3).join('\n');
-      if (WIN_SOURCE.some((w) => near.includes(w))) seen += 1;
-    }
+    for (const site of assertedLaunchers(file, text)) if (site.spelled.windows) spelledWindows.push(site);
   }
-  assert.ok(seen >= 10,
-    `only ${seen} Windows-spelled asserted launcher(s) are visible to the audit — it was 0 before the `
-    + 'cooked-value fix, and a count that has fallen back to nothing is that defect returning');
+  assert.equal(spelledWindows.length, 11,
+    `${spelledWindows.length} Windows-spelled asserted launcher(s), expected 11 — it was ZERO before the `
+    + 'cooked-value fix, so a fall toward nothing is that defect returning and a rise is cases to look at');
+  const rendering = spelledWindows.filter((s) => s.expectation === 'EXPECTED_RENDERING').length;
+  assert.equal(rendering, 8,
+    `${rendering} of the Windows sites are EXPECTED_RENDERING, expected 8 — the architect measured 4 on the `
+    + 'third head, and items 7 and 8 (the receiver chain and the named platform ctx) are what moved it');
 });
 
 test('C35b — one definition of LAUNCHER, exported, because the two had already diverged', () => {
