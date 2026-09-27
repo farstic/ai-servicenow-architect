@@ -39,6 +39,28 @@ export function latestTag(tags) {
 }
 
 /**
+ * The newest FINAL tag — ARC-09-C66, and a SIBLING of `latestTag` rather than a change to it.
+ *
+ * The two answer different questions and the 2.0.7 cut proved it. `latestTag` must keep counting a
+ * prerelease, because the preflight asks "is this version greater than the newest tag" and a release must not
+ * repeat or precede its own rc. The CHANGELOG asks something else: what has happened since the last thing a
+ * user could install. After `v2.0.7-rc.1` existed, `latestTag` returned the rc, whose commit is a CHILD of
+ * `develop`, so `rc..HEAD` was empty, every generated group came out empty, and the release's own suite
+ * refused the section (`tests/changelog.test.mjs` C12c and C62) and rolled the cut back. `rc.1` itself had
+ * passed for the only reason it could: at that moment the newest tag was still `v2.0.6`.
+ *
+ * So a prerelease is not a release: it is excluded here, and nowhere else.
+ */
+export function latestFinalTag(tags) {
+  const versions = tags
+    .map((t) => t.trim())
+    .filter((t) => /^v\d+\.\d+\.\d+$/.test(t))
+    .map((t) => t.slice(1));
+  if (versions.length === 0) return null;
+  return `v${versions.sort(compareVersions).at(-1)}`;
+}
+
+/**
  * Run the eight checks in order, stopping at the first failure.
  *
  * `git` is injected — every call goes through it, so the whole sequence can be driven against a
@@ -62,7 +84,11 @@ export function preflight({ version, root, git, config, flags = {}, platform = p
 
   // 3. Forward, not backward. Skipped entirely when there is no tag yet, which is the 2.0.0 case
   // this script was written for: "greater than nothing" is not a question.
-  const latest = latestTag(git(['tag', '-l', 'v*']).split('\n'));
+  const tags = git(['tag', '-l', 'v*']).split('\n');
+  const latest = latestTag(tags);
+  // ARC-09-C66 — carried separately, because the changelog's range and the version comparison are different
+  // questions and a prerelease answers only one of them.
+  const latestFinal = latestFinalTag(tags);
   if (latest && compareVersions(version, latest.slice(1)) <= 0) {
     return { ok: false, message: `release: ${version} is not greater than the latest tag ${latest}` };
   }
@@ -125,5 +151,5 @@ export function preflight({ version, root, git, config, flags = {}, platform = p
   }
   if (!hasNpm) return { ok: false, message: 'release: npm is not on PATH' };
 
-  return { ok: true, branch, latest, docsPin: gitlink, platform };
+  return { ok: true, branch, latest, latestFinal, docsPin: gitlink, platform };
 }
