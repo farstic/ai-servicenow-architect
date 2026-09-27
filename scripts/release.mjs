@@ -185,14 +185,24 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
 
   // ── the plan screen ────────────────────────────────────────────────────────────────────────
   const current = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
-  const commits = pre.latest
-    ? gitRun(['log', '--oneline', `${pre.latest}..HEAD`]).split('\n').filter(Boolean).length
+  /*
+   * ARC-09-C66 — the RANGE is measured from the newest FINAL tag, and so is the line that reports it.
+   *
+   * `pre.latest` counts a prerelease, which the preflight needs and this does not: after `v2.0.7-rc.1`
+   * existed, the range was `rc..HEAD` — empty, because the rc's commit is a child of develop — so the
+   * generated groups were empty, the release's own suite refused the section, and the cut rolled back. The
+   * plan line uses the same tag as the changelog on purpose: a display that named one range while the
+   * generator read another would be a second thing to disagree about.
+   */
+  const since = pre.latestFinal;
+  const commits = since
+    ? gitRun(['log', '--oneline', `${since}..HEAD`]).split('\n').filter(Boolean).length
     : gitRun(['log', '--oneline']).split('\n').filter(Boolean).length;
   const plan = gatePlan({ noInstall: flags['no-install'], platform });
 
   write([
     `release ${current} → ${version}`,
-    `  branch   ${pre.branch}${pre.latest ? ` · ${commits} commits since ${pre.latest}` : ` · ${commits} commits, no previous tag`}`,
+    `  branch   ${pre.branch}${since ? ` · ${commits} commits since ${since}` : ` · ${commits} commits, no previous release tag`}`,
     `  gates    ${plan.map((g) => g.name).join(' → ')}`,
     `  writes   ${staged.join(', ')}`,
     `  tag      v${version} (annotated)`,
@@ -226,7 +236,7 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
   // ── writes ─────────────────────────────────────────────────────────────────────────────────
   const date = now().toISOString().slice(0, 10);
   const written = applyWrites({ root, version, date, run: runChild,
-    from: pre.latest, tag: { contract: contractSha, docsPin: pre.docsPin } });
+    from: since, tag: { contract: contractSha, docsPin: pre.docsPin } });
   if (!written.ok) {
     rollback(root, written.touched);
     fail(written.message);

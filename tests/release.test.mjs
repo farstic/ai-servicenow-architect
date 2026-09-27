@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { release } from '../scripts/release.mjs';
 import { allowedCloneTags, cloneTagsIn } from './lib/install-tag.mjs';
 import { buildTagMessage, parseTagMessage, tagIsComplete } from '../scripts/lib/release/tag.mjs';
-import { compareVersions, latestTag } from '../scripts/lib/release/preflight.mjs';
+import { compareVersions, latestFinalTag, latestTag, preflight } from '../scripts/lib/release/preflight.mjs';
 import { badgeLine, writeHead, writeInstallTag, writeMarker } from '../scripts/lib/release/writers.mjs';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { STAGED } from '../scripts/lib/release/writers.mjs';
@@ -222,6 +222,51 @@ test('versions sort the way semver says, prerelease below its release', () => {
   assert.equal(latestTag([]), null, 'the 2.0.0 case: no tag is not an error');
 });
 
+/**
+ * ARC-09-C66 — the changelog's range comes from the newest FINAL tag, and the preflight's does not.
+ *
+ * THE DEFECT THIS CLOSES, measured on the refused 2.0.7 cut: `latestTag` counts a prerelease, so once
+ * `v2.0.7-rc.1` existed the changelog was generated from `rc..HEAD` — empty, because the rc's commit is a
+ * CHILD of develop — every group came out empty, and the release's own suite refused the section and rolled
+ * back. `rc.1` had passed for the only reason it could: the newest tag was still `v2.0.6` at that moment, so
+ * a rehearsal cannot catch this by construction.
+ *
+ * The two functions answer different questions and both are asserted here, because a fix that made
+ * `latestTag` skip prereleases would let a release repeat or precede its own rc.
+ */
+test('ARC-09-C66 — latestFinalTag ignores a prerelease, and latestTag still counts it', () => {
+  assert.equal(latestFinalTag(['v2.0.5', 'v2.0.6', 'v2.0.7-rc.1']), 'v2.0.6');
+  assert.equal(latestTag(['v2.0.5', 'v2.0.6', 'v2.0.7-rc.1']), 'v2.0.7-rc.1',
+    'the preflight lost its prerelease, so a release could repeat or precede its own rc');
+
+  // A prerelease of a NEWER version does not become the changelog's baseline either.
+  assert.equal(latestFinalTag(['v2.0.6', 'v3.0.0-rc.1']), 'v2.0.6');
+  // ...and with only prereleases there is no final tag, which is "no previous release" rather than a guess.
+  assert.equal(latestFinalTag(['v2.0.7-rc.1', 'v2.0.7-rc.2']), null);
+  assert.equal(latestFinalTag([]), null);
+  // The same sort rules, so rc.10 above rc.9 is not re-learned here — finals only, ten above nine.
+  assert.equal(latestFinalTag(['v2.0.9', 'v2.0.10']), 'v2.0.10');
+});
+
+test('ARC-09-C66 — the release hands the changelog the FINAL tag, and preflight carries both', () => {
+  // ASSERTED ON THE SOURCE, deliberately. Driving `preflight` here would mean fixturing eight checks — a
+  // corpus directory, a config, a branch, a remote — to read one field, and the field is not the behaviour;
+  // the WIRING is, and it is what was wrong. The behaviour is proved by the pure functions above and by the
+  // end-to-end case below, which writes a real changelog through the real release.
+  const preflightSource = readFileSync(join(REAL_ROOT, 'scripts/lib/release/preflight.mjs'), 'utf8');
+  assert.match(preflightSource, /return \{ ok: true, branch, latest, latestFinal,/,
+    'preflight no longer carries the final tag beside the prerelease-inclusive one');
+  assert.match(preflightSource, /compareVersions\(version, latest\.slice\(1\)\)/,
+    'the version comparison stopped using the prerelease-inclusive tag — a release could repeat its own rc');
+
+  const release = readFileSync(join(REAL_ROOT, 'scripts/release.mjs'), 'utf8');
+  assert.match(release, /const since = pre\.latestFinal;/,
+    'release.mjs no longer derives its range from the newest final tag');
+  assert.match(release, /from: since,/, 'the changelog is generated from something else again');
+  assert.doesNotMatch(release, /from: pre\.latest\b/,
+    'the changelog is generated from the prerelease-inclusive tag again — ARC-09-C66');
+});
+
 // ── the writers, on text ───────────────────────────────────────────────────────────────────────
 
 test('the writers replace exactly one thing each, and refuse what they cannot place', () => {
@@ -245,6 +290,35 @@ test('the writers replace exactly one thing each, and refuse what they cannot pl
 });
 
 // ── the acceptance criteria, on the fixture ────────────────────────────────────────────────────
+
+test('ARC-09-C66 — a prerelease tag does not empty the generated groups', async (t) => {
+  // THE CONTROL THE ARCHITECT NAMED, as a case, and stated as the property rather than as a count: the rc's
+  // presence must change NOTHING about the generated section. Before the fix the range was `rc..HEAD` —
+  // empty, because a rehearsal's tag is HEAD's own commit — so the section came out as the carried notes plus
+  // the tag line, the release's own suite refused it, and the first 2.0.7 cut rolled back.
+  //
+  // Two runs of the same fixture, one with the tag and one without, because "at least one group" would have
+  // passed on a fixture whose commits happen to produce one anyway — and this fixture's produce exactly one.
+  const groupsAfterRelease = async (withRc) => {
+    const root = fixture(t);
+    if (withRc) git(root, ['tag', '-a', 'v2.0.0-rc.1', '-m', 'v2.0.0-rc.1']);
+    const { code, out } = await run(root, ['2.0.0', '--yes', '--offline', '--no-install']);
+    assert.equal(code, 0, out);
+    const changelog = readFileSync(join(root, 'docs/CHANGELOG.md'), 'utf8');
+    const start = changelog.indexOf('## 2.0.0 ');
+    assert.ok(start > 0, `no released section was written:\n${changelog.slice(0, 300)}`);
+    const next = changelog.indexOf('\n## ', start + 5);
+    const section = changelog.slice(start, next === -1 ? undefined : next);
+    return [...section.matchAll(/^### (\w+)/gm)].map((m) => m[1]);
+  };
+
+  const withRc = await groupsAfterRelease(true);
+  const without = await groupsAfterRelease(false);
+  assert.ok(without.length > 0, `the fixture generates no groups at all: ${JSON.stringify(without)}`);
+  assert.deepEqual(withRc, without,
+    `the rc tag changed the generated section: with ${JSON.stringify(withRc)}, without `
+    + `${JSON.stringify(without)} — which is ARC-09-C66, the defect that rolled the first 2.0.7 cut back`);
+});
 
 test('AC 1/2 — a green run commits once, tags once, and the tag carries the two shas', async (t) => {
   const root = fixture(t);
