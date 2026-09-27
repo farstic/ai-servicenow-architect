@@ -46,6 +46,8 @@ import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { assertedLaunchers, MARK, productLines } from './launcher-extract.mjs';
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const ls = (...paths) => execFileSync('git', ['ls-files', ...paths],
@@ -53,49 +55,33 @@ const ls = (...paths) => execFileSync('git', ['ls-files', ...paths],
 
 const read = (rel) => readFileSync(resolve(ROOT, rel), 'utf8');
 
-/** Comments blanked, line count preserved — the same rule the launcher sweep uses, for the same reason. */
-const codeOf = (text) => text
-  .replace(/\/\*[\s\S]*?\*\//g, (block) => '\n'.repeat((block.match(/\n/g) ?? []).length))
-  .split('\n')
-  .map((line) => line.replace(/(^|[^:])\/\/.*$/, '$1'))
-  .join('\n');
-
-const LAUNCHER = /\.\/snowarch|\.\/bootstrap\.sh|\.\\\\snowarch\.cmd|\.\\\\bootstrap\.cmd|\.\\snowarch\.cmd/;
-const hasLauncher = (text) => new RegExp(LAUNCHER.source).test(text);
-
-/** A spelling read from the process renders whatever machine is running; one with a pinned platform does not. */
-const DERIVED_CALL = /\b(spellings|cliSpelling|bootstrapSpelling)\(\s*\)/;
-
-/** An interpolation that carries a launcher: `${cli}`, `${SPELL.cli}`, `${esc(FRAME_CLI)}`, … */
-const INTERPOLATED = /\$\{[^}]*(cli|bootstrap|spell|CLI|POSIX|Spelling|SPELL)[^}]*\}/;
-
-// A sentinel no source line contains, written as an ESCAPE rather than a raw byte: the first version
-// held the literal control character, which is invisible in a diff and in review.
-const MARK = '\u0001';
-
-/**
- * A line reduced to the SENTENCE it carries, so both sides can be compared as prose.
+/*
+ * THE LINE-BASED MACHINERY IS GONE — ARC-07-C35b, second head, and `codeOf` was not merely redundant.
  *
- * The launcher and every interpolation become one marker, a regex is unescaped, quoting and assertion
- * scaffolding go, whitespace collapses. BOTH SIDES go through this, which is the point: one definition
- * of what "the same sentence" means.
+ * `codeOf` blanked comments with a regex BEFORE the parser saw the text, and a regex cannot tell a comment
+ * from a string. On `tests/contract/gen-governance.test.mjs` the `/*` inside the line comment `rules/*.md`
+ * paired with the `*` + `/` inside a regex literal 443 lines later, and 452 lines went blank: that file's
+ * TWO asserted launchers became zero. Measured across all 223 tracked test files — raw parse 114 sites,
+ * after `codeOf` 112 — and it is the only file where the count moves today, but 203 of those files contain
+ * a `/*`, so the mechanism is general and the next one is a matter of where somebody puts a comment.
+ *
+ * A PARSER NEVER YIELDS COMMENT TEXT. Comments are trivia in a TypeScript AST and no walk of the nodes
+ * visits them, so stripping them first could only ever subtract. The sweep in
+ * `tests/windows-spellings.test.mjs` still blanks comments for a real reason — it reads LINES, and a lesson
+ * written in a comment is not a launcher spelled in code — and that reason does not transfer to this file.
+ *
+ * `sentence`, `hasLauncher`, `LAUNCHER`, `DERIVED_CALL` and `INTERPOLATED` went with it: every one was the
+ * old normaliser's, and the extractor replaced all of them. `LAUNCHER` in particular now has ONE definition,
+ * exported from `launcher-extract.mjs` — two regexes for "what a launcher looks like" is exactly the drift
+ * this audit exists to catch, and the two had already diverged: this file's carried the source-escaped form
+ * and the extractor's the cooked one.
  */
-const sentence = (line) => line
-  .replace(new RegExp(LAUNCHER.source, 'g'), MARK)
-  .replace(/\$\{[^}]*\}/g, MARK)
-  .replace(/\\([.\/\\()[\]{}^$*+?|-])/g, '$1')
-  .replace(/new RegExp\(|assert\.\w+\(|expect\(|\.(toContain|toBe|toMatch|toEqual|not)\(/g, ' ')
-  // THE ASSERTION'S FIRST ARGUMENT IS AN EXPRESSION, NOT PROSE, and leaving it in was why nothing
-  // resolved. `assert.equal(r.text, 'corpus missing — run …')` normalised to `r.text, corpus missing …`,
-  // and no product line can carry `r.text,`. Stripping a leading identifier chain followed by a comma
-  // is narrow enough to be safe: prose does not begin with `foo.bar[0]?.baz,`.
-  .replace(/^\s*[A-Za-z_$][\w$.?[\]()]*\s*,\s*/, ' ')
-  .replace(/['"`]/g, ' ')
-  .replace(/\s+/g, ' ')
-  .trim();
 
 /**
  * The distinctive run of prose beside the launcher: the longest stretch between markers.
+ *
+ * Kept for `byKey`, which is ARC-07-C35's matching rule — a case measures the two rules against each other,
+ * so the older one has to still be runnable.
  *
  * TRAILING SCAFFOLDING IS STRIPPED, and measuring is how I know to: the key for the store-root-entry
  * pair came out as `store <command> ));`, which no product line can contain, so a resolvable site was
@@ -115,52 +101,77 @@ const PRODUCT_PATHS = ['tools/snowarch/lib', 'tools/snowarch/bin', 'packages/sno
 const TEST_PATHS = ['tests', 'tools/snowarch/tests', 'packages/snowarch/tests'];
 
 /**
- * THE UNRESOLVED BASELINE — ARC-07-C35, measured 2026-09-27, target for C35b.
+ * THE UNRESOLVED BASELINE — ARC-07-C35b, measured 2026-09-27 on the parsed extractor.
  *
  * Exact per file, asserted EQUAL and never `<=`: a new unresolved site fails exactly as loudly as a
- * mismatch, and a count that has come DOWN fails too, so the list shrinks as C35b resolves it instead
- * of quietly outliving the work.
+ * mismatch, and a count that has come DOWN fails too, so the list shrinks with the work instead of quietly
+ * outliving it.
  *
- * `tests/launcher-audit.test.mjs` IS IN ITS OWN BASELINE, and that is deliberate rather than awkward.
- * Its launcher literals are PLANTED FIXTURES — a product line and a test line written to be audited —
- * so they are not assertions about the product and cannot resolve. Excluding the file by name would be
- * an allow-list, which is the mistake this whole row exists to stop making; listing its count means a
- * change to those fixtures fails here and gets looked at, which is what should happen.
+ * EVERY ENTRY'S REASON IS THE ONE THE AUDIT COMPUTED, and a case asserts they are EQUAL — which is the
+ * second bar this row merges on. The third head claimed as much and was wrong: the audit emitted four shapes,
+ * 83 of 86 entries were the same `no product line carries "…"`, and the split beside them was hand-made with
+ * fifteen entries wrong on inspection. A reason nobody can check is a claim, not an annotation.
+ *
+ * `reasonFor` above is the order of what can be DEMONSTRATED, and the counts here are its output on this head:
+ *
+ *   -  25  the product assembles this sentence, EACH NAMING the product line that shares four consecutive
+ *          words with it. "Assembles" was 57 when it was a hand-made label and could be claimed of anything;
+ *          it is 25 now, and every one of them points at a line a reader can open.
+ *   -  20  the assertion is about the launcher alone — no prose to place it in, which is what a negative
+ *          assertion like `expect(out).not.toContain('./snowarch')` is.
+ *   -  17  no product line carries this sentence, said plainly instead of dressed as assembly.
+ *   -   5  outside the product index: the case asserts a committed page (`docs/`, `.claude/`), which is POSIX
+ *          by rule 3 and is not in the product index at all.
+ *   -   5  regex syntax in the sentence: a template passed to `new RegExp` leaves `^`, `\.`, `.*` or `$` in
+ *          the prose, and no product line can carry those. ARC-07-C35c's real blocker, now named per site
+ *          rather than estimated at eight.
+ *   -   2  a pinned and a deriving line both carry it, with no argv to route by.
+ *   -   1  the case drives a pinned shell in another statement, so whether it reached this sentence needs
+ *          dataflow this audit does not do.
+ *
+ * `tests/launcher-audit.test.mjs` IS IN THIS LIST at one site, and ARC-07-C35b item 14 was that the entry
+ * called it a "planted fixture" while this file's own header and the row called it the real `LAUNCHER`
+ * self-test. The row was right and the label was wrong — and the fix is not a better label, it is that the
+ * audit COMPUTES the reason now: it says "the assertion is about the launcher alone", which is exactly what
+ * `assert.ok(LAUNCHER.test('./snowarch') && LAUNCHER.test('.\\snowarch.cmd'))` is. Listing the file at all is
+ * deliberate: excluding it by name would be an allow-list, which is the mistake this row exists to stop.
  */
-const UNRESOLVED_BASELINE = Object.freeze(new Map([
-  ['packages/snowarch/tests/cli/import-legacy.test.ts', 2],
-  ['packages/snowarch/tests/cli/store-command.test.ts', 1],
-  ['packages/snowarch/tests/cli/tty.test.ts', 1],
-  ['packages/snowarch/tests/doctor/doctor.test.ts', 1],
-  ['packages/snowarch/tests/server/store-schema.test.ts', 3],
-  ['packages/snowarch/tests/servicenow/prod-ack.test.ts', 1],
-  ['packages/snowarch/tests/store/migrations.test.ts', 1],
-  ['packages/snowarch/tests/store/schema.test.ts', 1],
-  ['packages/snowarch/tests/tools/gate-split.test.ts', 1],
-  ['packages/snowarch/tests/tools/permissions.test.ts', 2],
-  ['tests/cli-help.test.mjs', 1],
-  ['tests/doctor/bootstrap-finished.test.mjs', 2],
-  ['tests/doctor/engine-docs.test.mjs', 3],
-  ['tests/doctor/framework.test.mjs', 1],
-  ['tests/doctor/host.test.mjs', 3],
-  ['tests/doctor/panel.test.mjs', 1],
-  ['tests/doctor/release-currency.test.mjs', 3],
-  ['tests/doctor/status-command.test.mjs', 2],
-  ['tests/doctor/status-template.test.mjs', 1],
-  ['tests/doctor/win32-remedies.test.mjs', 3],
-  ['tests/handoff-command.test.mjs', 1],
-  ['tests/hook/session-start.test.mjs', 1],
-  ['tests/launcher-audit.test.mjs', 3],
-  ['tests/upgrade/upgrade-unit.test.mjs', 1],
-  ['tests/upgrade/upgrade.e2e.test.mjs', 1],
-  ['tests/windows-spellings.test.mjs', 5],
-  ['tools/snowarch/tests/b00-checks.test.mjs', 1],
-  ['tools/snowarch/tests/b02-docs.test.mjs', 2],
-  ['tools/snowarch/tests/b06-migration.test.mjs', 2],
-  ['tools/snowarch/tests/bootstrap-plan.test.mjs', 1],
-  ['tools/snowarch/tests/cli.test.mjs', 2],
-  ['tools/snowarch/tests/store-root-entry.test.mjs', 2],
-  ['tools/snowarch/tests/text.test.mjs', 2],
+export const UNRESOLVED_BASELINE = Object.freeze(new Map([
+  ['packages/snowarch/tests/cli/import-legacy.test.ts', { n: 2, why: '1× no product line carries this sentence; 1× the assertion is about the launcher alone' }],
+  ['packages/snowarch/tests/cli/instance-manage.test.ts', { n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/format.ts:151)' }],
+  ['packages/snowarch/tests/cli/instance.test.ts', { n: 2, why: '1× outside the product index; 1× no product line carries this sentence' }],
+  ['packages/snowarch/tests/cli/preset-ui.test.ts', { n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/preset-ui.ts:62)' }],
+  ['packages/snowarch/tests/cli/store-command.test.ts', { n: 1, why: 'a pinned and a deriving line both carry it' }],
+  ['packages/snowarch/tests/cli/tty.test.ts', { n: 1, why: 'the case drives a pinned shell in another statement' }],
+  ['packages/snowarch/tests/servicenow/prod-ack.test.ts', { n: 1, why: 'outside the product index' }],
+  ['packages/snowarch/tests/tools/gate-split.test.ts', { n: 1, why: 'outside the product index' }],
+  ['packages/snowarch/tests/tools/permissions.test.ts', { n: 3, why: '2× outside the product index; 1× the product assembles this sentence (packages/snowarch/src/utils/permissions.ts:257)' }],
+  ['tests/contract/gen-governance.test.mjs', { n: 2, why: 'no product line carries this sentence' }],
+  ['tests/docs-status.test.mjs', { n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' }],
+  ['tests/docs-upstream.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
+  ['tests/doctor/bootstrap-finished.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
+  ['tests/doctor/fix.test.mjs', { n: 2, why: '1× no product line carries this sentence; 1× regex syntax in the sentence' }],
+  ['tests/doctor/framework.test.mjs', { n: 4, why: '2× the assertion is about the launcher alone; 2× the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' }],
+  ['tests/doctor/mode-and-cache.test.mjs', { n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' }],
+  ['tests/doctor/panel.test.mjs', { n: 8, why: '1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:155); 1× no product line carries this sentence; 1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276); 4× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:190); 1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:109)' }],
+  ['tests/doctor/status-command.test.mjs', { n: 3, why: '1× no product line carries this sentence; 1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276); 1× the product assembles this sentence (tools/snowarch/lib/commands/status.mjs:75)' }],
+  ['tests/doctor/win32-remedies.test.mjs', { n: 3, why: 'the assertion is about the launcher alone' }],
+  ['tests/handoff-command.test.mjs', { n: 2, why: '1× the assertion is about the launcher alone; 1× no product line carries this sentence' }],
+  ['tests/hook/session-start.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
+  ['tests/launcher-audit.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
+  ['tests/snowarch-skill.test.mjs', { n: 1, why: 'no product line carries this sentence' }],
+  ['tests/upgrade/upgrade-unit.test.mjs', { n: 4, why: 'no product line carries this sentence' }],
+  ['tests/upgrade/upgrade.e2e.test.mjs', { n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/text.mjs:178)' }],
+  ['tests/version-tag.test.mjs', { n: 1, why: 'regex syntax in the sentence' }],
+  ['tests/windows-spellings.test.mjs', { n: 3, why: 'the assertion is about the launcher alone' }],
+  ['tools/snowarch/tests/b00-checks.test.mjs', { n: 2, why: 'no product line carries this sentence' }],
+  ['tools/snowarch/tests/b02-docs.test.mjs', { n: 3, why: '2× the product assembles this sentence (scripts/gen-doctor-docs.mjs:44); 1× regex syntax in the sentence' }],
+  ['tools/snowarch/tests/b09-summary.test.mjs', { n: 3, why: '1× no product line carries this sentence; 1× the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126); 1× the product assembles this sentence (tools/snowarch/lib/steps/B02.mjs:115)' }],
+  ['tools/snowarch/tests/bootstrap-runner.test.mjs', { n: 2, why: '1× the product assembles this sentence (scripts/gen-doctor-docs.mjs:44); 1× no product line carries this sentence' }],
+  ['tools/snowarch/tests/bootstrap-state.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
+  ['tools/snowarch/tests/cli.test.mjs', { n: 3, why: '1× the product assembles this sentence (tools/snowarch/lib/cli.mjs:221); 2× regex syntax in the sentence' }],
+  ['tools/snowarch/tests/store-forwarder.test.mjs', { n: 1, why: 'a pinned and a deriving line both carry it' }],
+  ['tools/snowarch/tests/text.test.mjs', { n: 7, why: '5× the assertion is about the launcher alone; 1× the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175); 1× the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126)' }],
 ]));
 
 /** The tracked files, as `{ file, text }` — the default sources for both halves. */
@@ -184,16 +195,11 @@ export const testSources = (paths = TEST_PATHS) => ls(...paths)
  * has NO resolvable site today, so the mismatch path would otherwise be untestable.
  */
 export function productIndex(sources = productSources()) {
-  const index = [];
-  for (const { file: rel, text } of sources) {
-    codeOf(text).split('\n').forEach((line, i) => {
-      const literal = hasLauncher(line);
-      const derived = INTERPOLATED.test(line);
-      if (!literal && !derived) return;
-      index.push({ file: rel, line: i + 1, sentence: sentence(line), kind: literal ? 'PINNED' : 'DERIVED' });
-    });
-  }
-  return index;
+  // ARC-07-C35b — PARSED, not normalised. The line-based version could not tell a launcher inside a
+  // string from one inside an expression, and it carried whatever else was on the line into the key.
+  // `productLines` returns the prose of each literal, with a MARK where the spelling goes, and the
+  // PACKAGE the file belongs to — which is what command tracing compares a routed site against.
+  return sources.flatMap(({ file: rel, text }) => productLines(rel, text));
 }
 
 /**
@@ -202,58 +208,207 @@ export function productIndex(sources = productSources()) {
  * `extraTestPaths` and `extraProductPaths` exist for the control: a planted file under a temp root has
  * to be auditable without moving it into the repository.
  */
+/**
+ * ARC-07-C35b — TWO MATCHING RULES, and the row's answer is measured rather than argued.
+ *
+ * `byKey` is ARC-07-C35's: take the longest prose run between MARKs and require 12 characters of it. It
+ * cannot resolve a sentence that IS a command — `${CLI} upgrade` has eight characters of prose — and that
+ * was 29 of the 43 unresolved files.
+ *
+ * `bySentence` compares the MARK-NORMALISED SENTENCES: the test asserts `usage: MARK store <command>` and
+ * the product prints `usage: MARK store <command> [options]`, so the test's sentence is contained in the
+ * product's. The launcher's position is part of the comparison rather than thrown away, which is what makes
+ * a short sentence usable — and a sentence that is short enough to match several product lines is reported
+ * ambiguous, which is honest, instead of being dropped for having no long run.
+ */
+export const byKey = (testProse, productProse) => {
+  const key = keyOf(testProse);
+  return key ? productProse.includes(key) : false;
+};
+
+const squash = (text) => text.replace(/\s+/g, ' ').trim();
+
+export const bySentence = (testProse, productProse) => {
+  const t = squash(testProse);
+  // A sentence of nothing but the launcher resolves nothing: `expect(x).not.toContain('./snowarch')` is an
+  // assertion ABOUT the launcher with no sentence to place it in.
+  if (t.replace(new RegExp(MARK, 'g'), '').trim().length < 3) return false;
+  return squash(productProse).includes(t);
+};
+
+/**
+ * EVERY hit, not `hits[0]` — the product lines are path-sorted, so citing the first named whichever of
+ * several same-kind lines happened to sort earliest (`packages/` before `tools/`), and a reader then went to
+ * a line that was not the one under test. The sentence is shared by all of them; the reader needs the list.
+ */
+const sites = (hits) => hits.map((h) => `${h.file}:${h.line}`);
+const cite = (hits) => sites(hits).join(', ');
+
+/**
+ * THE REASON THE AUDIT CAN PROVE — ARC-07-C35b, fourth head, and the second bar this PR merges on.
+ *
+ * The third head's baseline said its reasons were "taken from the audit's own report", and that was FALSE:
+ * the audit emitted four shapes (83 of 86 entries were the same `no product line carries "…"`), and the
+ * 57/19/4/2 split beside them was hand-made — fifteen entries were wrong on inspection. A hand-made reason is
+ * a claim nobody checks, which is the shape of defect this whole arc keeps finding.
+ *
+ * So the reason is COMPUTED, in the order of what can be demonstrated, and the baseline must equal it:
+ *
+ *   1. no prose at all                      → the assertion is about the launcher alone
+ *   2. regex syntax in the sentence          → a template passed to `new RegExp` leaves `^`, `\.`, `.*`, `$`
+ *                                              in the prose, and no product line can carry those
+ *   3. a product line matches once its       → the product spells a placeholder the fixture fills, NAMING
+ *      `<…>` placeholders are wildcarded        that line
+ *   4. a product line shares four or more    → the product assembles this sentence, NAMING that line. This
+ *      consecutive words                        is the ONLY way "assembles" may be claimed now
+ *   5. a committed page carries it           → outside the product index (`docs/`, `.claude/`): the case
+ *                                              asserts an artefact, not a product line
+ *   6. the argv routed it                    → the routed package carries no such sentence
+ *   7. otherwise                             → no product line carries this sentence
+ */
+const RX_SYNTAX = /\\[.\/\\]|\.\*|\[\^|\(\?:|\$$|^\^/;
+
+const squashOne = (text) => text.replace(/\s+/g, ' ').trim();
+
+/** The product sentence with its `<label>`-shaped placeholders treated as wildcards. */
+const placeholderMatch = (productProse, testProse) => {
+  if (!/<[a-z][a-z-]*>/i.test(productProse)) return false;
+  const parts = squashOne(productProse).split(/<[a-z][a-z-]*>/i).map((x) => x.trim()).filter((x) => x.length >= 3);
+  if (parts.length === 0) return false;
+  let at = 0;
+  const hay = squashOne(testProse);
+  for (const part of parts) {
+    const found = hay.indexOf(part, at);
+    if (found === -1) return false;
+    at = found + part.length;
+  }
+  return true;
+};
+
+/** Four consecutive words in common — enough to say the product builds this sentence from parts. */
+const sharesAnchor = (productProse, testProse) => {
+  const words = squashOne(productProse).split(' ').filter((w) => w.length > 0);
+  const hay = ` ${squashOne(testProse)} `;
+  for (let i = 0; i + 4 <= words.length; i += 1) {
+    if (hay.includes(` ${words.slice(i, i + 4).join(' ')} `)) return true;
+  }
+  return false;
+};
+
+/** The committed pages a case may be asserting instead of a product line. */
+let pagesCache = null;
+const committedPages = () => {
+  if (pagesCache) return pagesCache;
+  pagesCache = ls('docs', '.claude', 'README.md')
+    .filter((f) => /\.(md|json)$/.test(f))
+    .map((file) => ({ file, text: read(file) }));
+  return pagesCache;
+};
+
+export function reasonFor({ prose, route }, product) {
+  const bare = prose.replaceAll(MARK, '').trim();
+  if (bare.length < 3) return 'the assertion is about the launcher alone';
+  if (RX_SYNTAX.test(prose)) return 'regex syntax in the sentence';
+
+  const byPlaceholder = product.find((line) => placeholderMatch(line.sentence, prose));
+  if (byPlaceholder) {
+    return `the product spells a placeholder the fixture fills (${byPlaceholder.file}:${byPlaceholder.line})`;
+  }
+  const byAnchor = product.find((line) => sharesAnchor(line.sentence, prose));
+  if (byAnchor) return `the product assembles this sentence (${byAnchor.file}:${byAnchor.line})`;
+
+  // A sentence a committed page carries is a sentence about an ARTEFACT — `docs/INSTALL.md` is POSIX by
+  // rule 3 — and the product index does not contain pages, so no product line ever could.
+  const needle = bare.split(MARK)[0].trim();
+  if (needle.length >= 8 && committedPages().some(({ text }) => text.includes(needle))) {
+    return 'outside the product index';
+  }
+  if (route) return `the routed ${route} package carries no such sentence`;
+  return 'no product line carries this sentence';
+}
+
 export function audit({ tests = testSources(), product: productFiles = productSources(),
-  baseline = UNRESOLVED_BASELINE } = {}) {
+  baseline = UNRESOLVED_BASELINE, match = bySentence } = {}) {
   const product = productIndex(productFiles);
   const mismatches = [];
   const unresolved = [];
   let agreed = 0;
 
   for (const { file: rel, text } of tests) {
-    const src = codeOf(text);
-    // A constant assigned from a spelling carries that spelling's kind to every line that uses it.
-    const kinds = new Map();
-    src.split('\n').forEach((line) => {
-      const m = /^const (\w+) = (?:esc\()?\s*(spellings|cliSpelling|bootstrapSpelling)\(([^)]*)\)/.exec(line);
-      if (m) kinds.set(m[1], m[3].trim() === '' ? 'DERIVED' : 'PINNED');
-    });
+    // ARC-07-C35b — the extractor finds the assertions and their prose; this decides what that means.
+    for (const found_site of assertedLaunchers(rel, text)) {
+      const { line, expectation, sentence: prose, argv, answeredBy: route,
+        caseDrivesPinned } = found_site;
+      const site = `${rel}:${line}`;
+      // `continue`, not `return`: this loop is a `for...of` now, and the `return` the `forEach` version
+      // used would have returned from `audit()` — measured, it made the whole result `undefined` on the
+      // first site with no distinctive sentence.
+      const shown = keyOf(prose) ?? squash(prose);
+      if (!shown) {
+        unresolved.push({ site, file: rel, why: 'no sentence beside the launcher at all',
+          reason: 'the assertion is about the launcher alone' });
+        continue;
+      }
 
-    src.split('\n').forEach((line, i) => {
-      // `assert` OR `expect`: the engine's suites use `node:assert`, the server's use vitest. Adding
-      // `packages/snowarch/tests` to the paths without this matched almost nothing there — 1 target
-      // in 18 literals — which would have been a widening in name only, and the baseline would have
-      // recorded the blindness as success.
-      if (!/\bassert\b|\bexpect\s*\(/.test(line)) return;
-      const literal = hasLauncher(line);
-      const named = [...kinds.keys()].find((k) => new RegExp(`\\$\\{[^}]*\\b${k}\\b`).test(line));
-      if (!literal && !named) return;
-
-      const site = `${rel}:${i + 1}`;
-      const expectation = literal ? 'PINNED' : kinds.get(named);
-      const key = keyOf(sentence(line));
-      if (!key) { unresolved.push({ site, file: rel, why: 'no distinctive sentence beside the launcher' }); return; }
-
-      const hits = product.filter((p) => p.sentence.includes(key));
-      const found = [...new Set(hits.map((h) => h.kind))];
+      // COMMAND TRACING, the row's piece (b): when the case SPAWNS a command, only the package that
+      // answers it can be the line under test. `store <command>` matches a pinned engine line and a
+      // deriving server one, and the argv is what says which — `['store','--help']` is the frame's own
+      // answer, `['store','migrate','--help']` is forwarded. Without this the pair is ambiguous and the
+      // architect's named control cannot fire at all, which is why this row exists.
+      const routed = route ? product.filter((p) => p.package === route) : product;
+      const hits = routed.filter((p) => match(prose, p.sentence));
+      const kinds = [...new Set(hits.map((h) => h.kind))];
       if (hits.length === 0) {
-        unresolved.push({ site, file: rel, why: `no product line carries "${key.slice(0, 48)}"` });
-      } else if (found.length > 1) {
+        unresolved.push({ site, file: rel, reason: reasonFor({ prose, route }, product),
+          why: route
+            ? `no ${route} line carries "${shown.slice(0, 48)}" (argv ${JSON.stringify(argv)})`
+            : `no product line carries "${shown.slice(0, 48)}"` });
+      } else if (kinds.length > 1) {
+        unresolved.push({ site, file: rel, reason: 'a pinned and a deriving line both carry it',
+          why: `"${shown.slice(0, 48)}" matches both a PINNED and a DERIVED product line` });
+      } else if (expectation === 'DERIVED_ON_PINNED_SUBJECT') {
+        // Item 2: the case drove a pinned shell and then asserted the RUNNER's spelling against it. Red on
+        // any machine whose shell differs from the one driven, whatever the product line does.
+        mismatches.push({ site, expectation, product: cite(hits), products: sites(hits), kind: kinds[0],
+          route: route ?? null,
+          why: 'the case drove a pinned shell and asserted a DERIVED spelling against it — the expectation '
+            + 'follows the runner while the value follows the ctx, so the two part company off this machine' });
+      } else if (expectation === 'EXPECTED_RENDERING') {
+        // The case supplied a pinned shell and asserted that shell's rendering — ARC-07-C31's own pattern.
+        // A DERIVING product line is what should be there; a PINNED one means the product spells a
+        // launcher the case thought it was driving, which is a real disagreement.
+        if (kinds[0] === 'DERIVED') agreed += 1;
+        else {
+          mismatches.push({ site, expectation, product: cite(hits), products: sites(hits), kind: kinds[0],
+            route: route ?? null,
+            why: 'the case drove a pinned shell and asserted its rendering, but the product line SPELLS '
+              + 'the launcher — the shell it was given changes nothing' });
+        }
+      } else if (kinds[0] !== expectation && caseDrivesPinned) {
+        // The case drove a pinned shell, just not into the call it asserts — so whether that shell reached
+        // this sentence is unknown here, and an unknown is recorded rather than reported either way.
         unresolved.push({ site, file: rel,
-          why: `"${key.slice(0, 48)}" matches both a PINNED and a DERIVED product line` });
-      } else if (found[0] !== expectation) {
-        mismatches.push({ site, expectation, product: `${hits[0].file}:${hits[0].line}`, kind: found[0],
+          reason: 'the case drives a pinned shell in another statement',
+          why: 'the case drives a pinned shell in a different statement from the one asserted, so whether '
+            + 'it reached this sentence needs dataflow this audit does not do' });
+      } else if (kinds[0] !== expectation) {
+        mismatches.push({ site, expectation, product: cite(hits), products: sites(hits), kind: kinds[0],
+          route: route ?? null,
           why: expectation === 'PINNED'
             ? 'a pinned expectation against a product line that DERIVES — red on every Windows cell'
             : 'a derived expectation against a product line that is PINNED — red on every Windows cell' });
       } else agreed += 1;
-    });
+    }
   }
 
   // The baseline, both directions.
   const counted = new Map();
   for (const u of unresolved) counted.set(u.file, (counted.get(u.file) ?? 0) + 1);
   const drift = [];
-  for (const [file, expected] of baseline) {
+  for (const [file, entry] of baseline) {
+    // The entry is `{ n, why }` now — ARC-07-C35b — but a bare number still works, because the audit's own
+    // cases plant tiny baselines and should not have to carry prose to do it.
+    const expected = typeof entry === 'number' ? entry : entry.n;
     const actual = counted.get(file) ?? 0;
     if (actual !== expected) drift.push(`${file}: ${actual} unresolved, the baseline says ${expected}`);
   }
@@ -261,7 +416,20 @@ export function audit({ tests = testSources(), product: productFiles = productSo
     if (!baseline.has(file)) drift.push(`${file}: ${actual} unresolved site(s), and the file is not in the baseline`);
   }
 
-  return { agreed, mismatches, unresolved, drift,
+  /*
+   * THE REASON STRING PER FILE, computed here so the baseline can be compared to it rather than trusted.
+   * Counts where a file mixes reasons, because one label over a mixed file is not a true annotation.
+   */
+  const reasons = new Map();
+  for (const u of unresolved) {
+    const at = reasons.get(u.file) ?? new Map();
+    at.set(u.reason, (at.get(u.reason) ?? 0) + 1);
+    reasons.set(u.file, at);
+  }
+  const computed = new Map([...reasons].map(([file, counts]) => [file,
+    [...counts].map(([r, n]) => (counts.size === 1 ? r : `${n}× ${r}`)).join('; ')]));
+
+  return { agreed, mismatches, unresolved, drift, computed,
     ok: mismatches.length === 0 && drift.length === 0 };
 }
 
