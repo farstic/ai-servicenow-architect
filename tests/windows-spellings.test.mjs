@@ -99,13 +99,17 @@ const LAUNCHER_PATTERNS = Object.freeze([
 /**
  * The two files that ARE the definitions, and the only ones allowed to spell a launcher.
  *
- * EXEMPT FOR WHAT THEY DEFINE, NOT FOR WHAT THEY SAY — and `text.mjs` says quite a lot. Besides the
- * definition itself and `ADD_INSTANCE`'s POSIX default, it carries SIX messages with the launcher
- * spelled by hand: the banner's `upgrade`, `staleRegistration` and `doctorFail`, the `staleSuffix`, and
- * `MODE_VARIANTS`' `timedOut` and `failed`. A Windows reader is shown a spelling their shell refuses in
- * all six, and this guard cannot see them because reading that file is what the exemption prevents.
- * They belong to ARC-07-C31's sweep and are named in that row so nobody reads the exemption as meaning
- * the file is settled.
+ * EXEMPT FOR WHAT THEY DEFINE, NOT FOR WHAT THEY SAY — and that distinction was earned. `text.mjs`
+ * carried SIX messages with the launcher spelled by hand on top of the definition itself: BANNER's
+ * `upgrade`, `staleRegistration` and `doctorFail`, the `staleSuffix`, and `MODE_VARIANTS`' `timedOut`
+ * and `failed`. A Windows reader was shown a spelling their shell refuses in all six, and this guard
+ * structurally could not see them, because reading that file is what the exemption prevents — I had
+ * been reading the exemption as the file being settled.
+ *
+ * ARC-07-C31's first slice fixed all six: every `BANNER` and `MODE_VARIANTS` member takes the spelling
+ * as a required argument now, so what remains here is `spellings()` itself and `ADD_INSTANCE`'s POSIX
+ * default, which ARE the definition. The two cases below hold that: no member may be called without a
+ * spelling, and no generator may call one unpinned.
  */
 const DEFINITIONS = Object.freeze([
   'tools/snowarch/lib/text.mjs',
