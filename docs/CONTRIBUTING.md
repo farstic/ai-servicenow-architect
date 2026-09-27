@@ -1391,6 +1391,13 @@ The checklist, verbatim — paste it into the release pull request's description
 >    skipped, and the final tag is dead. A rehearsal cannot catch it, because a rehearsal makes no
 >    tag. If you fetched the tag into a **shallow** clone the case skips with the reason named
 >    rather than failing.
+> 5a. **Write `## Unreleased` BEFORE the rc, not after it — ARC-09-C66.** Once a prerelease tag exists,
+>    the generated groups are empty: `release.mjs` asks for the commits since the newest tag, `latestTag`
+>    counts a prerelease, and the rc's commit is a child of `develop`, so the range is empty and the
+>    release section comes out as `### Notes` plus the tag line. `tests/changelog.test.mjs` (C12c, C62)
+>    refuses that and the release rolls back — which is what happened to the first 2.0.7 cut, after an
+>    rc.1 that had passed for the only reason it could: at that moment the newest tag was still the
+>    previous release. **The rehearsal cannot catch this**, so the block being there is the rule.
 > 6. Watch `release` → check the Release page: three doctor JSONs, `install-metrics.md`.
 > 7. Update the install page's metrics link if the numbers moved; announce.
 > 8. Optional: dispatch `publish-npm` with `dry_run: false` — see [The npm channel (optional)](#the-npm-channel-optional).

@@ -9,6 +9,96 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+One thing runs through almost all of this release: a sentence should be spelled for the person reading
+it, and a check should say what it actually saw. Nothing here changes how the product is configured,
+and there is no migration step — an existing checkout keeps its instance store, its preset and its
+flags untouched. The bundled documentation corpus does not move; it stays at `68c0d11`.
+
+**The launcher is spelled once, from the shell you are in.** 2.0.6 fixed the installer and six doctor
+remedies and left 77 sites spelling the POSIX form; those are now closed. A Windows reader sees
+`.\snowarch.cmd` in the wizard, in every doctor remedy, in the health panel, in the upgrade's own
+output and on the always-loaded rules page, and a Git Bash reader on the same machine still sees
+`./snowarch`, because the spelling is decided by the shell rather than by the operating system. The
+server's error remedies were the last holdout: they used to carry a POSIX launcher at runtime whatever
+you were typing into, and they now carry a placeholder that each reader fills — the pages with the
+POSIX form they are committed with, the server and the doctor with yours.
+
+**The doctor tells you why it could not read something, instead of certifying what it never read.**
+An unreadable `.local/bootstrap-state.json` used to leave checks reporting a checkout as healthier
+than it is: one said `design · disabled` about a mode nobody could read, one crashed and was reported
+as a fault in this tool, and two whole sections — `host` and `prereqs` — said nothing at all. Every one
+of them now names the file and points at the check that owns it. And a file the process cannot READ is
+no longer described as corrupt: `chmod 000` on an intact state file used to produce *is not valid JSON*
+with a remedy that rewrites the file, which cannot fix a permission.
+
+**`npm test` runs both halves and reports both.** It was two commands joined by `&&`, so a failure in
+the first withdrew the second silently — on a machine where the first half fails, that is 1463 cases
+leaving the gate with nothing in the output saying so. Every half now runs whatever the previous one
+did, each is named before it runs, and the run ends with a table: a half shown as `ok` ran and passed,
+and a half missing from the table did not run.
+
+**Three smaller things a person sees.** The wizard's probe summary folds at its ` · ` separators, so
+`FLUENT:` is never left on one line with `off.` on the next — reported from a real install. After an
+upgrade that checks out a tag, the *return with* hint names a ref your checkout actually has, where it
+used to name `main`, which a clone made with `--branch v2.0.5` does not have; it also says that moving
+`HEAD` leaves your instance store alone, because `.local/` is ignored by git. And `/snowarch doctor`
+relays the ids the summary line carries, so a warning is something you can act on rather than a number
+to go and look up.
+
+**Under the surface, the instruments that hold all of this.** A launcher audit now compares each
+asserted launcher with the product line that prints it, so a test that pins a spelling the product
+derives is refused before a Windows runner finds it; the two assertions CI used to make as inline YAML
+are a module with cases; and the tool that proves a test can fail refuses to run against an uncommitted
+tree.
+
+### Added
+
+- `scripts/ci/launcher-audit.mjs`: the gate resolves each asserted launcher to the product line that
+  prints it — by the command a case runs, where a spawn decides which package answers — and refuses an
+  expectation that disagrees with it. The sites it cannot yet resolve are listed with the reason it
+  computed for each (#318 `ea9fff7`, #326 `b6d1d6f`).
+- `scripts/ci/assert-state-readable.mjs`: the assertion two CI steps made as inline `node -e` blocks,
+  now a module with cases — code in YAML was covered by no local check (#318 `ea9fff7`).
+- `scripts/ci/test-all.mjs`: `npm test`'s two halves, each named before it runs, with a table naming
+  what each one said (#325 `086b961`).
+
+### Fixed
+
+- The launcher sweep is finished: 163 sites in 34 files carried a POSIX spelling, and none do. The
+  engine's definition is one leaf module, the server's is its own, and a Windows reader sees
+  `.\snowarch.cmd` in the wizard, the remedies, the panel, the upgrade output and the rules page
+  (#316 `4422674`, #317 `ba74291`, #319 `b0f305f`, #320 `e3ecdce`).
+- The server's error remedies no longer hand a POSIX launcher to a Windows reader: the registry holds a
+  placeholder and every reader substitutes — the committed pages with POSIX, the server and the doctor
+  with the shell they are speaking to (#321 `1884fe1`).
+- The doctor's checks can be told which shell they are rendering for, so its Windows remedies are
+  driven by a case rather than only by a Windows runner (#321 `1884fe1`).
+- An unreadable state file is reported rather than swallowed: E-10 no longer certifies a mode it could
+  not read, E-29 no longer surfaces as a crash in this tool, and `--section host` and `--section
+  prereqs` say what happened instead of nothing (#323 `5a14bf3`).
+- A state file the process cannot read is no longer called invalid JSON, and is no longer offered a
+  remedy that rewrites it (#323 `5a14bf3`).
+- `doctor --no-cache --no-cache` no longer writes the cache it was twice told not to write: a repeated
+  boolean flag collected into a list, and five checks compared that list to `true` (#324 `c7d2529`).
+- Two test files wrote into the checkout they were testing, leaving the doctor's cache files behind in
+  an ignored directory where the install-changed-nothing gate could not see them (#322 `806c4a2`).
+- The upgrade's *return with* hint names a ref the checkout has — the branch you were on, else the tag
+  `HEAD` was at, else the commit — and says that `.local/` is ignored, so your instance store is
+  untouched by any checkout (#327 `3c512a7`).
+- `/snowarch doctor` relays the check ids the summary line carries, and points at a section rather than
+  a full re-run for the remedy (#327 `3c512a7`).
+- The wizard's probe summary folds at its field separators, so a field's name is never left without its
+  value (#327 `3c512a7`).
+
+### Changed
+
+- `npm test` no longer short-circuits: both halves run, both are reported, and the exit code is
+  non-zero if either failed (#325 `086b961`).
+- The control tool refuses to run against an uncommitted tree, prints the checkpoint it will restore
+  to, and verifies the restore (#315 `e1fe5db`).
+- A test that counted a shared temporary directory now works under a private one, so it measures what
+  it created rather than its neighbours (#322 `806c4a2`).
+
 ## 2.0.6 — 2026-09-27
 
 ### Notes
