@@ -26,7 +26,8 @@ import { bootstrapSpelling, CANCELLED, cliSpelling, EXIT_INTERRUPTED, EXIT_USAGE
 export { EXIT_USAGE, EXIT_INTERRUPTED };
 import { proposeEnvironment, ENVIRONMENTS, normalizeInstanceUrl, resolveEnvironment, type Environment } from './url.js';
 import { remedyFor } from '../errors/codes.js';
-import { wrapRow,
+import { wrapFields,
+  wrapRow,
   applyingLine, COLUMNS, dependencyViolation, ENTRY_DEFAULTS, labelOf, prodRefusal, resolveFlags,
   wrapText,
   toggleFlag, type ReviewIo,
@@ -1138,7 +1139,9 @@ export async function runAdd(options: AddOptions, terminal: AddIo, deps: AddDeps
   // `wrapText` the permissions screen uses, so it cannot silently exceed the budget again as fields
   // are added; the saved line is 59 columns and needs no help.
   io.write(`${savedLine(label, masked, isDefault)}\n`);
-  for (const line of wrapText(
+  // ARC-07-C41 — `wrapFields`, not `wrapText`: this line is a list of `name: value` pairs joined by ` · `,
+  // and a prose wrapper split `FLUENT:` from `off.` in the owner's field run. It folds at the separators now.
+  for (const line of wrapFields(
     probeSummary(probeResult?.last ?? null, masked.flags, options.noProbes === true), COLUMNS)) {
     io.write(`${line}\n`);
   }

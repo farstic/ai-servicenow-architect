@@ -128,6 +128,21 @@ export interface ScreenInput {
  */
 export declare function wrapText(text: string, width: number): string[];
 /**
+ * ARC-07-C41 — a list of `name: value` fields folds at its SEPARATORS, never inside a field.
+ *
+ * `wrapText` breaks on whitespace, which is right for prose and wrong for this: the owner's 2.0.6 field run
+ * came back with `… now_assist: ok · FLUENT:` on one line and `off.` on the next. Measured on their own
+ * configuration — everything on with FLUENT turned off at the permissions screen — the line is 103 columns
+ * and `wrapText` breaks it after `FLUENT:` at 98. Both halves are under budget, which is exactly why the W16
+ * budget case passes over it: this is not a width defect.
+ *
+ * A unit longer than the width takes its own line whole, which is the rule `wrapText` already applies to a
+ * long word and `storeLine` applies to a path — breaking a field in half helps nobody. And the separator
+ * joins two fields, so when they land on different lines it belongs to neither: no line ends in a dangling
+ * ` ·`.
+ */
+export declare function wrapFields(text: string, width: number, separator?: string): string[];
+/**
  * One flag row: a FIXED prefix and a wrapped annotation under it.
  *
  * Wrapping the whole row as one string was the first attempt, and it collapsed the column

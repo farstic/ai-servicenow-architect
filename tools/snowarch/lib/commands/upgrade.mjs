@@ -28,7 +28,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from '../exit.mjs';
-import { branchState, git, isShallow } from '../git.mjs';
+import { branchState, describe, git, isShallow } from '../git.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { loadConfig, root as defaultRoot } from '../config.mjs';
 import { loadState } from '../state.mjs';
@@ -666,15 +666,49 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
         + '(development commits)');
     }
   } else {
+    /*
+     * ARC-07-C39 — THE RETURN REF IS ONE THE CHECKOUT ACTUALLY HAS, and `main` often is not.
+     *
+     * This said `git checkout ${branch.branch ?? 'main'}`. On a clone made with `--branch v2.0.5` there is no
+     * local `main` at all — the clone has one remote-tracking branch and the tag — so the command handed to
+     * the reader fails with `error: pathspec 'main' did not match any file(s) known to git`, at the exact
+     * moment the message exists to unstick them. `branch.branch` is read BEFORE the checkout above, so it is
+     * right whenever they were on a branch; when they were already detached it is null, and the honest answer
+     * is where HEAD actually was — the tag if it was at one, otherwise the sha, both of which always resolve.
+     *
+     * AND IT SAYS WHAT MOVING HEAD DOES TO THE STORE: nothing. That is the question a reader mid-upgrade
+     * actually has, and a remedy that leaves it unanswered invites them to go looking for their credentials.
+     */
+    const returnTo = returnRef(branch, describe(root, opts));
     const out = git(root, ['checkout', '--quiet', target], { ...opts, allowFail: true });
     if (out === null) {
       log.fail(`upgrade: git could not check out ${target}; nothing else was changed`);
       return EXIT_FAIL;
     }
-    log.step(`HEAD is detached at ${target} — return with: git checkout ${branch.branch ?? 'main'}`);
+    log.step(`HEAD is detached at ${target} — return with: git checkout ${returnTo}`);
+    log.step('your instance store lives in .local/, which git ignores, so no checkout touches it');
   }
 
   return finish({ root, env, log, run, target, latest, remote, now, state });
+}
+
+/**
+ * ARC-07-C39 — the ref a reader can actually check out to get back.
+ *
+ * `git checkout main` was wrong on the clone shape the row names: `git clone --branch v2.0.5` leaves HEAD
+ * detached at the tag with no local `main` at all, so the command failed with
+ * `error: pathspec 'main' did not match any file(s) known to git` at the moment the message existed to
+ * unstick the reader. The order is what the checkout HAS: the branch they were on (read before the move, so
+ * it is still true), else the tag HEAD was exactly at, else the sha — and a sha always resolves, which is why
+ * it is the floor rather than a name that might not exist.
+ *
+ * Exported for the cases: every state is one line here, and a fixture can check that what this returns
+ * RESOLVES in a real repository rather than that the sentence matches a string.
+ */
+export function returnRef(branch, described) {
+  if (branch.branch) return branch.branch;
+  if (described?.exact && described.name) return described.name;
+  return branch.short;
 }
 
 /**

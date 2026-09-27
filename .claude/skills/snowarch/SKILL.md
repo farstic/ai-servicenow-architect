@@ -205,8 +205,16 @@ it. It never suggests `claude mcp add`, and never edits `~/.claude.json` or `.mc
 ## doctor
 
 Run `./snowarch doctor` — the full check, text output. Relay the summary line
-`DOCTOR: n ok, n warn, n fail`, then every FAIL line with its remedy, unchanged. Suggest
-`./snowarch doctor --fix` only for the items the report marks fixable; never propose editing a
+`DOCTOR: n ok, n warn (ids), n fail (ids)`, then every FAIL line with its remedy, unchanged.
+
+**The line NAMES the checks that warned and failed, so never send a reader to find out WHICH.**
+ARC-07-W15 put the ids on it: a real line reads `DOCTOR: 13 ok, 1 warn (E-23), 1 fail (E-11)`. What a
+follow-up buys is the REMEDY, not the id, and naming the section makes it one check instead of a full run —
+`E-23 — run ./snowarch doctor --section legacy for the remedy`. A sentence that says the quick run "doesn't
+say what it is" describes a panel that no longer exists and spends the reader's next step on something they
+have already been told.
+
+Suggest `./snowarch doctor --fix` only for the items the report marks fixable; never propose editing a
 configuration file by hand instead.
 
 <!-- ARC-08-S09: the doctor's own check ids, --fix semantics and the self-heal report shape extend
