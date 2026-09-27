@@ -71,20 +71,24 @@ function readJson(path) {
  * `first` is only a first run when THIS invocation created the cache: a design-only checkout that
  * has been running for a month does not need to be told again every session.
  */
-function nudges({ report, cache, banner, firstRun, upgrade, now = Date.now() }) {
+function nudges({ report, cache, banner, firstRun, upgrade, now = Date.now(),
+  // ARC-07-C31 — the spelling the banner's lines are rendered with. Passed, not read: this function
+  // is handed its `banner` too, so reading a shell here would be the one thing in it that came from
+  // somewhere other than its arguments.
+  spell }) {
   const lines = [];
   const instances = report?.server?.instances ?? cache?.server?.instances ?? [];
-  if (firstRun && report?.mode !== 'live' && instances.length === 0) lines.push(banner.firstRun);
+  if (firstRun && report?.mode !== 'live' && instances.length === 0) lines.push(banner.firstRun(spell));
   // FRESH, not merely present (ARC-09-S07). A `behind: true` from a fortnight ago is a claim
   // nobody has checked since; printing it every session teaches a reader to skip the line, and
   // then the one that matters is skipped too. Expired means SILENCE — never a hedged nudge.
   if (upgrade?.behind === true && upgrade.latestTag && freshUpgradeCheck(upgrade, now)) {
-    lines.push(banner.upgrade(upgrade.latestTag));
+    lines.push(banner.upgrade(upgrade.latestTag, spell));
   }
   const stale = report?.stale?.claudeJsonEntries ?? cache?.report?.stale?.claudeJsonEntries ?? [];
-  if (stale.some((e) => e.scope === 'this-folder')) lines.push(banner.staleRegistration);
+  if (stale.some((e) => e.scope === 'this-folder')) lines.push(banner.staleRegistration(spell));
   const fail = report?.summary?.fail ?? cache?.summary?.fail ?? 0;
-  if (fail > 0) lines.push(banner.doctorFail(fail));
+  if (fail > 0) lines.push(banner.doctorFail(fail, spell));
   return lines;
 }
 
@@ -152,7 +156,11 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   // do: a case's assertion picked up the previous case's line.
   const out = [];
   const say = (line) => { if (line) out.push(line); };
-  const { BANNER } = await import('../lib/text.mjs');
+  // ARC-07-C31 — `spellings` comes from the SAME destructure as `BANNER`, at function scope. The
+  // block at the `unbootstrapped` branch below has its own import, and reaching for that one from
+  // here would be a ReferenceError — the fourth out-of-scope reference this programme has paid for,
+  // so this one is read from the signature rather than assumed.
+  const { BANNER, spellings } = await import('../lib/text.mjs');
   const { cachePath, inputsPath, cacheStale } = await import('../lib/doctor-cache.mjs');
 
   const cache = readJson(cachePath(root));
@@ -164,7 +172,7 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   phase.mark('cache-read+decision');
   if (cache && inputs && !staleness.stale && cache.modeLine) {
     say(cache.modeLine);
-    for (const line of nudges({ cache, banner: BANNER, firstRun: false, upgrade, now })) say(line);
+    for (const line of nudges({ cache, banner: BANNER, firstRun: false, upgrade, now, spell: spellings() })) say(line);
     phase.mark('render');
     phase.done('cache');
     return { path: 'cache', lines: out };
@@ -174,7 +182,7 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
   // state answers a question nobody asked and costs a second doing it.
   if (!existsSync(join(root, '.local', 'bootstrap-state.json'))) {
     // The hook renders for the person in front of it, so the PROCESS is the right shell here.
-    const { MODE_VARIANTS, modeLine, spellings } = await import('../lib/text.mjs');
+    const { MODE_VARIANTS, modeLine } = await import('../lib/text.mjs');
     say(modeLine({ mode: 'unknown', qualifier: MODE_VARIANTS.notBootstrapped(spellings()) }));
     return { path: 'unbootstrapped', lines: out };
   }
@@ -191,12 +199,15 @@ export async function banner({ root = ROOT, now = Date.now(), watchdogMs = WATCH
     if (e?.message !== 'watchdog') throw e;
     // The watchdog. An old line marked old beats no line: the mode rarely changes, and the
     // suffix says how much to trust it.
-    say(cache?.modeLine ? `${cache.modeLine}${BANNER.staleSuffix}` : BANNER.timedOut);
+    // ARC-07-C31 — the hook renders for the person in front of it, so the PROCESS is the right shell.
+    say(cache?.modeLine
+      ? `${cache.modeLine}${BANNER.staleSuffix(spellings())}`
+      : BANNER.timedOut(spellings()));
     return { path: 'timeout', lines: out };
   }
 
   say(report.modeLine);
-  for (const line of nudges({ report, banner: BANNER, firstRun: cache === null, upgrade, now })) say(line);
+  for (const line of nudges({ report, banner: BANNER, firstRun: cache === null, upgrade, now, spell: spellings() })) say(line);
   phase.mark('render');
   phase.done('rerun');
   return { path: 'rerun', lines: out };
@@ -222,8 +233,11 @@ if (isMain) {
   } catch (e) {
     // The CLASS, never the message: a message can carry a path, a URL or a value, and this line
     // goes into a session transcript.
-    const { BANNER } = await import('../lib/text.mjs');
-    lines = [BANNER.failed(e?.constructor?.name ?? 'Error')];
+    // ARC-07-C31 — `spellings` from the SAME destructure, because this is the CLI WRAPPER's catch
+    // block, not `banner`'s: the one at function scope above is out of reach here. Read from the
+    // structure rather than assumed — the fifth out-of-scope reference this programme has paid for.
+    const { BANNER, spellings } = await import('../lib/text.mjs');
+    lines = [BANNER.failed(e?.constructor?.name ?? 'Error', spellings())];
   }
   process.stdout.write(`${lines.join('\n')}\n`);
   // Always. Whatever Claude Code does with a hook's exit code, it can never be provoked from here.

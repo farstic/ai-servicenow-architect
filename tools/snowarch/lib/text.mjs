@@ -99,7 +99,10 @@ export const ADD_INSTANCE = (cli = './snowarch') =>
  */
 const needSpell = (spell, who) => {
   if (!spell || typeof spell.cli !== 'string' || typeof spell.bootstrap !== 'string') {
-    throw new TypeError(`MODE_VARIANTS.${who} needs a spellings object — this module has no process `
+    // The OWNER is named by the caller, not assumed: this helper guards `MODE_VARIANTS` and `BANNER`
+    // both, and a message that said MODE_VARIANTS for a BANNER member sent the reader to the wrong
+    // object. It did exactly that once, which is why `who` is now the full name.
+    throw new TypeError(`${who} needs a spellings object — this module has no process `
       + 'default, because its three consumers render for three different shells');
   }
   return spell;
@@ -115,15 +118,15 @@ const needSpell = (spell, who) => {
  */
 export const MODE_VARIANTS = Object.freeze({
   unconfigured: (spell) =>
-    `no ServiceNow instance configured; run ${ADD_INSTANCE(needSpell(spell, 'unconfigured').cli)}`,
+    `no ServiceNow instance configured; run ${ADD_INSTANCE(needSpell(spell, 'MODE_VARIANTS.unconfigured').cli)}`,
   serverDisabled: (label, spell) => `server disabled in .claude/settings.local.json although instance `
-    + `"${label}" is configured; run ${needSpell(spell, 'serverDisabled').cli} mode live`,
+    + `"${label}" is configured; run ${needSpell(spell, 'MODE_VARIANTS.serverDisabled').cli} mode live`,
   noInstanceLoaded: (spell) => {
-    needSpell(spell, 'noInstanceLoaded');
+    needSpell(spell, 'MODE_VARIANTS.noInstanceLoaded');
     return 'server enabled but no instance is loaded (see SV-02/SV-03); run /snowarch setup-instance';
   },
   notBootstrapped: (spell) => 'this checkout has not been bootstrapped; run '
-    + `${needSpell(spell, 'notBootstrapped').bootstrap}`,
+    + `${needSpell(spell, 'MODE_VARIANTS.notBootstrapped').bootstrap}`,
 });
 
 /**
@@ -155,19 +158,48 @@ export function modeLine({ mode, instance = null, qualifier = null, stamp = null
  * Each is ONE line. The banner has a budget measured in milliseconds and a reader who has not
  * asked for any of this yet; a nudge that wraps is a nudge that gets skipped.
  */
+/**
+ * ARC-07-C31 — EVERY MEMBER IS A FUNCTION TAKING THE SPELLING, including the two that have no launcher
+ * to spell.
+ *
+ * THIS FILE WAS EXEMPT FROM THE SPELLING GUARD AND I READ THAT AS THE FILE BEING SETTLED. It is exempt
+ * for what it DEFINES — `spellings` on line 45 and `ADD_INSTANCE`'s POSIX default — not for what it
+ * says, and it said six messages with the launcher spelled POSIX by hand. A Windows reader was shown a
+ * spelling their shell refuses in all six, and the guard structurally could not see them, because
+ * reading this file is exactly what the exemption prevents.
+ *
+ * TWO CONSUMERS, TWO RENDERINGS, which is why the spelling is an argument rather than a lazy call: the
+ * SessionStart hook and `/snowarch status` render for the person in front of them, and `exportable()`
+ * below feeds `text.json` — a GENERATED, COMMITTED file that must be byte-identical on every runner or
+ * `gen:check` fails on one of them. A lazy `spellings()` here would satisfy the first and break the
+ * second, which is precisely the mistake ARC-07-W17 made with `MODE_VARIANTS` and paid for across
+ * twelve Windows cells.
+ *
+ * `firstRun` and `staleSuffix`… — the ones with nothing to spell take the argument anyway. A UNIFORM
+ * CALL SHAPE is what stops the defect this programme has already shipped once: a consumer called a
+ * variant as a VALUE and printed the function's source as a Mode line, and the only reason it was not
+ * caught sooner is that some members took an argument and others did not.
+ */
 export const BANNER = Object.freeze({
-  firstRun: 'No ServiceNow instance configured — /snowarch setup-instance adds one '
-    + '(design-only works without it).',
-  upgrade: (tag) => `A newer release is available (${tag}) — run ./snowarch upgrade.`,
-  staleRegistration: 'Stale MCP registrations from the old setup found in ~/.claude.json — run '
-    + './snowarch doctor --section legacy for the removal commands.',
-  doctorFail: (n) => `Doctor: ${n} FAIL — run ./snowarch doctor for remedies.`,
+  firstRun: (spell) => {
+    needSpell(spell, 'BANNER.firstRun');
+    return 'No ServiceNow instance configured — /snowarch setup-instance adds one '
+      + '(design-only works without it).';
+  },
+  upgrade: (tag, spell) =>
+    `A newer release is available (${tag}) — run ${needSpell(spell, 'BANNER.upgrade').cli} upgrade.`,
+  staleRegistration: (spell) => 'Stale MCP registrations from the old setup found in ~/.claude.json '
+    + `— run ${needSpell(spell, 'BANNER.staleRegistration').cli} doctor --section legacy for the removal `
+    + 'commands.',
+  doctorFail: (n, spell) =>
+    `Doctor: ${n} FAIL — run ${needSpell(spell, 'BANNER.doctorFail').cli} doctor for remedies.`,
   /** The cache could not be refreshed in time: the line is still true, just old. */
-  staleSuffix: ' (cache stale — run ./snowarch doctor)',
-  timedOut: 'Mode: unknown — doctor timed out; run ./snowarch doctor',
+  staleSuffix: (spell) => ` (cache stale — run ${needSpell(spell, 'BANNER.staleSuffix').cli} doctor)`,
+  timedOut: (spell) =>
+    `Mode: unknown — doctor timed out; run ${needSpell(spell, 'BANNER.timedOut').cli} doctor`,
   /** Anything unforeseen. The CLASS, never the message: a message can carry a path or a value. */
-  failed: (errorClass) => `Mode: unknown — session banner failed (${errorClass}); run `
-    + './snowarch doctor',
+  failed: (errorClass, spell) => `Mode: unknown — session banner failed (${errorClass}); run `
+    + `${needSpell(spell, 'BANNER.failed').cli} doctor`,
   /**
    * What `/snowarch status` says when the doctor cannot run at all (ARC-08-S09).
    *
@@ -367,6 +399,14 @@ export function summaryBlock({ mode, instance = null, counts = {}, nodeUsable = 
   return lines.join('\n');
 }
 
+/**
+ * The POSIX rendering, stated — ARC-07-C31.
+ *
+ * Every committed generated artefact takes this: `text.json`, the rules page, the doctor's documented
+ * block. A bare `spellings()` would render the machine that happened to run the generator.
+ */
+const POSIX = Object.freeze(spellings({ platform: 'linux', env: {} }));
+
 /** Everything the Node-free launchers need, as data. `text.json` is generated from this. */
 export function exportable({ serverKey }) {
   const forShell = (where) => ({
@@ -381,13 +421,17 @@ export function exportable({ serverKey }) {
     // the same words. The two that take an argument are rendered with an example one, so the file
     // shows the shape rather than a placeholder nobody can compare against.
     banner: {
-      firstRun: BANNER.firstRun,
-      upgrade: BANNER.upgrade('v2.1.0'),
-      staleRegistration: BANNER.staleRegistration,
-      doctorFail: BANNER.doctorFail(2),
-      staleSuffix: BANNER.staleSuffix,
-      timedOut: BANNER.timedOut,
-      failed: BANNER.failed('Error'),
+      // ARC-07-C31 — PINNED POSIX, because `text.json` is generated AND COMMITTED: its bytes must be
+      // identical on every runner or `gen:check` fails on a mac or on the Windows cell, whichever ran
+      // second. The Node-free launchers read this file, and they cannot know the reader's shell either.
+      // Same form as `gen-doctor-docs.mjs` and the rules page — the platform is STATED, not inherited.
+      firstRun: BANNER.firstRun(POSIX),
+      upgrade: BANNER.upgrade('v2.1.0', POSIX),
+      staleRegistration: BANNER.staleRegistration(POSIX),
+      doctorFail: BANNER.doctorFail(2, POSIX),
+      staleSuffix: BANNER.staleSuffix(POSIX),
+      timedOut: BANNER.timedOut(POSIX),
+      failed: BANNER.failed('Error', POSIX),
       fromState: BANNER.fromState('design-only', '2026-09-10T10:00:00.000Z',
         'until Node 20+ is installed'),
     },

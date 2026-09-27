@@ -12,6 +12,9 @@ import { existsSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync }
 import { join } from 'node:path';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 
+/** ARC-07-C31 — BANNER's members take the spelling now; the hook renders for the process. */
+const SPELL = spellings();
+
 import { banner, MAX_AGE_MS, UPGRADE_MAX_AGE_MS, WATCHDOG_MS } from '../../tools/snowarch/hooks/session-start.mjs';
 import { BANNER } from '../../tools/snowarch/lib/text.mjs';
 import { cachePath, inputsPath } from '../../tools/snowarch/lib/doctor-cache.mjs';
@@ -40,7 +43,7 @@ const seen = [];
 
 /** The only lines that may follow the Mode line. Anything else is the banner inventing prose. */
 const isNudge = (line) => [
-  BANNER.firstRun, BANNER.staleRegistration,
+  BANNER.firstRun(SPELL), BANNER.staleRegistration(SPELL),
 ].includes(line) || /^A newer release is available \(/.test(line) || /^Doctor: \d+ FAIL /.test(line);
 
 /**
@@ -189,10 +192,10 @@ test('with no cache the hook re-runs, and the first-run nudge is printed once', 
   const first = runHook(root);
   assert.equal(first.status, 0);
   assert.match(first.lines[0], /^Mode: /);
-  assert.ok(first.lines.includes(BANNER.firstRun), first.stdout);
+  assert.ok(first.lines.includes(BANNER.firstRun(SPELL)), first.stdout);
 
   const second = runHook(root);
-  assert.equal(second.lines.includes(BANNER.firstRun), false,
+  assert.equal(second.lines.includes(BANNER.firstRun(SPELL)), false,
     'the first-run nudge was printed on a second session');
 });
 
@@ -205,7 +208,7 @@ test('the upgrade nudge names the tag, and an absent file is no nudge', async (t
   writeJson(root, '.local/upgrade-check.json',
     { behind: true, latestTag: 'v2.1.0', checkedAt: new Date().toISOString() });
   const r = runHook(root);
-  assert.ok(r.lines.includes(BANNER.upgrade('v2.1.0')), r.stdout);
+  assert.ok(r.lines.includes(BANNER.upgrade('v2.1.0', SPELL)), r.stdout);
 
   writeJson(root, '.local/upgrade-check.json',
     { behind: false, latestTag: 'v2.1.0', checkedAt: new Date().toISOString() });
@@ -221,14 +224,14 @@ test('the stale-registration nudge fires for THIS folder only', async (t) => {
     { scope: 'other', project: '~/old', name: 'x', command: 'claude mcp remove x -s local' }] } };
   writeJson(root, '.local/doctor-last.json', { ...cache, report: withOther });
   const other = await banner({ root });
-  assert.equal(other.lines.includes(BANNER.staleRegistration), false,
+  assert.equal(other.lines.includes(BANNER.staleRegistration(SPELL)), false,
     'another project\'s leftovers nudged this session');
 
   const withThis = { ...cache.report, stale: { claudeJsonEntries: [
     { scope: 'this-folder', project: '~/here', name: 'x', command: 'claude mcp remove x -s local' }] } };
   writeJson(root, '.local/doctor-last.json', { ...cache, report: withThis });
   const here = await banner({ root });
-  assert.ok(here.lines.includes(BANNER.staleRegistration), here.lines.join('\n'));
+  assert.ok(here.lines.includes(BANNER.staleRegistration(SPELL)), here.lines.join('\n'));
 });
 
 test('the doctor-FAIL nudge counts the failures the cache recorded', async (t) => {
@@ -237,7 +240,7 @@ test('the doctor-FAIL nudge counts the failures the cache recorded', async (t) =
   writeJson(root, '.local/doctor-last.json',
     { ...cache, summary: { ...cache.summary, fail: 3 } });
   const r = await banner({ root });
-  assert.ok(r.lines.includes(BANNER.doctorFail(3)), r.lines.join('\n'));
+  assert.ok(r.lines.includes(BANNER.doctorFail(3, SPELL)), r.lines.join('\n'));
 });
 
 // AC 5.
@@ -256,7 +259,10 @@ test('a doctor that throws becomes one honest line, and the session still starts
   assert.equal(r.status, 0);
   assert.equal(r.stderr, '');
   assert.equal(r.lines.length, 1, r.stdout);
-  assert.match(r.lines[0], /^Mode: unknown — session banner failed \([A-Za-z]*Error\); run \.\/snowarch doctor$/);
+  // ARC-07-C31, rule 2 — derived and escaped: the wrapper renders for the shell it runs in.
+  const esc = SPELL.cli.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  assert.match(r.lines[0],
+    new RegExp(`^Mode: unknown — session banner failed \\([A-Za-z]*Error\\); run ${esc} doctor$`));
 });
 
 test('a doctor that hangs hits the watchdog, and the old line is marked old', async (t) => {
@@ -274,7 +280,7 @@ test('a doctor that hangs hits the watchdog, and the old line is marked old', as
   // `path: 'timeout'` IS "the watchdog fired" — the banner reports which branch answered, so the
   // claim is read off the result rather than inferred from how long the call took.
   assert.equal(r.path, 'timeout');
-  assert.equal(r.lines[0], `${cache.modeLine}${BANNER.staleSuffix}`);
+  assert.equal(r.lines[0], `${cache.modeLine}${BANNER.staleSuffix(SPELL)}`);
 });
 
 test('a hang with no cache at all still says something true', async (t) => {
@@ -282,7 +288,7 @@ test('a hang with no cache at all still says something true', async (t) => {
   rmSync(cachePath(root));
   rmSync(inputsPath(root));
   const r = await banner({ root, watchdogMs: 50, run: () => hangs(300) });
-  assert.equal(r.lines[0], BANNER.timedOut);
+  assert.equal(r.lines[0], BANNER.timedOut(SPELL));
   assert.ok(WATCHDOG_MS < 10_000, 'the watchdog must fire before the hook timeout');
 });
 
@@ -350,11 +356,11 @@ test('nothing the hook printed carries the fixture credentials', async (t) => {
 
 test('the nudge strings the hook prints are the ones text.json exports', () => {
   const text = JSON.parse(readFileSync(join(REAL_ROOT, 'tools/snowarch/lib/text.json'), 'utf8'));
-  assert.equal(text.banner.firstRun, BANNER.firstRun);
-  assert.equal(text.banner.staleRegistration, BANNER.staleRegistration);
-  assert.equal(text.banner.upgrade, BANNER.upgrade('v2.1.0'));
-  assert.equal(text.banner.doctorFail, BANNER.doctorFail(2));
-  assert.equal(text.banner.timedOut, BANNER.timedOut);
+  assert.equal(text.banner.firstRun, BANNER.firstRun(SPELL));
+  assert.equal(text.banner.staleRegistration, BANNER.staleRegistration(SPELL));
+  assert.equal(text.banner.upgrade, BANNER.upgrade('v2.1.0', SPELL));
+  assert.equal(text.banner.doctorFail, BANNER.doctorFail(2, SPELL));
+  assert.equal(text.banner.timedOut, BANNER.timedOut(SPELL));
 });
 
 // ARC-09-S07 — the freshness rule, and the one number it depends on.
@@ -364,7 +370,7 @@ test('an upgrade check older than a week is silence, not a hedged nudge', async 
 
   writeJson(root, '.local/upgrade-check.json',
     { behind: true, latestTag: 'v2.1.0', checkedAt: days(6) });
-  assert.ok(runHook(root).lines.includes(BANNER.upgrade('v2.1.0')), 'six days old is still fresh');
+  assert.ok(runHook(root).lines.includes(BANNER.upgrade('v2.1.0', SPELL)), 'six days old is still fresh');
 
   writeJson(root, '.local/upgrade-check.json',
     { behind: true, latestTag: 'v2.1.0', checkedAt: days(8) });
