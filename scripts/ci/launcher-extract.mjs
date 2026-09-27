@@ -49,6 +49,9 @@ export const LAUNCHER = /\.\/snowarch|\.\/bootstrap\.sh|\.\\snowarch\.cmd|\.\\bo
 /** A spelling read from the process renders whatever machine runs it; one given a platform does not. */
 const READS_THE_PROCESS = new Set(['spellings', 'cliSpelling', 'bootstrapSpelling']);
 
+/** The values `process.platform` can take that this repository drives by name. */
+const PLATFORMS = new Set(['win32', 'linux', 'darwin']);
+
 /**
  * ARC-07-C35's TARGET RULE, kept exactly: a launcher LITERAL, or a spelling INTERPOLATED INTO A STRING.
  *
@@ -137,9 +140,39 @@ export function proseOf(node) {
 
   if (ts.isParenthesizedExpression(node)) return proseOf(node.expression);
 
-  // `new RegExp(`usage: ${CLI} …`)` and `esc(FRAME_CLI)`: the prose is in the arguments.
+  /*
+   * CONTAINERS CARRY PROSE, and dropping them mislabelled nine sites.
+   *
+   * `assert.equal(out, ['the corpus is missing', `run ${CLI} docs sync`].join('\n'))` used to contribute
+   * `\n` — the join's separator and nothing else — because only a call's ARGUMENTS were read. The site was
+   * then filed as "the assertion is about the launcher alone", which is a false reason: there is a sentence,
+   * and the extractor was not looking at it. `carriesLauncher` walks INTO these containers, so the site was
+   * declared and then described wrongly, which is worse than not seeing it.
+   */
+  if (ts.isArrayLiteralExpression(node)) return node.elements.map((e) => proseOf(e)).join(' ');
+  if (ts.isObjectLiteralExpression(node)) {
+    return node.properties
+      .map((prop) => (ts.isPropertyAssignment(prop) ? proseOf(prop.initializer) : MARK))
+      .join(' ');
+  }
+  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+    return ts.isBlock(node.body) ? MARK : proseOf(node.body);
+  }
+
+  // `new RegExp(`usage: ${CLI} …`)`, `esc(FRAME_CLI)`, and `[…].join('\n')`: the prose is in the arguments
+  // AND, for a method call, in the receiver — which is where an array or a template usually sits.
   if (ts.isNewExpression(node) || ts.isCallExpression(node)) {
-    return (node.arguments ?? []).map((a) => proseOf(a)).join(' ');
+    const fromArgs = (node.arguments ?? []).map((a) => proseOf(a));
+    const callee = ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+      ? node.expression : null;
+    // `.join(sep)` is the shape this repository writes most, and the separator is part of the sentence.
+    if (callee && callee.name.text === 'join' && ts.isArrayLiteralExpression(callee.expression)) {
+      const sep = node.arguments[0] && ts.isStringLiteralLike(node.arguments[0])
+        ? node.arguments[0].text : ' ';
+      return callee.expression.elements.map((e) => proseOf(e)).join(sep);
+    }
+    const fromReceiver = callee ? proseOf(callee.expression) : '';
+    return [fromReceiver, ...fromArgs].filter((x) => x !== '').join(' ');
   }
 
   // Everything else — an identifier, a property access, a call result — is not prose.
@@ -172,6 +205,28 @@ function carriesLauncher(node, spellings) {
   };
   walk(node);
   return found;
+}
+
+/**
+ * The kind an expectation states INLINE: `${spellings({ platform: 'linux', env: {} }).cli}` is PINNED.
+ *
+ * ARC-07-C35's own named control site — `tools/snowarch/tests/store-forwarder.test.mjs:73` — was reported
+ * DERIVED against its own "PINNED POSIX" comment, because the kind was only ever read from a NAMED constant
+ * and a template span has no name. `mentionsPinned` already knew how to read a call; the expectation did not.
+ */
+function inlineKind(node) {
+  let kind = null;
+  const walk = (n) => {
+    if (kind) return;
+    if (ts.isCallExpression(n)) {
+      const name = ts.isIdentifier(n.expression) ? n.expression.text
+        : (ts.isPropertyAccessExpression(n.expression) ? n.expression.name.text : null);
+      if (name && READS_THE_PROCESS.has(name)) { kind = pinsShell(n) ? 'PINNED' : 'DERIVED'; return; }
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(node);
+  return kind;
 }
 
 /** A named spelling constant, or a spelling call, appearing in this expression. */
@@ -214,12 +269,61 @@ export function spellingConstants(sf) {
   const walk = (node) => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const call = findSpellingCall(node.initializer);
-      if (call) kinds.set(node.name.text, call.arguments.length === 0 ? 'DERIVED' : 'PINNED');
+      if (call) kinds.set(node.name.text, pinsShell(call) ? 'PINNED' : 'DERIVED');
     }
     ts.forEachChild(node, walk);
   };
   walk(sf);
   return kinds;
+}
+
+/**
+ * Does this spelling call PIN a shell? Read the argument, never the count.
+ *
+ * `spellings({ platform: process.platform, env: process.env })` has an argument and derives from the process
+ * anyway — it is the process spelled out longhand. Counting arguments called it pinned, which would let a
+ * case that reads the runner's platform be treated as one that named it.
+ */
+export function pinsShell(call) {
+  if (!call || call.arguments.length === 0) return false;
+  let readsProcess = false;
+  const walk = (n) => {
+    if (readsProcess) return;
+    if (ts.isIdentifier(n) && n.text === 'process') { readsProcess = true; return; }
+    ts.forEachChild(n, walk);
+  };
+  for (const arg of call.arguments) walk(arg);
+  return !readsProcess;
+}
+
+/**
+ * The kind of a spelling constant AS SEEN FROM one assertion — nearest scope wins, not last in the file.
+ *
+ * `spellingConstants` builds one table keyed by name, so two cases that both write `const cli = …` with
+ * different kinds collapse into whichever appears later. Measured on a two-case fixture: a DERIVED case and
+ * a PINNED case both came back PINNED, so the derived one could have hard-coded a launcher and passed. The
+ * walk starts at the assertion and climbs, which is what a reader of that case would do.
+ */
+function kindInScope(sf, assertion, name, fileWide) {
+  let scope = assertion.parent;
+  while (scope) {
+    let found = null;
+    const scan = (n) => {
+      if (found) return;
+      // Do not descend into a NESTED function: its declarations are not in this scope.
+      if (n !== scope && ts.isFunctionLike(n)) return;
+      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === name && n.initializer) {
+        const call = findSpellingCall(n.initializer);
+        if (call) found = pinsShell(call) ? 'PINNED' : 'DERIVED';
+        return;
+      }
+      ts.forEachChild(n, scan);
+    };
+    scan(scope);
+    if (found) return found;
+    scope = scope.parent;
+  }
+  return fileWide.get(name) ?? null;
 }
 
 function findSpellingCall(node) {
@@ -271,28 +375,89 @@ function subjectOf(node) {
   return node.arguments[0] ?? null;
 }
 
-/** Does the subject carry a spelling whose platform was NAMED — a pinned shell driven into the product? */
-function subjectPinsShell(sf, assertion, subject, pinned) {
-  if (subject && mentionsPinned(subject, pinned)) return true;
+/**
+ * ARC-07-C35b, third head — THE NARROW RULE FOR `EXPECTED_RENDERING`, after the architect refuted the wide one.
+ *
+ * The wide version asked "does the enclosing function MENTION a pinned constant or a spelling call with
+ * arguments", and that is not the question. Mutating the row's own control file proved it: adding a
+ * FRAME_CLI assertion to the `migrate --help` case and hard-coding `usage: ./snowarch store <command>`
+ * against the SERVER's result came back `EXPECTED_RENDERING`, `agreed=4`, 0 mismatches — the exact
+ * Windows-red class the audit exists to catch, hidden by the fallback, because the case mentioned a pinned
+ * constant somewhere else.
+ *
+ * The question is whether a pinned shell was DRIVEN INTO the call whose result is being asserted. So:
+ *
+ *   - the subject is a call, or a value bound from one, and that call RECEIVES the pinned spelling or a
+ *     platform-bearing ctx as an argument, in the same function; and
+ *   - `argv` is null — a case that SPAWNS a command cannot drive a shell by argument at all, so a launcher
+ *     literal in a spawn-shaped case is a pinned expectation and nothing else.
+ *
+ * There is no "mentions" fallback. A case that pins a shell for one assertion and hard-codes a launcher in
+ * another is now caught, which is the direction that matters.
+ */
+function drivenPinnedShell(sf, assertion, subject, pinned, argv, bearing) {
+  // A spawn-shaped case drives nothing by argument. This is the half that unhid the mutation.
+  if (argv) return false;
+  if (!subject) return false;
 
+  const call = callBehind(sf, assertion, subject);
+  if (!call) return false;
   /*
-   * THE ENCLOSING CASE, not one hop, and measuring is what moved this line.
+   * THE EXPECTATION IS NOT A DRIVEN SHELL, and `assert.ok` is where the two are the same node.
    *
-   * One hop covered the cases that read `const vWin = renderVersion(info, win)` on the line above the
-   * assertion, and left eight more where the pinned shell is three or four statements away — `said` is
-   * collected from a run, `finished` joins it, the assertion matches `finished`. Following that properly is
-   * dataflow analysis, and an audit that needs dataflow is the wrong shape; the question it actually has to
-   * answer is simpler: DID THIS CASE DRIVE A PINNED SHELL? If it did, a launcher literal in it is an
-   * expected rendering, because that is the only reason to pin one.
-   *
-   * THE LIMIT, written down rather than discovered: a case that drives a pinned shell for one assertion and
-   * wrongly hard-codes a launcher in another is not caught here. That is a false NEGATIVE, which for an
-   * advisory audit is the safer direction — `tests/windows-spellings.test.mjs` still holds the hard rule
-   * that no source line outside the definitions spells a launcher at all.
+   * `assert.ok(log.lines.join('\n').includes(`usage: ${spellings({ platform: 'linux' }).cli} store`))`
+   * has no separate expected value: the subject IS the expectation, so the pinned spelling sits inside the
+   * sentence being asserted rather than inside a call that produced a value. Counting it made
+   * `store-forwarder.test.mjs:73` — ARC-07-C35's own named control site — an EXPECTED_RENDERING when it is
+   * a pinned expectation about a POSIX literal the engine's frame prints on every platform.
    */
+  // OVERLAP IN EITHER DIRECTION. With `assert.ok(X)` the bearing node IS the subject call, so the
+  // expectation CONTAINS the argument rather than sitting inside it — my first version only checked one way
+  // and left `store-forwarder.test.mjs:73` misclassified exactly as before.
+  const overlaps = (a, b) => a.getStart(sf) < b.getEnd() && b.getStart(sf) < a.getEnd();
+  const driving = (call.arguments ?? []).filter((arg) => !bearing.some((b) => overlaps(arg, b)));
+  return driving.some((arg) => mentionsPinned(arg, pinned));
+}
+
+/** Does the enclosing case mention a pinned shell anywhere — the WIDE signal, kept only to say "unknown". */
+function mentionsInEnclosingCase(assertion, pinned) {
   let scope = assertion.parent;
   while (scope && !ts.isFunctionLike(scope)) scope = scope.parent;
   return Boolean(scope && mentionsPinned(scope, pinned));
+}
+
+/** The call whose result the subject is: itself, its root, or the initializer it was bound from. */
+function callBehind(sf, from, subject) {
+  if (ts.isCallExpression(subject)) return subject;
+  if (ts.isPropertyAccessExpression(subject) || ts.isElementAccessExpression(subject)
+    || ts.isNonNullExpression(subject) || ts.isParenthesizedExpression(subject)) {
+    let inner = subject.expression;
+    while (inner) {
+      if (ts.isCallExpression(inner)) return inner;
+      if (ts.isPropertyAccessExpression(inner) || ts.isElementAccessExpression(inner)
+        || ts.isNonNullExpression(inner) || ts.isParenthesizedExpression(inner)) inner = inner.expression;
+      else break;
+    }
+    // `r.text` where `const r = render(WIN)` — the binding carries the call.
+    const name = rootIdentifier(subject);
+    return name ? boundCall(sf, from, name) : null;
+  }
+  if (ts.isIdentifier(subject)) return boundCall(sf, from, subject.text);
+  return null;
+}
+
+/** The call a local constant was bound from, resolved in the nearest scope that declares it. */
+function boundCall(sf, from, name) {
+  const decl = declarationInScope(sf, from, name);
+  if (!decl?.initializer) return null;
+  let inner = decl.initializer;
+  // `await` as well as a property access or a cast: `const r = await runIt(WIN)` is the same shape.
+  while (inner && !ts.isCallExpression(inner)) {
+    inner = ts.isPropertyAccessExpression(inner) || ts.isNonNullExpression(inner)
+      || ts.isParenthesizedExpression(inner) || ts.isAwaitExpression(inner) || ts.isAsExpression(inner)
+      ? inner.expression : null;
+  }
+  return inner ?? null;
 }
 
 /**
@@ -312,10 +477,14 @@ function mentionsPinned(node, pinned) {
       && ts.isStringLiteralLike(n.initializer)) {
       hit = true; return;
     }
+    // A POSITIONAL platform, which is how several cases drive it:
+    // `deletionAdvice(2, 2, 'C:\\Users\\me', 'win32', {})` and `noTtyMessage('linux', {})`. Measured —
+    // without this arm those two files' four correct assertions were reported as defects.
+    if (ts.isStringLiteralLike(n) && PLATFORMS.has(n.text)) { hit = true; return; }
     if (ts.isCallExpression(n)) {
       const name = ts.isIdentifier(n.expression) ? n.expression.text
         : (ts.isPropertyAccessExpression(n.expression) ? n.expression.name.text : null);
-      if (name && READS_THE_PROCESS.has(name) && n.arguments.length > 0) { hit = true; return; }
+      if (name && READS_THE_PROCESS.has(name) && pinsShell(n)) { hit = true; return; }
     }
     ts.forEachChild(n, walk);
   };
@@ -390,6 +559,63 @@ function argvOf(node) {
  * Scoped to the enclosing function so a spawn in a neighbouring case cannot be borrowed, and LAST rather
  * than first because a case that runs two commands asserts about the most recent one.
  */
+/**
+ * The argv behind the VALUE being asserted, found through the identifier the subject reads.
+ *
+ * `argvInScope` takes the last spawn before the assertion, and a case that runs two commands and asserts the
+ * FIRST is then routed to the second package — a correct assertion reported as a mismatch against a product
+ * line it never reached. Measured on a two-spawn fixture: asserting `first.text` after a later
+ * `run(entry, ['store','migrate','--help'])` routed to the server. So the subject's binding is asked first,
+ * and the last spawn stays as the fallback for a case that asserts a call's result directly.
+ */
+function argvForSubject(sf, assertion, subject) {
+  if (!subject) return null;
+  const name = ts.isIdentifier(subject) ? subject.text : rootIdentifier(subject);
+  if (!name) return null;
+  // NEAREST SCOPE, and this is the same defect as the file-wide constants table: `const r = run(…)` appears
+  // in every case in `store-root-entry.test.mjs`, so a file-wide scan gave EVERY assertion the FIRST case's
+  // argv — measured, it routed the `migrate --help` case to the engine and reported a mismatch against a
+  // product line it never reached.
+  const found = declarationInScope(sf, assertion, name);
+  if (!found?.initializer) return null;
+  const call = spawnShapedCall(found.initializer);
+  return call ? argvOf(call) : null;
+}
+
+/** The nearest declaration of `name` visible from this node, climbing out through the enclosing scopes. */
+function declarationInScope(sf, from, name) {
+  let scope = from.parent;
+  while (scope) {
+    let hit = null;
+    const scan = (n) => {
+      if (hit) return;
+      if (n !== scope && ts.isFunctionLike(n)) return;
+      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === name) { hit = n; return; }
+      ts.forEachChild(n, scan);
+    };
+    scan(scope);
+    if (hit) return hit;
+    scope = scope.parent;
+  }
+  return null;
+}
+
+/** A call that RUNS something: the shapes this repository's cases use to spawn a command. */
+function spawnShapedCall(node) {
+  let hit = null;
+  const walk = (n) => {
+    if (hit) return;
+    if (ts.isCallExpression(n)) {
+      const name = ts.isIdentifier(n.expression) ? n.expression.text
+        : (ts.isPropertyAccessExpression(n.expression) ? n.expression.name.text : null);
+      if (name && /^(run|cli|spawnSync|execFileSync|runAt|lintAt|snowarch)$/.test(name)) { hit = n; return; }
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(node);
+  return hit;
+}
+
 function argvInScope(sf, assertion) {
   let best = null;
   const within = (node) => {
@@ -452,18 +678,30 @@ export function assertedLaunchers(file, text) {
       if (bearing.length > 0) {
         const literal = bearing.some((a) => hasLauncherLiteral(a));
         const named = bearing.map((a) => namedSpelling(a, spellings)).find(Boolean) ?? null;
-        const argv = argvInScope(sf, node);
-        const pinnedSubject = subjectPinsShell(sf, node, subjectOf(node), pinned);
+        const subject = subjectOf(node);
+        // The subject's own binding decides the route; the last spawn is only the fallback (item 6).
+        const argv = argvForSubject(sf, node, subject) ?? argvInScope(sf, node);
+        const pinnedSubject = drivenPinnedShell(sf, node, subject, pinned, argv, bearing);
+        // THE SIDE-EFFECT SHAPE, reported rather than guessed either way. `promptSecret(…, { platform:
+        // 'win32' })` writes to a recorder and the assertion reads `stdout.written`: the case DID drive a
+        // pinned shell, but not into the call whose value is asserted, so the narrow rule cannot see it and
+        // calling it a pinned expectation reported correct code as a defect. It is neither agreement nor a
+        // mismatch — it is a question this audit cannot answer without dataflow, and the audit says so.
+        const caseDrivesPinned = !argv && !pinnedSubject && mentionsInEnclosingCase(node, pinned);
+        // The kind stated INLINE wins over a named constant, and a named constant is resolved in the
+        // NEAREST scope rather than file-wide.
+        const stated = bearing.map((a) => inlineKind(a)).find(Boolean) ?? null;
+        const scoped = named ? kindInScope(sf, node, named, spellings) : null;
         sites.push({
           file,
           line: lineOf(sf, node),
-          // A launcher literal is a PINNED expectation only when nothing pinned the shell behind the
-          // value. `EXPECTED_RENDERING` is the third answer, and it is what stopped thirteen correct
-          // assertions being reported as defects.
-          expectation: literal
-            ? (pinnedSubject ? 'EXPECTED_RENDERING' : 'PINNED')
-            : (spellings.get(named) ?? 'DERIVED'),
+          // `EXPECTED_RENDERING` is decided by the SUBJECT, not by literal-vs-constant: a case that drives
+          // a pinned shell and asserts `${esc(win.cli)}` is rendering that shell just as much as one that
+          // writes the launcher out, and the wide rule reported the second and missed the first.
+          expectation: pinnedSubject ? 'EXPECTED_RENDERING'
+            : (literal ? 'PINNED' : (stated ?? scoped ?? 'DERIVED')),
           pinnedSubject,
+          caseDrivesPinned,
           sentence: bearing.map((a) => proseOf(a)).join(' '),
           argv,
           answeredBy: answeredBy(argv),

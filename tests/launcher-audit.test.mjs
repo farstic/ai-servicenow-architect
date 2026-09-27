@@ -361,3 +361,162 @@ test('C35b — one definition of LAUNCHER, exported, because the two had already
   assert.ok(LAUNCHER.test('./snowarch') && LAUNCHER.test('.\\snowarch.cmd'),
     'the one definition no longer covers both spellings of the cooked value');
 });
+
+/* ── ARC-07-C35b, third head — the architect's adversarial review ──────────────────────────────── */
+
+test('C35b — a `//` inside a template cannot swallow the lines after it (item 1, second fixture)', () => {
+  // The other half of the `codeOf` defect: the LINE strip truncated a template at
+  // `tools/snowarch/tests/b00-checks.test.mjs:93`, the unterminated template swallowed ten lines, a PHANTOM
+  // site was invented at :93 and the real one at :102 was misattributed — its baseline reason was an
+  // artefact of the strip. The parser reads the template as a template.
+  const text = [
+    "const CLI = spellings({ platform: 'linux', env: {} }).cli;",
+    'const note = stripComments(`// observed on git 2.39.5',
+    '  and on 2.43.0`);',
+    'assert.equal(note.hint, `run ${CLI} doctor --section prereqs for the detail`);',
+  ].join('\n');
+  const sites = assertedLaunchers('tests/planted.test.mjs', text);
+  assert.equal(sites.length, 1, `a phantom or lost site: ${JSON.stringify(sites.map((s) => s.line))}`);
+  assert.equal(sites[0].line, 4, 'the site was attributed to the wrong line');
+  assert.match(sites[0].sentence, /^run .* doctor --section prereqs for the detail$/);
+});
+
+test('C35b — the real file: b00-checks has no phantom site at :93 (item 1)', () => {
+  const file = 'tools/snowarch/tests/b00-checks.test.mjs';
+  const lines = assertedLaunchers(file, readFileSync(resolve(root, file), 'utf8')).map((s) => s.line);
+  assert.deepEqual(lines, [102, 111],
+    `the phantom at :93 is back or a real site moved: ${JSON.stringify(lines)}`);
+});
+
+test('C35b — an inline pinned spelling call is a PINNED expectation (item 3)', () => {
+  // `${spellings({ platform: 'linux', env: {} }).cli}` states its kind INLINE, and the kind used to be read
+  // only from a NAMED constant — so ARC-07-C35's own named control site,
+  // `tools/snowarch/tests/store-forwarder.test.mjs:73`, was reported DERIVED against its own
+  // "PINNED POSIX" comment.
+  const file = 'tools/snowarch/tests/store-forwarder.test.mjs';
+  const sites = assertedLaunchers(file, readFileSync(resolve(root, file), 'utf8'));
+  const site = sites.find((s) => s.line === 73);
+  assert.ok(site, `the site at :73 is gone: ${JSON.stringify(sites.map((s) => s.line))}`);
+  assert.equal(site.expectation, 'PINNED');
+
+  // ...and inline DERIVED is still derived, so this is reading the argument rather than assuming.
+  const derived = assertedLaunchers('tests/planted.test.mjs',
+    'assert.equal(r.text, `run ${spellings().cli} doctor --section legacy now`);');
+  assert.equal(derived[0].expectation, 'DERIVED');
+});
+
+test('C35b — EXPECTED_RENDERING is the SHAPE, not a mention anywhere in the case (item 4)', () => {
+  // THE ARCHITECT'S MUTATION, which the wide rule hid: a FRAME_CLI (pinned POSIX) assertion added to the
+  // `migrate --help` case, against the SERVER's result. The case mentions a pinned constant elsewhere, so
+  // "does the enclosing function mention one" answered yes and the site was called an expected rendering —
+  // `agreed=4`, 0 mismatches, with the Windows-red class hidden inside it.
+  const file = 'tools/snowarch/tests/store-root-entry.test.mjs';
+  const original = readFileSync(resolve(root, file), 'utf8');
+  const SERVER_SITE = 'assert.match(r.text, new RegExp(`usage: ${SERVER_CLI} store <command>`));';
+  const mutated = original.replace(SERVER_SITE,
+    `${SERVER_SITE}\n    assert.match(r.text, new RegExp(\`usage: \${FRAME_CLI} store <command>\`));`);
+  assert.notEqual(mutated, original, 'the mutation did not apply — the pair has been rewritten');
+
+  const r = audit({ tests: [{ file, text: mutated }] });
+  assert.equal(r.mismatches.length, 1, JSON.stringify(r.mismatches));
+  assert.equal(r.mismatches[0].expectation, 'PINNED');
+  assert.equal(r.mismatches[0].kind, 'DERIVED');
+  assert.equal(r.mismatches[0].route, 'server');
+
+  // A SPAWN-SHAPED CASE DRIVES NOTHING BY ARGUMENT, which is the half that unhid it: every assertion in
+  // that file has an argv, so none of them can be an expected rendering however much the case mentions.
+  for (const s of assertedLaunchers(file, original)) {
+    assert.notEqual(s.expectation, 'EXPECTED_RENDERING',
+      `a spawn-shaped case at :${s.line} was called an expected rendering`);
+  }
+
+  // ...and the narrow shape IS recognised: a pinned ctx driven into the call whose value is asserted.
+  const narrow = ['test("w", () => {',
+    '  const out = render({ platform: "win32", env: {} });',
+    '  assert.equal(out, "run .\\\\snowarch.cmd doctor --section legacy");',
+    '});'].join('\n');
+  const [site] = assertedLaunchers('tests/planted.test.mjs', narrow);
+  assert.equal(site.expectation, 'EXPECTED_RENDERING');
+  assert.equal(site.argv, null);
+
+  // ...and it RESOLVES through bySentence, which the architect asked to be shown rather than assumed: the
+  // branch is reachable, not decoration.
+  const product = [{ file: 'tools/snowarch/lib/planted.mjs',
+    text: 'export const line = (spell) => `run ${spell.cli} doctor --section legacy`;\n' }];
+  const r2 = audit({ tests: [{ file: 'tests/planted.test.mjs', text: narrow }], product, baseline: EMPTY });
+  assert.equal(r2.agreed, 1, JSON.stringify(r2));
+  assert.deepEqual(r2.mismatches, []);
+});
+
+test('C35b — "pinned" is what the argument says, and a constant is read in its own scope (item 4)', () => {
+  // `spellings({ platform: process.platform, env: process.env })` has an argument and derives from the
+  // process anyway — counting arguments called it pinned.
+  const fromProcess = assertedLaunchers('tests/planted.test.mjs', [
+    'const S = spellings({ platform: process.platform, env: process.env });',
+    'assert.equal(out, `run ${S.cli} doctor now`);',
+  ].join('\n'));
+  assert.equal(fromProcess[0].expectation, 'DERIVED');
+
+  // Two cases, the same constant NAME, different kinds: a file-wide table collapsed them to the later one,
+  // so the derived case could have hard-coded a launcher and passed.
+  const dup = assertedLaunchers('tests/planted.test.mjs', [
+    "test('a', () => { const cli = spellings().cli; assert.equal(x, `run ${cli} doctor here`); });",
+    "test('b', () => { const cli = spellings({ platform: 'linux', env: {} }).cli;",
+    '  assert.equal(y, `run ${cli} docs sync now`); });',
+  ].join('\n'));
+  assert.deepEqual(dup.map((s) => s.expectation), ['DERIVED', 'PINNED'],
+    'the two cases collapsed to one kind — the constants table is file-wide again');
+});
+
+test('C35b — a container contributes its prose (item 5)', () => {
+  // `['a', `run ${CLI} docs sync`].join('\n')` contributed only the SEPARATOR, because a call's receiver was
+  // never read — and the site was then filed as "about the launcher alone", a reason that was false because
+  // `carriesLauncher` had walked into the array and declared the site.
+  const join = assertedLaunchers('tests/planted.test.mjs', [
+    "const CLI = spellings({ platform: 'linux', env: {} }).cli;",
+    "assert.equal(out, ['the corpus is missing', `run ${CLI} docs sync`].join('\\n'));",
+  ].join('\n'));
+  assert.equal(join.length, 1);
+  assert.match(join[0].sentence, /the corpus is missing/);
+  assert.match(join[0].sentence, /run .* docs sync/);
+
+  // An object's property values, and an arrow's expression body, for the same reason.
+  const obj = assertedLaunchers('tests/planted.test.mjs', [
+    "const CLI = spellings({ platform: 'linux', env: {} }).cli;",
+    'assert.deepEqual(r, { remedy: `run ${CLI} bootstrap --reset to start over` });',
+  ].join('\n'));
+  assert.match(obj[0].sentence, /^run .* bootstrap --reset to start over$/);
+});
+
+test('C35b — the route follows the subject, not the last spawn (item 6)', () => {
+  // A case that runs two commands and asserts the FIRST was routed to the second package, so a correct
+  // assertion became a mismatch against a product line it never reached.
+  const two = ['test("t", () => {',
+    "  const first = run(entry, ['store', '--help']);",
+    "  const second = run(entry, ['store', 'migrate', '--help']);",
+    '  assert.match(first.text, new RegExp(`usage: ${FRAME_CLI} store <command>`));',
+    '  assert.match(second.text, new RegExp(`usage: ${SERVER_CLI} store <command>`));',
+    '});',
+    "const FRAME_CLI = spellings({ platform: 'linux', env: {} }).cli;",
+    'const SERVER_CLI = spellings();',
+  ].join('\n');
+  const sites = assertedLaunchers('tests/planted.test.mjs', two);
+  assert.deepEqual(sites.map((s) => s.answeredBy), ['engine', 'server'],
+    `the route did not follow the subject: ${JSON.stringify(sites.map((s) => [s.line, s.argv]))}`);
+});
+
+test('C35b — a mismatch cites every product line that carries the sentence (item 7)', () => {
+  // `hits[0]` on a path-sorted list named whichever same-kind line sorted first — `packages/` before
+  // `tools/` — and a reader went to a line that was not the one under test.
+  const product = [
+    { file: 'packages/snowarch/src/a.ts', text: 'export const a = (s) => `run ${s.cli} doctor --section x`;\n' },
+    { file: 'packages/snowarch/src/b.ts', text: 'export const b = (s) => `run ${s.cli} doctor --section x`;\n' },
+  ];
+  const tests = [{ file: 'packages/snowarch/tests/p.test.ts',
+    text: "assert.equal(r.text, 'run ./snowarch doctor --section x');\n" }];
+  const r = audit({ tests, product, baseline: EMPTY });
+  assert.equal(r.mismatches.length, 1, JSON.stringify(r));
+  assert.deepEqual(r.mismatches[0].products,
+    ['packages/snowarch/src/a.ts:1', 'packages/snowarch/src/b.ts:1']);
+  assert.match(r.mismatches[0].product, /a\.ts:1, packages\/snowarch\/src\/b\.ts:1/);
+});

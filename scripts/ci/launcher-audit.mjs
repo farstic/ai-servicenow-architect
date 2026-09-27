@@ -107,26 +107,33 @@ const TEST_PATHS = ['tests', 'tools/snowarch/tests', 'packages/snowarch/tests'];
  * mismatch, and a count that has come DOWN fails too, so the list shrinks with the work instead of quietly
  * outliving it.
  *
- * EVERY ENTRY CARRIES ITS REASON, which is what the row asks for in place of an empty list. There are four,
- * and each is a limit of what this audit can know rather than a site nobody looked at:
+ * EVERY ENTRY CARRIES ITS REASON, TAKEN FROM THE AUDIT'S OWN REPORT — not from a second classifier that
+ * could disagree with it, which the first version of this list did. Where a file mixes reasons the entry
+ * counts them (`5× … ; 2× …`), because "done" for this row is a TRUE annotation and a single label over a
+ * mixed file is not one.
  *
- *   - `the assertion is about the launcher alone` (21 sites). `expect(windows).not.toContain('./snowarch')`
- *     asserts that a launcher is ABSENT. There is no sentence to place it in, so there is no product line
- *     to resolve against — and a negative assertion is exactly the shape that should not be resolved by
- *     guessing.
- *   - `the product assembles this sentence` (44). The test asserts a whole command —
- *     `instance set-preset prod full --ack-prod` — that the product never writes as one literal: it comes
- *     from a remedy table filled with a label and a preset at runtime. Resolving these needs the audit to
- *     evaluate the assembly, which is a bigger instrument than this row.
- *   - `the product spells a placeholder the fixture fills` (4). The mirror image: the product says
- *     `instance test <label>` and the fixture says `instance test pdi`.
- *   - `a pinned and a deriving line both carry it` (2) and `the contract holds it with <cli>` (2).
- *     `usage: <launcher> store` is carried by a pinned engine line and a deriving server line, and neither
- *     case spawns a command, so command tracing has no argv to route by. Package affinity — a test in
- *     `packages/snowarch/tests` asserts a server line — would resolve both, and it is NOT done here on
- *     purpose: `store-root-entry.test.mjs` is an ENGINE test that asserts SERVER lines, so affinity would
- *     misroute wherever tracing did not already cover it, and a false resolution is worse than an honest
- *     reason. It is the next row's candidate, with that counter-example attached.
+ * The reasons, with the site counts measured on this head:
+ *
+ *   -  57  the product assembles this sentence. The test asserts a whole command —
+ *          `instance set-preset prod full --ack-prod` — that the product never writes as one literal: it
+ *          comes from a remedy table filled at runtime. Resolving these needs the audit to evaluate the
+ *          assembly, which is a bigger instrument than this row.
+ *   -  19  the assertion is about the launcher alone. `expect(windows).not.toContain('./snowarch')` asserts
+ *          an ABSENCE; there is no sentence to place it in, and a negative assertion is exactly the shape
+ *          that should not be resolved by guessing. This count FELL from 21 as `proseOf` learned to read
+ *          containers — ten of those were the extractor dropping a sentence it could see, which made the
+ *          reason itself false.
+ *   -   4  the product spells a placeholder the fixture fills: `instance test <label>` against
+ *          `instance test pdi`.
+ *   -   2  the contract holds it with `<cli>` — ARC-07-C32's design, where no launcher-bearing product line
+ *          exists because the reader substitutes.
+ *   -   1  a pinned and a deriving line both carry it, with no argv to route by.
+ *   -   1  the case drives a pinned shell in a different statement from the one asserted, so whether it
+ *          reached this sentence needs dataflow this audit does not do. Reported as an UNKNOWN rather than
+ *          as agreement or a mismatch — it is the honest answer, and calling it a pinned expectation
+ *          reported `tty.test.ts:188`, which is correct code, as a defect.
+ *   -   1  the routed package carries no such sentence.
+ *   -   1  planted fixture.
  *
  * `tests/launcher-audit.test.mjs` IS BACK IN THIS LIST, at one site rather than the three C35 recorded, and
  * the movement is worth reading. The parser correctly stopped counting its planted fixtures — launchers
@@ -137,43 +144,45 @@ const TEST_PATHS = ['tests', 'tools/snowarch/tests', 'packages/snowarch/tests'];
  * exists to stop making, and a change to that case should fail here and be looked at.
  */
 export const UNRESOLVED_BASELINE = Object.freeze(new Map([
-  ['packages/snowarch/tests/cli/import-legacy.test.ts', { n: 2, why: 'the product assembles this sentence; the assertion is about the launcher alone' }],
+  ['packages/snowarch/tests/cli/import-legacy.test.ts', { n: 2, why: '1× the product assembles this sentence; 1× the assertion is about the launcher alone' }],
   ['packages/snowarch/tests/cli/instance-manage.test.ts', { n: 1, why: 'the product spells a placeholder the fixture fills' }],
   ['packages/snowarch/tests/cli/instance.test.ts', { n: 2, why: 'the product assembles this sentence' }],
   ['packages/snowarch/tests/cli/preset-ui.test.ts', { n: 1, why: 'the product assembles this sentence' }],
   ['packages/snowarch/tests/cli/store-command.test.ts', { n: 1, why: 'a pinned and a deriving line both carry it' }],
+  ['packages/snowarch/tests/cli/tty.test.ts', { n: 1, why: 'the case drives a pinned shell in another statement' }],
   ['packages/snowarch/tests/servicenow/prod-ack.test.ts', { n: 1, why: 'the product assembles this sentence' }],
   ['packages/snowarch/tests/tools/gate-split.test.ts', { n: 1, why: 'the product assembles this sentence' }],
-  ['packages/snowarch/tests/tools/permissions.test.ts', { n: 3, why: 'the product assembles this sentence; the product spells a placeholder the fixture fills' }],
+  ['packages/snowarch/tests/tools/permissions.test.ts', { n: 3, why: '2× the product assembles this sentence; 1× the product spells a placeholder the fixture fills' }],
+  ['tests/cli-help.test.mjs', { n: 2, why: 'the product assembles this sentence' }],
   ['tests/contract/gen-governance.test.mjs', { n: 2, why: 'the product assembles this sentence' }],
   ['tests/docs-status.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
   ['tests/docs-upstream.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tests/doctor/bootstrap-finished.test.mjs', { n: 2, why: 'the product assembles this sentence; the assertion is about the launcher alone' }],
-  ['tests/doctor/fix.test.mjs', { n: 2, why: 'the assertion is about the launcher alone; the contract holds it with <cli>' }],
-  ['tests/doctor/framework.test.mjs', { n: 4, why: 'the assertion is about the launcher alone; the product assembles this sentence' }],
+  ['tests/doctor/bootstrap-finished.test.mjs', { n: 2, why: '1× the product assembles this sentence; 1× the assertion is about the launcher alone' }],
+  ['tests/doctor/fix.test.mjs', { n: 2, why: '1× the product assembles this sentence; 1× the contract holds it with <cli>' }],
+  ['tests/doctor/framework.test.mjs', { n: 4, why: '2× the assertion is about the launcher alone; 2× the product assembles this sentence' }],
   ['tests/doctor/legacy.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
   ['tests/doctor/mode-and-cache.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
-  ['tests/doctor/panel.test.mjs', { n: 8, why: 'the assertion is about the launcher alone; the product assembles this sentence' }],
+  ['tests/doctor/panel.test.mjs', { n: 8, why: 'the product assembles this sentence' }],
   ['tests/doctor/release-currency.test.mjs', { n: 2, why: 'the product assembles this sentence' }],
   ['tests/doctor/status-command.test.mjs', { n: 3, why: 'the product assembles this sentence' }],
-  ['tests/doctor/win32-remedies.test.mjs', { n: 4, why: 'the product assembles this sentence; the assertion is about the launcher alone' }],
-  ['tests/handoff-command.test.mjs', { n: 2, why: 'the assertion is about the launcher alone; the product assembles this sentence' }],
+  ['tests/doctor/win32-remedies.test.mjs', { n: 4, why: '1× the product assembles this sentence; 3× the assertion is about the launcher alone' }],
+  ['tests/handoff-command.test.mjs', { n: 2, why: '1× the assertion is about the launcher alone; 1× the product assembles this sentence' }],
   ['tests/hook/session-start.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tests/launcher-audit.test.mjs', { n: 1, why: 'planted fixtures' }],
-  ['tests/snowarch-skill.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tests/upgrade/upgrade-unit.test.mjs', { n: 4, why: 'the product assembles this sentence; the assertion is about the launcher alone' }],
-  ['tests/upgrade/upgrade.e2e.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
+  ['tests/launcher-audit.test.mjs', { n: 1, why: 'planted fixture' }],
+  ['tests/snowarch-skill.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
+  ['tests/upgrade/upgrade-unit.test.mjs', { n: 4, why: 'the product assembles this sentence' }],
+  ['tests/upgrade/upgrade.e2e.test.mjs', { n: 1, why: 'the routed package carries no such sentence' }],
   ['tests/version-tag.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
-  ['tests/windows-spellings.test.mjs', { n: 4, why: 'the assertion is about the launcher alone; the contract holds it with <cli>' }],
+  ['tests/windows-spellings.test.mjs', { n: 4, why: '3× the assertion is about the launcher alone; 1× the contract holds it with <cli>' }],
   ['tools/snowarch/tests/b00-checks.test.mjs', { n: 2, why: 'the product assembles this sentence' }],
   ['tools/snowarch/tests/b02-docs.test.mjs', { n: 3, why: 'the product assembles this sentence' }],
-  ['tools/snowarch/tests/b09-summary.test.mjs', { n: 3, why: 'the assertion is about the launcher alone; the product assembles this sentence' }],
-  ['tools/snowarch/tests/bootstrap-plan.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
-  ['tools/snowarch/tests/bootstrap-runner.test.mjs', { n: 2, why: 'the assertion is about the launcher alone; the product assembles this sentence' }],
+  ['tools/snowarch/tests/b09-summary.test.mjs', { n: 3, why: 'the product assembles this sentence' }],
+  ['tools/snowarch/tests/bootstrap-plan.test.mjs', { n: 3, why: 'the product assembles this sentence' }],
+  ['tools/snowarch/tests/bootstrap-runner.test.mjs', { n: 2, why: 'the product assembles this sentence' }],
   ['tools/snowarch/tests/bootstrap-state.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tools/snowarch/tests/cli.test.mjs', { n: 3, why: 'the product assembles this sentence; the product spells a placeholder the fixture fills' }],
-  ['tools/snowarch/tests/store-forwarder.test.mjs', { n: 1, why: 'a pinned and a deriving line both carry it' }],
-  ['tools/snowarch/tests/text.test.mjs', { n: 7, why: 'the assertion is about the launcher alone; the product assembles this sentence' }],
+  ['tools/snowarch/tests/cli.test.mjs', { n: 3, why: '1× the product assembles this sentence; 2× the product spells a placeholder the fixture fills' }],
+  ['tools/snowarch/tests/store-forwarder.test.mjs', { n: 1, why: 'the product assembles this sentence' }],
+  ['tools/snowarch/tests/text.test.mjs', { n: 7, why: '5× the assertion is about the launcher alone; 2× the product assembles this sentence' }],
 ]));
 
 /** The tracked files, as `{ file, text }` — the default sources for both halves. */
@@ -238,6 +247,14 @@ export const bySentence = (testProse, productProse) => {
   return squash(productProse).includes(t);
 };
 
+/**
+ * EVERY hit, not `hits[0]` — the product lines are path-sorted, so citing the first named whichever of
+ * several same-kind lines happened to sort earliest (`packages/` before `tools/`), and a reader then went to
+ * a line that was not the one under test. The sentence is shared by all of them; the reader needs the list.
+ */
+const sites = (hits) => hits.map((h) => `${h.file}:${h.line}`);
+const cite = (hits) => sites(hits).join(', ');
+
 export function audit({ tests = testSources(), product: productFiles = productSources(),
   baseline = UNRESOLVED_BASELINE, match = bySentence } = {}) {
   const product = productIndex(productFiles);
@@ -248,7 +265,8 @@ export function audit({ tests = testSources(), product: productFiles = productSo
   for (const { file: rel, text } of tests) {
     // ARC-07-C35b — the extractor finds the assertions and their prose; this decides what that means.
     for (const found_site of assertedLaunchers(rel, text)) {
-      const { line, expectation, sentence: prose, argv, answeredBy: route } = found_site;
+      const { line, expectation, sentence: prose, argv, answeredBy: route,
+        caseDrivesPinned } = found_site;
       const site = `${rel}:${line}`;
       // `continue`, not `return`: this loop is a `for...of` now, and the `return` the `forEach` version
       // used would have returned from `audit()` — measured, it made the whole result `undefined` on the
@@ -280,13 +298,19 @@ export function audit({ tests = testSources(), product: productFiles = productSo
         // launcher the case thought it was driving, which is a real disagreement.
         if (kinds[0] === 'DERIVED') agreed += 1;
         else {
-          mismatches.push({ site, expectation, product: `${hits[0].file}:${hits[0].line}`, kind: kinds[0],
+          mismatches.push({ site, expectation, product: cite(hits), products: sites(hits), kind: kinds[0],
             route: route ?? null,
             why: 'the case drove a pinned shell and asserted its rendering, but the product line SPELLS '
               + 'the launcher — the shell it was given changes nothing' });
         }
+      } else if (kinds[0] !== expectation && caseDrivesPinned) {
+        // The case drove a pinned shell, just not into the call it asserts — so whether that shell reached
+        // this sentence is unknown here, and an unknown is recorded rather than reported either way.
+        unresolved.push({ site, file: rel,
+          why: 'the case drives a pinned shell in a different statement from the one asserted, so whether '
+            + 'it reached this sentence needs dataflow this audit does not do' });
       } else if (kinds[0] !== expectation) {
-        mismatches.push({ site, expectation, product: `${hits[0].file}:${hits[0].line}`, kind: kinds[0],
+        mismatches.push({ site, expectation, product: cite(hits), products: sites(hits), kind: kinds[0],
           route: route ?? null,
           why: expectation === 'PINNED'
             ? 'a pinned expectation against a product line that DERIVES — red on every Windows cell'
