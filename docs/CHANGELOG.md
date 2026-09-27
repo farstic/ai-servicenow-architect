@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.7 — 2026-09-27
+
+### Notes
+
 One thing runs through almost all of this release: a sentence should be spelled for the person reading
 it, and a check should say what it actually saw. Nothing here changes how the product is configured,
 and there is no migration step — an existing checkout keeps its instance store, its preset and its
@@ -98,6 +102,12 @@ tree.
   to, and verifies the restore (#315 `e1fe5db`).
 - A test that counted a shared temporary directory now works under a private one, so it measures what
   it created rather than its neighbours (#322 `806c4a2`).
+
+### Internal
+
+- changelog: the 2.0.7 Unreleased block, and the finding that the cut needed it (c808570)
+
+Tag v2.0.7 · contract 2768eb77081a · docs-pin 68c0d11
 
 ## 2.0.6 — 2026-09-27
 
