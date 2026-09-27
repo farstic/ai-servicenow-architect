@@ -9,6 +9,7 @@
 // rather than repeating the strings.
 
 import { renderSummaryLine } from './doctor/report-text.mjs';
+import { POSIX, isWindowsShell, spellings } from './launcher-spelling.mjs';
 
 /**
  * How many Claude Code dialogs a first `claude` will show.
@@ -25,25 +26,20 @@ import { renderSummaryLine } from './doctor/report-text.mjs';
 export const EXPECTED_DIALOGS = 1;
 
 /**
- * Are we talking to a shell that spells paths the Windows way?
+ * The spelling itself lives in `launcher-spelling.mjs` — ARC-07-C31, and the move is the row.
  *
- * Not `process.platform === 'win32'` alone: Git Bash on Windows runs `./bootstrap.sh` perfectly
- * well, and telling that user to type `.\bootstrap.cmd` would be telling them to type something
- * that does not work. `SHELL` and `MSYSTEM` are how a bash on Windows announces itself.
+ * RE-EXPORTED, not re-implemented, because some seventy call sites import `spellings` from here and
+ * the definition's address is not what any of them are about. What changed is which file the guard
+ * exempts: it exempted THIS one, whose comment named the definition while its behaviour skipped five
+ * hundred lines of sentences — and those sentences are precisely where a hand-spelled launcher gets
+ * written. Now the exempt file is the definition and nothing else, and this file is read like the
+ * rest of the tree.
  */
-export const isWindowsShell = ({ platform = process.platform, env = process.env } = {}) =>
-  platform === 'win32' && !env.SHELL && !env.MSYSTEM;
-
-/** The command spellings, by shell. */
-export function spellings(where = {}) {
-  return isWindowsShell(where)
-    // ARC-07-C1, closed by W7. The line above prefixed the bootstrap and NOT the cli, while the POSIX
-    // branch below prefixes both — the author knew the rule and applied it to one of the two.
-    // PowerShell does not resolve a command from the current directory, and nothing in the bootstrap
-    // puts the checkout on PATH, so a bare `snowarch.cmd` is the one spelling PowerShell refuses.
-    ? { bootstrap: '.\\bootstrap.cmd', cli: '.\\snowarch.cmd' }
-    : { bootstrap: './bootstrap.sh', cli: './snowarch' };
-}
+// IMPORTED ABOVE AND RE-EXPORTED HERE, which is two lines where `export { … } from` would be one —
+// because that form re-exports WITHOUT binding the name in this module, and three renderers in this
+// file call `spellings` themselves. The one-line version was 55 red cases in the engine suite alone,
+// all of them `ReferenceError: spellings is not defined`.
+export { isWindowsShell, spellings };
 
 /**
  * The four things a design-only or unknown checkout can BE, as sentences.
@@ -65,7 +61,7 @@ export function spellings(where = {}) {
  * rest of the switch around it; `instance add` is the wizard alone, and a user who runs it is one
  * step into a live mode the toggles do not yet reflect.
  */
-export const ADD_INSTANCE = (cli = './snowarch') =>
+export const ADD_INSTANCE = (cli = POSIX.cli) =>
   `${cli} mode live, or /snowarch setup-instance inside Claude`;
 
 /**
@@ -77,10 +73,12 @@ export const ADD_INSTANCE = (cli = './snowarch') =>
  * bootstrapped gave a Windows reader a command their shell rejects, with the POSIX one beside it as a
  * distraction. One spelling, for the shell doing the reading.
  *
- * FUNCTIONS, because `spellings()` must not be read at module load here: this file's own
- * `isWindowsShell` is a `const`, and `text.mjs` sits in the `panel -> text -> report-text -> panel`
- * import cycle ARC-07-W17 measured — a load-time read throws
- * `Cannot access 'isWindowsShell' before initialization`.
+ * FUNCTIONS, and the reason is the THREE CONSUMERS, not the import cycle. It was both until C31 moved
+ * the definition to `launcher-spelling.mjs`: a load-time `spellings()` here used to throw
+ * `Cannot access 'isWindowsShell' before initialization`, because `text.mjs` sits in the
+ * `panel -> text -> report-text -> panel` cycle and the `const` was in this file. A leaf module is
+ * initialised before any cycle is entered, so that hazard is gone — and these are still functions,
+ * because a value would render one shell for a doctor, a committed page and a live terminal alike.
  */
 /**
  * The spelling a variant was given, or a refusal — ARC-07-W17.
@@ -398,14 +396,6 @@ export function summaryBlock({ mode, instance = null, counts = {}, nodeUsable = 
   }
   return lines.join('\n');
 }
-
-/**
- * The POSIX rendering, stated — ARC-07-C31.
- *
- * Every committed generated artefact takes this: `text.json`, the rules page, the doctor's documented
- * block. A bare `spellings()` would render the machine that happened to run the generator.
- */
-const POSIX = Object.freeze(spellings({ platform: 'linux', env: {} }));
 
 /** Everything the Node-free launchers need, as data. `text.json` is generated from this. */
 export function exportable({ serverKey }) {

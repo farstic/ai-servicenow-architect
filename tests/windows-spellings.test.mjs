@@ -99,20 +99,26 @@ const LAUNCHER_PATTERNS = Object.freeze([
 /**
  * The two files that ARE the definitions, and the only ones allowed to spell a launcher.
  *
- * EXEMPT FOR WHAT THEY DEFINE, NOT FOR WHAT THEY SAY — and that distinction was earned. `text.mjs`
- * carried SIX messages with the launcher spelled by hand on top of the definition itself: BANNER's
- * `upgrade`, `staleRegistration` and `doctorFail`, the `staleSuffix`, and `MODE_VARIANTS`' `timedOut`
- * and `failed`. A Windows reader was shown a spelling their shell refuses in all six, and this guard
- * structurally could not see them, because reading that file is what the exemption prevents — I had
- * been reading the exemption as the file being settled.
+ * EXEMPT FOR WHAT THEY DEFINE, NOT FOR WHAT THEY SAY — and that distinction cost this row two rounds
+ * to make TRUE rather than merely written down. `text.mjs` was on this list, and it carried SIX
+ * messages with the launcher spelled by hand on top of the definition: BANNER's `upgrade`,
+ * `staleRegistration` and `doctorFail`, the `staleSuffix`, and `MODE_VARIANTS`' `timedOut` and
+ * `failed`. A Windows reader was shown a spelling their shell refuses in all six, and this guard
+ * structurally could not see them, because reading that file is what an exemption prevents.
  *
- * ARC-07-C31's first slice fixed all six: every `BANNER` and `MODE_VARIANTS` member takes the spelling
- * as a required argument now, so what remains here is `spellings()` itself and `ADD_INSTANCE`'s POSIX
- * default, which ARE the definition. The two cases below hold that: no member may be called without a
- * spelling, and no generator may call one unpinned.
+ * C31's first slice fixed the six and rewrote the comment above to say the exemption covered only the
+ * definition. The BEHAVIOUR still skipped all five hundred lines, and the architect's review proved it
+ * with two controls the guard survived 9/9 green: appending a fresh `export const CONTROL_316 =
+ * './snowarch x';` to the file, and reverting `BANNER.upgrade` to its hand-spelled form. A comment is
+ * not an exemption. So the definition MOVED, to `launcher-spelling.mjs`, which is four lines of
+ * strings and nothing else — `text.mjs` is now read like every other file in the tree, and both of
+ * those controls fail.
+ *
+ * `tty.ts` is the server's own copy, deliberate and documented in its own header: the server must
+ * never import the engine, so the two share the semantics and not the code.
  */
 const DEFINITIONS = Object.freeze([
-  'tools/snowarch/lib/text.mjs',
+  'tools/snowarch/lib/launcher-spelling.mjs',
   'packages/snowarch/src/cli/tty.ts',
 ]);
 
