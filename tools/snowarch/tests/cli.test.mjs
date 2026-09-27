@@ -263,7 +263,11 @@ const GENERATED_USAGE = ['instance', 'store'];
  * case fails and the list shrinks with the sweep instead of outliving it. That is the same rule
  * `SWEEP_REMAINDER` is held to, for the same reason.
  */
-const DEFERRED_TO_TRIGGER_SLICE = ['bootstrap', 'upgrade'];
+// ARC-07-C31 slice 4 — EMPTY, and the list emptying is what it was for. `bootstrap` and `upgrade`
+// were here because their files are e2e triggers and the architect split them into their own slice.
+// That slice landed, their usages are functions, and this case failed with `take it off the list, the
+// sweep reached it` — which is the list shrinking with the work instead of outliving it.
+const DEFERRED_TO_TRIGGER_SLICE = [];
 
 test('ARC-07-C31 — every usage the frame renders itself spells the reader\'s launcher', () => {
   const WIN = { platform: 'win32', env: {} };

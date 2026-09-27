@@ -9,6 +9,18 @@ import { run as runB02, gitlink, mapSyncFailure } from '../lib/steps/B02.mjs';
 import { CORPUS_TEXT, stepLine } from '../lib/steps/format.mjs';
 import { ATTRIBUTION, CORPUS_DIR, EXIT as DOCS_EXIT, SyncError } from '../lib/docs/sync.mjs';
 import { docsStatus } from '../lib/docs/status.mjs';
+import { spellings } from '../lib/text.mjs';
+
+/**
+ * ARC-07-C31 slice 4 — the launcher these cases assert, DERIVED, and named for what prints it.
+ *
+ * These are the ENGINE's step sentences, rendered from the ctx the run was given. The cases below
+ * drive them through the process, so `FRAME_SPELL` is the process's — and where a case pins a
+ * platform instead, it pins the expectation to the same one.
+ */
+const FRAME_SPELL = spellings();
+// `RegExp.escape` is not on Node 20, and the spelling contains `.` and `\\`.
+const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import {
   AREAS, buildUpstream, git, makeWorkspace, writeCitingSkill, CITED_PAGE,
 } from '../../../tests/helpers/docs-fixture.mjs';
@@ -113,12 +125,14 @@ test('AC 3 — skip touches no network, and the corpus is then MISSING to the do
   // The story's line carries the CONSEQUENCE too. It is a constant beside the other B02 texts so
   // the Node-free launchers print the same bytes, and the step line renders it after the reason.
   const { skipNote } = await import('../lib/steps/B02.mjs');
+  // Both are the same FUNCTION now, so identity is the assertion rather than string equality — which
+  // is strictly stronger: it holds that B02 re-exports the constant instead of restating it.
   assert.equal(skipNote, CORPUS_TEXT.skipConsequence);
   assert.equal(
-    stepLine({ id: 'B02', title: 'docs', status: 'skipped', detail: skipReason, note: skipNote,
+    stepLine({ id: 'B02', title: 'docs', status: 'skipped', detail: skipReason, note: skipNote(FRAME_SPELL),
       last: 'B09' }),
     '[B02/09] docs … skipped (--docs skip) — the doctor will report the corpus as FAIL until you '
-    + 'run ./snowarch docs sync');
+    + `run ${FRAME_SPELL.cli} docs sync`);
   // A skip that costs nothing says nothing extra.
   assert.equal(stepLine({ id: 'B06', title: 'instance', status: 'skipped', detail: 'design-only',
     last: 'B09' }), '[B06/09] instance … skipped (design-only)');
@@ -171,34 +185,37 @@ test('a dead citation is a WARN — the corpus is here, and the fix is a maintai
   const r = await runB02(ctx);
 
   assert.equal(r.status, 'warn', 'a dead citation must never stop an installation');
-  assert.match(r.detail, /^\d+ dead citation\(s\) — see \.\/snowarch docs verify$/);
+  // ARC-07-C31 slice 4 — DERIVED and escaped: B02's run renders this from the ctx's shell now, so a
+  // POSIX literal is green on a mac and red on three Windows cells. `RegExp.escape` is not on Node 20.
+  assert.match(r.detail,
+    new RegExp(`^\\d+ dead citation\\(s\\) — see ${esc(FRAME_SPELL.cli)} docs verify$`));
   assert.ok(r.data.dead > 0);
   assert.match(ctx.lines.join('\n'), /^citations: checked: \d+ \| dead: [1-9]/m);
 });
 
 test('each docs exit code maps to the remedy that situation actually needs', () => {
   const incomplete = mapSyncFailure(new SyncError('vendor/ServiceNowDocs is incomplete',
-    DOCS_EXIT.incomplete));
+    DOCS_EXIT.incomplete), FRAME_SPELL);
   assert.equal(incomplete.status, 'fail');
-  assert.equal(incomplete.remedy, 'run ./snowarch docs sync');
+  assert.equal(incomplete.remedy, `run ${FRAME_SPELL.cli} docs sync`);
 
   // ARC-03's own sentence, unaltered: it already says what to do, and a second phrasing would give
   // one situation two descriptions depending on which command hit it.
   const dirty = mapSyncFailure(new SyncError('vendor/ServiceNowDocs has local changes — commit, '
-    + 'stash or discard them, then re-run', DOCS_EXIT.dirty));
+    + 'stash or discard them, then re-run', DOCS_EXIT.dirty), FRAME_SPELL);
   assert.equal(dirty.status, 'fail');
   assert.match(dirty.detail, /has local changes — commit, stash or discard them/);
   assert.equal(dirty.remedy, null, 'the sentence already carries its remedy');
 
   for (const code of [DOCS_EXIT.git, DOCS_EXIT.upstream]) {
     const r = mapSyncFailure(new SyncError('cannot reach github.com (DNS) — check your network '
-      + 'and re-run', code));
+      + 'and re-run', code), FRAME_SPELL);
     assert.equal(r.status, 'fail');
     assert.match(r.detail, /^cannot reach github\.com \(DNS\)/, 'ARC-03 owns the network sentences');
   }
 
-  const unknown = mapSyncFailure(new SyncError('something else', 99));
-  assert.equal(unknown.remedy, 'run ./snowarch docs sync');
+  const unknown = mapSyncFailure(new SyncError('something else', 99), FRAME_SPELL);
+  assert.equal(unknown.remedy, `run ${FRAME_SPELL.cli} docs sync`);
 });
 
 test('a mode that is neither sparse nor full cannot reach the library\'s refusal', async () => {
@@ -216,9 +233,9 @@ test('AC 6 — the Node-free texts are constants, so the launchers print the sam
   assert.equal(CORPUS_TEXT.citationsUnverified,
     'citations: not verified until Node 20+ is installed');
   assert.equal(CORPUS_TEXT.areasPresent(19, 19), 'areas: 19/19 present');
-  assert.equal(CORPUS_TEXT.areaMissing('it-service-management'),
-    'area it-service-management missing — run ./snowarch docs sync once Node is installed, '
-    + 'or re-run ./bootstrap.sh');
+  assert.equal(CORPUS_TEXT.areaMissing('it-service-management', FRAME_SPELL),
+    `area it-service-management missing — run ${FRAME_SPELL.cli} docs sync once Node is installed, `
+    + `or re-run ${FRAME_SPELL.bootstrap}`);
   // The launchers cannot import this file, so what keeps them honest is that these are the only
   // definitions and S10/S11's parity test reads them from here.
   assert.equal(Object.keys(CORPUS_TEXT).length, 4);

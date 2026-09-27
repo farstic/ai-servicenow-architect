@@ -23,6 +23,7 @@ import { hashFor } from '../inputs.mjs';
 import { failureBlock, stepLine, stopLine } from './format.mjs';
 import { saveState } from '../state.mjs';
 import { EXIT_FAIL, EXIT_INTERRUPTED, EXIT_MEANING, EXIT_OK } from '../exit.mjs';
+import { spellings } from '../launcher-spelling.mjs';
 
 export const STEPS = Object.freeze([B00, B01, B02, B03, B04, B05, B06, B07, B08, B09]);
 export const LAST = STEPS[STEPS.length - 1].id;
@@ -107,7 +108,13 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
 
     if (!runs(step, ctx)) {
       const detail = step.skipReason ?? 'not applicable';
-      const note = step.skipNote ?? null;
+      // ARC-07-C31 slice 4 — a skip note is a FUNCTION of the shell now, because the one that exists
+      // names a launcher. A step that supplies a plain string still works; one that supplies a
+      // function is called with the run's own spelling.
+      const raw = step.skipNote ?? null;
+      const note = typeof raw === 'function'
+        ? raw(spellings({ platform: ctx.platform, env: ctx.env }))
+        : raw;
       state.steps[step.id] = { status: 'skipped', inputsHash: null, detail,
         finishedAt: now().toISOString(), durationMs: 0 };
       summary.skipped += 1;
@@ -197,7 +204,11 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
     if (result.status === 'fail') {
       summary.fail += 1;
       onLine(stepLine({ id: step.id, title: step.title, status: 'fail', last: lastId }));
-      for (const l of failureBlock({ id: step.id, cause: result.detail, remedy: result.remedy })) {
+      for (const l of failureBlock({ id: step.id, cause: result.detail, remedy: result.remedy,
+        // ARC-07-C31 slice 4 — from the ctx's shell, so the "re-run …" line a reader follows is the
+        // one their shell accepts. It was a POSIX default on this function and this caller never
+        // passed it, which is exactly how a default comes to answer for a caller that knew better.
+        launcher: spellings({ platform: ctx.platform, env: ctx.env }).bootstrap })) {
         onLine(l);
       }
       save(root, state);
@@ -230,14 +241,19 @@ export async function runSteps({ root, ctx, state, from = null, onLine = () => {
  * run on one platform would leave the other's path unproven.
  */
 export function interrupt({ root, state, live, onLine = () => {}, now = () => new Date(),
-  save = saveState, platform = process.platform, spawn = nodeSpawn }) {
+  // ARC-07-C31 slice 4 — `env` beside the `platform` this already had, because `isWindowsShell`
+  // reads SHELL and MSYSTEM and a platform alone renders POSIX on any mac.
+  save = saveState, platform = process.platform, env = process.env, spawn = nodeSpawn }) {
   if (live) live.interrupted = true;
   const killed = killTree(live?.child, { platform, spawn });
   const at = live?.step ?? null;
   if (at) {
     state.steps[at] = { ...(state.steps[at] ?? {}), status: 'failed', reason: 'interrupted',
       finishedAt: now().toISOString() };
-    onLine(`interrupted during ${at} — re-run ./bootstrap.sh to resume at ${at}`);
+    // ARC-07-C31 slice 4 — from the `platform` this function ALREADY took, plus the env, because
+    // `isWindowsShell` reads SHELL and MSYSTEM and a platform alone renders POSIX on any mac.
+    onLine(`interrupted during ${at} — re-run ${spellings({ platform, env }).bootstrap} `
+      + `to resume at ${at}`);
   } else {
     onLine('interrupted — nothing was in progress');
   }

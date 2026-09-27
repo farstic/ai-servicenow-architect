@@ -1,3 +1,4 @@
+import { needSpell } from '../launcher-spelling.mjs';
 // ARC-06-S03 — the step line, in one place, because three programs print it.
 //
 // The Node CLI prints it; `bootstrap.sh` (S10) and `bootstrap.ps1` (S11) print the same lines with
@@ -91,7 +92,16 @@ export function stepLine({ id, title, status, detail = null, note = null, durati
  * a step that fails without one gets a sentence saying so, which is at least honest and shows up in
  * review as something to fix.
  */
-export function failureBlock({ id, cause, remedy, launcher = './bootstrap.sh' }) {
+/**
+ * ARC-07-C31 slice 4 — `launcher` REQUIRED: two callers, and the rule this row settled is a count.
+ * It already took the spelling as a parameter; what it had was a POSIX DEFAULT, which is how the one
+ * caller that forgot rendered the wrong shell for a Windows reader resuming an install.
+ */
+export function failureBlock({ id, cause, remedy, launcher }) {
+  if (typeof launcher !== 'string' || launcher === '') {
+    throw new TypeError('failureBlock needs a launcher spelling — the block tells a reader how to '
+      + 'resume, and a default here is how that sentence comes to name the wrong shell');
+  }
   return [
     `${WORDING.fail} ${id}: ${cause}`,
     `Remedy: ${remedy || `none recorded — please report this with the log from .local/logs/`}`,
@@ -125,8 +135,12 @@ export const CORPUS_TEXT = Object.freeze({
   citationsUnverified: 'citations: not verified until Node 20+ is installed',
   // The consequence of `--docs skip`, said at the moment the operator chooses it rather than left
   // for the doctor to spring on them later. It rides on the step line as `skipNote`.
-  skipConsequence: 'the doctor will report the corpus as FAIL until you run ./snowarch docs sync',
+  // ARC-07-C31 slice 4 — FUNCTIONS, because these are read by a step that knows the ctx's shell. A
+  // string cannot take one, and a module-load `spellings()` would fix the platform at import.
+  skipConsequence: (spell) =>
+    `the doctor will report the corpus as FAIL until you run ${needSpell(spell, 'CORPUS_TEXT.skipConsequence').cli} docs sync`,
   areasPresent: (present, total) => `areas: ${present}/${total} present`,
-  areaMissing: (area) => `area ${area} missing — run ./snowarch docs sync once Node is installed, `
-    + 'or re-run ./bootstrap.sh',
+  areaMissing: (area, spell) => `area ${area} missing — run `
+    + `${needSpell(spell, 'CORPUS_TEXT.areaMissing').cli} docs sync once Node is installed, `
+    + `or re-run ${spell.bootstrap}`,
 });

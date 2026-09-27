@@ -22,6 +22,8 @@
  * `noTtyMessage` call sites passed `platform` and not `env`, so a win32 message rendered `./snowarch`.
  */
 import { test } from 'node:test';
+import { tmpdir } from 'node:os';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -147,32 +149,20 @@ const DEFINITIONS = Object.freeze([
 const DATA_EXEMPT = Object.freeze(['packages/snowarch/src/errors/codes.ts']);
 
 /**
- * THE SWEEP REMAINDER — ARC-07-C31, dated 2026-09-27, target 2.0.7.
+ * THE SWEEP REMAINDER IS GONE — ARC-07-C31, closed 2026-09-27, and this comment is its record.
  *
- * WHY AN EXEMPTION AT ALL, and it is not taste: a red assertion here fails the release-dryrun cells on
- * mac and ubuntu, so a guard left red blocks `release.mjs` itself. The sweep is 76 sites in 34 files and
- * three of them — `steps/B02.mjs`, `bootstrap.mjs`, `commands/upgrade.mjs` — are e2e trigger files,
- * where a hurried mistake is not a red test but a broken install on the platform a mac cannot check. So
- * it lands in 2.0.7 under ARC-07-C31 rather than in the last hours of this one.
+ * It was a frozen `Map` of 34 files and 163 sites, asserted EQUAL per file so it could only shrink.
+ * Four slices took it to zero: the definition itself, the engine's non-trigger files, the server's
+ * thirty, and the e2e-trigger files with the three scripts. There is no exemption left but the two
+ * DEFINITIONS above and `codes.ts`, which is `DATA_EXEMPT` until ARC-07-C32 gives the contract a
+ * substitution point.
  *
- * AN EXACT COUNT PER FILE, ASSERTED EQUAL AND NEVER `<=`, so this cannot become a place new defects
- * hide: adding a literal to a listed file fails exactly as loudly as adding one to an unlisted file,
- * and REMOVING one fails too — which is deliberate, because the count coming down means the sweep has
- * started and the list must shrink with it rather than drift out of date silently.
- *
- * The numbers are the measurement at this head, not an estimate; the row carries the same table.
+ * WHY THE LIST IS WORTH REMEMBERING RATHER THAN JUST DELETING: it was asserted EQUAL and never
+ * `<=`, which meant a count coming DOWN failed too. Every slice had to shrink it deliberately, and
+ * three times it caught a miscount of mine — `tools/snowarch/lib/docs/status.mjs` reported 0 against a listed 1 because
+ * one sentence swept two sites, and twice a file I thought I had finished still held one. A list that
+ * only fails upward would have let each of those pass.
  */
-const SWEEP_REMAINDER = Object.freeze(new Map([
-  ['scripts/ci/doctor-snapshot.mjs', 2],
-  ['scripts/gen-doctor-docs.mjs', 1],
-  ['scripts/lib/release/preflight.mjs', 1],
-  ['tools/snowarch/lib/bootstrap.mjs', 3],
-  ['tools/snowarch/lib/commands/upgrade.mjs', 4],
-  ['tools/snowarch/lib/steps/B02.mjs', 4],
-  ['tools/snowarch/lib/steps/B04.mjs', 1],
-  ['tools/snowarch/lib/steps/format.mjs', 4],
-  ['tools/snowarch/lib/steps/index.mjs', 1],
-]));
 
 /**
  * Comments stripped: prose ABOUT the defect is not the defect.
@@ -221,7 +211,6 @@ test('ARC-07-W17 — no shipped file spells the launcher except the two definiti
     .filter((f) => !DEFINITIONS.includes(f) && !DATA_EXEMPT.includes(f));
 
   const offences = [];
-  const counted = new Map();
   for (const rel of files) {
     const here = [];
     codeOf(read(rel)).split('\n').forEach((line, i) => {
@@ -229,23 +218,13 @@ test('ARC-07-W17 — no shipped file spells the launcher except the two definiti
         if (pattern.test(line)) here.push(`${rel}:${i + 1}: ${why}`);
       }
     });
-    if (SWEEP_REMAINDER.has(rel)) counted.set(rel, here.length);
-    else offences.push(...here);
+    offences.push(...here);
   }
   assert.deepEqual(offences, [],
     `${offences.length} site(s) spell a launcher instead of reading it:\n  ${offences.join('\n  ')}`);
 
-  // ...AND THE LISTED FILES ARE HELD TO THEIR EXACT COUNT. Equal, not `<=`: a new literal in a listed
-  // file must fail as loudly as one anywhere else, and a count that has come DOWN must fail too, so the
-  // list shrinks with the sweep instead of quietly outliving it.
-  const drift = [];
-  for (const [rel, expected] of SWEEP_REMAINDER) {
-    const actual = counted.get(rel);
-    if (actual === undefined) drift.push(`${rel} is listed but was not read — has it moved or gone?`);
-    else if (actual !== expected) drift.push(`${rel}: ${actual} site(s), the list says ${expected}`);
-  }
-  assert.deepEqual(drift, [],
-    `ARC-07-C31's list no longer matches the tree:\n  ${drift.join('\n  ')}`);
+  // NOTHING LEFT TO COUNT. The per-file exemption is gone, so the assertion above is the whole rule:
+  // no shipped file spells a launcher except the two definitions, and `codes.ts` until C32.
 });
 
 test('...and the negative: the widened guard sees a planted spelling in any shipped file', () => {
@@ -439,7 +418,25 @@ test('ARC-07-W17 — no generator can render a launcher for the machine it runs 
   // write. That is what "not a generator" MEANS here, so the list cannot quietly grow to cover a file
   // that does generate — the day one of these writes a file, this fails and the exemption has to be
   // argued again.
-  const NOT_GENERATORS = Object.freeze(['scripts/ci/assert-state-readable.mjs']);
+  const NOT_GENERATORS = Object.freeze(['scripts/ci/assert-state-readable.mjs',
+    // ARC-07-C31 slice 4 — a release PREFLIGHT: it answers `{ ok, message }` and writes nothing, so
+    // its message is a maintainer's terminal line and derives. The `WRITES` assertion below is what
+    // holds that claim rather than this comment.
+    'scripts/lib/release/preflight.mjs']);
+
+  /**
+   * ...AND ONE SCRIPT THAT DOES BOTH — ARC-07-C31 slice 4, and the pair above could not cover it.
+   *
+   * `scripts/ci/doctor-snapshot.mjs` WRITES a release asset, so it cannot claim "not a generator",
+   * and two of its lines are `die()` messages read by the maintainer running the capture, so pinning
+   * them would hand a Windows reader a command their shell refuses — the defect this row exists for.
+   * Nothing it spells reaches the asset.
+   *
+   * THE CLAIM IS CHECKED IN THE CODE, not taken from a comment: the file's unpinned spelling must be
+   * assigned to a constant named `TERMINAL_CLI`, and the count is exact. A second unpinned call, or
+   * one that is not named for its audience, fails here.
+   */
+  const TERMINAL_IN_GENERATOR = Object.freeze(new Map([['scripts/ci/doctor-snapshot.mjs', 1]]));
   const WRITES = /\b(writeFileSync|appendFileSync|mkdirSync|rmSync|renameSync|copyFileSync|createWriteStream)\b/;
 
   const all = execFileSync('git', ['ls-files', 'scripts', 'packages/contract/gen'],
@@ -455,7 +452,24 @@ test('ARC-07-W17 — no generator can render a launcher for the machine it runs 
   assert.deepEqual(notGenerators, [],
     `the exemption no longer holds:\n  ${notGenerators.join('\n  ')}`);
 
-  const generators = all.filter((f) => !NOT_GENERATORS.includes(f));
+  const terminalOnly = [];
+  for (const [rel, expected] of TERMINAL_IN_GENERATOR) {
+    assert.ok(all.includes(rel), `${rel} is exempt but is not a tracked script — has it moved?`);
+    const code = codeOf(read(rel));
+    const unpinned = code.match(/\b(spellings|cliSpelling|bootstrapSpelling)\(\s*\)/g) ?? [];
+    const named = code.match(/const TERMINAL_CLI = (spellings|cliSpelling)\(\s*\)/g) ?? [];
+    if (unpinned.length !== expected) {
+      terminalOnly.push(`${rel}: ${unpinned.length} unpinned call(s), the exemption says ${expected}`);
+    } else if (named.length !== expected) {
+      terminalOnly.push(`${rel}: ${named.length} of ${expected} unpinned call(s) are named `
+        + 'TERMINAL_CLI — an unpinned spelling here is exempt only when it says so in its name');
+    }
+  }
+  assert.deepEqual(terminalOnly, [],
+    `the terminal-only exemption no longer holds:\n  ${terminalOnly.join('\n  ')}`);
+
+  const generators = all
+    .filter((f) => !NOT_GENERATORS.includes(f) && !TERMINAL_IN_GENERATOR.has(f));
 
   const offences = [];
   for (const rel of generators) {
@@ -648,4 +662,119 @@ test('ARC-07-C31 — the six that became required refuse to render without a spe
     assert.throws(call, { name: 'TypeError', message: new RegExp(`^${name} needs a spellings object`) },
       `${name} rendered without a spelling instead of refusing`);
   }
+});
+
+/**
+ * ARC-07-C31 slice 4 — the STEPS' sentences, driven, and one refusal a control asked for.
+ *
+ * The refusal half exists because a control was INERT: putting `failureBlock`'s POSIX default back broke
+ * nothing, since its one caller passes a launcher either way. A default only bites the caller that
+ * forgets, so the property to hold is that forgetting REFUSES — and `failureBlock` is the case that
+ * earned it, because the caller which never passed one is exactly how a Windows reader resuming an
+ * install was shown `./bootstrap.sh`.
+ */
+test('ARC-07-C31 — the steps\' sentences render the reader\'s shell, and refuse without one', async () => {
+  const WIN = { platform: 'win32', env: {} };
+  const win = spellings(WIN);
+  const posix = spellings({ platform: 'linux', env: {} });
+
+  const { failureBlock, CORPUS_TEXT } = await import('../tools/snowarch/lib/steps/format.mjs');
+  const { mapSyncFailure } = await import('../tools/snowarch/lib/steps/B02.mjs');
+  const { nextText } = await import('../tools/snowarch/lib/bootstrap.mjs');
+
+  const rendered = [
+    ['failureBlock', failureBlock({ id: 'B04', cause: 'x', remedy: null, launcher: win.bootstrap })
+      .join('\n'),
+    failureBlock({ id: 'B04', cause: 'x', remedy: null, launcher: posix.bootstrap }).join('\n')],
+    ['CORPUS_TEXT.skipConsequence', CORPUS_TEXT.skipConsequence(win), CORPUS_TEXT.skipConsequence(posix)],
+    ['CORPUS_TEXT.areaMissing', CORPUS_TEXT.areaMissing('itsm', win), CORPUS_TEXT.areaMissing('itsm', posix)],
+    ['mapSyncFailure', mapSyncFailure({ code: 999, message: 'x' }, win).remedy,
+      mapSyncFailure({ code: 999, message: 'x' }, posix).remedy],
+    ['nextText', nextText({ stoppedAt: 'B02' }, { mode: 'design-only' }, win),
+      nextText({ stoppedAt: 'B02' }, { mode: 'design-only' }, posix)],
+  ];
+  for (const [name, w, p] of rendered) {
+    assert.doesNotMatch(w, /\.\/snowarch|\.\/bootstrap\.sh/,
+      `${name} renders a POSIX launcher on a Windows shell:\n${w}`);
+    assert.equal(/\.\\snowarch\.cmd|\.\\bootstrap\.cmd/.test(w), true,
+      `${name} renders no Windows launcher at all:\n${w}`);
+    assert.doesNotMatch(p, /snowarch\.cmd|bootstrap\.cmd/,
+      `${name} renders a Windows launcher on a POSIX shell:\n${p}`);
+  }
+
+  // ...and the refusals. `failureBlock` takes a plain string rather than a spellings object, so its
+  // message is its own; the other two carry `needSpell`'s.
+  assert.throws(() => failureBlock({ id: 'B04', cause: 'x', remedy: null }),
+    { name: 'TypeError', message: /^failureBlock needs a launcher spelling/ });
+  assert.throws(() => CORPUS_TEXT.areaMissing('itsm'),
+    { name: 'TypeError', message: /^CORPUS_TEXT\.areaMissing needs/ });
+  assert.throws(() => mapSyncFailure({ code: 999, message: 'x' }),
+    { name: 'TypeError', message: /^mapSyncFailure needs/ });
+  assert.throws(() => nextText({ stoppedAt: 'B02' }, { mode: 'design-only' }),
+    { name: 'TypeError', message: /^nextText needs/ });
+});
+
+/**
+ * ARC-07-C31 slice 4 — the three sites a case reaches through a SEAM, driven by argument.
+ *
+ * The row claimed a case drives each of slice 4's derivations. Control AA showed that was not true of
+ * `runSteps`'s threading, and auditing the rest found three more: `finish`'s two sentences, `interrupt`'s
+ * resume line, and `storePlan`'s unreadable-store line. Each takes its dependencies as parameters, so
+ * each can be driven with a win32 shell and read — no fixture beyond a temp directory.
+ *
+ * What is NOT here is said in the row rather than implied: `B02.run`'s and `B04.run`'s inline remedies
+ * need a corpus and an `npm ci` to reach, so they are held by the source sweep and by `mapSyncFailure`,
+ * which IS driven, rather than by a case of their own.
+ */
+test('ARC-07-C31 — finish, interrupt and storePlan spell the shell they are told', async () => {
+  const WIN = { platform: 'win32', env: {} };
+  const win = spellings(WIN);
+  const posixSpell = spellings({ platform: 'linux', env: {} });
+
+  const { finish } = await import('../tools/snowarch/lib/commands/upgrade.mjs');
+  const { interrupt } = await import('../tools/snowarch/lib/steps/index.mjs');
+
+  // `finish`: its `run` is a seam, so a non-zero bootstrap is one stub away.
+  const said = [];
+  const log = { step: (l) => said.push(l), fail: (l) => said.push(l), ok: (l) => said.push(l),
+    warn: (l) => said.push(l), note: (l) => said.push(l), debug: () => {} };
+  await finish({ root: '/nonexistent', env: {}, platform: 'win32', log,
+    run: () => ({ status: 1 }), target: 'v9.9.9', latest: 'v9.9.9', remote: 'origin',
+    now: () => new Date(0), state: { mode: 'design' } });
+  const finished = said.join('\n');
+  assert.match(finished, /\.\\snowarch\.cmd upgrade/, `finish did not spell win32:\n${finished}`);
+  assert.match(finished, /\.\\bootstrap\.cmd/, `finish's bootstrap spelling:\n${finished}`);
+  assert.doesNotMatch(finished, /\.\/snowarch|\.\/bootstrap\.sh/, finished);
+
+  // `interrupt`: every dependency is a parameter, including the platform it already took and the env
+  // slice 4 added beside it.
+  const interrupted = [];
+  interrupt({ root: '/nonexistent', state: { steps: {} }, live: { step: 'B04' },
+    onLine: (l) => interrupted.push(l), now: () => new Date(0), save: () => {},
+    platform: 'win32', env: {}, spawn: () => ({}) });
+  assert.match(interrupted.join('\n'), /re-run \.\\bootstrap\.cmd to resume at B04/);
+
+  // ...and the POSIX direction for both, so a site that hard-coded the Windows form could not pass.
+  const posixSaid = [];
+  const plog = { ...log, step: (l) => posixSaid.push(l), fail: (l) => posixSaid.push(l) };
+  await finish({ root: '/nonexistent', env: {}, platform: 'linux', log: plog,
+    run: () => ({ status: 1 }), target: 'v9.9.9', latest: 'v9.9.9', remote: 'origin',
+    now: () => new Date(0), state: { mode: 'design' } });
+  assert.doesNotMatch(posixSaid.join('\n'), /snowarch\.cmd|bootstrap\.cmd/);
+  const posixInterrupt = [];
+  interrupt({ root: '/nonexistent', state: { steps: {} }, live: { step: 'B04' },
+    onLine: (l) => posixInterrupt.push(l), now: () => new Date(0), save: () => {},
+    platform: 'linux', env: {}, spawn: () => ({}) });
+  assert.match(posixInterrupt.join('\n'), /re-run \.\/bootstrap\.sh to resume at B04/);
+
+  // `storePlan` reads the store from disk rather than through a seam, so this one costs a temp
+  // directory — which is still cheaper than leaving the site to the sweep alone.
+  const { storePlan } = await import('../tools/snowarch/lib/commands/upgrade.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'c31-storeplan-'));
+  try {
+    mkdirSync(join(dir, '.local'), { recursive: true });
+    writeFileSync(join(dir, '.local', 'instances.json'), '{ not json');
+    assert.match(storePlan(dir, 'v9.9.9', { spell: win }).line, /\.\\snowarch\.cmd store migrate/);
+    assert.match(storePlan(dir, 'v9.9.9', { spell: posixSpell }).line, /\.\/snowarch store migrate/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

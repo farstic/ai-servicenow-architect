@@ -30,6 +30,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync, writeSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spellings } from '../../tools/snowarch/lib/launcher-spelling.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (n) => argv.includes(n);
@@ -159,7 +160,20 @@ const isMain = process.argv[1] !== undefined
 
 if (isMain) {
   const inPath = resolve(value('--in') ?? 'doctor.json');
-  if (!existsSync(inPath)) die(`${inPath} is not there — run ./snowarch doctor --json --no-cache first`);
+  // ARC-07-C31 slice 4 — DECIDED BY AUDIENCE, measured rather than assumed from the file's name.
+  // This script writes a release asset, which argues for a pinned POSIX spelling — and neither of its
+  // two launcher lines goes INTO that asset. Both are `die()` messages on stderr, read by the
+  // maintainer running the capture, so they spell that maintainer's own shell.
+  //
+  // NAMED `TERMINAL_CLI`, and the name is load-bearing: `tests/windows-spellings.test.mjs` treats
+  // every script as a generator that must PIN its spelling, which is right for anything written into a
+  // committed file. Its exemption for this file asserts that the one unpinned call is assigned to a
+  // constant with this name — so the claim "this spelling reaches a terminal and not the asset" is
+  // made in the code the guard reads, not only in a comment it cannot check.
+  const TERMINAL_CLI = spellings().cli;
+  if (!existsSync(inPath)) {
+    die(`${inPath} is not there — run ${TERMINAL_CLI} doctor --json --no-cache first`);
+  }
 
   let report;
   try { report = JSON.parse(readFileSync(inPath, 'utf8')); } catch (e) { die(`${inPath} is not JSON: ${e.message}`); }
@@ -180,7 +194,7 @@ if (isMain) {
       if (dropped.length > 0) {
         die(`the report is missing ${dropped.length} check(s) the snapshot has: ${dropped.join(', ')}`
           + ` — is ${inPath} a stale capture? Nothing was written.`
-          + ' Re-run ./snowarch doctor --json --no-cache, or take the platform\'s doctor-<label>'
+          + ` Re-run ${TERMINAL_CLI} doctor --json --no-cache, or take the platform's doctor-<label>`
           + ' artifact from a green CI run. Pass --allow-dropping-checks if the removal is intended.');
       }
     }
