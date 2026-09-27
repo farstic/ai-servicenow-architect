@@ -28,7 +28,7 @@ const SCRIPT = resolve(HERE, '..', 'scripts', 'ci', 'control.mjs');
 const EXIT = { ok: 0, inert: 1, refused: 2, restoreFailed: 3 };
 
 /** A repository with one committed file, and nothing else. */
-function repo(t, { content = 'export const answer = 42;\n' } = {}) {
+function repo(t, { content = 'export const answer = 42;\n', autocrlf = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'control-script-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
@@ -39,6 +39,9 @@ function repo(t, { content = 'export const answer = 42;\n' } = {}) {
   git('config', 'user.email', 'test@example.invalid');
   git('config', 'user.name', 'test');
   git('config', 'commit.gpgsign', 'false');
+  // `core.autocrlf` is the Windows runner's default, and it is what broke the first version of this
+  // tool: a fixture that never sets it cannot reproduce the cell that failed.
+  if (autocrlf !== null) git('config', 'core.autocrlf', String(autocrlf));
   mkdirSync(join(dir, 'lib'), { recursive: true });
   writeFileSync(join(dir, 'lib', 'thing.mjs'), content);
   git('add', '-A');
@@ -176,4 +179,32 @@ test('ARC-07-C34 — several files are one checkpoint, and all of them are verif
   assert.equal(r.read(), 'export const answer = 42;\n');
   assert.equal(readFileSync(join(r.dir, 'lib', 'other.mjs'), 'utf8'), 'export const second = 1;\n');
   assert.match(got.out, /2 file\(s\)/);
+});
+
+test('ARC-07-C34 — a CRLF-converting checkout still verifies, which the Windows cells proved it must', (t) => {
+  // THE WINDOWS CELLS FOUND THIS AND A MAC COULD NOT, until this case. `core.autocrlf=true` is the
+  // runner's default: the blob stays LF and `git checkout <sha> -- <file>` writes CRLF to the working
+  // tree. The first version of this tool compared `git show <sha>:<file>` against
+  // `readFileSync(file, 'utf8')` — BYTES — so a restore git considers perfect looked like a failure,
+  // and three of this file's own VALID-path cases exited 3 on all three Windows cells while passing
+  // here.
+  //
+  // The fix is to ask GIT whether the file matches the commit, because git applies the same filters on
+  // the way out that it applied on the way in. The fixture sets autocrlf explicitly rather than
+  // inheriting it, which is ARC-09-C14's rule for `init.defaultBranch` applied to the same class of
+  // machine setting: a test that depends on the operator's git config tests the operator.
+  const r = repo(t, { autocrlf: true });
+
+  const got = control({ dir: r.dir, files: [r.file],
+    degrade: `node -e "const {writeFileSync}=require('fs');writeFileSync('lib/thing.mjs','x\n')"`,
+    test: 'false' });
+
+  assert.equal(got.code, EXIT.ok, got.out);
+  assert.match(got.out, /VALID/);
+  assert.doesNotMatch(got.out, /RESTORE FAILED/,
+    'the verify compared bytes instead of asking git, so a CRLF checkout read as a failed restore');
+
+  // ...and git agrees the file is back, which is the claim that matters rather than the byte count.
+  const diff = spawnSync('git', ['diff', '--quiet', r.sha(), '--', r.file], { cwd: r.dir });
+  assert.equal(diff.status, 0, 'git says the restored file differs from the checkpoint');
 });

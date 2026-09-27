@@ -44,6 +44,26 @@ const warn = (text) => writeSync(2, `${text}\n`);
 
 const git = (args) => execFileSync('git', args, { encoding: 'utf8' });
 
+/**
+ * Is the working tree's copy of `file` the same as the one in `sha`? — ARC-07-C34, corrected.
+ *
+ * ASKED OF GIT, NOT OF THE BYTES, and the Windows cells are why. This compared
+ * `git show <sha>:<file>` against `readFileSync(file)` — and on a runner with `core.autocrlf=true`
+ * `git checkout <sha> -- <file>` writes CRLF while the blob stays LF, so a restore git considers
+ * perfect looked like a failure and the tool exited 3 on three of its own cases. The checkpoint
+ * comparison passed only because the fixture file had been written by the test with LF and never
+ * checked out.
+ *
+ * `git diff --quiet` applies the same filters git applied on the way in, so the answer is the one git
+ * would give on any platform. `readFileSync` survives only in the error listing, where showing the
+ * operator what is on disk is the point.
+ */
+function sameAsCommit(sha, file) {
+  const r = spawnSync('git', ['diff', '--quiet', sha, '--', file], { stdio: 'ignore' });
+  // 0 identical · 1 differs · anything else is git failing to answer, which is not "identical".
+  return r.status === 0;
+}
+
 /** `--file a --file b --degrade "…" --test "…"` — no positional arguments, so nothing is guessed. */
 function parse(argv) {
   const files = [];
@@ -82,13 +102,11 @@ function checkpoint(files) {
   }
   const drifted = [];
   for (const file of files) {
-    let committed;
-    try { committed = git(['show', `${sha}:${file}`]); }
+    try { git(['show', `${sha}:${file}`]); }
     catch { return { error: `control: REFUSED — ${file} is not in ${sha.slice(0, 12)}` }; }
-    let onDisk;
-    try { onDisk = readFileSync(file, 'utf8'); }
+    try { readFileSync(file, 'utf8'); }
     catch (e) { return { error: `control: REFUSED — cannot read ${file}: ${e.message}` }; }
-    if (committed !== onDisk) drifted.push(file);
+    if (!sameAsCommit(sha, file)) drifted.push(file);
   }
   if (drifted.length > 0) {
     return { error: 'control: REFUSED — these files differ from the checkpoint although git calls '
@@ -129,12 +147,7 @@ if (args.error) {
     catch (e) { restoreError = e.message; }
 
     // ...AND VERIFY IT, because a restore that silently failed is the loss this script prevents.
-    const stillWrong = [];
-    for (const file of files) {
-      try {
-        if (git(['show', `${cp.sha}:${file}`]) !== readFileSync(file, 'utf8')) stillWrong.push(file);
-      } catch { stillWrong.push(file); }
-    }
+    const stillWrong = files.filter((file) => !sameAsCommit(cp.sha, file));
 
     if (restoreError || stillWrong.length > 0) {
       warn(`control: RESTORE FAILED — these files are NOT back at ${cp.sha.slice(0, 12)}:\n  `
