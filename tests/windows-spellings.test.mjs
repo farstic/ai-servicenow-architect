@@ -599,3 +599,39 @@ test('ARC-07-C31 — a sentence with a required spelling THROWS rather than prin
   assert.throws(() => unfetchablePin('abc1234'),
     { name: 'TypeError', message: /^unfetchablePin needs the launcher spelling/ });
 });
+
+/**
+ * ...and so do the six that became required when the rule narrowed — ARC-07-C31.
+ *
+ * THIS CASE EXISTS BECAUSE A CONTROL WAS INERT. Degrading `loadState` to `spell = spellings()` broke
+ * nothing: every caller passes one, so the default was unreachable and no test noticed the guarantee
+ * had gone. A rule held only by review is a rule that returns the day someone adds the eleventh
+ * caller — and the eleventh caller is exactly what this row already tripped over, `recordedMode`
+ * calling through an injected default where a grep could not see it.
+ *
+ * So each one is called with NO spelling and must refuse. `loadState` is the one that matters most:
+ * seven of its callers hold a ctx, and a default would hand each of them the process.
+ */
+test('ARC-07-C31 — the six that became required refuse to render without a spelling', async () => {
+  const { loadState } = await import('../tools/snowarch/lib/state.mjs');
+  const { syncUpstream } = await import('../tools/snowarch/lib/docs/upstream.mjs');
+  const { formatPlan, applyFamilySwitch } = await import('../tools/snowarch/lib/docs/family.mjs');
+  const { formatResult } = await import('../tools/snowarch/lib/docs/verify.mjs');
+  const { classifyGitFailure } = await import('../tools/snowarch/lib/docs/sync.mjs');
+
+  const PLAN = { from: 'a', to: 'b', tip: 'deadbeefcafe', edits: [], review: [] };
+  // Each refuses BEFORE it does anything — `syncUpstream` and `applyFamilySwitch` would otherwise
+  // reach the network and the working tree, so a refusal that came later would be a test that runs a
+  // git fetch to prove an argument check.
+  for (const [name, call] of [
+    ['loadState', () => loadState('/nonexistent')],
+    ['syncUpstream', () => syncUpstream({ root: '/nonexistent', config: { docs: {} } })],
+    ['formatPlan', () => formatPlan(PLAN)],
+    ['formatResult', () => formatResult({ status: 'missing', allowMissing: false })],
+    ['classifyGitFailure', () => classifyGitFailure('fatal: nope', { upstream: 'u', pin: 'p' })],
+    ['applyFamilySwitch', () => applyFamilySwitch(PLAN, { root: '/nonexistent', config: { docs: {} } })],
+  ]) {
+    assert.throws(call, { name: 'TypeError', message: new RegExp(`^${name} needs a spellings object`) },
+      `${name} rendered without a spelling instead of refusing`);
+  }
+});
