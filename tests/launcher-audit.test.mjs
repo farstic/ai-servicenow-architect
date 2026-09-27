@@ -726,3 +726,41 @@ test('C35c — and the audit REPORTS the false negative, which is what the bar i
   assert.equal(r.mismatches[0].expectation, 'PINNED');
   assert.equal(r.mismatches[0].kind, 'DERIVED');
 });
+
+test('C35c — a search call\'s sentence is its argument, not the haystack it looks in', () => {
+  // `proseOf` folded BOTH sides of a method call, so a prose receiver searched for its own needle contributed
+  // the needle twice. Measured: `\`prefix run ${CLI} docs sync suffix\`.includes(\`run ${CLI} docs sync\`)` and
+  // the same with `startsWith` each put it in 2×. A sentence with its own middle repeated matches no product
+  // line, and `bySentence` is a containment test — so the site was unresolvable for a reason that had nothing
+  // to do with the launcher.
+  const HEAD = "const CLI = spellings({ platform: 'linux', env: {} }).cli;";
+  const prose = (line) => assertedLaunchers('tests/planted.test.mjs', `${HEAD}\n${line}`)[0]?.sentence ?? '';
+  const needle = `run ${MARK} docs sync`;
+  const times = (text) => text.split(needle).length - 1;
+
+  // The two shapes that doubled.
+  assert.equal(times(prose(
+    'assert.ok(`prefix run ${CLI} docs sync suffix`.includes(`run ${CLI} docs sync`));')), 1);
+  assert.equal(times(prose(
+    'assert.ok(`run ${CLI} docs sync now`.startsWith(`run ${CLI} docs sync`));')), 1);
+
+  // ...and the one that never did, so the fix is not "drop the receiver everywhere".
+  assert.equal(times(prose('assert.ok(text.includes(`run ${CLI} docs sync`));')), 1);
+
+  // THE OTHER SIDE, which is why this is a LIST and not a rule about receivers: `.join(sep)` BUILDS the
+  // expectation out of its receiver, and dropping that would lose the sentence entirely.
+  const built = prose("assert.equal(out, ['the corpus is missing', `run ${CLI} docs sync`].join('\\n'));");
+  assert.match(built, /the corpus is missing/);
+  assert.equal(times(built), 1);
+
+  // ...and a NON-search method keeps its receiver, which is the other half of "this is a list, not a rule
+  // about receivers". `/re/.test(line)` is the sharper example of the same thing and cannot be used here: a
+  // launcher inside a regex is not a target until ARC-07-C35c's regex arm lands, so it would assert nothing.
+  const trimmed = prose('assert.equal(out, `run ${CLI} docs sync `.trim());');
+  assert.match(trimmed, /^run .* docs sync\s*$/,
+    'a non-search method lost its receiver — the expectation is the receiver in that shape');
+  // THE TRAILING SPACE IS THE TEMPLATE'S OWN, and it stays: this extracts literals, it does not EVALUATE the
+  // call, so `.trim()`'s effect is not applied. It does not matter because `bySentence` squashes whitespace
+  // before comparing — and saying so here is cheaper than the next reader discovering it from a diff.
+  assert.equal(trimmed.endsWith(' '), true);
+});

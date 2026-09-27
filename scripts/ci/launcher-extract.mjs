@@ -123,6 +123,10 @@ const spellsLauncher = (node) => {
  * This is the whole of piece (a). It walks the expression rather than the text, so what comes back is
  * the sentence the test asserts — never the expression it asserts it about.
  */
+/** The method calls whose ARGUMENT is the claim and whose receiver is only the haystack. */
+const SEARCHES = new Set(['includes', 'startsWith', 'endsWith', 'indexOf', 'lastIndexOf', 'search',
+  'match', 'contains']);
+
 /** A node that CARRIES prose: a literal, a template, a regex, an array of them, or a `+` of them. */
 const isProse = (node) => ts.isStringLiteralLike(node) || ts.isTemplateExpression(node)
   || ts.isRegularExpressionLiteral(node) || ts.isArrayLiteralExpression(node)
@@ -171,6 +175,22 @@ export function proseOf(node) {
     const fromArgs = (node.arguments ?? []).map((a) => proseOf(a));
     const callee = ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
       ? node.expression : null;
+    /*
+     * ARC-07-C35c — A SEARCH CALL'S SENTENCE IS ITS ARGUMENT, and the receiver is the haystack.
+     *
+     * `proseOf` folded both, so `\`prefix run ${CLI} docs sync suffix\`.includes(\`run ${CLI} docs sync\`)`
+     * contributed the needle TWICE — once inside the haystack and once as the argument — and
+     * `startsWith` did the same. Measured on planted cases: the needle appeared 2× in each. A sentence with
+     * its own middle repeated matches no product line, and `bySentence` is a containment test, so the site
+     * was unresolvable for a reason that had nothing to do with the launcher.
+     *
+     * The haystack is never the claim: `x.includes(y)` asserts something about Y. The other direction is
+     * deliberately NOT in this list — `/re/.test(line)` puts the expectation in the RECEIVER, and `.join(sep)`
+     * below builds the expectation from the receiver — so the list is the calls that SEARCH, and everything
+     * else keeps both sides.
+     */
+    if (callee && SEARCHES.has(callee.name.text)) return fromArgs.join(' ');
+
     // `.join(sep)` is the shape this repository writes most, and the separator is part of the sentence.
     if (callee && callee.name.text === 'join' && ts.isArrayLiteralExpression(callee.expression)) {
       const sep = node.arguments[0] && ts.isStringLiteralLike(node.arguments[0])
