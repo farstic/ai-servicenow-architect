@@ -15,7 +15,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { cloudSyncProvider } from '../../cloud-sync.mjs';
 import { maskProxy } from '../../net-sentences.mjs';
 import { get as claudeGet, resolveClaude } from '../../registration-claude.mjs';
-import { loadState } from '../../state.mjs';
+import { loadStateOrReason } from '../../state.mjs';
 import { remedyFor } from '../../../../../packages/contract/lib/contract.mjs';
 import { defineCheck } from '../registry.mjs';
 
@@ -197,12 +197,28 @@ export function hostChecks() {
           ...(ctx.exec ? { exec: ctx.exec } : {}) });
         const statusLine = entry.status ?? null;
         const { kind, approved } = classifyStatus(statusLine);
-        const state = (() => {
-          try { return loadState(ctx.root, spellFor(ctx)); } catch { return null; }
-        })();
+        const { state, reason: stateUnreadable } = loadStateOrReason(ctx.root, spellFor(ctx));
         const live = state?.mode === 'live';
         const data = { statusLine, scope: entry.scope ?? null, approved,
-          registration: state?.registration ?? null, mode: state?.mode ?? null };
+          registration: state?.registration ?? null, mode: state?.mode ?? null,
+          ...(stateUnreadable ? { stateUnreadable } : {}) };
+
+        // ARC-07-C37 — EVERY SENTENCE BELOW COMPARES THE REGISTRATION TO THE RECORDED MODE, so a mode
+        // that could not be read makes all of them guesses. Measured on a tree with an unreadable
+        // state file: this check reported `ok — project entry present, disabled in design mode
+        // (expected)`, which is a checkout described as healthier than it is, in the one section
+        // (`host`) where E-11 is not there to say otherwise. `--section host` said nothing at all.
+        //
+        // The registration itself WAS measured, so it is still reported; what is dropped is every
+        // claim about the mode. A `warn` rather than a `fail` because nothing here is known to be
+        // wrong — the check simply cannot answer its question, and E-11 owns the file.
+        if (stateUnreadable) {
+          return warn(`registration reads "${statusLine ?? 'no status'}", but the recorded mode could `
+            + 'not be read, so whether that is right for this checkout is unknown (see E-11)', {
+            remedy: `${cliOf(ctx)} bootstrap --reset   (rewrites .local/bootstrap-state.json)`,
+            data,
+          });
+        }
 
         if (!entry.found || kind === 'unknown') {
           // The format is Claude Code's, not ours (`03` R-13): a wording change must degrade to a

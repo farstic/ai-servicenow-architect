@@ -13,7 +13,7 @@
 import { existsSync } from 'node:fs';
 
 import { checkClaudeCode, checkGit, makeExec } from '../../steps/B00.mjs';
-import { loadState } from '../../state.mjs';
+import { loadState, loadStateOrReason } from '../../state.mjs';
 import { meetsFloor, formatVersion } from '../../versions.mjs';
 import { which } from '../../which.mjs';
 import { defineCheck } from '../registry.mjs';
@@ -88,23 +88,25 @@ export function capabilityPacks({ env = process.env, platform = process.platform
 
 const packLine = (name, pack) => `${name} ${pack.how ? 'yes' : 'no'}`;
 
-/** `live` when the recorded mode says so; anything else — including no state — is design-only. */
+/**
+ * The recorded mode, or the REASON it could not be read — ARC-07-C37.
+ *
+ * `live` when the recorded mode says so; anything else — including no state at all — is design-only,
+ * and `reason` is non-null only when the file EXISTS and could not be read.
+ *
+ * ARC-07-C31 rethrew a `TypeError` here by hand, because finding this call site is what cost a
+ * sitting: the call goes through the injected default and reads `load(root)`, so it was invisible to
+ * a grep for `loadState(`, and the `catch` turned a missing argument into a silent `null` that only a
+ * behavioural assertion two files away noticed. C37 moves that rule into `loadStateOrReason`, where
+ * the next site written gets it for free instead of having to remember.
+ *
+ * It returns a PAIR rather than a mode, because the swallowing was only half the defect: E-03 turns
+ * a missing npm into a `warn` in design-only and a `fail` in live, so a mode it could not read is a
+ * mode it must not assume. The caller decides what to say; this says what happened.
+ */
 export function recordedMode(root, spell, { load = loadState } = {}) {
-  try {
-    return load(root, spell)?.mode ?? null;
-  } catch (e) {
-    // ARC-07-C31 — A TypeError IS RETHROWN, and finding this call site is why. `loadState`'s spelling
-    // became required and this site was invisible to a grep for `loadState(`, because the call goes
-    // through the injected default and reads `load(root)`. The `catch` below then turned the missing
-    // argument into a silent `null`, and the only thing that noticed was a behavioural assertion two
-    // files away — `E-03 reads the mode from the recorded state`, which went from `fail` to `warn`.
-    // An unreadable state file is a finding about the CHECKOUT; a TypeError is a finding about this
-    // code, and swallowing the second to be tolerant of the first is how a defect gets a hiding place.
-    if (e instanceof TypeError) throw e;
-    // An unreadable state file is E-11's finding, not this one's. Reporting it twice would have
-    // the operator fix one problem and read two lines about it.
-    return null;
-  }
+  const { state, reason } = loadStateOrReason(root, spell, { load });
+  return { mode: state?.mode ?? null, reason };
 }
 
 export function enginePrereqChecks() {
@@ -189,17 +191,31 @@ export function enginePrereqChecks() {
       // installed without it. Same fact, two consequences — so the mode is read, not assumed.
       run: async (ctx) => {
         const exec = ctx.exec ?? makeExec({ env: ctx.env, plat: ctx.platform });
-        const mode = ctx.mode ?? recordedMode(ctx.root, spellFor(ctx));
+        const recorded = ctx.mode === undefined || ctx.mode === null
+          ? recordedMode(ctx.root, spellFor(ctx))
+          : { mode: ctx.mode, reason: null };
+        const { mode, reason } = recorded;
         const r = exec('npm', ['--version']);
         if (r.found && r.ok) return ok(r.stdout.trim(), { version: r.stdout.trim(), mode });
         const detail = r.found
           ? `npm found but did not answer --version: ${(r.stderr || '').trim().split('\n')[0]}`
           : 'npm not found on PATH';
         const remedy = 'install Node.js from nodejs.org (bundles npm)';
-        return mode === 'live'
-          ? fail(detail, { remedy, data: { mode } })
-          : { status: 'warn', detail: `${detail} — needed only for live mode`, remedy,
-            data: { mode } };
+        if (mode === 'live') return fail(detail, { remedy, data: { mode } });
+        // ARC-07-C37 — A MODE THAT COULD NOT BE READ IS NOT design-only, and this branch is where the
+        // difference reaches a reader. Absent npm is a `warn` in design-only and a `fail` in live, so
+        // swallowing an unreadable state into `null` downgraded a real failure and said nothing about
+        // why. The status stays a `warn` — claiming `fail` on a mode nobody could read would be the
+        // same guess in the other direction — but the sentence now names the uncertainty and points at
+        // the check that owns the file, so an operator running `--section prereqs` alone is not left
+        // with a confident "needed only for live mode".
+        if (reason) {
+          return { status: 'warn', remedy, data: { mode, stateUnreadable: reason },
+            detail: `${detail} — the recorded mode could not be read, so this may be a failure rather `
+              + 'than a warning (see E-11)' };
+        }
+        return { status: 'warn', detail: `${detail} — needed only for live mode`, remedy,
+          data: { mode } };
       },
     }),
 

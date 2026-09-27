@@ -14,7 +14,7 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { bootstrapOf, cliOf, spellFor } from './spell.mjs';
 import { spellings } from '../text.mjs';
-import { loadState } from '../state.mjs';
+import { loadStateOrReason } from '../state.mjs';
 import { dirname, join, resolve } from 'node:path';
 
 import { loadContract } from '../../../../packages/contract/lib/contract.mjs';
@@ -253,10 +253,11 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     bootstrapped: existsSync(join(root, '.local', 'bootstrap-state.json')),
     // ARC-08-C16 — which entry carries the server. Our own record, read from
     // `bootstrap-state.json`; NOT `~/.claude.json`, which this module promises never to read.
-    registration: (() => {
-      try { return loadState(root, spellings({ platform, env }))?.registration ?? 'project'; }
-      catch { return 'project'; }
-    })(),
+    // ARC-07-C37 — `'project'` is the DERIVATION's default and stays one, but the read no longer
+    // swallows every error to get there: a `TypeError` from a bad call reached this `catch` and became
+    // a confident `'project'`, which then fed the Mode line. What an unreadable file means for the
+    // report is E-11's to say, and it does; what this needed was to stop hiding a defect in our code.
+    registration: loadStateOrReason(root, spellings({ platform, env })).state?.registration ?? 'project',
     // ARC-07-W17 — the doctor renders for the shell it was TOLD about, so a fixture capture can pin it
     // and a committed fixture stops depending on the capturing machine.
     spell: spellFor({ platform, env }),
@@ -384,9 +385,9 @@ export async function fixCommand({ root, config, registry, options, env, home, n
     // The first pass never writes the cache: it describes a checkout that is about to change.
     writeCache: false });
 
-  const state = (() => {
-    try { return loadState(root, spellings({ platform, env })); } catch { return null; }
-  })();
+  // ARC-07-C37 — the fix planner tolerates an unreadable state (there is nothing to plan from) and no
+  // longer tolerates a programming error that looks like one.
+  const { state } = loadStateOrReason(root, spellings({ platform, env }));
   const plan = buildPlan(first.report, {
     stale: options.sections === null ? cacheStale(root) : null,
   });

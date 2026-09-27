@@ -12,7 +12,7 @@ import { bootstrapOf, cliOf } from '../spell.mjs';
 import { join } from 'node:path';
 
 import { makeExec, samePath } from '../../steps/B00.mjs';
-import { loadState, STATE_VERSION } from '../../state.mjs';
+import { loadStateOrReason, STATE_VERSION } from '../../state.mjs';
 import { plannedSteps } from '../../steps/index.mjs';
 import { version as engineVersionOf } from '../../config.mjs';
 import { spellings } from '../../text.mjs';
@@ -21,7 +21,7 @@ import { projectEntryEnabled } from '../../settings-local.mjs';
 import { RUNNING_STEP_ENV } from '../../spawn-env.mjs';
 
 import { credentialKeys, credentialLines, CREDENTIAL_EXT } from './credential-shape.mjs';
-import { fail, ok, warn } from './result.mjs';
+import { fail, ok, skip, warn } from './result.mjs';
 import { spellFor } from '../spell.mjs';
 
 /** The four files that make a directory this checkout rather than any directory. */
@@ -413,8 +413,24 @@ export function engineRepoChecks() {
       spawns: false,
       fixable: true,
       run: async (ctx) => {
-        let state = null;
-        try { state = loadState(ctx.root, spellFor(ctx)); } catch { state = null; }
+        const { state, reason: stateUnreadable } = loadStateOrReason(ctx.root, spellFor(ctx));
+        // ARC-07-C37 — THIS CHECK COMPARES THE TOGGLES TO THE RECORDED MODE, so an unreadable state
+        // leaves it with nothing to compare against. It used to swallow the read error and carry on
+        // with `state?.mode ?? 'design'`, and measured on a tree whose state file is not JSON it
+        // reported `ok — design · disabled`: a checkout certified healthy on a mode nobody could read,
+        // in the SAME section as the check that fails on that exact file. So the silence was never
+        // about which section ran — it was this `catch`.
+        //
+        // A SKIP, not a fail: the toggles may be perfectly correct, and E-11 already owns the file's
+        // sentence and its remedy. This follows the convention E-13…E-16 use for a corpus they cannot
+        // read — say what is missing, name the check that explains it, and do not repeat its remedy.
+        if (stateUnreadable) {
+          // `skip` takes its data DIRECTLY, not wrapped in `{ data }` — the wrapped form type-checks,
+          // passes every status assertion, and quietly buries the reason one level down where `--json`
+          // readers will not find it. Caught by asserting the field rather than only the sentence.
+          return skip('the recorded mode could not be read, so the toggles cannot be compared to it '
+            + '(see E-11)', { mode: null, stateUnreadable, fix: null });
+        }
         if (!existsSync(join(ctx.root, SETTINGS_LOCAL))) {
           return fail('.claude/settings.local.json is absent — the mode toggle is unset', {
             remedy: `${cliOf(ctx)} mode design (or ${cliOf(ctx)} mode live)`,
@@ -511,11 +527,14 @@ export function engineRepoChecks() {
             problems.push(`.local/ is mode ${mode.toString(8).padStart(3, '0')}, not 700`);
           }
         }
-        let state = null;
-        try {
-          state = loadState(ctx.root, spellFor(ctx));
-        } catch (e) {
-          return fail(e.message, {
+        // ARC-07-C37 — E-11 OWNS THIS SENTENCE, and that does not change; what changes is that the
+        // read no longer catches EVERY error. A `catch (e)` here reported a `TypeError` from a
+        // programming mistake as a finding about the user's checkout, complete with a
+        // `bootstrap --reset` remedy that would not have fixed it — the same hiding place C31 found in
+        // `recordedMode`, in the one check whose job is to report this file.
+        const { state, reason } = loadStateOrReason(ctx.root, spellFor(ctx));
+        if (reason) {
+          return fail(reason, {
             remedy: `${cliOf(ctx)} bootstrap --reset`,
             command: `${cliOf(ctx)} bootstrap --reset`,
             fixable: false,
@@ -575,7 +594,15 @@ export function engineRepoChecks() {
       spawns: false,
       fixable: false,
       run: async (ctx) => {
-        const state = loadState(ctx.root, spellFor(ctx));
+        // ARC-07-C37 — this read had NO `catch` at all, which was not tolerance but an omission: the
+        // runner turns a throw into `check crashed: <message>`, so an unreadable state file — a
+        // legitimate thing to find in a checkout — was reported to the operator as a crash in OUR
+        // code. Measured on the same fixture that produced E-10's false `ok`.
+        const { state, reason: stateUnreadable } = loadStateOrReason(ctx.root, spellFor(ctx));
+        if (stateUnreadable) {
+          return skip('the recorded state could not be read, so whether the bootstrap finished is '
+            + 'unknown (see E-11)', { stateUnreadable });
+        }
         // No state is E-11's finding, not this one. A check that repeated it would put two
         // failures on one cause and send a reader to two remedies.
         if (!state?.mode) return ok('no recorded install to check');
