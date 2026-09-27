@@ -6,6 +6,7 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { scanRepo } from './citations.mjs';
+import { spellings } from '../launcher-spelling.mjs';
 
 export const EXIT = { ok: 0, dead: 1, missing: 3 };
 
@@ -64,12 +65,15 @@ export function verifyCitations({ root = process.cwd(), corpusDir = 'vendor/Serv
   };
 }
 
-export function formatResult(r) {
+  // ARC-07-C31 — the shell as a PARAMETER defaulting to the process: this renders for a
+  // terminal, so the reader's own shell is the right answer, and the parameter is what lets a
+  // case assert the Windows sentence by argument rather than by forcing `process.platform`.
+export function formatResult(r, spell = spellings()) {
   const lines = [];
   if (r.status === 'missing') {
     lines.push(r.allowMissing
       ? 'citations: not verified until the corpus is present'
-      : 'corpus missing — run ./bootstrap.sh --docs sparse (or ./snowarch docs sync)');
+      : `corpus missing — run ${spell.bootstrap} --docs sparse (or ${spell.cli} docs sync)`);
     return { text: lines.join('\n'), code: r.allowMissing ? EXIT.ok : EXIT.missing };
   }
   for (const d of r.dead) {

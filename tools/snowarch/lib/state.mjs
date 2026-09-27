@@ -17,6 +17,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, wri
 import { join } from 'node:path';
 import { EXIT_FAIL } from './exit.mjs';
 import { isSecretKey, redact } from './redact.mjs';
+import { spellings } from './launcher-spelling.mjs';
 
 export const STATE_VERSION = 1;
 export const PRODUCT = 'snowarch';
@@ -113,7 +114,10 @@ export function emptyState({ engineVersion, platform = process.platform, node = 
  * A version this build does not know is an error, not something to migrate on the fly: the file may
  * have been written by a newer snowarch whose fields this one would silently drop on the next save.
  */
-export function loadState(root) {
+  // ARC-07-C31 — the shell as a PARAMETER defaulting to the process: this renders for a
+  // terminal, so the reader's own shell is the right answer, and the parameter is what lets a
+  // case assert the Windows sentence by argument rather than by forcing `process.platform`.
+export function loadState(root, spell = spellings()) {
   const p = statePath(root);
   if (!existsSync(p)) return null;
 
@@ -122,18 +126,18 @@ export function loadState(root) {
   // user who opened this file to look at it should not be told it is corrupt.
   try { parsed = JSON.parse(readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); } catch (e) {
     throw new StateError(`.local/bootstrap-state.json is not valid JSON (${e.message}) — `
-      + 'run ./snowarch bootstrap --reset to start over');
+      + `run ${spell.cli} bootstrap --reset to start over`);
   }
   const version = parsed?.version;
   if (version > STATE_VERSION) {
-    throw new StateError('state file is from a newer snowarch — run ./snowarch upgrade');
+    throw new StateError(`state file is from a newer snowarch — run ${spell.cli} upgrade`);
   }
   // A missing or nonsensical version is a DIFFERENT problem, and gets a different sentence: telling
   // someone their file is "from a newer snowarch" when it has no version at all sends them to an
   // upgrade that will not help.
   if (!Number.isInteger(version) || version < 1) {
     throw new StateError('.local/bootstrap-state.json has no usable schema version — '
-      + 'run ./snowarch bootstrap --reset to start over');
+      + `run ${spell.cli} bootstrap --reset to start over`);
   }
   if (!parsed.steps || typeof parsed.steps !== 'object') parsed.steps = {};
   return parsed;

@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { CORPUS_DIR, EXIT, SyncError, classifyGitFailure } from './sync.mjs';
 import { applyAllTargets } from './recipe-block.mjs';
 import { verifyCitations } from './verify.mjs';
+import { spellings } from '../launcher-spelling.mjs';
 
 const raw = (args, cwd) => execFileSync('git', args, {
   cwd, encoding: 'utf8', stdio: 'pipe', maxBuffer: 64 * 1024 * 1024,
@@ -62,8 +63,11 @@ const keyOf = (d) => `${d.file}:${d.line} ${d.path}`;
  * before the checkout because "which citations BECAME dead" is a difference between two states, and
  * the first state stops existing the moment the corpus moves.
  */
+  // ARC-07-C31 — the shell as a PARAMETER defaulting to the process: this renders for a
+  // terminal, so the reader's own shell is the right answer, and the parameter is what lets a
+  // case assert the Windows sentence by argument rather than by forcing `process.platform`.
 export function syncUpstream({ root = process.cwd(), config, to = null, verify = true,
-  log = console.log } = {}) {
+  log = console.log, spell = spellings() } = {}) {
   const { docs } = config;
   const corpus = join(root, CORPUS_DIR);
   const ctx = { upstream: docs.upstream, pin: docs.pin };
@@ -94,7 +98,7 @@ export function syncUpstream({ root = process.cwd(), config, to = null, verify =
       throw new SyncError(to
         ? `sha ${to} not fetchable from upstream — is it reachable from branch '${docs.family}'?`
         : `upstream branch '${docs.family}' not found — the release family may have moved; `
-          + `run ./snowarch docs family <name> --dry-run`,
+          + `run ${spell.cli} docs family <name> --dry-run`,
       EXIT.upstream);
     }
     throw new SyncError(classifyGitFailure(fetched.stderr, ctx), EXIT.git);

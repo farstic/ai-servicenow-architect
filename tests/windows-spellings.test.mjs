@@ -180,16 +180,10 @@ const SWEEP_REMAINDER = Object.freeze(new Map([
   ['scripts/lib/release/preflight.mjs', 1],
   ['tools/snowarch/lib/bootstrap.mjs', 3],
   ['tools/snowarch/lib/commands/upgrade.mjs', 4],
-  ['tools/snowarch/lib/docs/family.mjs', 3],
-  ['tools/snowarch/lib/docs/upstream.mjs', 1],
-  ['tools/snowarch/lib/docs/verify.mjs', 2],
-  ['tools/snowarch/lib/net-sentences.mjs', 1],
-  ['tools/snowarch/lib/state.mjs', 3],
   ['tools/snowarch/lib/steps/B02.mjs', 4],
   ['tools/snowarch/lib/steps/B04.mjs', 1],
   ['tools/snowarch/lib/steps/format.mjs', 4],
   ['tools/snowarch/lib/steps/index.mjs', 1],
-  ['tools/snowarch/lib/version-info.mjs', 1]
 ]));
 
 /**
@@ -511,4 +505,97 @@ test('ARC-07-C31 — every banner message renders the Windows spelling on a Wind
   const posix = spellings({ platform: 'linux', env: {} });
   assert.match(BANNER.upgrade('v9.9.9', posix), /\.\/snowarch upgrade\.$/);
   assert.doesNotMatch(BANNER.timedOut(posix), /snowarch\.cmd/);
+});
+
+/**
+ * ARC-07-C31 slice 2 — THE SENTENCES, DRIVEN, not merely swept.
+ *
+ * The sweep above proves no literal remains. It says nothing about what a Windows reader is SHOWN,
+ * which is the gap the architect's review of slice 1 found: six messages had been repaired and the
+ * only thing holding them was a source-level guard that could not read the file they were in.
+ *
+ * So each helper slice 2 changed is rendered with a win32 spelling and read. `env: {}` is load-bearing
+ * — `isWindowsShell` is `platform === 'win32' && !env.SHELL && !env.MSYSTEM` and `env` defaults to
+ * `process.env`, so `{ platform: 'win32' }` alone renders POSIX on any machine whose SHELL is set.
+ *
+ * WHAT IS NOT COVERED HERE, said plainly: `planFamilySwitch` and `syncUpstream` each throw their
+ * sentence from inside a network branch — `ls-remote` and `fetch` against the real upstream — so
+ * driving them would mean a network fixture, and they are held by the sweep alone for now. Both take
+ * a `spell` parameter, so a case can reach them the day one of those fixtures exists.
+ */
+test('ARC-07-C31 — every sentence slice 2 changed renders the Windows spelling', async () => {
+  const WIN = { platform: 'win32', env: {} };
+  const win = spellings(WIN);
+  const posix = spellings({ platform: 'linux', env: {} });
+
+  const { NOT_BOOTSTRAPPED } = await import('../tools/snowarch/lib/mode.mjs');
+  const { NOT_INSTALLED } = await import('../tools/snowarch/lib/instance.mjs');
+  const { E12_ABSENT, formatStatus } = await import('../tools/snowarch/lib/docs/status.mjs');
+  const { unfetchablePin } = await import('../tools/snowarch/lib/net-sentences.mjs');
+  const { formatResult } = await import('../tools/snowarch/lib/docs/verify.mjs');
+  const { formatPlan } = await import('../tools/snowarch/lib/docs/family.mjs');
+
+  // [name, windows rendering, posix rendering] — one table, so a helper cannot be covered in one
+  // direction only. The POSIX half is what would catch a helper that hard-coded the Windows form.
+  const rendered = [
+    ['NOT_BOOTSTRAPPED', NOT_BOOTSTRAPPED(win), NOT_BOOTSTRAPPED(posix)],
+    ['NOT_INSTALLED', NOT_INSTALLED(win), NOT_INSTALLED(posix)],
+    ['E12_ABSENT', E12_ABSENT('skip', win), E12_ABSENT('skip', posix)],
+    ['unfetchablePin', unfetchablePin('abc1234', win.cli), unfetchablePin('abc1234', posix.cli)],
+    ['formatStatus', formatStatus({ present: false, mode: 'skip' }, win).text,
+      formatStatus({ present: false, mode: 'skip' }, posix).text],
+    ['formatResult', formatResult({ status: 'missing', allowMissing: false }, win).text,
+      formatResult({ status: 'missing', allowMissing: false }, posix).text],
+    ['formatPlan', formatPlan({ from: 'a', to: 'b', tip: 'deadbeefcafe', edits: [], review: [] },
+      { spell: win }).text,
+      formatPlan({ from: 'a', to: 'b', tip: 'deadbeefcafe', edits: [], review: [] },
+        { spell: posix }).text],
+  ];
+
+  for (const [name, w, p] of rendered) {
+    assert.doesNotMatch(w, /\.\/snowarch|\.\/bootstrap\.sh/,
+      `${name} renders a POSIX launcher on a Windows shell:\n${w}`);
+    assert.equal(/\.\\snowarch\.cmd|\.\\bootstrap\.cmd/.test(w), true,
+      `${name} renders no Windows launcher at all:\n${w}`);
+    assert.doesNotMatch(p, /snowarch\.cmd|bootstrap\.cmd/,
+      `${name} renders a Windows launcher on a POSIX shell:\n${p}`);
+  }
+
+  // `renderVersion` needs a whole info object, so it is driven separately rather than shoehorned
+  // into the table above.
+  const { renderVersion } = await import('../tools/snowarch/lib/version-info.mjs');
+  const info = { version: '1.0.0', releaseTag: 'v1.0.0', commit: 'abc1234', contractSha: 'aaaa',
+    builtContractSha: 'aaaa', contractMatches: true, floors: {}, docsPin: 'deadbeefcafe',
+    docsFamily: 'zurich', docsPinMatches: false, docsPinGitlink: 'feedfacedead' };
+  // JOINED: `renderVersion` returns the LINES, not a string — its caller joins them. Matching the
+  // array coerces it through `String()`, which joins on commas and would match by accident.
+  const vWin = renderVersion(info, win).join('\n');
+  assert.match(vWin, /\.\\snowarch\.cmd docs verify/, `renderVersion:\n${vWin}`);
+  assert.doesNotMatch(vWin, /\.\/snowarch/, 'a POSIX launcher on a Windows shell');
+  assert.match(renderVersion(info, posix).join('\n'), /\.\/snowarch docs verify/);
+});
+
+/**
+ * ...and the ones whose spelling is REQUIRED refuse to render without it — ARC-07-C31 slice 2.
+ *
+ * `NOT_BOOTSTRAPPED` and `NOT_INSTALLED` were `const`s handed to `refuse()` and `log.fail()`, so the
+ * failure worth preventing is a caller that drops the parentheses and prints the function's source.
+ * `E12_ABSENT` is required because TWO consumers render it for two different shells. `unfetchablePin`
+ * cannot import the shared guard — `tests/launcher-parity.test.mjs` copies that file alone — so it
+ * carries its own, and this case holds that the refusal is still a named TypeError rather than an
+ * `undefined` in a sentence whose whole job is to say what to type.
+ */
+test('ARC-07-C31 — a sentence with a required spelling THROWS rather than printing one', async () => {
+  const { NOT_BOOTSTRAPPED } = await import('../tools/snowarch/lib/mode.mjs');
+  const { NOT_INSTALLED } = await import('../tools/snowarch/lib/instance.mjs');
+  const { E12_ABSENT } = await import('../tools/snowarch/lib/docs/status.mjs');
+  const { unfetchablePin } = await import('../tools/snowarch/lib/net-sentences.mjs');
+
+  assert.throws(() => NOT_BOOTSTRAPPED(), { name: 'TypeError', message: /^NOT_BOOTSTRAPPED needs/ });
+  assert.throws(() => NOT_INSTALLED(), { name: 'TypeError', message: /^NOT_INSTALLED needs/ });
+  // The spelling is the SECOND argument here, which is the slip that cost three Windows cells when
+  // `summaryLine`'s options landed in its `checks` slot.
+  assert.throws(() => E12_ABSENT('skip'), { name: 'TypeError', message: /^E12_ABSENT needs/ });
+  assert.throws(() => unfetchablePin('abc1234'),
+    { name: 'TypeError', message: /^unfetchablePin needs the launcher spelling/ });
 });

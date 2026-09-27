@@ -100,6 +100,7 @@ const withLongPaths = (args) => (isWindows() ? ['-c', 'core.longpaths=true', ...
  * business: the matched substrings are libcurl's, as surfaced by git.
  */
 import * as SENTENCE from '../net-sentences.mjs';
+import { spellings } from '../launcher-spelling.mjs';
 
 export { maskProxy, upstreamHost } from '../net-sentences.mjs';
 
@@ -112,7 +113,10 @@ export { maskProxy, upstreamHost } from '../net-sentences.mjs';
  * substrings themselves are S-07's deliverable. Matched case-insensitively: git surfaces libcurl's
  * casing, and it has varied across versions.
  */
-export function classifyGitFailure(stderr, { upstream, pin, env = process.env } = {}) {
+export function classifyGitFailure(stderr, { upstream, pin, env = process.env,
+  // ARC-07-C31 — `platform` beside the `env` this already had. `isWindowsShell` needs both: `env`
+  // alone reads this machine's SHELL and would render POSIX on a Windows cell.
+  platform = process.platform } = {}) {
   const text = String(stderr ?? '');
   const low = text.toLowerCase();
   const proxy = env.HTTPS_PROXY || env.https_proxy || null;
@@ -132,7 +136,7 @@ export function classifyGitFailure(stderr, { upstream, pin, env = process.env } 
   }
   if (low.includes('not our ref') || low.includes("couldn't find remote ref")
       || low.includes('could not find remote ref')) {
-    return SENTENCE.unfetchablePin(pin);
+    return SENTENCE.unfetchablePin(pin, spellings({ platform, env }).cli);
   }
   if (low.includes('no space left on device')) {
     return SENTENCE.noDiskSpace;

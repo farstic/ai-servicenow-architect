@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 import { CORPUS_DIR, EXIT, SyncError } from './sync.mjs';
 import { syncUpstream, formatUpstream } from './upstream.mjs';
+import { spellings } from '../launcher-spelling.mjs';
 
 /** `--dry-run`/`--yes` were both omitted: the plan is printed and nothing is applied. */
 export const EXIT_NEEDS_YES = 2;
@@ -103,7 +104,11 @@ export function classifyLine(text, old, to) {
  * `planFamilySwitch` touches no file and makes exactly one network call — `ls-remote`, to find out
  * whether the branch exists at all, which a dry run has to know and cannot learn offline.
  */
-export function planFamilySwitch({ root = process.cwd(), config, to, from = null } = {}) {
+  // ARC-07-C31 — the shell as a PARAMETER defaulting to the process: this renders for a
+  // terminal, so the reader's own shell is the right answer, and the parameter is what lets a
+  // case assert the Windows sentence by argument rather than by forcing `process.platform`.
+export function planFamilySwitch({ root = process.cwd(), config, to, from = null,
+  spell = spellings() } = {}) {
   if (!/^[a-z][a-z0-9-]*$/.test(to)) {
     throw new SyncError(`"${to}" is not a family name — expected lowercase letters, digits and hyphens`,
       EXIT.git);
@@ -116,7 +121,7 @@ export function planFamilySwitch({ root = process.cwd(), config, to, from = null
   const remote = probe(['ls-remote', '--heads', config.docs.upstream, to], root);
   if (!remote.ok || remote.out === '') {
     throw new SyncError(`upstream branch '${to}' not found — the release family may have moved; `
-      + `run ./snowarch docs family <name> --dry-run`, EXIT.upstream);
+      + `run ${spell.cli} docs family <name> --dry-run`, EXIT.upstream);
   }
   const tip = remote.out.split(/\s+/)[0];
 
@@ -166,7 +171,10 @@ const snip = (s) => {
 };
 
 /** The proposal, exactly as `--yes` will apply it. */
-export function formatPlan(plan, { applied = false } = {}) {
+  // ARC-07-C31 — the shell as a PARAMETER defaulting to the process: this renders for a
+  // terminal, so the reader's own shell is the right answer, and the parameter is what lets a
+  // case assert the Windows sentence by argument rather than by forcing `process.platform`.
+export function formatPlan(plan, { applied = false, spell = spellings() } = {}) {
   if (plan.already) return { text: `already on ${plan.to} — nothing to do`, code: EXIT.ok };
   const lines = [`docs family: ${plan.from} → ${plan.to}`];
   lines.push(`upstream branch ${plan.to}: found (tip ${plan.tip.slice(0, 7)})`);
@@ -182,8 +190,8 @@ export function formatPlan(plan, { applied = false } = {}) {
     lines.push(`REVIEW (not edited) ${r.file}:${r.line}  "${snip(r.text)}"`);
   }
   if (!applied) {
-    lines.push('THEN: ./snowarch docs sync --upstream (moves the pin to '
-      + `${plan.to} tip), ./snowarch docs verify, ARC-02 description-length lint`);
+    lines.push(`THEN: ${spell.cli} docs sync --upstream (moves the pin to `
+      + `${plan.to} tip), ${spell.cli} docs verify, ARC-02 description-length lint`);
     lines.push('dry run — nothing changed. Re-run with --yes to apply.');
   }
   return { text: lines.join('\n'), code: EXIT.ok };
