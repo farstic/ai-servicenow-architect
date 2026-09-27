@@ -100,6 +100,7 @@ const withLongPaths = (args) => (isWindows() ? ['-c', 'core.longpaths=true', ...
  * business: the matched substrings are libcurl's, as surfaced by git.
  */
 import * as SENTENCE from '../net-sentences.mjs';
+import { needSpell, spellings } from '../launcher-spelling.mjs';
 
 export { maskProxy, upstreamHost } from '../net-sentences.mjs';
 
@@ -112,7 +113,14 @@ export { maskProxy, upstreamHost } from '../net-sentences.mjs';
  * substrings themselves are S-07's deliverable. Matched case-insensitively: git surfaces libcurl's
  * casing, and it has varied across versions.
  */
-export function classifyGitFailure(stderr, { upstream, pin, env = process.env } = {}) {
+/**
+ * ARC-07-C31 — the SPELLING arrives in the ctx, required, rather than a `platform` this would default.
+ *
+ * All four call sites already pass a `ctx` built in one place per module, so putting it there is one
+ * edit per module instead of four, and the four cannot come to different conclusions about the shell.
+ */
+export function classifyGitFailure(stderr, { upstream, pin, env = process.env, spell } = {}) {
+  needSpell(spell, 'classifyGitFailure');
   const text = String(stderr ?? '');
   const low = text.toLowerCase();
   const proxy = env.HTTPS_PROXY || env.https_proxy || null;
@@ -132,7 +140,7 @@ export function classifyGitFailure(stderr, { upstream, pin, env = process.env } 
   }
   if (low.includes('not our ref') || low.includes("couldn't find remote ref")
       || low.includes('could not find remote ref')) {
-    return SENTENCE.unfetchablePin(pin);
+    return SENTENCE.unfetchablePin(pin, spell.cli);
   }
   if (low.includes('no space left on device')) {
     return SENTENCE.noDiskSpace;
@@ -489,7 +497,7 @@ export function syncCorpus({ root = process.cwd(), config, mode: requestedMode, 
   const corpus = join(root, CORPUS_DIR);
   const areas = readAreas(root, docs.areasFile);
   const mode = resolveMode(root, requestedMode);
-  const ctx = { upstream: docs.upstream, pin: docs.pin };
+  const ctx = { upstream: docs.upstream, pin: docs.pin, spell: spellings() };
   const say = quiet ? () => {} : log;
   // Only the three steps that TOUCH THE NETWORK are declared retryable. The class gate would make
   // it harmless to declare the local ones too — `sparse-checkout set` cannot emit a libcurl error —

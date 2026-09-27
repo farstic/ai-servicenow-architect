@@ -5,6 +5,7 @@
 // can get wrong — an unknown command, an unknown flag, a missing value — ends in EXIT_USAGE with
 // the usage block for what they were actually trying to do, never a stack trace.
 import { EXIT_OK, EXIT_USAGE } from './exit.mjs';
+import { spellings } from './text.mjs';
 import { cwdNote, loadConfig, root } from './config.mjs';
 import { renderVersion, versionInfo } from './version-info.mjs';
 import { createLogger } from './log.mjs';
@@ -54,7 +55,11 @@ export function parseArgs(argv, { booleans = [] } = {}) {
 
 const PLACEHOLDER = (name, story) => ({
   summary: `${name} — not available in this build`,
-  usage: `usage: ./snowarch ${name} …\n\n  Not available in this build; ${story} adds it.`,
+  // ARC-07-C31 — A FUNCTION OF `where`, like every usage in this table now. NOTE FOR A REVIEWER:
+  // nothing constructs `PLACEHOLDER` today; it is swept with the rest because a dead branch that
+  // spells the launcher by hand is the one a future caller would copy.
+  usage: (where) => `usage: ${spellings(where).cli} ${name} …\n\n`
+    + `  Not available in this build; ${story} adds it.`,
   run: ({ log }) => {
     log.fail(`"${name}" is not available in this build — ${story} adds it`);
     return EXIT_USAGE;
@@ -123,10 +128,10 @@ async function upgradeCommand(args) {
 
 export const COMMANDS = {
   version: { summary: 'print the version, the release tag, the commit, the contract sha and the floors',
-    run: versionCommand, usage: 'usage: ./snowarch version [--json]' },
+    run: versionCommand, usage: (where) => `usage: ${spellings(where).cli} version [--json]` },
   docs: { summary: 'sync, verify, describe or re-family the documentation corpus', run: docsCommand,
-    usage: 'usage: ./snowarch docs (sync | verify | status | family) …\n\n'
-      + '  Run `./snowarch docs` with no sub-command for the full flag list.' },
+    usage: (where) => `usage: ${spellings(where).cli} docs (sync | verify | status | family) …\n\n`
+      + `  Run \`${spellings(where).cli} docs\` with no sub-command for the full flag list.` },
   bootstrap: { summary: 'install this checkout: plan, then the numbered steps, resumable',
     run: bootstrapCommand, usage: BOOTSTRAP_USAGE, booleans: ['yes', 'reset', 'skip-claude-check'],
     defersLog: true },
@@ -160,9 +165,17 @@ export const COMMANDS = {
     booleans: ['check', 'yes', 'pre', 'force-floor'] },
 };
 
-export function helpText() {
+/**
+ * ARC-07-C31 — `where` is a PARAMETER with the process as its default, not a read inside the body.
+ *
+ * The default keeps every existing caller — `main`, `bin/snowarch.mjs`, `cli.test.mjs` — writing
+ * `helpText()` and getting the shell in front of them, which is what a terminal should show. The
+ * parameter is what lets a case drive the Windows rendering by argument: ARC-07 measured forcing
+ * `process.platform` as unusable locally, because `win32.resolve` on POSIX paths fails everything.
+ */
+export function helpText(where) {
   const width = Math.max(...Object.keys(COMMANDS).map((k) => k.length));
-  const lines = ['usage: ./snowarch <command> [options]', '', 'commands:'];
+  const lines = [`usage: ${spellings(where).cli} <command> [options]`, '', 'commands:'];
   for (const [name, c] of Object.entries(COMMANDS)) {
     lines.push(`  ${name.padEnd(width)}  ${c.summary}`);
   }
@@ -171,16 +184,21 @@ export function helpText() {
   return lines.join('\n');
 }
 
-export async function main(argv, { out = process.stdout, err = process.stderr, home = '' } = {}) {
+export async function main(argv, { out = process.stdout, err = process.stderr, home = '',
+  platform = process.platform, env = process.env } = {}) {
+  // ARC-07-C31 — ONE `where`, built once and threaded, so the help, the usage and the
+  // unknown-command line cannot render three different shells in one run. Defaulted to the
+  // process: this is a terminal, and the reader's own shell is the right answer here.
+  const where = { platform, env };
   const [name, ...rest] = argv;
 
   if (name === undefined || name === 'help' || name === '--help') {
-    out.write(`${helpText()}\n`);
+    out.write(`${helpText(where)}\n`);
     return EXIT_OK;
   }
   const command = COMMANDS[name];
   if (!command) {
-    err.write(`snowarch: unknown command "${name}" — run ./snowarch help\n`);
+    err.write(`snowarch: unknown command "${name}" — run ${spellings(where).cli} help\n`);
     return EXIT_USAGE;
   }
 
@@ -196,7 +214,7 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
   // ARC-07-W17 — A USAGE MAY BE A FUNCTION. The doctor's has to be: deriving its launcher through
   // `spellings()` at module load throws inside the `panel -> text -> report-text -> panel` cycle, so
   // it is evaluated when it is printed. Resolved in one place, so every command may do the same.
-  const usageOf = (c) => (typeof c.usage === 'function' ? c.usage() : c.usage);
+  const usageOf = (c) => (typeof c.usage === 'function' ? c.usage(where) : c.usage);
   if (flags.help) { out.write(`${usageOf(command)}\n`); return EXIT_OK; }
   if (errors.length > 0 && name !== 'docs') {
     // `docs` parses its own arguments — it has sub-commands of its own — so the frame does not

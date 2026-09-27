@@ -10,6 +10,16 @@ import {
   applyFamilySwitch, classifyLine, formatPlan, planFamilySwitch,
 } from '../tools/snowarch/lib/docs/family.mjs';
 import { AREAS, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
+import { spellings } from '../tools/snowarch/lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
 
 /**
  * The family switch, on a seeded tree.
@@ -114,7 +124,7 @@ test('AC 1 — the dry run prints both config edits, every gateway, a REVIEW lis
   assert.equal(before, '', 'precondition: the tree is clean');
 
   const plan = planFamilySwitch({ ...w, to: 'zurich' });
-  const text = formatPlan(plan).text;
+  const text = formatPlan(plan, { spell: SPELL }).text;
 
   assert.match(text, /^docs family: australia → zurich$/m);
   assert.match(text, /^upstream branch zurich: found \(tip [0-9a-f]{7}\)$/m);
@@ -271,7 +281,7 @@ test('AC 4 — --yes applies every EDIT byte-for-byte, moves the pin, and stages
     .map((e) => [`${e.file}:${e.line}`, e.after]));
   assert.ok(planned.size > 0, 'precondition: there are prose edits to apply');
 
-  const r = applyFamilySwitch(plan, { ...w, log: silent });
+  const r = applyFamilySwitch(plan, { ...w, log: silent, spell: SPELL });
   assert.equal(r.applied, true);
 
   for (const [where, after] of planned) {
@@ -291,9 +301,9 @@ test('AC 6 — a second --yes is a no-op that says so', () => {
   const w = seeded({ family: 'zurich' });
   const plan = planFamilySwitch({ ...w, to: 'zurich' });
   assert.equal(plan.already, true);
-  assert.equal(formatPlan(plan).text, 'already on zurich — nothing to do');
+  assert.equal(formatPlan(plan, { spell: SPELL }).text, 'already on zurich — nothing to do');
   const lines = [];
-  const r = applyFamilySwitch(plan, { ...w, log: (l) => lines.push(l) });
+  const r = applyFamilySwitch(plan, { ...w, log: (l) => lines.push(l), spell: SPELL });
   assert.equal(r.applied, false);
   assert.deepEqual(lines, ['already on zurich — nothing to do']);
 });
@@ -307,9 +317,9 @@ test('a family outside the schema enum adds one enum line, applied first', () =>
 
   const plan = planFamilySwitch({ ...w, to: 'behind' });
   assert.ok(plan.schemaEdit, 'no schema edit was planned');
-  assert.match(formatPlan(plan).text, /^EDIT engine\.config\.schema\.json: docs\.family enum \+ "behind"$/m);
+  assert.match(formatPlan(plan, { spell: SPELL }).text, /^EDIT engine\.config\.schema\.json: docs\.family enum \+ "behind"$/m);
 
-  applyFamilySwitch(plan, { ...w, log: silent });
+  applyFamilySwitch(plan, { ...w, log: silent, spell: SPELL });
   const after = JSON.parse(read(w.root, 'engine.config.schema.json'))
     .properties.docs.properties.family.enum;
   assert.ok(after.includes('behind'), 'the enum was not extended');
@@ -320,7 +330,7 @@ test('a family already in the enum adds no schema line', () => {
   const w = seeded();
   const plan = planFamilySwitch({ ...w, to: 'zurich' });
   assert.equal(plan.schemaEdit, null, 'zurich is in the enum and needs no edit');
-  assert.ok(!formatPlan(plan).text.includes('engine.config.schema.json'));
+  assert.ok(!formatPlan(plan, { spell: SPELL }).text.includes('engine.config.schema.json'));
 });
 
 test('--from repairs a half-done switch', () => {
@@ -360,7 +370,7 @@ test('the lint-failure path exits 1, keeps the edits staged, and prints both rec
 
   const plan = planFamilySwitch({ ...w, to: 'zurich' });
   const lines = [];
-  const r = applyFamilySwitch(plan, { ...w, log: (l) => lines.push(l) });
+  const r = applyFamilySwitch(plan, { ...w, log: (l) => lines.push(l), spell: SPELL });
   const text = lines.join('\n');
 
   assert.equal(r.code, EXIT.incomplete, 'a failing lint must exit 1');
@@ -387,14 +397,14 @@ test('an edit whose line moved since the plan is refused, not applied blindly', 
   git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'someone else'], w.root);
   assert.equal(git(['status', '--porcelain'], w.root).trim(), '', 'precondition: clean again');
 
-  assert.throws(() => applyFamilySwitch(plan, { ...w, log: silent }),
+  assert.throws(() => applyFamilySwitch(plan, { ...w, log: silent, spell: SPELL }),
     /is not the line the plan described/);
 });
 
 test('the areas file and the corpus contents are not rewritten by a family switch', () => {
   const w = seeded();
   const areas = read(w.root, 'vendor/docs-areas.txt');
-  applyFamilySwitch(planFamilySwitch({ ...w, to: 'zurich' }), { ...w, log: silent });
+  applyFamilySwitch(planFamilySwitch({ ...w, to: 'zurich' }), { ...w, log: silent, spell: SPELL });
   assert.equal(read(w.root, 'vendor/docs-areas.txt'), areas);
   assert.equal(AREAS.length, areas.split('\n').filter(Boolean).length);
 });
@@ -409,7 +419,7 @@ test('a tree dirtied after the dry run is refused by the earlier, broader guard'
   git(['add', 'unrelated.md'], w.root);
   assert.match(git(['status', '--porcelain'], w.root), /unrelated\.md/);
 
-  assert.throws(() => applyFamilySwitch(plan, { ...w, log: silent }), (e) => {
+  assert.throws(() => applyFamilySwitch(plan, { ...w, log: silent, spell: SPELL }), (e) => {
     assert.equal(e.code, EXIT.dirty);
     assert.match(e.message, /^working tree not clean/);
     return true;

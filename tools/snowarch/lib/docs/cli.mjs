@@ -16,8 +16,18 @@ import { docsStatus, formatStatus } from './status.mjs';
 import { syncUpstream, formatUpstream } from './upstream.mjs';
 import { planFamilySwitch, formatPlan, applyFamilySwitch, EXIT_NEEDS_YES } from './family.mjs';
 import { root } from '../config.mjs';
+import { spellings } from '../launcher-spelling.mjs';
 
-export function runDocs(argv) {
+/**
+ * ARC-07-C31 — THE BOUNDARY, which is the one place reading the process is the right answer.
+ *
+ * This is the docs command's entry point: everything below renders for the person who typed it, so
+ * the spelling is resolved ONCE here and threaded, rather than each renderer deciding for itself.
+ * A parameter with a process default rather than a bare `spellings()` in the body, so a case can
+ * drive the whole command's Windows rendering by argument. One caller — `tools/snowarch/lib/cli.mjs`'s
+ * `docs` entry — which is what the rule requires of a default.
+ */
+export function runDocs(argv, { spell = spellings() } = {}) {
   const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
   const [cmd, ...rest] = argv;
 
@@ -55,7 +65,7 @@ export function runDocs(argv) {
       try {
         const r = syncUpstream({
           root, config, to: value('--to') ?? null,
-          verify: !flag('--no-verify'), log: asJson ? null : console.log,
+          verify: !flag('--no-verify'), log: asJson ? null : console.log, spell,
         });
         if (asJson) console.log(JSON.stringify(r, null, 2));
         return (formatUpstream(r).code);
@@ -113,9 +123,9 @@ export function runDocs(argv) {
     const r = verifyCitations({ root, allowMissing: rest.includes('--allow-missing') });
     if (rest.includes('--json')) {
       console.log(JSON.stringify(r, null, 2));
-      return (formatResult(r).code);
+      return (formatResult(r, spell).code);
     }
-    const { text, code } = formatResult(r);
+    const { text, code } = formatResult(r, spell);
     (code === EXIT.ok ? console.log : console.error)(text);
     return (code);
   }
@@ -129,16 +139,16 @@ export function runDocs(argv) {
       return (2);
     }
     try {
-      const plan = planFamilySwitch({ root, config, to: name, from: val('--from') ?? null });
+      const plan = planFamilySwitch({ root, config, to: name, from: val('--from') ?? null, spell });
       if (has('--json')) { console.log(JSON.stringify(plan, null, 2)); return (0); }
       if (!has('--yes')) {
-        console.log(formatPlan(plan).text);
+        console.log(formatPlan(plan, { spell }).text);
         // No flag at all is not a dry run: the maintainer asked for something and got a plan, so the
         // exit code has to say the thing they asked for did not happen.
         if (!has('--dry-run')) { console.error('refusing to apply without --yes'); return (EXIT_NEEDS_YES); }
         return (0);
       }
-      const r = applyFamilySwitch(plan, { root, config });
+      const r = applyFamilySwitch(plan, { root, config, spell });
       return (r.code);
     } catch (e) {
       if (!(e instanceof SyncError)) throw e;
@@ -156,7 +166,7 @@ export function runDocs(argv) {
       console.log(JSON.stringify(s, null, 2));
       return (0);
     }
-    const { text, code } = formatStatus(s);
+    const { text, code } = formatStatus(s, spell);
     (code === 0 ? console.log : console.error)(text);
     return (code);
   }

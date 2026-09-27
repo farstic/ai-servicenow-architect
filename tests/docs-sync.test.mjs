@@ -11,6 +11,16 @@ import {
 } from '../tools/snowarch/lib/docs/sync.mjs';
 // One fixture, shared with tests/docs-status.test.mjs — see tests/helpers/docs-fixture.mjs.
 import { AREAS, LONG_NAME, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
+import { spellings } from '../tools/snowarch/lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
 
 let scratch, upstream, upstreamUrl;
 const workspace = () => makeWorkspace({ scratch, pin: upstream.pin, upstreamUrl });
@@ -257,31 +267,33 @@ test('failure mapping — every row, and the proxy password never appears', () =
     ['fatal: unable to access: SSL certificate problem: unable to get local issuer certificate', {},
       'TLS interception detected — set GIT_SSL_CAINFO (or git config http.sslCAInfo) to your corporate CA bundle and re-run; the MCP server needs the same bundle via NODE_EXTRA_CA_CERTS (docs/TROUBLESHOOTING.md)'],
     ["fatal: couldn't find remote ref ba513f2", {},
-      'pin ba513f2 not fetchable from upstream (force-push or history rewrite?) — maintainer: run ./snowarch docs sync --upstream'],
+      'pin ba513f2 not fetchable from upstream (force-push or history rewrite?) — maintainer: '
+      + `run ${SPELL.cli} docs sync --upstream`],
     ['fatal: remote error: upload-pack: not our ref ba513f2', {},
-      'pin ba513f2 not fetchable from upstream (force-push or history rewrite?) — maintainer: run ./snowarch docs sync --upstream'],
+      'pin ba513f2 not fetchable from upstream (force-push or history rewrite?) — maintainer: '
+      + `run ${SPELL.cli} docs sync --upstream`],
     ['fatal: write error: No space left on device', {},
       'insufficient disk space: need ~400 MB free (~700 MB for --mode full)'],
     ['fatal: something nobody predicted\nand a second line', {},
       'git failed: fatal: something nobody predicted'],
   ];
   for (const [stderr, env, expected] of cases) {
-    assert.equal(classifyGitFailure(stderr, { upstream: UPSTREAM, pin: PIN, env }), expected, stderr.slice(0, 40));
+    assert.equal(classifyGitFailure(stderr, { upstream: UPSTREAM, pin: PIN, env, spell: SPELL }), expected, stderr.slice(0, 40));
   }
-  assert.ok(!classifyGitFailure('Could not resolve proxy: x', { upstream: UPSTREAM, pin: PIN, env: { HTTPS_PROXY: 'http://user:pw@127.0.0.1:9' } }).includes('pw'));
+  assert.ok(!classifyGitFailure('Could not resolve proxy: x', { upstream: UPSTREAM, pin: PIN, spell: SPELL, env: { HTTPS_PROXY: 'http://user:pw@127.0.0.1:9' } }).includes('pw'));
 });
 
 test('failure mapping — the casing git happens to use does not matter', () => {
-  assert.match(classifyGitFailure('FATAL: COULD NOT RESOLVE HOST: GITHUB.COM', { upstream: UPSTREAM, pin: PIN, env: {} }), /^cannot reach github\.com \(DNS\)/);
+  assert.match(classifyGitFailure('FATAL: COULD NOT RESOLVE HOST: GITHUB.COM', { upstream: UPSTREAM, pin: PIN, env: {}, spell: SPELL }), /^cannot reach github\.com \(DNS\)/);
 });
 
 test('a proxy is not blamed when none is configured, and DNS is not blamed when one is', () => {
   // The two halves of the same mistake: sending someone to check their DNS when the proxy is the
   // problem, or to their proxy when they have none.
   const dnsWithProxy = classifyGitFailure('Could not resolve host: github.com',
-    { upstream: UPSTREAM, pin: PIN, env: { HTTPS_PROXY: 'http://127.0.0.1:9' } });
+    { upstream: UPSTREAM, pin: PIN, spell: SPELL, env: { HTTPS_PROXY: 'http://127.0.0.1:9' } });
   assert.ok(!dnsWithProxy.includes('(DNS)'), 'blamed DNS while a proxy was configured');
-  const proxyWithout = classifyGitFailure('Could not resolve proxy: nope', { upstream: UPSTREAM, pin: PIN, env: {} });
+  const proxyWithout = classifyGitFailure('Could not resolve proxy: nope', { upstream: UPSTREAM, pin: PIN, env: {}, spell: SPELL });
   assert.ok(!proxyWithout.includes('HTTPS_PROXY'), 'blamed a proxy that is not configured');
 });
 

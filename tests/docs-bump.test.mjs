@@ -10,6 +10,16 @@ import { syncUpstream } from '../tools/snowarch/lib/docs/upstream.mjs';
 import { prBody } from '../scripts/docs-bump.mjs';
 import { RECIPE_TARGET, renderRecipeBlock } from '../tools/snowarch/lib/docs/recipe-block.mjs';
 import { AREAS, CITED_PAGE, buildUpstream, git, makeWorkspace, writeCitingSkill } from './helpers/docs-fixture.mjs';
+import { spellings } from '../tools/snowarch/lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
 
 /**
  * The weekly bump: the body a reviewer reads, and the paths the workflow takes around it.
@@ -72,7 +82,7 @@ test('AC 1 — the body carries the pin line, the citations line and the newly-d
   const w = ready();
   // `deletes-cited` removes the page the fixture skill cites, so there IS a newly dead citation —
   // the shape the real first bump will have.
-  const report = syncUpstream({ ...w, config: { ...w.config, docs: { ...w.config.docs, family: 'deletes-cited' } }, log: silent });
+  const report = syncUpstream({ ...w, config: { ...w.config, docs: { ...w.config.docs, family: 'deletes-cited' } }, log: silent, spell: SPELL });
   const body = prBody(report);
 
   assert.match(body, new RegExp(`^docs pin: ${upstream.pin.slice(0, 7)} \\(\\d{4}-\\d\\d-\\d\\d\\) → [0-9a-f]{7} `, 'm'));
@@ -83,7 +93,7 @@ test('AC 1 — the body carries the pin line, the citations line and the newly-d
 
 test('the body leads with the checklist and fences the report unaltered', () => {
   const w = ready();
-  const report = syncUpstream({ ...w, log: silent });
+  const report = syncUpstream({ ...w, log: silent, spell: SPELL });
   const body = prBody(report);
   const lines = body.split('\n');
 
@@ -166,7 +176,7 @@ test('AC 3 — the branch name is stable for the same target SHA', () => {
   // The workflow derives it from the short SHA, so two runs against one tip address one branch and
   // therefore one pull request. Asserted on the value the workflow reads, not on the workflow.
   const w = ready();
-  const a = syncUpstream({ ...w, log: silent });
+  const a = syncUpstream({ ...w, log: silent, spell: SPELL });
   assert.equal(`chore/docs-bump-${a.to.slice(0, 7)}`, `chore/docs-bump-${upstream.tip.slice(0, 7)}`);
   assert.match(`chore/docs-bump-${a.to.slice(0, 7)}`, /^chore\/docs-bump-[0-9a-f]{7}$/);
 });
@@ -209,7 +219,7 @@ test('the workflow never merges, never edits skills, and asks for no secret but 
 test('the areas file is untouched by a bump', () => {
   const w = ready();
   const areas = read(w.root, 'vendor/docs-areas.txt');
-  syncUpstream({ ...w, log: silent });
+  syncUpstream({ ...w, log: silent, spell: SPELL });
   assert.equal(read(w.root, 'vendor/docs-areas.txt'), areas);
   assert.equal(AREAS.length, areas.split('\n').filter(Boolean).length);
 });
@@ -249,7 +259,7 @@ test('the body a reviewer reads names the regenerated document among the staged 
   git(['add', '-A'], w.root);
   git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'doc'], w.root);
 
-  const report = syncUpstream({ ...w, log: silent });
+  const report = syncUpstream({ ...w, log: silent, spell: SPELL });
   const fenced = prBody(report).split('```')[1].trim().split('\n');
 
   assert.equal(report.recipe.architecture, 'written');

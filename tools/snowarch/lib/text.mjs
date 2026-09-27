@@ -9,7 +9,7 @@
 // rather than repeating the strings.
 
 import { renderSummaryLine } from './doctor/report-text.mjs';
-import { POSIX, isWindowsShell, spellings } from './launcher-spelling.mjs';
+import { POSIX, isWindowsShell, needSpell, spellings } from './launcher-spelling.mjs';
 
 /**
  * How many Claude Code dialogs a first `claude` will show.
@@ -39,7 +39,7 @@ export const EXPECTED_DIALOGS = 1;
 // because that form re-exports WITHOUT binding the name in this module, and three renderers in this
 // file call `spellings` themselves. The one-line version was 55 red cases in the engine suite alone,
 // all of them `ReferenceError: spellings is not defined`.
-export { isWindowsShell, spellings };
+export { isWindowsShell, needSpell, spellings };
 
 /**
  * The four things a design-only or unknown checkout can BE, as sentences.
@@ -95,16 +95,6 @@ export const ADD_INSTANCE = (cli = POSIX.cli) =>
  * `summaryLine` and `renderText` carry, for the same reason: a plausible-looking wrong line passes
  * review and a green test.
  */
-const needSpell = (spell, who) => {
-  if (!spell || typeof spell.cli !== 'string' || typeof spell.bootstrap !== 'string') {
-    // The OWNER is named by the caller, not assumed: this helper guards `MODE_VARIANTS` and `BANNER`
-    // both, and a message that said MODE_VARIANTS for a BANNER member sent the reader to the wrong
-    // object. It did exactly that once, which is why `who` is now the full name.
-    throw new TypeError(`${who} needs a spellings object — this module has no process `
-      + 'default, because its three consumers render for three different shells');
-  }
-  return spell;
-};
 
 /**
  * EVERY VARIANT TAKES ONE, including the one that does not use it.

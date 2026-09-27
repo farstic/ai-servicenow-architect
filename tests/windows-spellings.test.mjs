@@ -29,6 +29,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
+// The markers come from the generator that WRITES them — ARC-07-C31. A copy here would be a
+// second declaration of the region's shape, and the guard would go quietly blind the day the
+// generator changed it.
+import { BEGIN as HELP_BEGIN, END as HELP_END } from '../scripts/gen-cli-help.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8');
@@ -171,27 +176,14 @@ const SWEEP_REMAINDER = Object.freeze(new Map([
   ['packages/snowarch/src/tools/updateset.ts', 2],
   ['packages/snowarch/src/utils/permissions.ts', 3],
   ['scripts/ci/doctor-snapshot.mjs', 2],
-  ['scripts/gen-cli-help.mjs', 1],
   ['scripts/gen-doctor-docs.mjs', 1],
   ['scripts/lib/release/preflight.mjs', 1],
   ['tools/snowarch/lib/bootstrap.mjs', 3],
-  ['tools/snowarch/lib/cli.mjs', 6],
-  ['tools/snowarch/lib/commands/status.mjs', 1],
   ['tools/snowarch/lib/commands/upgrade.mjs', 4],
-  ['tools/snowarch/lib/docs/family.mjs', 3],
-  ['tools/snowarch/lib/docs/status.mjs', 2],
-  ['tools/snowarch/lib/docs/upstream.mjs', 1],
-  ['tools/snowarch/lib/docs/verify.mjs', 2],
-  ['tools/snowarch/lib/instance.mjs', 2],
-  ['tools/snowarch/lib/mode.mjs', 2],
-  ['tools/snowarch/lib/net-sentences.mjs', 1],
-  ['tools/snowarch/lib/state.mjs', 3],
   ['tools/snowarch/lib/steps/B02.mjs', 4],
   ['tools/snowarch/lib/steps/B04.mjs', 1],
   ['tools/snowarch/lib/steps/format.mjs', 4],
   ['tools/snowarch/lib/steps/index.mjs', 1],
-  ['tools/snowarch/lib/store.mjs', 1],
-  ['tools/snowarch/lib/version-info.mjs', 1]
 ]));
 
 /**
@@ -204,8 +196,30 @@ const SWEEP_REMAINDER = Object.freeze(new Map([
  * were right the whole time, which is exactly why it went unnoticed until the numbers were read back
  * against the file. The same bug was in the sweeper I wrote to fix these sites, caught there first.
  */
-const codeOf = (text) => text
-  .replace(/\/\*[\s\S]*?\*\//g, (block) => '\n'.repeat((block.match(/\n/g) ?? []).length))
+const blankLines = (block) => '\n'.repeat((block.match(/\n/g) ?? []).length);
+
+/**
+ * A GENERATED REGION IS NOT THE FILE'S LINE — ARC-07-C31, and it is blanked rather than read.
+ *
+ * `instance.mjs` and `store.mjs` each carry a `help-begin`/`help-end` region written by
+ * `scripts/gen-cli-help.mjs`. The `usage:` line inside it spells the launcher POSIX, and editing it in
+ * the product file is undone by the next `gen:check` — so blaming the frame for it sends a maintainer
+ * to a line they must not change. The literal's owner is the generator, which is held to the pinned
+ * spelling by the `no generator can render a launcher for the machine it runs on` case AND by the
+ * `a generated region holds the pinned POSIX rendering` case below.
+ *
+ * BLANKED BEFORE THE COMMENTS ARE, because the markers are themselves `//` comments: stripping first
+ * would leave two blank lines and nothing to find. Line-count preserving, for the reason the block
+ * comment above is — a guard that reports the wrong line number is most of the cost of using it.
+ */
+const withoutGeneratedRegions = (text) => {
+  const pattern = new RegExp(`${HELP_BEGIN.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[\\s\\S]*?`
+    + `${HELP_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
+  return text.replace(pattern, blankLines);
+};
+
+const codeOf = (text) => withoutGeneratedRegions(text)
+  .replace(/\/\*[\s\S]*?\*\//g, blankLines)
   .split('\n')
   .map((line) => line.replace(/(^|[^:])\/\/.*$/, '$1'))
   .join('\n');
@@ -380,6 +394,40 @@ test('...and the negative: the check sees a planted bare spelling', () => {
   assert.equal('cd /d "{root}" && .\\bootstrap.cmd'.includes('cd /d '), true);
 });
 
+/**
+ * The pair to `withoutGeneratedRegions` — ARC-07-C31, and without it that blanking IS a blind spot.
+ *
+ * The sweep skips a `help-begin`/`help-end` region because its literal belongs to the generator. That
+ * is only honest while the region actually holds what the generator pins, so this reads the committed
+ * regions back and asserts exactly that. Together the two are the whole rule: the frame is not blamed
+ * for a line it must not edit, and nobody may hand-write a different launcher inside the markers and
+ * have it skipped.
+ *
+ * READ FROM THE PRODUCT FILES, not from the generator's output in memory: `gen:check` already proves
+ * the generator and the files agree, and a case that re-ran the generator would prove the same thing
+ * twice while proving nothing about what is committed.
+ */
+test('ARC-07-C31 — a generated help region holds the PINNED POSIX rendering', () => {
+  const regions = [
+    ['tools/snowarch/lib/instance.mjs', 'instance'],
+    ['tools/snowarch/lib/store.mjs', 'store'],
+  ];
+  for (const [rel, word] of regions) {
+    const text = read(rel);
+    const from = text.indexOf(HELP_BEGIN);
+    const to = text.indexOf(HELP_END, from);
+    assert.ok(from !== -1 && to !== -1,
+      `${rel} has no ${HELP_BEGIN} / ${HELP_END} region — has the generator's marker changed?`);
+    const body = text.slice(from, to);
+    assert.ok(body.includes(`usage: ${POSIX.cli} ${word} <command> [options]`),
+      `${rel}'s generated region is not the pinned POSIX rendering:\n${body}`);
+    // And the Windows spelling is NOT in it, which is the direction that fails if a Windows runner
+    // ever regenerates and commits: the assertion above would still pass on a second usage line.
+    assert.equal(body.includes('snowarch.cmd'), false,
+      `${rel}'s generated region carries a Windows spelling — it is committed, so it must be POSIX`);
+  }
+});
+
 test('ARC-07-W17 — no generator can render a launcher for the machine it runs on', () => {
   // EVERY GENERATED TARGET IS COMMITTED, so its bytes must be identical on every runner or `gen:check`
   // fails on one of them — and that failure is not cosmetic: on the twelve red Windows cells it took
@@ -457,4 +505,133 @@ test('ARC-07-C31 — every banner message renders the Windows spelling on a Wind
   const posix = spellings({ platform: 'linux', env: {} });
   assert.match(BANNER.upgrade('v9.9.9', posix), /\.\/snowarch upgrade\.$/);
   assert.doesNotMatch(BANNER.timedOut(posix), /snowarch\.cmd/);
+});
+
+/**
+ * ARC-07-C31 slice 2 — THE SENTENCES, DRIVEN, not merely swept.
+ *
+ * The sweep above proves no literal remains. It says nothing about what a Windows reader is SHOWN,
+ * which is the gap the architect's review of slice 1 found: six messages had been repaired and the
+ * only thing holding them was a source-level guard that could not read the file they were in.
+ *
+ * So each helper slice 2 changed is rendered with a win32 spelling and read. `env: {}` is load-bearing
+ * — `isWindowsShell` is `platform === 'win32' && !env.SHELL && !env.MSYSTEM` and `env` defaults to
+ * `process.env`, so `{ platform: 'win32' }` alone renders POSIX on any machine whose SHELL is set.
+ *
+ * WHAT IS NOT COVERED HERE, said plainly: `planFamilySwitch` and `syncUpstream` each throw their
+ * sentence from inside a network branch — `ls-remote` and `fetch` against the real upstream — so
+ * driving them would mean a network fixture, and they are held by the sweep alone for now. Both take
+ * a `spell` parameter, so a case can reach them the day one of those fixtures exists.
+ */
+test('ARC-07-C31 — every sentence slice 2 changed renders the Windows spelling', async () => {
+  const WIN = { platform: 'win32', env: {} };
+  const win = spellings(WIN);
+  const posix = spellings({ platform: 'linux', env: {} });
+
+  const { NOT_BOOTSTRAPPED } = await import('../tools/snowarch/lib/mode.mjs');
+  const { NOT_INSTALLED } = await import('../tools/snowarch/lib/instance.mjs');
+  const { E12_ABSENT, formatStatus } = await import('../tools/snowarch/lib/docs/status.mjs');
+  const { unfetchablePin } = await import('../tools/snowarch/lib/net-sentences.mjs');
+  const { formatResult } = await import('../tools/snowarch/lib/docs/verify.mjs');
+  const { formatPlan } = await import('../tools/snowarch/lib/docs/family.mjs');
+
+  // [name, windows rendering, posix rendering] — one table, so a helper cannot be covered in one
+  // direction only. The POSIX half is what would catch a helper that hard-coded the Windows form.
+  const rendered = [
+    ['NOT_BOOTSTRAPPED', NOT_BOOTSTRAPPED(win), NOT_BOOTSTRAPPED(posix)],
+    ['NOT_INSTALLED', NOT_INSTALLED(win), NOT_INSTALLED(posix)],
+    ['E12_ABSENT', E12_ABSENT('skip', win), E12_ABSENT('skip', posix)],
+    ['unfetchablePin', unfetchablePin('abc1234', win.cli), unfetchablePin('abc1234', posix.cli)],
+    ['formatStatus', formatStatus({ present: false, mode: 'skip' }, win).text,
+      formatStatus({ present: false, mode: 'skip' }, posix).text],
+    ['formatResult', formatResult({ status: 'missing', allowMissing: false }, win).text,
+      formatResult({ status: 'missing', allowMissing: false }, posix).text],
+    ['formatPlan', formatPlan({ from: 'a', to: 'b', tip: 'deadbeefcafe', edits: [], review: [] },
+      { spell: win }).text,
+      formatPlan({ from: 'a', to: 'b', tip: 'deadbeefcafe', edits: [], review: [] },
+        { spell: posix }).text],
+  ];
+
+  for (const [name, w, p] of rendered) {
+    assert.doesNotMatch(w, /\.\/snowarch|\.\/bootstrap\.sh/,
+      `${name} renders a POSIX launcher on a Windows shell:\n${w}`);
+    assert.equal(/\.\\snowarch\.cmd|\.\\bootstrap\.cmd/.test(w), true,
+      `${name} renders no Windows launcher at all:\n${w}`);
+    assert.doesNotMatch(p, /snowarch\.cmd|bootstrap\.cmd/,
+      `${name} renders a Windows launcher on a POSIX shell:\n${p}`);
+  }
+
+  // `renderVersion` needs a whole info object, so it is driven separately rather than shoehorned
+  // into the table above.
+  const { renderVersion } = await import('../tools/snowarch/lib/version-info.mjs');
+  const info = { version: '1.0.0', releaseTag: 'v1.0.0', commit: 'abc1234', contractSha: 'aaaa',
+    builtContractSha: 'aaaa', contractMatches: true, floors: {}, docsPin: 'deadbeefcafe',
+    docsFamily: 'zurich', docsPinMatches: false, docsPinGitlink: 'feedfacedead' };
+  // JOINED: `renderVersion` returns the LINES, not a string — its caller joins them. Matching the
+  // array coerces it through `String()`, which joins on commas and would match by accident.
+  const vWin = renderVersion(info, win).join('\n');
+  assert.match(vWin, /\.\\snowarch\.cmd docs verify/, `renderVersion:\n${vWin}`);
+  assert.doesNotMatch(vWin, /\.\/snowarch/, 'a POSIX launcher on a Windows shell');
+  assert.match(renderVersion(info, posix).join('\n'), /\.\/snowarch docs verify/);
+});
+
+/**
+ * ...and the ones whose spelling is REQUIRED refuse to render without it — ARC-07-C31 slice 2.
+ *
+ * `NOT_BOOTSTRAPPED` and `NOT_INSTALLED` were `const`s handed to `refuse()` and `log.fail()`, so the
+ * failure worth preventing is a caller that drops the parentheses and prints the function's source.
+ * `E12_ABSENT` is required because TWO consumers render it for two different shells. `unfetchablePin`
+ * cannot import the shared guard — `tests/launcher-parity.test.mjs` copies that file alone — so it
+ * carries its own, and this case holds that the refusal is still a named TypeError rather than an
+ * `undefined` in a sentence whose whole job is to say what to type.
+ */
+test('ARC-07-C31 — a sentence with a required spelling THROWS rather than printing one', async () => {
+  const { NOT_BOOTSTRAPPED } = await import('../tools/snowarch/lib/mode.mjs');
+  const { NOT_INSTALLED } = await import('../tools/snowarch/lib/instance.mjs');
+  const { E12_ABSENT } = await import('../tools/snowarch/lib/docs/status.mjs');
+  const { unfetchablePin } = await import('../tools/snowarch/lib/net-sentences.mjs');
+
+  assert.throws(() => NOT_BOOTSTRAPPED(), { name: 'TypeError', message: /^NOT_BOOTSTRAPPED needs/ });
+  assert.throws(() => NOT_INSTALLED(), { name: 'TypeError', message: /^NOT_INSTALLED needs/ });
+  // The spelling is the SECOND argument here, which is the slip that cost three Windows cells when
+  // `summaryLine`'s options landed in its `checks` slot.
+  assert.throws(() => E12_ABSENT('skip'), { name: 'TypeError', message: /^E12_ABSENT needs/ });
+  assert.throws(() => unfetchablePin('abc1234'),
+    { name: 'TypeError', message: /^unfetchablePin needs the launcher spelling/ });
+});
+
+/**
+ * ...and so do the six that became required when the rule narrowed — ARC-07-C31.
+ *
+ * THIS CASE EXISTS BECAUSE A CONTROL WAS INERT. Degrading `loadState` to `spell = spellings()` broke
+ * nothing: every caller passes one, so the default was unreachable and no test noticed the guarantee
+ * had gone. A rule held only by review is a rule that returns the day someone adds the eleventh
+ * caller — and the eleventh caller is exactly what this row already tripped over, `recordedMode`
+ * calling through an injected default where a grep could not see it.
+ *
+ * So each one is called with NO spelling and must refuse. `loadState` is the one that matters most:
+ * seven of its callers hold a ctx, and a default would hand each of them the process.
+ */
+test('ARC-07-C31 — the six that became required refuse to render without a spelling', async () => {
+  const { loadState } = await import('../tools/snowarch/lib/state.mjs');
+  const { syncUpstream } = await import('../tools/snowarch/lib/docs/upstream.mjs');
+  const { formatPlan, applyFamilySwitch } = await import('../tools/snowarch/lib/docs/family.mjs');
+  const { formatResult } = await import('../tools/snowarch/lib/docs/verify.mjs');
+  const { classifyGitFailure } = await import('../tools/snowarch/lib/docs/sync.mjs');
+
+  const PLAN = { from: 'a', to: 'b', tip: 'deadbeefcafe', edits: [], review: [] };
+  // Each refuses BEFORE it does anything — `syncUpstream` and `applyFamilySwitch` would otherwise
+  // reach the network and the working tree, so a refusal that came later would be a test that runs a
+  // git fetch to prove an argument check.
+  for (const [name, call] of [
+    ['loadState', () => loadState('/nonexistent')],
+    ['syncUpstream', () => syncUpstream({ root: '/nonexistent', config: { docs: {} } })],
+    ['formatPlan', () => formatPlan(PLAN)],
+    ['formatResult', () => formatResult({ status: 'missing', allowMissing: false })],
+    ['classifyGitFailure', () => classifyGitFailure('fatal: nope', { upstream: 'u', pin: 'p' })],
+    ['applyFamilySwitch', () => applyFamilySwitch(PLAN, { root: '/nonexistent', config: { docs: {} } })],
+  ]) {
+    assert.throws(call, { name: 'TypeError', message: new RegExp(`^${name} needs a spellings object`) },
+      `${name} rendered without a spelling instead of refusing`);
+  }
 });

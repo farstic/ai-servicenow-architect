@@ -17,6 +17,7 @@ import { pathToFileURL } from 'node:url';
 
 import { cachePath, cacheStale, inputsPath } from '../doctor-cache.mjs';
 import { loadState, saveState } from '../state.mjs';
+import { spellFor } from './spell.mjs';
 
 /** The `data.fix.kind` vocabulary. A kind outside this table is never applied — it is reported. */
 export const KINDS = Object.freeze(['deps-missing', 'corpus-missing', 'sparse-mismatch',
@@ -72,14 +73,21 @@ function stepContext(root, ctx, { state = null, docs = null } = {}) {
 async function fixDeps({ root, ctx, run }) {
   if (ctx.mode !== 'live') return result('noop', 'design-only installs have no dependencies');
   const B04 = await import('../steps/B04.mjs');
-  const r = await (run ?? B04.run)(stepContext(root, ctx, { state: readState(root) }));
+  const r = await (run ?? B04.run)(stepContext(root, ctx,
+    { state: readState(root, spellFor(ctx)) }));
   return r?.status === 'fail' ? result('failed', r.detail) : result('applied', r?.detail ?? null);
 }
 
-/** The recorded state, or an empty one. A step that mutates it gets something to mutate. */
-function readState(root) {
+/**
+ * The recorded state, or an empty one. A step that mutates it gets something to mutate.
+ *
+ * ARC-07-C31 — `spell` is threaded rather than defaulted: both callers hold a `ctx`, so the doctor's
+ * own `spellFor` is the honest source, and a default here would be the process on a run the doctor
+ * was told is win32.
+ */
+function readState(root, spell) {
   try {
-    return loadState(root) ?? { steps: {} };
+    return loadState(root, spell) ?? { steps: {} };
   } catch {
     return { steps: {} };
   }
@@ -91,7 +99,7 @@ async function fixDocs({ root, ctx, kind, run }) {
   const recorded = ctx.docsMode ?? 'sparse';
   const mode = recorded === 'skip' ? 'sparse' : recorded;
   const note = recorded === 'skip' ? 'recorded mode was "skip" — synced as "sparse"' : null;
-  const state = readState(root);
+  const state = readState(root, spellFor(ctx));
   const r = await (run ?? B02.run)(stepContext(root, ctx, { state, docs: mode }));
   if (r?.status === 'fail') return result('failed', r.detail);
   // B02 records the mode it actually synced ON THE STATE. Persisting it is what makes the `skip`

@@ -9,6 +9,7 @@ import { execFileSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 import { CORPUS_DIR, EXIT, SyncError } from './sync.mjs';
 import { syncUpstream, formatUpstream } from './upstream.mjs';
+import { needSpell, spellings } from '../launcher-spelling.mjs';
 
 /** `--dry-run`/`--yes` were both omitted: the plan is printed and nothing is applied. */
 export const EXIT_NEEDS_YES = 2;
@@ -103,7 +104,13 @@ export function classifyLine(text, old, to) {
  * `planFamilySwitch` touches no file and makes exactly one network call — `ls-remote`, to find out
  * whether the branch exists at all, which a dry run has to know and cannot learn offline.
  */
-export function planFamilySwitch({ root = process.cwd(), config, to, from = null } = {}) {
+  // ARC-07-C31 — A DEFAULT IS ALLOWED HERE BECAUSE THERE IS EXACTLY ONE CALLER, NAMED: `tools/snowarch/lib/docs/cli.mjs:132`.
+  // The rule this row settled is that a default needs literally one caller and a comment saying
+  // which; everything else takes the spelling required. `loadState` is why the rule is that
+  // narrow — it had ten callers and seven held a ctx, and a default would have handed each the
+  // process.
+export function planFamilySwitch({ root = process.cwd(), config, to, from = null,
+  spell = spellings() } = {}) {
   if (!/^[a-z][a-z0-9-]*$/.test(to)) {
     throw new SyncError(`"${to}" is not a family name — expected lowercase letters, digits and hyphens`,
       EXIT.git);
@@ -116,7 +123,7 @@ export function planFamilySwitch({ root = process.cwd(), config, to, from = null
   const remote = probe(['ls-remote', '--heads', config.docs.upstream, to], root);
   if (!remote.ok || remote.out === '') {
     throw new SyncError(`upstream branch '${to}' not found — the release family may have moved; `
-      + `run ./snowarch docs family <name> --dry-run`, EXIT.upstream);
+      + `run ${spell.cli} docs family <name> --dry-run`, EXIT.upstream);
   }
   const tip = remote.out.split(/\s+/)[0];
 
@@ -166,7 +173,14 @@ const snip = (s) => {
 };
 
 /** The proposal, exactly as `--yes` will apply it. */
-export function formatPlan(plan, { applied = false } = {}) {
+/**
+ * ARC-07-C31 — REQUIRED, two callers: `tools/snowarch/lib/docs/cli.mjs:135` and this module's own
+ * `applyFamilySwitch`. Worth knowing for anyone counting: `tools/snowarch/lib/plan.mjs` has an
+ * unrelated `formatPlan(current, ctx, …)`, so a bare grep reports seven callers for this one and I
+ * nearly wrote that number down.
+ */
+export function formatPlan(plan, { applied = false, spell } = {}) {
+  needSpell(spell, 'formatPlan');
   if (plan.already) return { text: `already on ${plan.to} — nothing to do`, code: EXIT.ok };
   const lines = [`docs family: ${plan.from} → ${plan.to}`];
   lines.push(`upstream branch ${plan.to}: found (tip ${plan.tip.slice(0, 7)})`);
@@ -182,8 +196,8 @@ export function formatPlan(plan, { applied = false } = {}) {
     lines.push(`REVIEW (not edited) ${r.file}:${r.line}  "${snip(r.text)}"`);
   }
   if (!applied) {
-    lines.push('THEN: ./snowarch docs sync --upstream (moves the pin to '
-      + `${plan.to} tip), ./snowarch docs verify, ARC-02 description-length lint`);
+    lines.push(`THEN: ${spell.cli} docs sync --upstream (moves the pin to `
+      + `${plan.to} tip), ${spell.cli} docs verify, ARC-02 description-length lint`);
     lines.push('dry run — nothing changed. Re-run with --yes to apply.');
   }
   return { text: lines.join('\n'), code: EXIT.ok };
@@ -209,7 +223,15 @@ function applyLineEdit(root, e) {
  * order to fix what the lint caught. It is only acceptable because the last two lines say how to
  * finish and how to abandon, so neither state is a puzzle.
  */
-export function applyFamilySwitch(plan, { root = plan.root, config, log = console.log } = {}) {
+/**
+ * ARC-07-C31 — `spell` REQUIRED, threaded from `runDocs`. One caller, so a default would have been
+ * within the rule; it is required anyway because this function passes the spelling on to two things
+ * that require it, and a default here would be a place for the process to re-enter a chain that has
+ * already excluded it.
+ */
+export function applyFamilySwitch(plan, { root = plan.root, config, log = console.log,
+  spell } = {}) {
+  needSpell(spell, 'applyFamilySwitch');
   if (plan.already) { log(`already on ${plan.to} — nothing to do`); return { applied: false, code: EXIT.ok }; }
   const oldPin = config.docs.pin;
 
@@ -220,7 +242,7 @@ export function applyFamilySwitch(plan, { root = plan.root, config, log = consol
   // edits before the refresh would trip it on THIS command's own edits and turn a real guard into
   // an obstacle, so the order is: move the pin against the target family, then edit, then stage.
   const report = syncUpstream({
-    root, config: { ...config, docs: { ...config.docs, family: plan.to } }, log: null,
+    root, config: { ...config, docs: { ...config.docs, family: plan.to } }, log: null, spell,
   });
   log(formatUpstream(report).text);
 
@@ -260,7 +282,7 @@ export function applyFamilySwitch(plan, { root = plan.root, config, log = consol
     catch { failed = name; break; }
   }
 
-  log(formatPlan(plan, { applied: true }).text);
+  log(formatPlan(plan, { applied: true, spell }).text);
   log(`staged: everything — review, then: git commit -m "chore(docs): switch release family to ${plan.to}"`);
   if (failed) {
     log(`half-applied: fix the named lint, then review with git diff --cached`);

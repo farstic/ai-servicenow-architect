@@ -72,6 +72,22 @@ export function tlsIntercepted({ tool = TOOL.git } = {}) {
 export const noDiskSpace =
   'insufficient disk space: need ~400 MB free (~700 MB for --mode full)';
 
-export const unfetchablePin = (pin) =>
-  `pin ${String(pin ?? '').slice(0, 7)} not fetchable from upstream (force-push or history `
-  + 'rewrite?) — maintainer: run ./snowarch docs sync --upstream';
+/**
+ * ARC-07-C31 — this one takes a `cli` STRING and guards it locally, which is the exception in this
+ * engine rather than the pattern.
+ *
+ * Every other sentence module takes a spellings object and calls the shared `needSpell` from
+ * `tools/snowarch/lib/text.mjs`. THIS MODULE MUST NOT IMPORT THAT ONE: `tests/launcher-parity.test.mjs`
+ * copies this file alone into a temp tree — with only `remedies.json` and `text.json` beside it —
+ * and runs `scripts/gen-launcher-text.mjs` against it, which imports this module by path. An import
+ * of a file that is not copied would be a missing module on exactly that path, and the launcher
+ * generator is what prints these sentences in a shell that has no Node.
+ */
+export const unfetchablePin = (pin, cli) => {
+  if (typeof cli !== 'string' || cli === '') {
+    throw new TypeError('unfetchablePin needs the launcher spelling as its second argument — '
+      + 'this module has no default, because it cannot import one');
+  }
+  return `pin ${String(pin ?? '').slice(0, 7)} not fetchable from upstream (force-push or history `
+    + `rewrite?) — maintainer: run ${cli} docs sync --upstream`;
+};

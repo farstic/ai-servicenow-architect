@@ -23,6 +23,7 @@ import { join } from 'node:path';
 import { branchState, describe, gitlink, isShallow, tagMessage } from './git.mjs';
 import { loadConfig, version as readVersion } from './config.mjs';
 import { parseTagMessage } from '../../../scripts/lib/release/tag.mjs';
+import { spellings } from './launcher-spelling.mjs';
 
 /** The corpus path is config's, not a literal — ARC-03 owns where the submodule lives. */
 const DOCS_PATH = 'vendor/ServiceNowDocs';
@@ -111,7 +112,12 @@ export const floorLine = (floors) => Object.entries(floors)
  *
  * Line 1 is ARC-06-S02's, byte for byte — four programs quote it and a test pins it.
  */
-export function renderVersion(info) {
+  // ARC-07-C31 — A DEFAULT IS ALLOWED HERE BECAUSE THERE IS EXACTLY ONE CALLER, NAMED: `tools/snowarch/lib/cli.mjs:82`, the `version` command.
+  // The rule this row settled is that a default needs literally one caller and a comment saying
+  // which; everything else takes the spelling required. `loadState` is why the rule is that
+  // narrow — it had ten callers and seven held a ctx, and a default would have handed each the
+  // process.
+export function renderVersion(info, spell = spellings()) {
   const lines = [];
 
   const floors = Object.entries(info.floors)
@@ -151,7 +157,8 @@ export function renderVersion(info) {
   // docs-pin:
   const pinVerdict = info.docsPinMatches
     ? 'gitlink matches engine.config.json'
-    : `gitlink ${info.docsPinGitlink ? `${info.docsPinGitlink.slice(0, 7)} ` : ''}≠ engine.config.json (run ./snowarch docs verify)`;
+    : `gitlink ${info.docsPinGitlink ? `${info.docsPinGitlink.slice(0, 7)} ` : ''}`
+      + `≠ engine.config.json (run ${spell.cli} docs verify)`;
   lines.push(`docs-pin:   ${info.docsPin.slice(0, 7)} (${info.docsFamily}) — ${pinVerdict}`);
 
   // floors:

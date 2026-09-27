@@ -5,7 +5,19 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseArgs, helpText, COMMANDS } from '../lib/cli.mjs';
+import { parseArgs, helpText, COMMANDS, main } from '../lib/cli.mjs';
+import { spellings } from '../lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED, and named for what prints it.
+ *
+ * `run()` spawns `bin/snowarch.mjs`, so the child renders the shell IT is running in: on the
+ * three Windows cells that is `.\\snowarch.cmd`. Both expectations below held the POSIX form as a
+ * literal — green on a mac, red under pwsh, and about nothing either way. Rule 1, and rule 2 for
+ * the regex: `RegExp.escape` is not on Node 20 and the spelling contains `.` and `\\`.
+ */
+const FRAME_CLI = spellings().cli;
+const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import { EXIT_OK, EXIT_USAGE } from '../lib/exit.mjs';
 import { contractSha, cwdNote, loadConfig, version } from '../lib/config.mjs';
 
@@ -103,14 +115,14 @@ test('an unbuilt checkout says so rather than printing a stale sha', () => {
 test('an unknown command names itself and points at help', () => {
   const r = run(['nope']);
   assert.equal(r.code, EXIT_USAGE);
-  assert.equal(r.stderr.trim(), 'snowarch: unknown command "nope" — run ./snowarch help');
+  assert.equal(r.stderr.trim(), `snowarch: unknown command "nope" — run ${FRAME_CLI} help`);
 });
 
 test("an unknown flag prints the sub-command's usage, not a stack trace", () => {
   const r = run(['version', '--nonsense']);
   assert.equal(r.code, EXIT_USAGE);
   assert.match(r.stderr, /--nonsense needs a value/);
-  assert.match(r.stderr, /usage: \.\/snowarch version/);
+  assert.match(r.stderr, new RegExp(`usage: ${esc(FRAME_CLI)} version`));
   assert.ok(!r.stderr.includes('\n    at '), 'a stack trace reached the user');
 });
 
@@ -220,4 +232,82 @@ test('the two docs entry points are one implementation', () => {
   assert.ok(cliUsage.stderr.includes('usage: node scripts/docs.mjs'),
     'the mounted docs command lost its usage block');
   assert.ok(scriptUsage.stdout.includes('snowarch'), 'the frame lost its help');
+});
+
+/**
+ * ARC-07-C31 — the frame's help renders the READER'S shell, driven by argument.
+ *
+ * `env: {}` is load-bearing: `isWindowsShell` is `platform === 'win32' && !env.SHELL && !env.MSYSTEM`
+ * and `env` defaults to `process.env`, so `{ platform: 'win32' }` alone renders POSIX on any machine
+ * whose shell is set. BY ARGUMENT rather than by forcing `process.platform`, which ARC-07 measured as
+ * unusable — 550 of 1271 root cases fail under it, because faking the platform breaks path handling,
+ * executable resolution and fixture creation.
+ *
+ * THE TWO GENERATED USAGES ARE EXCLUDED BY NAME, not by accident. `instance` and `store` take their
+ * `USAGE` from a `help-begin`/`help-end` region written by `scripts/gen-cli-help.mjs`, which is
+ * committed and therefore PINNED POSIX — the same ruling `codes.ts` and the doctor's documented block
+ * carry. Asserting that every usage derives would be asserting the opposite of that ruling, so the
+ * split is written down here and held in both directions.
+ */
+const GENERATED_USAGE = ['instance', 'store'];
+
+/**
+ * ...and the ones ARC-07-C31 has NOT reached yet, listed so the gap is a fact rather than a silence.
+ *
+ * `bootstrap.mjs` and `commands/upgrade.mjs` are e2e TRIGGER FILES: touching either obliges the five
+ * `tests/upgrade` files at `--test-concurrency=2` and risks a broken install on the platform a mac
+ * cannot check, so the architect split them into their own slice. Their usages are still POSIX
+ * strings, and a Windows reader is still shown a command their shell refuses in those two helps.
+ *
+ * ASSERTED, NOT SKIPPED, and asserted to still BE strings — so when that slice converts them this
+ * case fails and the list shrinks with the sweep instead of outliving it. That is the same rule
+ * `SWEEP_REMAINDER` is held to, for the same reason.
+ */
+const DEFERRED_TO_TRIGGER_SLICE = ['bootstrap', 'upgrade'];
+
+test('ARC-07-C31 — every usage the frame renders itself spells the reader\'s launcher', () => {
+  const WIN = { platform: 'win32', env: {} };
+  const win = spellings(WIN).cli;
+  const posix = spellings({ platform: 'linux', env: {} }).cli;
+
+  assert.match(helpText(WIN).split('\n')[0], new RegExp(`^usage: ${esc(win)} <command>`));
+  assert.doesNotMatch(helpText(WIN), /\.\/snowarch/, 'a POSIX launcher on a Windows shell');
+  assert.match(helpText({ platform: 'linux', env: {} }).split('\n')[0],
+    new RegExp(`^usage: ${esc(posix)} <command>`));
+
+  let derived = 0;
+  for (const [name, c] of Object.entries(COMMANDS)) {
+    if (GENERATED_USAGE.includes(name)) {
+      // The other direction of the ruling: a pinned usage must NOT follow the shell, or the committed
+      // region and the runtime would disagree and `gen:check` would fail on the next machine.
+      assert.equal(typeof c.usage, 'string', `${name}'s usage is generated, so it is a pinned string`);
+      assert.ok(c.usage.includes(posix), `${name}'s generated usage is not the pinned POSIX form`);
+      continue;
+    }
+    if (DEFERRED_TO_TRIGGER_SLICE.includes(name)) {
+      assert.equal(typeof c.usage, 'string',
+        `${name} is listed as deferred but now renders — take it off the list, the sweep reached it`);
+      continue;
+    }
+    assert.equal(typeof c.usage, 'function',
+      `${name}'s usage is a string, so it cannot render a Windows reader's shell`);
+    const w = c.usage(WIN);
+    const p = c.usage({ platform: 'linux', env: {} });
+    assert.doesNotMatch(w, /\.\/snowarch/, `${name} renders a POSIX launcher on a Windows shell`);
+    // A member that carries a launcher must carry the RIGHT one; one that carries none — there are
+    // none today — must not silently start passing by saying nothing.
+    assert.equal(p.includes(posix), w.includes(win),
+      `${name} spells a launcher in one rendering and not the other`);
+    if (p.includes(posix)) derived += 1;
+  }
+  assert.ok(derived >= 5, `only ${derived} usages carry a launcher — the floor caught an empty sweep`);
+});
+
+test('ARC-07-C31 — the unknown-command line spells the reader\'s launcher too', async () => {
+  const captured = [];
+  const sink = { write: (t) => { captured.push(t); return true; } };
+  const code = await main(['nope'], { out: sink, err: sink, platform: 'win32', env: {} });
+  assert.equal(code, EXIT_USAGE);
+  assert.match(captured.join(''), /run \.\\snowarch\.cmd help/);
+  assert.doesNotMatch(captured.join(''), /\.\/snowarch/, 'a POSIX launcher on a Windows shell');
 });

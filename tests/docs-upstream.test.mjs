@@ -9,6 +9,16 @@ import { CORPUS_DIR, EXIT, SyncError, syncCorpus } from '../tools/snowarch/lib/d
 import { docsStatus, formatStatus } from '../tools/snowarch/lib/docs/status.mjs';
 import { formatUpstream, syncUpstream, writePin } from '../tools/snowarch/lib/docs/upstream.mjs';
 import { BEGIN, END, RECIPE_TARGET, renderRecipeBlock } from '../tools/snowarch/lib/docs/recipe-block.mjs';
+import { spellings } from '../tools/snowarch/lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
 import {
   AREAS, CITED_PAGE, buildUpstream, git, makeWorkspace, writeCitingSkill,
 } from './helpers/docs-fixture.mjs';
@@ -59,7 +69,7 @@ test('AC 1 — the pin moves to the tip, both paths are staged, and nothing is c
   const w = ready();
   const headBefore = git(['rev-parse', 'HEAD'], w.root).trim();
 
-  const r = syncUpstream({ ...w, log: silent });
+  const r = syncUpstream({ ...w, log: silent, spell: SPELL });
 
   assert.equal(r.to, upstream.tip);
   assert.equal(git(['rev-parse', 'HEAD'], corpusOf(w)).trim(), upstream.tip, 'submodule did not move');
@@ -77,7 +87,7 @@ test('AC 2 — a tip that deletes a cited page: newly dead with file:line, exit 
   assert.ok(readFileSync(skill, 'utf8').includes(CITED_PAGE));
   assert.equal(docsStatus({ root: w.root }).citations.dead.length, 0, 'the citation is dead already');
 
-  const r = syncUpstream({ ...w, log: silent });
+  const r = syncUpstream({ ...w, log: silent, spell: SPELL });
 
   assert.equal(r.newlyDead.length, 1, JSON.stringify(r.newlyDead));
   assert.equal(r.newlyDead[0].path, CITED_PAGE);
@@ -97,7 +107,7 @@ test('AC 2 — a tip that deletes a cited page: newly dead with file:line, exit 
 
 test('AC 3 — --to a reachable sha moves there', () => {
   const w = ready();
-  const r = syncUpstream({ ...w, to: upstream.tip, log: silent });
+  const r = syncUpstream({ ...w, to: upstream.tip, log: silent, spell: SPELL });
   assert.equal(r.to, upstream.tip);
   assert.equal(pinIn(w.root), upstream.tip);
 });
@@ -107,7 +117,7 @@ test('AC 3 — --to an unreachable sha exits 6, and NOTHING moved', () => {
   const absent = 'f'.repeat(40);
   const porcelainBefore = git(['status', '--porcelain'], w.root).trim();
 
-  assert.throws(() => syncUpstream({ ...w, to: absent, log: silent }), (e) => {
+  assert.throws(() => syncUpstream({ ...w, to: absent, log: silent, spell: SPELL }), (e) => {
     assert.ok(e instanceof SyncError);
     assert.equal(e.code, EXIT.upstream);
     assert.equal(e.message, `sha ${absent} not fetchable from upstream — is it reachable from branch 'australia'?`);
@@ -120,11 +130,11 @@ test('AC 3 — --to an unreachable sha exits 6, and NOTHING moved', () => {
 
 test('AC 5 — a family branch that is not upstream exits 6 and names `docs family`', () => {
   const w = ready({ family: 'no-such-family' });
-  assert.throws(() => syncUpstream({ ...w, log: silent }), (e) => {
+  assert.throws(() => syncUpstream({ ...w, log: silent, spell: SPELL }), (e) => {
     assert.equal(e.code, EXIT.upstream);
     assert.equal(e.message,
       "upstream branch 'no-such-family' not found — the release family may have moved; "
-      + 'run ./snowarch docs family <name> --dry-run');
+      + `run ${SPELL.cli} docs family <name> --dry-run`);
     return true;
   });
   assert.equal(pinIn(w.root), upstream.pin);
@@ -137,7 +147,7 @@ test('AC 4 — a dirty tree outside vendor/ refuses before any network call', ()
   // Precondition: dirty OUTSIDE vendor, which is the only kind this command refuses.
   assert.match(git(['status', '--porcelain'], w.root), /unrelated\.txt/);
 
-  assert.throws(() => syncUpstream({ ...w, log: silent }), (e) => {
+  assert.throws(() => syncUpstream({ ...w, log: silent, spell: SPELL }), (e) => {
     assert.equal(e.code, EXIT.dirty);
     assert.match(e.message, /^working tree not clean — commit or stash first: /);
     assert.match(e.message, /unrelated\.txt/);
@@ -150,13 +160,13 @@ test('a dirty corpus does NOT block the refresh — that is sync\'s refusal, not
   const w = ready();
   writeFileSync(join(corpusOf(w), 'README.md'), 'edited\n');
   assert.match(git(['status', '--porcelain'], w.root), /vendor\//);
-  const r = syncUpstream({ ...w, log: silent });
+  const r = syncUpstream({ ...w, log: silent, spell: SPELL });
   assert.equal(r.to, upstream.tip);
 });
 
 test('--no-verify skips both runs and says so, with no citation figures invented', () => {
   const w = ready();
-  const r = syncUpstream({ ...w, verify: false, log: silent });
+  const r = syncUpstream({ ...w, verify: false, log: silent, spell: SPELL });
   assert.equal(r.checkedBefore, null);
   assert.equal(r.checkedAfter, null);
   assert.deepEqual(r.newlyDead, []);
@@ -172,7 +182,7 @@ test('a tip BEHIND the pin is followed, and the report says it is older', () => 
   const w = ready({ family: 'behind' });
   assert.notEqual(upstream.behind, upstream.pin);
 
-  const r = syncUpstream({ ...w, log: silent });
+  const r = syncUpstream({ ...w, log: silent, spell: SPELL });
   assert.equal(r.to, upstream.behind);
   assert.equal(r.olderThanPin, true);
   assert.match(formatUpstream(r).text, /\(older than the current pin\)$/m);
@@ -207,7 +217,7 @@ test('healed citations are reported: a page the new tip restores', () => {
   // Start on the branch that deleted the page, cite it (dead), then refresh to `australia`, whose
   // tip still has it. The diff has to name the recovery, not only the breakage.
   const w = ready({ family: 'deletes-cited' });
-  syncUpstream({ ...w, log: silent });
+  syncUpstream({ ...w, log: silent, spell: SPELL });
   assert.equal(docsStatus({ root: w.root }).citations.dead.length, 1, 'precondition: one dead');
 
   git(['add', '-A'], w.root);
@@ -215,7 +225,7 @@ test('healed citations are reported: a page the new tip restores', () => {
   const w2 = { ...w, config: JSON.parse(readFileSync(join(w.root, 'engine.config.json'), 'utf8')) };
   w2.config.docs.family = 'australia';
 
-  const r = syncUpstream({ ...w2, log: silent });
+  const r = syncUpstream({ ...w2, log: silent, spell: SPELL });
   assert.equal(r.healed.length, 1, JSON.stringify(r.healed));
   assert.equal(r.healed[0].path, CITED_PAGE);
   assert.equal(r.newlyDead.length, 0);
@@ -224,7 +234,7 @@ test('healed citations are reported: a page the new tip restores', () => {
 
 test('AC 6 — after the refresh, status reads the STAGED gitlink and labels it', () => {
   const w = ready();
-  syncUpstream({ ...w, log: silent });
+  syncUpstream({ ...w, log: silent, spell: SPELL });
 
   const s = docsStatus({ root: w.root, verify: false });
   assert.equal(s.gitlink, upstream.tip, 'status read the committed gitlink, not the staged one');
@@ -237,7 +247,7 @@ test('AC 6 — after the refresh, status reads the STAGED gitlink and labels it'
 
 test('the report headings are the exact contract S09 pastes', () => {
   const w = ready();
-  const r = syncUpstream({ ...w, log: silent });
+  const r = syncUpstream({ ...w, log: silent, spell: SPELL });
   const lines = formatUpstream(r).text.split('\n');
   assert.match(lines[0], /^docs pin: [0-9a-f]{7} \(\d{4}-\d\d-\d\d\) → [0-9a-f]{7} \(\d{4}-\d\d-\d\d\)/);
   assert.match(lines[1], /^citations: checked: \d+ \| dead: \d+ → checked: \d+ \| dead: \d+$/);
@@ -249,7 +259,7 @@ test('the report headings are the exact contract S09 pastes', () => {
 
 test('--json carries every field the workflow reads', () => {
   const w = ready();
-  const r = syncUpstream({ ...w, log: silent });
+  const r = syncUpstream({ ...w, log: silent, spell: SPELL });
   for (const k of ['from', 'to', 'upstreamDate', 'checkedBefore', 'checkedAfter', 'newlyDead', 'healed', 'staged']) {
     assert.ok(k in r, `missing key ${k}`);
   }
@@ -261,7 +271,7 @@ test('the areas file is never touched', () => {
   const w = ready();
   const areas = join(w.root, 'vendor/docs-areas.txt');
   const before = readFileSync(areas, 'utf8');
-  syncUpstream({ ...w, log: silent });
+  syncUpstream({ ...w, log: silent, spell: SPELL });
   assert.equal(readFileSync(areas, 'utf8'), before);
   assert.ok(!git(['diff', '--cached', '--name-only'], w.root).includes('docs-areas'));
   assert.equal(AREAS.length, before.split('\n').filter(Boolean).length);
@@ -299,7 +309,7 @@ test('the block moves with the pin, and is staged with it', () => {
   assert.ok(docText(w).includes(upstream.pin), 'the fixture block does not carry the old pin');
   assert.ok(!docText(w).includes(upstream.tip), 'the fixture block already carries the new pin');
 
-  const r = syncUpstream({ ...w, log: silent });
+  const r = syncUpstream({ ...w, log: silent, spell: SPELL });
 
   assert.equal(r.recipe.architecture, 'written');
   assert.ok(docText(w).includes(upstream.tip), 'the block still does not carry the new pin');
@@ -318,7 +328,7 @@ test('the block the bump writes is the block the generator writes', () => {
   // document its own CI rejects — which is the failure this whole fix exists to remove.
   const w = ready();
   withRecipeDoc(w);
-  syncUpstream({ ...w, log: silent });
+  syncUpstream({ ...w, log: silent, spell: SPELL });
   const afterBump = docText(w);
 
   const check = spawnSync(process.execPath,
@@ -333,7 +343,7 @@ test('a refresh that moves nothing does not stage a document it did not change',
   const w = ready();
   withRecipeDoc(w);
 
-  const r = syncUpstream({ ...w, to: upstream.pin, log: silent });
+  const r = syncUpstream({ ...w, to: upstream.pin, log: silent, spell: SPELL });
 
   assert.equal(r.from, r.to, 'the fixture moved after all — this proves nothing');
   assert.equal(r.recipe.architecture, 'current');
@@ -346,7 +356,7 @@ test('a document that has lost its markers is reported, not silently skipped', (
   withRecipeDoc(w, { markers: false });
   const before = docText(w);
 
-  const r = syncUpstream({ ...w, log: silent });
+  const r = syncUpstream({ ...w, log: silent, spell: SPELL });
 
   // The pin still moves. This runs after the write, and a command that aborted here would leave a
   // moved pin, a moved gitlink and no report — worse than the staleness it was refusing.
@@ -365,7 +375,7 @@ test('a workspace with no such document is not a failure', () => {
   // Every other test in this file runs in exactly this shape, so the status has to be benign —
   // but it is asserted by name here rather than inferred from those tests passing.
   const w = ready();
-  const r = syncUpstream({ ...w, log: silent });
+  const r = syncUpstream({ ...w, log: silent, spell: SPELL });
   assert.deepEqual(r.recipe, { architecture: 'absent', sh: 'absent', ps1: 'absent' },
     'a fixture tree has none of the three generated targets');
   assert.deepEqual(r.staged, ['engine.config.json', CORPUS_DIR]);
@@ -391,7 +401,7 @@ test('a bump stages five paths when the pin moves, and two when it does not', ()
   git(['add', '-A'], w.root);
   git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'targets'], w.root);
 
-  const r = syncUpstream({ ...w, log: silent });
+  const r = syncUpstream({ ...w, log: silent, spell: SPELL });
 
   assert.deepEqual(r.staged, ['engine.config.json', CORPUS_DIR, ...targets]);
   assert.deepEqual(r.recipe, { architecture: 'written', sh: 'written', ps1: 'written' });
@@ -402,7 +412,7 @@ test('a bump stages five paths when the pin moves, and two when it does not', ()
   // are committed first: `syncUpstream` refuses a dirty tree before it touches the network, which
   // is the behaviour under test everywhere else in this file.
   git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f', 'commit', '-qm', 'bumped'], w.root);
-  const again = syncUpstream({ ...w, config: JSON.parse(readFileSync(join(w.root, 'engine.config.json'), 'utf8')),
+  const again = syncUpstream({ ...w, spell: SPELL, config: JSON.parse(readFileSync(join(w.root, 'engine.config.json'), 'utf8')),
     to: r.to, log: silent });
   assert.deepEqual(again.staged, ['engine.config.json', CORPUS_DIR]);
 });

@@ -22,6 +22,7 @@ import { RUNNING_STEP_ENV } from '../../spawn-env.mjs';
 
 import { credentialKeys, credentialLines, CREDENTIAL_EXT } from './credential-shape.mjs';
 import { fail, ok, warn } from './result.mjs';
+import { spellFor } from '../spell.mjs';
 
 /** The four files that make a directory this checkout rather than any directory. */
 export const ROOT_MARKERS = Object.freeze(
@@ -413,7 +414,7 @@ export function engineRepoChecks() {
       fixable: true,
       run: async (ctx) => {
         let state = null;
-        try { state = loadState(ctx.root); } catch { state = null; }
+        try { state = loadState(ctx.root, spellFor(ctx)); } catch { state = null; }
         if (!existsSync(join(ctx.root, SETTINGS_LOCAL))) {
           return fail('.claude/settings.local.json is absent — the mode toggle is unset', {
             remedy: `${cliOf(ctx)} mode design (or ${cliOf(ctx)} mode live)`,
@@ -512,7 +513,7 @@ export function engineRepoChecks() {
         }
         let state = null;
         try {
-          state = loadState(ctx.root);
+          state = loadState(ctx.root, spellFor(ctx));
         } catch (e) {
           return fail(e.message, {
             remedy: `${cliOf(ctx)} bootstrap --reset`,
@@ -574,7 +575,7 @@ export function engineRepoChecks() {
       spawns: false,
       fixable: false,
       run: async (ctx) => {
-        const state = loadState(ctx.root);
+        const state = loadState(ctx.root, spellFor(ctx));
         // No state is E-11's finding, not this one. A check that repeated it would put two
         // failures on one cause and send a reader to two remedies.
         if (!state?.mode) return ok('no recorded install to check');

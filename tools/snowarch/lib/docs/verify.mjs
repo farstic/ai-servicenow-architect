@@ -6,6 +6,7 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { join, sep } from 'node:path';
 import { scanRepo } from './citations.mjs';
+import { needSpell, spellings } from '../launcher-spelling.mjs';
 
 export const EXIT = { ok: 0, dead: 1, missing: 3 };
 
@@ -64,12 +65,19 @@ export function verifyCitations({ root = process.cwd(), corpusDir = 'vendor/Serv
   };
 }
 
-export function formatResult(r) {
+/**
+ * ARC-07-C31 — REQUIRED, because there are TWO callers. Both are in
+ * `tools/snowarch/lib/docs/cli.mjs`, both print to a terminal, and a default would still have been
+ * within a hair of the rule — which is exactly why the rule is a COUNT and not a judgement about
+ * whether two callers feel like one consumer.
+ */
+export function formatResult(r, spell) {
+  needSpell(spell, 'formatResult');
   const lines = [];
   if (r.status === 'missing') {
     lines.push(r.allowMissing
       ? 'citations: not verified until the corpus is present'
-      : 'corpus missing — run ./bootstrap.sh --docs sparse (or ./snowarch docs sync)');
+      : `corpus missing — run ${spell.bootstrap} --docs sparse (or ${spell.cli} docs sync)`);
     return { text: lines.join('\n'), code: r.allowMissing ? EXIT.ok : EXIT.missing };
   }
   for (const d of r.dead) {

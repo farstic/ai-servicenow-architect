@@ -10,7 +10,7 @@
 // claim is that its ServiceNow facts are grounded; reporting the failure of the thing the product
 // is FOR as a note in the margin is the one report that would mislead an operator into shipping.
 import { ALWAYS_DIRS, ROOT_FILES } from '../../docs/sync.mjs';
-import { bootstrapOf, cliOf } from '../spell.mjs';
+import { bootstrapOf, cliOf, spellFor } from '../spell.mjs';
 import { docsStatus, E12_ABSENT, SPARSE } from '../../docs/status.mjs';
 import { defineCheck } from '../registry.mjs';
 
@@ -55,7 +55,11 @@ export function engineDocsChecks() {
           // The sentence is ARC-03-S11's, imported rather than retyped: the doctor, the status
           // skill and the docs command all print the same words, and a second copy here is a
           // second thing to keep in step.
-          const text = E12_ABSENT(mode);
+          // ARC-07-C31 — THE CTX's SHELL, not the process, through the doctor's own `spellFor`:
+          // this file already reads `cliOf(ctx)` and `bootstrapOf(ctx)` from that module, and
+          // `spellFor` threads BOTH `platform` and `env` — `env` matters because `isWindowsShell`
+          // reads SHELL and MSYSTEM, so a ctx with only a platform renders POSIX on any mac.
+          const text = E12_ABSENT(mode, spellFor(ctx));
           return fail(text.replace(/^E-12 docs corpus: FAIL — /, ''), {
             remedy: `run ${cliOf(ctx)} docs sync`,
             command: `${cliOf(ctx)} docs sync`,

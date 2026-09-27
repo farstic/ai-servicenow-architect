@@ -7,6 +7,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { docsStatus, E12_ABSENT, formatStatus, SCHEMA, SPARSE } from '../tools/snowarch/lib/docs/status.mjs';
 import { CORPUS_DIR, MODE, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
 import { AREAS, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
+import { spellings } from '../tools/snowarch/lib/text.mjs';
+
+/** ARC-07-C31 — DERIVED: `E12_ABSENT` renders for the terminal, so the process is its source. */
+const SPELL = spellings();
 
 /**
  * `docsStatus()` is the contract ARC-08 wraps, so what is tested is not "does it return an object"
@@ -209,7 +213,7 @@ test('criterion 2 — an absent corpus is a valid object, one MISSING block, exi
   // cannot disagree about what an absent corpus means.
   const lines = f.text.split('\n');
   assert.equal(lines.length, 2, 'the missing case prints the remedy and the E-check line');
-  assert.equal(lines[1], E12_ABSENT(s.mode));
+  assert.equal(lines[1], E12_ABSENT(s.mode, spellings()));
 });
 
 test('verify:false leaves citations null — and the KEY is still there', () => {
@@ -289,7 +293,8 @@ test('AC 3 — docs mode "skip" with no corpus: exit 3, present false, mode skip
   const f = formatStatus(s);
   assert.equal(f.code, 3);
   assert.equal(f.text.split('\n')[1],
-    'E-12 docs corpus: FAIL — corpus absent (docs mode "skip"); grounding and citations are unverified — run ./snowarch docs sync');
+    'E-12 docs corpus: FAIL — corpus absent (docs mode "skip"); grounding and citations are '
+    + `unverified — run ${SPELL.cli} docs sync`);
   // FAIL, never WARN or SKIP: an absent corpus means every citation in every skill is unverified.
   assert.ok(!/WARN|SKIP/.test(f.text), 'the absent corpus is reported as something softer than FAIL');
 });

@@ -253,8 +253,10 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     bootstrapped: existsSync(join(root, '.local', 'bootstrap-state.json')),
     // ARC-08-C16 — which entry carries the server. Our own record, read from
     // `bootstrap-state.json`; NOT `~/.claude.json`, which this module promises never to read.
-    registration: (() => { try { return loadState(root)?.registration ?? 'project'; }
-      catch { return 'project'; } })(),
+    registration: (() => {
+      try { return loadState(root, spellings({ platform, env }))?.registration ?? 'project'; }
+      catch { return 'project'; }
+    })(),
     // ARC-07-W17 — the doctor renders for the shell it was TOLD about, so a fixture capture can pin it
     // and a committed fixture stops depending on the capturing machine.
     spell: spellFor({ platform, env }),
@@ -382,7 +384,9 @@ export async function fixCommand({ root, config, registry, options, env, home, n
     // The first pass never writes the cache: it describes a checkout that is about to change.
     writeCache: false });
 
-  const state = (() => { try { return loadState(root); } catch { return null; } })();
+  const state = (() => {
+    try { return loadState(root, spellings({ platform, env })); } catch { return null; }
+  })();
   const plan = buildPlan(first.report, {
     stale: options.sections === null ? cacheStale(root) : null,
   });

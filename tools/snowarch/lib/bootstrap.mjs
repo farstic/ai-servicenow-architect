@@ -13,6 +13,7 @@ import { checkLocation, checkMode } from './instance-file.mjs';
 import { DOCS, buildPlan, runPlanScreen } from './plan.mjs';
 import { LAST, STEPS, interrupt, runSteps, stepById } from './steps/index.mjs';
 import { RESET_MESSAGE, StateError, emptyState, loadState, resetState, saveState } from './state.mjs';
+import { spellings } from './launcher-spelling.mjs';
 
 export const USAGE = [
   'usage: ./snowarch bootstrap [options]',
@@ -97,6 +98,10 @@ export function stepContext({ root, config, env = process.env, node, flags = {},
 
 export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = [],
   input = process.stdin, out = process.stdout, err = process.stderr, env = process.env,
+  // ARC-07-C31 — `platform` beside the `env` this already had, for `loadState`'s spelling. The
+  // ARGUMENT is all that changes in this file: its own three launcher sites stay with the
+  // e2e-trigger slice, and this edit is why slice 2 runs the five `tests/upgrade` files.
+  platform = process.platform,
   cwd = process.cwd(), probe = undefined, exec = undefined, asker = null } = {}) {
   // With `--json`, stdout carries ONE thing: the object. The plan screen is prose, so it follows
   // every other human line to stderr — a caller piping this into `jq` must not have to strip a
@@ -152,7 +157,7 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
   }
 
   let state;
-  try { state = loadState(root); } catch (e) {
+  try { state = loadState(root, spellings({ platform, env })); } catch (e) {
     if (!(e instanceof StateError)) throw e;
     return refuse(e.message, e.code);
   }

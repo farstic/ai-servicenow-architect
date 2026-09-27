@@ -11,6 +11,16 @@ import { computeSettings, hookEntry, HOOKS_LEFT_ALONE } from '../lib/settings-lo
 import { emptyState, loadState, saveState } from '../lib/state.mjs';
 import { instanceKeptNote, restartSentence } from '../lib/text.mjs';
 import { makeCheckout, recorder, stub } from './helpers/workspace.mjs';
+import { spellings } from '../lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
 
 /**
  * ARC-06-S12 — which steps each form runs, and what the toggle does on the way through.
@@ -81,7 +91,7 @@ test('criterion 1 — a live switch caches B01–B03 and runs B04 onwards', asyn
   for (const id of ['B04', 'B05', 'B06', 'B07', 'B08', 'B09']) {
     assert.equal(ran.includes(id), true, `${id} did not run`);
   }
-  assert.equal(loadState(root).mode, 'live');
+  assert.equal(loadState(root, SPELL).mode, 'live');
 });
 
 test('criterion 2 — a design switch touches the toggle and leaves the store byte-identical', async () => {
@@ -107,7 +117,7 @@ test('criterion 2 — a design switch touches the toggle and leaves the store by
   assert.deepEqual(settings.permissions, { allow: ['Bash(ls:*)'] });
 
   assert.equal(readFileSync(join(root, '.local', 'instances.json'), 'utf8'), STORE);
-  assert.equal(loadState(root).mode, 'design-only');
+  assert.equal(loadState(root, SPELL).mode, 'design-only');
 });
 
 test('...and says so: the instance is kept, and a running Claude has to reconnect', async () => {
@@ -154,7 +164,7 @@ test('...and a user-set disableAllHooks is left alone, with the note', async () 
   const settings = JSON.parse(readFileSync(join(root, '.claude/settings.local.json'), 'utf8'));
   assert.equal(settings.disableAllHooks, true, 'the user\'s key was rewritten');
   // The state never claims authorship of a key this installation does not write.
-  assert.equal(loadState(root).hooksDisabledByBootstrap, false);
+  assert.equal(loadState(root, SPELL).hooksDisabledByBootstrap, false);
 });
 
 test('...and a checkout without that key gets no note — the guard is not stuck on', async () => {

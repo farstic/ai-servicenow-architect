@@ -119,7 +119,9 @@ test('E-12 prefers the ABSENT sentence over the incomplete one — an absent cor
 test('E-12 fails an absent corpus with ARC-03-S11\'s sentence, and never warns or skips', async (t) => {
   const r = await run(t, 'E-12', { status: { present: false, mode: 'skip' } });
   assert.equal(r.status, 'fail');
-  assert.ok(E12_ABSENT('skip').endsWith(r.detail),
+  // The ctx here comes from `contextFor`, which defaults to the process — so the expectation
+  // derives from the process too. ARC-07-C31 rule 1: the same source the product line used.
+  assert.ok(E12_ABSENT('skip', spellings()).endsWith(r.detail),
     `the sentence is not ARC-03-S11's: ${JSON.stringify(r.detail)}`);
   assert.equal(r.command, `${SPELLED_CLI} docs sync`);
   assert.equal(checks.find((c) => c.id === 'E-12').severity, 'fail');

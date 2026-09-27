@@ -6,6 +6,16 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { spellings } from '../tools/snowarch/lib/text.mjs';
+
+/**
+ * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
+ *
+ * The product lines here render for the terminal in front of them, so the process is the same
+ * source they use (rule 1). A POSIX literal would be green on a mac and red on all three Windows
+ * cells, which is this row's own "62 expectations across 13 files" trap.
+ */
+const SPELL = spellings();
 import { extract, scanRepo, areasOf, findBareCitations, CitationSyntaxError }
   from '../tools/snowarch/lib/docs/citations.mjs';
 
@@ -117,7 +127,7 @@ test('the warning never becomes a failure — verify still exits 0 with warnings
       'ok markdown/alpha/a.md and blind *(citation: `nowhere.md`)*\n');
     const r = verifyCitations({ root: dir });
     assert.equal(r.status, 'ok');
-    assert.equal(formatResult(r).code, EXIT.ok, 'a bare citation must warn, never fail');
+    assert.equal(formatResult(r, SPELL).code, EXIT.ok, 'a bare citation must warn, never fail');
     assert.ok(r.warnings.some((w) => /citation without a markdown/.test(w.reason)));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
