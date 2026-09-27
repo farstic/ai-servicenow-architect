@@ -54,7 +54,7 @@ test('a checkout that cannot run the server says so once, with the reasons in th
     const code = await storeCommand({ log, argv: ['migrate'], root: dir,
       exists: () => false, depsInstalled: () => false, run: () => { throw new Error('spawned'); } });
     assert.equal(code, EXIT_PREREQ);
-    assert.equal(log.lines.filter((l) => l.includes(NOT_INSTALLED)).length, 1);
+    assert.equal(log.lines.filter((l) => l.includes(NOT_INSTALLED(spellings()))).length, 1);
     assert.ok(log.lines.some((l) => l.includes(CLI_PATH)));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

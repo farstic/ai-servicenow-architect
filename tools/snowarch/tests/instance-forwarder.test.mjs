@@ -10,6 +10,7 @@ import {
 } from '../lib/instance.mjs';
 import { EXIT_PREREQ } from '../lib/exit.mjs';
 import { recorder } from './helpers/workspace.mjs';
+import { spellings } from '../lib/text.mjs';
 
 /**
  * ARC-07-S05 — the forwarder forwards, and nothing else.
@@ -64,7 +65,7 @@ test('a checkout that cannot run the wizard says ONE sentence, exits 3, and spaw
     });
     assert.equal(code, EXIT_PREREQ);
     assert.equal(spawned, 0, 'the server CLI was spawned anyway');
-    assert.ok(log.lines.join('\n').includes(NOT_INSTALLED));
+    assert.ok(log.lines.join('\n').includes(NOT_INSTALLED(spellings())));
     // The reasons go to the log, not into the sentence: three of them at once would bury the
     // one action the reader has to take.
     assert.equal(log.lines.filter((l) => l.includes('Live mode is not installed')).length, 1);

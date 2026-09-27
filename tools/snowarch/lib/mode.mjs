@@ -26,8 +26,8 @@ import { CREATED_BY_US, SCOPES, resolveClaude, register as registerServer, serve
 import { LAST, STEPS, interrupt, runSteps } from './steps/index.mjs';
 import { readDefaultLabel } from '../../../packages/snowarch/dist/store/label.js';
 import { StateError, loadState, recordedInstance, saveState } from './state.mjs';
-import { MODE_DESIGN_NOTE, instanceKeptNote, modeLine, registrationLine, restartSentence, spellings }
-  from './text.mjs';
+import { MODE_DESIGN_NOTE, instanceKeptNote, modeLine, needSpell, registrationLine, restartSentence,
+  spellings } from './text.mjs';
 
 /**
  * ARC-07-C31 — A FUNCTION OF THE READER'S SHELL, the shape `doctor/index.mjs` already uses.
@@ -61,8 +61,18 @@ export const USER_SCOPE_REFUSAL =
 export const userScopeRefusal = (serverKey) =>
   USER_SCOPE_REFUSAL.replace('"servicenow"', `"${serverKey}"`);
 
-export const NOT_BOOTSTRAPPED =
-  'this checkout has not been bootstrapped — run ./bootstrap.sh first (mode switches an existing '
+/**
+ * ARC-07-C31 — the spelling is REQUIRED, and the argument is the point rather than the check.
+ *
+ * This was a `const` passed straight to `refuse()`. Turning it into a function with a default would
+ * leave `refuse(NOT_BOOTSTRAPPED, …)` compiling and printing the function's SOURCE — the defect this
+ * programme shipped once already, in the SessionStart hook's `Mode:` line. A required argument makes
+ * every call site say what shell it means, and `needSpell` turns the miss into a named TypeError
+ * instead of `undefined` in a sentence whose whole job is to tell someone what to type.
+ */
+export const NOT_BOOTSTRAPPED = (spell) =>
+  'this checkout has not been bootstrapped — run '
+  + `${needSpell(spell, 'NOT_BOOTSTRAPPED').bootstrap} first (mode switches an existing `
   + 'installation; it does not create one)';
 
 export const storePath = (root) => join(root, '.local', 'instances.json');
@@ -99,7 +109,10 @@ export function stepsFor(target, registry = STEPS) {
 }
 
 export async function modeCommand({ flags = {}, positional = [], log, root = defaultRoot,
-  env = process.env, out = process.stdout, err = process.stderr, cwd = process.cwd(),
+  // ARC-07-C31 — `platform` beside the `env` that was already here, because `isWindowsShell` needs
+  // both: `env` alone would read this machine's SHELL and render POSIX on a Windows cell.
+  env = process.env, platform = process.platform,
+  out = process.stdout, err = process.stderr, cwd = process.cwd(),
   probe = undefined, exec = undefined, execClaude = undefined, claudePath = undefined,
   // `hash` travels WITH `registry`, and only with it: the runner hashes a step from ARC-09-S05's
   // table by step id, so a test that injects stub steps must also say how those are hashed. The
@@ -127,7 +140,7 @@ export async function modeCommand({ flags = {}, positional = [], log, root = def
     if (!(e instanceof StateError)) throw e;
     return refuse(e.message, e.code);
   }
-  if (!state) return refuse(NOT_BOOTSTRAPPED, EXIT_PREREQ);
+  if (!state) return refuse(NOT_BOOTSTRAPPED(spellings({ platform, env })), EXIT_PREREQ);
 
   if (target === undefined) return report({ state, root, flags, log, readLabel });
 

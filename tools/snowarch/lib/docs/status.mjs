@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { ALWAYS_DIRS, CORPUS_DIR, MODE, ROOT_FILES, readAreas } from './sync.mjs';
 import { verifyCitations } from './verify.mjs';
+import { needSpell, spellings } from '../text.mjs';
 
 /**
  * The doctor's E-12 line, owned here and imported by ARC-08 — never retyped.
@@ -20,9 +21,17 @@ import { verifyCitations } from './verify.mjs';
  * margin. The mode is quoted because "skip" and "sparse" fail for different reasons — one was asked
  * for, the other went wrong — and the remedy is the same command either way.
  */
-export const E12_ABSENT = (mode) =>
+/**
+ * ARC-07-C31 — the spelling is REQUIRED here, and this one is not a style choice.
+ *
+ * TWO CONSUMERS WITH TWO DIFFERENT SHELLS: `docs status` renders for the terminal in front of it,
+ * and `doctor/checks/engine-docs.mjs` renders for the ctx it was given, which a win32 case drives.
+ * A default would satisfy the first and silently give the second the process — which is exactly the
+ * defect that cost twelve Windows cells when `MODE_VARIANTS` read the process.
+ */
+export const E12_ABSENT = (mode, spell) =>
   `E-12 docs corpus: FAIL — corpus absent (docs mode "${mode}"); grounding and citations are `
-  + 'unverified — run ./snowarch docs sync';
+  + `unverified — run ${needSpell(spell, 'E12_ABSENT').cli} docs sync`;
 
 /** The object's version. Additions are non-breaking; a removal or a changed meaning is not. */
 export const SCHEMA = 1;
@@ -289,14 +298,20 @@ const mb = (b) => (b === null ? '—' : `${Math.round(b / 1_000_000)} MB`);
  * One line per fact with its verdict in the last column and, when it is not `ok`, the remedy on the
  * next line. The wording is reused verbatim by the doctor, so it is written once here.
  */
-export function formatStatus(s) {
+/**
+ * ARC-07-C31 — `spell` DEFAULTS to the process here, unlike `E12_ABSENT` above, and the difference is
+ * the consumer count: this renderer has one caller, `tools/snowarch/lib/docs/cli.mjs`, printing to a terminal. The
+ * parameter is still there so a case can drive the Windows rendering by argument.
+ */
+export function formatStatus(s, spell = spellings()) {
   if (!s.present) {
     return {
       text: [
-        'docs corpus: MISSING — run ./bootstrap.sh --docs sparse (or node scripts/docs.mjs sync)',
+        `docs corpus: MISSING — run ${spell.bootstrap} --docs sparse `
+        + '(or node scripts/docs.mjs sync)',
         // The doctor's exact line, so `docs status` and the doctor cannot disagree about what an
         // absent corpus means or what to do about it.
-        E12_ABSENT(s.mode),
+        E12_ABSENT(s.mode, spell),
       ].join('\n'),
       code: 3,
     };

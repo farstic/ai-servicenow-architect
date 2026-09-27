@@ -10,6 +10,7 @@ import { EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from '../lib/exit.mjs';
 import { emptyState, saveState } from '../lib/state.mjs';
 import { modeLine, registrationLine } from '../lib/text.mjs';
 import { makeCheckout, recorder } from './helpers/workspace.mjs';
+import { spellings } from '../lib/text.mjs';
 
 /**
  * ARC-06-S12 — `snowarch mode`, the reporting form and every refusal.
@@ -37,7 +38,11 @@ test('a checkout that was never bootstrapped is a prerequisite failure, not a mo
   const r = await run(root);
   assert.equal(r.code, EXIT_PREREQ);
   assert.match(r.text, /has not been bootstrapped/);
-  assert.equal(r.text.includes(NOT_BOOTSTRAPPED), true);
+  // ARC-07-C31 — CALLED, and derived from the process, because `modeCommand` renders for the
+  // terminal in front of it. A bare `NOT_BOOTSTRAPPED` would now be a function, and
+  // `includes(<function>)` would compare against its SOURCE — which is the defect the required
+  // argument exists to make impossible to write by accident.
+  assert.equal(r.text.includes(NOT_BOOTSTRAPPED(spellings())), true);
 });
 
 test('mode prints the S09 Mode line and the registration kind — one definition each', async () => {

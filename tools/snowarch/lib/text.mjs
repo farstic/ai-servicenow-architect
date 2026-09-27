@@ -95,7 +95,16 @@ export const ADD_INSTANCE = (cli = POSIX.cli) =>
  * `summaryLine` and `renderText` carry, for the same reason: a plausible-looking wrong line passes
  * review and a green test.
  */
-const needSpell = (spell, who) => {
+/**
+ * EXPORTED for the engine's other sentence modules — ARC-07-C31 slice 2.
+ *
+ * `mode.mjs`, `instance.mjs` and `tools/snowarch/lib/docs/status.mjs` now take a spelling too, and four bespoke copies
+ * of this check would be four chances to word the refusal differently or forget it. The one module
+ * that CANNOT use it is `net-sentences.mjs`: `tests/launcher-parity.test.mjs` copies that file alone
+ * into a temp tree with only `remedies.json` and `text.json` beside it and runs the launcher
+ * generator against it, so an import of this module there would be a missing file on that path.
+ */
+export const needSpell = (spell, who) => {
   if (!spell || typeof spell.cli !== 'string' || typeof spell.bootstrap !== 'string') {
     // The OWNER is named by the caller, not assumed: this helper guards `MODE_VARIANTS` and `BANNER`
     // both, and a message that said MODE_VARIANTS for a BANNER member sent the reader to the wrong
