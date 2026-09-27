@@ -14,7 +14,7 @@ import {
 import { cliSpelling, EXIT_USAGE } from '../../src/cli/tty.js';
 import { runInstance } from '../../src/cli/instance-command.js';
 import { ENVIRONMENTS } from '../../src/cli/url.js';
-import { applyingLine, COLUMNS, probeNote, resolveFlagAnswer, wrapText }
+import { applyingLine, COLUMNS, probeNote, resolveFlagAnswer, wrapFields, wrapText }
   from '../../src/cli/preset-ui.js';
 import { remedyFor } from '../../src/errors/codes.js';
 import { expandPreset } from '../../src/utils/permissions.js';
@@ -1335,6 +1335,68 @@ describe('ARC-07-W16 — every line the wizard ends with fits the terminal', () 
     ];
     for (const line of lines) {
       expect(line.length, `${line.length} > ${COLUMNS}: ${line}`).toBeLessThanOrEqual(COLUMNS);
+    }
+  });
+
+  it('ARC-07-C41 — no folded line ends in a bare `name:` or a dangling separator', () => {
+    // THE OWNER'S FIELD RUN on 2.0.6: the probes line came back as `… now_assist: ok · FLUENT:` / `off.`
+    // Measured on their own configuration — everything on with FLUENT turned off at the permissions screen —
+    // the line is 103 columns and the prose wrapper broke it after `FLUENT:` at 98. Both halves are UNDER the
+    // budget, which is exactly why the case above passes over it: this is not a width defect, and a width
+    // assertion cannot see it.
+    //
+    // THE OWNER'S OWN PROBE VALUES, not this describe's. Their run had `now_assist: ok`; the fixture above
+    // has `not licensed`, which is longer, and with it `wrapText` happens to break at a separator — so a case
+    // built on the fixture would assert the defect against a line that does not show it. Measured both ways.
+    const ownersProbe = { at: '2026-09-26T12:00:00Z', auth: 'ok', write: 'ok', cmdb: 'ok', scripting: 'ok',
+      atf: 'ok', nowAssist: 'ok', fluent: 'not installed' } as never;
+    const flags = { ...expandPreset('full'), FLUENT_ENABLED: 'false' } as never;
+    const line = probeSummary(ownersProbe, flags, false);
+    expect(line.length).toBeGreaterThan(COLUMNS);
+
+    const folded = wrapFields(line, COLUMNS);
+    expect(folded.length).toBeGreaterThan(1);
+    for (const one of folded) {
+      expect(one.length, `${one.length} > ${COLUMNS}: ${one}`).toBeLessThanOrEqual(COLUMNS);
+      // A field's name without its value, which is what the owner saw.
+      expect(one, `a line ends with a field name and no value: ${one}`).not.toMatch(/[A-Za-z_]+:$/);
+      // A separator joins two fields and belongs to neither when they land on different lines.
+      expect(one.trimEnd(), `a line ends with a dangling separator: ${one}`).not.toMatch(/·$/);
+    }
+
+    // ...and every field survived the fold intact — a fold that dropped one would satisfy everything above.
+    const fields = line.split(' · ');
+    for (const field of fields) {
+      expect(folded.some((one) => one.includes(field)), `the fold split «${field}»`).toBe(true);
+    }
+
+    // The prose wrapper is what this replaces, and it is asserted to FAIL the same rule, so the case cannot
+    // pass by testing a wrapper nobody uses.
+    expect(wrapText(line, COLUMNS).some((one) => /[A-Za-z_]+:$/.test(one)),
+      'wrapText no longer splits a field — if that is deliberate, this case has lost its point').toBe(true);
+  });
+
+  it('ARC-07-C41 — and the WIZARD\'s own output folds the same way, not just the helper', async () => {
+    // AN INERT CONTROL IS WHY THIS EXISTS. Swapping the call site back to `wrapText` left every assertion
+    // above passing, because they call `wrapFields` directly: nothing looked at what `runAdd` actually WRITES.
+    // A helper proved and a line unproved is the reader-vs-writer split this arc keeps finding.
+    const w = workspace();
+    try {
+      const terminal = io([]);
+      const result = await runAdd({ ...baseOptions, preset: 'full', yes: true }, terminal, {
+        storePath: w.store, makeClient: client([200]).make, reachability: reachable, env: {},
+      });
+      expect(result.exitCode).toBe(EXIT_OK);
+
+      const written = terminal.written().split('\n').filter((one) => one.length > 0);
+      const probes = written.findIndex((one) => one.startsWith('Probes:'));
+      expect(probes, `the wizard printed no probes line:\n${written.join('\n')}`).toBeGreaterThanOrEqual(0);
+      for (const one of written) {
+        expect(one, `a written line ends with a field name and no value: ${one}`).not.toMatch(/[A-Za-z_]+:$/);
+        expect(one.trimEnd(), `a written line ends with a dangling separator: ${one}`).not.toMatch(/·$/);
+      }
+    } finally {
+      w.cleanup();
     }
   });
 

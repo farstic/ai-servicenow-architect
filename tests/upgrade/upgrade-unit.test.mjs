@@ -12,9 +12,13 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { fileURLToPath } from 'node:url';
+
 import {
-  classifyGitFetchError, doctorLines, parseSemver, renderPlan, sortTags,
+  classifyGitFetchError, doctorLines, parseSemver, renderPlan, returnRef, sortTags,
 } from '../../tools/snowarch/lib/commands/upgrade.mjs';
+import { branchState, describe } from '../../tools/snowarch/lib/git.mjs';
+import { git as harnessGit } from './harness.mjs';
 import { failureLines } from '../../tools/snowarch/lib/doctor/panel.mjs';
 import {
   MAX_AGE_MS, REFRESH_AFTER_MS, cachePath, isFresh, needsRefresh, readUpgradeCheck,
@@ -22,6 +26,7 @@ import {
 } from '../../tools/snowarch/lib/upgrade-check.mjs';
 
 const isWindows = process.platform === 'win32';
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 test('the classifier names a remedy only for a shape it recognises', () => {
   // Git's own words are printed by the CALLER, always. What this decides is whether a second,
@@ -491,4 +496,63 @@ test('ARC-09-C56 — a cache older than this run is not this run', async (t) => 
     `yesterday's labels were printed as this run's measurement: ${sv03}`);
   // ...and the line is still THERE, from the stdout — silence would lose the check entirely.
   assert.match(sv03, /^SV-03 WARN/, `the check lost its line instead of falling back: ${sv03}`);
+});
+
+/**
+ * ARC-07-C39 — U5's return hint names a ref the checkout actually has.
+ *
+ * `git checkout main` is what it said, and a clone made with `--branch v2.0.5` has no local `main`: the
+ * command handed to a reader mid-upgrade failed with `error: pathspec 'main' did not match any file(s) known
+ * to git`. The assertion is NOT that the sentence matches a string — that is how a wrong command passes a
+ * test that reads it back — but that the ref this chooses RESOLVES in a repository of that shape.
+ */
+test('ARC-07-C39 — the return ref resolves in a tag-only checkout, and a branch still wins', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'c39-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  // THE HARNESS'S WRAPPER, not `execFileSync` — ARC-09-C27b, and `harness-shape` caught my first version:
+  // every git call under `tests/upgrade/` carries `core.longpaths` because the Windows cells need it, and a
+  // direct call is a path length away from failing there and nowhere else. The wrapper also supplies the
+  // fixture identity, so a runner with no git author still commits.
+  const git = (...args) => harnessGit(dir, args);
+
+  git('init', '--quiet', '-b', 'trunk');
+  writeFileSync(join(dir, 'a.txt'), 'one\n');
+  git('add', '.');
+  git('commit', '--quiet', '-m', 'one');
+  git('tag', '-a', 'v2.0.5', '-m', 'v2.0.5');
+  writeFileSync(join(dir, 'a.txt'), 'two\n');
+  git('commit', '--quiet', '-am', 'two');
+  git('tag', '-a', 'v2.0.6', '-m', 'v2.0.6');
+
+  // THE SHAPE THE ROW NAMES: detached at a tag, no local `main`.
+  git('checkout', '--quiet', '--detach', 'v2.0.5');
+  const detached = branchState(dir);
+  assert.equal(detached.branch, null, 'the fixture is not detached — the case is not testing the shape');
+  assert.equal(harnessGit(dir, ['rev-parse', '--verify', 'main'], { allowFail: true }), null,
+    'this fixture HAS a local main, so it cannot show the defect');
+
+  const ref = returnRef(detached, describe(dir));
+  assert.equal(ref, 'v2.0.5', `the hint names ${ref}, which is not where HEAD was`);
+  // THE PROPERTY THAT MATTERS: the command runs, and it leaves git where it said it would.
+  git('checkout', '--quiet', 'v2.0.6');
+  git('checkout', '--quiet', ref);
+  assert.equal(describe(dir)?.name, 'v2.0.5', 'following the hint did not return to the ref it named');
+
+  // ...and a reader who WAS on a branch is still sent to their branch, so the fix is not "always the tag".
+  git('checkout', '--quiet', 'trunk');
+  assert.equal(returnRef(branchState(dir), describe(dir)), 'trunk');
+
+  // ...and with no tag at all the sha is the floor, because a sha always resolves.
+  const bare = { branch: null, short: detached.sha.slice(0, 7), sha: detached.sha };
+  assert.equal(returnRef(bare, null), detached.sha.slice(0, 7));
+});
+
+test('ARC-07-C39 — the hint says the store is untouched, which is the reader\'s real question', () => {
+  // A remedy that moves HEAD and says nothing about the instance store invites a reader mid-upgrade to go
+  // looking for their credentials. The answer is that `.local/` is ignored by git, so no checkout touches it.
+  const source = readFileSync(join(REPO, 'tools/snowarch/lib/commands/upgrade.mjs'), 'utf8');
+  const hint = source.slice(source.indexOf('HEAD is detached at'));
+  assert.match(hint.slice(0, 400), /\.local\/, which git ignores/);
+  assert.doesNotMatch(hint.slice(0, 200), /git checkout main/,
+    'the hint still hard-codes `main`, which a tag clone does not have');
 });
