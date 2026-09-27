@@ -549,3 +549,98 @@ test('C35b — a mismatch cites every product line that carries the sentence (it
     ['packages/snowarch/src/a.ts:1', 'packages/snowarch/src/b.ts:1']);
   assert.match(r.mismatches[0].product, /a\.ts:1, packages\/snowarch\/src\/b\.ts:1/);
 });
+
+/* ── ARC-07-C35b, fourth head — the three false negatives, each with a case that sees it ─────────── */
+
+/** A deriving product line to compare a hard-coded launcher against. */
+const DERIVING_PRODUCT = [{ file: 'tools/snowarch/lib/planted.mjs',
+  text: 'export const line = (spell) => `run ${spell.cli} doctor --section legacy now`;\n' }];
+
+test('C35b — a later case cannot vouch for an earlier one (item 1, false negative)', () => {
+  // THE FILE-WIDE PINNED SET. `spellingConstants` is keyed by NAME and last-wins, so a DERIVED case that
+  // hard-codes POSIX was granted EXPECTED_RENDERING as soon as a LATER case declared the same name pinned —
+  // and an expected rendering agrees with a deriving product line. A hard-coded launcher then passed the
+  // audit because of a constant in a different test. `kindInScope` had fixed the expectation side only.
+  const text = [
+    "test('derives', () => {",
+    '  const cli = spellings();',
+    "  assert.equal(render(cli), 'run ./snowarch doctor --section legacy now');",
+    '});',
+    "test('pins', () => {",
+    "  const cli = spellings({ platform: 'linux', env: {} });",
+    '  assert.equal(render(cli), `run ${cli.cli} doctor --section legacy now`);',
+    '});',
+  ].join('\n');
+  const sites = assertedLaunchers('tests/planted.test.mjs', text);
+  assert.equal(sites.length, 2, JSON.stringify(sites.map((s) => s.line)));
+  assert.notEqual(sites[0].expectation, 'EXPECTED_RENDERING',
+    'the first case was vouched for by the second case\'s constant — a hard-coded launcher hidden');
+  assert.equal(sites[0].expectation, 'PINNED');
+
+  // ...and the audit reports it, which is the half that matters: a false negative is a mismatch that never
+  // arrives, so the case asserts the arrival rather than the label alone.
+  const r = audit({ tests: [{ file: 'tests/planted.test.mjs', text }],
+    product: DERIVING_PRODUCT, baseline: EMPTY });
+  assert.equal(r.mismatches.length, 1, JSON.stringify(r));
+  assert.equal(r.mismatches[0].expectation, 'PINNED');
+});
+
+test('C35b — a pinned ctx with a DERIVED expectation is reported (item 2, false negative)', () => {
+  // The ctx pins `linux` and the expectation reads the RUNNER's spelling. They agree on this machine and part
+  // company on any other — which is what a Windows cell is — and the third head called it an expected
+  // rendering, so the audit said nothing at all.
+  const text = [
+    "test('mixed', () => {",
+    "  const out = render({ platform: 'linux', env: {} });",
+    '  assert.equal(out, `run ${spellings().cli} doctor --section legacy now`);',
+    '});',
+  ].join('\n');
+  const [site] = assertedLaunchers('tests/planted.test.mjs', text);
+  assert.equal(site.expectation, 'DERIVED_ON_PINNED_SUBJECT');
+
+  const r = audit({ tests: [{ file: 'tests/planted.test.mjs', text }],
+    product: DERIVING_PRODUCT, baseline: EMPTY });
+  assert.equal(r.mismatches.length, 1, JSON.stringify(r));
+  assert.match(r.mismatches[0].why, /the expectation follows the runner while the value follows the ctx/);
+
+  // ...and the same shape with a PINNED expectation is the legitimate one, so this is not a check that fires
+  // on every driven case.
+  const ok = assertedLaunchers('tests/planted.test.mjs', [
+    "test('pinned both ends', () => {",
+    "  const out = render({ platform: 'linux', env: {} });",
+    "  assert.equal(out, 'run ./snowarch doctor --section legacy now');",
+    '});',
+  ].join('\n'));
+  assert.equal(ok[0].expectation, 'EXPECTED_RENDERING');
+});
+
+test('C35b — a platform WORD in the case does not excuse a hard-coded launcher (item 3)', () => {
+  // `caseDrivesPinned` asked whether the case MENTIONED 'win32'/'linux'/'darwin' anywhere — a skip condition
+  // or a fixture value answered yes — and an UNKNOWN is a mismatch that never arrives. It now requires a
+  // platform-bearing ctx passed as an ARGUMENT to a call: evidence that a shell was driven somewhere.
+  const word = [
+    "test('mentions a platform in a skip', () => {",
+    "  if (process.platform === 'win32') return;",
+    "  assert.equal(render(ctx).line, 'run ./snowarch doctor --section legacy now');",
+    '});',
+  ].join('\n');
+  const r = audit({ tests: [{ file: 'tests/planted.test.mjs', text: word }],
+    product: DERIVING_PRODUCT, baseline: EMPTY });
+  assert.equal(r.mismatches.length, 1,
+    `a hard-coded launcher was excused by the word "win32" in a skip condition: ${JSON.stringify(r)}`);
+  assert.deepEqual(r.unresolved, []);
+
+  // ...and the architect's ruling stands for the shape it was made for: a ctx DRIVEN into another call in the
+  // same case keeps the site an UNKNOWN rather than a mismatch, because dataflow is what would settle it.
+  const driven = [
+    "test('drives a shell elsewhere', () => {",
+    "  promptSecret('Password:', { io, platform: 'win32', env: {} });",
+    "  assert.ok(stdout.written.includes('run ./snowarch doctor --section legacy now'));",
+    '});',
+  ].join('\n');
+  const r2 = audit({ tests: [{ file: 'tests/planted.test.mjs', text: driven }],
+    product: DERIVING_PRODUCT, baseline: EMPTY });
+  assert.deepEqual(r2.mismatches, [], JSON.stringify(r2.mismatches));
+  assert.equal(r2.unresolved.length, 1);
+  assert.match(r2.unresolved[0].why, /needs dataflow this audit does not do/);
+});
