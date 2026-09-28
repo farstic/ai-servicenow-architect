@@ -138,13 +138,22 @@ test('C43 head 1 — the doctor\'s repository inputs do not move with `.local/`'
   }
 });
 
-test('C43 head 1 — the variable is not documented, defaulted or advertised yet', async () => {
+test('C43 head 2 — the variable is documented where a contributor reads, and nowhere else', async () => {
   /*
-   * Head 1 is INERT, and this is the assertion that keeps it that way. A reader who finds the
-   * variable in a page and exports it before head 2 lands gets the half-moved state root C43's row
-   * describes: the doctor reads the real `bootstrap-state.json` and writes its cache to the temp
-   * directory. It becomes a supported, documented seam in head 2 — with the twenty remaining sites
-   * routed — and not one commit earlier.
+   * THIS CASE IS THE INVERSION OF HEAD 1'S, AND THE INVERSION IS THE POINT.
+   *
+   * Head 1 asserted the variable was named in NO page: it was inert, and a reader who exported it
+   * before the twenty-five hand-built paths were routed would have got a half-moved state root — the
+   * doctor reading the real `bootstrap-state.json` while writing its cache elsewhere. Head 2 routed
+   * them, so the seam is supported and the bound is lifted. What replaces it is not "anything goes":
+   *
+   *   CONTRIBUTING     yes. It is a test and CI seam, and that page is where the rules for whoever
+   *                    changes this repository live.
+   *   docs/plans/      yes. C43's row is the engineering record of both heads.
+   *   ANY USER PAGE    no. `INSTALL.md`, `README.md`, `TROUBLESHOOTING.md`, `MODES-AND-PRESETS.md`,
+   *                    the settings files, the launchers and the workflows stay clean, because nothing
+   *                    in the product sets it and an installed checkout keeps its state beside itself.
+   *                    A user who reads it as a way to relocate an installation has been misled by us.
    */
   const { readFileSync, readdirSync, statSync } = await import('node:fs');
   const pages = [];
@@ -157,18 +166,15 @@ test('C43 head 1 — the variable is not documented, defaulted or advertised yet
     }
   };
   walk(root);
-  /*
-   * ONE EXEMPTION, NAMED WITH ITS REASON: `docs/plans/` is the engineering record, and C43's row is
-   * where the commission, the two heads and this very bound are written down. A plan row is not a
-   * page anyone reads to configure the product, and this one tells a reader the variable is inert and
-   * must not be exported — so it is the one place naming it makes the situation clearer rather than
-   * more dangerous. Everything a user actually reads — INSTALL, README, TROUBLESHOOTING,
-   * MODES-AND-PRESETS, the settings files, the launchers, the workflows — stays clean.
-   */
-  const PLANS = `docs${sep}plans${sep}`;
   const named = pages.filter((p) => readFileSync(p, 'utf8').includes('SNOWARCH_STATE_ROOT'))
     .map((p) => p.slice(root.length + 1))
-    .filter((p) => !p.startsWith(PLANS));
-  assert.deepEqual(named, [],
-    'SNOWARCH_STATE_ROOT is named in a page, script or workflow — head 1 must stay undocumented');
+    .filter((p) => !p.startsWith(`docs${sep}plans${sep}`));
+  assert.deepEqual(named, [join('docs', 'CONTRIBUTING.md')],
+    'SNOWARCH_STATE_ROOT is named somewhere new — it belongs in CONTRIBUTING, not in a user-facing page');
+  // And the page has to actually explain it, not merely mention it: the two bounds are what stop a
+  // reader treating it as a way to move a real installation.
+  const contributing = readFileSync(join(root, 'docs', 'CONTRIBUTING.md'), 'utf8');
+  assert.match(contributing, /local-paths\.mjs/, 'the page does not say where the paths are named');
+  assert.match(contributing, /useStateRoot\(\)/, 'the page does not say how a suite opts in');
+  assert.match(contributing, /test and CI seam/, 'the page does not say it is not for a real install');
 });

@@ -13,6 +13,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { storePath } from '../local-paths.mjs';
 import { contractSha } from '../config.mjs';
 import { runDoctor } from '../doctor/index.mjs';
 import { childEnv } from '../spawn-env.mjs';
@@ -33,7 +34,7 @@ export const NO_INSTANCE = `no instance configured — run ${ADD_INSTANCE()}`;
 export const PROBES_UNAVAILABLE = 'probes: not available in this build';
 
 export function storeMtime(root) {
-  const p = join(root, '.local', 'instances.json');
+  const p = storePath(root);
   return existsSync(p) ? String(statSync(p).mtimeMs) : 'none';
 }
 

@@ -13,6 +13,7 @@
 import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { chmodSync } from 'node:fs';
 import { join } from 'node:path';
+import { localPathFrom, logsDir, storePath as storePathOf } from '../local-paths.mjs';
 import { pathToFileURL } from 'node:url';
 
 import { cachePath, cacheStale, inputsPath } from '../doctor-cache.mjs';
@@ -146,7 +147,7 @@ async function fixFlags({ root, ctx, fix, storeModule }) {
     'dist', 'store', 'index.js');
   if (!existsSync(entry)) return result('failed', 'the server store module is not built');
   const store = storeModule ?? await import(pathToFileURL(entry).href);
-  const storePath = ctx.storePath ?? join(root, '.local', 'instances.json');
+  const storePath = ctx.storePath ?? storePathOf(root);
   const loaded = store.loadStore(storePath);
   if ('error' in loaded) return result('failed', loaded.error.message);
   const current = loaded.store.instances?.[label];
@@ -166,7 +167,8 @@ function fixStoreMode({ root, ctx, fix }) {
   if ((ctx.platform ?? process.platform) === 'win32') {
     return result('noop', 'file modes: ACL-inherited');
   }
-  const target = join(root, fix?.path ?? '.local');
+  // The path arrives as DATA from the check that found it, so it is routed as data.
+  const target = localPathFrom(root, fix?.path ?? '.local');
   if (!existsSync(target)) return result('noop', 'nothing to chmod');
   const want = parseInt(fix?.to ?? '700', 8);
   if ((statSync(target).mode & 0o777) === want) return result('noop', 'already correct');
@@ -298,7 +300,7 @@ export function renderPlan({ actions, refused }) {
 /** Paths only — never a value, never a credential. One line per fixer, appended. */
 export function logFix(root, entries, { now = new Date() } = {}) {
   try {
-    const dir = join(root, '.local', 'logs');
+    const dir = logsDir(root);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const stamp = now.toISOString().replace(/[:.]/g, '-');
     const file = join(dir, `doctor-fix-${stamp}.log`);

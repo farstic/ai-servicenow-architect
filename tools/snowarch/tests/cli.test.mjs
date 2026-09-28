@@ -22,6 +22,16 @@ const FRAME_CLI = spellings().cli;
 const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import { EXIT_OK, EXIT_USAGE } from '../lib/exit.mjs';
 import { contractSha, cwdNote, loadConfig, version } from '../lib/config.mjs';
+import { stateRootInUse, useStateRoot } from './helpers/state-root.mjs';
+/*
+ * ARC-07-C43 head 2 — THIS SUITE RUNS THE REAL CLI, so its `.local/` goes somewhere else.
+ *
+ * Measured: with this line absent, a full `npm test` leaves logs and the doctor/upgrade caches in the
+ * repository's own `.local/`, which is gitignored and therefore invisible to `assert-clean`. A `cwd`
+ * cannot fix it — `root` comes from `config.mjs`'s own location — so the state root is what moves.
+ */
+useStateRoot();
+
 
 /**
  * The CLI frame: parse, dispatch, refuse clearly.
@@ -44,6 +54,54 @@ function run(args, opts = {}) {
     { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
   return { code: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
+
+/*
+ * ARC-07-C43 head 2 — A SPAWNED CLI WRITES NOTHING UNDER THIS CHECKOUT, and the assertion is the
+ * checkout's own `.local/` listed before and after rather than a claim about where the log went.
+ *
+ * `mode sideways` is the case the architect set, and it is the right one: it FAILS — `mode takes live
+ * or design` — and a failing run logs, so before head 2 this exact command left
+ * `.local/logs/mode-<stamp>.log` in the repository. It also needs no store, no instance and no
+ * network, so what it proves is about the state root and nothing else.
+ *
+ * Two directions, because one alone would pass for the wrong reason: nothing NEW appears under the
+ * checkout, AND the log the command certainly wrote is found under the redirected root. A case that
+ * only checked the checkout would also pass if the command had silently stopped logging at all.
+ */
+test('ARC-07-C43 — a spawned `mode sideways` writes under the state root, not the checkout', () => {
+  // NOT `useStateRoot()` — that would make this case pass on its own while every OTHER case in the
+  // file still wrote into the checkout. It READS the suite's opt-in, so removing the call at the top
+  // of this file fails here, which is the property that actually protects the other cases.
+  const stateRootDir = stateRootInUse();
+  assert.ok(stateRootDir,
+    'this suite never called useStateRoot(), so every case in it writes into the checkout');
+  const listing = (dir) => {
+    const walk = (d, at = '') => {
+      let out = [];
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        const rel = at ? `${at}/${e.name}` : e.name;
+        out = out.concat(e.isDirectory() ? walk(join(d, e.name), rel) : [rel]);
+      }
+      return out.sort();
+    };
+    return existsSync(dir) ? walk(dir) : [];
+  };
+
+  const checkoutLocal = join(repoRoot, '.local');
+  const before = listing(checkoutLocal);
+  const logsBefore = listing(join(stateRootDir, '.local', 'logs'));
+
+  const m = run(['mode', 'sideways'], { cwd: repoRoot });
+
+  assert.equal(m.code, EXIT_USAGE, 'the command did not run the way this case assumes');
+  assert.match(m.stderr, /mode takes live or design/);
+  assert.deepEqual(listing(checkoutLocal), before,
+    'a spawned CLI added something under the checkout\'s .local/ — the state root did not reach it');
+  const logsAfter = listing(join(stateRootDir, '.local', 'logs'));
+  const added = logsAfter.filter((f) => !logsBefore.includes(f));
+  assert.equal(added.length, 1, `expected one new log under the state root, got ${added.join(', ')}`);
+  assert.match(added[0], /^mode-\d{8}-\d{6}\.log$/);
+});
 
 test('the parser: every form, and the errors', () => {
   const cases = [

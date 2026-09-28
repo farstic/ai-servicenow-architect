@@ -672,6 +672,33 @@ full runs, in a file that story never touched. Copy the artefact and run against
 has to live **inside** the package, because Node resolves dependencies by walking up from the module
 and a copy in `os.tmpdir()` dies with `ERR_MODULE_NOT_FOUND`.
 
+### `SNOWARCH_STATE_ROOT` — where `.local/` goes, for a test that runs the real CLI
+
+Everything the product writes lives under `.local/`: the bootstrap state, the instance store, B07's
+config, the doctor's cache and its inputs, the upgrade check, and one log per command run. All of it is
+named in **`tools/snowarch/lib/local-paths.mjs`**, which is the only place that builds those paths —
+build one by hand and it stops following the rule below. Each helper asks `stateRoot()` in
+`config.mjs`, which answers `SNOWARCH_STATE_ROOT` when it is set and the repository root when it is not.
+
+**What it is for.** A suite that spawns the real `bin/snowarch.mjs` cannot be pointed away from this
+checkout with a `cwd` — see the section below for why — so it sets the state root instead. Call
+`useStateRoot()` once at the top of the file (`tools/snowarch/tests/helpers/state-root.mjs`): it makes a
+private temp directory, tracked and removed with the rest of the fixtures, and covers both the children
+it spawns and any product function the file calls in-process with the real root.
+
+**Two things it deliberately does not do.**
+
+- It does not capture a caller that passes its own root. `statePath(fixture)` is still under `fixture`,
+  set or not, so the hundred-odd cases that write into a temp tree are untouched — and a case that
+  means to redirect the real root has to say so.
+- It does not move the checkout's own files. The doctor's staleness inputs mix `.local/` state with
+  `.mcp.json`, both settings files and `engine.config.json`; the first follows the state root and the
+  rest stay in the repository. A redirect that moved all six would look for files that are not there,
+  call every input changed, and re-run the doctor for ever.
+
+It is a **test and CI seam**, not a way to relocate a real installation: nothing in the product sets it,
+no launcher passes it, and an installed checkout keeps its state beside itself.
+
 ### A test that spawns the CLI writes into THIS checkout's `.local/` — and a `cwd` will not stop it
 
 `npm test` leaves a `.local/` at the repository root, and `assert-clean` cannot see it because
@@ -687,9 +714,14 @@ finds the corpus and the contract — which means a spawned child discovers the 
 writes the same `.local/` wherever it is standing. The only thing that redirects it is a root the
 command is *given*: pass a fixture root to the helper you are testing (`statePath`, `cachePath`,
 `storePath`, `createLogger`'s `logRoot`) and assert against that, or pass `noFile` for a run that
-should write nothing. A spawn of the real bin has no such seam today; ARC-07-C33 carries the measured
-size of adding one, and until it exists, **a new test that spawns the real bin is adding to this
-list** — so prefer calling the command's module with a root of your own.
+should write nothing.
+
+**A spawn of the real bin has a seam now, and it is one line.** `useStateRoot()` at the top of the file
+— see `SNOWARCH_STATE_ROOT` above — sends everything that run writes to a private temp directory. The
+five suites named above use it, and `tools/snowarch/tests/cli.test.mjs` carries the case that proves it:
+a spawned `mode sideways` leaves the checkout's `.local/` byte-for-byte as it was and its log under the
+state root instead. Prefer calling the command's module with a root of your own where you can; where you
+genuinely need the real bin, that line is what keeps the run out of this checkout.
 
 ### Report paths with forward slashes, on every platform
 
@@ -820,6 +852,14 @@ does not, and both have let a defect through to CI:
 - The legacy-name ratchet reads the working tree, and until ARC-10-C1 it read the INDEX — a run
   before `git add` scanned neither new file. Staging first is no longer load-bearing, but it is
   still what makes a local run and CI's run ask the same question.
+
+**`tests/upgrade/` is not in `npm test`, so changing what it covers means running it yourself.** Run
+`node --test --test-concurrency=2 tests/upgrade/*.test.mjs` plus `node scripts/ci/assert-clean.mjs`
+before you push a change to `tools/snowarch/lib/commands/upgrade.mjs`, `lib/bootstrap.mjs`,
+`lib/plan.mjs`, `lib/state.mjs`, `lib/steps/` or `tests/upgrade/` itself — `plan.mjs` and `state.mjs`
+because `upgrade` prints that plan and reads that state, which is how each of them reached the list.
+The `upgrade-e2e` CI job has no `paths:` filter and runs on every push and pull request regardless;
+this is about learning it locally rather than from a red cell twenty minutes later.
 
 **`npm test` prints a table, and it is there because the gate used to shrink silently (ARC-09-C64).**
 The script was `node tests/run.mjs && npm test --workspaces --if-present`, so a failure in the first

@@ -19,6 +19,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { spellings } from '../text.mjs';
 import { join } from 'node:path';
+import { statePath } from '../local-paths.mjs';
 
 import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ } from '../exit.mjs';
 import { BANNER } from '../text.mjs';
@@ -66,7 +67,7 @@ export function fallbackPanel(root, cause,
   // `platform: 'linux'` so a COMMITTED fixture renders identically on every runner; a `spellings()` in
   // here reads the machine instead and the fixture then depends on the shell that captured it.
   { read = readFileSync, exists = existsSync, platform, env } = {}) {
-  const path = join(root, '.local', 'bootstrap-state.json');
+  const path = statePath(root);
   if (!exists(path)) {
     // ARC-07-W17 — one spelling, the reader's. This named both by hand and the Windows one was BARE,
     // which PowerShell refuses; the sentence that tells somebody their checkout is not bootstrapped

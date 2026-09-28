@@ -26,6 +26,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node
 import { CACHE_FILE } from '../doctor-cache.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { localDir, storePath } from '../local-paths.mjs';
 
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from '../exit.mjs';
 import { branchState, describe, git, isShallow } from '../git.mjs';
@@ -345,7 +346,11 @@ export function rerunAtTag(root, tag, { ctx, state, run = spawnSync, keepWorktre
     // The store and the state are the CHECKOUT's, not the tag's: an upgrade does not move them,
     // and B06's inputs are mostly about them. A worktree without them would read `storePresent=no`
     // and call B06 stale on every upgrade — the opposite of this row's point.
-    const local = join(root, '.local');
+    // ARC-07-C43 head 2 — TWO ROOTS, and only one is this checkout's state. The SOURCE follows
+    // `SNOWARCH_STATE_ROOT` because it IS the checkout's `.local/`; the link's LOCATION is a path
+    // inside the worktree just created, which is another tree — redirecting that would put the
+    // link somewhere the upgrade is not looking.
+    const local = localDir(root);
     if (existsSync(local)) {
       try { symlinkSync(local, join(at, '.local'), 'dir'); } catch { /* already there */ }
     }
@@ -426,7 +431,7 @@ export function planSteps(root, tag, { ctx, state, opts = {}, run = spawnSync } 
  * ARC-07-C31 slice 4 — one caller, `line 611` below, so a default is within the rule and named.
  */
 export function storePlan(root, tag, { opts = {}, spell = spellings() } = {}) {
-  const store = join(root, '.local', 'instances.json');
+  const store = storePath(root);
   if (!existsSync(store)) return { line: 'store: none (no instance store in this checkout)' };
   let from = null;
   try { from = JSON.parse(readFileSync(store, 'utf8'))?.version ?? null; } catch { from = 'unreadable'; }

@@ -16,16 +16,19 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { EXIT_FAIL } from './exit.mjs';
-import { stateRoot } from './config.mjs';
+import { statePath as statePathOf, doctorCachePath as doctorCachePathOf }
+  from './local-paths.mjs';
 import { isSecretKey, redact } from './redact.mjs';
 import { needSpell, spellings } from './launcher-spelling.mjs';
 
 export const STATE_VERSION = 1;
 export const PRODUCT = 'snowarch';
 
-// ARC-07-C43 — both follow `SNOWARCH_STATE_ROOT`; unset, both are the root they were given.
-export const statePath = (root) => join(stateRoot(root), '.local', 'bootstrap-state.json');
-export const doctorCachePath = (root) => join(stateRoot(root), '.local', 'doctor-last.json');
+// ARC-07-C43 head 2 — named in `local-paths.mjs` now, the one home for everything under
+// `.local/`. Re-exported here because ten call sites and four suites import them from this
+// module, and a rename would have been churn with no reader asking for it.
+export const statePath = statePathOf;
+export const doctorCachePath = doctorCachePathOf;
 
 /** Everything `--reset` may remove. Named here so the runner cannot widen it by accident. */
 export const RESET_PATHS = [statePath, doctorCachePath];

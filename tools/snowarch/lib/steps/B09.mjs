@@ -7,6 +7,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { doctorCachePath } from '../local-paths.mjs';
 import { contractSha, version as engineVersion } from '../config.mjs';
 import { recordedInstance } from '../state.mjs';
 import { writeDoctorCache } from '../doctor-cache.mjs';
@@ -116,7 +117,7 @@ export const run = async (ctx) => {
   // Design-only runs never reach B08, so the banner would have no cache at all on a first install.
   // Live runs already have one, and overwriting it here would replace a handshake's findings with
   // a summary's.
-  if (ctx.mode !== 'live' && !existsSync(join(ctx.root, '.local', 'doctor-last.json'))) {
+  if (ctx.mode !== 'live' && !existsSync(doctorCachePath(ctx.root))) {
     writeDoctorCache(ctx.root, {
       mode: ctx.mode,
       engineVersion: engineVersion(ctx.root),

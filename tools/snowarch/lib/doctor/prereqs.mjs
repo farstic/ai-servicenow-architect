@@ -11,6 +11,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { storePath as storePathOf } from '../local-paths.mjs';
 
 import { meetsFloor } from '../versions.mjs';
 
@@ -76,6 +77,6 @@ export function collectPrereqs({ root, config, platform = process.platform, env 
     },
     deps: { ok: depsInstalled },
     mode: { toggle },
-    store: { exists: existsSync(storePath ?? join(root, '.local', 'instances.json')) },
+    store: { exists: existsSync(storePath ?? storePathOf(root)) },
   };
 }
