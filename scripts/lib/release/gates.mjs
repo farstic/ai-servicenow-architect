@@ -13,9 +13,11 @@
  * rebuild's output is deliberately left in the working tree so it can be inspected — and the
  * preflight's clean-tree check means the next attempt refuses until it has been dealt with.
  */
+import { spawnSync } from 'node:child_process';
 import { lstatSync } from 'node:fs';
 import { spellings } from '../../../tools/snowarch/lib/text.mjs';
 import { join } from 'node:path';
+import { npmCommand, spawnFor } from '../../../tools/snowarch/lib/spawn-batch.mjs';
 
 export const EXIT_GATE = 1;
 
@@ -60,11 +62,23 @@ export function gatePlan({ noInstall = false, platform = process.platform,
   // returns `./snowarch` on any machine with SHELL set, and a caller written that way asserts the
   // POSIX spelling while believing it asked about Windows. Measured here before it could mislead.
   const launcher = spellings({ platform, env }).cli;
+  /*
+   * ARC-09-C70 — `npm` IS `npm.cmd` ON WINDOWS, and the plan has to say so.
+   *
+   * These argv used to start with the literal `'npm'`, which worked only because the runner spawned
+   * them with `shell: true` and the shell added the extension. C69 removed the shell — rightly, it is
+   * DEP0190 with an args array — and a bare `npm` then reached `CreateProcess`, which appends `.exe`
+   * and nothing else. The Windows `release-dryrun` cell failed on `gate lint (exit 1)` with no output
+   * at all: `status` was `null` from a spawn that never happened, and `?? 1` turned that into an exit
+   * code. The plan names the command for the platform it will run on, the way `launcher` above already
+   * does — one expression, beside the other one that already had to know this.
+   */
+  const npm = npmCommand(platform);
   return [
-    ...(noInstall ? [] : [{ name: 'install', argv: ['npm', 'ci', '--ignore-scripts'] }]),
+    ...(noInstall ? [] : [{ name: 'install', argv: [npm, 'ci', '--ignore-scripts'] }]),
     { name: 'dist', argv: ['node', 'scripts/build-dist.mjs'], then: 'dist-diff' },
-    { name: 'lint', argv: ['npm', 'run', 'lint'] },
-    { name: 'test', argv: ['npm', 'test'] },
+    { name: 'lint', argv: [npm, 'run', 'lint'] },
+    { name: 'test', argv: [npm, 'test'] },
     { name: 'contract', argv: ['node', 'scripts/contract-gate.mjs', '--skip-build'] },
     { name: 'docs', argv: [launcher, 'docs', 'verify'] },
   ];
@@ -76,6 +90,44 @@ export function gatePlan({ noInstall = false, platform = process.platform,
  * Returns `{ ok: true }` or `{ ok: false, message, gate }`. The message is the exact line the story
  * fixes, because a maintainer greps for it and CI matches on it.
  */
+/**
+ * The child-process runner the gates use — ARC-09-C70, and it is a FUNCTION here so it can be driven.
+ *
+ * It used to be a closure inside `release.mjs`, which meant the only way to exercise it was to run a
+ * real release: every test injects `run` and therefore skipped the very code that failed on the Windows
+ * cell. A defect in the one seam nobody could reach is a defect that waits for a release night.
+ *
+ * TWO THINGS IT OWES A READER, both learned from `release-dryrun (windows-latest)` printing
+ * `release: gate failed: lint (exit 1) — nothing was written` and not one line of lint's own output:
+ *
+ *   1. The gate's OUTPUT. `stdio: 'inherit'` left nothing to print, and on a spawn that never started
+ *      there was nothing to inherit either. Captured and written straight through, so a passing gate
+ *      still puts its log on the record and a failing one cannot be silent.
+ *   2. WHICH silence it was. A spawn that never happened carries an `error` and no output; a child that
+ *      ran and said nothing before failing is rarer and reads identically unless it is named.
+ *
+ * `maxBuffer` is raised on purpose: the `test` gate can outrun the 1 MB default, and an ENOBUFS would
+ * report a PASSING gate as failed — a worse defect than the one this fixes.
+ */
+export function makeGateRunner({ root, platform = process.platform, err,
+  spawn = spawnSync, spawnForImpl = spawnFor }) {
+  return (args) => {
+    const [cmd, ...rest] = args;
+    const call = spawnForImpl(cmd, rest, { platform });
+    const r = spawn(call.file, call.args,
+      { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26, ...call.options });
+    const output = `${r?.stdout ?? ''}${r?.stderr ?? ''}`;
+    if (output) err.write(output.endsWith('\n') ? output : `${output}\n`);
+    const code = r?.status ?? 1;
+    if (r?.error) {
+      err.write(`release: ${cmd} could not be started: ${r.error.message}\n`);
+    } else if (code !== 0 && !output.trim()) {
+      err.write(`release: ${cmd} exited ${code} and printed nothing\n`);
+    }
+    return code;
+  };
+}
+
 export function runGates({ plan, run, diffDist, onStart = () => {}, linked = () => false }) {
   for (const gate of plan) {
     // Before the install, not after: the damage is done by the command, and the check costs an

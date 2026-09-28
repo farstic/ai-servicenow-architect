@@ -27,6 +27,7 @@ import { badgeLine, writeHead, writeInstallTag, writeMarker } from '../scripts/l
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { STAGED } from '../scripts/lib/release/writers.mjs';
 import { writeGitattributes } from './helpers/gitattributes.mjs';
+import { gatePlan, makeGateRunner } from '../scripts/lib/release/gates.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
@@ -976,4 +977,72 @@ test('ARC-09-C65 — the two rules agree on an rc tree, which is what the rehear
 
   // ...and a FINAL tree still allows its own version, so this change moved nothing there.
   assert.deepEqual(allowed({ tags: ['v2.0.5'], treeVersion: '2.0.6' }), ['v2.0.5', 'v2.0.6']);
+});
+
+/*
+ * ARC-09-C70 — the Windows `release-dryrun` blocker, in the two halves it actually had.
+ *
+ * `release-dryrun (windows-latest)` failed at 17af0a8 where it passed on develop: `gate dist…` ok, then
+ * `release: gate failed: lint (exit 1) — nothing was written` and NOT ONE LINE of lint's own output.
+ * Both halves are asserted here, and neither could be asserted before: the runner was a closure inside
+ * `release.mjs`, and every case in this file injects `run`, so the one seam that broke was the one seam
+ * no case could reach.
+ */
+test('C70 — the gate plan names npm the way the platform spells it', () => {
+  const win = gatePlan({ platform: 'win32', env: {} });
+  const mac = gatePlan({ platform: 'darwin', env: {} });
+
+  // THE DEFECT: these argv used to start with the literal `npm`, which worked only because the runner
+  // added `shell: true`. C69 removed the shell (DEP0190 with an args array) and a bare `npm` then
+  // reached CreateProcess, which appends `.exe` and nothing else.
+  for (const name of ['install', 'lint', 'test']) {
+    const w = win.find((g) => g.name === name);
+    const m = mac.find((g) => g.name === name);
+    assert.equal(w.argv[0], 'npm.cmd', `the ${name} gate would not start on Windows`);
+    assert.equal(m.argv[0], 'npm', `the ${name} gate must stay bare off Windows`);
+  }
+  // The gates that are not npm are untouched — `node` is a real executable and needs no spelling.
+  assert.equal(win.find((g) => g.name === 'dist').argv[0], 'node');
+});
+
+test('C70 — a spawn that never started is reported, not turned into a bare exit code', () => {
+  const said = [];
+  const err = { write: (x) => said.push(x) };
+  const run = makeGateRunner({ root: '/not-read-by-these-cases', platform: 'win32', err,
+    // What Node hands back for a command Windows could not find: no status, an `error`, no output.
+    spawn: () => ({ status: null, stdout: '', stderr: '', error: new Error('spawn npm ENOENT') }) });
+
+  const code = run(['npm', 'run', 'lint']);
+  assert.equal(code, 1, 'a failed spawn still has to fail the gate');
+  assert.match(said.join(''), /could not be started: spawn npm ENOENT/,
+    'this is the line whose absence sent a reader to lint instead of to the spawn');
+});
+
+test('C70 — a failing gate\'s own output reaches the log, and a silent one says it was silent', () => {
+  const said = [];
+  const err = { write: (x) => said.push(x) };
+  const withOutput = makeGateRunner({ root: '/not-read-by-these-cases', platform: 'linux', err,
+    spawn: () => ({ status: 1, stdout: 'lint: 3 problems\n', stderr: 'at file.mjs:9\n' }) });
+  assert.equal(withOutput(['npm', 'run', 'lint']), 1);
+  const printed = said.join('');
+  assert.match(printed, /lint: 3 problems/, 'the gate refused and showed nothing of what it refused on');
+  assert.match(printed, /at file\.mjs:9/, 'stderr is part of what a reader needs, not an extra');
+  assert.doesNotMatch(printed, /printed nothing/, 'it printed plenty');
+
+  // The rarer silence, named so it does not read like the one above.
+  const quiet = [];
+  const mute = makeGateRunner({ root: '/not-read-by-these-cases', platform: 'linux', err: { write: (x) => quiet.push(x) },
+    spawn: () => ({ status: 2, stdout: '', stderr: '' }) });
+  assert.equal(mute(['npm', 'test']), 2);
+  assert.match(quiet.join(''), /npm exited 2 and printed nothing/);
+});
+
+test('C70 — a passing gate is not silenced by the capture', () => {
+  const said = [];
+  const run = makeGateRunner({ root: '/not-read-by-these-cases', platform: 'linux', err: { write: (x) => said.push(x) },
+    spawn: () => ({ status: 0, stdout: 'up to date\n', stderr: '' }) });
+  assert.equal(run(['npm', 'ci']), 0);
+  // Capturing replaced `stdio: 'inherit'`, so a passing gate's log has to be written through rather
+  // than swallowed — it arrives at once instead of streaming, which for a CI log is the same thing.
+  assert.match(said.join(''), /up to date/);
 });

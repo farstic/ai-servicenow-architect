@@ -37,7 +37,8 @@ import { fileURLToPath } from 'node:url';
 import { npmCommand, spawnFor } from '../tools/snowarch/lib/spawn-batch.mjs';
 
 import { askOnce, isYes } from '../tools/snowarch/lib/ask.mjs';
-import { EXIT_GATE, gatePlan, modulesAreLinked, runGates } from './lib/release/gates.mjs';
+import { EXIT_GATE, gatePlan, makeGateRunner, modulesAreLinked, runGates }
+  from './lib/release/gates.mjs';
 import { EXIT_PREFLIGHT, preflight } from './lib/release/preflight.mjs';
 import { buildTagMessage } from './lib/release/tag.mjs';
 import { applyWrites, rollback, STAGED } from './lib/release/writers.mjs';
@@ -108,22 +109,12 @@ export async function release({
   };
   const gitRun = git ?? gitDefault;
 
-  /*
-   * Child processes for the gates and for npm.
-   *
-   * ARC-09-C69 — `spawnFor`, and the comment that used to sit here explained only half of it. `npm` on
-   * Windows is `npm.cmd`, a batch file Node has refused to exec directly since CVE-2024-27980; the
-   * previous answer to that was `shell: platform === 'win32'`, which Node 24 deprecates when an args
-   * array is passed (DEP0190) and which quotes nothing, so a path with a space arrives split. A release
-   * runs on a Windows leg too, and a deprecation printed into a release log is a line whoever reads that
-   * log has to rule out. Every argument here is still ours; none comes from a user.
-   */
-  const runDefault = (args) => {
-    const [cmd, ...rest] = args;
-    const call = spawnFor(cmd, rest, { platform });
-    const r = spawnSync(call.file, call.args, { cwd: root, stdio: 'inherit', ...call.options });
-    return r.status ?? 1;
-  };
+  // Child processes for the gates. ARC-09-C69/C70 — `makeGateRunner` in `lib/release/gates.mjs` owns
+  // both halves now: the platform's own `npm` spelling with no shell (DEP0190), and printing what a
+  // failing gate actually said. It lives there because a closure HERE was reachable only by running a
+  // real release — every test injects `run`, so the one seam that failed on the Windows cell was the
+  // one seam no case could touch.
+  const runDefault = makeGateRunner({ root, platform, err });
   const runChild = run ?? runDefault;
 
   const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));

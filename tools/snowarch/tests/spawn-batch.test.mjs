@@ -103,14 +103,71 @@ test('C69 — nothing in this repository spawns with an args array AND a shell',
   }
   assert.ok(files.length > 150, `the scan found only ${files.length} files — it is not reading the repo`);
 
-  /** `shell:` present and not the literal `false` — `true`, or any expression that can be true. */
-  const shellIsOn = (node) => ts.isObjectLiteralExpression(node) && node.properties.some((pr) =>
-    ts.isPropertyAssignment(pr) && pr.name?.getText?.() === 'shell'
-      && pr.initializer.kind !== ts.SyntaxKind.FalseKeyword);
+  /**
+   * `shell:` present and not the literal `false` — following a SPREAD one hop.
+   *
+   * ARC-09-C70, and the architect's control is what found it: a degradation that built the option in a
+   * separate object and spread it in —
+   *
+   *     const call = { file: cmd, args, options: { shell: … } };
+   *     spawnSync(call.file, call.args, { …, ...call.options });
+   *
+   * — was not flagged, while the same defect written inline was. That is not a corner: assembling the
+   * options elsewhere and spreading them is exactly how `test-all.mjs`, the harnesses and now
+   * `makeGateRunner` pass them, so the shape the scan could not see is the shape the repository uses.
+   *
+   * ONE HOP, and no further, deliberately. Resolving a spread to an object literal bound in the same
+   * file covers every way this codebase writes it; a general resolver would need types, and a scan
+   * nobody can predict is a scan people route around. A spread this cannot resolve is reported as
+   * unresolved by the case below rather than silently treated as clean — the mistake that let the
+   * callee-name version of this rule pass twice.
+   */
+  const bindings = new Map();
+  const collectBindings = (src) => {
+    const visit = (node) => {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
+        && node.initializer && ts.isObjectLiteralExpression(node.initializer)) {
+        bindings.set(node.name.getText(), node.initializer);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(src);
+  };
+
+  /** `call.options` → the object literal at that path, when it is one. `opts` → its own literal. */
+  const resolveSpread = (expr) => {
+    const parts = expr.getText().split('.');
+    let node = bindings.get(parts[0]);
+    for (const key of parts.slice(1)) {
+      if (!node || !ts.isObjectLiteralExpression(node)) return null;
+      const prop = node.properties.find((pr) => ts.isPropertyAssignment(pr)
+        && pr.name?.getText?.() === key);
+      node = prop && ts.isPropertyAssignment(prop)
+        && ts.isObjectLiteralExpression(prop.initializer) ? prop.initializer : null;
+    }
+    return node && ts.isObjectLiteralExpression(node) ? node : null;
+  };
+
+  const unresolved = [];
+  const shellIsOn = (node, file) => {
+    if (!ts.isObjectLiteralExpression(node)) return false;
+    for (const pr of node.properties) {
+      if (ts.isPropertyAssignment(pr) && pr.name?.getText?.() === 'shell'
+        && pr.initializer.kind !== ts.SyntaxKind.FalseKeyword) return true;
+      if (ts.isSpreadAssignment(pr)) {
+        const target = resolveSpread(pr.expression);
+        if (!target) { unresolved.push(`${file}: ...${pr.expression.getText()}`); continue; }
+        if (shellIsOn(target, file)) return true;
+      }
+    }
+    return false;
+  };
 
   const offenders = [];
   for (const file of files) {
     const src = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+    bindings.clear();
+    collectBindings(src);
     const visit = (node) => {
       if (ts.isCallExpression(node)) {
         // An args ARRAY in the second position is what makes the shell deprecated. A spawn given one
@@ -131,7 +188,7 @@ test('C69 — nothing in this repository spawns with an args array AND a shell',
          * harness's `run(dir, cmd, args)`, a test's spy. So the shape is read wherever it appears:
          * an args array plus a `shell` that is not `false` is the defect, whatever the function is called.
          */
-        if (hasArgsArray && options && shellIsOn(options)) {
+        if (hasArgsArray && options && shellIsOn(options, file.slice(root.length + 1))) {
           const { line } = src.getLineAndCharacterOfPosition(node.getStart());
           offenders.push(`${file.slice(root.length + 1)}:${line + 1}`);
         }
@@ -142,6 +199,74 @@ test('C69 — nothing in this repository spawns with an args array AND a shell',
   }
   assert.deepEqual(offenders, [],
     'a spawn passes an args array with a shell (DEP0190) — use `spawnFor` from spawn-batch.mjs');
+});
+
+test('C70 — the scan sees the option assembled elsewhere and spread in', async () => {
+  /*
+   * THE ARCHITECT'S CONTROL FOUND THIS, and it is the second blind spot in this one instrument: a
+   * degradation that spread the options in was not flagged while the same defect written inline was.
+   * Assembling options elsewhere and spreading them is how `test-all.mjs`, the harnesses and
+   * `makeGateRunner` all pass them, so the shape the scan could not see was the shape the repository
+   * uses. Both spellings are planted here, and the direct one is planted too — a reader that lost the
+   * easy case while learning the hard one would be a step backwards nobody would notice.
+   */
+  const ts = (await import('typescript')).default;
+  const planted = [
+    "const call = { file: 'npm.cmd', args: ['test'], options: { shell: true } };",
+    "spawnSync(call.file, call.args, { cwd: '.', ...call.options });",
+    "const opts = { shell: process.platform === 'win32' };",
+    "spawnSync('npm.cmd', ['ci'], { cwd: '.', ...opts });",
+    "spawnSync('npm.cmd', ['run', 'x'], { shell: true });",
+    "const clean = { options: { windowsVerbatimArguments: true } };",
+    "spawnSync('cmd.exe', ['/c', 'x'], { ...clean.options });",
+  ].join('\n');
+
+  const src = ts.createSourceFile('planted.mjs', planted, ts.ScriptTarget.Latest, true);
+  const bindings = new Map();
+  const bind = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)
+      && node.initializer && ts.isObjectLiteralExpression(node.initializer)) {
+      bindings.set(node.name.getText(), node.initializer);
+    }
+    ts.forEachChild(node, bind);
+  };
+  bind(src);
+  const resolveSpread = (expr) => {
+    const parts = expr.getText().split('.');
+    let node = bindings.get(parts[0]);
+    for (const key of parts.slice(1)) {
+      if (!node || !ts.isObjectLiteralExpression(node)) return null;
+      const prop = node.properties.find((pr) => ts.isPropertyAssignment(pr) && pr.name?.getText?.() === key);
+      node = prop && ts.isObjectLiteralExpression(prop.initializer) ? prop.initializer : null;
+    }
+    return node;
+  };
+  const on = (node) => ts.isObjectLiteralExpression(node) && node.properties.some((pr) => {
+    if (ts.isPropertyAssignment(pr) && pr.name?.getText?.() === 'shell') {
+      return pr.initializer.kind !== ts.SyntaxKind.FalseKeyword;
+    }
+    if (ts.isSpreadAssignment(pr)) {
+      const target = resolveSpread(pr.expression);
+      return target ? on(target) : false;
+    }
+    return false;
+  });
+
+  const flagged = [];
+  const visit = (node) => {
+    if (ts.isCallExpression(node) && node.expression.getText() === 'spawnSync') {
+      const options = node.arguments.find((a, i) => i > 0 && ts.isObjectLiteralExpression(a));
+      const second = node.arguments[1];
+      if (second && !ts.isObjectLiteralExpression(second) && options && on(options)) {
+        flagged.push(node.arguments[0].getText());
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(src);
+
+  assert.deepEqual(flagged, ["call.file", "'npm.cmd'", "'npm.cmd'"],
+    'the reader must catch the spread shapes AND the inline one, and leave the clean spread alone');
 });
 
 test('C69 — and the scan can still see the shape it is looking for', async () => {

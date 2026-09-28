@@ -102,8 +102,24 @@ export const npmCommand = (platform = process.platform) => (platform === 'win32'
  * that did carry one wrote `shell: process.platform === 'win32'`, which is the deprecated shape.
  */
 export function spawnFor(file, args = [], { env = process.env, platform = process.platform } = {}) {
-  if (platform === 'win32' && isBatch(file)) return batchCommand(file, args, { env });
-  return { file, args, options: {} };
+  /*
+   * ARC-09-C70 — A BARE `npm` ON WINDOWS IS A BATCH FILE, and this guard exists because the plain
+   * reading of the line above was wrong in a way that produced no error message at all.
+   *
+   * `isBatch('npm')` is false — there is no extension to match — so a caller passing the name it would
+   * type on a mac got a direct spawn, and `CreateProcess` appends `.exe` and nothing else. That is how
+   * `release-dryrun (windows-latest)` reported `gate failed: lint (exit 1)` with no output: the child
+   * never started, `status` was `null`, and `?? 1` manufactured an exit code. The shell used to hide
+   * this by resolving the name; removing the shell removed the hiding too.
+   *
+   * A LIST, deliberately short and named: these are the tools this repository spawns that npm installs
+   * as `.cmd` shims on Windows. A caller that knows better passes the full spelling — `npmCommand()` is
+   * the one to use — and this is the net under the caller that does not.
+   */
+  const SHIMMED = new Set(['npm', 'npx']);
+  const spelled = platform === 'win32' && SHIMMED.has(file) ? `${file}.cmd` : file;
+  if (platform === 'win32' && isBatch(spelled)) return batchCommand(spelled, args, { env });
+  return { file: spelled, args, options: {} };
 }
 
 /** Is this a file Windows can only run through the command processor? */
