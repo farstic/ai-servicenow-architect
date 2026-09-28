@@ -9,12 +9,26 @@
 // put a URL is a `detail` string.
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { stateRoot } from './config.mjs';
 import { isSecretKey, redact } from './redact.mjs';
 import { writeJsonAtomic } from './settings-local.mjs';
 
+/**
+ * `.local/` follows `SNOWARCH_STATE_ROOT` (ARC-07-C43); everything else is a file in the repository.
+ *
+ * PER-ENTRY rather than per-root, because this module addresses both kinds: `INPUT_FILES` below mixes
+ * the store and the recorded mode, which are state, with `.mcp.json`, the settings files and
+ * `engine.config.json`, which are the checkout. Moving all six would make a redirected run compare
+ * mtimes of files that are not there and re-run the doctor for ever.
+ *
+ * Named `pathIn` and not `at`: `cacheStale` below has a local `const at` for a parsed timestamp, and a
+ * module helper shadowed by a local of the same name is a trap for whoever edits that block next.
+ */
+const pathIn = (root, ...parts) => join(parts[0] === '.local' ? stateRoot(root) : root, ...parts);
+
 export const CACHE_VERSION = 1;
 export const CACHE_FILE = join('.local', 'doctor-last.json');
-export const cachePath = (root) => join(root, CACHE_FILE);
+export const cachePath = (root) => pathIn(root, '.local', 'doctor-last.json');
 
 /**
  * The six files whose mtime decides whether the cache still describes this checkout.
@@ -34,13 +48,13 @@ export const INPUT_FILES = Object.freeze({
 });
 
 export const INPUTS_FILE = join('.local', 'doctor-last.inputs.json');
-export const inputsPath = (root) => join(root, INPUTS_FILE);
+export const inputsPath = (root) => pathIn(root, '.local', 'doctor-last.inputs.json');
 
 /** `{ mcpJsonMtime: 1757…, … }` — `null` for a file that is not there, which is itself an input. */
 export function collectInputs(root, { stat = statSync, exists = existsSync } = {}) {
   const out = {};
   for (const [key, parts] of Object.entries(INPUT_FILES)) {
-    const p = join(root, ...parts);
+    const p = pathIn(root, ...parts);
     out[key] = exists(p) ? Math.round(stat(p).mtimeMs) : null;
   }
   return out;
@@ -114,7 +128,7 @@ export function writeDoctorCache(root, { mode, checks, engineVersion = null, con
   // a redactable value or an instance address fails the write rather than reaching a file that,
   // unlike the store, things read casually. A documentation URL is allowed through and stored.
   assertCacheStorable(payload, 'doctor-last');
-  mkdirSync(join(root, '.local'), { recursive: true, mode: 0o700 });
+  mkdirSync(pathIn(root, '.local'), { recursive: true, mode: 0o700 });
   // 0600: it names a configured instance and its probe results. Not a secret, but not the sort of
   // thing another account on a shared machine has any business reading either.
   writeJsonAtomic(cachePath(root), payload, { mode: 0o600 });
@@ -220,7 +234,7 @@ export function writeReportCache(root, report, { writer = 'doctor', now = new Da
     report: stored,
   };
   assertCacheStorable(payload, 'doctor-last');
-  mkdirSync(join(root, '.local'), { recursive: true, mode: 0o700 });
+  mkdirSync(pathIn(root, '.local'), { recursive: true, mode: 0o700 });
   writeJsonAtomic(cachePath(root), payload, { mode: 0o600 });
   const inputs = collectInputs(root);
   writeJsonAtomic(inputsPath(root), inputs, { mode: 0o600 });

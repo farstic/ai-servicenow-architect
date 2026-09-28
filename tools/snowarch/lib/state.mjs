@@ -14,16 +14,18 @@
 // `/snowarch status` skill reads `mode` when the doctor cannot run. That is why `docs.mode` is
 // nested exactly where it is, and why the shape is versioned.
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { EXIT_FAIL } from './exit.mjs';
+import { stateRoot } from './config.mjs';
 import { isSecretKey, redact } from './redact.mjs';
 import { needSpell, spellings } from './launcher-spelling.mjs';
 
 export const STATE_VERSION = 1;
 export const PRODUCT = 'snowarch';
 
-export const statePath = (root) => join(root, '.local', 'bootstrap-state.json');
-export const doctorCachePath = (root) => join(root, '.local', 'doctor-last.json');
+// ARC-07-C43 — both follow `SNOWARCH_STATE_ROOT`; unset, both are the root they were given.
+export const statePath = (root) => join(stateRoot(root), '.local', 'bootstrap-state.json');
+export const doctorCachePath = (root) => join(stateRoot(root), '.local', 'doctor-last.json');
 
 /** Everything `--reset` may remove. Named here so the runner cannot widen it by accident. */
 export const RESET_PATHS = [statePath, doctorCachePath];
@@ -232,7 +234,9 @@ export function loadStateOrReason(root, spell, { load = loadState } = {}) {
 export function saveState(root, state, { now = new Date() } = {}) {
   assertStorable(state);
   const p = statePath(root);
-  mkdirSync(join(root, '.local'), { recursive: true, mode: 0o700 });
+  // `dirname(p)`, not `join(root, '.local')`: the directory created is the one written to, so a
+  // redirected state root cannot create one place and write to another.
+  mkdirSync(dirname(p), { recursive: true, mode: 0o700 });
 
   const next = { ...state, updatedAt: now.toISOString() };
   const tmp = `${p}.tmp-${process.pid}`;
