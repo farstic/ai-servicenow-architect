@@ -103,17 +103,18 @@ const spellsLauncher = (node) => {
   // win32 cell, had only ever seen POSIX. Measured: the fixture
   // `assert.equal(out, '.\\snowarch.cmd doctor')` yielded 0 sites and `'./snowarch doctor'` yielded 1.
   if (ts.isStringLiteralLike(node)) return LAUNCHER.test(node.text);
-  // A REGEX IS NOT READ HERE, and that is a scope decision with a measurement behind it rather than an
-  // oversight. `/run \.\/snowarch doctor/` holds `\.\/snowarch`, so unescaping it first — which
-  // `regexProse` below does, and which ARC-07-C35's line-based version did — detects 45 more asserted
-  // launchers. Turning that on produced THIRTEEN reported mismatches, every one of them correct code, and
-  // chasing them down needs three separate pieces this row does not have: a product-side kind that knows
-  // `${spellings({ platform: 'linux' }).cli}` is PINNED though it is an interpolation; the committed
-  // generated pages indexed as product artefacts, because a page asserted by `install-page.test.mjs` is
-  // POSIX by rule 3 and its runtime twin derives; and a way to tell a GENERATOR's sentence from the runtime
-  // sentence it writes, since `scripts/gen-doctor-docs.mjs` carries the same words as the check it renders.
-  // Shipping the widening without those would mean an audit that cries wolf on correct tests, which is how
-  // a gate gets switched off. It is ARC-07-C35c, with those three pieces and this measurement as its start.
+  /*
+   * A REGEX IS READ, UNESCAPED FIRST — ARC-07-C35c's regex arm, switched on with the three pieces that stop it
+   * crying wolf. `/run \.\/snowarch doctor/` holds `\.\/snowarch`, not `./snowarch`, so this is where the
+   * escaping has to come off, and `assert.match(x, /…/)` is the shape this repository writes most.
+   *
+   * Switching it on alone reported THIRTEEN correct tests as mismatches, which is why it waited for: a
+   * product-side kind that knows `${spellings({ platform: 'linux' }).cli}` is PINNED though it is an
+   * interpolation; the committed generated pages indexed as product artefacts, because a page asserted by
+   * `install-page.test.mjs` is POSIX by rule 3 while its runtime twin derives; and a way to tell a GENERATOR's
+   * sentence from the runtime sentence it writes, since the two carry the same words by construction.
+   */
+  if (ts.isRegularExpressionLiteral(node)) return LAUNCHER.test(regexProse(node.getText()));
   return false;
 };
 
@@ -688,6 +689,8 @@ function mentionsPinned(node, isPinnedName, sf, from) {
       && ts.isStringLiteralLike(n.initializer)) {
       hit = true; return;
     }
+    // A spelling object written out by hand, inline or one hop away.
+    if (ts.isObjectLiteralExpression(n) && platformLiteralIn(n)) { hit = true; return; }
     // A POSITIONAL platform, which is how several cases drive it:
     // `deletionAdvice(2, 2, 'C:\\Users\\me', 'win32', {})` and `noTtyMessage('linux', {})`.
     if (ts.isStringLiteralLike(n) && PLATFORMS.has(n.text)) { hit = true; return; }
@@ -702,11 +705,23 @@ function mentionsPinned(node, isPinnedName, sf, from) {
   return hit;
 }
 
-/** `{ platform: 'win32', … }` — a ctx that names its platform. */
+/**
+ * `{ platform: 'win32', … }` — a ctx that names its platform — or a SPELLING OBJECT written out by hand.
+ *
+ * ARC-07-C35c's regex arm found the second shape: `windows-spellings.test.mjs:274` drives
+ * `MODE_VARIANTS.unconfigured({ cli: '.\\snowarch.cmd', bootstrap: '.\\bootstrap.cmd' })` — a spelling with no
+ * `platform` key and no `spellings()` call anywhere, so nothing recognised it and a correct assertion about the
+ * Windows rendering was reported as a pinned expectation against a deriving product line. An object whose `cli`
+ * or `bootstrap` IS a launcher literal is a named shell by construction: there is nothing left to derive.
+ */
 function platformLiteralIn(objectLiteral) {
-  return objectLiteral.properties.some((prop) => ts.isPropertyAssignment(prop)
+  const named = objectLiteral.properties.some((prop) => ts.isPropertyAssignment(prop)
     && ts.isIdentifier(prop.name) && prop.name.text === 'platform'
     && ts.isStringLiteralLike(prop.initializer) && PLATFORMS.has(prop.initializer.text));
+  if (named) return true;
+  return objectLiteral.properties.some((prop) => ts.isPropertyAssignment(prop)
+    && ts.isIdentifier(prop.name) && /^(cli|bootstrap)$/.test(prop.name.text)
+    && ts.isStringLiteralLike(prop.initializer) && LAUNCHER.test(prop.initializer.text));
 }
 
 /**
@@ -723,6 +738,71 @@ function platformLiteralIn(objectLiteral) {
  */
 const SUBJECT_FIRST = new Set(['equal', 'notEqual', 'strictEqual', 'notStrictEqual', 'deepEqual',
   'notDeepEqual', 'deepStrictEqual', 'match', 'doesNotMatch', 'include', 'notInclude']);
+
+/**
+ * Assertions that claim a sentence is ABSENT — ARC-07-C35c's regex arm again.
+ *
+ * `assert.doesNotMatch(r.text, /usage: \.\/snowarch instance <command>/)` says the engine's usage must NOT be
+ * there, and comparing that sentence's kind to a product line's settles nothing: the case is not claiming the
+ * product prints it. Before this, `instance-root-entry.test.mjs:88` was reported as a pinned expectation
+ * against a deriving product line — a defect report about a case asserting an absence.
+ */
+const NEGATIVE = new Set(['notEqual', 'notStrictEqual', 'notDeepEqual', 'doesNotMatch', 'notInclude',
+  'doesNotInclude']);
+
+/**
+ * Does the subject READ A COMMITTED FILE rather than call the product? ARC-07-C35c, piece 3.
+ *
+ * `read('README.md')`, `readFileSync(join(root, 'docs/INSTALL.md'))`, `JSON.parse(readFileSync(…text.json…))` —
+ * a case whose value came off disk is asserting about an ARTEFACT, and an artefact is POSIX by rule 3 while its
+ * runtime twin derives. Both are right, so the two must not be compared with each other: this is the route for
+ * a case that runs nothing.
+ */
+const READS_A_FILE = /^(read|readFileSync|readJson|readFile|loadJson)$/;
+
+function subjectReadsArtefact(sf, from, subject) {
+  if (!subject) return false;
+  let found = false;
+  const walk = (n) => {
+    if (found) return;
+    if (ts.isCallExpression(n)) {
+      const name = ts.isIdentifier(n.expression) ? n.expression.text
+        : (ts.isPropertyAccessExpression(n.expression) ? n.expression.name.text : null);
+      if (name && READS_A_FILE.test(name)) { found = true; return; }
+    }
+    ts.forEachChild(n, walk);
+  };
+  walk(subject);
+  if (found) return true;
+  // ...or one hop through the binding it came from: `const generated = JSON.parse(readFileSync(…))`.
+  const name = ts.isIdentifier(subject) ? subject.text : rootIdentifier(subject);
+  if (!name) return false;
+  const decl = declarationInScope(sf, from, name);
+  if (!decl?.initializer) return false;
+  let hit = false;
+  const scan = (n) => {
+    if (hit) return;
+    if (ts.isCallExpression(n)) {
+      const called = ts.isIdentifier(n.expression) ? n.expression.text
+        : (ts.isPropertyAccessExpression(n.expression) ? n.expression.name.text : null);
+      if (called && READS_A_FILE.test(called)) { hit = true; return; }
+    }
+    ts.forEachChild(n, scan);
+  };
+  scan(decl.initializer);
+  return hit;
+}
+
+/** Does this assertion claim the sentence is ABSENT? */
+function isNegativeAssertion(node) {
+  const { expression } = node;
+  if (!ts.isPropertyAccessExpression(expression)) return false;
+  const root = rootIdentifier(expression);
+  if (root === 'assert') return NEGATIVE.has(expression.name.text);
+  // vitest: `expect(x).not.toContain(y)` — the negation is a property in the chain.
+  if (root === 'expect') return /(^|\.)not\./.test(expression.getText());
+  return false;
+}
 
 /** The arguments that carry what the assertion EXPECTS, with the subject dropped where there is one. */
 function expectationArgs(node) {
@@ -954,6 +1034,8 @@ export function assertedLaunchers(file, text) {
         const literal = bearing.some((a) => hasLauncherLiteral(a));
         const named = bearing.map((a) => namedSpelling(a, spellings)).find(Boolean) ?? null;
         const subject = subjectOf(node);
+        const negative = isNegativeAssertion(node);
+        const readsArtefact = subjectReadsArtefact(sf, node, subject);
         // The subject's own binding decides the route. `undefined` means it has none, and only then does the
         // last spawn stand in; `null` means it is bound to something that is not a spawn, which is an answer.
         const bound = argvForSubject(sf, node, subject);
@@ -992,6 +1074,8 @@ export function assertedLaunchers(file, text) {
             : (literal ? 'PINNED' : (stated ?? scoped ?? 'DERIVED')),
           pinnedSubject,
           caseDrivesPinned,
+          negative,
+          readsArtefact,
           // STRICT: the spelling inside the assertion's OWN literals, so the Windows count is a number the
           // case can assert rather than a floor. A neighbourhood scan of nearby lines gave 13 where the
           // strict answer is smaller, and a floor of ten hid the difference.
@@ -1040,8 +1124,21 @@ export function productLines(file, text) {
       const interpolated = ts.isTemplateExpression(node)
         && node.templateSpans.some((s) => /cli|bootstrap|spell|CLI|POSIX|Spelling|SPELL/.test(s.expression.getText()));
       if (spelled || interpolated) {
+        /*
+         * ARC-07-C35c, piece 1 — AN INTERPOLATION THAT NAMES ITS PLATFORM IS PINNED.
+         *
+         * Every interpolation was called DERIVED, and `scripts/gen-doctor-docs.mjs:44` writes
+         * `run ${spellings({ platform: 'linux', env: {} }).cli} docs sync` — a GENERATOR, pinning POSIX because
+         * the page it writes is committed. Calling that line deriving is the same class of error this audit
+         * exists to catch, one side over: a pinned product line described as following the reader's shell. It
+         * was behind a mismatch report on `bootstrap-runner.test.mjs:177` before the narrow rule took that site
+         * out of the comparison, so today it is correctness rather than a live defect — and the same
+         * `pinsShell` that reads a test's spelling reads the product's.
+         */
+        const pinnedInterpolation = interpolated && node.templateSpans
+          .some((span) => inlineKind(span.expression, sf, node) === 'PINNED');
         lines.push({ file, line: lineOf(sf, node), sentence: proseOf(node),
-          kind: spelled ? 'PINNED' : 'DERIVED', package: packageOf(file) });
+          kind: spelled || pinnedInterpolation ? 'PINNED' : 'DERIVED', package: packageOf(file) });
       }
     }
     ts.forEachChild(node, walk);
@@ -1054,6 +1151,18 @@ export function productLines(file, text) {
 export function packageOf(file) {
   if (file.startsWith('packages/snowarch/')) return 'server';
   if (file.startsWith('tools/snowarch/')) return 'engine';
+  /*
+   * ARC-07-C35c, piece 3 — A GENERATOR'S SENTENCE IS AN ARTEFACT'S, not the runtime's.
+   *
+   * `scripts/gen-*.mjs` writes committed pages, so it carries the same words as the runtime line by
+   * construction — and it PINS them, because a committed page is POSIX by rule 3. Measured: with the two
+   * sentences in one pool, `mode-and-cache.test.mjs:100` — which derives its expectation from
+   * `MODE_VARIANTS` exactly as rule 1 asks — was matched against `gen-doctor-docs.mjs:66`'s pinned copy and
+   * reported as a defect. They are different claims about different artefacts, so they are different packages:
+   * a case that READS a page is answered by the pages and their generators, and a case that calls the product
+   * is answered by the product.
+   */
+  if (/^scripts\/gen-/.test(file)) return 'artefact';
   return 'scripts';
 }
 
