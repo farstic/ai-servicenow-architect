@@ -17,7 +17,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { audit, byKey, bySentence, testSources, UNRESOLVED_BASELINE } from '../scripts/ci/launcher-audit.mjs';
+import { audit, byKey, bySentence, productSources, testSources,
+  UNRESOLVED_BASELINE } from '../scripts/ci/launcher-audit.mjs';
 import { answeredBy, assertedLaunchers, LAUNCHER, MARK, productLines } from '../scripts/ci/launcher-extract.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -955,4 +956,51 @@ test('C35c — the walk reaches the CASE, and a spelling call is not a driven sh
   // ...and the OTHER case in the same describe still reads the outer constant, so shadowing resolves the way a
   // reader of that file would read it: the inner `cli` for `it('a')`, the describe's for `it('b')`.
   assert.equal(shadowed.agreed, 1);
+});
+
+test('C35c — a sentence matches at word boundaries, and never mid-word (item 6)', () => {
+  // A bare `includes` matched mid-word: `doctor now` is inside `run the doctor nowhere near this`, which is a
+  // different sentence about a different thing. Measured on the tree: ZERO matches land mid-word today, so this
+  // is a guard rather than a repair — and the planted pair is what makes the class checkable at all.
+  assert.equal(bySentence('doctor now', 'run the doctor nowhere near this'), false);
+  assert.equal(bySentence('doctor now', 'run the doctor now, please'), true);
+
+  // A PREFIX still matches, which is the shape the store pair depends on: the test asserts part of a longer
+  // product sentence.
+  assert.equal(bySentence('usage: x store <command>', 'usage: x store <command> [options]'), true);
+  // ...and a launcher-adjacent boundary is not a word boundary problem: a MARK is punctuation to this rule.
+  assert.equal(bySentence(`${MARK} docs sync`, `run ${MARK} docs sync to fetch it`), true);
+});
+
+test('C35c — how many lines an agreement rests on is reported, not implied (item 6)', () => {
+  // THE NUMBERS THAT DECIDED THIS ITEM, and they are asserted so they cannot quietly drift. 39 agreements: 7
+  // rest on ONE product line, 1 on a few, and 31 on FOUR OR MORE — 30 of them on two words of prose or fewer,
+  // `~ doctor` against 17 lines and `~ docs sync` against 29.
+  //
+  // That looks like agreement by coincidence and is not: in every one of them EVERY matching line shares a
+  // kind, so whichever line prints the sentence the answer is the same. Requiring three words of prose would
+  // have turned 30 true agreements into unresolved sites — measured — so resolution is deliberately NOT
+  // narrowed here. What changed is that the report says which kind of agreement each one was.
+  const r = audit();
+  assert.equal(r.agreedOver.one + r.agreedOver.few + r.agreedOver.many, r.agreed,
+    'the histogram no longer totals the agreements, so one of the agreeing branches stopped counting');
+  assert.ok(r.agreedOver.many > 0,
+    'no agreement rests on several lines any more — if that is real work, update the row with the new numbers');
+
+  // ...and every one of those many-line agreements is UNIVERSAL: all its lines share a kind. That is the claim
+  // the item rests on, so it is driven rather than asserted about a count.
+  const product = productSources().flatMap(({ file, text }) => productLines(file, text));
+  for (const { file, text } of testSources()) {
+    for (const site of assertedLaunchers(file, text)) {
+      const routed = site.answeredBy ? product.filter((p) => p.package === site.answeredBy) : product;
+      const hits = routed.filter((p) => bySentence(site.sentence, p.sentence));
+      if (hits.length < 2) continue;
+      const kinds = new Set(hits.map((h) => h.kind));
+      if (kinds.size === 1) continue;
+      // A split hit set must be reported ambiguous rather than resolved — that is the other half of the rule.
+      const listed = r.unresolved.find((u) => u.site === `${file}:${site.line}`);
+      assert.ok(listed && /matches both a PINNED and a DERIVED/.test(listed.why),
+        `${file}:${site.line} matches lines of both kinds and was not reported ambiguous`);
+    }
+  }
 });
