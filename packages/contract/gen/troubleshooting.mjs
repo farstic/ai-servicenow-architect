@@ -58,7 +58,15 @@ fine. Two rules go with that: never set \`NODE_TLS_REJECT_UNAUTHORIZED=0\` (it i
 result for the TLS error and it disables certificate verification for the entire process), and know
 that an empty value counts as unset — \`HTTPS_PROXY=""\` is what \`\${HTTPS_PROXY:-}\` expands to when
 the launching shell has no such variable, so the server deletes empty proxy and CA variables at
-start-up, before the HTTP agent is built.`;
+start-up, before the HTTP agent is built.
+
+**Two messages the clone prints on Windows that are not errors.** A release tag is *annotated* — a tag
+object that points at the commit rather than being one — and git 2.54 says so out loud while checking it
+out anyway: \`warning: refs/tags/v2.0.7 <sha> is not a commit!\`. Confirmed twice on
+git 2.54.0.windows.1 during the 2026-09-28 Windows sitting, and absent on git 2.39, so a reader who does
+not see it has nothing missing. The other is the fourteen lines about "detached HEAD", which the clone
+command on the install page already quiets with \`-c advice.detachedHead=false\`. Neither needs anything
+done about it; \`./snowarch doctor\` is what tells you whether the install is actually wrong.`;
 
 /**
  * Which surface reports a code, by family rather than by a per-code list.
