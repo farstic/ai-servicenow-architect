@@ -5,7 +5,8 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { modeCommand } from '../lib/mode.mjs';
-import { CLAUDE_ABSENT, CREATED_BY_US, flagsChanged, get, isShim, parseGet, register, shimTarget,
+import { CLAUDE_ABSENT, CREATED_BY_US, SHIM_UNRESOLVED, flagsChanged, get, isShim, parseGet,
+  register, shimTarget, spawnClaude,
   unregister } from '../lib/registration-claude.mjs';
 import { EXIT_OK } from '../lib/exit.mjs';
 import { emptyState, loadState, saveState } from '../lib/state.mjs';
@@ -578,4 +579,111 @@ test('ARC-06-C14 — an entry that cannot be removed is reported, not disowned',
   assert.equal(r.state.registrationReason, CREATED_BY_US);
   assert.match(r.text, /could not be removed after the switch failed/);
   assert.match(r.text, /claude mcp remove servicenow -s local/);
+});
+
+
+/*
+ * ARC-09-C72 — E-27 called a working installation broken, because our reader could not parse its shim.
+ *
+ * From the colleague's Windows sitting: `could not read registration status: …\claude.CMD is a command
+ * shim whose entry point could not be read — run claude once by hand, or reinstall Claude Code`, on a
+ * machine where B00 had just run `claude --version` successfully and Claude Code was connected with 397
+ * tools. Claude Code 2.1.282's shim does not carry the `%~dp0…js` shape the reader looks for.
+ *
+ * "I could not parse your launcher" is a fact about our reader. "Reinstall Claude Code" is advice to a
+ * user whose installation is fine. The three branches below are the fix, in order.
+ */
+test('C72 — a shim whose entry point parses is still run under this Node, untouched', () => {
+  const seen = [];
+  const r = spawnClaude('C:\\npm\\claude.CMD', ['mcp', 'add-json', 'servicenow', '{"a":1}'], {},
+    { target: () => 'C:\\npm\\node_modules\\claude\\cli.js',
+      spawn: (file, args, options) => { seen.push({ file, args, options }); return { status: 0, stdout: 'ok' }; } });
+
+  assert.equal(r.status, 0);
+  assert.equal(seen[0].file, process.execPath, 'the parsed entry runs under THIS Node, not a shell');
+  assert.deepEqual(seen[0].args,
+    ['C:\\npm\\node_modules\\claude\\cli.js', 'mcp', 'add-json', 'servicenow', '{"a":1}']);
+  // THE REASON THIS BRANCH IS FIRST: `add-json` passes a JSON document as ONE argument, and no command
+  // processor touches it here, so nothing can reshape it.
+  assert.equal(seen[0].args.at(-1), '{"a":1}');
+  assert.equal(seen[0].options.shell, undefined);
+});
+
+test('C72 — a shim that cannot be parsed is RUN through the command processor, not refused', () => {
+  const seen = [];
+  const r = spawnClaude('C:\\npm\\claude.CMD', ['mcp', 'get', 'servicenow'], {},
+    { target: () => null,   // the 2.1.282 shape, as the colleague's machine had it
+      spawn: (file, args, options) => { seen.push({ file, args, options }); return { status: 0, stdout: 'servicenow: connected' }; } });
+
+  assert.equal(r.status, 0, 'a shim that runs perfectly well was being refused');
+  assert.equal(r.stdout, 'servicenow: connected');
+  assert.match(seen[0].file, /cmd\.exe$/i, 'the fallback is what B00 already does for npm.cmd');
+  assert.deepEqual(seen[0].args.slice(0, 3), ['/d', '/s', '/c']);
+  // No space in this path, so `quoteForCmd` leaves it bare and the outer pair is cmd's own.
+  assert.equal(seen[0].args[3], '"C:\\npm\\claude.CMD mcp get servicenow"');
+  assert.equal(seen[0].options.windowsVerbatimArguments, true);
+  assert.equal(seen[0].options.shell, undefined, 'DEP0190 — never a shell with an args array');
+});
+
+test('C72 — the refusal survives for a shim that can be neither parsed NOR run', () => {
+  const file = 'C:\\npm\\claude.CMD';
+  const r = spawnClaude(file, ['mcp', 'get', 'servicenow'], {},
+    { target: () => null,
+      spawn: () => ({ status: null, stdout: '', stderr: '', error: new Error('spawn cmd.exe ENOENT') }) });
+
+  // "We cannot start this" is still worth saying plainly rather than as an errno — that is what the
+  // sentence was written for, and it keeps exactly that case.
+  assert.equal(r.stderr, SHIM_UNRESOLVED(file));
+  assert.equal(r.status, null);
+});
+
+test('C72 — a shim that RAN and said no keeps its own words', () => {
+  const r = spawnClaude('C:\\npm\\claude.CMD', ['mcp', 'get', 'servicenow'], {},
+    { target: () => null,
+      spawn: () => ({ status: 1, stdout: '', stderr: 'No MCP server found with name: servicenow' }) });
+
+  // The distinction the old code could not draw: this is the CLI's answer, not our failure to launch it,
+  // and `run()` prefers the CLI's words to anything we could write.
+  assert.equal(r.status, 1);
+  assert.equal(r.stderr, 'No MCP server found with name: servicenow');
+  assert.notEqual(r.stderr, SHIM_UNRESOLVED('C:\\npm\\claude.CMD'));
+});
+
+test('C72 — an argument cmd would rewrite is named, never sent', () => {
+  // `batchCommand` refuses a `%`, which cmd expands even inside quotes. Naming it beats sending a
+  // corrupted command and reporting whatever came back.
+  const file = 'C:\\odd%name\\claude.CMD';
+  const r = spawnClaude(file, ['mcp', 'get', 'servicenow'], {},
+    { target: () => null, spawn: () => { throw new Error('must not be spawned'); } });
+  assert.match(r.stderr, /expanded by the command processor/);
+  assert.ok(r.stderr.startsWith(SHIM_UNRESOLVED(file)), 'the sentence still leads, the reason follows');
+});
+
+test('C72 — a real executable is untouched by any of this', () => {
+  const seen = [];
+  spawnClaude('/usr/local/bin/claude', ['mcp', 'get', 'servicenow'], { cwd: '/x' },
+    { target: () => { throw new Error('a non-shim must not be parsed'); },
+      spawn: (file, args, options) => { seen.push({ file, args, options }); return { status: 0 }; } });
+  assert.equal(seen[0].file, '/usr/local/bin/claude');
+  assert.deepEqual(seen[0].args, ['mcp', 'get', 'servicenow']);
+  assert.equal(seen[0].options.cwd, '/x');
+});
+
+test('C72 — a shim under a profile path WITH A SPACE survives, which is the common Windows case', () => {
+  /*
+   * The colleague's shim lives under the user profile — `~\AppData\Roaming\npm\claude.CMD` — and a
+   * Windows profile called `John Smith` is not unusual. That is the same class as ARC-09-C68's
+   * `'C:\Program' is not recognized`, and this is the check most likely to meet it, because npm puts its
+   * shims under the profile by default.
+   */
+  const seen = [];
+  const file = 'C:\\Users\\John Smith\\AppData\\Roaming\\npm\\claude.CMD';
+  spawnClaude(file, ['mcp', 'get', 'servicenow'], {},
+    { target: () => null,
+      spawn: (f, args) => { seen.push({ f, args }); return { status: 0, stdout: 'ok' }; } });
+
+  assert.equal(seen[0].args[3], `""${file}" mcp get servicenow"`,
+    'the path with a space must be ONE quoted token — otherwise cmd sees C:\\Users\\John');
+  // And stripping cmd's outer pair leaves a line Windows can actually run.
+  assert.equal(seen[0].args[3].slice(1, -1), `"${file}" mcp get servicenow`);
 });

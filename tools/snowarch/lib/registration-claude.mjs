@@ -17,6 +17,7 @@
 // through `mode.mjs`: a `remove` that forgot `-s local` would happily delete the PROJECT entry,
 // which is committed and belongs to everyone who cloned the repository.
 import { spawnSync } from 'node:child_process';
+import { batchCommand } from './spawn-batch.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { childEnv } from './spawn-env.mjs';
@@ -79,15 +80,51 @@ export const isShim = (file) => /\.(cmd|bat)$/i.test(String(file));
  * whose target cannot be found is refused with a sentence rather than spawned, because the spawn
  * would fail with an errno nobody can act on.
  */
-const DEFAULT_EXEC = (file, args, options) => {
-  if (isShim(file)) {
-    const target = shimTarget(file);
-    if (!target) {
-      return { status: null, stdout: '', stderr: SHIM_UNRESOLVED(file), error: new Error('shim') };
-    }
-    return spawnSync(process.execPath, [target, ...args], { encoding: 'utf8', ...options });
+export const spawnClaude = (file, args, options,
+  { spawn = spawnSync, target = shimTarget } = {}) => {
+  if (!isShim(file)) return spawn(file, args, { encoding: 'utf8', ...options });
+
+  /*
+   * A SHIM IS READ FIRST AND RUN SECOND — ARC-09-C72, and the order is the whole of the fix.
+   *
+   * READ FIRST, because resolving the shim's own `.js` entry and running it under THIS Node passes every
+   * argument through untouched. `add-json` hands over a JSON document as ONE argument, and no command
+   * processor is involved in that path, so nothing can reshape it.
+   *
+   * RUN SECOND, which is new. The refusal used to be unconditional: a shim whose entry point could not be
+   * parsed was never spawned at all, and E-27 reported
+   *
+   *     could not read registration status: …\claude.CMD is a command shim whose entry point could not
+   *     be read — run claude once by hand, or reinstall Claude Code
+   *
+   * on a machine where B00 had just run `claude --version` successfully and Claude Code was connected
+   * with 397 tools. Claude Code 2.1.282's shim simply does not carry the `%~dp0…js` shape the reader
+   * looks for. "I could not parse your launcher" is a fact about our reader; "reinstall Claude Code" is
+   * advice to a user whose installation is fine. So the fallback is what B00 already does for `npm.cmd`:
+   * hand the command processor one quoted line, and let Windows resolve the shim the way it knows how.
+   *
+   * THE REFUSAL SURVIVES for the case it was written for — a shim that can be neither parsed nor run —
+   * because "we cannot start this" is still worth saying plainly rather than as an errno.
+   */
+  const entry = target(file);
+  if (entry) return spawn(process.execPath, [entry, ...args], { encoding: 'utf8', ...options });
+
+  let call;
+  try {
+    call = batchCommand(file, args, { env: options?.env ?? process.env });
+  } catch (e) {
+    // `batchCommand` refuses an argument cmd would rewrite — a `%`, which it expands even inside
+    // quotes. Naming that is better than sending a corrupted command and reporting what came back.
+    return { status: null, stdout: '', stderr: `${SHIM_UNRESOLVED(file)} (and ${e.message})`,
+      error: e };
   }
-  return spawnSync(file, args, { encoding: 'utf8', ...options });
+  const r = spawn(call.file, call.args, { encoding: 'utf8', ...options, ...call.options });
+  // Only a spawn that did not happen falls back to the sentence. A shim that RAN and said no has its
+  // own words, and `run()` above prefers those to anything we could write.
+  if (r?.error) {
+    return { status: null, stdout: '', stderr: SHIM_UNRESOLVED(file), error: r.error };
+  }
+  return r;
 };
 
 /** What a `.cmd` shim with no readable entry point reads like. Never a raw EINVAL. */
@@ -100,7 +137,7 @@ export const resolveClaude = ({ env = process.env, platform = process.platform }
   which('claude', { env, platform });
 
 /** The CLI's version, for the flags-changed message. Best effort: an unknown version still reports. */
-export function claudeVersion({ claudePath, exec = DEFAULT_EXEC } = {}) {
+export function claudeVersion({ claudePath, exec = spawnClaude } = {}) {
   if (!claudePath) return null;
   const r = exec(claudePath, ['--version'], {});
   const m = /(\d+\.\d+\.\d+)/.exec(String(r?.stdout ?? ''));
@@ -190,7 +227,7 @@ function scopeWord(value) {
  * rule — our spawn, so `CLAUDE_PROJECT_DIR` is SET rather than inherited from whatever session
  * happens to be running this.
  */
-export function run(args, { root, claudePath, exec = DEFAULT_EXEC, env = process.env } = {}) {
+export function run(args, { root, claudePath, exec = spawnClaude, env = process.env } = {}) {
   if (!claudePath) return { ok: false, status: null, reason: CLAUDE_ABSENT, stdout: '', stderr: '' };
   const r = exec(claudePath, ['mcp', ...args], { cwd: root, env: childEnv(root, {}, env) });
   const stdout = String(r?.stdout ?? '');
