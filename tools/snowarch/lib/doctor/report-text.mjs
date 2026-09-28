@@ -48,7 +48,27 @@ const paint = (label, colour) => (colour && CODES[label] ? `${CODES[label]}${lab
  * identical to a broken doctor unless the options are on the page.
  */
 export function headerLine({ version, ranAt, options = {} }) {
-  const when = String(ranAt).replace('T', ' ').replace(/\.\d+Z?$/, '').replace('Z', '');
+  /*
+   * ARC-07-C45 — THE ZONE IS PRINTED, because the report already prints it one line over.
+   *
+   * The header said `2026-09-28 06:09:58` while the panel's `ranAtLine` said `06:09 UTC` from the
+   * same `ranAt`: one instant, two spellings, and the header's was the one a reader would take for
+   * local time. `panel.mjs` had already written down exactly this — that this renderer "drops the
+   * `Z` without replacing it" — and called it defensible in a report read on the machine that
+   * produced it. It stops being defensible the moment the two lines are read together, which is
+   * always: they are in the same report.
+   *
+   * UTC rather than local for the panel's reason: two people comparing pasted copies must be
+   * comparing the same bytes. Seconds stay — the header is the precise one — so the two lines differ
+   * in precision and agree about the clock.
+   *
+   * Only an ISO instant is labelled. Anything else is printed as it arrived, the same rule
+   * `ranAtLine` follows: a renderer that stamped `UTC` onto a string it did not recognise would be
+   * asserting a zone it has no reason to believe.
+   */
+  const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(ranAt));
+  const when = String(ranAt).replace('T', ' ').replace(/\.\d+Z?$/, '').replace('Z', '')
+    + (iso ? ' UTC' : '');
   const section = options.section ?? 'all';
   return `snowarch doctor ${version ?? '?'} — ${when} `
     + `(quick: ${options.quick ? 'yes' : 'no'} · network: ${options.noNetwork ? 'no' : 'yes'} · section: ${section})`;

@@ -13,6 +13,7 @@ import { buildReport, SCHEMA_KEYS, validateReport } from '../../tools/snowarch/l
 import {
   headerLine, renderText, statusLabel, summaryLine, useColour,
 } from '../../tools/snowarch/lib/doctor/report-text.mjs';
+import { ranAtLine } from '../../tools/snowarch/lib/doctor/panel.mjs';
 import { collectPrereqs, guessShell, SHELLS } from '../../tools/snowarch/lib/doctor/prereqs.mjs';
 import { doctorCommand, findRoot, notAtRoot } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -258,6 +259,18 @@ test('the renderer: FAIL shouts, the Mode line is last, colour only on a TTY', (
 
   assert.match(headerLine({ version: '9.9.9', ranAt: '2026-09-10T10:00:12Z', options: { quick: true } }),
     /quick: yes · network: yes · section: all/);
+  /*
+   * ARC-07-C45 — ONE CLOCK, ONE SPELLING. This header printed `2026-09-10 10:00:12` bare while the
+   * panel's `ranAtLine` printed `10:00 UTC` from the same `ranAt`, in the same report: the reader is
+   * given one instant twice and only one of the two says which clock it is on. Seconds stay here —
+   * the header is the precise line — so the two differ in precision and agree about the zone.
+   */
+  assert.match(headerLine({ version: '9.9.9', ranAt: '2026-09-10T10:00:12Z', options: {} }),
+    /— 2026-09-10 10:00:12 UTC \(/);
+  assert.equal(ranAtLine('2026-09-10T10:00:12Z').endsWith(' UTC'), true,
+    'the panel already labelled it, which is why the header disagreeing was the defect');
+  // A value that is not an ISO instant is quoted, never stamped with a zone it did not claim.
+  assert.match(headerLine({ version: '9.9.9', ranAt: 'unknown', options: {} }), /— unknown \(/);
   assert.equal(summaryLine({ ok: 1, warn: 0, fail: 0, skip: 2, fixable: 0 }, null, { cli: LAUNCHER }),
     'DOCTOR: 1 ok, 0 warn, 0 fail, 2 skipped');
 });
