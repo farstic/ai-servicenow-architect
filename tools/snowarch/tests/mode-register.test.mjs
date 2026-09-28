@@ -301,13 +301,35 @@ test('a .cmd shim is run through its own entry point, on every platform', (t) =>
   assert.equal(shown.scope, 'project');
 });
 
-test('a shim whose entry point cannot be read is refused with a sentence, not an errno', (t) => {
+test('a shim that can be neither parsed NOR run is refused with a sentence, not an errno', (t) => {
+  /*
+   * ARC-09-C72 — THE PREMISE IS DERIVED NOW, because the old one had quietly become POSIX-only.
+   *
+   * This case planted a `.cmd` with no parsable entry and expected the refusal. That held while an
+   * unparsable shim was never spawned at all; once C72 made the fallback RUN it, the fixture stopped
+   * being "cannot be run" on Windows — it is a real batch file, so `cmd.exe` runs it, `something-else`
+   * is not a command, and the result carries the shim's own words instead of our sentence. The case was
+   * green on macOS and Linux for the wrong reason: there is no `cmd.exe` there, so the spawn failed and
+   * the refusal appeared by accident of the platform.
+   *
+   * So the second half of the premise is MADE TRUE on every OS rather than left to the host: `ComSpec`
+   * points at a command processor that is not there, which is what `batchCommand` reads, so the spawn
+   * cannot happen anywhere. That is the state the sentence was written for — "we cannot start this" —
+   * and it is now the state the case actually creates.
+   *
+   * The other direction, an unparsable shim that DOES run, is asserted in
+   * `C72 — a shim that cannot be parsed is RUN through the command processor, not refused` and in
+   * `C72 — a shim that RAN and said no keeps its own words`. Between them the fixture's two futures are
+   * both covered, on all three platforms, with no case depending on which machine it woke up on.
+   */
   const dir = tempDir('snowarch-shim-', t);
   writeFileSync(join(dir, 'claude.cmd'), '@ECHO off\r\nsomething-else %*\r\n');
-  const shown = get('servicenow', { root: dir, claudePath: join(dir, 'claude.cmd') });
+  const shown = get('servicenow', { root: dir, claudePath: join(dir, 'claude.cmd'),
+    env: { ComSpec: join(dir, 'no-such-command-processor.exe') } });
+
   assert.equal(shown.found, false);
   assert.match(shown.reason, /command shim whose entry point could not be read/);
-  assert.equal(/EINVAL|spawnSync/.test(shown.reason), false, 'an errno reached the sentence');
+  assert.equal(/EINVAL|spawnSync|ENOENT/.test(shown.reason), false, 'an errno reached the sentence');
 });
 
 test('shimTarget reads both slash styles, an absolute target, and refuses a guess', () => {
