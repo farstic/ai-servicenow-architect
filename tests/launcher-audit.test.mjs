@@ -764,3 +764,61 @@ test('C35c — a search call\'s sentence is its argument, not the haystack it lo
   // before comparing — and saying so here is cheaper than the next reader discovering it from a diff.
   assert.equal(trimmed.endsWith(' '), true);
 });
+
+test('C35c — a destructured or inline spawn subject routes to its OWN spawn (item 3)', () => {
+  // Two shapes that both fell back to the LAST spawn in the case, so an assertion about the ENGINE's answer
+  // was checked against the SERVER's product line — a mismatch attributed to a line the case never reached.
+  //
+  // Measured before the fix: the destructured one routed to `['store','migrate','--help']`; the inline one got
+  // argv `null` and NO route when the other spawn came later, and that other spawn's route when it came first.
+  const TAIL = "const FRAME_CLI = spellings({ platform: 'linux', env: {} }).cli;";
+  const routeOf = (lines) => {
+    const site = assertedLaunchers('tests/planted.test.mjs', `${lines.join('\n')}\n${TAIL}`)
+      .find((s) => s.sentence.includes('store'));
+    assert.ok(site, `no site was found at all:\n${lines.join('\n')}`);
+    return { argv: site.argv, route: site.answeredBy };
+  };
+
+  // `const { text } = run(…)` — the binding is a pattern, not an identifier.
+  assert.deepEqual(routeOf([
+    "test('t', () => {",
+    "  const { text } = run(entry, ['store', '--help']);",
+    "  const second = run(entry, ['store', 'migrate', '--help']);",
+    '  assert.match(text, new RegExp(`usage: ${FRAME_CLI} store <command>`));',
+    '});',
+  ]), { argv: ['store', '--help'], route: 'engine' });
+
+  // An INLINE spawn, with the other one after it...
+  assert.deepEqual(routeOf([
+    "test('t', () => {",
+    "  assert.match(run(entry, ['store', '--help']).text, new RegExp(`usage: ${FRAME_CLI} store <command>`));",
+    "  const second = run(entry, ['store', 'migrate', '--help']);",
+    '});',
+  ]), { argv: ['store', '--help'], route: 'engine' });
+
+  // ...and before it, which is the direction that silently routed to the wrong package.
+  assert.deepEqual(routeOf([
+    "test('t', () => {",
+    "  const setup = run(entry, ['store', 'migrate', '--help']);",
+    "  assert.match(run(entry, ['store', '--help']).text, new RegExp(`usage: ${FRAME_CLI} store <command>`));",
+    '});',
+  ]), { argv: ['store', '--help'], route: 'engine' });
+
+  // `const [first] = …` is the same statement written differently, so the pattern arm covers both.
+  assert.deepEqual(routeOf([
+    "test('t', () => {",
+    "  const [first] = [run(entry, ['store', '--help'])];",
+    "  const second = run(entry, ['store', 'migrate', '--help']);",
+    '  assert.match(first.text, new RegExp(`usage: ${FRAME_CLI} store <command>`));',
+    '});',
+  ]).route, 'engine');
+
+  // ...and the shape that already worked keeps working, so this is not "always take the first spawn".
+  assert.deepEqual(routeOf([
+    "test('t', () => {",
+    "  const first = run(entry, ['store', '--help']);",
+    "  const second = run(entry, ['store', 'migrate', '--help']);",
+    '  assert.match(second.text, new RegExp(`usage: ${FRAME_CLI} store <command>`));',
+    '});',
+  ]), { argv: ['store', 'migrate', '--help'], route: 'server' });
+});
