@@ -85,5 +85,42 @@ export function batchCommand(file, args = [], { env = process.env } = {}) {
   };
 }
 
+/**
+ * `npm`, spelled for the platform — `npm.cmd` on Windows, where npm IS a batch file.
+ *
+ * ARC-09-C69. Four call sites wrote this expression themselves and two others passed a bare `npm`
+ * with `shell: true`, leaning on the shell to add the extension. The shell is what we are removing, so
+ * the name has to be right before the call rather than resolved inside one.
+ */
+export const npmCommand = (platform = process.platform) => (platform === 'win32' ? 'npm.cmd' : 'npm');
+
+/**
+ * What to spawn for `file` and `args` on this platform: `{ file, args, options }`, ready to spread.
+ *
+ * The one entry point a caller wants — it is `batchCommand` on Windows for a batch file and the
+ * unchanged call everywhere else, so no site has to carry a platform branch of its own. Every site
+ * that did carry one wrote `shell: process.platform === 'win32'`, which is the deprecated shape.
+ */
+export function spawnFor(file, args = [], { env = process.env, platform = process.platform } = {}) {
+  /*
+   * ARC-09-C70 — A BARE `npm` ON WINDOWS IS A BATCH FILE, and this guard exists because the plain
+   * reading of the line above was wrong in a way that produced no error message at all.
+   *
+   * `isBatch('npm')` is false — there is no extension to match — so a caller passing the name it would
+   * type on a mac got a direct spawn, and `CreateProcess` appends `.exe` and nothing else. That is how
+   * `release-dryrun (windows-latest)` reported `gate failed: lint (exit 1)` with no output: the child
+   * never started, `status` was `null`, and `?? 1` manufactured an exit code. The shell used to hide
+   * this by resolving the name; removing the shell removed the hiding too.
+   *
+   * A LIST, deliberately short and named: these are the tools this repository spawns that npm installs
+   * as `.cmd` shims on Windows. A caller that knows better passes the full spelling — `npmCommand()` is
+   * the one to use — and this is the net under the caller that does not.
+   */
+  const SHIMMED = new Set(['npm', 'npx']);
+  const spelled = platform === 'win32' && SHIMMED.has(file) ? `${file}.cmd` : file;
+  if (platform === 'win32' && isBatch(spelled)) return batchCommand(spelled, args, { env });
+  return { file: spelled, args, options: {} };
+}
+
 /** Is this a file Windows can only run through the command processor? */
 export const isBatch = (file) => /\.(cmd|bat)$/i.test(String(file));

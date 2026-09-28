@@ -27,6 +27,7 @@ import { badgeLine, writeHead, writeInstallTag, writeMarker } from '../scripts/l
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import { STAGED } from '../scripts/lib/release/writers.mjs';
 import { writeGitattributes } from './helpers/gitattributes.mjs';
+import { gatePlan, makeGateRunner } from '../scripts/lib/release/gates.mjs';
 
 const REAL_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG = JSON.parse(readFileSync(join(REAL_ROOT, 'engine.config.json'), 'utf8'));
@@ -161,7 +162,24 @@ async function run(root, argv, { ask = null, fail = null, skip = 0, gen = false,
   const out = capture();
   const err = capture();
   const r = runner(root, { fail, skip, gen });
+  /*
+   * ARC-09-C71 — `platform` IS PINNED, and a Windows cell is what asked for it.
+   *
+   * `gatePlan` names `npm` the way the platform spells it (ARC-09-C70), so on Windows the gates arrive
+   * as `npm.cmd run lint`. The stub above matches by `args.join(' ').includes(fail)` and rewrites the
+   * manifests when `args[0] === 'npm'` — so on the three Windows cells a `fail: 'npm run lint'` matched
+   * NOTHING: the gate passed, the release continued, and the case read `expected 1, actual 0`. The same
+   * silence hit `npm test` twice and the manifest rewrite once.
+   *
+   * These cases are about the release's ORDERING and its writes, not about how a child is spawned, so
+   * they pin one platform and stay identical on every machine. The platform-shaped call has cases of its
+   * own — `C70 — the gate plan names npm the way the platform spells it` and the `makeGateRunner` cases
+   * below — which is the division rule 1 asks for: derive from the same source, or say which platform you
+   * are asserting. A matcher that has to know the host is a matcher that asserts different things on
+   * different machines.
+   */
   const code = await release({ argv, root, out: out.stream, err: err.stream, ask, run: r.run,
+    platform: 'linux',
     ...(unstage.length ? { staged: STAGED.filter((f) => !unstage.includes(f)) } : {}),
     now: () => new Date('2026-09-11T00:00:00Z') });
   return { code, out: out.text(), err: err.text(), calls: r.calls };
@@ -369,7 +387,9 @@ test('AC 3 — a stale dist/ refuses, with no tag and no new commit', async (t) 
   const err = capture();
   const code = await release({
     argv: ['2.0.0', '--yes', '--offline', '--no-install'],
-    root, out: out.stream, err: err.stream,
+    // ARC-09-C71 — pinned, like the helper: `gatePlan` spells `npm` for the platform, and this case's
+    // subject is the dist gate's second half, not how a child is spawned.
+    root, out: out.stream, err: err.stream, platform: 'linux',
     run: runner(root).run,
     // The build succeeded and produced something different from what is committed — which is not
     // an exit code, and is the whole reason this gate has a second half.
@@ -537,7 +557,11 @@ test('a real --dry-run on this checkout prints this checkout\'s tag message and 
   // still the REAL ones — this is the case that would catch a script that cannot run here at all.
   const code = await release({
     argv: ['99.0.0', '--dry-run', '--offline', '--no-install', '--allow-branch', branch],
-    root: REAL_ROOT, out: out.stream, err: err.stream,
+    // ARC-09-C71 — pinned too, and deliberately NOT left as "the one that uses the host": nothing is
+    // spawned here (`run: () => 0`) and nothing this asserts — the tag message, the contract sha, the
+    // pin, the clean tree — is platform-shaped. One rule for all four call sites beats one exception
+    // that a later edit has to remember.
+    root: REAL_ROOT, out: out.stream, err: err.stream, platform: 'linux',
     // The gates are stubbed to pass: running lint and the whole suite from inside the suite would
     // be a recursion, not a test. What is real here is everything else — the preflight against
     // this repository, the contract sha of the committed artefact, the pin, the gitlink.
@@ -656,7 +680,17 @@ test('ARC-09-C49 — the whole suite runs after the writes, on the version being
   };
   const out = capture();
   const err = capture();
-  const code = await release({ argv: ['2.0.0', '--yes', '--offline'], root,
+  /*
+   * ARC-09-C71 — `platform` PINNED, and this call is why the row has a second half.
+   *
+   * It calls `release()` directly rather than through the `run` helper, so it never received the pin the
+   * other 42 cases got — and its stub matches `args.join(' ') === 'npm test'`, which on Windows is
+   * `npm.cmd test`. The post-write suite therefore counted ONCE instead of twice on all three cells:
+   * `npm test ran 1 time(s); it must run before AND after the writes`. Six of the seven were fixed in one
+   * line precisely because they shared a helper; this one proves the hole is the DIRECT call, so the case
+   * below now asserts every one of them carries a platform.
+   */
+  const code = await release({ argv: ['2.0.0', '--yes', '--offline'], root, platform: 'linux',
     out: out.stream, err: err.stream, run: r, now: () => new Date('2026-09-11T00:00:00Z') });
 
   assert.equal(code, 0, `${err.text()}${out.text()}`);
@@ -976,4 +1010,112 @@ test('ARC-09-C65 — the two rules agree on an rc tree, which is what the rehear
 
   // ...and a FINAL tree still allows its own version, so this change moved nothing there.
   assert.deepEqual(allowed({ tags: ['v2.0.5'], treeVersion: '2.0.6' }), ['v2.0.5', 'v2.0.6']);
+});
+
+/*
+ * ARC-09-C70 — the Windows `release-dryrun` blocker, in the two halves it actually had.
+ *
+ * `release-dryrun (windows-latest)` failed at 17af0a8 where it passed on develop: `gate dist…` ok, then
+ * `release: gate failed: lint (exit 1) — nothing was written` and NOT ONE LINE of lint's own output.
+ * Both halves are asserted here, and neither could be asserted before: the runner was a closure inside
+ * `release.mjs`, and every case in this file injects `run`, so the one seam that broke was the one seam
+ * no case could reach.
+ */
+test('C70 — the gate plan names npm the way the platform spells it', () => {
+  const win = gatePlan({ platform: 'win32', env: {} });
+  const mac = gatePlan({ platform: 'darwin', env: {} });
+
+  // THE DEFECT: these argv used to start with the literal `npm`, which worked only because the runner
+  // added `shell: true`. C69 removed the shell (DEP0190 with an args array) and a bare `npm` then
+  // reached CreateProcess, which appends `.exe` and nothing else.
+  for (const name of ['install', 'lint', 'test']) {
+    const w = win.find((g) => g.name === name);
+    const m = mac.find((g) => g.name === name);
+    assert.equal(w.argv[0], 'npm.cmd', `the ${name} gate would not start on Windows`);
+    assert.equal(m.argv[0], 'npm', `the ${name} gate must stay bare off Windows`);
+  }
+  // The gates that are not npm are untouched — `node` is a real executable and needs no spelling.
+  assert.equal(win.find((g) => g.name === 'dist').argv[0], 'node');
+});
+
+test('C70 — a spawn that never started is reported, not turned into a bare exit code', () => {
+  const said = [];
+  const err = { write: (x) => said.push(x) };
+  const run = makeGateRunner({ root: '/not-read-by-these-cases', platform: 'win32', err,
+    // What Node hands back for a command Windows could not find: no status, an `error`, no output.
+    spawn: () => ({ status: null, stdout: '', stderr: '', error: new Error('spawn npm ENOENT') }) });
+
+  const code = run(['npm', 'run', 'lint']);
+  assert.equal(code, 1, 'a failed spawn still has to fail the gate');
+  assert.match(said.join(''), /could not be started: spawn npm ENOENT/,
+    'this is the line whose absence sent a reader to lint instead of to the spawn');
+});
+
+test('C70 — a failing gate\'s own output reaches the log, and a silent one says it was silent', () => {
+  const said = [];
+  const err = { write: (x) => said.push(x) };
+  const withOutput = makeGateRunner({ root: '/not-read-by-these-cases', platform: 'linux', err,
+    spawn: () => ({ status: 1, stdout: 'lint: 3 problems\n', stderr: 'at file.mjs:9\n' }) });
+  assert.equal(withOutput(['npm', 'run', 'lint']), 1);
+  const printed = said.join('');
+  assert.match(printed, /lint: 3 problems/, 'the gate refused and showed nothing of what it refused on');
+  assert.match(printed, /at file\.mjs:9/, 'stderr is part of what a reader needs, not an extra');
+  assert.doesNotMatch(printed, /printed nothing/, 'it printed plenty');
+
+  // The rarer silence, named so it does not read like the one above.
+  const quiet = [];
+  const mute = makeGateRunner({ root: '/not-read-by-these-cases', platform: 'linux', err: { write: (x) => quiet.push(x) },
+    spawn: () => ({ status: 2, stdout: '', stderr: '' }) });
+  assert.equal(mute(['npm', 'test']), 2);
+  assert.match(quiet.join(''), /npm exited 2 and printed nothing/);
+});
+
+test('C70 — a passing gate is not silenced by the capture', () => {
+  const said = [];
+  const run = makeGateRunner({ root: '/not-read-by-these-cases', platform: 'linux', err: { write: (x) => said.push(x) },
+    spawn: () => ({ status: 0, stdout: 'up to date\n', stderr: '' }) });
+  assert.equal(run(['npm', 'ci']), 0);
+  // Capturing replaced `stdio: 'inherit'`, so a passing gate's log has to be written through rather
+  // than swallowed — it arrives at once instead of streaming, which for a CI log is the same thing.
+  assert.match(said.join(''), /up to date/);
+});
+
+test('ARC-09-C71 — every `release()` call in this file pins a platform', async () => {
+  /*
+   * THE HOLE WAS THE DIRECT CALL, so this is the assertion that closes the class rather than the case.
+   *
+   * Six of the seven Windows failures were fixed in ONE line because they shared the `run` helper. The
+   * seventh called `release()` itself and therefore never got the pin, and its stub matched
+   * `args.join(' ') === 'npm test'` — which on Windows is `npm.cmd test` — so the post-write suite
+   * counted once instead of twice on all three cells. A fourth and a fifth call site would have done the
+   * same thing, silently, and only on a platform nobody here runs.
+   *
+   * It PARSES rather than greps, with the `typescript` pinned for `launcher-extract.mjs`: an object
+   * argument spread over five lines is not something a regular expression should be asked to bound, and
+   * a scan that misses a call is a scan that reports "all clear".
+   */
+  const ts = (await import('typescript')).default;
+  const file = fileURLToPath(import.meta.url);
+  const src = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+
+  const unpinned = [];
+  let seen = 0;
+  const visit = (node) => {
+    if (ts.isCallExpression(node) && node.expression.getText() === 'release'
+      && node.arguments.length === 1 && ts.isObjectLiteralExpression(node.arguments[0])) {
+      seen += 1;
+      const pins = node.arguments[0].properties.some((pr) => ts.isPropertyAssignment(pr)
+        && pr.name?.getText?.() === 'platform');
+      if (!pins) {
+        unpinned.push(`line ${src.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(src);
+
+  assert.ok(seen >= 4, `the scan found only ${seen} release() calls — it is not reading this file`);
+  assert.deepEqual(unpinned, [],
+    'a release() call takes the host platform, so its gate spelling differs between machines — pass '
+    + "platform: 'linux' unless the platform is what the case is about");
 });

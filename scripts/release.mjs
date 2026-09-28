@@ -34,9 +34,11 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { npmCommand, spawnFor } from '../tools/snowarch/lib/spawn-batch.mjs';
 
 import { askOnce, isYes } from '../tools/snowarch/lib/ask.mjs';
-import { EXIT_GATE, gatePlan, modulesAreLinked, runGates } from './lib/release/gates.mjs';
+import { EXIT_GATE, gatePlan, makeGateRunner, modulesAreLinked, runGates }
+  from './lib/release/gates.mjs';
 import { EXIT_PREFLIGHT, preflight } from './lib/release/preflight.mjs';
 import { buildTagMessage } from './lib/release/tag.mjs';
 import { applyWrites, rollback, STAGED } from './lib/release/writers.mjs';
@@ -107,14 +109,12 @@ export async function release({
   };
   const gitRun = git ?? gitDefault;
 
-  // Child processes for the gates and for npm. `shell` on Windows only, and only because `npm`
-  // there is `npm.cmd` — a batch file, which Node has refused to exec directly since
-  // CVE-2024-27980. Every argument here is ours; none comes from a user.
-  const runDefault = (args) => {
-    const [cmd, ...rest] = args;
-    const r = spawnSync(cmd, rest, { cwd: root, stdio: 'inherit', shell: platform === 'win32' });
-    return r.status ?? 1;
-  };
+  // Child processes for the gates. ARC-09-C69/C70 — `makeGateRunner` in `lib/release/gates.mjs` owns
+  // both halves now: the platform's own `npm` spelling with no shell (DEP0190), and printing what a
+  // failing gate actually said. It lives there because a closure HERE was reachable only by running a
+  // real release — every test injects `run`, so the one seam that failed on the Windows cell was the
+  // one seam no case could touch.
+  const runDefault = makeGateRunner({ root, platform, err });
   const runChild = run ?? runDefault;
 
   const config = JSON.parse(readFileSync(join(root, 'engine.config.json'), 'utf8'));
@@ -136,8 +136,9 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
   // The npm probe is skipped when the caller injected a runner: a test has no npm to find, and a
   // preflight that failed on the absence of a tool it was never going to spawn would be asserting
   // about the machine rather than about the release.
-  const hasNpm = injectedRun || Boolean(spawnSync('npm', ['--version'],
-    { encoding: 'utf8', shell: platform === 'win32' }).stdout);
+  const npmProbe = spawnFor(npmCommand(platform), ['--version'], { platform });
+  const hasNpm = injectedRun || Boolean(spawnSync(npmProbe.file, npmProbe.args,
+    { encoding: 'utf8', ...npmProbe.options }).stdout);
   const pre = preflight({ version, root, git: gitRun, config, flags, platform, hasNpm });
   if (!pre.ok) { fail(pre.message); return EXIT_PREFLIGHT; }
 

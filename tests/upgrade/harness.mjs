@@ -21,6 +21,7 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { npmCommand, spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 import {
   chmodSync, cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, writeSync,
 } from 'node:fs';
@@ -242,9 +243,12 @@ function rewriteVersion(root, version) {
   // `trackedFiles()` carries every tracked file, and this is one.
   if (!existsSync(lock)) throw new Error(`harness: no package-lock.json in ${root}`);
   const before = createHash('sha256').update(readFileSync(lock)).digest('hex');
-  execFileSync('npm', ['version', version, '--no-git-tag-version', '--workspaces',
-    '--include-workspace-root', '--no-workspaces-update'],
-  { cwd: root, stdio: 'pipe', shell: process.platform === 'win32' });
+  // ARC-09-C69 — `spawnFor`, not `shell: process.platform === 'win32'`: that shape is DEP0190 on
+  // Node 24 with an args array, and this line printed one of the three warnings left after C67,
+  // right after the `world[win32] files=… modules-copy=…` line.
+  const bump = spawnFor(npmCommand(), ['version', version, '--no-git-tag-version', '--workspaces',
+    '--include-workspace-root', '--no-workspaces-update']);
+  execFileSync(bump.file, bump.args, { cwd: root, stdio: 'pipe', ...bump.options });
   const after = createHash('sha256').update(readFileSync(lock)).digest('hex');
   if (before === after) {
     throw new Error(`harness: npm version ${version} left package-lock.json unchanged — the bump `

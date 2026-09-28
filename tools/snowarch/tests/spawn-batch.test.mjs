@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BatchArgumentError, batchCommand, comSpec, isBatch, quoteForCmd }
   from '../lib/spawn-batch.mjs';
 import { root } from '../lib/config.mjs';
+import { scanSpawnShapes } from './helpers/spawn-scan.mjs';
+import { tempDir } from './helpers/temp.mjs';
 
 /**
  * ARC-09-C67/C68 — the quoting, and the rule that no caller reintroduces `shell: true` with args.
@@ -72,35 +74,60 @@ test('C67 — only a .cmd or .bat is a batch file', () => {
   for (const f of ['git.exe', 'node', '/usr/bin/npm', 'x.cmd.exe']) assert.equal(isBatch(f), false, f);
 });
 
-test('C67 — no engine module spawns with `shell: true` and an args array', () => {
+test('C69/C70 — nothing in this repository spawns with an args array AND a shell', async (t) => {
+  const { offenders, unresolved, files } = await scanSpawnShapes({
+    roots: ['tools/snowarch/lib', 'tools/snowarch/tests', 'tests', 'scripts'].map((d) => join(root, d)),
+  });
+  assert.ok(files > 150, `the reader saw only ${files} files — it is not reading the repository`);
+  assert.deepEqual(offenders.map((o) => o.slice(root.length + 1)), [],
+    'a spawn passes an args array with a shell (DEP0190) — use `spawnFor` from spawn-batch.mjs');
   /*
-   * THE RULE, ASSERTED RATHER THAN REMEMBERED. DEP0190 fires on exactly that combination, and the
-   * warning printed on every launcher run — bootstrap, doctor, `mode live`, and three times during
-   * an upgrade, once between `Proceed? [Y/n]` and the answer, which is the worst place a stray line
-   * can land. A second site would reintroduce it silently, on Windows only, where nobody here looks.
+   * A spread the reader could not follow is REPORTED rather than assumed clean — "could not tell" and
+   * "nothing here" being one value is the defect this programme keeps finding. It is a DIAGNOSTIC and not
+   * an assertion, and the reason is measured: of the 40, most are `...opts` / `...options` where the name
+   * is a function PARAMETER, so the object belongs to the caller and one hop cannot reach it, and the
+   * rest are `...call.options` where `call` came from `spawnFor(…)` — a call, not a literal, so nothing
+   * static can say what is in it. Asserting zero would be asserting that no wrapper forwards its options
+   * and that nobody spreads a helper's return, neither of which is true or desirable.
    *
-   * Comments are blanked first: this repository's own rule for a source scan, because in a comment a
-   * spawn option is the lesson and in code it is the call — and the four times this arc mistook one
-   * for the other are in `docs/CONTRIBUTING.md`.
+   * What the hard rule above DOES cover is the shape the architect's control caught the reader missing:
+   * an options object written as a literal in the same file and spread in.
    */
-  const files = [];
-  const walk = (dir) => {
-    for (const e of readdirSync(dir, { withFileTypes: true })) {
-      const p = join(dir, e.name);
-      if (e.isDirectory()) walk(p);
-      else if (e.name.endsWith('.mjs') && statSync(p).size < 2_000_000) files.push(p);
-    }
-  };
-  walk(join(root, 'tools', 'snowarch', 'lib'));
-  assert.ok(files.length > 30, `the scan found only ${files.length} files — it is not reading the lib`);
+  t.diagnostic(`spreads the reader could not follow one hop: ${unresolved.length}`);
+});
 
-  const offenders = [];
-  for (const p of files) {
-    const code = readFileSync(p, 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-      .replace(/(^|[^:])\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, ' '));
-    if (/shell:\s*true/.test(code)) offenders.push(p.slice(root.length + 1));
-  }
-  assert.deepEqual(offenders, [],
-    'a module spawns with `shell: true` — use `batchCommand` from spawn-batch.mjs instead');
+test('C69/C70 — the reader catches both spellings of the defect, and neither false-positives', async (t) => {
+  /*
+   * THE PLANTED FIXTURE GOES THROUGH THE REAL READER, which is the whole point of `spawn-scan.mjs`
+   * being a module. The previous version of this case re-implemented the walk over a string, so a
+   * degradation of the reader left the case green — a copy, not a proof.
+   *
+   * Both spellings are here because the architect's control found the second one: options assembled
+   * elsewhere and spread in were not flagged while the same defect written inline was, and the spread is
+   * how `test-all.mjs`, the harnesses and `makeGateRunner` all pass options.
+   */
+  const dir = tempDir('spawn-scan-', t);
+  writeFileSync(join(dir, 'planted.mjs'), [
+    "import { spawnSync } from 'node:child_process';",
+    "// 1. inline — the shape C67 removed from the product",
+    "spawnSync('npm.cmd', ['run', 'x'], { shell: true });",
+    "// 2. assembled elsewhere and spread in — the shape the architect's control found",
+    "const call = { file: 'npm.cmd', args: ['test'], options: { shell: true } };",
+    "spawnSync(call.file, call.args, { cwd: '.', ...call.options });",
+    "// 3. a bare identifier spread, the other way this gets written",
+    "const opts = { shell: process.platform === 'win32' };",
+    "spawnSync('npm.cmd', ['ci'], { cwd: '.', ...opts });",
+    "// 4. NOT the defect: one command string with a shell — no args array to leave unescaped",
+    "spawnSync('a-command --with args', { shell: true });",
+    "// 5. NOT the defect: a spread carrying no shell at all",
+    "const clean = { options: { windowsVerbatimArguments: true } };",
+    "spawnSync('cmd.exe', ['/d', '/s', '/c', 'x'], { ...clean.options });",
+    "// 6. NOT the defect: an explicit false",
+    "spawnSync('node', ['x.mjs'], { shell: false });",
+  ].join('\n'));
+
+  const { offenders } = await scanSpawnShapes({ roots: [dir] });
+  assert.deepEqual(offenders.map((o) => o.slice(dir.length + 1)),
+    ['planted.mjs:3', 'planted.mjs:6', 'planted.mjs:9'],
+    'the reader must catch the inline and both spread spellings, and flag none of the three that are fine');
 });
