@@ -345,7 +345,32 @@ export const bySentence = (testProse, productProse) => {
   // A sentence of nothing but the launcher resolves nothing: `expect(x).not.toContain('./snowarch')` is an
   // assertion ABOUT the launcher with no sentence to place it in.
   if (t.replace(new RegExp(MARK, 'g'), '').trim().length < 3) return false;
-  return squash(productProse).includes(t);
+
+  /*
+   * AT WORD BOUNDARIES — ARC-07-C35c item 6.
+   *
+   * A bare `includes` matches mid-word: `doctor now` is inside `run the doctor nowhere near this`, which is a
+   * different sentence about a different thing. Measured on the tree today: ZERO matches land mid-word, so this
+   * changes nothing here and is a guard rather than a repair — the same shape as C35c's other items.
+   *
+   * WHAT THIS DELIBERATELY DOES NOT DO IS NARROW RESOLUTION, and the measurement is why. 40 sites resolve
+   * today, 31 of them against FOUR OR MORE product lines and 30 on two words of prose or fewer — `~ doctor`
+   * against 17 lines, `~ docs sync` against 29 — which looks like agreement by coincidence and is not: in every
+   * one of the 40, EVERY matching line shares a kind, so whichever line prints the sentence the answer is the
+   * same. That is universal quantification, and requiring three words of prose would have discarded 30 true
+   * agreements for a theory. The residual limit is real and stays recorded on the row: the line under test may
+   * be outside the hit set altogether, which the argv route narrows and C35c's remaining pieces narrow further.
+   */
+  const hay = squash(productProse);
+  const isWord = (ch) => /[A-Za-z0-9]/.test(ch);
+  for (let at = hay.indexOf(t); at !== -1; at = hay.indexOf(t, at + 1)) {
+    const before = at === 0 ? '' : hay[at - 1];
+    const after = at + t.length >= hay.length ? '' : hay[at + t.length];
+    const opens = before === '' || !isWord(before) || !isWord(t[0]);
+    const closes = after === '' || !isWord(after) || !isWord(t.at(-1));
+    if (opens && closes) return true;
+  }
+  return false;
 };
 
 /**
@@ -445,6 +470,7 @@ export function audit({ tests = testSources(), product: productFiles = productSo
   const mismatches = [];
   const unresolved = [];
   let agreed = 0;
+  const agreedOver = { one: 0, few: 0, many: 0 };
 
   for (const { file: rel, text } of tests) {
     // ARC-07-C35b — the extractor finds the assertions and their prose; this decides what that means.
@@ -504,7 +530,11 @@ export function audit({ tests = testSources(), product: productFiles = productSo
         // The case supplied a pinned shell and asserted that shell's rendering — ARC-07-C31's own pattern.
         // A DERIVING product line is what should be there; a PINNED one means the product spells a
         // launcher the case thought it was driving, which is a real disagreement.
-        if (kinds[0] === 'DERIVED') agreed += 1;
+        if (kinds[0] === 'DERIVED') {
+          agreed += 1;
+          // Counted in the same histogram, so it totals the agreements rather than most of them.
+          agreedOver[hits.length === 1 ? 'one' : hits.length <= 3 ? 'few' : 'many'] += 1;
+        }
         else {
           mismatches.push({ site, expectation, product: cite(hits), products: sites(hits), kind: kinds[0],
             route: route ?? null,
@@ -524,7 +554,14 @@ export function audit({ tests = testSources(), product: productFiles = productSo
           why: expectation === 'PINNED'
             ? 'a pinned expectation against a product line that DERIVES — red on every Windows cell'
             : 'a derived expectation against a product line that is PINNED — red on every Windows cell' });
-      } else agreed += 1;
+      } else {
+        agreed += 1;
+        // ARC-07-C35c item 6 — HOW MANY LINES an agreement rests on, so its strength is visible in the report
+        // rather than implied by a single number. One line is a resolution; twenty-nine lines that all share a
+        // kind is a universal answer, which is sound and weaker, and a reader deserves to see which it was.
+        const bucket = hits.length === 1 ? 'one' : hits.length <= 3 ? 'few' : 'many';
+        agreedOver[bucket] += 1;
+      }
     }
   }
 
@@ -603,7 +640,7 @@ export function audit({ tests = testSources(), product: productFiles = productSo
   const computed = new Map([...found].map(([file, counts]) => [file,
     [...counts.values()].sort((a, b) => (keyed(a) < keyed(b) ? -1 : keyed(a) > keyed(b) ? 1 : 0))]));
 
-  return { agreed, mismatches, unresolved, drift, computed,
+  return { agreed, agreedOver, mismatches, unresolved, drift, computed,
     ok: mismatches.length === 0 && drift.length === 0 };
 }
 
