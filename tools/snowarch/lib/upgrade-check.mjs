@@ -14,6 +14,7 @@
  */
 import { chmodSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { stateRoot } from './config.mjs';
 
 export const CACHE_FILE = join('.local', 'upgrade-check.json');
 
@@ -29,7 +30,8 @@ export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /** How often the doctor's release-currency check may refresh it. */
 export const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
 
-export const cachePath = (root) => join(root, CACHE_FILE);
+// ARC-07-C43 — `writeUpgradeCheck` creates `dirname(path)`, so this is the only site to seam.
+export const cachePath = (root) => join(stateRoot(root), CACHE_FILE);
 
 /** The cache, or `null`. A malformed file is an absent one — never a crash in a hook. */
 export function readUpgradeCheck(root) {

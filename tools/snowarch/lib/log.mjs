@@ -2,7 +2,7 @@
 import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { redact } from './redact.mjs';
-import { root } from './config.mjs';
+import { root, stateRoot } from './config.mjs';
 
 const KEEP = 10;
 
@@ -45,7 +45,8 @@ export function createLogger({ command, quiet = false, verbose = false, json = f
    */
   let file = noFile ? false : null;
   let held = defer ? [] : null;
-  const dir = join(logRoot, '.local', 'logs');
+  // ARC-07-C43 — `.local/` follows `SNOWARCH_STATE_ROOT`; unset, this is `logRoot` unchanged.
+  const dir = join(stateRoot(logRoot), '.local', 'logs');
 
   const toFile = (line) => {
     // `defer` holds the lines in memory instead of opening the file. ARC-06-S03's plan screen is
