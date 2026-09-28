@@ -49,7 +49,7 @@ test('ARC-09-C64 — a failure in the FIRST half still lets the second half run 
   // 1463 vitest cases from the gate with nothing in the output saying so.
   const { calls, run } = fakeRun({ a: { status: 1 } });
   const { lines, write } = collect();
-  const r = runSteps({ steps: TWO, run, write });
+  const r = runSteps({ steps: TWO, run, write, platform: 'linux' });
 
   assert.equal(calls.length, 2, 'the second half did not run after the first failed');
   assert.deepEqual(calls.map((c) => c.args[0]), ['a', 'b']);
@@ -73,7 +73,7 @@ test('ARC-09-C64 — a failure in the SECOND half is not lost either', () => {
   // that "run everything" cannot be implemented as "ignore everything".
   const { run } = fakeRun({ b: { status: 2 } });
   const { lines, write } = collect();
-  const r = runSteps({ steps: TWO, run, write });
+  const r = runSteps({ steps: TWO, run, write, platform: 'linux' });
   assert.equal(r.ok, false);
   assert.deepEqual(r.results.map((x) => x.outcome), ['ok', 'FAIL (exit 2)']);
   assert.match(lines.join(''), /FAIL: 1 of 2 half\(s\) failed \(second\)/);
@@ -82,13 +82,13 @@ test('ARC-09-C64 — a failure in the SECOND half is not lost either', () => {
 test('ARC-09-C64 — both halves failing names both, and both halves passing is a pass', () => {
   const both = fakeRun({ a: { status: 1 }, b: { status: 1 } });
   const first = collect();
-  assert.equal(runSteps({ steps: TWO, run: both.run, write: first.write }).ok, false);
+  assert.equal(runSteps({ steps: TWO, run: both.run, write: first.write, platform: 'linux' }).ok, false);
   assert.match(first.lines.join(''), /FAIL: 2 of 2 half\(s\) failed \(first, second\)/);
 
   // The green direction, which is what stops this runner from being a check that always fails.
   const green = fakeRun({});
   const second = collect();
-  const r = runSteps({ steps: TWO, run: green.run, write: second.write });
+  const r = runSteps({ steps: TWO, run: green.run, write: second.write, platform: 'linux' });
   assert.equal(r.ok, true);
   assert.match(second.lines.join(''), /all 2 half\(s\) passed/);
   assert.doesNotMatch(second.lines.join(''), /FAIL/);
@@ -101,7 +101,7 @@ test('ARC-09-C64 — a half that could not be spawned is a failure, not a silenc
   // failure in this repository rather than a hypothetical.
   const { run } = fakeRun({ b: { status: null, error: new Error('spawn npm.cmd EINVAL') } });
   const { lines, write } = collect();
-  const r = runSteps({ steps: TWO, run, write });
+  const r = runSteps({ steps: TWO, run, write, platform: 'linux' });
   assert.equal(r.ok, false, 'a half that never started was reported as passing');
   assert.match(r.results[1].outcome, /FAIL \(could not run: spawn npm\.cmd EINVAL\)/);
   assert.match(lines.join(''), /could not run/);
@@ -109,7 +109,7 @@ test('ARC-09-C64 — a half that could not be spawned is a failure, not a silenc
   // A half killed by a signal is the same story: no status, still a failure.
   const killed = fakeRun({ a: { status: null, signal: 'SIGKILL' } });
   const out = collect();
-  assert.equal(runSteps({ steps: TWO, run: killed.run, write: out.write }).ok, false);
+  assert.equal(runSteps({ steps: TWO, run: killed.run, write: out.write, platform: 'linux' }).ok, false);
   assert.match(out.lines.join(''), /FAIL \(killed by SIGKILL\)/);
 });
 
@@ -155,22 +155,43 @@ test('ARC-09-C64 — the two real halves are the two that were chained, and the 
    * knowable on any platform: on win32 the npm half goes through `cmd.exe /d /s /c` with one quoted
    * command line, and nowhere does a shell option appear beside an args array.
    */
-  const calls = [];
-  runSteps({ steps: STEPS, write: () => {},
-    run: (file, args, options) => { calls.push({ file, args, options }); return { status: 0 }; } });
-  assert.equal(calls.length, 2);
-  for (const c of calls) {
-    assert.equal(c.options.shell, undefined, `${c.file} was spawned with a shell option`);
+  /*
+   * BOTH PLATFORMS, PINNED — not `if (process.platform === 'win32')`. ARC-09-C71: a case that branches on
+   * the host asserts one half of its subject and takes the other on trust, and the half nobody runs is
+   * the half that breaks. `runSteps` takes the platform, so both are knowable from either machine.
+   */
+  const drive = (platform) => {
+    const calls = [];
+    runSteps({ steps: STEPS, platform, write: () => {},
+      run: (file, args, options) => { calls.push({ file, args, options }); return { status: 0 }; } });
+    return calls;
+  };
+
+  for (const platform of ['linux', 'win32']) {
+    const calls = drive(platform);
+    assert.equal(calls.length, 2, `${platform}: both halves have to be spawned`);
+    for (const c of calls) {
+      assert.equal(c.options.shell, undefined, `${platform}: ${c.file} was spawned with a shell option`);
+    }
+    assert.equal(calls[0].file, process.execPath, `${platform}: the engine half is node on a JS entry point`);
   }
-  assert.equal(calls[0].file, process.execPath, 'the engine half is node on a JS entry point');
-  if (process.platform === 'win32') {
-    assert.match(calls[1].file, /cmd\.exe$/i, 'npm.cmd on Windows has to go through the command processor');
-    assert.deepEqual(calls[1].args.slice(0, 3), ['/d', '/s', '/c']);
-    assert.equal(calls[1].options.windowsVerbatimArguments, true);
-  } else {
-    assert.equal(calls[1].file, 'npm', 'nothing on POSIX is a batch file');
-    assert.deepEqual(calls[1].args, ['test', '--workspaces', '--if-present']);
-  }
+
+  // The npm half is the one that differs, and this is the difference: on Windows npm IS a batch file.
+  const posix = drive('linux');
+  assert.deepEqual(posix[1].args, ['test', '--workspaces', '--if-present']);
+  assert.equal(posix[1].options.windowsVerbatimArguments, undefined, 'a POSIX spawn needs no such thing');
+
+  const win = drive('win32');
+  assert.match(win[1].file, /cmd\.exe$/i, 'npm.cmd on Windows has to go through the command processor');
+  assert.deepEqual(win[1].args.slice(0, 3), ['/d', '/s', '/c']);
+  // `npm.cmd` has no space in it, so `quoteForCmd` leaves it bare — quoting a token that needs no
+  // quoting would be noise, and the outer pair is cmd's own. A path WITH a space is asserted in
+  // `tools/snowarch/tests/spawn-batch.test.mjs`, where that is the subject.
+  assert.equal(win[1].args[3], '"npm.cmd test --workspaces --if-present"');
+  // And the tripwire is doing its job: STEPS was built on THIS machine, so `command` is the bare `npm`,
+  // and the win32 call still reaches `npm.cmd` rather than a name Windows cannot start.
+  assert.equal(win[1].args[3].includes('npm.cmd'), true);
+  assert.equal(win[1].options.windowsVerbatimArguments, true);
 
   // ...and the workspace that half runs still has a test script, so `--if-present` is not silently
   // covering nothing. This is the floor: if `packages/snowarch` lost its script, the second half would

@@ -162,7 +162,24 @@ async function run(root, argv, { ask = null, fail = null, skip = 0, gen = false,
   const out = capture();
   const err = capture();
   const r = runner(root, { fail, skip, gen });
+  /*
+   * ARC-09-C71 — `platform` IS PINNED, and a Windows cell is what asked for it.
+   *
+   * `gatePlan` names `npm` the way the platform spells it (ARC-09-C70), so on Windows the gates arrive
+   * as `npm.cmd run lint`. The stub above matches by `args.join(' ').includes(fail)` and rewrites the
+   * manifests when `args[0] === 'npm'` — so on the three Windows cells a `fail: 'npm run lint'` matched
+   * NOTHING: the gate passed, the release continued, and the case read `expected 1, actual 0`. The same
+   * silence hit `npm test` twice and the manifest rewrite once.
+   *
+   * These cases are about the release's ORDERING and its writes, not about how a child is spawned, so
+   * they pin one platform and stay identical on every machine. The platform-shaped call has cases of its
+   * own — `C70 — the gate plan names npm the way the platform spells it` and the `makeGateRunner` cases
+   * below — which is the division rule 1 asks for: derive from the same source, or say which platform you
+   * are asserting. A matcher that has to know the host is a matcher that asserts different things on
+   * different machines.
+   */
   const code = await release({ argv, root, out: out.stream, err: err.stream, ask, run: r.run,
+    platform: 'linux',
     ...(unstage.length ? { staged: STAGED.filter((f) => !unstage.includes(f)) } : {}),
     now: () => new Date('2026-09-11T00:00:00Z') });
   return { code, out: out.text(), err: err.text(), calls: r.calls };

@@ -74,8 +74,15 @@ const outcome = (r) => {
  *
  * `run` and `write` are injected so the cases can drive the combining rule — which is the whole of this
  * module's behaviour — without spending four minutes running two real suites. The defaults are the product.
+ *
+ * `platform` IS A SEAM, and ARC-09-C71 is why. `spawnFor` wraps a Windows batch file in
+ * `cmd.exe /d /s /c`, so on a Windows cell the second half's `args[0]` became `/d` and four cases that
+ * matched the step's own argv — and keyed a status table off it — silently answered `status: 0` for
+ * every call. They are about the COMBINING rule (every half runs, every half is counted), not about
+ * spawning, so they pin the platform and one case pins `win32` to assert the wrapping on purpose.
  */
-export function runSteps({ steps = STEPS, run = spawnSync, write = (s) => writeSync(1, s) } = {}) {
+export function runSteps({ steps = STEPS, run = spawnSync, write = (s) => writeSync(1, s),
+  platform = process.platform } = {}) {
   const results = [];
   for (const [i, step] of steps.entries()) {
     write(`\n=== npm test [${i + 1}/${steps.length}] ${step.id}: ${step.label}`
@@ -84,7 +91,7 @@ export function runSteps({ steps = STEPS, run = spawnSync, write = (s) => writeS
     // ARC-09-C69 — `spawnFor`, not `shell: process.platform === 'win32'`. That shape is DEP0190 on
     // Node 24 with an args array, and this script printed one of the three warnings that survived
     // C67 — after both halves had finished, which is where a reader least expects a deprecation.
-    const call = spawnFor(step.command, step.args);
+    const call = spawnFor(step.command, step.args, { platform });
     const r = run(call.file, call.args, { cwd: root, stdio: 'inherit', ...call.options });
     results.push({ ...step, status: r?.status ?? null, signal: r?.signal ?? null, error: r?.error ?? null,
       outcome: outcome(r ?? {}) });
