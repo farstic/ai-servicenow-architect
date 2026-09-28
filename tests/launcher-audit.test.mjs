@@ -17,9 +17,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { audit, byKey, bySentence, productSources, testSources,
+import { artefactLines, audit, byKey, bySentence, productSources, testSources,
   UNRESOLVED_BASELINE } from '../scripts/ci/launcher-audit.mjs';
-import { answeredBy, assertedLaunchers, LAUNCHER, MARK, productLines } from '../scripts/ci/launcher-extract.mjs';
+import { answeredBy, assertedLaunchers, LAUNCHER, MARK, packageOf,
+  productLines } from '../scripts/ci/launcher-extract.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -180,17 +181,16 @@ test('C35b — a template, a `+` concatenation and a multi-line assertion extrac
   assert.match(sites[2].sentence, /^the corpus is missing — .* docs sync$/,
     'a multi-line assertion was not extracted — the line-based version could not see these at all');
 
-  // A LAUNCHER INSIDE A REGEX IS NOT A TARGET YET, and this asserts the SCOPE rather than a defect.
-  // `/run \.\/snowarch doctor/` holds `\.\/snowarch`, so detecting it means unescaping first — which
-  // finds 45 more sites and, measured, reported 13 correct tests as mismatches. Three pieces are missing
-  // before that can be switched on, and they are ARC-07-C35c's. When it lands, this expectation flips to 1
-  // in the same commit as the extractor change.
+  // A LAUNCHER INSIDE A REGEX IS A TARGET NOW — ARC-07-C35c's regex arm, switched on with the four pieces that
+  // stop it crying wolf. `/run \.\/snowarch doctor/` holds `\.\/snowarch`, so the escaping comes off first, and
+  // `assert.match(x, /…/)` is the shape this repository writes most: it brought 54 more sites into the audit.
   const withRegex = assertedLaunchers('tests/planted.test.mjs',
     ["const CLI = spellings({ platform: 'linux', env: {} }).cli;",
       'assert.match(r.text, /run \\.\\/snowarch doctor --section legacy/);'].join('\n'));
-  assert.equal(withRegex.length, 0,
-    'a regex-borne launcher is being audited — if that is deliberate, ARC-07-C35c has landed and this '
-    + 'case says 1 instead');
+  assert.equal(withRegex.length, 1, 'a regex-borne launcher is not being audited');
+  // ...and its prose is UNESCAPED, so it can match a product line at all.
+  assert.match(withRegex[0].sentence, /^run .* doctor --section legacy$/);
+  assert.equal(withRegex[0].expectation, 'PINNED', 'a launcher written out in a regex is a pinned expectation');
 });
 
 test('C35b — the launcher is marked on BOTH sides, so a pinned product line can be matched', () => {
@@ -280,7 +280,9 @@ test('C35b — matching by SENTENCE resolves what matching by KEY could not', ()
     tests: [{ file: 'tests/planted.test.mjs', text: "expect(out).not.toContain('./snowarch');\n" }] });
   assert.equal(bare.agreed, 0);
   assert.equal(bare.unresolved.length, 1);
-  assert.match(bare.unresolved[0].why, /no sentence beside the launcher|no product line carries/);
+  // Its reason moved when C35c's regex arm brought negative assertions into their own class: this fixture is
+  // `expect(out).not.toContain('./snowarch')`, which asserts an ABSENCE, and that is truer than "no sentence".
+  assert.match(bare.unresolved[0].why, /asserted ABSENT|no sentence beside the launcher/);
 });
 
 test('C35b/C35c — every baseline entry EQUALS the record the audit computed', () => {
@@ -436,13 +438,14 @@ test('C35b — a WINDOWS-spelled literal is a target: the cooked value, never th
   for (const { file, text } of testSources()) {
     for (const site of assertedLaunchers(file, text)) if (site.spelled.windows) spelledWindows.push(site);
   }
-  assert.equal(spelledWindows.length, 11,
-    `${spelledWindows.length} Windows-spelled asserted launcher(s), expected 11 — it was ZERO before the `
-    + 'cooked-value fix, so a fall toward nothing is that defect returning and a rise is cases to look at');
+  assert.equal(spelledWindows.length, 28,
+    `${spelledWindows.length} Windows-spelled asserted launcher(s), expected 28 — it was ZERO before the `
+    + 'cooked-value fix and 11 before C35c\'s regex arm, which brought 17 more in; a fall toward nothing is '
+    + 'that defect returning and a rise is cases to look at');
   const rendering = spelledWindows.filter((s) => s.expectation === 'EXPECTED_RENDERING').length;
-  assert.equal(rendering, 8,
-    `${rendering} of the Windows sites are EXPECTED_RENDERING, expected 8 — the architect measured 4 on the `
-    + 'third head, and items 7 and 8 (the receiver chain and the named platform ctx) are what moved it');
+  assert.equal(rendering, 16,
+    `${rendering} of the Windows sites are EXPECTED_RENDERING, expected 16 — 4 on C35b's third head, 8 once `
+    + "items 7 and 8 landed, 16 with the regex arm on. Every one of them is a win32 cell's own assertion.");
 });
 
 test('C35b — one definition of LAUNCHER, exported, because the two had already diverged', () => {
@@ -992,7 +995,16 @@ test('C35c — how many lines an agreement rests on is reported, not implied (it
   const product = productSources().flatMap(({ file, text }) => productLines(file, text));
   for (const { file, text } of testSources()) {
     for (const site of assertedLaunchers(file, text)) {
-      const routed = site.answeredBy ? product.filter((p) => p.package === site.answeredBy) : product;
+      // A NEGATIVE assertion is recorded BEFORE any comparison, so it can never be "reported ambiguous" and
+      // this loop must skip it — mirroring the audit's ORDER as well as its routing.
+      if (site.negative) continue;
+      // MIRRORS THE AUDIT'S ROUTING, artefacts included — C35c's regex arm gave a page-reading case its own
+      // candidate pool, and a case that recomputed over everything would be asking a different question than
+      // the audit answers.
+      const routed = site.readsArtefact
+        ? [...artefactLines(), ...product.filter((p) => p.package === 'artefact')]
+        : (site.answeredBy ? product.filter((p) => p.package === site.answeredBy)
+          : product.filter((p) => p.package !== 'artefact'));
       const hits = routed.filter((p) => bySentence(site.sentence, p.sentence));
       if (hits.length < 2) continue;
       const kinds = new Set(hits.map((h) => h.kind));
@@ -1003,4 +1015,89 @@ test('C35c — how many lines an agreement rests on is reported, not implied (it
         `${file}:${site.line} matches lines of both kinds and was not reported ambiguous`);
     }
   }
+});
+
+/* ── ARC-07-C35c — the regex arm, and the four pieces that let it be switched on ─────────────────── */
+
+test('C35c — a committed artefact is the candidate for a case that READS one (piece 2 and 3)', () => {
+  // `install-page.test.mjs:346` asserts that README and INSTALL tell a reader to run `./snowarch mode design`.
+  // The page is POSIX by rule 3 — committed, so its bytes are the same on every runner — while its runtime twin
+  // in `engine-repo.mjs` derives, and BOTH are right. Comparing the two reported the case as a defect.
+  const page = [{ file: 'docs/PLANTED.md', text: 'Run `./snowarch mode design` before deleting anything.\n' }];
+  const runtime = [{ file: 'tools/snowarch/lib/planted.mjs',
+    text: 'export const remedy = (spell) => `${spell.cli} mode design` ;\n' }];
+  const reads = { file: 'tests/planted.test.mjs',
+    text: "assert.match(read('docs/PLANTED.md'), /\\.\\/snowarch mode design/);\n" };
+
+  // The artefact route is what makes it agree: a pinned expectation against a pinned page.
+  const r = audit({ tests: [reads], product: runtime, artefacts: page, baseline: EMPTY });
+  assert.deepEqual(r.mismatches, [], JSON.stringify(r.mismatches));
+  assert.equal(r.agreed, 1, JSON.stringify(r));
+
+  // ...and a case that CALLS the product is still answered by the product, not by the page — which is the half
+  // that keeps the artefacts from flooding every other site. Indexing all 377 of them globally took agreements
+  // from 44 to 11 and mismatches from 2 to 9, measured, which is why this is a route and not a pool.
+  const calls = { file: 'tests/planted.test.mjs',
+    text: "assert.match(remedy(spellings()), /\\.\\/snowarch mode design/);\n" };
+  const r2 = audit({ tests: [calls], product: runtime, artefacts: page, baseline: EMPTY });
+  assert.equal(r2.mismatches.length, 1, JSON.stringify(r2));
+  assert.equal(r2.mismatches[0].kind, 'DERIVED');
+});
+
+test('C35c — a generator\'s sentence is an artefact\'s, not the runtime\'s (piece 3)', () => {
+  // `scripts/gen-*.mjs` writes committed pages, so it carries the same words as the runtime line by
+  // construction — and PINS them, because a page is POSIX by rule 3. Measured with both in one pool:
+  // `mode-and-cache.test.mjs:100`, which derives its expectation from `MODE_VARIANTS` exactly as rule 1 asks,
+  // was matched against `gen-doctor-docs.mjs:66`'s pinned copy and reported as a defect.
+  assert.equal(packageOf('scripts/gen-doctor-docs.mjs'), 'artefact');
+  assert.equal(packageOf('scripts/release.mjs'), 'scripts');
+  assert.equal(packageOf('tools/snowarch/lib/text.mjs'), 'engine');
+
+  // The real pair: the generator pins POSIX, and the runtime line it writes derives.
+  const generator = productLines('scripts/gen-doctor-docs.mjs',
+    "export const page = { remedy: `run ${spellings({ platform: 'linux', env: {} }).cli} docs sync` };\n");
+  assert.equal(generator[0].kind, 'PINNED', 'piece 1: an interpolation that names its platform is pinned');
+  assert.equal(generator[0].package, 'artefact');
+
+  const runtime = productLines('tools/snowarch/lib/planted.mjs',
+    'export const remedy = (spell) => `run ${spell.cli} docs sync`;\n');
+  assert.equal(runtime[0].kind, 'DERIVED');
+  assert.equal(runtime[0].package, 'engine');
+});
+
+test('C35c — a hand-written spelling object is a named shell (regex arm)', () => {
+  // `windows-spellings.test.mjs:274` drives `MODE_VARIANTS.unconfigured({ cli: '.\\snowarch.cmd', bootstrap:
+  // '.\\bootstrap.cmd' })` — a spelling with no `platform` key and no `spellings()` call anywhere, so nothing
+  // recognised it and a correct assertion about the Windows rendering was reported as a pinned expectation
+  // against a deriving product line. An object whose `cli` IS a launcher literal has nothing left to derive.
+  // `String.raw`, because the escaping is the whole subject: the source carries two backslashes where the
+  // cooked value has one, and the regex carries them escaped again.
+  const fixture = [
+    "test('w', () => {",
+    String.raw`  const win = { cli: '.\\snowarch.cmd', bootstrap: '.\\bootstrap.cmd' };`,
+    String.raw`  assert.match(render(win), /\.\\snowarch\.cmd mode live/);`,
+    '});',
+  ].join('\n');
+  const site = assertedLaunchers('tests/planted.test.mjs', fixture)[0];
+  assert.ok(site, `the site was not seen at all:\n${fixture}`);
+  assert.equal(site.expectation, 'EXPECTED_RENDERING');
+});
+
+test('C35c — an assertion that a sentence is ABSENT is recorded, never compared (regex arm)', () => {
+  // `assert.doesNotMatch(r.text, /usage: \\.\\/snowarch instance <command>/)` says the engine's usage must NOT be
+  // in that output. No product line can settle that — the case is not claiming the product prints it — and
+  // comparing kinds reported `instance-root-entry.test.mjs:88` as a defect for asserting an absence.
+  const product = [{ file: 'tools/snowarch/lib/planted.mjs',
+    text: 'export const usage = (spell) => `usage: ${spell.cli} instance <command>`;\n' }];
+  const text = "assert.doesNotMatch(r.text, /usage: \\.\\/snowarch instance <command>/);\n";
+  const r = audit({ tests: [{ file: 'tests/planted.test.mjs', text }], product, baseline: EMPTY });
+  assert.deepEqual(r.mismatches, []);
+  assert.equal(r.unresolved.length, 1);
+  assert.match(r.unresolved[0].why, /asserted ABSENT/);
+
+  // ...and the POSITIVE twin of the same sentence still resolves, so this is not "ignore every regex".
+  const positive = "assert.match(r.text, /usage: \\.\\/snowarch instance <command>/);\n";
+  const r2 = audit({ tests: [{ file: 'tests/planted.test.mjs', text: positive }], product, baseline: EMPTY });
+  assert.equal(r2.mismatches.length, 1, JSON.stringify(r2));
+  assert.equal(r2.mismatches[0].expectation, 'PINNED');
 });

@@ -152,7 +152,7 @@ const TEST_PATHS = ['tests', 'tools/snowarch/tests', 'packages/snowarch/tests'];
  */
 export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ['packages/snowarch/tests/cli/import-legacy.test.ts', [
-    { at: '~', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion is about the launcher alone' },
+    { at: '~', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion claims this sentence is absent' },
     { at: '~ instance add prod --url https://acme.service-now.com -', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
   ]],
   ['packages/snowarch/tests/cli/instance-manage.test.ts', [
@@ -170,6 +170,7 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ]],
   ['packages/snowarch/tests/cli/tty.test.ts', [
     { at: 'On PowerShell/cmd use: ~ instance add … --password-stdin', kind: 'PINNED', n: 1, why: 'the case drives a pinned shell in another statement' },
+    { at: '~ instance add', kind: 'EXPECTED_RENDERING', n: 1, why: 'a pinned and a deriving line both carry it' },
   ]],
   ['packages/snowarch/tests/servicenow/prod-ack.test.ts', [
     { at: '~ instance set-preset prod full --ack-prod', kind: 'DERIVED', n: 1, why: 'outside the product index' },
@@ -182,8 +183,19 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: '~ instance set-preset prod <preset> --ack-prod', kind: 'DERIVED', n: 1, why: 'outside the product index' },
     { at: '~ instance set-preset prod full --ack-prod', kind: 'DERIVED', n: 1, why: 'outside the product index' },
   ]],
+  ['tests/cli-help.test.mjs', [
+    { at: '~', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion claims this sentence is absent' },
+  ]],
   ['tests/contract/gen-governance.test.mjs', [
     { at: 'Bash(~ doctor*)', kind: 'PINNED', n: 2, why: 'no product line carries this sentence' },
+  ]],
+  ['tests/contract/launcher-placeholder.test.mjs', [
+    { at: '~', kind: 'EXPECTED_RENDERING', n: 2, why: 'the assertion is about the launcher alone' },
+    { at: '~', kind: 'PINNED', n: 2, why: 'the assertion is about the launcher alone' },
+  ]],
+  ['tests/contract/runtime-errors.test.mjs', [
+    { at: 'If two different runtime errors occur in one session, al', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: '~', kind: 'PINNED', n: 1, why: 'the assertion is about the launcher alone' },
   ]],
   ['tests/docs-status.test.mjs', [
     { at: 'E-12 docs corpus: FAIL — corpus absent (docs mode "skip"', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' },
@@ -205,6 +217,7 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ]],
   ['tests/doctor/mode-and-cache.test.mjs', [
     { at: 'DOCTOR: 1 ok, 0 warn, 1 fail, 2 skipped (1 fixable — run', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' },
+    { at: 'Mode: design-only — ~', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:66)' },
   ]],
   ['tests/doctor/panel.test.mjs', [
     { at: 'Capability packs and the corpus branch are not probed on', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:190)' },
@@ -220,8 +233,16 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: 'Mode: unknown — doctor unavailable after it failed (Erro', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/commands/status.mjs:75)' },
     { at: 'Run ~ doctor --fix for the fixable ones (1).', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276)' },
   ]],
+  ['tests/doctor/status-template.test.mjs', [
+    { at: '**Do not run `~ doctor --quick --json`', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'Mode: unverified — ~ status did not run', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'On Windows without Git for Windows I cannot run ~ from h', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'Run `~ status`.', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'allowed-tools:.*Bash(~ status*)', kind: 'PINNED', n: 1, why: 'regex syntax in the sentence' },
+  ]],
   ['tests/doctor/win32-remedies.test.mjs', [
     { at: '~', kind: 'EXPECTED_RENDERING', n: 3, why: 'the assertion is about the launcher alone' },
+    { at: '~\\b', kind: 'PINNED', n: 2, why: 'the assertion claims this sentence is absent' },
   ]],
   ['tests/handoff-command.test.mjs', [
     { at: '~ instance add uat --url https://acme.service-now.com --', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
@@ -235,11 +256,14 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ]],
   ['tests/snowarch-skill.test.mjs', [
     { at: 'Bash(~ status*) Bash(node tools/snowarch/bin/snowarch.mj', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'Mode: unverified — ~ status did not run (<cause>)', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
   ]],
   ['tests/upgrade/upgrade-unit.test.mjs', [
     { at: 'E-27 FAIL Claude Code registration status: design-only i', kind: 'PINNED', n: 2, why: 'no product line carries this sentence' },
+    { at: 'E-28 WARN release currency: v9.9.8 available — ~ upgrade', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
     { at: 'SV-03 WARN instances: instances: pdi: flags explicit, pr', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
     { at: 'SV-99 WARN: a check that no longer exists — ~ doctor', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: '— ~ instance test pdi$', kind: 'PINNED', n: 1, why: 'regex syntax in the sentence' },
   ]],
   ['tests/upgrade/upgrade.e2e.test.mjs', [
     { at: 'A newer release is available (v9.2.0) — run ~ upgrade.', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/text.mjs:178)' },
@@ -248,7 +272,19 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: 'gitlink bbbbbbb ≠ engine\\.config\\.json \\(run ~ docs veri', kind: 'DERIVED', n: 1, why: 'regex syntax in the sentence' },
   ]],
   ['tests/windows-spellings.test.mjs', [
+    { at: '(?<!.\\snowarch)~', kind: 'PINNED', n: 1, why: 'the assertion claims this sentence is absent' },
+    { at: 're-run ~ to resume at B04', kind: 'PINNED', n: 2, why: 'no product line carries this sentence' },
+    { at: '~', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion claims this sentence is absent' },
     { at: '~', kind: 'EXPECTED_RENDERING', n: 3, why: 'the assertion is about the launcher alone' },
+    { at: '~', kind: 'PINNED', n: 1, why: 'the assertion is about the launcher alone' },
+    { at: '~ upgrade', kind: 'PINNED', n: 1, why: 'the case drives a pinned shell in another statement' },
+    { at: '~ upgrade.$', kind: 'EXPECTED_RENDERING', n: 1, why: 'regex syntax in the sentence' },
+    { at: '~$', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion is about the launcher alone' },
+    { at: '~|~', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion claims this sentence is absent' },
+    { at: '~|~', kind: 'PINNED', n: 3, why: 'the assertion claims this sentence is absent' },
+  ]],
+  ['tests/workflows.test.mjs', [
+    { at: 'call ~ --help', kind: 'PINNED', n: 2, why: 'no product line carries this sentence' },
   ]],
   ['tools/snowarch/tests/b00-checks.test.mjs', [
     { at: 'not at the repository root — run: cd "/repo" && ~', kind: 'EXPECTED_RENDERING', n: 1, why: 'no product line carries this sentence' },
@@ -266,22 +302,36 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ]],
   ['tools/snowarch/tests/bootstrap-runner.test.mjs', [
     { at: 'FAIL B02: the corpus is empty Remedy: run ~ docs sync Re', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' },
+    { at: 'Re-run ~ to resume at B02.', kind: 'PINNED', n: 2, why: 'no product line carries this sentence' },
     { at: 'interrupted during B04 — re-run ~ to resume at B04', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
+    { at: '~ docs sync', kind: 'PINNED', n: 1, why: 'the case drives a pinned shell in another statement' },
+    { at: '~|~', kind: 'PINNED', n: 1, why: 'the assertion claims this sentence is absent' },
   ]],
   ['tools/snowarch/tests/bootstrap-state.test.mjs', [
     { at: '~', kind: 'DERIVED', n: 1, why: 'the assertion is about the launcher alone' },
   ]],
   ['tools/snowarch/tests/cli.test.mjs', [
     { at: '^usage: ~ <command>', kind: 'EXPECTED_RENDERING', n: 2, why: 'regex syntax in the sentence' },
+    { at: 'run ~ help', kind: 'PINNED', n: 1, why: 'the case drives a pinned shell in another statement' },
     { at: 'snowarch: unknown command "nope" — run ~ help', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/cli.mjs:221)' },
+    { at: '~', kind: 'EXPECTED_RENDERING', n: 2, why: 'the assertion claims this sentence is absent' },
+    { at: '~', kind: 'PINNED', n: 1, why: 'the assertion claims this sentence is absent' },
+  ]],
+  ['tools/snowarch/tests/instance-root-entry.test.mjs', [
+    { at: 'usage: ~ instance <command>', kind: 'PINNED', n: 1, why: 'the assertion claims this sentence is absent' },
   ]],
   ['tools/snowarch/tests/store-forwarder.test.mjs', [
     { at: 'usage: ~ store', kind: 'PINNED', n: 1, why: 'a pinned and a deriving line both carry it' },
   ]],
   ['tools/snowarch/tests/text.test.mjs', [
+    { at: '2 more run with ~ doctor$', kind: 'EXPECTED_RENDERING', n: 1, why: 'regex syntax in the sentence' },
     { at: 'DOCTOR: 5 ok, 0 warn, 1 fail, 37 not in section (1 fixab', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' },
     { at: 'Health check (quick): 13 ok · 1 warn (E-23) · 1 fail (E-', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126)' },
     { at: '~', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion is about the launcher alone' },
+    { at: '~ doctor$', kind: 'EXPECTED_RENDERING', n: 2, why: 'regex syntax in the sentence' },
+    { at: '~ instance', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion claims this sentence is absent' },
+    { at: '~ instance set-preset pdi', kind: 'EXPECTED_RENDERING', n: 1, why: 'outside the product index' },
+    { at: '~ mode live', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion claims this sentence is absent' },
     { at: '~ ~', kind: 'EXPECTED_RENDERING', n: 4, why: 'the assertion is about the launcher alone' },
   ]],
 ]));
@@ -290,6 +340,47 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
 export const productSources = (paths = PRODUCT_PATHS) => ls(...paths)
   .filter((f) => /\.(mjs|ts|js)$/.test(f) && !/\.test\./.test(f) && !/\.d\.ts$/.test(f))
   .map((file) => ({ file, text: read(file) }));
+
+/**
+ * ARC-07-C35c, piece 2 — THE COMMITTED ARTEFACTS, indexed as product lines of their own package.
+ *
+ * `tests/install-page.test.mjs:346` asserts that `README.md` and `docs/INSTALL.md` tell a reader to run
+ * `./snowarch mode design`. That page is POSIX by rule 3 — it is committed, so its bytes are the same on every
+ * runner — while its runtime twin in `engine-repo.mjs` derives, and BOTH are right. With only the source trees
+ * indexed, the pinned expectation could only be compared against the deriving line, so a correct case was
+ * reported as a defect. The artefact is the thing the case is about, so the artefact is in the index.
+ *
+ * `tools/snowarch/lib/text.json` is here for the same reason and is not a page: `text.test.mjs:146` asserts its
+ * POSIX block, which is generated and committed exactly like a page.
+ *
+ * LINE-BASED, because these are not JavaScript: there is no AST, so a line carrying a launcher IS the product
+ * line, and its kind is PINNED by construction — a committed file cannot derive anything at read time.
+ */
+const ARTEFACT_PATHS = ['docs', '.claude/rules', 'README.md', 'tools/snowarch/lib/text.json'];
+
+export const artefactSources = (paths = ARTEFACT_PATHS) => ls(...paths)
+  .filter((f) => /\.(md|json)$/.test(f) && !f.startsWith('docs/plans/'))
+  .map((file) => ({ file, text: read(file) }));
+
+/** Every line of a committed artefact that spells a launcher. */
+export function artefactLines(sources = artefactSources()) {
+  const out = [];
+  for (const { file, text } of sources) {
+    text.split('\n').forEach((line, i) => {
+      if (!LAUNCHER_TEXT.test(line)) return;
+      out.push({ file, line: i + 1, sentence: markLaunchersIn(squash(line)), kind: 'PINNED',
+        package: 'artefact' });
+    });
+  }
+  return out;
+}
+
+// NO BARE `snowarch.cmd` ALTERNATIVE, and the sweep in `tests/windows-spellings.test.mjs` refused my first
+// version for having one: PowerShell does not resolve a command from the current directory, so a bare
+// spelling is the defect ARC-07-W17 exists to stop — in a page as much as in a remedy. An artefact that
+// carried one would be a finding, not a product line to match against.
+const LAUNCHER_TEXT = /\.\/snowarch|\.\/bootstrap\.sh|\.\\snowarch\.cmd|\.\\bootstrap\.cmd/;
+const markLaunchersIn = (text) => text.replace(new RegExp(LAUNCHER_TEXT.source, 'g'), MARK);
 
 export const testSources = (paths = TEST_PATHS) => ls(...paths)
   // `.ts` AS WELL AS `.mjs`, and this was the THIRD layer of the same fake widening: I added the
@@ -311,6 +402,13 @@ export function productIndex(sources = productSources()) {
   // string from one inside an expression, and it carried whatever else was on the line into the key.
   // `productLines` returns the prose of each literal, with a MARK where the spelling goes, and the
   // PACKAGE the file belongs to — which is what command tracing compares a routed site against.
+  /*
+   * THE ARTEFACTS ARE NOT IN HERE, and measuring is why. Adding all 377 of their lines to the general candidate
+   * pool took agreements from 44 to 11 and mismatches from 2 to 9: every artefact line is PINNED, so a sentence
+   * that legitimately resolved against a deriving source line suddenly matched a committed page as well and
+   * came out ambiguous — or matched only the page and was reported a defect. A page is the right candidate ONLY
+   * for a case that reads a page, which is what the route below decides.
+   */
   return sources.flatMap(({ file: rel, text }) => productLines(rel, text));
 }
 
@@ -465,8 +563,11 @@ export function reasonFor({ prose, route }, product) {
 }
 
 export function audit({ tests = testSources(), product: productFiles = productSources(),
-  baseline = UNRESOLVED_BASELINE, match = bySentence } = {}) {
+  baseline = UNRESOLVED_BASELINE, match = bySentence, artefacts: artefactFiles = null } = {}) {
   const product = productIndex(productFiles);
+  // Injected for the cases, exactly as `tests`/`product` are: a planted page has to be auditable
+  // without committing one.
+  const artefacts = artefactFiles ? artefactLines(artefactFiles) : artefactLines();
   const mismatches = [];
   const unresolved = [];
   let agreed = 0;
@@ -476,7 +577,7 @@ export function audit({ tests = testSources(), product: productFiles = productSo
     // ARC-07-C35b — the extractor finds the assertions and their prose; this decides what that means.
     for (const found_site of assertedLaunchers(rel, text)) {
       const { line, expectation, sentence: prose, argv, answeredBy: route,
-        caseDrivesPinned } = found_site;
+        caseDrivesPinned, negative, readsArtefact } = found_site;
       const site = `${rel}:${line}`;
       // `continue`, not `return`: this loop is a `for...of` now, and the `return` the `forEach` version
       // used would have returned from `audit()` — measured, it made the whole result `undefined` on the
@@ -493,7 +594,17 @@ export function audit({ tests = testSources(), product: productFiles = productSo
        * is edited: a per-line baseline would churn on every unrelated change, and a list that churns is a list
        * nobody reads. The sentence moves when the ASSERTION changes, which is exactly when someone should look.
        */
-      const at = squash(prose).replaceAll(MARK, '~').slice(0, 56);
+      /*
+       * THE BARE SPELLING IS MASKED IN THE KEY TOO, and the sweep is what asked for it: a site key is a
+       * SENTENCE, and `tests/windows-spellings.test.mjs` asserts against its own `BARE_INVOCATION` pattern, so
+       * the key came out holding the text `snowarch.cmd` — which `ARC-07-W17` forbids in any shipped file,
+       * including this one, because PowerShell does not resolve a command from the current directory. Masking
+       * every spelling of the launcher, bare included, keeps the key an identity and keeps this file honest.
+       */
+      const at = squash(prose)
+        .replaceAll(MARK, '~')
+        .replace(/(?<![.\\/])\b(snowarch|bootstrap)\.cmd\b/g, '~')
+        .slice(0, 56);
       if (!shown) {
         unresolved.push({ site, file: rel, at, kind: expectation,
           why: 'no sentence beside the launcher at all',
@@ -506,7 +617,33 @@ export function audit({ tests = testSources(), product: productFiles = productSo
       // deriving server one, and the argv is what says which — `['store','--help']` is the frame's own
       // answer, `['store','migrate','--help']` is forwarded. Without this the pair is ambiguous and the
       // architect's named control cannot fire at all, which is why this row exists.
-      const routed = route ? product.filter((p) => p.package === route) : product;
+      /*
+       * A NEGATIVE assertion is RECORDED, never compared — ARC-07-C35c's regex arm.
+       *
+       * `assert.doesNotMatch(r.text, /usage: \.\/snowarch instance <command>/)` claims the engine's usage is
+       * NOT in that output. No product line can settle that: the case is not saying the product prints this
+       * sentence, it is saying this output does not. Comparing kinds reported `instance-root-entry.test.mjs:88`
+       * as a defect for asserting an absence.
+       */
+      if (negative) {
+        unresolved.push({ site, file: rel, at, kind: expectation,
+          reason: 'the assertion claims this sentence is absent',
+          why: `"${shown.slice(0, 48)}" is asserted ABSENT, which no product line can settle` });
+        continue;
+      }
+
+      /*
+       * ARC-07-C35c, piece 3 — ROUTE BY WHAT THE SUBJECT READS.
+       *
+       * `assert.match(read('README.md'), /\.\/snowarch mode design/)` is a claim about a committed page, and
+       * the page is POSIX by rule 3 while its runtime twin derives — both right. The argv route answers "which
+       * package runs this"; this answers the same question for a case that runs nothing and reads a file
+       * instead, and it is what lets the artefacts be candidates without flooding every other site.
+       */
+      const routed = readsArtefact
+        ? [...artefacts, ...product.filter((p) => p.package === 'artefact')]
+        : (route ? product.filter((p) => p.package === route)
+          : product.filter((p) => p.package !== 'artefact'));
       const hits = routed.filter((p) => match(prose, p.sentence));
       const kinds = [...new Set(hits.map((h) => h.kind))];
       if (hits.length === 0) {
