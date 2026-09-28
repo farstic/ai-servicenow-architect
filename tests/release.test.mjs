@@ -387,7 +387,9 @@ test('AC 3 — a stale dist/ refuses, with no tag and no new commit', async (t) 
   const err = capture();
   const code = await release({
     argv: ['2.0.0', '--yes', '--offline', '--no-install'],
-    root, out: out.stream, err: err.stream,
+    // ARC-09-C71 — pinned, like the helper: `gatePlan` spells `npm` for the platform, and this case's
+    // subject is the dist gate's second half, not how a child is spawned.
+    root, out: out.stream, err: err.stream, platform: 'linux',
     run: runner(root).run,
     // The build succeeded and produced something different from what is committed — which is not
     // an exit code, and is the whole reason this gate has a second half.
@@ -555,7 +557,11 @@ test('a real --dry-run on this checkout prints this checkout\'s tag message and 
   // still the REAL ones — this is the case that would catch a script that cannot run here at all.
   const code = await release({
     argv: ['99.0.0', '--dry-run', '--offline', '--no-install', '--allow-branch', branch],
-    root: REAL_ROOT, out: out.stream, err: err.stream,
+    // ARC-09-C71 — pinned too, and deliberately NOT left as "the one that uses the host": nothing is
+    // spawned here (`run: () => 0`) and nothing this asserts — the tag message, the contract sha, the
+    // pin, the clean tree — is platform-shaped. One rule for all four call sites beats one exception
+    // that a later edit has to remember.
+    root: REAL_ROOT, out: out.stream, err: err.stream, platform: 'linux',
     // The gates are stubbed to pass: running lint and the whole suite from inside the suite would
     // be a recursion, not a test. What is real here is everything else — the preflight against
     // this repository, the contract sha of the committed artefact, the pin, the gitlink.
@@ -674,7 +680,17 @@ test('ARC-09-C49 — the whole suite runs after the writes, on the version being
   };
   const out = capture();
   const err = capture();
-  const code = await release({ argv: ['2.0.0', '--yes', '--offline'], root,
+  /*
+   * ARC-09-C71 — `platform` PINNED, and this call is why the row has a second half.
+   *
+   * It calls `release()` directly rather than through the `run` helper, so it never received the pin the
+   * other 42 cases got — and its stub matches `args.join(' ') === 'npm test'`, which on Windows is
+   * `npm.cmd test`. The post-write suite therefore counted ONCE instead of twice on all three cells:
+   * `npm test ran 1 time(s); it must run before AND after the writes`. Six of the seven were fixed in one
+   * line precisely because they shared a helper; this one proves the hole is the DIRECT call, so the case
+   * below now asserts every one of them carries a platform.
+   */
+  const code = await release({ argv: ['2.0.0', '--yes', '--offline'], root, platform: 'linux',
     out: out.stream, err: err.stream, run: r, now: () => new Date('2026-09-11T00:00:00Z') });
 
   assert.equal(code, 0, `${err.text()}${out.text()}`);
@@ -1062,4 +1078,44 @@ test('C70 — a passing gate is not silenced by the capture', () => {
   // Capturing replaced `stdio: 'inherit'`, so a passing gate's log has to be written through rather
   // than swallowed — it arrives at once instead of streaming, which for a CI log is the same thing.
   assert.match(said.join(''), /up to date/);
+});
+
+test('ARC-09-C71 — every `release()` call in this file pins a platform', async () => {
+  /*
+   * THE HOLE WAS THE DIRECT CALL, so this is the assertion that closes the class rather than the case.
+   *
+   * Six of the seven Windows failures were fixed in ONE line because they shared the `run` helper. The
+   * seventh called `release()` itself and therefore never got the pin, and its stub matched
+   * `args.join(' ') === 'npm test'` — which on Windows is `npm.cmd test` — so the post-write suite
+   * counted once instead of twice on all three cells. A fourth and a fifth call site would have done the
+   * same thing, silently, and only on a platform nobody here runs.
+   *
+   * It PARSES rather than greps, with the `typescript` pinned for `launcher-extract.mjs`: an object
+   * argument spread over five lines is not something a regular expression should be asked to bound, and
+   * a scan that misses a call is a scan that reports "all clear".
+   */
+  const ts = (await import('typescript')).default;
+  const file = fileURLToPath(import.meta.url);
+  const src = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+
+  const unpinned = [];
+  let seen = 0;
+  const visit = (node) => {
+    if (ts.isCallExpression(node) && node.expression.getText() === 'release'
+      && node.arguments.length === 1 && ts.isObjectLiteralExpression(node.arguments[0])) {
+      seen += 1;
+      const pins = node.arguments[0].properties.some((pr) => ts.isPropertyAssignment(pr)
+        && pr.name?.getText?.() === 'platform');
+      if (!pins) {
+        unpinned.push(`line ${src.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(src);
+
+  assert.ok(seen >= 4, `the scan found only ${seen} release() calls — it is not reading this file`);
+  assert.deepEqual(unpinned, [],
+    'a release() call takes the host platform, so its gate spelling differs between machines — pass '
+    + "platform: 'linux' unless the platform is what the case is about");
 });
