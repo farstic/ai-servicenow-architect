@@ -14,6 +14,7 @@
 // the others, and a cached "yes" from last week is exactly the answer nobody wants after Node has
 // been uninstalled.
 import { execFileSync } from 'node:child_process';
+import { batchCommand, isBatch } from '../spawn-batch.mjs';
 import { realpathSync, statfsSync } from 'node:fs';
 import { arch, platform, release } from 'node:os';
 import { posix, resolve, win32 } from 'node:path';
@@ -59,17 +60,24 @@ export function makeExec({ env = process.env, plat = process.platform,
     const bin = resolveBin(name, { env, platform: plat });
     if (!bin) return { found: false, ok: false, stdout: '', stderr: '' };
     try {
-      // WINDOWS: a `.cmd` / `.bat` cannot be spawned directly any more. Node closed
-      // CVE-2024-27980 by refusing to exec a batch file without a shell, and the refusal is an
-      // EINVAL from `spawnSync` — so `npm --version`, which resolves to `npm.CMD`, came back as
-      // "found but did not answer". The doctor reported a WARN about npm on every Windows machine
-      // and had done since the check was written; ARC-08-S11's first CI run is what showed it,
-      // because nothing else had ever run E-03 on Windows. `shell: true` only where it is needed:
-      // it re-introduces quoting rules, and `bin` is a path this process resolved rather than
-      // anything a user typed.
-      const batch = plat === 'win32' && /\.(cmd|bat)$/i.test(bin);
-      const stdout = run(bin, args,
-        { encoding: 'utf8', stdio: 'pipe', timeout: 10_000, ...(batch ? { shell: true } : {}) });
+      /*
+       * WINDOWS: a `.cmd` / `.bat` cannot be spawned directly — Node closed CVE-2024-27980 in 20.12
+       * by refusing to exec a batch file without a shell, and the refusal is an EINVAL, so
+       * `npm --version` (which resolves to `npm.CMD`) came back as "found but did not answer" on
+       * every Windows machine.
+       *
+       * ARC-09-C67/C68 — AND `shell: true` WAS THE WRONG FIX, in the two ways the comment that used
+       * to sit here predicted when it said "it re-introduces quoting rules". Node 24 deprecates
+       * `shell: true` with an args array (DEP0190) and printed that warning on every launcher run;
+       * and it concatenates arguments without quoting, so a resolved
+       * `C:\Program Files\nodejs\npm.cmd` arrived as three tokens and E-03 said
+       * `'C:\Program' is not recognized` on a machine whose npm was fine. `spawn-batch.mjs` runs it
+       * through `cmd.exe /d /s /c` with one command line we quoted ourselves.
+       */
+      const useBatch = plat === 'win32' && isBatch(bin);
+      const call = useBatch ? batchCommand(bin, args, { env }) : { file: bin, args, options: {} };
+      const stdout = run(call.file, call.args,
+        { encoding: 'utf8', stdio: 'pipe', timeout: 10_000, ...call.options });
       return { found: true, ok: true, stdout, stderr: '', bin };
     } catch (e) {
       return { found: true, ok: false, stdout: String(e.stdout ?? ''),

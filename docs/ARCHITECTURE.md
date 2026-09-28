@@ -547,6 +547,16 @@ The command spellings follow the **shell**, not only the platform: Git Bash on W
 are both unset. `text.json` is generated from the same module, and the Node-free launchers read it
 — one definition, three programs, the same shape as `remedies.json`.
 
+**What a reader types is not what we print, and that is correct — do not "fix" it.** On the 2026-09-28
+Windows sitting the colleague typed `./snowarch doctor --section repo` in **PowerShell 5.1** and it ran:
+`PATHEXT` resolves the extensionless name to `snowarch.cmd`, and PowerShell is relaxed about the slash.
+The report still spelled every command back as `.\snowarch.cmd`, and that is the rule holding, not
+missing a cue — the spelling is chosen from the SHELL the product detected (`win32`, no `SHELL`, no
+`MSYSTEM`), never from the form the user happened to type. A change that echoed the typed form back
+would make the same report print two spellings on one machine, and the one it learned would be the one
+that does not work in `cmd.exe`. Measured here: `spellings({ platform: 'win32', env: {} })` gives
+`.\snowarch.cmd`, and the same call with `SHELL` or `MSYSTEM` set gives `./snowarch`.
+
 B09 **returns** its block rather than printing it: the runner prints a step's line after `run()`
 returns, so a block written from inside would be followed by `[B09/09] summary … ok` and the closing
 five lines would not be the last five. `--json`'s `next` carries that same string, so the two cannot

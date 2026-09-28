@@ -200,7 +200,20 @@ export function enginePrereqChecks() {
         const detail = r.found
           ? `npm found but did not answer --version: ${(r.stderr || '').trim().split('\n')[0]}`
           : 'npm not found on PATH';
-        const remedy = 'install Node.js from nodejs.org (bundles npm)';
+        /*
+         * ARC-09-C68 — TWO CAUSES, TWO REMEDIES, and the single one used to blame a healthy machine.
+         *
+         * A colleague's Windows 11 run reported `'C:\Program' is not recognized as an internal or
+         * external command` here — our own quoting defect, C67's — and told them to install Node.js,
+         * on a machine where B00 had already reported `npm present` and B04's `npm ci` had succeeded.
+         * "npm is missing" and "npm is here and our call to it failed" are different facts, and the
+         * second one is ours to own: the remedy now hands over the exact command to try, so a reader
+         * can tell in one step which of the two it is rather than reinstalling a working toolchain.
+         */
+        const remedy = r.found
+          ? `run ${r.bin ? `"${r.bin}"` : 'npm'} --version in a terminal — if that answers, this `
+            + 'check is at fault rather than your installation, and the doctor wants the output'
+          : 'install Node.js from nodejs.org (bundles npm)';
         if (mode === 'live') return fail(detail, { remedy, data: { mode } });
         // ARC-07-C37 — A MODE THAT COULD NOT BE READ IS NOT design-only, and this branch is where the
         // difference reaches a reader. Absent npm is a `warn` in design-only and a `fail` in live, so
