@@ -32,9 +32,13 @@ export function createLogger({ command, quiet = false, verbose = false, json = f
    * `./snowarch version` created `.local/logs/version-<stamp>.log` on every run. Measured three times in a
    * checkout with no `.local/` at all; a bare `./snowarch mode`, which only reports, did the same.
    *
-   * That is what left an unexplained `.local/` in the tree after `npm test`: `tests/version-tag.test.mjs`
-   * spawns `version` with the REAL checkout as its cwd, deliberately, because it is reading the real version of
-   * record — and `.local/` is gitignored, so `assert-clean` could not see it.
+   * It is ONE COMMAND OF A CLASS, and the first version of this comment claimed the class: `npm test` still
+   * leaves a `.local/` at the repository root. `tests/version-tag.test.mjs` spawns `version` with the REAL
+   * checkout as its cwd, deliberately, because it is reading the real version of record — that part is fixed —
+   * but four other suites spawn commands that write for a living, `root` is derived from `config.mjs`'s own
+   * location rather than `cwd`, so their children discover the same checkout, and `.local/` is gitignored, so
+   * `assert-clean` cannot see any of it. The class, its file list and the size of the seam that would close it
+   * are in ARC-07-C33 and `docs/CONTRIBUTING.md`; `noFile` is not that seam and does not pretend to be.
    *
    * `file = false` is the state this already had for a read-only checkout, so a run that writes nothing starts
    * in it rather than needing a new branch anywhere else.
