@@ -22,7 +22,7 @@ const FRAME_CLI = spellings().cli;
 const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import { EXIT_OK, EXIT_USAGE } from '../lib/exit.mjs';
 import { contractSha, cwdNote, loadConfig, version } from '../lib/config.mjs';
-import { useStateRoot } from './helpers/state-root.mjs';
+import { stateRootInUse, useStateRoot } from './helpers/state-root.mjs';
 /*
  * ARC-07-C43 head 2 — THIS SUITE RUNS THE REAL CLI, so its `.local/` goes somewhere else.
  *
@@ -69,7 +69,12 @@ function run(args, opts = {}) {
  * only checked the checkout would also pass if the command had silently stopped logging at all.
  */
 test('ARC-07-C43 — a spawned `mode sideways` writes under the state root, not the checkout', () => {
-  const stateRootDir = useStateRoot();
+  // NOT `useStateRoot()` — that would make this case pass on its own while every OTHER case in the
+  // file still wrote into the checkout. It READS the suite's opt-in, so removing the call at the top
+  // of this file fails here, which is the property that actually protects the other cases.
+  const stateRootDir = stateRootInUse();
+  assert.ok(stateRootDir,
+    'this suite never called useStateRoot(), so every case in it writes into the checkout');
   const listing = (dir) => {
     const walk = (d, at = '') => {
       let out = [];
