@@ -55,6 +55,20 @@ export const HEADER =
   'Plan — Enter runs it as shown · type a number to choose that line\'s value · "?" explains · q quits';
 
 /**
+ * The same plan, with no keys offered — ARC-07-C46.
+ *
+ * `upgrade` passes `--yes`, and on that path `runPlanScreen` prints the plan and returns without
+ * ever calling `ask`. The header still offered four keys: Enter runs it, a number chooses, "?"
+ * explains, q quits. None of them was true — there was no prompt to press them at — and `q quits`
+ * is the one that matters, because a reader who wanted out would press it, see it ignored, and have
+ * to reach for Ctrl-C while an install was already running.
+ *
+ * The suffix stays: `(accepted: --yes)` is the sentence that explains why nothing is being asked, so
+ * dropping the legend without it would leave a plan that simply appears and starts.
+ */
+export const HEADER_ACCEPTED = 'Plan — running it as shown';
+
+/**
  * What each line and each key is for (ARC-07-C11) — the owner's ruling, and the pattern is the
  * preset editor's.
  *
@@ -151,7 +165,7 @@ export function formatPlan(plan, ctx, { accepted = null } = {}) {
   const pad = (s, w) => s.padEnd(w);
   return [
     ...ORIENTATION,
-    `${HEADER}${accepted ? `  (accepted: ${accepted})` : ''}`,
+    `${accepted ? `${HEADER_ACCEPTED}  (accepted: ${accepted})` : HEADER}`,
     `  1  Mode   ${pad(modeValue(plan), 20)} ${modeHint(plan)}`.trimEnd(),
     `  2  Docs   ${pad(docsValue(plan), 20)} `
       + 'full = whole corpus · skip = none (the doctor will report FAIL)',

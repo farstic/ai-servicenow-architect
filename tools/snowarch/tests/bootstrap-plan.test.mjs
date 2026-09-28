@@ -167,6 +167,23 @@ test('--yes prints the plan with its provenance and asks nothing', async () => {
     accepted: '--yes' });
   assert.equal(r.action, 'run');
   assert.match(out.text(), /\(accepted: --yes\)/);
+  /*
+   * ARC-07-C46 — THE LEGEND IS NOT PRINTED, because on this path none of it is true.
+   *
+   * `upgrade` passes `--yes`, and the owner's 2.0.7 run showed the interactive header above a plan
+   * nothing would be asked about: Enter runs it, a number chooses, `"?"` explains, q quits — with no
+   * prompt to press any of them at. `q quits` is the one that costs something: a reader who wanted
+   * out would press it, watch it be ignored, and reach for Ctrl-C with the install already running.
+   *
+   * The `(accepted: --yes)` suffix is asserted above and stays: it is the sentence that says why
+   * nothing is being asked, so the legend cannot simply be dropped on its own.
+   */
+  assert.match(out.text(), /^Plan — running it as shown {2}\(accepted: --yes\)$/m);
+  for (const key of ['Enter runs it', 'q quits', '"?" explains', 'type a number']) {
+    assert.equal(out.text().includes(key), false,
+      `the --yes plan offered "${key}", and there is no prompt to press it at`);
+  }
+  assert.equal(out.text().includes(HEADER), false, 'the interactive header reached the --yes path');
 });
 
 test('stdin closing is a quit, never an accept', async () => {
@@ -263,7 +280,10 @@ test('--json puts the object on stdout and every human line on stderr', async ()
 
   // The plan screen is prose: under --json it must not reach the stream carrying the object.
   assert.equal(out.text(), '', 'stdout was polluted by the plan screen');
-  assert.match(err.text(), /Plan — Enter runs it/);
+  // ARC-07-C46 — the marker is the ACCEPTED header, because `--json` implies `--yes` and this case
+  // is about which stream the prose lands on. It read `Plan — Enter runs it` and so was quietly
+  // asserting the interactive legend on a path that asks nothing; the legend's own case is below.
+  assert.match(err.text(), /Plan — running it as shown/);
 
   const payload = JSON.parse(log.lines.at(-1));
   assert.deepEqual(Object.keys(payload), ['mode', 'docs', 'steps', 'summary', 'next']);
