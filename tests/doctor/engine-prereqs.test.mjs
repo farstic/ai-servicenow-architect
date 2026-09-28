@@ -205,19 +205,69 @@ test('E-00, E-03 and E-04 declare that they spawn, so --quick never runs them', 
  * machines where this suite mostly runs, and the property under test is which options `makeExec`
  * chooses, which is knowable everywhere.
  */
-test('makeExec spawns a Windows .cmd through a shell, and everything else directly', () => {
+test('ARC-09-C67/C68 — a Windows .cmd goes through cmd.exe, quoted, and never `shell: true`', () => {
   const seen = [];
-  const spy = (bin, args, options) => { seen.push({ bin, options }); return ''; };
+  const spy = (bin, args, options) => { seen.push({ bin, args, options }); return '10.9.2\n'; };
 
-  const win = makeExec({ plat: 'win32', env: {}, resolve: () => 'C:\\x\\npm.CMD', exec: spy });
-  win('npm', ['--version']);
-  assert.equal(seen.at(-1).options.shell, true, 'a .cmd spawned without a shell is EINVAL on Windows');
+  /*
+   * THE DEPRECATION AND THE SPACE ARE ONE DEFECT, and this case is written so either regression fails
+   * it. Node 24 warns `DEP0190` for `shell: true` WITH an args array — printed on every launcher run
+   * on the colleague's machine — and the same option concatenates arguments without quoting, so a
+   * resolved `C:\Program Files\nodejs\npm.cmd` reached cmd as three tokens and E-03 reported
+   * `'C:\Program' is not recognized` on a machine whose npm was fine.
+   *
+   * Asserted on the ARGV rather than by spawning: a `.cmd` cannot run on the POSIX machines this suite
+   * mostly runs on, and what is under test is the command line `makeExec` builds — knowable anywhere.
+   */
+  const spaced = 'C:\\Program Files\\nodejs\\npm.cmd';
+  const win = makeExec({ plat: 'win32', env: { ComSpec: 'C:\\Windows\\system32\\cmd.exe' },
+    resolve: () => spaced, exec: spy });
+  const r = win('npm', ['--version']);
+
+  const call = seen.at(-1);
+  assert.equal(call.bin, 'C:\\Windows\\system32\\cmd.exe', 'the batch file was not run through cmd.exe');
+  assert.deepEqual(call.args.slice(0, 3), ['/d', '/s', '/c'],
+    '/d skips registry AutoRun, /s plus the outer quotes is what makes the inner quoting ours');
+  assert.equal(call.args[3], `"\"${spaced}\" --version"`,
+    'the path with a space is not one quoted token — this is the `C:\\Program` defect');
+  assert.equal(call.options.windowsVerbatimArguments, true,
+    'without it Node re-quotes the argv we just quoted, and cmd sees the escaping twice');
+  assert.equal(call.options.shell, undefined, 'DEP0190: `shell: true` with an args array is deprecated');
+  assert.equal(r.ok, true);
+  assert.equal(r.bin, spaced, 'the resolved path is still reported, for the remedy to name');
 
   const winExe = makeExec({ plat: 'win32', env: {}, resolve: () => 'C:\\x\\git.exe', exec: spy });
   winExe('git', ['--version']);
-  assert.equal(seen.at(-1).options.shell, undefined, 'an .exe does not need the shell, and its quoting rules');
+  assert.equal(seen.at(-1).bin, 'C:\\x\\git.exe', 'an .exe needs no command processor');
+  assert.equal(seen.at(-1).options.shell, undefined);
 
   const posix = makeExec({ plat: 'linux', env: {}, resolve: () => '/usr/bin/npm', exec: spy });
   posix('npm', ['--version']);
-  assert.equal(seen.at(-1).options.shell, undefined, 'nothing on POSIX is a batch file');
+  assert.equal(seen.at(-1).bin, '/usr/bin/npm', 'nothing on POSIX is a batch file');
+  assert.equal(seen.at(-1).options.shell, undefined);
+});
+
+test('ARC-09-C68 — E-03 does not tell a machine with a working npm to reinstall Node', async (t) => {
+  const root = greenTree(t);
+  const bin = 'C:\\Program Files\\nodejs\\npm.cmd';
+
+  /*
+   * THE SENTENCE A HEALTHY MACHINE WAS GIVEN. On the colleague's Windows 11 run E-03 said
+   * `'C:\Program' is not recognized as an internal or external command` — C67's quoting defect, ours —
+   * and told them to install Node.js, on a machine where B00 had reported `npm present` and B04's
+   * `npm ci` had already succeeded. "npm is missing" and "our call to npm failed" are different facts.
+   */
+  const brokenCall = Object.assign(() => ({ found: true, ok: false, stdout: '',
+    stderr: "'C:\\Program' is not recognized as an internal or external command", bin }), { asked: [] });
+  const found = await runById(checks, 'E-03', ctx(root, { exec: brokenCall, mode: 'design' }));
+  assert.match(found.detail, /did not answer --version/);
+  assert.doesNotMatch(found.remedy, /install Node\.js/,
+    'npm answered for B00 and for `npm ci` — telling this reader to reinstall Node blames the machine');
+  assert.ok(found.remedy.includes(bin),
+    'the remedy does not name the command the reader can run to tell the two causes apart');
+
+  // An npm that is really absent still says how to get one.
+  const absent = await runById(checks, 'E-03', ctx(root, { exec: execFrom({}), mode: 'design' }));
+  assert.match(absent.detail, /not found on PATH/);
+  assert.match(absent.remedy, /install Node\.js/);
 });
