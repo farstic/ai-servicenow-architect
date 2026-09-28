@@ -18,6 +18,16 @@
  */
 import { fetch as undiciFetch } from 'undici';
 /**
+ * Which dispatcher this environment calls for — a function, so the CHOICE can be asserted.
+ *
+ * ARC-07-C44. The observable consequence of choosing `proxy` is a warning Node emits ONCE per
+ * process, on construction, which makes it useless to assert in a suite where some earlier file may
+ * already have triggered it: a case watching for the warning would pass whether or not the bug was
+ * back. The decision itself has no such problem, so the decision is what a case reads.
+ */
+export type DispatcherKind = 'proxy' | 'connect' | 'global';
+export declare function dispatcherKind(env?: NodeJS.ProcessEnv, connect?: Record<string, unknown>): DispatcherKind;
+/**
  * Drop the cached agent so the next request rebuilds it from the current environment.
  *
  * For tests only. Production code changes no proxy variable after start-up, and a caller that

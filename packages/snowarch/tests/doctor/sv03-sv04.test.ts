@@ -9,6 +9,7 @@ import { ALL_CHECKS } from '../../src/doctor/checks.js';
 import { stubProbesFor } from '../../src/doctor/types.js';
 import { instanceManager } from '../../src/servicenow/instances.js';
 import { makeProbes, describeProbes, statusOf } from '../../src/doctor/probes-binding.js';
+import { logger } from '../../src/utils/logging.js';
 import { ROPC_ERROR_TABLE } from '../../src/servicenow/probes.js';
 import { FLAG_NAMES } from '../../src/utils/permissions.js';
 import { remedyFor } from '../../src/errors/codes.js';
@@ -241,6 +242,41 @@ describe('SV-04 — the probe binding', () => {
     expect(r.remedy).toBeUndefined();
     expect(remedyFor('OAUTH_ROPC_DISABLED')?.remedy).toBeTruthy();
     expect(r.detail).not.toContain(FIXTURE_PASS);
+  });
+
+  /*
+   * ARC-07-C44 — the owner's 2.0.7 upgrade run printed seven `[INFO] Querying ServiceNow table: …`
+   * lines into their terminal during `doctor`, and again during B08 verify. The probe drives the
+   * ordinary query path, whose logger sits at INFO by default; the doctor's output is the report.
+   *
+   * The assertion runs the REAL binding with a probe that logs the way the real query path does, so
+   * it fails if the binding stops pinning the level — and it checks the level is RESTORED, because a
+   * pin that leaks would silence the server for the rest of the process.
+   */
+  it('runs the probe quiet, and gives the level back afterwards', async () => {
+    const lines: string[] = [];
+    const real = console.error;
+    console.error = (...a: unknown[]) => { lines.push(a.join(' ')); };
+    try {
+      const probes = makeProbes({
+        readEntry: () => entry({ auth: { method: 'basic', username: FIXTURE_USER,
+          password: FIXTURE_PASS } }) as never,
+        makeClient: () => ({}) as never,
+        probe: (async () => {
+          logger.info('Querying ServiceNow table: sys_user');
+          logger.warn('Request failed, retrying in 1ms (attempt 1/1)');
+          return probeResult();
+        }) as never,
+      });
+      const r = await probes.runAll('pdi');
+      expect(r.status).toBe('ok');
+      expect(lines).toEqual([]);
+      // Restored: the same call outside the probe still logs.
+      logger.info('Querying ServiceNow table: after');
+      expect(lines.some((l) => l.includes('after'))).toBe(true);
+    } finally {
+      console.error = real;
+    }
   });
 
   it('says there is nothing to probe when the store has no such entry', async () => {
