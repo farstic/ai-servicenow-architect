@@ -92,22 +92,38 @@ test('failure 2 — an unresolved site in a file the baseline does not list', ()
   assert.match(r.drift.join('\n'), /is not in the baseline/);
 });
 
-test('failure 3 — a baseline count that no longer matches, in either direction', () => {
+test('failure 3 — a baseline that no longer matches the tree, in either direction', () => {
+  // ARC-07-C35's case, kept and re-pointed at the per-SITE baseline (C35c item 5). Both directions still
+  // matter and the messages changed: a site the baseline does not carry is `new`, and one it carries that the
+  // tree no longer has is `resolved or gone`. The second direction is what keeps the list honest — `<=` would
+  // have let it rot.
   const orphan = [{ file: 'tests/planted.test.mjs',
     text: "assert.equal(r.text, 'a sentence the product has never printed anywhere ./snowarch x');\n" }];
 
-  // Too low: the file is listed, but with fewer sites than the tree has.
+  // Too little: the file is listed with nothing in it, and the tree has a site.
   const low = audit({ tests: orphan, product: productThatDerives,
-    baseline: new Map([['tests/planted.test.mjs', 0]]) });
+    baseline: new Map([['tests/planted.test.mjs', []]]) });
   assert.equal(low.ok, false);
-  assert.match(low.drift.join('\n'), /1 unresolved, the baseline says 0/);
+  assert.match(low.drift.join('\n'), /new — 1×/);
 
-  // Too high: the sweep resolved one and the baseline was not shrunk. This direction is the one that
-  // keeps the list honest, and `<=` would have let it rot.
+  // Too much: the baseline carries a site the tree does not have any more.
   const high = audit({ tests: orphan, product: productThatDerives,
-    baseline: new Map([['tests/planted.test.mjs', 2]]) });
+    baseline: new Map([['tests/planted.test.mjs', [
+      { at: 'a sentence the product has never printed anywhere ~ x', kind: 'PINNED', n: 1,
+        why: 'no product line carries this sentence' },
+      { at: 'a sentence nobody ever wrote', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    ]]]) });
   assert.equal(high.ok, false);
-  assert.match(high.drift.join('\n'), /1 unresolved, the baseline says 2/);
+  assert.match(high.drift.join('\n'), /resolved or gone — 1× a sentence nobody ever wrote/);
+
+  // ...and the count direction, which is the collision case: three becoming two must drift.
+  const three = audit({ tests: orphan, product: productThatDerives,
+    baseline: new Map([['tests/planted.test.mjs', [
+      { at: 'a sentence the product has never printed anywhere ~ x', kind: 'PINNED', n: 3,
+        why: 'no product line carries this sentence' },
+    ]]]) });
+  assert.equal(three.ok, false);
+  assert.match(three.drift.join('\n'), /1 now, the baseline says 3/);
 });
 
 test('a line that PASSES a spelling is not a target — the 106-false-target lesson', () => {
@@ -266,38 +282,99 @@ test('C35b — matching by SENTENCE resolves what matching by KEY could not', ()
   assert.match(bare.unresolved[0].why, /no sentence beside the launcher|no product line carries/);
 });
 
-test('C35b — every baseline reason EQUALS the reason the audit computed (item 12)', () => {
-  // THE SECOND BAR THIS ROW MERGES ON. The third head's list said its reasons came from the audit's own
-  // report and they did not: the audit emitted four shapes, 83 of 86 entries were the same one, and the split
-  // beside them was hand-made with fifteen entries wrong on inspection. A reason nobody can check is a claim.
-  // `audit()` computes one per file now, and this compares them character for character.
+test('C35b/C35c — every baseline entry EQUALS the record the audit computed', () => {
+  // THE SECOND BAR THIS ROW MERGES ON, now per SITE rather than per file. `audit()` computes a multiset of
+  // `{ at, kind, n, why }` per file and this compares them triple for triple — the sentence, the expectation,
+  // the count and the reason — so a hand-edited baseline cannot say anything the audit did not.
   const r = audit();
-  for (const [file, why] of r.computed) {
+  const keyed = (e) => `${e.at}\u0000${e.kind}\u0000${e.why}`;
+  for (const [file, computed] of r.computed) {
     const entry = UNRESOLVED_BASELINE.get(file);
-    assert.ok(entry, `${file} is unresolved and not in the baseline`);
-    assert.equal(entry.why, why,
-      `${file}: the baseline reason is not the one the audit computed\n  baseline: ${entry.why}\n  audit:    ${why}`);
+    assert.ok(Array.isArray(entry), `${file} is unresolved and not in the baseline`);
+    const want = new Map(entry.map((e) => [keyed(e), e.n ?? 1]));
+    for (const e of computed) {
+      assert.equal(want.get(keyed(e)), e.n,
+        `${file}: the baseline says ${want.get(keyed(e)) ?? 'nothing'} for ${e.at} [${e.kind}] — ${e.why}, `
+        + `the audit computed ${e.n}`);
+    }
+    assert.equal(entry.length, computed.length, `${file}: the baseline has entries the audit did not compute`);
   }
   for (const [file] of UNRESOLVED_BASELINE) {
     assert.ok(r.computed.has(file), `${file} is in the baseline with nothing unresolved in it any more`);
   }
 });
 
+test('C35c — one site resolving while another appears is NOT silent (item 5)', () => {
+  // A per-file COUNT could not see this: two sites, one resolves, one appears, the count is unchanged and the
+  // drift is empty. Driven with a two-site file against a baseline that carries the OLD pair.
+  const product = [{ file: 'tools/snowarch/lib/planted.mjs',
+    text: 'export const a = (s) => `run ${s.cli} alpha sentence here`;\n' }];
+  const text = [
+    "assert.equal(one, 'run ./snowarch alpha sentence here');",
+    "assert.equal(two, 'run ./snowarch omega sentence here');",
+  ].join('\n');
+
+  // The baseline as it would have been written when BOTH were unresolved.
+  const asWas = new Map([['tests/planted.test.mjs', [
+    { at: 'run ~ alpha sentence here', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'run ~ omega sentence here', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+  ]]]);
+  const r = audit({ tests: [{ file: 'tests/planted.test.mjs', text }], product, baseline: asWas });
+
+  // `alpha` now resolves (against the planted product line) and `omega` does not, so the FILE still has one
+  // unresolved site — the same count as before — and the drift must still name both movements.
+  assert.equal(r.unresolved.length, 1);
+  assert.equal(r.drift.length, 1, JSON.stringify(r.drift));
+  assert.match(r.drift[0], /resolved or gone — 1× run ~ alpha sentence here/);
+});
+
+test('C35c — a flipped expectation on an ambiguous site drifts (item 5)', () => {
+  // Ambiguity is filed BEFORE the expectation is compared, so no mismatch can be reported for a site two
+  // product lines disagree about — and nothing else recorded the expectation, so flipping it was invisible. The
+  // baseline carries `kind` now, which is what makes the flip visible without pretending the audit can settle
+  // which line is right.
+  const product = [
+    { file: 'tools/snowarch/lib/planted.mjs', text: "export const a = 'usage: ./snowarch store thing';\n" },
+    { file: 'packages/snowarch/src/planted.ts', text: 'export const b = (s) => `usage: ${s.cli} store thing`;\n' },
+  ];
+  const pinned = { file: 'tests/planted.test.mjs',
+    text: "assert.equal(out, 'usage: ./snowarch store thing');\n" };
+  const derived = { file: 'tests/planted.test.mjs',
+    text: 'const CLI = spellings();\nassert.equal(out, `usage: ${CLI.cli} store thing`);\n' };
+
+  const first = audit({ tests: [pinned], product, baseline: EMPTY });
+  assert.equal(first.unresolved.length, 1);
+  assert.match(first.unresolved[0].why, /matches both a PINNED and a DERIVED/);
+  const recorded = new Map([['tests/planted.test.mjs',
+    [{ at: first.unresolved[0].at, kind: first.unresolved[0].kind, n: 1,
+      why: 'a pinned and a deriving line both carry it' }]]]);
+
+  // Same sentence, same ambiguity, opposite expectation: the count is identical and the kind is not.
+  const flipped = audit({ tests: [derived], product, baseline: recorded });
+  assert.equal(flipped.unresolved.length, 1);
+  assert.ok(flipped.drift.length > 0,
+    'a flipped expectation on an ambiguous site left no drift — the baseline is not recording the kind');
+  assert.match(flipped.drift.join('\n'), /\[DERIVED\]|\[PINNED\]/);
+});
+
 test('C35b — every baseline entry carries a reason, which is what "done" means for this row', () => {
-  // The row's own definition: done when the baseline is empty or every remaining entry has a reason
-  // written beside it. A count with no reason is a site nobody looked at, and this is what stops one
-  // being added.
+  // The row's own definition of done. A count with no reason is a site nobody looked at, and after C35c item 5
+  // an entry is a LIST of `{ at, kind, n, why }` — so every field of every triple is checked, not just that
+  // the file appears.
   for (const [file, entry] of UNRESOLVED_BASELINE) {
-    assert.equal(typeof entry, 'object', `${file}: the baseline entry is a bare count with no reason`);
-    assert.equal(typeof entry.n, 'number', `${file}: no count`);
-    assert.ok(typeof entry.why === 'string' && entry.why.length >= 12,
-      `${file}: the reason is missing or too short to be one — "${entry.why}"`);
+    assert.ok(Array.isArray(entry) && entry.length > 0, `${file}: the baseline entry is not a list of sites`);
+    for (const e of entry) {
+      assert.equal(typeof e.at, 'string', `${file}: a site with no sentence to identify it`);
+      assert.match(e.kind, /^(PINNED|DERIVED|EXPECTED_RENDERING|DERIVED_ON_PINNED_SUBJECT)$/,
+        `${file}: ${e.at} carries no expectation`);
+      assert.ok(Number.isInteger(e.n) && e.n >= 1, `${file}: ${e.at} has no count`);
+      assert.ok(typeof e.why === 'string' && e.why.length >= 12,
+        `${file}: ${e.at}'s reason is missing or too short to be one — "${e.why}"`);
+    }
   }
   assert.ok(UNRESOLVED_BASELINE.size > 0,
     'the baseline is empty — delete this case with it, and say so in the row');
 });
-
-/* ── ARC-07-C35b, second head — two under-reports the architect measured ───────────────────────── */
 
 test('C35b — a comment cannot delete code: a `/*` in a line comment and a `*/` in a later regex', () => {
   // DEFECT 1, as the architect's control specifies it. `codeOf` blanked comments with a REGEX before the

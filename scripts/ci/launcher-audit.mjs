@@ -103,9 +103,23 @@ const TEST_PATHS = ['tests', 'tools/snowarch/tests', 'packages/snowarch/tests'];
 /**
  * THE UNRESOLVED BASELINE — ARC-07-C35b, measured 2026-09-27 on the parsed extractor.
  *
- * Exact per file, asserted EQUAL and never `<=`: a new unresolved site fails exactly as loudly as a
- * mismatch, and a count that has come DOWN fails too, so the list shrinks with the work instead of quietly
- * outliving it.
+ * PER SITE, as a MULTISET per file — ARC-07-C35c item 5, replacing a per-file count that could not see two
+ * things. One site resolving while another appeared in the same file left the count unchanged, so the work and
+ * the regression cancelled out silently; and a site listed as ambiguous could have its EXPECTATION flipped with
+ * no drift at all, because ambiguity is filed before the expectation is compared and nothing else recorded it.
+ *
+ * An entry is `{ at, kind, n, why }`: the sentence that identifies the site, the expectation it carries, how
+ * many sites in that file carry that exact triple, and the reason the audit computed. Three ways to drift, each
+ * naming itself — a triple that is new, one that is resolved or gone, and one whose count moved.
+ *
+ * KEYED BY THE SENTENCE, NEVER BY `file:line`: a line number moves whenever anything above it is edited, so a
+ * per-line baseline would churn on every unrelated change, and a list that churns is a list nobody reads. The
+ * sentence moves when the ASSERTION changes, which is exactly when someone should look.
+ *
+ * AND A COUNT PER TRIPLE, because eight keys collided when there was one entry per distinct sentence:
+ * `tools/snowarch/tests/text.test.mjs` has FOUR sites whose sentence is two launchers and nothing else, and two
+ * other files have three each of a bare launcher. Without the count, one of those resolving would leave the
+ * others matching and the drift would be silent — this item's own defect, one level down.
  *
  * EVERY ENTRY'S REASON IS THE ONE THE AUDIT COMPUTED, and a case asserts they are EQUAL — which is the
  * second bar this row merges on. The third head claimed as much and was wrong: the audit emitted four shapes,
@@ -137,41 +151,139 @@ const TEST_PATHS = ['tests', 'tools/snowarch/tests', 'packages/snowarch/tests'];
  * deliberate: excluding it by name would be an allow-list, which is the mistake this row exists to stop.
  */
 export const UNRESOLVED_BASELINE = Object.freeze(new Map([
-  ['packages/snowarch/tests/cli/import-legacy.test.ts', { n: 2, why: '1× no product line carries this sentence; 1× the assertion is about the launcher alone' }],
-  ['packages/snowarch/tests/cli/instance-manage.test.ts', { n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/format.ts:151)' }],
-  ['packages/snowarch/tests/cli/instance.test.ts', { n: 2, why: '1× outside the product index; 1× no product line carries this sentence' }],
-  ['packages/snowarch/tests/cli/preset-ui.test.ts', { n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/preset-ui.ts:62)' }],
-  ['packages/snowarch/tests/cli/store-command.test.ts', { n: 1, why: 'a pinned and a deriving line both carry it' }],
-  ['packages/snowarch/tests/cli/tty.test.ts', { n: 1, why: 'the case drives a pinned shell in another statement' }],
-  ['packages/snowarch/tests/servicenow/prod-ack.test.ts', { n: 1, why: 'outside the product index' }],
-  ['packages/snowarch/tests/tools/gate-split.test.ts', { n: 1, why: 'outside the product index' }],
-  ['packages/snowarch/tests/tools/permissions.test.ts', { n: 3, why: '2× outside the product index; 1× the product assembles this sentence (packages/snowarch/src/utils/permissions.ts:257)' }],
-  ['tests/contract/gen-governance.test.mjs', { n: 2, why: 'no product line carries this sentence' }],
-  ['tests/docs-status.test.mjs', { n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' }],
-  ['tests/docs-upstream.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tests/doctor/bootstrap-finished.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tests/doctor/fix.test.mjs', { n: 2, why: '1× no product line carries this sentence; 1× regex syntax in the sentence' }],
-  ['tests/doctor/framework.test.mjs', { n: 4, why: '2× the assertion is about the launcher alone; 2× the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' }],
-  ['tests/doctor/mode-and-cache.test.mjs', { n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' }],
-  ['tests/doctor/panel.test.mjs', { n: 8, why: '1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:155); 1× no product line carries this sentence; 1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276); 4× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:190); 1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:109)' }],
-  ['tests/doctor/status-command.test.mjs', { n: 3, why: '1× no product line carries this sentence; 1× the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276); 1× the product assembles this sentence (tools/snowarch/lib/commands/status.mjs:75)' }],
-  ['tests/doctor/win32-remedies.test.mjs', { n: 3, why: 'the assertion is about the launcher alone' }],
-  ['tests/handoff-command.test.mjs', { n: 2, why: '1× the assertion is about the launcher alone; 1× no product line carries this sentence' }],
-  ['tests/hook/session-start.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tests/launcher-audit.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tests/snowarch-skill.test.mjs', { n: 1, why: 'no product line carries this sentence' }],
-  ['tests/upgrade/upgrade-unit.test.mjs', { n: 4, why: 'no product line carries this sentence' }],
-  ['tests/upgrade/upgrade.e2e.test.mjs', { n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/text.mjs:178)' }],
-  ['tests/version-tag.test.mjs', { n: 1, why: 'regex syntax in the sentence' }],
-  ['tests/windows-spellings.test.mjs', { n: 3, why: 'the assertion is about the launcher alone' }],
-  ['tools/snowarch/tests/b00-checks.test.mjs', { n: 2, why: 'no product line carries this sentence' }],
-  ['tools/snowarch/tests/b02-docs.test.mjs', { n: 3, why: '2× the product assembles this sentence (scripts/gen-doctor-docs.mjs:44); 1× regex syntax in the sentence' }],
-  ['tools/snowarch/tests/b09-summary.test.mjs', { n: 3, why: '1× no product line carries this sentence; 1× the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126); 1× the product assembles this sentence (tools/snowarch/lib/steps/B02.mjs:115)' }],
-  ['tools/snowarch/tests/bootstrap-runner.test.mjs', { n: 2, why: '1× the product assembles this sentence (scripts/gen-doctor-docs.mjs:44); 1× no product line carries this sentence' }],
-  ['tools/snowarch/tests/bootstrap-state.test.mjs', { n: 1, why: 'the assertion is about the launcher alone' }],
-  ['tools/snowarch/tests/cli.test.mjs', { n: 3, why: '1× the product assembles this sentence (tools/snowarch/lib/cli.mjs:221); 2× regex syntax in the sentence' }],
-  ['tools/snowarch/tests/store-forwarder.test.mjs', { n: 1, why: 'a pinned and a deriving line both carry it' }],
-  ['tools/snowarch/tests/text.test.mjs', { n: 7, why: '5× the assertion is about the launcher alone; 1× the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175); 1× the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126)' }],
+  ['packages/snowarch/tests/cli/import-legacy.test.ts', [
+    { at: '~', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion is about the launcher alone' },
+    { at: '~ instance add prod --url https://acme.service-now.com -', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
+  ]],
+  ['packages/snowarch/tests/cli/instance-manage.test.ts', [
+    { at: '— = never probed. ~ instance test <label> probes one; --', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/format.ts:151)' },
+  ]],
+  ['packages/snowarch/tests/cli/instance.test.ts', [
+    { at: '~ instance add pdi', kind: 'DERIVED', n: 1, why: 'outside the product index' },
+    { at: '~ instance add x --url https://h --env dev --auth oauth_', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
+  ]],
+  ['packages/snowarch/tests/cli/preset-ui.test.ts', [
+    { at: 'WRITE is locked on production — raise it later with: ~ i', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/preset-ui.ts:62)' },
+  ]],
+  ['packages/snowarch/tests/cli/store-command.test.ts', [
+    { at: 'usage: ~ store', kind: 'DERIVED', n: 1, why: 'a pinned and a deriving line both carry it' },
+  ]],
+  ['packages/snowarch/tests/cli/tty.test.ts', [
+    { at: 'On PowerShell/cmd use: ~ instance add … --password-stdin', kind: 'PINNED', n: 1, why: 'the case drives a pinned shell in another statement' },
+  ]],
+  ['packages/snowarch/tests/servicenow/prod-ack.test.ts', [
+    { at: '~ instance set-preset prod full --ack-prod', kind: 'DERIVED', n: 1, why: 'outside the product index' },
+  ]],
+  ['packages/snowarch/tests/tools/gate-split.test.ts', [
+    { at: '~ instance set-preset pdi pdi-developer', kind: 'DERIVED', n: 1, why: 'outside the product index' },
+  ]],
+  ['packages/snowarch/tests/tools/permissions.test.ts', [
+    { at: 'Write operations are disabled for instance "prod-lookali', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (packages/snowarch/src/utils/permissions.ts:257)' },
+    { at: '~ instance set-preset prod <preset> --ack-prod', kind: 'DERIVED', n: 1, why: 'outside the product index' },
+    { at: '~ instance set-preset prod full --ack-prod', kind: 'DERIVED', n: 1, why: 'outside the product index' },
+  ]],
+  ['tests/contract/gen-governance.test.mjs', [
+    { at: 'Bash(~ doctor*)', kind: 'PINNED', n: 2, why: 'no product line carries this sentence' },
+  ]],
+  ['tests/docs-status.test.mjs', [
+    { at: 'E-12 docs corpus: FAIL — corpus absent (docs mode "skip"', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' },
+  ]],
+  ['tests/docs-upstream.test.mjs', [
+    { at: '~', kind: 'DERIVED', n: 1, why: 'the assertion is about the launcher alone' },
+  ]],
+  ['tests/doctor/bootstrap-finished.test.mjs', [
+    { at: '~', kind: 'DERIVED', n: 1, why: 'the assertion is about the launcher alone' },
+  ]],
+  ['tests/doctor/fix.test.mjs', [
+    { at: 'SV-09 store schema v1 < server v2 ~ store migrate', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'SV-09.*run: ~ store migrate', kind: 'DERIVED', n: 1, why: 'regex syntax in the sentence' },
+  ]],
+  ['tests/doctor/framework.test.mjs', [
+    { at: 'DOCTOR: 0 ok, 0 warn, 1 fail (E-00) (1 fixable — run ~ d', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' },
+    { at: 'DOCTOR: 1 ok, 0 warn, 1 fail (E-29) (1 fixable — run ~ d', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' },
+    { at: '~ x', kind: 'EXPECTED_RENDERING', n: 2, why: 'the assertion is about the launcher alone' },
+  ]],
+  ['tests/doctor/mode-and-cache.test.mjs', [
+    { at: 'DOCTOR: 1 ok, 0 warn, 1 fail, 2 skipped (1 fixable — run', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' },
+  ]],
+  ['tests/doctor/panel.test.mjs', [
+    { at: 'Capability packs and the corpus branch are not probed on', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:190)' },
+    { at: 'Capability packs, citation counts and the corpus branch ', kind: 'DERIVED', n: 2, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:190)' },
+    { at: 'Docs: vendor/ServiceNowDocs @ ~ (australia) · sparse · c', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:109)' },
+    { at: 'E-10 FAIL settings.local toggles match the recorded mode', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'Run ~ doctor --fix for the fixable ones (1).', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276)' },
+    { at: 'citation counts and the corpus branch are not probed on ', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:190)' },
+    { at: '~ Engine: snowarch ~ · contract ~ Docs: vendor/ServiceNo', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:155)' },
+  ]],
+  ['tests/doctor/status-command.test.mjs', [
+    { at: 'E-00 FAIL a check: it did not — ~ fix-it', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'Mode: unknown — doctor unavailable after it failed (Erro', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/commands/status.mjs:75)' },
+    { at: 'Run ~ doctor --fix for the fixable ones (1).', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276)' },
+  ]],
+  ['tests/doctor/win32-remedies.test.mjs', [
+    { at: '~', kind: 'EXPECTED_RENDERING', n: 3, why: 'the assertion is about the launcher alone' },
+  ]],
+  ['tests/handoff-command.test.mjs', [
+    { at: '~ instance add uat --url https://acme.service-now.com --', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: '~ ~', kind: 'PINNED', n: 1, why: 'the assertion is about the launcher alone' },
+  ]],
+  ['tests/hook/session-start.test.mjs', [
+    { at: '~~', kind: 'DERIVED', n: 1, why: 'the assertion is about the launcher alone' },
+  ]],
+  ['tests/launcher-audit.test.mjs', [
+    { at: '~', kind: 'PINNED', n: 1, why: 'the assertion is about the launcher alone' },
+  ]],
+  ['tests/snowarch-skill.test.mjs', [
+    { at: 'Bash(~ status*) Bash(node tools/snowarch/bin/snowarch.mj', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+  ]],
+  ['tests/upgrade/upgrade-unit.test.mjs', [
+    { at: 'E-27 FAIL Claude Code registration status: design-only i', kind: 'PINNED', n: 2, why: 'no product line carries this sentence' },
+    { at: 'SV-03 WARN instances: instances: pdi: flags explicit, pr', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'SV-99 WARN: a check that no longer exists — ~ doctor', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+  ]],
+  ['tests/upgrade/upgrade.e2e.test.mjs', [
+    { at: 'A newer release is available (v9.2.0) — run ~ upgrade.', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/text.mjs:178)' },
+  ]],
+  ['tests/version-tag.test.mjs', [
+    { at: 'gitlink bbbbbbb ≠ engine\\.config\\.json \\(run ~ docs veri', kind: 'DERIVED', n: 1, why: 'regex syntax in the sentence' },
+  ]],
+  ['tests/windows-spellings.test.mjs', [
+    { at: '~', kind: 'EXPECTED_RENDERING', n: 3, why: 'the assertion is about the launcher alone' },
+  ]],
+  ['tools/snowarch/tests/b00-checks.test.mjs', [
+    { at: 'not at the repository root — run: cd "/repo" && ~', kind: 'EXPECTED_RENDERING', n: 1, why: 'no product line carries this sentence' },
+    { at: 'not at the repository root — run: pushd "C:\\repo" ~', kind: 'EXPECTED_RENDERING', n: 1, why: 'no product line carries this sentence' },
+  ]],
+  ['tools/snowarch/tests/b02-docs.test.mjs', [
+    { at: '[B02/09] docs … skipped (--docs skip) — the doctor will ', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' },
+    { at: '^\\d+ dead citation\\(s\\) — see ~ docs verify$', kind: 'DERIVED', n: 1, why: 'regex syntax in the sentence' },
+    { at: 'area it-service-management missing — run ~ docs sync onc', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' },
+  ]],
+  ['tools/snowarch/tests/b09-summary.test.mjs', [
+    { at: 'E-10 FAIL settings.local toggles match the recorded mode', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
+    { at: 'Health check (quick): 14 ok · 1 warn (E-23) · 0 fail · 2', kind: 'EXPECTED_RENDERING', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126)' },
+    { at: 'this checkout is inside a cloud-synced folder (Dropbox) ', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/steps/B02.mjs:115)' },
+  ]],
+  ['tools/snowarch/tests/bootstrap-runner.test.mjs', [
+    { at: 'FAIL B02: the corpus is empty Remedy: run ~ docs sync Re', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' },
+    { at: 'interrupted during B04 — re-run ~ to resume at B04', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
+  ]],
+  ['tools/snowarch/tests/bootstrap-state.test.mjs', [
+    { at: '~', kind: 'DERIVED', n: 1, why: 'the assertion is about the launcher alone' },
+  ]],
+  ['tools/snowarch/tests/cli.test.mjs', [
+    { at: '^usage: ~ <command>', kind: 'EXPECTED_RENDERING', n: 2, why: 'regex syntax in the sentence' },
+    { at: 'snowarch: unknown command "nope" — run ~ help', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/cli.mjs:221)' },
+  ]],
+  ['tools/snowarch/tests/store-forwarder.test.mjs', [
+    { at: 'usage: ~ store', kind: 'PINNED', n: 1, why: 'a pinned and a deriving line both carry it' },
+  ]],
+  ['tools/snowarch/tests/text.test.mjs', [
+    { at: 'DOCTOR: 5 ok, 0 warn, 1 fail, 37 not in section (1 fixab', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' },
+    { at: 'Health check (quick): 13 ok · 1 warn (E-23) · 1 fail (E-', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126)' },
+    { at: '~', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion is about the launcher alone' },
+    { at: '~ ~', kind: 'EXPECTED_RENDERING', n: 4, why: 'the assertion is about the launcher alone' },
+  ]],
 ]));
 
 /** The tracked files, as `{ file, text }` — the default sources for both halves. */
@@ -344,8 +456,21 @@ export function audit({ tests = testSources(), product: productFiles = productSo
       // used would have returned from `audit()` — measured, it made the whole result `undefined` on the
       // first site with no distinctive sentence.
       const shown = keyOf(prose) ?? squash(prose);
+      /*
+       * A STABLE IDENTITY PER SITE — ARC-07-C35c item 5, and NOT the line number.
+       *
+       * The baseline was a per-file COUNT, so one site resolving while another appeared in the same file was
+       * silent, and a flipped expectation on a site already listed as ambiguous never drifted at all: the
+       * count was the same either way. Both need per-site identity.
+       *
+       * Keyed by the SENTENCE rather than `file:line`, because a line number moves whenever anything above it
+       * is edited: a per-line baseline would churn on every unrelated change, and a list that churns is a list
+       * nobody reads. The sentence moves when the ASSERTION changes, which is exactly when someone should look.
+       */
+      const at = squash(prose).replaceAll(MARK, '~').slice(0, 56);
       if (!shown) {
-        unresolved.push({ site, file: rel, why: 'no sentence beside the launcher at all',
+        unresolved.push({ site, file: rel, at, kind: expectation,
+          why: 'no sentence beside the launcher at all',
           reason: 'the assertion is about the launcher alone' });
         continue;
       }
@@ -359,12 +484,14 @@ export function audit({ tests = testSources(), product: productFiles = productSo
       const hits = routed.filter((p) => match(prose, p.sentence));
       const kinds = [...new Set(hits.map((h) => h.kind))];
       if (hits.length === 0) {
-        unresolved.push({ site, file: rel, reason: reasonFor({ prose, route }, product),
+        unresolved.push({ site, file: rel, at, kind: expectation,
+          reason: reasonFor({ prose, route }, product),
           why: route
             ? `no ${route} line carries "${shown.slice(0, 48)}" (argv ${JSON.stringify(argv)})`
             : `no product line carries "${shown.slice(0, 48)}"` });
       } else if (kinds.length > 1) {
-        unresolved.push({ site, file: rel, reason: 'a pinned and a deriving line both carry it',
+        unresolved.push({ site, file: rel, at, kind: expectation,
+          reason: 'a pinned and a deriving line both carry it',
           why: `"${shown.slice(0, 48)}" matches both a PINNED and a DERIVED product line` });
       } else if (expectation === 'DERIVED_ON_PINNED_SUBJECT') {
         // Item 2: the case drove a pinned shell and then asserted the RUNNER's spelling against it. Red on
@@ -387,7 +514,7 @@ export function audit({ tests = testSources(), product: productFiles = productSo
       } else if (kinds[0] !== expectation && caseDrivesPinned) {
         // The case drove a pinned shell, just not into the call it asserts — so whether that shell reached
         // this sentence is unknown here, and an unknown is recorded rather than reported either way.
-        unresolved.push({ site, file: rel,
+        unresolved.push({ site, file: rel, at, kind: expectation,
           reason: 'the case drives a pinned shell in another statement',
           why: 'the case drives a pinned shell in a different statement from the one asserted, so whether '
             + 'it reached this sentence needs dataflow this audit does not do' });
@@ -401,33 +528,80 @@ export function audit({ tests = testSources(), product: productFiles = productSo
     }
   }
 
-  // The baseline, both directions.
-  const counted = new Map();
-  for (const u of unresolved) counted.set(u.file, (counted.get(u.file) ?? 0) + 1);
-  const drift = [];
-  for (const [file, entry] of baseline) {
-    // The entry is `{ n, why }` now — ARC-07-C35b — but a bare number still works, because the audit's own
-    // cases plant tiny baselines and should not have to carry prose to do it.
-    const expected = typeof entry === 'number' ? entry : entry.n;
-    const actual = counted.get(file) ?? 0;
-    if (actual !== expected) drift.push(`${file}: ${actual} unresolved, the baseline says ${expected}`);
+  /*
+   * THE BASELINE, PER SITE AND BOTH DIRECTIONS — ARC-07-C35c item 5.
+   *
+   * A per-file count could not see two things. One site resolving while another appeared in the same file left
+   * the count unchanged, so the work and the regression cancelled out silently. And a site listed as ambiguous
+   * could have its EXPECTATION flipped — a pinned expectation made deriving, or the reverse — with no drift at
+   * all, because ambiguity is filed before the expectation is compared and nothing else recorded it.
+   *
+   * So an entry is `{ at, why, kind }` per site: the sentence that identifies it, the reason the audit
+   * computed, and the expectation it carries. Three ways to drift now — a site that is new, a site that is
+   * gone, and a site whose reason or expectation changed — and each names itself.
+   */
+  /*
+   * A MULTISET PER FILE, not a list of unique sentences — measured, because eight keys collided.
+   *
+   * `tools/snowarch/tests/text.test.mjs` has FOUR sites whose sentence is two launchers and nothing else, and
+   * `win32-remedies` and `windows-spellings` have three each of a bare launcher. With one entry per distinct
+   * sentence, one of those resolving would leave the others matching and the drift would be silent — the very
+   * defect this item is about, moved one level down. So each distinct `{ at, kind, why }` carries a COUNT, and
+   * the comparison is between multisets: three becoming two is drift, and it says which triple moved.
+   *
+   * The count is per triple rather than per file, which is what makes it different from what it replaces: a
+   * file's total can stay the same while one sentence resolves and another appears, and that now shows as one
+   * `resolved` line and one `new` line.
+   */
+  const tally = (list) => {
+    const out = new Map();
+    for (const e of list) {
+      const key = `${e.at}\u0000${e.kind}\u0000${e.why}`;
+      const at = out.get(key) ?? { at: e.at, kind: e.kind, why: e.why, n: 0 };
+      at.n += 1;
+      out.set(key, at);
+    }
+    return out;
+  };
+
+  const perFile = new Map();
+  for (const u of unresolved) {
+    if (!perFile.has(u.file)) perFile.set(u.file, []);
+    perFile.get(u.file).push({ at: u.at, kind: u.kind, why: u.reason });
   }
-  for (const [file, actual] of counted) {
-    if (!baseline.has(file)) drift.push(`${file}: ${actual} unresolved site(s), and the file is not in the baseline`);
+  const found = new Map([...perFile].map(([file, list]) => [file, tally(list)]));
+
+  const drift = [];
+  const describe = (e) => `${e.n}× ${e.at} [${e.kind}] — ${e.why}`;
+  const keyed = (e) => `${e.at}\u0000${e.kind}\u0000${e.why}`;
+
+  for (const [file, entry] of baseline) {
+    const expected = tally(Array.isArray(entry) ? entry.flatMap((e) => Array(e.n ?? 1).fill(e)) : []);
+    const actual = found.get(file) ?? new Map();
+    for (const [key, want] of expected) {
+      const have = actual.get(key);
+      if (!have) drift.push(`${file}: resolved or gone — ${describe(want)}`);
+      else if (have.n !== want.n) {
+        drift.push(`${file}: ${have.n} now, the baseline says ${want.n} — ${want.at} [${want.kind}]`);
+      }
+    }
+    for (const [key, have] of actual) {
+      if (!expected.has(key)) drift.push(`${file}: new — ${describe(have)}`);
+    }
+  }
+  for (const [file, actual] of found) {
+    if (!baseline.has(file)) {
+      const n = [...actual.values()].reduce((sum, e) => sum + e.n, 0);
+      drift.push(`${file}: ${n} unresolved site(s), and the file is not in the baseline`);
+    }
   }
 
   /*
-   * THE REASON STRING PER FILE, computed here so the baseline can be compared to it rather than trusted.
-   * Counts where a file mixes reasons, because one label over a mixed file is not a true annotation.
+   * THE RECORDS PER FILE, computed here so the baseline can be compared to them rather than trusted. The case
+   * that asserts the two are equal is the second bar this row merges on.
    */
-  const reasons = new Map();
-  for (const u of unresolved) {
-    const at = reasons.get(u.file) ?? new Map();
-    at.set(u.reason, (at.get(u.reason) ?? 0) + 1);
-    reasons.set(u.file, at);
-  }
-  const computed = new Map([...reasons].map(([file, counts]) => [file,
-    [...counts].map(([r, n]) => (counts.size === 1 ? r : `${n}× ${r}`)).join('; ')]));
+  const computed = new Map([...found].map(([file, counts]) => [file,
+    [...counts.values()].sort((a, b) => (keyed(a) < keyed(b) ? -1 : keyed(a) > keyed(b) ? 1 : 0))]));
 
   return { agreed, mismatches, unresolved, drift, computed,
     ok: mismatches.length === 0 && drift.length === 0 };
