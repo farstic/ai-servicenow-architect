@@ -21,6 +21,16 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CLI_PATH, preconditions, USAGE } from '../lib/instance.mjs';
 import { NO_INSTANCE_MESSAGE } from '../../../packages/snowarch/dist/no-instance.js';
 import { cliSpelling } from '../../../packages/snowarch/dist/cli/tty.js';
+import { useStateRoot } from './helpers/state-root.mjs';
+/*
+ * ARC-07-C43 head 2 — THIS SUITE RUNS THE REAL CLI, so its `.local/` goes somewhere else.
+ *
+ * Measured: with this line absent, a full `npm test` leaves logs and the doctor/upgrade caches in the
+ * repository's own `.local/`, which is gitignored and therefore invisible to `assert-clean`. A `cwd`
+ * cannot fix it — `root` comes from `config.mjs`'s own location — so the state root is what moves.
+ */
+useStateRoot();
+
 
 /**
  * ARC-07-C31 slice 3 — `SERVER_CLI`, named for the package that PRINTS the line.

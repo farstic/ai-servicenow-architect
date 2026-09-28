@@ -9,6 +9,16 @@ import { NO_INSTANCE, PROBES_UNAVAILABLE, SERVER_IDS, runProbes, run as runB08 }
 import { CACHE_VERSION, COMPATIBILITY_KEYS, cachePath, summarise, writeDoctorCache } from '../lib/doctor-cache.mjs';
 import { register, reset } from '../lib/redact.mjs';
 import { makeCheckout } from './helpers/workspace.mjs';
+import { useStateRoot } from './helpers/state-root.mjs';
+/*
+ * ARC-07-C43 head 2 — THIS SUITE RUNS THE REAL CLI, so its `.local/` goes somewhere else.
+ *
+ * Measured: with this line absent, a full `npm test` leaves logs and the doctor/upgrade caches in the
+ * repository's own `.local/`, which is gitignored and therefore invisible to `assert-clean`. A `cwd`
+ * cannot fix it — `root` comes from `config.mjs`'s own location — so the state root is what moves.
+ */
+useStateRoot();
+
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const isWindows = process.platform === 'win32';

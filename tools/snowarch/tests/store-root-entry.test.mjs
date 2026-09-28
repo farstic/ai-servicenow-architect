@@ -19,6 +19,16 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { preconditions } from '../lib/instance.mjs';
+import { useStateRoot } from './helpers/state-root.mjs';
+/*
+ * ARC-07-C43 head 2 — THIS SUITE RUNS THE REAL CLI, so its `.local/` goes somewhere else.
+ *
+ * Measured: with this line absent, a full `npm test` leaves logs and the doctor/upgrade caches in the
+ * repository's own `.local/`, which is gitignored and therefore invisible to `assert-clean`. A `cwd`
+ * cannot fix it — `root` comes from `config.mjs`'s own location — so the state root is what moves.
+ */
+useStateRoot();
+
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 

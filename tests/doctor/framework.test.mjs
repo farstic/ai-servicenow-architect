@@ -17,6 +17,16 @@ import { ranAtLine } from '../../tools/snowarch/lib/doctor/panel.mjs';
 import { collectPrereqs, guessShell, SHELLS } from '../../tools/snowarch/lib/doctor/prereqs.mjs';
 import { doctorCommand, findRoot, notAtRoot } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
+import { useStateRoot } from '../../tools/snowarch/tests/helpers/state-root.mjs';
+/*
+ * ARC-07-C43 head 2 — THIS SUITE RUNS THE REAL CLI, so its `.local/` goes somewhere else.
+ *
+ * Measured: with this line absent, a full `npm test` leaves logs and the doctor/upgrade caches in the
+ * repository's own `.local/`, which is gitignored and therefore invisible to `assert-clean`. A `cwd`
+ * cannot fix it — `root` comes from `config.mjs`'s own location — so the state root is what moves.
+ */
+useStateRoot();
+
 
 /**
  * ARC-08-S01 — the doctor framework, before any check exists.
