@@ -147,8 +147,10 @@ async function upgradeCommand(args) {
 }
 
 export const COMMANDS = {
+  // `readOnly`: it reads three files and prints. ARC-07-C33 — it used to leave `.local/logs/version-*.log`.
   version: { summary: 'print the version, the release tag, the commit, the contract sha and the floors',
-    run: versionCommand, usage: (where) => `usage: ${spellings(where).cli} version [--json]` },
+    run: versionCommand, readOnly: true,
+    usage: (where) => `usage: ${spellings(where).cli} version [--json]` },
   docs: { summary: 'sync, verify, describe or re-family the documentation corpus', run: docsCommand,
     usage: (where) => `usage: ${spellings(where).cli} docs (sync | verify | status | family) …\n\n`
       + `  Run \`${spellings(where).cli} docs\` with no sub-command for the full flag list.` },
@@ -157,6 +159,8 @@ export const COMMANDS = {
     defersLog: true },
   mode: { summary: 'switch this checkout between design-only and live, or report which it is',
     run: modeCommand, usage: MODE_USAGE,
+    // BARE `mode` REPORTS; `mode live` and `mode design` rewrite the toggles and must keep their log.
+    readOnly: ({ positional }) => positional.length === 0,
     booleans: ['yes', 'ack-user-scope', 'skip-claude-check'] },
   // ARC-08-S01: the framework ships with an EMPTY registry — the runner, the schema, the renderer
   // and the exit codes are the product here, and S02-S04 add checks to it. An empty run that says
@@ -244,9 +248,18 @@ export async function main(argv, { out = process.stdout, err = process.stderr, h
     return EXIT_USAGE;
   }
 
+  /*
+   * ARC-07-C33's residual — A RUN THAT WRITES NOTHING LEAVES NO LOG.
+   *
+   * `readOnly` is a FUNCTION where the answer depends on the arguments, which it does for `mode`: bare it
+   * reports, and `mode live` rewrites the toggles. A static flag would have had to pick one of those and be
+   * wrong about the other.
+   */
+  const readOnly = typeof command.readOnly === 'function'
+    ? command.readOnly({ positional, flags }) : Boolean(command.readOnly);
   const log = createLogger({
     command: name, quiet: Boolean(flags.quiet), verbose: Boolean(flags.verbose),
-    json: Boolean(flags.json), defer: Boolean(command.defersLog), out, err,
+    json: Boolean(flags.json), defer: Boolean(command.defersLog), noFile: readOnly, out, err,
   });
   const note = cwdNote();
   if (note) log.note(note);

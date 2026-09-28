@@ -672,6 +672,25 @@ full runs, in a file that story never touched. Copy the artefact and run against
 has to live **inside** the package, because Node resolves dependencies by walking up from the module
 and a copy in `os.tmpdir()` dies with `ERR_MODULE_NOT_FOUND`.
 
+### A test that spawns the CLI writes into THIS checkout's `.local/` — and a `cwd` will not stop it
+
+`npm test` leaves a `.local/` at the repository root, and `assert-clean` cannot see it because
+`.local/` is gitignored. Measured by per-file bisect in a fresh `git worktree` that had none: five
+suites, eight files — `tests/doctor/framework.test.mjs` (`logs/doctor-*.log`),
+`tools/snowarch/tests/cli.test.mjs` (`logs/mode-*.log`), `instance-root-entry.test.mjs` and
+`store-root-entry.test.mjs` (two logs each), and `b08-verify.test.mjs`, which writes
+`doctor-last.json`, `doctor-last.inputs.json` and `upgrade-check.json`.
+
+**Giving the child a temp `cwd` does not help, and that is by design.** `config.mjs` derives `root`
+from that file's own location, never `process.cwd()`, so that a CLI invoked from a subdirectory still
+finds the corpus and the contract — which means a spawned child discovers the same checkout and
+writes the same `.local/` wherever it is standing. The only thing that redirects it is a root the
+command is *given*: pass a fixture root to the helper you are testing (`statePath`, `cachePath`,
+`storePath`, `createLogger`'s `logRoot`) and assert against that, or pass `noFile` for a run that
+should write nothing. A spawn of the real bin has no such seam today; ARC-07-C33 carries the measured
+size of adding one, and until it exists, **a new test that spawns the real bin is adding to this
+list** — so prefer calling the command's module with a root of your own.
+
 ### Report paths with forward slashes, on every platform
 
 A tool that prints `governance\mcp-protocols.md` on Windows and `governance/…` on Unix produces

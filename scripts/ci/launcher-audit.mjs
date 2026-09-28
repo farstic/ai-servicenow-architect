@@ -156,14 +156,14 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: '~ instance add prod --url https://acme.service-now.com -', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
   ]],
   ['packages/snowarch/tests/cli/instance-manage.test.ts', [
-    { at: '— = never probed. ~ instance test <label> probes one; --', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/format.ts:151)' },
+    { at: '— = never probed. ~ instance test <label> probes one; --', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/format.ts)' },
   ]],
   ['packages/snowarch/tests/cli/instance.test.ts', [
     { at: '~ instance add pdi', kind: 'DERIVED', n: 1, why: 'outside the product index' },
     { at: '~ instance add x --url https://h --env dev --auth oauth_', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
   ]],
   ['packages/snowarch/tests/cli/preset-ui.test.ts', [
-    { at: 'WRITE is locked on production — raise it later with: ~ i', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/preset-ui.ts:62)' },
+    { at: 'WRITE is locked on production — raise it later with: ~ i', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (packages/snowarch/src/cli/preset-ui.ts)' },
   ]],
   ['packages/snowarch/tests/cli/store-command.test.ts', [
     { at: 'usage: ~ store', kind: 'DERIVED', n: 1, why: 'a pinned and a deriving line both carry it' },
@@ -179,7 +179,7 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: '~ instance set-preset pdi pdi-developer', kind: 'DERIVED', n: 1, why: 'outside the product index' },
   ]],
   ['packages/snowarch/tests/tools/permissions.test.ts', [
-    { at: 'Write operations are disabled for instance "prod-lookali', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (packages/snowarch/src/utils/permissions.ts:257)' },
+    { at: 'Write operations are disabled for instance "prod-lookali', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (packages/snowarch/src/utils/permissions.ts)' },
     { at: '~ instance set-preset prod <preset> --ack-prod', kind: 'DERIVED', n: 1, why: 'outside the product index' },
     { at: '~ instance set-preset prod full --ack-prod', kind: 'DERIVED', n: 1, why: 'outside the product index' },
   ]],
@@ -198,7 +198,7 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: '~', kind: 'PINNED', n: 1, why: 'the assertion is about the launcher alone' },
   ]],
   ['tests/docs-status.test.mjs', [
-    { at: 'E-12 docs corpus: FAIL — corpus absent (docs mode "skip"', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' },
+    { at: 'E-12 docs corpus: FAIL — corpus absent (docs mode "skip"', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs)' },
   ]],
   ['tests/docs-upstream.test.mjs', [
     { at: '~', kind: 'DERIVED', n: 1, why: 'the assertion is about the launcher alone' },
@@ -211,27 +211,27 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: 'SV-09.*run: ~ store migrate', kind: 'DERIVED', n: 1, why: 'regex syntax in the sentence' },
   ]],
   ['tests/doctor/framework.test.mjs', [
-    { at: 'DOCTOR: 0 ok, 0 warn, 1 fail (E-00) (1 fixable — run ~ d', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' },
-    { at: 'DOCTOR: 1 ok, 0 warn, 1 fail (E-29) (1 fixable — run ~ d', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' },
+    { at: 'DOCTOR: 0 ok, 0 warn, 1 fail (E-00) (1 fixable — run ~ d', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs)' },
+    { at: 'DOCTOR: 1 ok, 0 warn, 1 fail (E-29) (1 fixable — run ~ d', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs)' },
     { at: '~ x', kind: 'EXPECTED_RENDERING', n: 2, why: 'the assertion is about the launcher alone' },
   ]],
   ['tests/doctor/mode-and-cache.test.mjs', [
-    { at: 'DOCTOR: 1 ok, 0 warn, 1 fail, 2 skipped (1 fixable — run', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' },
-    { at: 'Mode: design-only — ~', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:66)' },
+    { at: 'DOCTOR: 1 ok, 0 warn, 1 fail, 2 skipped (1 fixable — run', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs)' },
+    { at: 'Mode: design-only — ~', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs)' },
   ]],
   ['tests/doctor/panel.test.mjs', [
-    { at: 'Capability packs and the corpus branch are not probed on', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:190)' },
-    { at: 'Capability packs, citation counts and the corpus branch ', kind: 'DERIVED', n: 2, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:190)' },
-    { at: 'Docs: vendor/ServiceNowDocs @ ~ (australia) · sparse · c', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:109)' },
+    { at: 'Capability packs and the corpus branch are not probed on', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
+    { at: 'Capability packs, citation counts and the corpus branch ', kind: 'DERIVED', n: 2, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
+    { at: 'Docs: vendor/ServiceNowDocs @ ~ (australia) · sparse · c', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
     { at: 'E-10 FAIL settings.local toggles match the recorded mode', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
-    { at: 'Run ~ doctor --fix for the fixable ones (1).', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276)' },
-    { at: 'citation counts and the corpus branch are not probed on ', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:190)' },
-    { at: '~ Engine: snowarch ~ · contract ~ Docs: vendor/ServiceNo', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:155)' },
+    { at: 'Run ~ doctor --fix for the fixable ones (1).', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
+    { at: 'citation counts and the corpus branch are not probed on ', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
+    { at: '~ Engine: snowarch ~ · contract ~ Docs: vendor/ServiceNo', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
   ]],
   ['tests/doctor/status-command.test.mjs', [
     { at: 'E-00 FAIL a check: it did not — ~ fix-it', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
-    { at: 'Mode: unknown — doctor unavailable after it failed (Erro', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/commands/status.mjs:75)' },
-    { at: 'Run ~ doctor --fix for the fixable ones (1).', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs:276)' },
+    { at: 'Mode: unknown — doctor unavailable after it failed (Erro', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/commands/status.mjs)' },
+    { at: 'Run ~ doctor --fix for the fixable ones (1).', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/panel.mjs)' },
   ]],
   ['tests/doctor/status-template.test.mjs', [
     { at: '**Do not run `~ doctor --quick --json`', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
@@ -266,7 +266,7 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: '— ~ instance test pdi$', kind: 'PINNED', n: 1, why: 'regex syntax in the sentence' },
   ]],
   ['tests/upgrade/upgrade.e2e.test.mjs', [
-    { at: 'A newer release is available (v9.2.0) — run ~ upgrade.', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/text.mjs:178)' },
+    { at: 'A newer release is available (v9.2.0) — run ~ upgrade.', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/text.mjs)' },
   ]],
   ['tests/version-tag.test.mjs', [
     { at: 'gitlink bbbbbbb ≠ engine\\.config\\.json \\(run ~ docs veri', kind: 'DERIVED', n: 1, why: 'regex syntax in the sentence' },
@@ -291,17 +291,17 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
     { at: 'not at the repository root — run: pushd "C:\\repo" ~', kind: 'EXPECTED_RENDERING', n: 1, why: 'no product line carries this sentence' },
   ]],
   ['tools/snowarch/tests/b02-docs.test.mjs', [
-    { at: '[B02/09] docs … skipped (--docs skip) — the doctor will ', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' },
+    { at: '[B02/09] docs … skipped (--docs skip) — the doctor will ', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs)' },
     { at: '^\\d+ dead citation\\(s\\) — see ~ docs verify$', kind: 'DERIVED', n: 1, why: 'regex syntax in the sentence' },
-    { at: 'area it-service-management missing — run ~ docs sync onc', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' },
+    { at: 'area it-service-management missing — run ~ docs sync onc', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs)' },
   ]],
   ['tools/snowarch/tests/b09-summary.test.mjs', [
     { at: 'E-10 FAIL settings.local toggles match the recorded mode', kind: 'PINNED', n: 1, why: 'no product line carries this sentence' },
-    { at: 'Health check (quick): 14 ok · 1 warn (E-23) · 0 fail · 2', kind: 'EXPECTED_RENDERING', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126)' },
-    { at: 'this checkout is inside a cloud-synced folder (Dropbox) ', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/steps/B02.mjs:115)' },
+    { at: 'Health check (quick): 14 ok · 1 warn (E-23) · 0 fail · 2', kind: 'EXPECTED_RENDERING', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs)' },
+    { at: 'this checkout is inside a cloud-synced folder (Dropbox) ', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/steps/B02.mjs)' },
   ]],
   ['tools/snowarch/tests/bootstrap-runner.test.mjs', [
-    { at: 'FAIL B02: the corpus is empty Remedy: run ~ docs sync Re', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs:44)' },
+    { at: 'FAIL B02: the corpus is empty Remedy: run ~ docs sync Re', kind: 'PINNED', n: 1, why: 'the product assembles this sentence (scripts/gen-doctor-docs.mjs)' },
     { at: 'Re-run ~ to resume at B02.', kind: 'PINNED', n: 2, why: 'no product line carries this sentence' },
     { at: 'interrupted during B04 — re-run ~ to resume at B04', kind: 'DERIVED', n: 1, why: 'no product line carries this sentence' },
     { at: '~ docs sync', kind: 'PINNED', n: 1, why: 'the case drives a pinned shell in another statement' },
@@ -313,7 +313,7 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ['tools/snowarch/tests/cli.test.mjs', [
     { at: '^usage: ~ <command>', kind: 'EXPECTED_RENDERING', n: 2, why: 'regex syntax in the sentence' },
     { at: 'run ~ help', kind: 'PINNED', n: 1, why: 'the case drives a pinned shell in another statement' },
-    { at: 'snowarch: unknown command "nope" — run ~ help', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/cli.mjs:221)' },
+    { at: 'snowarch: unknown command "nope" — run ~ help', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/cli.mjs)' },
     { at: '~', kind: 'EXPECTED_RENDERING', n: 2, why: 'the assertion claims this sentence is absent' },
     { at: '~', kind: 'PINNED', n: 1, why: 'the assertion claims this sentence is absent' },
   ]],
@@ -325,8 +325,8 @@ export const UNRESOLVED_BASELINE = Object.freeze(new Map([
   ]],
   ['tools/snowarch/tests/text.test.mjs', [
     { at: '2 more run with ~ doctor$', kind: 'EXPECTED_RENDERING', n: 1, why: 'regex syntax in the sentence' },
-    { at: 'DOCTOR: 5 ok, 0 warn, 1 fail, 37 not in section (1 fixab', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs:175)' },
-    { at: 'Health check (quick): 13 ok · 1 warn (E-23) · 1 fail (E-', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs:126)' },
+    { at: 'DOCTOR: 5 ok, 0 warn, 1 fail, 37 not in section (1 fixab', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (scripts/ci/doctor-snapshot.mjs)' },
+    { at: 'Health check (quick): 13 ok · 1 warn (E-23) · 1 fail (E-', kind: 'DERIVED', n: 1, why: 'the product assembles this sentence (tools/snowarch/lib/doctor/report-text.mjs)' },
     { at: '~', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion is about the launcher alone' },
     { at: '~ doctor$', kind: 'EXPECTED_RENDERING', n: 2, why: 'regex syntax in the sentence' },
     { at: '~ instance', kind: 'EXPECTED_RENDERING', n: 1, why: 'the assertion claims this sentence is absent' },
@@ -545,12 +545,23 @@ export function reasonFor({ prose, route }, product) {
   if (bare.length < 3) return 'the assertion is about the launcher alone';
   if (RX_SYNTAX.test(prose)) return 'regex syntax in the sentence';
 
+  /*
+   * THE FILE, NOT THE LINE — ARC-07-C35c, found by my own edit drifting the baseline.
+   *
+   * These reasons are STORED in the baseline, and a stored `file:line` moves whenever anything above that line
+   * is edited: adding four lines to `cli.mjs` drifted a site whose assertion and product line were both
+   * untouched. That is the churn the site key avoids by using the sentence, arriving through the back door.
+   *
+   * The architect's requirement was that "assembles" may be claimed only where a product line is NAMED, and it
+   * still is — the file names it, and the exact `file:line` is in `why`, which the audit REPORTS and does not
+   * store. A reader greps the sentence in the named file and lands on it.
+   */
   const byPlaceholder = product.find((line) => placeholderMatch(line.sentence, prose));
   if (byPlaceholder) {
-    return `the product spells a placeholder the fixture fills (${byPlaceholder.file}:${byPlaceholder.line})`;
+    return `the product spells a placeholder the fixture fills (${byPlaceholder.file})`;
   }
   const byAnchor = product.find((line) => sharesAnchor(line.sentence, prose));
-  if (byAnchor) return `the product assembles this sentence (${byAnchor.file}:${byAnchor.line})`;
+  if (byAnchor) return `the product assembles this sentence (${byAnchor.file})`;
 
   // A sentence a committed page carries is a sentence about an ARTEFACT — `docs/INSTALL.md` is POSIX by
   // rule 3 — and the product index does not contain pages, so no product line ever could.
@@ -647,8 +658,12 @@ export function audit({ tests = testSources(), product: productFiles = productSo
       const hits = routed.filter((p) => match(prose, p.sentence));
       const kinds = [...new Set(hits.map((h) => h.kind))];
       if (hits.length === 0) {
+        const exact = product.find((line) => match(prose, line.sentence))
+          ?? product.find((line) => sharesAnchor(line.sentence, prose));
         unresolved.push({ site, file: rel, at, kind: expectation,
           reason: reasonFor({ prose, route }, product),
+          // The exact line is REPORTED here, where a moving line number costs nothing.
+          at_line: exact ? `${exact.file}:${exact.line}` : null,
           why: route
             ? `no ${route} line carries "${shown.slice(0, 48)}" (argv ${JSON.stringify(argv)})`
             : `no product line carries "${shown.slice(0, 48)}"` });

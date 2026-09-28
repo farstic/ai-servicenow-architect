@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync,
+  writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, helpText, COMMANDS, main } from '../lib/cli.mjs';
+import { createLogger } from '../lib/log.mjs';
 import { spellings } from '../lib/text.mjs';
 
 /**
@@ -356,4 +358,63 @@ test('ARC-07-C31 — the unknown-command line spells the reader\'s launcher too'
   assert.equal(code, EXIT_USAGE);
   assert.match(captured.join(''), /run \.\\snowarch\.cmd help/);
   assert.doesNotMatch(captured.join(''), /\.\/snowarch/, 'a POSIX launcher on a Windows shell');
+});
+
+/**
+ * ARC-07-C33's residual — A RUN THAT WRITES NOTHING LEAVES NO LOG.
+ *
+ * `log.mjs`'s own comment has said since ARC-06 that "a `version` that prints one line should not leave a log
+ * behind", and that was the contract rather than the behaviour: the file opens on the FIRST line, `version`
+ * prints through the logger, and so `./snowarch version` created `.local/logs/version-<stamp>.log` every time.
+ * Measured three times in a checkout with no `.local/` at all, and a bare `./snowarch mode` — which only
+ * reports — did the same.
+ *
+ * That is what left the unexplained `.local/` in the tree after `npm test`, which C33 recorded as OPEN with
+ * everything it had ruled out: `tests/version-tag.test.mjs` spawns `version` with the REAL checkout as its cwd,
+ * deliberately, because it reads the version of record — and `.local/` is gitignored, so `assert-clean` could
+ * not see it. The process-level tracer could not see it either; a fresh `git worktree`, which has no `.local/`
+ * at all, found it in one run.
+ */
+test('ARC-07-C33 — a read-only command writes no log file, and a writing one still does', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'snowarch-nofile-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const sink = { write: () => true };
+
+  const logsIn = (root) => {
+    const at = join(root, '.local', 'logs');
+    return existsSync(at) ? readdirSync(at).filter((f) => f.endsWith('.log')).length : 0;
+  };
+
+  const quiet = join(dir, 'quiet');
+  mkdirSync(quiet, { recursive: true });
+  createLogger({ command: 'version', logRoot: quiet, noFile: true, out: sink, err: sink })
+    .step('the line that used to open the file');
+  assert.equal(logsIn(quiet), 0, 'a read-only run left a log file');
+  assert.equal(existsSync(join(quiet, '.local')), false,
+    'a read-only run created .local/ — which is the residual C33 recorded, returning');
+
+  // ...and the other direction, so this is not "never log again": a writing run still opens its file.
+  const writes = join(dir, 'writes');
+  mkdirSync(writes, { recursive: true });
+  createLogger({ command: 'bootstrap', logRoot: writes, out: sink, err: sink }).step('a line worth keeping');
+  assert.equal(logsIn(writes), 1, 'a writing run stopped logging');
+});
+
+test('ARC-07-C33 — the command table says which runs write, and `mode` decides by its argument', () => {
+  // `readOnly` is a FUNCTION where the answer depends on the arguments, and `mode` is why: bare it reports, and
+  // `mode live` rewrites the toggles. A static flag would have had to pick one and be wrong about the other.
+  const readOnly = (name, positional = []) => {
+    const command = COMMANDS[name];
+    return typeof command.readOnly === 'function'
+      ? command.readOnly({ positional, flags: {} }) : Boolean(command.readOnly);
+  };
+
+  assert.equal(readOnly('version'), true);
+  assert.equal(readOnly('mode'), true, 'a bare `mode` only reports');
+  assert.equal(readOnly('mode', ['live']), false, '`mode live` rewrites the toggles and must keep its log');
+  assert.equal(readOnly('mode', ['design']), false);
+  // Everything that writes stays writing, named rather than assumed.
+  for (const name of ['doctor', 'bootstrap', 'instance', 'store', 'upgrade']) {
+    assert.equal(readOnly(name), false, `${name} stopped logging`);
+  }
 });

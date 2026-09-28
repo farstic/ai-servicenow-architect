@@ -22,8 +22,28 @@ function stamp(now = new Date()) {
  * still nobody else's business.
  */
 export function createLogger({ command, quiet = false, verbose = false, json = false,
-  defer = false, logRoot = root, now = new Date(), out = process.stdout, err = process.stderr } = {}) {
-  let file = null;
+  defer = false, noFile = false, logRoot = root, now = new Date(),
+  out = process.stdout, err = process.stderr } = {}) {
+  /*
+   * `noFile` — ARC-07-C33's residual, and the comment above already said this should be true.
+   *
+   * "A `version` that prints one line should not leave a log behind" was the stated contract and not the
+   * behaviour: the file opens on the FIRST line, and `version` prints its lines through this logger, so
+   * `./snowarch version` created `.local/logs/version-<stamp>.log` on every run. Measured three times in a
+   * checkout with no `.local/` at all; a bare `./snowarch mode`, which only reports, did the same.
+   *
+   * It is ONE COMMAND OF A CLASS, and the first version of this comment claimed the class: `npm test` still
+   * leaves a `.local/` at the repository root. `tests/version-tag.test.mjs` spawns `version` with the REAL
+   * checkout as its cwd, deliberately, because it is reading the real version of record — that part is fixed —
+   * but four other suites spawn commands that write for a living, `root` is derived from `config.mjs`'s own
+   * location rather than `cwd`, so their children discover the same checkout, and `.local/` is gitignored, so
+   * `assert-clean` cannot see any of it. The class, its file list and the size of the seam that would close it
+   * are in ARC-07-C33 and `docs/CONTRIBUTING.md`; `noFile` is not that seam and does not pretend to be.
+   *
+   * `file = false` is the state this already had for a read-only checkout, so a run that writes nothing starts
+   * in it rather than needing a new branch anywhere else.
+   */
+  let file = noFile ? false : null;
   let held = defer ? [] : null;
   const dir = join(logRoot, '.local', 'logs');
 
