@@ -756,6 +756,22 @@ function argvOf(node) {
  */
 function argvForSubject(sf, assertion, subject) {
   if (!subject) return null;
+
+  /*
+   * ARC-07-C35c item 3 — THE SUBJECT'S OWN SPAWN COMES FIRST.
+   *
+   * `assert.match(run(entry, ['store','--help']).text, …)` spawns INLINE, and the binding lookup below cannot
+   * see it: `rootIdentifier` walks down to `run`, finds the harness's helper, and answers "bound, not a spawn".
+   * Measured — with a later spawn in the case that gave argv `null` and NO route at all, and with an earlier
+   * one it routed to that earlier spawn instead: `['store','migrate','--help']`, the server, for an assertion
+   * about the engine's own answer. Asking the subject first is the whole fix for that shape.
+   */
+  const own = spawnShapedCall(subject);
+  if (own) {
+    const argv = argvOf(own);
+    if (argv) return { argv, call: own };
+  }
+
   const name = ts.isIdentifier(subject) ? subject.text : rootIdentifier(subject);
   if (!name) return null;
   // NEAREST SCOPE, and this is the same defect as the file-wide constants table: `const r = run(…)` appears
@@ -779,7 +795,7 @@ function declarationInScope(sf, from, name) {
     const scan = (n) => {
       if (hit) return;
       if (n !== scope && ts.isFunctionLike(n)) return;
-      if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === name) { hit = n; return; }
+      if (ts.isVariableDeclaration(n) && bindsName(n.name, name)) { hit = n; return; }
       ts.forEachChild(n, scan);
     };
     scan(scope);
@@ -787,6 +803,27 @@ function declarationInScope(sf, from, name) {
     scope = scope.parent;
   }
   return null;
+}
+
+/**
+ * Does this declaration bind `name` — as an identifier, or through a DESTRUCTURING pattern?
+ *
+ * ARC-07-C35c item 3. `const { text } = run(entry, ['store','--help'])` binds `text`, and only an identifier
+ * name was recognised, so the subject `text` had no declaration and the route fell back to the LAST spawn in
+ * the case. Measured: an assertion about the engine's own `store --help` answer routed to
+ * `['store','migrate','--help']` — the server — which is a mismatch attributed to a product line the case
+ * never reached. Array patterns too, because `const [first] = …` is the same statement written differently.
+ */
+function bindsName(nameNode, name) {
+  if (ts.isIdentifier(nameNode)) return nameNode.text === name;
+  if (ts.isObjectBindingPattern(nameNode) || ts.isArrayBindingPattern(nameNode)) {
+    return nameNode.elements.some((element) => {
+      if (ts.isOmittedExpression(element)) return false;
+      // `{ text }`, `{ text: renamed }` and `[first]` all reach here; the BOUND name is what matters.
+      return bindsName(element.name, name);
+    });
+  }
+  return false;
 }
 
 /** A call that RUNS something: the shapes this repository's cases use to spawn a command. */
