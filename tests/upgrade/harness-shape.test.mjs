@@ -16,6 +16,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { npmCommand, spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 
 import { buildWorld, LONGPATHS, NOT_COPIED, persistLongPaths } from './harness.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
@@ -46,9 +47,19 @@ const TREE_SCANNING = Object.freeze([
   'tests/never-commit.test.mjs',
 ]);
 
-const run = (dir, cmd, args) =>
-  spawnSync(cmd, args, { cwd: dir, encoding: 'utf8', maxBuffer: 1 << 26,
-    shell: cmd === 'npm' && process.platform === 'win32' });
+/*
+ * ARC-09-C69 — `spawnFor`, not `shell: cmd === 'npm' && process.platform === 'win32'`.
+ *
+ * Found by the AST scan rather than by reading a log: this one runs inside a fixture world on a
+ * Windows cell, so its DEP0190 line was attributed to whatever had printed last. The shell is also why
+ * the caller had to pass a bare `npm` and hope the extension was added for it — `spawnFor` is given the
+ * platform's own spelling and needs no shell to find it.
+ */
+const run = (dir, cmd, args) => {
+  const call = spawnFor(cmd === 'npm' ? npmCommand() : cmd, args);
+  return spawnSync(call.file, call.args,
+    { cwd: dir, encoding: 'utf8', maxBuffer: 1 << 26, ...call.options });
+};
 
 /**
  * Git, with `core.longpaths` on Windows. ONE entry point, and a scan test keeps it that way.

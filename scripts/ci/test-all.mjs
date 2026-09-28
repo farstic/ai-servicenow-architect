@@ -33,10 +33,11 @@ import { spawnSync } from 'node:child_process';
 import { writeSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { npmCommand, spawnFor } from '../../tools/snowarch/lib/spawn-batch.mjs';
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npm = npmCommand();
 
 /**
  * The halves, in the order a reader wants them: the fast one that fails most often, then the slow one.
@@ -51,7 +52,6 @@ export const STEPS = Object.freeze([
     covers: 'tests/ and tools/snowarch/tests/',
     command: process.execPath,
     args: [resolve(root, 'tests', 'run.mjs')],
-    shell: false,
   }),
   Object.freeze({
     id: 'workspaces',
@@ -59,7 +59,6 @@ export const STEPS = Object.freeze([
     covers: 'packages/snowarch (vitest)',
     command: npm,
     args: ['test', '--workspaces', '--if-present'],
-    shell: process.platform === 'win32',
   }),
 ]);
 
@@ -82,7 +81,11 @@ export function runSteps({ steps = STEPS, run = spawnSync, write = (s) => writeS
     write(`\n=== npm test [${i + 1}/${steps.length}] ${step.id}: ${step.label}`
       + `${step.covers ? `  (${step.covers})` : ''}\n`);
     // NO early exit on failure. That is the entire row: the next half runs whatever this one did.
-    const r = run(step.command, step.args, { cwd: root, stdio: 'inherit', shell: step.shell === true });
+    // ARC-09-C69 — `spawnFor`, not `shell: process.platform === 'win32'`. That shape is DEP0190 on
+    // Node 24 with an args array, and this script printed one of the three warnings that survived
+    // C67 — after both halves had finished, which is where a reader least expects a deprecation.
+    const call = spawnFor(step.command, step.args);
+    const r = run(call.file, call.args, { cwd: root, stdio: 'inherit', ...call.options });
     results.push({ ...step, status: r?.status ?? null, signal: r?.signal ?? null, error: r?.error ?? null,
       outcome: outcome(r ?? {}) });
   }

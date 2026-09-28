@@ -13,6 +13,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { npmCommand, spawnFor } from '../tools/snowarch/lib/spawn-batch.mjs';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -116,8 +117,10 @@ test('the published tarball carries dist/ and no sources or tests (ARC-09-S10)',
   // `npm pack --dry-run` is npm's own answer to "what would be published", computed from `files`
   // plus the things npm always includes. Asking npm beats re-deriving the rules from `files`,
   // which is how a test ends up agreeing with a bug.
-  const r = spawnSync('npm', ['pack', '--dry-run', '--workspace', 'packages/snowarch', '--json'],
-    { encoding: 'utf8', cwd: root, maxBuffer: 1 << 26, shell: process.platform === 'win32' });
+  // ARC-09-C69 — `spawnFor` rather than `shell: process.platform === 'win32'`, DEP0190 on Node 24.
+  const pack = spawnFor(npmCommand(), ['pack', '--dry-run', '--workspace', 'packages/snowarch', '--json']);
+  const r = spawnSync(pack.file, pack.args,
+    { encoding: 'utf8', cwd: root, maxBuffer: 1 << 26, ...pack.options });
   assert.equal(r.status, 0, r.stderr);
   const files = JSON.parse(r.stdout)[0].files.map((f) => f.path);
 

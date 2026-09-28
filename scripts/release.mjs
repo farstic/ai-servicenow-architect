@@ -34,6 +34,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { npmCommand, spawnFor } from '../tools/snowarch/lib/spawn-batch.mjs';
 
 import { askOnce, isYes } from '../tools/snowarch/lib/ask.mjs';
 import { EXIT_GATE, gatePlan, modulesAreLinked, runGates } from './lib/release/gates.mjs';
@@ -107,12 +108,20 @@ export async function release({
   };
   const gitRun = git ?? gitDefault;
 
-  // Child processes for the gates and for npm. `shell` on Windows only, and only because `npm`
-  // there is `npm.cmd` — a batch file, which Node has refused to exec directly since
-  // CVE-2024-27980. Every argument here is ours; none comes from a user.
+  /*
+   * Child processes for the gates and for npm.
+   *
+   * ARC-09-C69 — `spawnFor`, and the comment that used to sit here explained only half of it. `npm` on
+   * Windows is `npm.cmd`, a batch file Node has refused to exec directly since CVE-2024-27980; the
+   * previous answer to that was `shell: platform === 'win32'`, which Node 24 deprecates when an args
+   * array is passed (DEP0190) and which quotes nothing, so a path with a space arrives split. A release
+   * runs on a Windows leg too, and a deprecation printed into a release log is a line whoever reads that
+   * log has to rule out. Every argument here is still ours; none comes from a user.
+   */
   const runDefault = (args) => {
     const [cmd, ...rest] = args;
-    const r = spawnSync(cmd, rest, { cwd: root, stdio: 'inherit', shell: platform === 'win32' });
+    const call = spawnFor(cmd, rest, { platform });
+    const r = spawnSync(call.file, call.args, { cwd: root, stdio: 'inherit', ...call.options });
     return r.status ?? 1;
   };
   const runChild = run ?? runDefault;
@@ -136,8 +145,9 @@ async function runRelease({ version, flags, root, out, err, write, fail, git: gi
   // The npm probe is skipped when the caller injected a runner: a test has no npm to find, and a
   // preflight that failed on the absence of a tool it was never going to spawn would be asserting
   // about the machine rather than about the release.
-  const hasNpm = injectedRun || Boolean(spawnSync('npm', ['--version'],
-    { encoding: 'utf8', shell: platform === 'win32' }).stdout);
+  const npmProbe = spawnFor(npmCommand(platform), ['--version'], { platform });
+  const hasNpm = injectedRun || Boolean(spawnSync(npmProbe.file, npmProbe.args,
+    { encoding: 'utf8', ...npmProbe.options }).stdout);
   const pre = preflight({ version, root, git: gitRun, config, flags, platform, hasNpm });
   if (!pre.ok) { fail(pre.message); return EXIT_PREFLIGHT; }
 

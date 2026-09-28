@@ -136,15 +136,41 @@ test('ARC-09-C64 — the two real halves are the two that were chained, and the 
   // one. Nothing here needs either.
   assert.equal(engine.command, process.execPath);
   assert.match(engine.args[0], /tests[/\\]run\.mjs$/);
-  assert.equal(engine.shell, false);
+  // ARC-09-C69 — a step no longer DECLARES a shell. It used to carry `shell: false` here and
+  // `shell: process.platform === 'win32'` below, and the second of those is DEP0190 on Node 24 with an
+  // args array — this script printed one of the three warnings that survived C67, after both halves had
+  // finished. The decision moved to `spawnFor` at the call, so there is nothing here to get wrong.
+  assert.equal('shell' in engine, false, 'a step declaring a shell is the shape C69 removed');
 
   // The second half stays npm's own iteration rather than a `vitest` line copied out of the workspace:
   // `packages/snowarch` declares `vitest run --coverage`, and a copy of that here would be a second
   // declaration to drift from the first.
   assert.deepEqual(workspaces.args, ['test', '--workspaces', '--if-present']);
   assert.match(workspaces.command, /^npm(\.cmd)?$/);
-  assert.equal(workspaces.shell, process.platform === 'win32',
-    'npm is spawned with a shell on win32 and without one elsewhere — Node refuses a bare .cmd');
+  assert.equal('shell' in workspaces, false, 'the npm half must not declare a shell either');
+
+  /*
+   * AND THE CALL IS WHAT IS ASSERTED NOW, not the data — which is the stronger claim: what mattered was
+   * never the field, it was what reached `spawnSync`. Driven through `runSteps`'s `run` seam so it is
+   * knowable on any platform: on win32 the npm half goes through `cmd.exe /d /s /c` with one quoted
+   * command line, and nowhere does a shell option appear beside an args array.
+   */
+  const calls = [];
+  runSteps({ steps: STEPS, write: () => {},
+    run: (file, args, options) => { calls.push({ file, args, options }); return { status: 0 }; } });
+  assert.equal(calls.length, 2);
+  for (const c of calls) {
+    assert.equal(c.options.shell, undefined, `${c.file} was spawned with a shell option`);
+  }
+  assert.equal(calls[0].file, process.execPath, 'the engine half is node on a JS entry point');
+  if (process.platform === 'win32') {
+    assert.match(calls[1].file, /cmd\.exe$/i, 'npm.cmd on Windows has to go through the command processor');
+    assert.deepEqual(calls[1].args.slice(0, 3), ['/d', '/s', '/c']);
+    assert.equal(calls[1].options.windowsVerbatimArguments, true);
+  } else {
+    assert.equal(calls[1].file, 'npm', 'nothing on POSIX is a batch file');
+    assert.deepEqual(calls[1].args, ['test', '--workspaces', '--if-present']);
+  }
 
   // ...and the workspace that half runs still has a test script, so `--if-present` is not silently
   // covering nothing. This is the floor: if `packages/snowarch` lost its script, the second half would

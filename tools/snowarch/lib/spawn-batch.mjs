@@ -85,5 +85,26 @@ export function batchCommand(file, args = [], { env = process.env } = {}) {
   };
 }
 
+/**
+ * `npm`, spelled for the platform — `npm.cmd` on Windows, where npm IS a batch file.
+ *
+ * ARC-09-C69. Four call sites wrote this expression themselves and two others passed a bare `npm`
+ * with `shell: true`, leaning on the shell to add the extension. The shell is what we are removing, so
+ * the name has to be right before the call rather than resolved inside one.
+ */
+export const npmCommand = (platform = process.platform) => (platform === 'win32' ? 'npm.cmd' : 'npm');
+
+/**
+ * What to spawn for `file` and `args` on this platform: `{ file, args, options }`, ready to spread.
+ *
+ * The one entry point a caller wants — it is `batchCommand` on Windows for a batch file and the
+ * unchanged call everywhere else, so no site has to carry a platform branch of its own. Every site
+ * that did carry one wrote `shell: process.platform === 'win32'`, which is the deprecated shape.
+ */
+export function spawnFor(file, args = [], { env = process.env, platform = process.platform } = {}) {
+  if (platform === 'win32' && isBatch(file)) return batchCommand(file, args, { env });
+  return { file, args, options: {} };
+}
+
 /** Is this a file Windows can only run through the command processor? */
 export const isBatch = (file) => /\.(cmd|bat)$/i.test(String(file));

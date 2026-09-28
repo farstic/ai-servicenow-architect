@@ -40,12 +40,19 @@ import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeSync } from 'node:fs';
+import { npmCommand, spawnFor } from '../tools/snowarch/lib/spawn-batch.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const skipBuild = process.argv.includes('--skip-build');
 const planOnly = process.argv.includes('--plan');
 
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npm = npmCommand();
+// ARC-09-C69 — one place, `spawnFor`: `shell: process.platform === 'win32'` with an args array is
+// DEP0190 on Node 24, and three steps below were each writing that expression for themselves.
+const runNpm = (args) => {
+  const call = spawnFor(npm, args);
+  return spawnSync(call.file, call.args, { cwd: root, encoding: 'utf8', ...call.options });
+};
 
 /** A step is a label, a command, and what its failure means. */
 const STEPS = [
@@ -77,19 +84,19 @@ const STEPS = [
   {
     id: 'dist',
     label: 'the server agrees with itself',
-    run: () => spawnSync(npm, ['run', 'test:contract'], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' }),
+    run: () => runNpm(['run', 'test:contract']),
     remedy: 'a contract invariant broke — the failing test names which',
   },
   {
     id: 'generated',
     label: 'the generated texts are what the generators produce',
-    run: () => spawnSync(npm, ['run', 'gen:check'], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' }),
+    run: () => runNpm(['run', 'gen:check']),
     remedy: 'a generated file is stale — run npm run gen and commit the result',
   },
   {
     id: 'engine',
     label: 'the engine agrees with the server',
-    run: () => spawnSync(npm, ['run', 'lint:contract'], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' }),
+    run: () => runNpm(['run', 'lint:contract']),
     remedy: 'the pin or a lint check disagrees — run node packages/contract/pin.mjs and read the proposal',
   },
 ];
