@@ -822,3 +822,60 @@ test('C35c — a destructured or inline spawn subject routes to its OWN spawn (i
     '});',
   ]), { argv: ['store', 'migrate', '--help'], route: 'server' });
 });
+
+test('C35c — the walk reaches the CASE, and a spelling call is not a driven shell (item 4)', () => {
+  // TWO DEFECTS IN ONE WALK, one in each direction, both measured.
+  const PRODUCT = [{ file: 'tools/snowarch/lib/planted.mjs',
+    text: 'export const line = (spell) => `run ${spell.cli} docs sync now`;\n' }];
+  const run = (lines) => audit({ tests: [{ file: 'tests/planted.test.mjs', text: `${lines.join('\n')}\n` }],
+    product: PRODUCT, baseline: EMPTY });
+
+  // The shape that already worked: a pinned ctx driven in, the assertion beside it.
+  const flat = run([
+    "test('t', () => {",
+    "  const out = render({ platform: 'win32', env: {} });",
+    "  assert.equal(out, 'run ./snowarch docs sync now');",
+    '});',
+  ]);
+  assert.equal(flat.agreed, 1, JSON.stringify(flat));
+  assert.deepEqual(flat.mismatches, []);
+
+  // THE FALSE POSITIVE. The same code with the assertion inside a nested callback was reported as a MISMATCH,
+  // because `while (!isFunctionLike(scope))` stopped at the `forEach` arrow and the ctx two lines above was
+  // outside it. It is an UNKNOWN now — the case did drive a shell, and whether it reached this value needs
+  // dataflow — which is the honest answer and not a defect report about correct code.
+  const nested = run([
+    "test('t', () => {",
+    "  const out = render({ platform: 'win32', env: {} });",
+    '  [out].forEach((one) => {',
+    "    assert.equal(one, 'run ./snowarch docs sync now');",
+    '  });',
+    '});',
+  ]);
+  assert.deepEqual(nested.mismatches, [], JSON.stringify(nested.mismatches));
+  assert.equal(nested.unresolved.length, 1);
+  assert.match(nested.unresolved[0].why, /needs dataflow this audit does not do/);
+
+  // THE FALSE NEGATIVE, and the one that matters more. A case whose expectation reads `${cli.cli}` from
+  // `const cli = spellings({ platform: 'linux', env: {} })` had THAT call counted as "a pinned shell driven
+  // somewhere in this case", so a pinned expectation against a DERIVING product line — the Windows-red class —
+  // was downgraded from a mismatch to an UNKNOWN and reported as nothing at all. A spelling call is not a shell
+  // being driven into the product; it IS the spelling.
+  const shadowed = run([
+    "describe('d', () => {",
+    '  const cli = spellings();',
+    "  it('a', () => {",
+    "    const cli = spellings({ platform: 'linux', env: {} });",
+    '    assert.equal(out, `run ${cli.cli} docs sync now`);',
+    '  });',
+    "  it('b', () => {",
+    '    assert.equal(out, `run ${cli.cli} docs sync now`);',
+    '  });',
+    '});',
+  ]);
+  assert.equal(shadowed.mismatches.length, 1, JSON.stringify(shadowed));
+  assert.equal(shadowed.mismatches[0].expectation, 'PINNED');
+  // ...and the OTHER case in the same describe still reads the outer constant, so shadowing resolves the way a
+  // reader of that file would read it: the inner `cli` for `it('a')`, the describe's for `it('b')`.
+  assert.equal(shadowed.agreed, 1);
+});

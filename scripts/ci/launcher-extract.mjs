@@ -549,6 +549,37 @@ function receivesPinned(sf, assertion, call, isPinnedName, bearing) {
 }
 
 /**
+ * The enclosing CASE, not the nearest arrow — ARC-07-C35c item 4.
+ *
+ * `while (!isFunctionLike(scope))` stops at the first callback, and an assertion inside a nested one is
+ * common: `[out].forEach((one) => { assert.equal(one, …) })`. Measured, that cost a FALSE POSITIVE — the same
+ * code with the assertion moved inside a `forEach` went from `EXPECTED_RENDERING` to a reported MISMATCH,
+ * because the ctx driven two lines above was outside the callback the walk stopped at. An audit that reports
+ * correct code is an audit somebody switches off.
+ *
+ * A case is the function a runner was handed, so the walk climbs until it finds one whose parent is a call to
+ * `test`/`it`/`describe`, and falls back to the outermost function-like when a fixture is written some other
+ * way. It never leaves the file.
+ */
+function enclosingCase(node) {
+  let scope = node.parent;
+  let outermost = null;
+  while (scope) {
+    if (ts.isFunctionLike(scope)) {
+      outermost = scope;
+      const parent = scope.parent;
+      if (parent && ts.isCallExpression(parent)) {
+        const name = ts.isIdentifier(parent.expression) ? parent.expression.text
+          : (ts.isPropertyAccessExpression(parent.expression) ? parent.expression.name.text : null);
+        if (name && /^(test|it|describe|suite)$/.test(name)) return scope;
+      }
+    }
+    scope = scope.parent;
+  }
+  return outermost;
+}
+
+/**
  * Was a pinned shell driven into SOME call in this case — item 3, narrowed from "mentioned anywhere".
  *
  * The wide version answered yes for any `'win32'`/`'linux'`/`'darwin'` string in the case, including a skip
@@ -557,19 +588,35 @@ function receivesPinned(sf, assertion, call, isPinnedName, bearing) {
  * when it was not driven into the value asserted here.
  */
 function pinnedDrivenSomewhereInCase(sf, assertion, isPinnedName, bearing) {
-  let scope = assertion.parent;
-  while (scope && !ts.isFunctionLike(scope)) scope = scope.parent;
+  const scope = enclosingCase(assertion);
   if (!scope) return false;
   let hit = false;
   const walk = (n) => {
     if (hit) return;
-    if (ts.isCallExpression(n) && receivesPinned(sf, assertion, n, isPinnedName, bearing)) {
+    if (ts.isCallExpression(n) && !isSpellingCall(n)
+      && receivesPinned(sf, assertion, n, isPinnedName, bearing)) {
       hit = true; return;
     }
     ts.forEachChild(n, walk);
   };
   walk(scope);
   return hit;
+}
+
+/**
+ * A call to the spelling functions themselves.
+ *
+ * ARC-07-C35c item 4, and the distinction is which QUESTION is being asked. For the SUBJECT's own chain a
+ * spelling call is exactly what is being driven — `assert.equal(spellings(WIN).cli, '.\\snowarch.cmd')` is an
+ * expected rendering, and excluding it there took the Windows renderings from 8 to 2, which is how I found this
+ * out. For "did the case drive a shell somewhere ELSE", a spelling call is not the product being driven; it IS
+ * the spelling, and counting it downgraded a real mismatch to an UNKNOWN — a pinned expectation against a
+ * deriving product line, reported as nothing at all.
+ */
+function isSpellingCall(call) {
+  const callee = ts.isIdentifier(call.expression) ? call.expression.text
+    : (ts.isPropertyAccessExpression(call.expression) ? call.expression.name.text : null);
+  return Boolean(callee && READS_THE_PROCESS.has(callee));
 }
 
 /**
