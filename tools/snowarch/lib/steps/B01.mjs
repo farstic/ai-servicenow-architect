@@ -9,6 +9,7 @@
 import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { localDir } from '../local-paths.mjs';
 import { cloudSyncWarning } from '../cloud-sync.mjs';
 import { checkMcpJson, checkSettingsJson } from '../registration.mjs';
 import { FILE, TEXT } from './inputs.mjs';
@@ -29,7 +30,7 @@ export const REGISTRATION_REMEDY =
 
 /** `.local/` at 0700, whether it is new or already there. Windows has no mode to set. */
 export function ensureLocalDir(root, plat = process.platform) {
-  const dir = join(root, '.local');
+  const dir = localDir(root);
   const existed = existsSync(dir);
   mkdirSync(join(dir, 'logs'), { recursive: true, mode: 0o700 });
   if (plat === 'win32') return { existed, modes: 'acl-inherited' };

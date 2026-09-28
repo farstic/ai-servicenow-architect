@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import { statePath } from '../local-paths.mjs';
 import { ALWAYS_DIRS, CORPUS_DIR, MODE, ROOT_FILES, readAreas } from './sync.mjs';
 import { verifyCitations } from './verify.mjs';
 import { needSpell, spellings } from '../text.mjs';
@@ -117,7 +118,7 @@ function sparseOf(corpus) {
  * checkout), and reporting both is the point: the disagreement is the finding.
  */
 function recordedMode(root) {
-  const p = join(root, '.local', 'bootstrap-state.json');
+  const p = statePath(root);
   if (!existsSync(p)) return null;
   try {
     const m = JSON.parse(readFileSync(p, 'utf8'))?.docs?.mode;

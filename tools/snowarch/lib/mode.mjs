@@ -18,7 +18,8 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { EXIT_FAIL, EXIT_OK, EXIT_PREREQ, EXIT_USAGE } from './exit.mjs';
-import { loadConfig, root as defaultRoot, stateRoot, version } from './config.mjs';
+import { loadConfig, root as defaultRoot, version } from './config.mjs';
+import { storePath as storePathOf } from './local-paths.mjs';
 import { checkLocation, checkMode } from './instance-file.mjs';
 import { LIVE_YES_WITHOUT_FILE, liveYesNeedsInstanceFile } from './bootstrap.mjs';
 import { CREATED_BY_US, SCOPES, resolveClaude, register as registerServer, serverEntry, unregister }
@@ -75,8 +76,8 @@ export const NOT_BOOTSTRAPPED = (spell) =>
   + `${needSpell(spell, 'NOT_BOOTSTRAPPED').bootstrap} first (mode switches an existing `
   + 'installation; it does not create one)';
 
-// ARC-07-C43 — the store follows `.local/`; a redirected state root moves it with the rest.
-export const storePath = (root) => join(stateRoot(root), '.local', 'instances.json');
+// ARC-07-C43 head 2 — `local-paths.mjs` owns it; re-exported for this module's importers.
+export const storePath = storePathOf;
 
 /** The label only. Never the store's contents: this file names an instance, it does not open it. */
 export function defaultLabel(root, read = readDefaultLabel) {

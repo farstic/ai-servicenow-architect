@@ -8,6 +8,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
+import { statePath as statePathOf } from '../local-paths.mjs';
 
 export const ROOT_FILES = ['.gitignore', 'LICENSE', 'README.md', 'llms.txt', 'llms_template.txt'];
 
@@ -373,7 +374,7 @@ export function resolveMode(root, requested) {
     }
     return requested;
   }
-  const statePath = join(root, '.local', 'bootstrap-state.json');
+  const statePath = statePathOf(root);
   if (existsSync(statePath)) {
     try {
       const recorded = JSON.parse(readFileSync(statePath, 'utf8'))?.docs?.mode;

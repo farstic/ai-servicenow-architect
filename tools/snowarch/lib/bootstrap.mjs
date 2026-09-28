@@ -7,6 +7,7 @@
 import { lineReader } from './ask.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { storePath } from './local-paths.mjs';
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from './exit.mjs';
 import { loadConfig, root as defaultRoot, version } from './config.mjs';
 import { checkLocation, checkMode } from './instance-file.mjs';
@@ -147,7 +148,7 @@ export async function bootstrapCommand({ flags, log, root = defaultRoot, argv = 
   // refusal sentence FROM this one, and a second edge would close the cycle.
   if (liveYesNeedsInstanceFile({ mode: flags.mode, yes: flags.yes,
     instanceFile: flags['instance-file'],
-    hasStore: existsSync(join(root, '.local', 'instances.json')) })) {
+    hasStore: existsSync(storePath(root)) })) {
     return refuse(LIVE_YES_WITHOUT_FILE);
   }
 

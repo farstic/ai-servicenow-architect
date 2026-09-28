@@ -12,6 +12,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { storePath } from '../local-paths.mjs';
 import { codeForStatus, probeAuth } from '../probe-auth.mjs';
 import { readInstanceFile, SENTENCE } from '../instance-file.mjs';
 import { childEnv } from '../spawn-env.mjs';
@@ -110,10 +111,10 @@ export function awaitChild(child) {
   });
 }
 
-export const storeExists = (root) => Boolean(root) && existsSync(join(root, '.local', 'instances.json'));
+export const storeExists = (root) => Boolean(root) && existsSync(storePath(root));
 
 function shapeOf(root) {
-  const p = join(root, '.local', 'instances.json');
+  const p = storePath(root);
   if (!existsSync(p)) return { present: false, version: null };
   try {
     // Presence and schema version only. This file holds credentials, and a hash input that read
@@ -330,7 +331,7 @@ export async function fromInstanceFile(ctx) {
     { ...e, flags: completeFlags(e.preset === 'custom' ? e.flags : expandPreset(contract, e.preset)) },
   ]));
 
-  saveStore(join(ctx.root, '.local', 'instances.json'),
+  saveStore(storePath(ctx.root),
     { version: file.store.version, defaultInstance: file.defaultInstance, instances });
 
   ctx.line?.(SENTENCE.stillThere(ctx.instanceFile));
@@ -431,7 +432,7 @@ export const run = async (ctx) => {
   // The wizard exists to ADD an instance. A checkout that has one is not being asked to, whoever
   // is watching.
   const { readDefaultSummary } = await import('../../../../packages/snowarch/dist/store/label.js');
-  const kept = readDefaultSummary(join(ctx.root, '.local', 'instances.json'));
+  const kept = readDefaultSummary(storePath(ctx.root));
   if (kept) {
     // ON THE LINE, not only in the state file. A person watching an upgrade reads the step line and
     // nothing else, and this step line said `ok` while the decision underneath it was the keep-path
@@ -470,7 +471,7 @@ export const run = async (ctx) => {
 
   // The same reader the keep-path above used; imported once, higher up, because a second
   // `const { readDefaultSummary }` in one function is a second binding of one name.
-  const label = readDefaultSummary(join(ctx.root, '.local', 'instances.json'));
+  const label = readDefaultSummary(storePath(ctx.root));
   // ARC-06-C15 — RECORD what the wizard just saved. `./snowarch mode` reported
   // `instance=<label> (unknown) preset=unknown` on every live checkout because it read
   // `state.instance` and `state.steps.B08.data.instance`, and nothing in the tree wrote either.

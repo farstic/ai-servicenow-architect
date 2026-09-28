@@ -10,6 +10,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { bootstrapOf, cliOf } from '../spell.mjs';
 import { join } from 'node:path';
+import { localDir } from '../../local-paths.mjs';
 
 import { makeExec, samePath } from '../../steps/B00.mjs';
 import { loadStateOrReason, STATE_VERSION } from '../../state.mjs';
@@ -494,7 +495,7 @@ export function engineRepoChecks() {
       spawns: false,
       fixable: true,
       run: async (ctx) => {
-        const local = join(ctx.root, '.local');
+        const local = localDir(ctx.root);
         if (!existsSync(local)) {
           // `fixable: false` on the RESULT: the check can be fixable (a wrong mode is one command),
           // but an absent `.local/` is an install that never ran, and `--fix` does not install.

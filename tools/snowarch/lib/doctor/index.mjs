@@ -16,6 +16,7 @@ import { bootstrapOf, cliOf, spellFor } from './spell.mjs';
 import { spellings } from '../text.mjs';
 import { loadStateOrReason } from '../state.mjs';
 import { dirname, join, resolve } from 'node:path';
+import { statePath, storePath } from '../local-paths.mjs';
 
 import { loadContract } from '../../../../packages/contract/lib/contract.mjs';
 import { EXIT_OK, EXIT_USAGE, EXIT_PREREQ } from '../exit.mjs';
@@ -131,7 +132,7 @@ export function serverEnabled(root, config) {
 /** The recorded mode, or `null`. An unreadable state file is E-11's finding, not this one's. */
 export function readMode(root) {
   try {
-    return JSON.parse(readFileSync(join(root, '.local', 'bootstrap-state.json'), 'utf8'))?.mode ?? null;
+    return JSON.parse(readFileSync(statePath(root), 'utf8'))?.mode ?? null;
   } catch {
     return null;
   }
@@ -174,7 +175,7 @@ export function findRoot(from) {
  * from the one asked.
  */
 function storeSummaries(root, config) {
-  const path = process.env.SNOW_STORE || join(root, '.local', 'instances.json');
+  const path = process.env.SNOW_STORE || storePath(root);
   try {
     return readStoreSummaries(path).map((i) => ({ ...i, status: 'configured' }));
   } catch {
@@ -250,7 +251,7 @@ export async function runDoctor({ root, config, registry = engineRegistry(), sec
     toggles: { enabled: serverEnabled(root, config) },
     instances: probed ? instances : fromStore,
     probed,
-    bootstrapped: existsSync(join(root, '.local', 'bootstrap-state.json')),
+    bootstrapped: existsSync(statePath(root)),
     // ARC-08-C16 — which entry carries the server. Our own record, read from
     // `bootstrap-state.json`; NOT `~/.claude.json`, which this module promises never to read.
     // ARC-07-C37 — `'project'` is the DERIVATION's default and stays one, but the read no longer
@@ -415,7 +416,7 @@ export async function fixCommand({ root, config, registry, options, env, home, n
     mode: state?.mode ?? null,
     docsMode: state?.docs?.mode ?? 'sparse',
     registration: state?.registration ?? 'project',
-    storePath: join(root, '.local', 'instances.json'),
+    storePath: storePath(root),
   };
   const applied = await applyPlan(plan, fixCtx, deps);
   for (const entry of applied) {
