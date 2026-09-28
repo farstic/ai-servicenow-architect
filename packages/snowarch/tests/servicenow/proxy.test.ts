@@ -4,7 +4,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AddressInfo, Socket } from 'node:net';
-import { proxyConfigured, resetHttpDispatcher, snFetch } from '../../src/servicenow/http.js';
+import { dispatcherKind, proxyConfigured, resetHttpDispatcher,
+  snFetch } from '../../src/servicenow/http.js';
 import { sanitiseProxyEnv } from '../../src/env-sanitise.js';
 import { classifyNetworkError } from '../../src/servicenow/net-errors.js';
 
@@ -225,5 +226,38 @@ describe('criterion 7 - one HTTP call site', () => {
       .filter((f) => /(?<![\w.])fetch\s*\(/.test(readFileSync(f, 'utf8')))
       .map(rel);
     expect(callers).toEqual([]);
+  });
+});
+
+/*
+ * ARC-07-C44 — a machine with NO proxy was being warned about the proxy feature it was not using.
+ *
+ * `EnvHttpProxyAgent` is experimental, so constructing it prints `[UNDICI-EHPA] Warning: …` plus a
+ * `--trace-warnings` line to stderr. It was constructed unconditionally, so the owner's 2.0.7
+ * upgrade run showed the warning on a machine where E-26 reported no proxy at all.
+ *
+ * THE CHOICE IS WHAT IS ASSERTED, not the warning. Node emits that warning once per process, on
+ * construction, so a case watching for it would pass whether or not the defect was back as soon as
+ * any earlier file in the run had triggered it. `dispatcherKind` is the decision itself.
+ */
+describe('criterion 7 - the experimental proxy agent is built only when there is a proxy', () => {
+  it('no proxy and no seam: the ordinary global dispatcher, which warns about nothing', () => {
+    expect(dispatcherKind({}, undefined)).toBe('global');
+  });
+
+  it('a proxy: the proxy agent, and its warning is then about a feature in use', () => {
+    expect(dispatcherKind({ HTTPS_PROXY: 'http://proxy.example:3128' }, undefined)).toBe('proxy');
+    expect(dispatcherKind({ http_proxy: 'http://proxy.example:3128' }, undefined)).toBe('proxy');
+  });
+
+  it('the connect seam with no proxy still gets a dispatcher that honours it', () => {
+    // `resetHttpDispatcher({ lookup })` is how the direct-path cases above inject a resolver. That
+    // must keep working without a proxy, and without reaching for the experimental agent to do it.
+    expect(dispatcherKind({}, { lookup: () => {} })).toBe('connect');
+  });
+
+  it('a proxy wins over the seam, so a proxied run is never silently made direct', () => {
+    expect(dispatcherKind({ HTTPS_PROXY: 'http://proxy.example:3128' },
+      { lookup: () => {} })).toBe('proxy');
   });
 });

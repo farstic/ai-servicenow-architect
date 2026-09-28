@@ -13,6 +13,7 @@
  */
 import { probeClientFor, probeOptionsFor } from '../servicenow/probe-client.js';
 import { probeAll } from '../servicenow/probes.js';
+import { withLogLevel } from '../utils/logging.js';
 import { storeEntry } from './store-entry.js';
 import { cliSpelling } from '../cli/tty.js';
 /** `auth ok · write ok · scripting role missing (…)` — one line, statuses only. */
@@ -64,7 +65,11 @@ export function makeProbes(deps = {}) {
                 };
             }
             const client = makeClient({ url: entry.url, auth: entry.auth });
-            const result = await probe(client, probeOptionsFor(entry.auth, env));
+            // ARC-07-C44 — QUIET. The probe drives the ordinary query path, which logs a line per table
+            // at INFO, and the operator's terminal showed all seven of them during `doctor` and again
+            // during B08 verify. The statuses are reported by `describeProbes` below; the query log is
+            // the server's, not the report's. `error` is the level the handshake child is already given.
+            const result = await withLogLevel('error', () => probe(client, probeOptionsFor(entry.auth, env)));
             const status = statusOf(result);
             const detail = `${label}: ${describeProbes(result)}`;
             const data = { label, auth: result.auth.status,

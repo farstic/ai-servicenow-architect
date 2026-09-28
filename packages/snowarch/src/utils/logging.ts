@@ -17,7 +17,35 @@ type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
 const LEVEL_ORDER: Record<LogLevel, number> = { error: 0, warn: 1, info: 2, debug: 3 };
 
+/**
+ * A level pinned for one call, ahead of the environment — ARC-07-C44.
+ *
+ * The doctor's probe runs the ordinary query path, which logs `Querying ServiceNow table: …` at
+ * INFO, so a `doctor` run printed seven of those lines into the operator's terminal and B08 printed
+ * them again during verify. The report is the doctor's output; the query log is not.
+ *
+ * NOT `process.env.SNOW_LOG_LEVEL = 'error'` around the call, which is how it would have to be done
+ * without this: the doctor calls the probe IN-PROCESS, so that would mutate the environment of
+ * whatever is hosting it and would have to be restored in a `finally` that a throw between the two
+ * could still skip. An override this module owns cannot leak into anyone else's environment.
+ *
+ * The level itself is the one `doctor/checks.ts` already pins for the handshake child it spawns, so
+ * a quiet probe and a quiet handshake are one decision spelled once rather than two.
+ */
+let override: LogLevel | null = null;
+
+export async function withLogLevel<T>(level: LogLevel, fn: () => Promise<T>): Promise<T> {
+  const previous = override;
+  override = level;
+  try {
+    return await fn();
+  } finally {
+    override = previous;
+  }
+}
+
 function activeLevel(): number {
+  if (override) return LEVEL_ORDER[override];
   const lvl = (process.env.SNOW_LOG_LEVEL || process.env.LOG_LEVEL || 'info').toLowerCase();
   return LEVEL_ORDER[lvl as LogLevel] ?? LEVEL_ORDER.info;
 }

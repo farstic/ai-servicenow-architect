@@ -16,10 +16,29 @@
  * reason for it is that a second call site is a second place where proxy support silently does
  * not apply — and it would fail only on the machines least able to debug it.
  */
-import { EnvHttpProxyAgent, fetch as undiciFetch, type Dispatcher } from 'undici';
+import { Agent, EnvHttpProxyAgent, fetch as undiciFetch, getGlobalDispatcher,
+  type Dispatcher } from 'undici';
 
 let dispatcher: Dispatcher | undefined;
 let connectOptions: Record<string, unknown> | undefined;
+
+/**
+ * Which dispatcher this environment calls for — a function, so the CHOICE can be asserted.
+ *
+ * ARC-07-C44. The observable consequence of choosing `proxy` is a warning Node emits ONCE per
+ * process, on construction, which makes it useless to assert in a suite where some earlier file may
+ * already have triggered it: a case watching for the warning would pass whether or not the bug was
+ * back. The decision itself has no such problem, so the decision is what a case reads.
+ */
+export type DispatcherKind = 'proxy' | 'connect' | 'global';
+
+export function dispatcherKind(
+  env: NodeJS.ProcessEnv = process.env,
+  connect?: Record<string, unknown>,
+): DispatcherKind {
+  if (proxyConfigured(env)) return 'proxy';
+  return connect ? 'connect' : 'global';
+}
 
 /**
  * Built on first use, then reused: one connection pool for the process.
@@ -29,7 +48,34 @@ let connectOptions: Record<string, unknown> | undefined;
  */
 function getDispatcher(): Dispatcher {
   if (!dispatcher) {
-    dispatcher = new EnvHttpProxyAgent(connectOptions ? { connect: connectOptions } : undefined);
+    /*
+     * ARC-07-C44 — THE PROXY AGENT IS BUILT ONLY WHEN THERE IS A PROXY.
+     *
+     * `EnvHttpProxyAgent` is flagged experimental by undici, so CONSTRUCTING it prints
+     * `[UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental` plus a `--trace-warnings` line to
+     * stderr — once per process, on the first request. Measured in the owner's 2.0.7 upgrade run,
+     * where E-26 reported no proxy configured: the warning was printed anyway, because the agent was
+     * built unconditionally. A machine with no proxy was being warned about a proxy feature it was
+     * not using.
+     *
+     * The fix is the condition, NOT a suppressed warning. `process.noDeprecation`, a
+     * `--no-warnings` flag or a `warning` listener would hide every other warning Node has to give
+     * us, including ones about the code we are about to ship. On a machine that IS proxied the agent
+     * is built and the warning prints — that one is true, and it names the feature actually in use.
+     *
+     * `connect` keeps its own arm: it is the test seam for a custom `lookup`, and a test that sets
+     * it with no proxy still needs a dispatcher that honours it. `Agent` is undici's ordinary pooling
+     * dispatcher and is not experimental, so that arm prints nothing either.
+     */
+    const kind = dispatcherKind(process.env, connectOptions);
+    if (kind === 'proxy') {
+      dispatcher = new EnvHttpProxyAgent(connectOptions ? { connect: connectOptions } : undefined);
+    } else if (kind === 'connect') {
+      dispatcher = new Agent({ connect: connectOptions });
+    } else {
+      // No proxy and no seam: undici's global dispatcher, which is what `fetch` would use anyway.
+      dispatcher = getGlobalDispatcher();
+    }
   }
   return dispatcher;
 }

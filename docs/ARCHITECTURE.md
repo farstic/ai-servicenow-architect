@@ -1338,7 +1338,7 @@ survives a truncated paste:
 
 <!-- generated:doctor-text -->
 ```
-snowarch doctor 2.0.0 — 2026-09-04 10:00:12 (quick: no · network: yes · section: all)
+snowarch doctor 2.0.0 — 2026-09-04 10:00:12 UTC (quick: no · network: yes · section: all)
 
 prereqs
   E-00  ok    Claude Code CLI: 2.1.258 >= 2.1.214, logged in

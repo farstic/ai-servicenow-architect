@@ -9,6 +9,25 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+Three things the terminal said that it should not have. A `doctor` run — and the verify step of an
+install — printed seven `Querying ServiceNow table: …` lines from the probe's own query log, and
+warned that an experimental proxy feature was in use on machines with no proxy configured at all; the
+report's header dated a run without saying which clock it was on, one line above a panel that did; and
+an install run with `--yes`, which is how `upgrade` runs it, offered four keys to press above a plan
+nothing would be asked about. No configuration changes, and nothing to migrate.
+
+### Fixed
+
+- `doctor` and the install's verify step no longer print the probe's own `Querying ServiceNow table: …`
+  lines: the probe runs at the log level the handshake child already used. The experimental-proxy
+  warning is gone too on machines with no proxy — the agent that emits it is now built only when a
+  proxy is actually configured, rather than the warning being suppressed.
+- The doctor's report header says `UTC`, so the instant it prints and the one the status panel prints
+  a line later are one clock with one spelling.
+- An install accepted with `--yes` prints `Plan — running it as shown  (accepted: --yes)` instead of
+  offering Enter, a number, `?` and `q` on a screen that asks nothing — `q` in particular did nothing
+  for a reader who wanted out.
+
 ## 2.0.7 — 2026-09-27
 
 ### Notes
