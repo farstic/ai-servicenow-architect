@@ -84,13 +84,13 @@ Get-ChildItem memory, scratchpad, deliverables, diagram-preview -ErrorAction Sil
 macOS / Linux:
 
 ```sh
-git -c advice.detachedHead=false clone --branch v2.0.7 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
+git -c advice.detachedHead=false clone --branch v2.0.8 https://github.com/farstic/ai-servicenow-architect.git && cd ai-servicenow-architect && ./bootstrap.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-git -c advice.detachedHead=false clone --branch v2.0.7 https://github.com/farstic/ai-servicenow-architect.git
+git -c advice.detachedHead=false clone --branch v2.0.8 https://github.com/farstic/ai-servicenow-architect.git
 cd ai-servicenow-architect
 .\bootstrap.cmd
 ```

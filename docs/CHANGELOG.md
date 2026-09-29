@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.8 — 2026-09-29
+
+### Notes
+
 **This release is almost entirely about Windows, and about checks that should never blame the machine
 they are diagnosing.** Nothing here changes how the product is configured, there is no migration step,
 and an existing checkout keeps its instance store, its preset and its flags untouched. The bundled
@@ -114,6 +118,55 @@ preflight still sees prereleases, which is what it needs.
 - plan: the state-root seam commissioned with its two heads and its control (#339 `3a673d0`)
 - plan: ARC-07-C33 closed against C43, with the credit left where it belongs (#346 `4166d23`)
 - release: develop to 2.0.8-dev, and v2.0.7's pages ported back (#329 `f66e893`)
+
+### Added
+
+- engine: the state-root seam beside root discovery, inert until head 2 (94c0515)
+- ci: the launcher audit reads a regex, with the four pieces that stop it crying wolf (9bacf14)
+
+### Fixed
+
+- doctor: E-27 runs the claude shim instead of parsing it, so a working install passes (85b88dd)
+- tests: every release() call pins a platform, and a case asserts the class (09f2b84)
+- tests: the cases pin the platform where the platform is not the subject (d2a221c)
+- release: the gate runner names npm for the platform, and shows what it refused on (c34f441)
+- ci: nothing spawns an args array with a shell, and the scan reads the shape (17af0a8)
+- doctor: E-03 stops telling a machine with a working npm to reinstall Node (2ce5eda)
+- bootstrap: a Windows .cmd runs through cmd.exe, quoted — never `shell: true` with args (b907c8a)
+- bootstrap: an accepted plan does not offer keys there is no prompt to press (f7c8cbc)
+- doctor: the report header says UTC, so its clock and the panel's are one (4474865)
+- doctor: the probe runs quiet, and the proxy agent is built only when there is a proxy (80db06d)
+- ci: the audit's stored reason names the file, not a line number that moves (63cb9b1)
+- engine: a read-only command leaves no log, which the logger already claimed (befe2f5)
+- ci: a sentence matches at word boundaries, and an agreement says how many lines it rests on (0d4d14a)
+- ci: the audit's baseline is per site, so a resolution and a regression cannot cancel out (2e431b0)
+- ci: the scope walk reaches the case, and a spelling call is not a driven shell (4309d4f)
+- ci: a destructured or inline spawn subject routes to its own spawn (5566d5e)
+- ci: a search call's sentence is its argument, not the haystack it looks in (d1c40aa)
+- ci: a pinned shell is one whose platform is named, not one that avoids the word `process` (ae127f7)
+- release: the changelog's range is the newest FINAL tag, not the newest prerelease (d8214e6)
+
+### Changed
+
+- engine: every path under .local/ has one home, and the redirect reaches all of it (49ac63e)
+
+### Internal
+
+- changelog: the 2.0.8 Unreleased block, written before the rc (3911a6c)
+- plan: C33 is closed against C43, and the credit stays where it belongs (111e595)
+- engine: the shim-refusal case creates its premise instead of borrowing it from the host (887f018)
+- the git 2.54 clone warning, in the generator that owns the page (147dbeb)
+- plan: ARC-09-C70, and C69's confirmed count with the two blind spots its controls found (3565045)
+- ci: the spawn-shape reader is a module, so a case drives it instead of a copy (cb92487)
+- ARC-09-C67 and C68, and the spelling a PowerShell reader sees is correct (28c4caf)
+- plan: C43 delivered — both heads, and the count was twenty-five not twenty (6088b8c)
+- engine: the five suites that run the real CLI write their .local/ somewhere else (2e55ebc)
+- plan: C44, C45 and C46 — the owner's three findings, with what was measured (dce6001)
+- plan: C43's boundary is ruled — the twenty paths are head 2, and head 1 is inert (5ce7f8d)
+- plan: ARC-07-C43 — the state-root seam, commissioned with its heads and its control (23c073f)
+- C33 is one command of a class, not closed — the measured list and the seam's size (bbd61ed)
+
+Tag v2.0.8 · contract 029b44f944f9 · docs-pin 68c0d11
 
 ## 2.0.7 — 2026-09-27
 
