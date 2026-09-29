@@ -9,24 +9,111 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-Three things the terminal said that it should not have. A `doctor` run — and the verify step of an
-install — printed seven `Querying ServiceNow table: …` lines from the probe's own query log, and
-warned that an experimental proxy feature was in use on machines with no proxy configured at all; the
-report's header dated a run without saying which clock it was on, one line above a panel that did; and
-an install run with `--yes`, which is how `upgrade` runs it, offered four keys to press above a plan
-nothing would be asked about. No configuration changes, and nothing to migrate.
+**This release is almost entirely about Windows, and about checks that should never blame the machine
+they are diagnosing.** Nothing here changes how the product is configured, there is no migration step,
+and an existing checkout keeps its instance store, its preset and its flags untouched. The bundled
+documentation corpus does not move; it stays at `68c0d11`.
+
+**The `.cmd` launchers run properly, and quietly.** Every launcher run on Windows used to print
+`[DEP0190] DeprecationWarning: Passing args to a child process with shell option true …` and its
+`--trace-deprecation` line — during bootstrap, during the doctor, during `mode live`, and three times
+during an upgrade, once between `Proceed? [Y/n]` and your answer. A `.cmd` cannot be spawned directly
+(Node closed CVE-2024-27980), and the previous answer to that — a shell — is what Node 24 deprecates.
+Batch files now go through `cmd.exe` with a command line quoted here rather than by the command
+processor, so the warning is gone and the quoting is ours.
+
+**The npm check stops blaming a healthy machine for a space in a path.** On a machine whose npm was
+working perfectly — the install's own `npm ci` had just succeeded — the doctor reported `npm found but
+did not answer --version: 'C:\Program' is not recognized as an internal or external command` and advised
+reinstalling Node.js. The cause was our own unquoted spawn. "npm is missing" and "our call to npm
+failed" are different facts and now get different remedies: an absent npm still says how to get one, and
+a present one that did not answer hands you the exact command to try.
+
+**E-27 runs your Claude launcher instead of reading it.** On Windows, `claude` installed from npm is a
+`.cmd` shim, and the doctor used to parse that file for its entry point. Claude Code 2.1.282's shim does
+not carry the shape it looked for, so a machine where `claude --version` worked and Claude Code was
+connected with 397 tools was told its launcher could not be read and to reinstall Claude Code. The check
+runs the shim when it cannot parse it now, and keeps the refusal only for a launcher that can be neither
+parsed nor run.
+
+**The doctor is quieter, and its clock says which clock it is.** A `doctor` run — and the verify step of
+an install — printed seven `Querying ServiceNow table: …` lines from the probe's own query log; the probe
+runs at the level the handshake already used. The experimental-proxy warning is gone on a machine with no
+proxy: the agent that emits it is built only when a proxy is actually configured, rather than the warning
+being suppressed. And the report's header prints `UTC`, so the instant it shows and the one the status
+panel shows a line later are one clock with one spelling.
+
+**Two smaller things you see.** An install accepted with `--yes` — which is how `upgrade` runs it —
+prints `Plan — running it as shown  (accepted: --yes)` rather than offering Enter, a number, `?` and `q`
+on a screen that asks nothing; `q` in particular did nothing for a reader who wanted out. And a
+read-only command leaves no log: `./snowarch version` and a bare `./snowarch mode` used to write
+`.local/logs/<command>-<stamp>.log` on every run, which the logger's own contract had said for three
+releases they should not.
+
+**One release-machinery fix worth knowing if you read this file.** After a release candidate, the
+changelog's range counted from the newest tag including prereleases, so a final release's section would
+have covered only the commits since its own rc. It counts from the newest FINAL tag now, while the
+preflight still sees prereleases, which is what it needs.
+
+### Added
+
+- `tools/snowarch/lib/spawn-batch.mjs`: the one place that knows how to run a `.cmd` on Windows —
+  `cmd.exe /d /s /c` with a command line quoted here rather than by the shell. `/d` skips registry
+  AutoRun, so a machine-local value cannot reach a diagnostic, and an argument the command processor
+  would rewrite is refused with a sentence rather than sent (#343 `30fb48f`).
+- `tools/snowarch/lib/local-paths.mjs`: every path under `.local/` named once — the state, the store,
+  the config, the doctor's cache and its inputs, the upgrade check and the log directory
+  (#342 `a4eee05`).
 
 ### Fixed
 
-- `doctor` and the install's verify step no longer print the probe's own `Querying ServiceNow table: …`
-  lines: the probe runs at the log level the handshake child already used. The experimental-proxy
-  warning is gone too on machines with no proxy — the agent that emits it is now built only when a
-  proxy is actually configured, rather than the warning being suppressed.
-- The doctor's report header says `UTC`, so the instant it prints and the one the status panel prints
-  a line later are one clock with one spelling.
-- An install accepted with `--yes` prints `Plan — running it as shown  (accepted: --yes)` instead of
-  offering Enter, a number, `?` and `q` on a screen that asks nothing — `q` in particular did nothing
-  for a reader who wanted out.
+- Windows launcher runs no longer print Node's `DEP0190` deprecation: a batch file goes through
+  `cmd.exe` with one quoted command line instead of a shell plus an args array (#343 `30fb48f`).
+- E-03 no longer tells a machine with a working npm to reinstall Node.js, and a resolved path with a
+  space in it survives the spawn (#343 `30fb48f`).
+- E-27 runs the `claude.CMD` shim when its entry point cannot be parsed, so a working Claude Code
+  install is no longer reported as unreadable (#345 `8efe868`).
+- The doctor's probe runs quiet: the seven `Querying ServiceNow table: …` lines are gone from `doctor`
+  and from the install's verify step (#340 `f1c8e8b`).
+- The experimental-proxy warning is not printed on a machine with no proxy configured (#340 `f1c8e8b`).
+- The doctor's report header says `UTC`, so it and the status panel agree about the clock
+  (#340 `f1c8e8b`).
+- An install accepted with `--yes` prints no interactive legend above a plan it will not ask about
+  (#340 `f1c8e8b`).
+- A read-only command leaves no log file: `version`, and `mode` with no argument, write nothing under
+  `.local/` (#338 `509842d`).
+- Five test suites that run the real CLI no longer write into the checkout they are testing — 13 files
+  before, none after, measured either side by the same instrument (#342 `a4eee05`).
+- After a release candidate, the changelog's range starts at the newest FINAL tag rather than the newest
+  prerelease (#330 `9720320`).
+- The Windows release dry run reaches its gates again: the plan names `npm` the way the platform spells
+  it, and a gate that fails shows what it failed on instead of an exit code alone (#344 `1e7256d`).
+
+### Changed
+
+- The launcher audit reads a regex, and resolves a spelling to the product line that prints it through
+  four more shapes: a pinned shell named by its platform, a search call's own sentence, a destructured
+  or inline spawn subject, and a scope walk that reaches the case (#331 `4cb1fc9`, #332 `3d51431`,
+  #333 `6f49535`, #334 `a8f2dee`, #337 `f4523b5`).
+- The audit's baseline is per site, so a resolution and a regression can no longer cancel out in one
+  total, and a sentence matches at word boundaries (#335 `2217a18`, #336 `5f57951`).
+- Nothing in the repository spawns an args array together with a shell, and a reader over the engine,
+  both test roots and `scripts/` asserts it — parsing rather than grepping, because one command string
+  with a shell is not the deprecated shape (#344 `1e7256d`).
+- The release's gate runner is a function with cases rather than a closure no test could reach
+  (#344 `1e7256d`).
+- Where the engine writes its `.local/` is a seam the test harness can redirect, so a suite that runs
+  the real CLI writes somewhere private instead of into the checkout. Not a knob for an installation:
+  nothing in the product sets it, and `docs/CONTRIBUTING.md` is where it is written down
+  (#341 `f175ec7`, #342 `a4eee05`).
+- Cases that are not about the platform pin one, so a spelling the product derives cannot make a suite
+  assert different things on different machines (#344 `1e7256d`).
+
+### Internal
+
+- plan: the state-root seam commissioned with its two heads and its control (#339 `3a673d0`)
+- plan: ARC-07-C33 closed against C43, with the credit left where it belongs (#346 `4166d23`)
+- release: develop to 2.0.8-dev, and v2.0.7's pages ported back (#329 `f66e893`)
 
 ## 2.0.7 — 2026-09-27
 
