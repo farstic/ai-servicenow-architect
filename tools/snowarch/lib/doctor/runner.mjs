@@ -66,18 +66,21 @@ export function planRun(checks, { quick = false, noNetwork = false, sections = n
 const timeoutFor = (check) => (check.network ? NETWORK_TIMEOUT_MS : DEFAULT_TIMEOUT_MS);
 
 /** One check, run defensively: never throws, always timed, always shaped like a CheckResult. */
-async function runOne(check, ctx, now) {
+async function runOne(check, ctx, now, budgetFor = timeoutFor) {
   const started = now();
-  const budget = timeoutFor(check);
+  const budget = budgetFor(check);
   let timer;
   try {
     const result = await Promise.race([
       Promise.resolve(check.run(ctx)),
       new Promise((_, reject) => {
+        // ARC-09-C77 — REF'D, because it bounds an awaited check, and cleared in `finally` so it never
+        // holds a run whose checks have answered. It was unref'd "so it does not keep the process alive
+        // once every check has answered" — which the `clearTimeout` already guaranteed — and the price
+        // was a budget the event loop could not see: a check pending on nothing ended the whole doctor
+        // in exit 13 before its budget fired, with no report at all.
         timer = setTimeout(() => reject(new Error(`timed out after ${Math.round(budget / 1000)} s`)),
           budget);
-        // An unref'd timer does not keep the process alive if every check has already answered.
-        if (typeof timer?.unref === 'function') timer.unref();
       }),
     ]);
     return { ...result, id: check.id, durationMs: now() - started };
@@ -154,7 +157,9 @@ export async function runChecks(checks, ctx, options = {}) {
   const results = [];
 
   for (const check of selected) {
-    const raw = await runOne(check, ctx, now);
+    // `options.timeoutFor` beside `options.now`: a budget the tests replace, so it is proven without
+    // being spent (ARC-03-C1's rule). Absent, each check gets the one `timeoutFor` gives it.
+    const raw = await runOne(check, ctx, now, options.timeoutFor);
     results.push(redactResult(
       applyContractRemedy(raw, ctx?.contract ?? null, spellings({ platform: ctx?.platform, env: ctx?.env })),
       options));
