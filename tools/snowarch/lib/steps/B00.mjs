@@ -220,8 +220,18 @@ export function checkDisk({ root, docs, plat, statfs = statfsSync }) {
  * An upstream that needs no network, or one this probe cannot speak to, is reported rather than
  * skipped in silence: the line says which, and the two are not the same claim.
  */
-/** A pause the tests replace, so the schedule is proven without being spent (ARC-03-C1's rule). */
-const pause = (ms) => new Promise((resolve) => { const t = setTimeout(resolve, ms); t.unref?.(); });
+/**
+ * A pause the tests replace, so the schedule is proven without being spent (ARC-03-C1's rule).
+ *
+ * ARC-09-C76 — and a pause that HOLDS the event loop. It used to `unref()` its timer, and an awaited
+ * unref'd timer is a promise nothing keeps alive: when a retryable failure leaves no socket open — a
+ * refused connection does exactly that — the loop is empty for the whole wait, and Node ends the
+ * process with `main()` still pending: exit 13, `Detected unsettled top-level await`, where the
+ * operator was owed a retry and then exit 3. Under `node:test` the runner keeps the loop alive, so no
+ * in-process case can see it; the one that does runs the real CLI in a child
+ * (`tools/snowarch/tests/b00-settles.test.mjs`).
+ */
+const pause = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
 export async function checkNetwork({ env, plat, probe = probeNetwork, target, upstream,
                                      sleep = pause }) {

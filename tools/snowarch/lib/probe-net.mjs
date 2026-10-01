@@ -212,14 +212,20 @@ export async function probeNetwork({ target = DEFAULT_TARGET, env = process.env,
   const port = Number(url.port || 443);
   const proxy = proxyFor(host, env);
 
+  // A ceiling over the WHOLE probe, not only over each socket. The story's budget is a number of
+  // seconds the operator waits, and three sequential 10-second waits inside one step is not that
+  // number however careful each individual timeout is.
+  //
+  // ARC-09-C76: a REF'D timer, cleared in `finally`. Unref'd, the one thing guaranteed to settle the
+  // race was invisible to the event loop, so a request pending without a handle of its own left a
+  // probe that never settled and a process that ended under it. Cleared, it still does not hold a
+  // process whose probe has already answered.
+  let ceiling;
   try {
-    // A ceiling over the WHOLE probe, not only over each socket. The story's budget is a number of
-    // seconds the operator waits, and three sequential 10-second waits inside one step is not that
-    // number however careful each individual timeout is.
     const deadline = new Promise((_, rej) => {
-      const t = setTimeout(() => { const e = new Error('probe timed out'); e.code = 'ETIMEDOUT_PROBE'; rej(e); },
-        timeoutMs);
-      t.unref?.();
+      ceiling = setTimeout(() => {
+        const e = new Error('probe timed out'); e.code = 'ETIMEDOUT_PROBE'; rej(e);
+      }, timeoutMs);
     });
     const socket = proxy
       ? await Promise.race([tunnel({ proxyUrl: proxy, host, port, timeoutMs }), deadline])
@@ -243,5 +249,7 @@ export async function probeNetwork({ target = DEFAULT_TARGET, env = process.env,
   } catch (e) {
     return { ok: false, status: null, proxy: SENTENCE.maskProxy(proxy),
       code: e?.code ?? null, detail: classifyNetFailure(e, { host, proxy }) };
+  } finally {
+    clearTimeout(ceiling);
   }
 }

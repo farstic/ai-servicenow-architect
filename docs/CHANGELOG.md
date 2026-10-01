@@ -9,6 +9,20 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A bootstrap that has to retry its network check now finishes it.** When the preflight's network probe
+failed in a way worth retrying — a refused or reset connection, a server error, a probe that timed out —
+the run paused before trying again, and that pause did not keep the process open: Node ended it in the
+middle of the wait with `Detected unsettled top-level await` and exit 13, before the preflight had
+printed a single line. The pause now holds the process, so the run retries as designed and ends the way
+it should — exit 3 and its reasons, if the network is still down.
+
+### Fixed
+
+- A bootstrap whose network preflight needed a retry no longer ends with exit 13 and `Detected unsettled
+  top-level await`. The pause between attempts did not hold the process open, so Node exited in the middle
+  of the wait instead of retrying; the run now waits, retries, and answers as it should — exit 3 with its
+  reasons when the network stays down.
+
 ## 2.0.9 — 2026-10-01
 
 ### Notes
