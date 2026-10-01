@@ -102,6 +102,8 @@ export function bootstrap(root, { mode = 'design', hooks = true, state: over = {
  * that no fixture should duplicate per test. They are all read-only to the code under test, so a
  * junction (Windows) or a symlink (everywhere else) is the same thing to a reader and free to
  * make. `vendor/docs-areas.txt` is a small file and is copied, because a fixer may write beside it.
+ *
+ * The docs corpus is not on this list, and `linkInstall` refuses it on any list — see `CORPUS`.
  */
 export const LINKED = Object.freeze([
   'packages/snowarch/dist',
@@ -115,37 +117,40 @@ export const LINKED = Object.freeze([
   'tools/snowarch/lib',
   'tests/lib',
   'tests/fixtures',
-  // The corpus, so the docs checks answer about a real one rather than about its absence. Linked
-  // like the rest: 35,000 files that no fixture should copy — and linked ONLY when it is really
-  // there. See `isCorpus` below; this entry is the one that is not read-only.
-  'vendor/ServiceNowDocs',
 ]);
 
 /**
- * Is this a corpus, or the empty hole where a submodule would be?
+ * The docs corpus — never linked into a fixture, empty or real.
+ *
+ * It used to be, "so the docs checks answer about a real one", and it was the one linked path that
+ * is not read-only: F2's job is to repair a corpus, and a fixture's corpus path that resolves into
+ * the live checkout makes that a repair of the live checkout.
  *
  * ARC-09-C2. `existsSync` answers YES for `vendor/ServiceNowDocs` on a checkout with no submodule
- * content, because git creates the mount point. Linking that hole gave every `--fix` fixture a
- * corpus path that resolved into the LIVE checkout with nothing in it — and F2, whose job is to
- * repair a missing corpus, did exactly that: one test cloned 305 MB from the real upstream into the
- * developer's (or the runner's) own `vendor/ServiceNowDocs`.
+ * content, because git creates the mount point. Linking that hole let F2 clone 305 MB from the real
+ * upstream into the runner's own `vendor/ServiceNowDocs`. The guard it got refused only that shape,
+ * and kept linking a corpus that was really there.
  *
- * Eight tests in `tests/doctor/fix.test.mjs` reached it. On a machine whose corpus is already
- * complete the sync is a no-op, so it was invisible for four stories; on a CI cell that checks out
- * no submodule it built the corpus one area at a time while the rest of the suite ran, which is
- * what made `the two docs entry points are one implementation` read 17 areas and then 19 a moment
- * later.
+ * ARC-09-C74 measured the shape that stayed. Whenever the areas file is ahead of the cone — right
+ * after an area is added — a `--fix` case ran `sparse-checkout set` through the link and rewrote
+ * the developer's own cone: `tests/doctor/fix.test.mjs`, the one writer in 113 files, found by a
+ * per-file bisect on 2.0.9-dev. So a fixture now gets no corpus at all, which is the shape the
+ * nine CI test cells have always run, because they check out no submodule. A case that needs a
+ * corpus builds its own with `tests/helpers/docs-fixture.mjs`, as the F2 cases do.
  */
-const isCorpus = (path) => existsSync(join(path, 'markdown'));
+const CORPUS = 'vendor/ServiceNowDocs';
 
 export function linkInstall(root, { from = REAL_ROOT, links = LINKED } = {}) {
   for (const rel of links) {
+    // Refused rather than skipped: a caller passing its own list has asked for the one path this
+    // file leaves out, and quietly not linking it would build a fixture its author does not know.
+    const posix = rel.replace(/\\/g, '/');
+    if (posix === CORPUS || posix.startsWith(`${CORPUS}/`)) {
+      throw new Error(`linkInstall: a fixture is never linked to a docs corpus (${rel}) — build one `
+        + 'with tests/helpers/docs-fixture.mjs (ARC-09-C74)');
+    }
     const target = join(from, rel);
     if (!existsSync(target)) continue;
-    // A fixture gets a REAL corpus or its own empty directory — never the live mount point. With
-    // the hole linked, a fixer writing "the corpus that is missing" writes it into the checkout
-    // this suite is supposed to leave alone.
-    if (rel === 'vendor/ServiceNowDocs' && !isCorpus(target)) continue;
     const dest = join(root, rel);
     if (existsSync(dest)) continue;
     mkdirSync(dirname(dest), { recursive: true });

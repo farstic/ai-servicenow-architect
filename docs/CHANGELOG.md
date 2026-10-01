@@ -33,6 +33,12 @@ pinned corpus `68c0d11`, which does not move. Nothing else about the corpus chan
   the taxonomy roster and its trigger map, and roster counts in `CLAUDE.md` that match the roster — so
   the next gateway fails by name until it is wired.
 
+### Fixed
+
+- `npm test` no longer rewrites a contributor's own docs corpus. The `--fix` test fixtures were linked to
+  the live `vendor/ServiceNowDocs`, so right after an area was added to `vendor/docs-areas.txt` a test
+  re-synced the real sparse cone; fixtures now carry no corpus unless they build their own.
+
 ## 2.0.8 — 2026-09-29
 
 ### Notes

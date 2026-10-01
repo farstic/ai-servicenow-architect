@@ -6,9 +6,10 @@
 // here is the flow — propose, review, apply, re-run — against a fixture that has really drifted.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync,
-  statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, readFileSync,
+  realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -567,38 +568,59 @@ test('an outdated store schema is REFUSED with its command, never repaired', () 
   assert.equal(KINDS.includes('store-schema'), false);
 });
 
-// ARC-09-C2 — the fixtures leave the LIVE checkout alone.
+/**
+ * What a fixture must never change: the live corpus's top level, and its sparse cone to the byte.
+ *
+ * `null` where there is nothing to compare. A checkout with no submodule — every CI `test` cell —
+ * has an empty mount point and no cone, and a fixer that cloned into it would change `entries`.
+ */
+const LIVE_CORPUS = join(REAL_ROOT, 'vendor', 'ServiceNowDocs');
+function liveCorpus() {
+  if (!existsSync(LIVE_CORPUS)) return { entries: null, cone: null };
+  const entries = readdirSync(LIVE_CORPUS).length;
+  // Its own `.git` (a gitfile, once absorbed), or this is the empty mount point — and git asked
+  // there would answer for the superproject.
+  if (!existsSync(join(LIVE_CORPUS, '.git'))) return { entries, cone: null };
+  const gitDir = execFileSync('git', ['-C', LIVE_CORPUS, 'rev-parse', '--absolute-git-dir'],
+    { encoding: 'utf8' }).trim();
+  const cone = join(gitDir, 'info', 'sparse-checkout');
+  return { entries, cone: existsSync(cone) ? sha(cone) : null };
+}
+
+// ARC-09-C2 and ARC-09-C74 — the fixtures leave the LIVE corpus alone.
 //
-// This suite ran a real corpus sync into `REAL_ROOT/vendor/ServiceNowDocs` for four stories.
-// `linkInstall` symlinked the corpus into every fixture, `existsSync` said yes to the empty
+// This suite reached `REAL_ROOT/vendor/ServiceNowDocs` twice. C2: `linkInstall` linked the empty
 // submodule mount point a checkout without content carries, and F2 — whose whole job is to repair
-// a missing corpus — repaired the live one: 305 MB, cloned from the real upstream, by a unit test.
-// Invisible on a machine whose corpus is already complete; on a CI cell with no submodule it built
-// the corpus while the rest of the suite ran, and `the two docs entry points are one
-// implementation` read 17 areas and then 19.
-test('a fixture never gets the live corpus mount point, and never writes the checkout', (t) => {
-  const corpus = join(REAL_ROOT, 'vendor', 'ServiceNowDocs');
-  const before = existsSync(corpus) ? readdirSync(corpus).length : null;
+// a missing corpus — cloned 305 MB into it from the real upstream; on a CI cell that built the
+// corpus while the rest of the suite ran. The guard C2 got refused only that shape and kept
+// linking a corpus that was really there, and its control counted top-level entries around
+// BUILDING a fixture — so C74 went unseen: whenever the areas file was ahead of the cone, right
+// after an area is added, a `--fix` case here ran `sparse-checkout set` through the link and
+// rewrote the developer's own cone. A fixture now gets no corpus at all, and this case holds that
+// by its EFFECT rather than its shape: it runs `--fix` with a reason to sync, then compares.
+test('a --fix run leaves the live corpus byte-identical, cone included, and no fixture holds a path into it', async (t) => {
+  const before = liveCorpus();
+  const { root } = driftedTree(t);
 
-  const root = greenTree(t);
-  linkInstall(root);
-  const linked = join(root, 'vendor', 'ServiceNowDocs');
+  // The probe has to be able to fire. A fixture whose areas match the live cone gives a fixer
+  // nothing to do even with a path into the live corpus — which is how C74 stayed invisible on a
+  // complete checkout. An area the cone lacks, written into the FIXTURE's areas file only, gives F2
+  // a reason to sync: through a link it rewrites the live cone; without one there is nothing of the
+  // developer's to reach.
+  appendFileSync(join(root, 'vendor', 'docs-areas.txt'), 'markdown/zz-fixture-only-area\n');
+  await doctorAt(root, { fix: true, yes: true });
 
-  if (before === null || !existsSync(join(corpus, 'markdown'))) {
-    // No corpus here: the fixture must NOT have been handed a path into the checkout. This is the
-    // CI shape, and the one that did the damage.
-    assert.equal(existsSync(linked) && lstatSync(linked).isSymbolicLink(), false,
-      'the empty mount point was linked into a fixture — a fixer would write the checkout');
-  } else {
-    assert.equal(lstatSync(linked).isSymbolicLink(), true, 'a real corpus is linked, not copied');
-  }
+  assert.deepEqual(liveCorpus(), before,
+    `a --fix fixture changed the live corpus — restore it with: ${SPELLED_CLI} docs sync`);
+
+  const held = join(root, 'vendor', 'ServiceNowDocs');
+  assert.equal(existsSync(held) && existsSync(LIVE_CORPUS)
+    && realpathSync(held) === realpathSync(LIVE_CORPUS), false,
+  'a fixture holds a path into the live corpus — a fixer would write through it');
 
   // And whatever the fixture's config says, it cannot reach the real upstream: a sync that should
   // not be running fails in milliseconds instead of cloning the internet into a temp directory.
   const upstream = readJson(root, 'engine.config.json').docs.upstream;
   assert.equal(/^https?:|github\.com/.test(upstream), false,
     `a fixture may not carry a network upstream: ${upstream}`);
-
-  assert.equal(existsSync(corpus) ? readdirSync(corpus).length : null, before,
-    'building a fixture changed the live corpus');
 });
