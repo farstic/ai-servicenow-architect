@@ -35,6 +35,9 @@ pinned corpus `68c0d11`, which does not move. Nothing else about the corpus chan
 
 ### Fixed
 
+- `./snowarch doctor --fix` repairs a docs corpus whose checkout has moved off the pin. The repair called
+  a function that was never there and failed every time with `(run ?? sync.syncDocs) is not a function`;
+  it now runs the same sync the install's docs step runs.
 - `npm test` no longer rewrites a contributor's own docs corpus. The `--fix` test fixtures were linked to
   the live `vendor/ServiceNowDocs`, so right after an area was added to `vendor/docs-areas.txt` a test
   re-synced the real sparse cone; fixtures now carry no corpus unless they build their own.

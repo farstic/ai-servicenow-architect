@@ -18,7 +18,8 @@ import { applyPlan, buildPlan, FIXERS, fixesBlock, KINDS, logFix,
 import { doctorCommand, runDoctor } from '../../tools/snowarch/lib/doctor/index.mjs';
 import { engineRegistry } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
 import { cachePath, inputsPath } from '../../tools/snowarch/lib/doctor-cache.mjs';
-import { buildUpstream, makeWorkspace } from '../helpers/docs-fixture.mjs';
+import { syncCorpus } from '../../tools/snowarch/lib/docs/sync.mjs';
+import { buildUpstream, git, makeWorkspace } from '../helpers/docs-fixture.mjs';
 import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { contextFor, greenTree, linkInstall, readJson, REAL_ROOT,
   writeJson } from './helpers/tree.mjs';
@@ -500,6 +501,38 @@ test('F2 reports a sync that could not complete, and never crashes', async (t) =
   assert.ok(applied.detail && applied.detail.length > 0, 'a failure with no reason');
   assert.equal(/Cannot set properties|undefined/.test(applied.detail), false,
     `the step crashed rather than failing: ${applied.detail}`);
+});
+
+/**
+ * F3 against the REAL sync — ARC-09-C75, the case an injected runner could not fail.
+ *
+ * The one F3 case injected `run`, so it proved the refusal and nothing about the repair — and the
+ * repair called `sync.syncDocs`, which `sync.mjs` never exported: every real `--fix` on a
+ * head-off-pin failed with `(run ?? sync.syncDocs) is not a function`. The corpus is the ARC-03
+ * fixture's, synced from a local upstream into its own workspace, so the real repair runs against
+ * nothing a developer owns — which, after ARC-09-C74, is a thing this file has to say.
+ */
+test('F3 runs the real sync and puts a corpus whose HEAD moved back on the pin', async (t) => {
+  const scratch = tempDir('snowarch-f3-', t);
+  const upstream = buildUpstream(scratch);
+  const w = makeWorkspace({ scratch, pin: upstream.pin, upstreamUrl: pathToFileURL(upstream.bare).href });
+  syncCorpus({ ...w, log: () => {} });
+  const corpus = join(w.root, 'vendor', 'ServiceNowDocs');
+  const head = () => git(['rev-parse', 'HEAD'], corpus).trim();
+  assert.equal(head(), upstream.pin, 'precondition: the synced corpus is at the pin');
+
+  // The working tree moves off the pin: a local commit, the plainest way a HEAD leaves it.
+  git(['-c', 'user.email=f@example.invalid', '-c', 'user.name=f',
+    'commit', '--allow-empty', '-qm', 'off the pin'], corpus);
+  assert.notEqual(head(), upstream.pin, 'precondition: HEAD is off the pin');
+
+  const action = { id: 'F3', check: 'E-13', kind: 'head-off-pin', title: 't',
+    target: 'vendor/ServiceNowDocs', detail: 'd', fix: {} };
+  const [applied] = await applyPlan({ actions: [action] },
+    { root: w.root, config: w.config, docsMode: 'sparse', mode: 'design', platform: process.platform });
+
+  assert.equal(applied.result, 'applied', applied.detail);
+  assert.equal(head(), upstream.pin, 'F3 said applied and HEAD is still off the pin');
 });
 
 // The contract `--json` has with a script.

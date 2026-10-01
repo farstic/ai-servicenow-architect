@@ -120,15 +120,29 @@ async function fixDocs({ root, ctx, kind, run }) {
  * `head-off-pin` from E-13 means the working tree moved; `pin ≠ gitlink` is a maintainer's
  * deliberate bump and is REFUSED with the `docs-bump.mjs` command, because moving the pin is a
  * decision and this is a repair.
+ *
+ * ARC-09-C75. Through `syncCorpus`, the one implementation `B02` and `docs sync` call, and read the
+ * way B02 reads it: a `SyncError` is the failure, an incomplete corpus is a failure, and nothing
+ * else is. This called `sync.syncDocs`, which `sync.mjs` has never exported, so every real run
+ * failed with `(run ?? sync.syncDocs) is not a function` before reaching git — and the one F3 case
+ * injected `run`, so nothing in the suite could see it.
  */
 async function fixHeadOffPin({ root, ctx, fix, run }) {
   if (fix?.pinMovedByMaintainer) {
     return result('refused', 'the pin and the committed gitlink differ — that is a maintainer bump');
   }
   const sync = await import('../docs/sync.mjs');
-  const r = await (run ?? sync.syncDocs)({ root, mode: ctx.docsMode ?? 'sparse',
-    config: ctx.config, env: ctx.env ?? process.env });
-  return r?.ok === false ? result('failed', r.reason ?? 'docs sync failed') : result('applied');
+  let r;
+  try {
+    // Its lines go nowhere, as B02's do under F2: `--fix --json` keeps stdout for the one object.
+    r = await (run ?? sync.syncCorpus)({ root, config: ctx.config, mode: ctx.docsMode ?? 'sparse',
+      log: () => {} });
+  } catch (e) {
+    if (!(e instanceof sync.SyncError)) throw e;
+    return result('failed', e.message);
+  }
+  if (!r?.completeness?.ok) return result('failed', `${sync.CORPUS_DIR} is incomplete after sync`);
+  return result('applied');
 }
 
 /**
