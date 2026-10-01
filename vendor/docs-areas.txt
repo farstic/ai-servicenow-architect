@@ -4,6 +4,7 @@ markdown/build-workflows
 markdown/core-business-suite
 markdown/customer-service-management
 markdown/employee-service-management
+markdown/financial-services-operations
 markdown/governance-risk-compliance
 markdown/integrate-applications
 markdown/intelligent-experiences

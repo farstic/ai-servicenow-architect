@@ -50,7 +50,9 @@ test('the live fixture renders to exactly these bytes', () => {
     LIVE.modeLineDetailed,
     `Engine: snowarch ${LIVE.engine.version} · contract ${LIVE.engine.contractSha.slice(0, 12)}`,
     `Docs: vendor/ServiceNowDocs @ ${LIVE.engine.docs.pin.slice(0, 12)} (australia) · sparse`,
-    'Roster: 28 skills / 9 agents',
+    // The roster moves when a skill is added, the way the tally moves when a check is — fso-insurance-
+    // specialist took it from 28 to 29 — so it is read from the fixture by the same rule, not spelled.
+    `Roster: ${LIVE.engine.roster.skills} skills / ${LIVE.engine.roster.agents} agents`,
     'Instances: pdi (pdi, custom)',
     // The tally moves when a check is added — ARC-08-C30's E-29 took it from 14 to 15 — so it is
     // read from the fixture's own summary rather than spelled, the way the version and the shas

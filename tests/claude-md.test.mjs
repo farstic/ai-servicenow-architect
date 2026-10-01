@@ -4,6 +4,7 @@ import { existsSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from 'no
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gatewayDirs } from './lib/gateways.mjs';
 
 /**
  * `CLAUDE.md` is loaded into every session, so its size is a running cost and its wording is
@@ -66,12 +67,17 @@ test('criterion 3 — the two blocks that are copied, not paraphrased', () => {
   // behaviour change, which is the failure mode a line budget invites.
   assert.ok(doc.includes('Code artefact produced. Proposing a Code Reviewer pass '
     + '(style, performance, security, best-practice) before final delivery — proceed?'));
-  for (const gateway of ['**ITSM Specialist**', '**CSM Specialist**', '**HRSD Specialist**',
-    '**ITOM/Discovery Specialist**', '**CMDB & CSDM Specialist**']) {
-    assert.ok(doc.includes(gateway), `the gateway table lost ${gateway}`);
+  // The gateway set is DERIVED from the roster, not pinned at five. The literal five names and the `5`
+  // meant the sixth gateway (fso-insurance-specialist, 2.0.9) could only arrive by editing this case, and
+  // the seventh would have met the same wall. The guard is the one it always was — a lost row fails and a
+  // stray row fails — held for whatever the roster classifies as a gateway; `tests/gateway-wiring.test.mjs`
+  // carries the rest of that class.
+  const gateways = gatewayDirs(root);
+  for (const dir of gateways) {
+    assert.ok(doc.includes(`\`.claude/skills/${dir}/SKILL.md\``), `the gateway table lost ${dir}`);
   }
   const rows = lines.filter((l) => /^\| .* \| \*\*[A-Z].*Specialist\*\* \| `\.claude\/skills\//.test(l));
-  assert.equal(rows.length, 5, 'the gateway table must have exactly five rows');
+  assert.equal(rows.length, gateways.length, 'the gateway table must have exactly one row per gateway');
 });
 
 test('criterion 7 — every repository path it names resolves', () => {
