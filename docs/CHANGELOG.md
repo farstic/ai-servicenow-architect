@@ -9,17 +9,39 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
-**A sixth Domain Expert gateway, for Financial Services Operations on the insurance side.** Nothing the
-Architect already does changes: the five existing gateways, their envelopes and their triggers are
-untouched, and the new one fires only on its own domain — policy servicing, claims, underwriting tasks,
-life servicing, Document Processor, Complaint Management and Customer Lifecycle / KYC on FSO. It produces
-the same 5-Part Constraint Envelope as the others and co-fires with the CSM Specialist whenever the case,
-account, contact or consumer layer underneath is touched, the way ITOM and CMDB & CSDM already do.
+**This release adds a Domain Expert gateway for insurers, and fixes a repair the doctor offered and
+could not do.** Nothing here changes how the product is configured: there is no migration step, and an
+existing checkout keeps its instance store, its preset and its flags untouched. The documentation corpus
+stays pinned at `68c0d11`; what grows is the part of it a sparse install checks out.
 
-**The sparse documentation corpus grows by one area.** `financial-services-operations` joins the
-sparse set (19 areas → 20), so the new gateway's citations resolve on a sparse install. On the next
-upgrade or bootstrap the docs step re-syncs and fetches it: 728 files, about 3.1 MB, measured on the
-pinned corpus `68c0d11`, which does not move. Nothing else about the corpus changes.
+**Insurance work now has a gateway of its own.** A request about Financial Services Operations on the
+insurance side — servicing a policy or changing its coverage, a claim from first notice of loss through
+adjusters, reserves, payments and SIU, an underwriting task, a life-servicing change, Document Processor,
+Complaint Management, Customer Lifecycle and KYC, the Guidewire, FRISS and Socure integrations, Now Assist
+for FSO — fires the FSO Insurance Specialist at Phase 1 Step 5, the sixth gateway beside ITSM, CSM, HRSD,
+ITOM/Discovery and CMDB & CSDM. Before any builder runs it writes the same 5-Part Constraint Envelope the
+others do, against FSO's own baseline, the `sn_bom_*` and `sn_ins_*` model, so a §1.1 verdict on a custom
+table comes from the domain that owns the baseline it would duplicate. Until now the nearest gateway was
+CSM, which knows the case, account and contact layer FSO is built on and nothing of its policy, claim and
+underwriting model. CSM still fires beside it whenever that layer is touched, and the five existing
+gateways are unchanged.
+
+**The sparse corpus gains one area, and an upgrade fetches it.** `financial-services-operations` joins
+the sparse set (19 areas → 20), so the new gateway's citations resolve on a sparse install. The areas file
+is one of the docs step's inputs, so an upgrade from 2.0.8 re-runs that step and fetches the area: 728
+files, about 3.1 MB. A full install already has it, and a `skip` install stays as it is.
+
+**`doctor --fix` repairs a corpus that has moved off its pin.** When the corpus checkout's HEAD is not the
+pinned commit, the doctor reports it and offers a repair — and that repair failed every time, with
+`(run ?? sync.syncDocs) is not a function`, because it called a function that was never there. It now runs
+the same sync the install's docs step runs and puts the checkout back on the pin. A pin that differs from
+the committed gitlink is still refused: that is a maintainer's bump, not damage.
+
+**For contributors: the test suite leaves your docs corpus alone.** Right after an area was added to
+`vendor/docs-areas.txt`, `npm test` re-synced your own corpus's sparse cone, because the `--fix` test
+fixtures were linked to the live `vendor/ServiceNowDocs`. Fixtures now carry no corpus unless they build
+their own, and a case holds the live cone byte-identical across a `--fix` run that has every reason to
+sync.
 
 ### Added
 
@@ -27,20 +49,27 @@ pinned corpus `68c0d11`, which does not move. Nothing else about the corpus chan
   — the FSO Core case, task and policy model, Personal and Commercial Lines Servicing, Insurance Claims,
   underwriting tasks, life servicing, Document Processor, Complaint Management and Customer Lifecycle /
   KYC. Wired into the Phase 1 Step 5 gateway table and the taxonomy, with the CSM boundary drawn as a
-  co-fire.
-- `financial-services-operations` in the sparse documentation set, for that gateway's citations.
+  co-fire (#349 `2c6db24`).
+- `financial-services-operations` in the sparse documentation set, for that gateway's citations
+  (#349 `2c6db24`).
 - A case that holds every gateway to its wiring as a class — a row in the Phase 1 Step 5 table, a row in
   the taxonomy roster and its trigger map, and roster counts in `CLAUDE.md` that match the roster — so
-  the next gateway fails by name until it is wired.
+  the next gateway fails by name until it is wired (#349 `2c6db24`).
 
 ### Fixed
 
 - `./snowarch doctor --fix` repairs a docs corpus whose checkout has moved off the pin. The repair called
   a function that was never there and failed every time with `(run ?? sync.syncDocs) is not a function`;
-  it now runs the same sync the install's docs step runs.
+  it now runs the same sync the install's docs step runs (#350 `672b2dd`).
 - `npm test` no longer rewrites a contributor's own docs corpus. The `--fix` test fixtures were linked to
   the live `vendor/ServiceNowDocs`, so right after an area was added to `vendor/docs-areas.txt` a test
-  re-synced the real sparse cone; fixtures now carry no corpus unless they build their own.
+  re-synced the real sparse cone; fixtures now carry no corpus unless they build their own
+  (#350 `18db811`).
+
+### Internal
+
+- release: develop to 2.0.9-dev, and v2.0.8's pages ported back (#348 `191a226`)
+- contributing: the version-bump step warns against `--no-workspaces-update` (#349 `0e8c0ff`)
 
 ## 2.0.8 — 2026-09-29
 
