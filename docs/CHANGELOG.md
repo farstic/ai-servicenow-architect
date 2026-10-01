@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.9 — 2026-10-01
+
+### Notes
+
 **This release adds a Domain Expert gateway for insurers, and fixes a repair the doctor offered and
 could not do.** Nothing here changes how the product is configured: there is no migration step, and an
 existing checkout keeps its instance store, its preset and its flags untouched. The documentation corpus
@@ -70,6 +74,22 @@ sync.
 
 - release: develop to 2.0.9-dev, and v2.0.8's pages ported back (#348 `191a226`)
 - contributing: the version-bump step warns against `--no-workspaces-update` (#349 `0e8c0ff`)
+
+### Added
+
+- fso-insurance-specialist: a sixth Domain Expert gateway, for FSO insurance work (2c6db24)
+
+### Fixed
+
+- doctor: F3 runs the sync B02 runs, so a head-off-pin corpus is repaired (ARC-09-C75) (672b2dd)
+- tests: --fix fixtures never reach the live docs corpus (ARC-09-C74) (18db811)
+
+### Internal
+
+- changelog: the 2.0.9 Unreleased block, written before the rc (6d2bebe)
+- the bump step warns against --no-workspaces-update (0e8c0ff)
+
+Tag v2.0.9 · contract 63750dc33868 · docs-pin 68c0d11
 
 ## 2.0.8 — 2026-09-29
 
