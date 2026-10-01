@@ -31,7 +31,7 @@
       "dead": null
     },
     "roster": {
-      "skills": 28,
+      "skills": 29,
       "agents": 9
     }
   },
@@ -354,7 +354,7 @@
       "title": "roster from directory listing",
       "status": "ok",
       "severity": "fail",
-      "detail": "28 skills · 9 sub-agents · 1 utility",
+      "detail": "29 skills · 9 sub-agents · 1 utility",
       "remedy": null,
       "command": null,
       "code": null,
@@ -362,13 +362,13 @@
       "quick": true,
       "durationMs": 0,
       "data": {
-        "skills": 28,
+        "skills": 29,
         "agents": 9,
         "utility": [
           "snowarch"
         ],
         "declared": {
-          "skills": 28,
+          "skills": 29,
           "agents": 9
         },
         "problems": []
@@ -380,7 +380,7 @@
       "title": "skill descriptions",
       "status": "ok",
       "severity": "fail",
-      "detail": "28 skills · 9 agents clean",
+      "detail": "29 skills · 9 agents clean",
       "remedy": null,
       "command": null,
       "code": null,

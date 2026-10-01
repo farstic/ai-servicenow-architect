@@ -9,6 +9,30 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**A sixth Domain Expert gateway, for Financial Services Operations on the insurance side.** Nothing the
+Architect already does changes: the five existing gateways, their envelopes and their triggers are
+untouched, and the new one fires only on its own domain — policy servicing, claims, underwriting tasks,
+life servicing, Document Processor, Complaint Management and Customer Lifecycle / KYC on FSO. It produces
+the same 5-Part Constraint Envelope as the others and co-fires with the CSM Specialist whenever the case,
+account, contact or consumer layer underneath is touched, the way ITOM and CMDB & CSDM already do.
+
+**The sparse documentation corpus grows by one area.** `financial-services-operations` joins the
+sparse set (19 areas → 20), so the new gateway's citations resolve on a sparse install. On the next
+upgrade or bootstrap the docs step re-syncs and fetches it: 728 files, about 3.1 MB, measured on the
+pinned corpus `68c0d11`, which does not move. Nothing else about the corpus changes.
+
+### Added
+
+- `fso-insurance-specialist`: the Domain Expert gateway for Financial Services Operations insurance work
+  — the FSO Core case, task and policy model, Personal and Commercial Lines Servicing, Insurance Claims,
+  underwriting tasks, life servicing, Document Processor, Complaint Management and Customer Lifecycle /
+  KYC. Wired into the Phase 1 Step 5 gateway table and the taxonomy, with the CSM boundary drawn as a
+  co-fire.
+- `financial-services-operations` in the sparse documentation set, for that gateway's citations.
+- A case that holds every gateway to its wiring as a class — a row in the Phase 1 Step 5 table, a row in
+  the taxonomy roster and its trigger map, and roster counts in `CLAUDE.md` that match the roster — so
+  the next gateway fails by name until it is wired.
+
 ## 2.0.8 — 2026-09-29
 
 ### Notes

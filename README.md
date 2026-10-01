@@ -70,7 +70,7 @@ Installing the AI ServiceNow Architect into this folder only — nothing else on
 Two choices below, then it runs on its own (about a minute; live adds a short wizard).
 Plan — Enter runs it as shown · type a number to choose that line's value · "?" explains · q quits
   1  Mode   design-only          live needs a ServiceNow instance (wizard runs in this terminal); Node 24.16.0 found
-  2  Docs   sparse (19 areas)    full = whole corpus · skip = none (the doctor will report FAIL)
+  2  Docs   sparse (20 areas)    full = whole corpus · skip = none (the doctor will report FAIL)
   Steps  B01 workspace · B02 docs · B05 tool list · B07 Claude settings · B09 summary
 [B01/09] workspace … ok (0.1 s)
 [docs] 31.5 s · pin 11b39be · sparse · complete

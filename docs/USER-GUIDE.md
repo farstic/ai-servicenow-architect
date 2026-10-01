@@ -41,7 +41,7 @@ terminal prints, formatted for reading:
 Mode: live — pdi (pdi) · preset pdi-developer · WRITE=on CMDB_WRITE=on SCRIPTING=on ATF=on NOW_ASSIST=off FLUENT=off · 398 tools (contract)   [modeLineDetailed]
 Engine: snowarch 2.0.0 · tag v2.0.0 · contract a1b2c3d                                       [engine.version, engine.tag, engine.contractSha]
 Docs: vendor/ServiceNowDocs @ ba513f2 (australia) · sparse · citations checked: 181 | dead: 0 [engine.docs]
-Roster: 28 skills / 9 agents                                                                 [engine.roster]
+Roster: 29 skills / 9 agents                                                                 [engine.roster]
 Capabilities: docx yes (python3) · PDF QA no · draw.io yes · Mermaid no                       [engine.capabilities]
 Instances: pdi (pdi, custom, default) · uat (test, read-only)                                 [server.instances]
 Doctor: 41 ok, 1 warn (E-23), 0 fail — quick run 2026-09-10 10:00 · full report: ./snowarch doctor  [summary, checks, ranAt, options.quick]

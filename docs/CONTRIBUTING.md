@@ -74,7 +74,7 @@ that has happened here too.
 to commit a byte-identical copy at `skills/` and `agents/`, kept equal by `scripts/sync-agents-skills.sh`
 and a pre-commit hook — and the gates scanned the *mirror* while Claude Code read `.claude/`. ARC-02-S01
 deleted the mirrors, the sync script, the structure gate and the hook chain, and rewrote every path
-reference. `tests/engine-config.test.mjs` keeps the counts honest: it asserts `engine.config.json`'s `roster` (28 skills, 9 agents) against the files actually on disk, so a lost or duplicated skill fails the build rather than drifting in prose.
+reference. `tests/engine-config.test.mjs` keeps the counts honest: it asserts `engine.config.json`'s `roster` (29 skills, 9 agents) against the files actually on disk, so a lost or duplicated skill fails the build rather than drifting in prose.
 
 ## Versioning
 
@@ -1469,6 +1469,7 @@ The checklist, verbatim — paste it into the release pull request's description
 >
 >    ```sh
 >    npm version <next>-dev --no-git-tag-version --workspaces --include-workspace-root
+>    # never add --no-workspaces-update: the lock keeps its workspace versions, and a re-run then changes nothing
 >    node scripts/build-dist.mjs
 >    node packages/contract/pin.mjs --yes
 >    # CLAUDE.md's marker and docs/README-head.md, through writers.mjs rather than by hand:
