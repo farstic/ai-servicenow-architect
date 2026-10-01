@@ -22,6 +22,10 @@ it should — exit 3 and its reasons, if the network is still down.
   top-level await`. The pause between attempts did not hold the process open, so Node exited in the middle
   of the wait instead of retrying; the run now waits, retries, and answers as it should — exit 3 with its
   reasons when the network stays down.
+- `./snowarch doctor` and the session-start banner always report a time-out now. The doctor's per-check
+  time limit and the banner's watchdog were timers the process did not wait for, so a check or a re-run
+  that hung on nothing ended the run with exit 13 and nothing printed — no report, or no banner — instead
+  of saying that it timed out.
 
 ## 2.0.9 — 2026-10-01
 

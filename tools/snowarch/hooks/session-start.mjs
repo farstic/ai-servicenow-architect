@@ -107,8 +107,11 @@ async function reRun({ config, watchdogMs, run }) {
     return await Promise.race([
       doctor({ root: ROOT, config, quick: true, noNetwork: true, writeCache: true }),
       new Promise((_, reject) => {
+        // ARC-09-C77 — REF'D: it bounds an awaited run, and `finally` clears it, so it never holds a
+        // hook whose run has answered. Unref'd, a run pending on nothing ended the hook in exit 13
+        // before the watchdog fired — no banner, and an exit code that is the one thing Claude Code
+        // reads from this process.
         timer = setTimeout(() => reject(new Error('watchdog')), watchdogMs);
-        if (typeof timer?.unref === 'function') timer.unref();
       }),
     ]);
   } finally {
