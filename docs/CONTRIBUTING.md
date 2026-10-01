@@ -1469,6 +1469,7 @@ The checklist, verbatim — paste it into the release pull request's description
 >
 >    ```sh
 >    npm version <next>-dev --no-git-tag-version --workspaces --include-workspace-root
+>    # never add --no-workspaces-update: the lock keeps its workspace versions, and a re-run then changes nothing
 >    node scripts/build-dist.mjs
 >    node packages/contract/pin.mjs --yes
 >    # CLAUDE.md's marker and docs/README-head.md, through writers.mjs rather than by hand:
