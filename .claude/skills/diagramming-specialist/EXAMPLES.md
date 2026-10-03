@@ -1,6 +1,6 @@
 # Diagramming Specialist — EXAMPLES
 
-Gold-standard reference. Every example applies the discipline from `SKILL.md`: a legend, exact spec identifiers, one message per figure, fidelity notes, and §1.1 flags. Mermaid is the default; all blocks are written to parse.
+Gold-standard reference. Every example applies the discipline from `SKILL.md`: a legend, exact spec identifiers, one message per figure, fidelity notes, and §1.1 flags. The figures below are sketched in Mermaid so the examples stay readable as text; every delivered figure is an editable `.drawio` in the house style (Example 6), and all Mermaid blocks are written to parse.
 
 ---
 

@@ -695,11 +695,15 @@ export const AUDIT_PATTERNS = [
   { id: 'overrides-any-prior', scope: ['.claude/', 'governance/'],
     test: (l) => /overrides any prior/i.test(l),
     why: 'a diff against text no reader can see — state the rule, not what it replaced' },
+  // Every shape the default has been written in, not the one this story happened to remove: "Mermaid is
+  // the default", "(Mermaid default, …)", "Mermaid by default", "defaults to Mermaid", "the default is
+  // Mermaid", "default: Mermaid", "Mermaid … (default)" and the catalogue's "Default notation" column.
+  // The first was a live line the port missed, and the pattern written for the port could not see it.
   { id: 'mermaid-default', scope: ['.claude/', 'governance/', 'CLAUDE.md'],
-    test: (l) => /Mermaid by default|Mermaid[^.|\n]*\(default\)|\|\s*Default notation\s*\|/i.test(l),
+    test: (l) => /Mermaid (?:is (?:the|a) default|defaults?\b|by default)|\bdefaults? to Mermaid\b|\bdefault(?: notation)? is Mermaid\b|\bdefault:\s*Mermaid\b|Mermaid[^.|\n]*\(default\)|\|\s*Default notation\s*\|/i.test(l),
     why: 'every delivered figure is an editable draw.io file; Mermaid is a draft' },
   { id: 'scoped-by-default', scope: ['.claude/skills/technical-designer/', '.claude/agents/technical-designer.md'],
-    test: (l) => /default to scoped|Default for new functionality: scoped app/i.test(l),
+    test: (l) => /default to scoped|Default for new functionality: scoped app|\bdefaults? to (?:an? )?(?:new )?scoped\b/i.test(l),
     why: 'a new scoped app is a §1.1 object, and the baseline scope is the default' },
 ];
 
@@ -728,7 +732,12 @@ export function findAuditRegressions({ files, read: readFile, patterns = AUDIT_P
     readFile(f).split('\n').forEach((line, i) => {
       for (const p of mine) {
         if (!p.test(line)) continue;
-        if (allow.some((a) => a.file === f && a.id === p.id && line.includes(a.context))) continue;
+        // An exemption excuses its own SENTENCE, not the line it sits on. The pattern is tested again
+        // with the exempted text taken out, and the line passes only when what remains is clean — so
+        // an old fetch written into the same step, beside the sentence, is still a hit.
+        const excused = allow.some((a) => a.file === f && a.id === p.id && line.includes(a.context)
+          && !p.test(line.split(a.context).join(' ')));
+        if (excused) continue;
         hits.push(`${f}:${i + 1}: [${p.id}] ${line.trim().slice(0, 80)} — ${p.why}`);
       }
     });
@@ -761,6 +770,11 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     plant('CLAUDE.md', '- Diagrams: Mermaid in markdown for every figure (default); draw.io on request.');
     plant('.claude/skills/diagramming-specialist/SKILL.md', '| Diagram | Use it for | Default notation |');
     plant('.claude/agents/technical-designer.md', '3. **Scoping decision** — If unknown, default to scoped with prefix `x_<vendor>_<app>`.');
+    // The shapes a control found inert on the first head — each a wording that has actually been used.
+    plant('.claude/skills/diagramming-specialist/EXAMPLES.md', 'Mermaid is the default; all blocks are written to parse.');
+    plant('governance/taxonomy.md', '| Diagramming Specialist | figures | (Mermaid default, draw.io on request) |');
+    plant('.claude/skills/hld-lld-writer/SKILL.md', 'Figures: the Diagramming Specialist defaults to Mermaid.');
+    plant('.claude/skills/technical-designer/SKILL.md', 'If the scope is unknown, the design defaults to a scoped app.');
     // ...and the same phrases where their scopes do NOT reach, which must stay quiet.
     plant('docs/USER-GUIDE.md', 'the same prompts work in the Master Project chat; Mermaid by default');
     plant('.claude/agents/flow-designer-specialist.md', 'If unknown, default to scoped with prefix `x_<vendor>_<app>`.');
@@ -769,13 +783,19 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     plant('.claude/agents/integration-specialist.md', [
       `say so instead of recalling it. ${AUDIT_ALLOW[0].context}`,
       '4. Verify against `ServiceNowDocs/` using `WebFetch` for MID Server behaviour.',
+      // The regression written exactly where it would be: the old fetch inside the same step, on the
+      // SAME line as the exempted sentence. The sentence does not excuse its neighbour.
+      '4. Verify using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown`; '
+        + `say so instead of recalling it. ${AUDIT_ALLOW[0].context}`,
     ].join('\n'));
     plant('.claude/agents/story-writer.md', AUDIT_ALLOW[0].context);
 
     const files = ['.claude/agents/atf-author.md', 'governance/governance-rules.md', '.claude/agents/developer.md',
       '.claude/skills/story-writer/SKILL.md', 'CLAUDE.md', '.claude/skills/diagramming-specialist/SKILL.md',
       '.claude/agents/technical-designer.md', 'docs/USER-GUIDE.md', '.claude/agents/flow-designer-specialist.md',
-      '.claude/agents/integration-specialist.md', '.claude/agents/story-writer.md'];
+      '.claude/agents/integration-specialist.md', '.claude/agents/story-writer.md',
+      '.claude/skills/diagramming-specialist/EXAMPLES.md', 'governance/taxonomy.md', '.claude/skills/hld-lld-writer/SKILL.md',
+      '.claude/skills/technical-designer/SKILL.md'];
     const readAt = (f) => readFileSync(join(dir, f), 'utf8');
     const hits = findAuditRegressions({ files, read: readAt });
     const at = (rel, id) => hits.filter((h) => h.startsWith(`${rel}:`) && h.includes(`[${id}]`)).length;
@@ -790,8 +810,12 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     assert.equal(hits.some((h) => h.startsWith('docs/USER-GUIDE.md:')), false, 'a scope reached outside itself');
     assert.equal(hits.some((h) => h.startsWith('.claude/agents/flow-designer-specialist.md:')), false,
       'the scoped-by-default rule reached past the Technical Designer');
+    assert.equal(at('.claude/skills/diagramming-specialist/EXAMPLES.md', 'mermaid-default'), 1, '"Mermaid is the default" was not seen');
+    assert.equal(at('governance/taxonomy.md', 'mermaid-default'), 1, '"(Mermaid default, …)" was not seen');
+    assert.equal(at('.claude/skills/hld-lld-writer/SKILL.md', 'mermaid-default'), 1, '"defaults to Mermaid" was not seen');
+    assert.equal(at('.claude/skills/technical-designer/SKILL.md', 'scoped-by-default'), 1, '"defaults to a scoped app" was not seen');
     assert.deepEqual(hits.filter((h) => h.startsWith('.claude/agents/integration-specialist.md:')).map((h) => h.split(':')[1]),
-      ['2'], 'the exemption must pass line 1 and nothing else in the file');
+      ['2', '3'], 'the exemption must pass line 1 only — line 3 carries the old fetch beside the exempted sentence');
     assert.equal(at('.claude/agents/story-writer.md', 'corpus-webfetch'), 1, 'an exemption anchored to one file excused another');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
