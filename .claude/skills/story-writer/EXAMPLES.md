@@ -8,7 +8,7 @@ Three gold-standard examples of Story Writer output. Each example shows the inpu
 
 ### Input prompt
 
-> *"Here's the transcript from the GSC workshop on P1 incident escalation. We need sprint-ready stories. Module: ITSM, workspace: Service Operations Workspace, roles: itil, sn_si.major_incident_manager, gsc_l1_operator (engagement alias), gsc_shift_lead (engagement alias). Australia release.*
+> *"Here's the transcript from the GSC workshop on P1 incident escalation. We need sprint-ready stories. Module: ITSM, workspace: Service Operations Workspace, roles: itil, major_incident_manager, gsc_l1_operator (engagement alias), gsc_shift_lead (engagement alias). Australia release.*
 >
 > *Workshop excerpt:*
 >
@@ -34,7 +34,7 @@ Three gold-standard examples of Story Writer output. Each example shows the inpu
 
 #### Step 2 — Inferred requirements
 
-- **INFERRED:** Auto-paging needs the `on_call_rota` table and the on-call API. Confirm rota structure.
+- **INFERRED:** Auto-paging needs the on-call shift table, Shift [`cmn_rota`] *(citation: `markdown/it-service-management/on-call-scheduling/tables-oob-oncall.md`)*, and the on-call API. Confirm rota structure.
 - **INFERRED:** "Within 60 seconds" implies async/event-driven, not synchronous business rule.
 - **INFERRED:** "War room" likely means a Microsoft Teams channel — confirm collaboration platform.
 - **INFERRED:** Banner is a `incident.work_notes` annotation OR a Form-level UI message — the implementation choice belongs to the Technical Designer.
@@ -44,7 +44,7 @@ Three gold-standard examples of Story Writer output. Each example shows the inpu
 ```gherkin
 Feature: Auto-page on-call major incident manager on P1 declaration
   As a gsc_l1_operator
-  I want a P1 incident to auto-page the on-call sn_si.major_incident_manager within 60 seconds
+  I want a P1 incident to auto-page the on-call major_incident_manager within 60 seconds
   So that we eliminate manual WhatsApp paging and capture the escalation in the audit trail
 
   Background:
@@ -55,17 +55,17 @@ Feature: Auto-page on-call major incident manager on P1 declaration
   Scenario: P1 incident with on-call MIM available
     Given a new incident is created with priority = "1 - Critical"
     When the incident state moves to In Progress (state=2)
-    Then within 60 seconds the on-call sn_si.major_incident_manager is paged via the configured channel
+    Then within 60 seconds the on-call major_incident_manager is paged via the configured channel
     And the page event is recorded in the incident's audit history with channel and timestamp
     And the incident's assigned_to field is set to the on-call MIM
 
   Scenario: P1 incident with no on-call MIM scheduled
     Given a new incident is created with priority = "1 - Critical"
-    And no sn_si.major_incident_manager is on call at the current time
+    And no major_incident_manager is on call at the current time
     When the incident state moves to In Progress (state=2)
     Then within 60 seconds the gsc_shift_lead is paged as the fallback
     And the audit history records "MIM rota gap — escalated to shift lead"
-    And the incident is flagged with a sys_tag "rota_gap" for follow-up
+    And the incident is tagged "rota gap" for follow-up
 
   Scenario: Paging service unavailable
     Given the paging integration is unavailable
@@ -83,13 +83,13 @@ Feature: Auto-page on-call major incident manager on P1 declaration
 
 ```gherkin
 Feature: War room provisioned on P1 declaration and archived on closure
-  As a sn_si.major_incident_manager
+  As a major_incident_manager
   I want a collaboration war room to be auto-provisioned on P1 declaration and archived on closure
   So that I have an immediate communication channel and a postmortem-usable artefact
 
   Background:
     Given the user is logged into Service Operations Workspace
-    And the user holds the role sn_si.major_incident_manager
+    And the user holds the role major_incident_manager
 
   Scenario: War room created on P1 declaration
     Given a P1 incident has just been declared
@@ -156,9 +156,9 @@ Feature: Auto-create HR onboarding case when new sys_user lands from Workday
     Given the Workday → ServiceNow integration is configured and operational
     And a Lifecycle Event template "Standard Onboarding" is configured in HRSD
 
-  Scenario: New sys_user lands from Workday with onboarding-eligible employee_type
+  Scenario: New sys_user lands from Workday with onboarding-eligible u_employee_type
     Given a new sys_user record is created via the Workday integration
-    And the sys_user.employee_type is one of "Permanent", "Fixed-Term Contractor"
+    And the sys_user.u_employee_type is one of "Permanent", "Fixed-Term Contractor"
     And sys_user.start_date is in the future or today
     When the integration commits the new record
     Then an sn_hr_core_case is created within 5 minutes
@@ -167,12 +167,12 @@ Feature: Auto-create HR onboarding case when new sys_user lands from Workday
     And the case.opened_for is set to the new sys_user's manager (sys_user.manager)
     And the new sys_user receives a welcome notification at sys_user.email
 
-  Scenario: New sys_user lands but employee_type is excluded
+  Scenario: New sys_user lands but u_employee_type is excluded
     Given a new sys_user record is created via the Workday integration
-    And the sys_user.employee_type is "Intern" or "External Consultant"
+    And the sys_user.u_employee_type is "Intern" or "External Consultant"
     When the integration commits the new record
     Then no sn_hr_core_case is auto-created
-    And the audit history records "onboarding skipped — excluded employee_type"
+    And the audit history records "onboarding skipped — excluded u_employee_type"
 
   Scenario: Workday integration delivers a sys_user with missing manager reference
     Given a new sys_user record arrives without a populated manager field
@@ -189,7 +189,7 @@ Feature: Auto-create HR onboarding case when new sys_user lands from Workday
     And the HR Service Delivery admin (sn_hr_core.admin) receives a notification
 
   # OPEN QUESTIONS
-  # 1. Confirm the trigger boundary — is this on sys_user.insert from Workday only, or also on sys_user updates that flip employee_type to onboarding-eligible?
+  # 1. Confirm the trigger boundary — is this on sys_user.insert from Workday only, or also on sys_user updates that flip u_employee_type to onboarding-eligible?
   # 2. ASSUMPTION: "5 minutes" is a soft target; the underlying mechanism is async (Flow triggered by sys_user insert event). Confirm acceptable latency.
   # 3. Should rehires (sys_user with prior employment history) follow Standard Onboarding, or a "Rehire" template variant?
   # 4. Workday delivers what timezone for start_date? UTC, employee local, or HR ops local? Affects the "in the future or today" check.
@@ -208,7 +208,7 @@ Feature: Auto-create HR onboarding case when new sys_user lands from Workday
 
 > Story produced (1 Feature, 6 supporting stories proposed). Proposing:
 >
-> 1. **Technical Designer** — design the Flow (trigger on sys_user insert, filter on employee_type, call Lifecycle Event service), the integration touchpoint with Workday for payload audit, and the failure-handling subflow. Proceed?
+> 1. **Technical Designer** — design the Flow (trigger on sys_user insert, filter on u_employee_type, call Lifecycle Event service), the integration touchpoint with Workday for payload audit, and the failure-handling subflow. Proceed?
 > 2. **ATF Author (skill mode)** — single-Feature test coverage including the four scenarios plus the synthetic Workday payload setup. Proceed?
 > 3. **HRSD Specialist (consult)** — verify Lifecycle Event template structure and rehire-handling pattern against HRSD baseline before design. Proceed?
 
@@ -224,7 +224,7 @@ The four scenarios cover happy path, exclusion, partial-data fallback, and confi
 
 ### Input prompt
 
-> *"Tier-2 CSM agents need cases auto-routed when an account hits a contract-renewal trigger. Specifically: any case opened against an account with `contract.renewal_status = 'AT_RISK'` should auto-assign to the account's Customer Success Manager. CSM module, CRM Workspace, roles: sn_customerservice_agent (tier-2), sn_customerservice_account_relationship_manager (CSM alias). Australia release. Sprint planning kicks off Monday — needs to be ready."*
+> *"Tier-2 CSM agents need cases auto-routed when an account hits a contract-renewal trigger. Specifically: any case opened against an account with `contract.u_renewal_status = 'AT_RISK'` should auto-assign to the account's Customer Success Manager. CSM module, CRM Workspace, roles: sn_customerservice_agent (tier-2), sn_customerservice.relationship_agent (CSM alias). Australia release. Sprint planning kicks off Monday — needs to be ready."*
 
 ### Expected output
 
@@ -243,37 +243,37 @@ Feature: Auto-route case to CSM when account contract is at-risk
     And the account has at least one active contract record
 
   Scenario: Case opened against at-risk account with assigned CSM
-    Given the account.primary_contract.renewal_status is "AT_RISK"
-    And the account has a customer_success_manager populated (role sn_customerservice_account_relationship_manager)
+    Given the account.u_primary_contract.u_renewal_status is "AT_RISK"
+    And the account has a u_customer_success_manager populated (role sn_customerservice.relationship_agent)
     When the case is inserted
-    Then case.assigned_to is set to account.customer_success_manager
+    Then case.assigned_to is set to account.u_customer_success_manager
     And case.priority is elevated to "High" if originally "Moderate" or below
-    And case.work_notes records "auto-routed to CSM due to contract.renewal_status=AT_RISK"
+    And case.work_notes records "auto-routed to CSM due to contract.u_renewal_status=AT_RISK"
 
   Scenario: Case opened against at-risk account with no CSM assigned
-    Given the account.primary_contract.renewal_status is "AT_RISK"
-    And the account.customer_success_manager is empty
+    Given the account.u_primary_contract.u_renewal_status is "AT_RISK"
+    And the account.u_customer_success_manager is empty
     When the case is inserted
-    Then case.assigned_to is set to the account.relationship_manager_team (default queue)
+    Then case.assigned_to is set to the account.u_relationship_manager_team (default queue)
     And a notification is sent to the team manager
     And case.work_notes records "AT_RISK account, no CSM assigned — escalated to team queue"
 
   Scenario: Case opened against at-risk account, CSM is on leave
-    Given the account.primary_contract.renewal_status is "AT_RISK"
-    And the account.customer_success_manager.on_leave is true
+    Given the account.u_primary_contract.u_renewal_status is "AT_RISK"
+    And the account.u_customer_success_manager.u_on_leave is true
     When the case is inserted
-    Then case.assigned_to falls back to account.customer_success_manager.delegate
+    Then case.assigned_to falls back to account.u_customer_success_manager.u_delegate
     And case.work_notes records "primary CSM on leave — assigned to delegate"
 
   Scenario: Account has multiple contracts with mixed renewal status
     Given the account has multiple contracts
-    And at least one contract.renewal_status is "AT_RISK"
+    And at least one contract.u_renewal_status is "AT_RISK"
     When the case is inserted
     Then auto-routing fires (any AT_RISK contract triggers the rule)
     And case.work_notes records the specific at-risk contract number
 
   # OPEN QUESTIONS
-  # 1. Confirm "primary_contract" — is this a designated contract on the account, or "the most recent contract"? Affects the lookup logic.
+  # 1. Confirm "u_primary_contract" — is this a designated contract on the account, or "the most recent contract"? Affects the lookup logic.
   # 2. ASSUMPTION: Cases reopened later don't re-trigger routing (assigned_to stays). Confirm.
   # 3. What about cases opened by the CSM themselves on their own account? Should auto-routing still fire? (Likely no.)
   # 4. Does priority elevation apply to all severities including "Critical"? (No-op there, but worth confirming.)
@@ -291,25 +291,25 @@ Feature: Auto-route case to CSM when account contract is at-risk
 #### Sprint metadata
 
 - **Story points (estimate):** 5
-- **Dependencies:** Account record must have `customer_success_manager` and `relationship_manager_team` fields populated for at-risk accounts (data hygiene precursor — flag as separate story if not).
+- **Dependencies:** Account record must have `u_customer_success_manager` and `u_relationship_manager_team` fields populated for at-risk accounts (data hygiene precursor — flag as separate story if not).
 - **Sprint candidate:** Yes, ready for design dispatch immediately.
 
 #### Post-build §6.2 manifest
 
 > Story produced (1 Feature, 4 happy + edge scenarios, embedded ATF outline). Proposing:
 >
-> 1. **Technical Designer** — design the auto-routing mechanism (Flow vs Business Rule decision, with rationale; account.primary_contract lookup pattern; CSM.delegate field). Proceed?
+> 1. **Technical Designer** — design the auto-routing mechanism (Flow vs Business Rule decision, with rationale; account.u_primary_contract lookup pattern; `u_customer_success_manager.u_delegate` field). Proceed?
 > 2. **ATF Author (skill mode)** — convert embedded TC-01..TC-07 outline into ATF coverage. Proceed?
-> 3. **CSM Specialist (consult)** — verify account.primary_contract semantic and customer_success_manager.delegate pattern against CSM baseline. Proceed?
-> 4. **Data hygiene precursor story** — flag separately if account-data audit shows gaps in `customer_success_manager` population. Proceed?
+> 3. **CSM Specialist (consult)** — verify account.u_primary_contract semantic and u_customer_success_manager.u_delegate pattern against CSM baseline. Proceed?
+> 4. **Data hygiene precursor story** — flag separately if account-data audit shows gaps in `u_customer_success_manager` population. Proceed?
 
 ### Explanation
 
 This example shows a Story Writer producing a sprint-ready output with an embedded ATF outline directly inside the Feature file as comments. This is the right pattern when the user signals sprint urgency — the ATF Author skill receives a structured starting point rather than re-deriving test cases from scratch.
 
-The story correctly slices the at-risk scenarios into four observable cases including the multi-contract mixed-status edge case, which is the kind of edge case real product owners forget. Three of the four OPEN QUESTIONS materially affect the design choice (primary_contract semantic, reopen behaviour, self-routing edge case). The fourth is a low-risk confirmation.
+The story correctly slices the at-risk scenarios into four observable cases including the multi-contract mixed-status edge case, which is the kind of edge case real product owners forget. Three of the four OPEN QUESTIONS materially affect the design choice (u_primary_contract semantic, reopen behaviour, self-routing edge case). The fourth is a low-risk confirmation.
 
-The §6.2 manifest also surfaces a **CSM Specialist consult** — Story Writer doesn't pretend to know whether `customer_success_manager.delegate` is a baseline field or a custom one. That goes to the domain expert before design starts.
+The §6.2 manifest also surfaces a **CSM Specialist consult** — Story Writer writes the account fields the request describes as the engagement's own (`u_`), and doesn't pretend to know whether a baseline construct should replace them: the corpus keeps an account's team as Account Team Members [`sn_customerservice_team_member`] *(citation: `markdown/customer-service-management/r_TIWCustomerService.md`)*. That goes to the domain expert before design starts.
 
 ---
 

@@ -155,11 +155,11 @@ The proposed "customer journey stage" is a **dimension** of the case record itse
 | `sn_customerservice_case.state` | Lifecycle state, not customer journey |
 | `sn_customerservice_case.priority` | Severity, not journey |
 | `sn_customerservice_case.category` | Issue type (e.g., billing, technical), not journey |
-| `customer_account.customer_lifecycle_stage` (if present in baseline — verify) | This lives on the *account*, not the case. Cases inherit account context but the request is per-case journey, which may differ from account-level stage. |
+| An account-level lifecycle stage on `customer_account` (not documented in the bundled corpus — verify on the instance) | This lives on the *account*, not the case. Cases inherit account context but the request is per-case journey, which may differ from account-level stage. |
 
 **Critical baseline fields to respect:** `account`, `contact`, `consumer`, `state`, `priority`, `category` — all already exist and the journey-stage field must not conflict with their semantics.
 
-**Related baseline tables:** `customer_account` for account-level context; `sn_customerservice_contract` for contract-stage context (renewal date, contract state).
+**Related baseline tables:** `customer_account` for account-level context; `ast_contract` for contract-stage context (its State, Starts and Ends) *(citation: `markdown/customer-service-management/r_BRIWCustomerService.md`, `markdown/customer-service-management/create-csm-service-contracts.md`)*.
 
 (citation: markdown/customer-service-management/configure-csm-accounts-contacts.md)
 
@@ -217,8 +217,8 @@ Consult flags:
 
 ## Open Questions
 
-1. **Engagement field-naming convention** — is `u_customer_journey_stage` correct, or does the engagement use `x_<scope>_customer_journey_stage`? Confirm with Chief Architect before Technical Designer dispatches.
-2. **Auto-population** — should the field auto-populate from `customer_account.customer_lifecycle_stage` (if that field exists on baseline `customer_account` in the engagement's release)? Verify baseline field availability before design.
+1. **Engagement field-naming convention** — is `u_customer_journey_stage` correct, or does the engagement build in a scoped app, where it is `x_<vendor>_<app>_customer_journey_stage` *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*? Confirm with Chief Architect before Technical Designer dispatches.
+2. **Auto-population** — should the field auto-populate from an account-level lifecycle stage, if the engagement's release has one? Such a field on `customer_account` is not documented in the bundled corpus — verify on the instance before design.
 3. **Choice value localisation** — does the engagement need localised choice labels? Affects sys_choice record design.
 
 ---
@@ -330,35 +330,35 @@ Before any specialist may be dispatched, §1.1 requires honest evaluation of bas
 
 2. Custom object proposed (smallest viable scope):
 
-   Smallest-scope candidate: **A new child table extending `task` (or extending `sn_customerservice_case` directly), in the baseline `sn_customerservice` scope.** Not a new scoped app.
+   Smallest-scope candidate: **A new child table extending `task` (or extending `sn_customerservice_case` directly), in the global scope.** Not a new scoped app.
 
    Hierarchy position (§1.1 preference order, from least to most invasive):
    - Field on baseline table: insufficient — five typed fields needed
-   - New child table extending baseline CSM table, in baseline `sn_customerservice` scope: PROPOSED
+   - New child table extending baseline CSM table, in the global scope: PROPOSED
    - New top-level table in pre-existing scoped app: not justified — sibling-of-task design loses parent-child semantic
    - New scoped app: not justified — no separate deployment cadence required
 
-   Proposed table: `sn_customerservice_case_escalation` (extending `task`, in scope `sn_customerservice`, one related list on `sn_customerservice_case`).
+   Proposed table: `u_case_escalation` (extending `task`, global scope — custom tables in the global scope take `u_` *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)* — one related list on `sn_customerservice_case`).
 
-   Field list:
-   - `parent_case` (Reference to `sn_customerservice_case`, mandatory)
-   - `from_tier` (Reference to `sys_user_group`)
-   - `to_tier` (Reference to `sys_user_group`)
-   - `reason_code` (Choice)
-   - `business_impact_summary` (String, 4000)
-   - `stakeholders` (Reference list to `sys_user`)
+   Field list (a global table's columns take `u_` *(citation: `markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`)*):
+   - `u_parent_case` (Reference to `sn_customerservice_case`, mandatory)
+   - `u_from_tier` (Reference to `sys_user_group`)
+   - `u_to_tier` (Reference to `sys_user_group`)
+   - `u_reason_code` (Choice)
+   - `u_business_impact_summary` (String, 4000)
+   - `u_stakeholders` (Reference list to `sys_user`)
    - Inherits: `sys_created_on`, `sys_created_by`, `state` from task parent
 
 3. Consequences of approval:
-   - **Data model:** one new child table in baseline scope; one related list on case form; minor form-layout work. No CSM upgrade-path concern (child of `task`).
+   - **Data model:** one new child table in the global scope; one related list on case form; minor form-layout work. No CSM upgrade-path concern (child of `task`).
    - **Deployment:** ships in the same update set as the case-form changes; no separate scoped-app deployment cadence.
    - **Support cost:** low — agents learn one new related list; no separate workspace.
-   - **Platform-upgrade risk:** low — child of baseline `task`, in baseline scope, with field types that align with baseline conventions. If Vancouver+ ships `sn_customerservice_escalation`, migration path is documented (field-by-field copy script during upgrade).
+   - **Platform-upgrade risk:** low — child of baseline `task`, in the global scope, with field types that align with baseline conventions. If Vancouver+ ships `sn_customerservice_escalation`, migration path is documented (field-by-field copy script during upgrade).
 
 4. Alternatives if rejected:
    - **Alternative A: Pure baseline (Verdict A-degraded).** Use `escalation` field + `work_notes` + field-level audit. Lose the structured fields; reporting is text-parsing or summary-by-priority. Acceptable if escalation reporting is informal.
    - **Alternative B: Defer until release upgrade.** Wait for Vancouver+ release of `sn_customerservice_escalation` and use baseline then. Acceptable if engagement's roadmap includes the upgrade within 6 months.
-   - **Alternative C: Reduce-dimension custom design.** Drop "stakeholders" (handle as `work_notes` mentions) and "business-impact summary" (handle as `work_notes`), keep only `from_tier`, `to_tier`, `reason_code`. Smaller field set, but still a custom table — same §1.1 cost, less benefit. Not recommended.
+   - **Alternative C: Reduce-dimension custom design.** Drop "stakeholders" (handle as `work_notes` mentions) and "business-impact summary" (handle as `work_notes`), keep only `u_from_tier`, `u_to_tier`, `u_reason_code`. Smaller field set, but still a custom table — same §1.1 cost, less benefit. Not recommended.
 
 Decision required from Chief Architect before any specialist is dispatched.
 
@@ -383,19 +383,19 @@ If rejected → adopt Alternative A or Alternative B from Part 3.
 
 (Surfaced now so that if the proposal is approved, the downstream Technical Designer dispatch carries these constraints.)
 
-- **Do not create a top-level scoped app for this.** Child table in the baseline `sn_customerservice` scope is the correct level. New scoped app for one related list is §1.1 over-escalation.
+- **Do not create a top-level scoped app for this.** A child table in the global scope is the correct level. New scoped app for one related list is §1.1 over-escalation.
 - **Do not duplicate `task` fields on the new escalation table.** The escalation table inherits from `task` and automatically has `sys_created_on`, `sys_created_by`, `state`, `assigned_to`. Adding parallel fields creates audit-trail confusion.
 - **Do not write a Business Rule that copies escalation-table rows back to `work_notes`.** Keep the two stores separate: structured fields on the new table, agent commentary in `work_notes`. Double-writing is a maintenance trap.
-- **Do not name the table `u_case_escalation` or `x_acme_case_escalation` if the engagement uses the baseline `sn_customerservice` scope convention.** Match engagement scope-prefix convention; confirm with App Engine Specialist if unclear.
+- **Do not name the table in ServiceNow's own `sn_customerservice` namespace.** A global table takes `u_`; if the engagement builds in an existing scoped app, the table takes that app's namespace — confirm with App Engine Specialist if unclear.
 - **Do not reference `sn_customerservice_escalation` without checking the corpus for the engagement's release.** In Australia it is baseline (see the correction note above).
-- **Do not skip Security & GRC consult on `business_impact_summary`.** Customer business-impact statements can be commercially sensitive; ACL design matters.
+- **Do not skip Security & GRC consult on `u_business_impact_summary`.** Customer business-impact statements can be commercially sensitive; ACL design matters.
 
 ## Open Questions
 
 1. **Engagement release-upgrade roadmap** — is Vancouver+ on the roadmap within 6 months? If yes, Alternative B (defer) becomes attractive.
-2. **Engagement scope-prefix convention** — `sn_customerservice` vs `x_acme_csm` vs `u_*`. Determines table naming.
+2. **Engagement scope-prefix convention** — global `u_` vs an existing scoped app's namespace such as `x_acme_csm`. Determines table naming.
 3. **Stakeholder reporting requirement** — is the "stakeholder list" needed for outbound notifications, or only for record-keeping? If notifications, Now Assist or Flow Designer downstream involvement increases.
-4. **Reduce-dimension acceptable?** — Would dropping "stakeholders" and "business-impact summary" (keeping only `from_tier`, `to_tier`, `reason_code`) make the §1.1 proposal more acceptable? See Alternative C.
+4. **Reduce-dimension acceptable?** — Would dropping "stakeholders" and "business-impact summary" (keeping only `u_from_tier`, `u_to_tier`, `u_reason_code`) make the §1.1 proposal more acceptable? See Alternative C.
 
 ---
 

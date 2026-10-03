@@ -54,7 +54,7 @@ Platform systems = `System`; external = `System_Ext`; baseline tables solid; ref
 ```mermaid
 C4Context
     title System Context — CSM Escalation
-    Person(agent, "CSM Agent", "csm_agent")
+    Person(agent, "CSM Agent", "sn_customerservice_agent")
     System(sn, "ServiceNow CSM", "sn_customerservice_case")
     System_Ext(crm, "Salesforce", "account master")
     System_Ext(slack, "Slack", "escalation channel")
@@ -68,7 +68,7 @@ C4Context
 erDiagram
     customer_account  ||--o{ sn_customerservice_case : "account"
     customer_contact  ||--o{ sn_customerservice_case : "contact"
-    sn_customerservice_case ||--o{ sn_customerservice_case_task : "tasks"
+    sn_customerservice_case ||--o{ sn_customerservice_task : "tasks"
     sn_customerservice_case }o--|| sys_user : "assigned_to"
     sn_customerservice_case {
         string  number
@@ -96,7 +96,7 @@ stateDiagram-v2
 ```
 
 ### Fidelity notes
-- All table names (`sn_customerservice_case`, `customer_account`, `customer_contact`, `sn_customerservice_case_task`) and the `escalated` field come from the Envelope's Data Model Alignment — all baseline.
+- All table names (`sn_customerservice_case`, `customer_account`, `customer_contact`, `sn_customerservice_task`) and the `escalated` field come from the Envelope's Data Model Alignment — all baseline.
 - `Escalated` is modelled as a *state transition driver*, not a new `state` choice value, matching the spec (escalation is a flag + flow, not a custom state).
 
 ### §1.1 flags
