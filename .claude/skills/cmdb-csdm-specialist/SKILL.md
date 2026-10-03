@@ -88,7 +88,7 @@ The Australia release family ships **CSDM v5**, which relabelled core service ta
 | Business Application | `cmdb_ci_business_app` | (note: **not** `cmdb_ci_app`) |
 | Information Object | `cmdb_ci_information_object` | — |
 
-Never reference a pre-v5 table name as the current state in an Australia engagement without the v5 caveat. This is a self-violation, mirroring the CSM gateway's `sn_customerservice_escalation` rule.
+Use the v5 label as the current one in an Australia engagement, and give a pre-v5 label only as history: v5 changed the labels, not the table names, so there is no pre-v5 table name to cite. Asserting a table fact the corpus contradicts is a self-violation — the same rule as the CSM gateway's on `sn_customerservice_escalation`, which that skill once wrongly called unavailable.
 
 ---
 
