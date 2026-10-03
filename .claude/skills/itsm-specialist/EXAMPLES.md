@@ -31,7 +31,7 @@ This request touches three core baseline ITSM processes: incident lifecycle, on-
 
 - `incident.priority` is set to 1 (Critical) or 2 (High) by Data Lookup Definition keyed on `impact` and `urgency` at insert time.
 - `incident.assignment_group` is set by baseline assignment rules, also fired at insert.
-- `incident.state` transitions through New (1) → In Progress (2). The "not acknowledged" condition maps to "state remains New and `assigned_to` is not populated, or `assigned_to` is populated and no work_note has been added by the assignee".
+- `incident.state` transitions through New (1) → In Progress (2). The "not acknowledged" condition maps to "state remains New and `assigned_to` is not populated, or `assigned_to` is populated and the assignee has added nothing to `work_notes`".
 - *(citation: `markdown/it-service-management/incident-management/reference-section-for-incident-management.md`)*
 
 ### On-call coordination
@@ -67,14 +67,14 @@ No new tables. No new scoped app. No new state values. No new Connection Aliases
 
 The escalation requirement is fully satisfied by combining four baseline constructs:
 
-1. **A scheduled job** that runs every 5 minutes scanning `incident` for `priority IN 1,2 AND state=1 AND sys_created_on < 15 minutes ago AND <no work_note from assigned_to>` — or equivalent baseline `IncidentInactivityMonitor` pattern. *(citation: `markdown/it-service-management/incident-management/reference-section-for-incident-management.md`)*
+1. **A scheduled job** that runs every 5 minutes scanning `incident` for `priority IN 1,2 AND state=1 AND sys_created_on < 15 minutes ago AND <no work_notes entry from assigned_to>` — or equivalent baseline `IncidentInactivityMonitor` pattern. *(citation: `markdown/it-service-management/incident-management/reference-section-for-incident-management.md`)*
 2. **Baseline `OnCallRotation` Script Include** to resolve the on-call duty manager for the incident's assignment group at the moment of escalation.
-3. **A baseline notification record** with: table = `incident`, when = "Event is fired", event = a custom event name like `incident.escalated_to_duty_manager`, condition = the 15-min/no-ack predicate, recipient = the resolved on-call duty manager. The event is fired from the scheduled job.
-4. **A work_note append** by the scheduled job, written via `gr.work_notes = "Escalated to duty manager <name> — no acknowledgement within 15 min of creation"`.
+3. **A baseline notification record** with: table = `incident`, when = "Event is fired", event = a custom event named for the record and the action, as baseline events are *(citation: `markdown/build-workflows/system-events/events.md`)*, like `incident.escalated.duty.manager`, condition = the 15-min/no-ack predicate, recipient = the resolved on-call duty manager. The event is fired from the scheduled job.
+4. **A `work_notes` append** by the scheduled job, written via `gr.work_notes = "Escalated to duty manager <name> — no acknowledgement within 15 min of creation"`.
 
 No custom tables. No new scope. No state-machine changes.
 
-The "custom event name" (`incident.escalated_to_duty_manager`) is **not** a §1.1 concern — events are baseline platform infrastructure, registered via the `sysevent_register` table which is baseline. Adding an event is configuration, not a custom architectural object.
+The "custom event name" (`incident.escalated.duty.manager`) is **not** a §1.1 concern — events are baseline platform infrastructure, registered via the `sysevent_register` table which is baseline. Adding an event is configuration, not a custom architectural object.
 
 ## Part 4 — Routing Recommendation
 
@@ -96,14 +96,14 @@ The following are explicitly blocked in any downstream design:
 - **Do not extend `incident.state` with a new "Escalated" value.** Escalation is an event, not a state — the incident remains in New or In Progress. *(citation: `markdown/it-service-management/incident-management/reference-section-for-incident-management.md`)*
 - **Do not duplicate the baseline assignment-rule logic in the scheduled job.** The scheduled job reads `assignment_group` from the incident; it does not re-route. *(citation: `markdown/it-service-management/incident-management/t_DefinAnAssignRuleIncidents.md`)*
 - **Do not hardcode the duty-manager rotation sys_id in the scheduled job.** Resolve at runtime via `OnCallRotation.getUsersOnSchedule()` or externalise to a system property if a default fallback is needed.
-- **Do not write the work_note in a custom audit table** — use `incident.work_notes`. This is a §1.1 hot spot; the work_notes journal is the baseline audit for state changes and operational events. *(citation: `markdown/platform-security/audit-mgmt-console.md`)*
+- **Do not write the work note in a custom audit table** — use `incident.work_notes`. This is a §1.1 hot spot; the work_notes journal is the baseline audit for state changes and operational events. *(citation: `markdown/platform-security/audit-mgmt-console.md`)*
 - **Do not query `task_sla.stage='completed'` if SLA tracking is added** — baseline value is `complete` without the -ed. (Defensive — relevant if Technical Designer adds SLA-aware logic.)
 
 ## Open Questions
 
 1. **Duty manager resolution.** The baseline `cmn_rota` typically defines a single on-call engineer. Confirm whether the engagement has a separate `cmn_rota` rotation specifically for "Duty Manager", or whether the duty manager is the on-call engineer's escalation contact (in which case the rotation needs a second tier configured).
-2. **Acknowledgement definition.** "Not acknowledged within 15 minutes" — does "acknowledged" mean `state=2 (In Progress)`, or `assigned_to is set`, or "a work_note has been added by `assigned_to`"? The three are subtly different. Recommend defaulting to "assigned_to is set AND state transitioned out of New (state != 1)".
-3. **15-minute timer reference point.** From `sys_created_on` of the incident, or from `incident.assigned_at` (when assignment first happened)? Defaulting to `sys_created_on` if no assignment SLA is active.
+2. **Acknowledgement definition.** "Not acknowledged within 15 minutes" — does "acknowledged" mean `state=2 (In Progress)`, or `assigned_to is set`, or "`assigned_to` has added to `work_notes`"? The three are subtly different. Recommend defaulting to "assigned_to is set AND state transitioned out of New (state != 1)".
+3. **15-minute timer reference point.** From `sys_created_on` of the incident, or from the moment it was first assigned? Defaulting to `sys_created_on` if no assignment SLA is active.
 4. **Re-escalation behaviour.** If the duty manager doesn't ack within another 15 minutes, escalate further? Out of scope unless specified.
 ```
 
@@ -132,7 +132,7 @@ The Open Questions are real — the request as written has ambiguity in three pl
 > Module: ITSM
 > Volume: ~200K incidents/year
 > Sensitivity: standard ITSM
-> Engagement: BankCo — Service Owners are a defined role (`sn_incident.service_owner`), Service Owners are already mapped to `cmdb_ci_service` records via a custom group structure. No current customisations to `incident.priority` or `incident.impact`.
+> Engagement: BankCo — Service Owners are a defined role (`u_service_owner`, BankCo's own global role), Service Owners are already mapped to `cmdb_ci_service` records via a custom group structure. No current customisations to `incident.priority` or `incident.impact`.
 > Release family: Australia
 
 ### Expected gateway output
@@ -246,8 +246,8 @@ Technical Designer receives this envelope and produces:
 
 ## Open Questions
 
-1. **Scope convention.** The proposal uses `u_` prefix on a baseline-scope field. Confirm whether the engagement has a standing rule for `u_` vs scoped-app custom fields. If a scoped app is preferred, the field becomes `<scope>.u_business_severity` and ACL/BR records move into the scoped app.
-2. **Service Owner role identity.** The dispatch envelope mentions `sn_incident.service_owner` as the role. Confirm this is the engagement's actual role name and that it's already populated for the relevant CIs.
+1. **Scope convention.** The proposal uses `u_` prefix on a baseline-scope field. Confirm whether the engagement has a standing rule for `u_` vs scoped-app custom fields. If a scoped app is preferred, the field takes the app's namespace in place of `u_`, `x_<vendor>_<app>_business_severity` *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*, and ACL/BR records move into the scoped app.
+2. **Service Owner role identity.** The dispatch envelope names `u_service_owner` as the role. Confirm this is the engagement's actual role name and that it's already populated for the relevant CIs.
 3. **Backfill strategy.** NULL = implicit Low, or explicit Service-Owner-driven backfill exercise? Recommend defaulting to NULL with a future backfill story if reporting needs require it.
 4. **Read access.** Should `u_business_severity` be visible to all `itil` users (read-only) or restricted to Service Owners? Recommend read-visible-to-itil, write-restricted-to-Service-Owner.
 5. **Escalation-timing linkage.** The request says business severity "drives escalation timing". Confirm whether escalation timing is per-incident (the Example 1 pattern reads `u_business_severity` and adjusts the 15-minute timer) or per-CI (the timer is on the cmdb_ci_service record).
@@ -293,8 +293,8 @@ This request touches change management approval orchestration, change risk scori
 
 - Baseline `change_request` has a state machine: New → Assess → Authorize → Scheduled → Implement → Review → Closed.
 - Approvals happen in the `Authorize` state, driven by baseline `sysapproval_approver` records.
-- Approver resolution in baseline: a Flow Designer flow or a Business Rule generates `sysapproval_approver` records, one per required approver. Approval rules can be table-driven (via `approval_rule` table) or flow-driven (via Flow Designer with approval action).
-- Baseline `change_request.risk` is a 0–100 score, typically calculated by a Risk Assessment questionnaire (the `assessment_metric` / `assessment_metric_type` baseline pattern). *(citation: `markdown/it-service-management/change-management/reference-change-management.md`)*
+- Approver resolution in baseline: a Flow Designer flow or a Business Rule generates `sysapproval_approver` records, one per required approver. Classic approval rules have been replaced by the Workflow Studio Ask for Approval action, so approval routing is flow-driven *(citation: `markdown/build-workflows/approvals/c_ApprovalRules.md`)*.
+- Baseline `change_request.risk` is a 0–100 score, typically calculated by a Risk Assessment questionnaire (the baseline Assessment Metric Type [`asmt_metric_type`] and Assessment Metric [`asmt_metric`] tables *(citation: `markdown/api-reference/rest-apis/copy-assessments-api.md`, `markdown/build-workflows/workflow-studio/activate-process-automation-designer-for-app-engine.md`)*). *(citation: `markdown/it-service-management/change-management/reference-change-management.md`)*
 - Baseline `change_request.type` distinguishes Standard (pre-approved, no CAB), Normal (CAB review), Emergency (expedited CAB).
 - *(citation: `markdown/it-service-management/change-management/reference-change-management.md`)*
 
@@ -305,7 +305,7 @@ This request touches change management approval orchestration, change risk scori
 
 ### PCI scope tracking
 
-- PCI scope is typically tracked on the CI via a `cmdb_ci.compliance_scope` or similar custom field; baseline `cmdb_ci` does not carry a PCI flag. The engagement is expected to have implemented this if PCI is audited.
+- PCI scope is typically tracked on the CI via a `cmdb_ci.u_compliance_scope` or similar custom field; baseline `cmdb_ci` does not carry a PCI flag. The engagement is expected to have implemented this if PCI is audited.
 
 ### Business Unit / Service Owner / requester seniority
 
@@ -320,17 +320,16 @@ The request implies orchestrating a matrix decision across **five dimensions** w
 |---|---|
 | `change_request` | The record being approved |
 | `sysapproval_approver` | Where the resolved approvers are written |
-| `approval_rule` | Baseline approval-rule definition table |
-| `assessment_metric` | Baseline risk-scoring questionnaire definition |
+| `asmt_metric` | Baseline risk-scoring questionnaire definition |
 | `cmn_schedule` | Frozen period definition |
 | `cmdb_ci` | CI being changed (carries PCI flag if implemented) |
 | `sys_user` | Requester seniority lookup |
 
-The baseline `approval_rule` table handles **single-dimensional** approval routing well. It is **not designed for** five-dimensional matrices with ~50 scenarios changing quarterly.
+Baseline flow-driven approval routing handles **single-dimensional** routing well. It is **not designed for** five-dimensional matrices with ~50 scenarios changing quarterly.
 
 Two baseline-extension paths exist:
 
-- **Path X — Multiple `approval_rule` records, layered.** One rule per scenario combination. With 5 dimensions and ~50 scenarios, this means ~50 `approval_rule` records, each with a complex `condition` script. Maintenance burden: each quarterly change requires editing multiple records, hard to validate exhaustively, hard to audit.
+- **Path X — One approval branch per scenario, layered.** Classic approval rules, one per scenario, are not an option: they have been replaced by the Workflow Studio Ask for Approval action *(citation: `markdown/build-workflows/approvals/c_ApprovalRules.md`)*. The flow equivalent is one conditioned approval branch per scenario combination — with 5 dimensions and ~50 scenarios, ~50 branches, each with a complex condition. Maintenance burden: each quarterly change requires editing multiple branches, hard to validate exhaustively, hard to audit.
 - **Path Y — Data Lookup Definitions, chained.** Multiple Data Lookups, each handling one dimension, chained in a Script Include orchestrator that resolves the final approver list. Same data complexity, similar maintenance burden, slightly better auditability.
 
 Both baseline paths struggle at the scale described (~50 scenarios, quarterly change cadence).
@@ -347,24 +346,24 @@ A custom decision-matrix table appears genuinely necessary. Surfacing for explic
 
 | Baseline option | Why it falls short for this specific requirement |
 |---|---|
-| **Single `approval_rule` records, one per scenario** | At ~50 scenarios with complex multi-dimensional conditions, each record's `condition` script becomes a mini-ruleset. Maintenance is error-prone — adding a new dimension means editing all 50. *(citation: `markdown/it-service-management/change-management/reference-change-management.md`)* |
-| **Chained Data Lookup Definitions** | Better auditability than `approval_rule` records, but still requires ~50 lookup table entries plus orchestrator Script Include. The orchestrator becomes complex; quarterly changes still mean editing multiple data structures in lockstep. |
+| **One approval branch per scenario** | Classic approval rules have been replaced by the Workflow Studio Ask for Approval action *(citation: `markdown/build-workflows/approvals/c_ApprovalRules.md`)*. In the flow, at ~50 scenarios with complex multi-dimensional conditions, each branch's condition becomes a mini-ruleset. Maintenance is error-prone — adding a new dimension means editing all 50. |
+| **Chained Data Lookup Definitions** | Better auditability than per-scenario approval branches, but still requires ~50 lookup table entries plus orchestrator Script Include. The orchestrator becomes complex; quarterly changes still mean editing multiple data structures in lockstep. |
 | **Flow Designer-based approval orchestrator** | A single flow can evaluate the five dimensions and branch to one of ~50 approval paths via decision tables. Decision Tables (`sys_decision`) are baseline. **This is actually viable** — but at 50 scenarios it pushes the decision-table pattern past its readable scale, and quarterly changes mean editing a complex flow definition. *(citation: `markdown/build-workflows/index.md`)* |
 | **External rule engine integration** | Out of scope — would route to Integration Specialist, not in scope here. |
 
 The viable baseline path is **chained Data Lookups + Flow Designer with Decision Tables**. This is "Verdict B with effort" — possible, but operationally fragile at the described scale and change cadence.
 
-A **custom table** would be a dedicated `<scope>_change_approval_matrix` with fields for the five input dimensions and structured approver-output. This trades a quarterly maintenance burden (multiple `approval_rule` + Data Lookup + flow edits, lockstep) for a single-table maintenance burden (50 rows, queryable, auditable, change-log-trackable via baseline `sys_history_set`).
+A **custom table** would be a dedicated `u_approval_matrix` with fields for the five input dimensions and structured approver-output. This trades a quarterly maintenance burden (multiple approval branches + Data Lookup + flow edits, lockstep) for a single-table maintenance burden (50 rows, queryable, auditable, change-log-trackable via baseline `sys_history_set`).
 
 #### 2. Custom object proposed (smallest possible scope)
 
-**Preferred:** Extend baseline `approval_rule` with several new fields to carry the multi-dimensional matrix conditions, without a new table. **Evaluated and rejected** — `approval_rule` is keyed on `condition` script, not declarative dimensions; adding fields doesn't change how the rule engine reads it.
+**Preferred:** Extend the classic approval rules with several new fields to carry the multi-dimensional matrix conditions, without a new table. **Evaluated and rejected** — classic approval rules have been replaced by the Workflow Studio Ask for Approval action *(citation: `markdown/build-workflows/approvals/c_ApprovalRules.md`)*; new fields would extend a superseded construct.
 
-**Proposed:** **A new table extending `approval_rule` in baseline scope:**
+**Proposed:** **A new top-level table in baseline scope, read by the approval flow:**
 
 ```
-Table name:      u_approval_matrix (extending approval_rule, baseline scope)
-Parent:          approval_rule
+Table name:      u_approval_matrix (top level, baseline scope)
+Parent:          none (the approval flow reads it and writes sysapproval_approver records)
 New fields:      u_risk_min, u_risk_max (range)
                  u_business_unit (ref to business_unit)
                  u_pci_scope_required (boolean)
@@ -375,22 +374,20 @@ New fields:      u_risk_min, u_risk_max (range)
 Scope:           baseline (not a new scoped app)
 ```
 
-**Smaller alternative (also viable):** A new table at top level in baseline scope, not extending `approval_rule`. This severs the connection to the baseline rule engine; you build your own orchestrator Script Include that reads this table. Slightly more code, slightly cleaner data model. Pick based on how much baseline approval-rule behaviour you want to inherit.
-
-**Even smaller alternative:** Decide if all 5 dimensions are truly orthogonal. If "BU" + "PCI scope" can be derived from `cmdb_ci`, the effective dimensions drop to 3 (risk, change-window, requester seniority), and ~50 scenarios likely drop to ~10–15. At that scale, the baseline chained-Data-Lookup path becomes viable. **Recommend the user evaluate dimension reduction before approving a new table.**
+**Smaller alternative:** Decide if all 5 dimensions are truly orthogonal. If "BU" + "PCI scope" can be derived from `cmdb_ci`, the effective dimensions drop to 3 (risk, change-window, requester seniority), and ~50 scenarios likely drop to ~10–15. At that scale, the baseline chained-Data-Lookup path becomes viable. **Recommend the user evaluate dimension reduction before approving a new table.**
 
 #### 3. Consequences of approval
 
 - **Data model:** One new table, one new structured maintenance surface. ~50 rows, quarterly updates.
 - **Deployment:** Goes in the engagement's existing customisation update set or a new "Change Governance" scoped app — recommend NOT a new scoped app (single table is too small to justify scope separation per §1.1 hierarchy).
 - **Support cost:** Change Manager / CAB owner needs UI for managing the 50 rows. Recommend a list view + form on the new table; no special UI needed.
-- **Platform-upgrade risk:** Low. The table extends `approval_rule` so it inherits baseline upgrade semantics. As long as ServiceNow doesn't drop `approval_rule` (it won't — it's foundational to change management), this is upgrade-safe.
+- **Platform-upgrade risk:** Low. The table is top level and extends no baseline table, so no baseline parent can change under it.
 - **Audit and PCI implications:** `u_pci_scope_required` field carries regulatory weight. Field-level audit must be enabled on this field; the field-edit history must survive audit retention requirements. **Security & GRC Specialist consult is required** if this proposal is approved.
 
 #### 4. Alternatives if rejected
 
 - **Degraded design 1 (recommended):** Reduce dimensions to 3 (drop BU + PCI as derived from CI), implement with chained Data Lookups + Flow Designer Decision Tables. Maintenance burden manageable at ~10–15 effective scenarios.
-- **Degraded design 2:** Use baseline `approval_rule` records with the engagement accepting ~50 rules and a quarterly review process. Brittle but baseline-only.
+- **Degraded design 2:** Use ~50 conditioned approval branches in the baseline approval flow, with a quarterly review process. Brittle but baseline-only.
 - **Deferred functionality:** Phase 1 — implement for the highest-frequency 10 scenarios using baseline Decision Tables. Phase 2 — evaluate scaling after 6 months of operational data.
 - **Manual workaround:** Change Manager continues to use the spreadsheets, with a Service Catalog item that captures the inputs and creates a `change_request` plus a manual approval-routing task. No automation. Status quo.
 
@@ -406,8 +403,8 @@ If dimensions cannot be reduced and the operational reality is genuinely 50 scen
 
 Do not dispatch Technical Designer until the Chief Architect resolves the proposal above. Options:
 
-- **Approve as proposed.** Chief Architect approves the new `u_approval_matrix` table extending `approval_rule` in baseline scope. Re-dispatch ITSM Specialist with the approval in the envelope, then proceed to Technical Designer. **Fire Security & GRC Specialist consult before Developer dispatch.**
-- **Approve a smaller variant.** Chief Architect approves a top-level table in baseline scope (not extending `approval_rule`), or extends a different baseline structure.
+- **Approve as proposed.** Chief Architect approves the new top-level `u_approval_matrix` table in baseline scope. Re-dispatch ITSM Specialist with the approval in the envelope, then proceed to Technical Designer. **Fire Security & GRC Specialist consult before Developer dispatch.**
+- **Approve a smaller variant.** Chief Architect approves the table with fewer dimensions or fields than proposed.
 - **Reject and force dimension reduction.** Chief Architect rejects the custom-table proposal and asks the user to evaluate whether 5 dimensions are genuinely orthogonal. Re-dispatch only after dimension-reduction analysis.
 - **Reject and force degraded design.** Chief Architect rejects and instructs the user to live with chained Data Lookups + Decision Tables at the cost of maintenance burden.
 

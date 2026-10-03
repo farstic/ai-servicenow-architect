@@ -104,7 +104,7 @@ flowchart LR
     C -- Yes --> E[Modal: select<br/>reason + details]
     E --> F{Valid<br/>submission?}
     F -- No --> G[Inline validation<br/>error]
-    F -- Yes --> H[Server-side BR:<br/>state=Escalated,<br/>append work_note]
+    F -- Yes --> H[Server-side BR:<br/>state=Escalated,<br/>append to work_notes]
     H --> I[Email duty<br/>manager]
     H --> J[Confirmation<br/>to agent]
 ```
@@ -115,7 +115,7 @@ flowchart LR
 
 **sn_customerservice_agent** — primary journey: identifies a case requiring senior attention, opens it in CRM Workspace, clicks "Escalate to Duty Manager" button on the form header, selects reason from the picklist and enters details, submits. Receives confirmation and continues working other cases.
 
-**Regional duty manager (sn_user with assignment_group.manager relationship)** — primary journey: receives email notification with case number, link, reason, and details. Opens the case in the workspace, reviews the work-note audit trail, takes action (assigns to themselves, reassigns, etc.).
+**Regional duty manager** (a `sys_user`: the manager of the case's assignment group, `assignment_group.manager` *(citation: `markdown/platform-administration/user-administration/t_CreateAGroup.md`)*) — primary journey: receives email notification with case number, link, reason, and details. Opens the case in the workspace, reviews the work-note audit trail, takes action (assigns to themselves, reassigns, etc.).
 
 **sn_customerservice_manager** — observational journey: reviews escalation patterns via case work notes during weekly team retrospectives (R1); shifts to Performance Analytics dashboards in R2.
 
@@ -623,7 +623,7 @@ The process initiates when a CSM Agent observes a third independent case with ma
 | Customer-facing comms latency from MI declaration | < 15 minutes |
 | MI closure latency from resolution | < 60 minutes |
 
-These are tracked via baseline Performance Analytics on the `em_alert` and `em_event_correlation` tables (existing CSM Major Incident Management).
+These are tracked via Performance Analytics on the case records: the major case and its child cases in CSM Major issue management *(citation: `markdown/customer-service-management/major-issue-management.md`)*.
 
 ## 9. References
 

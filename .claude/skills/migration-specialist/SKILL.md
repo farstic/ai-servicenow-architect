@@ -109,7 +109,7 @@ If any of these is missing, raise it as an Open Question and proceed with a docu
 **Data source → Import set + staging table → Transform map → Target table.** *(citation: `markdown/servicenow-platform/integration-hub-etl/create-etl-transform-map.md`)*
 
 1. **Data source** — defines the incoming records and format. File (CSV/Excel/XML attached or via MID/Attachment), JDBC (direct DB pull via MID), REST/data stream. Choose based on access, volume, and whether a repeatable delta pull is needed.
-2. **Import set + staging table** — `sys_import_set` groups a load; rows land in an **auto-created staging table** (`sys_import_set_row` subtype, `imp_*`) as raw, untyped strings. **This is baseline and transient — not a custom object.** Each row carries `sys_import_state` (pending → processed/error/ignored).
+2. **Import set + staging table** — `sys_import_set` groups a load; rows land in an **auto-created staging table** (`sys_import_set_row` subtype, `imp_*`) as raw, untyped strings. **This is baseline and transient — not a custom object.** Each row carries a **State**, `Pending` until it is transformed *(citation: `markdown/integrate-applications/system-import-sets/r_ImportSetMode.md`)*; the run then counts each row as inserted, updated, ignored, skipped or an error *(citation: `markdown/integrate-applications/system-import-sets/import-run-details.md`)*.
 3. **Transform map** — maps staging columns → target fields. Key parts:
    - **Field maps** — source col → target field, with type coercion.
    - **Coalesce** — one or more coalesce fields decide **insert vs update**: a match updates, no match inserts. The coalesce key is the backbone of **idempotent re-runs** and dedup.

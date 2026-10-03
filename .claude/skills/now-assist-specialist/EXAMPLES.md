@@ -324,7 +324,7 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 
 ### OQ-CUSTOM-03: AI Search profile for multilingual semantic case matching
 
-**Baseline option evaluated:** AI Search supports multilingual profiles via baseline configuration. A new search profile (sn_search_profile) is configuration, not a major custom object — analogous to creating a new dashboard or report.
+**Baseline option evaluated:** AI Search supports multilingual profiles via baseline configuration. A new search profile (a record in AI Search Search Profile [`ais_search_profile`] *(citation: `markdown/platform-administration/ai-search/components-installed-ais.md`)*) is configuration, not a major custom object — analogous to creating a new dashboard or report.
 
 **Outcome:** configuration within a baseline construct, no §1.1 escalation required.
 

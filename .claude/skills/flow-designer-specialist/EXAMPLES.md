@@ -108,7 +108,7 @@ None directly in this flow. The notification subflow may use a script step — s
 - Flow Execution log captures every step.
 - DLQ table acts as the operational alert source.
 - Custom audit row inserted into `x_acme_change_audit` on each terminal transition with: outcome, approver, duration, escalation_used.
-- Performance Analytics indicator: `chg_approval_cycle_time` (ms from trigger to terminal state).
+- Performance Analytics indicator: **Change approval cycle time** (ms from trigger to terminal state).
 
 #### Test approach (handoff to ATF Author)
 - Happy path: approval within SLA → state=-2.
@@ -263,7 +263,7 @@ The handoff to Developer for `ResolveNotificationMessage` is correctly scoped: t
 
 ### Input prompt
 
-> Flow Designer Specialist task: design a scheduled flow that runs daily at 02:00 UTC, finds all closed incidents older than 30 days that haven't had a customer feedback request sent, sends the feedback request via email, and updates the incident's `feedback_requested` flag.
+> Flow Designer Specialist task: design a scheduled flow that runs daily at 02:00 UTC, finds all closed incidents older than 30 days that haven't had a customer feedback request sent, sends the feedback request via email, and updates the incident's `x_acme_itsm_feedback_requested` flag.
 >
 > Volume context: ~2000 closed incidents/day match the criteria.
 > Scope: x_acme_itsm.
@@ -321,7 +321,7 @@ None (side-effects only).
 
 #### Transaction strategy
 - **Async (scheduled)** — no caller waiting.
-- **Idempotency** — the `feedback_requested = false` filter is the idempotency mechanism; once the Action sets the flag to true, a re-run of the flow won't re-process the same record. The custom Action must set the flag *only if the email send succeeded* — see Developer handoff.
+- **Idempotency** — the `x_acme_itsm_feedback_requested = false` filter is the idempotency mechanism; once the Action sets the flag to true, a re-run of the flow won't re-process the same record. The custom Action must set the flag *only if the email send succeeded* — see Developer handoff.
 - **Bounded** — set limit of 5000 prevents runaway processing on data anomalies.
 
 #### Custom scripts called out
@@ -332,7 +332,7 @@ None (side-effects only).
     2. Validate input.
     3. Load incident via `GlideRecordSecure`.
     4. Resolve customer email from `incident.caller_id.email`. If empty → return `{success: false, error_detail: 'no customer email'}`.
-    5. Send email via baseline notification with template `incident_feedback_request_v2` (template lives outside this Action — referenced by name).
+    5. Send email via baseline notification with template `incident.feedback.request.v2` (template lives outside this Action — referenced by name; dotted, as the platform's own `change.update.risk` *(citation: `markdown/platform-administration/t_CreateAnEmailTemplate.md`)*).
     6. On send success: set `incident.x_acme_itsm_feedback_requested = true`, `incident.update()`. Return `{success: true}`.
     7. On send failure: do NOT set the flag. Return `{success: false, error_detail: <error message>}`.
   - Performance: must complete in <500ms per call (loop budget at 5000 records ÷ 30-min flow window).
@@ -366,7 +366,7 @@ None — uses baseline platform email.
 #### Open questions
 - **OQ-1:** Set limit of 5000 — confirm with operations that 30 minutes is the maximum acceptable run duration, and that 5000 is the right ceiling. If volumes exceed 5000/day on average, design needs sharding or hourly runs instead.
 - **OQ-2:** The 60-day historical bound — is this the correct rule, or should the flow process all unflagged closed records regardless of age? Affects the look-up condition.
-- **OQ-3:** Should opt-out customers be excluded? No mention in spec. Assumption: respect a `caller_id.feedback_opt_out` flag. Confirm.
+- **OQ-3:** Should opt-out customers be excluded? No mention in spec. Assumption: respect a `caller_id.x_acme_itsm_feedback_opt_out` flag (the app's own field on `sys_user`, like `x_acme_itsm_feedback_requested` on `incident`). Confirm.
 
 #### Handoffs proposed
 - **Developer** — implement `SendFeedbackRequest` custom Action server script per spec above.

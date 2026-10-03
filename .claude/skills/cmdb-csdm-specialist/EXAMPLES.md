@@ -85,7 +85,7 @@ Consult flags:
 - **Do not duplicate the service** as one record "for CSM" and another "for ITSM." One business service, one (or more) technology management service, linked by designed relationships.
 - **Do not invent a `cmdb_rel_type`** for the business↔technology service link — use the designed CSDM relationship.
 - **Do not model this at Crawl stage** if Foundation/Crawl service data is not yet trustworthy — confirm stage first.
-- **Do not reference pre-v5 names** (`cmdb_ci_service_technical_service`); Australia is CSDM v5 → `cmdb_ci_service_technical`.
+- **Do not use the pre-v5 label** ("Technical service"); Australia is CSDM v5, which relabelled the table without renaming it → `cmdb_ci_service_technical` *(citation: `markdown/servicenow-platform/common-service-data-model-csdm/manage-tech-servs-domain.md`)*.
 
 ## Open Questions
 
@@ -137,7 +137,7 @@ Existing baseline fields evaluated: `business_criticality` (operational critical
 
 **Verdict: B — Requires baseline extension.**
 
-Smallest viable extension: **one Choice field** `customer_tier` (values `platinum` / `gold` / `silver`) on `cmdb_ci_service_business`, mandatory=No, no default, manual write only.
+Smallest viable extension: **one Choice field** `u_customer_tier` (values `platinum` / `gold` / `silver`) on `cmdb_ci_service_business`, mandatory=No, no default, manual write only.
 
 - **Not Verdict A:** no baseline field carries commercial tier; `business_criticality` has distinct operational semantics and reusing it would corrupt existing criticality reports.
 - **Not Verdict C:** one Choice field on a baseline class is the top of the §1.1 preference hierarchy — no new table, scope, or class.
@@ -154,7 +154,7 @@ Smallest viable extension: **one Choice field** `customer_tier` (values `platinu
 - **Do not create a `u_service_tier` table** with a 1:1 reference — one field on the baseline class is enough.
 - **Do not overload `business_criticality`** with commercial values — distinct semantic; breaks criticality reporting.
 - **Do not place the field on `cmdb_ci`** (root) — over-broad; bloats schema for irrelevant CI types.
-- **Do not let a future Service Graph import clear the manual value** — if any data source writes the class, set an IRE reconciliation rule protecting `customer_tier`.
+- **Do not let a future Service Graph import clear the manual value** — if any data source writes the class, set an IRE reconciliation rule protecting `u_customer_tier`.
 
 ## Open Questions
 

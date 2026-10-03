@@ -77,7 +77,7 @@ Fire automatically when the user request mentions any of:
 
 **Process triggers:** Discovery (the application, not the consultant), discovery scan, discovery schedule, MID Server, ECC queue, Service Mapping, top-down service map, business service mapping, Event Management, alert correlation, alert rules, IRE, identification rule, reconciliation rule, CSDM, CSDM phase, CI Class Manager, CMDB Health, Cloud Discovery, AWS / Azure / GCP discovery, Service Graph Connector, SGC, Certificate Management, certificate inventory, SSL certificate.
 
-**Table triggers:** `cmdb_ci`, `cmdb_ci_*` (any CI class), `cmdb_rel_ci`, `cmdb_ci_service`, `cmdb_ci_service_discovered`, `cmdb_ci_business_app`, `cmdb_ci_appl`, `ecc_queue`, `ecc_agent`, `sn_disco_pattern`, `sa_pattern`, `em_alert`, `em_event`, `cmdb_identification_rule`.
+**Table triggers:** `cmdb_ci`, `cmdb_ci_*` (any CI class), `cmdb_rel_ci`, `cmdb_ci_service`, `cmdb_ci_service_discovered`, `cmdb_ci_business_app`, `cmdb_ci_appl`, `ecc_queue`, `ecc_agent`, `sa_pattern`, `em_alert`, `em_event`, `cmdb_identifier`.
 
 **Concept triggers:** probe, sensor, horizontal discovery, top-down discovery, pattern-based discovery, identifier, classifier, dedup, duplicate CI, MID cluster, credential-less discovery.
 
@@ -146,8 +146,8 @@ You are bound by §1.1. You may not propose, recommend, or pre-approve any of th
 For every component, first evaluate whether baseline serves the requirement:
 
 1. **Existing baseline CMDB CI classes** — `cmdb_ci_server` family (Linux, Windows, Solaris, AIX, UNIX), `cmdb_ci_appl` family, `cmdb_ci_database` family, `cmdb_ci_network_*` family, `cmdb_ci_cloud_*` family. The baseline class tree is extensive.
-2. **Baseline Discovery patterns** — `sn_disco_pattern` records. ServiceNow ships thousands. Extend rather than replace.
-3. **IRE rules** — `cmdb_identification_rule` and reconciliation rule records.
+2. **Baseline Discovery patterns** — Discovery Patterns [`sa_pattern`] records *(citation: `markdown/it-operations-management/discovery-and-service-mapping-patterns/c_MappingPatternsCustomization.md`)*. ServiceNow ships thousands. Extend rather than replace.
+3. **IRE rules** — `cmdb_identifier` (identification) and `cmdb_reconciliation_definition` (reconciliation) records *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/r_IWIdentAndReconcil.md`)*.
 4. **Service Mapping patterns** — `sa_pattern` records. Top-down baseline patterns cover common application stacks.
 5. **Event Management connectors** — baseline connectors for Splunk, SCOM, SolarWinds, AWS CloudWatch, Azure Monitor, etc. Use Service Graph Connector pattern.
 6. **CSDM baseline tables (v5 names)** — `cmdb_ci_business_app`, `cmdb_ci_service_business`, `cmdb_ci_service_technical`, `cmdb_ci_service_auto`.
@@ -213,7 +213,7 @@ Cite where Verdict B/C is in play.]
 | `cmdb_ci.install_status` | Choice | Installed / Retired / In Stock — drives CMDB Health |
 | `cmdb_ci.operational_status` | Choice | Operational / Non-Operational |
 
-**Related baseline tables:** [`cmdb_rel_ci`, `ecc_queue`, `sn_disco_pattern`, `cmdb_identification_rule`, `em_alert`, `em_event`]
+**Related baseline tables:** [`cmdb_rel_ci`, `ecc_queue`, `sa_pattern`, `cmdb_identifier`, `em_alert`, `em_event`]
 
 [Cite every claim driving Verdict B/C.]
 
@@ -265,7 +265,7 @@ Cite where Verdict B/C is in play.]
 **Primary tables:**
 - `discovery_schedule` — Discovery schedules
 - `ecc_queue` — communication queue between MID Server and instance
-- `sn_disco_pattern` — Discovery patterns (replaces older probe/sensor design for most cases)
+- `sa_pattern` — Discovery Patterns, every pattern type *(citation: `markdown/it-operations-management/discovery-and-service-mapping-patterns/c_MappingPatternsCustomization.md`)* (replaces older probe/sensor design for most cases)
 - `cmdb_ci_*` — target CI classes
 
 **Discovery flow:**
@@ -285,7 +285,7 @@ Cite where Verdict B/C is in play.]
 **Primary tables:**
 - `ecc_agent` — MID Server registration
 - `ecc_queue` — work queue (input and output)
-- `mid_cluster` — MID Server clusters
+- `ecc_agent_cluster` — MID Server clusters *(citation: `markdown/servicenow-platform/mid-server/t_ConfigureAMIDServerCluster.md`)*
 
 **MID Server placement principles:**
 - One MID Server per network zone where Discovery / Integration must reach
@@ -304,7 +304,7 @@ Cite where Verdict B/C is in play.]
   - `cmdb_ci_hardware` (physical hardware)
     - `cmdb_ci_computer` (compute resources)
       - `cmdb_ci_server` (servers — has variants for Linux, Windows, etc.)
-      - `cmdb_ci_workstation`
+      - `cmdb_ci_pc_hardware` (personal computers) *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/cmdb-tables-details.md`)*
   - `cmdb_ci_appl` (applications)
     - `cmdb_ci_db_instance` (database instances)
     - `cmdb_ci_web_server` (web servers)
@@ -314,7 +314,7 @@ Cite where Verdict B/C is in play.]
 
 **IRE (Identification and Reconciliation Engine):**
 
-- **Identification rule** (`cmdb_identification_rule`) — defines which fields identify a CI within a class. Multiple identifiers can be defined; IRE tries them in order.
+- **Identification rule** (Identifier [`cmdb_identifier`]; its entries, Identifier Entry [`cmdb_identifier_entry`], carry the priorities *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/r_IWIdentAndReconcil.md`)*) — defines which fields identify a CI within a class. Multiple entries can be defined; IRE tries them in priority order.
 - **Reconciliation rule** — defines which data sources can update which fields. Hierarchy of trust: `discovery_source` plus per-field policy.
 - **Independent vs dependent identifiers** — e.g., `cmdb_ci_server` is independently identified by `serial_number` OR (`name` + `ip_address`); `cmdb_ci_database` is dependent on its host `cmdb_ci_server`.
 
@@ -340,17 +340,18 @@ Cite where Verdict B/C is in play.]
 **Primary tables:**
 - `em_event` — raw events from monitoring tools
 - `em_alert` — correlated alerts (aggregated events)
-- `em_alert_rules` — correlation rule configuration
+- `em_match_rule` — event rules, which turn events into alerts *(citation: `markdown/it-operations-management/event-management/create-event-rules.md`)*
+- `em_alert_correlation_rule` — alert correlation rules, which group related alerts *(citation: `markdown/it-operations-management/event-management/r_InstalledWithEventManagement.md`)*
 
 **Event flow:**
 1. **Connector pulls/pushes** — Service Graph Connector or event connector delivers events from external monitoring (Splunk, SCOM, AWS CloudWatch, etc.).
 2. **Event insert** — `em_event` record created.
-3. **Correlation rule fires** — `em_alert_rules` correlate events into an alert.
+3. **Rules fire** — an event rule (`em_match_rule`) turns the event into an alert; alert correlation rules (`em_alert_correlation_rule`) group related alerts.
 4. **Alert created/updated** — `em_alert` record reflects the consolidated alert state.
 5. **Incident creation** — optional auto-creation of `incident` from `em_alert` per correlation rule.
 6. **Alert closure** — events ageing out or explicit closure events close the alert.
 
-**Anti-pattern alert:** Custom event-correlation tables are §1.1 violations. Use baseline `em_alert_rules`.
+**Anti-pattern alert:** Custom event-correlation tables are §1.1 violations. Use baseline event rules and alert correlation rules (`em_match_rule`, `em_alert_correlation_rule`).
 
 ---
 
@@ -358,7 +359,7 @@ Cite where Verdict B/C is in play.]
 
 ### Cloud Discovery — lightweight
 
-**Pattern:** Cloud-specific Discovery patterns (`sn_disco_pattern` records tagged for AWS/Azure/GCP) discover cloud resources via cloud-provider APIs (not via MID Server-on-VM probing).
+**Pattern:** Cloud-specific Discovery patterns (`sa_pattern` records tagged for AWS/Azure/GCP) discover cloud resources via cloud-provider APIs (not via MID Server-on-VM probing).
 **Key point:** Use baseline Cloud Discovery patterns. Custom cloud connectors are §1.1 violations.
 
 ### Service Graph Connectors — lightweight
@@ -368,7 +369,7 @@ Cite where Verdict B/C is in play.]
 
 ### Certificate Management — lightweight
 
-**Pattern:** Certificate discovery via Discovery patterns; certificate records in `cmdb_certificate`; expiry-tracking alerts.
+**Pattern:** Certificate discovery via Discovery patterns; certificate records in Unique Certificate [`cmdb_ci_certificate`] and Installed Certificate [`sn_disco_certmgmt_cmdb_installed_certificate`] *(citation: `markdown/it-operations-management/discovery/cert-inventory-mgmt-process-post-discovery.md`)*; expiry-tracking alerts.
 **Key point:** Baseline Certificate Management covers SSL/TLS certificate inventory and expiry tracking.
 
 ---
@@ -382,7 +383,7 @@ Cite where Verdict B/C is in play.]
 | Custom Discovery probe duplicating baseline pattern | Maintenance burden, breaks on baseline pattern updates | Extend baseline pattern or use pattern override | `markdown/it-operations-management/discovery-and-service-mapping-patterns/` |
 | Custom MID Server script bypassing ECC queue | Security risk, breaks observability | Use ECC queue protocol | `markdown/it-operations-management/configure-a-mid-server.md` |
 | Custom service-map table | Duplicates `cmdb_rel_ci` semantics | Use `cmdb_rel_ci` with appropriate relationship types | `markdown/it-operations-management/service-mapping/` |
-| Custom event correlation table | Duplicates `em_alert_rules` | Use `em_alert_rules` configuration | `markdown/it-operations-management/event-management/` |
+| Custom event correlation table | Duplicates `em_alert_correlation_rule` | Configure alert correlation rules | `markdown/it-operations-management/event-management/r_InstalledWithEventManagement.md` |
 | Custom cloud-discovery connector | Breaks Cloud Discovery upgrade path | Use baseline Cloud Discovery patterns | `markdown/it-operations-management/cloud-discovery-workspace/` |
 | Custom CMDB Health rules table | baseline CMDB Health rules cover it | Configure CMDB Health rules | `markdown/servicenow-platform/configuration-management-database-cmdb/c_CMDBHealth.md` |
 | New top-level CI class without "new technology" justification | Almost always covered by baseline class hierarchy | Extend existing baseline class | `markdown/servicenow-platform/configuration-management-database-cmdb/ci-class-manager-landing-page.md` |
@@ -419,7 +420,7 @@ Cite where Verdict B/C is in play.]
 ### Hot spot 5 — "We need a custom event correlation strategy"
 
 **Reflexive bad design:** Custom Business Rule + custom table for correlation logic.
-**Baseline alternative:** Configure `em_alert_rules` with the correlation criteria. Event Management correlation engine handles most patterns natively.
+**Baseline alternative:** Configure alert correlation rules (`em_alert_correlation_rule`) with the correlation criteria. Event Management correlation engine handles most patterns natively.
 **Verdict:** Always A.
 
 ### Hot spot 6 — "We need to track CIs across multiple data sources"

@@ -312,7 +312,7 @@ This integration takes inbound monitoring events from an external tool and produ
 #### Open questions
 - **OQ-1:** Multiple monitoring tools or one? Spec says "an external monitoring tool" — singular. If multiple, need per-tool client_id and per-tool rate limit tier.
 - **OQ-2:** Auto-close — should resolved alerts in the monitoring tool auto-close the corresponding incident? Out of scope for this spec; would be a separate `PUT /events/{correlation_id}/close` endpoint.
-- **OQ-3:** Severity-3 (`minor`) and severity-4 (`info`) — do these create incidents or events (sn_si_event)? At the volume cap (1000/hr), `info`-level mass creation could flood the incident queue. Confirm with ITSM Specialist.
+- **OQ-3:** Severity-3 (`minor`) and severity-4 (`info`) — do these create incidents or Event Management events (Event [`em_event`] *(citation: `markdown/it-operations-management/event-management/exploring-event-management.md`)*)? At the volume cap (1000/hr), `info`-level mass creation could flood the incident queue. Confirm with ITSM Specialist.
 - **OQ-4:** Conflict between platform's built-in inbound rate limiting and per-endpoint requirement — confirm during build that 1500 rpm is achievable per-endpoint without instance-wide knock-on.
 
 #### Handoffs proposed
@@ -400,7 +400,7 @@ N/A at the spoke level — spokes are libraries. Consumers (flows) trigger.
   | Operation | Idempotent at counterparty? | Spoke behaviour |
   |---|---|---|
   | `Lookup Ticket` | Naturally idempotent (read) | No additional handling. |
-  | `Create Ticket` | Atlas accepts `Idempotency-Key` header (per Atlas docs) | Spoke generates a UUID-based key from `request.external_correlation_id` (required input) and sends it. |
+  | `Create Ticket` | Atlas accepts `Idempotency-Key` header (per Atlas docs) | Spoke generates a UUID-based key from the action's required `external_correlation_id` input and sends it. |
   | `Update Ticket` | Idempotent if all fields are absolute (PUT semantics, not PATCH-add) | Spoke uses PUT; consumer responsibility to send full state. |
   | `Close Ticket` | Idempotent (closing an already-closed ticket returns 200 with `already_closed: true`) | Pass through. |
 - **Consumer-visible:** every Action accepts an optional `idempotency_key` input that overrides the default key generation, for cases where the consumer manages keys explicitly.
