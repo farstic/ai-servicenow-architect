@@ -11,7 +11,7 @@
     "ARC-09-C78": "the 2026-10-03 prompt-audit port: sub-agents read the local corpus instead of fetching it, the confidentiality rule is folder discipline, the baseline scope is the default, the dead override sentence and the duplicated citation rows removed, the phase labels dropped, the CSDM v5 names and the MI Workbench citation, every delivered figure draw.io, and the CSM Example 3 correction",
     "ARC-09-C81": "the 2026-10-04 identifier check: each ServiceNow name the corpus does not have replaced by the corpus name, cited, or renamed into the example's own u_/x_ namespace, and the sentence that carried it corrected where the corpus contradicts it (classic approval rules replaced, CSDM v5 relabelled rather than renamed, SLA business time on a schedule)"
   },
-  "_measured": "52 of 65 bodies differ (13 identical), 2026-10-04, against import/engine-v2.8.0-worktree. The two newly differing are skills/flow-designer-specialist/EXAMPLES.md and skills/integration-specialist/EXAMPLES.md, which ARC-09-C81's identifier corrections reached and no earlier change had.",
+  "_measured": "53 of 65 bodies differ (12 identical), 2026-10-04, against import/engine-v2.8.0-worktree. The one newly differing is skills/hrsd-specialist/EXAMPLES.md, which ARC-09-C81's identifier corrections reached and no earlier change had. The FSO skill postdates the import tag, so its two files are outside this comparison and this ledger.",
   "files": {
     "agents/atf-author.md": [
       "ARC-02-S06",
@@ -90,13 +90,15 @@
     ],
     "skills/csm-specialist/EXAMPLES.md": [
       "ARC-03-C4",
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C81"
     ],
     "skills/csm-specialist/SKILL.md": [
       "ARC-02-S03",
       "ARC-02-S06",
       "ARC-03-S04",
-      "ARC-03-C4"
+      "ARC-03-C4",
+      "ARC-09-C81"
     ],
     "skills/developer/SKILL.md": [
       "ARC-02-S03",
@@ -140,7 +142,8 @@
     "skills/hrsd-specialist/SKILL.md": [
       "ARC-02-S03",
       "ARC-02-S06",
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C81"
     ],
     "skills/integration-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -220,7 +223,8 @@
       "ARC-03-S04"
     ],
     "skills/story-writer/EXAMPLES.md": [
-      "ARC-03-C4"
+      "ARC-03-C4",
+      "ARC-09-C81"
     ],
     "skills/story-writer/SKILL.md": [
       "ARC-02-S03",
@@ -242,10 +246,12 @@
       "ARC-03-C4"
     ],
     "skills/technical-designer/EXAMPLES.md": [
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C81"
     ],
     "skills/diagramming-specialist/EXAMPLES.md": [
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C81"
     ],
     "skills/now-assist-specialist/EXAMPLES.md": [
       "ARC-09-C78",
@@ -255,6 +261,9 @@
       "ARC-09-C81"
     ],
     "skills/integration-specialist/EXAMPLES.md": [
+      "ARC-09-C81"
+    ],
+    "skills/hrsd-specialist/EXAMPLES.md": [
       "ARC-09-C81"
     ]
   }
