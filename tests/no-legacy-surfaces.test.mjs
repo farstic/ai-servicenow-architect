@@ -692,6 +692,9 @@ export const AUDIT_PATTERNS = [
     test: (l) => l.includes('github.com/ServiceNow/ServiceNowDocs')
       || (l.includes('WebFetch') && /ServiceNowDocs|\bcorpus\b/.test(l)),
     why: 'the corpus is local — it is read with Grep and Read, never fetched' },
+  { id: 'phase-label', scope: ['.claude/'],
+    test: (l) => /\bPhase 2\.\d/.test(l),
+    why: 'an engine-development phase label the reader cannot act on — the builders are just the builders' },
   { id: 'overrides-any-prior', scope: ['.claude/', 'governance/'],
     test: (l) => /overrides any prior/i.test(l),
     why: 'a diff against text no reader can see — state the rule, not what it replaced' },
@@ -703,7 +706,9 @@ export const AUDIT_PATTERNS = [
     test: (l) => /Mermaid (?:is (?:the|a) default|defaults?\b|by default)|\bdefaults? to Mermaid\b|\bdefault(?: notation)? is Mermaid\b|\bdefault:\s*Mermaid\b|Mermaid[^.|\n]*\(default\)|\|\s*Default notation\s*\|/i.test(l),
     why: 'every delivered figure is an editable draw.io file; Mermaid is a draft' },
   { id: 'scoped-by-default', scope: ['.claude/skills/technical-designer/', '.claude/agents/technical-designer.md'],
-    test: (l) => /default to scoped|Default for new functionality: scoped app|\bdefaults? to (?:an? )?(?:new )?scoped\b/i.test(l),
+    // The two older wordings are the ones a later sweep found the port had not carried: a new scoped
+    // app offered as a decision the designer resolves alone, and a two-way scoped-or-global choice.
+    test: (l) => /default to scoped|Default for new functionality: scoped app|\bdefaults? to (?:an? )?(?:new )?scoped\b|chose (?:a )?new scoped app|scoped \(with prefix\) vs global/i.test(l),
     why: 'a new scoped app is a §1.1 object, and the baseline scope is the default' },
 ];
 
@@ -763,20 +768,26 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     const plant = (rel, text) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), `${text}\n`); };
     // One planted line per pattern, each in a file its scope covers — the old wording, as it stood.
     plant('.claude/agents/atf-author.md', 'Sub-agents run in satellite projects, not the Master.');
-    plant('governance/governance-rules.md', 'CLAUDE.md, Master Project Instructions, individual SKILL.md anti-patterns');
+    plant('governance/governance-rules.md', 'CLAUDE.md, Master Project Instructions, individual SKILL.md anti-patterns (Phase 2.2)');
     plant('.claude/agents/developer.md',
       '4. Verify against `ServiceNowDocs/` using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown`.');
     plant('.claude/skills/story-writer/SKILL.md', 'This rule overrides any prior "default to scoped app" language elsewhere in this SKILL.');
     plant('CLAUDE.md', '- Diagrams: Mermaid in markdown for every figure (default); draw.io on request.');
     plant('.claude/skills/diagramming-specialist/SKILL.md', '| Diagram | Use it for | Default notation |');
-    plant('.claude/agents/technical-designer.md', '3. **Scoping decision** — If unknown, default to scoped with prefix `x_<vendor>_<app>`.');
+    plant('.claude/agents/technical-designer.md', [
+      '3. **Scoping decision** — If unknown, default to scoped with prefix `x_<vendor>_<app>`.',
+      '3. **Decisions made** — (e.g., chose new scoped app over extending existing because of a separate deployment cadence).',
+    ].join('\n'));
+    plant('.claude/skills/technical-designer/EXAMPLES.md', '2. **Scope decision** — scoped (with prefix) vs global, with justification.');
+    plant('.claude/skills/now-assist-specialist/EXAMPLES.md', 'Three examples demonstrating Phase 2.2 disciplines.');
+    plant('.claude/skills/hld-lld-writer/EXAMPLES.md', 'the builders that consume it — multiple Phase 2.2/2.1 builder handoffs.');
     // The shapes a control found inert on the first head — each a wording that has actually been used.
     plant('.claude/skills/diagramming-specialist/EXAMPLES.md', 'Mermaid is the default; all blocks are written to parse.');
     plant('governance/taxonomy.md', '| Diagramming Specialist | figures | (Mermaid default, draw.io on request) |');
     plant('.claude/skills/hld-lld-writer/SKILL.md', 'Figures: the Diagramming Specialist defaults to Mermaid.');
     plant('.claude/skills/technical-designer/SKILL.md', 'If the scope is unknown, the design defaults to a scoped app.');
     // ...and the same phrases where their scopes do NOT reach, which must stay quiet.
-    plant('docs/USER-GUIDE.md', 'the same prompts work in the Master Project chat; Mermaid by default');
+    plant('docs/USER-GUIDE.md', 'the same prompts work in the Master Project chat; Mermaid by default; Phase 2.2 disciplines');
     plant('.claude/agents/flow-designer-specialist.md', 'If unknown, default to scoped with prefix `x_<vendor>_<app>`.');
     // The exemption: its own sentence passes; an old-style corpus fetch in the SAME file still fails,
     // and the same sentence in ANOTHER file is not excused by an entry anchored to this one.
@@ -795,7 +806,8 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
       '.claude/agents/technical-designer.md', 'docs/USER-GUIDE.md', '.claude/agents/flow-designer-specialist.md',
       '.claude/agents/integration-specialist.md', '.claude/agents/story-writer.md',
       '.claude/skills/diagramming-specialist/EXAMPLES.md', 'governance/taxonomy.md', '.claude/skills/hld-lld-writer/SKILL.md',
-      '.claude/skills/technical-designer/SKILL.md'];
+      '.claude/skills/technical-designer/SKILL.md', '.claude/skills/technical-designer/EXAMPLES.md',
+      '.claude/skills/now-assist-specialist/EXAMPLES.md', '.claude/skills/hld-lld-writer/EXAMPLES.md'];
     const readAt = (f) => readFileSync(join(dir, f), 'utf8');
     const hits = findAuditRegressions({ files, read: readAt });
     const at = (rel, id) => hits.filter((h) => h.startsWith(`${rel}:`) && h.includes(`[${id}]`)).length;
@@ -814,6 +826,13 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     assert.equal(at('governance/taxonomy.md', 'mermaid-default'), 1, '"(Mermaid default, …)" was not seen');
     assert.equal(at('.claude/skills/hld-lld-writer/SKILL.md', 'mermaid-default'), 1, '"defaults to Mermaid" was not seen');
     assert.equal(at('.claude/skills/technical-designer/SKILL.md', 'scoped-by-default'), 1, '"defaults to a scoped app" was not seen');
+    assert.equal(at('.claude/agents/technical-designer.md', 'scoped-by-default'), 2,
+      '"default to scoped" and "chose new scoped app" must each be seen');
+    assert.equal(at('.claude/skills/technical-designer/EXAMPLES.md', 'scoped-by-default'), 1, '"scoped (with prefix) vs global" was not seen');
+    assert.equal(at('.claude/skills/now-assist-specialist/EXAMPLES.md', 'phase-label'), 1, '"Phase 2.2" was not seen');
+    assert.equal(at('.claude/skills/hld-lld-writer/EXAMPLES.md', 'phase-label'), 1, '"Phase 2.2/2.1" was not seen');
+    assert.equal(hits.some((h) => h.startsWith('governance/') && h.includes('[phase-label]')), false,
+      'the phase-label rule reached outside .claude/');
     assert.deepEqual(hits.filter((h) => h.startsWith('.claude/agents/integration-specialist.md:')).map((h) => h.split(':')[1]),
       ['2', '3'], 'the exemption must pass line 1 only — line 3 carries the old fetch beside the exempted sentence');
     assert.equal(at('.claude/agents/story-writer.md', 'corpus-webfetch'), 1, 'an exemption anchored to one file excused another');

@@ -602,7 +602,7 @@ Add AI-driven case deflection to the Acme customer-facing portal. Before a custo
 
 ### Explanation
 
-This design exercises **multiple consult flags simultaneously** — Security & GRC for customer content, DevOps for the new scoped app — and surfaces **multiple Phase 2.2/2.1 builder handoffs** — Developer, Flow Designer Specialist, **Now Assist Specialist**, UI/UX Specialist, Reporting & Analytics. Technical Designer's job is to identify all of these correctly and refuse to encroach on their territory.
+This design exercises **multiple consult flags simultaneously** — Security & GRC for customer content, DevOps for the new scoped app — and surfaces **multiple builder handoffs** — Developer, Flow Designer Specialist, **Now Assist Specialist**, UI/UX Specialist, Reporting & Analytics. Technical Designer's job is to identify all of these correctly and refuse to encroach on their territory.
 
 Notable discipline: Section 6 (Client-side logic) is "Not applicable" with a rationale pointing to UI/UX Specialist — Technical Designer doesn't pretend to design Service Portal widgets. Section 8 (Integrations) uses the "internal Now Assist skill" as the only touchpoint and immediately hands off to Now Assist Specialist for the skill itself.
 

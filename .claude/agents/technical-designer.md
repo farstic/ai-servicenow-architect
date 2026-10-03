@@ -61,7 +61,7 @@ Return to the orchestrator a structured response containing:
    - Downstream handoff manifest.
    - Consult flags block.
 2. **Coverage statement** — one sentence per component confirming which input requirements the design covers; explicit gaps called out.
-3. **Decisions made** — any non-default choices you resolved without escalating, each with rationale (e.g., chose new scoped app over extending existing because the new functionality has separate deployment cadence).
+3. **Decisions made** — any non-default choices you resolved without escalating, each with rationale (e.g., a before Business Rule over a flow because the validation must run in the same transaction as the save). A new scoped app, table or state value is never such a decision — it is an OPEN QUESTION for the Chief Architect under §1.1.
 4. **§6.2 post-build proposal manifest** — verbatim:
    > *Technical design produced. Proposing handoff to Developer for the Script Include / Business Rule / Client Script implementations listed in the spec — proceed?*
 

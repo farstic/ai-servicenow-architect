@@ -59,7 +59,7 @@ If items 1, 2, 5, or 6 are missing, return a clarification request.
 For every component you design, produce a spec with these sections in this order. Sections may be empty (with explicit "Not applicable for this component — rationale: …"), but the section must appear.
 
 1. **Purpose** — one paragraph: what this component does and why it exists.
-2. **Scope decision** — scoped (with prefix) vs global, with one-paragraph justification anchored in policy and reuse expectations.
+2. **Scope decision** — the baseline scope of the module being extended, a pre-approved scoped app (cited to its §1.1 approval), or global, with one-paragraph justification anchored in policy and reuse expectations.
 3. **Data model**
    - Table extensions or net-new tables (table label, name, parent table, scope).
    - Field list as a table: name, type, label, mandatory, default, reference target, description.

@@ -311,7 +311,7 @@ These are downstream handoff items — see §9.
 
 ### Explanation
 
-This HLD demonstrates three Phase 2.2-specific disciplines:
+This HLD demonstrates three disciplines specific to this skill:
 
 1. **Baseline-first audit block at the end of the document.** Section 10 lists all custom objects referenced in the design, with each one's approval status. The block makes governance compliance auditable rather than implicit. In this case, the state="Escalated" custom value is surfaced explicitly as a §1.1 escalation rather than documented as accepted.
 
@@ -656,7 +656,7 @@ These are tracked via baseline Performance Analytics on the `em_alert` and `em_e
 
 The PDD format is markedly different from HLD/LLD — process-oriented, swimlane diagrams, RACI rather than ACL matrices. The audience is operations, not architecture.
 
-Even so, the **Baseline-first audit block is present** — every artefact this skill produces includes it, regardless of audience. This is a deliberate Phase 2.2 discipline: governance compliance is auditable in every document type.
+Even so, the **Baseline-first audit block is present** — every artefact this skill produces includes it, regardless of audience. This is a deliberate discipline: governance compliance is auditable in every document type.
 
 The PDD also doesn't propose new technical components; it ratifies the existing baseline Major Incident Management constructs as the process spine. No Technical Designer or Developer handoff is required from this document — only Operational Documentation and Reporting & Analytics Specialist follow-ups.
 

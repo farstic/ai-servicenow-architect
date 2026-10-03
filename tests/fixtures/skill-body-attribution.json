@@ -10,7 +10,7 @@
     "ARC-03-C5": "a fact the cited page changed: the AI-native tier names and AI Control Tower's tier coverage, automatic entitlement assignment, and the record-trigger settings plus the reactivation re-run warning",
     "ARC-09-C78": "the 2026-10-03 prompt-audit port: sub-agents read the local corpus instead of fetching it, the confidentiality rule is folder discipline, the baseline scope is the default, the dead override sentence and the duplicated citation rows removed, the phase labels dropped, the CSDM v5 names and the MI Workbench citation, every delivered figure draw.io, and the CSM Example 3 correction"
   },
-  "_measured": "49 of 65 bodies differ (16 identical), 2026-10-03, against import/engine-v2.8.0-worktree. The two newly differing are skills/technical-designer/EXAMPLES.md and skills/diagramming-specialist/EXAMPLES.md, which ARC-09-C78's phase-label and draw.io wording reached and no earlier change had.",
+  "_measured": "50 of 65 bodies differ (15 identical), 2026-10-04, against import/engine-v2.8.0-worktree. The three newly differing are skills/technical-designer/EXAMPLES.md, skills/diagramming-specialist/EXAMPLES.md and skills/now-assist-specialist/EXAMPLES.md, which ARC-09-C78's phase-label and draw.io wording reached and no earlier change had.",
   "files": {
     "agents/atf-author.md": [
       "ARC-02-S06",
@@ -125,7 +125,8 @@
       "ARC-09-C78"
     ],
     "skills/hld-lld-writer/EXAMPLES.md": [
-      "ARC-03-C4"
+      "ARC-03-C4",
+      "ARC-09-C78"
     ],
     "skills/hld-lld-writer/SKILL.md": [
       "ARC-02-S03",
@@ -234,6 +235,9 @@
       "ARC-09-C78"
     ],
     "skills/diagramming-specialist/EXAMPLES.md": [
+      "ARC-09-C78"
+    ],
+    "skills/now-assist-specialist/EXAMPLES.md": [
       "ARC-09-C78"
     ]
   }
