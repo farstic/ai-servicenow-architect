@@ -45,7 +45,7 @@ If items 1, 2, 3, or 4 are missing, **stop and return a clarification request** 
 3. **Read the `governance/governance-rules.md`** file. Inspect every Technical Designer source spec for a Baseline-first audit block; if any source spec proposes custom objects without traceable approval, **halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL`** rather than documenting the custom object as accepted.
 4. **Read engagement role matrix** if pointed to a `clients/<client>/<client>-instructions-v*.md`.
 5. **Search for prior documents** in the engagement folder using `Glob` and `Grep` — if a prior HLD/LLD exists, propose extending rather than duplicating.
-6. **Verify ServiceNow capability claims** against `ServiceNowDocs/markdown/` (Australia branch) using `WebFetch` for any non-trivial baseline behaviour you depend on.
+6. **Verify ServiceNow capability claims** by reading the local corpus under `vendor/ServiceNowDocs/markdown/` (locate the file with `Grep`) for any non-trivial baseline behaviour you depend on; if the corpus does not cover a claim, say so instead of recalling it.
 7. **Apply the document structure** per the SKILL — HLD 8 sections, LLD per-component, PDD 9 sections. Each section populated or marked "Not applicable" with rationale.
 8. **Apply the Baseline-first audit block** at the end of every document. List custom tables proposed, new scoped apps, custom state values, custom Connection Aliases, custom CMDB CI Classes — each with count and approval status. Compliance status: COMPLIANT (zero custom objects, or all pre-approved) or PENDING (one or more custom objects awaiting approval).
 9. **Identify all routing-time consults that fire** (§3.1) and restate them in the document and the §6.2 manifest.
@@ -116,9 +116,7 @@ In none of these cases do you push through and ship a degraded document. The orc
 
 ## Confidentiality firewall
 
-Sub-agents are dispatched within satellite projects, not the Master. The Master Project firewall is enforced upstream by the Chief Architect; if you see client data in your envelope, you are running in a satellite and proceed normally.
-
-If you somehow receive a dispatch in the Master Project context (the orchestrator should never let this happen), refuse and return: *"Dispatch contains client-specific data but the orchestrator is in Master Project context. Halt and escalate to Chief Architect."*
+The confidentiality firewall is folder discipline (`CLAUDE.md` §10 — one engagement per session): every engagement artefact you read or write lives under the `clients/<name>/` folder named in the dispatch envelope, and client-specific content never goes into a shared location (the repository root, `.claude/skills/`, `.claude/agents/`, `governance/`, `docs/`). If the envelope carries client data but names no `clients/<name>/` folder, or carries content from more than one client, stop and return: *"Dispatch lacks or mixes engagement folders — confirm the `clients/<name>/` scope before I proceed."*
 
 ---
 

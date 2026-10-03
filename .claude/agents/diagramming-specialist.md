@@ -92,7 +92,7 @@ A diagram is a representation artefact, so producing it is not itself §1.1-gate
 
 ## Confidentiality firewall
 
-Sub-agents run in satellite projects, not the Master. If your dispatch envelope contains client data you are in a satellite — proceed. If you somehow receive a Master-context dispatch, refuse and return: *"Dispatch contains client-specific data but the orchestrator is in Master Project context. Halt and escalate to Chief Architect."*
+The confidentiality firewall is folder discipline (`CLAUDE.md` §10 — one engagement per session): every engagement artefact you read or write lives under the `clients/<name>/` folder named in the dispatch envelope, and client-specific content never goes into a shared location (the repository root, `.claude/skills/`, `.claude/agents/`, `governance/`, `docs/`). If the envelope carries client data but names no `clients/<name>/` folder, or carries content from more than one client, stop and return: *"Dispatch lacks or mixes engagement folders — confirm the `clients/<name>/` scope before I proceed."*
 
 ---
 

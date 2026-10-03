@@ -230,6 +230,8 @@ Consult flags:
 
 ## Example 3 — Verdict C (§1.1 Halt)
 
+> **Correction (2026-10-03).** The premise of this example — that `sn_customerservice_escalation` is a Vancouver+ table absent from the Australia release — is wrong: the Australia corpus documents the baseline case and account escalation feature with exactly that table, plus `sn_customerservice_escalation_template` and `sn_customerservice_escalation_severity` *(citation: `markdown/customer-service-management/case-escalation-components.md`)*. Read the example only for the **shape** of a Verdict C envelope and halt proposal; the real answer to this dispatch input is Verdict A/B on the baseline escalation record, as the gateway rules. A replacement Verdict C example grounded in the current corpus is pending.
+
 ### Dispatch input
 
 **Source:** Chief Architect, routing from a user request.
@@ -385,7 +387,7 @@ If rejected → adopt Alternative A or Alternative B from Part 3.
 - **Do not duplicate `task` fields on the new escalation table.** The escalation table inherits from `task` and automatically has `sys_created_on`, `sys_created_by`, `state`, `assigned_to`. Adding parallel fields creates audit-trail confusion.
 - **Do not write a Business Rule that copies escalation-table rows back to `work_notes`.** Keep the two stores separate: structured fields on the new table, agent commentary in `work_notes`. Double-writing is a maintenance trap.
 - **Do not name the table `u_case_escalation` or `x_acme_case_escalation` if the engagement uses the baseline `sn_customerservice` scope convention.** Match engagement scope-prefix convention; confirm with App Engine Specialist if unclear.
-- **Do not reference `sn_customerservice_escalation` as if it exists in Australia.** It does not. Vancouver+ only.
+- **Do not reference `sn_customerservice_escalation` without checking the corpus for the engagement's release.** In Australia it is baseline (see the correction note above).
 - **Do not skip Security & GRC consult on `business_impact_summary`.** Customer business-impact statements can be commercially sensitive; ACL design matters.
 
 ## Open Questions

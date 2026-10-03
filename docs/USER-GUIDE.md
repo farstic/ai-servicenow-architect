@@ -217,7 +217,8 @@ sequenceDiagram
     rect rgb(245, 240, 230)
     Note over CA,CSM: Engine checks baseline first
     CA->>CSM: Take a look — this is CSM territory
-    CSM->>CSM: Evaluate baseline candidates:<br/>• work_notes (free text only)<br/>• sys_history_set (no reason field)<br/>• case.escalation (flag, not a log)<br/>• sn_customerservice_escalation (Vancouver+, NOT in Australia)
+    CSM->>CSM: Evaluate baseline candidates:<br/>• work_notes (free text only)<br/>• sys_history_set (no reason field)<br/>• case.escalation (flag, not a log)<br/>• sn_customerservice_escalation (baseline in Australia — see note)
+    Note over CSM: Correction 2026-10-03 — in Australia the escalation record IS baseline;<br/>this walkthrough keeps the halt shape for illustration only
     CSM-->>CA: No baseline construct covers a structured per-event log.<br/>This needs explicit approval before we build it.
     end
 

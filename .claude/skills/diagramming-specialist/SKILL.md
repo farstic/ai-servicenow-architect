@@ -1,6 +1,6 @@
 ---
 name: diagramming-specialist
-description: Use when a ServiceNow design needs a figure — solution and context (C4), data-model and ERD, sequence, process and swimlane, state and lifecycle, deployment and MID topology, CSDM and CMDB relationship maps, and project visuals such as roadmap, Gantt and RACI. Produces diagrams in Mermaid by default, draw.io XML or PlantUML on request. Depicts architecture faithfully and flags inconsistencies back to the source author; it never invents or decides architecture.
+description: Use when a ServiceNow design needs a figure — solution and context (C4), data-model and ERD, sequence, process and swimlane, state and lifecycle, deployment and MID topology, CSDM and CMDB relationship maps, and project visuals such as roadmap, Gantt and RACI. Delivers every figure as editable draw.io with an SVG or PNG export; Mermaid only as a draft, PlantUML on request. Depicts architecture faithfully and flags inconsistencies to the source author; it never invents or decides architecture.
 metadata:
   version: 1.0.0
 ---
@@ -20,7 +20,7 @@ A diagram is a **representation artefact** (`.md` with Mermaid, draw.io `.drawio
 **Not this skill:** HLD/LLD Writer and Technical Designer decide the architecture this skill depicts. A diagram is an artefact, not a ServiceNow object — but it must never render an unapproved custom table, scope or state as blessed; flag it PENDING instead.
 
 ## Two modes
-1. **Skill mode — inline, single diagram.** Adopted in the main thread; fires post-build per §6.2 when a design artefact returns: *"Design artefact produced. Proposing a Diagramming Specialist pass to render the architecture/process/data diagrams (Mermaid by default; draw.io or SVG for client-ready) before delivery — proceed?"* Use for one figure embedded in or alongside a doc.
+1. **Skill mode — inline, single diagram.** Adopted in the main thread; fires post-build per §6.2 when a design artefact returns: *"Design artefact produced. Proposing a Diagramming Specialist pass to render the architecture/process/data diagrams (editable draw.io with SVG/PNG export) before delivery — proceed?"* Use for one figure embedded in or alongside a doc.
 2. **Sub-agent mode — batch diagram pack.** Dispatched as the `diagramming-specialist` sub-agent (`.claude/agents/diagramming-specialist.md`) to produce the *full diagram set* for an HLD/LLD/programme — context + ERD + sequence + deployment + lifecycle, consistent across all figures. Returns the pack + a §6.2 manifest.
 
 ## When invoked
@@ -32,7 +32,7 @@ A diagram is a **representation artefact** (`.md` with Mermaid, draw.io `.drawio
 This is a **notation** skill, not a platform-fact skill, so it carries no ServiceNowDocs citation table of its own *by design*. The ServiceNow facts a diagram depicts — table names, scope prefixes, state values, CSDM domains, CI relationship types, role names — come from the **upstream spec, which is already doc-verified** by the author who produced it (Technical Designer against the table model, the domain gateway's Constraint Envelope, the Integration Specialist's auth/topology). Your job is to render those facts **without distortion**, not to re-derive them. If the source spec is silent or self-contradictory on a fact you'd need to draw, **do not guess** — return the gap. If you must depict a platform behaviour the spec didn't pin down, ground it via the orchestrator (it can verify against `ServiceNowDocs/`) before you draw it as fact.
 
 ## Diagram catalogue — pick the type that carries the message
-| Diagram | Use it for | Default notation |
+| Diagram | Use it for | Draft notation (Mermaid sketch — every delivered figure is `.drawio`) |
 |---|---|---|
 | **Solution / System Context (C4 L1)** | ServiceNow + external systems + actors, one box for the platform | Mermaid `C4Context` (or `flowchart`); draw.io for board decks |
 | **Container / module (C4 L2)** | scoped apps, plugins, workspaces, integration layer inside the platform | Mermaid `C4Container` / `flowchart` |
@@ -109,12 +109,10 @@ The deliverable is the editable `.drawio`; an exported SVG/PNG is what gets embe
 ## Output format
 ```markdown
 # Diagram(s): <subject>
-**Mode:** single (skill) / pack (sub-agent)   **Source spec:** <ref>   **Format:** Mermaid / draw.io / PlantUML
+**Mode:** single (skill) / pack (sub-agent)   **Source spec:** <ref>   **Format:** draw.io (`.drawio`) + SVG/PNG export
 ## Legend   [shape + colour conventions used]
 ## <Figure 1 title>  — <one line: what this figure shows / its single message>
-```mermaid
-<diagram>
-```
+![Figure 1 — <caption>](diagrams/fig-01-<slug>.svg)  — source: `diagrams/fig-01-<slug>.drawio`
 ## <Figure N …>
 ## Fidelity notes   [each node mapped to the spec element it represents; any element omitted + why]
 ## §1.1 flags   [custom objects depicted PENDING, with what approval is missing — empty if none]

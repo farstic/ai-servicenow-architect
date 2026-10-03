@@ -300,8 +300,8 @@ The five most common §1.1 violation requests in ITSM, and the baseline alternat
 1. **"We need a custom escalation table to track tier-1/tier-2/tier-3 escalation events."** → `incident.priority` + `cmn_rota` + `work_notes` for the event audit. Verdict A, almost always.
 2. **"We need a custom priority matrix that considers impact, urgency, customer SLA tier, and time-of-day."** → Data Lookup Definition with multiple key fields, plus a Script Include for the time-of-day adjustment if needed. Verdict A.
 3. **"We need a custom routing rule table because our routing is too complex for assignment rules."** → Multiple Data Lookup Definitions in a Script Include orchestrator. Verdict A or B.
-4. **"We need a custom MIM communications table to track stakeholder updates."** → `work_notes` on the MIM incident + a baseline MIM communication record (the latter exists in newer release families; for Australia, work_notes with structured prefixes suffices). Verdict A.
-5. **"We need a custom audit table for incident state changes."** → `sys_history_set` is baseline. Verdict A. (This was the §1.1 retrofit validation test scenario; the correct answer is always baseline audit history.)
+4. **"We need a custom MIM communications table to track stakeholder updates."** → the Major Incident Workbench Communicate tab plus `work_notes` on the MIM incident *(citation: `markdown/it-service-management/incident-management/mi-workbench-communicate-tab.md`)*. Verdict A.
+5. **"We need a custom audit table for incident state changes."** → `sys_history_set` is baseline. Verdict A.
 
 ## Post-Build Review Mode — §6.2 Closed Loop
 

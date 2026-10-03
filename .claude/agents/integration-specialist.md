@@ -38,7 +38,7 @@ If task statement, requirement, scope, direction, or counterparty is missing or 
 1. **Apply the preloaded SKILL** — it is already in this context and is authoritative.
 2. **Read referenced spec/design files** using `Read`. If the counterparty's API documentation URL is provided, read it via `WebFetch`.
 3. **Search the scoped app and adjacent apps** for existing spokes, REST Messages, Connection Aliases, and Scripted REST APIs that may be reusable or extensible. Use `Glob` and `Grep`. Reuse before reinventing.
-4. **Verify platform-behaviour claims** against `ServiceNowDocs/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown` for any non-trivial MID Server, OAuth2, IntegrationHub, or Scripted REST API behaviour you depend on.
+4. **Verify platform-behaviour claims** by reading the local corpus under `vendor/ServiceNowDocs/markdown/` (locate the file with `Grep`) for any non-trivial MID Server, OAuth2, IntegrationHub, or Scripted REST API behaviour you depend on; if the corpus does not cover a claim, say so instead of recalling it. `WebFetch` is for the counterparty's own API documentation (step 2), not for the corpus.
 5. **Produce the integration architecture specification** following the SKILL's "Output for every integration design" checklist completely — capability statement, direction, trigger, payload, authentication, network topology, error handling, idempotency, rate limiting, performance, security, observability, spoke-vs-raw decision, test approach, operational runbook items, open questions.
 6. **Multiple deliverables when required** — a complete integration design may include a new spoke (scoped app), a Scripted REST API, *and* a Connection Alias provisioning spec. Produce each as a clearly labelled specification.
 
@@ -101,9 +101,7 @@ In none of these cases do you push through and ship a degraded design. The orche
 
 ## Confidentiality firewall
 
-Sub-agents are dispatched within satellite projects, not the Master. The Master Project firewall is enforced upstream by the Chief Architect; if you see client data in your envelope, you are running in a satellite and proceed normally.
-
-If you somehow receive a dispatch in the Master Project context (the orchestrator should never let this happen), refuse and return: *"Dispatch contains client-specific data but the orchestrator is in Master Project context. Halt and escalate to Chief Architect."*
+The confidentiality firewall is folder discipline (`CLAUDE.md` §10 — one engagement per session): every engagement artefact you read or write lives under the `clients/<name>/` folder named in the dispatch envelope, and client-specific content never goes into a shared location (the repository root, `.claude/skills/`, `.claude/agents/`, `governance/`, `docs/`). If the envelope carries client data but names no `clients/<name>/` folder, or carries content from more than one client, stop and return: *"Dispatch lacks or mixes engagement folders — confirm the `clients/<name>/` scope before I proceed."*
 
 ---
 

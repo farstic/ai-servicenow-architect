@@ -189,11 +189,11 @@ The wrapper's body delegates to `SLABreachRiskCalculator` and returns the JSON s
 
 ### Explanation
 
-The design spec uses all 14 sections in order, marking sections "Not applicable" with rationale where appropriate (data model, flows, integrations, notifications, CMDB) rather than skipping them. This is a Phase 2.1-style discipline: empty sections force the designer to confirm absence is intentional, not an oversight.
+The design spec uses all 14 sections in order, marking sections "Not applicable" with rationale where appropriate (data model, flows, integrations, notifications, CMDB) rather than skipping them. This is a deliberate discipline: empty sections force the designer to confirm absence is intentional, not an oversight.
 
 The performance section explicitly flags the §3.1 consult and articulates the latency budget. The security section walks through four concerns rather than handwaving "ACLs are fine".
 
-The handoff manifest names exactly which Phase 2.1 builders consume the design (Developer here; not Flow Designer or Integration Specialist because their sections are empty). UI/UX Specialist is correctly surfaced as a consult — Technical Designer doesn't pretend to know the SOW UX framework, that's a domain consult.
+The handoff manifest names exactly which builders consume the design (Developer here; not Flow Designer or Integration Specialist because their sections are empty). UI/UX Specialist is correctly surfaced as a consult — Technical Designer doesn't pretend to know the SOW UX framework, that's a domain consult.
 
 The Developer handoff is the post-build §6.2 trigger. Once Developer produces the wrapper Script Include and the Client Script (both JS), the Code Reviewer trigger will fire on those artefacts — but not on this design spec, which is text.
 
@@ -395,9 +395,9 @@ Provide an HR Lifecycle Event in HRSD that, on initiation by an HR business part
 
 ### Explanation
 
-This is a multi-builder design — three Phase 2.1 builders consume the spec (Developer, Flow Designer Specialist, Integration Specialist). The spec uses tables aggressively (field list, ACL matrix, BR list, integration touchpoints) rather than prose, because that's what downstream builders consume cleanly.
+This is a multi-builder design — three builders consume the spec (Developer, Flow Designer Specialist, Integration Specialist). The spec uses tables aggressively (field list, ACL matrix, BR list, integration touchpoints) rather than prose, because that's what downstream builders consume cleanly.
 
-The rationale columns on the BR list and Client Script list are mandatory ("server not client because…", "BR not flow because…") — that's a Phase 2.1-style anti-pattern guard. Without rationale, the design is just a list, and the Developer can't second-guess the choices.
+The rationale columns on the BR list and Client Script list are mandatory ("server not client because…", "BR not flow because…") — that's an anti-pattern guard. Without rationale, the design is just a list, and the Developer can't second-guess the choices.
 
 The §3.1 consult flags fire correctly: Security & GRC fires on HR PII + outbound integration; Performance & Scale does NOT fire because the volume is low — and the spec says so explicitly rather than firing the consult defensively.
 
@@ -606,9 +606,9 @@ This design exercises **multiple consult flags simultaneously** — Security & G
 
 Notable discipline: Section 6 (Client-side logic) is "Not applicable" with a rationale pointing to UI/UX Specialist — Technical Designer doesn't pretend to design Service Portal widgets. Section 8 (Integrations) uses the "internal Now Assist skill" as the only touchpoint and immediately hands off to Now Assist Specialist for the skill itself.
 
-The Section 3 (Data model) field list and indexes follow a strict tabular format — that's what Developer and Reporting & Analytics consume cleanly. The ACL matrix in Section 4 has **field-level** restrictions on `attempted_subject` (customer-supplied content) — a Phase 2.1-style anti-pattern guard against logging PII without protection.
+The Section 3 (Data model) field list and indexes follow a strict tabular format — that's what Developer and Reporting & Analytics consume cleanly. The ACL matrix in Section 4 has **field-level** restrictions on `attempted_subject` (customer-supplied content) — an anti-pattern guard against logging PII without protection.
 
-Open Question 1 (customer-content classification policy) explicitly routes to Security & GRC Specialist rather than being resolved here. That's the Phase 2.1-style "honest uncertainty" pattern — Technical Designer surfaces what cannot be answered without policy input.
+Open Question 1 (customer-content classification policy) explicitly routes to Security & GRC Specialist rather than being resolved here. That's the "honest uncertainty" pattern — Technical Designer surfaces what cannot be answered without policy input.
 
 ---
 
