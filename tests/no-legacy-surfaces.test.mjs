@@ -675,8 +675,8 @@ test('and a marker planted where the lint does not honour it is still reported',
 
 // ─── ARC-09-C78 — the prompt-audit corrections stay corrected ──────────────────
 //
-// The engine's 2026-10-03 prompt audit found these five patterns in snowarch's own copies of the
-// roster, and C78 removed them. The same promotion ARC-02-S06 made: a sweep run once at review time
+// The engine's 2026-10-03 prompt audit found these patterns in snowarch's own copies of the roster,
+// and C78 removed them. The same promotion ARC-02-S06 made: a sweep run once at review time
 // decays, and one run on every push does not. Each pattern carries its OWN scope, so a phrase that is
 // legitimate in one surface — a counterparty's API docs, a quoted history — is not banned everywhere
 // in order to catch it in one place.
