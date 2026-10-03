@@ -184,7 +184,7 @@ The smallest viable extension:
 
 **Add a single String field on `sn_hr_le_case`:**
 
-- **Field name:** `sn_hr_le_case.u_target_role_title` (the global form; open question 1 covers a scoped app)
+- **Field name:** `sn_hr_le_case.u_target_role_title` (open question 1 covers how the platform names it)
 - **Type:** String, length 100
 - **Mandatory:** No (transfer LE cases may exist before target title is finalised)
 - **ACL:** Inherits `sn_hr_le_case` field ACLs
@@ -224,7 +224,7 @@ Consult flags:
 
 ## Open Questions
 
-1. **Engagement field-naming convention** — `u_target_role_title` (global) vs the scoped-app form `x_<vendor>_<app>_target_role_title` *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*. Confirm with Chief Architect / App Engine Specialist.
+1. **Engagement field-naming convention** — on `sn_hr_le_case` the platform names a new field by where it is created: in the table's own scope it takes no prefix, so `u_target_role_title` is the engagement's mark for a custom field; created from global, the platform adds `u_`; from a scoped app, that app's namespace, `x_<vendor>_<app>_target_role_title` *(citation: `markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`)*. Confirm with Chief Architect / App Engine Specialist.
 2. **Record producer variable** — does the existing "Initiate Internal Transfer" record producer already collect this attribute (perhaps under a different name)? If yes, the field may need a rename consultation; if no, the variable definition is part of the same configuration change.
 3. **Target title vs target position record** — is the target a free-text title, or should it be a reference to a position table (Position [`sn_hr_core_position`] *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*)? If reference, escalates the design — possible Verdict B+ with a join consideration. Verify Discovery output on position-table presence.
 
@@ -334,22 +334,22 @@ Before any specialist may be dispatched, §1.1 requires honest evaluation. This 
 
 2. Custom object proposed (smallest viable scope):
 
-   Smallest-scope candidate: **One new child table extending `sn_hr_core_profile`, in the global scope, with fields grouped to enable table-level ACLs per sensitivity tier — not 12 field-level ACLs.**
+   Smallest-scope candidate: **One new child table extending `sn_hr_core_profile`, in the baseline `sn_hr_core` scope, with fields grouped to enable table-level ACLs per sensitivity tier — not 12 field-level ACLs.**
 
    Actually, smallest scope considering the three sensitivity tiers may require **two new child tables**, one per restricted tier (emergency contacts are baseline — Part 2):
-   - `u_hr_profile_mobility` — passport, work-permit (Mobility COE access)
-   - `u_hr_profile_security` — security clearance level + expiry (Security COE access)
+   - `sn_hr_core_profile_mobility` (proposed — not baseline) — passport, work-permit (Mobility COE access)
+   - `sn_hr_core_profile_security` (proposed — not baseline) — security clearance level + expiry (Security COE access)
    - emergency contacts stay in baseline `sn_hr_core_contact` — no third table
 
    Hierarchy position (§1.1 preference order):
    - Field on baseline table (12 fields): rejected — ACL complexity is the failure mode, not storage
    - New child table (1) with 12 fields + complex per-field ACLs: rejected — same failure mode
-   - **Two new child tables (one per restricted tier) in the global scope**: PROPOSED — each table gets ONE table-level ACL per tier, simpler and harder to misconfigure
-   - New top-level table in scoped app: not justified — the global scope is appropriate
+   - **Two new child tables (one per restricted tier) in baseline `sn_hr_core` scope**: PROPOSED — each table gets ONE table-level ACL per tier, simpler and harder to misconfigure
+   - New top-level table in scoped app: not justified — `sn_hr_core` scope is appropriate
    - New scoped app: not justified
 
 3. Consequences of approval:
-   - **Data model:** two new child tables in the global scope (custom tables in the global scope take `u_` *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*). Each is a 1:1 extension of `sn_hr_core_profile`, joined by `profile` reference.
+   - **Data model:** two new child tables in `sn_hr_core` scope, whose namespace a table in that scope begins with *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*. Each is a 1:1 extension of `sn_hr_core_profile`, joined by `profile` reference.
    - **Deployment:** ships in HRSD update set; no new scoped app cadence.
    - **Support cost:** medium — two new tables to administer; ACLs simpler than 12-field ACL design but still three patterns to maintain.
    - **Platform-upgrade risk:** medium — child of baseline `sn_hr_core_profile`. Upgrade risk if ServiceNow ships its own sensitive-data-extension pattern in a future release (currently no announced roadmap).
@@ -387,7 +387,7 @@ If rejected: adopt Alternative A, B, or C from Part 3.
 - **Do not put passport numbers in `work_notes` for "audit" purposes.** PII in journal fields bypasses scoped HR security; severe §1.1 + governance violation.
 - **Do not disable the Scoped HR Security plugin** to "simplify" ACL design. The plugin is the baseline data-isolation mechanism; disabling it removes engagement-wide HR data protection.
 - **Do not duplicate emergency contacts outside baseline `sn_hr_core_contact`.** Single source of truth: the HR profile's Emergency Contacts list.
-- **Do not create the two child tables in a new scoped app** when the global scope is appropriate. New scoped app is over-escalation per §1.1.
+- **Do not create the two child tables in a new scoped app** when `sn_hr_core` scope is appropriate. New scoped app is over-escalation per §1.1.
 - **Do not store passport image attachments in the child table without explicit GRC review.** Attachment ACLs are separate from field ACLs; engagement must explicitly govern.
 - **Do not skip Security & GRC consult.** This request is fundamentally a security architecture question; HRSD Specialist cannot ratify the ACL strategy alone.
 - **Do not assume country-specific HR data law is the same across all engagement geographies.** Passport and work-permit storage may be legal in some countries and restricted in others; verify per-geography.
