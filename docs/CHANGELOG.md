@@ -38,6 +38,11 @@ worked example were corrected with it.
   Technical Designer defaults to the baseline scope rather than a new scoped app, and the CSM escalation
   example and the user guide carry a correction: the escalation table they called unavailable is baseline
   in Australia.
+- The specialists use the ServiceNow names the bundled documentation uses. Table, field, role and pattern
+  names the corpus does not contain are replaced by the corpus's own, with the page that names them; the
+  worked examples' own objects carry the `u_` or `x_` prefix the platform gives custom names; and where the
+  corpus contradicts a sentence — classic approval rules are replaced by the Workflow Studio Ask for
+  Approval action — the sentence now says what the corpus says.
 
 ### Changed
 
