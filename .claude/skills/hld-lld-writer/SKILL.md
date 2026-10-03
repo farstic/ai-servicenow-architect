@@ -64,7 +64,7 @@ For every HLD, produce a document with these sections. Sections may be marked "N
 
 1. **Executive Summary** — one to two pages: business problem, proposed solution, key benefits, high-level cost/timeline if known.
 2. **Solution Overview** — scope (in / out), assumptions, constraints, dependencies on other initiatives or systems.
-3. **Functional Architecture** — end-to-end process flow (with at least one Mermaid diagram), user journeys per persona, module and feature mapping.
+3. **Functional Architecture** — end-to-end process flow (with at least one figure from the Diagramming Specialist), user journeys per persona, module and feature mapping.
 4. **Technical Architecture** — data model summary (table-level, not field-level — that's LLD), integration architecture summary, environment topology, performance and scaling considerations.
 5. **Integrations** — per integration: purpose, direction, protocol, frequency, error handling at the conceptual level.
 6. **Security & Compliance** — role model, data classification and handling, audit logging, compliance regimen alignment, privacy considerations.
@@ -94,7 +94,7 @@ For a Process Design Document (less common — usually requested when the audien
 
 1. **Process purpose and outcome** — what the process achieves.
 2. **Roles and responsibilities** — RACI matrix or equivalent.
-3. **Process flow** — swimlane Mermaid diagram showing actors and steps.
+3. **Process flow** — swimlane figure (Diagramming Specialist, `.drawio` with SVG export) showing actors and steps.
 4. **Triggers** — what initiates the process (event, schedule, manual).
 5. **Steps** — numbered list with role, action, system, decision points.
 6. **Exceptions and escalations** — what happens when the process deviates.
@@ -115,7 +115,7 @@ For a Process Design Document (less common — usually requested when the audien
 | Open Decisions | Numbered `OD-NN` with status, options, recommendation, owner, decision-by date. |
 | Cross-references | Internal links to other sections (`[See §3.2](#32-...)`). |
 | Citations | When grounding a claim in ServiceNow documentation, cite the file path used. |
-| Language | Corporate professional English. No emoji, no exclamation marks, no "really" or "very". |
+| Language | Corporate professional English in a plain, unemphatic register — no emoji, no exclamation marks, no intensifiers. |
 
 ## ServiceNow design conventions (inherited from Technical Designer)
 
@@ -173,7 +173,7 @@ You do **not** propose Code Reviewer post-build — your output is a design docu
 | When | Hand-off |
 |---|---|
 | HLD is approved and component-level design is needed | **Technical Designer** — produces per-component specs from open decisions. |
-| LLD is approved and implementation can begin | **Developer** / **Flow Designer Specialist** / **Integration Specialist** — Phase 2.1 builders implement per the LLD. |
+| LLD is approved and implementation can begin | **Developer** / **Flow Designer Specialist** / **Integration Specialist** — the builders implement per the LLD. |
 | Document references operational artefacts not yet authored | **Operational Documentation** — produces runbooks, KBAs, training materials. |
 | Document references AI capabilities at concept level | **Now Assist Specialist** — designs the AI Agent / Now Assist skill referenced. |
 | Document references portal or workspace UX | **UI/UX Specialist** — designs the portal widgets, form layouts, list views. |

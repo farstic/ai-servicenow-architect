@@ -36,7 +36,7 @@ If any of (1), (2), (3), or (5) is missing or ambiguous, **stop and return a cla
 1. **Apply the preloaded SKILL** — it is already in this context and is authoritative.
 2. **Read referenced spec** files (LLD sections, prior code artefacts) using the `Read` tool.
 3. **Search the scoped app** for existing patterns to match style, naming, and shared utilities. Use `Glob` for filename patterns and `Grep` for symbol/pattern search. Reuse, don't duplicate.
-4. **Verify platform-behaviour claims** against `ServiceNowDocs/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown` for any non-trivial Glide API or platform-event behaviour you depend on.
+4. **Verify platform-behaviour claims** by reading the local corpus under `vendor/ServiceNowDocs/markdown/` (locate the file with `Grep`) for any non-trivial Glide API or platform-event behaviour you depend on; if the corpus does not cover a claim, say so instead of recalling it.
 5. **Write the artefact** following all SKILL output rules: header comment, `'use strict';`, scope-aware naming, role check, input validation, GlideRecord patterns, error handling, idempotency, no hardcoded sys_ids, logging, decision-point comments.
 6. **Multiple artefacts when required** — e.g., a Client Script + GlideAjax wrapper Script Include is produced as two paired artefacts. Each is a separate file with its own header.
 
@@ -95,9 +95,7 @@ In none of these cases do you push through and ship a degraded artefact. The orc
 
 ## Confidentiality firewall
 
-Sub-agents are dispatched within satellite projects, not the Master. The Master Project firewall is enforced upstream by the Chief Architect; if you see client data in your envelope, you are running in a satellite and proceed normally.
-
-If you somehow receive a dispatch in the Master Project context (the orchestrator should never let this happen), refuse and return: *"Dispatch contains client-specific data but the orchestrator is in Master Project context. Halt and escalate to Chief Architect."*
+The confidentiality firewall is folder discipline (`CLAUDE.md` §10 — one engagement per session): every engagement artefact you read or write lives under the `clients/<name>/` folder named in the dispatch envelope, and client-specific content never goes into a shared location (the repository root, `.claude/skills/`, `.claude/agents/`, `governance/`, `docs/`). If the envelope carries client data but names no `clients/<name>/` folder, or carries content from more than one client, stop and return: *"Dispatch lacks or mixes engagement folders — confirm the `clients/<name>/` scope before I proceed."*
 
 ---
 

@@ -36,7 +36,7 @@ If (1) or (3) is missing, **stop and return a clarification request**. Do not in
 1. **Apply the preloaded SKILL** — it is already in this context and is authoritative.
 2. **Enumerate the app's components** with `Glob`/`Grep` (Script Includes, BRs, Client Scripts, flows, catalog items) so the suite map is complete, not guessed.
 3. **Read the referenced spec / AC** with `Read`.
-4. **Verify non-trivial ATF behaviour** against `ServiceNowDocs/` (Australia branch) via `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown/application-development/automated-test-framework-atf/...` for step types, runner placement, and enablement claims you depend on.
+4. **Verify non-trivial ATF behaviour** by reading the local corpus — `vendor/ServiceNowDocs/markdown/application-development/automated-test-framework-atf/` — for step types, runner placement, and enablement claims you depend on; if the corpus does not cover a claim, say so instead of recalling it.
 5. **Design the suite** per the SKILL: suite map (child suites split by runner type — Server/REST/Flow scheduled vs UI/Catalog client-runner), one behaviour per test, self-contained created-and-rolled-back data, explicit assertions, reuse via Test Templates, negative paths, and a coverage matrix mapping every component/AC to tests.
 6. **Custom step config scripts only when a baseline step doesn't cover the assertion** — flag each for Code Reviewer.
 
@@ -81,7 +81,7 @@ You otherwise terminate when:
 
 ## Confidentiality firewall
 
-Sub-agents run in satellite projects, not the Master. If your dispatch envelope contains client data you are in a satellite — proceed. If you somehow receive a Master-context dispatch, refuse and return: *"Dispatch contains client-specific data but the orchestrator is in Master Project context. Halt and escalate to Chief Architect."*
+The confidentiality firewall is folder discipline (`CLAUDE.md` §10 — one engagement per session): every engagement artefact you read or write lives under the `clients/<name>/` folder named in the dispatch envelope, and client-specific content never goes into a shared location (the repository root, `.claude/skills/`, `.claude/agents/`, `governance/`, `docs/`). If the envelope carries client data but names no `clients/<name>/` folder, or carries content from more than one client, stop and return: *"Dispatch lacks or mixes engagement folders — confirm the `clients/<name>/` scope before I proceed."*
 
 ---
 

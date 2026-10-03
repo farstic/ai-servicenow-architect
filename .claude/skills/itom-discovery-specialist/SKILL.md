@@ -118,7 +118,7 @@ When dispatched, you expect the following structured fields. If missing, raise a
 | **MID Server placement and clustering** | Number of MID Servers, network zone placement, MID cluster definition, sizing (default 4GB heap, scaling considerations). |
 | **Discovery scope** | Which networks / IP ranges / cloud accounts / regions are in scope. Discovery schedules and frequency. |
 | **CMDB CI class plan** | Which baseline CI classes are in use (`cmdb_ci_server`, `cmdb_ci_appl`, `cmdb_ci_database`, etc.). Any custom CI classes that already exist (§1.1 implications). |
-| **CSDM phase** | Crawl / Walk / Run / Fly per the CSDM adoption model. Affects design recommendations for `cmdb_ci_service` vs `cmdb_ci_service_technical_service` vs `cmdb_ci_service_offering`. |
+| **CSDM phase** | Foundation / Crawl / Walk / Run / Fly per the CSDM adoption model. Affects which CSDM v5 service tables are in play — `cmdb_ci_service_business`, `cmdb_ci_service_technical`, `cmdb_ci_service_auto` (the CMDB & CSDM gateway owns the placement). |
 | **IRE configuration** | Existing identification rules per CI class, reconciliation rule policy (who can update which fields), data source priorities. |
 | **Event Management state** | Existing connector list, alert correlation rule patterns, alert ageing / closure rules. |
 | **Service Graph Connectors** | Which SGCs are active (Azure, AWS, GCP, Splunk, etc.), data-source confidence levels. |
@@ -150,7 +150,7 @@ For every component, first evaluate whether baseline serves the requirement:
 3. **IRE rules** — `cmdb_identification_rule` and reconciliation rule records.
 4. **Service Mapping patterns** — `sa_pattern` records. Top-down baseline patterns cover common application stacks.
 5. **Event Management connectors** — baseline connectors for Splunk, SCOM, SolarWinds, AWS CloudWatch, Azure Monitor, etc. Use Service Graph Connector pattern.
-6. **CSDM baseline tables** — `cmdb_ci_business_app`, `cmdb_ci_service`, `cmdb_ci_service_offering`, `cmdb_ci_service_technical_service`.
+6. **CSDM baseline tables (v5 names)** — `cmdb_ci_business_app`, `cmdb_ci_service_business`, `cmdb_ci_service_technical`, `cmdb_ci_service_auto`.
 
 **Baseline solutions are accepted without further approval.**
 
@@ -522,7 +522,7 @@ You must not:
 - **Author HLDs.** HLD/LLD Writer.
 - **Skip citation discipline.** Verdict B/C without citations is a self-violation.
 - **Default to a custom object without halt protocol.**
-- **Echo client-specific data.** Route to satellite project.
+- **Echo client-specific data** into shared locations — engagement data lives only under the engagement's `clients/<name>/` folder.
 - **Recommend custom CMDB classes for technologies already covered baseline.** Always verify baseline class hierarchy first.
 - **Bypass the ECC queue in any MID Server design.**
 - **Recommend custom dedup logic instead of IRE configuration.**

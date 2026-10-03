@@ -53,13 +53,11 @@ You do not own:
 
 Authoritative paths in `ServiceNowDocs/` (Australia branch):
 
-- `markdown/build-workflows/index.md` — primary Flow Designer surface
+- `markdown/build-workflows/index.md` — Flow Designer / Workflow Studio table of contents (locate the subflow, "Run in Background" and decision-table topics from here)
 - `markdown/build-workflows/workflow-studio/add-configure-trigger.md` — trigger semantics, transaction behaviour
 - `markdown/build-workflows/workflow-studio/actions.md` — Action Designer
-- `markdown/build-workflows/index.md` — subflow conventions, parameterisation
 - `markdown/build-workflows/workflow-studio/add-error-handler-flow.md` — try/catch, On Error stages
-- `markdown/build-workflows/index.md` — sync vs async, "Run in Background"
-- `markdown/build-workflows/index.md` — Decision Table semantics
+- `markdown/build-workflows/workflow-studio/configuring-decision-builder.md` — decision tables (Workflow Studio)
 - `markdown/integrate-applications/integration-hub/request-ih-overview.md` — spoke usage (consumption only — design is Integration Specialist)
 
 Always cite the file path used.
@@ -80,7 +78,7 @@ Every flow design you produce includes the following — no exceptions:
 10. **Custom scripts called out separately** — any Action containing a server script gets a Developer handoff with a script spec (signature, inputs, outputs, role check, error handling). You do not write the script.
 11. **Spoke consumption** — list of IntegrationHub spokes/Actions used. If a needed integration has no spoke, flag it for Integration Specialist design.
 12. **Scope and naming** — scoped app prefix; flow/subflow/Action naming convention.
-13. **Observability** — what logs, what tags, what metrics. Where the flow execution shows up (Flow Execution log, custom audit table).
+13. **Observability** — what logs, what tags, what metrics. Where the flow execution shows up (the Flow Execution log; a custom audit table only if the dispatch envelope approved one under §1.1).
 14. **Test approach** — happy path, primary error paths, idempotency check, condition-edge cases. Hand off to ATF Author.
 15. **Open questions** — anything the spec didn't resolve.
 
@@ -96,7 +94,7 @@ Steps:
 3. Ask for Approval (with attached approvers from Decision Table output).
 4. If Approved → update record + notify via subflow.
 5. If Rejected → update record + capture rejection reason + audit.
-6. On Error stage → write to dead-letter table, alert ops group.
+6. On Error stage → write to the dead-letter store named in the integration spec (a §1.1-approved object, never one you introduce), alert ops group.
 
 Idempotency: state guard before the approval step (don't re-fire if state already moved past awaiting_approval).
 
@@ -161,9 +159,6 @@ Per `governance/governance-rules.md` §1.1, you may not propose, design, or crea
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround.
 
 You do not design the custom object until the proposal is explicitly approved in a follow-up dispatch envelope. **Silently defaulting to a custom object is a §1.1 violation; the artefact will be reworked.**
-
-This rule overrides any prior "default to scoped app" or "create a dedicated table" language elsewhere in this SKILL.
-
 
 - **Business logic in flows that belongs in Script Includes** — flows orchestrate; they don't compute. Calculation, parsing, formatting → Script Include called from a custom Action.
 - **Look Up Records inside For Each** — the flow equivalent of nested GlideRecord. Pull joined data once before the loop, or push the operation into a Script Include.

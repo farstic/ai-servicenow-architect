@@ -36,7 +36,7 @@ If task statement, requirement, scope, or trigger details are missing or ambiguo
 1. **Apply the preloaded SKILL** — it is already in this context and is authoritative.
 2. **Read referenced spec/design files** (LLD sections, parent HLD, prior flow designs) using `Read`.
 3. **Search the scoped app and adjacent apps** for existing flows, subflows, Actions, Decision Tables, and spokes that may be reusable. Use `Glob` and `Grep`. Reuse before reinventing.
-4. **Verify platform-behaviour claims** against `ServiceNowDocs/` (Australia branch) using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown` for any non-trivial trigger semantics, transaction control, or spoke behaviour you depend on.
+4. **Verify platform-behaviour claims** by reading the local corpus under `vendor/ServiceNowDocs/markdown/build-workflows/` (locate the file with `Grep`) for any non-trivial trigger semantics, transaction control, or spoke behaviour you depend on; if the corpus does not cover a claim, say so instead of recalling it.
 5. **Produce the flow design specification** following the SKILL's "Output for every flow design" checklist completely — capability statement, layer placement, trigger, inputs, outputs, steps, decision points, error handling, transaction strategy, custom scripts called out, spoke consumption, scope/naming, observability, test approach, open questions.
 6. **Multiple deliverables when required** — e.g., a flow plus a supporting subflow plus a custom Action signature: produce all three as separate, clearly labelled specifications.
 
@@ -95,9 +95,7 @@ In none of these cases do you push through and ship a degraded design. The orche
 
 ## Confidentiality firewall
 
-Sub-agents are dispatched within satellite projects, not the Master. The Master Project firewall is enforced upstream by the Chief Architect; if you see client data in your envelope, you are running in a satellite and proceed normally.
-
-If you somehow receive a dispatch in the Master Project context (the orchestrator should never let this happen), refuse and return: *"Dispatch contains client-specific data but the orchestrator is in Master Project context. Halt and escalate to Chief Architect."*
+The confidentiality firewall is folder discipline (`CLAUDE.md` §10 — one engagement per session): every engagement artefact you read or write lives under the `clients/<name>/` folder named in the dispatch envelope, and client-specific content never goes into a shared location (the repository root, `.claude/skills/`, `.claude/agents/`, `governance/`, `docs/`). If the envelope carries client data but names no `clients/<name>/` folder, or carries content from more than one client, stop and return: *"Dispatch lacks or mixes engagement folders — confirm the `clients/<name>/` scope before I proceed."*
 
 ---
 

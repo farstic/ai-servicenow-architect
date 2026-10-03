@@ -48,10 +48,8 @@ You do not own:
 
 Authoritative paths in `ServiceNowDocs/` (Australia branch):
 
-- `markdown/application-development/business-rules-and-script-includes.md` — Script Include conventions, `client_callable`
-- `markdown/application-development/business-rules-and-script-includes.md` — Business Rule timing, `when` semantics
+- `markdown/application-development/business-rules-and-script-includes.md` — Business Rules and Script Includes (conventions, `client_callable`, `when` semantics)
 - `markdown/platform-user-interface/service-portal/client-script-reference.md` — Client Script types, performance considerations
-- `markdown/application-development/business-rules-and-script-includes.md` — server-side Glide API reference
 - `markdown/api-reference/c_GlideAjaxAPI.md` — GlideAjax client-server bridge
 - `markdown/application-development/c_CreatingListsAndFormsScopedApps.md` — scoped app coding rules
 - `markdown/platform-security/access-control/access-control-rules.md` — ACL evaluation order, integration with code
@@ -164,9 +162,6 @@ Per `governance/governance-rules.md` §1.1, you may not propose, design, or crea
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround.
 
 You do not design the custom object until the proposal is explicitly approved in a follow-up dispatch envelope. **Silently defaulting to a custom object is a §1.1 violation; the artefact will be reworked.**
-
-This rule overrides any prior "default to scoped app" or "create a dedicated table" language elsewhere in this SKILL.
-
 
 - **Logic in Business Rules instead of Script Includes** — BRs become unreadable, untestable, and fight scope rules. Push business logic into Script Includes; BRs are thin triggers.
 - **Nested GlideRecord loops** — quadratic explosion on volume tables. Replace with a single `addEncodedQuery` or `GlideAggregate`.

@@ -1,6 +1,6 @@
 # Global Architecture Rules
 
-**Authoritative source. All other governance references in the architecture engine — CLAUDE.md, Master Project Instructions, individual SKILL.md anti-patterns, sub-agent termination conditions — must reference this file by section number. If language drifts between this file and a downstream reference, this file wins.**
+**Authoritative source. All other governance references in the architecture engine — CLAUDE.md, the always-loaded rules under `.claude/rules/`, individual SKILL.md anti-patterns, sub-agent termination conditions — must reference this file by section number. If language drifts between this file and a downstream reference, this file wins.**
 
 ---
 
@@ -60,7 +60,7 @@ When detected, the Chief Architect halts the post-build §6.2 flow and re-dispat
 
 ### Scope of application
 
-This rule applies to all 25 specialists at all tiers — builders, reviewers, domain experts, consultants, documentation specialists. It overrides any prior "default to scoped app" or "create a dedicated table" language that may exist in earlier-phase SKILL.md files. Where conflict exists, §1.1 wins.
+This rule applies to every specialist in the roster — builders, reviewers, domain experts, consultants, documentation specialists. No skill or agent sets a different default: a new scoped app or a dedicated table is never assumed, and where any text appears to say otherwise, §1.1 wins.
 
 ### Routing-time vs post-build enforcement
 
@@ -130,7 +130,7 @@ This file is the canonical source for global architecture rules. Updates committ
 When a new rule is added (§1.2, §1.3, etc.):
 1. Author the rule here first.
 2. Update `taxonomy.md` to reference the new rule by §-number.
-3. Patch CLAUDE.md and Master Project Instructions with the routing-time enforcement reference.
+3. Patch CLAUDE.md, and the generated rules under `.claude/rules/` through their generator, with the routing-time enforcement reference.
 4. Patch every SKILL.md anti-patterns section with the skill-level reinforcement.
 5. Patch every agent definition's termination conditions with the agent-level reinforcement.
 

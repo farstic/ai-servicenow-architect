@@ -1,6 +1,6 @@
 # Now Assist Specialist — Examples
 
-Three gold-standard examples of Now Assist Specialist output, demonstrating Phase 2.2 disciplines: explicit confidence routing, human-in-the-loop boundaries, AI Control Tower attestations, and the Baseline-first audit pattern with the §1.1 escalation flow.
+Three gold-standard examples of Now Assist Specialist output, demonstrating the skill's disciplines: explicit confidence routing, human-in-the-loop boundaries, AI Control Tower attestations, and the Baseline-first audit pattern with the §1.1 escalation flow.
 
 ---
 
@@ -179,7 +179,7 @@ This is a clean baseline-first Now Assist design. The skill itself lives in Skil
 
 The AI Control Tower attestation is non-optional and is the governance layer that makes the capability deployable: it specifies data classes accessed, output classes produced, refusal conditions, and audit retention. Without an AICT attestation, the skill cannot ship.
 
-The confidence routing is explicit: ≥ 0.7 renders as primary content, 0.4–0.7 renders with a disclaimer, < 0.4 renders a fallback. No implicit thresholds. This is the Phase 2.2 discipline that distinguishes a buildable design from a "ChatGPT but for incidents" hand-wave.
+The confidence routing is explicit: ≥ 0.7 renders as primary content, 0.4–0.7 renders with a disclaimer, < 0.4 renders a fallback. No implicit thresholds. This is the discipline that distinguishes a buildable design from a "ChatGPT but for incidents" hand-wave.
 
 Hallucination resistance gets its own ATF test (ATF-ICS-06) because that's the operational risk for a summarisation skill — the prompt constraint says "use only the facts in the provided context", but the test verifies that across 20 random invocations.
 
@@ -379,7 +379,7 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 
 ### Explanation
 
-This example demonstrates two key Phase 2.2 Now Assist disciplines:
+This example demonstrates two key Now Assist disciplines:
 
 1. **The §1.1 escalation flow done correctly.** The initial design (§5) listed `semanticSearchCases` as a CUSTOM Action requiring escalation. The §13 evaluation walked through the baseline option (AI Search) and concluded the Action is actually configuration in AI Agent Studio wrapping baseline AI Search — no escalation required. The Baseline-first audit (§14) reflects the corrected position. This is exactly the discipline the rule is designed to produce: surface the question, evaluate baseline first, then proceed only if baseline is genuinely insufficient.
 
@@ -507,7 +507,7 @@ This example is shorter and tighter because AICT attestations have a focused str
 
 The discipline shown here is **explicit exclusions** in §3 — listing what the skill does NOT access (compensation, performance, termination, health) alongside what it does access. For HR PII especially, this is critical: the attestation is what Security & GRC will review, and "trust us, we don't read salary" is rejected. The exclusion table makes the boundary auditable.
 
-§5's "Override conditions: None" is also a Phase 2.2 discipline — every section must be populated. "Not applicable" with a rationale is correct; silence is rejected.
+§5's "Override conditions: None" is also a deliberate discipline — every section must be populated. "Not applicable" with a rationale is correct; silence is rejected.
 
 §8 (Open decisions) catches a real risk: the attestation references a "Closed — Confidential" state that may not be baseline. Rather than assert it exists, the attestation flags it as OD-AICT-02 and routes back to HRSD Specialist for verification. This is the honest-uncertainty pattern: the Now Assist Specialist designs the AICT attestation but doesn't pretend to know Acme's HR state model.
 

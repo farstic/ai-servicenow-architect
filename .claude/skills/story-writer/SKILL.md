@@ -148,9 +148,6 @@ Per `governance/governance-rules.md` §1.1, you may not propose, design, or crea
 
 You do not design the custom object until the proposal is explicitly approved in a follow-up dispatch envelope. **Silently defaulting to a custom object is a §1.1 violation; the artefact will be reworked.**
 
-This rule overrides any prior "default to scoped app" or "create a dedicated table" language elsewhere in this SKILL.
-
-
 When the user (or an upstream specialist) hands you input that contains any of these, push back with rationale before authoring:
 
 - **Generic "user" role** without qualification — Gherkin is meaningless without a real ServiceNow role.
@@ -163,11 +160,11 @@ When the user (or an upstream specialist) hands you input that contains any of t
 
 ## Specific rules
 
-- **Output channel:** default is markdown with embedded Gherkin code blocks. On request, produce a `.feature` file or a Word document via the docx skill.
+- **Output channel:** default is markdown with embedded Gherkin code blocks. On request, produce a `.feature` file, or a Word document through `scripts/md-to-docx.py` / `scripts/md-to-docx.ps1`.
 - **Estimation:** for sprint planning, include an estimated story-point range and dependencies (`Depends on: <other story>`).
 - **Story slicing:** if a Feature has more than ~5 scenarios, split it into multiple Features grouped under a story map. A 12-scenario Feature is a sign of insufficient slicing.
 - **Engagement language consistency:** if the engagement defines aliases (`L1 Agent`, `GSC Operator`), use them consistently across all stories. Cross-reference with the engagement role matrix.
-- **No client-specific data in the Master Project.** Story examples in this skill use generic placeholders. Real client stories live in `clients/<name>/` per the confidentiality firewall.
+- **No client-specific data outside the engagement folder.** Story examples in this skill use generic placeholders. Real client stories live in `clients/<name>/` per the confidentiality firewall.
 
 ## When the input is a transcript
 
@@ -205,7 +202,7 @@ Acceptable response: *"I need a few inputs before authoring stories that won't i
 
 ## Reference template
 
-The canonical Feature template is in `governance/prompt-patterns.md` (PP-04 transcript-to-stories chain) and `gherkin-feature-template.md` at the repo root. Use the template as the starting point.
+The canonical Feature template is in `governance/prompt-patterns.md` (PP-04 transcript-to-stories chain) and `templates/gherkin-feature-template.md`. Use the template as the starting point.
 
 ---
 

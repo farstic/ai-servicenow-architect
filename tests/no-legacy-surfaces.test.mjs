@@ -672,3 +672,179 @@ test('and a marker planted where the lint does not honour it is still reported',
   // The predicate is what this check now consults, so the marker on that line excuses nothing.
   assert.ok(!(honoursMarker(skill) && line.includes('retired-name: historical')));
 });
+
+// ─── ARC-09-C78 — the prompt-audit corrections stay corrected ──────────────────
+//
+// The engine's 2026-10-03 prompt audit found these patterns in snowarch's own copies of the roster,
+// and C78 removed them. The same promotion ARC-02-S06 made: a sweep run once at review time
+// decays, and one run on every push does not. Each pattern carries its OWN scope, so a phrase that is
+// legitimate in one surface — a counterparty's API docs, a quoted history — is not banned everywhere
+// in order to catch it in one place.
+//
+// Whole files, not `currentLines`: none of these scopes holds a history section, and that function
+// stops at the first `## <digit>` heading — which in CLAUDE.md is "## 1. Operating principles".
+
+export const AUDIT_PATTERNS = [
+  { id: 'master-project', scope: ['.claude/agents/', '.claude/skills/', 'governance/'],
+    test: (l) => /Master Project|satellite project/i.test(l),
+    why: 'the claude.ai project model; in Claude Code the firewall is folder discipline (CLAUDE.md §10)' },
+  { id: 'corpus-webfetch', scope: ['.claude/'],
+    test: (l) => l.includes('github.com/ServiceNow/ServiceNowDocs')
+      || (l.includes('WebFetch') && /ServiceNowDocs|\bcorpus\b/.test(l)),
+    why: 'the corpus is local — it is read with Grep and Read, never fetched' },
+  { id: 'phase-label', scope: ['.claude/'],
+    test: (l) => /\bPhase 2\.\d/.test(l),
+    why: 'an engine-development phase label the reader cannot act on — the builders are just the builders' },
+  { id: 'overrides-any-prior', scope: ['.claude/', 'governance/'],
+    test: (l) => /overrides any prior/i.test(l),
+    why: 'a diff against text no reader can see — state the rule, not what it replaced' },
+  // Every shape the default has been written in, not the one this story happened to remove: "Mermaid is
+  // the default", "(Mermaid default, …)", "Mermaid by default", "defaults to Mermaid", "the default is
+  // Mermaid", "default: Mermaid", "Mermaid … (default)" and the catalogue's "Default notation" column.
+  // The first was a live line the port missed, and the pattern written for the port could not see it.
+  { id: 'mermaid-default', scope: ['.claude/', 'governance/', 'CLAUDE.md'],
+    test: (l) => /Mermaid (?:is (?:the|a) default|defaults?\b|by default)|\bdefaults? to Mermaid\b|\bdefault(?: notation)? is Mermaid\b|\bdefault:\s*Mermaid\b|Mermaid[^.|\n]*\(default\)|\|\s*Default notation\s*\|/i.test(l),
+    why: 'every delivered figure is an editable draw.io file; Mermaid is a draft' },
+  { id: 'scoped-by-default', scope: ['.claude/skills/technical-designer/', '.claude/agents/technical-designer.md'],
+    // The two older wordings are the ones a later sweep found the port had not carried: a new scoped
+    // app offered as a decision the designer resolves alone, and a two-way scoped-or-global choice.
+    test: (l) => /default to scoped|Default for new functionality: scoped app|\bdefaults? to (?:an? )?(?:new )?scoped\b|chose (?:a )?new scoped app|scoped \(with prefix\) vs global/i.test(l),
+    why: 'a new scoped app is a §1.1 object, and the baseline scope is the default' },
+];
+
+/**
+ * The exemptions, anchored to a file, a pattern AND a substring of the line — the vocabulary
+ * allow-list's shape, so naming the file once does not excuse every future line in it.
+ *
+ * The one entry is the sentence that keeps WebFetch away from the corpus, which cannot do its job
+ * without naming both. A rule precise enough to pass it unexempted would have to parse "not for the
+ * corpus", and a rule that parses negation is one a rewording walks past.
+ */
+export const AUDIT_ALLOW = [
+  { file: '.claude/agents/integration-specialist.md', id: 'corpus-webfetch',
+    context: "`WebFetch` is for the counterparty's own API documentation (step 2), not for the corpus.",
+    reason: 'the instruction that WebFetch is NOT for the corpus has to name both' },
+];
+
+const inAuditScope = (file, scope) => scope.some((s) => (s.endsWith('/') ? file.startsWith(s) : file === s));
+
+/** The sweep, as a function over a file list and a reader, so the planted fixture runs THIS code. */
+export function findAuditRegressions({ files, read: readFile, patterns = AUDIT_PATTERNS, allow = AUDIT_ALLOW }) {
+  const hits = [];
+  for (const f of files) {
+    const mine = patterns.filter((p) => inAuditScope(f, p.scope));
+    if (mine.length === 0) continue;
+    readFile(f).split('\n').forEach((line, i) => {
+      for (const p of mine) {
+        if (!p.test(line)) continue;
+        // An exemption excuses its own SENTENCE, not the line it sits on. The pattern is tested again
+        // with the exempted text taken out, and the line passes only when what remains is clean — so
+        // an old fetch written into the same step, beside the sentence, is still a hit.
+        const excused = allow.some((a) => a.file === f && a.id === p.id && line.includes(a.context)
+          && !p.test(line.split(a.context).join(' ')));
+        if (excused) continue;
+        hits.push(`${f}:${i + 1}: [${p.id}] ${line.trim().slice(0, 80)} — ${p.why}`);
+      }
+    });
+  }
+  return hits;
+}
+
+const AUDIT_FILES = () => tracked()
+  .filter((f) => /\.(md|json)$/.test(f) && AUDIT_PATTERNS.some((p) => inAuditScope(f, p.scope)));
+
+test('ARC-09-C78 — the prompt-audit corrections stay corrected', () => {
+  const files = AUDIT_FILES();
+  // A floor, because a sweep that reached nothing would pass by having nothing to say.
+  assert.ok(files.length > 60, `only ${files.length} file(s) in scope — the scopes no longer match the tree`);
+  const hits = findAuditRegressions({ files, read });
+  assert.deepEqual(hits, [], `${hits.length} hit(s):\n  ${hits.join('\n  ')}`);
+  console.log(`    ${AUDIT_PATTERNS.length} patterns over ${files.length} file(s); ${AUDIT_ALLOW.length} anchored exemption(s)`);
+});
+
+test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppresses only its own line', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'snowarch-audit-'));
+  try {
+    const plant = (rel, text) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), `${text}\n`); };
+    // One planted line per pattern, each in a file its scope covers — the old wording, as it stood.
+    plant('.claude/agents/atf-author.md', 'Sub-agents run in satellite projects, not the Master.');
+    plant('governance/governance-rules.md', 'CLAUDE.md, Master Project Instructions, individual SKILL.md anti-patterns (Phase 2.2)');
+    plant('.claude/agents/developer.md',
+      '4. Verify against `ServiceNowDocs/` using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown`.');
+    plant('.claude/skills/story-writer/SKILL.md', 'This rule overrides any prior "default to scoped app" language elsewhere in this SKILL.');
+    plant('CLAUDE.md', '- Diagrams: Mermaid in markdown for every figure (default); draw.io on request.');
+    plant('.claude/skills/diagramming-specialist/SKILL.md', '| Diagram | Use it for | Default notation |');
+    plant('.claude/agents/technical-designer.md', [
+      '3. **Scoping decision** — If unknown, default to scoped with prefix `x_<vendor>_<app>`.',
+      '3. **Decisions made** — (e.g., chose new scoped app over extending existing because of a separate deployment cadence).',
+    ].join('\n'));
+    plant('.claude/skills/technical-designer/EXAMPLES.md', '2. **Scope decision** — scoped (with prefix) vs global, with justification.');
+    plant('.claude/skills/now-assist-specialist/EXAMPLES.md', 'Three examples demonstrating Phase 2.2 disciplines.');
+    plant('.claude/skills/hld-lld-writer/EXAMPLES.md', 'the builders that consume it — multiple Phase 2.2/2.1 builder handoffs.');
+    // The shapes a control found inert on the first head — each a wording that has actually been used.
+    plant('.claude/skills/diagramming-specialist/EXAMPLES.md', 'Mermaid is the default; all blocks are written to parse.');
+    plant('governance/taxonomy.md', '| Diagramming Specialist | figures | (Mermaid default, draw.io on request) |');
+    plant('.claude/skills/hld-lld-writer/SKILL.md', 'Figures: the Diagramming Specialist defaults to Mermaid.');
+    plant('.claude/skills/technical-designer/SKILL.md', 'If the scope is unknown, the design defaults to a scoped app.');
+    // ...and the same phrases where their scopes do NOT reach, which must stay quiet.
+    plant('docs/USER-GUIDE.md', 'the same prompts work in the Master Project chat; Mermaid by default; Phase 2.2 disciplines');
+    plant('.claude/agents/flow-designer-specialist.md', 'If unknown, default to scoped with prefix `x_<vendor>_<app>`.');
+    // The exemption: its own sentence passes; an old-style corpus fetch in the SAME file still fails,
+    // and the same sentence in ANOTHER file is not excused by an entry anchored to this one.
+    plant('.claude/agents/integration-specialist.md', [
+      `say so instead of recalling it. ${AUDIT_ALLOW[0].context}`,
+      '4. Verify against `ServiceNowDocs/` using `WebFetch` for MID Server behaviour.',
+      // The regression written exactly where it would be: the old fetch inside the same step, on the
+      // SAME line as the exempted sentence. The sentence does not excuse its neighbour.
+      '4. Verify using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown`; '
+        + `say so instead of recalling it. ${AUDIT_ALLOW[0].context}`,
+    ].join('\n'));
+    plant('.claude/agents/story-writer.md', AUDIT_ALLOW[0].context);
+
+    const files = ['.claude/agents/atf-author.md', 'governance/governance-rules.md', '.claude/agents/developer.md',
+      '.claude/skills/story-writer/SKILL.md', 'CLAUDE.md', '.claude/skills/diagramming-specialist/SKILL.md',
+      '.claude/agents/technical-designer.md', 'docs/USER-GUIDE.md', '.claude/agents/flow-designer-specialist.md',
+      '.claude/agents/integration-specialist.md', '.claude/agents/story-writer.md',
+      '.claude/skills/diagramming-specialist/EXAMPLES.md', 'governance/taxonomy.md', '.claude/skills/hld-lld-writer/SKILL.md',
+      '.claude/skills/technical-designer/SKILL.md', '.claude/skills/technical-designer/EXAMPLES.md',
+      '.claude/skills/now-assist-specialist/EXAMPLES.md', '.claude/skills/hld-lld-writer/EXAMPLES.md'];
+    const readAt = (f) => readFileSync(join(dir, f), 'utf8');
+    const hits = findAuditRegressions({ files, read: readAt });
+    const at = (rel, id) => hits.filter((h) => h.startsWith(`${rel}:`) && h.includes(`[${id}]`)).length;
+
+    for (const p of AUDIT_PATTERNS) {
+      assert.ok(hits.some((h) => h.includes(`[${p.id}]`)), `the planted ${p.id} line was not found`);
+    }
+    assert.equal(at('.claude/agents/atf-author.md', 'master-project'), 1);
+    assert.equal(at('governance/governance-rules.md', 'master-project'), 1);
+    assert.equal(at('CLAUDE.md', 'mermaid-default'), 1);
+    assert.equal(at('.claude/skills/diagramming-specialist/SKILL.md', 'mermaid-default'), 1);
+    assert.equal(hits.some((h) => h.startsWith('docs/USER-GUIDE.md:')), false, 'a scope reached outside itself');
+    assert.equal(hits.some((h) => h.startsWith('.claude/agents/flow-designer-specialist.md:')), false,
+      'the scoped-by-default rule reached past the Technical Designer');
+    assert.equal(at('.claude/skills/diagramming-specialist/EXAMPLES.md', 'mermaid-default'), 1, '"Mermaid is the default" was not seen');
+    assert.equal(at('governance/taxonomy.md', 'mermaid-default'), 1, '"(Mermaid default, …)" was not seen');
+    assert.equal(at('.claude/skills/hld-lld-writer/SKILL.md', 'mermaid-default'), 1, '"defaults to Mermaid" was not seen');
+    assert.equal(at('.claude/skills/technical-designer/SKILL.md', 'scoped-by-default'), 1, '"defaults to a scoped app" was not seen');
+    assert.equal(at('.claude/agents/technical-designer.md', 'scoped-by-default'), 2,
+      '"default to scoped" and "chose new scoped app" must each be seen');
+    assert.equal(at('.claude/skills/technical-designer/EXAMPLES.md', 'scoped-by-default'), 1, '"scoped (with prefix) vs global" was not seen');
+    assert.equal(at('.claude/skills/now-assist-specialist/EXAMPLES.md', 'phase-label'), 1, '"Phase 2.2" was not seen');
+    assert.equal(at('.claude/skills/hld-lld-writer/EXAMPLES.md', 'phase-label'), 1, '"Phase 2.2/2.1" was not seen');
+    assert.equal(hits.some((h) => h.startsWith('governance/') && h.includes('[phase-label]')), false,
+      'the phase-label rule reached outside .claude/');
+    assert.deepEqual(hits.filter((h) => h.startsWith('.claude/agents/integration-specialist.md:')).map((h) => h.split(':')[1]),
+      ['2', '3'], 'the exemption must pass line 1 only — line 3 carries the old fetch beside the exempted sentence');
+    assert.equal(at('.claude/agents/story-writer.md', 'corpus-webfetch'), 1, 'an exemption anchored to one file excused another');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('ARC-09-C78 — every exemption still suppresses a real line; a stale one is removed, not kept', () => {
+  for (const a of AUDIT_ALLOW) {
+    const p = AUDIT_PATTERNS.find((x) => x.id === a.id);
+    assert.ok(p, `${a.file}: exemption names an unknown pattern ${a.id}`);
+    const lines = read(a.file).split('\n').filter((l) => l.includes(a.context));
+    assert.equal(lines.length, 1, `${a.file}: the exempted sentence appears ${lines.length} time(s) — it must anchor exactly one line`);
+    assert.ok(p.test(lines[0]), `${a.file}: the exempted line no longer matches ${a.id} — remove the exemption`);
+  }
+});

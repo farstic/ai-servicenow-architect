@@ -28,13 +28,9 @@ You run as a *skill* in the Chief Architect's main thread — not as a sub-agent
 
 Authoritative paths in `ServiceNowDocs/` (Australia branch):
 
-- `markdown/application-development/business-rules-and-script-includes.md` — official ServiceNow coding standards
-- `markdown/application-development/business-rules-and-script-includes.md` — Script Include conventions
-- `markdown/application-development/business-rules-and-script-includes.md` — Business Rule timing and recursion
+- `markdown/application-development/business-rules-and-script-includes.md` — Business Rules and Script Includes (conventions, timing, recursion)
 - `markdown/platform-security/access-control/access-control-rules.md` — ACL evaluation
 - `markdown/platform-security/bp-before-query-business-rules.md` — secure coding patterns
-- `markdown/application-development/business-rules-and-script-includes.md` — Glide API reference
-- `markdown/application-development/business-rules-and-script-includes.md` — script performance guidance
 
 Cite the file path used in any rationale that depends on platform-documented behaviour.
 
@@ -187,9 +183,6 @@ Per `governance/governance-rules.md` §1.1, you may not propose, design, or crea
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround.
 
 You do not design the custom object until the proposal is explicitly approved in a follow-up dispatch envelope. **Silently defaulting to a custom object is a §1.1 violation; the artefact will be reworked.**
-
-This rule overrides any prior "default to scoped app" or "create a dedicated table" language elsewhere in this SKILL.
-
 
 You push back on these in your own behaviour:
 

@@ -62,13 +62,11 @@ You do not own:
 
 Authoritative paths in `ServiceNowDocs/` (Australia branch):
 
-- `markdown/integrate-applications/integration-hub/building-integrations-ih.md` — IntegrationHub overview
-- `markdown/integrate-applications/integration-hub/building-integrations-ih.md` — building new spokes
+- `markdown/integrate-applications/integration-hub/building-integrations-ih.md` — IntegrationHub overview and building new spokes
 - `markdown/integrate-applications/integration-hub/request-ih-overview.md` — consuming spokes (cross-reference for Flow Designer Specialist)
 - `markdown/api-reference/rest-apis/` — inbound Scripted REST APIs
 - `markdown/api-reference/web-services/` — outbound REST Messages
-- `markdown/it-operations-management/configure-a-mid-server.md` — MID Server topology, capabilities, affinities
-- `markdown/it-operations-management/configure-a-mid-server.md` — ECC queue semantics
+- `markdown/it-operations-management/configure-a-mid-server.md` — MID Server topology, capabilities, affinities, ECC queue
 - `markdown/integrate-applications/credentials.md` — alias indirection
 - `markdown/platform-security/authentication/c_OAuthApplications.md` — OAuth2 flows
 - `markdown/platform-security/authentication/c_MutualAuthentication.md` — mTLS configuration
@@ -105,7 +103,7 @@ For non-critical-path outbound (e.g., posting an incident summary to Jira):
 1. Trigger: record event (e.g., incident updated to Resolved).
 2. Async path: a Flow (Flow Designer's territory) calls the spoke Action.
 3. Spoke Action wraps REST Message with: Connection Alias, retry policy (3 attempts, exponential backoff), correlation ID propagation.
-4. On final failure: write to DLQ table with full payload + error.
+4. On final failure: write to the DLQ store (a §1.1-approved object named in the envelope) with full payload + error.
 5. DLQ has a replay UI Action gated by `x_acme_integration.dlq_replay`.
 6. Metrics: success rate, retry count, DLQ depth.
 
@@ -116,7 +114,7 @@ For inbound (e.g., monitoring tool creating incidents):
 1. Endpoint: `/api/x_acme_itsm/inbound/incident` versioned via path (`/v1/`).
 2. Auth: OAuth2 client credentials, scope-restricted role `x_acme_itsm.api_inbound`.
 3. Payload: JSON, max 64KB, schema-validated against `incident_inbound_v1.schema.json`.
-4. Validation: schema check → role check → idempotency check (correlation_id dedup against `x_acme_itsm_inbound_ledger`) → create record.
+4. Validation: schema check → role check → idempotency check (correlation_id dedup against the §1.1-approved ledger — `x_acme_itsm_inbound_ledger` here is an illustration, not a default) → create record.
 5. Response: 200 with sys_id on success, 4xx with structured error on validation/auth, 5xx on platform error.
 6. Rate limit: 1000 req/min per credential.
 7. Logs: every request logged with correlation_id; payload logged ONLY if `x_acme_itsm.api_debug_logging` system property is true (and even then, PII fields redacted).
@@ -125,7 +123,7 @@ For inbound (e.g., monitoring tool creating incidents):
 
 When the same external system will be called from multiple flows:
 
-1. Build a scoped app `x_acme_<system>_spoke` (e.g., `x_acme_atlas_spoke`).
+1. Build the spoke as a scoped app `x_acme_<system>_spoke` (e.g., `x_acme_atlas_spoke`) — a §1.1 object, so only with the approval recorded in the dispatch envelope.
 2. Define Connection & Credential Aliases for each environment (dev/test/uat/prod).
 3. Define REST Messages parameterised by Connection Alias.
 4. Define Spoke Actions: one per logical operation (lookup, create, update, close).
@@ -174,9 +172,6 @@ Per `governance/governance-rules.md` §1.1, you may not propose, design, or crea
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround.
 
 You do not design the custom object until the proposal is explicitly approved in a follow-up dispatch envelope. **Silently defaulting to a custom object is a §1.1 violation; the artefact will be reworked.**
-
-This rule overrides any prior "default to scoped app" or "create a dedicated table" language elsewhere in this SKILL.
-
 
 - **Integration logic embedded in Business Rules** — synchronous outbound HTTP from a `before` BR blocks the user save. Always async via flow + spoke.
 - **Hardcoded credentials in REST messages** — use Connection & Credential Aliases. No exceptions.

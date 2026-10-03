@@ -328,7 +328,7 @@ This is the heart of a CSM ↔ ITSM ↔ CSDM integration. Both ITSM and CSM shou
 - **ITSM** — incident/problem/change reference impacted services/CIs via the affected-CI and impacted-service relationships (`task_ci`, `cmdb_ci` references, business-service impact). *(citation: `markdown/it-service-management/incident-management/csdm-inc-mgt-form-configure.md`)*
 - **CSM** — customer-facing products and **install base** map to CSDM via the install-base framework; cases relate to the product/asset and, through it, to the service layer. *(citation: `markdown/customer-service-management/csdm-framework-for-install-base-management.md`)*
 
-The integration's job is to ensure both domains point at the same `cmdb_ci_service_*` records — **not** to create a bridging custom table. That bridging-table reflex is the single most important anti-pattern to block in this engagement.
+The integration's job is to ensure both domains point at the same `cmdb_ci_service_*` records — **not** to create a bridging custom table. That bridging-table reflex is the single most important anti-pattern to block in a cross-domain engagement.
 
 ---
 

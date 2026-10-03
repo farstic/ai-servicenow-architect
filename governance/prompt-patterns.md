@@ -54,10 +54,10 @@ Conventions:
 ---
 
 ### PP-03: Confidentiality firewall reset
-**When to use:** You realise you've pasted client-specific content into the Master Project. Use immediately to clear context and confirm the firewall is intact.
+**When to use:** You realise you've pasted one client's content into a session working on another engagement, or into a shared file. Use immediately to confirm the firewall is intact.
 
 **Template:**
-> The previous message contained client-specific content and was posted in the Master Project by mistake. Confirm the confidentiality firewall and tell me which satellite project I should move to. Do not echo the content back.
+> The previous message contained client-specific content in the wrong place. Confirm the confidentiality firewall: name the `clients/<name>/` folder this content belongs to, say whether anything was written outside it, and stop work on the current engagement until I confirm which one this session is for. Do not echo the content back.
 
 **Example (filled):**
 *(Use as-is, no placeholders.)*

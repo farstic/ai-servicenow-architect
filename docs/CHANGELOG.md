@@ -16,6 +16,13 @@ middle of the wait with `Detected unsettled top-level await` and exit 13, before
 printed a single line. The pause now holds the process, so the run retries as designed and ends the way
 it should — exit 3 and its reasons, if the network is still down.
 
+**The specialists now say what the bundled documentation says.** A prompt audit of the engine's roster found
+facts its own corpus contradicts and instructions written for an older setup, and snowarch's copies carried
+the same text. The sub-agents verify platform behaviour by reading the local corpus rather than fetching
+pages from GitHub; their confidentiality rule is the engagement folder; a new scoped app is never a design's
+default; and every delivered figure is an editable draw.io file. Several citations, table names and one
+worked example were corrected with it.
+
 ### Fixed
 
 - A bootstrap whose network preflight needed a retry no longer ends with exit 13 and `Detected unsettled
@@ -26,6 +33,18 @@ it should — exit 3 and its reasons, if the network is still down.
   time limit and the banner's watchdog were timers the process did not wait for, so a check or a re-run
   that hung on nothing ended the run with exit 13 and nothing printed — no report, or no banner — instead
   of saying that it timed out.
+- The specialists cite what the corpus says. The ITOM gateway names the CSDM v5 service tables, the ITSM
+  gateway cites the Major Incident Workbench Communicate tab for major-incident communications, the
+  Technical Designer defaults to the baseline scope rather than a new scoped app, and the CSM escalation
+  example and the user guide carry a correction: the escalation table they called unavailable is baseline
+  in Australia.
+
+### Changed
+
+- The nine sub-agents read the local documentation corpus to verify platform behaviour, and never fetch it
+  from GitHub; their confidentiality rule is folder discipline under `clients/<name>/`.
+- The Diagramming Specialist delivers every figure as an editable draw.io file with an SVG or PNG export;
+  Mermaid is a draft only, and the HLD/LLD Writer takes its figures from it.
 
 ## 2.0.9 — 2026-10-01
 
