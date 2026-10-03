@@ -76,13 +76,13 @@ If a path is unavailable in the Australia branch, flag explicitly:
 
 > *Citation unavailable in Australia branch — verify against engagement's actual release.*
 
-### Release-family awareness — CSDM v5 table renames (critical)
+### Release-family awareness — CSDM v5 service relabels (critical)
 
-The Australia release family ships **CSDM v5**, which renamed core service tables. Use the v5 names and flag the legacy name when it aids the reader:
+The Australia release family ships **CSDM v5**, which relabelled core service tables without renaming them *(citation: `markdown/servicenow-platform/common-service-data-model-csdm/manage-tech-servs-domain.md`)*. Use the v5 labels and flag the legacy label when it aids the reader:
 
-| CSDM v5 concept | v5 table | Legacy name (pre-v5) |
+| CSDM v5 concept | Table | Legacy label (pre-v5) |
 |---|---|---|
-| Technology management service | `cmdb_ci_service_technical` | "Technical service" / `cmdb_ci_service_technical_service` |
+| Technology management service | `cmdb_ci_service_technical` | "Technical service" |
 | Service Instance | `cmdb_ci_service_auto` | "Application service" |
 | Business service | `cmdb_ci_service_business` | (business service) |
 | Business Application | `cmdb_ci_business_app` | (note: **not** `cmdb_ci_app`) |
@@ -98,7 +98,7 @@ Fire automatically when the user request mentions any of:
 
 **Process triggers:** CSDM, CSDM phase / stage, Foundation / Crawl / Walk / Run / Fly, CSDM domain, conceptual model, service portfolio alignment, CMDB design, CMDB Health, CI class modelling, CI Class Manager, install base, install base management, service mapping *model* (vs execution), business service, technology management service, technical service, service instance, application service, business application, service offering.
 
-**Table triggers:** `cmdb_ci` (as a *modelling* question), `cmdb_ci_*` class selection, `cmdb_rel_ci` (relationship modelling), `cmdb_ci_service`, `cmdb_ci_service_business`, `cmdb_ci_service_technical`, `cmdb_ci_service_auto`, `cmdb_ci_business_app`, `cmdb_ci_information_object`, `cmdb_identification_rule`, `cmdb_rel_type`, install-base instance (`alm_*` ↔ CI linkage).
+**Table triggers:** `cmdb_ci` (as a *modelling* question), `cmdb_ci_*` class selection, `cmdb_rel_ci` (relationship modelling), `cmdb_ci_service`, `cmdb_ci_service_business`, `cmdb_ci_service_technical`, `cmdb_ci_service_auto`, `cmdb_ci_business_app`, `cmdb_ci_information_object`, `cmdb_identifier`, `cmdb_rel_type`, install-base instance (`alm_*` ↔ CI linkage).
 
 **Concept triggers:** identifier, identification rule, reconciliation rule, dedup / duplicate CI (as *design*), CI relationship type, service-to-CI relationship, impact tree, dependency map (as model), CSDM maturity, CMDB Health score, completeness / correctness / compliance dashboard.
 
@@ -158,7 +158,7 @@ You are bound by §1.1. CSDM intensifies it: the model is prescriptive, so devia
 - **Off-model service tables** — bespoke tables that sit beside `cmdb_ci_service_business` / `cmdb_ci_service_technical` / `cmdb_ci_service_auto` rather than using them.
 - **Custom relationship tables** that duplicate `cmdb_rel_ci` semantics, or custom `cmdb_rel_type` records used to invent relationships not in the CSDM model.
 - **Custom dedup logic** in Business Rules or Script Includes that bypass IRE.
-- **Custom CMDB Health rules tables** — `cmdb_health` dashboard rules cover completeness / correctness / compliance.
+- **Custom CMDB Health rules tables** — baseline CMDB Health (`cmdb_health_metric`, `cmdb_health_orphan_rule`, `cmdb_health_scorecard`) covers completeness / correctness / compliance *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/r_TablesInstalledCMDBHealth.md`)*.
 
 ### Baseline-first is the standing default
 
@@ -167,8 +167,8 @@ For every component, first evaluate whether baseline serves the requirement:
 1. **Baseline CI class hierarchy** — the `cmdb_ci` tree is extensive (`cmdb_ci_hardware`, `cmdb_ci_computer`, `cmdb_ci_server`, `cmdb_ci_appl`, `cmdb_ci_database`, `cmdb_ci_network_*`, `cmdb_ci_cloud_*`).
 2. **Baseline CSDM service tables** — `cmdb_ci_service_business`, `cmdb_ci_service_technical`, `cmdb_ci_service_auto`, `cmdb_ci_business_app`, `cmdb_ci_information_object`.
 3. **Baseline relationship types** — `cmdb_rel_type` records (e.g., "Depends on::Used by", "Runs on::Runs", "Consumes::Consumed by"). Use designed CSDM relationships only.
-4. **IRE rules** — `cmdb_identification_rule` and reconciliation rules.
-5. **CMDB Health** — `cmdb_health` dashboard rules for completeness/correctness/compliance.
+4. **IRE rules** — identification rules (`cmdb_identifier`, with its prioritised entries in `cmdb_identifier_entry`) and reconciliation rules (`cmdb_reconciliation_definition`) *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/r_IWIdentAndReconcil.md`)*.
+5. **CMDB Health** — `cmdb_health_metric` and the baseline health rules for completeness/correctness/compliance *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/r_TablesInstalledCMDBHealth.md`)*.
 6. **CSDM stage discipline** — do not model Run/Fly constructs while the engagement is at Crawl; premature service modelling is a common anti-pattern.
 
 **Baseline solutions are accepted without further approval.**
@@ -316,7 +316,7 @@ CSDM is implemented in stages, each building on the previous: **Foundation → C
 
 ### Concern 4 — IRE (Identification and Reconciliation Engine) — design, not execution
 
-- **Identification rule** (`cmdb_identification_rule`) — which fields identify a CI within a class; multiple identifiers tried in order; independent vs dependent identifiers (e.g., a database instance is dependent on its host server).
+- **Identification rule** (Identifier [`cmdb_identifier`]; its entries, Identifier Entry [`cmdb_identifier_entry`], carry the priorities *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/r_IWIdentAndReconcil.md`)*) — which fields identify a CI within a class; multiple entries tried in priority order; independent vs dependent identifiers (e.g., a database instance is dependent on its host server).
 - **Reconciliation rule** — which data source may update which field; per-field source precedence keyed off `discovery_source`.
 
 This skill designs the *rules*; the ITOM/Discovery Specialist owns how Discovery *feeds* them. **Custom dedup logic in Business Rules is a §1.1 violation — configure IRE instead.**
@@ -336,7 +336,7 @@ The integration's job is to ensure both domains point at the same `cmdb_ci_servi
 
 ### CMDB Health — lightweight
 
-Completeness / correctness / compliance scoring via `cmdb_health` dashboard rules. **Key point:** configure baseline Health rules; do not build a custom Health-rules table. *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/csdm-cmdb-foundations-dashboards.md`)*
+Completeness / correctness / compliance scoring via the baseline CMDB Health tables (`cmdb_health_metric`, `cmdb_health_scorecard`). **Key point:** configure baseline Health rules; do not build a custom Health-rules table. *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/c_CMDBHealth.md`, `markdown/servicenow-platform/configuration-management-database-cmdb/r_TablesInstalledCMDBHealth.md`)*
 
 ### Install-base management — lightweight
 
@@ -358,7 +358,7 @@ CSDM v5 uses `life_cycle_stage` + `life_cycle_stage_status` pairs, synchronised 
 | Custom relationship table or invented `cmdb_rel_type` | Off-model relationship breaks impact trees and dependency views | Use designed CSDM relationships in `cmdb_rel_ci` | `markdown/servicenow-platform/common-service-data-model-csdm/csdm-conceptual-model.md` |
 | Business Application data in `cmdb_ci_app` | Wrong table per CSDM mapping | Use `cmdb_ci_business_app` | `markdown/servicenow-platform/common-service-data-model-csdm/csdm-to-cmdb-mapping.md` |
 | Custom dedup Business Rule | Bypasses IRE; creates duplicate/orphan CIs | Configure IRE identification + reconciliation | `markdown/servicenow-platform/configuration-management-database-cmdb/` |
-| Custom CMDB Health rules table | Duplicates `cmdb_health` dashboard | Configure baseline Health rules | `markdown/servicenow-platform/configuration-management-database-cmdb/csdm-cmdb-foundations-dashboards.md` |
+| Custom CMDB Health rules table | Duplicates baseline CMDB Health (`cmdb_health_metric`) | Configure baseline Health rules | `markdown/servicenow-platform/configuration-management-database-cmdb/r_TablesInstalledCMDBHealth.md` |
 | Modelling Run/Fly service constructs at Crawl stage | Premature; data not yet trustworthy | Respect stage sequence; defer to the appropriate stage | `markdown/servicenow-platform/common-service-data-model-csdm/csdm-implementation-stages.md` |
 | Custom field to "fix" inherited lifecycle stages on Business Application | The inheritance is working as designed | Leave as designed; filter in the view if needed | `markdown/servicenow-platform/common-service-data-model-csdm/csdm-to-cmdb-mapping.md` |
 | Referencing a pre-v5 service table name as current state | Australia is CSDM v5 | Use `cmdb_ci_service_technical` / `cmdb_ci_service_auto` | `markdown/servicenow-platform/common-service-data-model-csdm/csdm-conceptual-model.md` |

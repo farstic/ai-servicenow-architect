@@ -113,7 +113,7 @@ For inbound (e.g., monitoring tool creating incidents):
 
 1. Endpoint: `/api/x_acme_itsm/inbound/incident` versioned via path (`/v1/`).
 2. Auth: OAuth2 client credentials, scope-restricted role `x_acme_itsm.api_inbound`.
-3. Payload: JSON, max 64KB, schema-validated against `incident_inbound_v1.schema.json`.
+3. Payload: JSON, max 64KB, schema-validated against `inbound_incident_v1.schema.json`.
 4. Validation: schema check → role check → idempotency check (correlation_id dedup against the §1.1-approved ledger — `x_acme_itsm_inbound_ledger` here is an illustration, not a default) → create record.
 5. Response: 200 with sys_id on success, 4xx with structured error on validation/auth, 5xx on platform error.
 6. Rate limit: 1000 req/min per credential.

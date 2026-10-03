@@ -8,9 +8,10 @@
     "ARC-03-S04": "a dead citation repaired",
     "ARC-03-C4": "the corpus renamed CSM Configurable Workspace to CRM Workspace, and our prose followed it — 25 mentions across 9 files, first mention per file carrying the old name in parentheses",
     "ARC-03-C5": "a fact the cited page changed: the AI-native tier names and AI Control Tower's tier coverage, automatic entitlement assignment, and the record-trigger settings plus the reactivation re-run warning",
-    "ARC-09-C78": "the 2026-10-03 prompt-audit port: sub-agents read the local corpus instead of fetching it, the confidentiality rule is folder discipline, the baseline scope is the default, the dead override sentence and the duplicated citation rows removed, the phase labels dropped, the CSDM v5 names and the MI Workbench citation, every delivered figure draw.io, and the CSM Example 3 correction"
+    "ARC-09-C78": "the 2026-10-03 prompt-audit port: sub-agents read the local corpus instead of fetching it, the confidentiality rule is folder discipline, the baseline scope is the default, the dead override sentence and the duplicated citation rows removed, the phase labels dropped, the CSDM v5 names and the MI Workbench citation, every delivered figure draw.io, and the CSM Example 3 correction",
+    "ARC-09-C81": "the 2026-10-04 identifier check: each ServiceNow name the corpus does not have replaced by the corpus name, cited, or renamed into the example's own u_/x_ namespace, and the sentence that carried it corrected where the corpus contradicts it (classic approval rules replaced, CSDM v5 relabelled rather than renamed, SLA business time on a schedule)"
   },
-  "_measured": "50 of 65 bodies differ (15 identical), 2026-10-04, against import/engine-v2.8.0-worktree. The three newly differing are skills/technical-designer/EXAMPLES.md, skills/diagramming-specialist/EXAMPLES.md and skills/now-assist-specialist/EXAMPLES.md, which ARC-09-C78's phase-label and draw.io wording reached and no earlier change had.",
+  "_measured": "52 of 65 bodies differ (13 identical), 2026-10-04, against import/engine-v2.8.0-worktree. The two newly differing are skills/flow-designer-specialist/EXAMPLES.md and skills/integration-specialist/EXAMPLES.md, which ARC-09-C81's identifier corrections reached and no earlier change had.",
   "files": {
     "agents/atf-author.md": [
       "ARC-02-S06",
@@ -72,13 +73,15 @@
       "ARC-03-S04"
     ],
     "skills/cmdb-csdm-specialist/EXAMPLES.md": [
-      "ARC-03-S04"
+      "ARC-03-S04",
+      "ARC-09-C81"
     ],
     "skills/cmdb-csdm-specialist/SKILL.md": [
       "ARC-02-S03",
       "ARC-02-S06",
       "ARC-03-S04",
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C81"
     ],
     "skills/code-reviewer/SKILL.md": [
       "ARC-02-S03",
@@ -126,7 +129,8 @@
     ],
     "skills/hld-lld-writer/EXAMPLES.md": [
       "ARC-03-C4",
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C81"
     ],
     "skills/hld-lld-writer/SKILL.md": [
       "ARC-02-S03",
@@ -141,26 +145,31 @@
     "skills/integration-specialist/SKILL.md": [
       "ARC-02-S03",
       "ARC-02-S06",
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C81"
     ],
     "skills/itom-discovery-specialist/EXAMPLES.md": [
-      "ARC-02-S12"
+      "ARC-02-S12",
+      "ARC-09-C81"
     ],
     "skills/itom-discovery-specialist/SKILL.md": [
       "ARC-02-S03",
       "ARC-02-S06",
       "ARC-02-S12",
       "ARC-03-S04",
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C81"
     ],
     "skills/itsm-specialist/EXAMPLES.md": [
-      "ARC-02-S06"
+      "ARC-02-S06",
+      "ARC-09-C81"
     ],
     "skills/itsm-specialist/SKILL.md": [
       "ARC-02-S03",
       "ARC-02-S06",
       "ARC-03-S04",
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C81"
     ],
     "skills/licensing-specialist/EXAMPLES.md": [
       "ARC-02-S06",
@@ -174,7 +183,8 @@
     "skills/migration-specialist/SKILL.md": [
       "ARC-02-S03",
       "ARC-02-S06",
-      "ARC-03-S04"
+      "ARC-03-S04",
+      "ARC-09-C81"
     ],
     "skills/now-assist-genai/EXAMPLES.md": [
       "ARC-03-S04"
@@ -238,7 +248,14 @@
       "ARC-09-C78"
     ],
     "skills/now-assist-specialist/EXAMPLES.md": [
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C81"
+    ],
+    "skills/flow-designer-specialist/EXAMPLES.md": [
+      "ARC-09-C81"
+    ],
+    "skills/integration-specialist/EXAMPLES.md": [
+      "ARC-09-C81"
     ]
   }
 }

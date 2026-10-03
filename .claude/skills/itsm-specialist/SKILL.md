@@ -183,7 +183,7 @@ One of three recommendations to the orchestrator:
 
 Universal ITSM anti-patterns (always include if the relevant concept is in scope):
 
-- "Do not duplicate baseline assignment logic in custom BRs — use baseline `assignment_rule` records or Data Lookup Definitions. *(citation: `markdown/it-service-management/incident-management/t_DefinAnAssignRuleIncidents.md`)*"
+- "Do not duplicate baseline assignment logic in custom BRs — use baseline assignment rules (Assignment Rule [`sysrule_assignment`] records *(citation: `markdown/it-service-management/on-call-scheduling/tables-oob-oncall.md`)*) or Data Lookup Definitions. *(citation: `markdown/it-service-management/incident-management/t_DefinAnAssignRuleIncidents.md`)*"
 - "Do not extend `incident.state` with new values without a documented impact analysis on SLA definitions, notifications, reports, and Performance Analytics indicators that depend on the state vocabulary."
 - "Do not create a custom on-call structure — use baseline `cmn_rota`, `cmn_schedule_span`, `cmn_rota_member`. *(citation: `markdown/it-service-management/on-call-scheduling/c_OnCallSchedulingConcepts.md`)*"
 - "Do not duplicate baseline notification logic in a custom BR — extend the baseline notification record by adding a condition or modifying the template."
@@ -248,7 +248,7 @@ Universal ITSM anti-patterns (always include if the relevant concept is in scope
 
 ### SLA definitions and breach tracking
 
-**Tables:** `contract_sla` (SLA definitions), `task_sla` (per-task SLA progress), `business_calendar_table` (business hours).
+**Tables:** `contract_sla` (SLA definitions), `task_sla` (per-task SLA progress), `cmn_schedule` (business hours: the schedule during which an SLA accumulates business time *(citation: `markdown/application-development/servicenow-sdk/fluent-sla-api.md`)*).
 
 **Stages a Task SLA moves through**, as the docs name them: **In Progress**, **Paused**, **Achieved**, **Breached**, **Completed**, **Cancelled** (citation: `markdown/it-service-management/service-level-management/c_SLAProcessing.md`; **Achieved** and **Breached** together in `markdown/it-service-management/service-level-management/sla-timer.md`). **These are the labels the documentation uses; it does not publish the stored values.** Check the choice list on the instance before writing a query against `task_sla.stage`, and never assume the stored value is the label lower-cased.
 
@@ -258,7 +258,7 @@ Universal ITSM anti-patterns (always include if the relevant concept is in scope
 
 ### Assignment and routing
 
-**Tables:** `sys_user_group` (assignment groups), `sys_user_grmember` (group membership), `assignment_rule` (declarative routing rules), `dl_definition` + `dl_matcher` (Data Lookup Definitions).
+**Tables:** `sys_user_group` (assignment groups), `sys_user_grmember` (group membership), `sysrule_assignment` (assignment rules), `dl_definition` + `dl_matcher` (Data Lookup Definitions).
 
 **Resolution pattern:** when an incident is created, baseline assignment rules fire in `order` sequence. The first matching rule sets `incident.assignment_group`. If no rule matches, `incident.assignment_group` is left empty for manual assignment.
 
@@ -286,7 +286,7 @@ Cite each when invoking in a Part 5 list.
 |---|---|---|
 | Custom escalation table per group/tier | `cmn_rota` + `incident.assignment_group` + on-call resolution Script Include | `markdown/it-service-management/on-call-scheduling/c_OnCallSchedulingConcepts.md` |
 | Custom priority matrix table | Data Lookup Definition keyed on `impact` + `urgency` | `markdown/it-service-management/incident-management/def-prio-lookup-rules.md` |
-| Custom assignment-routing table | `assignment_rule` records | `markdown/it-service-management/incident-management/t_DefinAnAssignRuleIncidents.md` |
+| Custom assignment-routing table | `sysrule_assignment` records | `markdown/it-service-management/incident-management/t_DefinAnAssignRuleIncidents.md` |
 | Custom SLA pause/resume logic in BRs | Baseline `task_sla` pause/resume conditions on `contract_sla` definitions | `markdown/it-service-management/service-level-management/service-level-management-concepts.md` |
 | Custom MIM table | Baseline MIM fields on `incident` + MIM Workbench | `markdown/it-service-management/incident-management/major-incident-overview.md` |
 | Duplicated baseline notification in custom BR | Extend the baseline notification record | `markdown/platform-administration/c_EmailNotifications.md` |
