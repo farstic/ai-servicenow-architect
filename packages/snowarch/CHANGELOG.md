@@ -7,11 +7,13 @@ All notable changes to this project are documented here. This project adheres to
 
 **Known gaps, raised not closed: the cut-value check (ARC-09-C93) does not see every write, and its
 premise is not yet confirmed live.** `snow_*` tools now return `warnings[].code = VALUE_TRUNCATED` when
-the platform's answer to a `createRecord` or `updateRecord` holds a shorter prefix of a string that was
-sent. Not checked, so an absent `warnings` key proves nothing: `batchRequest`
-(`snow_fluent_request_batch`), attachment upload, `createChangeRequest`, the Now Assist and catalogue
-POSTs, fields the response does not echo, and values that are not strings. In a playbook the warnings
-arrive on the playbook's result, not on the step. A write is still not refused before it is made.
+the platform's answer to a write holds a shorter prefix of a string that was sent: `createRecord` and
+`updateRecord`, the Batch API (`snow_fluent_request_batch`), attachment file names, `createChangeRequest`
+and a client copy made with `withUser` (ARC-09-C100). Not checked, so an absent `warnings` key proves
+nothing: the Now Assist and catalogue POSTs, which answer with the result of running something and not
+the record they wrote, fields the response does not echo, and values that are not strings. The list is
+capped at ten entries with a roll-up. In a playbook each step carries its own warnings and `on_error:
+'stop'` halts after a step that stored a cut value. A write is still not refused before it is made.
 That the response to a write on `sys_script`, and to a PATCH, carries the stored value is assumed (one
 POST on `sys_script_fix` was observed); `packages/snowarch/tests/live/README.md` has the run that
 settles it. The long form is `docs/PLATFORM-NOTES.md` PN-10, and the rows are ARC-09-C97 to C101 in

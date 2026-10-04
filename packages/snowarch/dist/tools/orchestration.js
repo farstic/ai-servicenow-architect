@@ -1,5 +1,6 @@
 import { ServiceNowError } from '../utils/errors.js';
 import { requireNowAssist, requireWrite } from '../utils/permissions.js';
+import { beginStep } from '../servicenow/stored-values.js';
 export function orchestrationToolManifest() {
     return [
         {
@@ -33,7 +34,9 @@ export function orchestrationToolManifest() {
         },
         {
             name: 'snow_orch_playbook_exec',
-            description: 'Execute a playbook step by step, passing results forward through context (requires NOW_ASSIST_ENABLED). Supports dry_run.',
+            description: 'Execute a playbook step by step, passing results forward through context (requires NOW_ASSIST_ENABLED). Supports dry_run. '
+                + 'A step whose writes stored a cut value, or whose result carries a warning, shows it on the step (`warnings`, tagged with the step) '
+                + 'and on the playbook result; under on_error "stop" (the default) the playbook halts there and says so in halted_at_step / halt_reason.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -51,7 +54,11 @@ export function orchestrationToolManifest() {
                                         tool_name: { type: 'string' },
                                         args_template: { type: 'object' },
                                         condition: { type: 'string' },
-                                        on_error: { type: 'string', enum: ['stop', 'skip', 'continue'] },
+                                        on_error: {
+                                            type: 'string', enum: ['stop', 'skip', 'continue'],
+                                            description: '"stop" (the default) ends the playbook after a step that fails or that returns a warning, '
+                                                + 'such as a write that stored a cut value; "skip" and "continue" go on to the next step.',
+                                        },
                                     },
                                     required: ['tool_name', 'args_template'],
                                 },
@@ -239,6 +246,7 @@ export async function dispatchOrchestrationAction(client, name, args) {
             const context = args.context || {};
             const dryRun = args.dry_run !== false;
             const stepResults = [];
+            let halted;
             // Dynamically import routeToolInvocation for live execution
             let routeToolInvocation;
             if (!dryRun) {
@@ -273,31 +281,58 @@ export async function dispatchOrchestrationAction(client, name, args) {
                     });
                     continue;
                 }
-                // Execute the step
+                // Execute the step. `beginStep` marks where this step's writes start, so a cut value is
+                // attributed to the step that stored it rather than arriving on the playbook with no owner.
+                const scope = beginStep(client);
                 const startTime = Date.now();
+                let result;
+                let failure;
+                let failed = false;
                 try {
-                    const result = await routeToolInvocation(client, step.tool_name, resolvedArgs);
-                    stepResults.push({
-                        step_index: i,
-                        tool_name: step.tool_name,
-                        status: 'executed',
-                        result,
-                        duration_ms: Date.now() - startTime,
-                    });
+                    result = await routeToolInvocation(client, step.tool_name, resolvedArgs);
                 }
                 catch (err) {
-                    const errorMsg = err instanceof ServiceNowError ? err.message : String(err);
+                    failed = true;
+                    failure = err;
+                }
+                // Whether the step returned or threw: a tool that wrote and then failed has still written.
+                const cuts = scope ? await scope.end({ step: i, tool: step.tool_name }) : [];
+                const withCuts = cuts.length > 0 ? { warnings: cuts } : {};
+                if (failed) {
                     stepResults.push({
                         step_index: i,
                         tool_name: step.tool_name,
                         status: 'error',
-                        error: errorMsg,
+                        error: failure instanceof ServiceNowError ? failure.message : String(failure),
+                        ...withCuts,
                         duration_ms: Date.now() - startTime,
                     });
                     if (onError === 'stop') {
                         break;
                     }
                     // 'skip' and 'continue' both move to the next step
+                    continue;
+                }
+                stepResults.push({
+                    step_index: i,
+                    tool_name: step.tool_name,
+                    status: 'executed',
+                    result,
+                    ...withCuts,
+                    duration_ms: Date.now() - startTime,
+                });
+                // `stop` means "do not go on past a step that did not do what was asked". A write that stored
+                // less than it was sent did not, the playbook cannot take it back, and the next step usually
+                // builds on the record that was just written. A warning the tool put on its own result counts
+                // the same way. `continue` and `skip` go on, with the warning on the step.
+                const ownWarnings = Array.isArray(result?.warnings) ? result.warnings.length : 0;
+                if (onError === 'stop' && (cuts.length > 0 || ownWarnings > 0)) {
+                    halted = {
+                        step: i,
+                        reason: `Step ${i} (${step.tool_name}) ${cuts.length > 0 ? 'stored a cut value' : 'returned a warning'}; `
+                            + 'on_error "stop" does not run the steps after it. Set on_error to "continue" for a step whose warning is acceptable.',
+                    };
+                    break;
                 }
             }
             return {
@@ -307,6 +342,7 @@ export async function dispatchOrchestrationAction(client, name, args) {
                 executed: stepResults.filter(s => s.status === 'executed').length,
                 skipped: stepResults.filter(s => s.status === 'skipped').length,
                 errors: stepResults.filter(s => s.status === 'error').length,
+                ...(halted ? { halted_at_step: halted.step, halt_reason: halted.reason } : {}),
                 steps: stepResults,
             };
         }

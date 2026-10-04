@@ -371,8 +371,9 @@ async function dispatchTool(
  * The client is wrapped for this one invocation. The wrapper only RECORDS a cut it sees (no I/O), and
  * once the tool has returned — or thrown — `settle` reads the dictionary for the cut columns and the
  * warnings go onto the result as `warnings`, or onto the error of a tool that failed after it wrote.
- * A tool needs no edit for its createRecord and updateRecord calls to be covered; calls the wrapper
- * does not see (the Batch API, attachments) are listed in the module header. The instance-free core
+ * A tool needs no edit for its writes to be covered (createRecord, updateRecord, the Batch API,
+ * attachments, change requests, a `withUser` copy); what the wrapper cannot compare is listed in the
+ * module header. The instance-free core
  * tools arrive with no client and are dispatched as they were. An invocation that arrives holding an
  * already wrapped client (an orchestration step) joins the outer one, which reports for all of them.
  */

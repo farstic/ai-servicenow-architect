@@ -46,9 +46,16 @@
  * on `task`): there is no row under the child's name, so those warnings stay `confirmed: false`, and
  * a benign normalisation on such a column is not suppressed. That is a known gap (PN-10).
  *
- * WHAT IT DOES NOT SEE. Only `createRecord` and `updateRecord` are checked. Not checked:
- * `batchRequest` (`snow_fluent_request_batch`), `uploadAttachment`, `createChangeRequest`, the Now
- * Assist and catalogue POSTs, and a client copy made with `withUser`. Only STRING values are compared.
+ * WHAT IT SEES (ARC-09-C100). `createRecord` and `updateRecord`, and the other methods that send a
+ * write and get the stored record back: `batchRequest` (`snow_fluent_request_batch`: each POST, PATCH
+ * or PUT to `/api/now/table/<table>[/<sys_id>]` that the platform answered 2xx), `uploadAttachment`
+ * (the `file_name` of the `sys_attachment` row), `createChangeRequest`, and a client copy made with
+ * `withUser`, which shares the invocation's list.
+ *
+ * WHAT IT DOES NOT SEE. `callNowAssist` and the catalogue order: they POST to something that RUNS and
+ * answers with the result of running it, not with the record that was written, so there is no stored
+ * value to compare a sent one with. A batch operation on a path that is not the Table API is the same.
+ * Only STRING values are compared.
  * A field the response does not echo (a journal field, a password, a column the account can write but
  * not read) can never warn, so an absent `warnings` key is not proof that nothing was cut.
  *
@@ -82,7 +89,26 @@ export interface CutValueWarning {
     /** True when the dictionary stated the limit and it explains the cut. False means inferred. */
     confirmed: boolean;
     message: string;
+    /** Set when the write was made by a step of a playbook: the step's index and the tool it ran. */
+    step?: number;
+    tool?: string;
 }
+/**
+ * What stands in for the warnings past the first nine (`capWarnings`): how many writes, on which
+ * tables and fields. It is shaped like a warning (a known `code`, a `table` when there is one) and
+ * carries a `count`, so the audit summary still counts every write.
+ */
+export interface CutValueRollup {
+    code: 'VALUE_TRUNCATED';
+    rollup: true;
+    count: number;
+    table?: string;
+    tables: string[];
+    fields: string[];
+    message: string;
+}
+/** The most warnings a result carries: nine whole ones and a roll-up, or ten whole ones. */
+export declare const MAX_WARNINGS = 10;
 /** Count code points without allocating an array — a script field can be tens of kilobytes. */
 export declare function lengthOf(s: string): number;
 /**
@@ -171,6 +197,35 @@ export interface Verified {
  * one, so a cut is reported once, on the outermost result.
  */
 export declare function withWriteVerification(client: ServiceNowClient): Verified;
+export interface StepScope {
+    /**
+     * Settle the writes made since the scope began and return THEIR warnings, tagged with the step and
+     * the tool. They stay in the invocation's list, so the outermost result still reports every write
+     * once. A second call returns `[]`.
+     */
+    end(meta: {
+        step: number;
+        tool: string;
+    }, budgetMs?: number): Promise<CutValueWarning[]>;
+}
+/**
+ * Begin attributing writes to one step of a playbook (ARC-09-C100). Without this the warnings of
+ * every step arrive together on the playbook's result, with no sign of which step wrote the cut value.
+ * Returns `null` for a client that is not a wrapper (a direct call with no invocation around it): there
+ * is nothing to attribute and the caller carries on as it did.
+ */
+export declare function beginStep(client: ServiceNowClient): StepScope | null;
+/**
+ * At most `MAX_WARNINGS` entries: the first nine whole, then ONE roll-up for everything after them
+ * (how many writes, on which tables and fields). A bulk tool can store a cut value in every record it
+ * writes - `snow_deploy_cmdb_data_import` takes 50 - and a whole warning is about 700 characters, so
+ * fifty of them put ~36 KB ahead of the result the caller asked for, in the first key, which is the
+ * last thing a size ceiling cuts. The owner still holds every warning, the audit trail counts them
+ * through the roll-up's `count`, and the roll-up says how many it stands for.
+ */
+export declare function capWarnings<T extends {
+    code: string;
+}>(warnings: T[]): Array<T | CutValueRollup>;
 /**
  * Put the warnings on the result the caller reads. A plain-object result gains a `warnings` array
  * (any warnings the tool already produced stay ahead of ours). Anything else — an array, a string, a
@@ -182,7 +237,7 @@ export declare function withWriteVerification(client: ServiceNowClient): Verifie
  * the END of its text (`capResult`, strategy `chars`), so a warning appended last is the first thing
  * a large result loses — and a large result is the script body whose cut matters most.
  */
-export declare function attachWarnings(result: unknown, warnings: CutValueWarning[]): unknown;
+export declare function attachWarnings(result: unknown, all: CutValueWarning[]): unknown;
 /**
  * Hang the warnings off an error that is about to be thrown, so the layer that renders it can say
  * that an earlier write in the same call stored a cut value. A non-enumerable symbol key: it is not
@@ -190,7 +245,7 @@ export declare function attachWarnings(result: unknown, warnings: CutValueWarnin
  */
 export declare function carryWarningsOnError(error: unknown, warnings: CutValueWarning[]): void;
 /** The warnings an error carries out of a tool that wrote before it threw, or `[]`. */
-export declare function carriedWarnings(error: unknown): CutValueWarning[];
+export declare function carriedWarnings(error: unknown): Array<CutValueWarning | CutValueRollup>;
 /**
  * One sentence about cuts that happened before a tool threw, or `''`. Server-built from the warnings;
  * it never repeats the error's own text and never contains a `(Code: …)` marker, which the session

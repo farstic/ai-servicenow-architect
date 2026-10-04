@@ -46,9 +46,16 @@
  * on `task`): there is no row under the child's name, so those warnings stay `confirmed: false`, and
  * a benign normalisation on such a column is not suppressed. That is a known gap (PN-10).
  *
- * WHAT IT DOES NOT SEE. Only `createRecord` and `updateRecord` are checked. Not checked:
- * `batchRequest` (`snow_fluent_request_batch`), `uploadAttachment`, `createChangeRequest`, the Now
- * Assist and catalogue POSTs, and a client copy made with `withUser`. Only STRING values are compared.
+ * WHAT IT SEES (ARC-09-C100). `createRecord` and `updateRecord`, and the other methods that send a
+ * write and get the stored record back: `batchRequest` (`snow_fluent_request_batch`: each POST, PATCH
+ * or PUT to `/api/now/table/<table>[/<sys_id>]` that the platform answered 2xx), `uploadAttachment`
+ * (the `file_name` of the `sys_attachment` row), `createChangeRequest`, and a client copy made with
+ * `withUser`, which shares the invocation's list.
+ *
+ * WHAT IT DOES NOT SEE. `callNowAssist` and the catalogue order: they POST to something that RUNS and
+ * answers with the result of running it, not with the record that was written, so there is no stored
+ * value to compare a sent one with. A batch operation on a path that is not the Table API is the same.
+ * Only STRING values are compared.
  * A field the response does not echo (a journal field, a password, a column the account can write but
  * not read) can never warn, so an absent `warnings` key is not proof that nothing was cut.
  *
@@ -84,7 +91,28 @@ export interface CutValueWarning {
   /** True when the dictionary stated the limit and it explains the cut. False means inferred. */
   confirmed: boolean;
   message: string;
+  /** Set when the write was made by a step of a playbook: the step's index and the tool it ran. */
+  step?: number;
+  tool?: string;
 }
+
+/**
+ * What stands in for the warnings past the first nine (`capWarnings`): how many writes, on which
+ * tables and fields. It is shaped like a warning (a known `code`, a `table` when there is one) and
+ * carries a `count`, so the audit summary still counts every write.
+ */
+export interface CutValueRollup {
+  code: 'VALUE_TRUNCATED';
+  rollup: true;
+  count: number;
+  table?: string;
+  tables: string[];
+  fields: string[];
+  message: string;
+}
+
+/** The most warnings a result carries: nine whole ones and a roll-up, or ten whole ones. */
+export const MAX_WARNINGS = 10;
 
 /** Count code points without allocating an array — a script field can be tens of kilobytes. */
 export function lengthOf(s: string): number {
@@ -352,57 +380,13 @@ export function withWriteVerification(client: ServiceNowClient): Verified {
   if (existing) return { client, owner: false, settle: async () => [] };
 
   const state: State = { pending: [], warnings: [] };
-
-  const record = (
-    operation: 'create' | 'update', table: string, sysId: string | undefined,
-    sent: unknown, stored: unknown,
-  ): void => {
-    try {
-      if (!isObject(sent) || !isObject(stored)) return;
-      const cuts = findCuts(sent, stored);
-      if (cuts.length === 0) return;
-      const id = sysId ?? (typeof stored.sys_id === 'string' ? stored.sys_id : undefined);
-      state.pending.push({ operation, table, sysId: id, live: isTrue(sent.active) || isTrue(stored.active), cuts });
-    } catch (e) {
-      // A check on a write that SUCCEEDED must never turn it into a failure.
-      logger.warn(`write verification skipped for ${table}: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
-  const proxy = new Proxy(client as unknown as object, {
-    get(target, prop) {
-      if (prop === 'createRecord') {
-        return async (table: string, data: Record<string, unknown>) => {
-          const stored = await (target as ServiceNowClient).createRecord(table, data);
-          record('create', table, undefined, data, stored);
-          return stored;
-        };
-      }
-      if (prop === 'updateRecord') {
-        return async (table: string, sysId: string, data: Record<string, unknown>) => {
-          const stored = await (target as ServiceNowClient).updateRecord(table, sysId, data);
-          record('update', table, sysId, data, stored);
-          return stored;
-        };
-      }
-      const value = Reflect.get(target, prop, target);
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  }) as unknown as ServiceNowClient;
-
-  wrapped.set(proxy as unknown as object, state);
+  const proxy = wrapClient(client, state);
 
   const settle = async (budgetMs: number = SETTLE_BUDGET_MS): Promise<CutValueWarning[]> => {
     const batch = state.pending.splice(0);
     if (batch.length === 0) return state.warnings;
-    const limits = await readLimits(client, batch, budgetMs);
-    let explainedAway = 0;
-    for (const p of batch) {
-      for (const cut of p.cuts) {
-        const w = reconcile(p, cut, limits.get(key(p.table, cut.field)) ?? null);
-        if (w) state.warnings.push(w); else explainedAway += 1;
-      }
-    }
+    const { warnings, explainedAway } = await reconcileBatch(client, batch, budgetMs);
+    state.warnings.push(...warnings);
     // A trace for the server's own log; tables and counts only, never a value.
     if (state.warnings.length > 0) {
       logger.warn(`${state.warnings.length} write(s) stored a cut value (tables: ${[...new Set(state.warnings.map((w) => w.table))].join(', ')})`);
@@ -416,6 +400,194 @@ export function withWriteVerification(client: ServiceNowClient): Verified {
   return { client: proxy, owner: true, settle };
 }
 
+/** Compare what a write sent with what the platform answered, and queue a cut for `settle`. Never throws. */
+function record(
+  state: State, operation: 'create' | 'update', table: string, sysId: string | undefined,
+  sent: unknown, stored: unknown,
+): void {
+  try {
+    if (!isObject(sent) || !isObject(stored)) return;
+    const cuts = findCuts(sent, stored);
+    if (cuts.length === 0) return;
+    const id = sysId ?? (typeof stored.sys_id === 'string' ? stored.sys_id : undefined);
+    state.pending.push({ operation, table, sysId: id, live: isTrue(sent.active) || isTrue(stored.active), cuts });
+  } catch (e) {
+    // A check on a write that SUCCEEDED must never turn it into a failure.
+    logger.warn(`write verification skipped for ${table}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+/** `/api/now/table/<table>` or `/api/now/table/<table>/<sys_id>`, with an optional version and query. */
+const TABLE_PATH = /^\/?api\/now(?:\/v\d+)?\/table\/([A-Za-z][A-Za-z0-9_]*)(?:\/([0-9a-f]{32}))?\/?$/i;
+
+function tableTarget(url: unknown): { table: string; sysId?: string } | null {
+  if (typeof url !== 'string') return null;
+  const m = TABLE_PATH.exec(url.split('#')[0]!.split('?')[0]!);
+  return m ? { table: m[1]!, ...(m[2] ? { sysId: m[2] } : {}) } : null;
+}
+
+/**
+ * The answer's body as an object, whatever shape it arrived in. The documented API sends
+ * `serviced_requests.body` Base64 encoded (`api-reference/rest-apis/batch-api.md`), and
+ * `client.batchRequest` passes it on undecoded because its `JSON.parse` fails on Base64; a parsed
+ * object (a mock, or a client that decoded it) and JSON text are read as they are. Anything that does
+ * not come out as an object is not a record to compare.
+ */
+function batchBody(body: unknown): Record<string, unknown> | undefined {
+  if (isObject(body)) return body;
+  if (typeof body !== 'string' || body === '') return undefined;
+  for (const text of [body, Buffer.from(body, 'base64').toString('utf8')]) {
+    try {
+      const parsed: unknown = JSON.parse(text);
+      if (isObject(parsed)) return parsed;
+    } catch { /* not JSON in this encoding */ }
+  }
+  return undefined;
+}
+
+/**
+ * The Batch API can write any table, and each answer in `results` echoes the stored record
+ * (`{ id, status_code, body: { result } }`). A write is checked when the platform answered 2xx for it,
+ * the request named a table path, and the method fits the path: POST to the table, PATCH or PUT to a
+ * record. Anything else - a GET, another API, a refused write - has no stored value to compare.
+ */
+function recordBatch(state: State, operations: unknown, answer: unknown): void {
+  try {
+    if (!Array.isArray(operations) || !isObject(answer) || !Array.isArray(answer.results)) return;
+    const byId = new Map<unknown, Record<string, unknown>>();
+    for (const op of operations) if (isObject(op) && !byId.has(op.id)) byId.set(op.id, op);
+    for (const r of answer.results) {
+      if (!isObject(r) || typeof r.status_code !== 'number' || r.status_code < 200 || r.status_code >= 300) continue;
+      const op = byId.get(r.id);
+      if (!op || typeof op.method !== 'string') continue;
+      const target = tableTarget(op.url);
+      if (!target) continue;
+      const method = op.method.toUpperCase();
+      const operation = method === 'POST' && !target.sysId ? 'create'
+        : (method === 'PATCH' || method === 'PUT') && target.sysId ? 'update' : null;
+      if (!operation) continue;
+      const stored = batchBody(r.body)?.result;
+      record(state, operation, target.table, target.sysId, op.body, stored);
+    }
+  } catch (e) {
+    logger.warn(`batch write verification skipped: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+/**
+ * The Proxy itself, shared by the invocation's client and by every copy made from it: a copy is a
+ * client of its own (`withUser` returns one) and a write through it is the same invocation's write.
+ */
+function wrapClient(client: ServiceNowClient, state: State): ServiceNowClient {
+  const proxy = new Proxy(client as unknown as object, {
+    get(target, prop) {
+      const real = target as ServiceNowClient;
+      if (prop === 'createRecord') {
+        return async (table: string, data: Record<string, unknown>) => {
+          const stored = await real.createRecord(table, data);
+          record(state, 'create', table, undefined, data, stored);
+          return stored;
+        };
+      }
+      if (prop === 'updateRecord') {
+        return async (table: string, sysId: string, data: Record<string, unknown>) => {
+          const stored = await real.updateRecord(table, sysId, data);
+          record(state, 'update', table, sysId, data, stored);
+          return stored;
+        };
+      }
+      const value = Reflect.get(target, prop, target);
+      if (typeof value !== 'function') return value;
+      if (prop === 'batchRequest') {
+        return async (operations: unknown) => {
+          const answer = await (value as (o: unknown) => Promise<unknown>).call(target, operations);
+          recordBatch(state, operations, answer);
+          return answer;
+        };
+      }
+      if (prop === 'uploadAttachment') {
+        return async (...args: unknown[]) => {
+          const stored = await (value as (...a: unknown[]) => Promise<unknown>).apply(target, args);
+          record(state, 'create', 'sys_attachment', undefined, { file_name: args[2] }, stored);
+          return stored;
+        };
+      }
+      if (prop === 'createChangeRequest') {
+        return async (params: unknown) => {
+          const stored = await (value as (p: unknown) => Promise<unknown>).call(target, params);
+          record(state, 'create', 'change_request', undefined, params, stored);
+          return stored;
+        };
+      }
+      if (prop === 'withUser') {
+        return (options: unknown) => wrapClient((value as (o: unknown) => ServiceNowClient).call(target, options), state);
+      }
+      return value.bind(target);
+    },
+  }) as unknown as ServiceNowClient;
+  wrapped.set(proxy as unknown as object, state);
+  return proxy;
+}
+
+/** Read the limits for a batch of pending cuts and reconcile each. Never rejects. */
+async function reconcileBatch(
+  client: Pick<ServiceNowClient, 'queryRecords'>, batch: Pending[], budgetMs: number,
+): Promise<{ warnings: CutValueWarning[]; explainedAway: number }> {
+  const limits = await readLimits(client, batch, budgetMs);
+  const warnings: CutValueWarning[] = [];
+  let explainedAway = 0;
+  for (const p of batch) {
+    for (const cut of p.cuts) {
+      const w = reconcile(p, cut, limits.get(key(p.table, cut.field)) ?? null);
+      if (w) warnings.push(w); else explainedAway += 1;
+    }
+  }
+  return { warnings, explainedAway };
+}
+
+// ─── A step of a larger call ─────────────────────────────────────────────────────────────────
+
+export interface StepScope {
+  /**
+   * Settle the writes made since the scope began and return THEIR warnings, tagged with the step and
+   * the tool. They stay in the invocation's list, so the outermost result still reports every write
+   * once. A second call returns `[]`.
+   */
+  end(meta: { step: number; tool: string }, budgetMs?: number): Promise<CutValueWarning[]>;
+}
+
+/**
+ * Begin attributing writes to one step of a playbook (ARC-09-C100). Without this the warnings of
+ * every step arrive together on the playbook's result, with no sign of which step wrote the cut value.
+ * Returns `null` for a client that is not a wrapper (a direct call with no invocation around it): there
+ * is nothing to attribute and the caller carries on as it did.
+ */
+export function beginStep(client: ServiceNowClient): StepScope | null {
+  const state = wrapped.get(client as unknown as object);
+  if (!state) return null;
+  const mark = state.pending.length;
+  let ended = false;
+  return {
+    async end(meta, budgetMs = SETTLE_BUDGET_MS) {
+      if (ended) return [];
+      ended = true;
+      const batch = state.pending.splice(mark);
+      if (batch.length === 0) return [];
+      try {
+        const { warnings } = await reconcileBatch(client, batch, budgetMs);
+        const tagged = warnings.map((w) => ({ ...w, step: meta.step, tool: meta.tool }));
+        state.warnings.push(...tagged);
+        return tagged;
+      } catch (e) {
+        // reconcileBatch does not reject; this is the second line. The writes stay unreported rather
+        // than the step failing for a check on a write that succeeded.
+        logger.warn(`step ${meta.step}: stored-value check failed: ${e instanceof Error ? e.message : String(e)}`);
+        return [];
+      }
+    },
+  };
+}
+
 // ─── Carrying the warnings out ───────────────────────────────────────────────────────────────
 
 /**
@@ -427,6 +599,47 @@ const isPlain = (v: unknown): v is Record<string, unknown> => {
   const proto = Object.getPrototypeOf(v);
   return proto === Object.prototype || proto === null;
 };
+
+const countOf = (w: object): number => {
+  const c = (w as { count?: unknown }).count;
+  return typeof c === 'number' && Number.isInteger(c) && c > 0 ? c : 1;
+};
+
+/**
+ * At most `MAX_WARNINGS` entries: the first nine whole, then ONE roll-up for everything after them
+ * (how many writes, on which tables and fields). A bulk tool can store a cut value in every record it
+ * writes - `snow_deploy_cmdb_data_import` takes 50 - and a whole warning is about 700 characters, so
+ * fifty of them put ~36 KB ahead of the result the caller asked for, in the first key, which is the
+ * last thing a size ceiling cuts. The owner still holds every warning, the audit trail counts them
+ * through the roll-up's `count`, and the roll-up says how many it stands for.
+ */
+export function capWarnings<T extends { code: string }>(warnings: T[]): Array<T | CutValueRollup> {
+  if (warnings.length <= MAX_WARNINGS) return [...warnings];
+  const kept = warnings.slice(0, MAX_WARNINGS - 1);
+  const rest = warnings.slice(MAX_WARNINGS - 1) as unknown as Array<{ table?: unknown; field?: unknown; fields?: unknown; tables?: unknown; count?: unknown }>;
+  const tables = new Set<string>();
+  const fields = new Set<string>();
+  let count = 0;
+  for (const w of rest) {
+    count += countOf(w);
+    if (typeof w.table === 'string') tables.add(w.table);
+    if (Array.isArray(w.tables)) for (const t of w.tables) if (typeof t === 'string') tables.add(t);
+    if (typeof w.field === 'string') fields.add(w.field);
+    if (Array.isArray(w.fields)) for (const f of w.fields) if (typeof f === 'string') fields.add(f);
+  }
+  const tableList = [...tables].slice(0, 5);
+  const fieldList = [...fields].slice(0, 10);
+  const rollup: CutValueRollup = {
+    code: 'VALUE_TRUNCATED', rollup: true, count,
+    ...(tableList.length === 1 && tables.size === 1 ? { table: tableList[0]! } : {}),
+    tables: tableList, fields: fieldList,
+    message: `${count} more write(s) stored a cut value and are not listed here`
+      + `${tableList.length ? ` (tables: ${tableList.join(', ')}${tables.size > tableList.length ? ', …' : ''}` : ''}`
+      + `${tableList.length ? `; fields: ${fieldList.join(', ')}${fields.size > fieldList.length ? ', …' : ''})` : ''}. `
+      + 'Read each record back and correct the cut values with a modify; do not re-add the records.',
+  };
+  return [...kept, rollup];
+}
 
 /** A list of things shaped like warnings — each an object with a string `code`. */
 const isWarningList = (v: unknown): v is unknown[] =>
@@ -443,11 +656,12 @@ const isWarningList = (v: unknown): v is unknown[] =>
  * the END of its text (`capResult`, strategy `chars`), so a warning appended last is the first thing
  * a large result loses — and a large result is the script body whose cut matters most.
  */
-export function attachWarnings(result: unknown, warnings: CutValueWarning[]): unknown {
-  if (warnings.length === 0) return result;
+export function attachWarnings(result: unknown, all: CutValueWarning[]): unknown {
+  if (all.length === 0) return result;
+  const warnings = capWarnings(all);
   if (isPlain(result)) {
     const { warnings: prior, ...rest } = result;
-    if (prior === undefined) return { warnings: [...warnings], ...rest };
+    if (prior === undefined) return { warnings, ...rest };
     if (isWarningList(prior)) return { warnings: [...prior, ...warnings], ...rest };
   }
   return { warnings, result };
@@ -463,15 +677,15 @@ const ON_ERROR = Symbol.for('snowarch.storedValueWarnings');
 export function carryWarningsOnError(error: unknown, warnings: CutValueWarning[]): void {
   if (warnings.length === 0 || typeof error !== 'object' || error === null) return;
   try {
-    Object.defineProperty(error, ON_ERROR, { value: warnings, enumerable: false, configurable: true });
+    Object.defineProperty(error, ON_ERROR, { value: capWarnings(warnings), enumerable: false, configurable: true });
   } catch { /* a frozen error: the server log still has the line */ }
 }
 
 /** The warnings an error carries out of a tool that wrote before it threw, or `[]`. */
-export function carriedWarnings(error: unknown): CutValueWarning[] {
+export function carriedWarnings(error: unknown): Array<CutValueWarning | CutValueRollup> {
   if (typeof error !== 'object' || error === null) return [];
   const carried = (error as Record<symbol, unknown>)[ON_ERROR];
-  return Array.isArray(carried) ? (carried as CutValueWarning[]) : [];
+  return Array.isArray(carried) ? (carried as Array<CutValueWarning | CutValueRollup>) : [];
 }
 
 /**
@@ -482,9 +696,11 @@ export function carriedWarnings(error: unknown): CutValueWarning[] {
 export function describeCutsOnError(error: unknown): string {
   const carried = carriedWarnings(error);
   if (carried.length === 0) return '';
-  const listed = carried.slice(0, 5)
+  const total = carried.reduce((n, w) => n + countOf(w), 0);
+  const whole = carried.filter((w): w is CutValueWarning => !('rollup' in w));
+  const listed = whole.slice(0, 5)
     .map((w) => `${w.table}.${w.field}${w.sys_id ? ` (${w.sys_id})` : ''}: ${w.sent_length} characters sent, ${w.stored_length} stored`);
-  const more = carried.length > 5 ? `; and ${carried.length - 5} more` : '';
-  return `Note: before this error, ${carried.length} write(s) in the same call stored a cut value — ${listed.join('; ')}${more}. `
+  const more = total > listed.length ? `; and ${total - listed.length} more` : '';
+  return `Note: before this error, ${total} write(s) in the same call stored a cut value — ${listed.join('; ')}${more}. `
     + 'Those records exist with the cut value: correct them with a modify, do not re-add them.';
 }
