@@ -306,7 +306,7 @@ flowchart LR
 
 - Confirmation the Script Include is live, with its name.
 - Confirmation it was captured in the named Update Set (so it can be promoted).
-- Any patch-after-create note that applied (for a Business Rule, that `action_insert`/`action_update` were set; see [`PLATFORM-NOTES.md`](./PLATFORM-NOTES.md)).
+- Any `warnings` on the result. `VALUE_TRUNCATED` means the write succeeded but the platform stored a value cut at its column limit (PN-07 and PN-10 in [`PLATFORM-NOTES.md`](./PLATFORM-NOTES.md)): the record exists with the cut value, so ask the engine to modify it rather than add it again. `FIELD_NOT_STORED` means the response did not show a field the tool sent, such as a Business Rule's filter.
 
 ### What to do next
 

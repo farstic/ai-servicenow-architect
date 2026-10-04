@@ -119,13 +119,13 @@ the message, holds the secret in a Connection and Credential Alias, and any rais
 instance. The API does not reject over-length input for a short label field; it trims it.
 **Grounding:** none in ServiceNowDocs (`markdown/application-development/c_FixScripts.md` for the
 baseline concept); observed behaviour
-**Evidence:** observed on PDI; regression test — none (platform, not server)
-**Engine consequence:** the Developer skill keeps `sys_script_fix.name` at 40 characters or fewer, and
-reads the stored `name` back from the create response instead of assuming what was sent was kept —
-the same check being worth applying to any short label field written over REST. **The server now
-does that for every write** (ARC-09-C93, PN-10): a value stored shorter than it was sent comes back as
-a `VALUE_TRUNCATED` warning on the tool's result, so the skill's own check is a second line, not the
-only one.
+**Evidence:** observed on PDI, one POST; the server's handling of a cut value is covered by
+`packages/snowarch/tests/tools/silent-truncation.test.ts` (PN-10)
+**Engine consequence:** keep `sys_script_fix.name` at 40 characters or fewer when authoring by hand.
+The Developer skill (`.claude/skills/developer/SKILL.md`) carries no such rule — checked while
+ARC-09-C93 was written. A write through this server that comes back cut now returns a `VALUE_TRUNCATED`
+warning (PN-10), within the limits PN-10 lists; that warning is the only check there is, not a second
+line behind a skill's.
 
 ---
 
@@ -165,27 +165,64 @@ an environment problem, never as a failed assertion about the product.
 
 ## PN-10 — `sys_script.name` (a Business Rule) is cut at 40 characters without an error
 
-**Applies to:** `sys_script` · Australia family · reported by the owner's live test (ARC-09-C93,
-finding R4)
-**Behaviour:** A Business Rule created over the REST Table API with a `name` longer than 40 characters
-was stored with the first 40 and the call succeeded. It is the same behaviour PN-07 records for
-`sys_script_fix.name`, on the table most callers meet first. `snow_scr_business_rule_add` then reported
-"Created business rule <the name that was SENT>", built from the argument, so the report agreed with the
-request and not with the record.
-**Grounding:** none in ServiceNowDocs (`markdown/application-development/business-rules-and-script-includes.md`
-for the baseline concept); observed behaviour
+**Applies to:** `sys_script` · release family not recorded by the report · reported by the owner's
+live test (ARC-09-C93, finding R4)
+**Behaviour:** The owner's live test created a Business Rule whose `name` was longer than 40
+characters; it was cut at 40 and `snow_scr_business_rule_add` reported success. PN-07 records the same
+behaviour for `sys_script_fix.name`.
+**Grounding:** the cut itself — none in ServiceNowDocs; observed behaviour. The dictionary's
+`max_length` is described as "a logical limit for the size of string fields", mapped by the system to a
+physical type with more length available than stated
+(`markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`),
+so that the platform cuts at exactly `max_length` is not documented in the bundled corpus — verify on
+the instance. Reading `sys_dictionary` needs the `personalize_dictionary` role
+(`markdown/platform-security/access-control/r_SecurityJumpStartACLRules.md`).
 **Evidence:** the owner's live test. **Not reproduced here** — this repository's tests have no
-instance. PN-07 observed, on a PDI, that the response to the write carried the CUT value; that the
-response for `sys_script` does is the Table API's behaviour for every table and is assumed, not seen.
-`packages/snowarch/tests/live/README.md` has the run that settles it. Regression test — the cut is
-reproduced with a fake that stores a shorter value: `packages/snowarch/tests/tools/silent-truncation.test.ts`
-and, over the real client with the HTTP seam mocked,
-`packages/snowarch/tests/servicenow/silent-truncation-http.test.ts`
-**Engine consequence:** the server compares what every write stored with what it sent and returns
-`warnings[].code = VALUE_TRUNCATED` with the field, both lengths and the column's limit
-(`packages/snowarch/src/servicenow/stored-values.ts`). It cannot stop the cut — the record, and the
-update-set entry that captured it, exist by the time the response says so — so the warning says to
-**modify** the record and not to add it again.
+instance. PN-07 observed, on a PDI, one POST whose response carried the CUT value; that the response
+for `sys_script`, and for a PATCH, does too is **assumed, not seen**, and it is the single point of
+failure of the design below. `packages/snowarch/tests/live/README.md` has the run that settles it,
+for the POST and the PATCH separately. Regression tests, with a fake that stores a shorter value:
+`packages/snowarch/tests/tools/silent-truncation.test.ts`,
+`packages/snowarch/tests/servicenow/stored-values.test.ts` and, over the real client with the HTTP seam
+mocked, `packages/snowarch/tests/servicenow/silent-truncation-http.test.ts`
+**Engine consequence:** `packages/snowarch/src/servicenow/stored-values.ts` compares what a
+`createRecord` or `updateRecord` stored with what it sent and returns `warnings[].code =
+VALUE_TRUNCATED` with the field, both lengths and a limit. It cannot stop the cut: by the time the
+response says so the record exists (and, if update-set capture was on, so does the entry), so the
+warning says to **modify** the record and not to add it again.
+
+*What it covers.* Writes made through `createRecord` and `updateRecord`, by any tool, string values only,
+when the response holds a strict prefix of what was sent (line endings normalised; a decimal's trailing
+zeros and trimmed whitespace are not a cut). The dictionary is read once per table after the tool has
+finished, within one budget, and the first failed lookup ends it; the warning is then `confirmed: false`.
+
+*What it does not cover* — so an absent `warnings` key is **not** proof that nothing was cut:
+`batchRequest` (`snow_fluent_request_batch`), attachment upload, `createChangeRequest`, the Now Assist
+and catalogue POSTs, and a client copy made with `withUser` (no caller today); fields the response does
+not echo (journal fields, passwords, write-only columns); and values that are not strings. In a playbook
+(`snow_orch_playbook_exec`) the warnings arrive on the playbook's result, not on the step that caused
+them, and `on_error: 'stop'` does not halt on one.
+
+*Known false alarms.* Any reformat that drops a non-whitespace tail looks like a cut unless the dictionary
+rules it out: a datetime written to a date column, a trailing list delimiter or `^`, an HTML tail removed
+by the sanitiser. The dictionary cannot rule anything out for a column defined on a parent table
+(`incident.short_description` is defined on `task`, so there is no row under `incident`): there a cut is
+never `confirmed` and a benign reformat is not suppressed.
+
+*Assumed, not documented.* That the platform counts characters in code points (the check suppresses a
+warning only when the limit fits under code points AND UTF-16 units); that the response to a PATCH echoes
+the stored value; that a platform which ignores an unknown column name does so without an error (the add
+tool checks the response for the two columns it sends — `FIELD_NOT_STORED`).
+
+*Refusal before the write is not built, on purpose* (plan rows ARC-09-C97 and C98). It needs the limit
+before the write, and the only dictionary reader in the server (`snow_disco_table_discover`) defaults a
+blank limit to 255, caches by table without the instance, does not walk inherited columns and reads at
+most 200 columns, so a limit taken from it could refuse a write the platform would have accepted. A
+reader that can be trusted for this is instance-keyed, walks `sys_db_object.super_class`, treats a blank
+or 0 limit as unknown, restricts itself to string-like types, remembers that the dictionary is unreadable
+for this account (it needs the role above), refuses only on a fresh uncached read, and has its own error
+code. The gate to building it is the live run above showing that `max_length` is the point the platform
+cuts at, on the tables callers write most, inherited columns included.
 
 ## Windows notes — this repository, not ServiceNow
 
