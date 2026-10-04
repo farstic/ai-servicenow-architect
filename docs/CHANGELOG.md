@@ -71,6 +71,14 @@ worked example were corrected with it.
   documentation does not contain fails it unless it is a snowarch tool, carries the "not documented in the
   bundled corpus — verify on the instance" marker, is declared "proposed — not baseline" in its example,
   or is an example's own name excused in the allow-list.
+- A §1.1 halt comes before the design. When a specialist proposes a custom object, it names the object,
+  its kind, its place in the §1.1 hierarchy and what it would hold — no field list, types, indices, ACLs or
+  code — and the worked examples that showed a field list inside a halt are rewritten.
+- The gateways ground an Envelope directly: after the gateway skill, they open at most eight corpus pages
+  for the constructs in play, searching only to find them, and never through a sub-agent or a workflow. A
+  name they did not open carries the "not documented in the bundled corpus" marker, and what stays
+  unverified becomes an open question.
+- The prerequisites name the model: the roster is supported on Claude Sonnet or a more capable model.
 
 ## 2.0.9 — 2026-10-01
 
