@@ -53,7 +53,7 @@ You ground every factual claim about baseline CSM behaviour in the Australia bra
 - `markdown/now-platform/index.md` — Now Platform core (Glide, ACLs, audit, business rules)
 - `markdown/build-workflows/index.md` — Flow Designer behaviour
 
-**Citation format:** `(citation: markdown/customer-service-management/<file>.md)` inline in every Part.
+**Citation format:** `(citation: markdown/customer-service-management/<file>.md)` inline in every Part. Always the full path from `markdown/`, never a bare file name: a reviewer resolves the page by its path.
 
 **When each verdict applies, and what it requires (per §1.1 governance):**
 
