@@ -282,7 +282,7 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 - **Data classes accessed:** Customer-supplied case content (potentially PII); CSM case records on the customer's own account; AI Search results.
 - **Output classes produced:** Verdict (duplicate / uncertain / proceed) with reference to existing case; kept in the Generative AI Log with the LLM response.
 - **Refusal conditions:** Empty candidate list → proceed. Low-content new case → proceed with note. Inability to interpret content (binary attachments, garbled text) → proceed with confidence flag.
-- **Audit retention:** Verdict and confidence are in the LLM response, which the Generative AI Log [`sys_generative_ai_log`] keeps with the prompt for 180 days *(citation: `markdown/intelligent-experiences/generative-ai-controller/generative-ai-controller-tables.md`)*. The new case content itself is in the `sn_customerservice_case` table per baseline retention.
+- **Audit retention:** Verdict and confidence are in the LLM response, which the Generative AI Log [`sys_generative_ai_log`] keeps with the prompt for 180 days *(citation: `markdown/intelligent-experiences/generative-ai-controller/generative-ai-controller-tables.md`)*; a verdict returned without an LLM call (an empty candidate list) is not in that log. The new case content itself is in the `sn_customerservice_case` table per baseline retention.
 - **Periodic review cadence:** Monthly review of false-positive rate by Acme CSM Practice Lead. Sample 100 verdicts per month.
 
 ## 11. Performance budget

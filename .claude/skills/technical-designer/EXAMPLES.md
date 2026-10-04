@@ -333,7 +333,7 @@ No effective-date rule: the effective date is the target job's start date, held 
 | Workday credential leakage | The credential lives in the spoke's OAuth 2.0 configuration, never in code. Integration Specialist owns this design. |
 | Audit | Baseline HRSD case audit covers LE state transitions; sync attempts are field changes on the LE case. |
 
-**Consult flag: Security & GRC Specialist — fires.** HR PII in scope; non-trivial ACLs across multiple tables; outbound integration with regulated employee data. Recommend Security & GRC review of:
+**Consult flag: Security & GRC Specialist — fires.** HR PII in scope; non-trivial field-level ACLs on the LE case; outbound integration with regulated employee data. Recommend Security & GRC review of:
 - The ACL matrix above (especially the field-level DENY on `x_acme_hrsd_workday_sync_status`).
 - The Integration Specialist's Workday auth and data-in-transit pattern.
 - Audit retention for the three new LE case fields.
@@ -395,13 +395,13 @@ No effective-date rule: the effective date is the target job's start date, held 
 
 ### Explanation
 
-This is a multi-builder design — three builders consume the spec (Developer, Flow Designer Specialist, Integration Specialist). The spec uses tables aggressively (field list, ACL matrix, BR list, integration touchpoints) rather than prose, because that's what downstream builders consume cleanly.
+This is a multi-builder design — three builders consume the spec (Developer, Flow Designer Specialist, Integration Specialist). The spec uses tables aggressively (field list, ACL matrix, server-side list, integration touchpoints) rather than prose, because that's what downstream builders consume cleanly.
 
-The rationale columns on the BR list and Client Script list are mandatory ("server not client because…", "BR not flow because…") — that's an anti-pattern guard. Without rationale, the design is just a list, and the Developer can't second-guess the choices.
+The rationale columns on the server-side and client-side lists are mandatory ("scheduled not BR because…", "UI policy, not a dictionary mandatory, because…") — that's an anti-pattern guard. Without rationale, the design is just a list, and the Developer can't second-guess the choices.
 
 The §3.1 consult flags fire correctly: Security & GRC fires on HR PII + outbound integration; Performance & Scale does NOT fire because the volume is low — and the spec says so explicitly rather than firing the consult defensively.
 
-The HRSD Specialist domain consult is correctly surfaced — Technical Designer designs the data model — the Jobs records for the titles and the effective date, three fields on the LE case for the rest, no table — and the BR list, but doesn't pretend to know HRSD's Lifecycle Event activity-set conventions. That's a domain expert handoff before Flow Designer Specialist can build the LE flow.
+The HRSD Specialist domain consult is correctly surfaced — Technical Designer designs the data model — the Jobs records for the titles and the effective date, three fields on the LE case for the rest, no table — and the server-side list, but doesn't pretend to know HRSD's Lifecycle Event activity-set conventions. That's a domain expert handoff before Flow Designer Specialist can build the LE flow.
 
 Open Question 4 (source manager change scenarios) is a real question that the input didn't cover. Technical Designer surfaces it rather than inventing a design — that's the convergent-but-honest discipline.
 
@@ -565,7 +565,7 @@ No deflection-rate job: Self-Service Analytics captures the deflection outcomes 
 2. **Portal widget design** — the Service Portal widget UX (suggestion display, accept/decline interactions, draft preservation) is owned by UI/UX Specialist; this design covers only the platform-side surface.
 3. **Deflection skill design** — the Now Assist skill itself (prompt, tools, confidence routing, AI Control Tower governance) is owned by Now Assist Specialist; this design covers only the platform integration point.
 4. **Multi-language support** — is the deflection skill expected to support multiple languages? Drives Now Assist Specialist's skill design.
-5. **Deflection-event retention** — how long do we keep deflection events for analytics? 12 months default; confirm with Acme legal.
+5. **Deflection-event retention** — how long do we keep deflection events for skill tuning? 12 months default; confirm with Acme legal.
 
 ## Downstream handoff manifest
 

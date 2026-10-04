@@ -171,7 +171,7 @@ R2 reporting may need indicator pre-aggregation at higher case volumes — flagg
 
 ### 6.2 Data classification and handling
 
-Customer-supplied case content (subject, description, escalation details free-text) is treated per Acme's existing CSM content-handling policy. **No new content classes are introduced by this programme** — the escalation details field captures the same kind of content as the existing case description.
+Customer-supplied case content (subject, description, the escalation's justification) is treated per Acme's existing CSM content-handling policy. **No new content classes are introduced by this programme** — the Escalation Justification captures the same kind of content as the existing case description.
 
 ### 6.3 Audit, logging, compliance
 
@@ -181,7 +181,7 @@ Work notes are immutable by default in baseline ServiceNow — agents cannot ret
 
 ### 6.4 Privacy considerations
 
-Escalation details may contain customer-identifiable information. Acme's existing CSM PII handling policy applies — no programme-level deviation.
+The escalation's justification may contain customer-identifiable information. Acme's existing CSM PII handling policy applies — no programme-level deviation.
 
 **Routing-time consult flag:** Security & GRC Specialist — **fires** on who holds the escalation and de-escalation requester roles. Consult requested before sign-off.
 
@@ -286,7 +286,7 @@ These are downstream handoff items — see §9.
 >
 > **Open dependency — CSM Specialist confirmation required:**
 >
-> - **OD-01** — the HLD recommends the baseline Escalation record over a new state value; the CSM Specialist confirms the fit before downstream design (Technical Designer R2/R3/R4, Developer R1) proceeds.
+> - **OD-01** — the HLD recommends the baseline Escalation record over a new state value; the CSM Specialist confirms the fit before downstream design (the Technical Designer's R1 re-issue and R2/R3/R4) proceeds.
 >
 > **Downstream handoffs once OD-01 is resolved:**
 >
