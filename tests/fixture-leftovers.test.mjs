@@ -8,12 +8,14 @@
  * own: every other file in `tests/` removed what it made when its test PASSED.
  *
  * THAT IS WHY THE CLASS IS NOT "files that leak today". The other bare `mkdtempSync` sites removed
- * their directory with a trailing `rmSync`, and a trailing `rmSync` is the shape
- * `tools/snowarch/tests/helpers/temp.mjs` was written to replace: a failed assertion throws past it,
- * so the directory survives exactly when somebody is looking at the failure. The helper removes at
- * test end, passing or failing, and again at exit for the sites that have no test context. So the
- * rule that closes the class is one sentence: no file under `tests/` makes a directory in the temp
- * location except through `tempDir()` / `trackTempDir()`.
+ * what they made when their test PASSED — by a `try/finally`, a `t.after`, or an `rmSync` at the end
+ * of the test body. Only the last is skipped by a failed assertion (the helper's own header says
+ * so), and none of the three has the exit and signal backstop the helper adds, so a killed run leaves
+ * the directory. How many of them a FAILING test would have leaked was not counted: they were
+ * converted to one rule rather than audited one by one. The helper removes at test end, passing or
+ * failing, and again at exit for the sites that have no test context. So the rule that closes the
+ * class is one sentence: no file under `tests/` makes a directory in the temp location except
+ * through `tempDir()` / `trackTempDir()`.
  *
  * TWO CASES, because they answer different questions.
  *
