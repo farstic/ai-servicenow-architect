@@ -268,13 +268,11 @@ The Open Questions are real and specific. Each one is the kind of decision that,
 
 ## Example 3 — Verdict C (§1.1 Halt)
 
-> **Correction (2026-10-04).** Parts 1–3 never evaluate the baseline Change approval policies: "an approval policy can contain multiple decisions allowing a single policy to handle every approval required for a change type" — the Change Approval Policy [`chg_policy_approval`], applied by the Apply Change Approval Policy flow action *(citations: `markdown/it-service-management/change-management/change-approval-policy.md`, `markdown/it-service-management/change-management/installed-with-approval-policy.md`, `markdown/it-service-management/change-management/use-apply-change-approval-policy-flow-activity.md`)*. Read this example for the shape of a Verdict C halt; `u_approval_matrix` is not a recommendation until approval policies have been weighed.
-
 ### Input dispatch envelope
 
 > **Domain Expert dispatch — ITSM Specialist gateway**
 >
-> **Request:** "We need a multi-tier change-approval matrix that considers: (1) change risk score, (2) the business unit owning the affected service, (3) whether the change touches PCI-scoped systems, (4) whether the change window overlaps a frozen period, and (5) the change requester's seniority level. The matrix should return: which approval groups are required, in what order, with what SLA per approval step. Today we have ~50 different approval scenarios documented in spreadsheets that change quarterly."
+> **Request:** "We need a multi-tier change-approval matrix, held in a custom table `u_approval_matrix`, that considers: (1) change risk score, (2) the business unit owning the affected service, (3) whether the change touches PCI-scoped systems, (4) whether the change window overlaps a frozen period, and (5) the change requester's seniority level. The matrix should return: which approval groups are required, in what order, with what SLA per approval step. Today we have ~50 different approval scenarios documented in spreadsheets that change quarterly."
 >
 > Module: ITSM (Change Management)
 > Volume: ~10K change requests/year
@@ -285,17 +283,21 @@ The Open Questions are real and specific. Each one is the kind of decision that,
 ### Expected gateway output
 
 ```markdown
-# ITSM Specialist Gateway Response — Multi-dimensional change-approval matrix with ~50 quarterly-changing scenarios
+# ITSM Specialist Gateway Response — Multi-dimensional change-approval matrix, requested as a custom table
 
 ## Part 1 — OOB Process Map
 
-This request touches change management approval orchestration, change risk scoring, CAB workflow, and approval SLA tracking.
+This request touches change approval routing, change risk, frozen periods and approval timing.
 
 ### Baseline change-approval pattern
 
 - Baseline `change_request` has a state machine: New → Assess → Authorize → Scheduled → Implement → Review → Closed.
-- Approvals happen in the `Authorize` state, driven by baseline `sysapproval_approver` records.
-- Approver resolution in baseline: a Flow Designer flow or a Business Rule generates `sysapproval_approver` records, one per required approver. Classic approval rules have been replaced by the Workflow Studio Ask for Approval action, so approval routing is flow-driven *(citation: `markdown/build-workflows/approvals/c_ApprovalRules.md`)*.
+- Approvals happen in the `Authorize` state, as baseline `sysapproval_approver` records. Classic approval rules have been replaced by the Workflow Studio Ask for Approval action *(citation: `markdown/build-workflows/approvals/c_ApprovalRules.md`)*.
+- **Change approval policies generate a change's approvals.** "A change approval policy is a course of action that can be applied to a change request. It uses a set of variable inputs to evaluate the decisions that are associated with it. For each matching decision, the associated approval definition is applied." And "an approval policy can contain multiple decisions allowing a single policy to handle every approval required for a change type" *(citation: `markdown/it-service-management/change-management/change-approval-policy.md`)*. The policy is a Change Approval Policy [`chg_policy_approval`] record *(citation: `markdown/it-service-management/change-management/installed-with-approval-policy.md`)*.
+  - **Policy inputs** are the variable sources a decision evaluates. The default `change_request` input "provides access to the change request table and to any table change request references" *(citation: `markdown/it-service-management/change-management/create-policy-input.md`)*.
+  - **Decisions** carry the conditions, and each answers with an approval definition *(citation: `markdown/it-service-management/change-management/create-decisions.md`)*. With the decision builder, a policy runs either the first decision that matches, in order, or every decision that matches *(citation: `markdown/it-service-management/change-management/change-approval-policy-decision-builder.md`)*.
+  - **Approval definitions** add a user or a group approval, mandatory or not. The approver comes from the definition or from a reference field on the change, and a group approval waits for the first response, all responses or a percentage *(citation: `markdown/it-service-management/change-management/create-approval-definitions.md`)*.
+- The Apply Change Approval Policy flow action "automatically generates the required user and group approvals". Its fields are the policy, the change request and a Due Date: None, or Approve, Reject or Cancel on the due date *(citation: `markdown/it-service-management/change-management/use-apply-change-approval-policy-flow-activity.md`)*. "Multiple actions can be used in a flow, where each action references the same or different Change approval policies" *(citation: `markdown/it-service-management/change-management/change-flow-actions.md`)*.
 - Baseline `change_request.risk` is a choice: **-- None --** until it is set to **High**, **Moderate** or **Low**. The Change Risk Calculator, on by default, or an optional Risk Assessment questionnaire can drive it (the baseline Assessment Metric Type [`asmt_metric_type`] and Assessment Metric [`asmt_metric`] tables *(citation: `markdown/api-reference/rest-apis/copy-assessments-api.md`, `markdown/build-workflows/workflow-studio/activate-process-automation-designer-for-app-engine.md`)*). *(citations: `markdown/it-service-management/change-management/t_CreateAChange.md`, `markdown/it-service-management/change-management/c_RskAsmtCalc.md`)*
 - Baseline `change_request.type` distinguishes Standard (pre-approved, no CAB), Normal (CAB review), Emergency (expedited CAB).
 - *(citation: `markdown/it-service-management/change-management/reference-change-management.md`)*
@@ -304,6 +306,7 @@ This request touches change management approval orchestration, change risk scori
 
 - Baseline supports `cmn_schedule` records with blackout windows. The baseline `Change Schedule` script include can check whether a proposed `start_date`/`end_date` overlaps a blackout window.
 - *(citation: `markdown/it-service-management/change-management/reference-change-management.md`)*
+- Conflict detection writes its result on the change: `conflict_status` holds the "Current conflict status as detected by the conflict detection script, such as Conflict and Not Run" *(citation: `markdown/api-reference/rest-apis/change-management-api.md`)*. A decision can read it.
 
 ### PCI scope tracking
 
@@ -313,133 +316,106 @@ This request touches change management approval orchestration, change risk scori
 
 - BU is typically `cmdb_ci.business_unit` or via service hierarchy. Baseline.
 - Requester seniority is typically `sys_user.title` or a `sys_user.<level>` custom field. Not in baseline ITSM scope per se — comes from HR/Identity.
+- The CI and the requester are references on the change, so the default policy input reaches all five dimensions.
 
 ## Part 2 — Data Model Alignment
 
-The request implies orchestrating a matrix decision across **five dimensions** with **~50 scenarios that change quarterly**. The baseline tables involved:
+The request names a custom table for the matrix. The baseline tables that already hold it:
 
 | Table | Role in this request |
 |---|---|
-| `change_request` | The record being approved |
-| `sysapproval_approver` | Where the resolved approvers are written |
+| `change_request` | The record being approved; its risk, type, `conflict_status`, CI and requester are what the decisions read |
+| `chg_policy_approval` | The Change Approval Policy: its inputs, one decision per scenario, and the approval definitions they answer with |
+| `sysapproval_approver` | Where the generated approvals are written |
 | `asmt_metric` | Baseline risk-scoring questionnaire definition |
 | `cmn_schedule` | Frozen period definition |
-| `cmdb_ci` | CI being changed (carries PCI flag if implemented) |
-| `sys_user` | Requester seniority lookup |
+| `cmdb_ci` | CI being changed (carries the PCI flag if implemented) |
+| `sys_user` | Requester seniority |
 
-Baseline flow-driven approval routing handles **single-dimensional** routing well. It is **not designed for** five-dimensional matrices with ~50 scenarios changing quarterly.
+**The matrix is a Change approval policy.**
+- Each of the ~50 scenarios is a decision. Its condition reads the five dimensions through the policy input, and its answer is the approval definition that names the approval group.
+- A quarterly change edits decision records on the policy, not a flow and not a script.
+- The order of the approval steps is a sequence of Apply Change Approval Policy actions in the flow, one policy per step.
 
-Two baseline-extension paths exist:
-
-- **Path X — One approval branch per scenario, layered.** Classic approval rules, one per scenario, are not an option: they have been replaced by the Workflow Studio Ask for Approval action *(citation: `markdown/build-workflows/approvals/c_ApprovalRules.md`)*. The flow equivalent is one conditioned approval branch per scenario combination — with 5 dimensions and ~50 scenarios, ~50 branches, each with a complex condition. Maintenance burden: each quarterly change requires editing multiple branches, hard to validate exhaustively, hard to audit.
-- **Path Y — Data Lookup Definitions, chained.** Multiple Data Lookups, each handling one dimension, chained in a Script Include orchestrator that resolves the final approver list. Same data complexity, similar maintenance burden, slightly better auditability.
-
-Both baseline paths struggle at the scale described (~50 scenarios, quarterly change cadence).
+**What the policy does not hold: an SLA per approval step.** Each action carries one Due Date, and the Due Date decides what happens when it falls due. Whether the scenarios need different durations is Open Question 1.
 
 ## Part 3 — §1.1 Baseline-First Verdict
 
-**Verdict C — Requires custom object — §1.1 halt protocol fires.**
+**Verdict C — the request names a custom table, `u_approval_matrix`, and the §1.1 halt fires.** Part 2's finding — the baseline Change approval policy covers the matrix — is the OPEN QUESTION's recommendation, not a different verdict.
 
 ### OPEN QUESTION — CUSTOM OBJECT PROPOSAL
 
-A custom decision-matrix table appears genuinely necessary. Surfacing for explicit Chief Architect approval before any further dispatch.
-
 #### 1. Baseline option evaluated and why it falls short
 
-| Baseline option | Why it falls short for this specific requirement |
-|---|---|
-| **One approval branch per scenario** | Classic approval rules have been replaced by the Workflow Studio Ask for Approval action *(citation: `markdown/build-workflows/approvals/c_ApprovalRules.md`)*. In the flow, at ~50 scenarios with complex multi-dimensional conditions, each branch's condition becomes a mini-ruleset. Maintenance is error-prone — adding a new dimension means editing all 50. |
-| **Chained Data Lookup Definitions** | Better auditability than per-scenario approval branches, but still requires ~50 lookup table entries plus orchestrator Script Include. The orchestrator becomes complex; quarterly changes still mean editing multiple data structures in lockstep. |
-| **Flow Designer-based approval orchestrator** | A single flow can evaluate the five dimensions and branch to one of ~50 approval paths via decision tables. Decision Tables (`sys_decision`) are baseline. **This is actually viable** — but at 50 scenarios it pushes the decision-table pattern past its readable scale, and quarterly changes mean editing a complex flow definition. *(citation: `markdown/build-workflows/index.md`)* |
-| **External rule engine integration** | Out of scope — would route to Integration Specialist, not in scope here. |
+| Baseline option | What it covers | Where it falls short |
+|---|---|---|
+| **Change approval policy** — one decision per scenario, approval definitions naming the groups, one Apply Change Approval Policy action per approval step | The five dimensions as decision conditions on the change and the records it references; the groups; their order; quarterly edits as decision records | An SLA per step: each action carries a single Due Date. Verify against the scenarios (Open Question 1). |
+| **One Ask for Approval branch per scenario in the flow** | Every scenario, as ~50 conditioned branches | Each quarterly change edits the flow, and each branch's condition becomes a mini-ruleset. The policy holds the same thing as records. |
+| **Decision Table** (`sys_decision`), read by the flow beside the policy | A duration per scenario and step, if Open Question 1 needs one | A second place where scenarios are kept, beside the policy's decisions *(citation: `markdown/build-workflows/index.md`)* |
 
-The viable baseline path is **chained Data Lookups + Flow Designer with Decision Tables**. This is "Verdict B with effort" — possible, but operationally fragile at the described scale and change cadence.
-
-A **custom table** would be a dedicated `u_approval_matrix` with fields for the five input dimensions and structured approver-output. This trades a quarterly maintenance burden (multiple approval branches + Data Lookup + flow edits, lockstep) for a single-table maintenance burden (50 rows, queryable, auditable, change-log-trackable via baseline `sys_history_set`).
+The Change approval policy covers the request. Nothing in it calls for a new table.
 
 #### 2. Custom object proposed (smallest possible scope)
 
-**Preferred:** Extend the classic approval rules with several new fields to carry the multi-dimensional matrix conditions, without a new table. **Evaluated and rejected** — classic approval rules have been replaced by the Workflow Studio Ask for Approval action *(citation: `markdown/build-workflows/approvals/c_ApprovalRules.md`)*; new fields would extend a superseded construct.
-
-**Proposed:** **A new top-level table in baseline scope, read by the approval flow:**
-
-```
-Table name:      u_approval_matrix (top level, baseline scope)
-Parent:          none (the approval flow reads it and writes sysapproval_approver records)
-New fields:      u_risk (choice: High / Moderate / Low, matching change_request.risk)
-                 u_business_unit (ref to business_unit)
-                 u_pci_scope_required (boolean)
-                 u_change_window_check (boolean)
-                 u_requester_seniority_min (integer)
-                 u_approval_chain (list of approval groups in order, JSON)
-                 u_approval_sla_per_step (JSON: {step: minutes})
-Scope:           baseline (not a new scoped app)
-```
-
-**Smaller alternative:** Decide if all 5 dimensions are truly orthogonal. If "BU" + "PCI scope" can be derived from `cmdb_ci`, the effective dimensions drop to 3 (risk, change-window, requester seniority), and ~50 scenarios likely drop to ~10–15. At that scale, the baseline chained-Data-Lookup path becomes viable. **Recommend the user evaluate dimension reduction before approving a new table.**
+- **Object:** `u_approval_matrix`, as the request names it.
+- **Kind and place in the §1.1 hierarchy:** a custom table that extends no baseline table — a new top-level table. The hierarchy places top-level tables after every extension of a baseline table, where justification is required *(citation: `governance/governance-rules.md` §1.1 halt protocol)*.
+- **What it would hold, in the request's words:** "which approval groups are required, in what order, with what SLA per approval step", for ~50 scenarios.
+- **Rejected as unnecessary.** The Change approval policy holds the scenarios as decisions, the groups as approval definitions and the order as one action per step (Part 2). No smaller custom object is proposed.
 
 #### 3. Consequences of approval
 
-- **Data model:** One new table, one new structured maintenance surface. ~50 rows, quarterly updates.
-- **Deployment:** Goes in the engagement's existing customisation update set or a new "Change Governance" scoped app — recommend NOT a new scoped app (single table is too small to justify scope separation per §1.1 hierarchy).
-- **Support cost:** Change Manager / CAB owner needs UI for managing the 50 rows. Recommend a list view + form on the new table; no special UI needed.
-- **Platform-upgrade risk:** Low. The table is top level and extends no baseline table, so no baseline parent can change under it.
-- **Audit and PCI implications:** `u_pci_scope_required` field carries regulatory weight. Field-level audit must be enabled on this field; the field-edit history must survive audit retention requirements. **Security & GRC Specialist consult is required** if this proposal is approved.
+- **Data model:** one custom table holding the scenarios a second time, beside the policy the Change module uses. Each quarterly change edits both, in step.
+- **Platform-upgrade risk:** the flow that reads the table is custom logic, retested at each upgrade, and the change's approvals no longer come from a Change approval policy.
+- **Audit and PCI implications:** a PCI-scope condition carries regulatory weight, so audit and retention apply to it. **Security & GRC Specialist consult is required** if this proposal is approved.
+- **Licensing:** the table consumes a custom table entitlement of the subscription it is mapped to *(citation: `markdown/platform-administration/allocating-custom-tables-subscr-apps-v2.md`)*. **Licensing & Entitlement consult** if approved.
 
 #### 4. Alternatives if rejected
 
-- **Degraded design 1 (recommended):** Reduce dimensions to 3 (drop BU + PCI as derived from CI), implement with chained Data Lookups + Flow Designer Decision Tables. Maintenance burden manageable at ~10–15 effective scenarios.
-- **Degraded design 2:** Use ~50 conditioned approval branches in the baseline approval flow, with a quarterly review process. Brittle but baseline-only.
-- **Deferred functionality:** Phase 1 — implement for the highest-frequency 10 scenarios using baseline Decision Tables. Phase 2 — evaluate scaling after 6 months of operational data.
-- **Manual workaround:** Change Manager continues to use the spreadsheets, with a Service Catalog item that captures the inputs and creates a `change_request` plus a manual approval-routing task. No automation. Status quo.
+- **Recommended:** the Change approval policy as in Part 2. First reduce the dimensions — BU and PCI derived from the CI — so that ~50 scenarios become fewer decisions.
+- **If the per-step SLA must vary by scenario:** add a Decision Table returning the duration, read by the flow beside the policy.
+- **Manual workaround:** Change Manager keeps the spreadsheets, with a Service Catalog item that captures the inputs and creates a `change_request` plus a manual approval-routing task. No automation; the status quo.
 
 ### Recommendation to the Chief Architect
 
-The dimension-reduction option (degraded design 1) is genuinely worth evaluating with the user before approving the custom table. ~50 scenarios at the described complexity is at the limit of what baseline can manage cleanly — but if dimension reduction brings it to ~15, baseline wins.
-
-If dimensions cannot be reduced and the operational reality is genuinely 50 scenarios changing quarterly, **the custom table is the right answer** under §1.1 — but it must be approved explicitly, and the Security & GRC Specialist consult must fire before downstream dispatch.
+Reject the custom table. The Change approval policy holds the scenarios as decisions and generates the approvals; the per-step SLA is an open question with a baseline answer, not a reason for a table.
 
 ## Part 4 — Routing Recommendation
 
-**HALT — §1.1 custom-object proposal required.**
+**HALT — §1.1: the request names a custom table.**
 
-Do not dispatch Technical Designer until the Chief Architect resolves the proposal above. Options:
+Do not dispatch Technical Designer or Flow Designer Specialist until the Chief Architect rules. Options:
 
-- **Approve as proposed.** Chief Architect approves the new top-level `u_approval_matrix` table in baseline scope. Re-dispatch ITSM Specialist with the approval in the envelope, then proceed to Technical Designer. **Fire Security & GRC Specialist consult before Developer dispatch.**
-- **Approve a smaller variant.** Chief Architect approves the table with fewer dimensions or fields than proposed.
-- **Reject and force dimension reduction.** Chief Architect rejects the custom-table proposal and asks the user to evaluate whether 5 dimensions are genuinely orthogonal. Re-dispatch only after dimension-reduction analysis.
-- **Reject and force degraded design.** Chief Architect rejects and instructs the user to live with chained Data Lookups + Decision Tables at the cost of maintenance burden.
+- **Reject in favour of the Change approval policy (recommended).** Re-dispatch ITSM Specialist with the ruling. Flow Designer Specialist then designs the approval flow, with one Apply Change Approval Policy action per step, and the policy's inputs, decisions and approval definitions.
+- **Approve the table as requested.** Re-dispatch ITSM Specialist with the approval in the envelope. **Fire the Security & GRC and Licensing & Entitlement consults before Technical Designer.**
 
-## Part 5 — Anti-Patterns to Block (applied if proposal is approved)
+## Part 5 — Anti-Patterns to Block
 
-If the Chief Architect approves the custom-table proposal, the following are explicitly blocked in downstream design:
-
-- **Do not create a separate scoped app** for this table. One table in baseline scope (or in an existing scoped app) is sufficient. *(citation: `governance/governance-rules.md` §1.1 hierarchy)*
-- **Do not duplicate `change_request.risk`** in the matrix table — reference the existing field.
-- **Do not duplicate baseline blackout-window checks** — call the baseline `ChangeSchedule` Script Include.
-- **Do not write the approver chain as a series of `sysapproval_approver` records pre-created** — generate them at the moment of approval-state entry, the baseline pattern.
-- **Do not store PCI scope on the matrix table** — read it from `cmdb_ci`. The matrix only conditions on it.
-- **Do not skip field-level audit** on `u_pci_scope_required` and `u_approval_chain`. Enable in the dictionary record.
+- **Do not build a matrix table for what the policy's decisions hold.** One decision per scenario, answered by an approval definition *(citation: `markdown/it-service-management/change-management/change-approval-policy.md`)*.
+- **Do not write one approval branch per scenario in the flow.** One Apply Change Approval Policy action per step generates the approvals *(citation: `markdown/it-service-management/change-management/use-apply-change-approval-policy-flow-activity.md`)*.
+- **Do not set the approval fields on the change by hand.** "You do not need to set the approval fields on the change request manually" *(same citation)*.
+- **Do not duplicate `change_request.risk`** — the decisions read it.
+- **Do not duplicate baseline blackout-window checks** — the decisions read `conflict_status`, or the flow calls the baseline `ChangeSchedule` Script Include.
+- **Do not store PCI scope anywhere but `cmdb_ci`** — the decisions read it through the change's CI.
 
 ## Open Questions
 
-1. **Dimension orthogonality.** Are all 5 dimensions genuinely independent, or can BU and PCI be derived from `cmdb_ci`? Most important question before approval.
-2. **Quarterly cadence ownership.** Who owns the quarterly review and update of the matrix? Change Manager? CAB? Service Owners? Affects ACL design.
-3. **Audit retention.** PCI audit typically requires 7 years of change history. Confirm the engagement's audit retention covers `u_approval_matrix` history.
-4. **Cross-engagement reuse.** Is this matrix specific to GlobalCo, or is it intended to be reusable across other engagements? Affects scoped-app-vs-baseline-scope decision.
-5. **Standard changes.** Does the matrix apply to Standard changes (pre-approved by definition) or only Normal and Emergency? Standard changes typically bypass approval entirely; confirm scope.
+1. **OPEN QUESTION: per-step SLA.** Do the scenarios need different approval durations per step, or one per step? Each Apply Change Approval Policy action has one Due Date, which chooses what happens when the step falls due; where the duration itself is set is not documented in the bundled corpus — verify on the instance. **Proposed default:** one duration per step, on each step's action; a Decision Table beside the policy only if the scenarios prove to need different durations.
+2. **Dimension orthogonality.** Can BU and PCI be derived from `cmdb_ci`? Fewer dimensions mean fewer decisions.
+3. **Quarterly cadence ownership.** Who edits the decisions each quarter? Decisions are created by an admin or a change manager *(citation: `markdown/it-service-management/change-management/create-decisions.md`)*. Affects who holds the role.
+4. **Audit retention.** PCI audit typically requires 7 years of change history. Confirm the engagement's retention covers the approval records and the edits to the policy's decisions.
+5. **Standard changes.** Does the policy apply to Standard changes (pre-approved by definition) or only Normal and Emergency? Standard changes typically bypass approval entirely; confirm scope.
 ```
 
 ### Explanation
 
-Verdict C is the rarest verdict and the most carefully structured. The envelope demonstrates:
+Verdict C is the rarest verdict and the most carefully structured. Here it comes from the request, not from the baseline falling short. The request names a custom table, and a request that names one is Verdict C however well the baseline answers it. The envelope demonstrates:
 
-- **Part 3's halt protocol** is the most rigorous part of the document. Three baseline options evaluated with explicit citations, three custom-object scope alternatives (preferred / smallest / "even smaller"), explicit consequences, and four alternatives if rejected. The Chief Architect can make an informed decision.
-- **The "evaluate dimension reduction" recommendation** is a Domain Expert acting as a *gateway* in the truest sense — pushing back on the request before approving the custom object. This is the §1.1 enforcement value: the custom-object path is the last resort, not the first response.
-- **Part 4's HALT recommendation** with four options (approve / approve smaller / reject + reduce / reject + degrade) gives the Chief Architect a structured decision. No silent default.
-- **Part 5's anti-patterns** are conditional on approval — "applied if proposal is approved" — and pre-empt the most common implementation drift. Includes the "do not create a separate scoped app" pattern specifically because the proposal explicitly chose baseline scope.
+- **Part 2 does the baseline work anyway.** The Change approval policy — inputs, one decision per scenario, approval definitions, one action per step — holds the ~50 scenarios as records, with each claim cited. That finding becomes the halt's recommendation.
+- **The residual is named, not inflated.** The policy action carries one Due Date. A per-step SLA is therefore an open question with a baseline answer (a Decision Table), not a reason for a table.
+- **Part 4's HALT** gives the Chief Architect two options, the recommended one first. There is no silent default.
+- **Part 5** blocks the drift back to a matrix table or to per-scenario branches.
 
-The Open Questions surface the strategic decisions the Chief Architect needs to consider (dimension reduction, audit retention, cross-engagement reuse). These are not implementation details — they are pre-approval gate questions.
+The Open Questions are the decisions that shape the policy before anyone builds it: the per-step SLA, dimension reduction, who edits the decisions, and audit retention.
 
 ---
 

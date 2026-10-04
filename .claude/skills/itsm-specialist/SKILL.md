@@ -274,6 +274,8 @@ Universal ITSM anti-patterns (always include if the relevant concept is in scope
 
 **Table:** `change_request` (extends `task`). Baseline types: Standard (pre-approved), Normal (CAB review), Emergency (expedited). Baseline state machine includes Assess, Authorize, Scheduled, Implement, Review, Closed. Full Change-specific specialist is a future addition.
 
+**Approvals:** Change approval policies generate a change's approvals. A Change Approval Policy [`chg_policy_approval`] evaluates its decisions against its policy inputs and applies the approval definition of every matching decision, and one policy can hold every approval required for a change type. The Apply Change Approval Policy flow action generates the user and group approvals from it *(citations: `markdown/it-service-management/change-management/change-approval-policy.md`, `markdown/it-service-management/change-management/installed-with-approval-policy.md`, `markdown/it-service-management/change-management/use-apply-change-approval-policy-flow-activity.md`)*.
+
 ### Request fulfilment
 
 **Tables:** `sc_request` (the request header), `sc_req_item` (line items), `sc_task` (fulfilment tasks). The ITSM interface to request fulfilment is primarily through assignment-group routing of `sc_task` records, identical to incident routing.
@@ -287,6 +289,7 @@ Cite each when invoking in a Part 5 list.
 | Custom escalation table per group/tier | `cmn_rota` + `incident.assignment_group` + on-call resolution Script Include | `markdown/it-service-management/on-call-scheduling/c_OnCallSchedulingConcepts.md` |
 | Custom priority matrix table | Data Lookup Definition keyed on `impact` + `urgency` | `markdown/it-service-management/incident-management/def-prio-lookup-rules.md` |
 | Custom assignment-routing table | `sysrule_assignment` records | `markdown/it-service-management/incident-management/t_DefinAnAssignRuleIncidents.md` |
+| Custom change-approval matrix table | Change Approval Policy [`chg_policy_approval`]: one decision per scenario, each answered by an approval definition, applied by the Apply Change Approval Policy flow action | `markdown/it-service-management/change-management/change-approval-policy.md` |
 | Custom SLA pause/resume logic in BRs | Baseline `task_sla` pause/resume conditions on `contract_sla` definitions | `markdown/it-service-management/service-level-management/service-level-management-concepts.md` |
 | Custom MIM table | Baseline MIM fields on `incident` + MIM Workbench | `markdown/it-service-management/incident-management/major-incident-overview.md` |
 | Duplicated baseline notification in custom BR | Extend the baseline notification record | `markdown/platform-administration/c_EmailNotifications.md` |
