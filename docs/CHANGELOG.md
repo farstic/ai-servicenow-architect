@@ -43,6 +43,13 @@ worked example were corrected with it.
   worked examples' own objects carry the `u_` or `x_` prefix the platform gives custom names; and where the
   corpus contradicts a sentence — classic approval rules are replaced by the Workflow Studio Ask for
   Approval action — the sentence now says what the corpus says.
+- The specialists' platform facts match the bundled documentation. Per-task SLAs live in Task SLA, case
+  states are the ones the Case API documents, an incident's priority is set from its impact and urgency,
+  migrations cite the import-set pages, PII is classified with Data Classification, a nightly precompute
+  goes to a Performance Analytics indicator rather than a system property, and Assists are estimated with
+  the skill's assist ratio. A hot spot whose request asks for a custom table, scoped app, portal, widget or
+  another object on its specialist's list of §1.1 triggers now answers Verdict C, with the baseline path in
+  the halt's open question, as the gateways' verdict table requires.
 
 ### Changed
 

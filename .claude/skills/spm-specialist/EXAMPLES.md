@@ -18,7 +18,7 @@ Two examples: a full guidance (Verdict A) and a §1.1 halt. Read alongside `SKIL
   *(citation: markdown/it-business-management/demand-management/demand-management-reference.md)*
 - **Delivery (agile):** approved demand → **epic** + **stories** (`rm_story`) on a backlog; sprints/boards.
   Use **Enterprise Agile Planning (SAFe)** if scaled (ARTs/PIs); plain scrum otherwise.
-  *(citation: markdown/it-business-management/agile-development/agile-2-mobile-app-overview.md)*
+  *(citations: markdown/it-business-management/agile-development/create-an-epic.md, markdown/it-business-management/enterprise-agile-planning/agile-configurations-in-eap.md)*
 - **Resourcing:** resource plans/requests against allocations & availability (soft → confirmed).
   *(citation: markdown/it-business-management/resource-management/rmw-references.md)*
 - **Alignment:** goal framework links demands/epics to strategic objectives (OKR-style).

@@ -137,7 +137,7 @@ None. Requirement is fully satisfied by baseline configuration.
 
 1. **Case create** — agent or auto-create from email/chat/portal. Form renders fields from baseline `sn_customerservice_case` and `task` parent.
 2. **Case categorisation** — agent sets `category`, `subcategory`, `priority`, `account`, `contact`/`consumer`, `contract`, `entitlement`.
-3. **Case work** — state transitions through `1` New → `10` Open → `18` Work in Progress → `3` Awaiting Info → `6` Resolved → `7` Closed.
+3. **Case work** — state transitions through `1` New → `10` Open → `18` Awaiting Info → `6` Resolved → `3` Closed *(citation: `markdown/api-reference/rest-apis/case-api.md`)*.
 4. **Reporting** — Performance Analytics indicators and reports run against `sn_customerservice_case` and join to `customer_account` for customer-segment analysis.
 
 The proposed "customer journey stage" is a **dimension** of the case record itself, not a new entity. It belongs on the case, not in a separate table.

@@ -147,7 +147,7 @@ You are bound by §1.1. You may not propose, recommend, or pre-approve any of th
 For every component, first evaluate whether baseline serves the requirement:
 
 1. **Existing baseline HR tables** — `sn_hr_core_case`, `sn_hr_le_case`, `sn_hr_core_profile`, `sn_hr_le_activity_set`, `sn_hr_le_activity`.
-2. **HR Case sub-state** (`sn_hr_core_case.sub_state` — not documented in the bundled corpus — verify on the instance; see the state model below) — use for COE-specific or sub-type-specific state variations rather than extending `state`.
+2. **Variants without new states** — never extend `state`: carry a COE- or sub-type-specific variant in a field. A case sub-state (`sn_hr_core_case.sub_state` — not documented in the bundled corpus — verify on the instance; see the state model below) can carry it where the instance has one.
 3. **`work_notes` / `comments`** — for audit and commentary on HR cases.
 4. **`sys_history_set`** — for field-level audit.
 5. **HR notifications** — reminders built from email templates and sent for Lifecycle Event activities and HR services, with their content in HR Email Content [`sn_hr_core_email_content`] *(citation: `markdown/employee-service-management/hr-service-delivery/HRNotifications.md`, `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*.
@@ -247,7 +247,7 @@ One of:
 ## Part 5 — Anti-Patterns to Block
 
 [Hard constraints. Examples:
-- **Do not extend `sn_hr_core_case.state` with new state values.** Use the HR case sub-state (`sub_state` — not documented in the bundled corpus — verify on the instance) for variant-state flows.
+- **Do not extend `sn_hr_core_case.state` with new state values.** Carry the variant in a field, or in the case sub-state where the instance has one (`sub_state` — not documented in the bundled corpus — verify on the instance).
 - **Do not create a custom HR Profile extension table.** Extend `sn_hr_core_profile` via dictionary. Citation: ...
 - **Do not duplicate Lifecycle Event activity sets in custom flows.** Use baseline `sn_hr_le_activity_set` records and configure activity definitions. Citation: ...]
 
@@ -281,14 +281,14 @@ One of:
 | 4 | Closed Incomplete | Closed without full resolution |
 | 7 | Cancelled | Cancelled |
 
-**Sub-state for variants:** `sn_hr_core_case.sub_state` — not documented in the bundled corpus — verify on the instance. Where the instance has it, it carries COE-specific or topic-specific sub-flows: extend the sub-state, not `state`.
+**Variants:** never add `state` values. A sub-state, `sn_hr_core_case.sub_state`, is not documented in the bundled corpus — verify on the instance. Where the instance has it, it can carry COE-specific or topic-specific sub-flows; where it does not, carry the variant in a field.
 
 **Baseline notifications (sample):** `hr_case.opened`, `hr_case.assigned`, `hr_case.commented`, `hr_case.resolved`, `hr_case.closed`.
 
 **Role gates:**
 - `sn_hr_core.basic` — read access to HR Case (filtered by subject_person or HR group membership)
 - `sn_hr_core.case_writer` — write access
-- `sn_hr_core.case_reader` — read-only access for specific COEs
+- `sn_hr_core.case_reader` — read access to all HR cases *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*
 - `sn_hr_core.admin` — administrative configuration *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*
 
 **subject_person vs opened_for:**
@@ -386,7 +386,7 @@ One of:
 | Anti-pattern | Why it's wrong | Baseline alternative | Citation |
 |---|---|---|---|
 | Custom HR Profile extension table | Breaks baseline employment-context joins | Extend `sn_hr_core_profile` via dictionary | `markdown/employee-service-management/` (HR Profile docs) |
-| Extending `sn_hr_core_case.state` with new values | HRSD uses the case sub-state for variants (`sub_state` — not documented in the bundled corpus — verify on the instance) | Extend the sub-state, leave `state` baseline | `markdown/employee-service-management/` (HR Case state model) |
+| Extending `sn_hr_core_case.state` with new values | A variant needs no new state value | Leave `state` baseline; carry the variant in a field, or in the sub-state where the instance has one (`sub_state` — not documented in the bundled corpus — verify on the instance) | `markdown/employee-service-management/` (HR Case state model) |
 | Custom flow for LE orchestration | Bypasses baseline activity-set library | Define `sn_hr_le_activity_set` + `sn_hr_le_activity` records | `markdown/employee-service-management/` (LE docs) |
 | Custom HR notification logic in Business Rules | Duplicates baseline HR notifications | Use HR notifications and their email content (`sn_hr_core_email_content`) | `markdown/employee-service-management/hr-service-delivery/HRNotifications.md` |
 | Custom HR Topics table | `sn_hr_core_topic_detail` covers it | Use baseline topic table | `markdown/employee-service-management/` |
@@ -415,14 +415,14 @@ One of:
 ### Hot spot 3 — "We need to track multiple HR cases for one employee with different states"
 
 **Reflexive bad design:** Custom HR sub-case table.
-**Baseline alternative:** `sn_hr_core_case` already supports multiple concurrent cases per `subject_person`. Use `state` and the case sub-state (see the state model) for variant flows.
+**Baseline alternative:** `sn_hr_core_case` already supports multiple concurrent cases per `subject_person`. Use `state` for the lifecycle, and a field (or the sub-state where the instance has one — see the state model) for variant flows.
 **Verdict:** Always A.
 
 ### Hot spot 4 — "We need a separate audit trail for HR Profile changes"
 
 **Reflexive bad design:** Custom `u_hr_profile_audit` table.
 **Baseline alternative:** Enable field auditing on `sn_hr_core_profile` fields via `sys_dictionary.audit = true`.
-**Verdict:** Always A.
+**Verdict:** C — the request names a separate audit trail, a new place to keep records — and the halt's OPEN QUESTION proposes field auditing on `sn_hr_core_profile`.
 
 ### Hot spot 5 — "We need to restrict HR notes by COE"
 
@@ -434,7 +434,7 @@ One of:
 
 **Reflexive bad design:** New portal definition with custom theme and pages.
 **Baseline alternative:** Use Employee Center Pro Journey Designer (if licensed) or configure baseline Employee Center with topic-filtered views.
-**Verdict:** A or B depending on Pro licensing.
+**Verdict:** C — the request names a custom portal — and the halt's OPEN QUESTION proposes Employee Center Pro Journey Designer (if licensed) or baseline Employee Center with topic-filtered views.
 
 ---
 
@@ -445,7 +445,7 @@ You fire twice per HRSD-tagged request. Second fire is the post-build review aft
 ### The four checks
 
 **Check 1 — Process-map alignment.** Spec respects OOB process map in Part 1?
-- Preserves baseline state transitions (state and the case sub-state)?
+- Preserves baseline state transitions — no new `state` values?
 - Preserves baseline notification timing?
 - Preserves baseline role gates (sn_hr_core.* roles)?
 - Respects subject_person vs opened_for distinction?
@@ -461,7 +461,7 @@ You fire twice per HRSD-tagged request. Second fire is the post-build review aft
 - Verdict C but spec exists without explicit approval → §1.1 violation.
 
 **Check 4 — Anti-pattern check.** Spec violates any Part 5 anti-pattern?
-- Particularly: scoped HR security disabled, PII in work_notes, custom audit tables, state-machine extensions on `state` instead of the case sub-state.
+- Particularly: scoped HR security disabled, PII in work_notes, custom audit tables, new values on `state`.
 
 ### Verdict
 

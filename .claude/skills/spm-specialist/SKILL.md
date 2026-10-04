@@ -29,7 +29,7 @@ Ground baseline claims in the Australia branch; cite the path. SPM evolves quick
 | Project management (PPM) | `markdown/it-business-management/project-management/c_ProjectApplicationOverview.md` |
 | Portfolio planning | `markdown/it-business-management/portfolio-management/portfolio-planning-overview.md` |
 | Resource management | `markdown/it-business-management/resource-management/rmw-references.md` |
-| Agile development | `markdown/it-business-management/agile-development/agile-2-mobile-app-overview.md` |
+| Agile development | `markdown/it-business-management/agile-development/create-an-epic.md`, `markdown/it-business-management/enterprise-agile-planning/agile-configurations-in-eap.md` |
 
 ## §1.1 Baseline-First
 SPM ships a deep baseline (demand, project, program, portfolio, resource, agile). The default answer to "do we need a custom demand/project/portfolio table" is **no**.
@@ -72,7 +72,7 @@ SPM ships a deep baseline (demand, project, program, portfolio, resource, agile)
 ### Agile / SAFe
 - **Stories** (`rm_story`), **epics**, **sprints**, **scrum tasks**, backlogs, boards.
 - **Enterprise Agile Planning** adds SAFe constructs — Agile Release Trains (ARTs), program increments, scaled planning. Choose scrum vs SAFe per the delivery model.
-*(citation: `markdown/it-business-management/agile-development/agile-2-mobile-app-overview.md`)*
+*(citations: `markdown/it-business-management/agile-development/create-an-epic.md`, `markdown/it-business-management/enterprise-agile-planning/agile-configurations-in-eap.md`)*
 
 ### Goals / alignment
 - The **goal framework** links work (demands/projects/epics) to strategic objectives (OKR-style), giving traceability from strategy to delivery.
@@ -85,13 +85,13 @@ SPM ships a deep baseline (demand, project, program, portfolio, resource, agile)
 | Custom project/task table | `pm_project` / `pm_project_task` + templates | `markdown/it-business-management/project-management/c_ProjectApplicationOverview.md` |
 | Custom portfolio/budget table | Portfolio planning + investment funding | `markdown/it-business-management/portfolio-management/portfolio-planning-overview.md` |
 | Custom resource allocation table | Resource plans/requests + allocations | `markdown/it-business-management/resource-management/rmw-references.md` |
-| Custom story/sprint table | `rm_story` / sprints / boards (scrum or SAFe) | `markdown/it-business-management/agile-development/agile-2-mobile-app-overview.md` |
+| Custom story/sprint table | `rm_story` / sprints / boards (scrum or SAFe) | `markdown/it-business-management/agile-development/create-a-backlog.md`, `markdown/it-business-management/enterprise-agile-planning/agile-configurations-in-eap.md` |
 | Custom `dmn_demand`/`pm_project` states | Configure within baseline state model (§1.1 review for new values) | `markdown/it-business-management/project-management/c_ProjectApplicationOverview.md` |
 
 ## §1.1 hot spots
-1. **"Our intake is special — build a custom demand form/table."** → `dmn_demand` with custom demand types + a tailored assessment set covers it. **Verdict A/B.**
-2. **"We need a custom resource model."** → Baseline resource plans/requests + allocations are rich; configure, don't rebuild. **Verdict A.**
-3. **"Agile is different here — custom story table."** → `rm_story` + boards (scrum) or SAFe (Enterprise Agile Planning). **Verdict A.**
+1. **"Our intake is special — build a custom demand form/table."** → `dmn_demand` with custom demand types + a tailored assessment set covers it. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes `dmn_demand` with those demand types and assessments.
+2. **"We need a custom resource model."** → Baseline resource plans/requests + allocations are rich; configure, don't rebuild. **Verdict C** — the request names a custom resource model, which shadows the baseline resource tables — and the halt's OPEN QUESTION proposes resource plans, requests and allocations.
+3. **"Agile is different here — custom story table."** → `rm_story` + boards (scrum) or SAFe (Enterprise Agile Planning). **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes `rm_story` with boards, or SAFe.
 
 ## Post-build review mode
 After Technical Designer returns an SPM spec, re-adopt to validate against this guidance:

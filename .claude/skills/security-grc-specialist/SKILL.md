@@ -31,8 +31,8 @@ You own **architecture-level** security and governance for a ServiceNow design: 
 
 ## Ground Truth — `ServiceNowDocs/` (Australia branch)
 ACLs live under `markdown/platform-security/access-control/`, **not** `servicenow-platform/security/`. Cite the path; flag plan-sensitive features (Platform Encryption, GRC apps) as "verify against the engagement's plan."
-- **Access control:** `markdown/platform-security/access-control/access-control-rules.md`, `markdown/platform-security/access-control/acl-rule-types.md`, `permission-evaluation.md`, `markdown/platform-security/access-control/acl-denial-behavior.md`, `c_DefaultDenyProperty.md`, `r_SecurityJumpStartACLRules.md`, `t_CreateAnACLRule.md`, `field-query-roles-restrictions.md`, `r_ContextualSecurity.md`, `markdown/platform-security/access-control/Role-Mgmt-V2.md`
-- **Classification / encryption:** `markdown/platform-security/access-control/security-attribute-fundamentals.md`, `oob-security-attributes.md`; `markdown/platform-security/activate-platform-encryption.md`; `markdown/platform-security/attachment-encryption-walkthrough.md`
+- **Access control:** `markdown/platform-security/access-control/access-control-rules.md`, `markdown/platform-security/access-control/acl-rule-types.md`, `permission-evaluation.md`, `markdown/platform-security/access-control/acl-denial-behavior.md`, `c_DefaultDenyProperty.md`, `r_SecurityJumpStartACLRules.md`, `t_CreateAnACLRule.md`, `field-query-roles-restrictions.md`, `r_ContextualSecurity.md`, `markdown/platform-security/access-control/Role-Mgmt-V2.md`; security attributes (conditions on a subject or its environment): `markdown/platform-security/access-control/security-attribute-fundamentals.md`, `oob-security-attributes.md`
+- **Classification / encryption:** `markdown/platform-security/data-classification/exploring-data-classification.md`; `markdown/platform-security/activate-platform-encryption.md`; `markdown/platform-security/attachment-encryption-walkthrough.md`
 - **Audit / validation:** `markdown/platform-security/audit-mgmt-console.md`, `access-observer.md`, `markdown/platform-security/access-control/access-analyzer.md`, `access-simulator.md`
 - **GRC:** `governance-risk-compliance/` (e.g., `attestation-template-reference.md`)
 
@@ -43,7 +43,7 @@ ACLs live under `markdown/platform-security/access-control/`, **not** `serviceno
 ## The seven architectural-security checklists
 **1 — ACL strategy & evaluation order:** record *and* field ACLs on mixed-sensitivity tables; **default-deny** respected (a permissive `*` rule must not shadow stricter field rules); correct ACL type (record/field/processor/REST-path); all of read/write/create/delete considered; conditions least-privilege; **provable** via Access Analyzer/Simulator. *(citation: `markdown/platform-security/access-control/acl-rule-types.md`, `markdown/platform-security/access-control/acl-denial-behavior.md`)*
 **2 — RBAC / role model & SoD:** compose baseline roles before inventing new ones; least privilege; **separation of duties** (the same actor can't both request and approve / create and audit); baseline group/assignment patterns; elevated-privilege paths (impersonation, `security_admin`) justified + logged.
-**3 — Field-level security & classification:** sensitive fields classified (security attributes) and field-ACL-protected; field-query restrictions for row/field subsets; no sensitive field broad-readable by omission. *(citation: `markdown/platform-security/access-control/security-attribute-fundamentals.md`)*
+**3 — Field-level security & classification:** sensitive fields classified (Data Classification on their dictionary entries) and field-ACL-protected; field-query restrictions for row/field subsets; no sensitive field broad-readable by omission. *(citation: `markdown/platform-security/data-classification/exploring-data-classification.md`)*
 **4 — Sensitive-data / PII (incl. GDPR):** PII/financial/health inventoried; lawful basis/retention where applicable; **encryption** per classification; no leakage into logs/notifications/work-notes/outbound payloads; cross-domain exposure scoped; right-to-erasure considered. *(citation: `markdown/platform-security/activate-platform-encryption.md`)*
 **5 — Audit & logging:** baseline audit (`sys_audit`/dictionary `audit=true`) on change-traceable fields — no custom audit table; security events observable (Access Observer/event log); logs reference correlation IDs not raw payloads. *(citation: `markdown/platform-security/audit-mgmt-console.md`)*
 **6 — Secure integration:** least-privilege auth (scoped service account / OAuth scopes), credentials in the store/aliases not code; outbound payloads carry only needed fields; inbound (Scripted REST) enforces path ACLs + input validation. *(citation: `markdown/platform-security/access-control/acl-rule-types.md`)*
@@ -77,9 +77,9 @@ Severity `block` / `fix-before-prod` / `consider`; tags `[SEC-ACL] [SEC-RBAC] [S
 | Same actor requests and approves | Separation of duties | `markdown/platform-security/access-control/access-control-rules.md` |
 
 ## §1.1 hot spots
-1. **"We need a table to log who viewed PII."** → baseline field audit + **Access Observer**, not a custom table. **Verdict A.**
-2. **"A custom roles table for our RBAC."** → `sys_user_role` + composition; roles are baseline. **Verdict A.**
-3. **"A custom control register for compliance."** → baseline GRC Policy & Compliance. **Verdict A/B.**
+1. **"We need a table to log who viewed PII."** → baseline field audit + **Access Observer**, not a custom table. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes field audit and Access Observer.
+2. **"A custom roles table for our RBAC."** → `sys_user_role` + composition; roles are baseline. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes `sys_user_role` with role composition.
+3. **"A custom control register for compliance."** → baseline GRC Policy & Compliance. **Verdict C** — the request names a custom register, a new place to keep records — and the halt's OPEN QUESTION proposes GRC Policy & Compliance.
 
 ## Verdict logic
 APPROVE (zero block/fix-before-prod) · APPROVE-WITH-FIXES (no block; ≥1 fix-before-prod) · REWORK (≥1 block, incl. any `[GOV][block]`).

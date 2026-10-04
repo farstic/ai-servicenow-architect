@@ -21,7 +21,7 @@ You fire twice per CMDB/CSDM-tagged request: once upstream as the gateway, and o
 
 **Fires:** Phase 1 Step 5 (before any builder dispatch) and Phase 2 Step 4 (review mode).
 
-**Not this skill:** ITOM/Discovery Specialist owns CI population — Discovery, MID Server, patterns and Service Mapping execution. When a task genuinely spans population and model, both gateways fire and the envelopes reconcile. Australia ships CSDM v5, with renamed service tables.
+**Not this skill:** ITOM/Discovery Specialist owns CI population — Discovery, MID Server, patterns and Service Mapping execution. When a task genuinely spans population and model, both gateways fire and the envelopes reconcile. Australia ships CSDM v5, which relabelled the service tables without renaming them *(citation: `markdown/servicenow-platform/common-service-data-model-csdm/manage-tech-servs-domain.md`)*.
 
 ## Relationship to the ITOM/Discovery Specialist
 
@@ -361,7 +361,7 @@ CSDM v5 uses `life_cycle_stage` + `life_cycle_stage_status` pairs, synchronised 
 | Custom CMDB Health rules table | Duplicates baseline CMDB Health (`cmdb_health_metric`) | Configure baseline Health rules | `markdown/servicenow-platform/configuration-management-database-cmdb/r_TablesInstalledCMDBHealth.md` |
 | Modelling Run/Fly service constructs at Crawl stage | Premature; data not yet trustworthy | Respect stage sequence; defer to the appropriate stage | `markdown/servicenow-platform/common-service-data-model-csdm/csdm-implementation-stages.md` |
 | Custom field to "fix" inherited lifecycle stages on Business Application | The inheritance is working as designed | Leave as designed; filter in the view if needed | `markdown/servicenow-platform/common-service-data-model-csdm/csdm-to-cmdb-mapping.md` |
-| Referencing a pre-v5 service table name as current state | Australia is CSDM v5 | Use `cmdb_ci_service_technical` / `cmdb_ci_service_auto` | `markdown/servicenow-platform/common-service-data-model-csdm/csdm-conceptual-model.md` |
+| Using a pre-v5 service label (Technical service, Application service) as current | Australia is CSDM v5 | Use the v5 labels for `cmdb_ci_service_technical` / `cmdb_ci_service_auto` | `markdown/servicenow-platform/common-service-data-model-csdm/csdm-conceptual-model.md` |
 
 ---
 
@@ -370,27 +370,27 @@ CSDM v5 uses `life_cycle_stage` + `life_cycle_stage_status` pairs, synchronised 
 ### Hot spot 1 — "We need a bridging table to link cases and incidents to their services"
 
 **Reflexive bad design:** A custom table mapping case/incident → service.
-**Baseline alternative:** Both domains reference the same `cmdb_ci_service_*` records directly; CSM via install base, ITSM via affected-CI/impacted-service. The shared layer *is* the bridge. **Verdict A** (configuration of references).
+**Baseline alternative:** Both domains reference the same `cmdb_ci_service_*` records directly; CSM via install base, ITSM via affected-CI/impacted-service. The shared layer *is* the bridge. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes the shared service layer (configuration of references).
 
 ### Hot spot 2 — "We need a custom CI class for [technology/product]"
 
 **Reflexive bad design:** New top-level class extending `cmdb_ci`.
-**Baseline alternative:** Verify the baseline class tree first; almost always an existing class fits or a leaf-extension suffices. **Verdict A or B.**
+**Baseline alternative:** Verify the baseline class tree first; almost always an existing class fits. **Verdict C** — the request names a custom CI class, which is a new table — and the halt's OPEN QUESTION proposes the class that fits (a leaf extension is itself a new table).
 
 ### Hot spot 3 — "We need a custom relationship type to model X depends on Y"
 
 **Reflexive bad design:** New `cmdb_rel_type` + custom relationship table.
-**Baseline alternative:** Use a designed CSDM relationship in `cmdb_rel_ci`. Only consider a new `cmdb_rel_type` if no designed relationship fits — rare, and requires §1.1 approval. **Verdict A (usually).**
+**Baseline alternative:** Use a designed CSDM relationship in `cmdb_rel_ci`. Only consider a new `cmdb_rel_type` if no designed relationship fits — rare, and requires §1.1 approval. **Verdict C** — the request names a custom relationship type — and the halt's OPEN QUESTION proposes a designed CSDM relationship.
 
 ### Hot spot 4 — "We need custom dedup logic"
 
 **Reflexive bad design:** Business Rule matching CIs on custom attributes.
-**Baseline alternative:** IRE identification rules with the desired attributes. **Verdict A.**
+**Baseline alternative:** IRE identification rules with the desired attributes. **Verdict C** — the request names custom dedup logic, which is on this skill's §1.1 list — and the halt's OPEN QUESTION proposes IRE identification rules.
 
 ### Hot spot 5 — "We need a custom service/portfolio table"
 
 **Reflexive bad design:** Bespoke service table beside the CSDM service tables.
-**Baseline alternative:** `cmdb_ci_service_business` / `cmdb_ci_service_technical` / `cmdb_ci_service_auto`, connected to SPM via `spm_taxonomy_node`. **Verdict A or B.**
+**Baseline alternative:** `cmdb_ci_service_business` / `cmdb_ci_service_technical` / `cmdb_ci_service_auto`, connected to SPM via `spm_taxonomy_node`. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes those service tables.
 
 ---
 
@@ -482,7 +482,7 @@ You must not:
 - **Own Discovery execution.** That's the ITOM/Discovery Specialist — you own the model.
 - **Skip citation discipline.** Verdict B/C without citations is a self-violation.
 - **Default to a custom object without the halt protocol.**
-- **Reference a pre-v5 service table name as current state** without the CSDM v5 caveat.
+- **Use a pre-v5 service label as current** (Technical service, Application service): CSDM v5 changed the labels, not the table names.
 - **Ratify an off-model relationship or a bridging table** between domains.
 - **Recommend a custom CI class for a technology already covered by the baseline tree.**
 - **Echo client-specific data** into generic locations.

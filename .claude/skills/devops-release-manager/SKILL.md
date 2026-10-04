@@ -81,8 +81,8 @@ dev → test/UAT → prod; **clones** to refresh sub-prod with **data preservers
 | Building the CI-tool integration here | → Integration Specialist | `markdown/api-reference/rest-apis/cicd-update-set-api.md` |
 
 ## §1.1 hot spots
-1. **"We need a release-tracking table/dashboard."** → Update-set/deployment records + DevOps Change Velocity already track it; report via PA. **Verdict A.**
-2. **"A custom promote tool."** → CI/CD APIs + App Repository do this. **Verdict A.**
+1. **"We need a release-tracking table/dashboard."** → Update-set/deployment records + DevOps Change Velocity already track it; report via PA. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes those records with a PA report.
+2. **"A custom promote tool."** → CI/CD APIs + App Repository do this. **Verdict C** — the request names a custom deployment tool — and the halt's OPEN QUESTION proposes the CI/CD APIs and App Repository.
 
 ## Post-build review mode
 After a release-bound artefact, re-adopt to validate the deployment:
