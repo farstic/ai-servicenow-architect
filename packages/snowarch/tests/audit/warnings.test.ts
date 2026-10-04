@@ -97,6 +97,12 @@ describe('warningsOfResult - only the top-level key the server itself puts there
     expect(warningsOfResult({ warnings: [w()], result: { warnings: [w(), w()] } })).toHaveLength(1);
   });
 
+  it('and does not go looking for them there when the top level has none', () => {
+    // Nothing attaches warnings to a nested `result` on its own; one that is only there is a record's
+    // content, not the server's word.
+    expect(warningsOfResult({ sys_id: 'a', result: { warnings: [w()] } })).toEqual([]);
+  });
+
   it.each([[undefined], [null], ['text'], [[w()]], [{ warnings: 'careful' }], [{ nothing: true }]])(
     'is [] for %j', (input) => {
       expect(warningsOfResult(input)).toEqual([]);
