@@ -217,14 +217,13 @@ sequenceDiagram
     rect rgb(245, 240, 230)
     Note over CA,CSM: Engine checks baseline first
     CA->>CSM: Take a look — this is CSM territory
-    CSM->>CSM: Evaluate baseline candidates:<br/>• work_notes (free text only)<br/>• sys_history_set (no reason field)<br/>• case.escalation (flag, not a log)<br/>• sn_customerservice_escalation (baseline in Australia — see note)
-    Note over CSM: Correction 2026-10-03 — in Australia the escalation record IS baseline;<br/>this walkthrough keeps the halt shape for illustration only
-    CSM-->>CA: No baseline construct covers a structured per-event log.<br/>This needs explicit approval before we build it.
+    CSM->>CSM: Evaluate baseline candidates:<br/>• work_notes (free text only)<br/>• sys_history_set (no reason field)<br/>• case.escalation (flag, not a log)<br/>• sn_customerservice_escalation — the case escalation record (baseline)
+    CSM-->>CA: The baseline escalation record covers it —<br/>who escalated, the reason, the history.<br/>The request names a separate log, so the decision is yours.
     end
 
     rect rgb(254, 235, 235)
     Note over CA,You: §1.1 HARD STOP — engine pauses
-    CA->>You: Here is what baseline can do (none of it fits).<br/>Here is the smallest custom table that would work.<br/>Here are the consequences if you approve.<br/>Here are degraded alternatives if you reject.<br/><br/>What's your decision?
+    CA->>You: Here is the baseline that covers it (recommended).<br/>Here is the table you named, rejected as unnecessary.<br/>Here are the consequences if you approve it anyway.<br/><br/>What's your decision?
     Note over CA: NO table model produced.<br/>NO code produced.<br/>NO design artefact of any kind.
     CA-x Builder: ❌ Builders not dispatched
     end
@@ -240,18 +239,18 @@ sequenceDiagram
     end
 ```
 
-The key moment is the red zone. The engine **pauses**: no table model, no field list, no ACL matrix, no code. It surfaces the four baseline candidates it considered, names the smallest possible custom object it would propose, lists the consequences, and offers degraded alternatives. Then it waits.
+The key moment is the red zone. The engine **pauses**: no table model, no field list, no ACL matrix, no code. It shows the baseline it evaluated and what that covers, names the custom object you asked for — with no design — lists the consequences of approving it, and offers the baseline path. Then it waits.
 
 ### What you receive (before you've decided)
 
 A pause. The message contains:
 
-1. **The baseline candidates evaluated** — and exactly why each falls short.
-2. **The custom object proposed** — at the smallest possible scope.
+1. **The baseline evaluated** — what it covers, and where it falls short.
+2. **The custom object you named** — its kind, its place in the §1.1 hierarchy and what it would hold, or why it is not needed.
 3. **Consequences of approval** — data model impact, deployment, support cost, upgrade risk.
-4. **Alternatives if rejected** — degraded paths using baseline only.
+4. **Alternatives if rejected** — the baseline path, with any gap as an open question.
 
-What you will *not* see: a table name, field list, ACL matrix, code, or ERD. If you do see those in the same response as the OPEN QUESTION, the engine has bypassed §1.1 — that's a bug; please flag it. (This is regression-tested as **T-10**.)
+What you will *not* see: a field list, column types, an ACL matrix, code, or an ERD. If you do see those in the same response as the OPEN QUESTION, the engine has bypassed §1.1 — that's a bug; please flag it. (This is regression-tested as **T-10**.)
 
 ### What to do next
 
@@ -260,7 +259,7 @@ Four legitimate responses:
 | Reply | What happens |
 |---|---|
 | `"Approved. Use a new table in the existing x_acme_csm scoped app."` | The engine resumes and builds it with the approved scope as a constraint |
-| `"Rejected — use the work_notes baseline alternative instead."` | The engine produces a baseline-only design with documented gaps |
+| `"Rejected — use the baseline escalation record."` | The engine designs on the baseline, with any gap as an open question |
 | `"Re-evaluate option 2 more carefully — I think there's a baseline path."` | The CSM Specialist re-runs with the refined constraint |
 | `"Defer this feature to the next release."` | The engine acknowledges and closes the thread |
 
