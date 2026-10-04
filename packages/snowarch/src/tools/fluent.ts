@@ -101,9 +101,11 @@ export function fluentToolManifest(): ToolDefinition[] {
     {
       name: 'snow_fluent_request_batch',
       description:
-        'Execute multiple ServiceNow REST API operations in a single HTTP call. ' +
-        'Reduces round-trips by 50-70%. Each operation specifies method, URL path, and optional body. ' +
-        'Max 50 operations per batch.',
+        'Execute multiple ServiceNow REST API operations in a single HTTP call (the Batch API). ' +
+        'Each operation specifies id, method, URL path (relative, with its query) and an optional body; the body is ' +
+        'sent Base64 encoded, as the Batch API requires, and each result body comes back decoded (parsed when it is JSON). ' +
+        'This tool accepts at most 50 operations. If the platform reached a size or processing limit, the operations it did not ' +
+        'process are listed in `unserviced` with a `note`: they have NOT been run.',
       inputSchema: {
         type: 'object',
         properties: {

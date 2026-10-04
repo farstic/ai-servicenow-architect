@@ -15,6 +15,43 @@ import { currentInstanceOrNull } from './context.js';
  * answer. `INSUFFICIENT_PRIVILEGES` (a 403) is an access decision, not a fault (ARC-09-C99).
  */
 const NOT_RETRIED = ['AUTHENTICATION_FAILED', 'INVALID_REQUEST', 'NOT_FOUND', 'INSUFFICIENT_PRIVILEGES'];
+// ─── The Batch API's bodies (ARC-09-C108) ────────────────────────────────────────────────────
+//
+// vendor/ServiceNowDocs/markdown/api-reference/rest-apis/batch-api.md: `rest_requests.body` is the
+// "Base64-encoded body of the request ... Before encoding, the body can be in any format", and
+// `serviced_requests.body` is the "Base64 encoded body of the response. To get the value of the body,
+// Base64 decode the content of this parameter."
+/** A request body as the page wants it: the Base64 of its text. A string is a body in a format of the caller's choosing. */
+function encodeBatchBody(body) {
+    const text = typeof body === 'string' ? body : JSON.stringify(body);
+    return Buffer.from(text, 'utf8').toString('base64');
+}
+/**
+ * A response body as the caller can use it: decoded, then parsed when it is JSON. Base64 that is not JSON
+ * (the page's own example answers in XML) comes back as the decoded text. A string that is NOT Base64 - or
+ * whose bytes are not UTF-8, which is what a short plain word like "test" decodes to - is kept as it came:
+ * guessing would turn a plain body into garbage. A body that is already JSON text is parsed.
+ */
+function decodeBatchBody(body) {
+    if (typeof body !== 'string' || body === '')
+        return body;
+    const compact = body.replace(/\s+/g, '');
+    let text = body;
+    if (/^[A-Za-z0-9+/]+={0,2}$/.test(compact) && compact.length % 4 === 0) {
+        const decoded = Buffer.from(compact, 'base64').toString('utf8');
+        // The round trip is the whole test: bytes that are not UTF-8 decode to replacement characters, which
+        // do not encode back to the same string, and a string that is not canonical Base64 does not either.
+        // (A check for U+FFFD in the text would add nothing and would refuse a body that really contains one.)
+        if (Buffer.from(decoded, 'utf8').toString('base64') === compact)
+            text = decoded;
+    }
+    try {
+        return JSON.parse(text);
+    }
+    catch {
+        return text;
+    }
+}
 // ─── Input validation helpers ────────────────────────────────────────────────
 /** Validate and sanitize ServiceNow table names (alphanumeric + underscores only) */
 function validateTableName(table) {
@@ -993,7 +1030,7 @@ export class ServiceNowClient {
                     { name: 'Content-Type', value: 'application/json' },
                     { name: 'Accept', value: 'application/json' },
                 ],
-                ...(op.body ? { body: JSON.stringify(op.body) } : {}),
+                ...(op.body ? { body: encodeBatchBody(op.body) } : {}),
             })),
         };
         const url = `${this.baseUrl}/api/now/v1/batch`;
@@ -1002,25 +1039,29 @@ export class ServiceNowClient {
                 method: 'POST',
                 body: JSON.stringify(batchPayload),
             });
-            // Parse individual responses
-            const results = (response.serviced_requests || []).map((r) => {
-                let parsedBody;
-                try {
-                    parsedBody = typeof r.body === 'string' ? JSON.parse(r.body) : r.body;
-                }
-                catch {
-                    parsedBody = r.body;
-                }
-                return {
-                    id: r.id,
-                    status_code: r.status_code,
-                    body: parsedBody,
-                };
-            });
+            // Each item's body is Base64 (see decodeBatchBody); `id` and `status_code` are kept as they were.
+            const results = (response.serviced_requests || []).map((r) => ({
+                id: r.id,
+                status_code: r.status_code,
+                body: decodeBatchBody(r.body),
+            }));
+            // `unserviced_requests`: the ids the platform did not process because the batch reached a size or
+            // processing limit. Without this a cut batch returned fewer results than operations, with no word
+            // that the missing ones had not run - and in a batch of writes, that is the dangerous half.
+            const unserviced = (Array.isArray(response.unserviced_requests) ? response.unserviced_requests : [])
+                .map((u) => (u !== null && typeof u === 'object' ? u.id : u))
+                .filter((u) => u !== undefined && u !== null)
+                .map((u) => String(u));
             return {
                 batch_id: batchPayload.batch_request_id,
                 total: operations.length,
                 results,
+                unserviced,
+                ...(unserviced.length > 0 ? {
+                    note: `${unserviced.length} of ${operations.length} operation(s) were not processed because the batch `
+                        + `reached a size or processing limit: ${unserviced.join(', ')}. They have not been run; send them `
+                        + 'again in a smaller batch after checking which of the others took effect.',
+                } : {}),
             };
         }
         catch (error) {

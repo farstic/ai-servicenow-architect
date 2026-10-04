@@ -243,6 +243,30 @@ it prints neither the column's name nor which dictionary columns are references)
 `max_length` means "not stated" rather than a default (the corpus says only that the value matters for
 String fields, `r_DictionaryEntryForm.md`). Both are checked on the instance, not here.
 
+## PN-11 — The Batch API Base64-encodes the body of every request and every answer, and lists what it did not process
+
+**Applies to:** `POST /api/now/{api_version}/batch` · Australia family · from the documentation, not yet observed on an instance
+**Behaviour:** In a batch, each `rest_requests.body` is the **Base64-encoded** body of that request ("Before
+encoding, the body can be in any format. For example, XML or JSON"), and each `serviced_requests.body` is the
+**Base64-encoded** body of that answer ("To get the value of the body, Base64 decode the content"). A body
+that is plain JSON in the request is therefore not a body the platform can read, and a body in the answer is
+not JSON until it is decoded. When the batch reaches a size or processing limit (5 MB per request item and
+10 MB per answer item by default; a 30-second transaction quota), the platform cancels the transaction and
+lists the requests it did not process in `unserviced_requests`; the ones before them in `serviced_requests`
+have run. Each item also carries `status_code`, `status_text`, `error_message`, `redirect_url`,
+`execution_time` and `headers`.
+**Grounding:** `markdown/api-reference/rest-apis/batch-api.md` (the request and response parameter tables,
+the size and processing limits, and the cURL example whose answers decode to XML and JSON).
+**Evidence:** the documentation only. `client.batchRequest` sent plain JSON and returned undecoded bodies, and
+ignored `unserviced_requests`, until ARC-09-C108; that the platform now accepts what is sent has not been
+confirmed against an instance.
+**Engine consequence:** `client.batchRequest` Base64-encodes each request body (a string is taken as a body in
+the caller's own format), decodes each answer body (JSON is parsed, other Base64 text is returned as text, and
+anything that is not Base64 is kept as it came), and returns `unserviced` (always) with a `note` naming the
+operations that did not run. The cut-value check (PN-10) reads the same answer. This tool's own cap of 50
+operations is not a platform limit the page states. `error_message`, `status_text`, `redirect_url`,
+`execution_time` and `headers` are still not passed to the caller.
+
 ## Windows notes — this repository, not ServiceNow
 
 The notes above are ServiceNow behaviour. These are about the machine the engine runs on, and they

@@ -428,10 +428,10 @@ function tableTarget(url: unknown): { table: string; sysId?: string } | null {
 
 /**
  * The answer's body as an object, whatever shape it arrived in. The documented API sends
- * `serviced_requests.body` Base64 encoded (`api-reference/rest-apis/batch-api.md`), and
- * `client.batchRequest` passes it on undecoded because its `JSON.parse` fails on Base64; a parsed
- * object (a mock, or a client that decoded it) and JSON text are read as they are. Anything that does
- * not come out as an object is not a record to compare.
+ * `serviced_requests.body` Base64 encoded (`api-reference/rest-apis/batch-api.md`). `client.batchRequest`
+ * decodes it since ARC-09-C108, so this normally receives an object; it still reads Base64 and JSON text,
+ * because the wrapper does not own the client it wraps (a test double, or a client that did not decode).
+ * Anything that does not come out as an object is not a record to compare.
  */
 function batchBody(body: unknown): Record<string, unknown> | undefined {
   if (isObject(body)) return body;
