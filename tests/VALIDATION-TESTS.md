@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 23 tests, T-01 through T-23, no number reserved. The count is asserted by
+> **How many.** 24 tests, T-01 through T-24, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -790,8 +790,8 @@ proceed: produce the Licensing & Entitlement Constraint Note under its name
 
 1. Architect restates the task.
 2. **§1.1 evaluation (Phase 1 Step 4) HALTS** — custom table + new scoped app, unapproved. No design artefact or build in the same turn.
-3. **Licensing & Entitlement consult fires (§3.1)** — custom table/scoped app (App Engine units) + 400 requester→write (fulfiller-subscription delta) triggers. The Architect adopts `.claude/skills/licensing-specialist/SKILL.md` and produces a **Licensing Constraint Note**.
-4. The Note **prices** the custom path (≈400 fulfiller subscriptions + App Engine units + build/upgrade) and feeds that into the §1.1 ruling — it does **not** approve the custom object.
+3. **Licensing & Entitlement consult fires (§3.1)** — custom table/scoped app (custom table entitlements) + 400 requester→write (fulfiller-subscription delta) triggers. The Architect adopts `.claude/skills/licensing-specialist/SKILL.md` and produces a **Licensing Constraint Note**.
+4. The Note **prices** the custom path (≈400 fulfiller subscriptions + custom table entitlements + build/upgrade) and feeds that into the §1.1 ruling — it does **not** approve the custom object.
 5. SKU/tier claims (e.g., FSM ownership) are flagged "verify against the engagement's subscription"; no prices quoted.
 6. The §1.1 ruling, once made, is recorded as an **ADR** (governance §4.1).
 
@@ -1184,6 +1184,55 @@ nothing to write to`, makes **no MCP call**, and asks no write question — for 
 
 ---
 
+## T-24 — FSO Insurance Gateway: fires on the domain, with no listed keyword
+
+**Covers:** Phase 1 Step 5 (FSO Insurance gateway, with the CSM co-fire)
+**Modes:** design-only ✅ · live ✅
+
+### Prompt
+
+```
+Our motor insurance customers should be able to report a car accident from our website, attach
+photos of the damage, and have the report land with a loss assessor who estimates the repair cost
+and decides how much of it we settle. Design how this works on the platform.
+```
+
+The prompt names none of the FSO gateway's trigger keywords and none of CSM's (`CLAUDE.md` §5,
+Step 5). That is the point of the test: the gateway has to fire on the DOMAIN — a motor insurer's
+loss report, its assessment and its settlement — the way T-10's request has to fire the ITSM
+gateway with no listed keyword in it.
+
+### Expected behaviour
+
+1. Architect restates the task.
+2. **FSO Insurance Specialist gateway fires (Phase 1 Step 5)** in this turn: the Architect invokes
+   the skill or reads `.claude/skills/fso-insurance-specialist/SKILL.md`, and writes the 5-Part
+   Constraint Envelope itself.
+3. **CSM Specialist co-fires.** Every FSO case table sits on the CSM case model, so the Envelope's
+   routing part names CSM as co-firing and reconciles the two.
+4. Part 2 maps the need onto the baseline claims applications the skill lists — Insurance Claims
+   Core and the personal lines claims tables — with each name as the corpus spells it. Part 3
+   Verdict: **A or B**. **The letter is not a criterion** — only a Verdict C halt, for a need the
+   baseline claims applications cover, fails this test.
+5. Architect proposes a builder and waits for approval. Nothing is designed before the Envelope
+   exists.
+
+### Pass criteria
+
+- The FSO Insurance gateway fires **automatically** at Phase 1 Step 5, though the prompt names none
+  of its keywords.
+- The Envelope is written in the same turn, and names CSM as co-firing.
+- No builder is dispatched and no design is produced before the Envelope.
+
+### Fail signals
+
+- The gateway is deferred until a keyword appears — "it fires once the line of business is
+  named" — which is how T-10 failed.
+- CSM Specialist fires alone, or ITSM fires because an accident was read as an incident.
+- A design artefact or a builder dispatch before the Envelope.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -1210,7 +1259,7 @@ When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `gove
 
 ## Running all tests
 
-Twenty manual tests, one fresh `claude` session each — a session that has already seen T-01 is not
+Twenty-four manual tests, one fresh `claude` session each — a session that has already seen T-01 is not
 a fresh session for T-02, and the routing behaviour under test is exactly what prior context changes.
 
 ```sh

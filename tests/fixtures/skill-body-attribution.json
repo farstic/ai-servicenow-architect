@@ -10,9 +10,10 @@
     "ARC-03-C5": "a fact the cited page changed: the AI-native tier names and AI Control Tower's tier coverage, automatic entitlement assignment, and the record-trigger settings plus the reactivation re-run warning",
     "ARC-09-C78": "the 2026-10-03 prompt-audit port: sub-agents read the local corpus instead of fetching it, the confidentiality rule is folder discipline, the baseline scope is the default, the dead override sentence and the duplicated citation rows removed, the phase labels dropped, the CSDM v5 names and the MI Workbench citation, every delivered figure draw.io, and the CSM Example 3 correction",
     "ARC-09-C81": "the 2026-10-04 identifier check: each ServiceNow name the corpus does not have replaced by the corpus name, cited, or renamed into the example's own u_/x_ namespace, and the sentence that carried it corrected where the corpus contradicts it (classic approval rules replaced, CSDM v5 relabelled rather than renamed, SLA business time on a schedule)",
-    "ARC-09-C82": "the 2026-10-04 roster-facts pass against the bundled corpus: each claim the corpus contradicts or does not carry corrected in the corpus's own words and cited (task SLAs, case states, priority set from impact and urgency, import-set pages for transform maps, Data Classification for PII, PA indicators instead of system properties, the Assist ratio), and every hot spot whose request asks for one of its skill's §1.1 triggers given Verdict C, with the baseline path in the halt's OPEN QUESTION"
+    "ARC-09-C82": "the 2026-10-04 roster-facts pass against the bundled corpus: each claim the corpus contradicts or does not carry corrected in the corpus's own words and cited (task SLAs, case states, priority set from impact and urgency, import-set pages for transform maps, Data Classification for PII, PA indicators instead of system properties, the Assist ratio), and every hot spot whose request asks for one of its skill's §1.1 triggers given Verdict C, with the baseline path in the halt's OPEN QUESTION",
+    "ARC-09-C83": "the 2026-10-04 licensing-wording pass: \"App Engine units\", a term the bundled corpus does not use, replaced by its own — the custom table entitlements of the subscription a table is mapped to, an App Engine subscription as the example — with the keyword lists keeping the user's word beside the two corpus terms"
   },
-  "_measured": "61 of 65 bodies differ (4 identical), 2026-10-04, against import/engine-v2.8.0-worktree. The eight that ARC-09-C82a newly reached are the EXAMPLES of code-reviewer, developer, estimation-specialist, migration-specialist, operational-documentation, performance-scale-specialist, security-grc-specialist and spm-specialist; ARC-09-C82b's thirteen roster files were already listed, so the count holds. The FSO skill postdates the import tag, so its two files are outside this comparison and this ledger.",
+  "_measured": "61 of 65 bodies differ (4 identical), 2026-10-04, against import/engine-v2.8.0-worktree. The eight that ARC-09-C82a newly reached are the EXAMPLES of code-reviewer, developer, estimation-specialist, migration-specialist, operational-documentation, performance-scale-specialist, security-grc-specialist and spm-specialist; ARC-09-C82b's thirteen roster files were already listed, so the count holds. ARC-09-C83's two licensing files were already listed, so the count holds. The FSO skill postdates the import tag, so its two files are outside this comparison and this ledger.",
   "files": {
     "agents/atf-author.md": [
       "ARC-02-S06",
@@ -194,13 +195,15 @@
     "skills/licensing-specialist/EXAMPLES.md": [
       "ARC-02-S06",
       "ARC-03-S04",
-      "ARC-09-C82"
+      "ARC-09-C82",
+      "ARC-09-C83"
     ],
     "skills/licensing-specialist/SKILL.md": [
       "ARC-02-S03",
       "ARC-03-S04",
       "ARC-03-C5",
-      "ARC-09-C82"
+      "ARC-09-C82",
+      "ARC-09-C83"
     ],
     "skills/migration-specialist/SKILL.md": [
       "ARC-02-S03",
