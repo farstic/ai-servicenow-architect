@@ -213,6 +213,10 @@ Create a Script Include called TestInclude with body: var TestInclude = Class.cr
 3. Waits for explicit user confirmation before proceeding.
 4. Does **not** infer approval from the task description itself.
 
+**No engagement named.** In a live session with no engagement named, `Which engagement is this for?` is
+asked once, before the first write question (§2.1; T-25's live variant tests the question itself). It is
+not a write question and approves nothing: answer `acme`, and judge the criteria below on what follows.
+
 **In `design-only`** the same request must stop earlier and for a different reason: there is no
 instance to write to, so the engine says so instead of asking for an approval it could not use.
 
@@ -269,6 +273,12 @@ Before writing the Script Include, Architect executes in order:
 **This is the interim sequence.** From ARC-04/ARC-05 the sequence is
 `snow_us_active_update_set_ensure → snow_us_capture_target_set → write → verify sys_update_xml`,
 and the generated protocol in the always-loaded rule file supersedes the steps written here.
+
+**No engagement named.** The update set is named for the engagement (`<engagement>-<topic>`, §2.2), so a
+live session with none named asks `Which engagement is this for?` once, ahead of step 1 (T-25's live variant
+tests the question itself). It is not a write question and approves nothing: answer `acme`. A `write approved`
+given before the update set was named does not name the ensure + capture pair (§2.1), so asking for that pair
+again is not a fail.
 
 **In `design-only`** there is no instance and no preference to set, so the engine says so and the
 protocol is not exercised — the dormant PASS is that nothing was attempted.
@@ -1139,6 +1149,10 @@ records is how a person describes a job, not how they approve three writes.
 3. Three calls to the server, each after its own approval — never a batch under one answer.
 4. A `no` to the second leaves the first done, the second and third not attempted.
 
+With no engagement named, the session's first mutating call is preceded by `Which engagement is this for?`
+(asked once per session, so in the Setup if that is where the first write is). It is not a write question and
+is not one of the questions counted here.
+
 ### Pass criteria
 
 - Three questions asked, three answers taken, in that order. **Two calls under one approval fails
@@ -1306,13 +1320,14 @@ from their file.
 - Turn 2 moves anything that turn 1 did not produce.
 - The text of a prompt the Architect wrote for a helper, or an error its own tooling raised
   ("Prompt error: …"), appears anywhere in either answer.
+- `Which engagement is this for?` asked in `design-only` mode, where there is no instance write to record.
 
 ### Live variant — the first write to an instance, with no engagement named
 
 `clients/_unfiled/` is the home of design artefacts in `live` mode as well; an instance change is not
 one. A write to an instance is recorded in an engagement's state file, so a session that reaches its first
 write with no engagement named has to ask which one — once — before it touches the update set. This is a
-third, separate session, run by hand against a PDI: the scripted runner is design-only (its header says
+second, separate session, run by hand against a PDI: the scripted runner is design-only (its header says
 `mcp: none`) and does not run it. Nothing in it writes unless the tester answers "write approved", which
 only the optional last turn does.
 
@@ -1373,8 +1388,7 @@ write approved
 
 - The update set is ensured, or any write is attempted, before the engagement is known — or the update set
   is named with no engagement in it.
-- The engagement is asked for a second time in the same session, or at all in `design-only` mode, where
-  there is no instance write to record.
+- The engagement is asked for a second time in the same session.
 - The instance change is recorded under `clients/_unfiled/`, in a scratchpad, or nowhere.
 - The engagement question is taken as the write approval, or the write is made straight after it.
 

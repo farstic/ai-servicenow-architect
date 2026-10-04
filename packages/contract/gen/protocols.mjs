@@ -117,6 +117,10 @@ engagement to be named (CLAUDE.md Phase 1 Step 2), and it can hold one client's 
 question is asked once per session, not once per write, and it is not the write question: the answer
 names the engagement and approves nothing.
 
+§2.0 is the capabilities pre-flight, which is in the always-loaded rule file and not in this document. A call
+it refuses is never made and no write question is asked for it, and this question is not asked for it either:
+there is nothing yet to record.
+
 ## §2.2 — Update-set capture
 
 **Why a preference and not a "current update set".** REST honours the authenticated user's

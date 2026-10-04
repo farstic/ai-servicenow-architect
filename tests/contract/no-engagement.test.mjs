@@ -45,10 +45,14 @@ test('ARC-09-C105 — the rule file carries it as a §2.1 bullet, ahead of the u
 
 test('ARC-09-C105 — the long form says the same, and gives the reason', () => {
   const gate = between(read(LONG), '## §2.1 — The write gate', '## §2.2');
-  assert.ok(gate.includes(`\`${OWNERS_QUESTION}\``), 'the long form does not quote the question');
-  assert.ok(gate.includes('`clients/_unfiled/`'));
-  assert.match(gate, /never recorded|never filed/);
-  assert.match(gate, /update-set name/, 'the reason — the §2.2 name needs an engagement — is not given');
+  // The rule sentence itself, whole: the long form renders the same constant, so it cannot be a paraphrase.
+  assert.ok(gate.includes(OWNERS_RULE), 'the long form does not carry the rule sentence, character for character');
+  // ...and what is left once the sentence is taken out is the reason, which only the long form gives.
+  const reason = gate.replace(OWNERS_RULE, '');
+  assert.match(reason, /§2\.2 update-set name is `<engagement>-<topic>`/, 'the reason is not given');
+  assert.match(reason, /approves nothing/, 'the long form does not say the answer is not an approval');
+  // §2.0 is defined in the rule file only; a document that cites it says what it is.
+  assert.match(reason, /§2\.0 is the capabilities pre-flight/, 'the long form cites §2.0 without saying what it is');
 });
 
 test('ARC-09-C105 — CLAUDE.md points at the write gate and does not restate it', () => {

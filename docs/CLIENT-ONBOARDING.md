@@ -103,7 +103,7 @@ has to say whose it is.
 
 When you name the engagement, say which of that work belongs to it: only what this session produced moves
 into `clients/<name>/`, to the folder the artefact belongs in (`designs/`, `stories/`…). Anything else in
-`_unfiled` stays there until you say which engagement it is for — one folder is never the place two
+`_unfiled` stays there until you say which engagement it is for — an engagement's folder is never the place two
 clients' work is mixed.
 
 ## Maintenance

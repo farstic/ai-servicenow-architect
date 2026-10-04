@@ -6,7 +6,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * ARC-09-C89, C90, C91 — the three places where an engagement's files are named, filed and numbered.
+ * ARC-09-C89, C90, C91, C105 — the places where an engagement's files are named, filed and numbered, and (C105)
+ * what a live session does about an engagement before its first write.
  *
  * The owner's S09/S10 sittings found that Phase 1 Step 2 read a file onboarding never wrote (R5), that
  * design-only work with no engagement named went to a session scratchpad (R6), and that two artefacts
@@ -209,8 +210,12 @@ test('C105 — every surface that names the unfiled home also says no instance c
     'docs/CLIENT-ONBOARDING.md']) {
     assert.ok(naming.includes(want), `${want} no longer names clients/_unfiled/`);
   }
-  const silent = naming.filter((f) => !INSTANCE_CHANGE.test(read(f)));
-  assert.deepEqual(silent, [], 'names the unfiled home without saying an instance change is never filed there');
+  // In ONE paragraph with the unfiled home, and with a "never": a sentence about instance changes anywhere
+  // else in a file does not say what is filed where.
+  const together = (text) => text.split(/\n\s*\n/)
+    .some((p) => /_unfiled/.test(p) && INSTANCE_CHANGE.test(p) && /\bnever\b/i.test(p));
+  const silent = naming.filter((f) => !together(read(f)));
+  assert.deepEqual(silent, [], 'names the unfiled home without saying, beside it, that an instance change is never filed there');
 });
 
 test('C105 — onboarding: the live-mode paragraph names the question, the update set and the state file', () => {
@@ -223,11 +228,16 @@ test('C105 — onboarding: the live-mode paragraph names the question, the updat
   assert.match(section, /never records an instance change under `_unfiled`/);
 });
 
-test('C105 — T-25 carries the live case, and it checks the question comes before the update set', () => {
+/** One case of the spec, from its `## T-nn` heading to the next `## ` heading - never the tail of the file. */
+const caseOf = (doc, id) => {
+  const from = doc.indexOf(`## ${id} `);
+  assert.notEqual(from, -1, `${id} is gone`);
+  return doc.slice(from).split(/\n(?=## )/)[0];
+};
+
+test('C105 — T-25 states the live case: question before the update set, nothing recorded in _unfiled', () => {
   const doc = read('tests/VALIDATION-TESTS.md');
-  const from = doc.indexOf('## T-25 ');
-  assert.notEqual(from, -1, 'T-25 is gone');
-  const t25 = doc.slice(from);
+  const t25 = caseOf(doc, 'T-25');
   assert.match(t25, /^\*\*Modes:\*\* design-only ✅ · live ✅/m, 'T-25 still says live was not run');
   assert.ok(t25.includes('### Live variant'), 'T-25 has no live variant');
   const live = t25.slice(t25.indexOf('### Live variant'));
@@ -235,4 +245,38 @@ test('C105 — T-25 carries the live case, and it checks the question comes befo
   assert.match(live, /before any\s+`snow_us_active_update_set_ensure`\s+and before the write question/,
     'the ordering — question, then update set, then the write question — is not stated');
   assert.match(live, /`clients\/_unfiled\/` holds\s+no record of it/, 'the live case does not forbid filing the change in _unfiled');
+});
+
+test('C105 — T-25: the live variant is the second session, and the design-only half forbids the question', () => {
+  const t25 = caseOf(read('tests/VALIDATION-TESTS.md'), 'T-25');
+  const at = t25.indexOf('### Live variant');
+  assert.match(t25.slice(at), /a\s+second, separate session/);
+  assert.doesNotMatch(t25, /third, separate session/);
+  // The design-only turns run the scripted runner, so THEY are where "no question in design-only" can be checked.
+  const failSignals = t25.slice(t25.indexOf('### Fail signals'), at);
+  assert.ok(failSignals.includes('`Which engagement is this for?` asked in `design-only` mode'),
+    'the design-only Fail signals do not forbid the engagement question');
+});
+
+test('C105 — the live write cases (T-05, T-06, T-23) say the engagement question may come first and is not a write question', () => {
+  const doc = read('tests/VALIDATION-TESTS.md');
+  for (const id of ['T-05', 'T-06', 'T-23']) {
+    const t = caseOf(doc, id);
+    assert.ok(t.includes('`Which engagement is this for?`'), `${id} does not mention the engagement question`);
+    assert.match(t, /not a write question/, `${id} does not say the question is not a write question`);
+  }
+});
+
+test('C105 — the user guide\'s live-write walkthrough mentions the question', () => {
+  const guide = read('docs/USER-GUIDE.md');
+  const from = guide.indexOf('## Scenario 4');
+  const scenario = guide.slice(from, guide.indexOf('### What you receive', from));
+  assert.ok(scenario.length > 500, 'Scenario 4 was not found');
+  assert.ok(scenario.includes('Which engagement is this for?'), 'Scenario 4 never mentions the engagement question');
+});
+
+test('C105 — onboarding: the new sentence and the old one do not contradict each other', () => {
+  const doc = read('docs/CLIENT-ONBOARDING.md');
+  assert.doesNotMatch(doc, /one folder is never the place two\s+clients' work is mixed/);
+  assert.match(doc, /an engagement's folder is never the place two\s+clients' work is mixed/);
 });
