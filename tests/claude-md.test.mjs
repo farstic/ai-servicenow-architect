@@ -90,8 +90,10 @@ test('criterion 7 — every repository path it names resolves', () => {
       // no `SKILL.md` at the repository root to resolve.
       if (['SKILL.md', 'EXAMPLES.md', 'README.md', 'CLAUDE.md'].includes(p)) continue;
       if (!/^(\.claude\/|governance\/|docs\/|templates\/|clients\/|packages\/|tests\/|vendor\/|scripts\/|[A-Z-]+\.md$)/.test(p)) continue;
-      // A path with a placeholder is a shape: `clients/<name>/` exists only per engagement.
-      if (p.includes('<')) { skipped.push(p); continue; }
+      // A path with a placeholder is a shape: `clients/<name>/` exists only per engagement. So does
+      // `clients/_unfiled/` (ARC-09-C90) and every other path under a gitignored `clients/`: none of
+      // it is in a clean clone, which is the checkout this test runs in.
+      if (p.includes('<') || p.startsWith('clients/')) { skipped.push(p); continue; }
       if (!existsSync(join(root, p))) dead.push(`CLAUDE.md:${i + 1} ${p}`);
     }
   }
