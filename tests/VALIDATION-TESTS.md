@@ -1349,6 +1349,15 @@ claude -p "$(<prompt.txt)"
 T-05 and T-06 run on their dormant variant in `design-only`; their live halves need a configured
 instance and are ARC-09/ARC-10's gate. T-07's setup is in its own section above.
 
+The scripted form is `scripts/validation/validation-run.sh <tag> [--repeat N] [T-NN …]`. It reads every
+case in this file, runs each in a session confined to the checkout's own settings
+(`--setting-sources project`), with no MCP server, a fixed tool set (`--tools`) and Sonnet 5.5 unless
+`VALIDATION_MODEL` says otherwise, and prints a header (sha, model, setting sources, tools) and, per turn,
+the skills invoked, the corpus pages read and any cited page that does not exist — a bare file name that
+resolves to one page is reported as BARE, not accepted. It judges nothing: the Pass criteria above do. It
+does not run a case's **Setup** block; T-25 and any other case that has one need it run by hand in the
+clone first.
+
 Record the run under `docs/validation/<date>-<os>.md`, from `docs/validation/TEMPLATE.md`
 (ARC-10-S07). The records already under `docs/spikes/` stay where they are; that path is retired for
 new ones.
