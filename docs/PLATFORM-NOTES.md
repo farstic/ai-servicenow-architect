@@ -170,12 +170,11 @@ live test (ARC-09-C93, finding R4)
 **Behaviour:** The owner's live test created a Business Rule whose `name` was longer than 40
 characters; it was cut at 40 and `snow_scr_business_rule_add` reported success. PN-07 records the same
 behaviour for `sys_script_fix.name`.
-**Grounding:** the cut itself — none in ServiceNowDocs; observed behaviour. The dictionary's
-`max_length` is described as "a logical limit for the size of string fields", mapped by the system to a
-physical type with more length available than stated
-(`markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`),
-so that the platform cuts at exactly `max_length` is not documented in the bundled corpus — verify on
-the instance. Reading `sys_dictionary` needs the `personalize_dictionary` role
+**Grounding:** none in ServiceNowDocs (`markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`
+for the dictionary's `max_length`, which it calls "a logical limit for the size of string fields",
+mapped by the system to a physical type with more length available than stated, so that the platform
+cuts at exactly `max_length` is not documented in the bundled corpus — verify on the instance);
+observed behaviour. Reading `sys_dictionary` needs the `personalize_dictionary` role
 (`markdown/platform-security/access-control/r_SecurityJumpStartACLRules.md`).
 **Evidence:** the owner's live test. **Not reproduced here** — this repository's tests have no
 instance. PN-07 observed, on a PDI, one POST whose response carried the CUT value; that the response
