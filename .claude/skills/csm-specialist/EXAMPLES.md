@@ -230,8 +230,6 @@ Consult flags:
 
 ## Example 3 — Verdict C (§1.1 Halt)
 
-> **Correction (2026-10-03).** The premise of this example — that `sn_customerservice_escalation` is a Vancouver+ table absent from the Australia release — is wrong: the Australia corpus documents the baseline case and account escalation feature with exactly that table, plus `sn_customerservice_escalation_template` and `sn_customerservice_escalation_severity` *(citation: `markdown/customer-service-management/case-escalation-components.md`)*. Read the example only for the **shape** of a Verdict C envelope and halt proposal; the real answer to this dispatch input is Verdict A/B on the baseline escalation record, as the gateway rules. A replacement Verdict C example grounded in the current corpus is pending.
-
 ### Dispatch input
 
 **Source:** Chief Architect, routing from a user request.
@@ -246,7 +244,7 @@ Consult flags:
 ```markdown
 # CSM Specialist Gateway Response
 
-**Request:** Create a custom case-escalation table with structured fields, related list on the case form, and a Script Include to write escalation records on a UI Action click.
+**Request:** Create a custom case-escalation table with structured fields, a related list on the case form, and a Script Include that writes an escalation record when the agent clicks an Escalate button.
 **Domain Expert:** CSM Specialist v2.0
 **Release family:** Australia
 
@@ -254,133 +252,87 @@ Consult flags:
 
 ## Part 1 — OOB Process Map
 
-The CSM baseline does not have a generic "case escalation" table in Australia release family. The Vancouver+ release introduces `sn_customerservice_escalation`, but **this is not available in Australia** — verify the engagement's release before assuming.
+The baseline case and account escalation feature does what the request describes:
 
-The baseline escalation handling in Australia for `sn_customerservice_case`:
-
-1. **Agent identifies escalation need** — typically when state moves to higher priority, or when case ages past an SLA threshold.
-2. **Baseline escalation channels:**
-   - `sn_customerservice_case.escalation` field (Choice: None / Low / High / Moderate / Critical) — present on baseline and visible on the case form.
-   - `sn_customerservice_case.priority` field — agents may raise priority to signal escalation.
-   - `work_notes` — agents log escalation context as appended journal entries.
-   - `sys_history_set` — every field change is auto-audited.
-   - SLA engine (`task_sla`) — breach events fire baseline notifications and can drive `assignment_group` reassignment via assignment rules.
-3. **Baseline notifications** fire on priority change, escalation-field change, and SLA-breach approach.
-
-The user's request describes a *structured escalation event log* with five typed fields. This is a richer model than the baseline single `escalation` Choice field provides.
-
-(citation: markdown/customer-service-management/csm-case-management.md, markdown/customer-service-management/agent-exp.md)
+1. **Escalate.** "Users with the escalation requester role can escalate a case or account": the agent opens the case, clicks the **Escalate Case** related link and fills in the Escalation form *(citation: `markdown/customer-service-management/escalate-csm-case.md`)*.
+2. **The Escalation record** carries the Reason (for example "Inactivity" or "Lack of Progress"), the Escalation Justification — "additional information that explains why this escalation is needed" — the Escalation Severity, the Escalation Type and a Watch List *(citation: `markdown/customer-service-management/case-escalation-form.md`)*.
+3. **State.** The record is Requested, then Escalated or Declined; de-escalating it closes it *(citations: `markdown/customer-service-management/case-escalation-form.md`, `markdown/customer-service-management/de-escalate-csm-case.md`)*.
+4. **Notification and history.** Users on the watch list receive email notifications, and "for case escalations, updates are replicated to the case activity history as work notes so they aren't visible to the customer" *(citation: `markdown/customer-service-management/case-escalation-form.md`)*.
+5. **On the case form,** "the case or account form for the source record includes an **Escalations** related list" *(same citation)*.
+6. **Templates and severities** shape the escalation; a template can add the case assignment group's manager to the approvers *(citation: `markdown/customer-service-management/create-escalation-template.md`)*.
 
 ## Part 2 — Data Model Alignment
 
-**Primary baseline table:** `sn_customerservice_case` (extends `task`)
+**Primary baseline table:** Escalations [`sn_customerservice_escalation`] — "Stores records created for escalated cases and accounts" — with Escalation Templates [`sn_customerservice_escalation_template`] and Escalation Severity [`sn_customerservice_escalation_severity`] *(citation: `markdown/customer-service-management/case-escalation-components.md`)*. The case, `sn_customerservice_case` (extends `task`), keeps its own state.
 
-**Existing baseline fields relevant to escalation:**
-
-| Field | Type | Coverage of the requirement |
-|---|---|---|
-| `sn_customerservice_case.escalation` | Choice (None/Low/Moderate/High/Critical) | Captures current escalation level only, not history |
-| `sn_customerservice_case.priority` | Choice | Severity proxy for escalation level |
-| `sn_customerservice_case.assignment_group` | Reference | Captures which tier owns the case at this moment |
-| `sn_customerservice_case.work_notes` | Journal | Captures arbitrary escalation context, not structured |
-
-**Baseline tables NOT available in Australia for this requirement:**
-
-- `sn_customerservice_escalation` — **NOT in Australia.** Released in Vancouver. Cannot be assumed.
-
-**Related baseline tables:**
-
-- `sys_history_set` + `sys_history_line` — captures field-change events but with raw old/new values, not domain-modelled "escalation events"
-- `task_sla` — captures SLA breach but not arbitrary escalation events
-
-The requirement for structured *escalation events* (from-tier → to-tier, reason code, business-impact summary, stakeholders) is not satisfied by any baseline construct in Australia. Each baseline option covers part of the requirement but none covers the full structured-event model.
-
-(citation: markdown/customer-service-management/csm-data-management.md)
+| The request asks for | Baseline home |
+|---|---|
+| "a separate 'case escalation' table" | the Escalation record, one per escalation of a case |
+| "reason code" | Reason |
+| "business-impact summary" | Escalation Justification |
+| "stakeholder list" | Watch List |
+| "a related list on the case form with full escalation history" | the case form's Escalations related list, each record with its state; its updates replicated to the case's work notes |
+| "the Script Include that creates an escalation record when the agent clicks an Escalate button" | the **Escalate Case** related link creates the record — no Script Include |
+| "from-tier, to-tier" | no field on a case escalation: the escalation's Assignment group is "for account escalations" — Open Question 1 |
 
 ## Part 3 — §1.1 Baseline-First Verdict
 
-**Verdict: C — Requires custom object. §1.1 HALT.**
+**Verdict C — the request names a custom table ("a separate 'case escalation' table"), and the §1.1 halt fires.** Part 2's finding — the baseline case and account escalation feature covers the request — is the OPEN QUESTION's recommendation, not a different verdict.
 
 ```
 🚨 OPEN QUESTION — CUSTOM OBJECT PROPOSAL (§1.1 Blocking)
 
 Before any specialist may be dispatched, §1.1 requires honest evaluation of baseline alternatives. This proposal halts dispatch until Chief Architect direction is received.
 
-1. Baseline options evaluated [citations REQUIRED]:
+1. Baseline option evaluated [citations REQUIRED]:
 
-   a. `sn_customerservice_case.escalation` Choice field
-      - Covers: current escalation level (None/Low/Moderate/High/Critical)
-      - Falls short: single-value field, no history of transitions, no structured metadata (from-tier, to-tier, reason, stakeholders)
-      - Citation: markdown/customer-service-management/csm-case-management.md
-
-   b. `work_notes` structured-JSON append on each escalation event
-      - Covers: free-text escalation log with timestamp and agent attribution
-      - Falls short: no typed fields, no related-list rendering on the form, hard to report on programmatically without text parsing
-      - Citation: markdown/now-platform/index.md (work_notes journal field)
-
-   c. Field auditing on `escalation` + `priority` + `assignment_group` via `sys_history_set`
-      - Covers: every change to escalation-relevant fields is captured with old value, new value, who, when
-      - Falls short: captures field deltas, not domain events; no place for reason-code, business-impact summary, stakeholder list; no related-list rendering by default
-      - Citation: markdown/now-platform/index.md (audit history)
-
-   d. Hybrid: `escalation` + `priority` + `assignment_group` audit + structured JSON in `work_notes` on each escalation
-      - Covers: most of the requirement, with field-level audit for state and JSON for structured context
-      - Falls short: structured JSON in a journal field is not queryable for reports without text parsing; agents must manually format the JSON; brittle long-term
-      - This is a degraded-but-acceptable Alternative — see item 4.
+   The case and account escalation feature: the Escalate Case related link, the Escalation record with its Reason, Escalation Justification, Escalation Severity and Watch List, the case form's Escalations related list, and its updates replicated to the case's work notes.
+      - Covers: the record, the reason, the business-impact summary, the stakeholders, the related list with the history, and the Escalate button.
+      - Falls short: no field for "from-tier, to-tier" on a case escalation (Open Question 1).
+      - Citations: markdown/customer-service-management/case-escalation-form.md, markdown/customer-service-management/escalate-csm-case.md
 
 2. Custom object proposed (smallest viable scope):
 
    - Object: the separate "case escalation" table the request names — `sn_customerservice_case_escalation` (proposed — not baseline; a table in the `sn_customerservice` scope begins with that namespace *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*).
-   - Kind and place in the §1.1 hierarchy: a new table extending a baseline table, in the baseline `sn_customerservice` scope — the "acceptable" rung. A field on the baseline case cannot hold a history of transitions; a top-level table or a new scoped app is not justified.
+   - Kind and place in the §1.1 hierarchy: a new table extending a baseline table, in the baseline `sn_customerservice` scope — the "acceptable" rung.
    - What it would hold, in the request's words: "from-tier, to-tier, reason code, business-impact summary, and stakeholder list", shown as "a related list on the case form with full escalation history".
+   - Rejected as unnecessary: the baseline Escalation record holds all of it but the tiers, and the tiers are Open Question 1.
 
 3. Consequences of approval:
-   - **Data model:** one new table in the baseline scope; one related list on the case form; minor form-layout work.
-   - **Deployment:** ships in the same update set as the case-form changes; no separate scoped-app deployment cadence.
-   - **Support cost:** low — agents learn one new related list; no separate workspace.
-   - **Platform-upgrade risk:** low — the table extends a baseline table, in the baseline scope. If Vancouver+ ships `sn_customerservice_escalation`, migration path is documented (field-by-field copy script during upgrade).
+   - **Data model:** a second escalation store beside the baseline Escalation record; the Escalate Case related link and the escalation states would not reach it.
+   - **Support cost:** a custom form, related list and Script Include to maintain, where the feature ships its own.
+   - **Licensing:** the table consumes a custom table entitlement of the subscription it is mapped to *(citation: `markdown/platform-administration/allocating-custom-tables-subscr-apps-v2.md`)*.
+   - **Security & GRC:** business-impact statements can be commercially sensitive — the consult fires either way.
 
 4. Alternatives if rejected:
-   - **Alternative A: Pure baseline (Verdict A-degraded).** Use `escalation` field + `work_notes` + field-level audit. Lose the structured fields; reporting is text-parsing or summary-by-priority. Acceptable if escalation reporting is informal.
-   - **Alternative B: Defer until release upgrade.** Wait for Vancouver+ release of `sn_customerservice_escalation` and use baseline then. Acceptable if engagement's roadmap includes the upgrade within 6 months.
-   - **Alternative C: Reduce-dimension custom design.** Move the stakeholder list and the business-impact summary to work notes, and keep only the tiers and the reason code. Smaller, but still a custom table — same §1.1 cost, less benefit. Not recommended.
+   - **Recommended:** the baseline escalation feature — escalation templates and severities configured for the engagement, and the escalation requester role given to the agents who escalate.
+   - **For the tiers:** Open Question 1's default.
 
 Decision required from Chief Architect before any specialist is dispatched.
-
-Recommendation if approved: dispatch Technical Designer with this envelope as the dispatch constraints, plus Security & GRC consult (business-impact summary may contain commercially sensitive content).
-
-Recommendation if rejected: adopt Alternative A (pure baseline degraded design). Dispatch ITSM-equivalent Technical Designer pattern to formalise the configuration: enable field-level audit on `escalation`, `priority`, `assignment_group`; define structured `work_notes` template; build Performance Analytics indicator on `sn_customerservice_case` filtered by `escalation > 0`.
 ```
-
-(citation: markdown/customer-service-management/csm-case-management.md, markdown/now-platform/index.md)
 
 ## Part 4 — Routing Recommendation
 
-**HALT — §1.1 custom-object proposal in Part 3 requires Chief Architect decision.**
+**HALT — §1.1: the request names a custom table.**
 
-No specialist is dispatched until the proposal is approved, rejected, or replaced by a Chief Architect alternative.
+No specialist is dispatched until the Chief Architect rules. Options:
 
-If approved → dispatch Technical Designer with this envelope. Security & GRC consult fires.
-
-If rejected → adopt Alternative A or Alternative B from Part 3.
+- **Reject in favour of the baseline escalation feature (recommended).** Configure the templates, severities and requester roles; no table and no Script Include. Security & GRC consult on the Escalation Justification content.
+- **Approve the table as requested.** Re-dispatch the CSM Specialist with the approval in the envelope; the Security & GRC and Licensing & Entitlement consults fire before Technical Designer.
 
 ## Part 5 — Anti-Patterns to Block
 
-(Surfaced now so that if the proposal is approved, the downstream Technical Designer dispatch carries these constraints.)
-
-- **Do not create a top-level scoped app for this.** Child table in the baseline `sn_customerservice` scope is the correct level. New scoped app for one related list is §1.1 over-escalation.
-- **Do not duplicate `task` fields on the new escalation table.** The escalation table inherits from `task` and automatically has `sys_created_on`, `sys_created_by`, `state`, `assigned_to`. Adding parallel fields creates audit-trail confusion.
-- **Do not write a Business Rule that copies escalation-table rows back to `work_notes`.** Keep the two stores separate: structured fields on the new table, agent commentary in `work_notes`. Double-writing is a maintenance trap.
-- **Do not name the table `u_case_escalation` or `x_acme_case_escalation` if the engagement uses the baseline `sn_customerservice` scope convention.** Match engagement scope-prefix convention; confirm with App Engine Specialist if unclear.
-- **Do not reference `sn_customerservice_escalation` without checking the corpus for the engagement's release.** In Australia it is baseline (see the correction note above).
-- **Do not skip Security & GRC consult on the business-impact summary.** Customer business-impact statements can be commercially sensitive; ACL design matters.
+- **Do not build a custom escalation table.** The Escalation record [`sn_customerservice_escalation`] is baseline in Australia *(citation: `markdown/customer-service-management/case-escalation-components.md`)*.
+- **Do not write a Script Include and a UI Action to create escalation records.** The Escalate Case related link does it *(citation: `markdown/customer-service-management/escalate-csm-case.md`)*.
+- **Do not copy escalation updates into the case's work notes by script.** The feature replicates them *(citation: `markdown/customer-service-management/case-escalation-form.md`)*.
+- **Do not add an "Escalated" state to the case.** The Escalation record carries the escalation's state; the case keeps its baseline state.
+- **Do not skip the Security & GRC consult on the Escalation Justification.** Customer business-impact statements can be commercially sensitive.
 
 ## Open Questions
 
-1. **Engagement release-upgrade roadmap** — is Vancouver+ on the roadmap within 6 months? If yes, Alternative B (defer) becomes attractive.
-2. **Engagement scope-prefix convention** — `sn_customerservice` vs `x_acme_csm` vs `u_*`. Determines table naming.
-3. **Stakeholder reporting requirement** — is the "stakeholder list" needed for outbound notifications, or only for record-keeping? If notifications, Now Assist or Flow Designer downstream involvement increases.
-4. **Reduce-dimension acceptable?** — Would dropping the stakeholder list and the business-impact summary (keeping only the tiers and the reason code) make the §1.1 proposal more acceptable? See Alternative C.
+1. **OPEN QUESTION: from-tier and to-tier.** Are the tiers severity levels or support teams? **Proposed default:** the Escalation Severity for the level; a move between teams is the case's own reassignment, kept in its history. Confirm with the business which one they mean.
+2. **Requester roles.** Who holds `sn_customerservice.escalation_requester`, and who de-escalates with `sn_customerservice.deescalation_requester`? *(citations: `markdown/customer-service-management/escalate-csm-case.md`, `markdown/customer-service-management/de-escalate-csm-case.md`)*
+3. **Templates and approvals.** Which escalation templates does the engagement need, and does an escalation need approval? A template can add the case assignment group's manager to the approvers *(citation: `markdown/customer-service-management/create-escalation-template.md`)*.
 
 ---
 
@@ -393,7 +345,7 @@ If rejected → adopt Alternative A or Alternative B from Part 3.
 
 - **Example 1 (Verdict A)** — pattern for the most common request type. The Domain Expert proves baseline covers it and the build chain is short-circuited. PROCEED — baseline configuration only. No Technical Designer dispatch.
 - **Example 2 (Verdict B)** — pattern for legitimate baseline extensions. One field on a baseline table. §1.1 accepts this at the smallest scope. PROCEED — Technical Designer dispatch with envelope as constraints.
-- **Example 3 (Verdict C)** — pattern for §1.1 halt. The Domain Expert refuses to ratify a custom table without Chief Architect approval. Four baseline alternatives evaluated honestly. Alternatives if rejected documented. HALT — wait for decision.
+- **Example 3 (Verdict C)** — pattern for a §1.1 halt on a named object. The request names a custom table, so the verdict is C; Part 2 finds the baseline case and account escalation feature covers it, and the halt recommends that feature. The one gap, the tiers, is an open question with a proposed default. HALT — wait for decision.
 
 The §6.2 post-build review fires after Technical Designer returns a spec for Verdict B and Verdict C (approved) cases. The Domain Expert re-validates the spec against the envelope before Developer is dispatched. Post-build review examples are not included in this file — they are short reviews following the four-check structure in `SKILL.md`.
 
