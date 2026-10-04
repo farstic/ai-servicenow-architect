@@ -9,6 +9,10 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+## 2.0.10 — 2026-10-04
+
+### Notes
+
 **This release makes the specialists say what the bundled documentation says, and stops a §1.1 halt
 before the design.** Nothing here changes how the product is configured: there is no migration step, and an
 existing checkout keeps its instance store, its preset and its flags untouched. The documentation corpus
@@ -104,6 +108,69 @@ grounds its Envelope directly, opening at most eight documentation pages and nev
 - The CSM gateway's §1.1 example and the user guide's walkthrough of it recommend the baseline case and
   account escalation feature. The request names a custom escalation table, so the answer is still a halt, but
   the halt now says the baseline covers it; the correction note and the wait for a later release are gone.
+
+### Added
+
+- engine: docs verify checks every roster name against the bundled corpus (ARC-09-C81c) (c36099c)
+
+### Fixed
+
+- docs: the user guide's halt walkthrough recommends the baseline escalation record (ARC-09-C86) (f101788)
+- csm-specialist: Example 3 recommends the baseline escalation feature (ARC-09-C86) (4dae311)
+- docs: the prerequisites name the model, Claude Sonnet or more capable (ARC-09-C85) (16332f5)
+- engine: CLAUDE.md bounds the grounding of an Envelope, as the owner approved (ARC-09-C85) (8417345)
+- engine: a halt comes before the design, and gateways ground Part 2 boundedly (ARC-09-C85) (f200b64)
+- itsm-specialist: the conflict_status citation names the page that documents it (ARC-09-C84) (57de5dd)
+- itsm-specialist: blackout checks cite conflict detection and ChangeCollisionHelper (ARC-09-C84) (269add0)
+- now-assist-specialist: the specialists search the corpus under both product names (ARC-09-C84) (4c7b039)
+- engine: the HLD template embeds its process figure as an SVG from a draw.io source (ARC-09-C84) (a9d92e9)
+- itsm-specialist: Example 3 weighs the Change approval policies (ARC-09-C84) (fe3a8f9)
+- engine: the licensing skill prices custom tables in custom table entitlements (ARC-09-C83) (d47e5e2)
+- engine: the transfer ACL row cites how matching ACLs combine (ARC-09-C82b) (2e7ad72)
+- engine: the examples' round-two fixes, with the C82 row's counts (ARC-09-C82b) (792c5e3)
+- engine: read-through fixes in the four rewritten examples (ARC-09-C82b) (4f27a27)
+- engine: the rewritten examples agree below their envelopes (ARC-09-C82b) (159e267)
+- tests: the guard's comment names tests/VALIDATION-TESTS.md by its path (ARC-09-C82b) (550025c)
+- engine: examples weigh the baseline, figures ship as draw.io, the guard widens (ARC-09-C82b) (45a2da1)
+- engine: four gateway hot spots their own §1.1 lists name are Verdict C (ARC-09-C82a) (4c61286)
+- engine: roster facts per the corpus; trigger-naming hot spots are Verdict C (ARC-09-C82a) (fc21571)
+- engine: a proposal declares one name; the real-tree case holds excuses, capitals (ARC-09-C81c) (4cb4c2a)
+- engine: CSM and HRSD Example 3 propose their tables in the module's scope (ARC-09-C81a) (b63947c)
+- engine: the CSM, HR and FSO roster names agree with the bundled corpus (ARC-09-C81a) (49e7f2b)
+- engine: the CMDB self-violation rule speaks of labels; C81b counts 8 skills (ARC-09-C81b) (c48ca3c)
+- engine: the ITSM, ITOM and CMDB roster names agree with the bundled corpus (ARC-09-C81b) (4702150)
+- engine: the last F10 and F13 leftovers, and the guard holds their shapes (ARC-09-C78) (d2a755a)
+- engine: port the 2026-10-03 prompt-audit corrections into the roster (ARC-09-C78) (ac044d3)
+- doctor: the per-check budget and the hook's watchdog fire on idle work (ARC-09-C77) (f65faaa)
+- bootstrap: the retry pause holds the event loop — exit 3, not 13 (ARC-09-C76) (ee7b30f)
+
+### Internal
+
+- changelog: two 2.0.10 sentences say all of the rule they describe (c7a44e3)
+- plan: 2.0.10 statuses closed, C79 and C80 behind the cut, C87–C95 opened (9400293)
+- changelog: the 2.0.10 Notes, for review before the cut (6de64ee)
+- plan: the C86 row, C85's merge and the changelog line (ARC-09-C86) (d7fda3b)
+- tests: a portable root for the halt test; the install cap moves for the model row (ARC-09-C85) (acd6a2e)
+- plan: the C85 row carries the halt test's two additions and the R1 move (ARC-09-C85) (49e4c32)
+- tests: the halt test names an unread marker and knows every field spelling (ARC-09-C85) (71030d1)
+- plan: the C85 row and its changelog lines (ARC-09-C85) (98c6828)
+- tests: stricter T-02 and T-10 halts, and either halt passes T-17 (ARC-09-C85) (f9fb555)
+- plan: the C84 row and the changelog carry the product-name sentence (ARC-09-C84) (658924b)
+- plan: the C84 row, C83's merge and the changelog lines (ARC-09-C84) (91d472a)
+- tests: the corpus-fetch guard reads a sentence the wrap split over two lines (ARC-09-C84) (9a74eee)
+- plan: the C83 row, C82b's merge and the changelog line (ARC-09-C83) (607e172)
+- tests: T-17 follows the skill's words, and T-24 proves the FSO gateway fires (ARC-09-C83) (2279b79)
+- plan: the C82 row records the C82b revision and its counts (ARC-09-C82b) (48294e3)
+- plan: the C82 row, the R1 ledger and the changelog carry C82b (ARC-09-C82b) (a00f078)
+- plan: ARC-09-C81 closes with the guard; atf-author names its step-result table (5d38473)
+- plan: ARC-09-C81 records its C81a slice; the R1 ledger attributes its bodies (d72ae20)
+- plan: ARC-09-C81 opens with its C81b slice; the changelog names the correction (7b23a92)
+- plan: ARC-09-C78 counts 27 attributed bodies; the guard comment states no count (6fa6e62)
+- engine: the C78 guard covers every shape; the exemption excuses only its sentence (a8298fe)
+- engine: the prompt-audit corrections stay corrected — a class guard (ARC-09-C78) (1e61345)
+- plan: ARC-09-C78 records the T0-T4 smoke run (236beac)
+
+Tag v2.0.10 · contract 20a28a8cf2e7 · docs-pin 68c0d11
 
 ## 2.0.9 — 2026-10-01
 
