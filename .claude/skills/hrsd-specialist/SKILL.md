@@ -80,7 +80,7 @@ Fire automatically when the user request mentions any of:
 
 **Process triggers:** HR case, HR Lifecycle Event, LE, onboarding, offboarding, transfer, leave of absence, parental leave, HR profile, HR Knowledge, HR document, document template, HR notification, employee comms, COE, Center of Excellence (HR), HR agent, HR services catalog, Employee Center, Employee Center Pro, EC Pro.
 
-**Table triggers:** `sn_hr_core_case`, `sn_hr_le_case`, `sn_hr_core_profile`, `sn_hr_le_activity_set`, `sn_hr_le_activity`, `sn_hr_core_topic_detail`, `sn_hr_core_service`, `sn_hr_dt_doc_template`.
+**Table triggers:** `sn_hr_core_case`, `sn_hr_le_case`, `sn_hr_core_profile`, `sn_hr_le_activity_set`, `sn_hr_le_activity`, `sn_hr_core_topic_detail`, `sn_hr_core_service`, `sn_doc_template`.
 
 **Role / persona triggers:** sn_hr_core.basic, sn_hr_core.case_writer, sn_hr_core.case_reader, sn_hr_le.admin, employee, HR agent, COE manager, HR business partner, HRBP.
 
@@ -120,7 +120,7 @@ When dispatched, you expect the following structured fields from upstream Discov
 |---|---|
 | **HR Profile presence and population** | Is `sn_hr_core_profile` populated for all active employees? How are records created (HR Integration source, manual)? |
 | **Lifecycle Event activity-set library** | Which LE types exist (Onboarding, Transfer, Separation)? Are activity sets baseline or customised? |
-| **Scoped HR data policies** | Is the **Scoped HR Security** plugin active (`com.sn_hr_core.scoped`)? Are restricted-notes patterns in use? Are COE-specific ACLs configured? |
+| **Scoped HR data policies** | Is the **Human Resources Scoped App: Security** plugin active (`com.snc.hr.scoped_security`) *(citation: `markdown/employee-service-management/hr-service-delivery/activate-case-and-knowledge-management-scoped.md`)*? Are restricted-notes patterns in use? Are COE-specific ACLs configured? |
 | **Employee Center vs Employee Center Pro** | Which is in use? Pro requires separate licensing and offers Journey Designer; Center is the baseline portal. |
 | **COE structure** | Centers of Excellence (Benefits, Payroll, Workplace, IT-Onboarding, etc.) — how many, mapped to assignment groups, mapped to HR Topics? |
 | **HR Topics and Topic Categories** | Are `sn_hr_core_topic_detail` and topic categories populated for case categorisation? |
@@ -147,10 +147,10 @@ You are bound by §1.1. You may not propose, recommend, or pre-approve any of th
 For every component, first evaluate whether baseline serves the requirement:
 
 1. **Existing baseline HR tables** — `sn_hr_core_case`, `sn_hr_le_case`, `sn_hr_core_profile`, `sn_hr_le_activity_set`, `sn_hr_le_activity`.
-2. **HR Case sub-state** (`sn_hr_core_case.sub_state`) — use for COE-specific or sub-type-specific state variations rather than extending `state`.
+2. **HR Case sub-state** (`sn_hr_core_case.sub_state` — not documented in the bundled corpus — verify on the instance; see the state model below) — use for COE-specific or sub-type-specific state variations rather than extending `state`.
 3. **`work_notes` / `comments`** — for audit and commentary on HR cases.
 4. **`sys_history_set`** — for field-level audit.
-5. **HR notification engine** (`sn_hr_core_notification_definition`) — for HR-specific notifications.
+5. **HR notifications** — reminders built from email templates and sent for Lifecycle Event activities and HR services, with their content in HR Email Content [`sn_hr_core_email_content`] *(citation: `markdown/employee-service-management/hr-service-delivery/HRNotifications.md`, `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*.
 6. **Lifecycle Event activity-set library** — define new LE types via `sn_hr_le_activity_set` records, not via custom flows.
 7. **Configuration options** — UI Policies, dictionary defaults, ACL conditions, HR services catalog.
 
@@ -247,7 +247,7 @@ One of:
 ## Part 5 — Anti-Patterns to Block
 
 [Hard constraints. Examples:
-- **Do not extend `sn_hr_core_case.state` with new state values.** HRSD has `sn_hr_core_case.sub_state` specifically for variant-state flows. Citation: ...
+- **Do not extend `sn_hr_core_case.state` with new state values.** Use the HR case sub-state (`sub_state` — not documented in the bundled corpus — verify on the instance) for variant-state flows.
 - **Do not create a custom HR Profile extension table.** Extend `sn_hr_core_profile` via dictionary. Citation: ...
 - **Do not duplicate Lifecycle Event activity sets in custom flows.** Use baseline `sn_hr_le_activity_set` records and configure activity definitions. Citation: ...]
 
@@ -281,7 +281,7 @@ One of:
 | 4 | Closed Incomplete | Closed without full resolution |
 | 7 | Cancelled | Cancelled |
 
-**Sub-state for variants:** `sn_hr_core_case.sub_state` — used for COE-specific or topic-specific sub-flows. Extend sub_state, not state.
+**Sub-state for variants:** `sn_hr_core_case.sub_state` — not documented in the bundled corpus — verify on the instance. Where the instance has it, it carries COE-specific or topic-specific sub-flows: extend the sub-state, not `state`.
 
 **Baseline notifications (sample):** `hr_case.opened`, `hr_case.assigned`, `hr_case.commented`, `hr_case.resolved`, `hr_case.closed`.
 
@@ -289,7 +289,7 @@ One of:
 - `sn_hr_core.basic` — read access to HR Case (filtered by subject_person or HR group membership)
 - `sn_hr_core.case_writer` — write access
 - `sn_hr_core.case_reader` — read-only access for specific COEs
-- `sn_hr_admin` — administrative configuration
+- `sn_hr_core.admin` — administrative configuration *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*
 
 **subject_person vs opened_for:**
 - `subject_person` = the employee the case is about (e.g., the new hire being onboarded).
@@ -316,7 +316,7 @@ One of:
 **Activity definitions:** Each activity can be:
 - A notification (uses HR notification engine)
 - An HR task (creates an `sn_hr_core_task`)
-- A document generation (uses `sn_hr_dt_doc_template`)
+- A document generation (uses Document Template [`sn_doc_template`]; HR Document Templates is deprecated as of Australia *(citation: `markdown/employee-service-management/hr-service-delivery/migration-hrdt-dt.md`)*)
 - A subflow invocation (Flow Designer)
 - A wait-for-condition
 
@@ -330,7 +330,7 @@ One of:
 **Key fields:**
 - `user` (Reference to `sys_user`)
 - `employment_type` (Choice: Full-time / Part-time / Contractor / Intern / etc.)
-- `employment_status` (Choice: Active / On Leave / Terminated / etc.)
+- `employment_status` (Choice: Active / On Leave / Terminated / etc.) — not documented in the bundled corpus — verify on the instance
 - `manager` (Reference to `sys_user`)
 - `department` (Reference)
 - `location` (Reference)
@@ -365,7 +365,7 @@ One of:
 
 ### HR Document Templates — lightweight
 
-**Primary table:** `sn_hr_dt_doc_template`
+**Primary table:** Document Template [`sn_doc_template`] *(citation: `markdown/employee-service-management/hr-service-delivery/reference-doc-templates.md`)*. HR Document Templates is deprecated: starting with the Australia release it is no longer supported or available for new activation *(citation: `markdown/employee-service-management/hr-service-delivery/migration-hrdt-dt.md`)*.
 **Purpose:** Dynamic letter/document generation from templates with merge-fields from HR Profile and HR Case data.
 **Use:** NDA generation, offer letters, separation paperwork.
 
@@ -386,9 +386,9 @@ One of:
 | Anti-pattern | Why it's wrong | Baseline alternative | Citation |
 |---|---|---|---|
 | Custom HR Profile extension table | Breaks baseline employment-context joins | Extend `sn_hr_core_profile` via dictionary | `markdown/employee-service-management/` (HR Profile docs) |
-| Extending `sn_hr_core_case.state` with new values | HRSD uses `sub_state` for variants | Extend `sub_state`, leave `state` baseline | `markdown/employee-service-management/` (HR Case state model) |
+| Extending `sn_hr_core_case.state` with new values | HRSD uses the case sub-state for variants (`sub_state` — not documented in the bundled corpus — verify on the instance) | Extend the sub-state, leave `state` baseline | `markdown/employee-service-management/` (HR Case state model) |
 | Custom flow for LE orchestration | Bypasses baseline activity-set library | Define `sn_hr_le_activity_set` + `sn_hr_le_activity` records | `markdown/employee-service-management/` (LE docs) |
-| Custom HR notification logic in Business Rules | Duplicates HR notification engine | Use `sn_hr_core_notification_definition` records | `markdown/servicenow-platform/notify/` |
+| Custom HR notification logic in Business Rules | Duplicates baseline HR notifications | Use HR notifications and their email content (`sn_hr_core_email_content`) | `markdown/employee-service-management/hr-service-delivery/HRNotifications.md` |
 | Custom HR Topics table | `sn_hr_core_topic_detail` covers it | Use baseline topic table | `markdown/employee-service-management/` |
 | Designing for Employee Center Pro without confirmed license | Delivers non-functional design | Confirm Pro vs Center licensing before design | `markdown/employee-service-management/` (EC vs ECP) |
 | Custom audit table for HR cases | `sys_history_set` covers it | Enable field auditing in dictionary | `markdown/platform-administration/table-administration-and-data-management/` |
@@ -415,7 +415,7 @@ One of:
 ### Hot spot 3 — "We need to track multiple HR cases for one employee with different states"
 
 **Reflexive bad design:** Custom HR sub-case table.
-**Baseline alternative:** `sn_hr_core_case` already supports multiple concurrent cases per `subject_person`. Use `state` and `sub_state` for variant flows.
+**Baseline alternative:** `sn_hr_core_case` already supports multiple concurrent cases per `subject_person`. Use `state` and the case sub-state (see the state model) for variant flows.
 **Verdict:** Always A.
 
 ### Hot spot 4 — "We need a separate audit trail for HR Profile changes"
@@ -445,7 +445,7 @@ You fire twice per HRSD-tagged request. Second fire is the post-build review aft
 ### The four checks
 
 **Check 1 — Process-map alignment.** Spec respects OOB process map in Part 1?
-- Preserves baseline state transitions (state + sub_state)?
+- Preserves baseline state transitions (state and the case sub-state)?
 - Preserves baseline notification timing?
 - Preserves baseline role gates (sn_hr_core.* roles)?
 - Respects subject_person vs opened_for distinction?
@@ -461,7 +461,7 @@ You fire twice per HRSD-tagged request. Second fire is the post-build review aft
 - Verdict C but spec exists without explicit approval → §1.1 violation.
 
 **Check 4 — Anti-pattern check.** Spec violates any Part 5 anti-pattern?
-- Particularly: scoped HR security disabled, PII in work_notes, custom audit tables, state-machine extensions on `state` instead of `sub_state`.
+- Particularly: scoped HR security disabled, PII in work_notes, custom audit tables, state-machine extensions on `state` instead of the case sub-state.
 
 ### Verdict
 

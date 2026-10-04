@@ -155,11 +155,11 @@ The proposed "customer journey stage" is a **dimension** of the case record itse
 | `sn_customerservice_case.state` | Lifecycle state, not customer journey |
 | `sn_customerservice_case.priority` | Severity, not journey |
 | `sn_customerservice_case.category` | Issue type (e.g., billing, technical), not journey |
-| `customer_account.customer_lifecycle_stage` (if present in baseline — verify) | This lives on the *account*, not the case. Cases inherit account context but the request is per-case journey, which may differ from account-level stage. |
+| An account-level lifecycle stage on `customer_account` (not documented in the bundled corpus — verify on the instance) | This lives on the *account*, not the case. Cases inherit account context but the request is per-case journey, which may differ from account-level stage. |
 
 **Critical baseline fields to respect:** `account`, `contact`, `consumer`, `state`, `priority`, `category` — all already exist and the journey-stage field must not conflict with their semantics.
 
-**Related baseline tables:** `customer_account` for account-level context; `sn_customerservice_contract` for contract-stage context (renewal date, contract state).
+**Related baseline tables:** `customer_account` for account-level context; `ast_contract` for contract-stage context (its State, Starts and Ends) *(citation: `markdown/customer-service-management/r_BRIWCustomerService.md`, `markdown/customer-service-management/create-csm-service-contracts.md`)*.
 
 (citation: markdown/customer-service-management/configure-csm-accounts-contacts.md)
 
@@ -217,8 +217,8 @@ Consult flags:
 
 ## Open Questions
 
-1. **Engagement field-naming convention** — is `u_customer_journey_stage` correct, or does the engagement use `x_<scope>_customer_journey_stage`? Confirm with Chief Architect before Technical Designer dispatches.
-2. **Auto-population** — should the field auto-populate from `customer_account.customer_lifecycle_stage` (if that field exists on baseline `customer_account` in the engagement's release)? Verify baseline field availability before design.
+1. **Engagement field-naming convention** — is `u_customer_journey_stage` correct? On `sn_customerservice_case` the platform names a new field by where it is created: in the table's own scope it takes no prefix, so `u_` there is the engagement's mark for a custom field; created from global, the platform adds `u_`; from a scoped app, that app's namespace, `x_<vendor>_<app>_customer_journey_stage` *(citation: `markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`)*. Confirm with Chief Architect before Technical Designer dispatches.
+2. **Auto-population** — should the field auto-populate from an account-level lifecycle stage, if the engagement's release has one? Such a field on `customer_account` is not documented in the bundled corpus — verify on the instance before design.
 3. **Choice value localisation** — does the engagement need localised choice labels? Affects sys_choice record design.
 
 ---
@@ -338,9 +338,9 @@ Before any specialist may be dispatched, §1.1 requires honest evaluation of bas
    - New top-level table in pre-existing scoped app: not justified — sibling-of-task design loses parent-child semantic
    - New scoped app: not justified — no separate deployment cadence required
 
-   Proposed table: `sn_customerservice_case_escalation` (extending `task`, in scope `sn_customerservice`, one related list on `sn_customerservice_case`).
+   Proposed table: `sn_customerservice_case_escalation` (proposed — not baseline; extending `task`, in scope `sn_customerservice`, whose namespace a table in that scope begins with *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*; one related list on `sn_customerservice_case`).
 
-   Field list:
+   Field list (columns of a table in the same scoped application take no prefix *(citation: `markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`)*):
    - `parent_case` (Reference to `sn_customerservice_case`, mandatory)
    - `from_tier` (Reference to `sys_user_group`)
    - `to_tier` (Reference to `sys_user_group`)

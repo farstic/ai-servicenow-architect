@@ -24,10 +24,10 @@ You fire twice per request: once upstream as the gateway, and once downstream af
 Trigger conditions — any of these in a user request fires this skill:
 
 - Case management: `sn_customerservice_case`, case lifecycle, case state transitions, case routing.
-- Customer model: `customer_account`, `customer_contact`, `customer_consumer`, partner accounts, account hierarchy, account relationships.
-- Contracts and entitlements: `sn_customerservice_contract`, `sn_entitlement`, entitlement evaluation, service level commitments per customer.
+- Customer model: `customer_account`, `customer_contact`, `csm_consumer`, partner accounts, account hierarchy, account relationships.
+- Contracts and entitlements: `ast_contract`, `service_entitlement`, entitlement evaluation, service level commitments per customer.
 - Workspace and portals: CRM Workspace, Customer Service Portal, agent vs customer-facing experience.
-- Adjacent CSM: special handling notes (`sn_customerservice_special_handling_note`), customer projects (`sn_customerservice_m2m_account_project`), case tasks.
+- Adjacent CSM: special handling notes (`sn_shn_notes`), customer projects (`customer_project`), case tasks.
 - Routing / Omnichannel: case assignment, advanced work assignment, channel-specific routing (chat, email, phone).
 
 ## When NOT to use this skill
@@ -82,12 +82,12 @@ Per `governance/governance-rules.md` §1.1, you may not ratify any of the follow
 
 - A new custom table (any `x_*_*` table or any non-baseline `<scope>_<table>`).
 - A new scoped application.
-- A custom state-model extension (new state values on `sn_customerservice_case.state`, `sn_customerservice_contract.state`, etc.).
+- A custom state-model extension (new state values on `sn_customerservice_case.state`, `ast_contract.state`, etc.).
 - A custom Connection & Credential Alias.
 - A custom escalation table — **specific CSM hot spot, and the answer is always no.** The baseline escalation tables `sn_customerservice_escalation`, `sn_customerservice_escalation_template` and `sn_customerservice_escalation_severity` ship in Australia (citation: `markdown/customer-service-management/case-escalation-components.md`), so a custom one is a §1.1 violation, not a release-family question.
 - Any other major custom architectural object.
 
-**Your bias is baseline.** CSM has rich baseline coverage — case state machine, entitlement evaluation via baseline `EntitlementUtil` Script Include, account hierarchy via baseline `customer_account` parent/child relationships, special handling via baseline notes. The default answer to "do we need a custom table for X" in CSM is almost always **no**.
+**Your bias is baseline.** CSM has rich baseline coverage — case state machine, entitlement evaluation via the baseline calculation (`global.CSManagementUtils`), account hierarchy via baseline `customer_account` parent/child relationships, special handling via baseline notes. The default answer to "do we need a custom table for X" in CSM is almost always **no**.
 
 **Halt protocol — Verdict C trigger.** Emit Verdict C with the four-part `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` structure when a custom object is genuinely the only viable technical path: baseline option evaluated and why it falls short, custom object proposed at smallest possible scope, consequences of approval, alternatives if rejected.
 
@@ -104,7 +104,7 @@ When dispatched downstream of Discovery Specialist, expect these structured fiel
 
 **CSM-specific fields (required):**
 - **Account-contact-consumer model usage** — B2B-only (accounts + contacts), B2C-only (consumers), or mixed.
-- **Contract & entitlement structure** — `sn_customerservice_contract` records present; entitlement tiers defined; SLA-by-tier expectations.
+- **Contract & entitlement structure** — `ast_contract` records present; entitlement tiers defined; SLA-by-tier expectations.
 - **CSM Workspace vs Customer Service Portal split** — agent experience surface and customer-facing surface.
 - **Partner & escalation patterns** — partner-managed cases, special-handling notes, account-team customisations.
 
@@ -183,11 +183,11 @@ For each table:
 
 *(citation: `markdown/customer-service-management/csm-case-management.md`)*
 
-**Related tables:** `task_sla`, `sn_customerservice_case_task`, `sys_journal_field`, `sys_history_set`, `sn_customerservice_special_handling_note`.
+**Related tables:** `task_sla`, `sn_customerservice_task`, `sys_journal_field`, `sys_history_set`, `sn_shn_notes`.
 
 **Baseline notifications:** "Case Assigned to Agent", "Case Resolved", "Case Reopened", "Case Awaiting Customer Info".
 
-**Role gates:** `sn_customerservice_agent` for write; `sn_customerservice_manager` for terminal-state transitions; `sn_customerservice_partner` for partner-managed cases.
+**Role gates:** `sn_customerservice_agent` for write; `sn_customerservice_manager` for terminal-state transitions; `sn_customerservice.partner` for partner-managed cases.
 
 ### Account-Contact-Consumer model
 
@@ -197,29 +197,27 @@ The CSM customer model has three core tables:
 |---|---|---|
 | `customer_account` | B2B company account | Extends `core_company` |
 | `customer_contact` | B2B individual at an account | Extends `sys_user`, linked via `customer_contact.account` |
-| `customer_consumer` | B2C individual (no employer account) | Extends `sys_user`, no account link |
+| `csm_consumer` | B2C individual (no employer account) | The consumer record; a self-registered consumer's login is Consumer User [`csm_consumer_user`], which extends `sys_user` *(citation: `markdown/customer-service-management/r_TIWCustomerService.md`)* |
 
 **Account hierarchy:** `customer_account.parent` enables parent/child account structures. Baseline `Account Hierarchy` plugin provides the navigation UI.
 
-**Account relationships:** `customer_account_relationship` enables bi-directional relationships (e.g., "Customer of", "Partner with") between accounts that are not strict parent/child.
+**Account relationships:** `account_relationship` enables bi-directional relationships (e.g., "Customer of", "Partner with") between accounts that are not strict parent/child.
 
-**Contact relationships:** `customer_contact_relationship` enables contacts to have multi-account access.
+**Contact relationships:** `sn_customerservice_contact_relationship` enables contacts to have multi-account access.
 
 *(citation: `markdown/customer-service-management/c_CustomerServiceRelationships.md`)*
 
 ### Contract and entitlement evaluation
 
-**Tables:** `sn_customerservice_contract` (the contract), `sn_entitlement` (entitlement definitions linked to a contract), `sn_entitlement_condition` (per-entitlement conditions).
+**Tables:** Contract [`ast_contract`] (the contract; State, Starts, Ends) and Entitlement [`service_entitlement`] (entitlements, each with a Contract field) *(citation: `markdown/customer-service-management/r_BRIWCustomerService.md`, `markdown/customer-service-management/create-csm-service-contracts.md`)*. No per-entitlement condition table is documented: the match is by weighted case fields.
 
-**Resolution pattern:** when a case is created, the baseline `EntitlementUtil` Script Include evaluates the entitlement chain:
+**Resolution pattern:** when an agent creates a case, the baseline calculation (`global.CSManagementUtils`, method `getFirstEntitlement`) scores the candidate entitlements on fields of the case *(citation: `markdown/customer-service-management/csm-case-entitlement-calculation.md`)*:
 
-1. Identify the case's account (`case.account` or via `case.contact.account`).
-2. Find active contracts for the account: `sn_customerservice_contract` where `account=X AND state=active AND start_date<=now<=end_date`.
-3. For each active contract, find applicable entitlements: `sn_entitlement` where `contract=Y` and condition matches the case.
-4. Apply the best-fit entitlement to the case: write `case.entitlement` and `case.contract`.
-5. Entitlement-driven SLA: the matched entitlement may specify SLA terms via linked `contract_sla` records.
+1. The fields considered: Account, Consumer, Product, Asset, Contract and Case Channel (plus Sold Product and Install Base when Proactive Customer Service Operations is active).
+2. Each carries a relative weight — Account/Consumer 1, Product 2, Asset 3, Contract 4 — and the entitlement with the highest score is assigned to the case.
+3. Entitlement-driven SLA: the matched entitlement may specify SLA terms via linked `contract_sla` records.
 
-**§1.1 hot spot:** custom entitlement-evaluation logic is the most common §1.1 violation in CSM. The baseline `EntitlementUtil` Script Include covers >90% of evaluation needs. Verdict C is rarely warranted.
+**§1.1 hot spot:** custom entitlement-evaluation logic is the most common §1.1 violation in CSM. The baseline calculation covers >90% of evaluation needs. Verdict C is rarely warranted.
 
 ### CRM Workspace vs Customer Service Portal
 
@@ -237,15 +235,15 @@ The CSM customer model has three core tables:
 
 ### Special handling notes
 
-**Table:** `sn_customerservice_special_handling_note`. Account-level or contact-level instructions that surface on the case form when an agent opens a related case. Baseline UI displays them prominently.
+**Table:** Special Handling Notes [`sn_shn_notes`] *(citation: `markdown/customer-service-management/r_InstalledWithSpecHandNotes.md`)*. Account-level or contact-level instructions that surface on the case form when an agent opens a related case. Baseline UI displays them prominently.
 
 ### Customer projects
 
-**Tables:** `sn_customerservice_m2m_account_project` (account-to-project link), project-related case structure. Baseline support for tracking long-running customer engagements as case parents.
+**Tables:** Customer Project [`customer_project`] (the project carries its account) and `customer_project_task` *(citation: `markdown/customer-service-management/csm-ppm-integration-roles-tasks.md`)*, project-related case structure. Baseline support for tracking long-running customer engagements as case parents.
 
 ### Partner-managed cases
 
-Cases where a partner organisation (not the direct customer) is the responsible agent. Driven by `sn_customerservice_partner` role and `case.partner_contact` reference. Out-of-the-box workflow supports partner visibility constraints.
+Cases where a partner organisation (not the direct customer) is the responsible agent. Driven by `sn_customerservice.partner` role and `case.partner_contact` reference. Out-of-the-box workflow supports partner visibility constraints.
 
 ## Domain-Specific Anti-Patterns to Block (Part 5 library)
 
@@ -253,19 +251,19 @@ Cases where a partner organisation (not the direct customer) is the responsible 
 |---|---|---|
 | Custom escalation table | Baseline `sn_customerservice_escalation` (+ `_template`, `_severity`), with `sys_audit` for field-level history once Audit is set on the dictionary record | `markdown/customer-service-management/case-escalation-components.md` |
 | Custom customer-contact table | Extend `customer_contact` baseline (which extends `sys_user`) | `markdown/customer-service-management/configure-csm-accounts-contacts.md` |
-| Custom entitlement-evaluation logic | Baseline `EntitlementUtil` Script Include | `markdown/customer-service-management/c_CreateAnEntitlement.md` |
+| Custom entitlement-evaluation logic | Baseline entitlement calculation (`global.CSManagementUtils`, `getFirstEntitlement`) | `markdown/customer-service-management/csm-case-entitlement-calculation.md` |
 | Custom account-hierarchy table | `customer_account.parent` baseline self-reference | `markdown/customer-service-management/c_AccountHierarchy.md` |
-| Custom case-routing table | `assignment_rule` records + Advanced Work Assignment | `markdown/customer-service-management/csm-case-management.md` |
+| Custom case-routing table | `sysrule_assignment` records + Advanced Work Assignment | `markdown/customer-service-management/csm-case-management.md` |
 | Custom audit table for case state changes | `sys_history_set` baseline audit | `markdown/platform-security/audit-mgmt-console.md` |
 | Duplicated baseline notification in custom BR | Extend the baseline notification record | `markdown/platform-administration/c_EmailNotifications.md` |
-| Custom case-deflection event table | Baseline events + `sys_event_log` | `markdown/build-workflows/system-events/events.md` |
+| Custom case-deflection event table | Baseline events + `sysevent` | `markdown/build-workflows/system-events/events.md` |
 
 ## §1.1 Hot Spots — Where Build Specialists Routinely Propose Custom Objects
 
 1. **"We need a custom escalation table — the baseline one is not in our release."** → It is. `sn_customerservice_escalation` and its template and severity tables are baseline in Australia (citation: `markdown/customer-service-management/case-escalation-components.md`). Activate the case and account escalation feature, set Audit on the dictionary record for change history, and populate severities and templates. Verdict A, and a custom table is a §1.1 violation.
-2. **"We need a custom entitlement-evaluation Script Include because the baseline one is too rigid."** → Almost always wrong. The baseline `EntitlementUtil` accepts custom conditions via `sn_entitlement_condition`. Verdict A or B.
+2. **"We need a custom entitlement-evaluation Script Include because the baseline one is too rigid."** → Almost always wrong. The baseline calculation (`global.CSManagementUtils`) already scores account or consumer, product, asset and contract by configurable weight *(citation: `markdown/customer-service-management/csm-case-entitlement-calculation.md`)*. Verdict A or B.
 3. **"We need a custom customer-contact table because the baseline lacks fields X, Y, Z."** → Extend `customer_contact` with fields, not a new table. Verdict B.
-4. **"We need a custom contract-renewal tracking table."** → `sn_customerservice_contract` has `end_date` and renewal-tracking baseline fields. Verdict A or B.
+4. **"We need a custom contract-renewal tracking table."** → Contract [`ast_contract`] carries State, Starts and Ends *(citation: `markdown/customer-service-management/create-csm-service-contracts.md`)*. Verdict A or B.
 5. **"We need a custom audit table for case work-notes changes."** → `sys_journal_field` baseline. Verdict A.
 
 ## Post-Build Review Mode — §6.2 Closed Loop

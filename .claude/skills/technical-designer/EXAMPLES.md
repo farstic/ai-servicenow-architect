@@ -77,7 +77,7 @@ No persistent storage proposed. The risk score is computed at form load and rend
 - Risk recomputes from historical data continuously; persisting would create staleness.
 - Form-load latency budget (sub-200ms for the badge call) accommodates real-time computation per the existing `SLABreachRiskCalculator` performance profile.
 
-If persistence is later required (e.g., for list views or reporting), the recommended design is a calculated field (`x_acme_itsm.sla_risk_score`) on `incident` populated by an async BR — that is a follow-up design, not in scope here.
+If persistence is later required (e.g., for list views or reporting), the recommended design is a calculated field (`x_acme_itsm_sla_risk_score`, the app's field on another scope's table *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*) on `incident` populated by an async BR — that is a follow-up design, not in scope here.
 
 **No new tables. No new fields. No indexes.** Section captured explicitly to confirm absence is intentional.
 
@@ -257,7 +257,7 @@ Provide an HR Lifecycle Event in HRSD that, on initiation by an HR business part
 | `source_role_title` | string(80) | Source role title | yes | — | — | Title at time of transfer. |
 | `target_role_title` | string(80) | Target role title | yes | — | — | New title. |
 | `effective_date` | glide_date | Effective date | yes | — | — | Date of reporting-line change. |
-| `target_cost_centre` | reference | Target cost centre | yes | — | `cmn_cost_centre` | Cost-centre alignment. |
+| `target_cost_centre` | reference | Target cost centre | yes | — | `cmn_cost_center` | Cost-centre alignment. |
 | `workday_sync_status` | choice | Workday sync status | no | `pending` | — | Values: pending, in_progress, success, failed. |
 | `workday_sync_attempt_count` | integer | Workday sync attempt count | no | 0 | — | Used by retry logic. |
 
@@ -272,12 +272,12 @@ Provide an HR Lifecycle Event in HRSD that, on initiation by an HR business part
 
 | Table | Operation | Role | Condition | Rationale |
 |---|---|---|---|---|
-| `sn_hr_le_case` (Internal Transfer LE) | create | `sn_hr_core.hr_business_partner` | LE definition = Internal Transfer | Only HRBPs initiate transfers. |
+| `sn_hr_le_case` (Internal Transfer LE) | create | `x_acme_hrsd.hr_business_partner` | LE definition = Internal Transfer | Only HRBPs initiate transfers. |
 | `sn_hr_le_case` | read | `sn_hr_core.basic` | `subject_person = current` OR has explicit case ACL | Baseline HRSD privacy: employee sees own LE; HR roles see by activity ACL. |
-| `x_acme_hrsd_transfer_meta` | create | `sn_hr_core.hr_business_partner` | parent LE state = open | Created by the LE flow on initiation. |
-| `x_acme_hrsd_transfer_meta` | read | `sn_hr_core.hr_business_partner` | parent LE assigned to caller | HRBPs see own transfers. |
-| `x_acme_hrsd_transfer_meta` | read | `sn_hr_core.hr_admin` | (none) | HR admins see all. |
-| `x_acme_hrsd_transfer_meta` | write | `sn_hr_core.hr_admin` | (none) | Restricted writes. |
+| `x_acme_hrsd_transfer_meta` | create | `x_acme_hrsd.hr_business_partner` | parent LE state = open | Created by the LE flow on initiation. |
+| `x_acme_hrsd_transfer_meta` | read | `x_acme_hrsd.hr_business_partner` | parent LE assigned to caller | HRBPs see own transfers. |
+| `x_acme_hrsd_transfer_meta` | read | `sn_hr_core.admin` | (none) | HR admins see all. |
+| `x_acme_hrsd_transfer_meta` | write | `sn_hr_core.admin` | (none) | Restricted writes. |
 | `x_acme_hrsd_transfer_meta.workday_sync_status` field-level | read | `sn_hr_core.basic` | DENY | Sync status is operational metadata, not employee-facing. |
 
 ## 5. Server-side logic outline
@@ -342,7 +342,7 @@ Provide an HR Lifecycle Event in HRSD that, on initiation by an HR business part
 
 ## 12. CMDB / CSDM impact
 
-**None.** No `cmdb_*` access. Cost centre is referenced from `cmn_cost_centre`, which is HR/Finance domain, not CMDB.
+**None.** No `cmdb_*` access. Cost centre is referenced from `cmn_cost_center` *(citation: `markdown/application-development/app-engine-studio/add-data.md`)*, which is HR/Finance domain, not CMDB.
 
 ## 13. Test strategy outline
 
@@ -465,7 +465,7 @@ Add AI-driven case deflection to the Acme customer-facing portal. Before a custo
 | `session_id` | string(64) | Session ID | yes | — | — | Portal session correlation. |
 | `customer_account` | reference | Customer account | yes | — | `customer_account` | Account submitting. |
 | `attempted_subject` | string(255) | Attempted subject | yes | — | — | Customer's draft case subject. |
-| `suggested_articles` | string(2000) | Suggested articles (JSON) | no | — | — | JSON array of `{ kb_sys_id, score }`. |
+| `suggested_articles` | string(2000) | Suggested articles (JSON) | no | — | — | JSON array of `{ article_sys_id, score }`. |
 | `accepted_article` | reference | Accepted article | no | — | `kb_knowledge` | Set if customer accepted; null if not. |
 | `outcome` | choice | Outcome | yes | — | — | Values: deflected, not_deflected_submitted, not_deflected_abandoned. |
 | `case_created` | reference | Case created | no | — | `sn_customerservice_case` | Set if outcome = not_deflected_submitted. |
@@ -485,7 +485,7 @@ Add AI-driven case deflection to the Acme customer-facing portal. Before a custo
 |---|---|---|---|---|
 | `x_acme_csm_portal_deflection_event` | create | `snc_internal` (system context) | (none) | Only created by the portal-side flow, not directly by users. |
 | `x_acme_csm_portal_deflection_event` | read | `sn_customerservice_agent` | `customer_account = caller account` | CSM agents see deflection events for accounts they support. |
-| `x_acme_csm_portal_deflection_event` | read | `sn_customerservice_admin` | (none) | Admins see all. |
+| `x_acme_csm_portal_deflection_event` | read | `csm_admin` | (none) | Admins see all. |
 | `x_acme_csm_portal_deflection_event` | write | (none) | (none) | Read-only after creation. Audit integrity. |
 | `x_acme_csm_portal_deflection_event.attempted_subject` | read | `sn_customerservice_agent` | `customer_account = caller account` | Subject may contain customer-confidential text; restrict to entitled agents. |
 
@@ -512,7 +512,7 @@ Add AI-driven case deflection to the Acme customer-facing portal. Before a custo
 
 | Direction | System | Purpose | Auth | Payload | Volume | MID Server |
 |---|---|---|---|---|---|---|
-| Internal | Now Assist deflection skill | Suggest KB articles for a customer subject | Platform-internal (no external auth) | { subject, account_context } → { articles: [{kb_sys_id, score}] } | ~10K/month | n/a |
+| Internal | Now Assist deflection skill | Suggest KB articles for a customer subject | Platform-internal (no external auth) | { subject, account_context } → { articles: [{article_sys_id, score}] } | ~10K/month | n/a |
 
 **No external integrations.** The Now Assist skill is platform-internal.
 
@@ -553,11 +553,11 @@ Add AI-driven case deflection to the Acme customer-facing portal. Before a custo
 
 | Coverage area | Test approach |
 |---|---|
-| Deflection happy path — customer accepts | ATF + skill mock: customer submits subject, mock skill returns articles, customer accepts → assert no case created, deflection_event.outcome = deflected. |
-| Deflection rejected | ATF + skill mock: customer rejects suggestions, submits case → assert case created, deflection_event.case_created = case sys_id, outcome = not_deflected_submitted. |
-| Deflection abandoned | ATF: customer closes portal session without accepting or submitting → assert deflection_event.outcome = not_deflected_abandoned. |
+| Deflection happy path — customer accepts | ATF + skill mock: customer submits subject, mock skill returns articles, customer accepts → assert no case created, x_acme_csm_portal_deflection_event.outcome = deflected. |
+| Deflection rejected | ATF + skill mock: customer rejects suggestions, submits case → assert case created, x_acme_csm_portal_deflection_event.case_created = case sys_id, outcome = not_deflected_submitted. |
+| Deflection abandoned | ATF: customer closes portal session without accepting or submitting → assert x_acme_csm_portal_deflection_event.outcome = not_deflected_abandoned. |
 | Skill timeout fallback | ATF + skill mock with 5s delay: assert widget falls back to standard case path, no skill suggestions returned. |
-| ACL — agent cannot read other accounts | ATF: agent A reads deflection_event for account B → assert denied. |
+| ACL — agent cannot read other accounts | ATF: agent A reads x_acme_csm_portal_deflection_event for account B → assert denied. |
 | Performance — skill latency | Load test: 50 concurrent customer submissions, assert p95 skill round-trip ≤ 2s. |
 
 ## 14. Open questions
