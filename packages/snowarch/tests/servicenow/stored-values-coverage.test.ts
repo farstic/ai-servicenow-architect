@@ -34,6 +34,9 @@ const SYS = 'a'.repeat(32);
 const cut = (v: unknown) => (typeof v === 'string' ? v.slice(0, 5) : v);
 const cutAll = (d: Record<string, unknown>) => Object.fromEntries(Object.entries(d).map(([k, v]) => [k, cut(v)]));
 
+/** What `client.batchRequest` returns: the answers, each with a body of whatever shape the platform used. */
+interface BatchAnswer { batch_id: string; total: number; results: Array<{ id: string; status_code: number; body: unknown }> }
+
 /** A client with the five write methods; every write stores strings cut to 5 characters. */
 class Wide {
   lookups: unknown[] = [];
@@ -44,10 +47,10 @@ class Wide {
   async updateRecord(_t: string, sysId: string, data: Record<string, unknown>) { return { sys_id: sysId, ...cutAll(data) }; }
   async queryRecords(p: unknown) { this.lookups.push(p); return { count: 0, records: [] }; }
   async createChangeRequest(params: Record<string, unknown>) { return { sys_id: 'cr1', ...cutAll(params) }; }
-  async uploadAttachment(table: string, sysId: string, fileName: string) {
+  async uploadAttachment(table: string, sysId: string, fileName: string, _contentType?: string, _contentBase64?: string) {
     return { sys_id: 'at1', file_name: cut(fileName), table_name: table, table_sys_id: sysId };
   }
-  async batchRequest(ops: Array<{ id: string; method: string; url: string; body?: Record<string, unknown> }>) {
+  async batchRequest(ops: Array<{ id: string; method: string; url: string; body?: Record<string, unknown> }>): Promise<BatchAnswer> {
     return {
       batch_id: 'b1', total: ops.length,
       results: ops.map((op) => ({
@@ -76,7 +79,7 @@ describe('ARC-09-C100 - the Batch API (it can write any table)', () => {
       { id: 'b', method: 'PATCH', url: `/api/now/table/u_other/${SYS}`, body: { label: LONG } },
     ]);
     expect(out.total).toBe(2);                                   // the batch result is returned untouched
-    expect(out.results[0].body.result.name).toBe('abcde');
+    expect((out.results[0]!.body as { result: Record<string, unknown> }).result.name).toBe('abcde');
     const warnings = await v.settle();
     expect(warnings).toHaveLength(2);
     expect(warnings[0]).toMatchObject({ operation: 'create', table: 'u_t', field: 'name', sent_length: 10, stored_length: 5 });
