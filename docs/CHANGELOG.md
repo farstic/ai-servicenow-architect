@@ -9,6 +9,12 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**This release makes the specialists say what the bundled documentation says, and stops a §1.1 halt
+before the design.** Nothing here changes how the product is configured: there is no migration step, and an
+existing checkout keeps its instance store, its preset and its flags untouched. The documentation corpus
+stays pinned at `68c0d11`. The roster is supported on Claude Sonnet or a more capable model; smaller models
+are not supported.
+
 **A bootstrap that has to retry its network check now finishes it.** When the preflight's network probe
 failed in a way worth retrying — a refused or reset connection, a server error, a probe that timed out —
 the run paused before trying again, and that pause did not keep the process open: Node ended it in the
@@ -20,8 +26,16 @@ it should — exit 3 and its reasons, if the network is still down.
 facts its own corpus contradicts and instructions written for an older setup, and snowarch's copies carried
 the same text. The sub-agents verify platform behaviour by reading the local corpus rather than fetching
 pages from GitHub; their confidentiality rule is the engagement folder; a new scoped app is never a design's
-default; and every delivered figure is an editable draw.io file. Several citations, table names and one
-worked example were corrected with it.
+default; and every delivered figure is an editable draw.io file. Three passes against the corpus followed.
+Table, role and field names it does not contain are replaced by its own, and `./snowarch docs verify` now
+checks every name beside every citation. Platform facts it contradicts are corrected and cited, and the
+worked examples weigh the baseline before a custom object.
+
+**A §1.1 halt comes before the design.** When a request needs a custom object, the gateway names it — its
+kind, its place in the §1.1 hierarchy and what it would hold — and stops there: no field list, no types, no
+code. The worked examples that showed a design inside a halt are rewritten, the ITSM and CSM halts now
+recommend the baseline that covers their request, and a test reads every proposal in the roster. A gateway
+grounds its Envelope directly, opening at most eight documentation pages and never through a sub-agent.
 
 ### Fixed
 
@@ -35,14 +49,13 @@ worked example were corrected with it.
   of saying that it timed out.
 - The specialists cite what the corpus says. The ITOM gateway names the CSDM v5 service tables, the ITSM
   gateway cites the Major Incident Workbench Communicate tab for major-incident communications, the
-  Technical Designer defaults to the baseline scope rather than a new scoped app, and the CSM escalation
-  example and the user guide carry a correction: the escalation table they called unavailable is baseline
-  in Australia.
+  Technical Designer defaults to the baseline scope rather than a new scoped app.
 - The specialists use the ServiceNow names the bundled documentation uses. Table, field, role and pattern
-  names the corpus does not contain are replaced by the corpus's own, with the page that names them; the
-  worked examples' own objects carry the `u_` or `x_` prefix the platform gives custom names; and where the
-  corpus contradicts a sentence — classic approval rules are replaced by the Workflow Studio Ask for
-  Approval action — the sentence now says what the corpus says.
+  names the corpus does not contain are replaced by the corpus's own, with the page that names them. The
+  worked examples name their own objects the way the platform names custom ones — `u_` in the global
+  scope, `x_` in a custom scope, the module's own namespace in a baseline scope — and declare each one
+  "proposed — not baseline". Where the corpus contradicts a sentence — classic approval rules are replaced
+  by the Workflow Studio Ask for Approval action — the sentence now says what the corpus says.
 - The specialists' platform facts match the bundled documentation. Per-task SLAs live in Task SLA, case
   states are the ones the Case API documents, an incident's priority is set from its impact and urgency,
   migrations cite the import-set pages, PII is classified with Data Classification, a nightly precompute
@@ -85,8 +98,8 @@ worked example were corrected with it.
   code — and the worked examples that showed a field list inside a halt are rewritten.
 - The gateways ground an Envelope directly: after the gateway skill, they open at most eight corpus pages
   for the constructs in play, searching only to find them, and never through a sub-agent or a workflow. A
-  name they did not open carries the "not documented in the bundled corpus" marker, and what stays
-  unverified becomes an open question.
+  name that is neither printed in the gateway skill nor on a page opened in the turn carries the "not
+  documented in the bundled corpus" marker, and what stays unverified becomes an open question.
 - The prerequisites name the model: the roster is supported on Claude Sonnet or a more capable model.
 - The CSM gateway's §1.1 example and the user guide's walkthrough of it recommend the baseline case and
   account escalation feature. The request names a custom escalation table, so the answer is still a halt, but
