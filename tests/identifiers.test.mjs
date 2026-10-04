@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import {
   MARKER, PLATFORM_PREFIXES, PROPOSED, REASONS, checkAllowList, corpusIndex, formatIdentifiers, readAllowList,
-  scanRoster, verifyIdentifiers,
+  rosterWants, scanRoster, verifyIdentifiers,
 } from '../tools/snowarch/lib/docs/identifiers.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -16,16 +16,19 @@ const CORPUS = join(ROOT, 'vendor', 'ServiceNowDocs');
 const HAS_CORPUS = existsSync(join(CORPUS, 'markdown'));
 
 // The allow-list's size by reason. A change here is a decision about the roster, made in review.
-const EXPECTED = { 'example-field': 9, 'payload-key': 22, 'example-role': 3, 'script-variable': 5, 'example-name': 46 };
+const EXPECTED = { 'example-field': 9, 'payload-key': 23, 'example-role': 3, 'script-variable': 5, 'example-name': 48, 'script-code': 12 };
 // The excuses the real roster rests on, by kind (sites), and the absent names written only in capitals
 // or in mixed case. A new member of either is a decision made in review, as a new allow-list entry is:
 // the marker covers its whole line, and a platform name retyped in capitals is never looked at.
-const EXCUSES = { tool: 6, marker: 7, proposed: 4, glob: 5, glued: 1, placeholder: 4 };
+const EXCUSES = { tool: 6, marker: 7, proposed: 4, glob: 5, glued: 1, placeholder: 4, 'script-code': 19 };
 const CAPITALS = {
   constant: ['AT_RISK', 'BODY_SHA256', 'CMDB_WRITE', 'FLAG_DEPENDENCY_VIOLATION', 'GET_TICKET', 'NOW_ASSIST',
     'POST_CLOSE_TICKET', 'POST_TICKET', 'PRESET_FLAGS_MISMATCH', 'PUT_TICKET', 'REST_OUT', 'WAR_ROOM'],
   mixed: ['Discovery_Custom', 'System_Ext'],
 };
+// What the two C104 arms rest on in the real roster. A change is a decision made in review.
+const DOTTED_REAL = { checked: 26, scriptCode: 12 };   // 12 variables in example code, on 19 sites
+const CAMEL_REAL = { checked: 14, excused: 3 };         // SnSysId, AceGrid, GlobalCo: names an example invents
 const kinds = (r) => r.excused.reduce((a, e) => (e.by === 'allow-list' ? a : { ...a, [e.by]: (a[e.by] ?? 0) + 1 }), {});
 
 // A fixture corpus small enough to read: two `cmdb_ci_cloud_` names (a family), one `cmdb_ci_lone_`
@@ -38,6 +41,8 @@ const PAGE = [
   'Plugin com.snc.real_plugin is required.',
   'SIU Tasksn\\_demo\\_siu\\_task — Stores tasks.',
   'Also present: present_plain_name, incident_state and sys_audit.',
+  'The HR Case [hr_case] table; its event hr_case.reopened. The current record.',
+  'The Account [customer_account] table, and the ServiceNow platform with GlideRecord.',
 ].join('\n');
 const PREFIXES = ['sn', 'sys', 'cmdb', 'incident'];
 const TOOLS = new Set(['snow_core_capabilities_read']);
@@ -111,12 +116,13 @@ test('tier 1 has no allow-list: an entry for a platform-prefixed name is itself 
   assert.match(r.allowErrors[0].why, /platform-prefixed name has no allow-list/);
 });
 
-test('tier 2: each of the five reasons excuses its name, and an unlisted one fails', (t) => {
+test('tier 2: each of the six reasons excuses its name, and an unlisted one fails', (t) => {
   const dir = fixture(t, [
     'The `x_acme_app_ledger` table has `ledger_status`.',
     'The payload carries `order_ref`; the example role is `gsc_operator`.',
     '```javascript\nvar row_count = 0;\n```',
     'The index is `idx_ledger_status`; also `unlisted_name`.',
+    'The step sets `current.approval` after `current.u_flag_x`.',
   ].join('\n'));
   const allow = [
     { file: FILE, identifier: 'ledger_status', reason: 'example-field', table: 'x_acme_app_ledger' },
@@ -124,6 +130,7 @@ test('tier 2: each of the five reasons excuses its name, and an unlisted one fai
     { file: FILE, identifier: 'gsc_operator', reason: 'example-role' },
     { file: FILE, identifier: 'row_count', reason: 'script-variable' },
     { file: FILE, identifier: 'idx_ledger_status', reason: 'example-name' },
+    { file: FILE, identifier: 'current.approval', reason: 'script-code' },
   ];
   assert.deepEqual(Object.keys(REASONS).sort(), [...new Set(allow.map((e) => e.reason))].sort(), 'one plant per reason');
   const r = run(dir, { allow });
@@ -233,9 +240,7 @@ test('the real allow-list holds against the real roster, on every cell, with the
 });
 
 let realIndex;
-const realIndexOnce = () => (realIndex ??= corpusIndex(CORPUS, {
-  words: new Set([...scanRoster(ROOT).tokens.values()].flatMap((t) => t.sites.map((s) => s.on)).filter((w) => w && !w.includes('_'))),
-}));
+const realIndexOnce = () => (realIndex ??= corpusIndex(CORPUS, rosterWants(scanRoster(ROOT))));
 
 test('the real roster against the bundled corpus: nothing unexcused, nothing stale, every prefix live', () => {
   const r = verifyIdentifiers({ root: ROOT, ...(HAS_CORPUS ? { index: realIndexOnce() } : {}) });
@@ -284,4 +289,123 @@ test('the regression this guards: `sn_customerservice_contract` back in the CSM 
   const r = verifyIdentifiers({ root: dir, corpusDir: CORPUS, index: realIndexOnce() });
   assert.deepEqual(r.unexcused.map((u) => `${u.file} ${u.identifier}`),
     ['.claude/skills/csm-specialist/SKILL.md sn_customerservice_contract']);
+});
+
+// ── ARC-09-C104 — the two shapes the guard could not see ─────────────────────────────────────────
+// A dotted name whose right half has no underscore (`hr_case.opened`) and a CamelCase name
+// (`ChangeSchedule`) were never looked up: the guard tokenises on underscores. Each arm below is
+// planted on both sides — the claim that must fail, and the near-miss that must not.
+
+const dottedNames = (r) => r.dotted.unexcused.map((u) => u.identifier);
+const camelNames = (r) => r.camel.unexcused.map((u) => u.identifier);
+
+test('dotted arm: a table.word the corpus does not print fails; the marker or the corpus answers it', (t) => {
+  const bad = run(fixture(t, 'Baseline notification `hr_case.opened` fires on creation.\n'));
+  assert.deepEqual(dottedNames(bad), ['hr_case.opened']);
+  assert.deepEqual(names(bad), [], 'the underscore check has nothing to say about it');
+  assert.equal(bad.status, 'fail');
+  assert.match(formatIdentifiers(bad).text, /^UNEXCUSED \.claude\/skills\/fx\/SKILL\.md:1 hr_case\.opened — a dotted name the corpus does not print/m);
+  assert.equal(formatIdentifiers(bad).code, 1);
+  assert.deepEqual(dottedNames(run(fixture(t, `Baseline notification \`hr_case.opened\` (${MARKER}).\n`))), []);
+  assert.deepEqual(dottedNames(run(fixture(t, 'The event `hr_case.reopened` fires.\n'))), [], 'the corpus prints this one');
+  assert.deepEqual(dottedNames(run(fixture(t, `(${MARKER})\nBaseline notification \`hr_case.opened\`.\n`))), ['hr_case.opened'], 'another line');
+});
+
+test('dotted arm: a left half the corpus does not name, a fence, a path and a number are not looked at', (t) => {
+  const r = run(fixture(t, [
+    'Call `acme.widget` and `gs.info` in the script.',
+    '```javascript\nhr_case.opened = true;\n```',
+    'See `hr_case.md`, `elsewhere/hr_case.opened` and version 9.1.4.',
+  ].join('\n')));
+  assert.deepEqual(dottedNames(r), []);
+  assert.equal(r.dotted.checked, 0, 'nothing in that text is a candidate');
+});
+
+test('dotted arm: example code takes a script-code entry, and only a variable can', (t) => {
+  const text = 'The step sets `current.approval` after `current.u_flag_x`, beside `hr_case.opened`.\n';
+  const dir = fixture(t, text);
+  const entry = (identifier) => ({ file: FILE, identifier, reason: 'script-code' });
+  const r = run(dir, { allow: [entry('current.approval')] });
+  assert.deepEqual(dottedNames(r), ['hr_case.opened'], 'the entry excuses its own name and no other');
+  assert.equal(r.dotted.scriptCode, 1);
+  assert.ok(r.excused.some((e) => e.by === 'script-code' && e.identifier === 'current.approval'));
+  assert.deepEqual(r.allowErrors, []);
+  // a table written with a word is a claim about the table: no entry covers it
+  const claim = run(dir, { allow: [entry('hr_case.opened')] });
+  assert.match(claim.allowErrors[0].why, /script-code entry names a variable/);
+  assert.ok(dottedNames(claim).includes('hr_case.opened'), 'and it excuses nothing');
+  // an entry the file no longer earns, and one the corpus now answers
+  assert.match(run(dir, { allow: [entry('current.gone')] }).allowErrors[0].why, /does not write this name/);
+  const stale = run(fixture(t, 'The step sets `current.approval` after `current.u_flag_x`.\n', { corpus: `${PAGE}\ncurrent.approval is printed.\n` }),
+    { allow: [entry('current.approval')] });
+  assert.match(stale.stale[0].why, /corpus has this name/);
+});
+
+test('camelcase arm: an absent name on a line that says baseline fails; the corpus, the marker or a declaration answers it', (t) => {
+  const line = '`ChangeSchedule` is a baseline Script Include.\n';
+  const bad = run(fixture(t, line));
+  assert.deepEqual(camelNames(bad), ['ChangeSchedule']);
+  assert.equal(bad.status, 'fail');
+  assert.match(formatIdentifiers(bad).text, /^UNEXCUSED \.claude\/skills\/fx\/SKILL\.md:1 ChangeSchedule — a CamelCase name on a line that claims baseline/m);
+  assert.deepEqual(camelNames(run(fixture(t, line, { corpus: `${PAGE}\nThe ChangeSchedule class.\n` }))), []);
+  assert.deepEqual(camelNames(run(fixture(t, `${line.trim()} (${MARKER})\n`))), []);
+  assert.deepEqual(camelNames(run(fixture(t, '`ChangeSchedule` (proposed — not baseline) is baseline-shaped.\n'))), [], 'a declared proposal');
+  for (const word of ['out-of-the-box', 'OOB', 'ships', 'built-in']) {
+    assert.deepEqual(camelNames(run(fixture(t, `The ${word} \`ChangeSchedule\` helper.\n`))), ['ChangeSchedule'], word);
+  }
+});
+
+test('camelcase arm: a brand the corpus holds, a name off a claim line, a fence, one hump and a path are not looked at', (t) => {
+  const r = run(fixture(t, [
+    'ServiceNow ships a baseline `GlideRecord` for this.',
+    'AceGrid is the client product; BankCo owns it.',
+    '```javascript\nChangeSchedule is baseline here\n```',
+    'The baseline `Account` and `Contact` ship together; see [page](elsewhere/PageName.md) on the baseline.',
+  ].join('\n')));
+  assert.deepEqual(camelNames(r), []);
+  assert.equal(r.camel.checked, 2, 'GlideRecord and ServiceNow share the one claim line that names a CamelCase word, and the corpus holds both');
+});
+
+test('camelcase arm: an invented name takes an ordinary entry, and the entry is checked', (t) => {
+  const text = 'The baseline cluster class, and the client product `AceGrid` beside it.\n';
+  const dir = fixture(t, text);
+  const entry = (extra = {}) => ({ file: FILE, identifier: 'AceGrid', reason: 'example-name', ...extra });
+  const ok = run(dir, { allow: [entry()] });
+  assert.deepEqual(camelNames(ok), []);
+  assert.deepEqual(ok.allowErrors, []);
+  assert.ok(ok.excused.some((e) => e.by === 'allow-list' && e.identifier === 'AceGrid'));
+  assert.deepEqual(camelNames(run(dir)), ['AceGrid'], 'without it the name fails');
+  assert.match(run(fixture(t, 'The client product `AceGrid`, no claim here.\n'), { allow: [entry()] }).allowErrors[0].why, /does not write this name on a line that claims baseline/);
+  assert.match(run(dir, { allow: [entry({ reason: 'example-field' })] }).allowErrors[0].why, /needs a table|names the example's own table/);
+  const stale = run(fixture(t, text, { corpus: `${PAGE}\nAceGrid is printed.\n` }), { allow: [entry()] });
+  assert.match(stale.stale[0].why, /corpus has this name/);
+});
+
+test('both arms print their own counts beside the existing line, and the existing line does not move', (t) => {
+  const r = run(fixture(t, [
+    'Use `sys_user`. The event `hr_case.reopened` and `current.approval` after `current.u_flag_x`.',
+    'The baseline `GlideRecord` and `ServiceNow`.',
+  ].join('\n')), { allow: [{ file: FILE, identifier: 'current.approval', reason: 'script-code' }] });
+  const text = formatIdentifiers(r).text;
+  assert.match(text, /^identifiers: checked \d+ \| unexcused 0$/m);
+  assert.match(text, /^dotted names: checked 2 \| unexcused 0 \| script-code 1$/m);
+  assert.match(text, /^camelcase names: checked 2 \| unexcused 0 \| excused 0$/m);
+  assert.equal(r.status, 'ok');
+});
+
+test('an index built without the roster\'s names refuses to answer for them, rather than reading "not asked" as "not there"', (t) => {
+  const dir = fixture(t, 'Baseline notification `hr_case.reopened` and the baseline `GlideRecord`.\n');
+  const blind = corpusIndex(join(dir, 'vendor', 'ServiceNowDocs'), {});
+  assert.throws(() => run(dir, { index: blind }), /corpus index was built without 2 name\(s\)/);
+  const asked = corpusIndex(join(dir, 'vendor', 'ServiceNowDocs'), rosterWants(scanRoster(dir)));
+  assert.equal(run(dir, { index: asked }).status, 'ok', 'the same roster, asked properly, is clean');
+});
+
+test('the real roster: both arms hold, and what they rest on is pinned', () => {
+  if (!HAS_CORPUS) return;
+  const r = verifyIdentifiers({ root: ROOT, index: realIndexOnce() });
+  assert.deepEqual(r.dotted.unexcused, []);
+  assert.deepEqual(r.camel.unexcused, []);
+  assert.deepEqual({ checked: r.dotted.checked, scriptCode: r.dotted.scriptCode }, DOTTED_REAL);
+  assert.deepEqual({ checked: r.camel.checked, excused: r.camel.excused }, CAMEL_REAL);
 });

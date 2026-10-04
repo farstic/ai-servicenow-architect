@@ -82,7 +82,7 @@ Per `governance/governance-rules.md` §1.1, you may not ratify any of the follow
 
 - A new custom table (any `x_*_*` table or any non-baseline `<scope>_<table>`).
 - A new scoped application.
-- A custom state-model extension (new state values on `sn_customerservice_case.state`, `ast_contract.state`, etc.).
+- A custom state-model extension (new state values on `sn_customerservice_case.state`, or on the **State** of a Contract [`ast_contract`] *(citation: `markdown/it-service-management/contract-management/t_ApproveOrRejectAContract.md`)*, etc.).
 - A custom Connection & Credential Alias.
 - A custom escalation table — **specific CSM hot spot, and the answer is always no.** The baseline escalation tables `sn_customerservice_escalation`, `sn_customerservice_escalation_template` and `sn_customerservice_escalation_severity` ship in Australia (citation: `markdown/customer-service-management/case-escalation-components.md`), so a custom one is a §1.1 violation, not a release-family question.
 - Any other major custom architectural object.
@@ -199,10 +199,10 @@ The CSM customer model has three core tables:
 | Table | Purpose | Identity model |
 |---|---|---|
 | `customer_account` | B2B company account | Extends `core_company` |
-| `customer_contact` | B2B individual at an account | Extends `sys_user`, linked via `customer_contact.account` |
+| `customer_contact` | B2B individual at an account | Extends `sys_user`, linked to its account by the contact's `account` reference *(citation: `markdown/api-reference/rest-apis/contact-api.md`)* |
 | `csm_consumer` | B2C individual (no employer account) | The consumer record; a self-registered consumer's login is Consumer User [`csm_consumer_user`], which extends `sys_user` *(citation: `markdown/customer-service-management/r_TIWCustomerService.md`)* |
 
-**Account hierarchy:** `customer_account.parent` enables parent/child account structures. Baseline `Account Hierarchy` plugin provides the navigation UI.
+**Account hierarchy:** an account's parent-account reference enables parent/child account structures *(citation: `markdown/customer-service-management/c_AccountHierarchy.md`)*. Baseline `Account Hierarchy` plugin provides the navigation UI.
 
 **Account relationships:** `account_relationship` enables bi-directional relationships (e.g., "Customer of", "Partner with") between accounts that are not strict parent/child.
 
@@ -255,7 +255,7 @@ Cases where a partner organisation (not the direct customer) is the responsible 
 | Custom escalation table | Baseline `sn_customerservice_escalation` (+ `_template`, `_severity`), with `sys_audit` for field-level history once Audit is set on the dictionary record | `markdown/customer-service-management/case-escalation-components.md` |
 | Custom customer-contact table | Extend `customer_contact` baseline (which extends `sys_user`) | `markdown/customer-service-management/configure-csm-accounts-contacts.md` |
 | Custom entitlement-evaluation logic | Baseline entitlement calculation (`global.CSManagementUtils`, `getFirstEntitlement`) | `markdown/customer-service-management/csm-case-entitlement-calculation.md` |
-| Custom account-hierarchy table | `customer_account.parent` baseline self-reference | `markdown/customer-service-management/c_AccountHierarchy.md` |
+| Custom account-hierarchy table | the account's baseline parent-account self-reference | `markdown/customer-service-management/c_AccountHierarchy.md` |
 | Custom case-routing table | `sysrule_assignment` records + Advanced Work Assignment | `markdown/customer-service-management/csm-case-management.md` |
 | Custom audit table for case state changes | `sys_history_set` baseline audit | `markdown/platform-security/audit-mgmt-console.md` |
 | Duplicated baseline notification in custom BR | Extend the baseline notification record | `markdown/platform-administration/c_EmailNotifications.md` |

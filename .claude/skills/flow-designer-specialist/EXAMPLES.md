@@ -336,7 +336,7 @@ None (side-effects only).
     2. Validate input.
     3. Load incident via `GlideRecordSecure`.
     4. Resolve customer email from `incident.caller_id.email`. If empty → return `{success: false, error_detail: 'no customer email'}`.
-    5. Send email via baseline notification with template `incident.feedback.request.v2` (template lives outside this Action — referenced by name; dotted, as the platform's own `change.update.risk` *(citation: `markdown/platform-administration/t_CreateAnEmailTemplate.md`)*).
+    5. Send email via baseline notification with the example's own feedback-request template (the template lives outside this Action — referenced by name; the platform names its own templates with dots, as `change.update.risk` *(citation: `markdown/platform-administration/t_CreateAnEmailTemplate.md`)*).
     6. On send success: set `incident.x_acme_itsm_feedback_requested = true`, `incident.update()`. Return `{success: true}`.
     7. On send failure: do NOT set the flag. Return `{success: false, error_detail: <error message>}`.
   - Performance: must complete in <500ms per call (loop budget at 5000 records ÷ 30-min flow window).

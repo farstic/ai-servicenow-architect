@@ -424,7 +424,7 @@ One of:
 ### Hot spot 4 — "We need a separate audit trail for HR Profile changes"
 
 **Reflexive bad design:** Custom `u_hr_profile_audit` table.
-**Baseline alternative:** Enable field auditing on `sn_hr_core_profile` fields via `sys_dictionary.audit = true`.
+**Baseline alternative:** Enable field auditing on `sn_hr_core_profile` fields by selecting the **Audit** check box in each field's dictionary record *(citation: `markdown/platform-security/c_UnderstandingTheSysAuditTable.md`)*.
 **Verdict:** C — the request names a separate audit trail, a new place to keep records — and the halt's OPEN QUESTION proposes field auditing on `sn_hr_core_profile`.
 
 ### Hot spot 5 — "We need to restrict HR notes by COE"

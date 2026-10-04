@@ -83,7 +83,7 @@ Per `governance/governance-rules.md` §1.1, you may not ratify any of the follow
 
 - A new custom table (any `x_*_*` table or any non-baseline `<scope>_<table>`).
 - A new scoped application (any new `x_<vendor>_<app>` scope).
-- A custom state-model extension (new state values on `incident.state`, `problem.state`, `change_request.state`, `task_sla.stage`, etc.).
+- A custom state-model extension (new state values on `incident.state`, `change_request.state`, `task_sla.stage`, or the State field of `problem` *(citation: `markdown/it-service-management/problem-management/problem-form.md`)*, etc.).
 - A custom Connection & Credential Alias.
 - A new sys_user_group structure where a baseline `assignment_group` pattern would suffice.
 - Any other major custom architectural object.
@@ -105,7 +105,7 @@ When dispatched downstream of Discovery Specialist (PP-04 pattern), expect the f
 
 **ITSM-specific fields (required):**
 - **Existing assignment-group structure** — flat list vs hierarchy; manager/owner field population; group-membership management approach.
-- **Baseline-state customisations** — any existing extensions to `incident.state`, `incident.priority`, `problem.state`, `change_request.state`.
+- **Baseline-state customisations** — any existing extensions to `incident.state`, `incident.priority`, `change_request.state` and the State field of `problem`.
 - **On-call rota presence** — does the engagement use `cmn_rota` baseline on-call, a third-party tool, or no on-call at all.
 - **SLA definition source** — `contract_sla` records present; SLA contracts in use; SLA breach handling pattern.
 - **Major Incident Management presence** — MIM enabled, MIM workbench customised, MIM communication templates configured.
@@ -270,7 +270,7 @@ Universal ITSM anti-patterns (always include if the relevant concept is in scope
 
 ### Problem management
 
-**Table:** `problem` (extends `task`). Baseline state machine: Assess → Root Cause Analysis → Fix in Progress → Resolved → Closed. Related to `incident` via `problem.related_incidents` and to `change_request` via `problem.rfc`.
+**Table:** `problem` (extends `task`). Baseline state machine: Assess → Root Cause Analysis → Fix in Progress → Resolved → Closed. Related to `incident` via `problem.related_incidents` and to `change_request` by a change request reference (the reference field's name: not documented in the bundled corpus — verify on the instance).
 
 ### Change management
 

@@ -21,6 +21,16 @@
 // as a namespace — are looked up whole: both halves of `sn_si.major_incident_manager` exist, and the
 // pair does not. A dotted name whose left part is `x_`/`u_` is custom as a whole, and so is a name
 // written straight after the roster's placeholder prefix, `x_<vendor>_<app>_business_severity`.
+//
+// ARC-09-C104 — two shapes the underscore tokeniser cannot see, each its own arm with its own count.
+// Dotted: `hr_case.opened` — the left half is a corpus name, the right half a plain word, and nothing
+// was ever looked up for the pair. The arm reads outside fences, only when the left half is a corpus
+// table token or a word the `on` rule has learned, and wants the whole dotted name printed in the
+// corpus; the marker answers it, and so does a `script-code` entry for a variable in example code
+// (a left half with no underscore). Nothing else excuses it — a claim about a table is reworded in the
+// corpus's own words or marked. CamelCase: an absent name of two or more humps, outside fences, on a
+// line that says baseline, out-of-the-box, OOB, ships or built-in, with no marker or declaration on
+// the line; an invented name takes an ordinary tier-2 entry.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { loadContract, toolNames } from '../../../../packages/contract/lib/contract.mjs';
@@ -54,6 +64,7 @@ export const REASONS = Object.freeze({
   'payload-key': "a key of an external system's payload, or an input or output of an example action",
   'example-role': 'a role the example invents',
   'script-variable': 'a variable, parameter or property inside example code',
+  'script-code': 'a variable and its member written in a sentence about example code (current.approval, gr.next); a dotted name only, whose left half has no underscore',
   'example-name': 'any other name the example invents: a group, a metric, an index, a file, a value',
 });
 
@@ -73,6 +84,15 @@ const ALLOWLIST = new URL('./identifier-allowlist.json', import.meta.url);
 const TOKEN = /[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+/g;
 const DOTTED = /[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+/g;
 const CUSTOM = /^(x|u)_/;
+const CAMEL_NAME = /^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+$/;
+// Two or more humps: `ChangeSchedule`, not `Account` or `ITSM`.
+const CAMEL = /\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+\b/g;
+// The words that turn a sentence into a claim about what the platform ships.
+const BASELINE_LINE = /baseline|out[- ]of[- ]the[- ]box|\boob\b|\bships\b|built-in/i;
+// A dotted run that ends in one of these is a file or a host, not a platform name.
+const NOT_A_NAME = new Set(['md', 'json', 'mjs', 'js', 'ts', 'yml', 'html', 'css', 'csv', 'txt', 'png', 'svg', 'drawio', 'xml',
+  'sh', 'pdf', 'docx', 'py', 'io', 'net', 'ink', 'com', 'org']);
+const FENCE = /^\s*```/;
 // The roster's placeholder prefix, one or more angle-bracket segments: `x_<vendor>_<app>_`.
 const PLACEHOLDER = /x_(?:<[^<>\s]+>_)+$/;
 // Leading and trailing underscores are markdown emphasis (`_sn_hr_core_`), not part of the name.
@@ -110,20 +130,32 @@ export function scanRoster(root) {
   const texts = new Map();      // file → its text, for an allow-list entry's table
   const proposed = new Map();   // file → the names a PROPOSED line declares there
   const placeholders = [];      // names written straight after the x_<vendor>_<app>_ placeholder
+  const plainDotted = new Map();  // lower-cased `left.word` (no underscore on the right) → [{ file, line, text }]
+  const camel = new Map();        // `ChangeSchedule` on a line that claims baseline → [{ file, line, text, marked }]
   for (const abs of rosterFiles(root)) {
     const file = relative(root, abs).split(sep).join('/');
     const body = readFileSync(abs, 'utf8');
     texts.set(file, body);
     proposed.set(file, new Set([...body.matchAll(DECLARED)].map((m) => m[1].toLowerCase())));
+    let fenced = false;
     body.split(/\r?\n/).forEach((text, i) => {
       const line = i + 1;
       const spans = [];
+      // A fence's own line and everything between two of them is a transcript, not a claim.
+      const fenceLine = FENCE.test(text);
+      if (fenceLine) fenced = !fenced;
+      const prose = !fenced && !fenceLine;
       for (const m of text.matchAll(DOTTED)) {
         const whole = dotted(m[0]);
         const left = whole.split('.')[0];
         if (!whole.includes('.')) continue;
         const span = { from: m.index, to: m.index + m[0].length, whole, custom: CUSTOM.test(left) };
         spans.push(span);
+        if (prose && plainShape(whole, text, m)) {
+          if (!plainDotted.has(whole)) plainDotted.set(whole, []);
+          const seen = plainDotted.get(whole);
+          if (!seen.some((x) => x.file === file && x.line === line)) seen.push({ file, line, text });
+        }
         if (!span.custom && candidate(left)) {
           if (!qualified.has(whole)) qualified.set(whole, []);
           qualified.get(whole).push({ file, line, text });
@@ -141,9 +173,39 @@ export function scanRoster(root) {
         e.spellings.add(m[0]);
         e.sites.push({ file, line, text, on, glob, within: span && candidate(span.whole.split('.')[0]) ? span.whole : null });
       }
+      if (prose && BASELINE_LINE.test(text)) {
+        const marked = text.toLowerCase().includes(MARKER) || text.toLowerCase().includes(PROPOSED);
+        for (const m of text.matchAll(CAMEL)) {
+          if (text[m.index - 1] === '/') continue;                     // a path segment, `elsewhere/PageName.md`
+          if (!camel.has(m[0])) camel.set(m[0], []);
+          const seen = camel.get(m[0]);
+          if (!seen.some((x) => x.file === file && x.line === line)) seen.push({ file, line, text, marked });
+        }
+      }
     });
   }
-  return { tokens, qualified, texts, proposed, placeholders };
+  return { tokens, qualified, texts, proposed, placeholders, plainDotted, camel };
+}
+
+/**
+ * Is this dotted run a name the dotted arm should look at? Its right half has no underscore (the `on`
+ * rule already looks those up), it is not a version, a file, a host or a path, and its left half is not
+ * one the guard looks up whole already — `com.`, `glide.`, `sn_<scope>.`, `x_` and `u_`.
+ */
+function plainShape(whole, text, m) {
+  const parts = whole.split('.');
+  if (parts.slice(1).some((p) => p.includes('_'))) return false;
+  if (parts.some((p) => /^\d+$/.test(p))) return false;
+  if (NOT_A_NAME.has(parts[parts.length - 1])) return false;
+  if (candidate(parts[0]) || CUSTOM.test(parts[0])) return false;
+  return text[m.index - 1] !== '/' && text[m.index + m[0].length] !== '/';
+}
+
+/** What the index must answer for this roster: the plain words a field is written on, and the two arms' names. */
+export function rosterWants(roster) {
+  const words = new Set();
+  for (const t of roster.tokens.values()) for (const s of t.sites) if (s.on && !s.on.includes('_')) words.add(s.on);
+  return { words, dotted: new Set(roster.plainDotted.keys()), camel: new Set(roster.camel.keys()) };
 }
 
 /**
@@ -151,10 +213,12 @@ export function scanRoster(root) {
  * dotted names under `com.`, `glide.` and `sn_*.`. One pass over every page; the `\_` escape the
  * corpus writes is removed before tokenising, or `sys\_user` would never match `sys_user`.
  */
-export function corpusIndex(corpus, { words = new Set() } = {}) {
+export function corpusIndex(corpus, { words = new Set(), dotted: wantDotted = new Set(), camel: wantCamel = new Set() } = {}) {
   const tokens = new Set();
   const seen = new Set();
   const names = new Set();
+  const foundDotted = new Set();  // of the plain dotted names asked about, those the corpus prints
+  const foundCamel = new Set();   // of the CamelCase names asked about, those the corpus prints
   for (const f of walk(join(corpus, 'markdown'))) {
     const text = readFileSync(f, 'utf8').replace(/\\_/g, '_');
     for (const m of text.matchAll(/[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*/g)) {
@@ -167,15 +231,20 @@ export function corpusIndex(corpus, { words = new Set() } = {}) {
       if (parts.length > 1) {
         const d = dotted(m[0]);
         if (d.includes('.') && candidate(d.split('.')[0])) names.add(d);
+        if (wantDotted.has(d)) foundDotted.add(d);
       }
     }
+    if (wantCamel.size) for (const m of text.matchAll(CAMEL)) if (wantCamel.has(m[0])) foundCamel.add(m[0]);
   }
   const namespaces = new Map();
   for (const d of names) {
     const left = d.split('.')[0];
     namespaces.set(left, (namespaces.get(left) ?? 0) + 1);
   }
-  return { tokens, words: seen, dotted: names, namespaces, has: (t) => tokens.has(t) || seen.has(t) };
+  return {
+    tokens, words: seen, dotted: names, namespaces, has: (t) => tokens.has(t) || seen.has(t),
+    foundDotted, foundCamel, asked: { dotted: wantDotted, camel: wantCamel },
+  };
 }
 
 // The measured order: presence in the corpus decides first, whatever the capitalisation.
@@ -198,6 +267,27 @@ export function checkAllowList(list, roster, { prefixes = PLATFORM_PREFIXES, glu
     if (keys.has(key)) { fail('listed twice'); continue; }
     keys.add(key);
     if (!Object.hasOwn(REASONS, e.reason)) { fail(`reason "${e.reason}" is not one of ${Object.keys(REASONS).join(', ')}`); continue; }
+    const dottedId = e.identifier.includes('.');
+    const camelId = !dottedId && CAMEL_NAME.test(e.identifier);
+    if (e.reason === 'script-code' && !dottedId) { fail('a script-code entry names a dotted name: current.approval, not a bare word'); continue; }
+    if (dottedId) {
+      // The dotted arm's one excuse. A table written with a word is a claim about the table, so the
+      // left half must be a variable — no underscore — and the file must write the pair.
+      if (e.reason !== 'script-code') { fail('only a script-code entry names a dotted name'); continue; }
+      if (e.table) { fail('only an example-field entry names a table'); continue; }
+      if (!roster.plainDotted?.get(e.identifier)?.some((x) => x.file === e.file)) { fail('the file does not write this name'); continue; }
+      if (e.identifier.split('.')[0].includes('_')) {
+        fail('a script-code entry names a variable, not a table: a left half with an underscore is a claim about that table — reword it in the corpus\'s words or mark it');
+      }
+      continue;
+    }
+    if (camelId) {
+      if (e.reason === 'example-field') { fail("an example-field entry names the example's own table: a CamelCase name takes example-name or payload-key"); continue; }
+      if (!roster.camel?.get(e.identifier)?.some((x) => x.file === e.file)) {
+        fail('the file does not write this name on a line that claims baseline');
+      }
+      continue;
+    }
     if (prefixes.includes(e.identifier.split('_')[0])) {
       fail('a platform-prefixed name has no allow-list: use the corpus name, the marker, or a rename');
       continue;
@@ -245,12 +335,19 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
   const allowErrors = checkAllowList(list, roster, { prefixes, glued: gluedList });
   const reasons = reasonCounts(list);
   const corpus = resolve(root, corpusDir);
+  const none = () => ({ checked: 0, unexcused: [], scriptCode: 0, excused: 0 });
   if (!index && !existsSync(join(corpus, 'markdown'))) {
-    return { status: 'missing', checked: 0, classes: null, capitals: null, unexcused: [], excused: [], stale: [], deadPrefixes: [], allowErrors, reasons };
+    return { status: 'missing', checked: 0, classes: null, capitals: null, unexcused: [], excused: [], stale: [], deadPrefixes: [], allowErrors, reasons, dotted: none(), camel: none() };
   }
-  const words = new Set();
-  for (const t of roster.tokens.values()) for (const s of t.sites) if (s.on && !s.on.includes('_')) words.add(s.on);
-  const idx = index ?? corpusIndex(corpus, { words });
+  const wants = rosterWants(roster);
+  const idx = index ?? corpusIndex(corpus, wants);
+  // An index built for another roster cannot say whether THIS roster's names are in the corpus, and
+  // "not asked" would read as "not there". Refuse rather than report a wall of false misses.
+  const asked = idx.asked ?? { dotted: new Set(), camel: new Set() };
+  const unasked = [...wants.dotted].filter((n) => !asked.dotted.has(n)).concat([...wants.camel].filter((n) => !asked.camel.has(n)));
+  if (unasked.length) {
+    throw new Error(`the corpus index was built without ${unasked.length} name(s) this roster asks about (${unasked.slice(0, 3).join(', ')}): build it with corpusIndex(corpus, rosterWants(scanRoster(root)))`);
+  }
   // Names only, to excuse a mention of a tool. Whether the contract matches its pin is the contract
   // gate's question; this check must not fail on it.
   const toolSet = tools ?? new Set(toolNames(loadContract({ verifyPin: false })));
@@ -329,15 +426,56 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
       }
     }
   }
-  for (const e of list) if (idx.has(e.identifier)) stale.push({ file: e.file, identifier: e.identifier, why: 'the corpus has this name: remove the entry' });
+  // The two arms, each against its own population.
+  const dottedArm = none();
+  const scriptNames = new Set();
+  // Only a variable's entry counts: an entry whose left half has an underscore names a table, is
+  // reported by checkAllowList, and excuses nothing here.
+  const scriptEntries = new Set(list.filter((e) => e.reason === 'script-code' && !e.identifier.split('.')[0].includes('_'))
+    .map((e) => `${e.file}\0${e.identifier}`));
+  for (const [whole, sites] of roster.plainDotted) {
+    const left = whole.split('.')[0];
+    if (!idx.has(left)) continue;                 // neither a corpus table token nor a word the `on` rule learned
+    dottedArm.checked += 1;
+    if (idx.foundDotted.has(whole)) continue;
+    for (const s of sites) {
+      if (marked(s)) pass(s, whole, 'marker');
+      else if (scriptEntries.has(`${s.file}\0${whole}`)) { pass(s, whole, 'script-code'); scriptNames.add(whole); }
+      else {
+        dottedArm.unexcused.push({ file: s.file, line: s.line, identifier: whole,
+          why: `a dotted name the corpus does not print; ${left} is a name the corpus has, so this is a claim about it: use the corpus's words, the marker, or — for a variable in example code — a script-code entry` });
+      }
+    }
+  }
+  dottedArm.scriptCode = scriptNames.size;
+  const camelArm = none();
+  const camelExcused = new Set();
+  for (const [name, sites] of roster.camel) {
+    camelArm.checked += 1;
+    if (idx.foundCamel.has(name)) continue;
+    for (const s of sites) {
+      if (s.marked) { pass(s, name, s.text.toLowerCase().includes(MARKER) ? 'marker' : 'proposed'); camelExcused.add(name); }
+      else if (entries.has(`${s.file}\0${name}`)) { pass(s, name, 'allow-list'); camelExcused.add(name); }
+      else {
+        camelArm.unexcused.push({ file: s.file, line: s.line, identifier: name,
+          why: 'a CamelCase name on a line that claims baseline, and the corpus does not have it: use its name, the marker, or a declaration' });
+      }
+    }
+  }
+  camelArm.excused = camelExcused.size;
+  for (const e of list) {
+    const found = e.identifier.includes('.') ? idx.foundDotted.has(e.identifier)
+      : (CAMEL_NAME.test(e.identifier) ? idx.foundCamel.has(e.identifier) : idx.has(e.identifier));
+    if (found) stale.push({ file: e.file, identifier: e.identifier, why: 'the corpus has this name: remove the entry' });
+  }
   const firsts = new Set([...idx.tokens].map((t) => t.split('_')[0]));
   const deadPrefixes = prefixes.filter((p) => !firsts.has(p));
-  const bad = unexcused.length + stale.length + deadPrefixes.length + allowErrors.length;
+  const bad = unexcused.length + dottedArm.unexcused.length + camelArm.unexcused.length + stale.length + deadPrefixes.length + allowErrors.length;
   return {
     status: bad ? 'fail' : 'ok',
     checked: classes.found + classes.custom + classes.constant + classes.mixed + classes.absent + classes.qualified,
     classes, capitals: { constant: [...new Set(capitals.constant)].sort(), mixed: [...new Set(capitals.mixed)].sort() },
-    unexcused, excused, stale, deadPrefixes, allowErrors, reasons,
+    unexcused, excused, stale, deadPrefixes, allowErrors, reasons, dotted: dottedArm, camel: camelArm,
   };
 }
 
@@ -348,8 +486,10 @@ export function formatIdentifiers(r) {
     return { text: lines.join('\n'), code: r.allowErrors.length ? 1 : 0 };
   }
   for (const p of r.deadPrefixes) lines.push(`PREFIX ${p} — begins no corpus name; remove it from PLATFORM_PREFIXES`);
-  for (const u of r.unexcused) lines.push(`UNEXCUSED ${u.file}:${u.line} ${u.identifier} — ${u.why}`);
+  for (const u of [...r.unexcused, ...r.dotted.unexcused, ...r.camel.unexcused]) lines.push(`UNEXCUSED ${u.file}:${u.line} ${u.identifier} — ${u.why}`);
   for (const s of r.stale) lines.push(`STALE ${s.file} ${s.identifier} — ${s.why}`);
   lines.push(`identifiers: checked ${r.checked} | unexcused ${r.unexcused.length}`);
+  lines.push(`dotted names: checked ${r.dotted.checked} | unexcused ${r.dotted.unexcused.length} | script-code ${r.dotted.scriptCode}`);
+  lines.push(`camelcase names: checked ${r.camel.checked} | unexcused ${r.camel.unexcused.length} | excused ${r.camel.excused}`);
   return { text: lines.join('\n'), code: r.status === 'ok' ? 0 : 1 };
 }
