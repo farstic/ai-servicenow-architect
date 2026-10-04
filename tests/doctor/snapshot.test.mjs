@@ -11,14 +11,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { diff, EXPECTED_FAIL_ON_RUNNERS, normalise, PLATFORMS, snapshotPath, WINDOWS_DIFFERS,
   wouldDrop }
   from '../../scripts/ci/doctor-snapshot.mjs';
 import { engineChecks } from '../../tools/snowarch/lib/doctor/checks/index.mjs';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { REAL_ROOT } from './helpers/tree.mjs';
 
 const REPORT = JSON.parse(readFileSync(
@@ -226,8 +226,7 @@ test('C33: an identical report drops nothing', () => {
 
 /** A temp root with one snapshot in it, plus a stale report that is missing `drop` ids. */
 function staleTree(t, drop) {
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-snapwrite-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = tempDir('snowarch-snapwrite-', t);
   mkdirSync(join(root, 'tests/fixtures/doctor'), { recursive: true });
   const snapshot = normalise(REPORT);
   const target = join(root, 'tests/fixtures/doctor/snapshot-linux.json');

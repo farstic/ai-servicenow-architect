@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync }
   from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * The launcher prints the same sentences the Node path does — and it runs on machines with no Node
@@ -338,7 +339,7 @@ test('each launcher declares the sentences it uses, and only those', () => {
 test('a launcher that names a sentence the generator does not have is an error, not a silence', () => {
   // The failure this guards: a typo'd `$MSG_NET_WORK` would simply not be written, and the
   // launcher would print an empty remedy on the one machine that needed it.
-  const dir = mkdtempSync(join(tmpdir(), 'launcher-gen-'));
+  const dir = tempDir('launcher-gen-');
   try {
     mkdirSync(join(dir, 'tools/snowarch/lib'), { recursive: true });
     for (const f of ['net-sentences.mjs', 'remedies.json', 'text.json']) {
@@ -373,7 +374,7 @@ test('the network probe believes git\'s exit code, and says which failure it was
   // the PowerShell port read only the exit code and called a working network unreachable. Same
   // command, two answers — which is exactly the drift a shared launcher is supposed to prevent.
   // Run against a stubbed git, so the assertion is about the launcher and not about the network.
-  const dir = mkdtempSync(join(tmpdir(), 'launcher-net-'));
+  const dir = tempDir('launcher-net-');
   const run = (gitExit, gitStderr) => {
     const bin = join(dir, 'bin');
     mkdirSync(bin, { recursive: true });
@@ -529,7 +530,7 @@ test('the Windows launcher is a launcher too — the budget, with the region rep
 test('a failed recipe removes the corpus THIS run created, and dies with B02 — not the doctor\'s wording', {
   skip: process.platform === 'win32' ? 'POSIX launcher; the real .ps1 runs in the no-node, windows-latest cell' : false,
 }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'launcher-b02-'));
+  const dir = tempDir('launcher-b02-');
   // A git that gets the bootstrap to B02, creates the corpus directory at the clone as the real one
   // would, and then fails the FETCH — the step the 408 landed on in the run that started this.
   const stub = (failVerb) => [
@@ -634,7 +635,7 @@ test('the recipe is idempotent — a second bootstrap succeeds, with .git left a
   // `submodule absorbgitdirs` leaves `.git` as a FILE. The second is why the guard asks whether
   // `.git` EXISTS rather than whether it is a directory — `-d` is false on exactly the tree the
   // guard exists for, and a fixture that left a directory behind would have passed a broken guard.
-  const dir = mkdtempSync(join(tmpdir(), 'launcher-idem-'));
+  const dir = tempDir('launcher-idem-');
   const calls = join(dir, 'calls');
   const stub = [
     '#!/bin/sh',

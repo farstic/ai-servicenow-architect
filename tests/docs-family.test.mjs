@@ -2,7 +2,6 @@ import { test, before, after } from 'node:test';
 import { execFileSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CORPUS_DIR, EXIT, SyncError, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
@@ -11,6 +10,7 @@ import {
 } from '../tools/snowarch/lib/docs/family.mjs';
 import { AREAS, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { tempDir, trackTempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
@@ -80,7 +80,7 @@ function seeded({ family = 'australia' } = {}) {
 }
 
 before(() => {
-  scratch = mkdtempSync(join(tmpdir(), 'snowarch-docs-family-'));
+  scratch = tempDir('snowarch-docs-family-');
   upstream = buildUpstream(scratch);
   upstreamUrl = pathToFileURL(upstream.bare).href;
   assert.ok(upstream.zurichTip && upstream.zurichTip !== upstream.tip,
@@ -191,7 +191,7 @@ const ENGINE_TREES = [
 
 function withEngine(ws) {
   ENGINE_SRC ??= (() => {
-    const d = mkdtempSync(join(scratch, 'engine-'));
+    const d = trackTempDir(mkdtempSync(join(scratch, 'engine-')));
     for (const [from, to] of ENGINE_TREES) cpSync(join(REPO, from), join(d, to), { recursive: true });
     return d;
   })();

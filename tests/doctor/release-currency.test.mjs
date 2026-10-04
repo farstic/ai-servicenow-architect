@@ -9,9 +9,6 @@
 import { test } from 'node:test';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 
 /**
  * The launcher these regexes hold, DERIVED AND ESCAPED — ARC-07-W17.
@@ -26,6 +23,7 @@ const ESCAPED_CLI = spellings().cli.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import { hostChecks } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
 import { runChecks } from '../../tools/snowarch/lib/doctor/runner.mjs';
 import { writeUpgradeCheck } from '../../tools/snowarch/lib/upgrade-check.mjs';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 const E28 = hostChecks().find((c) => c.id === 'E-28');
 
@@ -56,8 +54,7 @@ const gitStub = ({ tags = [], localTag = null, head = 'abc1234' } = {}) => (_cmd
 
 async function e28(t, { tags = [], localTag = null, head = 'abc1234', now = realClock,
   cache = null, noNetwork = false } = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = tempDir('snowarch-e28-', t);
   if (cache) writeUpgradeCheck(root, { ...cache, now: () => new Date() });
   return E28.run({ root, noNetwork, now, exec: gitStub({ tags, localTag, head }) });
 }
@@ -114,8 +111,7 @@ test('C31 — a cache from an earlier run is read, not crashed on', async (t) =>
 
 test('C31 — a cache that says BEHIND still warns, without asking the remote again', async (t) => {
   let asked = 0;
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = tempDir('snowarch-e28-', t);
   writeUpgradeCheck(root, { latestTag: 'v9.0.0', localTag: 'v9.0.0-rc.1', behind: true, now: () => new Date() });
   // ARC-09-C47 — the stub answers the command it is given, and the counter counts what this
   // test's own message claims: a REMOTE call. E-28 now also runs `git describe` to notice a
@@ -134,8 +130,7 @@ test('C31 — a cache that says BEHIND still warns, without asking the remote ag
 
 test('C31 — --no-network says what the last check saw, and asks nothing', async (t) => {
   let asked = 0;
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = tempDir('snowarch-e28-', t);
   const r = await E28.run({ root, noNetwork: true, now: realClock,
     exec: () => { asked += 1; return ''; } });
   assert.equal(r.status, 'skip');
@@ -161,8 +156,7 @@ test('C31 — --no-network says what the last check saw, and asks nothing', asyn
 // part of the change rather than incidental to it.
 
 test('C32 — the empty outcome is cached: three runs, one remote call', async (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = tempDir('snowarch-e28-', t);
   let calls = 0;
   const ctx = { root, noNetwork: false, now: realClock,
     exec: (cmd, args) => { if (args[0] === 'ls-remote') calls += 1; return lsRemote(['v9.0.0-rc.1']); } };
@@ -183,8 +177,7 @@ test('C32 — the empty outcome is cached: three runs, one remote call', async (
 });
 
 test('C32 — a cached empty outcome never reads as "up to date"', async (t) => {
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = tempDir('snowarch-e28-', t);
   writeUpgradeCheck(root, { latestTag: null, localTag: null, behind: false, now: () => new Date() });
 
   const r = await E28.run({ root, noNetwork: false, now: realClock, exec: () => lsRemote([]) });
@@ -207,10 +200,9 @@ test('C32 — --no-network tells a checked-and-empty run from one that never ran
   // code rather than creating it. The fix-up makes them reachable — E-28 declares `offline: true`,
   // the runner runs an offline check under `--no-network` — and this case goes THROUGH `runChecks`,
   // which is the only way to assert that a user would actually see them.
-  const never = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  const checked = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  const sawOne = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  t.after(() => [never, checked, sawOne].forEach((d) => rmSync(d, { recursive: true, force: true })));
+  const never = tempDir('snowarch-e28-', t);
+  const checked = tempDir('snowarch-e28-', t);
+  const sawOne = tempDir('snowarch-e28-', t);
   writeUpgradeCheck(checked, { latestTag: null, localTag: null, behind: false, now: () => new Date() });
   writeUpgradeCheck(sawOne, { latestTag: 'v9.1.0', localTag: 'v9.0.0', behind: true, now: () => new Date() });
 
@@ -256,8 +248,7 @@ test('C32 — the window expiring asks again, and a release that appeared is fou
   // The other half of "at most once per 24 h": at most, not never. A stale empty outcome must not
   // pin the check silent — the whole point of caching it is to spend one call per window, and a
   // release published in the meantime has to be seen on the next one.
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = tempDir('snowarch-e28-', t);
   const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000);
   writeUpgradeCheck(root, { latestTag: null, localTag: null, behind: false, now: () => twentyFiveHoursAgo });
 
@@ -273,8 +264,7 @@ test('C32 — the window expiring asks again, and a release that appeared is fou
   assert.match(r.detail, /^v9\.1\.0 available/);
 
   // ...and a fresh one does not: the same fixture one hour old asks nothing.
-  const fresh = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  t.after(() => rmSync(fresh, { recursive: true, force: true }));
+  const fresh = tempDir('snowarch-e28-', t);
   writeUpgradeCheck(fresh, { latestTag: null, localTag: null, behind: false,
     now: () => new Date(Date.now() - 60 * 60 * 1000) });
   let freshCalls = 0;
@@ -291,8 +281,7 @@ test('C32 — the release-tag paths are unchanged, in both directions', async (t
   assert.equal(behind.status, 'warn');
   assert.match(behind.detail, new RegExp(`^v9\\.1\\.0 available — run ${ESCAPED_CLI} upgrade$`));
 
-  const current = mkdtempSync(join(tmpdir(), 'snowarch-e28-'));
-  t.after(() => rmSync(current, { recursive: true, force: true }));
+  const current = tempDir('snowarch-e28-', t);
   writeUpgradeCheck(current, { latestTag: 'v9.0.0', localTag: 'v9.0.0', behind: false, now: () => new Date() });
   // The tree IS on v9.0.0 in this scenario, so `describe` says so; a stub that answered
   // ls-remote output to that question would be describing a tree nobody has.
@@ -324,8 +313,7 @@ const gitFor = ({ describe: tag, tags = [] }) => (_cmd, args) => (
   args.includes('describe') ? `${tag}\n` : lsRemote(tags));
 
 async function e28With(t, { cache, describe, tags = [], noNetwork = false }) {
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-c47-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = tempDir('snowarch-c47-', t);
   writeUpgradeCheck(root, { ...cache, now: () => new Date() });
   return E28.run({ root, noNetwork, now: realClock, exec: gitFor({ describe, tags }) });
 }
@@ -353,8 +341,7 @@ test('ARC-09-C47 — a record describing another tree is not used (the interrupt
   // verdict out of the record. So the assertion is that the stale `behind: true` was not used —
   // the remote says v9.0.0 is the newest release and the tree is on it, so the answer is `ok`,
   // where the cached record would have said "v9.0.0-rc.6 available".
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-c47-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = tempDir('snowarch-c47-', t);
   // RELEASE tags, deliberately. The owner's own record named prereleases, and a prerelease is
   // caught by check 3 before check 2 is reached — so a test written with their exact tags passes
   // whether or not this check exists. Found by the control: disabling the `describe` comparison

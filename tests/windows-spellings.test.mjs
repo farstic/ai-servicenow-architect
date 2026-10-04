@@ -22,8 +22,7 @@
  * `noTtyMessage` call sites passed `platform` and not `env`, so a win32 message rendered `./snowarch`.
  */
 import { test } from 'node:test';
-import { tmpdir } from 'node:os';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -36,6 +35,7 @@ import { POSIX } from '../tools/snowarch/lib/launcher-spelling.mjs';
 // second declaration of the region's shape, and the guard would go quietly blind the day the
 // generator changed it.
 import { BEGIN as HELP_BEGIN, END as HELP_END } from '../scripts/gen-cli-help.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8');
@@ -765,7 +765,7 @@ test('ARC-07-C31 — finish, interrupt and storePlan spell the shell they are to
   // `storePlan` reads the store from disk rather than through a seam, so this one costs a temp
   // directory — which is still cheaper than leaving the site to the sweep alone.
   const { storePlan } = await import('../tools/snowarch/lib/commands/upgrade.mjs');
-  const dir = mkdtempSync(join(tmpdir(), 'c31-storeplan-'));
+  const dir = tempDir('c31-storeplan-');
   try {
     mkdirSync(join(dir, '.local'), { recursive: true });
     writeFileSync(join(dir, '.local', 'instances.json'), '{ not json');

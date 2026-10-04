@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * `scripts/gen-roster.mjs`, driven through the CLI against a tree built per case.
@@ -24,7 +25,7 @@ const SKILLS = [
 ];
 
 function tree(mutate = () => {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'roster-'));
+  const dir = tempDir('roster-');
   const write = (rel, body) => {
     mkdirSync(join(dir, dirname(rel)), { recursive: true });
     writeFileSync(join(dir, rel), body);

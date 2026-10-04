@@ -8,8 +8,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { fileURLToPath } from 'node:url';
@@ -19,6 +18,7 @@ import {
 } from '../../tools/snowarch/lib/commands/upgrade.mjs';
 import { branchState, describe } from '../../tools/snowarch/lib/git.mjs';
 import { git as harnessGit } from './harness.mjs';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { failureLines } from '../../tools/snowarch/lib/doctor/panel.mjs';
 import {
   MAX_AGE_MS, REFRESH_AFTER_MS, cachePath, isFresh, needsRefresh, readUpgradeCheck,
@@ -93,8 +93,7 @@ test('the plan block says the five things a reader has to decide from', () => {
 });
 
 test('the cache is the hook\'s contract: three keys that may never be renamed', (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-upgrade-cache-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dir = tempDir('snowarch-upgrade-cache-', t);
 
   const written = writeUpgradeCheck(dir,
     { latestTag: 'v2.1.0', localTag: 'v2.0.0', localDistance: 3, behind: true });
@@ -253,13 +252,6 @@ import { CACHE_FILE } from '../../tools/snowarch/lib/doctor-cache.mjs';
 
 const MASKED = 'Mode: live — instance=<label> (<label>) preset=custom — doctor 2026-09-24 14 ok';
 const REAL = 'Mode: live — instance=pdi (pdi) preset=custom — doctor 2026-09-24 14 ok';
-
-/** A throwaway tree, removed when the case ends. */
-function tempDir(prefix, t) {
-  const dir = mkdtempSync(join(tmpdir(), prefix));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  return dir;
-}
 
 /** A tree whose doctor cache carries the UNMASKED line, as the real doctor writes it. */
 function treeWithCache(t, modeLine = REAL) {
@@ -507,8 +499,7 @@ test('ARC-09-C56 — a cache older than this run is not this run', async (t) => 
  * test that reads it back — but that the ref this chooses RESOLVES in a repository of that shape.
  */
 test('ARC-07-C39 — the return ref resolves in a tag-only checkout, and a branch still wins', (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'c39-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dir = tempDir('c39-', t);
   // THE HARNESS'S WRAPPER, not `execFileSync` — ARC-09-C27b, and `harness-shape` caught my first version:
   // every git call under `tests/upgrade/` carries `core.longpaths` because the Windows cells need it, and a
   // direct call is a path length away from failing there and nowhere else. The wrapper also supplies the

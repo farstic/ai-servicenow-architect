@@ -17,10 +17,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(HERE, '..', 'scripts', 'ci', 'control.mjs');
@@ -29,8 +30,7 @@ const EXIT = { ok: 0, inert: 1, refused: 2, restoreFailed: 3 };
 
 /** A repository with one committed file, and nothing else. */
 function repo(t, { content = 'export const answer = 42;\n', autocrlf = false } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'control-script-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dir = tempDir('control-script-', t);
   const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' });
   // `-b main` because `init.defaultBranch` is a MACHINE setting (ARC-09-C14): a fixture whose branch
   // name comes from the operator's git config is a fixture that behaves differently per machine, and

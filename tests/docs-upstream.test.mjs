@@ -1,8 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CORPUS_DIR, EXIT, SyncError, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
@@ -10,6 +9,7 @@ import { docsStatus, formatStatus } from '../tools/snowarch/lib/docs/status.mjs'
 import { formatUpstream, syncUpstream, writePin } from '../tools/snowarch/lib/docs/upstream.mjs';
 import { BEGIN, END, RECIPE_TARGET, renderRecipeBlock } from '../tools/snowarch/lib/docs/recipe-block.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
@@ -55,7 +55,7 @@ function ready({ family = 'australia', cite = CITED_PAGE } = {}) {
 }
 
 before(() => {
-  scratch = mkdtempSync(join(tmpdir(), 'snowarch-docs-upstream-'));
+  scratch = tempDir('snowarch-docs-upstream-');
   upstream = buildUpstream(scratch);
   upstreamUrl = pathToFileURL(upstream.bare).href;
   // The fixture's own shape, asserted once: the tip must be AHEAD of the pin or every test below

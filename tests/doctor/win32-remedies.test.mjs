@@ -18,10 +18,10 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 import { engineRepoChecks } from '../../tools/snowarch/lib/doctor/checks/engine-repo.mjs';
 import { engineDocsChecks } from '../../tools/snowarch/lib/doctor/checks/engine-docs.mjs';
 import { hostChecks } from '../../tools/snowarch/lib/doctor/checks/host.mjs';
@@ -34,9 +34,16 @@ const WIN = { platform: 'win32', env: {} };
 const WIN_CLI = spellings(WIN).cli;              // .\snowarch.cmd
 const WIN_BOOTSTRAP = spellings(WIN).bootstrap;  // .\bootstrap.cmd
 
-/** A checkout that answers almost nothing, so most checks reach their remedy branch. */
-function bareRoot() {
-  const root = mkdtempSync(join(tmpdir(), 'w17-win32-'));
+/**
+ * A checkout that answers almost nothing, so most checks reach their remedy branch.
+ *
+ * Through `tempDir`, never a bare `mkdtempSync` (ARC-09-C80): this function used to make its root
+ * and hand it back with nothing to remove it, so every full run left one `w17-win32-*` directory per
+ * case in TMPDIR. `t` is the case's own context — the helper removes the directory when the case ENDS,
+ * passing or failing, which a trailing `rmSync` does not do.
+ */
+function bareRoot(t) {
+  const root = tempDir('w17-win32-', t);
   mkdirSync(join(root, '.local'), { recursive: true });
   writeFileSync(join(root, 'engine.config.json'), JSON.stringify({
     mcp: { serverKey: 'servicenow' }, docs: { pin: 'a'.repeat(40), family: 'australia' },
@@ -80,8 +87,8 @@ for (const [name, checks] of [
   // cases hold `.\snowarch.cmd` and on a mac they hold `./snowarch`. What is missing is win32 coverage
   // from a MAC, which is a fixture job and goes with the rest of the sweep.
 ]) {
-  test(`ARC-07-W17 — ${name}'s remedies read the Windows spelling on a Windows shell`, async () => {
-    const lines = await remediesOf(checks, bareRoot());
+  test(`ARC-07-W17 — ${name}'s remedies read the Windows spelling on a Windows shell`, async (t) => {
+    const lines = await remediesOf(checks, bareRoot(t));
 
     // THE FLOOR: this family must actually have produced a launcher-bearing remedy.
     const bearing = lines.filter((l) => /snowarch|bootstrap/i.test(l));

@@ -4,16 +4,16 @@
 // tests call, so a rule cannot pass here and be absent there.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { lintSkills, lintAgents, lintPaths, lintVocabulary, lintRootless } from './lib/lint-rules.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const SKILL_OK = { name: 'thing', description: 'Does a thing.' };
 const AGENT_OK = { name: 'doer', description: 'Does it.', tools: 'Read, Write, Edit' };
 
 function tree(skills = {}, agents = {}, extra = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-lint-'));
+  const root = tempDir('snowarch-lint-');
   for (const [dir, spec] of Object.entries(skills)) {
     const d = join(root, '.claude/skills', dir);
     mkdirSync(d, { recursive: true });
@@ -139,7 +139,7 @@ test('SK-12 rejects an area-prefixed token missing the markdown/ root, and only 
 
 test('SK-11 rejects a missing, misplaced or incomplete ## Triggers section', () => {
   const withBody = (body) => {
-    const r = mkdtempSync(join(tmpdir(), 'snowarch-lint-'));
+    const r = tempDir('snowarch-lint-');
     mkdirSync(join(r, '.claude/skills/a'), { recursive: true });
     writeFileSync(join(r, '.claude/skills/a/SKILL.md'), `---\nname: a\ndescription: d\n---\n\n# A\n\n${body}`);
     writeFileSync(join(r, '.claude/skills/a/EXAMPLES.md'), '# E\n');
@@ -153,7 +153,7 @@ test('SK-11 rejects a missing, misplaced or incomplete ## Triggers section', () 
 });
 
 test('SK-10 rejects a dead .claude path — criterion 6 puts the dangling token in a SKILL BODY', () => {
-  const root = mkdtempSync(join(tmpdir(), 'snowarch-lint-'));
+  const root = tempDir('snowarch-lint-');
   try {
     mkdirSync(join(root, '.claude/skills/alpha'), { recursive: true });
     writeFileSync(join(root, '.claude/skills/alpha/SKILL.md'),

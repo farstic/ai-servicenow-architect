@@ -20,10 +20,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TAG = 'import/engine-v2.8.0-worktree';
@@ -43,7 +43,10 @@ test('R1 — every body that differs from the import tag is attributable, and no
     t.skip(`${TAG} is not in this clone — a shallow checkout cannot answer this`);
     return;
   }
-  const work = mkdtempSync(join(tmpdir(), 'snowarch-import-'));
+  // NO `t` here, on purpose (ARC-09-C80): passing it would register the helper's removal BEFORE this
+  // test's own `t.after`, so the directory would be deleted before `git worktree remove` ran and a
+  // stale `.git/worktrees/` entry could be left in a real checkout. The exit sweep follows this hook.
+  const work = tempDir('snowarch-import-');
   t.after(() => {
     try { git(['worktree', 'remove', '--force', work]); } catch { /* already gone */ }
     rmSync(work, { recursive: true, force: true });
@@ -111,7 +114,10 @@ test('R1 — every body that differs from the import tag is attributable, and no
 test('R1 — the assets are byte-identical, which the count CAN assert', (t) => {
   // The asset half never legitimately changed, so its number is an assertion rather than evidence.
   if (!tagPresent()) { t.skip(`${TAG} is not in this clone`); return; }
-  const work = mkdtempSync(join(tmpdir(), 'snowarch-import-'));
+  // NO `t` here, on purpose (ARC-09-C80): passing it would register the helper's removal BEFORE this
+  // test's own `t.after`, so the directory would be deleted before `git worktree remove` ran and a
+  // stale `.git/worktrees/` entry could be left in a real checkout. The exit sweep follows this hook.
+  const work = tempDir('snowarch-import-');
   t.after(() => {
     try { git(['worktree', 'remove', '--force', work]); } catch { /* already gone */ }
     rmSync(work, { recursive: true, force: true });
@@ -140,8 +146,7 @@ test('R1 — the comparison is line-ending blind, which is why the Windows cell 
   // Asserted here rather than trusted, because I cannot run the Windows cell: two trees whose only
   // difference is the line ending must compare identical, and a real content change must still be
   // caught through the same normalisation.
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-eol-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dir = tempDir('snowarch-eol-', t);
   const body = '---\nname: x\n---\n\n# A skill\n\nOne line, then another.\n';
   for (const [side, text] of [['old', body], ['new', body.replace(/\n/g, '\r\n')]]) {
     mkdirSync(join(dir, side, 'skills', 'x'), { recursive: true });

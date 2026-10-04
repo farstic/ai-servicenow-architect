@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { symlinkSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { tempDir, trackTempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * The engine lint, driven the way anyone runs it: the CLI, against a fixture tree.
@@ -235,14 +236,18 @@ test('...and the hang detector detects a hang', () => {
 // ---------------------------------------------------------------------------------------------
 
 const { mkdtempSync, mkdirSync, writeFileSync, readFileSync: readFile, rmSync } = await import('node:fs');
-const { tmpdir } = await import('node:os');
 
 /**
  * A fixture tree. `parent` exists for the one case that needs the tree to sit somewhere
  * specific — inside another repository — rather than wherever `TMPDIR` happens to point.
  */
-function minimalTree(mutate = () => {}, parent = tmpdir()) {
-  const dir = mkdtempSync(join(parent, 'engine-lint-'));
+function minimalTree(mutate = () => {}, parent) {
+  // With a `parent` the tree sits inside a directory the caller made. It is tracked all the same: the
+  // helper's `<dir>.owner` record lands beside it, inside that parent and OUTSIDE the lint root, so
+  // the case still sees exactly the tree it built.
+  const dir = parent === undefined
+    ? tempDir('engine-lint-')
+    : trackTempDir(mkdtempSync(join(parent, 'engine-lint-')));
   const write = (rel, body) => {
     mkdirSync(join(dir, dirname(rel)), { recursive: true });
     writeFileSync(join(dir, rel), body);
@@ -342,7 +347,7 @@ test('criterion 2 — L05 fails on a typo in a cited path and passes on the real
  * `git add` and no commit: L05 reads the INDEX, which is what makes a file created by the story
  * in hand resolve as soon as it is staged — the point at which this repository runs its gates.
  */
-function gitTree(mutate = () => {}, parent = tmpdir()) {
+function gitTree(mutate = () => {}, parent) {
   const dir = minimalTree(mutate, parent);
   const git = (...args) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' });
   git('init', '-q', '-b', 'main');
@@ -392,8 +397,7 @@ test('L05 reads the DISK for a tree that merely sits inside somebody else\'s rep
   // is right there on disk was reported dead — green in CI, red on their machine, which is the
   // environment-dependence this check was rewritten to remove. The question is whether the lint
   // ROOT is the toplevel, not whether one exists above it.
-  const foreign = mkdtempSync(join(tmpdir(), 'foreign-repo-'));
-  t.after(() => rmSync(foreign, { recursive: true, force: true }));
+  const foreign = tempDir('foreign-repo-', t);
   execFileSync('git', ['-C', foreign, 'init', '-q'], { stdio: 'ignore' });
 
   const dir = minimalTree(({ write }) => {
@@ -493,7 +497,7 @@ test('criterion 6 — L10 skips without the CLI and cannot run when it is requir
   // than passing. `--require-claude` is what the plugin-validate job passes, where a missing CLI
   // means the job is misconfigured.
   const dir = minimalTree();
-  const bin = mkdtempSync(join(tmpdir(), 'nopath-'));
+  const bin = tempDir('nopath-');
   try {
     symlinkSync(process.execPath, join(bin, 'node'));
     // `spawnSync`, not `execFileSync`: the skip REASON goes to stderr, and on the success path

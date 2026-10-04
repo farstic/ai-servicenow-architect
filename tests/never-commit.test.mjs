@@ -3,15 +3,15 @@
 // this test is the net under it.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
 
 import {
   credentialLines, CREDENTIAL_EXT, ENVISH, isPlaceholder,
 } from '../tools/snowarch/lib/doctor/checks/credential-shape.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const git = (args, cwd = root) => execFileSync('git', args, { cwd, encoding: 'utf8' });
@@ -71,7 +71,7 @@ test('S02 AC 5 — an engagement note in the working tree is invisible to git', 
   // A temp repository with this repository's OWN `.gitignore`, never the real tree: the assertion
   // is about a file EXISTING and staying unseen, and creating `clients/acme/memory.md` in the
   // checkout to prove it would be the test leaving engagement-shaped litter behind.
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-engagement-'));
+  const dir = tempDir('snowarch-engagement-');
   try {
     git(['init', '-q', '-b', 'main', '.'], dir);
     writeFileSync(join(dir, '.gitignore'), readFileSync(join(root, '.gitignore'), 'utf8'));
@@ -105,7 +105,7 @@ test('ARC-10-S03 AC 2 — the four engine-era scratch lines are gone, and their 
   // A temp repository with this repository's own `.gitignore`: each planted path is REPORTED.
   // `node-compile-cache` is the one that motivated the line — Node 22+ writes it under TMPDIR, not
   // in a checkout, so the rule was hiding something that never appears here.
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-scratch-'));
+  const dir = tempDir('snowarch-scratch-');
   try {
     git(['init', '-q', '-b', 'main', '.'], dir);
     writeFileSync(join(dir, '.gitignore'), readFileSync(join(root, '.gitignore'), 'utf8'));
@@ -177,7 +177,7 @@ test('the eol policy is stored in the index as lf and applied on checkout', () =
   for (const r of sh) assert.match(r, /attr\/[^\t]*eol=lf/, `eol=lf attribute missing: ${r}`);
 
   // (b) a fresh checkout of the same commit, in a temp worktree -- this is criterion 5's condition.
-  const wt = mkdtempSync(join(tmpdir(), 'eol-check-'));
+  const wt = tempDir('eol-check-');
   try {
     git(['worktree', 'add', '--detach', '-q', wt, 'HEAD']);
     const fresh = execFileSync('git', ['ls-files', '--eol'], { cwd: wt, encoding: 'utf8' })
@@ -198,7 +198,7 @@ test('one ignore file for the monorepo', () => {
 
 // ---------- mutations, in a throwaway repository so the real worktree is never dirtied ----------
 const withScratchRepo = (fn) => {
-  const dir = mkdtempSync(join(tmpdir(), 'never-commit-'));
+  const dir = tempDir('never-commit-');
   try {
     git(['init', '-q', '-b', 'main', '.'], dir);
     writeFileSync(join(dir, '.gitignore'), readFileSync(join(root, '.gitignore')));

@@ -3,13 +3,13 @@
 // regression test.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, cpSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { verifyCitations, formatResult, EXIT } from '../tools/snowarch/lib/docs/verify.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
@@ -29,7 +29,7 @@ const FIXTURE_CORPUS = resolve(here, 'fixtures/docs-corpus');
 // Every path is joined with node:path, never concatenated with '/', so the Windows cell exercises
 // the same code (criterion 6).
 function withTree(skillText, fn) {
-  const dir = mkdtempSync(join(tmpdir(), 'cite-verify-'));
+  const dir = tempDir('cite-verify-');
   try {
     mkdirSync(join(dir, '.claude', 'skills', 'fx'), { recursive: true });
     writeFileSync(join(dir, '.claude', 'skills', 'fx', 'SKILL.md'), skillText);
@@ -92,7 +92,7 @@ test('all citations resolving gives status ok and exit 0', () => {
 });
 
 test('the same path cited from two files is checked once', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'cite-dupe-'));
+  const dir = tempDir('cite-dupe-');
   try {
     mkdirSync(join(dir, '.claude', 'skills', 'a'), { recursive: true });
     mkdirSync(join(dir, '.claude', 'skills', 'b'), { recursive: true });

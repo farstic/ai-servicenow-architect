@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { compose, dialogsParagraph } from '../scripts/gen-readme.mjs';
 import { allowedCloneTags } from './lib/install-tag.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /** Positional adapter for the shape table below — the module's own call form is an object. */
 const allowedCloneTagsFor = (tags, treeVersion) => allowedCloneTags({ tags, treeVersion });
@@ -36,7 +36,7 @@ test('criterion 3 — the composition is current', () => {
 test('...and editing README.md by hand fails the check', () => {
   // A copy of the tree, because the assertion is about a generator that must REFUSE — running it
   // against the real repository to prove that would leave the repository needing a regenerate.
-  const dir = mkdtempSync(join(tmpdir(), 'install-page-'));
+  const dir = tempDir('install-page-');
   try {
     for (const rel of [INSTALL, README, 'docs/README-head.md', 'docs/README-tail.md',
       'docs/snippets/terminal-handoff.md',

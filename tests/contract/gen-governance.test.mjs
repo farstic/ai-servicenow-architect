@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fillLauncher } from '../../packages/contract/lib/contract.mjs';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 import { APPROVAL_PER_RECORD, APPROVAL_WITH_CAPTURE, PREFLIGHT_STOP, PREFLIGHT_UNKNOWN_GATE }
   from '../../packages/contract/gen/rule-file.mjs';
@@ -28,7 +28,7 @@ const PAGE = 'docs/MODES-AND-PRESETS.md';
 const realContract = () => JSON.parse(readFileSync(join(root, 'packages/snowarch/dist/contract.json'), 'utf8'));
 
 function tree(mutate = () => {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'gen-gov-'));
+  const dir = tempDir('gen-gov-');
   const write = (rel, body) => {
     mkdirSync(join(dir, dirname(rel)), { recursive: true });
     writeFileSync(join(dir, rel), body);

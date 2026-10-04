@@ -1,8 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -12,6 +11,7 @@ import {
 // One fixture, shared with tests/docs-status.test.mjs — see tests/helpers/docs-fixture.mjs.
 import { AREAS, LONG_NAME, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
@@ -44,7 +44,7 @@ const silent = () => {};
 const corpusOf = (w) => join(w.root, CORPUS_DIR);
 
 before(() => {
-  scratch = mkdtempSync(join(tmpdir(), 'snowarch-docs-sync-'));
+  scratch = tempDir('snowarch-docs-sync-');
   upstream = buildUpstream(scratch);
   // `pathToFileURL`, never `file://${path}` — a Windows path is not a URL path, and a URL's
   // `pathname` is not a filesystem path.

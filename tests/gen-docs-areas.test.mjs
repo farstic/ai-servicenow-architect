@@ -23,10 +23,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SCRIPT = 'scripts/gen-docs-areas.mjs';
@@ -37,8 +38,7 @@ const MARKER = '.gen-docs-areas-fixture-root';
 
 /** A tree the real script can run in: itself, its one import, a scan root, and the output file. */
 function fixture(t, { skill, areasFile }) {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-areas-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dir = tempDir('snowarch-areas-', t);
   for (const rel of [SCRIPT, CITATIONS]) {
     mkdirSync(join(dir, dirname(rel)), { recursive: true });
     copyFileSync(join(root, rel), join(dir, rel));

@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -212,14 +212,13 @@ test('the plan leaves no temp directory behind', { timeout: 120_000 }, (t) => {
   // so "count only mine" and "the root is empty" are the same assertion — and no neighbour can reach it.
   // TEMP and TMP as well as TMPDIR: `os.tmpdir()` reads TMPDIR on POSIX and TEMP/TMP on Windows, and the
   // Windows e2e cell runs this file too.
-  const privateTmp = mkdtempSync(join(tmpdir(), 'c36-plan-root-'));
+  const privateTmp = tempDir('c36-plan-root-', t);
   const saved = { TMPDIR: process.env.TMPDIR, TEMP: process.env.TEMP, TMP: process.env.TMP };
   t.after(() => {
     for (const [k, v] of Object.entries(saved)) {
       if (v === undefined) delete process.env[k];
       else process.env[k] = v;
     }
-    rmSync(privateTmp, { recursive: true, force: true });
   });
   process.env.TMPDIR = privateTmp;
   process.env.TEMP = privateTmp;

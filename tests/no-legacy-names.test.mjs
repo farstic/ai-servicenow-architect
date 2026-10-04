@@ -6,11 +6,11 @@
 // Without the backward direction the list would silently become a list of files nobody rewrote.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const git = (args, cwd = root) => execFileSync('git', args, { cwd, encoding: 'utf8' });
@@ -337,7 +337,7 @@ test('the S03 leaf-cut paths stay deleted', () => {
 
 // ---------- mutations, in a throwaway repository ----------
 const withScratchRepo = (fn) => {
-  const dir = mkdtempSync(join(tmpdir(), 'no-legacy-'));
+  const dir = tempDir('no-legacy-');
   try { git(['init', '-q', '-b', 'main', '.'], dir); fn(dir); }
   finally { rmSync(dir, { recursive: true, force: true }); }
 };

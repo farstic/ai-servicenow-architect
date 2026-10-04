@@ -1,13 +1,13 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { docsStatus, E12_ABSENT, formatStatus, SCHEMA, SPARSE } from '../tools/snowarch/lib/docs/status.mjs';
 import { CORPUS_DIR, MODE, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
 import { AREAS, buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /** ARC-07-C31 — DERIVED: `E12_ABSENT` renders for the terminal, so the process is its source. */
 const SPELL = spellings();
@@ -42,7 +42,7 @@ function workspace({ pin = upstream.pin, family = 'australia' } = {}) {
 }
 
 before(() => {
-  scratch = mkdtempSync(join(tmpdir(), 'snowarch-docs-status-'));
+  scratch = tempDir('snowarch-docs-status-');
   upstream = buildUpstream(scratch);
   upstreamUrl = pathToFileURL(upstream.bare).href;
 });

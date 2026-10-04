@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * ARC-05 acceptance, B05-04 — `gen-retired-names.mjs --check`, on a tree that is actually stale.
@@ -44,7 +44,7 @@ const NEEDED = [SCRIPT, OUT, IDENT,
 const MARKER = 'fixture_marker_only_in_the_copied_tree';
 
 function fixtureTree() {
-  const dir = mkdtempSync(join(tmpdir(), 'gen-retired-'));
+  const dir = tempDir('gen-retired-');
   for (const rel of NEEDED) {
     mkdirSync(join(dir, dirname(rel)), { recursive: true });
     copyFileSync(join(root, rel), join(dir, rel));
@@ -103,7 +103,7 @@ test('B05-04 — the fixture needs BOTH package directories, and says so when it
   // plan proposed, and the generator cannot find the rename map: it fails on a missing file rather
   // than performing the check. Without this, a future edit could quietly drop the second directory
   // and the test above would still pass against whatever it happened to resolve.
-  const dir = mkdtempSync(join(tmpdir(), 'gen-retired-partial-'));
+  const dir = tempDir('gen-retired-partial-');
   try {
     for (const rel of [SCRIPT, OUT, IDENT]) {
       mkdirSync(join(dir, dirname(rel)), { recursive: true });

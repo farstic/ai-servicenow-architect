@@ -14,13 +14,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
 import { lintLineEndings, lintHyphenSplits } from './lib/editorconfig.mjs';
 import { isHistory, honoursMarker } from '../packages/contract/lint/lib/scan.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const owners = JSON.parse(readFileSync(join(root, 'tests/legacy-names.allowlist.json'), 'utf8')).files;
@@ -96,7 +96,7 @@ test('the history glossary is exempt only line by line, and only where the marke
 });
 
 test('a planted ctx_ token fails — and each exemption suppresses only what it names', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-surfaces-'));
+  const dir = tempDir('snowarch-surfaces-');
   try {
     mkdirSync(join(dir, 'docs/plans'), { recursive: true });
     mkdirSync(join(dir, 'packages/x'), { recursive: true });
@@ -262,7 +262,7 @@ test('ARC-10-S04 AC 1/AC 4 — the old standing rule survives only where it is r
   // B10-02). What stood here was `OLD_RULE.some((t) => `see docs/${t}.md`.includes(t))` — which
   // asserts that `String.includes` works and never runs the sweep at all. A control that cannot
   // fail is worse than no control: it reads, in a diff, exactly like one that can.
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-oldrule-'));
+  const dir = tempDir('snowarch-oldrule-');
   try {
     mkdirSync(join(dir, 'docs'), { recursive: true });
     const planted = 'docs/GUIDE.md';
@@ -794,7 +794,7 @@ test('ARC-09-C78 — the prompt-audit corrections stay corrected', () => {
 });
 
 test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppresses only its own line', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-audit-'));
+  const dir = tempDir('snowarch-audit-');
   try {
     const plant = (rel, text) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), `${text}\n`); };
     // One planted line per pattern, each in a file its scope covers — the old wording, as it stood.
