@@ -281,7 +281,11 @@ test('the page stays a page, and the tail stays a tail', () => {
   // was a defect rather than a sacrifice: *"Enter accepts; a number changes that line"* restated the
   // header in the verb ARC-07-C10 retired. Net +1, nothing deleted for space, same rule as the six
   // moves above.
-  assert.ok(install <= 299, `${install} lines of install page (criterion: 299)`);
+  // 300 since ARC-09-C85: the model the roster is supported on. The owner's decision that it runs on
+  // Claude Sonnet or a more capable model, and not on smaller ones, is the first fact a reader checks
+  // before installing, so it is one row in the prerequisites table. Same rule as every move above: a
+  // cap is worth moving for a fact, and nothing was deleted to pay for it.
+  assert.ok(install <= 300, `${install} lines of install page (criterion: 300)`);
   assert.ok(tail <= 40, `${tail} lines of README tail (budget: 40)`);
   // The corpus cost stays on the install page: what the install takes off the disk is an install
   // fact, and every figure on it carries where it was measured.

@@ -11,9 +11,10 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = join(dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SURFACES = ['.claude', 'governance', 'templates', 'CLAUDE.md', 'tests/VALIDATION-TESTS.md'];
 
 // A block opens on a line that is the marker itself — a heading, a bold line, or the line a fenced
