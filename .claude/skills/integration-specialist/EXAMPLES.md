@@ -37,9 +37,9 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 
 #### Payload
 - **Format:** JSON.
-- **Content type:** `application/json-patch+json` (Azure DevOps Work Items API convention).
+- **Content type:** set by the spoke's Create Work Item action, not by this design.
 - **Size cap:** 16KB (Azure DevOps work item field limits).
-- **Schema reference:** Azure DevOps Work Items REST API v7.0, operation `Create Work Item`, document type `Bug` (per spec — confirm in OQ-1).
+- **Schema reference:** the spoke's Create Work Item action, work item type `Bug` (per spec — confirm in OQ-1). The spoke was built for Azure DevOps Boards REST API version 4.1 and TFS 2018 Update 3 and may be compatible with later versions — confirm against the organisation's Azure DevOps *(citation: `markdown/integrate-applications/integration-hub/azure-devops-spoke.md`)*.
 - **Field map:**
   | ServiceNow field | ADO field | Notes |
   |---|---|---|
@@ -103,16 +103,16 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
   - Phone numbers (configurable patterns; replace with `<PHONE>`)
   - Names from the `incident.caller_id.name` (literal substring replace; replace with `<CUSTOMER>`)
   - Configurable extra patterns via system property `x_acme_itsm.ado_pii_patterns`.
-- **Logs:** never log the un-redacted payload. Log only: incident sys_id, ADO work item id (post-success), error class, retry attempt number, correlation ID.
+- **Logs:** never log the un-redacted payload. Log only: incident sys_id, ADO work item id (post-success), error class, retry attempt number, run ID.
 
 #### Observability
-- **Logged fields per call** — a Log action in the calling flow writes them to `sys_flow_log`, and a failed call also appears in the Outbound HTTP Logs [`sys_outbound_http_log`] with its 4xx or 5xx request and response details: correlation_id, incident_sys_id, attempt_number, http_status, response_time_ms, error_class (if any), result (success/retry/dlq) *(citations: `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`, `markdown/it-asset-management/software-asset-management/now-assist-sam-skills-inputs.md`)*.
+- **Logged fields per call** — a Log action in the calling flow writes them to `sys_flow_log`: run_id, incident_sys_id, attempt_number, error_class (if any), result (success/retry/dlq). Outbound web services logging also tracks every outbound REST request, at the basic level by default — elevated or all where it is configured *(citations: `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`, `markdown/api-reference/web-services/outbound-request-logging.md`, `markdown/api-reference/web-services/outbound-logging-properties.md`)*.
 - **Metrics (Performance Analytics indicators):**
   - `ado_outbound_success_rate` (%)
   - `ado_outbound_p95_latency_ms`
   - `ado_outbound_dlq_depth`
   - `ado_outbound_daily_volume`
-- **Correlation ID:** generated at flow trigger time (UUID), propagated as `X-Correlation-ID` header on every ADO call. Logged on both ServiceNow and (where ADO supports) ADO sides.
+- **Run ID:** a UUID generated at flow trigger time (`run_id`) and written with every Log action entry for the run. The corpus documents no header input for the spoke's actions, so the ID stays on the ServiceNow side and is not sent to Azure DevOps *(citation: `markdown/integrate-applications/integration-hub/azure-devops-spoke.md`)*.
 - **Alerts:**
   - DLQ depth >10/hour → email ops.
   - Auth failure (any single 401) → email ops immediately.
@@ -140,11 +140,11 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 - Credential rotation procedure (quarterly).
 - DLQ replay procedure (manual, role-gated).
 - Integration disable procedure (set `x_acme_itsm.ado_integration_active = false` → flow short-circuits at trigger).
-- Log access procedure (where to find correlation ID end-to-end).
+- Log access procedure (where to find a run's entries by run ID).
 - ADO API deprecation tracking (subscribe to ADO release notes).
 
 #### Open questions
-- **OQ-1:** Confirm work item type — spec says "work item"; assumption is `Bug`. Is it `Bug`, `Task`, `Issue`, or organisation-specific? Affects `$Bug` path segment.
+- **OQ-1:** Confirm work item type — spec says "work item"; assumption is `Bug`. Is it `Bug`, `Task`, `Issue`, or organisation-specific? Affects the work item type the Create Work Item action is given.
 - **OQ-2:** ADO project per environment — is the same ADO project used for ServiceNow dev/test/uat/prod, or are there parallel ADO projects? Affects parameterisation strategy.
 - **OQ-3:** Re-route on Resolved-to-Closed transition — should subsequent state updates push to ADO too? Spec only covers initial resolve.
 - **OQ-4:** PII redaction scope — confirm the field list and patterns with Security & GRC.
@@ -163,7 +163,7 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 
 Every section of the SKILL output checklist is filled with substance, not boilerplate. The auth choice (Authorization Code + refresh token, not Client Credentials) is justified against ADO's specific limitation; the idempotency mechanism explicitly accounts for ADO's lack of native `Idempotency-Key` support and compensates with a server-side dedup check; the retry policy distinguishes retryable from non-retryable error classes by HTTP status code with a clear DLQ destination.
 
-The spoke decision is the most important architectural call. A junior designer would have built a one-off REST Message because the immediate spec only mentions one use case, or a custom spoke because three teams are asking. The senior designer checks the baseline first, finds the Microsoft Azure DevOps Boards Spoke, and reuses it for all four use cases. The PII redaction handoff to Developer is correctly scoped: Integration Specialist names the contract (`PIIRedactor.redact(text)` with documented patterns) and lets Developer implement. The seven handoffs proposed are all genuinely needed and none are optional given the production stakes.
+The spoke decision is the most important architectural call. A junior designer would have built a one-off REST Message because the immediate spec only mentions one use case, or a custom spoke because three teams are asking. The senior designer checks the baseline first, finds the Microsoft Azure DevOps Boards Spoke, and reuses it for all four use cases. The PII redaction handoff to Developer is correctly scoped: Integration Specialist names the contract (`PIIRedactor.redact(text)` with documented patterns) and lets Developer implement. The eight handoffs proposed are all genuinely needed and none are optional given the production stakes.
 
 ---
 
@@ -276,7 +276,7 @@ This integration takes inbound monitoring events from an external tool and produ
 - **PII handling:** the `summary` and `detail` fields may contain user/system identifiers. Treated as non-PII per spec but flagged for Security & GRC review.
 
 #### Observability
-- **Logged per request:** each inbound request is in the Transaction logs (`syslog_transaction`) with its response time, and the API script writes correlation_id, client_id, http_status, validation_errors (if any), incident_sys_id (on success) and idempotent_replay (boolean) to the Log [`syslog`] table *(citations: `markdown/api-reference/rest-api-explorer/c_RESTAPI.md`, `markdown/api-reference/rest-apis/tisc-api.md`)*.
+- **Logged per request:** each inbound request is in the Transaction logs (`syslog_transaction`), whose Response time field holds its round-trip time in milliseconds, and the API script writes correlation_id, client_id, http_status, validation_errors (if any), incident_sys_id (on success) and idempotent_replay (boolean) to the system log, which tracks script logs *(citations: `markdown/api-reference/rest-api-explorer/c_RESTAPI.md`, `markdown/platform-security/r_TransactionLogs.md`, `markdown/platform-security/r_SystemLogs.md`)*.
 - **Metrics:**
   - `monitoring_api_request_rate` (per minute)
   - `monitoring_api_success_rate` (%)
@@ -303,7 +303,7 @@ This integration takes inbound monitoring events from an external tool and produ
 - Idempotent replay: same correlation_id twice → second returns 200 with same sys_id and `idempotent_replay: true`, no second incident.
 - CI unresolvable: invalid `affected_ci` → 200 with `partial` warning, incident created without CI link.
 - Rate limit: 1501st request in a minute → 429 with `Retry-After: 60`.
-- Concurrent duplicate correlation_id: simultaneous requests with same correlation_id → at most one incident created (DB unique constraint enforces).
+- Concurrent duplicate correlation_id: two requests with the same correlation_id at the same moment → both may miss the lookup and create two incidents — the tradeoff the idempotency posture accepts; a repeat sent after the first insert returns the existing incident with `idempotent_replay: true`.
 
 #### Operational runbook items (handoff to Operational Documentation)
 - OAuth2 client provisioning procedure (creating the app registration, role assignment, scope).
@@ -397,7 +397,7 @@ N/A at the spoke level — spokes are libraries. Consumers (flows) trigger.
   - 401/403 (auth issue — alert ops, do not silently retry)
   - 400/404/422 (semantic issues — surface to caller as Action error)
 - **DLQ:** at the spoke level, Actions return structured error objects rather than writing to a DLQ. DLQ behaviour is the consuming flow's responsibility (different consumers have different DLQ needs — incident DLQ ≠ change DLQ).
-- **Action error contract:** every Action returns `{success: bool, data: <payload>, error: {code, message, retryable, attempt_count}}`.
+- **Action contract:** every Action returns `{success: bool, data: <payload>, http_status, response_time_ms, error: {code, message, retryable, attempt_count}}` — the Action measures the status and the round-trip time itself, so every consuming flow logs the same fields.
 
 #### Idempotency posture
 - **Operation-by-operation:**
@@ -420,10 +420,10 @@ N/A at the spoke level — spokes are libraries. Consumers (flows) trigger.
 #### Security
 - **TLS:** 1.2+ enforced (Atlas endpoints).
 - **HMAC verification:** outbound — spoke signs every request. Inbound webhooks from Atlas (if added in v2) would also verify HMAC.
-- **Logs:** spoke logs request URL, response status, response_time_ms, error class, attempt_count. Never logs request/response bodies — bodies may contain sensitive ticket detail. If body inspection is needed, enable `x_acme_atlas_spoke.debug_logging` system property (defaults false; bodies truncated to 256 chars and redacted for known sensitive patterns even when enabled).
+- **Logs:** the spoke writes no log of its own; each consuming flow's Log action records the action name, http_status, response_time_ms, error code and attempt_count the Action returns. Request and response bodies are never logged — they may contain sensitive ticket detail. If body inspection is needed, the `x_acme_atlas_spoke.debug_logging` system property (default false) makes the Actions also return the body, truncated to 256 chars and redacted for known sensitive patterns, for the consuming flow to log.
 
 #### Observability
-- **Per-call logging:** the consuming flow's Log action writes action_name, correlation_id, attempt_count, http_status, response_time_ms and error_class to `sys_flow_log`, and a failed call also appears in the Outbound HTTP Logs [`sys_outbound_http_log`] — no custom log table *(citations: `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`, `markdown/it-asset-management/software-asset-management/now-assist-sam-skills-inputs.md`)*.
+- **Per-call logging:** the consuming flow's Log action writes the action name, correlation_id and the http_status, response_time_ms, attempt_count and error code the Action returns to `sys_flow_log`; outbound web services logging also tracks every outbound REST request, at the basic level by default — no custom log table *(citations: `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`, `markdown/api-reference/web-services/outbound-request-logging.md`, `markdown/api-reference/web-services/outbound-logging-properties.md`)*.
 - **Metrics:**
   - `atlas_spoke_success_rate` (per Action)
   - `atlas_spoke_p95_latency` (per Action)
@@ -455,7 +455,7 @@ x_acme_atlas_spoke/
     - x_acme_atlas_spoke.debug_logging
     - x_acme_atlas_spoke.timestamp_skew_seconds (default 0)
   Logging (no custom table):
-    - consuming flows' Log action (sys_flow_log); failed calls in sys_outbound_http_log
+    - consuming flows' Log action (sys_flow_log); every outbound request in the outbound web services log
 ```
 
 #### Versioning
@@ -497,7 +497,7 @@ x_acme_atlas_spoke/
 
 ### Why this is the gold standard
 
-The decision to build a spoke (versus three separate REST Messages, one per consumer) is justified explicitly against the reusability requirement, and the spoke's structure mirrors a proper scoped application — Connection Aliases, REST Messages, Actions, Script Includes, system properties, and log table all enumerated. The semver discipline matters: consumers pin a version and upgrade deliberately, which prevents the classic "we upgraded the spoke and broke incident-to-Atlas without anyone noticing" production incident.
+The decision to build a spoke (versus three separate REST Messages, one per consumer) is justified explicitly against the reusability requirement, and the spoke's structure mirrors a proper scoped application — Connection Aliases, REST Messages, Actions, Script Includes, system properties, and logging (no custom table) all enumerated. The semver discipline matters: consumers pin a version and upgrade deliberately, which prevents the classic "we upgraded the spoke and broke incident-to-Atlas without anyone noticing" production incident.
 
 The error contract returned by every Action (`{success, data, error: {code, message, retryable, attempt_count}}`) is the reusability superpower: every consuming flow handles spoke errors the same way, regardless of which Action was called, regardless of which underlying Atlas error occurred. Without that contract, every consumer rewrites its own error-handling logic and they drift. The handoffs cover all the right specialists: Developer for the script bodies (the spoke is a *spec* without scripts at this level), DevOps for the App Repository workflow, Security & GRC for the HMAC implementation, and importantly Performance & Scale for the cross-consumer aggregate load — a question only an Integration Specialist with system-wide visibility would think to raise.
 

@@ -105,7 +105,7 @@ Refusal (`confidence = 0.0` with the insufficient-history message) renders the f
 - **Capability:** Incident Chronology Summariser.
 - **Purpose:** Read-only summarisation of incident chronology for itil agent ramp-up.
 - **Data classes accessed:** ITSM incident operational data (short_description, description, state, assignment_group, work_notes, comments, audit log). Subject to baseline `incident` ACLs (the caller is the itil agent, so access is already authorised).
-- **Output classes produced:** A short-form summary returned to the calling Client Script for in-form rendering. Not persisted.
+- **Output classes produced:** A short-form summary returned to the calling Client Script for in-form rendering. The skill writes nothing back to the incident; the response is kept in the Generative AI Log (see Audit retention).
 - **Refusal conditions:** Insufficient history → returns the insufficient-history fallback. Uninterpretable context → omits rather than fabricates.
 - **Audit retention:** Skill invocations are logged in the Generative AI Log [`sys_generative_ai_log`] — prompts and responses, retained 180 days — and each use in the Gen AI Usage Log [`sys_gen_ai_usage_log`] *(citation: `markdown/intelligent-experiences/generative-ai-controller/generative-ai-controller-tables.md`)*.
 - **Periodic review cadence:** Quarterly review of accuracy by Acme ITSM Practice Lead, sampling ~50 invocations per quarter.
@@ -249,9 +249,9 @@ One-shot per case submission. Invoked by the customer portal submission flow (Fl
 |---|---|---|---|
 | `getRecentCasesForAccount` | **Baseline** (Read Records via standard CSM spoke) | Retrieve up to 50 cases on the account, last 30 days, active states only. | Read-only. |
 | `semanticSearchCases` | **CUSTOM — §1.1 ESCALATION REQUIRED** | Compare the new case's text against the candidate cases via semantic similarity (AI Search profile). | Read-only. |
-| `proposeDeflection` | **Baseline** (Update Record via standard CSM spoke) | Write to the deflection-event tracker (see §13). | Write — limited. |
+| `proposeDeflection` | **Baseline** (agent output to the calling flow) | Hands the verdict, the existing case reference and the confidence back to the portal flow, which renders the deflection UX. | None — writes no record. |
 
-**OPEN QUESTION — CUSTOM OBJECT PROPOSAL (§1.1):** see §13 — the `semanticSearchCases` Action and the deflection-event tracker each require Chief Architect approval before this design can be implemented.
+**OPEN QUESTION — CUSTOM OBJECT PROPOSAL (§1.1):** see §13 — the `semanticSearchCases` Action requires Chief Architect approval before this design can be implemented.
 
 ## 6. Confidence routing
 
@@ -280,9 +280,9 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 - **Capability:** Duplicate Case Detection Agent.
 - **Purpose:** Detect duplicate case submissions at submission time and propose deflection.
 - **Data classes accessed:** Customer-supplied case content (potentially PII); CSM case records on the customer's own account; AI Search results.
-- **Output classes produced:** Verdict (duplicate / uncertain / proceed) with reference to existing case; written to the deflection-event tracker for analytics.
+- **Output classes produced:** Verdict (duplicate / uncertain / proceed) with reference to existing case; kept in the Generative AI Log with the LLM response.
 - **Refusal conditions:** Empty candidate list → proceed. Low-content new case → proceed with note. Inability to interpret content (binary attachments, garbled text) → proceed with confidence flag.
-- **Audit retention:** Verdict and confidence logged per submission to the deflection-event tracker (see §13). Raw LLM input/output retained for 30 days per Acme operational policy, then purged. The new case content itself is in the `sn_customerservice_case` table per baseline retention.
+- **Audit retention:** Verdict and confidence are in the LLM response, which the Generative AI Log [`sys_generative_ai_log`] keeps with the prompt for 180 days *(citation: `markdown/intelligent-experiences/generative-ai-controller/generative-ai-controller-tables.md`)*. The new case content itself is in the `sn_customerservice_case` table per baseline retention.
 - **Periodic review cadence:** Monthly review of false-positive rate by Acme CSM Practice Lead. Sample 100 verdicts per month.
 
 ## 11. Performance budget
@@ -303,7 +303,7 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 | ATF-DCD-05 | Multilingual happy path | ATF in Mandarin and Japanese — assert duplicate detection works across the engagement's supported languages. |
 | ATF-DCD-06 | Latency budget | Load test, 50 concurrent submissions, assert p95 ≤ 3s. |
 | ATF-DCD-07 | False-positive sampling | Manual: monthly review of 100 verdicts, assert false-positive rate < 5%. |
-| ATF-DCD-08 | AICT attestation validation | Verify deflection-event log entries match attestation data-classes; sample 20 entries per month. |
+| ATF-DCD-08 | AICT attestation validation | Verify Generative AI Log entries match attestation data-classes; sample 20 entries per month. |
 | ATF-DCD-09 | PII leakage prevention | Manual: verify deflection UI shows the *existing* case's sanitised summary, NOT the new case's raw content. |
 
 ## 13. Open decisions and OPEN QUESTION — CUSTOM OBJECT PROPOSAL
@@ -316,11 +316,11 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 
 **Outcome:** no §1.1 escalation required for this item.
 
-### OQ-CUSTOM-02: Deflection-event tracker
+### OQ-CUSTOM-02: Where the verdicts are kept
 
-**Baseline option evaluated:** the customer portal's existing deflection-event tracker (`x_acme_csm_portal_deflection_event` from the prior CSM portal deflection design — see `clients/acme/csm/customer-portal-deflection-design.md`). That table was pre-approved under §1.1 in a prior dispatch.
+**Baseline option evaluated:** the Generative AI Log [`sys_generative_ai_log`] keeps each prompt and response — the verdict and its confidence — for 180 days *(citation: `markdown/intelligent-experiences/generative-ai-controller/generative-ai-controller-tables.md`)*. The portal's deflection-event table (`x_acme_csm_portal_deflection_event`, from the CSM portal deflection design — see `clients/acme/csm/customer-portal-deflection-design.md`) is not reused: its approval covers the articles suggested per attempt, it has no verdict or confidence field, and it is create-only by system context.
 
-**Outcome:** REUSE — no new custom object proposed.
+**Outcome:** baseline — no custom object, and no write to another design's table.
 
 ### OQ-CUSTOM-03: AI Search profile for multilingual semantic case matching
 
@@ -338,22 +338,22 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 
 | Item | Count | Approval status |
 |---|---|---|
-| Custom tables proposed | 0 | n/a (reuses pre-approved `x_acme_csm_portal_deflection_event`) |
-| New scoped apps proposed | 0 | n/a (reuses pre-approved `x_acme_csm_portal`) |
+| Custom tables proposed | 0 | n/a — verdicts are kept in the Generative AI Log |
+| New scoped apps proposed | 0 | n/a |
 | Custom Action tools proposed | 0 | n/a (revised — `semanticSearchCases` wraps baseline AI Search) |
 | Custom Connection Aliases proposed | 0 | n/a |
 | Custom AI Skill Kit skill / AI Agent (configuration) | 1 AI Agent | n/a — configuration within AI Agent Studio |
 | Custom AI Search profile (configuration) | 1 | n/a — configuration within AI Search |
 | Custom LLM provider | 0 | n/a — uses Now LLM Service |
 
-**Compliance status: COMPLIANT.** Design uses configuration within baseline frameworks (AI Agent Studio, AI Search, AICT) and reuses pre-approved custom objects from the prior CSM portal deflection design. No new §1.1 escalation.
+**Compliance status: COMPLIANT.** Design uses configuration within baseline frameworks (AI Agent Studio, AI Search, AICT) and keeps its verdicts in the baseline Generative AI Log. No §1.1 escalation.
 
 ---
 
 ## Downstream handoff manifest
 
 - **Flow Designer Specialist** — designs the portal submission flow that invokes the Agent (separately).
-- **Developer** — implements the deflection-event tracker write (already specified in prior CSM portal design).
+- **Developer** — not required: the Agent and its tools are configuration in AI Agent Studio.
 - **Integration Specialist** — not required (Now LLM Service, baseline AI Search).
 - **UI/UX Specialist** — sanitised summary rendering in the deflection UI (see OD-NA-DCD-02).
 - **ATF Author** — 9 test cases including PII leakage prevention.
@@ -363,7 +363,7 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 
 ### §6.2 post-build manifest
 
-> *Capability design produced. The Duplicate Case Detection Agent is a baseline AI Agent in AI Agent Studio, using baseline AI Search for semantic matching and Now LLM Service for verdict generation. Reuses pre-approved custom objects from the prior CSM portal deflection design.*
+> *Capability design produced. The Duplicate Case Detection Agent is a baseline AI Agent in AI Agent Studio, using baseline AI Search for semantic matching and Now LLM Service for verdict generation. Keeps its verdicts in the baseline Generative AI Log; no custom objects.*
 >
 > **Proposing handoffs:**
 >
@@ -383,7 +383,7 @@ This example demonstrates two key Now Assist disciplines:
 
 1. **The §1.1 escalation flow done correctly.** The initial design (§5) listed `semanticSearchCases` as a CUSTOM Action requiring escalation. The §13 evaluation walked through the baseline option (AI Search) and concluded the Action is actually configuration in AI Agent Studio wrapping baseline AI Search — no escalation required. The Baseline-first audit (§14) reflects the corrected position. This is exactly the discipline the rule is designed to produce: surface the question, evaluate baseline first, then proceed only if baseline is genuinely insufficient.
 
-2. **Cross-design reuse.** OQ-CUSTOM-02 explicitly reuses the `x_acme_csm_portal_deflection_event` table that was pre-approved in a prior dispatch (the CSM portal deflection design from Technical Designer's Example 3). This is the "smallest viable scope" discipline — don't propose a new custom object when an already-approved one fits.
+2. **Reuse checked against what was approved.** OQ-CUSTOM-02 looks at the portal's deflection-event table, pre-approved in Technical Designer's Example 3, and does not reuse it: that approval covers the articles suggested per attempt, the table has no verdict or confidence field, and it is create-only. The baseline Generative AI Log already keeps the verdicts. Reuse an approved object only for what it was approved for, and prefer the baseline record that already exists.
 
 The confidence routing has *three* bands rather than two (≥ 0.85 deflect, 0.6–0.85 advisory link, < 0.6 proceed) — a more nuanced operational pattern that matches the risk: at high confidence, force the deflection; at medium, offer it but allow submission; at low, get out of the way. The human-in-the-loop section explicitly separates the Agent's role (internal verdict) from the portal's role (customer-facing UX) — that architectural separation prevents PII leakage (ATF-DCD-09) and limits the Agent's blast radius.
 
@@ -484,7 +484,7 @@ The skill invocation is logged in the Generative AI Log [`sys_generative_ai_log`
 
 ## 8. Open decisions
 
-- **OD-AICT-01:** The 30-day audit window referenced in the prior design draft has been corrected to 90 days here per Acme's actual operational log policy. Confirm with Acme Security Lead.
+- **OD-AICT-01:** The 30-day audit window referenced in the prior design draft is replaced by the Generative AI Log's 180-day platform retention (§6). Confirm with Acme Security Lead that 180 days satisfies Acme's operational log policy.
 - **OD-AICT-02:** "Closed — Confidential" state value is referenced but the underlying state-model design has not been confirmed for this engagement. If the state does not exist, the refusal condition must be revised. Reference: HRSD Specialist consult on baseline HR case state model.
 ```
 

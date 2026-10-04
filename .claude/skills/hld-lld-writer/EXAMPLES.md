@@ -50,7 +50,7 @@ Acme Customer Service Management currently handles ~3,500 cases per month across
 
 The Acme CSM Case Escalation programme delivers a structured escalation capability over six months in four releases:
 
-1. **R1 — Case Escalation Button** (this HLD's primary scope): a single-action escalation from the case form with mandatory reason capture, automatic notification to the duty manager, and audit trail via the case's work notes.
+1. **R1 — Case escalation** (this HLD's primary scope; the Escalation Button feature, delivered on the baseline): the agent escalates from the case's Escalate Case related link, the Escalation form captures reason, justification, severity and template, the duty manager on the escalation's watch list is emailed, and the escalation's updates are replicated to the case's work notes *(citations: `markdown/customer-service-management/escalate-csm-case.md`, `markdown/customer-service-management/case-escalation-process.md`, `markdown/customer-service-management/case-escalation-form.md`)*.
 2. **R2 — Escalation Reporting** (Q3): Performance Analytics dashboards on escalation rate, reason mix, and duty manager response time.
 3. **R3 — On-Call Rota Integration** (Q4): replace the static `sys_user_group.manager` resolution with an On-Call Management rota for duty managers.
 4. **R4 — Manager-Side De-Escalation** (Q4): structured workflow for duty managers to de-escalate a case with documented disposition; the baseline de-escalation requester role covers it (OD-01).
@@ -69,17 +69,17 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 
 | In scope (R1) | Out of scope (R1, deferred to R2–R4) |
 |---|---|
-| Case Escalation Button on CRM Workspace (formerly CSM Configurable Workspace) | Escalation analytics dashboards (R2) |
-| Mandatory reason picklist + escalation details free-text | On-Call rota integration (R3) |
+| The baseline Escalate Case related link on the case form | Escalation analytics dashboards (R2) |
+| Reason, Escalation Justification, severity and template on the baseline Escalation form | On-Call rota integration (R3) |
 | An Escalation record on the case — the baseline escalation feature, per OD-01 | De-escalation workflow (R4) |
-| Audit trail via case `work_notes` journal | Custom escalation history table (rejected per §1.1) |
-| Email notification to duty manager | Mobile-app integration |
-| Concurrency-safe submission | Classic platform UI (non-workspace) — workspace-only |
+| Audit trail: the Escalation record, and its updates replicated to the case's work notes | Custom escalation history table (rejected per §1.1) |
+| Email to the duty manager on the escalation's watch list | Mobile-app integration |
+| Escalation severities and templates configured for Acme | Changes to the baseline Escalation form |
 
 ### 2.2 Assumptions and constraints
 
 - "Regional duty manager" is resolved at runtime as the `manager` of the case's `assignment_group` (`sys_user_group.manager`). Replaced with On-Call Management in R3.
-- All escalation traffic is captured via the case's own `work_notes` journal. No custom audit table is in scope for any release of this programme.
+- Escalation updates are replicated to the case's own work notes. No custom audit table is in scope for any release of this programme.
 - Escalation uses the baseline case and account escalation feature: an Escalation record [`sn_customerservice_escalation`] against the case, not a new state value (see OD-01).
 - All work lives in the baseline `sn_customerservice` scope. No new scoped app.
 - Release family is Australia.
@@ -87,7 +87,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 ### 2.3 Dependencies
 
 - Acme CSM Practice has confirmed the duty-manager resolution rule for R1.
-- Acme Security Lead must approve the ACL design for the escalation UI Action (Security & GRC consult — see §6).
+- Acme Security Lead must approve who holds the escalation and de-escalation requester roles (Security & GRC consult — see §6).
 - R3 depends on On-Call Management being licensed; confirm with Acme licensing before R3 scoping.
 
 ---
@@ -98,13 +98,13 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 
 ![Figure 1 — Agent-side escalation flow](diagrams/fig-01-escalation-flow.svg)
 
-*Figure 1 — Agent-side escalation flow: the submission raises the Escalation record on the case and appends the work note in one server-side transaction. Source: `diagrams/fig-01-escalation-flow.drawio` (Diagramming Specialist).*
+*Figure 1 — Agent-side escalation flow: the agent's Escalate Case submission creates the Escalation record; approval follows where the escalation template requires it, the watch list is emailed on each update, and the updates are replicated to the case's work notes. Source: `diagrams/fig-01-escalation-flow.drawio` (Diagramming Specialist).*
 
 ### 3.2 User journeys per persona
 
-**sn_customerservice_agent** — primary journey: identifies a case requiring senior attention, opens it in CRM Workspace, clicks "Escalate to Duty Manager" button on the form header, selects reason from the picklist and enters details, submits. Receives confirmation and continues working other cases.
+**sn_customerservice_agent** — primary journey: identifies a case requiring senior attention, opens it, selects the Escalate Case related link, fills in Reason, Escalation Justification and the escalation template on the Escalation form, adds the duty manager to the watch list, and submits. Continues working other cases.
 
-**Regional duty manager** (a `sys_user`: the manager of the case's assignment group, `assignment_group.manager` *(citation: `markdown/platform-administration/user-administration/t_CreateAGroup.md`)*) — primary journey: receives email notification with case number, link, reason, and details. Opens the case in the workspace, reviews the work-note audit trail, takes action (assigns to themselves, reassigns, etc.).
+**Regional duty manager** (a `sys_user`: the manager of the case's assignment group, `assignment_group.manager` *(citation: `markdown/platform-administration/user-administration/t_CreateAGroup.md`)*) — primary journey: receives the escalation's email notifications as a watch-list member. Opens the escalation and the case, reviews the work notes, takes action (assigns to themselves, reassigns, etc.).
 
 **sn_customerservice_manager** — observational journey: reviews escalation patterns via case work notes during weekly team retrospectives (R1); shifts to Performance Analytics dashboards in R2.
 
@@ -113,10 +113,10 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 | Capability | ServiceNow product / module | Notes |
 |---|---|---|
 | Case management | CSM (sn_customerservice) baseline | No customisation. |
-| Escalation workflow | UI Action + Business Rule + GlideModal | Baseline scope; no new scoped app. |
-| Audit trail | Case `work_notes` journal | Baseline. No custom table per §1.1. |
+| Escalation workflow | The case and account escalation feature: Escalate Case related link, Escalation form, escalation templates and severities | Baseline feature; no new scoped app. |
+| Audit trail | The Escalation record and the case's work notes | Baseline. No custom table per §1.1. |
 | Duty-manager resolution | sys_user_group.manager (R1) → On-Call Management (R3) | Baseline lookup R1; Now Platform On-Call Management R3. |
-| Notification | Standard ServiceNow Email Notification | Baseline. |
+| Notification | Email to the current user and the watch list on each escalation update | Baseline *(citation: `markdown/customer-service-management/case-escalation-process.md`)*. |
 | Reporting | Performance Analytics (R2 only — out of R1 scope) | Baseline. |
 
 ---
@@ -128,10 +128,10 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 No new tables. No new fields. No new scoped app. The programme uses:
 
 - `sn_customerservice_case` (baseline) — case record; it keeps its baseline state, and the submission raises an Escalation record [`sn_customerservice_escalation`] against it *(citation: `markdown/customer-service-management/case-escalation-components.md`)*.
-- `sn_customerservice_case.work_notes` (baseline journal) — appended with structured `[Escalated]` entries on submission.
+- `sn_customerservice_case.work_notes` (baseline journal) — receives the escalation's updates, replicated as work notes *(citation: `markdown/customer-service-management/case-escalation-form.md`)*.
 - `sys_user_group.manager` (baseline) — duty manager resolution for R1.
 
-Component-level data model (no fields added, only behaviour) is documented in the underlying Technical Designer spec; see *Acme CSM Case Escalation Button — Technical Design* (`clients/acme/csm/case-escalation-button-technical-design.md`).
+The underlying Technical Designer spec, *Acme CSM Case Escalation Button — Technical Design* (`clients/acme/csm/case-escalation-button-technical-design.md`), designed a bespoke button, Business Rule and modal; per OD-01 it is re-issued as configuration of the baseline feature — escalation templates, severities, role assignments and notifications.
 
 ### 4.2 Integration architecture
 
@@ -141,11 +141,11 @@ R3 introduces an internal dependency on On-Call Management (not an external inte
 
 ### 4.3 Environment topology
 
-Standard Acme topology: Dev → SIT → UAT → Prod. Update sets used for promotion. No new scoped app means update sets capture the BR, UI Action, GlideModal/UI Page, Notification, and any ACLs without scope-isolation concerns.
+Standard Acme topology: Dev → SIT → UAT → Prod. Update sets used for promotion. No new scoped app means update sets capture the escalation templates and severities, the role assignments and the notification configuration without scope-isolation concerns.
 
 ### 4.4 Performance and scaling
 
-R1 volume: ~3,500 cases/month × estimated 5% escalation rate = ~175 escalations/month, ~6/day. Synchronous BR latency budget is generous at this volume. No async strategy required for R1.
+R1 volume: ~3,500 cases/month × estimated 5% escalation rate = ~175 escalations/month, ~6/day. No async strategy required for R1 at this volume.
 
 R2 reporting may need indicator pre-aggregation at higher case volumes — flagged as a Performance & Scale consult for R2 planning.
 
@@ -165,9 +165,9 @@ R2 reporting may need indicator pre-aggregation at higher case volumes — flagg
 
 | Role | Capabilities | Source |
 |---|---|---|
-| sn_customerservice_agent | Sees Escalate button; submits escalations; reads own case audit trail. | Baseline CSM role, with `sn_customerservice.escalation_requester` to request an escalation. |
-| sn_customerservice_manager | Sees Escalate button; submits escalations for any case they read; reads team audit trails. | Baseline CSM role; for R4, `sn_customerservice.deescalation_requester`, which contains the requester role. |
-| Regional duty manager | Receives notifications; reads escalated case + work-note audit trail. | Resolved at runtime as `sys_user_group.manager`; no separate ServiceNow role required. |
+| sn_customerservice_agent | Uses the Escalate Case related link; requests escalations; reads the case's work notes. | Baseline CSM role, with `sn_customerservice.escalation_requester` to request an escalation *(citation: `markdown/customer-service-management/escalate-csm-case.md`)*. |
+| sn_customerservice_manager | Requests escalations for any case they read; reads the team's escalation records. | Baseline CSM role, with `sn_customerservice.escalation_requester`. |
+| Regional duty manager | Receives the escalation's notifications as a watch-list member (R1); de-escalates the case when its cause is resolved (R4). | Resolved at runtime as `sys_user_group.manager`. R1 needs no role; R4 needs `sn_customerservice.deescalation_requester`, which de-escalating requires and which contains the requester role *(citations: `markdown/customer-service-management/de-escalate-csm-case.md`, `markdown/customer-service-management/case-escalation-components.md`)*. |
 
 ### 6.2 Data classification and handling
 
@@ -175,11 +175,7 @@ Customer-supplied case content (subject, description, escalation details free-te
 
 ### 6.3 Audit, logging, compliance
 
-Audit trail lives in the case's `work_notes` journal. The journal entry format is:
-
-```
-[Escalated] Reason: <reason label> | Details: <details text> | Escalated to: <duty manager display name> | Timestamp: <gs.nowDateTime()>
-```
+Audit trail lives on baseline records: the Escalation record keeps the reason, the justification and its state (Requested, Escalated, Declined, and Closed once de-escalated), and its updates are replicated to the case's activity history as work notes *(citations: `markdown/customer-service-management/case-escalation-form.md`, `markdown/customer-service-management/de-escalate-csm-case.md`)*.
 
 Work notes are immutable by default in baseline ServiceNow — agents cannot retroactively edit posted notes. This satisfies Acme's internal audit requirement without a separate log table.
 
@@ -187,7 +183,7 @@ Work notes are immutable by default in baseline ServiceNow — agents cannot ret
 
 Escalation details may contain customer-identifiable information. Acme's existing CSM PII handling policy applies — no programme-level deviation.
 
-**Routing-time consult flag:** Security & GRC Specialist — **fires** on the ACL design for the UI Action and BR. Consult requested before sign-off.
+**Routing-time consult flag:** Security & GRC Specialist — **fires** on who holds the escalation and de-escalation requester roles. Consult requested before sign-off.
 
 ---
 
@@ -199,7 +195,7 @@ R1 inherits the existing CSM support model. No new support tiers introduced.
 
 ### 7.2 Monitoring and alerting
 
-Baseline ServiceNow audit log captures UI Action invocations and BR executions. No custom monitoring required for R1.
+The Escalation records and their states are the operational view. No custom monitoring required for R1.
 
 ### 7.3 Backup, restore, DR
 
@@ -209,9 +205,9 @@ Inherits baseline ServiceNow backup posture. No new data stores.
 
 The following runbooks are **planned**, to be authored by Operational Documentation:
 
-- **RB-CSM-ESC-01** — How an agent uses the Escalate button (procedure).
+- **RB-CSM-ESC-01** — How an agent uses the Escalate Case related link (procedure).
 - **RB-CSM-ESC-02** — How a duty manager processes an escalation notification (procedure).
-- **RB-CSM-ESC-03** — Troubleshooting: "No duty manager assigned" error (resolution).
+- **RB-CSM-ESC-03** — Troubleshooting: the case's assignment group has no manager to add to the watch list (resolution).
 
 KBAs planned:
 - **KBA-CSM-ESC-01** — Agent-facing: when and how to escalate a case.
@@ -248,7 +244,7 @@ These are downstream handoff items — see §9.
 
 ### OD-03: Restrict escalation to specific priority levels?
 
-- **Context:** Story does not specify a priority filter on the Escalate button.
+- **Context:** Story does not specify a priority filter on escalation requests.
 - **Options:**
   1. Available on all cases regardless of priority.
   2. Available only on P1 and P2 cases.
@@ -261,12 +257,12 @@ These are downstream handoff items — see §9.
 
 ## 9. Downstream handoff manifest
 
-- **Technical Designer** — already produced R1 component spec; will produce R2/R3/R4 component specs separately.
-- **Developer** — implements UI Action, BR, GlideModal/UI Page, Notification per the R1 Technical Designer spec (post HLD approval).
-- **Flow Designer Specialist** — not required for R1 (no flows); may be required for R4 de-escalation workflow.
+- **Technical Designer** — re-issues the R1 component spec as configuration of the baseline escalation feature (OD-01); will produce R2/R3/R4 component specs separately.
+- **Developer** — not required for R1: the baseline feature is configured, not built.
+- **Flow Designer Specialist** — not required: escalation approval uses the template's approval subflow, and R4 uses the baseline De-escalate action *(citations: `markdown/customer-service-management/case-escalation-process.md`, `markdown/customer-service-management/de-escalate-csm-case.md`)*.
 - **Integration Specialist** — not required for R1; required for R3 if On-Call Management requires bespoke integration.
 - **Operational Documentation** — authors RB-CSM-ESC-01..03 and KBA-CSM-ESC-01.
-- **Security & GRC Specialist** — consult on ACL design before sign-off.
+- **Security & GRC Specialist** — consult on the escalation role assignments before sign-off.
 - **Reporting & Analytics Specialist** — R2 only; out of R1 scope.
 
 ---
@@ -288,14 +284,14 @@ These are downstream handoff items — see §9.
 
 > *Design document produced. Proposing review by the named reviewers (Chief Architect, Acme CSM Practice Lead, Acme Security Lead) before approval — confirm reviewers and dispatch for review?*
 >
-> **Blocking dependency — Chief Architect attention required:**
+> **Open dependency — CSM Specialist confirmation required:**
 >
 > - **OD-01** — the HLD recommends the baseline Escalation record over a new state value; the CSM Specialist confirms the fit before downstream design (Technical Designer R2/R3/R4, Developer R1) proceeds.
 >
 > **Downstream handoffs once OD-01 is resolved:**
 >
 > 1. **Operational Documentation** — author RB-CSM-ESC-01..03 and KBA-CSM-ESC-01 before R1 go-live.
-> 2. **Security & GRC Specialist** — consult on ACL design before sign-off.
+> 2. **Security & GRC Specialist** — consult on the escalation role assignments before sign-off.
 >
 > **No Code Reviewer trigger** — this artefact is a design document, not code.
 
@@ -303,11 +299,11 @@ These are downstream handoff items — see §9.
 
 This HLD demonstrates three disciplines specific to this skill:
 
-1. **Baseline-first audit block at the end of the document.** Section 10 lists all custom objects referenced in the design, with each one's approval status. The block makes governance compliance auditable rather than implicit. In this case, the state="Escalated" custom value is surfaced explicitly as a §1.1 escalation rather than documented as accepted.
+1. **Baseline-first audit block at the end of the document.** Section 10 lists all custom objects referenced in the design, with each one's approval status. The block makes governance compliance auditable rather than implicit. In this case it lists no custom object: the "Escalated" state the story asked for is answered by the baseline Escalation record (OD-01), and the audit block says so.
 
 2. **OD-01 weighs the baseline first.** The Open Decision section doesn't pretend the "Escalated" state is a settled question. It evaluates the baseline case and account escalation feature before any custom option, finds that it covers R1 and R4, and records why a new field or state value would be custom work the baseline makes unnecessary. A custom option that survived that test would go to the Chief Architect as an `OPEN QUESTION — CUSTOM OBJECT PROPOSAL`.
 
-3. **§6.2 manifest is multi-track.** The manifest has a blocking dependency (§1.1 approval), downstream handoffs (Operational Documentation, Security & GRC), and explicitly notes no Code Reviewer trigger. The post-build hook respects that HLD outputs are documents, not code.
+3. **§6.2 manifest is multi-track.** The manifest has an open dependency (the CSM Specialist's confirmation of OD-01), downstream handoffs (Operational Documentation, Security & GRC), and explicitly notes no Code Reviewer trigger. The post-build hook respects that HLD outputs are documents, not code.
 
 The HLD itself is also valuable as a counter-pattern — earlier in the engagement, the Technical Designer defaulted to a custom audit table. This HLD's §4.1 (Data model summary) makes the no-custom-table commitment first-class and visible to the review board, locking in the architectural decision rather than allowing it to drift across releases.
 
