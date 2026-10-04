@@ -273,7 +273,7 @@ Weighed and not used: Job Profile [`sn_hr_core_job_profile`] and Position [`sn_h
 |---|---|---|---|---|
 | `sn_hr_le_case` (Internal Transfer LE) | create | `x_acme_hrsd.hr_business_partner` | LE definition = Internal Transfer | Only HRBPs initiate transfers. |
 | `sn_hr_le_case` | read | `sn_hr_core.basic` | `subject_person = current` OR has explicit case ACL | Baseline HRSD privacy: employee sees own LE; HR roles see by activity ACL. |
-| `sn_hr_le_case` (Internal Transfer LE) | read | `x_acme_hrsd.hr_business_partner` | `assigned_to` = current user | HRBPs read the transfers assigned to them. Confirm that no baseline HR ACL grants this role wider read, since ACLs grant rather than restrict. |
+| `sn_hr_le_case` (Internal Transfer LE) | read | `x_acme_hrsd.hr_business_partner` | `assigned_to` = current user | HRBPs read the transfers assigned to them. Confirm that no baseline HR ACL grants this role wider read: where two or more ACLs match, passing any one of them grants access *(citation: `markdown/platform-security/access-control/exploring-access-control-list.md`)*. |
 | `sn_hr_le_case.x_acme_hrsd_target_cost_center` field-level | write | `x_acme_hrsd.hr_business_partner` | LE definition = Internal Transfer AND the LE is open | HRBPs set the target cost centre while the transfer is open. |
 | `sn_hr_le_case.x_acme_hrsd_workday_sync_status`, `x_acme_hrsd_workday_sync_attempts` field-level | write | `sn_hr_core.admin` | (none) | The sync job writes them in system context; admins correct them by hand. |
 | `sn_hr_le_case.x_acme_hrsd_workday_sync_status` field-level | read | `sn_hr_core.basic` | DENY | Sync status is operational metadata, not employee-facing. |
