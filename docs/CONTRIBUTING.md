@@ -1003,13 +1003,33 @@ claim about the platform, and the corpus not having it passes only as:
   `x_<vendor>_<app>_` placeholder.
 
 Any other absent name also passes with an entry in `tools/snowarch/lib/docs/identifier-allowlist.json`,
-keyed by (file, name), with one of five reasons: `example-field` (naming the example's own table — an
-`x_`/`u_` table, or one its file declares proposed), `payload-key`, `example-role`, `script-variable` or
-`example-name`. A name written on a corpus name — `incident.assigned_at` — is a claim about that table,
+keyed by (file, name), with one of six reasons: `example-field` (naming the example's own table — an
+`x_`/`u_` table, or one its file declares proposed), `payload-key`, `example-role`, `script-variable`,
+`example-name` or `script-code` (below). A name written on a corpus name — `incident.assigned_at` — is a claim about that table,
 so no reason covers it: it is the corpus's field, the marker, or the example's own prefixed field. This
 rule is strict by design: any word the corpus contains counts as a corpus name on the left of the dot,
 so `payload.error_class` is refused when `error_class` is absent, even though `payload` is a variable.
 The refusal is the rule, not a bug — write the field without the dot, or give it the example's prefix.
+
+Two shapes the underscore check cannot see have an arm each (ARC-09-C104), each printing its own line
+beside the first: `dotted names: checked N | unexcused M | script-code S` and
+`camelcase names: checked N | unexcused M | excused E`.
+
+- **Dotted** — `hr_case.opened`: a left half that is a corpus table token, or a word the check has
+  learned from a field written on it, and a right half with no underscore. Outside fences, the whole
+  pair must be printed in the corpus. It passes with the marker on the line, or — for a variable in a
+  sentence about example code, `current.approval` — a `script-code` entry. Only a variable can take one:
+  a left half with an underscore is a table, and a table written with a word is a claim about it, so it
+  is reworded in the corpus's own words (the State field of a Contract, not `ast_contract.state`) or
+  marked. Versions, file names, hosts and paths are not names.
+- **CamelCase** — `ChangeSchedule`: two or more humps, outside fences, on a line that says baseline,
+  out-of-the-box, OOB, ships or built-in. The corpus must print it, or the line carries the marker or a
+  `proposed — not baseline` declaration. A name an example invents on such a line (`AceGrid`, a client's
+  product) takes an `example-name` or `payload-key` entry.
+
+Both read the index `corpusIndex` builds, which has to be asked for the roster's names:
+`corpusIndex(corpus, rosterWants(scanRoster(root)))`. An index built without a name refuses to answer for
+it, because "not asked" would read as "not there".
 
 The marker covers its whole line, and a name written only in capitals or in mixed case (`CMDB_WRITE`,
 snowarch's own flag) is never looked at as a platform claim. So the real-tree case in
