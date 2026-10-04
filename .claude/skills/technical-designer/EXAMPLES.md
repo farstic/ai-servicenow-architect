@@ -257,8 +257,8 @@ Weighed and not used: Job Profile [`sn_hr_core_job_profile`] and Position [`sn_h
 
 | Name | Type | Label | Mandatory | Default | Reference | Description |
 |---|---|---|---|---|---|---|
-| `x_acme_hrsd_target_cost_center` | reference | Target cost centre | on Internal Transfer LEs (UI policy) | — | `cmn_cost_center` | Cost-centre alignment for the new role. |
-| `x_acme_hrsd_workday_sync_status` | choice | Workday sync status | no | `pending` | — | Values: pending, in_progress, success, failed. |
+| `x_acme_hrsd_target_cost_center` | reference | Target cost centre | on Internal Transfer LEs (data policy) | — | `cmn_cost_center` | Cost-centre alignment for the new role. |
+| `x_acme_hrsd_workday_sync_status` | choice | Workday sync status | no | (empty) | — | Values: pending, in_progress, success, failed. Empty on every other LE; the Internal Transfer flow sets `pending`. |
 | `x_acme_hrsd_workday_sync_attempts` | integer | Workday sync attempts | no | 0 | — | Used by retry logic. |
 
 ### Indexes
@@ -273,6 +273,7 @@ Weighed and not used: Job Profile [`sn_hr_core_job_profile`] and Position [`sn_h
 |---|---|---|---|---|
 | `sn_hr_le_case` (Internal Transfer LE) | create | `x_acme_hrsd.hr_business_partner` | LE definition = Internal Transfer | Only HRBPs initiate transfers. |
 | `sn_hr_le_case` | read | `sn_hr_core.basic` | `subject_person = current` OR has explicit case ACL | Baseline HRSD privacy: employee sees own LE; HR roles see by activity ACL. |
+| `sn_hr_le_case` (Internal Transfer LE) | read | `x_acme_hrsd.hr_business_partner` | `assigned_to` = current user | HRBPs read the transfers assigned to them. Confirm that no baseline HR ACL grants this role wider read, since ACLs grant rather than restrict. |
 | `sn_hr_le_case.x_acme_hrsd_target_cost_center` field-level | write | `x_acme_hrsd.hr_business_partner` | LE definition = Internal Transfer AND the LE is open | HRBPs set the target cost centre while the transfer is open. |
 | `sn_hr_le_case.x_acme_hrsd_workday_sync_status`, `x_acme_hrsd_workday_sync_attempts` field-level | write | `sn_hr_core.admin` | (none) | The sync job writes them in system context; admins correct them by hand. |
 | `sn_hr_le_case.x_acme_hrsd_workday_sync_status` field-level | read | `sn_hr_core.basic` | DENY | Sync status is operational metadata, not employee-facing. |
@@ -283,14 +284,13 @@ Weighed and not used: Job Profile [`sn_hr_core_job_profile`] and Position [`sn_h
 |---|---|---|---|---|---|---|
 | `SyncToWorkday` | Scheduled Job | (no table) | daily 06:00 AEST | n/a | n/a | Queries Internal Transfer `sn_hr_le_case` records whose target job starts today or earlier AND `x_acme_hrsd_workday_sync_status IN (pending, failed)` AND `x_acme_hrsd_workday_sync_attempts < 5`. Calls the Workday HR spoke per record. **Scheduled not BR because the trigger is date-based, not event-based.** |
 | `WorkdayTransferUtils` | Script Include | n/a | n/a | n/a | n/a | Encapsulates the Workday call (input shaping, response parsing, retry-status update). Called by `SyncToWorkday` and the Workday flow. **Script Include not inline because reused by both scheduled job and a flow.** |
+| `Require Target Cost Centre` | Data Policy | `sn_hr_le_case` | insert and update | n/a | LE definition = Internal Transfer | Makes `x_acme_hrsd_target_cost_center` mandatory on transfers only, on every route into the table: by default a data policy applies to all GlideRecord operations, the REST Table API and Scripted REST APIs included, and to the form as a client-side UI policy *(citation: `markdown/platform-administration/c_DataPolicy.md`)*. **Data policy, not a dictionary mandatory, because the field stays optional on every other LE; and no separate UI policy, because the data policy already applies on the form.** |
 
 No effective-date rule: the effective date is the target job's start date, held on the job record.
 
 ## 6. Client-side logic outline
 
-| Item | Type | Table | When | Condition | Rationale |
-|---|---|---|---|---|---|
-| `Require Target Cost Centre` | UI Policy | `sn_hr_le_case` | on load and on change | LE definition = Internal Transfer | Makes `x_acme_hrsd_target_cost_center` mandatory on transfers only. **UI policy, not a dictionary mandatory, because the field stays optional on every other LE.** |
+**Not applicable.** The `Require Target Cost Centre` data policy (Section 5) applies on the transfer form as a client-side UI policy by default, so no UI policy or Client Script is needed *(citation: `markdown/platform-administration/c_DataPolicy.md`)*.
 
 ## 7. Process automation outline
 
@@ -305,7 +305,7 @@ No effective-date rule: the effective date is the target job's start date, held 
 
 | Direction | System | Purpose | Auth | Payload | Volume | MID Server |
 |---|---|---|---|---|---|---|
-| Outbound | Workday HRIS | Update employee reporting line, cost centre, role title | OAuth 2.0, configured for the baseline Workday HR spoke on each instance — no custom Connection & Credential Alias *(citations: `markdown/integrate-applications/integration-hub/workday-hr-spoke.md`, `markdown/integrate-applications/integration-hub/configs-workday-hr-soap-oauth.md`)* | The spoke action's inputs: employee, effective date, manager, cost centre, role title | ~50/month, batched daily | Required if Workday is on-prem proxy; cloud Workday tenant: not required. **Confirm with Acme network team (Open Question).** |
+| Outbound | Workday HRIS | Update employee reporting line, cost centre, role title | OAuth 2.0, configured for the baseline Workday HR spoke on each instance — no custom Connection & Credential Alias *(citations: `markdown/integrate-applications/integration-hub/workday-hr-spoke.md`, `markdown/integrate-applications/integration-hub/configs-workday-hr-soap-oauth.md`)* | The spoke's Change Job action (transfers, promotions, lateral moves) and Change Organization action (cost center); the corpus lists no inputs for either — see OQ-3 *(citation: `markdown/integrate-applications/integration-hub/workday-hr-spoke.md`)* | ~50/month, batched daily | Required if Workday is on-prem proxy; cloud Workday tenant: not required. **Confirm with Acme network team (Open Question).** |
 
 **Hand-off note:** Integration Specialist consumes this list and produces the integration architecture spec, including the retry pattern (the attempt count on the LE case, HR admin escalation after five), the Workday HR spoke's OAuth 2.0 configuration, and the `WorkdayTransferUtils` Script Include's spoke invocation pattern.
 
@@ -329,7 +329,7 @@ No effective-date rule: the effective date is the target job's start date, held 
 | Concern | Mitigation |
 |---|---|
 | HR PII in transit to Workday | OAuth 2.0 over TLS 1.2+ through the Workday HR spoke's configuration, managed by the Integration Specialist; no PII logged outside the HR case tables. |
-| HR PII on the LE case | Field-level ACL DENY on `x_acme_hrsd_workday_sync_status` to `sn_hr_core.basic`; the LE case's baseline HRSD ACLs govern the rest. |
+| HR PII on the LE case | Field-level ACL DENY on `x_acme_hrsd_workday_sync_status` to `sn_hr_core.basic`; HRBPs read only the transfers assigned to them (Section 4); the LE case's baseline HRSD ACLs govern the rest. |
 | Workday credential leakage | The credential lives in the spoke's OAuth 2.0 configuration, never in code. Integration Specialist owns this design. |
 | Audit | Baseline HRSD case audit covers LE state transitions; sync attempts are field changes on the LE case. |
 
@@ -348,7 +348,7 @@ No effective-date rule: the effective date is the target job's start date, held 
 |---|---|
 | LE initiation creates correct sub-cases | ATF: HRBP initiates LE, assert source-manager and target-manager HR cases created with correct due dates. |
 | Effective date from the target job | ATF: initiate an Internal Transfer LE whose `subject_person_job` starts on a known date; assert the offboarding and onboarding cases are due 7d and 1d before it. |
-| Target cost centre required | ATF: submit an Internal Transfer LE without a target cost centre; assert the UI policy blocks it. |
+| Target cost centre required | ATF: submit an Internal Transfer LE without a target cost centre; assert the form will not submit, and that a server-side script making the same insert is rejected by the data policy. |
 | Workday sync happy path | ATF + integration mock: scheduled job runs, mock Workday returns success, assert status = success and LE case has confirmation note. |
 | Workday sync retry | ATF + integration mock: mock Workday returns 500, assert `x_acme_hrsd_workday_sync_attempts` increments and re-runs next day. |
 | Workday sync escalation | ATF + integration mock: 5 consecutive failures, assert HR admin escalation notification dispatched. |
@@ -358,13 +358,13 @@ No effective-date rule: the effective date is the target job's start date, held 
 
 1. **Workday tenant deployment** — cloud or on-prem? Drives MID Server requirement (Section 8). Open Question for Acme infra team.
 2. **Effective date source** — the design takes the target job's start date. Confirm with HR that the target job record exists, with its start date, before the LE starts.
-3. **Workday API contract** — assume the Workday HR spoke has an action that updates the reporting line; confirm with Integration Specialist (next handoff).
+3. **Workday API contract** — the spoke's Change Job and Change Organization actions cover the transfer and the cost centre, and the corpus lists no inputs for them; confirm their inputs with Integration Specialist (next handoff).
 4. **Source manager change scenarios** — what happens if the source manager changes between LE initiation and effective date? Out of scope here; flag for product owner.
 5. **Compensation changes** — explicitly out of scope per the input. Compensation flows through a separate Lifecycle Event.
 
 ## Downstream handoff manifest
 
-- **Developer** — implements the `SyncToWorkday` Scheduled Job and the `WorkdayTransferUtils` Script Include, and configures the `Require Target Cost Centre` UI Policy and the three fields on `sn_hr_le_case`.
+- **Developer** — implements the `SyncToWorkday` Scheduled Job and the `WorkdayTransferUtils` Script Include, and configures the `Require Target Cost Centre` Data Policy and the three fields on `sn_hr_le_case`.
 - **Flow Designer Specialist** — designs `Internal Transfer LE Flow` and `WorkdaySyncOnDemand` Subflow per Section 7 outline.
 - **Integration Specialist** — designs the Workday HR spoke invocation and its OAuth 2.0 configuration — no custom alias — and the retry pattern `WorkdayTransferUtils` uses.
 - **HRSD Specialist** — consult on Lifecycle Event activity-set configuration and Employee Center notification template.
@@ -382,7 +382,7 @@ No effective-date rule: the effective date is the target job's start date, held 
 
 > *Technical design produced. Proposing handoffs:*
 >
-> 1. *Developer for the `SyncToWorkday` Scheduled Job and the `WorkdayTransferUtils` Script Include, with the `Require Target Cost Centre` UI Policy and the three LE case fields — proceed?*
+> 1. *Developer for the `SyncToWorkday` Scheduled Job and the `WorkdayTransferUtils` Script Include, with the `Require Target Cost Centre` Data Policy and the three LE case fields — proceed?*
 > 2. *Flow Designer Specialist for the Internal Transfer LE Flow and Workday Sync Subflow design — proceed?*
 > 3. *Integration Specialist for the Workday HR spoke invocation, its OAuth 2.0 configuration and the retry design — proceed?*
 >
@@ -397,7 +397,7 @@ No effective-date rule: the effective date is the target job's start date, held 
 
 This is a multi-builder design — three builders consume the spec (Developer, Flow Designer Specialist, Integration Specialist). The spec uses tables aggressively (field list, ACL matrix, server-side list, integration touchpoints) rather than prose, because that's what downstream builders consume cleanly.
 
-The rationale columns on the server-side and client-side lists are mandatory ("scheduled not BR because…", "UI policy, not a dictionary mandatory, because…") — that's an anti-pattern guard. Without rationale, the design is just a list, and the Developer can't second-guess the choices.
+The rationale column on the server-side list is mandatory ("scheduled not BR because…", "data policy, not a dictionary mandatory, because…") — that's an anti-pattern guard. Without rationale, the design is just a list, and the Developer can't second-guess the choices.
 
 The §3.1 consult flags fire correctly: Security & GRC fires on HR PII + outbound integration; Performance & Scale does NOT fire because the volume is low — and the spec says so explicitly rather than firing the consult defensively.
 
@@ -457,7 +457,7 @@ Add AI-driven case deflection to the Acme customer-facing portal. Before a custo
 | Table | Action | Rationale |
 |---|---|---|
 | `sn_customerservice_case` (baseline) | Reuse | Standard CSM cases. |
-| `x_acme_csm_portal_deflection_event` | Net-new, pre-approved | One record per deflection attempt: which articles the skill suggested and which, if any, the customer accepted — the part Self-Service Analytics does not keep. Used for skill tuning. Deflection outcomes and the deflection rate come from Self-Service Analytics, whose scheduled job stores them in Deflection Metric [`ssa_deflection_metric`] *(citation: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`)*. |
+| `x_acme_csm_portal_deflection_event` | Net-new, pre-approved | One record per deflection attempt: which articles the skill suggested and which, if any, the customer accepted — the part Self-Service Analytics does not keep. Used for skill tuning. Deflection outcomes and the deflection rate are assumed to come from Self-Service Analytics, whose scheduled job stores matched outcomes in Deflection Metric [`ssa_deflection_metric`] *(citation: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`)* — an assumption, see OQ-6. |
 
 ### `x_acme_csm_portal_deflection_event` field list
 
@@ -491,9 +491,9 @@ Add AI-driven case deflection to the Acme customer-facing portal. Before a custo
 
 | Item | Type | Table | When | Order | Condition | Rationale |
 |---|---|---|---|---|---|---|
-| `LogDeflectionEvent` | Script Include | n/a | n/a | n/a | n/a | Public method `logEvent(sessionId, accountSysId, subject, suggestedArticles, acceptedArticleOrNull)`. Called by the portal flow after each deflection attempt. **Script Include not inline because reused across happy-path and abandonment flows.** |
+| `LogDeflectionEvent` | Script Include | n/a | n/a | n/a | n/a | Public method `logEvent(sessionId, accountSysId, subject, suggestedArticles, acceptedArticleOrNull)`. Called by the portal flow after each deflection attempt. **Script Include not inline because the accept and decline paths of the callback both use it.** |
 
-No deflection-rate job: Self-Service Analytics captures the deflection outcomes in Deflection Metric [`ssa_deflection_metric`] on its own schedule *(citation: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`)*.
+No deflection-rate job: Self-Service Analytics is assumed to capture the deflection outcomes in Deflection Metric [`ssa_deflection_metric`] on its own schedule *(citation: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`)* — see OQ-6.
 
 ## 6. Client-side logic outline
 
@@ -526,7 +526,7 @@ No deflection-rate job: Self-Service Analytics captures the deflection outcomes 
 - Deflection skill latency: budget ≤ 2 seconds (perceptual budget for "while customer waits"). Now Assist Specialist must validate this against the chosen LLM and AI Search index size.
 - Volume: ~10K/month attempted, ~250 peak per business day, ~30 per business hour. Concurrent peak budget: ~3 concurrent skill calls. Well within Now Assist throughput envelope.
 - `x_acme_csm_portal_deflection_event` write rate: ~10K/month, no concern.
-- Deflection outcomes and rate: computed by Self-Service Analytics' own scheduled job, not by this design.
+- Deflection outcomes and rate: assumed to be computed by Self-Service Analytics' own scheduled job, not by this design (OQ-6).
 
 **Consult flag: Performance & Scale Specialist — does not fire** at this volume. The 2-second perceptual latency budget on the skill is a Now Assist concern, not a platform-scale concern.
 
@@ -554,7 +554,7 @@ No deflection-rate job: Self-Service Analytics captures the deflection outcomes 
 |---|---|
 | Deflection happy path — customer accepts | ATF + skill mock: customer submits subject, mock skill returns articles, customer accepts → assert no case created and the deflection event records the accepted article. |
 | Deflection rejected | ATF + skill mock: customer rejects suggestions, submits case → assert case created and the deflection event holds the suggestions with no accepted article. |
-| Deflection abandoned | ATF: customer closes portal session without accepting or submitting → assert the deflection event holds the suggestions with no accepted article; recording the outcome is Self-Service Analytics' job. |
+| Deflection abandoned | ATF: customer closes portal session without accepting or submitting → assert no deflection event is written and no case is created: the subflow logs only on the widget's accept or decline callback. |
 | Skill timeout fallback | ATF + skill mock with 5s delay: assert widget falls back to standard case path, no skill suggestions returned. |
 | ACL — agent cannot read other accounts | ATF: agent A reads x_acme_csm_portal_deflection_event for account B → assert denied. |
 | Performance — skill latency | Load test: 50 concurrent customer submissions, assert p95 skill round-trip ≤ 2s. |
@@ -566,6 +566,7 @@ No deflection-rate job: Self-Service Analytics captures the deflection outcomes 
 3. **Deflection skill design** — the Now Assist skill itself (prompt, tools, confidence routing, AI Control Tower governance) is owned by Now Assist Specialist; this design covers only the platform integration point.
 4. **Multi-language support** — is the deflection skill expected to support multiple languages? Drives Now Assist Specialist's skill design.
 5. **Deflection-event retention** — how long do we keep deflection events for skill tuning? 12 months default; confirm with Acme legal.
+6. **Self-Service Analytics activity** — Self-Service Analytics derives deflection outcomes from recorded activity types (for example, viewed knowledge article, submitted positive feedback) within a configured window, and needs the Self-Service Analytics Core plugin (`com.snc.self_service_analytics_core`). Confirm that the widget's accept and decline are recorded as activities it reads; if they are not, the 30% target cannot be measured from it *(citations: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`, `markdown/servicenow-platform/knowledge-management/self-service-analytics.md`)*.
 
 ## Downstream handoff manifest
 
@@ -605,7 +606,7 @@ This design exercises **multiple consult flags simultaneously** — Security & G
 
 Notable discipline: Section 6 (Client-side logic) is "Not applicable" with a rationale pointing to UI/UX Specialist — Technical Designer doesn't pretend to design Service Portal widgets. Section 8 (Integrations) uses the "internal Now Assist skill" as the only touchpoint and immediately hands off to Now Assist Specialist for the skill itself.
 
-The Section 3 (Data model) field list and indexes follow a strict tabular format — that's what Developer and Reporting & Analytics consume cleanly. The ACL matrix in Section 4 has **field-level** restrictions on `attempted_subject` (customer-supplied content) — an anti-pattern guard against logging PII without protection.
+The Section 3 (Data model) field list and indexes follow a strict tabular format — that's what Developer consumes cleanly. The ACL matrix in Section 4 has **field-level** restrictions on `attempted_subject` (customer-supplied content) — an anti-pattern guard against logging PII without protection.
 
 Open Question 1 (customer-content classification policy) explicitly routes to Security & GRC Specialist rather than being resolved here. That's the "honest uncertainty" pattern — Technical Designer surfaces what cannot be answered without policy input.
 

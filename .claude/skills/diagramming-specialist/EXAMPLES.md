@@ -69,6 +69,7 @@ erDiagram
     customer_account  ||--o{ sn_customerservice_case : "account"
     customer_contact  ||--o{ sn_customerservice_case : "contact"
     sn_customerservice_case ||--o{ sn_customerservice_task : "tasks"
+    sn_customerservice_case ||--o{ sn_customerservice_escalation : "escalations"
     sn_customerservice_case }o--|| sys_user : "assigned_to"
     sn_customerservice_case {
         string  number
@@ -76,7 +77,10 @@ erDiagram
         reference contact
         choice  state
         choice  priority
-        boolean escalated
+    }
+    sn_customerservice_escalation {
+        string  number
+        choice  state
     }
 ```
 
@@ -87,8 +91,6 @@ stateDiagram-v2
     New --> Open : assign
     Open --> AwaitingInfo : need customer input
     AwaitingInfo --> Open : info received
-    Open --> Escalated : SLA breach OR manual
-    Escalated --> Open : de-escalate
     Open --> Resolved : resolve
     Resolved --> Closed : auto-close timer
     Resolved --> Open : reopen
@@ -96,8 +98,8 @@ stateDiagram-v2
 ```
 
 ### Fidelity notes
-- All table names (`sn_customerservice_case`, `customer_account`, `customer_contact`, `sn_customerservice_task`) and the `escalated` field come from the Envelope's Data Model Alignment — all baseline.
-- `Escalated` is modelled as a *state transition driver*, not a new `state` choice value, matching the spec (escalation is a flag + flow, not a custom state).
+- All table names (`sn_customerservice_case`, `customer_account`, `customer_contact`, `sn_customerservice_task`, `sn_customerservice_escalation`) come from the Envelope's Data Model Alignment — all baseline *(citation: `markdown/customer-service-management/case-escalation-components.md`)*.
+- Escalation is a record of its own [`sn_customerservice_escalation`], whose states are Requested, Escalated, Declined and, once de-escalated, Closed; the case lifecycle in Figure 3 carries no escalation state, matching the spec *(citations: `markdown/customer-service-management/case-escalation-form.md`, `markdown/customer-service-management/de-escalate-csm-case.md`)*.
 
 ### §1.1 flags
 None — every object is baseline-confirmed in the Constraint Envelope.

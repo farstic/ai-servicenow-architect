@@ -1,6 +1,6 @@
 # HLD/LLD Writer — Examples
 
-Three gold-standard examples of HLD/LLD Writer output. Each example shows the input, the produced document, and an explanation of why each choice was made — including the baseline-first audit pattern and the `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` escalation pattern.
+Three gold-standard examples of HLD/LLD Writer output. Each example shows the input, the produced document, and an explanation of why each choice was made — including the baseline-first audit pattern and the rule that the baseline is weighed before any `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` is raised.
 
 ---
 
@@ -78,7 +78,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 
 ### 2.2 Assumptions and constraints
 
-- "Regional duty manager" is resolved at runtime as the `manager` of the case's `assignment_group` (`sys_user_group.manager`). Replaced with On-Call Management in R3.
+- "Regional duty manager" is the `manager` of the case's `assignment_group` (`sys_user_group.manager`). In R1 the agent adds them to the escalation's watch list; an escalation template can also add the case assignment group's manager to the approvers *(citation: `markdown/customer-service-management/create-escalation-template.md`)*. R3 replaces the manual step with On-Call Management.
 - Escalation updates are replicated to the case's own work notes. No custom audit table is in scope for any release of this programme.
 - Escalation uses the baseline case and account escalation feature: an Escalation record [`sn_customerservice_escalation`] against the case, not a new state value (see OD-01).
 - All work lives in the baseline `sn_customerservice` scope. No new scoped app.
@@ -104,7 +104,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 
 **sn_customerservice_agent** — primary journey: identifies a case requiring senior attention, opens it, selects the Escalate Case related link, fills in Reason, Escalation Justification and the escalation template on the Escalation form, adds the duty manager to the watch list, and submits. Continues working other cases.
 
-**Regional duty manager** (a `sys_user`: the manager of the case's assignment group, `assignment_group.manager` *(citation: `markdown/platform-administration/user-administration/t_CreateAGroup.md`)*) — primary journey: receives the escalation's email notifications as a watch-list member. Opens the escalation and the case, reviews the work notes, takes action (assigns to themselves, reassigns, etc.).
+**Regional duty manager** (a `sys_user`: the manager of the case's assignment group, `assignment_group.manager` *(citation: `markdown/platform-administration/user-administration/t_CreateAGroup.md`)*) — primary journey: receives the escalation's email notifications as a watch-list member. Opens the case — and the escalation record, subject to the read-access check in §6.1 — reviews the work notes, takes action (assigns to themselves, reassigns, etc.).
 
 **sn_customerservice_manager** — observational journey: reviews escalation patterns via case work notes during weekly team retrospectives (R1); shifts to Performance Analytics dashboards in R2.
 
@@ -115,7 +115,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 | Case management | CSM (sn_customerservice) baseline | No customisation. |
 | Escalation workflow | The case and account escalation feature: Escalate Case related link, Escalation form, escalation templates and severities | Baseline feature; no new scoped app. |
 | Audit trail | The Escalation record and the case's work notes | Baseline. No custom table per §1.1. |
-| Duty-manager resolution | sys_user_group.manager (R1) → On-Call Management (R3) | Baseline lookup R1; Now Platform On-Call Management R3. |
+| Duty manager | The case assignment group's manager, added to the watch list by the agent (R1) → On-Call Management (R3) | Baseline field R1; Now Platform On-Call Management R3. |
 | Notification | Email to the current user and the watch list on each escalation update | Baseline *(citation: `markdown/customer-service-management/case-escalation-process.md`)*. |
 | Reporting | Performance Analytics (R2 only — out of R1 scope) | Baseline. |
 
@@ -141,7 +141,7 @@ R3 introduces an internal dependency on On-Call Management (not an external inte
 
 ### 4.3 Environment topology
 
-Standard Acme topology: Dev → SIT → UAT → Prod. Update sets used for promotion. No new scoped app means update sets capture the escalation templates and severities, the role assignments and the notification configuration without scope-isolation concerns.
+Standard Acme topology: Dev → SIT → UAT → Prod. Update sets carry configuration on the tables that track customizations — those with the update_synch attribute — and exclude task or process data; data records move by an instance-to-instance import *(citation: `markdown/application-development/system-update-sets/customizations-tracked-update-sets.md`)*. Whether the escalation templates, severities and role assignments are tracked or move as data is checked on the instance before the release plan is fixed.
 
 ### 4.4 Performance and scaling
 
@@ -166,8 +166,8 @@ R2 reporting may need indicator pre-aggregation at higher case volumes — flagg
 | Role | Capabilities | Source |
 |---|---|---|
 | sn_customerservice_agent | Uses the Escalate Case related link; requests escalations; reads the case's work notes. | Baseline CSM role, with `sn_customerservice.escalation_requester` to request an escalation *(citation: `markdown/customer-service-management/escalate-csm-case.md`)*. |
-| sn_customerservice_manager | Requests escalations for any case they read; reads the team's escalation records. | Baseline CSM role, with `sn_customerservice.escalation_requester`. |
-| Regional duty manager | Receives the escalation's notifications as a watch-list member (R1); de-escalates the case when its cause is resolved (R4). | Resolved at runtime as `sys_user_group.manager`. R1 needs no role; R4 needs `sn_customerservice.deescalation_requester`, which de-escalating requires and which contains the requester role *(citations: `markdown/customer-service-management/de-escalate-csm-case.md`, `markdown/customer-service-management/case-escalation-components.md`)*. |
+| sn_customerservice_manager | Requests escalations for any case they read; reads the team's escalation records — to be verified on the instance: the corpus describes the requester role only as able to request, and gives viewing all escalation records to the Escalation Configuration Viewer role (`sn_crm_escalation_config_viewer`) *(citation: `markdown/customer-service-management/case-escalation-components.md`)*. | Baseline CSM role, with `sn_customerservice.escalation_requester`. |
+| Regional duty manager | Receives the escalation's notifications as a watch-list member (R1); de-escalates the case when its cause is resolved (R4). | The case assignment group's manager (`sys_user_group.manager`), added to the watch list by the agent. R1 needs no role for the notifications — whether a watch-list member can open the escalation record without an escalation role is verified on the instance; R4 needs `sn_customerservice.deescalation_requester`, which de-escalating requires and which contains the requester role *(citations: `markdown/customer-service-management/de-escalate-csm-case.md`, `markdown/customer-service-management/case-escalation-components.md`)*. |
 
 ### 6.2 Data classification and handling
 

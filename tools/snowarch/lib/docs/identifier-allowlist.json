@@ -37,7 +37,6 @@
     {"file":".claude/skills/integration-specialist/EXAMPLES.md","identifier":"atlas_spoke_retry_rate","reason":"example-name"},
     {"file":".claude/skills/integration-specialist/EXAMPLES.md","identifier":"atlas_spoke_success_rate","reason":"example-name"},
     {"file":".claude/skills/integration-specialist/EXAMPLES.md","identifier":"attempt_count","reason":"example-field","table":"x_acme_itsm_ado_dlq"},
-    {"file":".claude/skills/integration-specialist/EXAMPLES.md","identifier":"attempt_number","reason":"payload-key"},
     {"file":".claude/skills/integration-specialist/EXAMPLES.md","identifier":"close_request","reason":"example-name"},
     {"file":".claude/skills/integration-specialist/EXAMPLES.md","identifier":"close_response","reason":"example-name"},
     {"file":".claude/skills/integration-specialist/EXAMPLES.md","identifier":"create_request","reason":"example-name"},

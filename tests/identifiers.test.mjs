@@ -16,7 +16,7 @@ const CORPUS = join(ROOT, 'vendor', 'ServiceNowDocs');
 const HAS_CORPUS = existsSync(join(CORPUS, 'markdown'));
 
 // The allow-list's size by reason. A change here is a decision about the roster, made in review.
-const EXPECTED = { 'example-field': 13, 'payload-key': 23, 'example-role': 3, 'script-variable': 5, 'example-name': 46 };
+const EXPECTED = { 'example-field': 13, 'payload-key': 22, 'example-role': 3, 'script-variable': 5, 'example-name': 46 };
 // The excuses the real roster rests on, by kind (sites), and the absent names written only in capitals
 // or in mixed case. A new member of either is a decision made in review, as a new allow-list entry is:
 // the marker covers its whole line, and a platform name retyped in capitals is never looked at.

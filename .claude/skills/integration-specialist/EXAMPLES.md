@@ -63,11 +63,11 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 - **Endpoint:** Azure DevOps Boards through the spoke's Create Work Item action; the connection URL is on the spoke's connection record on each instance, and the project stays parameterised per environment via the system property `x_acme_itsm.ado_project`.
 
 #### Error handling
-- **Retry policy:** exponential backoff with jitter. 3 attempts, base 1s, multiplier 2x, jitter ±20%. Max total elapsed: 10 seconds.
+- **Retry policy:** an IntegrationHub retry policy set as the spoke alias's Default Retry Policy, so it applies to every action that uses the alias: Retry Strategy Exponential Backoff (the multiplier is 2), Interval 1 second, Count 3 — retries after 1, 2 and 4 seconds — with the retryable errors below as its conditions. The platform policy has no jitter, and Honor "Retry-After" Header is an alternative strategy, not an addition *(citation: `markdown/build-workflows/workflow-studio/retry-policy.md`)*.
 - **Retryable errors:**
   - Network timeout
   - HTTP 5xx (server error)
-  - HTTP 429 (rate limited) — honour `Retry-After` header if present
+  - HTTP 429 (rate limited) — retried on the same backoff; the `Retry-After` value is not read under this strategy
   - HTTP 408 (request timeout)
 - **Non-retryable errors → DLQ immediately:**
   - HTTP 4xx (except 408, 429)
@@ -90,7 +90,7 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 
 #### Performance
 - **TPS target:** 30 sustained (well above 100/day requirement).
-- **Latency target:** p50 <500ms, p95 <2s, p99 <5s (per single POST call, excluding retries).
+- **Latency target:** p50 <500ms, p95 <2s, p99 <5s per Create Work Item action run, retries included — measured from the action's duration, which the flow execution details record for every action run *(citation: `markdown/build-workflows/workflow-studio/flow-execution-details.md`)*.
 - **Concurrency model:** Async fire-and-forget from the calling flow's perspective; the flow's "Run in Background" handles the wait.
 
 #### Security
@@ -103,13 +103,13 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
   - Phone numbers (configurable patterns; replace with `<PHONE>`)
   - Names from the `incident.caller_id.name` (literal substring replace; replace with `<CUSTOMER>`)
   - Configurable extra patterns via system property `x_acme_itsm.ado_pii_patterns`.
-- **Logs:** never log the un-redacted payload. Log only: incident sys_id, ADO work item id (post-success), error class, retry attempt number, run ID.
+- **Logs:** never log the un-redacted payload. Log only: incident sys_id, ADO work item id (post-success), error class, run ID. The retry attempts themselves are in System Logs > Outbound HTTP Requests *(citation: `markdown/build-workflows/workflow-studio/retry-policy.md`)*.
 
 #### Observability
-- **Logged fields per call** — a Log action in the calling flow writes them to `sys_flow_log`: run_id, incident_sys_id, attempt_number, error_class (if any), result (success/retry/dlq). Outbound web services logging also tracks every outbound REST request, at the basic level by default — elevated or all where it is configured *(citations: `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`, `markdown/api-reference/web-services/outbound-request-logging.md`, `markdown/api-reference/web-services/outbound-logging-properties.md`)*.
+- **Logged fields per call** — a Log action in the calling flow writes them to `sys_flow_log`: run_id, incident_sys_id, error_class (if any), result (success/dlq) — retries happen inside the action, so the flow sees only the final result. Outbound web services logging also tracks every outbound REST request, at the basic level by default — elevated or all where it is configured *(citations: `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`, `markdown/api-reference/web-services/outbound-request-logging.md`, `markdown/api-reference/web-services/outbound-logging-properties.md`)*.
 - **Metrics (Performance Analytics indicators):**
   - `ado_outbound_success_rate` (%)
-  - `ado_outbound_p95_latency_ms`
+  - `ado_outbound_p95_latency_ms` (from the action durations in the flow execution details)
   - `ado_outbound_dlq_depth`
   - `ado_outbound_daily_volume`
 - **Run ID:** a UUID generated at flow trigger time (`run_id`) and written with every Log action entry for the run. The corpus documents no header input for the spoke's actions, so the ID stays on the ServiceNow side and is not sent to Azure DevOps *(citation: `markdown/integrate-applications/integration-hub/azure-devops-spoke.md`)*.
@@ -132,7 +132,7 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 - Auth failure: simulated 401 → DLQ entry created, no work item, alert email sent.
 - Idempotency: duplicate trigger for same incident → second call finds the work item through the Wiql lookup, no second work item.
 - Schema rejection: simulated 422 from ADO → DLQ entry, no retry.
-- Rate-limit: simulated 429 with Retry-After: 5 → retry honours the header.
+- Rate-limit: simulated 429 → retried on the exponential backoff; the attempts show in System Logs > Outbound HTTP Requests.
 - DLQ replay: replay UI Action processes a DLQ entry → work item created on success, DLQ row marked replayed.
 - PII redaction: incident with email and phone in description → ADO work item description has redactions, ServiceNow log shows nothing.
 
@@ -499,7 +499,7 @@ x_acme_atlas_spoke/
 
 The decision to build a spoke (versus three separate REST Messages, one per consumer) is justified explicitly against the reusability requirement, and the spoke's structure mirrors a proper scoped application — Connection Aliases, REST Messages, Actions, Script Includes, system properties, and logging (no custom table) all enumerated. The semver discipline matters: consumers pin a version and upgrade deliberately, which prevents the classic "we upgraded the spoke and broke incident-to-Atlas without anyone noticing" production incident.
 
-The error contract returned by every Action (`{success, data, error: {code, message, retryable, attempt_count}}`) is the reusability superpower: every consuming flow handles spoke errors the same way, regardless of which Action was called, regardless of which underlying Atlas error occurred. Without that contract, every consumer rewrites its own error-handling logic and they drift. The handoffs cover all the right specialists: Developer for the script bodies (the spoke is a *spec* without scripts at this level), DevOps for the App Repository workflow, Security & GRC for the HMAC implementation, and importantly Performance & Scale for the cross-consumer aggregate load — a question only an Integration Specialist with system-wide visibility would think to raise.
+The Action contract returned by every Action (`{success, data, http_status, response_time_ms, error: {code, message, retryable, attempt_count}}`) is the reusability superpower: every consuming flow handles spoke errors the same way, regardless of which Action was called, regardless of which underlying Atlas error occurred. Without that contract, every consumer rewrites its own error-handling logic and they drift. The handoffs cover all the right specialists: Developer for the script bodies (the spoke is a *spec* without scripts at this level), DevOps for the App Repository workflow, Security & GRC for the HMAC implementation, and importantly Performance & Scale for the cross-consumer aggregate load — a question only an Integration Specialist with system-wide visibility would think to raise.
 
 ---
 

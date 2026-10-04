@@ -150,7 +150,7 @@ The idempotency guard at Step 1 is the most important detail — re-trigger scen
 > Will be consumed by incident MIM flows, change emergency flows, and HR case escalation flows.
 >
 > Scope: x_acme_platform (shared utility scope).
-> Pre-approved custom objects: the `x_acme_platform` scope and its `x_acme_platform_notification_template` table — approved over the global scope and over the baseline Email Template [`sysevent_email_template`], which holds email templates — rich HTML for email — not the Teams and Slack messages this subflow also sends *(citation: `markdown/platform-administration/t_CreateAnEmailTemplate.md`)*.
+> Pre-approved custom objects: the `x_acme_platform` scope and its `x_acme_platform_notification_template` table — approved over the global scope and over the baseline Email Template [`sysevent_email_template`], which holds email templates — rich HTML for email — not the Teams and Slack messages this subflow also sends *(citations: `markdown/platform-administration/t_CreateAnEmailTemplate.md`, `markdown/application-development/servicenow-sdk/fluent-email-notification-api.md`)*.
 
 ### Expected output
 
