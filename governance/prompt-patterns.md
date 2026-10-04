@@ -440,7 +440,7 @@ Conventions:
 ---
 
 ### PP-21: Licensing and entitlement check
-**When to use:** Before committing to a design, you want to know what it costs to *license* — subscriptions, SKU/tier coverage, App Engine units for custom tables, Now Assist Assists consumption, or third-party SaaS entitlement impact.
+**When to use:** Before committing to a design, you want to know what it costs to *license* — subscriptions, SKU/tier coverage, the custom table entitlements custom tables consume, Now Assist Assists consumption, or third-party SaaS entitlement impact.
 
 **Template:**
 > Licensing & Entitlement Specialist task: {{CONSTRAINT_NOTE (pre-build) / REVIEW (post-build)}} for {{DESIGN_OR_ARTEFACT}}.
