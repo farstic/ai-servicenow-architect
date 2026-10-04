@@ -56,6 +56,9 @@ worked example were corrected with it.
   naming the baseline it was weighed against. Change states, the AI Skill Kit, and the AI Admin Hub and
   AI Admin Center consoles carry the corpus's names, and the HLD and PDD examples embed their figures
   from draw.io sources.
+- The licensing specialist prices a custom table in the corpus's terms: the custom table entitlements of
+  the subscription the table is mapped to, rather than "App Engine units", which the bundled documentation
+  does not use. A question about App Engine units still reaches it.
 
 ### Changed
 
