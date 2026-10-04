@@ -22,15 +22,16 @@ Target **`incident`** (ITSM gateway, Verdict A — no custom table). Field maps:
 legacy_id → `correlation_id` (coalesce); title → `short_description`; body → `description`;
 reporter_email → `caller_id` (reference; resolve on `sys_user.email`); team → `assignment_group`
 (reference; resolve on `sys_user_group.name`); legacy_status → `state` (choice map below); priority →
-`priority`; opened → `opened_at`; resolved → `closed_at`; resolution_text → `close_notes`.
+`impact` + `urgency` (choice map — `priority` is read-only by default and set from them); opened → `opened_at`; resolved → `resolved_at`; resolution_text → `close_notes` *(citations: `markdown/it-service-management/incident-management/def-prio-lookup-rules.md`, `markdown/it-service-management/benchmarks/t_ConfigResIncBenchKPIs-cf.md`)*.
 **State choice map:** New→1, WorkInProgress→2, Pending→3(On Hold), Resolved→6, Closed→7, Cancelled→8.
+**Assumption:** `resolved_at` exists on the target instance. The corpus says the field "may not exist in some environments" and that the Incident Resolution Fields plugin (`com.snc.incident_resolution_fields`) adds it — verify on the instance before mapping to it.
 
 ## Pipeline
 CSV **data source** → **import set** + staging → **transform map** to `incident`.
 - `onBefore` (→ Developer): normalise date formats; trim; set `ignore=true` for rows with no resolvable caller AND route them to the error report (don't silently insert with a blank caller).
 - Field maps + reference coalesce for caller/group; choice map for state.
 - `onAfter` (→ Developer): write each ticket's notes to `sys_journal_field` (work_notes) on the inserted incident, oldest-first, preserving original timestamps in the note body.
-*(citation: markdown/servicenow-platform/integration-hub-etl/create-etl-transform-map.md)*
+*(citations: markdown/integrate-applications/system-import-sets/c_ImportSetsKeyConcepts.md, markdown/integrate-applications/system-import-sets/r_MapWithTransformationEventScripts.md)*
 
 ## Dependency sequence
 1. **Foundation** — ensure `sys_user` (callers) + `sys_user_group` (teams) exist; load/confirm first.
@@ -45,7 +46,7 @@ Cleanse in `onBefore`; **every unresolved row goes to an error report**, never a
 ## Reconciliation plan
 - Count: source rows vs `incident` where `correlation_id` set (target ≥ inserted; updates on re-run).
 - Sample: 50 records field-by-field (incl. state + dates + caller).
-- Critical fields: `opened_at`/`closed_at`, `state`, `caller_id`, `assignment_group` exact.
+- Critical fields: `opened_at`/`resolved_at`, `state`, `caller_id`, `assignment_group` exact.
 - Error/skipped report reviewed + signed off before cutover.
 
 ## Cutover & rollback runbook
@@ -82,7 +83,7 @@ ITSM gateway (target confirmed); **Developer + Code Reviewer** (onBefore/onAfter
 
 OPEN QUESTION — CUSTOM OBJECT PROPOSAL (§1.1 blocking)
 1. Baseline mechanic evaluated: load to **`incident`** with `correlation_id` + a `migrated`/source marker;
-   reporting can filter migrated vs net-new. (citation: create-etl-transform-map.md)
+   reporting can filter migrated vs net-new. (citation: markdown/integrate-applications/system-import-sets/c_ImportSetsKeyConcepts.md)
    Why a custom table falls short: `u_legacy_ticket` is permanent technical debt — it sits outside SLA,
    reporting, search, KCS, and every ITSM feature; agents work two systems; it never gets retired.
 2. Custom object proposed (smallest scope): the user's `u_legacy_ticket` table — rejected as unnecessary.
@@ -112,7 +113,7 @@ The rehearsal load ran. Re-adopt the skill to validate before promoting to the r
   callers/groups resolved (0 orphans in the sample). PASS.
 - **Idempotency:** re-ran the same file → 0 inserts, 201,180 updates (coalesce working). PASS.
 - **Error accounting:** 164 skipped all in the report with reasons. PASS.
-- **[fix-before-prod]:** 3 sampled records have `closed_at` earlier than `opened_at` (legacy data bug) —
+- **[fix-before-prod]:** 3 sampled records have `resolved_at` earlier than `opened_at` (legacy data bug) —
   add an `onBefore` guard to flag/repair before the real cutover.
 
 Verdict rationale: clean except the 164 caller decision (business) and the date-order guard (Developer).

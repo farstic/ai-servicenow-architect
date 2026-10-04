@@ -114,7 +114,7 @@ Consult flags:
 - **Do not create a `u_internal_transfer_case` table.** `sn_hr_le_case` covers it; this would be a §1.1 violation.
 - **Do not write a custom Flow Designer flow that orchestrates the five activities outside the activity-set library.** Use `sn_hr_le_activity_set` + `sn_hr_le_activity` records. The activity-set library is the baseline orchestration mechanism.
 - **Do not create a custom HR Profile extension table to track the transfer history.** `sn_hr_core_profile` audit history (`sys_history_set`) tracks manager/department/location changes natively.
-- **Do not extend `sn_hr_le_case.state` with new transfer-specific states.** Use the sub-state (see the field table above) if variant states are needed.
+- **Do not extend `sn_hr_le_case.state` with new transfer-specific states.** Carry a variant in a field, or in the sub-state where the instance has one (see the field table above).
 - **Do not duplicate the welcome-packet document in a custom template table.** Use `sn_doc_template`.
 - **Do not hardcode IT-task creation logic in a Business Rule on `sn_hr_le_case`.** The activity-set library has a dedicated activity type for cross-application task creation.
 
@@ -218,7 +218,7 @@ Consult flags:
 
 - **Do not write `u_target_role_title` to `sn_hr_core_profile.position` early.** That field captures the *current* position; overwriting it pre-effective creates audit confusion and breaks Employee Center "my profile" display.
 - **Do not create a `u_target_role` table.** One field on the baseline LE case table is enough.
-- **Do not extend `sn_hr_le_case.state` with new "Target Title Set" / "Target Title Confirmed" states.** State is lifecycle progress, not a data-presence flag. Use the sub-state or a separate field if pre-effective sub-stages are needed.
+- **Do not extend `sn_hr_le_case.state` with new "Target Title Set" / "Target Title Confirmed" states.** State is lifecycle progress, not a data-presence flag. Use a separate field, or the sub-state where the instance has one, if pre-effective sub-stages are needed.
 - **Do not duplicate the title into HR Profile via a custom Business Rule** before the transfer is effective. The activity-set library handles HR Profile updates at the right step.
 - **Do not name the field with engagement-scope prefix if engagement convention uses dictionary-level extension on baseline tables.** Coordinate with App Engine Specialist on naming.
 

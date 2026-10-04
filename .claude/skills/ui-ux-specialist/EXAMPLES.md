@@ -66,7 +66,7 @@ A request: "build a custom carousel widget on the customer portal to show the cu
 **§1.1 verdict: C — HALT (custom widget proposed).**
 
 OPEN QUESTION — CUSTOM OBJECT PROPOSAL (§1.1 blocking)
-1. Baseline evaluated: the baseline **Data Table / List** and **My Requests/Cases** widgets render a customer's open cases on the portal, themed to brand. (citation: markdown/platform-user-interface/service-portal/)
+1. Baseline evaluated: the base system **Simple List** widget renders a customer's open cases on the portal, themed to brand; the base **Carousel widget** shows a scrolling list of catalog-item images, not case records. (citation: markdown/platform-user-interface/service-portal/simple-list-widget.md, markdown/platform-user-interface/service-portal/carousel-widget.md)
    Falls short only on the "bespoke animated carousel" styling — a presentation preference, not a capability gap.
 2. Custom object proposed: a custom Service Portal widget (HTML/CSS/AngularJS + client/server script).
 3. Consequences: custom widget code to maintain and security-review (Code Reviewer), upgrade-path exposure, accessibility risk (custom animation).

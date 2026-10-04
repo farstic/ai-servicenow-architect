@@ -32,8 +32,8 @@ priority calculation (baseline impact/urgency) or the notification channel confi
 
 ## 4. Procedures
 - **Verify the rule is active:** Incident BR list → "P1 Auto-Assign" → Active = true.
-- **Re-run assignment for a stuck P1:** open the incident → set priority back to 2 then 1
-  (re-triggers), or run the "Reassign P1" UI action.
+- **Re-run assignment for a stuck P1:** open the incident → change Impact/Urgency so Priority recalculates to 2, then back to 1
+  (re-triggers), or run the "Reassign P1" UI action. *(citation: `markdown/it-service-management/incident-management/def-prio-lookup-rules.md`)*
 
 ## 5. Alerts & response
 - **Symptom: P1 unassigned > 2 min.** Diagnose: is the group's `cmn_rota` populated for now?

@@ -32,7 +32,7 @@ Ground non-trivial platform claims; cite the path. Limits are often plan/instanc
 | Concept | Path |
 |---|---|
 | Efficient server scripting (GlideRecord/GlideAggregate) | `markdown/application-development/business-rules-and-script-includes.md` |
-| Performance Analyzer (diagnose slow transactions) | `markdown/application-development/performance-analyzer/exploring-performance-analyzer.md`, `configuring-performance-analyzer.md` |
+| Performance Analyzer (page load times in UX framework pages); Stats Tools (slow transactions, queries, scripts) | `markdown/application-development/performance-analyzer/exploring-performance-analyzer.md`, `configuring-performance-analyzer.md`, `markdown/platform-administration/c_StatsToolsDiagnosticsPlugin.md` |
 | GlideAjax (client→server cost) | `markdown/api-reference/c_GlideAjaxAPI.md` |
 
 ## §1.1 Baseline-First — performance reading
@@ -97,14 +97,14 @@ Node/instance scaling, semaphore groups, and clustering are platform-level — f
 | `.query()` + `.next()` counting | `GlideAggregate` COUNT | `markdown/application-development/business-rules-and-script-includes.md` |
 | Nested GlideRecord loops | Encoded-query join / single aggregate | `markdown/application-development/business-rules-and-script-includes.md` |
 | Full-table loop in a `before` BR / on insert | Precompute (scheduled) + cached read | `markdown/application-development/business-rules-and-script-includes.md` |
-| Custom summary/shadow table for read speed | PA indicator or index | `markdown/application-development/performance-analyzer/exploring-performance-analyzer.md` |
+| Custom summary/shadow table for read speed | PA indicator or index | `markdown/now-intelligence/performance-analytics/automated-indicators.md` |
 | Synchronous external call in a BR | Async BR / event / spoke | `markdown/application-development/business-rules-and-script-includes.md` |
-| Live report over millions of rows | PA snapshots | `markdown/application-development/performance-analyzer/exploring-performance-analyzer.md` |
+| Live report over millions of rows | PA indicator scores from a data collection job, with snapshots for drill-down | `markdown/now-intelligence/performance-analytics/c_ClctData.md` |
 | No archival on a high-growth table | Table Rotation / Archive | `markdown/application-development/business-rules-and-script-includes.md` |
 
 ## §1.1 hot spots
-1. **"We need a summary table so reports are fast."** → PA indicator (or index), not a table. **Verdict A.**
-2. **"Precompute into our own rollup table."** → A scheduled job into a PA indicator / system-property cache, not a new table. **Verdict A/B.**
+1. **"We need a summary table so reports are fast."** → PA indicator (or index), not a table. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes the PA indicator or index.
+2. **"Precompute into our own rollup table."** → A PA indicator, whose data collection job is the scheduled precompute — not a system property, which flushes the cache on every node each time it changes, and not a new table *(citations: `markdown/now-intelligence/performance-analytics/c_ClctData.md`, `markdown/platform-administration/t_AddAPropertyUsingSysPropsList.md`)*. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes the PA indicator.
 3. **"Denormalise for read speed."** → Index + query rewrite first; denormalised shadow table is §1.1. **Halt if proposed.**
 
 ## Post-build audit — the four checks

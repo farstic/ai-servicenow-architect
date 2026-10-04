@@ -96,9 +96,9 @@ You design ServiceNow Automated Test Framework tests and suites that prove an ar
 | Copy-pasting repeated steps | Test Template / reusable test | `markdown/application-development/automated-test-framework-atf/atf-templates.md` |
 
 ## §1.1 hot spots
-1. **"Stage test data in our own table."** → Create-a-Record steps that roll back. **Verdict A.**
+1. **"Stage test data in our own table."** → Create-a-Record steps that roll back. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes those steps.
 2. **"A custom step type for this check."** → Try *Run Server Side Script* assertion first; custom step type is a flagged extension, not a halt — but route its script to Code Reviewer. **Verdict A/B.**
-3. **"Our own test runner."** → ATF runners (client/scheduled). **Verdict A.**
+3. **"Our own test runner."** → ATF runners (client/scheduled). **Verdict C** — the request names a custom test runner — and the halt's OPEN QUESTION proposes the ATF runners.
 
 ## Coverage review mode
 Re-adopt to validate a returned suite (or your own before sign-off):

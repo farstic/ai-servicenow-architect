@@ -30,7 +30,7 @@ Ground every platform-behaviour claim about import sets / transform maps / data 
 
 | Concept | Path |
 |---|---|
-| Transform map (ETL) | `markdown/servicenow-platform/integration-hub-etl/create-etl-transform-map.md` |
+| Transform map (import sets) | `markdown/integrate-applications/system-import-sets/c_CreatingNewTransformMaps.md` |
 | Import sets / identify (coalesce) | `markdown/servicenow-platform/configuration-management-database-cmdb/identification-import-sets.md` |
 | Import sets via web service | `markdown/api-reference/web-services/soap-web-service-import-sets.md` |
 
@@ -106,7 +106,7 @@ If any of these is missing, raise it as an Open Question and proceed with a docu
 ## Core migration mechanics — Rigorous Coverage
 
 ### The pipeline
-**Data source → Import set + staging table → Transform map → Target table.** *(citation: `markdown/servicenow-platform/integration-hub-etl/create-etl-transform-map.md`)*
+**Data source → Import set + staging table → Transform map → Target table.** *(citation: `markdown/integrate-applications/system-import-sets/c_ImportSetsKeyConcepts.md`)*
 
 1. **Data source** — defines the incoming records and format. File (CSV/Excel/XML attached or via MID/Attachment), JDBC (direct DB pull via MID), REST/data stream. Choose based on access, volume, and whether a repeatable delta pull is needed.
 2. **Import set + staging table** — `sys_import_set` groups a load; rows land in an **auto-created staging table** (`sys_import_set_row` subtype, `imp_*`) as raw, untyped strings. **This is baseline and transient — not a custom object.** Each row carries a **State**, `Pending` until it is transformed *(citation: `markdown/integrate-applications/system-import-sets/r_ImportSetMode.md`)*; the run then counts each row as inserted, updated, ignored, skipped or an error *(citation: `markdown/integrate-applications/system-import-sets/import-run-details.md`)*.
@@ -150,21 +150,21 @@ If any of these is missing, raise it as an Open Question and proceed with a docu
 ## Domain-Specific Anti-Patterns to Block (Part-5 library)
 | Anti-pattern | Baseline alternative | Citation |
 |---|---|---|
-| Custom `u_legacy_*` table to "hold" migrated records | Map to the baseline target (`incident`, `sn_customerservice_case`, …) | `markdown/servicenow-platform/integration-hub-etl/create-etl-transform-map.md` |
+| Custom `u_legacy_*` table to "hold" migrated records | Map to the baseline target (`incident`, `sn_customerservice_case`, …) | `markdown/integrate-applications/system-import-sets/c_CreatingNewTransformMaps.md` |
 | Custom dedup/matching engine | **Coalesce** (general) / **IRE** (CMDB) | `markdown/servicenow-platform/configuration-management-database-cmdb/identification-import-sets.md` |
 | No coalesce key (insert-only) | Coalesce on a stable natural key → idempotent re-runs | `markdown/servicenow-platform/configuration-management-database-cmdb/identification-import-sets.md` |
-| Permanent staging table kept after cutover | Staging is transient; drop/ignore post-cutover | `markdown/servicenow-platform/integration-hub-etl/create-etl-transform-map.md` |
-| Importing dirty data "to clean later" | Profile + cleanse at source/`onBefore`; route errors to a report | `markdown/servicenow-platform/integration-hub-etl/create-etl-transform-map.md` |
-| Loading children/attachments before parents | Strict dependency sequence: foundation → referenced → referencing | `markdown/servicenow-platform/integration-hub-etl/create-etl-transform-map.md` |
+| Permanent staging table kept after cutover | Staging is transient; drop/ignore post-cutover | `markdown/integrate-applications/system-import-sets/delete-import-sets.md` |
+| Importing dirty data "to clean later" | Profile + cleanse at source/`onBefore`; route errors to a report | `markdown/integrate-applications/system-import-sets/r_MapWithTransformationEventScripts.md` |
+| Loading children/attachments before parents | Strict dependency sequence: foundation → referenced → referencing | `markdown/integrate-applications/system-import-sets/t_CreatingAFieldMap.md` |
 | All legacy notes into `description` | Journals → `sys_journal_field` via `onAfter` | `markdown/api-reference/web-services/soap-web-service-import-sets.md` |
-| No reconciliation / no rehearsal / no backout | Mandatory counts+samples, clone rehearsal, idempotent backout | `markdown/servicenow-platform/integration-hub-etl/create-etl-transform-map.md` |
+| No reconciliation / no rehearsal / no backout | Mandatory counts+samples, clone rehearsal, idempotent backout | `markdown/integrate-applications/system-import-sets/import-run-details.md` |
 
 ---
 
 ## §1.1 Hot Spots — where builders reflexively go custom
-1. **"We need a table for the legacy data so we don't pollute incident."** → No — map to `incident` with `correlation_id` + a `migrated` marker; legacy-only tables are permanent debt. **Verdict A.**
-2. **"Our matching is too complex for coalesce."** → Multi-field coalesce + an `onBefore` normaliser usually suffices; for CMDB it's IRE. **Verdict A/B.**
-3. **"Keep the staging table for audit."** → Reconciliation report + import-set records are the audit; staging is transient. **Verdict A.**
+1. **"We need a table for the legacy data so we don't pollute incident."** → No — map to `incident` with `correlation_id` + a `migrated` marker; legacy-only tables are permanent debt. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes the mapping to `incident` (EXAMPLES Example 2 shows the halt).
+2. **"Our matching is too complex for coalesce."** → Multi-field coalesce + an `onBefore` normaliser usually suffices; for CMDB it's IRE. **Verdict C** — the request asks for a custom matching engine — and the halt's OPEN QUESTION proposes multi-field coalesce (IRE for CMDB).
+3. **"Keep the staging table for audit."** → Reconciliation report + import-set records are the audit; staging is transient. **Verdict C** — the request names a permanent staging table — and the halt's OPEN QUESTION proposes the reconciliation report and import-set records.
 
 ---
 

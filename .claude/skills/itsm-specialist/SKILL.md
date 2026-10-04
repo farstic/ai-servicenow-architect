@@ -297,11 +297,11 @@ Cite each when invoking in a Part 5 list.
 
 The five most common §1.1 violation requests in ITSM, and the baseline alternative for each:
 
-1. **"We need a custom escalation table to track tier-1/tier-2/tier-3 escalation events."** → `incident.priority` + `cmn_rota` + `work_notes` for the event audit. Verdict A, almost always.
+1. **"We need a custom escalation table to track tier-1/tier-2/tier-3 escalation events."** → `incident.priority` + `cmn_rota` + `work_notes` for the event audit. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes that baseline path.
 2. **"We need a custom priority matrix that considers impact, urgency, customer SLA tier, and time-of-day."** → Data Lookup Definition with multiple key fields, plus a Script Include for the time-of-day adjustment if needed. Verdict A.
-3. **"We need a custom routing rule table because our routing is too complex for assignment rules."** → Multiple Data Lookup Definitions in a Script Include orchestrator. Verdict A or B.
-4. **"We need a custom MIM communications table to track stakeholder updates."** → the Major Incident Workbench Communicate tab plus `work_notes` on the MIM incident *(citation: `markdown/it-service-management/incident-management/mi-workbench-communicate-tab.md`)*. Verdict A.
-5. **"We need a custom audit table for incident state changes."** → `sys_history_set` is baseline. Verdict A.
+3. **"We need a custom routing rule table because our routing is too complex for assignment rules."** → Multiple Data Lookup Definitions in a Script Include orchestrator. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes those Data Lookup Definitions.
+4. **"We need a custom MIM communications table to track stakeholder updates."** → the Major Incident Workbench Communicate tab plus `work_notes` on the MIM incident *(citation: `markdown/it-service-management/incident-management/mi-workbench-communicate-tab.md`)*. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes the Communicate tab.
+5. **"We need a custom audit table for incident state changes."** → `sys_history_set` is baseline. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes `sys_history_set`.
 
 ## Post-Build Review Mode — §6.2 Closed Loop
 

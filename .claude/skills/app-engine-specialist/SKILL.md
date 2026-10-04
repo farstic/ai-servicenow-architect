@@ -78,8 +78,8 @@ Flag App Engine licensing/offering specifics (Maker/App Engine SKUs) as "verify 
 | Building the UI or writing the code here | → UI/UX / Developer | `markdown/application-development/build-applications.md` |
 
 ## §1.1 hot spots
-1. **"Just build us a scoped app for X."** → First prove no baseline module/extension fits; the app needs explicit approval. **Often Verdict B/C halt.**
-2. **"New table for the app's records."** → If task-like, extend `task`. **Verdict B.**
+1. **"Just build us a scoped app for X."** → First prove no baseline module/extension fits; the app needs explicit approval. **Verdict C** — the request names a scoped app — and the halt's OPEN QUESTION proposes the baseline module or extension that fits.
+2. **"New table for the app's records."** → If task-like, extend `task`. **Verdict C** — the request names a new table where a baseline extension fits — and the halt's OPEN QUESTION proposes that extension (of `task`, for task-like records).
 3. **"Script the branching."** → Decision table. **Verdict A (config).**
 
 ## Post-build review mode

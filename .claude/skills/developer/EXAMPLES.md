@@ -19,7 +19,7 @@ Each example: input prompt (verbatim) → expected output (the actual artefact) 
 > - Scope: x_acme_itsm
 > - Method: calculateRisk(incidentSysId)
 > - Returns: { risk: 'low' | 'medium' | 'high', score: 0-100, basis: string }
-> - Calculation: based on assignment_group historical breach rate from contract_sla over the past 90 days, weighted by current priority and elapsed % of SLA.
+> - Calculation: based on assignment_group historical breach rate from task_sla over the past 90 days, weighted by current priority and elapsed % of SLA.
 > - Caller: Business Rule on incident insert/update; also exposed to Service Operations Workspace via GlideAjax.
 >
 > Volume context: ~3M historical incidents, ~50K active. Must complete in <100ms when called from Business Rule.
@@ -28,7 +28,7 @@ Each example: input prompt (verbatim) → expected output (the actual artefact) 
 
 ### Expected output
 
-*Developer first surfaces routing-time consults: Performance & Scale (3M historical records on contract_sla), Security & GRC (Workspace exposure may need ACL review). Then produces:*
+*Developer first surfaces routing-time consults: Performance & Scale (3M historical records on Task SLA [`task_sla`] *(citation: `markdown/it-service-management/service-level-management/r_InstalledWithServiceLevelMgmt.md`)*), Security & GRC (Workspace exposure may need ACL review). Then produces:*
 
 ```javascript
 /**
@@ -72,7 +72,7 @@ SLABreachRiskCalculator.prototype = {
         var assignmentGroup = inc.assignment_group.toString();
         var priority = parseInt(inc.priority.toString(), 10);
 
-        // Historical rate via GlideAggregate — JS-side counting on contract_sla
+        // Historical rate via GlideAggregate — JS-side counting on task_sla
         // would materialise hundreds of thousands of rows on this volume.
         var historicalRate = this._loadHistoricalRate(assignmentGroup);
 
@@ -100,7 +100,7 @@ SLABreachRiskCalculator.prototype = {
         var ninetyDaysAgo = new GlideDateTime();
         ninetyDaysAgo.addDaysUTC(-90);
 
-        var totalAgg = new GlideAggregate('contract_sla');
+        var totalAgg = new GlideAggregate('task_sla');
         totalAgg.addQuery('task.assignment_group', assignmentGroup);
         totalAgg.addQuery('start_time', '>=', ninetyDaysAgo.getValue());
         totalAgg.addAggregate('COUNT');
@@ -112,7 +112,7 @@ SLABreachRiskCalculator.prototype = {
             return 0;
         }
 
-        var breachedAgg = new GlideAggregate('contract_sla');
+        var breachedAgg = new GlideAggregate('task_sla');
         breachedAgg.addQuery('task.assignment_group', assignmentGroup);
         breachedAgg.addQuery('start_time', '>=', ninetyDaysAgo.getValue());
         breachedAgg.addQuery('has_breached', true);
@@ -126,7 +126,7 @@ SLABreachRiskCalculator.prototype = {
     },
 
     _loadElapsedPct: function(incidentSysId) {
-        var sla = new GlideRecord('contract_sla');
+        var sla = new GlideRecord('task_sla');
         sla.addQuery('task', incidentSysId);
         sla.addQuery('active', true);
         sla.orderByDesc('sys_created_on');
@@ -157,7 +157,7 @@ SLABreachRiskCalculator.prototype = {
 
 The artefact ticks every Developer SKILL output rule: header comment with spec reference, `'use strict'`, scope-aware naming, role check at the top of the public method, input validation, `GlideRecordSecure` for the user-surfaced read path, `GlideAggregate` instead of JS-side counting against a 3M-row table, bounded `setLimit(1)` for the active SLA lookup, no hardcoded sys_ids, and inline comments that explain *why* (the GlideAggregate choice, the role-check non-trust, the priority-weight policy) rather than *what*.
 
-Equally important is what the Developer did *not* do: did not skip the role check on the basis that the Business Rule caller is "trusted", did not write a JS-side loop counting `contract_sla` rows, did not silently return zero on missing inputs (it throws with explicit messages), did not hardcode the 90-day window without rationale. The post-build proposal correctly surfaces the §6.2 Code Reviewer handoff verbatim plus both relevant additional consults — Performance & Scale for the volume context, ATF Author for the release path. Both are surfaced even though the user did not ask, exactly as the SKILL mandates.
+Equally important is what the Developer did *not* do: did not skip the role check on the basis that the Business Rule caller is "trusted", did not write a JS-side loop counting `task_sla` rows, did not silently return zero on missing inputs (it throws with explicit messages), did not hardcode the 90-day window without rationale. The post-build proposal correctly surfaces the §6.2 Code Reviewer handoff verbatim plus both relevant additional consults — Performance & Scale for the volume context, ATF Author for the release path. Both are surfaced even though the user did not ask, exactly as the SKILL mandates.
 
 ---
 

@@ -323,7 +323,7 @@ Cite where Verdict B/C is in play.]
 ### Core process 4 — Service Mapping
 
 **Primary tables:**
-- `sa_pattern` — Service Mapping patterns (different from Discovery patterns)
+- `sa_pattern` — Discovery Patterns, which Service Mapping and Discovery share *(citation: `markdown/it-operations-management/discovery-and-service-mapping-patterns/c_MappingPatternsCustomization.md`)*
 - `cmdb_ci_service` — business services
 - `cmdb_rel_ci` — CI relationships (the service map)
 
@@ -348,7 +348,7 @@ Cite where Verdict B/C is in play.]
 2. **Event insert** — `em_event` record created.
 3. **Rules fire** — an event rule (`em_match_rule`) turns the event into an alert; alert correlation rules (`em_alert_correlation_rule`) group related alerts.
 4. **Alert created/updated** — `em_alert` record reflects the consolidated alert state.
-5. **Incident creation** — optional auto-creation of `incident` from `em_alert` per correlation rule.
+5. **Incident creation** — optional: an alert management rule (`em_alert_management_rule`) determines the alert's response, such as opening an `incident` *(citation: `markdown/it-operations-management/event-management/alert-management-rule.md`)*.
 6. **Alert closure** — events ageing out or explicit closure events close the alert.
 
 **Anti-pattern alert:** Custom event-correlation tables are §1.1 violations. Use baseline event rules and alert correlation rules (`em_match_rule`, `em_alert_correlation_rule`).
@@ -397,13 +397,13 @@ Cite where Verdict B/C is in play.]
 
 **Reflexive bad design:** New top-level table extending `cmdb_ci`.
 **Baseline alternative:** Almost always covered by existing CI class hierarchy. Verify in `cmdb_ci_*` class tree before approving any new class.
-**Verdict:** Usually A (baseline class fits) or B (extend existing class).
+**Verdict:** C — the request names a custom CI class, which is a new table — and the halt's OPEN QUESTION proposes the existing class that fits (an extension of it is itself a new table).
 
 ### Hot spot 2 — "We need custom dedup logic"
 
 **Reflexive bad design:** Business Rule that updates CIs based on custom matching.
 **Baseline alternative:** Configure IRE identification rules with the desired matching attributes.
-**Verdict:** Always A (IRE configuration).
+**Verdict:** C — the request names custom dedup logic, which is on this skill's §1.1 list — and the halt's OPEN QUESTION proposes IRE identification and reconciliation rules.
 
 ### Hot spot 3 — "We need to track service-map metadata"
 
@@ -415,7 +415,7 @@ Cite where Verdict B/C is in play.]
 
 **Reflexive bad design:** Custom probe in MID Server scripts/.
 **Baseline alternative:** Baseline patterns cover most discovery needs. For genuine custom needs, extend baseline pattern.
-**Verdict:** A (baseline pattern) or B (pattern extension).
+**Verdict:** C — the request names a custom probe, which is on this skill's §1.1 list — and the halt's OPEN QUESTION proposes a baseline pattern, or an extension or override of one.
 
 ### Hot spot 5 — "We need a custom event correlation strategy"
 

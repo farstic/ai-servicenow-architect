@@ -25,7 +25,7 @@ The Chief Architect is routing a CSM design where customer contacts include PII,
 - Read/write/create/delete each evaluated; PII fields write-gated to the agent role.
 
 ## Data classification & protection constraints
-- Classify contact email/phone/address as PII via security attributes. (citation: markdown/platform-security/access-control/security-attribute-fundamentals.md)
+- Classify contact email/phone/address as PII with **Data Classification** on their dictionary entries. (citation: markdown/platform-security/data-classification/exploring-data-classification.md)
 - Redact PII from work notes, notifications, and any outbound payload that ITSM or an integration consumes.
 - If GDPR applies, confirm lawful basis + retention for contact data; flag right-to-erasure handling.
 
@@ -34,7 +34,7 @@ The Chief Architect is routing a CSM design where customer contacts include PII,
 - If the engagement is in regulated scope, map case-data handling to a Policy & Compliance control + attestation. (citation: markdown/governance-risk-compliance/attestation-template-reference.md)
 
 ## §1.1 verdict
-**Configuration-only — PROCEED.** Field ACLs, baseline roles, security attributes, and field audit are all baseline configuration. No custom security table, scope, or group structure required.
+**Configuration-only — PROCEED.** Field ACLs, baseline roles, Data Classification, and field audit are all baseline configuration. No custom security table, scope, or group structure required.
 
 ## Anti-patterns to block (hand to the builder)
 - Do not grant `itil` read on `customer_contact` PII fields to "make the incident view convenient" — expose only the shared service record. (citation: markdown/platform-security/access-control/access-control-rules.md)

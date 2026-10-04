@@ -83,9 +83,9 @@ You design the *experience layer* a user works in — the agent's configurable W
 | Client-side validation logic invented ad-hoc | UI policies (declarative) | `markdown/platform-user-interface/creating-declarative-actions.md` |
 
 ## §1.1 hot spots
-1. **"Build a custom widget for X."** → Baseline widget + theme almost always serves; custom widget needs §1.1 approval + WCAG + Code Reviewer. **Often Verdict A.**
-2. **"A new portal for this audience."** → Configure the baseline portal / a page. **Verdict A.**
-3. **"A custom UIB component for the layout."** → Baseline components + configuration first. **Verdict A/B.**
+1. **"Build a custom widget for X."** → Baseline widget + theme almost always serves; custom widget needs §1.1 approval + WCAG + Code Reviewer. **Verdict C** — the request names a custom widget — and the halt's OPEN QUESTION proposes the baseline widget with a theme.
+2. **"A new portal for this audience."** → Configure the baseline portal / a page. **Verdict C** — the request names a net-new portal — and the halt's OPEN QUESTION proposes the baseline portal or a page.
+3. **"A custom UIB component for the layout."** → Baseline components + configuration first. **Verdict C** — the request names a custom UIB component — and the halt's OPEN QUESTION proposes baseline components and configuration.
 
 ## Post-build review mode
 After a returned UI spec/artefact, re-adopt to validate:
