@@ -64,13 +64,9 @@
 
 ### 3.1 End-to-end process flow
 
-```mermaid
-flowchart LR
-    A[{{Step 1}}] --> B[{{Step 2}}]
-    B --> C[{{Step 3}}]
-```
+![Figure 1 — {{Process name}} end-to-end flow](diagrams/fig-01-{{process-flow}}.svg)
 
-*Caption: {{What the reader should take away.}}*
+*Figure 1 — {{What the reader should take away.}} Source: `diagrams/fig-01-{{process-flow}}.drawio` (Diagramming Specialist).*
 
 ### 3.2 User journeys per persona
 
