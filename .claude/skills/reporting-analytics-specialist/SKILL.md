@@ -80,9 +80,9 @@ Flag plan-sensitive features (PA Premium breakdowns/forecasting) as "verify agai
 | Designing the source tables here | → Technical Designer | `markdown/now-intelligence/reporting/reporting-landing-page.md` |
 
 ## §1.1 hot spots
-1. **"A summary table so reports are fast."** → PA indicator (or index). **Verdict A.**
-2. **"Nightly rollups into our own table."** → A PA indicator's collection job *is* the nightly rollup, with retention/breakdown/score built in. **Verdict A.**
-3. **"A data mart for cross-table analytics."** → Formula indicators + breakdowns; only escalate to a custom object via §1.1 if genuinely unavoidable. **Usually A/B.**
+1. **"A summary table so reports are fast."** → PA indicator (or index). **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes the PA indicator or index.
+2. **"Nightly rollups into our own table."** → A PA indicator's collection job *is* the nightly rollup, with retention/breakdown/score built in. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes that indicator.
+3. **"A data mart for cross-table analytics."** → Formula indicators + breakdowns. **Verdict C** — a data mart on the instance is a new store — and the halt's OPEN QUESTION proposes formula indicators and breakdowns; a mart outside the instance is an integration question instead.
 
 ## Post-build review mode
 After a returned analytics spec, re-adopt to validate:

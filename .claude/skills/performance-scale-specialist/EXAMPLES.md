@@ -24,7 +24,7 @@ Access: read-heavy aggregate over a large historical window. Freshness: daily is
 - No leading-wildcard LIKE; bounded result.
 
 ## Async/batch constraints
-- Do **not** compute the 90-day aggregate synchronously on every incident open. **Precompute** per-group scores on a **nightly scheduled job**; cache the result (PA indicator or a keyed system-property cache) and read the cached value at open. Idempotent re-run.
+- Do **not** compute the 90-day aggregate synchronously on every incident open. **Precompute** per-group scores on a **nightly scheduled job**; store the result in a PA indicator — never a system property, since each property change flushes the cache on every node *(citation: `markdown/platform-administration/t_AddAPropertyUsingSysPropsList.md`)* — and read the stored value at open. Idempotent re-run.
 
 ## Data-lifecycle constraints
 - 3M+ incidents: confirm Table Rotation/Archive so the 90-day window query stays fast as history grows.
@@ -33,10 +33,10 @@ Access: read-heavy aggregate over a large historical window. Freshness: daily is
 - If this also drives a dashboard, use a **PA indicator**, not a live aggregate per page load.
 
 ## §1.1 verdict
-**Design/config — PROCEED.** GlideAggregate + scheduled precompute + index + (optional) PA indicator. The "cache" is a PA indicator / system-property store — **not** a new custom table unless approved.
+**Design/config — PROCEED.** GlideAggregate + scheduled precompute + index + (optional) PA indicator. The "cache" is a PA indicator, not a system property; a keyed store would be a custom table — a §1.1 OPEN QUESTION, not a default.
 
 ## Validation
-Performance Analyzer on the nightly job; load-test the aggregate at full history before go-live.
+Stats Tools (**Slow Transactions**, **Slow Queries**) on the nightly job (citation: markdown/platform-administration/c_StatsToolsDiagnosticsPlugin.md); load-test the aggregate at full history before go-live.
 ```
 
 ---
@@ -84,7 +84,7 @@ precompute pattern before merge; the counting and archival items follow.
 OPEN QUESTION — CUSTOM OBJECT PROPOSAL (§1.1 blocking)
 1. Baseline evaluated: a **PA indicator** (group breach rate, daily collection, breakdown by group) gives
    the pre-aggregated, instant-read, trended value — exactly the need. An indexed aggregate covers ad-hoc.
-   (citation: markdown/application-development/performance-analyzer/exploring-performance-analyzer.md)
+   (citation: markdown/now-intelligence/performance-analytics/automated-indicators.md)
    Why the custom table falls short: it's a hand-rolled PA — you'd rebuild collection jobs, retention,
    breakdowns, and scoring that PA already provides, and own it through every upgrade.
 2. Custom object proposed: `u_group_breach_stats` — rejected as unnecessary.

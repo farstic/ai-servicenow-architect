@@ -274,7 +274,7 @@ Structurally sound: thin async BR delegating to a Script Include, header comment
 ```javascript
 gs.error('PIINotifier failure: ' + e.message + ' caseNumber=' + (details && details.caseNumber));
 ```
-If detail is needed for triage, write the full details to a separate, ACL-restricted log table (`x_acme_hrsd_pii_failure_log`) with retention policy aligned to PII rules.
+If detail is needed for triage, log the case number only: the full details already sit on the HR case, behind its own ACLs. A separate restricted log table would be a new custom table; raise it as an `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` under §1.1, never as a fix.
 **Source:** `ServiceNowDocs/markdown/platform-security/audit-mgmt-console.md`
 
 ### [BEST][consider] `details` referenced in catch outside its declaring try
@@ -298,7 +298,7 @@ gs.error('... caseNumber=' + (typeof details !== 'undefined' && details ? detail
 **APPROVE-WITH-FIXES** — one `fix-before-prod` finding (PII in logs); one `consider` finding (catch-block scope hardening). Acceptable in dev/test as-is; both must be resolved before production.
 
 ## Handoff
-Recommend Security & GRC Specialist consult to formalise the PII-handling pattern (sanitised logs + ACL-restricted detail log table) — this should become a scoped-app-wide standard, not a per-BR fix. After fix, ATF Author for negative-path coverage (notifier failure → correct log content).
+Recommend Security & GRC Specialist consult to formalise the PII-handling pattern (sanitised logs that carry the case number, never the payload) — this should become a scoped-app-wide standard, not a per-BR fix. After fix, ATF Author for negative-path coverage (notifier failure → correct log content).
 
 ### Why this is the gold standard
 

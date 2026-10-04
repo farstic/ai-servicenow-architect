@@ -173,15 +173,13 @@ For each table:
 
 | State | Value | Transitions to | Roles |
 |---|---|---|---|
-| New | 1 | Open, Cancelled | sn_customerservice_agent |
-| Open | 10 | Awaiting Info, Awaiting Problem, Resolved | sn_customerservice_agent |
+| New | 1 | Open | sn_customerservice_agent |
+| Open | 10 | Awaiting Info, Resolved | sn_customerservice_agent |
 | Awaiting Info | 18 | Open, Resolved | sn_customerservice_agent |
-| Awaiting Problem | 19 | Open, Resolved | sn_customerservice_agent |
 | Resolved | 6 | Closed (auto), Open (reopen) | sn_customerservice_agent |
 | Closed | 3 | (terminal) | sn_customerservice_manager |
-| Cancelled | 7 | (terminal) | sn_customerservice_manager |
 
-*(citation: `markdown/customer-service-management/csm-case-management.md`)*
+*(citation: `markdown/api-reference/rest-apis/case-api.md` — the five values its `state` field lists. Any further state, such as a cancelled or awaiting-problem state, is not documented in the bundled corpus — verify on the instance.)*
 
 **Related tables:** `task_sla`, `sn_customerservice_task`, `sys_journal_field`, `sys_history_set`, `sn_shn_notes`.
 
@@ -215,9 +213,9 @@ The CSM customer model has three core tables:
 
 1. The fields considered: Account, Consumer, Product, Asset, Contract and Case Channel (plus Sold Product and Install Base when Proactive Customer Service Operations is active).
 2. Each carries a relative weight — Account/Consumer 1, Product 2, Asset 3, Contract 4 — and the entitlement with the highest score is assigned to the case.
-3. Entitlement-driven SLA: the matched entitlement may specify SLA terms via linked `contract_sla` records.
+3. SLA: the case's SLAs come from SLA Definitions [`contract_sla`], which carry their own conditions, duration and schedule *(citation: `markdown/it-service-management/service-level-management/r_InstalledWithServiceLevelMgmt.md`)*; whether a matched entitlement selects one is not documented in the bundled corpus — verify on the instance.
 
-**§1.1 hot spot:** custom entitlement-evaluation logic is the most common §1.1 violation in CSM. The baseline calculation covers >90% of evaluation needs. Verdict C is rarely warranted.
+**§1.1 hot spot:** custom entitlement-evaluation logic is the most common §1.1 violation in CSM. Verdict C is rarely warranted.
 
 ### CRM Workspace vs Customer Service Portal
 
@@ -260,11 +258,11 @@ Cases where a partner organisation (not the direct customer) is the responsible 
 
 ## §1.1 Hot Spots — Where Build Specialists Routinely Propose Custom Objects
 
-1. **"We need a custom escalation table — the baseline one is not in our release."** → It is. `sn_customerservice_escalation` and its template and severity tables are baseline in Australia (citation: `markdown/customer-service-management/case-escalation-components.md`). Activate the case and account escalation feature, set Audit on the dictionary record for change history, and populate severities and templates. Verdict A, and a custom table is a §1.1 violation.
+1. **"We need a custom escalation table — the baseline one is not in our release."** → It is. `sn_customerservice_escalation` and its template and severity tables are baseline in Australia (citation: `markdown/customer-service-management/case-escalation-components.md`). Activate the case and account escalation feature, set Audit on the dictionary record for change history, and populate severities and templates. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes the baseline escalation feature; building the custom table without approval is a §1.1 violation.
 2. **"We need a custom entitlement-evaluation Script Include because the baseline one is too rigid."** → Almost always wrong. The baseline calculation (`global.CSManagementUtils`) already scores account or consumer, product, asset and contract by configurable weight *(citation: `markdown/customer-service-management/csm-case-entitlement-calculation.md`)*. Verdict A or B.
-3. **"We need a custom customer-contact table because the baseline lacks fields X, Y, Z."** → Extend `customer_contact` with fields, not a new table. Verdict B.
-4. **"We need a custom contract-renewal tracking table."** → Contract [`ast_contract`] carries State, Starts and Ends *(citation: `markdown/customer-service-management/create-csm-service-contracts.md`)*. Verdict A or B.
-5. **"We need a custom audit table for case work-notes changes."** → `sys_journal_field` baseline. Verdict A.
+3. **"We need a custom customer-contact table because the baseline lacks fields X, Y, Z."** → Extend `customer_contact` with fields, not a new table. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes the field extension.
+4. **"We need a custom contract-renewal tracking table."** → Contract [`ast_contract`] carries State, Starts and Ends *(citation: `markdown/customer-service-management/create-csm-service-contracts.md`)*. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes those fields of `ast_contract`.
+5. **"We need a custom audit table for case work-notes changes."** → `sys_journal_field` baseline. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes `sys_journal_field`.
 
 ## Post-Build Review Mode — §6.2 Closed Loop
 

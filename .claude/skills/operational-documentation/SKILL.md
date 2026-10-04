@@ -87,8 +87,8 @@ Task-oriented ("How do I…"), screenshots/placeholders, plain language, happy p
 | Documenting intended-but-unconfirmed behaviour | Document what was built; flag unknowns as Open Questions | — |
 
 ## §1.1 hot spots
-1. **"A table to track our runbooks."** → Runbooks are KBAs (or repo/wiki docs); `kb_knowledge`, not a new table. **Verdict A.**
-2. **"A custom approval flow for docs."** → Baseline review/publish. **Verdict A.**
+1. **"A table to track our runbooks."** → Runbooks are KBAs (or repo/wiki docs); `kb_knowledge`, not a new table. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes `kb_knowledge`.
+2. **"A custom approval flow for docs."** → Baseline review/publish. **Verdict C** — the request names a custom publish workflow — and the halt's OPEN QUESTION proposes baseline review and publish.
 
 ## Quality review mode
 Re-adopt to validate a returned doc set:

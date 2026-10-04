@@ -69,7 +69,7 @@ Worked examples of the two modes. Illustrative scopes only; story-point and pers
 
 **Risks / dependencies** → RAID: external sandbox/test credentials availability (blocker if late); OAuth2 client provisioning on the external side; rate limits on the external API (also a Licensing/Performance flag).
 
-**§1.1 note:** the one custom object here is a Script Include (code, not a custom *table*) — baseline-clean. No custom-path delta to show.
+**§1.1 note:** two §1.1 objects are in scope — the Connection & Credential Alias (OAuth2) and the dead-letter store behind the DLQ pattern, which the Integration Specialist writes as "a §1.1-approved object named in the envelope". This estimate assumes the approved LLD records both approvals as ADRs; without them, each is a blocking OPEN QUESTION before commit. The Script Include is code, not a custom *table*. No custom-path delta to show.
 
 **Records into:** Project cost/effort plan (`markdown/it-business-management/project-management/cost-plan-breakdown.md`); resource plan for the spike (`markdown/it-business-management/resource-management/`).
 

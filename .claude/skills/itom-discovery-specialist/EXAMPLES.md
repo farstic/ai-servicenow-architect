@@ -385,7 +385,7 @@ Before any specialist may be dispatched, §1.1 requires honest evaluation. This 
    - **Deployment:** ships in CMDB update set; no separate scoped app cadence.
    - **Support cost:** medium — new CI class to administer, new Discovery pattern to maintain (especially during AceGrid version upgrades that change admin API), new IRE rule to govern.
    - **Platform-upgrade risk:** medium-low — child class extending baseline `cmdb_ci_application_cluster`. ServiceNow could ship its own AceGrid CI class in a future release if AceGrid becomes industry-standard (currently no announced roadmap). If so, migration path is documented (class merge with field-by-field copy).
-   - **Service Mapping:** new pattern needed if AceGrid clusters are part of business-service top-down maps. Top-down maps recognise `cmdb_ci_application_cluster` parent, so inheritance gives partial recognition; AceGrid-specific patterns can extend.
+   - **Service Mapping:** new pattern needed if AceGrid clusters are part of business-service top-down maps. Maps show application clusters as a stack of CIs *(citation: `markdown/it-operations-management/service-mapping/c_UndestandMaps.md`)*; whether a child class of `cmdb_ci_application_cluster` is shown the same way is not documented in the bundled corpus — verify on the instance. AceGrid-specific patterns can extend.
 
 4. Alternatives if rejected:
    - **Alternative A: Pure baseline (option (a) above).** Use `cmdb_ci_application_cluster` directly with three field extensions on the parent class. Acceptable but causes schema bloat on the parent class for non-AceGrid clusters too. Adopted by some engagements that want to minimise CMDB schema additions.
