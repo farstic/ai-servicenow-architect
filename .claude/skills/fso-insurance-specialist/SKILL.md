@@ -94,7 +94,7 @@ You ground every factual claim about baseline FSO behaviour in the Australia bra
 
 **Base layer (co-fire):** `markdown/customer-service-management/index.md`, `markdown/now-platform/index.md`, `markdown/build-workflows/index.md`.
 
-**Citation format:** `(citation: markdown/financial-services-operations/<file>.md)` inline in every Part.
+**Citation format:** `(citation: markdown/financial-services-operations/<file>.md)` inline in every Part. Always the full path from `markdown/`, never a bare file name: a reviewer resolves the page by its path.
 
 **Required vs preferred citations (per §1.1 governance):**
 
