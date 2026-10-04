@@ -30,6 +30,7 @@ import { localDir, storePath } from '../local-paths.mjs';
 
 import { EXIT_FAIL, EXIT_OK, EXIT_USAGE } from '../exit.mjs';
 import { branchState, describe, git, isShallow } from '../git.mjs';
+import { askOnce, isYes } from '../ask.mjs';
 import { childEnv } from '../spawn-env.mjs';
 import { loadConfig, root as defaultRoot } from '../config.mjs';
 import { loadState } from '../state.mjs';
@@ -156,7 +157,7 @@ export const USAGE = (where) => [
   '',
   '  --check        fetch the tags, say whether a newer release exists, change nothing (exit 4 when behind)',
   '  --to vX.Y.Z    a specific release tag (checks it out detached; the summary says how to return)',
-  '  --yes          accept the plan without asking',
+  '  --yes          accept the plan without asking (needed when stdin is closed or is not a terminal)',
   '  --pre          consider prerelease tags',
   '  --force-floor  upgrade even though the release wants a newer Claude Code',
 ].join('\n');
@@ -642,10 +643,26 @@ export async function upgradeCommand({ flags = {}, positional = [], log, root = 
   }
 
   if (!flags.yes) {
-    const answer = ask
-      ? await ask('Proceed? [Y/n]')
-      : await promptLine('Proceed? [Y/n] ', { input, log });
-    if (/^n/i.test(String(answer).trim())) {
+    // ARC-09-C109 — the reader is the shared one (`lib/ask.mjs`): one line, or `null` at end of input.
+    // This used to be a reader of its own that returned '' at end of input, and '' is not a "no", so a
+    // closed stdin (a CI step, `< /dev/null`, a pipe that ended) accepted the plan and moved the tree.
+    // Enter, an empty LINE, is still the default yes; only the absence of any answer is refused, with
+    // its own sentence and a non-zero exit, because a script that asked for an upgrade and got none must
+    // not see 0.
+    let answer;
+    if (ask) {
+      answer = await ask('Proceed? [Y/n]');
+    } else {
+      log.step('Proceed? [Y/n] ');
+      answer = await askOnce(input)();
+    }
+    if (answer === null) {
+      log.fail('upgrade: no answer on stdin (it is closed, or not a terminal) — nothing was changed; '
+        + 'pass --yes to accept the plan without asking');
+      return EXIT_USAGE;
+    }
+    // Anything that is not a yes is a no (design principle 10): the plan is a proposal.
+    if (!isYes(answer)) {
       log.step(NOTHING_CHANGED);
       return EXIT_OK;
     }
@@ -802,15 +819,4 @@ export async function finish({ root, env, log, run, target, latest, remote, now,
   // that defines it.
   writeUpgradeCheck(root, { localTag: target, remote, now, source: 'upgrade' });
   return EXIT_OK;
-}
-
-/** One line from stdin, with no dependency on a TTY library. */
-async function promptLine(prompt, { input, log }) {
-  log.step(prompt);
-  const { createInterface } = await import('node:readline');
-  const rl = createInterface({ input, terminal: false });
-  try {
-    for await (const line of rl) return line;
-    return '';
-  } finally { rl.close(); }
 }

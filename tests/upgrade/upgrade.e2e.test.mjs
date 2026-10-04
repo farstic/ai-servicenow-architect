@@ -189,6 +189,46 @@ test('AC 6 — n at the prompt changes nothing', async (t) => {
   assert.match(r.text, /Upgrade plan: v9\.0\.0 → v9\.1\.0/);
 }, MINUTES);
 
+// ARC-09-C109 — what counts as an acceptance at `Proceed? [Y/n]`.
+//
+// `promptLine` in upgrade.mjs read a line and returned '' when stdin ended, and '' does not match
+// /^n/i, so a closed stdin (`< /dev/null`, a CI step, a pipe that ended) ACCEPTED the plan and moved
+// the tree. The shared reader in `tools/snowarch/lib/ask.mjs` has a contract for exactly this - null
+// at end of input, "every caller treats it as a refusal, never as an empty answer" - and the upgrade
+// was the fourth reader that did not honour it. Enter (an empty LINE) is still the default, yes.
+test('ARC-09-C109 — a closed stdin is not an acceptance: nothing moves, exit 2, and the remedy says --yes', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: '', bin: w.bin });
+  assert.equal(r.status, 2, r.text);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head, 'the tree moved on a closed stdin');
+  assert.match(r.text, /Upgrade plan: v9\.0\.0 → v9\.1\.0/);            // the plan was still printed
+  assert.match(r.text, /no answer on stdin[^\n]*nothing was changed[^\n]*--yes/);
+  assert.doesNotMatch(r.text, /\[U5\/7\]/);                                // step 5 never started
+}, MINUTES);
+
+test('ARC-09-C109 — a word that is not yes is not an acceptance either', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+  const head = git(w.user, ['rev-parse', 'HEAD']);
+
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: 'maybe\n', bin: w.bin });
+  assert.equal(r.status, 0, r.text);
+  assert.match(r.text, /upgrade: nothing changed/);
+  assert.equal(git(w.user, ['rev-parse', 'HEAD']), head);
+}, MINUTES);
+
+test('ARC-09-C109 control — Enter at the prompt is still yes: the default has not moved', async (t) => {
+  const w = await buildWorld(t);
+  bootstrapUser(w.user);
+
+  const r = snowarch(w.user, ['upgrade', '--to', 'v9.1.0'], { input: '\n', bin: w.bin });
+  assert.equal(r.status, 0, r.text);
+  assert.equal(git(w.user, ['describe', '--tags', '--exact-match']), 'v9.1.0');
+}, MINUTES);
+
 test('AC 8 — a Claude Code below the tag\'s floor stops the upgrade, and --force-floor does not',
   async (t) => {
     const w = await buildWorld(t, { claudeFloor: '9.9.9' });
