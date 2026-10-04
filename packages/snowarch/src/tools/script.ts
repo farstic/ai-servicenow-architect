@@ -41,7 +41,7 @@ export function scriptToolManifest(): ToolDefinition[] {
     },
     {
       name: 'snow_scr_business_rule_add',
-      description: '[Scripting] Create a new business rule (requires SCRIPTING_ENABLED=true). ServiceNow supports ES2021 async/await in scripts. Defaults: action_insert true, action_update true, action_delete false, action_query false.',
+      description: '[Scripting] Create a new business rule in one write (requires SCRIPTING_ENABLED=true): filter_condition, advanced and active are all set on the create, so no follow-up modify is needed and no half-built rule sits on the table. ServiceNow supports ES2021 async/await in scripts. Defaults: advanced true, active true, action_insert true, action_update true, action_delete false, action_query false.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -49,7 +49,9 @@ export function scriptToolManifest(): ToolDefinition[] {
           table: { type: 'string', description: 'Table this rule applies to' },
           when: { type: 'string', description: '"before" | "after" | "async" | "display"' },
           script: { type: 'string', description: 'Server-side JavaScript. ServiceNow supports ES2021 (async/await, ?., ??).' },
-          condition: { type: 'string', description: 'Optional condition script' },
+          condition: { type: 'string', description: 'Optional condition SCRIPT (the Advanced section\'s Condition field). For a condition built from field tests, use filter_condition.' },
+          filter_condition: { type: 'string', description: 'Optional filter condition as an encoded query (for example "priority=1^state=2"): the form\'s condition builder, which decides whether the rule runs. Omit it only for a rule that should run on every matching operation.' },
+          advanced: { type: 'boolean', description: 'Enable the Advanced section, where the script lives (default: true — this tool requires a script)' },
           active: { type: 'boolean', description: 'Whether to activate the rule (default: true)' },
           order: { type: 'number', description: 'Execution order (default: 100)' },
           action_insert: { type: 'boolean', description: 'Run on insert (default: true)' },
@@ -485,9 +487,29 @@ export async function dispatchScriptAction(
       // existed, looked correct in the UI list, and never ran (field-notes §5). Defaults match
       // the platform's own form: insert and update on, delete and query off.
       const flag = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : fallback);
+      // ARC-09-C92: the filter and the Advanced switch are part of the CREATE. They were not
+      // accepted at all, so a rule that was meant to carry a filter had to be created without one —
+      // live on its whole table, or held inactive — and completed by a second write. A filter that is
+      // not a string is refused HERE, before any write: dropping it would create exactly the
+      // unconditioned rule this exists to prevent. `null` and '' mean "not given" (nothing to clear
+      // on a create).
+      if (args.filter_condition !== undefined && args.filter_condition !== null
+        && typeof args.filter_condition !== 'string')
+        throw new ServiceNowError(
+          'filter_condition must be a string (an encoded query, for example "priority=1^state=2")',
+          'INVALID_REQUEST');
       const data = {
         name: args.name, collection: args.table, when: args.when, script: args.script,
-        condition: args.condition, active: args.active !== false, order: args.order || 100,
+        ...(typeof args.filter_condition === 'string' && args.filter_condition !== ''
+          ? { filter_condition: args.filter_condition } : {}),
+        condition: args.condition,
+        // Default TRUE, unlike the platform's own default: this tool requires a script, and the
+        // script is entered in the Advanced section (corpus: it-business-management/
+        // scenario-planning-in-spw/create-a-business-rule-for-high-level-planning.md). Whether a
+        // script posted without it is ignored is not stated in the bundled corpus - verify on the
+        // instance; sending it is what the documented path does.
+        advanced: flag(args.advanced, true),
+        active: args.active !== false, order: args.order || 100,
         action_insert: flag(args.action_insert, true),
         action_update: flag(args.action_update, true),
         action_delete: flag(args.action_delete, false),
