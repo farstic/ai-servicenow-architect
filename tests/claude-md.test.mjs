@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gatewayDirs } from './lib/gateways.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * `CLAUDE.md` is loaded into every session, so its size is a running cost and its wording is
@@ -103,7 +103,7 @@ test('the fixture this cannot produce, produced', () => {
   // Which input shape would slip past? One with TWO version markers, a paraphrased Code Reviewer
   // sentence and a dead path — all three of which a reader would call fine at a glance. Built here
   // so the checks are shown failing rather than assumed to work.
-  const dir = mkdtempSync(join(tmpdir(), 'claude-md-'));
+  const dir = tempDir('claude-md-');
   try {
     const DEAD = `${'docs'}/${'GONE'}-${'FIXTURE'}.md`;
     const bad = [

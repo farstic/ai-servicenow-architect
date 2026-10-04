@@ -15,10 +15,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(root, rel), 'utf8').replace(/\r/g, '');
@@ -67,7 +67,7 @@ const gitIn = (cwd, args) => spawnSync('git', args, { cwd, encoding: 'utf8' });
  * was ever issued with `cwd` equal to the repository under test. A promise in a comment is not one.
  */
 export function resolveTag(tag, { at = root, run = gitIn,
-  mkTemp = () => mkdtempSync(join(tmpdir(), 'snowarch-tagcheck-')),
+  mkTemp = () => tempDir('snowarch-tagcheck-'),
   cleanup = (dir) => rmSync(dir, { recursive: true, force: true }) } = {}) {
   const countIn = (dir) => Number(String(run(dir, ['rev-list', '--count', tag]).stdout ?? '').trim());
 

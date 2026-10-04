@@ -1,8 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CORPUS_DIR, EXIT, syncCorpus } from '../tools/snowarch/lib/docs/sync.mjs';
@@ -11,6 +10,7 @@ import { prBody } from '../scripts/docs-bump.mjs';
 import { RECIPE_TARGET, renderRecipeBlock } from '../tools/snowarch/lib/docs/recipe-block.mjs';
 import { AREAS, CITED_PAGE, buildUpstream, git, makeWorkspace, writeCitingSkill } from './helpers/docs-fixture.mjs';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
@@ -69,7 +69,7 @@ exit 0
 }
 
 before(() => {
-  scratch = mkdtempSync(join(tmpdir(), 'snowarch-docs-bump-'));
+  scratch = tempDir('snowarch-docs-bump-');
   upstream = buildUpstream(scratch);
   upstreamUrl = pathToFileURL(upstream.bare).href;
   ({ bin: ghBin, log: ghLog } = stubGh(scratch));

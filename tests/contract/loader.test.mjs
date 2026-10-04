@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   ContractPinMismatch, expandPreset, flagNames, loadContract, presetNames,
 } from '../../packages/contract/lib/contract.mjs';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * ARC-05 acceptance, B05-05 — ARC-05-S10's three criteria, none of which had a unit test.
@@ -33,7 +33,7 @@ test('B05-05 AC 1 — the contract declares six flags, loaded with no dependency
 
 test('B05-05 AC 2 — a stale pin throws ContractPinMismatch naming both shas; verifyPin:false loads', () => {
   // A fixture root, because the claim is about a pin that DISAGREES and the committed pair agrees.
-  const dir = mkdtempSync(join(tmpdir(), 'contract-loader-'));
+  const dir = tempDir('contract-loader-');
   try {
     for (const rel of [CONTRACT, PIN]) {
       mkdirSync(join(dir, dirname(rel)), { recursive: true });

@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { CORPUS_DIR, ROOT_FILES } from '../../tools/snowarch/lib/docs/sync.mjs';
+import { trackTempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * One fixture corpus, two consumers.
@@ -135,7 +136,7 @@ function writeCitingSkill(root, page = CITED_PAGE) {
 }
 
 function makeWorkspace({ scratch, pin, upstreamUrl }) {
-  const w = mkdtempSync(join(scratch, 'work-'));
+  const w = trackTempDir(mkdtempSync(join(scratch, 'work-')));
   git(['init', '-q'], w);
   // The engine repository pins line endings (`* text=auto eol=lf`), so a fixture standing in for it
   // must too. Without this the workspace inherits the machine's `core.autocrlf`, and on the Windows

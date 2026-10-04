@@ -3,10 +3,10 @@
 // contains AND what "dead citation" means.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { spellings } from '../tools/snowarch/lib/text.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
@@ -72,7 +72,7 @@ test('an area that does not look like a directory name is warned, not emitted', 
 });
 
 test('criterion 7 — the scan needs no corpus, and a missing root is skipped, not fatal', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'cite-'));
+  const dir = tempDir('cite-');
   try {
     mkdirSync(join(dir, '.claude/skills/x'), { recursive: true });
     writeFileSync(join(dir, '.claude/skills/x/SKILL.md'), 'see markdown/it-service-management/a.md\n');
@@ -118,7 +118,7 @@ test('a table cell that is only a bare *.md is warned; a full path is not; a rep
 
 test('the warning never becomes a failure — verify still exits 0 with warnings present', async () => {
   const { verifyCitations, formatResult, EXIT } = await import('../tools/snowarch/lib/docs/verify.mjs');
-  const dir = mkdtempSync(join(tmpdir(), 'bare-'));
+  const dir = tempDir('bare-');
   try {
     mkdirSync(join(dir, '.claude/skills/x'), { recursive: true });
     mkdirSync(join(dir, 'vendor/ServiceNowDocs/markdown/alpha'), { recursive: true });

@@ -1,8 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -10,6 +9,7 @@ import {
   stopSuffix, syncCorpus, transientReason,
 } from '../tools/snowarch/lib/docs/sync.mjs';
 import { buildUpstream, git, makeWorkspace } from './helpers/docs-fixture.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * ARC-03-C1 — the corpus checkout survives a transient network failure, and says so.
@@ -31,7 +31,7 @@ const silent = () => {};
 let scratch, upstream, upstreamUrl;
 
 before(() => {
-  scratch = mkdtempSync(join(tmpdir(), 'snowarch-docs-retry-'));
+  scratch = tempDir('snowarch-docs-retry-');
   upstream = buildUpstream(scratch);
   upstreamUrl = pathToFileURL(upstream.bare).href;
 });

@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { EXTENSIONS, EXCLUDED, filesInScope, lintLineEndings, lintHyphenSplits }
   from './lib/editorconfig.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * `.editorconfig` declared `end_of_line = lf` and `insert_final_newline = true` for every path, and
@@ -34,7 +34,7 @@ test('the checks fail on each breach, and only on it', () => {
   // A checker nobody has seen fail is a checker nobody knows the shape of. Each case is one file
   // written wrong on purpose, in a temp tree, so the assertion is about the rule and not about
   // whatever the repository happens to contain today.
-  const dir = mkdtempSync(join(tmpdir(), 'editorconfig-'));
+  const dir = tempDir('editorconfig-');
   try {
     const w = (rel, body) => {
       mkdirSync(join(dir, dirname(rel)), { recursive: true });
@@ -61,7 +61,7 @@ test('the checks fail on each breach, and only on it', () => {
 });
 
 test('a hyphen split is caught, and code and tables are not prose', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'editorconfig-'));
+  const dir = tempDir('editorconfig-');
   try {
     writeFileSync(join(dir, 'doc.md'), [
       'A sentence that wraps on non-',

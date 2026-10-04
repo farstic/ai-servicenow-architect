@@ -9,10 +9,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SURFACES = ['.claude', 'governance', 'templates', 'CLAUDE.md', 'tests/VALIDATION-TESTS.md'];
@@ -74,7 +75,7 @@ test('ARC-09-C85 — no proposal block carries design detail in item 2', () => {
 });
 
 test('ARC-09-C85 — a planted field list, code fence or parent line in item 2 is found; words and a Verdict B design are not', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-halt-'));
+  const dir = tempDir('snowarch-halt-');
   try {
     const plant = (rel, text) => { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), `${text}\n`); };
     plant('a.md', ['### OPEN QUESTION — CUSTOM OBJECT PROPOSAL', '', '1. Baseline option evaluated: none fits.', '',

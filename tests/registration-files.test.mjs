@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import { checkMcpJson, checkSettingsJson, keys, strings } from '../tools/snowarch/lib/registration.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -133,7 +133,7 @@ test('LF only, and one trailing newline', () => {
 test('the generator rewrites permissions and leaves env alone', () => {
   // The one renderer that edits PART of a file it does not own. `env` is ARC-06's; if a regeneration
   // dropped it, the MCP timeout would silently return to the default on the next contract change.
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-settings-'));
+  const dir = tempDir('snowarch-settings-');
   try {
     mkdirSync(join(dir, '.claude'), { recursive: true });
     const seeded = { permissions: { allow: ['stale'], ask: [] }, env: { MCP_TIMEOUT: '1' }, custom: { keep: true } };

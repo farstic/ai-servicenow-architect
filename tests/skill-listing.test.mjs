@@ -8,11 +8,11 @@
 // they skip with a reason when it is absent — the same contract as the plugin-validate job (S-19).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { measure, pollutingAncestors, cleanScratchParent } from '../scripts/ci/skill-listing-check.mjs';
+import { tempDir } from '../tools/snowarch/tests/helpers/temp.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Every skill DIRECTORY registers, personas and utility alike — the CLI does not know the
@@ -25,7 +25,7 @@ const roster = config.roster.skills + (config.roster.utility ?? []).length;
 function poisoned() {
   // realpath: on macOS /var is a symlink to /private/var, and cleanScratchParent resolves its
   // candidates — so the fixture has to speak the same dialect or the comparison is about symlinks.
-  const base = realpathSync(mkdtempSync(join(tmpdir(), 'snowarch-poison-')));
+  const base = realpathSync(tempDir('snowarch-poison-'));
   mkdirSync(join(base, '.claude/skills/decoy'), { recursive: true });
   writeFileSync(join(base, '.claude/skills/decoy/SKILL.md'), '---\nname: decoy\ndescription: d\n---\n\n# D\n');
   mkdirSync(join(base, 'deep/deeper'), { recursive: true });
@@ -53,7 +53,7 @@ test('the walk-up is detected: an ancestor .claude/skills is found from any dept
 
 test('a clean candidate is chosen over a polluted one, and none means SKIP — never a wrong number', () => {
   const base = poisoned();
-  const clean = realpathSync(mkdtempSync(join(tmpdir(), 'snowarch-clean-')));
+  const clean = realpathSync(tempDir('snowarch-clean-'));
   try {
     // `clean` is only clean if TMPDIR itself is — which it may not be. Skip the positive half rather
     // than assert something the environment can falsify; the negative half is the load-bearing one.

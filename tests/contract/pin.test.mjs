@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tempDir } from '../../tools/snowarch/tests/helpers/temp.mjs';
 
 /**
  * ARC-05 acceptance, B05-01 / B05-02 / B05-03 — `pin.mjs`, which nothing invoked.
@@ -48,7 +48,7 @@ function runPin(dir, args = [], { pinPath = join(dir, 'pin.json'), stdio = 'pipe
  * shape somebody invented for a fixture.
  */
 function fixture(mutate = () => {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'pin-fixture-'));
+  const dir = tempDir('pin-fixture-');
   const contract = read(REAL_CONTRACT);
   const pin = read(REAL_PIN);
   mutate({ contract, pin });
