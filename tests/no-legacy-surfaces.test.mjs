@@ -148,21 +148,38 @@ const isExemptVocabLine = (file, line) =>
   vocabAllow.some((a) => a.file === file && line.includes(a.context));
 
 /**
- * A file's lines, stopping at the historical heading if it has one.
+ * The files that HAVE a history, and so a boundary below which their text is a record.
  *
- * `docs/CHANGELOG.md` is entirely the imported engine's history: its entries record what files
- * were CALLED and what vocabulary was in use at the time, and rewriting them would falsify the
- * record of what was decided and when. The heading carries a sentence saying so. Shared by the
- * criterion-2 and criterion-4 checks, so "current" means the same thing to both.
+ * `docs/CHANGELOG.md` is the imported engine's history: its entries record what files were CALLED and
+ * what vocabulary was in use at the time, and rewriting them would falsify the record of what was
+ * decided and when. Its release sections begin `## <version>`, which is what the boundary below looks
+ * for. ARC-09-C79: that boundary used to apply to EVERY file in scope, so a file whose own sections are
+ * numbered ("## 1. Operating principles") was read for the lines above its first one — CLAUDE.md for 8
+ * of 136, `governance/taxonomy.md` for 10 of 310. A boundary belongs to the files that have a history.
+ */
+export const HISTORY_FILES = new Set(['docs/CHANGELOG.md']);
+
+/** The retired vocabulary criterion 2 looks for. One definition, so a plant and the sweep cannot disagree. */
+export const TIER = /Tier [0-9]/;
+
+/**
+ * A file's lines, stopping at the historical heading if it has one. Shared by the criterion-2,
+ * criterion-4 and retired-name checks and the memory-convention check, so "current" means the same
+ * thing to all of them.
  */
 function currentLines(rel) {
-  return currentLines0(read(rel));
+  return currentLines0(read(rel), rel);
 }
 
-/** The same boundary, over text already in hand — so a caller may flatten it (ARC-10-S04). */
-function currentLines0(text) {
+/**
+ * The same boundary, over text already in hand — so a caller may flatten it (ARC-10-S04). Only a file in
+ * HISTORY_FILES has one; any other, and any caller that names no file, is read whole.
+ */
+export function currentLines0(text, rel) {
+  const lines = text.split('\n');
+  if (!HISTORY_FILES.has(rel)) return lines;
   const out = [];
-  for (const line of text.split('\n')) {
+  for (const line of lines) {
     // ARC-09-C17: history starts at the NEWEST release heading, not at the frozen one — a release
     // creates a `## <version>` section above it, and its contents are a record, not live text.
     if (/^## (\d|Before )/.test(line)) break;
@@ -192,7 +209,7 @@ test('ARC-02-S06 criterion 2 — no "Tier [0-9]" outside history and the anchore
   const hits = [];
   for (const f of IN_SCOPE()) {
     currentLines(f).forEach((line, i) => {
-      if (!/Tier [0-9]/.test(line)) return;
+      if (!TIER.test(line)) return;
       if (line.includes('<!-- retired-name: historical -->')) return;
       if (isExemptVocabLine(f, line)) return;
       hits.push(`${f}:${i + 1}: ${line.trim().slice(0, 90)}`);
@@ -225,14 +242,14 @@ export const OLD_RULE = [
  * how the hole was found: a sweep that cannot see a token split by a newline is one somebody gets
  * past by reflowing a paragraph.
  */
-export const flattenCurrent = (text) => currentLines0(text).join(' ').replace(/\s+/g, ' ');
+export const flattenCurrent = (text, rel) => currentLines0(text, rel).join(' ').replace(/\s+/g, ' ');
 
 export function findOldRule({ files, read: readFile, allowed = new Set(), tokens = OLD_RULE }) {
   const flat = flattenCurrent;
   const hits = [];
   for (const f of files) {
     if (allowed.has(f)) continue;
-    const text = flat(readFile(f));
+    const text = flat(readFile(f), f);
     for (const token of tokens) if (text.includes(token)) hits.push(`${f}: "${token}"`);
   }
   return hits;
@@ -254,7 +271,7 @@ test('ARC-10-S04 AC 1/AC 4 — the old standing rule survives only where it is r
 
   // Both directions. The history paragraph must actually carry them, or this passes on a tree where
   // the replacement was never explained and a reader who remembers the rule is left guessing.
-  const contributing = flattenCurrent(read('docs/CONTRIBUTING.md'));
+  const contributing = flattenCurrent(read('docs/CONTRIBUTING.md'), 'docs/CONTRIBUTING.md');
   for (const token of OLD_RULE) {
     assert.ok(contributing.includes(token), `the history paragraph does not name "${token}"`);
   }
@@ -938,4 +955,46 @@ test('ARC-09-C78 — every exemption still suppresses a real line; a stale one i
     assert.equal(lines.length, 1, `${a.file}: the exempted sentence appears ${lines.length} time(s) — it must anchor exactly one line`);
     assert.ok(p.test(lines[0]), `${a.file}: the exempted line no longer matches ${a.id} — remove the exemption`);
   }
+});
+
+// ─── ARC-09-C79 — a history boundary belongs to the files that have a history ────────────────────
+//
+// `currentLines` used to stop every file at its first `## <digit>` or `## Before ` heading — a boundary
+// written for `docs/CHANGELOG.md`, whose release sections begin `## 2.0.x`. In a file whose own sections
+// are numbered it stopped at section 1: CLAUDE.md was read for 8 of its lines, `governance/taxonomy.md`
+// for 10 of 311. Every sweep that calls it inherited the hole.
+
+test('ARC-09-C79 — the history boundary is the changelog\'s alone; every other in-scope file is read whole', () => {
+  assert.deepEqual([...HISTORY_FILES], ['docs/CHANGELOG.md']);
+  const short = [];
+  for (const f of IN_SCOPE()) {
+    const total = read(f).split('\n').length;
+    const seen = currentLines(f).length;
+    if (HISTORY_FILES.has(f)) continue;
+    if (seen !== total) short.push(`${f}: ${seen} of ${total}`);
+  }
+  assert.deepEqual(short, [], 'a sweep that reads a fraction of a file is not checking it');
+  // ...and the changelog still stops where its history starts.
+  const log = read('docs/CHANGELOG.md').split('\n');
+  const seen = currentLines('docs/CHANGELOG.md');
+  assert.ok(seen.length < log.length / 10, 'the changelog is read for its current notes only');
+  assert.match(log[seen.length], /^## (\d|Before )/, 'and the boundary is a release heading');
+});
+
+test('ARC-09-C79 — a token planted below a numbered heading is seen; the same token in the changelog\'s history is not', () => {
+  const claude = read('CLAUDE.md');
+  const anchor = '## 1. Operating principles';
+  assert.ok(claude.includes(anchor), 'the heading this plant sits under');
+  const tier = ['Tier', ' 1'].join('');
+  const planted = claude.replace(anchor, `${anchor}\n\nA sentence naming ${tier} and ${OLD_RULE[0]}.`);
+  assert.ok(currentLines0(planted, 'CLAUDE.md').some((l) => TIER.test(l)), 'the Tier sweep reads below the heading');
+  assert.equal(findOldRule({ files: ['CLAUDE.md'], read: () => planted }).length, 1, 'the retired-rule sweep too');
+  // The same plants under `governance/taxonomy.md`'s numbered heading, where the old boundary stopped at line 10.
+  const tax = read('governance/taxonomy.md').replace('## 0. Global governance rules', `## 0. Global governance rules\n\n${tier} planted.`);
+  assert.ok(currentLines0(tax, 'governance/taxonomy.md').some((l) => TIER.test(l)));
+  // History stays history: the changelog's own boundary still hides what sits below it.
+  const log = read('docs/CHANGELOG.md');
+  const heading = log.split('\n').find((l) => /^## (\d|Before )/.test(l));
+  const hidden = log.replace(heading, `${heading}\n\nThe notes record ${tier} as it was called.`);
+  assert.equal(currentLines0(hidden, 'docs/CHANGELOG.md').some((l) => TIER.test(l)), false);
 });
