@@ -58,7 +58,7 @@ that separate approval.
 
 ### Citation format
 
-Inline in the relevant Part:
+Inline in the relevant Part. Always the full path from `markdown/`, never a bare file name: a reviewer resolves the page by its path.
 
 `(citation: markdown/employee-service-management/<file>.md)`
 

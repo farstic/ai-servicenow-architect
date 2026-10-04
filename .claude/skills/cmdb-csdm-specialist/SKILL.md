@@ -70,7 +70,7 @@ that separate approval.
 
 ### Citation format
 
-Inline in the relevant Part: `(citation: markdown/servicenow-platform/common-service-data-model-csdm/csdm-conceptual-model.md)`
+Inline in the relevant Part. Always the full path from `markdown/`, never a bare file name: a reviewer resolves the page by its path. `(citation: markdown/servicenow-platform/common-service-data-model-csdm/csdm-conceptual-model.md)`
 
 If a path is unavailable in the Australia branch, flag explicitly:
 
