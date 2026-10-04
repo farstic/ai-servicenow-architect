@@ -24,6 +24,7 @@ import { isUnderCloudSyncFolder, maskPath } from './store/index.js';
 import { collectToolCatalog } from './tools/index.js';
 import { getResources, readResource } from './resources/index.js';
 import { logger } from './utils/logging.js';
+import { toolErrorText } from './utils/tool-error.js';
 import { ServiceNowError } from './utils/errors.js';
 import { getPackageVersion } from './utils/version.js';
 import { capResult, resolveCap } from './utils/result-size.js';
@@ -215,25 +216,10 @@ export function createServer(): Server {
       auditResult = error instanceof ServiceNowError ? error.code : 'ERROR';
       writeAudit();
 
-      if (error instanceof ServiceNowError) {
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `Error: ${error.message} (Code: ${error.code})`,
-            },
-          ],
-          isError: true,
-        };
-      }
-
+      // Includes a sentence about cut values when the tool had already written some before it threw
+      // (ARC-09-C93); the text itself is built, and tested, in utils/tool-error.ts.
       return {
-        content: [
-          {
-            type: 'text' as const,
-            text: `Error executing tool: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          },
-        ],
+        content: [{ type: 'text' as const, text: toolErrorText(error) }],
         isError: true,
       };
     }

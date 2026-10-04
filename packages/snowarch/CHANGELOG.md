@@ -3,6 +3,20 @@
 All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org).
 
+## Unreleased (2.0.11-dev)
+
+**Known gaps, raised not closed: the cut-value check (ARC-09-C93) does not see every write, and its
+premise is not yet confirmed live.** `snow_*` tools now return `warnings[].code = VALUE_TRUNCATED` when
+the platform's answer to a `createRecord` or `updateRecord` holds a shorter prefix of a string that was
+sent. Not checked, so an absent `warnings` key proves nothing: `batchRequest`
+(`snow_fluent_request_batch`), attachment upload, `createChangeRequest`, the Now Assist and catalogue
+POSTs, fields the response does not echo, and values that are not strings. In a playbook the warnings
+arrive on the playbook's result, not on the step. A write is still not refused before it is made.
+That the response to a write on `sys_script`, and to a PATCH, carries the stored value is assumed (one
+POST on `sys_script_fix` was observed); `packages/snowarch/tests/live/README.md` has the run that
+settles it. The long form is `docs/PLATFORM-NOTES.md` PN-10, and the rows are ARC-09-C97 to C101 in
+the ARC-09 plan.
+
 ## 2.0.0 — 2026-09-24
 
 Supersedes `snow-mcp` 1.0.0. Relicensed to Apache-2.0 and renamed to `@farstic/snowarch`; the old

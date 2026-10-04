@@ -32,6 +32,12 @@ export interface FakeRestOptions {
   queries?: Record<string, Array<Record<string, unknown>>>;
   /** What `createRecord` returns, keyed by table. */
   created?: Record<string, Record<string, unknown>>;
+  /**
+   * What `updateRecord` returns, keyed by table. Absent, the update echoes what was SENT — which
+   * is what a platform that stored it faithfully would do, and cannot express one that stored a
+   * shorter value (ARC-09-C93). A test about what the platform kept says what it kept here.
+   */
+  updated?: Record<string, Record<string, unknown>>;
   username?: string;
 }
 
@@ -71,7 +77,7 @@ export class FakeRestClient {
 
   async updateRecord(table: string, sysId: string, data: Record<string, unknown>): Promise<Record<string, unknown>> {
     this.calls.push({ op: 'update', table, arg: sysId, data });
-    return { sys_id: sysId, ...data };
+    return this.opts.updated?.[table] ?? { sys_id: sysId, ...data };
   }
 
   async deleteRecord(table: string, sysId: string): Promise<Record<string, unknown>> {

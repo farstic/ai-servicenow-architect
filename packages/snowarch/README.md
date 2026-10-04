@@ -343,7 +343,7 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (68), with what to do about it.
+Every code the server can throw (70), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
@@ -365,6 +365,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `ENOTFOUND` | as `DNS_FAILURE`: check the host in the store |
 | `ENV_REQUIRED` | pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do |
 | `ETIMEDOUT` | as `CONNECTION_TIMEOUT` |
+| `FIELD_NOT_STORED` | read the record back with `snow_scr_business_rule_read`; if the field is not set, set it with a modify rather than adding the record again, and if the record is active set `active` to false first. If it is set, the response did not echo it: the column names are not documented in the bundled corpus, so check them on the instance |
 | `FLAG_DEPENDENCY_VIOLATION` | decide which one was meant: turn WRITE on, or turn the dependent flag off. Neither is guessable from the store, so this is never repaired automatically |
 | `FLAGS_INCOMPLETE` | state every flag explicitly by re-applying a preset — the review screen shows what changes before anything is written |
 | `FLUENT_ERROR` | the message carries the SDK output |
@@ -407,7 +408,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `UNKNOWN_GATE` | report it; no user action can help |
 | `UNKNOWN_INSTANCE` | the listing prints the labels that exist |
 | `UNKNOWN_TOOL` | use the `snow_*` name from `governance/mcp-protocols.md`; maintainers: `npm run lint:contract` |
-| `UNSUPPORTED_ON_THIS_INSTANCE` | take the other route: run the script in System Definition > Scripts - Background, or author a Fix Script and run it from the UI. Keep `sys_script_fix.name` to 40 characters — it truncates silently over REST (see `docs/PLATFORM-NOTES.md` PN-07) |
+| `UNSUPPORTED_ON_THIS_INSTANCE` | take the other route: run the script in System Definition > Scripts - Background, or author a Fix Script and run it from the UI. Keep `sys_script_fix.name` to 40 characters — the platform truncates it over REST without an error (see `docs/PLATFORM-NOTES.md` PN-07); a write through this server returns a `VALUE_TRUNCATED` warning |
 | `UPDATE_FAILED` | the message carries the instance response |
 | `URL_HAS_CREDENTIALS` | remove them; the wizard asks for credentials separately |
 | `URL_HAS_PATH` | drop everything after the host |
@@ -415,6 +416,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `URL_NOT_HTTPS` | use the https form of the same host |
 | `URL_REQUIRED` | enter the full https URL of the instance; non-interactively pass `--url <origin>` (a URL cannot be proposed) |
 | `VALIDATION_ERROR` | the message names the argument and the shape |
+| `VALUE_TRUNCATED` | the record exists with the stored value, so modify it with a value of at most `column_limit` characters (when `confirmed` is false that length is only known to fit); do not add it again, which would make a second record. If the record is active, set `active` to false until it is corrected |
 | `WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 
 <!-- /generated:error-codes -->

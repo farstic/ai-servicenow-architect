@@ -2788,7 +2788,7 @@
   },
   {
     "name": "snow_scr_business_rule_add",
-    "description": "[Scripting] Create a new business rule (requires SCRIPTING_ENABLED=true). ServiceNow supports ES2021 async/await in scripts. Defaults: action_insert true, action_update true, action_delete false, action_query false.",
+    "description": "[Scripting] Create a new business rule in one write (requires SCRIPTING_ENABLED=true): filter_condition, advanced and active are all set on the create, so no follow-up modify is needed and no half-built rule sits on the table. A name or value the platform stores cut at its column limit, or a filter or Advanced switch the response does not show as set, comes back in `warnings`. ServiceNow supports ES2021 async/await in scripts. Defaults: advanced true, active true, action_insert true, action_update true, action_delete false, action_query false.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2810,7 +2810,15 @@
         },
         "condition": {
           "type": "string",
-          "description": "Optional condition script"
+          "description": "Optional condition SCRIPT (the Advanced section's Condition field). For a condition built from field tests, use filter_condition."
+        },
+        "filter_condition": {
+          "type": "string",
+          "description": "Optional filter as an encoded query (for example \"priority=1^state=2\"): the form's Filter Conditions builder, which decides whether the rule runs. Omit it only for a rule that should run on every matching operation. For changes, changesTo or changesFrom use the condition script (for example current.priority.changesTo(1)); their encoded-query form, and this column name, are not documented in the bundled corpus - verify on the instance."
+        },
+        "advanced": {
+          "type": "boolean",
+          "description": "Enable the form's Advanced section, where the script lives (default: true — this tool requires a script). The column name, and what the platform does with a script when this is false, are not documented in the bundled corpus - verify on the instance."
         },
         "active": {
           "type": "boolean",
@@ -2860,7 +2868,7 @@
         },
         "fields": {
           "type": "object",
-          "description": "Key-value pairs to update (name, script, active, condition, etc.)"
+          "description": "Key-value pairs to update (name, script, active, advanced, condition [a script], filter_condition [an encoded query], etc.)"
         }
       },
       "required": [

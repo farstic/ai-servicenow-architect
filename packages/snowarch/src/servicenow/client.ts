@@ -230,14 +230,23 @@ export class ServiceNowClient {
 
   /**
    * Make HTTP request with retry logic
+   *
+   * `requestedRetries` can only LOWER the client's own policy (`this.maxRetries`). It is reachable
+   * from a tool argument (`QueryRecordsParams.retries`), so a value that raised it, or that was not
+   * a count at all (`NaN`, `Infinity`, a string), would let a caller pick how many times this
+   * client hammers an instance. Anything that is not a non-negative integer is ignored.
    */
   private async request<T>(
     url: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    requestedRetries: number = this.maxRetries
   ): Promise<T> {
     let lastError: Error | undefined;
+    const maxRetries = Number.isInteger(requestedRetries) && requestedRetries >= 0
+      ? Math.min(requestedRetries, this.maxRetries)
+      : this.maxRetries;
 
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       let retryAfterMs: number | undefined; // set from a 429/503 Retry-After header
       try {
         const controller = new AbortController();
@@ -333,11 +342,11 @@ export class ServiceNowClient {
         }
 
         // Retry on network errors, rate limits, or server errors
-        if (attempt < this.maxRetries) {
+        if (attempt < maxRetries) {
           const backoff = this.retryDelayMs * Math.pow(2, attempt); // Exponential backoff
           // A 429/503 Retry-After takes precedence over backoff (capped at 60s).
           const delay = retryAfterMs !== undefined ? Math.min(retryAfterMs, 60000) : backoff;
-          logger.warn(`Request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${this.maxRetries})`);
+          logger.warn(`Request failed, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -438,7 +447,8 @@ export class ServiceNowClient {
     logger.debug(`Query: ${this.maskQuery(params.query)}`);
 
     try {
-      const response = await this.request<ServiceNowApiResponse<ServiceNowRecord[]>>(url);
+      const response = await this.request<ServiceNowApiResponse<ServiceNowRecord[]>>(
+        url, {}, params.retries);
 
       return {
         count: response.result.length,

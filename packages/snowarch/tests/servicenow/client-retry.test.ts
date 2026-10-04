@@ -49,3 +49,50 @@ describe('ServiceNowClient.request — 429 rate-limit handling', () => {
     expect(r.records?.length).toBe(1);    // and ultimately succeeded
   });
 });
+
+/**
+ * ARC-09-C93 gave `queryRecords` a `retries` option so an advisory lookup could fail fast. It is a
+ * field of `QueryRecordsParams`, and `snow_core_records_query` hands the caller's arguments to
+ * `queryRecords` as they come — so a caller can pass it, and no schema stops them. The option may
+ * only ever LOWER the client's own policy: a value that raised it would turn "retry 3 times with
+ * backoff" into a number the caller picks.
+ */
+describe('QueryRecordsParams.retries - can lower the retry policy, never raise it', () => {
+  beforeEach(() => { setEnv(); resetFetchMock(http); });
+  afterEach(() => vi.restoreAllMocks());
+
+  const unavailable = () => ({
+    ok: false, status: 503, statusText: 'Service Unavailable', headers: { get: () => null },
+    text: async () => JSON.stringify({ error: { message: 'down' } }),
+  });
+
+  async function clientWith(maxRetries: number) {
+    const { ServiceNowClient } = await import('../../src/servicenow/client.js');
+    return new ServiceNowClient({
+      instanceUrl: 'https://dummy.service-now.com', authMethod: 'basic',
+      basic: { username: 'd', password: 'd' }, maxRetries, retryDelayMs: 0,
+    } as never);
+  }
+
+  it('a value above the policy is held to the policy', async () => {
+    respond(http, unavailable());
+    const client = await clientWith(2);
+    await expect(client.queryRecords({ table: 'incident', limit: 1, retries: 99 })).rejects.toBeTruthy();
+    expect(http.calls).toHaveLength(3);                       // 1 attempt + the policy's 2 retries, not 100
+  });
+
+  it('0 means one attempt and no more', async () => {
+    respond(http, unavailable());
+    const client = await clientWith(2);
+    await expect(client.queryRecords({ table: 'incident', limit: 1, retries: 0 })).rejects.toBeTruthy();
+    expect(http.calls).toHaveLength(1);
+  });
+
+  it.each([[-1], [1.5], [Number.NaN], ['3'], [Number.POSITIVE_INFINITY]])(
+    'a value that is not a count (%j) is ignored: the policy stands', async (bad) => {
+      respond(http, unavailable());
+      const client = await clientWith(2);
+      await expect(client.queryRecords({ table: 'incident', limit: 1, retries: bad as never })).rejects.toBeTruthy();
+      expect(http.calls).toHaveLength(3);
+    });
+});

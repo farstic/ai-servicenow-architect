@@ -32,7 +32,7 @@ export function scriptToolManifest() {
         },
         {
             name: 'snow_scr_business_rule_add',
-            description: '[Scripting] Create a new business rule (requires SCRIPTING_ENABLED=true). ServiceNow supports ES2021 async/await in scripts. Defaults: action_insert true, action_update true, action_delete false, action_query false.',
+            description: '[Scripting] Create a new business rule in one write (requires SCRIPTING_ENABLED=true): filter_condition, advanced and active are all set on the create, so no follow-up modify is needed and no half-built rule sits on the table. A name or value the platform stores cut at its column limit, or a filter or Advanced switch the response does not show as set, comes back in `warnings`. ServiceNow supports ES2021 async/await in scripts. Defaults: advanced true, active true, action_insert true, action_update true, action_delete false, action_query false.',
             inputSchema: {
                 type: 'object',
                 properties: {
@@ -40,7 +40,9 @@ export function scriptToolManifest() {
                     table: { type: 'string', description: 'Table this rule applies to' },
                     when: { type: 'string', description: '"before" | "after" | "async" | "display"' },
                     script: { type: 'string', description: 'Server-side JavaScript. ServiceNow supports ES2021 (async/await, ?., ??).' },
-                    condition: { type: 'string', description: 'Optional condition script' },
+                    condition: { type: 'string', description: 'Optional condition SCRIPT (the Advanced section\'s Condition field). For a condition built from field tests, use filter_condition.' },
+                    filter_condition: { type: 'string', description: 'Optional filter as an encoded query (for example "priority=1^state=2"): the form\'s Filter Conditions builder, which decides whether the rule runs. Omit it only for a rule that should run on every matching operation. For changes, changesTo or changesFrom use the condition script (for example current.priority.changesTo(1)); their encoded-query form, and this column name, are not documented in the bundled corpus - verify on the instance.' },
+                    advanced: { type: 'boolean', description: 'Enable the form\'s Advanced section, where the script lives (default: true — this tool requires a script). The column name, and what the platform does with a script when this is false, are not documented in the bundled corpus - verify on the instance.' },
                     active: { type: 'boolean', description: 'Whether to activate the rule (default: true)' },
                     order: { type: 'number', description: 'Execution order (default: 100)' },
                     action_insert: { type: 'boolean', description: 'Run on insert (default: true)' },
@@ -61,7 +63,7 @@ export function scriptToolManifest() {
                 type: 'object',
                 properties: {
                     sys_id: { type: 'string', description: 'System ID of the rule' },
-                    fields: { type: 'object', description: 'Key-value pairs to update (name, script, active, condition, etc.)' },
+                    fields: { type: 'object', description: 'Key-value pairs to update (name, script, active, advanced, condition [a script], filter_condition [an encoded query], etc.)' },
                 },
                 required: ['sys_id', 'fields'],
             },
@@ -440,6 +442,19 @@ const SCRIPT_TOOL_NAMES = new Set([
     'snow_scr_ui_actions_index', 'snow_scr_ui_action_read', 'snow_scr_ui_action_add', 'snow_scr_ui_action_modify',
     'snow_scr_acls_index', 'snow_scr_acl_read', 'snow_scr_acl_add', 'snow_scr_acl_modify',
 ]);
+/**
+ * A boolean argument, or the fallback when it was not given. Anything else is refused: the server does
+ * not validate arguments against the input schema, so a client can send the STRING "false", and
+ * reading that as "not given" created a LIVE rule when an inactive one was asked for.
+ */
+function strictBool(name, v, fallback) {
+    if (v === undefined || v === null)
+        return fallback;
+    if (typeof v === 'boolean')
+        return v;
+    throw new ServiceNowError(`${name} must be true or false`, 'INVALID_REQUEST');
+}
+const isTrue = (v) => v === true || v === 'true';
 export async function dispatchScriptAction(client, name, args) {
     // Only gate scripting tools — return null for unrelated tools so dispatch continues
     if (!SCRIPT_TOOL_NAMES.has(name))
@@ -473,16 +488,68 @@ export async function dispatchScriptAction(client, name, args) {
             // existed, looked correct in the UI list, and never ran (field-notes §5). Defaults match
             // the platform's own form: insert and update on, delete and query off.
             const flag = (v, fallback) => (typeof v === 'boolean' ? v : fallback);
+            // ARC-09-C92: the filter and the Advanced switch are part of the CREATE. They were not
+            // accepted at all, so a rule that was meant to carry a filter had to be created without one —
+            // live on its whole table, or held inactive — and completed by a second write. A filter that is
+            // not a string is refused HERE, before any write: dropping it would create exactly the
+            // unconditioned rule this exists to prevent. `null`, '' and whitespace mean "not given"
+            // (nothing to clear on a create, and a blank conditions value is not a filter).
+            //
+            // Grounding: the form labels "Filter Conditions", "Advanced" and "Condition", and that the
+            // Condition field is available under Advanced, are printed in
+            // vendor/ServiceNowDocs/markdown/api-reference/business-rules-classic/c_BusinessRules.md. The
+            // COLUMN names `filter_condition` and `advanced` are not printed anywhere in the bundled corpus
+            // - verify on the instance. That is why the response is checked below.
+            if (args.filter_condition !== undefined && args.filter_condition !== null
+                && typeof args.filter_condition !== 'string')
+                throw new ServiceNowError('filter_condition must be a string (an encoded query, for example "priority=1^state=2")', 'INVALID_REQUEST');
+            const advanced = strictBool('advanced', args.advanced, true);
+            const active = strictBool('active', args.active, true);
             const data = {
                 name: args.name, collection: args.table, when: args.when, script: args.script,
-                condition: args.condition, active: args.active !== false, order: args.order || 100,
+                ...(typeof args.filter_condition === 'string' && args.filter_condition.trim() !== ''
+                    ? { filter_condition: args.filter_condition } : {}),
+                condition: args.condition,
+                // Default TRUE: this tool requires a script, and the form's Condition script is available
+                // under Advanced (c_BusinessRules.md, above). Whether a script posted without it is ignored
+                // is not stated in the bundled corpus - verify on the instance; sending it is the path the
+                // form documents.
+                advanced,
+                active, order: args.order || 100,
                 action_insert: flag(args.action_insert, true),
                 action_update: flag(args.action_update, true),
                 action_delete: flag(args.action_delete, false),
                 action_query: flag(args.action_query, false),
             };
             const result = await client.createRecord('sys_script', data);
-            return { ...result, summary: `Created business rule ${args.name}`, note: 'GlideEncrypter is deprecated in recent releases; use new sn_si.Vault or keystore APIs instead' };
+            // The name the platform STORED, not the one that was sent. This line used to repeat the
+            // argument, so a name cut at the column's limit was reported whole (ARC-09-C93). If it was cut,
+            // `warnings` on this result says so and gives the limit.
+            const stored = typeof result?.name === 'string' && result.name !== '' ? result.name : args.name;
+            // "One write" is only true if the platform kept what the write carried. A column name it does not
+            // know is ignored without an error, and the rule would then exist without its filter, live. The
+            // check is for PRESENCE, not equality: the platform may normalise a conditions value.
+            const notStored = [];
+            const missing = (field, why) => ({
+                code: 'FIELD_NOT_STORED', table: 'sys_script', ...(typeof result?.sys_id === 'string' ? { sys_id: result.sys_id } : {}),
+                field,
+                message: `sys_script.${field} was sent but the response does not show it as set: ${why} The rule exists`
+                    + `${data.active ? ' and is active' : ''}. Read it back with snow_scr_business_rule_read; if it is not set, `
+                    + `correct it with snow_scr_business_rule_modify (do not add the rule again, which would make a second rule)`
+                    + `${data.active ? ' and set active to false first' : ''}.`,
+            });
+            if ('filter_condition' in data
+                && !(typeof result?.filter_condition === 'string' && result.filter_condition.trim() !== ''))
+                notStored.push(missing('filter_condition', 'the rule may run on every matching operation.'));
+            if (advanced && !isTrue(result?.advanced))
+                notStored.push(missing('advanced', 'the script may not run.'));
+            const base = 'GlideEncrypter is deprecated in recent releases; use new sn_si.Vault or keystore APIs instead';
+            const note = advanced ? base
+                : `${base}. advanced is false, so the script and condition fields are in the section the form hides; whether the platform runs them is not documented in the bundled corpus - verify on the instance.`;
+            return {
+                ...result, summary: `Created business rule ${stored}`, note,
+                ...(notStored.length > 0 ? { warnings: notStored } : {}),
+            };
         }
         case 'snow_scr_business_rule_modify': {
             requireScripting();
