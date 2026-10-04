@@ -88,6 +88,9 @@ worked example were corrected with it.
   name they did not open carries the "not documented in the bundled corpus" marker, and what stays
   unverified becomes an open question.
 - The prerequisites name the model: the roster is supported on Claude Sonnet or a more capable model.
+- The CSM gateway's §1.1 example and the user guide's walkthrough of it recommend the baseline case and
+  account escalation feature. The request names a custom escalation table, so the answer is still a halt, but
+  the halt now says the baseline covers it; the correction note and the wait for a later release are gone.
 
 ## 2.0.9 — 2026-10-01
 
