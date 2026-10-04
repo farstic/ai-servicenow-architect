@@ -19,6 +19,7 @@ Each example: input prompt → expected output (the integration architecture spe
 > Retry on transient failures.
 > PII redaction in description field (customer names and emails).
 > Scope: x_acme_itsm.
+> Pre-approved custom objects: the `x_acme_itsm` scope (the client's ITSM app; the baseline weighed was the global scope) and the dead-letter table `x_acme_itsm_ado_dlq`, approved over the flow error handler and the Outbound HTTP Logs, which record a failure but cannot replay it.
 > Network: ServiceNow can reach Azure DevOps directly (no MID Server required).
 
 ### Expected output
@@ -52,14 +53,14 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 
 #### Authentication
 - **Mechanism:** OAuth2 (Authorization Code + refresh token) — Azure AD app registration. ADO does not support pure Client Credentials for personal/team scope; the app registration uses delegated permissions on a service account.
-- **Connection & Credential Alias:** `x_acme_itsm.azure_devops` (one alias per environment: dev, test, uat, prod, each with distinct app registrations).
+- **Connection & Credential Alias:** the spoke's default alias, configured on each instance (dev, test, uat, prod) with that environment's app registration — no custom alias *(citation: `markdown/integrate-applications/integration-hub/azure-devops-spoke.md`)*.
 - **Token caching:** ServiceNow's OAuth2 plugin handles token cache and refresh.
 - **Secret rotation policy:** quarterly, coordinated with Azure AD app credential rotation. Documented in operator runbook (handoff to Operational Documentation).
 - **Fallback on auth failure:** integration disabled, alert sent to `integration-ops@acme`. Records continue queuing in the flow's DLQ for replay after credential is restored.
 
 #### Network topology
 - **Direct egress** — no MID Server required. Azure DevOps endpoints are public; ServiceNow instance has direct outbound HTTPS access.
-- **Endpoint:** `https://dev.azure.com/{org}/{project}/_apis/wit/workitems/$Bug?api-version=7.0` (org and project parameterised per environment via system properties `x_acme_itsm.ado_org` and `x_acme_itsm.ado_project`).
+- **Endpoint:** Azure DevOps Boards through the spoke's Create Work Item action; the connection URL is on the spoke's connection record on each instance, and the project stays parameterised per environment via the system property `x_acme_itsm.ado_project`.
 
 #### Error handling
 - **Retry policy:** exponential backoff with jitter. 3 attempts, base 1s, multiplier 2x, jitter ±20%. Max total elapsed: 10 seconds.
@@ -73,14 +74,14 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
   - Auth failure (401/403)
   - Schema validation failure (422)
 - **DLQ:**
-  - Table: `x_acme_itsm_ado_dlq` (custom table in scope, fields: incident_sys_id, payload_redacted, error_class, error_detail, attempt_count, first_attempted_at, last_attempted_at, replay_status).
+  - Table: `x_acme_itsm_ado_dlq` (pre-approved in the dispatch envelope; fields: incident_sys_id, payload_redacted, error_class, error_detail, attempt_count, first_attempted_at, last_attempted_at, replay_status).
   - Replay UI Action gated by role `x_acme_itsm.dlq_replay`.
   - Manual replay; auto-replay deferred to v2.
 - **Alerting:** DLQ insertion triggers email to `integration-ops@acme` if DLQ depth exceeds 10 entries within an hour (Performance Analytics indicator + alert rule).
 
 #### Idempotency posture
 - **Idempotency key:** `incident.sys_id` mapped to ADO `Custom.SnSysId`.
-- **Dedup mechanism:** before POST, the spoke Action does a GET against ADO `Wiql` query for `Custom.SnSysId = '<sys_id>'`. If a work item already exists, skip the POST and update an idempotency ledger row in ServiceNow (`x_acme_itsm_ado_link` with sys_id ↔ ado_workitem_id mapping).
+- **Dedup mechanism:** before the create, the spoke's **Look up Queries by Wiql** action queries for `Custom.SnSysId = '<sys_id>'`. If a work item already exists, skip the create. Either way the work item id goes to the incident's baseline `correlation_id` field, where an integration maps an external id — no link table *(citations: `markdown/integrate-applications/integration-hub/azure-devops-spoke.md`, `markdown/integrate-applications/system-import-sets/r_StandardImportSetTables.md`)*.
 - **Counterparty support:** Azure DevOps does not natively support the `Idempotency-Key` header on this endpoint, so dedup is enforced via the ServiceNow-side check. Documented as a limitation.
 
 #### Rate limiting
@@ -105,7 +106,7 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 - **Logs:** never log the un-redacted payload. Log only: incident sys_id, ADO work item id (post-success), error class, retry attempt number, correlation ID.
 
 #### Observability
-- **Logged fields per call (in `x_acme_itsm_integration_log`):** correlation_id, incident_sys_id, attempt_number, http_status, response_time_ms, error_class (if any), result (success/retry/dlq).
+- **Logged fields per call** — a Log action in the calling flow writes them to `sys_flow_log`, and a failed call also appears in the Outbound HTTP Logs [`sys_outbound_http_log`] with its 4xx or 5xx request and response details: correlation_id, incident_sys_id, attempt_number, http_status, response_time_ms, error_class (if any), result (success/retry/dlq) *(citations: `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`, `markdown/it-asset-management/software-asset-management/now-assist-sam-skills-inputs.md`)*.
 - **Metrics (Performance Analytics indicators):**
   - `ado_outbound_success_rate` (%)
   - `ado_outbound_p95_latency_ms`
@@ -118,18 +119,18 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
   - Daily success rate <95% → email ops.
 
 #### Spoke vs raw REST decision
-- **Decision:** **build a scoped spoke** `x_acme_ado_spoke`. Reasoning: this is the third request from different teams to call Azure DevOps, and HRSD has flagged a likely 4th use case in their roadmap (HR ticket → ADO work item for tooling team). A reusable spoke amortises the auth, retry, and idempotency design across all four use cases.
-- **Spoke Actions to build:**
+- **Decision:** **use the baseline Microsoft Azure DevOps Boards Spoke.** This is the third request from different teams to call Azure DevOps, and HRSD has flagged a likely 4th use case in their roadmap (HR ticket → ADO work item for tooling team). The baseline spoke already ships the actions all four need — Create Work Item, Update Work Item, Look up Queries by Wiql — so they reuse it instead of a custom spoke. It requires an Integration Hub subscription *(citation: `markdown/integrate-applications/integration-hub/azure-devops-spoke.md`)*.
+- **Spoke actions used:**
   - `Create Work Item` (this spec)
   - `Update Work Item` (out of scope here; planned)
-  - `Lookup Work Item by SN Sys ID` (used by this spec for idempotency check)
-- **Spoke versioning:** semver `1.0.0`, pinned in consumer flows.
+  - `Look up Queries by Wiql` (used by this spec for the idempotency check)
+- **Spoke version:** the installed baseline version; consumer flows are retested when it is upgraded.
 
 #### Test approach (handoff to ATF Author)
-- Happy path: P1 incident resolved → work item created → ledger row written.
+- Happy path: P1 incident resolved → work item created → its id written to `correlation_id`.
 - Retry path: simulate transient 5xx on first attempt → succeeds on second → single work item created.
 - Auth failure: simulated 401 → DLQ entry created, no work item, alert email sent.
-- Idempotency: duplicate trigger for same incident → second call hits ledger short-circuit, no second work item.
+- Idempotency: duplicate trigger for same incident → second call finds the work item through the Wiql lookup, no second work item.
 - Schema rejection: simulated 422 from ADO → DLQ entry, no retry.
 - Rate-limit: simulated 429 with Retry-After: 5 → retry honours the header.
 - DLQ replay: replay UI Action processes a DLQ entry → work item created on success, DLQ row marked replayed.
@@ -150,10 +151,11 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 
 #### Handoffs proposed
 - **Flow Designer Specialist** — design the consuming flow on incident resolve (trigger, idempotency guard, error path to DLQ, alert wiring).
-- **Developer** — implement `x_acme_itsm.PIIRedactor.redact(text)` Script Include per redaction spec; implement spoke Action server scripts for `Create Work Item` and `Lookup Work Item by SN Sys ID`.
+- **Developer** — implement `x_acme_itsm.PIIRedactor.redact(text)` Script Include per redaction spec; the spoke's actions are baseline, so there are no spoke scripts to write.
 - **Code Reviewer** (post-build §6.2) — fires after Developer returns scripts.
 - **Security & GRC** — review PII redaction scope (OQ-4) and confirm OAuth2 scope on the Azure AD app registration is minimal.
-- **DevOps / Release Manager** — Spoke is a scoped app; needs App Repository workflow and per-env Connection Alias provisioning.
+- **DevOps / Release Manager** — the spoke is a baseline install; the dead-letter table ships in the `x_acme_itsm` app, and the spoke's alias is configured on each instance.
+- **Licensing & Entitlement** — confirm the Integration Hub subscription the spoke requires.
 - **Operational Documentation** — author runbook items above.
 - **ATF Author** — test suite per test approach above.
 
@@ -161,7 +163,7 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 
 Every section of the SKILL output checklist is filled with substance, not boilerplate. The auth choice (Authorization Code + refresh token, not Client Credentials) is justified against ADO's specific limitation; the idempotency mechanism explicitly accounts for ADO's lack of native `Idempotency-Key` support and compensates with a server-side dedup check; the retry policy distinguishes retryable from non-retryable error classes by HTTP status code with a clear DLQ destination.
 
-The spoke-vs-raw-REST decision is the most important architectural call. A junior designer would have built a one-off REST Message because the immediate spec only mentions one use case. The senior designer reads the room — three teams already asking, fourth on the roadmap — and amortises the work into a reusable spoke. The PII redaction handoff to Developer is correctly scoped: Integration Specialist names the contract (`PIIRedactor.redact(text)` with documented patterns) and lets Developer implement. The seven handoffs proposed are all genuinely needed and none are optional given the production stakes.
+The spoke decision is the most important architectural call. A junior designer would have built a one-off REST Message because the immediate spec only mentions one use case, or a custom spoke because three teams are asking. The senior designer checks the baseline first, finds the Microsoft Azure DevOps Boards Spoke, and reuses it for all four use cases. The PII redaction handoff to Developer is correctly scoped: Integration Specialist names the contract (`PIIRedactor.redact(text)` with documented patterns) and lets Developer implement. The seven handoffs proposed are all genuinely needed and none are optional given the production stakes.
 
 ---
 
@@ -176,6 +178,7 @@ The spoke-vs-raw-REST decision is the most important architectural call. A junio
 > Payload: JSON.
 > Must validate and reject malformed payloads.
 > Scope: x_acme_monitoring.
+> Pre-approved custom objects: the `x_acme_monitoring` scope (the client's monitoring app; the baseline weighed was the global scope). No custom tables.
 
 ### Expected output
 
@@ -249,9 +252,9 @@ This integration takes inbound monitoring events from an external tool and produ
 
 #### Idempotency posture
 - **Idempotency key:** `correlation_id` field in the payload (required).
-- **Dedup mechanism:** ledger table `x_acme_monitoring_event_ledger` with `correlation_id` (unique index), `incident_sys_id`, `received_at`, `client_id` (from OAuth2 token).
-- **Lookup before insert:** query ledger; if hit, return the existing `incident_sys_id` with HTTP 200 and `idempotent_replay: true` in the response body. No new incident created.
-- **Insert order:** incident insert first, then ledger insert. If incident insert succeeds and ledger fails, a retry creates a duplicate incident — accepted tradeoff (ledger insert is local DB write, very high success rate; alternative is a transactional write which requires more complex orchestration).
+- **Dedup mechanism:** the incident's baseline `correlation_id` field holds the payload's key — the field an integration maps an external id to — so the key and the incident are written in one insert; no ledger table *(citation: `markdown/integrate-applications/system-import-sets/r_StandardImportSetTables.md`)*.
+- **Lookup before insert:** query `incident` on `correlation_id`; if hit, return the existing `incident_sys_id` with HTTP 200 and `idempotent_replay: true` in the response body. No new incident created.
+- **One write:** the key is set in the same insert as the incident, so no second write can fail and leave a retry to duplicate it. Two identical requests arriving at the same moment can both miss the lookup — the same window a separate ledger had, since it was written after the incident — accepted tradeoff, documented.
 
 #### Rate limiting
 - **Inbound rate limit:** 1500 req/min per OAuth2 client. Headroom over the 1000 events/hour expected (which is 16.7/min). Rate limit configured via `x_acme_monitoring.rate_limit_rpm` system property.
@@ -273,7 +276,7 @@ This integration takes inbound monitoring events from an external tool and produ
 - **PII handling:** the `summary` and `detail` fields may contain user/system identifiers. Treated as non-PII per spec but flagged for Security & GRC review.
 
 #### Observability
-- **Logged per request (`x_acme_monitoring_api_log`):** correlation_id, client_id, http_status, validation_errors (if any), incident_sys_id (on success), response_time_ms, idempotent_replay (boolean).
+- **Logged per request:** each inbound request is in the Transaction logs (`syslog_transaction`) with its response time, and the API script writes correlation_id, client_id, http_status, validation_errors (if any), incident_sys_id (on success) and idempotent_replay (boolean) to the Log [`syslog`] table *(citations: `markdown/api-reference/rest-api-explorer/c_RESTAPI.md`, `markdown/api-reference/rest-apis/tisc-api.md`)*.
 - **Metrics:**
   - `monitoring_api_request_rate` (per minute)
   - `monitoring_api_success_rate` (%)
@@ -321,7 +324,7 @@ This integration takes inbound monitoring events from an external tool and produ
 - **Security & GRC** — review the role design (`x_acme_monitoring.api_inbound`), confirm payload field sensitivity classification, review IP allowlist mechanism.
 - **CMDB & CSDM** — confirm `affected_ci` resolution behaviour against the CI Class Manager rules; specifically whether `cmdb_ci` lookup should respect any class restrictions.
 - **ITSM Specialist** — confirm severity-to-priority mapping and address OQ-3.
-- **Performance & Scale** — validate the ledger table and unique index strategy at sustained 25 TPS.
+- **Performance & Scale** — validate the `correlation_id` lookup and its index on `incident` at sustained 25 TPS.
 - **Operational Documentation** — runbook items above.
 - **ATF Author** — test suite per test approach above.
 
@@ -329,7 +332,7 @@ This integration takes inbound monitoring events from an external tool and produ
 
 Inbound APIs are where most production integration defects happen, and this spec demonstrates why discipline matters. The validation chain (auth → role → IP → content-type → size → parse → schema → idempotency → CI resolution → insert) is ordered deliberately: cheap checks first, expensive checks last; security checks before parsing (parse errors should never expose internal detail to unauthenticated callers). The error envelope is structured and consistent, with correlation_id echoed back so the counterparty can debug end-to-end without ServiceNow log access.
 
-The idempotency posture is honest about its tradeoff: the ledger insert is non-transactional with the incident insert, and the spec states the failure mode (rare duplicate incident on ledger-insert failure) explicitly rather than pretending the design is transactional. That's senior-engineer behaviour — making the tradeoff visible rather than hiding it. The five proposed handoffs cover Developer (the script), Security & GRC (role design and PII), CMDB & CSDM (CI resolution rules), ITSM Specialist (severity mapping and OQ-3 about info-level flooding), and Performance & Scale (ledger at 25 TPS) — none requested by the user, all genuinely required for a production-grade build.
+The idempotency posture is honest about its tradeoff: the key lives on the incident itself, so no second write can fall out of step, and the spec states the one failure mode left (two identical requests at the same moment) explicitly rather than pretending the design is transactional. That's senior-engineer behaviour — making the tradeoff visible rather than hiding it. The five proposed handoffs cover Developer (the script), Security & GRC (role design and PII), CMDB & CSDM (CI resolution rules), ITSM Specialist (severity mapping and OQ-3 about info-level flooding), and Performance & Scale (the `correlation_id` lookup at 25 TPS) — none requested by the user, all genuinely required for a production-grade build.
 
 ---
 
@@ -343,6 +346,7 @@ The idempotency posture is honest about its tradeoff: the ledger insert is non-t
 > Auth: API key with HMAC request signing.
 > Spoke must be scoped, versioned, and reusable across multiple consuming flows (incident, change, problem).
 > Atlas API base URL is environment-specific.
+> Pre-approved custom objects: the `x_acme_atlas_spoke` scope and its alias `x_acme_atlas_spoke.atlas_connection` — approved over a REST step in each consuming flow, because no baseline spoke exists for an internal system. No custom tables.
 
 ### Expected output
 
@@ -419,7 +423,7 @@ N/A at the spoke level — spokes are libraries. Consumers (flows) trigger.
 - **Logs:** spoke logs request URL, response status, response_time_ms, error class, attempt_count. Never logs request/response bodies — bodies may contain sensitive ticket detail. If body inspection is needed, enable `x_acme_atlas_spoke.debug_logging` system property (defaults false; bodies truncated to 256 chars and redacted for known sensitive patterns even when enabled).
 
 #### Observability
-- **Per-call log row** in `x_acme_atlas_spoke_log`: action_name, correlation_id, attempt_count, http_status, response_time_ms, error_class.
+- **Per-call logging:** the consuming flow's Log action writes action_name, correlation_id, attempt_count, http_status, response_time_ms and error_class to `sys_flow_log`, and a failed call also appears in the Outbound HTTP Logs [`sys_outbound_http_log`] — no custom log table *(citations: `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`, `markdown/it-asset-management/software-asset-management/now-assist-sam-skills-inputs.md`)*.
 - **Metrics:**
   - `atlas_spoke_success_rate` (per Action)
   - `atlas_spoke_p95_latency` (per Action)
@@ -450,8 +454,8 @@ x_acme_atlas_spoke/
   System Properties:
     - x_acme_atlas_spoke.debug_logging
     - x_acme_atlas_spoke.timestamp_skew_seconds (default 0)
-  Log table:
-    - x_acme_atlas_spoke_log
+  Logging (no custom table):
+    - consuming flows' Log action (sys_flow_log); failed calls in sys_outbound_http_log
 ```
 
 #### Versioning

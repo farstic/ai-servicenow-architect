@@ -49,7 +49,7 @@ onLoad Client Script on the `incident` table in Service Operations Workspace. Th
 
 ## 4. Skill type
 
-Discriminative-summarisation (extracts and summarises existing content; does not generate new facts). Implemented as a generative skill in Skill Builder with a strict prompt constraint to avoid factual hallucination.
+Discriminative-summarisation (extracts and summarises existing content; does not generate new facts). Implemented as a generative skill in AI Skill Kit with a strict prompt constraint to avoid factual hallucination.
 
 ## 5. Input contract
 
@@ -107,7 +107,7 @@ Refusal (`confidence = 0.0` with the insufficient-history message) renders the f
 - **Data classes accessed:** ITSM incident operational data (short_description, description, state, assignment_group, work_notes, comments, audit log). Subject to baseline `incident` ACLs (the caller is the itil agent, so access is already authorised).
 - **Output classes produced:** A short-form summary returned to the calling Client Script for in-form rendering. Not persisted.
 - **Refusal conditions:** Insufficient history → returns the insufficient-history fallback. Uninterpretable context → omits rather than fabricates.
-- **Audit retention:** Skill invocations logged to `sys_log` (baseline Now Assist invocation logging). Retention follows Acme's existing operational log policy (90 days).
+- **Audit retention:** Skill invocations are logged in the Generative AI Log [`sys_generative_ai_log`] — prompts and responses, retained 180 days — and each use in the Gen AI Usage Log [`sys_gen_ai_usage_log`] *(citation: `markdown/intelligent-experiences/generative-ai-controller/generative-ai-controller-tables.md`)*.
 - **Periodic review cadence:** Quarterly review of accuracy by Acme ITSM Practice Lead, sampling ~50 invocations per quarter.
 
 ## 10. Performance budget
@@ -125,7 +125,7 @@ Refusal (`confidence = 0.0` with the insufficient-history message) renders the f
 | ATF-ICS-02 | Insufficient history | ATF on an incident with zero work notes/comments/audits, assert insufficient-history refusal returned. |
 | ATF-ICS-03 | High volume of work notes | ATF on an incident with 50+ work notes, assert summary still 2-3 sentences (no expansion). |
 | ATF-ICS-04 | Latency budget | Load test in lower env, 50 concurrent calls, assert p95 ≤ 1.5s. |
-| ATF-ICS-05 | AICT attestation validation | Verify `sys_log` entries for skill invocations match attestation data-classes; sample 10 invocations for output review. |
+| ATF-ICS-05 | AICT attestation validation | Verify `sys_generative_ai_log` entries for skill invocations match attestation data-classes; sample 10 invocations for output review. |
 | ATF-ICS-06 | Hallucination resistance | Manual review of 20 random outputs against source material; assert zero invented facts. |
 
 ## 12. Open decisions
@@ -141,10 +141,10 @@ Refusal (`confidence = 0.0` with the insufficient-history message) renders the f
 | New scoped apps proposed | 0 | n/a |
 | Custom Action tools proposed | 0 | n/a |
 | Custom Connection Aliases proposed | 0 | n/a |
-| Custom Skill Builder skill (configuration, not custom object) | 1 (Incident Chronology Summariser) | n/a — configuration within baseline Skill Builder framework |
+| Custom AI Skill Kit skill (configuration, not custom object) | 1 (Incident Chronology Summariser) | n/a — configuration within baseline AI Skill Kit framework |
 | Custom LLM provider (non-Now LLM Service) | 0 | n/a — uses Now LLM Service |
 
-**Compliance status: COMPLIANT.** The skill itself is configuration in Skill Builder using baseline tables (`incident`, `sys_journal_field`, `sys_audit`) and Now LLM Service. No §1.1 escalation required.
+**Compliance status: COMPLIANT.** The skill itself is configuration in AI Skill Kit using baseline tables (`incident`, `sys_journal_field`, `sys_audit`) and Now LLM Service. No §1.1 escalation required.
 
 ---
 
@@ -161,7 +161,7 @@ Refusal (`confidence = 0.0` with the insufficient-history message) renders the f
 
 ### §6.2 post-build manifest
 
-> *Capability design produced. The Incident Chronology Summariser is a baseline Skill Builder skill using Now LLM Service — no custom objects, no orchestration flow, no external integration. Proposing handoffs:*
+> *Capability design produced. The Incident Chronology Summariser is a baseline AI Skill Kit skill using Now LLM Service — no custom objects, no orchestration flow, no external integration. Proposing handoffs:*
 >
 > 1. **Developer** — implements `IncidentChronologyClient` Script Include and `Incident Chronology Summary` Client Script — proceed?
 > 2. **UI/UX Specialist consult** — SOW panel rendering pattern (placement, loading state, confidence-based disclaimer styling) — proceed?
@@ -175,7 +175,7 @@ Refusal (`confidence = 0.0` with the insufficient-history message) renders the f
 
 ### Explanation
 
-This is a clean baseline-first Now Assist design. The skill itself lives in Skill Builder (a baseline framework), uses baseline tables (`incident`, `sys_journal_field`, `sys_audit`), and consumes the Now LLM Service. The Baseline-first audit explicitly clarifies that the custom Skill Builder skill is **configuration within a baseline framework, not a major custom object under §1.1** — that nuance is important for Now Assist work because almost every Now Assist deliverable involves creating a "custom skill" in the colloquial sense.
+This is a clean baseline-first Now Assist design. The skill itself lives in AI Skill Kit (a baseline framework), uses baseline tables (`incident`, `sys_journal_field`, `sys_audit`), and consumes the Now LLM Service. The Baseline-first audit explicitly clarifies that the custom AI Skill Kit skill is **configuration within a baseline framework, not a major custom object under §1.1** — that nuance is important for Now Assist work because almost every Now Assist deliverable involves creating a "custom skill" in the colloquial sense.
 
 The AI Control Tower attestation is non-optional and is the governance layer that makes the capability deployable: it specifies data classes accessed, output classes produced, refusal conditions, and audit retention. Without an AICT attestation, the skill cannot ship.
 
@@ -342,7 +342,7 @@ English, Mandarin (Simplified), Japanese — per engagement requirement. The sys
 | New scoped apps proposed | 0 | n/a (reuses pre-approved `x_acme_csm_portal`) |
 | Custom Action tools proposed | 0 | n/a (revised — `semanticSearchCases` wraps baseline AI Search) |
 | Custom Connection Aliases proposed | 0 | n/a |
-| Custom Skill Builder skill / AI Agent (configuration) | 1 AI Agent | n/a — configuration within AI Agent Studio |
+| Custom AI Skill Kit skill / AI Agent (configuration) | 1 AI Agent | n/a — configuration within AI Agent Studio |
 | Custom AI Search profile (configuration) | 1 | n/a — configuration within AI Search |
 | Custom LLM provider | 0 | n/a — uses Now LLM Service |
 
@@ -450,9 +450,9 @@ The skill accesses:
 
 ## 4. Output classes produced
 
-A single text string (2-3 sentences) returned to the calling form panel. **The output is not persisted** — it is rendered transiently in the HRBP's session and discarded when the HRBP closes the case.
+A single text string (2-3 sentences) returned to the calling form panel. The skill writes nothing back to the case; the response is kept in the Generative AI Log (below).
 
-The skill invocation itself is logged to `sys_log` (baseline Now Assist invocation logging) with: invocation timestamp, calling user, case sys_id queried, latency. The output text itself is NOT included in the invocation log.
+The skill invocation is logged in the Generative AI Log [`sys_generative_ai_log`], which records prompts, responses and edited responses for 180 days, and each use in the Gen AI Usage Log [`sys_gen_ai_usage_log`] *(citation: `markdown/intelligent-experiences/generative-ai-controller/generative-ai-controller-tables.md`)*. The generated summary is therefore in that log, and the attestation covers it.
 
 ## 5. Refusal conditions and override conditions
 
@@ -468,8 +468,8 @@ The skill invocation itself is logged to `sys_log` (baseline Now Assist invocati
 
 | Item | Retention | Disposition |
 |---|---|---|
-| Skill invocation log (sys_log entries) | 90 days (per Acme operational log policy) | Auto-purged. |
-| Skill output text | Not retained — rendered transiently. | Not applicable. |
+| Generative AI Log (`sys_generative_ai_log`) — prompts and responses | 180 days (platform retention) | Purged by the platform. |
+| Skill output text | In the Generative AI Log with the response — 180 days. | As above. |
 | Underlying case data | Per baseline `sn_hr_core_case` retention (engagement-specific). | Per baseline. |
 | AICT attestation document | Indefinite — superseded versions retained for compliance trail. | Manual review on superseding. |
 

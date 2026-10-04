@@ -12,7 +12,7 @@ For each scenario: what you type, what the engine does, what you receive, and wh
 
 ## How to send a prompt
 
-Open Claude Code (`claude` from the repo root) and type your request at the `❯` prompt. If you prefer the browser, the same prompts work in the Master Project chat on Claude.ai — with one difference: **live deployment to an instance (Scenario 4) is CLI-only**, because the MCP connection runs through Claude Code. See [`INSTALL.md`](./INSTALL.md) if you haven't set up yet.
+Open Claude Code (`claude` from the repo root) and type your request at the `❯` prompt. Live deployment to an instance (Scenario 4) runs through Claude Code as well, because that is where the MCP connection runs. See [`INSTALL.md`](./INSTALL.md) if you haven't set up yet.
 
 Describe what you need in plain English — that is the whole interface for design work. There is one
 exception, the `/snowarch` command below, which configures and reports on the engine itself rather

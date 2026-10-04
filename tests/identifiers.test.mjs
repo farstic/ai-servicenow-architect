@@ -16,11 +16,11 @@ const CORPUS = join(ROOT, 'vendor', 'ServiceNowDocs');
 const HAS_CORPUS = existsSync(join(CORPUS, 'markdown'));
 
 // The allow-list's size by reason. A change here is a decision about the roster, made in review.
-const EXPECTED = { 'example-field': 28, 'payload-key': 21, 'example-role': 3, 'script-variable': 5, 'example-name': 51 };
+const EXPECTED = { 'example-field': 21, 'payload-key': 25, 'example-role': 3, 'script-variable': 5, 'example-name': 50 };
 // The excuses the real roster rests on, by kind (sites), and the absent names written only in capitals
 // or in mixed case. A new member of either is a decision made in review, as a new allow-list entry is:
 // the marker covers its whole line, and a platform name retyped in capitals is never looked at.
-const EXCUSES = { tool: 6, marker: 7, proposed: 3, glob: 5, glued: 1, placeholder: 4 };
+const EXCUSES = { tool: 6, marker: 7, proposed: 4, glob: 5, glued: 1, placeholder: 4 };
 const CAPITALS = {
   constant: ['AT_RISK', 'BODY_SHA256', 'CMDB_WRITE', 'FLAG_DEPENDENCY_VIOLATION', 'GET_TICKET', 'NOW_ASSIST',
     'POST_CLOSE_TICKET', 'POST_TICKET', 'PRESET_FLAGS_MISMATCH', 'PUT_TICKET', 'REST_OUT', 'WAR_ROOM'],

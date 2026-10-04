@@ -53,7 +53,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 1. **R1 — Case Escalation Button** (this HLD's primary scope): a single-action escalation from the case form with mandatory reason capture, automatic notification to the duty manager, and audit trail via the case's work notes.
 2. **R2 — Escalation Reporting** (Q3): Performance Analytics dashboards on escalation rate, reason mix, and duty manager response time.
 3. **R3 — On-Call Rota Integration** (Q4): replace the static `sys_user_group.manager` resolution with an On-Call Management rota for duty managers.
-4. **R4 — Manager-Side De-Escalation** (Q4): structured workflow for duty managers to return a case from "Escalated" to "In Progress" with documented disposition.
+4. **R4 — Manager-Side De-Escalation** (Q4): structured workflow for duty managers to de-escalate a case with documented disposition; the baseline de-escalation requester role covers it (OD-01).
 
 **Architectural commitment:** the programme is delivered entirely on baseline `sn_customerservice` constructs. No custom tables, no new scoped apps, no custom state values. The audit trail uses the case's `work_notes` journal — eliminating ~6 months of platform-upgrade compatibility risk and reducing ongoing support cost. This is captured in §10 Baseline-first audit.
 
@@ -71,7 +71,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 |---|---|
 | Case Escalation Button on CRM Workspace (formerly CSM Configurable Workspace) | Escalation analytics dashboards (R2) |
 | Mandatory reason picklist + escalation details free-text | On-Call rota integration (R3) |
-| State transition to "Escalated" (using existing baseline state value, TBD per OD-01) | De-escalation workflow (R4) |
+| An Escalation record on the case — the baseline escalation feature, per OD-01 | De-escalation workflow (R4) |
 | Audit trail via case `work_notes` journal | Custom escalation history table (rejected per §1.1) |
 | Email notification to duty manager | Mobile-app integration |
 | Concurrency-safe submission | Classic platform UI (non-workspace) — workspace-only |
@@ -80,7 +80,7 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 
 - "Regional duty manager" is resolved at runtime as the `manager` of the case's `assignment_group` (`sys_user_group.manager`). Replaced with On-Call Management in R3.
 - All escalation traffic is captured via the case's own `work_notes` journal. No custom audit table is in scope for any release of this programme.
-- The "Escalated" state value is an existing baseline state — confirmation pending (see OD-01).
+- Escalation uses the baseline case and account escalation feature: an Escalation record [`sn_customerservice_escalation`] against the case, not a new state value (see OD-01).
 - All work lives in the baseline `sn_customerservice` scope. No new scoped app.
 - Release family is Australia.
 
@@ -96,20 +96,9 @@ The Acme CSM Case Escalation programme delivers a structured escalation capabili
 
 ### 3.1 End-to-end process flow
 
-```mermaid
-flowchart LR
-    A[Agent identifies case<br/>needing escalation] --> B[Clicks Escalate<br/>to Duty Manager]
-    B --> C{Assignment group<br/>has manager?}
-    C -- No --> D[Error: No duty<br/>manager assigned]
-    C -- Yes --> E[Modal: select<br/>reason + details]
-    E --> F{Valid<br/>submission?}
-    F -- No --> G[Inline validation<br/>error]
-    F -- Yes --> H[Server-side BR:<br/>state=Escalated,<br/>append to work_notes]
-    H --> I[Email duty<br/>manager]
-    H --> J[Confirmation<br/>to agent]
-```
+![Figure 1 — Agent-side escalation flow](diagrams/fig-01-escalation-flow.svg)
 
-*Caption: Agent-side escalation flow. Server-side BR atomically updates state and appends work note in a single transaction.*
+*Figure 1 — Agent-side escalation flow: the submission raises the Escalation record on the case and appends the work note in one server-side transaction. Source: `diagrams/fig-01-escalation-flow.drawio` (Diagramming Specialist).*
 
 ### 3.2 User journeys per persona
 
@@ -138,7 +127,7 @@ flowchart LR
 
 No new tables. No new fields. No new scoped app. The programme uses:
 
-- `sn_customerservice_case` (baseline) — case record; state transitions to "Escalated" on submission.
+- `sn_customerservice_case` (baseline) — case record; it keeps its baseline state, and the submission raises an Escalation record [`sn_customerservice_escalation`] against it *(citation: `markdown/customer-service-management/case-escalation-components.md`)*.
 - `sn_customerservice_case.work_notes` (baseline journal) — appended with structured `[Escalated]` entries on submission.
 - `sys_user_group.manager` (baseline) — duty manager resolution for R1.
 
@@ -176,8 +165,8 @@ R2 reporting may need indicator pre-aggregation at higher case volumes — flagg
 
 | Role | Capabilities | Source |
 |---|---|---|
-| sn_customerservice_agent | Sees Escalate button; submits escalations; reads own case audit trail. | Baseline CSM role. |
-| sn_customerservice_manager | Sees Escalate button; submits escalations for any case they read; reads team audit trails. | Baseline CSM role. |
+| sn_customerservice_agent | Sees Escalate button; submits escalations; reads own case audit trail. | Baseline CSM role, with `sn_customerservice.escalation_requester` to request an escalation. |
+| sn_customerservice_manager | Sees Escalate button; submits escalations for any case they read; reads team audit trails. | Baseline CSM role; for R4, `sn_customerservice.deescalation_requester`, which contains the requester role. |
 | Regional duty manager | Receives notifications; reads escalated case + work-note audit trail. | Resolved at runtime as `sys_user_group.manager`; no separate ServiceNow role required. |
 
 ### 6.2 Data classification and handling
@@ -233,17 +222,18 @@ These are downstream handoff items — see §9.
 
 ## 8. Open Decisions
 
-### OD-01: Existing "Escalated" state value
+### OD-01: How an escalation is recorded
 
-- **Context:** The story references state="Escalated". CSM baseline state choices are: New (1), Open (10), Work in Progress (18), Awaiting Info (19), Resolved (3), Closed (6), Cancelled (7). There is no baseline "Escalated" state.
+- **Context:** The story references state="Escalated". The case states the Case API documents are New (1), Open (10), Awaiting Info (18), Resolved (6) and Closed (3); there is no "Escalated" state *(citation: `markdown/api-reference/rest-apis/case-api.md`)*. The case and account escalation feature records an escalation as its own record instead *(citation: `markdown/customer-service-management/case-escalation-components.md`)*.
 - **Options:**
-  1. Use baseline "Open" state and rely on a new field `u_is_escalated` (boolean) on the case — **rejected per §1.1: would require a custom field** (still a minor custom object, requires approval).
-  2. Repurpose "Awaiting Info" (state=19) as "Escalated" — semantic mismatch; rejected.
-  3. **Add "Escalated" as a new choice on `sn_customerservice_case.state`** — this is a custom state-model extension and falls under §1.1. Requires Chief Architect approval.
-- **Recommendation:** Option 3, with Chief Architect approval requested via OD-01. Smallest viable change; integer value to be assigned avoiding collisions (proposed: 110, well outside baseline range).
-- **Owner:** Chief Architect (governance) + Acme CSM Practice Lead (business).
+  1. **The baseline escalation feature** — the agent raises an Escalation [`sn_customerservice_escalation`] against the case, shaped by Escalation Templates and Escalation Severity, under the `sn_customerservice.escalation_requester` role; `sn_customerservice.deescalation_requester` covers R4. The case keeps its baseline state. No custom object.
+  2. Keep "Open" and add a field `u_is_escalated` (boolean) on the case — a custom field the baseline record makes unnecessary; rejected.
+  3. Repurpose "Awaiting Info" (state=18) as "Escalated" — semantic mismatch; rejected.
+  4. Add "Escalated" as a new choice on `sn_customerservice_case.state` — a custom state-model extension under §1.1, which option 1 makes unnecessary; rejected.
+- **Recommendation:** Option 1. It is baseline, so no §1.1 approval is needed; the CSM Specialist confirms that the escalation templates fit Acme's duty-manager routing.
+- **Owner:** CSM Specialist (baseline fit) + Acme CSM Practice Lead (business).
 - **Decision by:** before R1 sprint start.
-- **Status:** Open — **blocking on Chief Architect §1.1 ruling.**
+- **Status:** Open — awaiting the CSM Specialist's confirmation of the baseline fit; no §1.1 ruling is needed.
 
 ### OD-02: Notification channel scope
 
@@ -287,11 +277,11 @@ These are downstream handoff items — see §9.
 |---|---|---|
 | Custom tables proposed | 0 | n/a |
 | New scoped apps proposed | 0 | n/a |
-| **Custom state values proposed** | **1** (`sn_customerservice_case.state="Escalated"` value=110) | **Awaiting Chief Architect §1.1 approval — see OD-01.** |
+| Custom state values proposed | 0 | n/a — OD-01 recommends the baseline Escalation record. |
 | Custom Connection Aliases proposed | 0 | n/a |
 | Custom CMDB CI Classes proposed | 0 | n/a |
 
-**Compliance status:** **PENDING.** The HLD references one custom state-model extension (OD-01) that requires Chief Architect approval per §1.1 before downstream design can proceed.
+**Compliance status:** **COMPLIANT.** No custom objects: OD-01 recommends the baseline case and account escalation feature over a new state value.
 ```
 
 ### §6.2 post-build manifest
@@ -300,7 +290,7 @@ These are downstream handoff items — see §9.
 >
 > **Blocking dependency — Chief Architect attention required:**
 >
-> - **OD-01 / Baseline-first audit** — the HLD proposes one custom state-model extension (`state="Escalated"`, value=110). Per §1.1, this requires Chief Architect approval before downstream design (Technical Designer R2/R3/R4, Developer R1) can proceed.
+> - **OD-01** — the HLD recommends the baseline Escalation record over a new state value; the CSM Specialist confirms the fit before downstream design (Technical Designer R2/R3/R4, Developer R1) proceeds.
 >
 > **Downstream handoffs once OD-01 is resolved:**
 >
@@ -315,7 +305,7 @@ This HLD demonstrates three disciplines specific to this skill:
 
 1. **Baseline-first audit block at the end of the document.** Section 10 lists all custom objects referenced in the design, with each one's approval status. The block makes governance compliance auditable rather than implicit. In this case, the state="Escalated" custom value is surfaced explicitly as a §1.1 escalation rather than documented as accepted.
 
-2. **OD-01 explicitly routes back to Chief Architect.** The Open Decision section doesn't pretend the "Escalated" state is a settled question — it surfaces the §1.1 dependency, evaluates three options (including two that violate §1.1 in smaller ways), and recommends the smallest viable approach with explicit approval requirement. This is the `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` structure adapted to HLD format.
+2. **OD-01 weighs the baseline first.** The Open Decision section doesn't pretend the "Escalated" state is a settled question. It evaluates the baseline case and account escalation feature before any custom option, finds that it covers R1 and R4, and records why a new field or state value would be custom work the baseline makes unnecessary. A custom option that survived that test would go to the Chief Architect as an `OPEN QUESTION — CUSTOM OBJECT PROPOSAL`.
 
 3. **§6.2 manifest is multi-track.** The manifest has a blocking dependency (§1.1 approval), downstream handoffs (Operational Documentation, Security & GRC), and explicitly notes no Code Reviewer trigger. The post-build hook respects that HLD outputs are documents, not code.
 
@@ -583,20 +573,9 @@ The Customer Service Major Incident Process ensures that a single customer-impac
 
 ## 3. Process flow
 
-```mermaid
-flowchart TB
-    A[Agent detects 3rd<br/>matching report] --> B[Agent flags<br/>potential MI]
-    B --> C{Duty Manager<br/>validates}
-    C -- No, isolated incidents --> D[Continue as<br/>individual cases]
-    C -- Yes, pattern confirmed --> E[Declare MI:<br/>create Major Incident<br/>record]
-    E --> F[MIM Coordinator<br/>opens MI bridge]
-    F --> G[Comms approved<br/>by Customer Service Mgr]
-    G --> H[Customer notifications<br/>dispatched]
-    H --> I{Issue<br/>resolved?}
-    I -- No --> F
-    I -- Yes --> J[MIM Coordinator<br/>closes MI]
-    J --> K[Post-incident<br/>review scheduled]
-```
+![Figure 1 — Major incident process flow](diagrams/fig-01-mi-process-flow.svg)
+
+*Figure 1 — Major incident process flow (swimlane). Source: `diagrams/fig-01-mi-process-flow.drawio` (Diagramming Specialist).*
 
 ## 4. Triggers
 
