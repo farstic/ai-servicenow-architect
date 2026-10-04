@@ -684,28 +684,44 @@ test('and a marker planted where the lint does not honour it is still reported',
 // Whole files, not `currentLines`: none of these scopes holds a history section, and that function
 // stops at the first `## <digit>` heading — which in CLAUDE.md is "## 1. Operating principles".
 
+// Every pattern also reaches the surfaces a session reads without being asked to: CLAUDE.md and
+// .claude/rules/ load into every session, a builder copies the templates, and tests/VALIDATION-TESTS.md
+// holds the prompts run against the roster. A phrase the audit removed from a skill is as live in any of them.
+const ALWAYS_READ = ['CLAUDE.md', '.claude/rules/', 'templates/', 'tests/VALIDATION-TESTS.md'];
+
 export const AUDIT_PATTERNS = [
-  { id: 'master-project', scope: ['.claude/agents/', '.claude/skills/', 'governance/'],
+  { id: 'master-project', scope: ['.claude/agents/', '.claude/skills/', 'governance/', 'docs/USER-GUIDE.md', ...ALWAYS_READ],
     test: (l) => /Master Project|satellite project/i.test(l),
     why: 'the claude.ai project model; in Claude Code the firewall is folder discipline (CLAUDE.md §10)' },
-  { id: 'corpus-webfetch', scope: ['.claude/'],
-    test: (l) => l.includes('github.com/ServiceNow/ServiceNowDocs')
-      || (l.includes('WebFetch') && /ServiceNowDocs|\bcorpus\b/.test(l)),
+  // The fetch with the corpus named on its line, in any of the ways it has been named. A `tools:` line
+  // names no corpus, so the agents' tool lists pass: integration-specialist needs WebFetch for a
+  // counterparty's API documentation, which is not the corpus.
+  { id: 'corpus-webfetch', scope: ['.claude/', ...ALWAYS_READ],
+    test: (l) => /github\.com\/ServiceNow\/ServiceNowDocs/i.test(l)
+      || (/\bweb ?fetch\b/i.test(l)
+        && /ServiceNowDocs|\bcorpus\b|servicenow\.com\/docs|\b(?:Australia|ServiceNow) (?:release |product )?documentation\b/i.test(l)),
     why: 'the corpus is local — it is read with Grep and Read, never fetched' },
-  { id: 'phase-label', scope: ['.claude/'],
+  { id: 'phase-label', scope: ['.claude/', ...ALWAYS_READ],
     test: (l) => /\bPhase 2\.\d/.test(l),
     why: 'an engine-development phase label the reader cannot act on — the builders are just the builders' },
-  { id: 'overrides-any-prior', scope: ['.claude/', 'governance/'],
+  { id: 'overrides-any-prior', scope: ['.claude/', 'governance/', ...ALWAYS_READ],
     test: (l) => /overrides any prior/i.test(l),
     why: 'a diff against text no reader can see — state the rule, not what it replaced' },
   // Every shape the default has been written in, not the one this story happened to remove: "Mermaid is
   // the default", "(Mermaid default, …)", "Mermaid by default", "defaults to Mermaid", "the default is
   // Mermaid", "default: Mermaid", "Mermaid … (default)" and the catalogue's "Default notation" column.
   // The first was a live line the port missed, and the pattern written for the port could not see it.
-  { id: 'mermaid-default', scope: ['.claude/', 'governance/', 'CLAUDE.md'],
+  { id: 'mermaid-default', scope: ['.claude/', 'governance/', ...ALWAYS_READ],
     test: (l) => /Mermaid (?:is (?:the|a) default|defaults?\b|by default)|\bdefaults? to Mermaid\b|\bdefault(?: notation)? is Mermaid\b|\bdefault:\s*Mermaid\b|Mermaid[^.|\n]*\(default\)|\|\s*Default notation\s*\|/i.test(l),
     why: 'every delivered figure is an editable draw.io file; Mermaid is a draft' },
-  { id: 'scoped-by-default', scope: ['.claude/skills/technical-designer/', '.claude/agents/technical-designer.md'],
+  // The shapes that make Mermaid the DELIVERABLE without the word "default": named as the format, a
+  // Mermaid source rendered to the delivered SVG, the `.mmd` as source of truth, a figure required to be
+  // Mermaid. A Mermaid draft is legitimate — the diagramming examples sketch every figure in one — so
+  // neither the word Mermaid nor a ```mermaid fence is matched on its own.
+  { id: 'mermaid-delivered', scope: ['.claude/', 'governance/', ...ALWAYS_READ],
+    test: (l) => /\*\*Format:\*\*\s*Mermaid\b|\bmmdc\b[^\n]*\.svg\b|\.mmd`? is the source of truth|\bwith at least one Mermaid diagram\b|\bswimlane Mermaid diagram\b/i.test(l),
+    why: 'every delivered figure is an editable draw.io file exported to SVG; Mermaid is only its draft' },
+  { id: 'scoped-by-default', scope: ['.claude/skills/technical-designer/', '.claude/agents/technical-designer.md', ...ALWAYS_READ],
     // The two older wordings are the ones a later sweep found the port had not carried: a new scoped
     // app offered as a decision the designer resolves alone, and a two-way scoped-or-global choice.
     test: (l) => /default to scoped|Default for new functionality: scoped app|\bdefaults? to (?:an? )?(?:new )?scoped\b|chose (?:a )?new scoped app|scoped \(with prefix\) vs global/i.test(l),
@@ -772,7 +788,23 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     plant('.claude/agents/developer.md',
       '4. Verify against `ServiceNowDocs/` using `WebFetch` against `https://github.com/ServiceNow/ServiceNowDocs/tree/australia/markdown`.');
     plant('.claude/skills/story-writer/SKILL.md', 'This rule overrides any prior "default to scoped app" language elsewhere in this SKILL.');
-    plant('CLAUDE.md', '- Diagrams: Mermaid in markdown for every figure (default); draw.io on request.');
+    plant('CLAUDE.md', [
+      '- Diagrams: Mermaid in markdown for every figure (default); draw.io on request.',
+      'Sub-agents run in satellite projects, not the Master Project.',
+    ].join('\n'));
+    // One plant per surface the C82 widening added, each in a pattern that did not reach it before.
+    plant('.claude/rules/00-mode-and-mcp-gate.md', 'Read the Master Project Instructions before the first write.');
+    plant('templates/hld-template.md', 'Figures: Mermaid by default; draw.io on request.');
+    plant('tests/VALIDATION-TESTS.md', 'Run the Phase 2.2 disciplines against each builder.');
+    // The fetch shapes the first pattern could not see; the agents' tool list, which names no corpus, passes.
+    plant('.claude/skills/developer/SKILL.md', [
+      'Use WebFetch to read the Australia documentation for the API.',
+      'WebFetch on https://www.servicenow.com/docs/r/australia/api-reference.html for the method.',
+      'web fetch the ServiceNowDocs page for the table.',
+      'WebFetch the Corpus page if Grep finds nothing.',
+      'webfetch the servicenowdocs markdown.',
+      'tools: Read, Write, Edit, Glob, Grep, WebFetch',
+    ].join('\n'));
     plant('.claude/skills/diagramming-specialist/SKILL.md', '| Diagram | Use it for | Default notation |');
     plant('.claude/agents/technical-designer.md', [
       '3. **Scoping decision** — If unknown, default to scoped with prefix `x_<vendor>_<app>`.',
@@ -782,12 +814,29 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     plant('.claude/skills/now-assist-specialist/EXAMPLES.md', 'Three examples demonstrating Phase 2.2 disciplines.');
     plant('.claude/skills/hld-lld-writer/EXAMPLES.md', 'the builders that consume it — multiple Phase 2.2/2.1 builder handoffs.');
     // The shapes a control found inert on the first head — each a wording that has actually been used.
-    plant('.claude/skills/diagramming-specialist/EXAMPLES.md', 'Mermaid is the default; all blocks are written to parse.');
+    plant('.claude/skills/diagramming-specialist/EXAMPLES.md', [
+      'Mermaid is the default; all blocks are written to parse.',
+      // One plant per delivery shape...
+      '**Format:** Mermaid.',
+      'For the client pack, export to SVG (`mmdc -i fig.mmd -o fig.svg`).',
+      'The `.mmd` is the source of truth; the `.svg` is the artefact.',
+      'Each HLD section carries the design with at least one Mermaid diagram.',
+      'The PDD process flow is a swimlane Mermaid diagram.',
+      // ...and the draft, which stays legitimate wherever it is written.
+      '**Format:** draw.io (`.drawio`) + SVG export; the figure below is its Mermaid draft.',
+      '```mermaid',
+      '| Diagram | Use it for | Draft notation (Mermaid sketch — every delivered figure is `.drawio`) |',
+    ].join('\n'));
     plant('governance/taxonomy.md', '| Diagramming Specialist | figures | (Mermaid default, draw.io on request) |');
     plant('.claude/skills/hld-lld-writer/SKILL.md', 'Figures: the Diagramming Specialist defaults to Mermaid.');
     plant('.claude/skills/technical-designer/SKILL.md', 'If the scope is unknown, the design defaults to a scoped app.');
+    // The user guide is in master-project's scope since C82, and in no other.
+    plant('docs/USER-GUIDE.md', [
+      'If you prefer the browser, the same prompts work in the Master Project chat on Claude.ai.',
+      'Mermaid by default; Phase 2.2 disciplines.',
+    ].join('\n'));
     // ...and the same phrases where their scopes do NOT reach, which must stay quiet.
-    plant('docs/USER-GUIDE.md', 'the same prompts work in the Master Project chat; Mermaid by default; Phase 2.2 disciplines');
+    plant('docs/CONTRIBUTING.md', 'the same prompts work in the Master Project chat; Mermaid by default; Phase 2.2 disciplines');
     plant('.claude/agents/flow-designer-specialist.md', 'If unknown, default to scoped with prefix `x_<vendor>_<app>`.');
     // The exemption: its own sentence passes; an old-style corpus fetch in the SAME file still fails,
     // and the same sentence in ANOTHER file is not excused by an entry anchored to this one.
@@ -807,7 +856,9 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
       '.claude/agents/integration-specialist.md', '.claude/agents/story-writer.md',
       '.claude/skills/diagramming-specialist/EXAMPLES.md', 'governance/taxonomy.md', '.claude/skills/hld-lld-writer/SKILL.md',
       '.claude/skills/technical-designer/SKILL.md', '.claude/skills/technical-designer/EXAMPLES.md',
-      '.claude/skills/now-assist-specialist/EXAMPLES.md', '.claude/skills/hld-lld-writer/EXAMPLES.md'];
+      '.claude/skills/now-assist-specialist/EXAMPLES.md', '.claude/skills/hld-lld-writer/EXAMPLES.md',
+      '.claude/rules/00-mode-and-mcp-gate.md', 'templates/hld-template.md', 'tests/VALIDATION-TESTS.md',
+      '.claude/skills/developer/SKILL.md', 'docs/CONTRIBUTING.md'];
     const readAt = (f) => readFileSync(join(dir, f), 'utf8');
     const hits = findAuditRegressions({ files, read: readAt });
     const at = (rel, id) => hits.filter((h) => h.startsWith(`${rel}:`) && h.includes(`[${id}]`)).length;
@@ -818,8 +869,19 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     assert.equal(at('.claude/agents/atf-author.md', 'master-project'), 1);
     assert.equal(at('governance/governance-rules.md', 'master-project'), 1);
     assert.equal(at('CLAUDE.md', 'mermaid-default'), 1);
+    assert.equal(at('CLAUDE.md', 'master-project'), 1, 'CLAUDE.md is outside master-project');
+    assert.equal(at('.claude/rules/00-mode-and-mcp-gate.md', 'master-project'), 1, '.claude/rules/ is outside master-project');
+    assert.equal(at('templates/hld-template.md', 'mermaid-default'), 1, 'templates/ is outside the sweep');
+    assert.equal(at('tests/VALIDATION-TESTS.md', 'phase-label'), 1, 'VALIDATION-TESTS.md is outside the sweep');
     assert.equal(at('.claude/skills/diagramming-specialist/SKILL.md', 'mermaid-default'), 1);
-    assert.equal(hits.some((h) => h.startsWith('docs/USER-GUIDE.md:')), false, 'a scope reached outside itself');
+    assert.equal(at('docs/USER-GUIDE.md', 'master-project'), 1, 'the user guide is outside master-project');
+    assert.equal(hits.filter((h) => h.startsWith('docs/USER-GUIDE.md:')).length, 1,
+      'a pattern other than master-project reached the user guide');
+    assert.equal(hits.some((h) => h.startsWith('docs/CONTRIBUTING.md:')), false, 'a scope reached outside itself');
+    assert.equal(at('.claude/skills/developer/SKILL.md', 'corpus-webfetch'), 5, 'a widened fetch shape was not seen');
+    assert.equal(hits.some((h) => h.startsWith('.claude/skills/developer/SKILL.md:6:')), false, 'a tools: line was flagged');
+    assert.equal(at('.claude/skills/diagramming-specialist/EXAMPLES.md', 'mermaid-delivered'), 5,
+      'a Mermaid delivery shape was not seen, or a draft was taken for one');
     assert.equal(hits.some((h) => h.startsWith('.claude/agents/flow-designer-specialist.md:')), false,
       'the scoped-by-default rule reached past the Technical Designer');
     assert.equal(at('.claude/skills/diagramming-specialist/EXAMPLES.md', 'mermaid-default'), 1, '"Mermaid is the default" was not seen');

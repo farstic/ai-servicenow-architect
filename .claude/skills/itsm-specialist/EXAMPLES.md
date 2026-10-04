@@ -37,7 +37,7 @@ This request touches three core baseline ITSM processes: incident lifecycle, on-
 ### On-call coordination
 
 - The on-call engineer for an assignment group at any point in time is resolved via `cmn_rota_roster` (active member of the rotation defined in `cmn_rota`).
-- The baseline `OnCallRotation` Script Include exposes `OnCallRotation.getUsersOnSchedule(rotationSysId, dateTime)` to return the on-call user(s).
+- The baseline `OnCallRotation` Script Include's `whoIsOnCall(groupSysIds, rotaSysIds, rosterSysIds, gdt)`, called on an instance (`new OnCallRotation()`), gets the users on call at a given time *(citation: `markdown/api-reference/server-api-reference/c_OnCallRotationAPI.md`)*.
 - The duty manager role in baseline `cmn_rota` is typically configured as a separate rotation member type — "On-Call Engineer" and "On-Call Manager" can coexist in the same rotation with different escalation tiers.
 - *(citation: `markdown/it-service-management/on-call-scheduling/c_OnCallSchedulingConcepts.md`)*
 
@@ -67,7 +67,7 @@ No new tables. No new scoped app. No new state values. No new Connection Aliases
 
 The escalation requirement is fully satisfied by combining four baseline constructs:
 
-1. **A scheduled job** that runs every 5 minutes scanning `incident` for `priority IN 1,2 AND state=1 AND sys_created_on < 15 minutes ago AND <no work_notes entry from assigned_to>` — or equivalent baseline `IncidentInactivityMonitor` pattern. *(citation: `markdown/it-service-management/incident-management/reference-section-for-incident-management.md`)*
+1. **A scheduled job** that runs every 5 minutes scanning `incident` for `priority IN 1,2 AND state=1 AND sys_created_on < 15 minutes ago AND <no work_notes entry from assigned_to>` — or a baseline inactivity monitor (**System Policy > SLA > Inactivity Monitors**), which fires `incident.inactivity` when the incident stays inactive for the set time *(citation: `markdown/platform-administration/time-configuration/t_SetAnInactivityMonitor.md`)*.
 2. **Baseline `OnCallRotation` Script Include** to resolve the on-call duty manager for the incident's assignment group at the moment of escalation.
 3. **A baseline notification record** with: table = `incident`, when = "Event is fired", event = a custom event named for the record and the action, as baseline events are *(citation: `markdown/build-workflows/system-events/events.md`)*, like `incident.escalated.duty.manager`, condition = the 15-min/no-ack predicate, recipient = the resolved on-call duty manager. The event is fired from the scheduled job.
 4. **A `work_notes` append** by the scheduled job, written via `gr.work_notes = "Escalated to duty manager <name> — no acknowledgement within 15 min of creation"`.
@@ -95,7 +95,7 @@ The following are explicitly blocked in any downstream design:
 - **Do not create a custom escalation table per priority tier.** The `cmn_rota` + on-call resolution pattern handles this. *(citation: `markdown/it-service-management/on-call-scheduling/c_OnCallSchedulingConcepts.md`)*
 - **Do not extend `incident.state` with a new "Escalated" value.** Escalation is an event, not a state — the incident remains in New or In Progress. *(citation: `markdown/it-service-management/incident-management/reference-section-for-incident-management.md`)*
 - **Do not duplicate the baseline assignment-rule logic in the scheduled job.** The scheduled job reads `assignment_group` from the incident; it does not re-route. *(citation: `markdown/it-service-management/incident-management/t_DefinAnAssignRuleIncidents.md`)*
-- **Do not hardcode the duty-manager rotation sys_id in the scheduled job.** Resolve at runtime via `OnCallRotation.getUsersOnSchedule()` or externalise to a system property if a default fallback is needed.
+- **Do not hardcode the duty-manager rotation sys_id in the scheduled job.** Resolve at runtime via `new OnCallRotation().whoIsOnCall()` or externalise to a system property if a default fallback is needed.
 - **Do not write the work note in a custom audit table** — use `incident.work_notes`. This is a §1.1 hot spot; the work_notes journal is the baseline audit for state changes and operational events. *(citation: `markdown/platform-security/audit-mgmt-console.md`)*
 - **Do not query `task_sla.stage='completed'` if SLA tracking is added** — baseline value is `complete` without the -ed. (Defensive — relevant if Technical Designer adds SLA-aware logic.)
 
@@ -268,6 +268,8 @@ The Open Questions are real and specific. Each one is the kind of decision that,
 
 ## Example 3 — Verdict C (§1.1 Halt)
 
+> **Correction (2026-10-04).** Parts 1–3 never evaluate the baseline Change approval policies: "an approval policy can contain multiple decisions allowing a single policy to handle every approval required for a change type" — the Change Approval Policy [`chg_policy_approval`], applied by the Apply Change Approval Policy flow action *(citations: `markdown/it-service-management/change-management/change-approval-policy.md`, `markdown/it-service-management/change-management/installed-with-approval-policy.md`, `markdown/it-service-management/change-management/use-apply-change-approval-policy-flow-activity.md`)*. Read this example for the shape of a Verdict C halt; `u_approval_matrix` is not a recommendation until approval policies have been weighed.
+
 ### Input dispatch envelope
 
 > **Domain Expert dispatch — ITSM Specialist gateway**
@@ -294,7 +296,7 @@ This request touches change management approval orchestration, change risk scori
 - Baseline `change_request` has a state machine: New → Assess → Authorize → Scheduled → Implement → Review → Closed.
 - Approvals happen in the `Authorize` state, driven by baseline `sysapproval_approver` records.
 - Approver resolution in baseline: a Flow Designer flow or a Business Rule generates `sysapproval_approver` records, one per required approver. Classic approval rules have been replaced by the Workflow Studio Ask for Approval action, so approval routing is flow-driven *(citation: `markdown/build-workflows/approvals/c_ApprovalRules.md`)*.
-- Baseline `change_request.risk` is a 0–100 score, typically calculated by a Risk Assessment questionnaire (the baseline Assessment Metric Type [`asmt_metric_type`] and Assessment Metric [`asmt_metric`] tables *(citation: `markdown/api-reference/rest-apis/copy-assessments-api.md`, `markdown/build-workflows/workflow-studio/activate-process-automation-designer-for-app-engine.md`)*). *(citation: `markdown/it-service-management/change-management/reference-change-management.md`)*
+- Baseline `change_request.risk` is a choice: **-- None --** until it is set to **High**, **Moderate** or **Low**. The Change Risk Calculator, on by default, or an optional Risk Assessment questionnaire can drive it (the baseline Assessment Metric Type [`asmt_metric_type`] and Assessment Metric [`asmt_metric`] tables *(citation: `markdown/api-reference/rest-apis/copy-assessments-api.md`, `markdown/build-workflows/workflow-studio/activate-process-automation-designer-for-app-engine.md`)*). *(citations: `markdown/it-service-management/change-management/t_CreateAChange.md`, `markdown/it-service-management/change-management/c_RskAsmtCalc.md`)*
 - Baseline `change_request.type` distinguishes Standard (pre-approved, no CAB), Normal (CAB review), Emergency (expedited CAB).
 - *(citation: `markdown/it-service-management/change-management/reference-change-management.md`)*
 
@@ -364,7 +366,7 @@ A **custom table** would be a dedicated `u_approval_matrix` with fields for the 
 ```
 Table name:      u_approval_matrix (top level, baseline scope)
 Parent:          none (the approval flow reads it and writes sysapproval_approver records)
-New fields:      u_risk_min, u_risk_max (range)
+New fields:      u_risk (choice: High / Moderate / Low, matching change_request.risk)
                  u_business_unit (ref to business_unit)
                  u_pci_scope_required (boolean)
                  u_change_window_check (boolean)

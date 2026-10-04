@@ -14,21 +14,23 @@ Each example: input prompt → expected output (the flow design specification) �
 
 > Flow Designer Specialist task: design a record-triggered flow on the `change_request` table for x_acme_change.
 >
-> Behaviour: when a CHG is moved to "Awaiting Approval" (state=-5), the flow should:
+> Behaviour: when a CHG is moved to "Authorize" (state=-3), the flow should:
 > - Look up the CAB approver group based on the CHG's assignment_group, type, and risk via a Decision Table.
 > - Send the approval to the resolved CAB approver group with 5-business-day SLA.
 > - On approval: move the CHG to "Scheduled" (state=-2), notify requester via Microsoft Teams.
-> - On rejection: move to "Closed Incomplete" (state=4), capture rejection reason in work notes.
+> - On rejection: move to "Canceled" (state=4), capture rejection reason in work notes.
 > - On timeout (5 business days no response): escalate to the change manager group.
 >
 > Idempotency: re-firing the trigger must not produce duplicate approvals.
 >
 > Scope: x_acme_change.
+> Pre-approved custom objects: the `x_acme_change` scope (the client's change app; the baseline weighed was the global scope). No custom tables.
+> Baseline weighed for the CAB routing: the Change approval policy, which the Apply Change Approval Policy flow action applies to generate the user and group approvals from its decisions. The dispatch keeps the request's Decision Table because each route also returns its own approval SLA in business days, and the policy action takes a single Due Date for the action *(citations: `markdown/it-service-management/change-management/change-approval-policy.md`, `markdown/it-service-management/change-management/use-apply-change-approval-policy-flow-activity.md`)*.
 
 ### Expected output
 
 #### Capability statement
-This flow takes a `change_request` transition into "Awaiting Approval" and drives it to a final approval/rejection/timeout outcome with notifications and audit, without producing duplicate approvals on re-trigger.
+This flow takes a `change_request` transition into "Authorize" and drives it to a final approval/rejection/timeout outcome with notifications and audit, without producing duplicate approvals on re-trigger.
 
 #### Layer placement
 - **Top-level flow.** Single trigger, lifecycle-bound to `change_request`.
@@ -39,7 +41,7 @@ This flow takes a `change_request` transition into "Awaiting Approval" and drive
 |---|---|
 | Type | Record |
 | Table | `change_request` |
-| Condition | `state` changes to `-5` (Awaiting Approval) |
+| Condition | `state` changes to `-3` (Authorize) *(citation: `markdown/it-service-management/change-management/state-model-activate-tasks.md`)* |
 | Run as | System |
 | Run in Background | Yes (approval flows are long-running; do not block the save) |
 
@@ -55,7 +57,7 @@ None (side-effects only: state transitions, notifications, audit entries).
 
 1. **Idempotency guard** — Decision: does an active `sysapproval_approver` record exist for this CHG with state `requested`? If yes → end flow (already in flight).
 2. **Look Up Record** — refresh `current` to get latest field values (assignment_group, type, risk, requested_by).
-3. **Decision Table lookup** — `x_acme_change.cab_approver_routing` returns `cab_approver_group` and `approval_sla_business_days` (default 5).
+3. **Decision Table lookup** (kept over the Change approval policy, per the dispatch envelope) — `x_acme_change.cab_approver_routing` returns `cab_approver_group` and `approval_sla_business_days` (default 5).
    - Decision Table inputs: assignment_group, type, risk.
    - Decision Table outputs: cab_approver_group (sys_user_group), approval_sla_business_days (integer).
 4. **Ask for Approval** — to the resolved `cab_approver_group`.
@@ -67,13 +69,13 @@ None (side-effects only: state transitions, notifications, audit entries).
      1. Update Record: `current.state = -2` (Scheduled), `current.approval = approved`.
      2. Call subflow `x_acme_change.notifyChangeStakeholders` with target=current, channels=[teams,email], outcome=approved.
    - **Rejected branch:**
-     1. Update Record: `current.state = 4` (Closed Incomplete), `current.approval = rejected`, append rejection reason to `work_notes`.
+     1. Update Record: `current.state = 4` (Canceled), `current.approval = rejected`, append rejection reason to `work_notes`.
      2. Call subflow `notifyChangeStakeholders` with outcome=rejected.
    - **Timeout branch:**
      1. Look Up Record: `sys_user_group` where `name = 'Change Managers'`.
      2. Ask for Approval (escalation): to change manager group, due date now + 1 business day.
-     3. Recurse into the same outcome decision (approved/rejected/timeout — second timeout closes as Closed Incomplete with reason "no response from CAB or Change Manager").
-6. **On Error stage (flow-level)** — Insert Record into `x_acme_change_dlq` with error message, current sys_id, step name; send notification to `change-ops@acme` via email Action.
+     3. Recurse into the same outcome decision (approved/rejected/timeout — second timeout closes as Canceled with reason "no response from CAB or Change Manager").
+6. **Flow error handler** — a Log action records the handler's Error Status code and message and the current sys_id in `sys_flow_log`, which the flow's execution details show, and the email Action notifies `change-ops@acme` *(citations: `markdown/build-workflows/workflow-studio/flow-error-handler.md`, `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`)*.
 
 #### Decision points
 - **Step 1** — idempotency guard.
@@ -81,14 +83,14 @@ None (side-effects only: state transitions, notifications, audit entries).
 - **Step 3** — Decision Table for approver routing (data-driven, not flow-condition-driven, for maintainability).
 
 #### Error handling
-- Per-step On Error: each Update Record and Decision Table lookup has a documented On Error path (continue with default for Decision Table miss; abort to DLQ for Update Record failure).
-- Flow-level On Error stage: writes to `x_acme_change_dlq`, notifies ops.
+- Per-step On Error: each Update Record and Decision Table lookup has a documented On Error path (continue with default for Decision Table miss; abort to the flow error handler for Update Record failure).
+- Flow error handler: logs the failure and notifies ops; no custom dead-letter table.
 - Notification subflow failures are non-blocking — the state transition completes even if Teams is unreachable; the failure is logged.
 
 #### Transaction strategy
 - **Async with "Run in Background" at flow level** — approvals are long-running (days), the user save must not block.
 - **Idempotency via state guard** — Step 1 prevents duplicate approvals on re-trigger (e.g., admin manually re-saving the record while the flow is in flight).
-- **Compensating actions** — none needed; failures route to DLQ for manual replay rather than auto-rollback (state transitions are recoverable manually).
+- **Compensating actions** — none needed; failures are logged by the error handler for manual recovery rather than auto-rollback (state transitions are recoverable manually).
 
 #### Custom scripts called out
 None directly in this flow. The notification subflow may use a script step — see Example 2.
@@ -99,15 +101,15 @@ None directly in this flow. The notification subflow may use a script step — s
 
 #### Scope and naming
 - Scope: `x_acme_change`.
-- Flow name: `CHG Awaiting Approval Routing`.
-- Internal name: `x_acme_change.flow_chg_awaiting_approval_routing`.
+- Flow name: `CHG Authorize Approval Routing`.
+- Internal name: `x_acme_change.flow_chg_authorize_approval_routing`.
 - Decision Table: `x_acme_change.cab_approver_routing`.
-- DLQ table: `x_acme_change_dlq`.
+- No custom tables: errors go to the flow error handler, history to the baseline approval and audit records.
 
 #### Observability
 - Flow Execution log captures every step.
-- DLQ table acts as the operational alert source.
-- Custom audit row inserted into `x_acme_change_audit` on each terminal transition with: outcome, approver, duration, escalation_used.
+- The error handler's notification is the operational alert.
+- Each terminal transition is on baseline records: the approval records (`sysapproval_approver`) carry approver and outcome, the change's audit history (`sys_audit`) carries the state changes, and a second approval record shows that the escalation was used *(citations: `markdown/build-workflows/workflow-studio/ask-approval-flow-designer.md`, `markdown/platform-security/exploring-auditing.md`)*.
 - Performance Analytics indicator: **Change approval cycle time** (ms from trigger to terminal state).
 
 #### Test approach (handoff to ATF Author)
@@ -116,7 +118,7 @@ None directly in this flow. The notification subflow may use a script step — s
 - Timeout path: no response → escalation to change manager.
 - Double-trigger path: re-trigger while in flight → idempotency guard hits.
 - Decision Table miss: unknown combination → default approver group used.
-- Notification failure: Teams unavailable → state still transitions, DLQ entry written.
+- Notification failure: Teams unavailable → state still transitions, the failure is logged.
 
 #### Open questions
 - **OQ-1:** What is the default approver group when the Decision Table returns no match? Spec did not specify. Proposed default: change manager group.
@@ -125,7 +127,7 @@ None directly in this flow. The notification subflow may use a script step — s
 
 #### Handoffs proposed
 - **Subflow design** for `notifyChangeStakeholders` — propose Flow Designer Specialist subflow design (Example 2 pattern).
-- **Performance & Scale** — change_request volume is bounded but the trigger condition fires on every state-to-(-5) transition; confirm the trigger condition uses an indexed predicate.
+- **Performance & Scale** — change_request volume is bounded but the trigger condition fires on every state-to-(-3) transition; confirm the trigger condition uses an indexed predicate.
 - **Security & GRC** — Decision Table contents (group routing rules) are governance-sensitive; flag for ACL review.
 - **ATF Author** — full test suite per the test approach above.
 
@@ -148,6 +150,7 @@ The idempotency guard at Step 1 is the most important detail — re-trigger scen
 > Will be consumed by incident MIM flows, change emergency flows, and HR case escalation flows.
 >
 > Scope: x_acme_platform (shared utility scope).
+> Pre-approved custom objects: the `x_acme_platform` scope and its `x_acme_platform_notification_template` table — approved over the global scope and over the baseline Email Template [`sysevent_email_template`], which holds email templates — rich HTML for email — not the Teams and Slack messages this subflow also sends *(citations: `markdown/platform-administration/t_CreateAnEmailTemplate.md`, `markdown/application-development/servicenow-sdk/fluent-email-notification-api.md`)*.
 
 ### Expected output
 
@@ -225,12 +228,12 @@ If either spoke is unavailable in the target instance, design degrades to email-
 - Subflow name: `Notify Stakeholders`.
 - Internal name: `x_acme_platform.subflow_notify_stakeholders`.
 - Custom Action: `x_acme_platform.ResolveNotificationMessage`.
-- Template table: `x_acme_platform_notification_template` (table with fields: scope, table, key, subject, body).
+- Template table: `x_acme_platform_notification_template`, pre-approved in the dispatch envelope (fields: scope, table, key, subject, body).
 
 #### Observability
 - Subflow execution log captures invocation + per-channel outcome.
 - Failure detail is in the returned `results` list — callers decide what to do with it.
-- For trend analysis, callers may insert their own audit row before/after invocation. The subflow itself does not own audit.
+- For trend analysis, callers read the subflow's execution details or their own baseline records. The subflow itself does not own audit.
 
 #### Test approach (handoff to ATF Author)
 - Happy path: all three channels succeed.
@@ -267,6 +270,7 @@ The handoff to Developer for `ResolveNotificationMessage` is correctly scoped: t
 >
 > Volume context: ~2000 closed incidents/day match the criteria.
 > Scope: x_acme_itsm.
+> Pre-approved custom objects: the `x_acme_itsm` scope (the client's ITSM app; the baseline weighed was the global scope). No custom tables.
 
 ### Expected output
 
@@ -304,11 +308,11 @@ None (side-effects only).
 2. **For Each** incident in the result set — `max_iterations: 5000`.
    - Step 2.1: Call custom Action `x_acme_itsm.SendFeedbackRequest` with input `incident_sys_id = current.sys_id`. The Action returns `{success: bool, error_detail: string}`.
    - Step 2.2: Decision: if `success = true` → continue; else → append to `failures` flow variable.
-3. **Aggregate** — total processed, total succeeded, total failed.
+3. **Aggregate and log** — total processed, succeeded and failed; a Log action records run_timestamp, records_processed, succeeded, failed and duration_ms in `sys_flow_log` on every run *(citation: `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`)*.
 4. **Decision: failure rate**
    - If `failures / processed > 0.10` → notify ops via email Action (alert template `feedback-request-batch-failure`). Include first 10 failure entries in the alert body.
-   - Else → log summary to system log only.
-5. **On Error stage (flow-level)** — Insert Record into `x_acme_itsm_dlq` with error and run timestamp.
+   - Else → no alert; the step-3 summary is the run's record.
+5. **Flow error handler** — a Log action records the error and the run timestamp in `sys_flow_log`, and the email Action notifies ops *(citations: `markdown/build-workflows/workflow-studio/flow-error-handler.md`, `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`)*.
 
 #### Decision points
 - **Step 2.2** — per-record success/failure capture.
@@ -316,7 +320,7 @@ None (side-effects only).
 
 #### Error handling
 - Per-record errors are captured by the custom Action and surfaced via its return value, NOT thrown — the loop continues.
-- Flow-level On Error stage catches infrastructure failures (e.g., scheduler issue, ECC queue down) and writes to DLQ.
+- The flow error handler catches infrastructure failures inside a run (e.g., ECC queue down) and logs them; it runs only when a running flow catches an error *(citation: `markdown/build-workflows/workflow-studio/flow-error-handler.md`)*.
 - Failure-rate alert (>10%) at end-of-run signals systemic issues without flooding ops on a single bad record.
 
 #### Transaction strategy
@@ -346,12 +350,12 @@ None — uses baseline platform email.
 - Flow name: `Daily Feedback Request Sweep`.
 - Internal name: `x_acme_itsm.flow_daily_feedback_sweep`.
 - Custom Action: `x_acme_itsm.SendFeedbackRequest`.
-- DLQ table: `x_acme_itsm_dlq`.
+- No custom tables: errors go to the flow error handler, the run summary to `sys_flow_log`.
 - Field: `x_acme_itsm_feedback_requested` on `incident` (added via the scoped app's table extension).
 
 #### Observability
 - Flow Execution log per run.
-- End-of-run summary written to `x_acme_itsm_feedback_run_log` (custom audit table) with: run_timestamp, records_processed, succeeded, failed, duration_ms.
+- End-of-run summary recorded by a Log action in `sys_flow_log`, which the flow's execution details show: run_timestamp, records_processed, succeeded, failed, duration_ms *(citation: `markdown/build-workflows/workflow-studio/log-message-flow-designer.md`)*.
 - Performance Analytics indicator: `feedback_request_send_rate` (records/day surveyed).
 - Alert email on failure rate >10%.
 

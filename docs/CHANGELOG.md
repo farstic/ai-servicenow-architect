@@ -50,6 +50,12 @@ worked example were corrected with it.
   the skill's assist ratio. A hot spot whose request asks for a custom table, scoped app, portal, widget or
   another object on its specialist's list of §1.1 triggers now answers Verdict C, with the baseline path in
   the halt's open question, as the gateways' verdict table requires.
+- The worked examples weigh the baseline before a custom object. Each table, scope or alias left in a
+  builder example is either replaced by what the corpus documents — the Azure DevOps Boards spoke, the
+  flow error handler, an incident's `correlation_id`, the platform's own logs — or carries an approval line
+  naming the baseline it was weighed against. Change states, the AI Skill Kit, and the AI Admin Hub and
+  AI Admin Center consoles carry the corpus's names, and the HLD and PDD examples embed their figures
+  from draw.io sources.
 
 ### Changed
 

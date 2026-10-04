@@ -6,7 +6,7 @@ Gold-standard reference. Every example applies the discipline from `SKILL.md`: a
 
 ## Example 1 — Skill mode: one sequence diagram (integration round-trip)
 
-**Source spec:** Integration Specialist spec "P1/P2 incident → Azure DevOps work item on resolve". **Format:** Mermaid.
+**Source spec:** Integration Specialist spec "P1/P2 incident → Azure DevOps work item on resolve". **Format:** draw.io (`.drawio`) + SVG export; the figure below is its Mermaid draft.
 
 ### Legend
 Actors = participants; ServiceNow components prefixed `SN`; external system on the right; `Note` blocks carry non-happy-path behaviour.
@@ -26,26 +26,26 @@ sequenceDiagram
     SP->>ADO: POST /_apis/wit/workitems (OAuth2)
     ADO-->>SP: 201 Created (id)
     SP-->>FL: work_item_id
-    FL->>SN: Set incident.u_ado_ref = work_item_id
+    FL->>SN: Set incident.correlation_id = work_item_id
     Note over SP,ADO: Retry 3x exponential backoff;<br/>exhausted → DLQ record + work note on incident
 ```
 
 ### Fidelity notes
 - `incident`, `state=6 (Resolved)`, `priority IN (1,2)` — taken verbatim from the spec's trigger condition.
-- `u_ado_ref` is the custom field named in the spec (custom field on a baseline table = configuration, not a §1.1 object).
+- `correlation_id` is the baseline field the spec writes the work item id to.
 - ADO endpoint path is illustrative; the spec owns the exact route.
 
 ### §1.1 flags
-None — no custom table, scope, or state introduced.
+None new — the DLQ record lands in `x_acme_itsm_ado_dlq`, which the spec's envelope pre-approved, so it is drawn as approved, not PENDING.
 
 ### Export notes
-Mermaid renders in the PR. For the client pack, export to SVG (`mmdc -i fig.mmd -o fig.svg`) or rebuild in draw.io.
+The Mermaid above is the draft. The delivered figure is a house-style `.drawio` (Example 6), exported to SVG for the client pack.
 
 ---
 
 ## Example 2 — Sub-agent mode: a 3-figure diagram pack for an HLD
 
-**Source spec:** Technical Designer spec + CSM gateway Constraint Envelope, "Customer escalation capability". **Format:** Mermaid. One legend governs all figures.
+**Source spec:** Technical Designer spec + CSM gateway Constraint Envelope, "Customer escalation capability". **Format:** draw.io (`.drawio`) + SVG export; the figures below are Mermaid drafts. One legend governs all figures.
 
 ### Legend
 Platform systems = `System`; external = `System_Ext`; baseline tables solid; references shown with cardinality; lifecycle states are nodes.
@@ -69,6 +69,7 @@ erDiagram
     customer_account  ||--o{ sn_customerservice_case : "account"
     customer_contact  ||--o{ sn_customerservice_case : "contact"
     sn_customerservice_case ||--o{ sn_customerservice_task : "tasks"
+    sn_customerservice_case ||--o{ sn_customerservice_escalation : "escalations"
     sn_customerservice_case }o--|| sys_user : "assigned_to"
     sn_customerservice_case {
         string  number
@@ -76,7 +77,10 @@ erDiagram
         reference contact
         choice  state
         choice  priority
-        boolean escalated
+    }
+    sn_customerservice_escalation {
+        string  number
+        choice  state
     }
 ```
 
@@ -87,8 +91,6 @@ stateDiagram-v2
     New --> Open : assign
     Open --> AwaitingInfo : need customer input
     AwaitingInfo --> Open : info received
-    Open --> Escalated : SLA breach OR manual
-    Escalated --> Open : de-escalate
     Open --> Resolved : resolve
     Resolved --> Closed : auto-close timer
     Resolved --> Open : reopen
@@ -96,20 +98,20 @@ stateDiagram-v2
 ```
 
 ### Fidelity notes
-- All table names (`sn_customerservice_case`, `customer_account`, `customer_contact`, `sn_customerservice_task`) and the `escalated` field come from the Envelope's Data Model Alignment — all baseline.
-- `Escalated` is modelled as a *state transition driver*, not a new `state` choice value, matching the spec (escalation is a flag + flow, not a custom state).
+- All table names (`sn_customerservice_case`, `customer_account`, `customer_contact`, `sn_customerservice_task`, `sn_customerservice_escalation`) come from the Envelope's Data Model Alignment — all baseline *(citation: `markdown/customer-service-management/case-escalation-components.md`)*.
+- Escalation is a record of its own [`sn_customerservice_escalation`], whose states are Requested, Escalated, Declined and, once de-escalated, Closed; the case lifecycle in Figure 3 carries no escalation state, matching the spec *(citations: `markdown/customer-service-management/case-escalation-form.md`, `markdown/customer-service-management/de-escalate-csm-case.md`)*.
 
 ### §1.1 flags
 None — every object is baseline-confirmed in the Constraint Envelope.
 
 ### Export notes
-Three figures, one legend. For the review board deck, export each to SVG at 2x; keep the Mermaid source in the HLD appendix so the figures stay diff-able.
+Three figures, one legend. For the review board deck, deliver each as a `.drawio` and export it to SVG; keep the `.drawio` sources in the HLD's Diagram Sources appendix.
 
 ---
 
 ## Example 3 — Project visuals (the "and so on": roadmap, schedule, RACI)
 
-**Source spec:** programme plan in the HLD. **Format:** Mermaid + a RACI table.
+**Source spec:** programme plan in the HLD. **Format:** draw.io (`.drawio`) + SVG export, plus a RACI table; the figures below are Mermaid drafts.
 
 ### Figure 1 — Roadmap (timeline)
 ```mermaid
@@ -181,30 +183,28 @@ The table is drawn because the *spec* contains it; the dashed style and PENDING 
 
 ## Example 5 — Export to SVG and embed into an HLD
 
-Takes the Figure-2 ERD from Example 2 and ships it as a rendered SVG embedded in the HLD — the standard "save as SVG + add into the document" workflow.
+Takes the Figure-2 ERD from Example 2, built as a house-style `.drawio` (Example 6), and embeds its SVG export in the HLD.
 
-**1. Save the source** — `clients/acme/csm-escalation-hld/diagrams/fig-02-data-model.mmd` (the `erDiagram` block, verbatim).
+**1. Save the source** — `clients/acme/csm-escalation-hld/diagrams/fig-02-data-model.drawio`, hand-built in the house style (Example 6); the `erDiagram` block in Example 2 is only its draft.
 
-**2. Render locally** (no external service; Windows reuses Edge/Chrome — no Chromium download):
+**2. Export locally** (no external service) — from the draw.io desktop app or diagrams.net (export as SVG), or with the desktop app's command line:
 ```
-pwsh scripts/render-diagrams.ps1 -Path clients/acme/csm-escalation-hld/diagrams
-# or:  bash scripts/render-diagrams.sh clients/acme/csm-escalation-hld/diagrams
+drawio -x -f svg -o clients/acme/csm-escalation-hld/diagrams/fig-02-data-model.svg clients/acme/csm-escalation-hld/diagrams/fig-02-data-model.drawio
 ```
 → writes `fig-02-data-model.svg` beside the source.
 
-**3. Embed into the HLD section** — for the Word/PDF deliverable, place the rendered image with its numbered caption:
+**3. Embed into the HLD section** — place the exported image with its numbered caption:
 ```
 ![Figure 2 — Data model (ERD)](diagrams/fig-02-data-model.svg)
 ```
-For PR-review markdown, keep the inline ` ```mermaid ` fenced block as well, so the figure stays diff-able.
 
-**4. Diagram Sources appendix** (keeps every figure regenerable):
+**4. Diagram Sources appendix** (keeps every figure editable):
 
-| Figure | Source (`.mmd`) | Rendered (`.svg`) |
+| Figure | Source (`.drawio`) | Export (`.svg`) |
 |---|---|---|
-| Figure 2 — Data model (ERD) | `diagrams/fig-02-data-model.mmd` | `diagrams/fig-02-data-model.svg` |
+| Figure 2 — Data model (ERD) | `diagrams/fig-02-data-model.drawio` | `diagrams/fig-02-data-model.svg` |
 
-The `.mmd` is the source of truth; the `.svg` is the artefact. After any edit, re-run step 2 to regenerate.
+The `.drawio` is the source of truth; the `.svg` is its export. After any edit, re-run step 2 to re-export.
 
 ---
 
@@ -233,7 +233,7 @@ Minimal `.drawio` skeleton (a baseline node → a PENDING node):
 </root></mxGraphModel></diagram></mxfile>
 ```
 
-Full reference: `skills/diagramming-specialist/templates/house-style-reference.drawio` (open in draw.io / VS Code / Lucidchart). **Hand-craft every delivered figure to this standard** — labels exact-to-spec, the shared palette, one shared legend; export an SVG/PNG for the doc; never ship a recolored Mermaid as the figure.
+Full reference: `.claude/skills/diagramming-specialist/templates/house-style-reference.drawio` (open in draw.io / VS Code / Lucidchart). **Hand-craft every delivered figure to this standard** — labels exact-to-spec, the shared palette, one shared legend; export an SVG/PNG for the doc; never ship a recolored Mermaid as the figure.
 
 ---
 
