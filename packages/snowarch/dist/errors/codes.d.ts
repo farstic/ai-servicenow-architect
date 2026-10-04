@@ -419,6 +419,11 @@ export declare const ERROR_CODES: readonly [{
     readonly meaning: "The certificate is invalid for reasons other than an untrusted root — expired, or the wrong host.";
     readonly remedy: "check the instance URL and the certificate; this is not a CA-trust problem";
     readonly showInRule: false;
+}, {
+    readonly code: "VALUE_TRUNCATED";
+    readonly meaning: "A WARNING on a write that succeeded, not an error: a string was longer than its column and the platform stored only the first part of it, without refusing. It arrives as `warnings[].code` on the tool's result and names the field, both lengths and the column's limit.";
+    readonly remedy: "the record exists with the cut value, so modify it with a value of at most `column_limit` characters; do not add it again, which would make a second record. `confirmed: false` means the dictionary could not state the limit and it is inferred from the stored length";
+    readonly showInRule: false;
 }];
 export declare const ERROR_CODE_NAMES: ReadonlySet<string>;
 /**

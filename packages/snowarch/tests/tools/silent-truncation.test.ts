@@ -33,10 +33,13 @@ function runtime(): InstanceRuntime {
   };
 }
 
+/** What a caller reads: the tool's own fields, plus `warnings` when a write came back cut. */
+interface Result { summary?: string; warnings?: Array<Record<string, unknown> & { message: string }>; [k: string]: unknown }
+
 async function call(tool: string, args: Record<string, unknown>, opts: FakeRestOptions = {}) {
   const client = new FakeRestClient(opts);
   const result = await runWithInstance(runtime(), () => routeToolInvocation(client.asClient(), tool, args));
-  return { client, result: result as Record<string, any> };
+  return { client, result: result as Result };
 }
 
 const SENT = 'Close every task still open when the parent incident closes';
@@ -61,13 +64,13 @@ describe('ARC-09-C93 - a Business Rule name cut by the platform is reported with
       ...cut, queries: { [DICT_NAME('sys_script', 'name')]: [{ max_length: String(LIMIT) }] },
     });
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toMatchObject({
+    expect(result.warnings![0]).toMatchObject({
       code: 'VALUE_TRUNCATED', operation: 'create', table: 'sys_script', sys_id: 'b1', field: 'name',
       sent_length: SENT.length, stored_length: LIMIT, column_limit: LIMIT, confirmed: true,
     });
     // The words a person reads: the limit, how much was sent, and that the record exists cut.
-    expect(result.warnings[0].message).toContain(String(LIMIT));
-    expect(result.warnings[0].message).toContain(String(SENT.length));
+    expect(result.warnings![0]!.message).toContain(String(LIMIT));
+    expect(result.warnings![0]!.message).toContain(String(SENT.length));
     // Exactly one extra request, and only because a cut was seen.
     expect(client.sequence).toEqual([
       'create sys_script', `query sys_dictionary:name=sys_script^element=name`,
@@ -85,7 +88,7 @@ describe('ARC-09-C93 - a Business Rule name cut by the platform is reported with
     // read the dictionary does. The cut is real either way, so the warning is not withheld.
     const { result } = await call('snow_scr_business_rule_add', BR, cut);
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toMatchObject({
+    expect(result.warnings![0]).toMatchObject({
       code: 'VALUE_TRUNCATED', field: 'name', column_limit: LIMIT, stored_length: LIMIT, confirmed: false,
     });
   });
@@ -103,7 +106,7 @@ describe('ARC-09-C93 - a Business Rule name cut by the platform is reported with
         ...cut, queries: { [DICT_NAME('sys_script', 'name')]: [{ max_length }] },
       });
       expect(result.warnings, JSON.stringify(max_length)).toHaveLength(1);
-      expect(result.warnings[0].confirmed, JSON.stringify(max_length)).toBe(false);
+      expect(result.warnings![0]!.confirmed, JSON.stringify(max_length)).toBe(false);
     }
   });
 });
@@ -126,7 +129,7 @@ describe('ARC-09-C93 - it is the write path, not one tool', () => {
       { updated: { sys_script: { sys_id: 'b1', name: CUT } },
         queries: { [DICT_NAME('sys_script', 'name')]: [{ max_length: String(LIMIT) }] } });
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toMatchObject({
+    expect(result.warnings![0]).toMatchObject({
       code: 'VALUE_TRUNCATED', operation: 'update', table: 'sys_script', sys_id: 'b1',
       field: 'name', column_limit: LIMIT, confirmed: true,
     });
@@ -138,7 +141,7 @@ describe('ARC-09-C93 - it is the write path, not one tool', () => {
       queries: { [DICT_NAME('sys_script_include', 'name')]: [{ max_length: String(LIMIT) }] },
     });
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toMatchObject({ table: 'sys_script_include', field: 'name', confirmed: true });
+    expect(result.warnings![0]).toMatchObject({ table: 'sys_script_include', field: 'name', confirmed: true });
   });
 
   it('the generic record tool, on a column whose definition lives on a parent table', async () => {
@@ -149,7 +152,7 @@ describe('ARC-09-C93 - it is the write path, not one tool', () => {
       { table: 'incident', fields: { short_description: long, impact: '2' } },
       { created: { incident: { sys_id: 'i1', short_description: long.slice(0, 160), impact: '2' } } });
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]).toMatchObject({
+    expect(result.warnings![0]).toMatchObject({
       table: 'incident', field: 'short_description', sent_length: 200, stored_length: 160,
       column_limit: 160, confirmed: false,
     });
@@ -160,7 +163,7 @@ describe('ARC-09-C93 - it is the write path, not one tool', () => {
     const { result } = await call('snow_core_record_add',
       { table: 'u_thing', fields: { u_first: a, u_second: b } },
       { created: { u_thing: { sys_id: 't1', u_first: a.slice(0, 80), u_second: b.slice(0, 255) } } });
-    expect(result.warnings.map((w: { field: string }) => w.field)).toEqual(['u_first', 'u_second']);
+    expect(result.warnings!.map((w) => w.field)).toEqual(['u_first', 'u_second']);
   });
 });
 

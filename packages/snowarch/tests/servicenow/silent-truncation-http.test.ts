@@ -47,6 +47,9 @@ const SENT = 'Close every task still open when the parent incident closes';
 const CUT = SENT.slice(0, 40);
 const SYS_ID = 'b'.repeat(32);
 
+/** What a caller reads back from the router. */
+interface Result { sys_id?: string; summary?: string; warnings?: Array<Record<string, unknown>>; [k: string]: unknown }
+
 describe('ARC-09-C93 - over the real client', () => {
   beforeEach(() => { setEnv(); resetFetchMock(http); });
   afterEach(() => vi.restoreAllMocks());
@@ -72,13 +75,13 @@ describe('ARC-09-C93 - over the real client', () => {
     expect(decodeURIComponent(http.calls[1]!.url)).toContain('name=sys_script^element=name');
     expect(decodeURIComponent(http.calls[1]!.url)).toContain('sysparm_fields=max_length');
 
-    expect((result as any).warnings).toHaveLength(1);
-    expect((result as any).warnings[0]).toMatchObject({
+    expect((result as Result).warnings).toHaveLength(1);
+    expect((result as Result).warnings![0]).toMatchObject({
       code: 'VALUE_TRUNCATED', table: 'sys_script', sys_id: SYS_ID, field: 'name',
       sent_length: SENT.length, stored_length: 40, column_limit: 40, confirmed: true,
     });
-    expect((result as any).summary).toContain(CUT);
-    expect((result as any).summary).not.toContain(SENT);
+    expect((result as Result).summary).toContain(CUT);
+    expect((result as Result).summary).not.toContain(SENT);
   });
 
   it('a platform that stores the name whole produces one request and no warnings', async () => {
@@ -107,8 +110,11 @@ describe('ARC-09-C93 - over the real client', () => {
     const result = await runWithInstance(runtime(), () => routeToolInvocation(client,
       'snow_scr_business_rule_add', { name: SENT, table: 'incident', when: 'before', script: 'gs.info(1);' }));
 
-    expect((result as any).sys_id).toBe(SYS_ID);                     // the write still succeeded
-    expect((result as any).warnings).toHaveLength(1);
-    expect((result as any).warnings[0]).toMatchObject({ column_limit: 40, confirmed: false });
+    expect((result as Result).sys_id).toBe(SYS_ID);                     // the write still succeeded
+    expect((result as Result).warnings).toHaveLength(1);
+    expect((result as Result).warnings![0]).toMatchObject({ column_limit: 40, confirmed: false });
+    // The write and ONE lookup. The client retries a 403 with backoff (1s + 2s + 4s) unless told not
+    // to, and the caller of a tool should not wait that long to learn the dictionary is unreadable.
+    expect(http.calls).toHaveLength(2);
   });
 });

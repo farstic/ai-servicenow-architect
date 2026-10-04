@@ -502,6 +502,12 @@
       "showInRule": false
     },
     {
+      "code": "VALUE_TRUNCATED",
+      "meaning": "A WARNING on a write that succeeded, not an error: a string was longer than its column and the platform stored only the first part of it, without refusing. It arrives as `warnings[].code` on the tool's result and names the field, both lengths and the column's limit.",
+      "remedy": "the record exists with the cut value, so modify it with a value of at most `column_limit` characters; do not add it again, which would make a second record. `confirmed: false` means the dictionary could not state the limit and it is inferred from the stored length",
+      "showInRule": false
+    },
+    {
       "code": "WRITE_NOT_ENABLED",
       "meaning": "The instance's preset does not enable WRITE_ENABLED.",
       "remedy": "raise the preset; a `prod` instance additionally needs `--ack-prod`",

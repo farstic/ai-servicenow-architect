@@ -343,7 +343,7 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (68), with what to do about it.
+Every code the server can throw (69), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
@@ -415,6 +415,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `URL_NOT_HTTPS` | use the https form of the same host |
 | `URL_REQUIRED` | enter the full https URL of the instance; non-interactively pass `--url <origin>` (a URL cannot be proposed) |
 | `VALIDATION_ERROR` | the message names the argument and the shape |
+| `VALUE_TRUNCATED` | the record exists with the cut value, so modify it with a value of at most `column_limit` characters; do not add it again, which would make a second record. `confirmed: false` means the dictionary could not state the limit and it is inferred from the stored length |
 | `WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 
 <!-- /generated:error-codes -->

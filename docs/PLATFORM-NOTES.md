@@ -122,7 +122,10 @@ baseline concept); observed behaviour
 **Evidence:** observed on PDI; regression test — none (platform, not server)
 **Engine consequence:** the Developer skill keeps `sys_script_fix.name` at 40 characters or fewer, and
 reads the stored `name` back from the create response instead of assuming what was sent was kept —
-the same check being worth applying to any short label field written over REST.
+the same check being worth applying to any short label field written over REST. **The server now
+does that for every write** (ARC-09-C93, PN-10): a value stored shorter than it was sent comes back as
+a `VALUE_TRUNCATED` warning on the tool's result, so the skill's own check is a second line, not the
+only one.
 
 ---
 
@@ -159,6 +162,30 @@ developer programme's sleep policy).
 **Evidence:** observed while preparing ARC-07-S11's live suite
 **Engine consequence:** a live test suite wakes the instance first and treats an unreachable PDI as
 an environment problem, never as a failed assertion about the product.
+
+## PN-10 — `sys_script.name` (a Business Rule) is cut at 40 characters without an error
+
+**Applies to:** `sys_script` · Australia family · reported by the owner's live test (ARC-09-C93,
+finding R4)
+**Behaviour:** A Business Rule created over the REST Table API with a `name` longer than 40 characters
+was stored with the first 40 and the call succeeded. It is the same behaviour PN-07 records for
+`sys_script_fix.name`, on the table most callers meet first. `snow_scr_business_rule_add` then reported
+"Created business rule <the name that was SENT>", built from the argument, so the report agreed with the
+request and not with the record.
+**Grounding:** none in ServiceNowDocs (`markdown/application-development/business-rules-and-script-includes.md`
+for the baseline concept); observed behaviour
+**Evidence:** the owner's live test. **Not reproduced here** — this repository's tests have no
+instance. PN-07 observed, on a PDI, that the response to the write carried the CUT value; that the
+response for `sys_script` does is the Table API's behaviour for every table and is assumed, not seen.
+`packages/snowarch/tests/live/README.md` has the run that settles it. Regression test — the cut is
+reproduced with a fake that stores a shorter value: `packages/snowarch/tests/tools/silent-truncation.test.ts`
+and, over the real client with the HTTP seam mocked,
+`packages/snowarch/tests/servicenow/silent-truncation-http.test.ts`
+**Engine consequence:** the server compares what every write stored with what it sent and returns
+`warnings[].code = VALUE_TRUNCATED` with the field, both lengths and the column's limit
+(`packages/snowarch/src/servicenow/stored-values.ts`). It cannot stop the cut — the record, and the
+update-set entry that captured it, exist by the time the response says so — so the warning says to
+**modify** the record and not to add it again.
 
 ## Windows notes — this repository, not ServiceNow
 

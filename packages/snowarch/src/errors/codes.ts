@@ -528,6 +528,12 @@ export const ERROR_CODES = [
     remedy: "check the instance URL and the certificate; this is not a CA-trust problem",
     showInRule: false,
   },
+  {
+    code: 'VALUE_TRUNCATED',
+    meaning: "A WARNING on a write that succeeded, not an error: a string was longer than its column and the platform stored only the first part of it, without refusing. It arrives as `warnings[].code` on the tool's result and names the field, both lengths and the column's limit.",
+    remedy: "the record exists with the cut value, so modify it with a value of at most `column_limit` characters; do not add it again, which would make a second record. `confirmed: false` means the dictionary could not state the limit and it is inferred from the stored length",
+    showInRule: false,
+  },
 ] as const satisfies readonly ErrorCode[];
 
 export const ERROR_CODE_NAMES: ReadonlySet<string> = new Set(ERROR_CODES.map((e) => e.code));

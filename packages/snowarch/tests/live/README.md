@@ -392,3 +392,60 @@ Covered by the S07 c4 teardown; no extra objects are created.
 ### Verdict
 
 Record in `docs/validation/` under the sitting's file, as **ARC-04-S10 c1: CONFIRMED / FAILED**.
+
+## ARC-09-C92 and C93 — a rule is one write, and a cut name is reported with its limit
+
+**Build under test:** `develop` @ the sha on the PR that adds this section.
+
+**What the unit tests already prove** (`tests/tools/script-business-rule-one-write.test.ts`,
+`tests/tools/silent-truncation.test.ts`, `tests/servicenow/silent-truncation-http.test.ts`): that
+`snow_scr_business_rule_add` puts `filter_condition`, `advanced` and `active` in the one create, and that
+a response whose `name` is a shorter prefix of what was sent comes back as a `VALUE_TRUNCATED` warning.
+**What only a live run can prove**, because a fake returns what it was told to: that the REAL response
+to a write on `sys_script` carries the STORED name, and that `sys_dictionary` states
+`sys_script.name`'s `max_length` to this account. The first is the premise of the whole design (PN-10).
+If it is false the check is silent exactly where it matters, and **that is the result to record**.
+
+### Setup
+
+An instance on the `pdi-developer` preset, and the §2.2 chain (`snow_us_active_update_set_ensure`,
+`snow_us_capture_target_set`) so the probe records land in a throwaway update set.
+
+### The run
+
+```
+1  snow_scr_business_rule_add
+   { name: "c93-live-probe-0123456789-0123456789-01", table: "incident", when: "before",
+     script: "// c93 probe", filter_condition: "number=INC0000000", advanced: true, active: false }
+   (the name is 41 characters; the filter matches nothing; the rule is inactive — nothing can fire)
+2  snow_scr_business_rule_read { sys_id: <from step 1> }
+3  snow_scr_business_rule_add  the same call with name "c93-live-probe-short"
+```
+
+### Pass condition — the exact state to see
+
+Step 1 is ONE call, and its result carries `warnings[0]` with `code: "VALUE_TRUNCATED"`,
+`field: "name"`, `sent_length: 41`, `stored_length: 40`, `column_limit: 40` and `confirmed: true`. Step 2
+shows `name` of 40 characters, `filter_condition` as sent, `advanced` true and `active` false — the whole
+rule from the one write. **A failure looks like:** step 1 has no `warnings` while step 2 shows a 40-character
+name (the response echoed what was SENT — the design's premise is false); or `confirmed: false`
+(the account cannot read `sys_dictionary`, or the limit is not on this table's row); or step 2 missing
+`filter_condition` or `advanced`.
+
+### The evidence to record
+
+- the `warnings` array from step 1, and step 2's `name` (its length), `filter_condition`, `advanced`
+  and `active` — none of these is a secret;
+- **the negative control:** step 3 returns no `warnings` key and made no `sys_dictionary` request. A check
+  that warned on every write would pass the positive half every time.
+
+### Teardown
+
+Delete both probe rules in the UI (`record_remove` on a scripting table is the open question in the
+ARC-02-S10 section above) and discard the update set.
+
+### Verdict
+
+Record in `docs/validation/` under the sitting's file, as **ARC-09-C92 live: CONFIRMED / FAILED** and
+**ARC-09-C93 live: CONFIRMED / FAILED**, saying which of the three failure shapes above it was.
+

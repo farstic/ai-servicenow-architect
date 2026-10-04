@@ -35,6 +35,13 @@ export interface QueryRecordsParams {
     limit?: number;
     orderBy?: string;
     offset?: number;
+    /**
+     * Attempts AFTER the first. Unset keeps the client's own policy (3 by default, with backoff).
+     * `0` is for a lookup whose failure is an acceptable answer: the client retries a 403, which is a
+     * decision and not a fault, and a caller that only wanted to know "can I read this?" should not
+     * wait out 1s + 2s + 4s to be told no (ARC-09-C93's dictionary lookup).
+     */
+    retries?: number;
 }
 export interface QueryRecordsResponse {
     count: number;

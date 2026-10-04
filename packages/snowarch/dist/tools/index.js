@@ -69,6 +69,7 @@ import { cmdbReconciliationToolManifest, dispatchCmdbReconciliationAction } from
 import { orchestrationToolManifest, dispatchOrchestrationAction } from './orchestration.js';
 // Dynamic Schema Discovery
 import { discoveryToolManifest, dispatchDiscoveryAction } from './discovery.js';
+import { attachWarnings, withWriteVerification } from '../servicenow/stored-values.js';
 // ─── Package Definitions ──────────────────────────────────────────────────────
 export const ROLE_BUNDLE_MAP = {
     devops_engineer: [
@@ -288,7 +289,7 @@ const CATALOGUE = selectPackage(ALL_TOOLS, process.env.MCP_TOOL_PACKAGE || 'full
 export function collectToolCatalog() {
     return CATALOGUE;
 }
-export async function routeToolInvocation(client, name, args) {
+async function dispatchTool(client, name, args) {
     // Try each domain handler in order; first non-null result wins
     const handlers = [
         () => dispatchCoreAction(client, name, args),
@@ -335,4 +336,20 @@ export async function routeToolInvocation(client, name, args) {
             return result;
     }
     throw new ServiceNowError(`Unknown tool: ${name}`, 'UNKNOWN_TOOL');
+}
+/**
+ * Every tool invocation passes through here, so this is where a write is checked against what the
+ * platform STORED (ARC-09-C93, `src/servicenow/stored-values.ts`).
+ *
+ * The client is wrapped for this one invocation; if a value comes back cut, the cut is put on the
+ * result as `warnings`. No tool is edited and none can forget. The instance-free core tools arrive
+ * with no client and are dispatched as they were. An invocation that arrives holding an already
+ * wrapped client (an orchestration step) joins the outer one, which reports for all of them.
+ */
+export async function routeToolInvocation(client, name, args) {
+    if (!client)
+        return dispatchTool(client, name, args);
+    const verified = withWriteVerification(client);
+    const result = await dispatchTool(verified.client, name, args);
+    return verified.owner ? attachWarnings(result, verified.warnings) : result;
 }

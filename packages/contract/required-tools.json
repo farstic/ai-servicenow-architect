@@ -1,7 +1,7 @@
 {
   "$schema": "./required-tools.schema.json",
   "contractVersion": 1,
-  "contractSha256": "bfc140061c66baf5301d26e36b477dea5f352c5b670d443c86ae0371a00fb5b7",
+  "contractSha256": "1bc074fe7a2a1b69c665f9dacc87f269e97602333729fcbaa231dc51dd3acd60",
   "serverKey": "servicenow",
   "tools": [
     {

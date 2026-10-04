@@ -502,7 +502,11 @@ export async function dispatchScriptAction(client, name, args) {
                 action_query: flag(args.action_query, false),
             };
             const result = await client.createRecord('sys_script', data);
-            return { ...result, summary: `Created business rule ${args.name}`, note: 'GlideEncrypter is deprecated in recent releases; use new sn_si.Vault or keystore APIs instead' };
+            // The name the platform STORED, not the one that was sent. This line used to repeat the
+            // argument, so a name cut at the column's limit was reported whole (ARC-09-C93). If it was cut,
+            // `warnings` on this result says so and gives the limit.
+            const stored = typeof result?.name === 'string' && result.name !== '' ? result.name : args.name;
+            return { ...result, summary: `Created business rule ${stored}`, note: 'GlideEncrypter is deprecated in recent releases; use new sn_si.Vault or keystore APIs instead' };
         }
         case 'snow_scr_business_rule_modify': {
             requireScripting();
