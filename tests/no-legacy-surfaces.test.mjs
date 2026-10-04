@@ -685,8 +685,8 @@ test('and a marker planted where the lint does not honour it is still reported',
 // stops at the first `## <digit>` heading — which in CLAUDE.md is "## 1. Operating principles".
 
 // Every pattern also reaches the surfaces a session reads without being asked to: CLAUDE.md and
-// .claude/rules/ load into every session, a builder copies the templates, and VALIDATION-TESTS.md holds
-// the prompts run against the roster. A phrase the audit removed from a skill is as live in any of them.
+// .claude/rules/ load into every session, a builder copies the templates, and tests/VALIDATION-TESTS.md
+// holds the prompts run against the roster. A phrase the audit removed from a skill is as live in any of them.
 const ALWAYS_READ = ['CLAUDE.md', '.claude/rules/', 'templates/', 'tests/VALIDATION-TESTS.md'];
 
 export const AUDIT_PATTERNS = [
