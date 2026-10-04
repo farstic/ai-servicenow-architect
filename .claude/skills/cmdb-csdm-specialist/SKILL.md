@@ -270,7 +270,7 @@ Cite where Verdict B/C is in play.]
 
 ## Open Questions
 
-[Missing Input Contract fields, ambiguities, CSDM-stage uncertainty.]
+[Missing Input Contract fields, ambiguities, CSDM-stage uncertainty. Number each `OQ-EV-1`, `OQ-EV-2`… (`governance/governance-rules.md` §4.4).]
 
 ---
 

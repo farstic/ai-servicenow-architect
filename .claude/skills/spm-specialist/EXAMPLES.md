@@ -50,10 +50,10 @@ goal link) is baseline SPM configuration. No custom demand/project/portfolio/sto
 - No custom `dmn_demand.state` values without §1.1 review.
 
 ## Open questions
-1. Delivery model: scrum, or scaled (SAFe / Enterprise Agile Planning)? (Drives ART/PI structure.)
-2. Resource model: soft (plan) only, or firm/confirmed allocations with capacity?
-3. Investment funding / budget tracking in scope, or delivery only?
-4. Do approved demands ever go waterfall (`pm_project`) instead of agile?
+OQ-CN-1. Delivery model: scrum, or scaled (SAFe / Enterprise Agile Planning)? (Drives ART/PI structure.)
+OQ-CN-2. Resource model: soft (plan) only, or firm/confirmed allocations with capacity?
+OQ-CN-3. Investment funding / budget tracking in scope, or delivery only?
+OQ-CN-4. Do approved demands ever go waterfall (`pm_project`) instead of agile?
 ```
 
 ---

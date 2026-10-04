@@ -15,9 +15,11 @@
     "ARC-09-C84": "the C82 follow-ups: ITSM Example 3 weighs the Change approval policies — the request names its custom table, so the verdict stays C and the halt recommends the policy — and the ITSM skill names the policy as the baseline for change approvals; and, approved by the owner, one cited sentence in the Now Assist skills and agent: the bundled documentation titles the product family \"ServiceNow Otto\" on most pages and \"Now Assist\" on others, so the corpus is searched under both names",
     "ARC-09-C85": "gateway discipline: the §1.1 halt comes before the design — item 2 of every proposal names the object, its kind, its place in the hierarchy and what it would hold, with no field list, types, indices, ACLs or code, and the examples that carried field lists inside a halt are rewritten — and each gateway grounds Part 2 directly and boundedly, without a sub-agent, marking what it did not open",
     "ARC-09-C86": "CSM Example 3 rewritten on the corpus: the request names a custom case-escalation table, so the verdict stays C, and Part 2 finds the baseline case and account escalation feature covers it — the halt recommends that feature, the tiers are an open question with a default, and the correction banner and the Vancouver alternatives are gone",
-    "ARC-09-C88": "the three facts of the d01fbf9 sitting: the HRSD skill's five dotted notification names (0 corpus hits) replaced by what the corpus documents for HR notifications, cited, with the baseline names marked not documented; the personal-auto claim roles added to the FSO skill; the cluster classes added to the CMDB & CSDM skill's baseline class map, with a pointer in the ITOM skill"
+    "ARC-09-C88": "the three facts of the d01fbf9 sitting: the HRSD skill's five dotted notification names (0 corpus hits) replaced by what the corpus documents for HR notifications, cited, with the baseline names marked not documented; the personal-auto claim roles added to the FSO skill; the cluster classes added to the CMDB & CSDM skill's baseline class map, with a pointer in the ITOM skill",
+    "ARC-09-C89": "engagement role-matrix pointer: the four builders that read a role matrix are pointed at the one engagement file onboarding creates, <client>-engagement-state.md (its Roles section), not an instructions file that nothing writes",
+    "ARC-09-C91": "OPEN QUESTION ids carry their artefact: every id and numbered open question in the examples and output formats is OQ-<kind>-<n>, the kinds defined once in governance-rules.md §4.4, and each format that mints ids says which kind it mints"
   },
-  "_measured": "62 of 65 bodies differ (3 identical), 2026-10-04, against import/engine-v2.8.0-worktree. The eight that ARC-09-C82a newly reached are the EXAMPLES of code-reviewer, developer, estimation-specialist, migration-specialist, operational-documentation, performance-scale-specialist, security-grc-specialist and spm-specialist; ARC-09-C82b's thirteen roster files were already listed, so the count holds. ARC-09-C83's two licensing files were already listed, so the count holds. ARC-09-C84's five files (two ITSM, three Now Assist) were already listed, so the count holds. ARC-09-C85 reached one more — the App Engine EXAMPLES, whose halt now uses the standard item 2 — and its other 22 roster files were already listed. ARC-09-C86's one file was already listed. The FSO skill postdates the import tag, so its two files are outside this comparison and this ledger. ARC-09-C88's three files (the HRSD, ITOM and CMDB & CSDM SKILL.md) were already listed, so the count holds; the FSO skill is not in the import, so it is not compared.",
+  "_measured": "65 of 65 bodies differ (0 identical), 2026-10-04, against import/engine-v2.8.0-worktree. The eight that ARC-09-C82a newly reached are the EXAMPLES of code-reviewer, developer, estimation-specialist, migration-specialist, operational-documentation, performance-scale-specialist, security-grc-specialist and spm-specialist; ARC-09-C82b's thirteen roster files were already listed, so the count holds. ARC-09-C83's two licensing files were already listed, so the count holds. ARC-09-C84's five files (two ITSM, three Now Assist) were already listed, so the count holds. ARC-09-C85 reached one more — the App Engine EXAMPLES, whose halt now uses the standard item 2 — and its other 22 roster files were already listed. ARC-09-C86's one file was already listed. The FSO skill postdates the import tag, so its two files are outside this comparison and this ledger. ARC-09-C88's three files (the HRSD, ITOM and CMDB & CSDM SKILL.md) were already listed, so the count holds; the FSO skill is not in the import, so it is not compared. ARC-09-C89 listed the four builder agents (already listed). ARC-09-C91 newly reached three — the EXAMPLES of atf-author, devops-release-manager and reporting-analytics-specialist — and added its cause to the others it touched; the FSO skill's two files are outside the import, so they are not compared.",
   "files": {
     "agents/atf-author.md": [
       "ARC-02-S06",
@@ -47,7 +49,8 @@
       "ARC-02-S06",
       "ARC-02-S04",
       "ARC-09-C78",
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C89"
     ],
     "agents/integration-specialist.md": [
       "ARC-02-S06",
@@ -63,7 +66,8 @@
       "ARC-09-C78",
       "ARC-09-C82",
       "ARC-09-C84",
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C89"
     ],
     "agents/story-writer.md": [
       "ARC-02-S06",
@@ -71,13 +75,15 @@
       "ARC-03-S04",
       "ARC-03-C4",
       "ARC-09-C78",
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C89"
     ],
     "agents/technical-designer.md": [
       "ARC-02-S06",
       "ARC-02-S04",
       "ARC-09-C78",
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C89"
     ],
     "skills/app-engine-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -86,7 +92,8 @@
       "ARC-09-C82"
     ],
     "skills/app-engine-specialist/EXAMPLES.md": [
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C91"
     ],
     "skills/atf-author/SKILL.md": [
       "ARC-02-S03",
@@ -96,7 +103,8 @@
     ],
     "skills/cmdb-csdm-specialist/EXAMPLES.md": [
       "ARC-03-S04",
-      "ARC-09-C81"
+      "ARC-09-C81",
+      "ARC-09-C91"
     ],
     "skills/cmdb-csdm-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -106,7 +114,8 @@
       "ARC-09-C81",
       "ARC-09-C82",
       "ARC-09-C85",
-      "ARC-09-C88"
+      "ARC-09-C88",
+      "ARC-09-C91"
     ],
     "skills/code-reviewer/SKILL.md": [
       "ARC-02-S03",
@@ -120,7 +129,8 @@
       "ARC-09-C81",
       "ARC-09-C82",
       "ARC-09-C85",
-      "ARC-09-C86"
+      "ARC-09-C86",
+      "ARC-09-C91"
     ],
     "skills/csm-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -129,7 +139,8 @@
       "ARC-03-C4",
       "ARC-09-C81",
       "ARC-09-C82",
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C91"
     ],
     "skills/developer/SKILL.md": [
       "ARC-02-S03",
@@ -148,10 +159,12 @@
       "ARC-09-C82"
     ],
     "skills/discovery-specialist/EXAMPLES.md": [
-      "ARC-03-C4"
+      "ARC-03-C4",
+      "ARC-09-C91"
     ],
     "skills/discovery-specialist/SKILL.md": [
-      "ARC-02-S03"
+      "ARC-02-S03",
+      "ARC-09-C91"
     ],
     "skills/estimation-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -173,7 +186,8 @@
     "skills/hld-lld-writer/SKILL.md": [
       "ARC-02-S03",
       "ARC-02-S06",
-      "ARC-09-C78"
+      "ARC-09-C78",
+      "ARC-09-C91"
     ],
     "skills/hrsd-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -182,7 +196,8 @@
       "ARC-09-C81",
       "ARC-09-C82",
       "ARC-09-C85",
-      "ARC-09-C88"
+      "ARC-09-C88",
+      "ARC-09-C91"
     ],
     "skills/integration-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -195,7 +210,8 @@
       "ARC-02-S12",
       "ARC-09-C81",
       "ARC-09-C82",
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C91"
     ],
     "skills/itom-discovery-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -206,13 +222,15 @@
       "ARC-09-C81",
       "ARC-09-C82",
       "ARC-09-C85",
-      "ARC-09-C88"
+      "ARC-09-C88",
+      "ARC-09-C91"
     ],
     "skills/itsm-specialist/EXAMPLES.md": [
       "ARC-02-S06",
       "ARC-09-C81",
       "ARC-09-C82",
-      "ARC-09-C84"
+      "ARC-09-C84",
+      "ARC-09-C91"
     ],
     "skills/itsm-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -222,7 +240,8 @@
       "ARC-09-C81",
       "ARC-09-C82",
       "ARC-09-C84",
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C91"
     ],
     "skills/licensing-specialist/EXAMPLES.md": [
       "ARC-02-S06",
@@ -290,24 +309,28 @@
     ],
     "skills/story-writer/EXAMPLES.md": [
       "ARC-03-C4",
-      "ARC-09-C81"
+      "ARC-09-C81",
+      "ARC-09-C91"
     ],
     "skills/story-writer/SKILL.md": [
       "ARC-02-S03",
       "ARC-02-S06",
       "ARC-03-C4",
       "ARC-09-C78",
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C91"
     ],
     "skills/technical-designer/SKILL.md": [
       "ARC-02-S03",
       "ARC-02-S06",
       "ARC-09-C78",
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C91"
     ],
     "skills/ui-ux-specialist/EXAMPLES.md": [
       "ARC-03-C4",
-      "ARC-09-C82"
+      "ARC-09-C82",
+      "ARC-09-C91"
     ],
     "skills/ui-ux-specialist/SKILL.md": [
       "ARC-02-S03",
@@ -318,7 +341,8 @@
     "skills/technical-designer/EXAMPLES.md": [
       "ARC-09-C78",
       "ARC-09-C81",
-      "ARC-09-C82"
+      "ARC-09-C82",
+      "ARC-09-C91"
     ],
     "skills/diagramming-specialist/EXAMPLES.md": [
       "ARC-09-C78",
@@ -332,16 +356,19 @@
     ],
     "skills/flow-designer-specialist/EXAMPLES.md": [
       "ARC-09-C81",
-      "ARC-09-C82"
+      "ARC-09-C82",
+      "ARC-09-C91"
     ],
     "skills/integration-specialist/EXAMPLES.md": [
       "ARC-09-C81",
-      "ARC-09-C82"
+      "ARC-09-C82",
+      "ARC-09-C91"
     ],
     "skills/hrsd-specialist/EXAMPLES.md": [
       "ARC-09-C81",
       "ARC-09-C82",
-      "ARC-09-C85"
+      "ARC-09-C85",
+      "ARC-09-C91"
     ],
     "skills/code-reviewer/EXAMPLES.md": [
       "ARC-09-C82"
@@ -353,10 +380,12 @@
       "ARC-09-C82"
     ],
     "skills/migration-specialist/EXAMPLES.md": [
-      "ARC-09-C82"
+      "ARC-09-C82",
+      "ARC-09-C91"
     ],
     "skills/operational-documentation/EXAMPLES.md": [
-      "ARC-09-C82"
+      "ARC-09-C82",
+      "ARC-09-C91"
     ],
     "skills/performance-scale-specialist/EXAMPLES.md": [
       "ARC-09-C82"
@@ -365,7 +394,17 @@
       "ARC-09-C82"
     ],
     "skills/spm-specialist/EXAMPLES.md": [
-      "ARC-09-C82"
+      "ARC-09-C82",
+      "ARC-09-C91"
+    ],
+    "skills/atf-author/EXAMPLES.md": [
+      "ARC-09-C91"
+    ],
+    "skills/devops-release-manager/EXAMPLES.md": [
+      "ARC-09-C91"
+    ],
+    "skills/reporting-analytics-specialist/EXAMPLES.md": [
+      "ARC-09-C91"
     ]
   }
 }

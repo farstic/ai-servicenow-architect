@@ -36,9 +36,9 @@ Feature: {{Short, action-oriented feature name}}
     And the user receives {{notification}}
 
   # OPEN QUESTIONS
-  # 1. {{Question for the product owner}}
-  # 2. ASSUMPTION: {{stated assumption that needs confirmation}}
-  # 3. {{Decision the client must make before build}}
+  # OQ-ST-1. {{Question for the product owner}}
+  # OQ-ST-2. ASSUMPTION: {{stated assumption that needs confirmation}}
+  # OQ-ST-3. {{Decision the client must make before build}}
 ```
 
 ## Standard supporting stories to consider proposing

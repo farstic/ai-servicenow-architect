@@ -120,9 +120,9 @@ Consult flags:
 
 ## Open Questions
 
-1. **Existing baseline Internal Transfer LE template** — does the engagement's release ship a baseline Internal Transfer LE type that can be tailored, or does a new LE type need to be created? Verify in the Lifecycle Events Type [`sn_hr_le_type`] table *(citation: `markdown/employee-service-management/lifecycle-events/components-installed-with-enterprise-onboarding-and-transitions.md`)*.
-2. **IT-task catalog item** — is there an existing "Internal Transfer — Access Reprovisioning" record producer in the engagement's IT catalog, or does one need to be created? If yes-needs-creating, ITSM Specialist consult is appropriate.
-3. **30-day check-in scheduling** — the wait-for-condition activity needs a clear trigger (transfer effective date + 30 days). Confirm whether the effective date is captured on the LE case directly or sourced from HR Profile.
+OQ-EV-1. **Existing baseline Internal Transfer LE template** — does the engagement's release ship a baseline Internal Transfer LE type that can be tailored, or does a new LE type need to be created? Verify in the Lifecycle Events Type [`sn_hr_le_type`] table *(citation: `markdown/employee-service-management/lifecycle-events/components-installed-with-enterprise-onboarding-and-transitions.md`)*.
+OQ-EV-2. **IT-task catalog item** — is there an existing "Internal Transfer — Access Reprovisioning" record producer in the engagement's IT catalog, or does one need to be created? If yes-needs-creating, ITSM Specialist consult is appropriate.
+OQ-EV-3. **30-day check-in scheduling** — the wait-for-condition activity needs a clear trigger (transfer effective date + 30 days). Confirm whether the effective date is captured on the LE case directly or sourced from HR Profile.
 
 ---
 
@@ -224,9 +224,9 @@ Consult flags:
 
 ## Open Questions
 
-1. **Engagement field-naming convention** — on `sn_hr_le_case` the platform names a new field by where it is created: in the table's own scope it takes no prefix, so `u_target_role_title` is the engagement's mark for a custom field; created from global, the platform adds `u_`; from a scoped app, that app's namespace, `x_<vendor>_<app>_target_role_title` *(citation: `markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`)*. Confirm with Chief Architect / App Engine Specialist.
-2. **Record producer variable** — does the existing "Initiate Internal Transfer" record producer already collect this attribute (perhaps under a different name)? If yes, the field may need a rename consultation; if no, the variable definition is part of the same configuration change.
-3. **Target title vs target position record** — is the target a free-text title, or should it be a reference to a position table (Position [`sn_hr_core_position`] *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*)? If reference, escalates the design — possible Verdict B+ with a join consideration. Verify Discovery output on position-table presence.
+OQ-EV-1. **Engagement field-naming convention** — on `sn_hr_le_case` the platform names a new field by where it is created: in the table's own scope it takes no prefix, so `u_target_role_title` is the engagement's mark for a custom field; created from global, the platform adds `u_`; from a scoped app, that app's namespace, `x_<vendor>_<app>_target_role_title` *(citation: `markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`)*. Confirm with Chief Architect / App Engine Specialist.
+OQ-EV-2. **Record producer variable** — does the existing "Initiate Internal Transfer" record producer already collect this attribute (perhaps under a different name)? If yes, the field may need a rename consultation; if no, the variable definition is part of the same configuration change.
+OQ-EV-3. **Target title vs target position record** — is the target a free-text title, or should it be a reference to a position table (Position [`sn_hr_core_position`] *(citation: `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*)? If reference, escalates the design — possible Verdict B+ with a join consideration. Verify Discovery output on position-table presence.
 
 ---
 
@@ -384,12 +384,12 @@ If rejected: adopt Alternative A, B, or C from Part 3.
 
 ## Open Questions
 
-1. **Country-specific HR data law applicability** — Passport, work-permit, security-clearance storage may be subject to different regulations per country (GDPR vs APPI vs LGPD vs local employment laws). Discovery follow-up required on engagement's geographic footprint and per-country compliance posture.
-2. **Encryption-at-rest requirement** — Does engagement's DPO require column-level encryption for passport/clearance fields? Affects design pattern (custom-table with encryption vs sealed scoped-app integration).
-3. **HRIS authoritative source** — Is the engagement's HRIS (Workday/SAP/BambooHR) the authoritative source for any of these fields? If yes, ServiceNow becomes a read-only consumer, simplifying the storage question.
-4. **Dependants — PII or special-category?** Family member data may be special-category in some jurisdictions. Clarify whether storage in ServiceNow is acceptable at all.
-5. **Emergency contact — do the baseline records carry all five attributes?** Baseline emergency contacts (`sn_hr_core_contact`) are structured; confirm they hold relationship, full address, phone and alternative phone — not documented in the bundled corpus — verify on the instance.
-6. **Mobility COE membership model** — How is "Mobility COE" membership represented in `sys_user_group` in the engagement? ACL conditions need to reference the membership pattern correctly.
+OQ-EV-1. **Country-specific HR data law applicability** — Passport, work-permit, security-clearance storage may be subject to different regulations per country (GDPR vs APPI vs LGPD vs local employment laws). Discovery follow-up required on engagement's geographic footprint and per-country compliance posture.
+OQ-EV-2. **Encryption-at-rest requirement** — Does engagement's DPO require column-level encryption for passport/clearance fields? Affects design pattern (custom-table with encryption vs sealed scoped-app integration).
+OQ-EV-3. **HRIS authoritative source** — Is the engagement's HRIS (Workday/SAP/BambooHR) the authoritative source for any of these fields? If yes, ServiceNow becomes a read-only consumer, simplifying the storage question.
+OQ-EV-4. **Dependants — PII or special-category?** Family member data may be special-category in some jurisdictions. Clarify whether storage in ServiceNow is acceptable at all.
+OQ-EV-5. **Emergency contact — do the baseline records carry all five attributes?** Baseline emergency contacts (`sn_hr_core_contact`) are structured; confirm they hold relationship, full address, phone and alternative phone — not documented in the bundled corpus — verify on the instance.
+OQ-EV-6. **Mobility COE membership model** — How is "Mobility COE" membership represented in `sys_user_group` in the engagement? ACL conditions need to reference the membership pattern correctly.
 
 ---
 

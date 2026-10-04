@@ -82,9 +82,9 @@ Co-fire: **CSM Specialist** (Consumer Service Portal, `csm_consumer`). Consults:
 
 ## Open Questions
 
-- OQ-1: Consumer Service Portal plugin active on the instance? (blocks self-service intake)
-- OQ-2: Is the policy record updated in ServiceNow only, or must the core policy administration system be updated at fulfilment? The docs describe a manual "update the policy record" — if the core system is the master, this becomes an Integration Specialist item (proposed default: manual in phase 1).
-- OQ-3: Exact flow and playbook record names — not documented; read from the instance.
+- OQ-EV-1: Consumer Service Portal plugin active on the instance? (blocks self-service intake)
+- OQ-EV-2: Is the policy record updated in ServiceNow only, or must the core policy administration system be updated at fulfilment? The docs describe a manual "update the policy record" — if the core system is the master, this becomes an Integration Specialist item (proposed default: manual in phase 1).
+- OQ-EV-3: Exact flow and playbook record names — not documented; read from the instance.
 ```
 
 ---
@@ -159,8 +159,8 @@ No new table, scoped app or state value is required. If the builder proposes an 
 
 ## Open Questions
 
-- OQ-1: How does the instance map the persona-title output to approvers (group membership? role?) — not documented.
-- OQ-2: Should the head-of-claims level apply to payments only, or reserves too (two separate property pairs exist)?
+- OQ-EV-1: How does the instance map the persona-title output to approvers (group membership? role?) — not documented.
+- OQ-EV-2: Should the head-of-claims level apply to payments only, or reserves too (two separate property pairs exist)?
 ```
 
 ---
@@ -237,9 +237,9 @@ The docs prescribe both extensions, but under §1.1 a new table is approved by t
 
 ## Open Questions
 
-- OQ-1 (blocking): generic Insurance claims or Commercial Lines Claims extension? Which apps are licensed?
-- OQ-2 (blocking): does property/liability loss data fit `sn_ins_claim_property` + `sn_ins_claim_injury`, or is a dedicated incident table needed?
-- OQ-3: policy data source — are `sn_bom_cp_ins_policy` / `sn_bom_gl_ins_policy` loaded locally or looked up remotely?
+- OQ-EV-1 (blocking): generic Insurance claims or Commercial Lines Claims extension? Which apps are licensed?
+- OQ-EV-2 (blocking): does property/liability loss data fit `sn_ins_claim_property` + `sn_ins_claim_injury`, or is a dedicated incident table needed?
+- OQ-EV-3: policy data source — are `sn_bom_cp_ins_policy` / `sn_bom_gl_ins_policy` loaded locally or looked up remotely?
 ```
 
 ---

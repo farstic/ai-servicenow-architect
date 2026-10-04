@@ -89,9 +89,9 @@ Consult flags:
 
 ## Open Questions
 
-1. **Current CSDM stage?** Run-stage service modelling assumes Foundation/Crawl/Walk are established.
-2. **Population method** — are these services created/maintained manually, or via Service Mapping (→ ITOM consult)?
-3. **Customer visibility** — should customers see the business service on the portal? Drives ACL/Security & GRC consult.
+OQ-EV-1. **Current CSDM stage?** Run-stage service modelling assumes Foundation/Crawl/Walk are established.
+OQ-EV-2. **Population method** — are these services created/maintained manually, or via Service Mapping (→ ITOM consult)?
+OQ-EV-3. **Customer visibility** — should customers see the business service on the portal? Drives ACL/Security & GRC consult.
 
 ---
 
@@ -158,8 +158,8 @@ Smallest viable extension: **one Choice field** `u_customer_tier` (values `plati
 
 ## Open Questions
 
-1. Does customer tier apply only to consumer-facing business services, or also technology management services? Drives class placement.
-2. Any data source other than manual entry? If so, IRE reconciliation rule required.
+OQ-EV-1. Does customer tier apply only to consumer-facing business services, or also technology management services? Drives class placement.
+OQ-EV-2. Any data source other than manual entry? If so, IRE reconciliation rule required.
 
 ---
 
@@ -256,7 +256,7 @@ Recommendation: REJECT the custom table; adopt option (a) + (b).
 
 ## Open Questions
 
-1. Is the real need a *query surface* (→ report/DB view) or a *stored relationship* (→ already exists in baseline)? Clarifying this usually dissolves the request.
+OQ-EV-1. Is the real need a *query surface* (→ report/DB view) or a *stored relationship* (→ already exists in baseline)? Clarifying this usually dissolves the request.
 
 ---
 

@@ -36,7 +36,7 @@ If any of items 1–4 are missing or generic ("the user", "the system"), **stop 
 1. **Apply the preloaded SKILL** — it is already in this context and is authoritative.
 2. **Read the source of requirements** — transcript file, prior story, or requirements list — using the `Read` tool.
 3. **Read the Feature template** at `templates/gherkin-feature-template.md` for the canonical Gherkin structure.
-4. **Read engagement role matrix** if pointed to a `clients/<client>/<client>-instructions-v*.md`. Use those role aliases in stories instead of generic role names.
+4. **Read engagement role matrix** if pointed to a `clients/<client>/<client>-engagement-state.md` (its Roles section). Use those role aliases in stories instead of generic role names.
 5. **Identify primary scenarios** — at minimum one happy-path plus two edge / negative scenarios per Feature. Single-scenario Features are rejected.
 6. **Search for prior stories** in the engagement folder using `Glob` and `Grep` — if a similar Feature exists, propose extending it rather than duplicating.
 7. **Verify unknown table or field names** by searching the local corpus under `vendor/ServiceNowDocs/markdown/` with `Grep` if the input names a table or field you cannot recognise; if the corpus does not know it, flag it as engagement-specific in OPEN QUESTIONS.

@@ -81,7 +81,7 @@ Discovery is methodology, not platform behaviour — most output is structure. B
 |---|---|---|---|
 ## §1.1 implications to flag for the gateway   [flagged, NOT ruled]
 ## Routing recommendation   [which gateway(s) to fire; multi-builder plan if implied; §3.1 consults the NFRs trigger]
-## OPEN QUESTIONS   [each with a proposed default]
+## OPEN QUESTIONS   [each with a proposed default, numbered `OQ-DC-1`, `OQ-DC-2`…]
 ```
 
 ## Domain anti-patterns to block (in your own output)

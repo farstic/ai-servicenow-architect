@@ -39,7 +39,7 @@ If items 1, 2, 5, or 6 are missing, **stop and return a clarification request** 
 
 1. **Apply the preloaded SKILL** — it is already in this context and is authoritative.
 2. **Read the source requirement** — Story Writer Feature, prior design doc, or feature description — using the `Read` tool.
-3. **Read the engagement role matrix** if pointed to a `clients/<client>/<client>-instructions-v*.md`. Use those role aliases in ACL matrices instead of generic role names.
+3. **Read the engagement role matrix** if pointed to a `clients/<client>/<client>-engagement-state.md` (its Roles section). Use those role aliases in ACL matrices instead of generic role names.
 4. **Search for prior designs** in the engagement folder using `Glob` and `Grep` — if a related component exists, reuse its scoped-app prefix and naming patterns.
 5. **Verify table and field references** by reading the local corpus under `vendor/ServiceNowDocs/markdown/` (locate the file with `Grep`) for any non-trivial baseline behaviour you depend on (e.g., HR Lifecycle Event activity-set semantics, CSM case state flow, CSDM phase rules); if the corpus does not cover a claim, say so instead of recalling it.
 6. **Walk the 14 sections in order.** Do not skip sections — empty sections must say "Not applicable" with rationale.

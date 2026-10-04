@@ -43,9 +43,9 @@ Dashboard shared to a CSM-leadership group. Customer-identifying detail stays ou
 - **Security & GRC** — drill-down visibility on customer data.
 
 ## Open questions
-1. Is PA (and PA Premium for advanced breakdowns) licensed in this engagement?
-2. How far back should the trend history go (drives initial PA data-collection backfill)?
-3. Tier values source — `customer_account` tier field or entitlement level?
+OQ-CN-1. Is PA (and PA Premium for advanced breakdowns) licensed in this engagement?
+OQ-CN-2. How far back should the trend history go (drives initial PA data-collection backfill)?
+OQ-CN-3. Tier values source — `customer_account` tier field or entitlement level?
 ```
 
 ---

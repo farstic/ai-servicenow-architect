@@ -55,6 +55,13 @@ test('S02 AC 2 — the engagement and memory paths are ignored BY A NAMED RULE',
   assert.equal(engagement.source, '.gitignore');
   assert.equal(engagement.pattern, 'clients/');
 
+  // ARC-09-C90: work with no engagement named is filed under `clients/_unfiled/`. It must be ignored by
+  // the SAME rule as an engagement, not by a second one that could be edited away on its own — the
+  // folder holds a client's work until somebody says whose it is.
+  const unfiled = ignoredBy('clients/_unfiled/x.md');
+  assert.equal(unfiled.source, '.gitignore');
+  assert.equal(unfiled.pattern, 'clients/');
+
   // `memory/` stays after the convention is retired — a safety net for a checkout that still has
   // one, which is exactly why it must not quietly stop being ignored (ARC-10-S02).
   const memory = ignoredBy('memory/MEMORY.md');

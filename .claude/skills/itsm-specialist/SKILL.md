@@ -194,7 +194,7 @@ Universal ITSM anti-patterns (always include if the relevant concept is in scope
 
 ## Open Questions
 
-[Anything in the user request that wasn't clear enough to ratify a baseline path or trigger a verdict.]
+[Anything in the user request that wasn't clear enough to ratify a baseline path or trigger a verdict. Number each `OQ-EV-1`, `OQ-EV-2`… (`governance/governance-rules.md` §4.4).]
 ```
 
 ## Core Processes — Rigorous Coverage

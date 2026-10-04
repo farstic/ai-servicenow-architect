@@ -16,7 +16,7 @@
 > engine states that no live instance is configured and makes no tool call. A dormant PASS is a
 > real PASS: what it proves is that the gate holds when there is nothing to write to.
 >
-> **How many.** 24 tests, T-01 through T-24, no number reserved. The count is asserted by
+> **How many.** 25 tests, T-01 through T-25, no number reserved. The count is asserted by
 > `tests/validation-tests-shape.test.mjs` against the headings, so it cannot be left behind by the
 > next story that adds one.
 >
@@ -1235,6 +1235,80 @@ gateway with no listed keyword in it.
 
 ---
 
+## T-25 — work with no engagement is filed under `_unfiled`; ids name their artefact; plumbing stays out of the answer
+
+**Covers:** Phase 1 Step 2 (the engagement-state file; the unfiled home); `governance/governance-rules.md` §4.4 (OPEN QUESTION ids); `CLAUDE.md` §1 (plumbing stays out of the answer)
+**Modes:** design-only ✅ · live: not run — the filing rule is stated for design-only work with no engagement named
+
+Two turns in ONE session (the second depends on the first), from a checkout where `clients/` holds only
+what Setup writes.
+
+### Setup
+
+```sh
+mkdir -p clients/acme
+printf '%s\n' \
+  '# acme — engagement state' \
+  'Release family: Zurich. Delivery model: agile. Sign-off: product owner.' \
+  '' \
+  '## Roles' \
+  '- "L1 Agent" is the baseline `itil` role.' \
+  '' \
+  '## Open questions' \
+  'OQ-ES-1. Is Service Operations Workspace licensed? (Proposed default: yes.)' \
+  > clients/acme/acme-engagement-state.md
+```
+
+### Prompt
+
+Turn 1 — no client is named:
+
+```
+When a P1 incident has not been acknowledged for fifteen minutes, the duty manager should be
+paged. Design how that works on the platform.
+```
+
+Turn 2 — same session, after the answer:
+
+```
+This was for acme. Put what you just produced with their work, and tell me what you now apply
+from their file.
+```
+
+### Expected behaviour
+
+1. **Turn 1.** The ITSM Specialist gateway fires and the Constraint Envelope is written in the reply —
+   with no question about a folder before it. What was produced is saved under `clients/_unfiled/`,
+   and the reply says where, and that naming an engagement moves it.
+2. Every OPEN QUESTION in the Envelope carries an id of the form `OQ-EV-<n>`.
+3. **Turn 2.** Only what turn 1 produced moves into `clients/acme/`, to the folder the artefact belongs
+   in. `clients/acme/acme-engagement-state.md` is read — and what is applied from it (release family
+   Zurich, the role alias `L1 Agent`) is named.
+4. Where the reply cites both the state file's question and one of the Envelope's, they are
+   `OQ-ES-1` and an `OQ-EV-<n>`, never two questions numbered 1.
+
+### Pass criteria
+
+- A file exists under `clients/_unfiled/` after turn 1 and none under a session scratchpad or a temp
+  directory; the reply states the path.
+- The Envelope is in the reply of turn 1, and no folder was asked about first.
+- Every id in either reply carries its kind (`governance/governance-rules.md` §4.4).
+- After turn 2 the moved files are under `clients/acme/` and `clients/_unfiled/` no longer holds them.
+- Turn 2 names Zurich and `L1 Agent` as read from `clients/acme/acme-engagement-state.md`.
+
+### Fail signals
+
+- The work is written to a scratchpad or temp directory, or not saved at all.
+- "Which client folder is this under?" asked before the Envelope exists — the same deferral as T-10.
+- The reply does not say where the file went, or that naming an engagement moves it.
+- A bare `OQ-<n>`, or the state file's question and an Envelope question both numbered 1.
+- Turn 2 looks for an instructions file for acme, or says it found none.
+- Turn 2 moves anything that turn 1 did not produce.
+- The text of a prompt the Architect wrote for a helper, or an error its own tooling raised
+  ("Prompt error: …"), appears anywhere in either answer.
+
+---
+
 ## Regression Workflow
 
 When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `governance/governance-rules.md`, or any `SKILL.md`:
@@ -1261,7 +1335,7 @@ When a test fails after a change to `CLAUDE.md`, `governance/taxonomy.md`, `gove
 
 ## Running all tests
 
-Twenty-four manual tests, one fresh `claude` session each — a session that has already seen T-01 is not
+Twenty-five manual tests, one fresh `claude` session each — a session that has already seen T-01 is not
 a fresh session for T-02, and the routing behaviour under test is exactly what prior context changes.
 
 ```sh

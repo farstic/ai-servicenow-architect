@@ -2,7 +2,7 @@
 
 > **What this is:** the engagement's running register of **R**isks, **A**ssumptions, **I**ssues, and **D**ependencies. One living file per engagement at `clients/{{client-short-name}}/raid-log.md`. See `governance/governance-rules.md` §4.3.
 >
-> **How it is fed:** specialists surface RAID items as they work — Estimation surfaces sizing risks and assumptions, Discovery surfaces dependencies and open assumptions, Performance/Security/Licensing surface their own risks, and every `OPEN QUESTION` that is not immediately resolved becomes a RAID entry. The Chief Architect owns the file and reviews it at each design checkpoint.
+> **How it is fed:** specialists surface RAID items as they work — Estimation surfaces sizing risks and assumptions, Discovery surfaces dependencies and open assumptions, Performance/Security/Licensing surface their own risks, and every `OPEN QUESTION` that is not immediately resolved becomes a RAID entry, keeping its coded id and the artefact's name in `Linked` (`OQ-ST-2` · `case-escalation.feature`; `governance/governance-rules.md` §4.4). The Chief Architect owns the file and reviews it at each design checkpoint.
 >
 > **The distinction (keep them in the right quadrant):** a **Risk** *might* happen (future, probabilistic); an **Issue** *is* happening (present, actual); an **Assumption** is something taken as true but unconfirmed; a **Dependency** is something we need from elsewhere.
 

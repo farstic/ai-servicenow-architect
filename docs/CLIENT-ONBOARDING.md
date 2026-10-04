@@ -39,12 +39,19 @@ discipline: there is no interface-level firewall, so if you work in the wrong fo
 per the delivery-governance rules. The traceability matrix lives alongside them at
 `clients/<name>/traceability.md`, and the RAID log at `clients/<name>/raid-log.md`.
 
-## 3 — Write the engagement context file
+## 3 — Write the engagement-state file
 
 Create `clients/<name>/<name>-engagement-state.md` holding what you gathered in step 1, plus the
 engagement defaults the architect should apply silently: release family, delivery model, naming
 conventions, sign-off path. The Chief Architect reads this at Phase 1 Step 2 of every request, which is
-how a request stops needing the same preamble every time.
+how a request stops needing the same preamble every time. It is the one engagement file there is: the
+builders that read a role matrix (Story Writer, Technical Designer, HLD/LLD Writer, Now Assist
+Specialist) read the same file, so keep a **Roles** section in it — each role the client names, and the
+ServiceNow role it maps to.
+
+An unresolved question about the engagement itself goes in the same file under **Open questions**, numbered
+`OQ-ES-1`, `OQ-ES-2`… (`governance/governance-rules.md` §4.4): a story and a design number their own
+questions from 1 as well, and the kind in the id is what stops the three being confused in one answer.
 
 ## 4 — Connect the instance, if the engagement is live
 
@@ -77,9 +84,22 @@ it as a file under `clients/<name>/`, ask Claude to read it when the engagement 
 engagement's decision records. Prefer engagement context over a new specialist: a default recorded in
 step 3 costs nothing to maintain.
 
+## No engagement named yet
+
+Design-only work does not wait for an engagement. A request with no client named is answered in the
+reply as usual — the Constraint Envelope included, with no question about a folder first — and what it
+produces is saved under `clients/_unfiled/`, never in a session scratchpad or a temp directory, which do
+not survive a restart. The reply says where each file went. `clients/` is gitignored as a whole, so
+`_unfiled` cannot be committed any more than an engagement can.
+
+When you name the engagement, say which of that work belongs to it: only what this session produced moves
+into `clients/<name>/`, to the folder the artefact belongs in (`designs/`, `stories/`…). Anything else in
+`_unfiled` stays there until you say which engagement it is for — one folder is never the place two
+clients' work is mixed.
+
 ## Maintenance
 
-**After any major event** — a workshop, a refinement, a go-live — update the engagement context file
+**After any major event** — a workshop, a refinement, a go-live — update the engagement-state file
 with what changed, and record any architectural decision as a decision record.
 
 **Monthly.** Re-read the engagement context as if you were new to it. Anything stale, wrong, or no

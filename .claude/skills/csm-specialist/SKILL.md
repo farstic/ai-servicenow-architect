@@ -164,6 +164,8 @@ For each table:
 [Domain-specific anti-patterns. Each anti-pattern is a one-sentence "do not do X, do Y instead" with a citation.]
 
 ## Open Questions
+
+[Number each `OQ-EV-1`, `OQ-EV-2`… (`governance/governance-rules.md` §4.4).]
 ```
 
 ## Core Processes — Rigorous Coverage

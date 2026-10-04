@@ -217,9 +217,9 @@ Consult flags:
 
 ## Open Questions
 
-1. **Engagement field-naming convention** — is `u_customer_journey_stage` correct? On `sn_customerservice_case` the platform names a new field by where it is created: in the table's own scope it takes no prefix, so `u_` there is the engagement's mark for a custom field; created from global, the platform adds `u_`; from a scoped app, that app's namespace, `x_<vendor>_<app>_customer_journey_stage` *(citation: `markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`)*. Confirm with Chief Architect before Technical Designer dispatches.
-2. **Auto-population** — should the field auto-populate from an account-level lifecycle stage, if the engagement's release has one? Such a field on `customer_account` is not documented in the bundled corpus — verify on the instance before design.
-3. **Choice value localisation** — does the engagement need localised choice labels? Affects sys_choice record design.
+OQ-EV-1. **Engagement field-naming convention** — is `u_customer_journey_stage` correct? On `sn_customerservice_case` the platform names a new field by where it is created: in the table's own scope it takes no prefix, so `u_` there is the engagement's mark for a custom field; created from global, the platform adds `u_`; from a scoped app, that app's namespace, `x_<vendor>_<app>_customer_journey_stage` *(citation: `markdown/platform-administration/table-administration-and-data-management/r_DictionaryEntryForm.md`)*. Confirm with Chief Architect before Technical Designer dispatches.
+OQ-EV-2. **Auto-population** — should the field auto-populate from an account-level lifecycle stage, if the engagement's release has one? Such a field on `customer_account` is not documented in the bundled corpus — verify on the instance before design.
+OQ-EV-3. **Choice value localisation** — does the engagement need localised choice labels? Affects sys_choice record design.
 
 ---
 
@@ -273,7 +273,7 @@ The baseline case and account escalation feature does what the request describes
 | "stakeholder list" | Watch List |
 | "a related list on the case form with full escalation history" | the case form's Escalations related list, each record with its state; its updates replicated to the case's work notes |
 | "the Script Include that creates an escalation record when the agent clicks an Escalate button" | the **Escalate Case** related link creates the record — no Script Include |
-| "from-tier, to-tier" | no field on a case escalation: the escalation's Assignment group is "for account escalations" — Open Question 1 |
+| "from-tier, to-tier" | no field on a case escalation: the escalation's Assignment group is "for account escalations" — OQ-EV-1 |
 
 ## Part 3 — §1.1 Baseline-First Verdict
 
@@ -288,7 +288,7 @@ Before any specialist may be dispatched, §1.1 requires honest evaluation of bas
 
    The case and account escalation feature: the Escalate Case related link, the Escalation record with its Reason, Escalation Justification, Escalation Severity and Watch List, the case form's Escalations related list, and its updates replicated to the case's work notes.
       - Covers: the record, the reason, the business-impact summary, the stakeholders, the related list with the history, and the Escalate button.
-      - Falls short: no field for "from-tier, to-tier" on a case escalation (Open Question 1).
+      - Falls short: no field for "from-tier, to-tier" on a case escalation (OQ-EV-1).
       - Citations: markdown/customer-service-management/case-escalation-form.md, markdown/customer-service-management/escalate-csm-case.md
 
 2. Custom object proposed (smallest viable scope):
@@ -296,7 +296,7 @@ Before any specialist may be dispatched, §1.1 requires honest evaluation of bas
    - Object: the separate "case escalation" table the request names — `sn_customerservice_case_escalation` (proposed — not baseline; a table in the `sn_customerservice` scope begins with that namespace *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*).
    - Kind and place in the §1.1 hierarchy: a new table extending a baseline table, in the baseline `sn_customerservice` scope — the "acceptable" rung.
    - What it would hold, in the request's words: "from-tier, to-tier, reason code, business-impact summary, and stakeholder list", shown as "a related list on the case form with full escalation history".
-   - Rejected as unnecessary: the baseline Escalation record holds all of it but the tiers, and the tiers are Open Question 1.
+   - Rejected as unnecessary: the baseline Escalation record holds all of it but the tiers, and the tiers are OQ-EV-1.
 
 3. Consequences of approval:
    - **Data model:** a second escalation store beside the baseline Escalation record; the Escalate Case related link and the escalation states would not reach it.
@@ -306,7 +306,7 @@ Before any specialist may be dispatched, §1.1 requires honest evaluation of bas
 
 4. Alternatives if rejected:
    - **Recommended:** the baseline escalation feature — escalation templates and severities configured for the engagement, and the escalation requester role given to the agents who escalate.
-   - **For the tiers:** Open Question 1's default.
+   - **For the tiers:** OQ-EV-1's default.
 
 Decision required from Chief Architect before any specialist is dispatched.
 ```
@@ -330,9 +330,9 @@ No specialist is dispatched until the Chief Architect rules. Options:
 
 ## Open Questions
 
-1. **OPEN QUESTION: from-tier and to-tier.** Are the tiers severity levels or support teams? **Proposed default:** the Escalation Severity for the level; a move between teams is the case's own reassignment, kept in its history. Confirm with the business which one they mean.
-2. **Requester roles.** Who holds `sn_customerservice.escalation_requester`, and who de-escalates with `sn_customerservice.deescalation_requester`? *(citations: `markdown/customer-service-management/escalate-csm-case.md`, `markdown/customer-service-management/de-escalate-csm-case.md`)*
-3. **Templates and approvals.** Which escalation templates does the engagement need, and does an escalation need approval? A template can add the case assignment group's manager to the approvers *(citation: `markdown/customer-service-management/create-escalation-template.md`)*.
+OQ-EV-1. **OPEN QUESTION: from-tier and to-tier.** Are the tiers severity levels or support teams? **Proposed default:** the Escalation Severity for the level; a move between teams is the case's own reassignment, kept in its history. Confirm with the business which one they mean.
+OQ-EV-2. **Requester roles.** Who holds `sn_customerservice.escalation_requester`, and who de-escalates with `sn_customerservice.deescalation_requester`? *(citations: `markdown/customer-service-management/escalate-csm-case.md`, `markdown/customer-service-management/de-escalate-csm-case.md`)*
+OQ-EV-3. **Templates and approvals.** Which escalation templates does the engagement need, and does an escalation need approval? A template can add the case assignment group's manager to the approvers *(citation: `markdown/customer-service-management/create-escalation-template.md`)*.
 
 ---
 
