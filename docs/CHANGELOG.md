@@ -65,6 +65,9 @@ worked example were corrected with it.
   change approvals.
 - The HLD template's process-flow figure is an SVG exported from a draw.io source, as every delivered
   figure is, rather than a Mermaid block.
+- The Now Assist specialists search the documentation under both names it uses. The bundled
+  documentation titles the product family "ServiceNow Otto" on most pages and "Now Assist" on others; the
+  specialists use the client's naming in deliverables.
 
 ### Changed
 
