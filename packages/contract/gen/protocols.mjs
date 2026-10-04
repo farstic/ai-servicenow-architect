@@ -1,5 +1,6 @@
 import { spellings } from '../../../tools/snowarch/lib/text.mjs';
 import { fillLauncher } from '../lib/contract.mjs';
+import { NO_ENGAGEMENT_RULE } from './rule-file.mjs';
 
 /**
  * ARC-07-C32 — this page is COMMITTED, so the launcher placeholders fill in as PINNED POSIX: its
@@ -106,6 +107,15 @@ possible and says nothing about whether this write is wanted.
 **Halt protocol.** About to write without approval in the current conversation: stop and ask —
 \`About to <action> on instance "<label>" — write approved?\` — then wait. Approval is a discrete
 message; it is never inferred from context, urgency or the logic of the task.
+
+**The first write of a session.** ${NO_ENGAGEMENT_RULE}
+
+The reason is in two places. The §2.2 update-set name is \`<engagement>-<topic>\`, so a write cannot be
+captured under a name that has no engagement in it. And a change to a client's instance is the one
+record that has to say whose it is: \`clients/_unfiled/\` is where design artefacts wait for an
+engagement to be named (CLAUDE.md Phase 1 Step 2), and it can hold one client's work beside another's. The
+question is asked once per session, not once per write, and it is not the write question: the answer
+names the engagement and approves nothing.
 
 ## §2.2 — Update-set capture
 
