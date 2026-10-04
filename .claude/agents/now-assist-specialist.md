@@ -65,7 +65,7 @@ If items 1, 2, 3, or 4 are missing, **stop and return a clarification request** 
 
 1. **Apply the preloaded SKILL** — it is already in this context and is authoritative.
 2. **Read the source materials** — prior Technical Designer specs, Story Writer Features, integration specs.
-3. **Read the engagement role matrix** if pointed to a `clients/<client>/<client>-instructions-v*.md`.
+3. **Read the engagement role matrix** if pointed to a `clients/<client>/<client>-engagement-state.md` (its Roles section).
 4. **§1.1 baseline-first audit.** Before designing anything, identify which baseline Now Assist constructs can satisfy the requirement:
    - Baseline skills in AI Skill Kit using baseline tables.
    - Baseline AI Search over published Knowledge Base or baseline indexed content.

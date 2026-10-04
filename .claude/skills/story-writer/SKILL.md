@@ -87,9 +87,9 @@ Feature: <short, action-oriented feature name>
     And the user receives <notification>
 
   # OPEN QUESTIONS
-  # 1. <question for the product owner>
-  # 2. ASSUMPTION: <stated assumption that needs confirmation>
-  # 3. <decision the client must make before build>
+  # OQ-ST-1. <question for the product owner>
+  # OQ-ST-2. ASSUMPTION: <stated assumption that needs confirmation>
+  # OQ-ST-3. <decision the client must make before build>
 ```
 
 A Feature without an `OPEN QUESTIONS` block is suspicious. If you genuinely have none, write `# OPEN QUESTIONS: None.` and justify briefly.

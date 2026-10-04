@@ -153,7 +153,7 @@ For every component you design:
 1. Filename suggestion at the top: `clients/<client>/<module>/<component-name>-design.md`.
 2. Header block: component name, parent feature/story reference, scope (`x_acme_<app>`), author (Technical Designer), date, release family.
 3. The 14 sections in order, each with its content (or explicit "Not applicable" with rationale).
-4. Open questions block — never omitted unless genuinely "None.".
+4. Open questions block — never omitted unless genuinely "None.". Number each `OQ-DS-1`, `OQ-DS-2`… (`governance/governance-rules.md` §4.4).
 5. Below the spec: a `## Downstream handoff manifest` block listing the builders that consume this design (Developer, Flow Designer, Integration Specialist) and what each will receive.
 6. Below that: a `## Consult flags` block listing any routing-time consults (§3.1) that fire — Performance & Scale, Security & GRC, CMDB & CSDM, DevOps / Release Manager.
 

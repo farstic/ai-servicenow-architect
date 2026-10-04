@@ -121,9 +121,9 @@ None directly in this flow. The notification subflow may use a script step — s
 - Notification failure: Teams unavailable → state still transitions, the failure is logged.
 
 #### Open questions
-- **OQ-1:** What is the default approver group when the Decision Table returns no match? Spec did not specify. Proposed default: change manager group.
-- **OQ-2:** Should the rejection reason be required (form-enforced) or optional? Affects step 5 rejection branch.
-- **OQ-3:** Business calendar source — is there a single platform calendar for change SLAs, or scope-specific?
+- **OQ-DS-1:** What is the default approver group when the Decision Table returns no match? Spec did not specify. Proposed default: change manager group.
+- **OQ-DS-2:** Should the rejection reason be required (form-enforced) or optional? Affects step 5 rejection branch.
+- **OQ-DS-3:** Business calendar source — is there a single platform calendar for change SLAs, or scope-specific?
 
 #### Handoffs proposed
 - **Subflow design** for `notifyChangeStakeholders` — propose Flow Designer Specialist subflow design (Example 2 pattern).
@@ -244,21 +244,21 @@ If either spoke is unavailable in the target instance, design degrades to email-
 - Template override path vs default path.
 
 #### Open questions
-- **OQ-1:** When a spoke is unavailable in the target instance (e.g., Slack Spoke not installed), should the subflow degrade silently to other channels, or fail loudly? Assumption: silent degradation with `status:skipped, error_detail:'spoke not installed'`. Confirm.
-- **OQ-2:** Multilingual content — is the template scoped by user.preferred_language, or instance-default only? Affects `ResolveNotificationMessage` signature.
-- **OQ-3:** Are there compliance reasons HR notifications cannot go to Slack/Teams (PII channel restrictions)? If yes, this subflow should not be used by HR flows for some content categories — flag for HRSD Specialist review.
+- **OQ-DS-1:** When a spoke is unavailable in the target instance (e.g., Slack Spoke not installed), should the subflow degrade silently to other channels, or fail loudly? Assumption: silent degradation with `status:skipped, error_detail:'spoke not installed'`. Confirm.
+- **OQ-DS-2:** Multilingual content — is the template scoped by user.preferred_language, or instance-default only? Affects `ResolveNotificationMessage` signature.
+- **OQ-DS-3:** Are there compliance reasons HR notifications cannot go to Slack/Teams (PII channel restrictions)? If yes, this subflow should not be used by HR flows for some content categories — flag for HRSD Specialist review.
 
 #### Handoffs proposed
 - **Developer** — for `ResolveNotificationMessage` server script (custom Action body) per spec above.
 - **Code Reviewer** (post-build §6.2) — fires when Developer returns the script.
-- **HRSD Specialist** — to confirm whether this subflow is safe for HR case notifications (OQ-3).
+- **HRSD Specialist** — to confirm whether this subflow is safe for HR case notifications (OQ-DS-3).
 - **ATF Author** — test suite per test approach above.
 
 ### Why this is the gold standard
 
 The subflow design demonstrates the *contract-first* mindset that distinguishes good orchestration from glue code. Inputs and outputs are typed, the recipient resolution is explicit (with override semantics), and the channel branching is structured so adding a fourth channel later is mechanical rather than disruptive. Crucially, the design states the subflow's failure contract explicitly: per-channel failures are reported but do not abort the loop, and the subflow does not throw — callers always receive a structured result. This is the contract callers will depend on; making it implicit would be a defect.
 
-The handoff to Developer for `ResolveNotificationMessage` is correctly scoped: the signature, role check, and error semantics are specified, but the script body is not written here. That respects the boundary in taxonomy §2.1 between "design the spec" (Flow Designer's job) and "implement" (Developer's job). The three open questions are also non-trivial — particularly OQ-3, which surfaces a domain concern (HR PII channel restrictions) that the spec did not flag but a senior designer would always raise.
+The handoff to Developer for `ResolveNotificationMessage` is correctly scoped: the signature, role check, and error semantics are specified, but the script body is not written here. That respects the boundary in taxonomy §2.1 between "design the spec" (Flow Designer's job) and "implement" (Developer's job). The three open questions are also non-trivial — particularly OQ-DS-3, which surfaces a domain concern (HR PII channel restrictions) that the spec did not flag but a senior designer would always raise.
 
 ---
 
@@ -368,9 +368,9 @@ None — uses baseline platform email.
 - Re-run idempotency: run twice consecutively → second run finds zero candidates (already flagged).
 
 #### Open questions
-- **OQ-1:** Set limit of 5000 — confirm with operations that 30 minutes is the maximum acceptable run duration, and that 5000 is the right ceiling. If volumes exceed 5000/day on average, design needs sharding or hourly runs instead.
-- **OQ-2:** The 60-day historical bound — is this the correct rule, or should the flow process all unflagged closed records regardless of age? Affects the look-up condition.
-- **OQ-3:** Should opt-out customers be excluded? No mention in spec. Assumption: respect a `caller_id.x_acme_itsm_feedback_opt_out` flag (the app's own field on `sys_user`, like `x_acme_itsm_feedback_requested` on `incident`). Confirm.
+- **OQ-DS-1:** Set limit of 5000 — confirm with operations that 30 minutes is the maximum acceptable run duration, and that 5000 is the right ceiling. If volumes exceed 5000/day on average, design needs sharding or hourly runs instead.
+- **OQ-DS-2:** The 60-day historical bound — is this the correct rule, or should the flow process all unflagged closed records regardless of age? Affects the look-up condition.
+- **OQ-DS-3:** Should opt-out customers be excluded? No mention in spec. Assumption: respect a `caller_id.x_acme_itsm_feedback_opt_out` flag (the app's own field on `sys_user`, like `x_acme_itsm_feedback_requested` on `incident`). Confirm.
 
 #### Handoffs proposed
 - **Developer** — implement `SendFeedbackRequest` custom Action server script per spec above.

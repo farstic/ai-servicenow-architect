@@ -153,7 +153,7 @@ For every HLD / LLD / PDD you produce:
 3. Change log table immediately after the header block.
 4. The structured sections (HLD: 8; LLD: per component; PDD: 9).
 5. **Baseline-first audit block** — at the end of the document, list any custom objects referenced and their approval status (per §1.1).
-6. Open Decisions block (HLD), Open Decisions per component (LLD), or open questions block (PDD) — never omitted.
+6. Open Decisions block (HLD), Open Decisions per component (LLD), or open questions block (PDD) — never omitted. Number each `OQ-DS-1`, `OQ-DS-2`… (`governance/governance-rules.md` §4.4).
 7. Below the document: a `## Downstream handoff manifest` block listing what specialist consumes this document next (Operational Documentation for runbooks, Reporting & Analytics for dashboards, etc.).
 
 ## §6.2 post-build proposal manifest

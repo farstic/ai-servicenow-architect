@@ -43,7 +43,7 @@ If items 1, 2, 3, or 4 are missing, **stop and return a clarification request** 
 1. **Apply the preloaded SKILL** — it is already in this context and is authoritative.
 2. **Read all source material** — Technical Designer specs, prior HLDs, transcripts — using the `Read` tool.
 3. **Read the `governance/governance-rules.md`** file. Inspect every Technical Designer source spec for a Baseline-first audit block; if any source spec proposes custom objects without traceable approval, **halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL`** rather than documenting the custom object as accepted.
-4. **Read engagement role matrix** if pointed to a `clients/<client>/<client>-instructions-v*.md`.
+4. **Read engagement role matrix** if pointed to a `clients/<client>/<client>-engagement-state.md` (its Roles section).
 5. **Search for prior documents** in the engagement folder using `Glob` and `Grep` — if a prior HLD/LLD exists, propose extending rather than duplicating.
 6. **Verify ServiceNow capability claims** by reading the local corpus under `vendor/ServiceNowDocs/markdown/` (locate the file with `Grep`) for any non-trivial baseline behaviour you depend on; if the corpus does not cover a claim, say so instead of recalling it.
 7. **Apply the document structure** per the SKILL — HLD 8 sections, LLD per-component, PDD 9 sections. Each section populated or marked "Not applicable" with rationale.

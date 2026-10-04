@@ -64,7 +64,7 @@ ITSM gateway (target confirmed); **Developer + Code Reviewer** (onBefore/onAfter
 **Security & GRC** (caller PII; clone secret-exclusion); **Operational Documentation** (cutover runbook).
 
 ## Open questions
-1. Attachments in scope (size/volume)? 2. Statuses with no clean baseline equivalent — map to which state? 3. Callers with no ServiceNow account — create, or map to a generic "legacy" user?
+OQ-CN-1. Attachments in scope (size/volume)? OQ-CN-2. Statuses with no clean baseline equivalent — map to which state? OQ-CN-3. Callers with no ServiceNow account — create, or map to a generic "legacy" user?
 ```
 
 ---

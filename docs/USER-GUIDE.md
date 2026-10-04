@@ -342,7 +342,7 @@ Type `Status` any time to see the loaded engagement, the locked release family, 
 
 ### Switching engagements
 
-`Switch context to clients/<client-name>/.` The engine reads that engagement's instructions and applies its defaults silently from then on.
+`Switch context to clients/<client-name>/.` The engine reads that engagement's `<name>-engagement-state.md` and applies its defaults silently from then on.
 
 ---
 

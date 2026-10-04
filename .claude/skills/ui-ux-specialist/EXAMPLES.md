@@ -45,8 +45,8 @@ Home (my work) → Case list → Case record page → (resolve) → back to list
 - Performance & Scale — side-panel data brokers if case volume is high.
 
 ## Open questions
-1. Should the side panel show install base from the shared CSDM layer or only the product field? (Depends on CSDM adoption stage.)
-2. Customer-facing portal experience — separate design (different persona/surface)?
+OQ-CN-1. Should the side panel show install base from the shared CSDM layer or only the product field? (Depends on CSDM adoption stage.)
+OQ-CN-2. Customer-facing portal experience — separate design (different persona/surface)?
 ```
 
 ---

@@ -101,10 +101,10 @@ The following are explicitly blocked in any downstream design:
 
 ## Open Questions
 
-1. **Duty manager resolution.** The baseline `cmn_rota` typically defines a single on-call engineer. Confirm whether the engagement has a separate `cmn_rota` rotation specifically for "Duty Manager", or whether the duty manager is the on-call engineer's escalation contact (in which case the rotation needs a second tier configured).
-2. **Acknowledgement definition.** "Not acknowledged within 15 minutes" — does "acknowledged" mean `state=2 (In Progress)`, or `assigned_to is set`, or "`assigned_to` has added to `work_notes`"? The three are subtly different. Recommend defaulting to "assigned_to is set AND state transitioned out of New (state != 1)".
-3. **15-minute timer reference point.** From `sys_created_on` of the incident, or from the moment it was first assigned? Defaulting to `sys_created_on` if no assignment SLA is active.
-4. **Re-escalation behaviour.** If the duty manager doesn't ack within another 15 minutes, escalate further? Out of scope unless specified.
+OQ-EV-1. **Duty manager resolution.** The baseline `cmn_rota` typically defines a single on-call engineer. Confirm whether the engagement has a separate `cmn_rota` rotation specifically for "Duty Manager", or whether the duty manager is the on-call engineer's escalation contact (in which case the rotation needs a second tier configured).
+OQ-EV-2. **Acknowledgement definition.** "Not acknowledged within 15 minutes" — does "acknowledged" mean `state=2 (In Progress)`, or `assigned_to is set`, or "`assigned_to` has added to `work_notes`"? The three are subtly different. Recommend defaulting to "assigned_to is set AND state transitioned out of New (state != 1)".
+OQ-EV-3. **15-minute timer reference point.** From `sys_created_on` of the incident, or from the moment it was first assigned? Defaulting to `sys_created_on` if no assignment SLA is active.
+OQ-EV-4. **Re-escalation behaviour.** If the duty manager doesn't ack within another 15 minutes, escalate further? Out of scope unless specified.
 ```
 
 ### Explanation
@@ -246,11 +246,11 @@ Technical Designer receives this envelope and produces:
 
 ## Open Questions
 
-1. **Scope convention.** The proposal uses `u_` prefix on a baseline-scope field. Confirm whether the engagement has a standing rule for `u_` vs scoped-app custom fields. If a scoped app is preferred, the field takes the app's namespace in place of `u_`, `x_<vendor>_<app>_business_severity` *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*, and ACL/BR records move into the scoped app.
-2. **Service Owner role identity.** The dispatch envelope names `u_service_owner` as the role. Confirm this is the engagement's actual role name and that it's already populated for the relevant CIs.
-3. **Backfill strategy.** NULL = implicit Low, or explicit Service-Owner-driven backfill exercise? Recommend defaulting to NULL with a future backfill story if reporting needs require it.
-4. **Read access.** Should `u_business_severity` be visible to all `itil` users (read-only) or restricted to Service Owners? Recommend read-visible-to-itil, write-restricted-to-Service-Owner.
-5. **Escalation-timing linkage.** The request says business severity "drives escalation timing". Confirm whether escalation timing is per-incident (the Example 1 pattern reads `u_business_severity` and adjusts the 15-minute timer) or per-CI (the timer is on the cmdb_ci_service record).
+OQ-EV-1. **Scope convention.** The proposal uses `u_` prefix on a baseline-scope field. Confirm whether the engagement has a standing rule for `u_` vs scoped-app custom fields. If a scoped app is preferred, the field takes the app's namespace in place of `u_`, `x_<vendor>_<app>_business_severity` *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*, and ACL/BR records move into the scoped app.
+OQ-EV-2. **Service Owner role identity.** The dispatch envelope names `u_service_owner` as the role. Confirm this is the engagement's actual role name and that it's already populated for the relevant CIs.
+OQ-EV-3. **Backfill strategy.** NULL = implicit Low, or explicit Service-Owner-driven backfill exercise? Recommend defaulting to NULL with a future backfill story if reporting needs require it.
+OQ-EV-4. **Read access.** Should `u_business_severity` be visible to all `itil` users (read-only) or restricted to Service Owners? Recommend read-visible-to-itil, write-restricted-to-Service-Owner.
+OQ-EV-5. **Escalation-timing linkage.** The request says business severity "drives escalation timing". Confirm whether escalation timing is per-incident (the Example 1 pattern reads `u_business_severity` and adjusts the 15-minute timer) or per-CI (the timer is on the cmdb_ci_service record).
 ```
 
 ### Explanation
@@ -337,7 +337,7 @@ The request names a custom table for the matrix. The baseline tables that alread
 - A quarterly change edits decision records on the policy, not a flow and not a script.
 - The order of the approval steps is a sequence of Apply Change Approval Policy actions in the flow, one policy per step.
 
-**What the policy does not hold: an SLA per approval step.** Each action carries one Due Date, and the Due Date decides what happens when it falls due. Whether the scenarios need different durations is Open Question 1.
+**What the policy does not hold: an SLA per approval step.** Each action carries one Due Date, and the Due Date decides what happens when it falls due. Whether the scenarios need different durations is OQ-EV-1.
 
 ## Part 3 — §1.1 Baseline-First Verdict
 
@@ -349,9 +349,9 @@ The request names a custom table for the matrix. The baseline tables that alread
 
 | Baseline option | What it covers | Where it falls short |
 |---|---|---|
-| **Change approval policy** — one decision per scenario, approval definitions naming the groups, one Apply Change Approval Policy action per approval step | The five dimensions as decision conditions on the change and the records it references; the groups; their order; quarterly edits as decision records | An SLA per step: each action carries a single Due Date. Verify against the scenarios (Open Question 1). |
+| **Change approval policy** — one decision per scenario, approval definitions naming the groups, one Apply Change Approval Policy action per approval step | The five dimensions as decision conditions on the change and the records it references; the groups; their order; quarterly edits as decision records | An SLA per step: each action carries a single Due Date. Verify against the scenarios (OQ-EV-1). |
 | **One Ask for Approval branch per scenario in the flow** | Every scenario, as ~50 conditioned branches | Each quarterly change edits the flow, and each branch's condition becomes a mini-ruleset. The policy holds the same thing as records. |
-| **Decision Table** (`sys_decision`), read by the flow beside the policy | A duration per scenario and step, if Open Question 1 needs one | A second place where scenarios are kept, beside the policy's decisions *(citation: `markdown/build-workflows/index.md`)* |
+| **Decision Table** (`sys_decision`), read by the flow beside the policy | A duration per scenario and step, if OQ-EV-1 needs one | A second place where scenarios are kept, beside the policy's decisions *(citation: `markdown/build-workflows/index.md`)* |
 
 The Change approval policy covers the request. Nothing in it calls for a new table.
 
@@ -399,11 +399,11 @@ Do not dispatch Technical Designer or Flow Designer Specialist until the Chief A
 
 ## Open Questions
 
-1. **OPEN QUESTION: per-step SLA.** Do the scenarios need different approval durations per step, or one per step? Each Apply Change Approval Policy action has one Due Date, which chooses what happens when the step falls due; where the duration itself is set is not documented in the bundled corpus — verify on the instance. **Proposed default:** one duration per step, on each step's action; a Decision Table beside the policy only if the scenarios prove to need different durations.
-2. **Dimension orthogonality.** Can BU and PCI be derived from `cmdb_ci`? Fewer dimensions mean fewer decisions.
-3. **Quarterly cadence ownership.** Who edits the decisions each quarter? Decisions are created by an admin or a change manager *(citation: `markdown/it-service-management/change-management/create-decisions.md`)*. Affects who holds the role.
-4. **Audit retention.** PCI audit typically requires 7 years of change history. Confirm the engagement's retention covers the approval records and the edits to the policy's decisions.
-5. **Standard changes.** Does the policy apply to Standard changes (pre-approved by definition) or only Normal and Emergency? Standard changes typically bypass approval entirely; confirm scope.
+OQ-EV-1. **OPEN QUESTION: per-step SLA.** Do the scenarios need different approval durations per step, or one per step? Each Apply Change Approval Policy action has one Due Date, which chooses what happens when the step falls due; where the duration itself is set is not documented in the bundled corpus — verify on the instance. **Proposed default:** one duration per step, on each step's action; a Decision Table beside the policy only if the scenarios prove to need different durations.
+OQ-EV-2. **Dimension orthogonality.** Can BU and PCI be derived from `cmdb_ci`? Fewer dimensions mean fewer decisions.
+OQ-EV-3. **Quarterly cadence ownership.** Who edits the decisions each quarter? Decisions are created by an admin or a change manager *(citation: `markdown/it-service-management/change-management/create-decisions.md`)*. Affects who holds the role.
+OQ-EV-4. **Audit retention.** PCI audit typically requires 7 years of change history. Confirm the engagement's retention covers the approval records and the edits to the policy's decisions.
+OQ-EV-5. **Standard changes.** Does the policy apply to Standard changes (pre-approved by definition) or only Normal and Emergency? Standard changes typically bypass approval entirely; confirm scope.
 ```
 
 ### Explanation

@@ -252,7 +252,7 @@ Cite where Verdict B/C is in play.]
 
 ## Open Questions
 
-[Missing Input Contract fields, ambiguities.]
+[Missing Input Contract fields, ambiguities. Number each `OQ-EV-1`, `OQ-EV-2`… (`governance/governance-rules.md` §4.4).]
 
 ---
 

@@ -64,8 +64,8 @@ Technical Designer (tables/ACLs), Developer (API + scripts), Flow Designer (life
 - Nested-if routing in a BR instead of a decision table.
 
 ## Open questions
-1. Delegated development — who may build/maintain in this scope?
-2. Is any data sensitive (→ Security & GRC) or high-volume (→ Performance & Scale)?
+OQ-CN-1. Delegated development — who may build/maintain in this scope?
+OQ-CN-2. Is any data sensitive (→ Security & GRC) or high-volume (→ Performance & Scale)?
 ```
 
 ---

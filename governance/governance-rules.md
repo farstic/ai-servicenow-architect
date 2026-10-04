@@ -116,6 +116,24 @@ Every requirement on a release path must be traceable through story → design �
 - **Every unresolved `OPEN QUESTION` becomes a RAID item** so it survives the gap between sessions/laptops rather than evaporating. Estimation surfaces sizing risks/assumptions; Discovery surfaces dependencies; Performance/Security/Licensing each surface their own risks.
 - **NFRs are design constraints, not afterthoughts.** Capture them before build and hand each to its owning consult (Performance & Scale, Security & GRC, Licensing, UI/UX, Integration). An NFR with an unconfirmed target is a RAID Assumption until the client confirms it. Never assert an NFR target from memory.
 
+### §4.4 — OPEN QUESTION ids
+
+An `OPEN QUESTION` that will be referred to later carries an id that says which artefact it belongs to: `OQ-<kind>-<n>`, where `<kind>` is the two-letter code of the artefact's kind and `<n>` counts from 1 inside that one artefact.
+
+| Kind | Artefact | Its questions live in |
+|---|---|---|
+| `ES` | engagement state | `clients/<name>/<name>-engagement-state.md` |
+| `ST` | story | the `# OPEN QUESTIONS` block of a Feature file |
+| `DS` | design | a technical design, an HLD/LLD/PDD, or an integration, flow or Now Assist specification |
+| `EV` | gateway Envelope | the Open Questions part of a Constraint Envelope |
+| `DC` | Discovery output | its `OPEN QUESTIONS` section |
+| `CN` | consult note | the note a consult or reviewer returns |
+
+**Discipline:**
+- **Never a bare `OQ-<n>` or "Open Question <n>".** Engagement state and a story each count from 1, so an answer that quotes both holds two questions with the same number and the reader cannot tell which was meant.
+- **Outside its own artefact an id is followed by that artefact's name** — the file name, or for an Envelope the gateway's: `OQ-DS-2 (case-escalation-design.md)`. Two stories, or two co-fired Envelopes, share a kind, and the name is what tells their `OQ-ST-1`s apart.
+- **The RAID log keeps the id.** An `OPEN QUESTION` that becomes a RAID item (§4.3) carries its coded id and artefact name in the `Linked` column.
+
 ### Enforcement points
 
 - **Routing-time (Phase 1):** when a §1.1 custom-object question is raised, the Chief Architect notes that approval will be recorded as an ADR (§4.1); NFRs and RAID items surfaced during assumptions go into the engagement logs (§4.3).

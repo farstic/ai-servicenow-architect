@@ -72,7 +72,7 @@ Developer returned a Script Include `SLABreachRiskCalculator` with method `calcu
 No custom step config script produced (baseline *Run Server Side Script* + *Create a Record* cover it) → no Code Reviewer pass required for the tests themselves.
 
 ## Open questions
-1. Does `calculate()` throw or return null on an unauthorised caller? Test 4's assertion adapts to whichever the spec defines — confirm.
+OQ-DS-1. Does `calculate()` throw or return null on an unauthorised caller? Test 4's assertion adapts to whichever the spec defines — confirm.
 ```
 
 ---
@@ -131,7 +131,7 @@ The `x_acme_itsm` app (3 Script Includes, 2 Business Rules, 1 catalog item, 1 fl
 One custom step type was needed for the flow's wait-condition assertion → its config script is flagged for **Code Reviewer**.
 
 ## Open questions
-1. Is a client test runner provisioned in the test instance for the UI & Catalog child suite?
+OQ-DS-1. Is a client test runner provisioned in the test instance for the UI & Catalog child suite?
 ```
 
 ---

@@ -161,16 +161,16 @@ The wrapper's body delegates to `SLABreachRiskCalculator` and returns the JSON s
 
 ## 14. Open questions
 
-1. **Workspace badge component** — does Service Operations Workspace's UX framework provide a reusable badge component, or does the Client Script render via inline HTML? **ASSUMPTION:** SOW exposes `g_form.getControl()`-compatible badge rendering; confirm with UI/UX Specialist before implementation.
-2. **Tooltip content for the failure case** — "Risk unavailable" is generic. Should this surface the underlying cause (timeout / no SLA / non-itil caller)? Product owner decision.
-3. **Caching policy** — per-form-session caching is recommended but not required; confirm whether the engagement has a standing rule on client-side caching for derived data.
+OQ-DS-1. **Workspace badge component** — does Service Operations Workspace's UX framework provide a reusable badge component, or does the Client Script render via inline HTML? **ASSUMPTION:** SOW exposes `g_form.getControl()`-compatible badge rendering; confirm with UI/UX Specialist before implementation.
+OQ-DS-2. **Tooltip content for the failure case** — "Risk unavailable" is generic. Should this surface the underlying cause (timeout / no SLA / non-itil caller)? Product owner decision.
+OQ-DS-3. **Caching policy** — per-form-session caching is recommended but not required; confirm whether the engagement has a standing rule on client-side caching for derived data.
 
 ## Downstream handoff manifest
 
 - **Developer** — implements `x_acme_itsm.SLABreachRiskClient` Script Include (client_callable wrapper) and the `SLA Risk Badge` Client Script.
 - **Flow Designer Specialist** — not required. No flows in this design.
 - **Integration Specialist** — not required. No integrations in this design.
-- **UI/UX Specialist** — consult required for SOW badge component pattern (see Open Question 1).
+- **UI/UX Specialist** — consult required for SOW badge component pattern (see OQ-DS-1).
 
 ## Consult flags
 
@@ -186,7 +186,7 @@ The wrapper's body delegates to `SLABreachRiskCalculator` and returns the JSON s
 >
 > **Routing-time consult flag (§3.1) standing:** Performance & Scale Specialist consult is recommended before go-live to validate the existing Script Include's query plans against current ~500K-incident volume.
 >
-> **UI/UX Specialist consult** — Open Question 1 (SOW badge component pattern) should be resolved before Developer implementation begins.
+> **UI/UX Specialist consult** — OQ-DS-1 (SOW badge component pattern) should be resolved before Developer implementation begins.
 
 ### Explanation
 
@@ -305,7 +305,7 @@ No effective-date rule: the effective date is the target job's start date, held 
 
 | Direction | System | Purpose | Auth | Payload | Volume | MID Server |
 |---|---|---|---|---|---|---|
-| Outbound | Workday HRIS | Update employee reporting line, cost centre, role title | OAuth 2.0, configured for the baseline Workday HR spoke on each instance — no custom Connection & Credential Alias *(citations: `markdown/integrate-applications/integration-hub/workday-hr-spoke.md`, `markdown/integrate-applications/integration-hub/configs-workday-hr-soap-oauth.md`)* | The spoke's Change Job action (transfers, promotions, lateral moves) and Change Organization action (cost center); the corpus lists no inputs for either — see OQ-3 *(citation: `markdown/integrate-applications/integration-hub/workday-hr-spoke.md`)* | ~50/month, batched daily | Required if Workday is on-prem proxy; cloud Workday tenant: not required. **Confirm with Acme network team (Open Question).** |
+| Outbound | Workday HRIS | Update employee reporting line, cost centre, role title | OAuth 2.0, configured for the baseline Workday HR spoke on each instance — no custom Connection & Credential Alias *(citations: `markdown/integrate-applications/integration-hub/workday-hr-spoke.md`, `markdown/integrate-applications/integration-hub/configs-workday-hr-soap-oauth.md`)* | The spoke's Change Job action (transfers, promotions, lateral moves) and Change Organization action (cost center); the corpus lists no inputs for either — see OQ-DS-3 *(citation: `markdown/integrate-applications/integration-hub/workday-hr-spoke.md`)* | ~50/month, batched daily | Required if Workday is on-prem proxy; cloud Workday tenant: not required. **Confirm with Acme network team (Open Question).** |
 
 **Hand-off note:** Integration Specialist consumes this list and produces the integration architecture spec, including the retry pattern (the attempt count on the LE case, HR admin escalation after five), the Workday HR spoke's OAuth 2.0 configuration, and the `WorkdayTransferUtils` Script Include's spoke invocation pattern.
 
@@ -356,11 +356,11 @@ No effective-date rule: the effective date is the target job's start date, held 
 
 ## 14. Open questions
 
-1. **Workday tenant deployment** — cloud or on-prem? Drives MID Server requirement (Section 8). Open Question for Acme infra team.
-2. **Effective date source** — the design takes the target job's start date. Confirm with HR that the target job record exists, with its start date, before the LE starts.
-3. **Workday API contract** — the spoke's Change Job and Change Organization actions cover the transfer and the cost centre, and the corpus lists no inputs for them; confirm their inputs with Integration Specialist (next handoff).
-4. **Source manager change scenarios** — what happens if the source manager changes between LE initiation and effective date? Out of scope here; flag for product owner.
-5. **Compensation changes** — explicitly out of scope per the input. Compensation flows through a separate Lifecycle Event.
+OQ-DS-1. **Workday tenant deployment** — cloud or on-prem? Drives MID Server requirement (Section 8). Open Question for Acme infra team.
+OQ-DS-2. **Effective date source** — the design takes the target job's start date. Confirm with HR that the target job record exists, with its start date, before the LE starts.
+OQ-DS-3. **Workday API contract** — the spoke's Change Job and Change Organization actions cover the transfer and the cost centre, and the corpus lists no inputs for them; confirm their inputs with Integration Specialist (next handoff).
+OQ-DS-4. **Source manager change scenarios** — what happens if the source manager changes between LE initiation and effective date? Out of scope here; flag for product owner.
+OQ-DS-5. **Compensation changes** — explicitly out of scope per the input. Compensation flows through a separate Lifecycle Event.
 
 ## Downstream handoff manifest
 
@@ -403,7 +403,7 @@ The §3.1 consult flags fire correctly: Security & GRC fires on HR PII + outboun
 
 The HRSD Specialist domain consult is correctly surfaced — Technical Designer designs the data model — the Jobs records for the titles and the effective date, three fields on the LE case for the rest, no table — and the server-side list, but doesn't pretend to know HRSD's Lifecycle Event activity-set conventions. That's a domain expert handoff before Flow Designer Specialist can build the LE flow.
 
-Open Question 4 (source manager change scenarios) is a real question that the input didn't cover. Technical Designer surfaces it rather than inventing a design — that's the convergent-but-honest discipline.
+OQ-DS-4 (source manager change scenarios) is a real question that the input didn't cover. Technical Designer surfaces it rather than inventing a design — that's the convergent-but-honest discipline.
 
 ---
 
@@ -457,7 +457,7 @@ Add AI-driven case deflection to the Acme customer-facing portal. Before a custo
 | Table | Action | Rationale |
 |---|---|---|
 | `sn_customerservice_case` (baseline) | Reuse | Standard CSM cases. |
-| `x_acme_csm_portal_deflection_event` | Net-new, pre-approved | One record per deflection attempt: which articles the skill suggested and which, if any, the customer accepted — the part Self-Service Analytics does not keep. Used for skill tuning. Deflection outcomes and the deflection rate are assumed to come from Self-Service Analytics, whose scheduled job stores matched outcomes in Deflection Metric [`ssa_deflection_metric`] *(citation: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`)* — an assumption, see OQ-6. |
+| `x_acme_csm_portal_deflection_event` | Net-new, pre-approved | One record per deflection attempt: which articles the skill suggested and which, if any, the customer accepted — the part Self-Service Analytics does not keep. Used for skill tuning. Deflection outcomes and the deflection rate are assumed to come from Self-Service Analytics, whose scheduled job stores matched outcomes in Deflection Metric [`ssa_deflection_metric`] *(citation: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`)* — an assumption, see OQ-DS-6. |
 
 ### `x_acme_csm_portal_deflection_event` field list
 
@@ -493,7 +493,7 @@ Add AI-driven case deflection to the Acme customer-facing portal. Before a custo
 |---|---|---|---|---|---|---|
 | `LogDeflectionEvent` | Script Include | n/a | n/a | n/a | n/a | Public method `logEvent(sessionId, accountSysId, subject, suggestedArticles, acceptedArticleOrNull)`. Called by the portal flow after each deflection attempt. **Script Include not inline because the accept and decline paths of the callback both use it.** |
 
-No deflection-rate job: Self-Service Analytics is assumed to capture the deflection outcomes in Deflection Metric [`ssa_deflection_metric`] on its own schedule *(citation: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`)* — see OQ-6.
+No deflection-rate job: Self-Service Analytics is assumed to capture the deflection outcomes in Deflection Metric [`ssa_deflection_metric`] on its own schedule *(citation: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`)* — see OQ-DS-6.
 
 ## 6. Client-side logic outline
 
@@ -526,7 +526,7 @@ No deflection-rate job: Self-Service Analytics is assumed to capture the deflect
 - Deflection skill latency: budget ≤ 2 seconds (perceptual budget for "while customer waits"). Now Assist Specialist must validate this against the chosen LLM and AI Search index size.
 - Volume: ~10K/month attempted, ~250 peak per business day, ~30 per business hour. Concurrent peak budget: ~3 concurrent skill calls. Well within Now Assist throughput envelope.
 - `x_acme_csm_portal_deflection_event` write rate: ~10K/month, no concern.
-- Deflection outcomes and rate: assumed to be computed by Self-Service Analytics' own scheduled job, not by this design (OQ-6).
+- Deflection outcomes and rate: assumed to be computed by Self-Service Analytics' own scheduled job, not by this design (OQ-DS-6).
 
 **Consult flag: Performance & Scale Specialist — does not fire** at this volume. The 2-second perceptual latency budget on the skill is a Now Assist concern, not a platform-scale concern.
 
@@ -561,12 +561,12 @@ No deflection-rate job: Self-Service Analytics is assumed to capture the deflect
 
 ## 14. Open questions
 
-1. **Customer-content classification policy** — does Acme have a published policy on what customer-submitted text can be logged to the platform vs. tokenised/redacted? Decision required before go-live. Routing to Security & GRC Specialist.
-2. **Portal widget design** — the Service Portal widget UX (suggestion display, accept/decline interactions, draft preservation) is owned by UI/UX Specialist; this design covers only the platform-side surface.
-3. **Deflection skill design** — the Now Assist skill itself (prompt, tools, confidence routing, AI Control Tower governance) is owned by Now Assist Specialist; this design covers only the platform integration point.
-4. **Multi-language support** — is the deflection skill expected to support multiple languages? Drives Now Assist Specialist's skill design.
-5. **Deflection-event retention** — how long do we keep deflection events for skill tuning? 12 months default; confirm with Acme legal.
-6. **Self-Service Analytics activity** — Self-Service Analytics derives deflection outcomes from recorded activity types (for example, viewed knowledge article, submitted positive feedback) within a configured window, and needs the Self-Service Analytics Core plugin (`com.snc.self_service_analytics_core`). Confirm that the widget's accept and decline are recorded as activities it reads; if they are not, the 30% target cannot be measured from it *(citations: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`, `markdown/servicenow-platform/knowledge-management/self-service-analytics.md`)*.
+OQ-DS-1. **Customer-content classification policy** — does Acme have a published policy on what customer-submitted text can be logged to the platform vs. tokenised/redacted? Decision required before go-live. Routing to Security & GRC Specialist.
+OQ-DS-2. **Portal widget design** — the Service Portal widget UX (suggestion display, accept/decline interactions, draft preservation) is owned by UI/UX Specialist; this design covers only the platform-side surface.
+OQ-DS-3. **Deflection skill design** — the Now Assist skill itself (prompt, tools, confidence routing, AI Control Tower governance) is owned by Now Assist Specialist; this design covers only the platform integration point.
+OQ-DS-4. **Multi-language support** — is the deflection skill expected to support multiple languages? Drives Now Assist Specialist's skill design.
+OQ-DS-5. **Deflection-event retention** — how long do we keep deflection events for skill tuning? 12 months default; confirm with Acme legal.
+OQ-DS-6. **Self-Service Analytics activity** — Self-Service Analytics derives deflection outcomes from recorded activity types (for example, viewed knowledge article, submitted positive feedback) within a configured window, and needs the Self-Service Analytics Core plugin (`com.snc.self_service_analytics_core`). Confirm that the widget's accept and decline are recorded as activities it reads; if they are not, the 30% target cannot be measured from it *(citations: `markdown/servicenow-platform/knowledge-management/ssa-concepts.md`, `markdown/servicenow-platform/knowledge-management/self-service-analytics.md`)*.
 
 ## Downstream handoff manifest
 
@@ -608,7 +608,7 @@ Notable discipline: Section 6 (Client-side logic) is "Not applicable" with a rat
 
 The Section 3 (Data model) field list and indexes follow a strict tabular format — that's what Developer consumes cleanly. The ACL matrix in Section 4 has **field-level** restrictions on `attempted_subject` (customer-supplied content) — an anti-pattern guard against logging PII without protection.
 
-Open Question 1 (customer-content classification policy) explicitly routes to Security & GRC Specialist rather than being resolved here. That's the "honest uncertainty" pattern — Technical Designer surfaces what cannot be answered without policy input.
+OQ-DS-1 (customer-content classification policy) explicitly routes to Security & GRC Specialist rather than being resolved here. That's the "honest uncertainty" pattern — Technical Designer surfaces what cannot be answered without policy input.
 
 ---
 

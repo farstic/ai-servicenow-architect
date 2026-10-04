@@ -75,10 +75,10 @@ Feature: Auto-page on-call major incident manager on P1 declaration
     And the audit history records the integration failure with timestamp
 
   # OPEN QUESTIONS
-  # 1. Confirm the paging channel — is this OpsGenie, PagerDuty, ServiceNow native push, or a custom integration?
-  # 2. ASSUMPTION: "60 seconds" is end-to-end (incident state change → page received). Confirm SLA boundary.
-  # 3. What is the shift_lead fallback's own fallback — i.e., if the shift lead is also unavailable?
-  # 4. Should reopened P1 incidents re-page? Or only first declaration?
+  # OQ-ST-1. Confirm the paging channel — is this OpsGenie, PagerDuty, ServiceNow native push, or a custom integration?
+  # OQ-ST-2. ASSUMPTION: "60 seconds" is end-to-end (incident state change → page received). Confirm SLA boundary.
+  # OQ-ST-3. What is the shift_lead fallback's own fallback — i.e., if the shift lead is also unavailable?
+  # OQ-ST-4. Should reopened P1 incidents re-page? Or only first declaration?
 ```
 
 ```gherkin
@@ -105,9 +105,9 @@ Feature: War room provisioned on P1 declaration and archived on closure
     And the archive timestamp is recorded in incident.work_notes
 
   # OPEN QUESTIONS
-  # 1. Confirm the collaboration platform — Microsoft Teams, Slack, Webex?
-  # 2. ASSUMPTION: Banner is a Form-level UI message keyed off incident.priority and incident.state. Confirm with UI/UX before design.
-  # 3. Postmortem use of archived war rooms — should there be a permission model on archived rooms (read-only for non-MIM)?
+  # OQ-ST-1. Confirm the collaboration platform — Microsoft Teams, Slack, Webex?
+  # OQ-ST-2. ASSUMPTION: Banner is a Form-level UI message keyed off incident.priority and incident.state. Confirm with UI/UX before design.
+  # OQ-ST-3. Postmortem use of archived war rooms — should there be a permission model on archived rooms (read-only for non-MIM)?
 ```
 
 #### Step 4 — Supporting stories proposed
@@ -189,10 +189,10 @@ Feature: Auto-create HR onboarding case when new sys_user lands from Workday
     And the HR Service Delivery admin (sn_hr_core.admin) receives a notification
 
   # OPEN QUESTIONS
-  # 1. Confirm the trigger boundary — is this on sys_user.insert from Workday only, or also on sys_user updates that flip u_employee_type to onboarding-eligible?
-  # 2. ASSUMPTION: "5 minutes" is a soft target; the underlying mechanism is async (Flow triggered by sys_user insert event). Confirm acceptable latency.
-  # 3. Should rehires (sys_user with prior employment history) follow Standard Onboarding, or a "Rehire" template variant?
-  # 4. Workday delivers what timezone for start_date? UTC, employee local, or HR ops local? Affects the "in the future or today" check.
+  # OQ-ST-1. Confirm the trigger boundary — is this on sys_user.insert from Workday only, or also on sys_user updates that flip u_employee_type to onboarding-eligible?
+  # OQ-ST-2. ASSUMPTION: "5 minutes" is a soft target; the underlying mechanism is async (Flow triggered by sys_user insert event). Confirm acceptable latency.
+  # OQ-ST-3. Should rehires (sys_user with prior employment history) follow Standard Onboarding, or a "Rehire" template variant?
+  # OQ-ST-4. Workday delivers what timezone for start_date? UTC, employee local, or HR ops local? Affects the "in the future or today" check.
 ```
 
 #### Supporting stories proposed
@@ -273,10 +273,10 @@ Feature: Auto-route case to CSM when account contract is at-risk
     And case.work_notes records the specific at-risk contract number
 
   # OPEN QUESTIONS
-  # 1. Confirm "u_primary_contract" — is this a designated contract on the account, or "the most recent contract"? Affects the lookup logic.
-  # 2. ASSUMPTION: Cases reopened later don't re-trigger routing (assigned_to stays). Confirm.
-  # 3. What about cases opened by the CSM themselves on their own account? Should auto-routing still fire? (Likely no.)
-  # 4. Does priority elevation apply to all severities including "Critical"? (No-op there, but worth confirming.)
+  # OQ-ST-1. Confirm "u_primary_contract" — is this a designated contract on the account, or "the most recent contract"? Affects the lookup logic.
+  # OQ-ST-2. ASSUMPTION: Cases reopened later don't re-trigger routing (assigned_to stays). Confirm.
+  # OQ-ST-3. What about cases opened by the CSM themselves on their own account? Should auto-routing still fire? (Likely no.)
+  # OQ-ST-4. Does priority elevation apply to all severities including "Critical"? (No-op there, but worth confirming.)
 
   # ATF outline (for downstream ATF Author handoff)
   # TC-01: Happy path — at-risk account, CSM assigned → case.assigned_to = CSM, priority elevated
@@ -284,8 +284,8 @@ Feature: Auto-route case to CSM when account contract is at-risk
   # TC-03: At-risk account, CSM on leave → fallback to delegate
   # TC-04: Multiple contracts mixed → routing fires on first AT_RISK match
   # TC-05: Account not at-risk → no auto-routing (negative case)
-  # TC-06: CSM opens case on own account → no auto-routing (covers OQ-3 if confirmed)
-  # TC-07: Reopen of resolved case → assigned_to unchanged (covers OQ-2 if confirmed)
+  # TC-06: CSM opens case on own account → no auto-routing (covers OQ-ST-3 if confirmed)
+  # TC-07: Reopen of resolved case → assigned_to unchanged (covers OQ-ST-2 if confirmed)
 ```
 
 #### Sprint metadata

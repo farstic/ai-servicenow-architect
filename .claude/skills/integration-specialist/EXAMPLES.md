@@ -39,7 +39,7 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 - **Format:** JSON.
 - **Content type:** set by the spoke's Create Work Item action, not by this design.
 - **Size cap:** 16KB (Azure DevOps work item field limits).
-- **Schema reference:** the spoke's Create Work Item action, work item type `Bug` (per spec — confirm in OQ-1). The spoke was built for Azure DevOps Boards REST API version 4.1 and TFS 2018 Update 3 and may be compatible with later versions — confirm against the organisation's Azure DevOps *(citation: `markdown/integrate-applications/integration-hub/azure-devops-spoke.md`)*.
+- **Schema reference:** the spoke's Create Work Item action, work item type `Bug` (per spec — confirm in OQ-DS-1). The spoke was built for Azure DevOps Boards REST API version 4.1 and TFS 2018 Update 3 and may be compatible with later versions — confirm against the organisation's Azure DevOps *(citation: `markdown/integrate-applications/integration-hub/azure-devops-spoke.md`)*.
 - **Field map:**
   | ServiceNow field | ADO field | Notes |
   |---|---|---|
@@ -144,16 +144,16 @@ This integration takes a `state=Resolved` event on a P1/P2 incident and produces
 - ADO API deprecation tracking (subscribe to ADO release notes).
 
 #### Open questions
-- **OQ-1:** Confirm work item type — spec says "work item"; assumption is `Bug`. Is it `Bug`, `Task`, `Issue`, or organisation-specific? Affects the work item type the Create Work Item action is given.
-- **OQ-2:** ADO project per environment — is the same ADO project used for ServiceNow dev/test/uat/prod, or are there parallel ADO projects? Affects parameterisation strategy.
-- **OQ-3:** Re-route on Resolved-to-Closed transition — should subsequent state updates push to ADO too? Spec only covers initial resolve.
-- **OQ-4:** PII redaction scope — confirm the field list and patterns with Security & GRC.
+- **OQ-DS-1:** Confirm work item type — spec says "work item"; assumption is `Bug`. Is it `Bug`, `Task`, `Issue`, or organisation-specific? Affects the work item type the Create Work Item action is given.
+- **OQ-DS-2:** ADO project per environment — is the same ADO project used for ServiceNow dev/test/uat/prod, or are there parallel ADO projects? Affects parameterisation strategy.
+- **OQ-DS-3:** Re-route on Resolved-to-Closed transition — should subsequent state updates push to ADO too? Spec only covers initial resolve.
+- **OQ-DS-4:** PII redaction scope — confirm the field list and patterns with Security & GRC.
 
 #### Handoffs proposed
 - **Flow Designer Specialist** — design the consuming flow on incident resolve (trigger, idempotency guard, error path to DLQ, alert wiring).
 - **Developer** — implement `x_acme_itsm.PIIRedactor.redact(text)` Script Include per redaction spec; the spoke's actions are baseline, so there are no spoke scripts to write.
 - **Code Reviewer** (post-build §6.2) — fires after Developer returns scripts.
-- **Security & GRC** — review PII redaction scope (OQ-4) and confirm OAuth2 scope on the Azure AD app registration is minimal.
+- **Security & GRC** — review PII redaction scope (OQ-DS-4) and confirm OAuth2 scope on the Azure AD app registration is minimal.
 - **DevOps / Release Manager** — the spoke is a baseline install; the dead-letter table ships in the `x_acme_itsm` app, and the spoke's alias is configured on each instance.
 - **Licensing & Entitlement** — confirm the Integration Hub subscription the spoke requires.
 - **Operational Documentation** — author runbook items above.
@@ -313,17 +313,17 @@ This integration takes inbound monitoring events from an external tool and produ
 - Counterparty contact for triage.
 
 #### Open questions
-- **OQ-1:** Multiple monitoring tools or one? Spec says "an external monitoring tool" — singular. If multiple, need per-tool client_id and per-tool rate limit tier.
-- **OQ-2:** Auto-close — should resolved alerts in the monitoring tool auto-close the corresponding incident? Out of scope for this spec; would be a separate `PUT /events/{correlation_id}/close` endpoint.
-- **OQ-3:** Severity-3 (`minor`) and severity-4 (`info`) — do these create incidents or Event Management events (Event [`em_event`] *(citation: `markdown/it-operations-management/event-management/exploring-event-management.md`)*)? At the volume cap (1000/hr), `info`-level mass creation could flood the incident queue. Confirm with ITSM Specialist.
-- **OQ-4:** Conflict between platform's built-in inbound rate limiting and per-endpoint requirement — confirm during build that 1500 rpm is achievable per-endpoint without instance-wide knock-on.
+- **OQ-DS-1:** Multiple monitoring tools or one? Spec says "an external monitoring tool" — singular. If multiple, need per-tool client_id and per-tool rate limit tier.
+- **OQ-DS-2:** Auto-close — should resolved alerts in the monitoring tool auto-close the corresponding incident? Out of scope for this spec; would be a separate `PUT /events/{correlation_id}/close` endpoint.
+- **OQ-DS-3:** Severity-3 (`minor`) and severity-4 (`info`) — do these create incidents or Event Management events (Event [`em_event`] *(citation: `markdown/it-operations-management/event-management/exploring-event-management.md`)*)? At the volume cap (1000/hr), `info`-level mass creation could flood the incident queue. Confirm with ITSM Specialist.
+- **OQ-DS-4:** Conflict between platform's built-in inbound rate limiting and per-endpoint requirement — confirm during build that 1500 rpm is achievable per-endpoint without instance-wide knock-on.
 
 #### Handoffs proposed
 - **Developer** — implement the Scripted REST API operation script (validation chain, idempotency check, incident insert) per spec.
 - **Code Reviewer** (post-build §6.2) — fires after Developer returns the script.
 - **Security & GRC** — review the role design (`x_acme_monitoring.api_inbound`), confirm payload field sensitivity classification, review IP allowlist mechanism.
 - **CMDB & CSDM** — confirm `affected_ci` resolution behaviour against the CI Class Manager rules; specifically whether `cmdb_ci` lookup should respect any class restrictions.
-- **ITSM Specialist** — confirm severity-to-priority mapping and address OQ-3.
+- **ITSM Specialist** — confirm severity-to-priority mapping and address OQ-DS-3.
 - **Performance & Scale** — validate the `correlation_id` lookup and its index on `incident` at sustained 25 TPS.
 - **Operational Documentation** — runbook items above.
 - **ATF Author** — test suite per test approach above.
@@ -332,7 +332,7 @@ This integration takes inbound monitoring events from an external tool and produ
 
 Inbound APIs are where most production integration defects happen, and this spec demonstrates why discipline matters. The validation chain (auth → role → IP → content-type → size → parse → schema → idempotency → CI resolution → insert) is ordered deliberately: cheap checks first, expensive checks last; security checks before parsing (parse errors should never expose internal detail to unauthenticated callers). The error envelope is structured and consistent, with correlation_id echoed back so the counterparty can debug end-to-end without ServiceNow log access.
 
-The idempotency posture is honest about its tradeoff: the key lives on the incident itself, so no second write can fall out of step, and the spec states the one failure mode left (two identical requests at the same moment) explicitly rather than pretending the design is transactional. That's senior-engineer behaviour — making the tradeoff visible rather than hiding it. The five proposed handoffs cover Developer (the script), Security & GRC (role design and PII), CMDB & CSDM (CI resolution rules), ITSM Specialist (severity mapping and OQ-3 about info-level flooding), and Performance & Scale (the `correlation_id` lookup at 25 TPS) — none requested by the user, all genuinely required for a production-grade build.
+The idempotency posture is honest about its tradeoff: the key lives on the incident itself, so no second write can fall out of step, and the spec states the one failure mode left (two identical requests at the same moment) explicitly rather than pretending the design is transactional. That's senior-engineer behaviour — making the tradeoff visible rather than hiding it. The five proposed handoffs cover Developer (the script), Security & GRC (role design and PII), CMDB & CSDM (CI resolution rules), ITSM Specialist (severity mapping and OQ-DS-3 about info-level flooding), and Performance & Scale (the `correlation_id` lookup at 25 TPS) — none requested by the user, all genuinely required for a production-grade build.
 
 ---
 
@@ -383,7 +383,7 @@ N/A at the spoke level — spokes are libraries. Consumers (flows) trigger.
 - **Decision required:** Atlas is internal. If the ServiceNow instance can reach Atlas directly (production network peering or public-with-allowlist), no MID Server. Otherwise MID Server.
 - **Recommendation:** MID Server with `REST_OUT` capability, IP affinity matching the network zone where Atlas is reachable.
 - **MID Server cluster:** 2 MID Servers in the cluster for HA; affinity rules ensure both can reach Atlas.
-- **OQ-1** captures the network topology decision.
+- **OQ-DS-1** captures the network topology decision.
 
 #### Error handling
 - **Retry policy (default for all four Actions, overrideable per-Action):** exponential backoff with jitter; 4 attempts; base 500ms, multiplier 2x, jitter ±20%; total cap 15s.
@@ -480,10 +480,10 @@ x_acme_atlas_spoke/
 - DLQ replay (delegated to consumers; spoke has no DLQ of its own).
 
 #### Open questions
-- **OQ-1:** Network topology — direct or MID Server? Depends on whether ServiceNow can reach Atlas's network directly. Confirm with infrastructure.
-- **OQ-2:** Webhook return path from Atlas — does Atlas push status updates back to ServiceNow, or is ServiceNow polling? Spec covers four outbound operations only; inbound webhook may be a v2 addition.
-- **OQ-3:** Sensitive field detection in logs — what counts as sensitive in an Atlas ticket payload? Need a list from the Atlas team to configure the redaction patterns.
-- **OQ-4:** Field mapping between ServiceNow and Atlas — not in this spec; will be defined per consumer flow. Should the spoke provide a mapping helper, or let each flow handle its own mapping? Recommendation: each flow handles its own mapping; spoke stays generic.
+- **OQ-DS-1:** Network topology — direct or MID Server? Depends on whether ServiceNow can reach Atlas's network directly. Confirm with infrastructure.
+- **OQ-DS-2:** Webhook return path from Atlas — does Atlas push status updates back to ServiceNow, or is ServiceNow polling? Spec covers four outbound operations only; inbound webhook may be a v2 addition.
+- **OQ-DS-3:** Sensitive field detection in logs — what counts as sensitive in an Atlas ticket payload? Need a list from the Atlas team to configure the redaction patterns.
+- **OQ-DS-4:** Field mapping between ServiceNow and Atlas — not in this spec; will be defined per consumer flow. Should the spoke provide a mapping helper, or let each flow handle its own mapping? Recommendation: each flow handles its own mapping; spoke stays generic.
 
 #### Handoffs proposed
 - **Developer** — implement `AtlasSigner` Script Include (HMAC computation), `AtlasResponseParser` Script Include, and the server scripts inside each Action's steps.

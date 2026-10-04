@@ -101,8 +101,8 @@ notification.
 - **Runbook:** stored as a KBA in an internal Operations KB (or the team wiki if that's the engagement standard); maintained by the Platform team; reviewed each release.
 
 ## Open questions
-1. Which knowledge base is the canonical home for internal runbooks in this engagement — a KB, or an external wiki? (Affects where the runbook is published.)
-2. Should the KBA be visible on the customer/employee portal, or internal-only? (Drives the article's user criteria — Security & GRC consult if external.)
+OQ-CN-1. Which knowledge base is the canonical home for internal runbooks in this engagement — a KB, or an external wiki? (Affects where the runbook is published.)
+OQ-CN-2. Should the KBA be visible on the customer/employee portal, or internal-only? (Drives the article's user criteria — Security & GRC consult if external.)
 
 ---
 

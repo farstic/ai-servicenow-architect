@@ -60,10 +60,10 @@ Customer case lifecycle (portal + email intake → agent triage → resolution);
 Fire **CSM + ITSM + CMDB & CSDM** gateways (cross-domain, co-fire); sequence builders Technical Designer → (Integration for CRM) → Flow Designer → Developer; **UI/UX** for the workspace + portal; **§3.1 consults: Security & GRC** (PII), **Performance & Scale** (40k+/yr growth). Then Story Writer (PP-04) for the backlog.
 
 ## OPEN QUESTIONS
-1. CRM sync — **one-time migration** or **ongoing integration**? (Default: ongoing → Integration Specialist.)
-2. Peak/concurrency numbers? (Default: derive from 40k/yr business-hours distribution; confirm.)
-3. B2B only, or also B2C consumers? (Default: B2B accounts + contacts.)
-4. Are attached logs regulated/retention-bound? (Default: treat as sensitive; Security & GRC to confirm.)
+OQ-DC-1. CRM sync — **one-time migration** or **ongoing integration**? (Default: ongoing → Integration Specialist.)
+OQ-DC-2. Peak/concurrency numbers? (Default: derive from 40k/yr business-hours distribution; confirm.)
+OQ-DC-3. B2B only, or also B2C consumers? (Default: B2B accounts + contacts.)
+OQ-DC-4. Are attached logs regulated/retention-bound? (Default: treat as sensitive; Security & GRC to confirm.)
 ```
 
 ---

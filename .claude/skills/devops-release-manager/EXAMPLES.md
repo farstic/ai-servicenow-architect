@@ -43,9 +43,9 @@ Config: revert the update set. App: reinstall prior App Repository version. Rehe
 - **Security & GRC** — clone secret-exclusion.
 
 ## Open questions
-1. Is DevOps Change Velocity licensed, or is change created manually for now?
-2. Which external CI/CD tool drives the pipeline (→ Integration Specialist scope)?
-3. Clone cadence for sub-prod refresh?
+OQ-CN-1. Is DevOps Change Velocity licensed, or is change created manually for now?
+OQ-CN-2. Which external CI/CD tool drives the pipeline (→ Integration Specialist scope)?
+OQ-CN-3. Clone cadence for sub-prod refresh?
 ```
 
 ---

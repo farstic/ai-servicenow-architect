@@ -123,9 +123,9 @@ Consult flags:
 
 ## Open Questions
 
-1. **Service account governance** — does the engagement have a Linux service account with the appropriate sudo rules for Discovery? If not, Security & GRC consult fires.
-2. **Schedule timing** — is there a maintenance-window constraint on Linux servers? Discovery is low-impact but engagement may want to align with established windows.
-3. **CMDB Health baseline** — is CMDB Health Dashboard active in the engagement? Recommend enabling before initial scan to catch orphan / stale / duplicate CIs in real time.
+OQ-EV-1. **Service account governance** — does the engagement have a Linux service account with the appropriate sudo rules for Discovery? If not, Security & GRC consult fires.
+OQ-EV-2. **Schedule timing** — is there a maintenance-window constraint on Linux servers? Discovery is low-impact but engagement may want to align with established windows.
+OQ-EV-3. **CMDB Health baseline** — is CMDB Health Dashboard active in the engagement? Recommend enabling before initial scan to catch orphan / stale / duplicate CIs in real time.
 
 ---
 
@@ -242,10 +242,10 @@ Consult flags:
 
 ## Open Questions
 
-1. **Class placement** — is the field for Linux only, or all servers? If all servers, place on `cmdb_ci_server` (parent class). Confirm with engagement before Technical Designer dispatch.
-2. **Default tier on Discovery insert** — should new Linux CIs default to one tier on first Discovery, or remain blank until manually set? If default tier, configure on form via UI default (not IRE — IRE shouldn't write this field).
-3. **Compliance reporting consumer** — who consumes the compliance tier reports? Security team, audit team, both? Affects ACL visibility on the field (might need read access for `it_admin` + `security_admin` roles).
-4. **Engagement field-naming convention** — `u_compliance_baseline_tier` (global) vs the scoped-app form `x_<vendor>_<app>_compliance_baseline_tier` *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*. Confirm with Chief Architect / App Engine Specialist.
+OQ-EV-1. **Class placement** — is the field for Linux only, or all servers? If all servers, place on `cmdb_ci_server` (parent class). Confirm with engagement before Technical Designer dispatch.
+OQ-EV-2. **Default tier on Discovery insert** — should new Linux CIs default to one tier on first Discovery, or remain blank until manually set? If default tier, configure on form via UI default (not IRE — IRE shouldn't write this field).
+OQ-EV-3. **Compliance reporting consumer** — who consumes the compliance tier reports? Security team, audit team, both? Affects ACL visibility on the field (might need read access for `it_admin` + `security_admin` roles).
+OQ-EV-4. **Engagement field-naming convention** — `u_compliance_baseline_tier` (global) vs the scoped-app form `x_<vendor>_<app>_compliance_baseline_tier` *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*. Confirm with Chief Architect / App Engine Specialist.
 
 ---
 
@@ -405,12 +405,12 @@ If rejected: adopt Alternative A (extend `cmdb_ci_application_cluster` directly)
 
 ## Open Questions
 
-1. **AceGrid admin API stability** — is the API versioned? Pattern development assumes a stable contract. Provide AceGrid API documentation to Technical Designer.
-2. **Cluster name global uniqueness** — confirm or extend identifier to composite.
-3. **Health metric threshold for Event Management** — what threshold triggers an alert? Defines the event rule (`em_match_rule`) configuration downstream.
-4. **AceGrid version diversity** — are all 50 clusters on the same AceGrid version? Version differences in admin API affect pattern stability.
-5. **Service Map integration** — should AceGrid clusters appear in top-down business service maps? Affects whether new Service Mapping patterns are also needed (Service Mapping Specialist consult might extend timeline).
-6. **DevOps pattern lifecycle** — will AceGrid pattern be deployed via update set or via CI/CD? Affects DevOps consult scope.
+OQ-EV-1. **AceGrid admin API stability** — is the API versioned? Pattern development assumes a stable contract. Provide AceGrid API documentation to Technical Designer.
+OQ-EV-2. **Cluster name global uniqueness** — confirm or extend identifier to composite.
+OQ-EV-3. **Health metric threshold for Event Management** — what threshold triggers an alert? Defines the event rule (`em_match_rule`) configuration downstream.
+OQ-EV-4. **AceGrid version diversity** — are all 50 clusters on the same AceGrid version? Version differences in admin API affect pattern stability.
+OQ-EV-5. **Service Map integration** — should AceGrid clusters appear in top-down business service maps? Affects whether new Service Mapping patterns are also needed (Service Mapping Specialist consult might extend timeline).
+OQ-EV-6. **DevOps pattern lifecycle** — will AceGrid pattern be deployed via update set or via CI/CD? Affects DevOps consult scope.
 
 ---
 

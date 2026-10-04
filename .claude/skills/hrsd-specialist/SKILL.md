@@ -258,7 +258,7 @@ One of:
 
 ## Open Questions
 
-[Missing Input Contract fields, ambiguities, release-family clarifications.]
+[Missing Input Contract fields, ambiguities, release-family clarifications. Number each `OQ-EV-1`, `OQ-EV-2`… (`governance/governance-rules.md` §4.4).]
 
 ---
 
