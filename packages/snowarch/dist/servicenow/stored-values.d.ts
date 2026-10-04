@@ -112,8 +112,13 @@ export interface Verified {
 export declare function withWriteVerification(client: ServiceNowClient): Verified;
 /**
  * Put the warnings on the result the caller reads. An object result gains a `warnings` array (any
- * the tool already produced stay first). A result that is not an object — an array, a string —
- * cannot carry a field, so it is wrapped as `{ result, warnings }`: a changed shape on the rare
- * path is better than a cut value nobody was told about.
+ * the tool already produced stay ahead of ours). A result that is not an object — an array, a
+ * string — cannot carry a field, so it is wrapped as `{ result, warnings }`: a changed shape on the
+ * rare path is better than a cut value nobody was told about.
+ *
+ * `warnings` is the FIRST key, on purpose. A result over the client's size ceiling is cut from the
+ * END of its text (`capResult`, strategy `chars`), so a warning appended last is the first thing a
+ * large result loses — and a large result is the script body whose cut matters most. Keys keep the
+ * order they are inserted in, and the record spread after `warnings` keeps its own.
  */
 export declare function attachWarnings(result: unknown, warnings: CutValueWarning[]): unknown;

@@ -4,6 +4,7 @@ import {
   type CutValueWarning,
 } from '../../src/servicenow/stored-values.js';
 import { routeToolInvocation } from '../../src/tools/index.js';
+import { capResult } from '../../src/utils/result-size.js';
 import { FakeRestClient } from '../helpers/fake-rest.js';
 import { withPreset } from '../helpers/preset.js';
 import { runWithInstance, type Flags, type InstanceRuntime } from '../../src/servicenow/context.js';
@@ -166,6 +167,23 @@ describe('attachWarnings', () => {
 
   it.each([[[1, 2]], ['text'], [null]])('wraps a result that cannot carry a field (%j)', (r) => {
     expect(attachWarnings(r, [w])).toEqual({ result: r, warnings: [w] });
+  });
+
+  it('puts warnings FIRST, because the result-size cap keeps the start of the text and cuts the end', () => {
+    const big = { sys_id: 'a', name: 'cut', script: 'x'.repeat(5000) };
+    const attached = attachWarnings(big, [w]) as Record<string, unknown>;
+    expect(Object.keys(attached)[0]).toBe('warnings');
+    // The cap that reaches a client: a result over the ceiling is cut from the END. A warning
+    // appended last would be the first thing lost, on exactly the large results where a cut hurts.
+    const capped = capResult(attached, 1000);
+    expect(capped.truncated).toBe(true);
+    expect(capped.text).toContain('VALUE_TRUNCATED');
+  });
+
+  it('keeps that order when the tool already produced warnings of its own', () => {
+    const attached = attachWarnings({ sys_id: 'a', warnings: [{ code: 'OWN' }] }, [w]) as Record<string, unknown>;
+    expect(Object.keys(attached)[0]).toBe('warnings');
+    expect((attached.warnings as unknown[]).length).toBe(2);
   });
 });
 
