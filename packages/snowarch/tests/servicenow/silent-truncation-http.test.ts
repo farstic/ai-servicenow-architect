@@ -113,8 +113,8 @@ describe('ARC-09-C93 - over the real client', () => {
     expect((result as Result).sys_id).toBe(SYS_ID);                     // the write still succeeded
     expect((result as Result).warnings).toHaveLength(1);
     expect((result as Result).warnings![0]).toMatchObject({ column_limit: 40, confirmed: false });
-    // The write and ONE lookup. The client retries a 403 with backoff (1s + 2s + 4s) unless told not
-    // to, and the caller of a tool should not wait that long to learn the dictionary is unreadable.
+    // The write and ONE lookup. A 403 is never retried (ARC-09-C99), and the lookup is also made with
+    // `retries: 0` so that a 5xx on it does not cost the caller 1s + 2s + 4s either.
     expect(http.calls).toHaveLength(2);
   });
 });
