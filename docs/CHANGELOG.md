@@ -51,10 +51,11 @@ grounds its Envelope directly, opening at most eight documentation pages and nev
   gateway cites the Major Incident Workbench Communicate tab for major-incident communications, the
   Technical Designer defaults to the baseline scope rather than a new scoped app.
 - The specialists use the ServiceNow names the bundled documentation uses. Table, field, role and pattern
-  names the corpus does not contain are replaced by the corpus's own, with the page that names them; the
-  worked examples' own objects carry the `u_` or `x_` prefix the platform gives custom names; and where the
-  corpus contradicts a sentence — classic approval rules are replaced by the Workflow Studio Ask for
-  Approval action — the sentence now says what the corpus says.
+  names the corpus does not contain are replaced by the corpus's own, with the page that names them. The
+  worked examples name their own objects the way the platform names custom ones — `u_` in the global
+  scope, `x_` in a custom scope, the module's own namespace in a baseline scope — and declare each one
+  "proposed — not baseline". Where the corpus contradicts a sentence — classic approval rules are replaced
+  by the Workflow Studio Ask for Approval action — the sentence now says what the corpus says.
 - The specialists' platform facts match the bundled documentation. Per-task SLAs live in Task SLA, case
   states are the ones the Case API documents, an incident's priority is set from its impact and urgency,
   migrations cite the import-set pages, PII is classified with Data Classification, a nightly precompute
@@ -97,8 +98,8 @@ grounds its Envelope directly, opening at most eight documentation pages and nev
   code — and the worked examples that showed a field list inside a halt are rewritten.
 - The gateways ground an Envelope directly: after the gateway skill, they open at most eight corpus pages
   for the constructs in play, searching only to find them, and never through a sub-agent or a workflow. A
-  name they did not open carries the "not documented in the bundled corpus" marker, and what stays
-  unverified becomes an open question.
+  name that is neither printed in the gateway skill nor on a page opened in the turn carries the "not
+  documented in the bundled corpus" marker, and what stays unverified becomes an open question.
 - The prerequisites name the model: the roster is supported on Claude Sonnet or a more capable model.
 - The CSM gateway's §1.1 example and the user guide's walkthrough of it recommend the baseline case and
   account escalation feature. The request names a custom escalation table, so the answer is still a halt, but
