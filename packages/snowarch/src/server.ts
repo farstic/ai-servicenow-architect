@@ -24,6 +24,7 @@ import { isUnderCloudSyncFolder, maskPath } from './store/index.js';
 import { collectToolCatalog } from './tools/index.js';
 import { getResources, readResource } from './resources/index.js';
 import { logger } from './utils/logging.js';
+import { describeCutsOnError } from './servicenow/stored-values.js';
 import { ServiceNowError } from './utils/errors.js';
 import { getPackageVersion } from './utils/version.js';
 import { capResult, resolveCap } from './utils/result-size.js';
@@ -215,12 +216,17 @@ export function createServer(): Server {
       auditResult = error instanceof ServiceNowError ? error.code : 'ERROR';
       writeAudit();
 
+      // Set only when the tool had already written a value the platform stored cut (ARC-09-C93):
+      // the person is told, even though the call as a whole failed.
+      const cuts = describeCutsOnError(error);
+      const cutNote = cuts ? `\n${cuts}` : '';
+
       if (error instanceof ServiceNowError) {
         return {
           content: [
             {
               type: 'text' as const,
-              text: `Error: ${error.message} (Code: ${error.code})`,
+              text: `Error: ${error.message} (Code: ${error.code})${cutNote}`,
             },
           ],
           isError: true,
@@ -231,7 +237,7 @@ export function createServer(): Server {
         content: [
           {
             type: 'text' as const,
-            text: `Error executing tool: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            text: `Error executing tool: ${error instanceof Error ? error.message : 'Unknown error'}${cutNote}`,
           },
         ],
         isError: true,

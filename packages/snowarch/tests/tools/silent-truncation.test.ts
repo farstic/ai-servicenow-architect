@@ -45,7 +45,9 @@ async function call(tool: string, args: Record<string, unknown>, opts: FakeRestO
 const SENT = 'Close every task still open when the parent incident closes';
 const LIMIT = 40;
 const CUT = SENT.slice(0, LIMIT);
-const DICT_NAME = (table: string, field: string) => `sys_dictionary?name=${table}^element=${field}`;
+const DICT_NAME = (table: string, field: string) => `sys_dictionary?name=${table}^elementIN${field}`;
+/** What the dictionary answers for one column: the row names the column it is about. */
+const ROW = (element: string, max_length: unknown) => ({ element, max_length });
 const BR = { name: SENT, table: 'incident', when: 'before', script: 'gs.info(1);' };
 
 describe('the fixture is what it claims to be', () => {
@@ -57,11 +59,13 @@ describe('the fixture is what it claims to be', () => {
 });
 
 describe('ARC-09-C93 - a Business Rule name cut by the platform is reported with the limit', () => {
-  const cut = { created: { sys_script: { sys_id: 'b1', name: CUT, collection: 'incident' } } };
+  // A real answer carries the whole record, Advanced switch included (a response without it is C92's
+  // FIELD_NOT_STORED, tested in script-business-rule-one-write.test.ts).
+  const cut = { created: { sys_script: { sys_id: 'b1', name: CUT, collection: 'incident', advanced: 'true' } } };
 
   it('names the field, the table, both lengths and the limit, and says the dictionary confirmed it', async () => {
     const { result, client } = await call('snow_scr_business_rule_add', BR, {
-      ...cut, queries: { [DICT_NAME('sys_script', 'name')]: [{ max_length: String(LIMIT) }] },
+      ...cut, queries: { [DICT_NAME('sys_script', 'name')]: [ROW('name', String(LIMIT))] },
     });
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings![0]).toMatchObject({
@@ -73,7 +77,7 @@ describe('ARC-09-C93 - a Business Rule name cut by the platform is reported with
     expect(result.warnings![0]!.message).toContain(String(SENT.length));
     // Exactly one extra request, and only because a cut was seen.
     expect(client.sequence).toEqual([
-      'create sys_script', `query sys_dictionary:name=sys_script^element=name`,
+      'create sys_script', `query sys_dictionary:name=sys_script^elementINname`,
     ]);
   });
 
@@ -95,7 +99,7 @@ describe('ARC-09-C93 - a Business Rule name cut by the platform is reported with
 
   it('a dictionary that says the column holds MORE than was sent means it was not a length cut', async () => {
     const { result } = await call('snow_scr_business_rule_add', BR, {
-      ...cut, queries: { [DICT_NAME('sys_script', 'name')]: [{ max_length: '255' }] },
+      ...cut, queries: { [DICT_NAME('sys_script', 'name')]: [ROW('name', '255')] },
     });
     expect(result.warnings).toBeUndefined();
   });
@@ -103,7 +107,7 @@ describe('ARC-09-C93 - a Business Rule name cut by the platform is reported with
   it('a limit the dictionary states as 0 or blank is "unknown", never a limit of 255', async () => {
     for (const max_length of ['', '0', null]) {
       const { result } = await call('snow_scr_business_rule_add', BR, {
-        ...cut, queries: { [DICT_NAME('sys_script', 'name')]: [{ max_length }] },
+        ...cut, queries: { [DICT_NAME('sys_script', 'name')]: [ROW('name', max_length)] },
       });
       expect(result.warnings, JSON.stringify(max_length)).toHaveLength(1);
       expect(result.warnings![0]!.confirmed, JSON.stringify(max_length)).toBe(false);
@@ -111,11 +115,26 @@ describe('ARC-09-C93 - a Business Rule name cut by the platform is reported with
   });
 });
 
+describe('ARC-09-C93 - a rule that is live says so, because a cut can change what it does', () => {
+  const cut = { created: { sys_script: { sys_id: 'b1', name: CUT, active: 'true', advanced: 'true' } } };
+
+  it('a rule created active (the default) is told it is running with the cut value', async () => {
+    const { result } = await call('snow_scr_business_rule_add', BR, cut);
+    expect(result.warnings![0]!.message).toMatch(/record is active/);
+  });
+
+  it('a rule created inactive is not told that', async () => {
+    const { result } = await call('snow_scr_business_rule_add', { ...BR, active: false },
+      { created: { sys_script: { sys_id: 'b1', name: CUT, active: 'false', advanced: 'true' } } });
+    expect(result.warnings![0]!.message).not.toMatch(/active/);
+  });
+});
+
 describe('ARC-09-C93 - the normal path costs nothing and says nothing', () => {
   it('a name that fits is stored whole: no warnings key, and no request beyond the write', async () => {
     const fits = 'Close open tasks';
     const { result, client } = await call('snow_scr_business_rule_add', { ...BR, name: fits },
-      { created: { sys_script: { sys_id: 'b1', name: fits } } });
+      { created: { sys_script: { sys_id: 'b1', name: fits, advanced: 'true' } } });
     expect(Object.prototype.hasOwnProperty.call(result, 'warnings')).toBe(false);
     expect(client.sequence).toEqual(['create sys_script']);
     expect(result.summary).toContain(fits);
@@ -127,7 +146,7 @@ describe('ARC-09-C93 - it is the write path, not one tool', () => {
     const { result } = await call('snow_scr_business_rule_modify',
       { sys_id: 'b1', fields: { name: SENT } },
       { updated: { sys_script: { sys_id: 'b1', name: CUT } },
-        queries: { [DICT_NAME('sys_script', 'name')]: [{ max_length: String(LIMIT) }] } });
+        queries: { [DICT_NAME('sys_script', 'name')]: [ROW('name', String(LIMIT))] } });
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings![0]).toMatchObject({
       code: 'VALUE_TRUNCATED', operation: 'update', table: 'sys_script', sys_id: 'b1',
@@ -138,7 +157,7 @@ describe('ARC-09-C93 - it is the write path, not one tool', () => {
   it('another tool on another table, with no change to that tool (Script Include)', async () => {
     const { result } = await call('snow_scr_script_include_add', { name: SENT, script: 'var x = 1;' }, {
       created: { sys_script_include: { sys_id: 's1', name: CUT, api_name: SENT } },
-      queries: { [DICT_NAME('sys_script_include', 'name')]: [{ max_length: String(LIMIT) }] },
+      queries: { [DICT_NAME('sys_script_include', 'name')]: [ROW('name', String(LIMIT))] },
     });
     expect(result.warnings).toHaveLength(1);
     expect(result.warnings![0]).toMatchObject({ table: 'sys_script_include', field: 'name', confirmed: true });

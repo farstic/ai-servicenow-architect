@@ -40,6 +40,11 @@ export declare class ServiceNowClient {
     private getImpersonateHeader;
     /**
      * Make HTTP request with retry logic
+     *
+     * `requestedRetries` can only LOWER the client's own policy (`this.maxRetries`). It is reachable
+     * from a tool argument (`QueryRecordsParams.retries`), so a value that raised it, or that was not
+     * a count at all (`NaN`, `Infinity`, a string), would let a caller pick how many times this
+     * client hammers an instance. Anything that is not a non-negative integer is ignored.
      */
     private request;
     /**

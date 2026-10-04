@@ -35,9 +35,12 @@ export declare function collectToolCatalog(): ToolDefinition[];
  * Every tool invocation passes through here, so this is where a write is checked against what the
  * platform STORED (ARC-09-C93, `src/servicenow/stored-values.ts`).
  *
- * The client is wrapped for this one invocation; if a value comes back cut, the cut is put on the
- * result as `warnings`. No tool is edited and none can forget. The instance-free core tools arrive
- * with no client and are dispatched as they were. An invocation that arrives holding an already
- * wrapped client (an orchestration step) joins the outer one, which reports for all of them.
+ * The client is wrapped for this one invocation. The wrapper only RECORDS a cut it sees (no I/O), and
+ * once the tool has returned — or thrown — `settle` reads the dictionary for the cut columns and the
+ * warnings go onto the result as `warnings`, or onto the error of a tool that failed after it wrote.
+ * A tool needs no edit for its createRecord and updateRecord calls to be covered; calls the wrapper
+ * does not see (the Batch API, attachments) are listed in the module header. The instance-free core
+ * tools arrive with no client and are dispatched as they were. An invocation that arrives holding an
+ * already wrapped client (an orchestration step) joins the outer one, which reports for all of them.
  */
 export declare function routeToolInvocation(client: ServiceNowClient, name: string, args: Record<string, unknown>): Promise<any>;

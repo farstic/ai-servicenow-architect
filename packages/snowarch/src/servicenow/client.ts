@@ -230,13 +230,21 @@ export class ServiceNowClient {
 
   /**
    * Make HTTP request with retry logic
+   *
+   * `requestedRetries` can only LOWER the client's own policy (`this.maxRetries`). It is reachable
+   * from a tool argument (`QueryRecordsParams.retries`), so a value that raised it, or that was not
+   * a count at all (`NaN`, `Infinity`, a string), would let a caller pick how many times this
+   * client hammers an instance. Anything that is not a non-negative integer is ignored.
    */
   private async request<T>(
     url: string,
     options: RequestInit = {},
-    maxRetries: number = this.maxRetries
+    requestedRetries: number = this.maxRetries
   ): Promise<T> {
     let lastError: Error | undefined;
+    const maxRetries = Number.isInteger(requestedRetries) && requestedRetries >= 0
+      ? Math.min(requestedRetries, this.maxRetries)
+      : this.maxRetries;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       let retryAfterMs: number | undefined; // set from a 429/503 Retry-After header

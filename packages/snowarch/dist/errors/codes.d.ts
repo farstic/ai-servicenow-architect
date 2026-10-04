@@ -216,7 +216,7 @@ export declare const ERROR_CODES: readonly [{
 }, {
     readonly code: "UNSUPPORTED_ON_THIS_INSTANCE";
     readonly meaning: "The tool is registered, the preset let it through, and the server refused without contacting the instance: the operation has no REST endpoint on any instance. The two script-execution stubs stay registered because removing the names would turn a clear refusal into UNKNOWN_TOOL, which reads as \"you spelled it wrong\" and sends you hunting a typo that is not there. They fail before any HTTP request, so nothing reaches the instance and nothing is half-done.";
-    readonly remedy: "take the other route: run the script in System Definition > Scripts - Background, or author a Fix Script and run it from the UI. Keep `sys_script_fix.name` to 40 characters — it truncates silently over REST (see `docs/PLATFORM-NOTES.md` PN-07)";
+    readonly remedy: "take the other route: run the script in System Definition > Scripts - Background, or author a Fix Script and run it from the UI. Keep `sys_script_fix.name` to 40 characters — the platform truncates it over REST without an error (see `docs/PLATFORM-NOTES.md` PN-07); a write through this server returns a `VALUE_TRUNCATED` warning";
     readonly showInRule: false;
 }, {
     readonly code: "UNKNOWN_TOOL";
@@ -421,8 +421,13 @@ export declare const ERROR_CODES: readonly [{
     readonly showInRule: false;
 }, {
     readonly code: "VALUE_TRUNCATED";
-    readonly meaning: "A WARNING on a write that succeeded, not an error: a string was longer than its column and the platform stored only the first part of it, without refusing. It arrives as `warnings[].code` on the tool's result and names the field, both lengths and the column's limit.";
-    readonly remedy: "the record exists with the cut value, so modify it with a value of at most `column_limit` characters; do not add it again, which would make a second record. `confirmed: false` means the dictionary could not state the limit and it is inferred from the stored length";
+    readonly meaning: "A WARNING on a write that succeeded, not an error: a string appears to have been cut at its column — the platform stored only the first part of it, without refusing. It arrives as `warnings[].code` on the tool's result (or as a note on the error of a tool that failed after it wrote) and names the field, both lengths and a limit. The limit is the dictionary's stated `max_length` when `confirmed` is true, and otherwise the stored length, which is a lower bound; a column defined on a parent table never confirms.";
+    readonly remedy: "the record exists with the stored value, so modify it with a value of at most `column_limit` characters (when `confirmed` is false that length is only known to fit); do not add it again, which would make a second record. If the record is active, set `active` to false until it is corrected";
+    readonly showInRule: false;
+}, {
+    readonly code: "FIELD_NOT_STORED";
+    readonly meaning: "A WARNING on a write that succeeded, not an error: a field the tool sent is not shown as set in the platform's response (for `snow_scr_business_rule_add`: `filter_condition` or `advanced`). The record exists without it — a Business Rule without its filter runs on every matching operation. It arrives as `warnings[].code` on the tool's result.";
+    readonly remedy: "read the record back with `snow_scr_business_rule_read`; if the field is not set, set it with a modify rather than adding the record again, and if the record is active set `active` to false first. If it is set, the response did not echo it: the column names are not documented in the bundled corpus, so check them on the instance";
     readonly showInRule: false;
 }];
 export declare const ERROR_CODE_NAMES: ReadonlySet<string>;
