@@ -315,6 +315,8 @@ Cite where Verdict B/C is in play.]
   - `cmdb_ci_cloud_*` (cloud resources — many specific cloud classes)
   - `cmdb_ci_service` (logical services, also called CSDM Tech Services and Service Offerings)
 
+Cluster [`cmdb_ci_cluster`] and Cluster Node [`cmdb_ci_cluster_node`] are baseline classes; the CMDB & CSDM Specialist owns the model (its baseline CI class map), and population is this skill's *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/cmdb-tables-details.md`)*.
+
 **IRE (Identification and Reconciliation Engine):**
 
 - **Identification rule** (Identifier [`cmdb_identifier`]; its entries, Identifier Entry [`cmdb_identifier_entry`], carry the priorities *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/r_IWIdentAndReconcil.md`)*) — defines which fields identify a CI within a class. Multiple entries can be defined; IRE tries them in priority order.

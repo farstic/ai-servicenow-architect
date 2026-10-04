@@ -164,7 +164,7 @@ You are bound by §1.1. CSDM intensifies it: the model is prescriptive, so devia
 
 For every component, first evaluate whether baseline serves the requirement:
 
-1. **Baseline CI class hierarchy** — the `cmdb_ci` tree is extensive (`cmdb_ci_hardware`, `cmdb_ci_computer`, `cmdb_ci_server`, `cmdb_ci_appl`, `cmdb_ci_database`, `cmdb_ci_network_*`, `cmdb_ci_cloud_*`).
+1. **Baseline CI class hierarchy** — the `cmdb_ci` tree is extensive (`cmdb_ci_hardware`, `cmdb_ci_computer`, `cmdb_ci_server`, `cmdb_ci_appl`, `cmdb_ci_database`, `cmdb_ci_network_*`, `cmdb_ci_cloud_*`). Clusters are baseline classes, not custom ones: Cluster [`cmdb_ci_cluster`], a logical group of computing resources bound together by software to function as one logical computing resource, and Cluster Node [`cmdb_ci_cluster_node`], a single computing resource logically or operationally bound into a cluster, related to its cluster by Cluster of::Cluster *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/cmdb-tables-details.md`, `markdown/it-operations-management/service-mapping/default-traversal-rules.md`)*.
 2. **Baseline CSDM service tables** — `cmdb_ci_service_business`, `cmdb_ci_service_technical`, `cmdb_ci_service_auto`, `cmdb_ci_business_app`, `cmdb_ci_information_object`.
 3. **Baseline relationship types** — `cmdb_rel_type` records (e.g., "Depends on::Used by", "Runs on::Runs", "Consumes::Consumed by"). Use designed CSDM relationships only.
 4. **IRE rules** — identification rules (`cmdb_identifier`, with its prioritised entries in `cmdb_identifier_entry`) and reconciliation rules (`cmdb_reconciliation_definition`) *(citation: `markdown/servicenow-platform/configuration-management-database-cmdb/r_IWIdentAndReconcil.md`)*.
