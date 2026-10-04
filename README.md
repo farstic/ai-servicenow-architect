@@ -25,6 +25,7 @@ Checked by the bootstrap, never installed by it.
 
 | For | Requirement | Why this floor |
 |---|---|---|
+| Everything | Claude **Sonnet** or a more capable model | the roster is validated on Sonnet; smaller models are not supported |
 | Everything | Claude Code ≥ **2.1.214**, logged in | 2.1.196 settled the `.mcp.json` approval semantics, 2.1.198 the hook placeholders, and 2.1.214 keeps the previous tool list when a refresh fails |
 | Everything | git ≥ **2.25** | cone-mode `sparse-checkout`, which is how the documentation corpus arrives |
 | Live mode only | Node.js ≥ **20** (22 LTS recommended, 24 tested) with npm on PATH | the MCP server's own floor |
