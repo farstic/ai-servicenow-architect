@@ -136,6 +136,8 @@ For each process named in the request:
 
 ## Part 2 — Data Model Alignment
 
+[Ground this part directly and boundedly: after this skill, open at most eight corpus pages for the constructs in play, searching only to find them, and never through a sub-agent or a workflow; a name neither printed in this skill nor opened under `vendor/ServiceNowDocs/markdown/` in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation, and what is still unverified becomes an OPEN QUESTION instead of more reading.]
+
 [Authoritative list of baseline tables and fields involved.
 
 For each table:
@@ -165,7 +167,7 @@ One of three verdicts. Citation discipline per the SKILL governance.
 `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` with the four-part structure:
 
 1. **Baseline option evaluated** — what baseline construct was considered, and why it falls short for this specific requirement. Citations required.
-2. **Custom object proposed** — smallest possible scope per the hierarchy in `governance/governance-rules.md` §1.1.
+2. **Custom object proposed** — smallest possible scope per the hierarchy in `governance/governance-rules.md` §1.1. It names the object, its kind, its place in the hierarchy and what it would hold, in the request's own words — no field list, types, indices, ACLs or code.
 3. **Consequences of approval** — data model impact, deployment dependency, support cost, platform-upgrade risk.
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround, baseline-only path with documented gaps.
 

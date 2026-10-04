@@ -168,6 +168,9 @@ For each process named in the request:
 **Citation:** `markdown/financial-services-operations/<file>.md`
 
 ## Part 2 — Data Model Alignment
+
+[Ground this part directly and boundedly: after this skill, open at most eight corpus pages for the constructs in play, searching only to find them, and never through a sub-agent or a workflow; a name neither printed in this skill nor opened under `vendor/ServiceNowDocs/markdown/` in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation, and what is still unverified becomes an OPEN QUESTION instead of more reading.]
+
 [Authoritative list of baseline tables and fields involved.
 
 For each table:

@@ -261,7 +261,7 @@ You stop and return a clarification request when:
 You stop and return a `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` blocking question when:
 - The design requires a custom table for Agent state, a new scoped application, a custom Connection Alias for a non-baseline LLM provider, a custom Action tool, or any other major custom architectural object that was NOT pre-approved in the dispatch envelope.
 
-Structure the blocking question as: (1) baseline option evaluated and why insufficient (e.g., "baseline Now LLM Service does not support the engagement's required model X"), (2) custom object proposed at smallest viable scope, (3) consequences of approval (deployment dependency, support cost, AICT attestation complexity), (4) alternatives if rejected.
+Structure the blocking question as: (1) baseline option evaluated and why insufficient (e.g., "baseline Now LLM Service does not support the engagement's required model X"), (2) custom object proposed at smallest viable scope (named, with its kind, its place in the hierarchy and what it would hold — no field list, types, indices, ACLs or code), (3) consequences of approval (deployment dependency, support cost, AICT attestation complexity), (4) alternatives if rejected.
 
 Do NOT silently default to introducing the custom object. The orchestrator will resolve the escalation, then re-dispatch with an updated envelope if approved.
 

@@ -355,36 +355,15 @@ Before any specialist may be dispatched, §1.1 requires honest evaluation. This 
 
 2. Custom object proposed (smallest viable scope):
 
-   Smallest-scope candidate: **A new CI class `u_cmdb_ci_acegrid_cluster` extending `cmdb_ci_application_cluster`, in the global scope.**
-
-   Hierarchy position (§1.1 preference order):
-   - Field on baseline table: rejected — three fields on `cmdb_ci_application_cluster` for AceGrid-specific data bloats the parent class
-   - Child CI class extending baseline `cmdb_ci_application_cluster`, in the global scope: PROPOSED — keeps AceGrid-specific fields on the AceGrid class, inherits cluster semantics from baseline
-   - New top-level CI class extending `cmdb_ci`: rejected — would lose baseline cluster relationships and reporting
-   - New scoped app: rejected — the global scope is appropriate
-
-   Proposed class: `u_cmdb_ci_acegrid_cluster` (extends `cmdb_ci_application_cluster`, global scope; a custom CI class takes `u_`, as in the platform's own example `u_cmdb_ci_laptop` *(citation: `markdown/it-operations-management/discovery-and-service-mapping-patterns/t_CreateCITypeForSM.md`)*)
-
-   AceGrid-specific fields (global custom fields take `u_` *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*):
-   - `u_shard_count` (Integer)
-   - `u_replication_factor` (Integer)
-   - `u_health_metric` (Decimal) — AceGrid-reported health, 0.0 to 1.0
-   - `u_leader_node` (Reference to `cmdb_ci_linux_server` or `cmdb_ci_server`)
-   - Inherits from `cmdb_ci_application_cluster`: cluster name, cluster members (via `cmdb_rel_ci`)
-
-   Discovery: new `sa_pattern` record, or pattern extension sections (`sa_pattern_extension`) *(citation: `markdown/it-operations-management/service-mapping/components-installed-with-service-mapping.md`)* on a baseline `cmdb_ci_application_cluster` pattern, with AceGrid-specific probe sequence (call AceGrid's admin API on cluster leader to gather shard, replication, and health data).
-
-   IRE: new identification rule (`cmdb_identifier`) for `u_cmdb_ci_acegrid_cluster`:
-   - Independent identifier: `cluster_name` (assumes engagement guarantees unique AceGrid cluster names)
-   - Fallback identifier: `u_leader_node` + `name` (if name is reusable across clusters)
-
-   CMDB Health: new baseline CMDB Health rules for AceGrid-specific completeness (e.g., "u_shard_count must be populated", "u_leader_node relationship must exist").
+   - Object: the "first-class CI" the request names — `u_cmdb_ci_acegrid_cluster` (proposed — not baseline; a custom CI class takes `u_`, as in the platform's own example `u_cmdb_ci_laptop` *(citation: `markdown/it-operations-management/discovery-and-service-mapping-patterns/t_CreateCITypeForSM.md`)*).
+   - Kind and place in the §1.1 hierarchy: a new CI class extending the baseline application-cluster class weighed in Part 2, in the global scope — the "acceptable" rung. Fields on that baseline class (option a) were weighed first and rejected for bloating it; a top-level class or a new scoped app is not justified.
+   - What it would hold, in the request's words: "cluster name, leader node, follower nodes, shard count, replication factor, cluster health metric", populated by "custom Discovery and CMDB Health rules".
 
 3. Consequences of approval:
-   - **Data model:** one new CI class in the global scope; child of baseline `cmdb_ci_application_cluster`. Three new fields on the child class. IRE rule. CMDB Health rules.
+   - **Data model:** one new CI class in the global scope, with its own identification rule and CMDB Health rules; a Discovery pattern populates it.
    - **Deployment:** ships in CMDB update set; no separate scoped app cadence.
    - **Support cost:** medium — new CI class to administer, new Discovery pattern to maintain (especially during AceGrid version upgrades that change admin API), new IRE rule to govern.
-   - **Platform-upgrade risk:** medium-low — child class extending baseline `cmdb_ci_application_cluster`. ServiceNow could ship its own AceGrid CI class in a future release if AceGrid becomes industry-standard (currently no announced roadmap). If so, migration path is documented (class merge with field-by-field copy).
+   - **Platform-upgrade risk:** medium-low — the class extends a baseline class. ServiceNow could ship its own AceGrid CI class in a future release if AceGrid becomes industry-standard (currently no announced roadmap). If so, migration path is documented (class merge with field-by-field copy).
    - **Service Mapping:** new pattern needed if AceGrid clusters are part of business-service top-down maps. Maps show application clusters as a stack of CIs *(citation: `markdown/it-operations-management/service-mapping/c_UndestandMaps.md`)*; whether a child class of `cmdb_ci_application_cluster` is shown the same way is not documented in the bundled corpus — verify on the instance. AceGrid-specific patterns can extend.
 
 4. Alternatives if rejected:
@@ -417,8 +396,8 @@ If rejected: adopt Alternative A (extend `cmdb_ci_application_cluster` directly)
 
 - **Do not create the CI class in a custom scoped app.** Custom scoped apps for single CI classes are §1.1 over-escalation.
 - **Do not create a custom probe that bypasses pattern infrastructure.** Use `sa_pattern` records, even for AceGrid-specific discovery. Custom probes are §1.1 violations and break upgrade-path.
-- **Do not write a custom CMDB Business Rule that dedups AceGrid clusters by u_leader_node.** Use IRE. AceGrid identification rule must be defined as part of the design.
-- **Do not duplicate the AceGrid health metric in a separate "alert" table.** If `u_health_metric` drops below a threshold, the appropriate baseline path is Event Management — emit an event from AceGrid into `em_event`, configure alert correlation rules (`em_alert_correlation_rule`) to correlate, and let baseline event-management handle alerting.
+- **Do not write a custom CMDB Business Rule that dedups AceGrid clusters by leader node.** Use IRE. AceGrid identification rule must be defined as part of the design.
+- **Do not duplicate the AceGrid health metric in a separate "alert" table.** If the AceGrid health metric drops below a threshold, the appropriate baseline path is Event Management — emit an event from AceGrid into `em_event`, configure alert correlation rules (`em_alert_correlation_rule`) to correlate, and let baseline event-management handle alerting.
 - **Do not create custom relationships between AceGrid clusters and their nodes.** Use `cmdb_rel_ci` with appropriate baseline relationship types (Hosted on::Runs on, Depends on::Used by).
 - **Do not skip the IRE identification rule definition.** A new CI class without IRE rules will create orphans on every Discovery cycle.
 - **Do not assume cluster names are globally unique without verification.** If the engagement has multiple AceGrid deployments (e.g., prod, staging, dev), `cluster_name` alone may not be unique. Composite identifier (e.g., `cluster_name` + `environment`) may be needed.

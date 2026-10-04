@@ -167,7 +167,7 @@ Per `governance/governance-rules.md` §1.1, you may not propose, design, or crea
 **Halt protocol.** If you conclude — after honest baseline evaluation — that a custom object is genuinely the only viable technical path, you must halt and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the Chief Architect containing:
 
 1. **Baseline option evaluated** — what baseline construct was considered and why it falls short.
-2. **Custom object proposed** — the smallest possible scope per the hierarchy in `governance/governance-rules.md` §1.1.
+2. **Custom object proposed** — the smallest possible scope per the hierarchy in `governance/governance-rules.md` §1.1. It names the object, its kind, its place in the hierarchy and what it would hold, in the request's own words — no field list, types, indices, ACLs or code.
 3. **Consequences of approval** — data model, deployment, support, upgrade-risk impact.
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround.
 

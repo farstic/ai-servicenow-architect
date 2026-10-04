@@ -35,6 +35,8 @@ If a specialist concludes — after honest baseline evaluation — that a custom
    - A new top-level table in a pre-existing scoped app (requires justification).
    - A new top-level table in a new scoped app (requires strong justification).
    - A new scoped app (requires strongest justification — separate deployment cadence, App Repository distribution intent, or genuine domain separation).
+
+   The proposal names the object, its kind, its place in this hierarchy and what it would hold, in the request's own words; it carries no field list, types, indices, ACLs or code — the halt comes before the design.
 3. **Consequences of approval** — data model impact, deployment dependency, support cost, platform-upgrade risk, App Repository implications.
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround, baseline-only path with documented gaps.
 

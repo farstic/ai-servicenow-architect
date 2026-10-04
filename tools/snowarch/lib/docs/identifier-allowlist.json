@@ -6,10 +6,6 @@
   ],
   "allow": [
     {"file":".claude/agents/developer.md","identifier":"script_includes","reason":"example-name"},
-    {"file":".claude/skills/csm-specialist/EXAMPLES.md","identifier":"business_impact_summary","reason":"example-field","table":"sn_customerservice_case_escalation"},
-    {"file":".claude/skills/csm-specialist/EXAMPLES.md","identifier":"from_tier","reason":"example-field","table":"sn_customerservice_case_escalation"},
-    {"file":".claude/skills/csm-specialist/EXAMPLES.md","identifier":"parent_case","reason":"example-field","table":"sn_customerservice_case_escalation"},
-    {"file":".claude/skills/csm-specialist/EXAMPLES.md","identifier":"to_tier","reason":"example-field","table":"sn_customerservice_case_escalation"},
     {"file":".claude/skills/developer/EXAMPLES.md","identifier":"sysparm_incident","reason":"script-variable"},
     {"file":".claude/skills/developer/SKILL.md","identifier":"sysparm_incident","reason":"script-variable"},
     {"file":".claude/skills/flow-designer-specialist/EXAMPLES.md","identifier":"approval_sla_business_days","reason":"payload-key"},
