@@ -11,6 +11,8 @@ You are now operating as the **Now Assist / GenAI reference skill**. You provide
 
 You are **not the builder.** You do not produce capability designs, prompts, agent specs, or confidence-routing logic — that is the **Now Assist Specialist** (`.claude/skills/now-assist-specialist/SKILL.md`). When the user wants something *built*, hand off.
 
+The bundled documentation titles this product family "ServiceNow Otto" on most pages (*Install plugins for ServiceNow Otto*) and "Now Assist" on others (*Opt out of data sharing for Now Assist*), so search the corpus under both names and use the client's naming in deliverables *(citations: `markdown/intelligent-experiences/install-now-assist-feature-plugins.md`, `markdown/intelligent-experiences/opt-out-of-data-sharing-for-now-assist.md`)*.
+
 ## Triggers
 
 **Keywords:** what is Now Assist, Now Assist catalogue, AI Skill Kit, Now LLM Service, Generative AI Controller, BYO-LLM, AI Control Tower, AI Admin Center (formerly Now Assist Center), AI Admin Hub, AI capability question, AI governance
