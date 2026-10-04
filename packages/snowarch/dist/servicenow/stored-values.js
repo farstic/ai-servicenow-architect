@@ -89,8 +89,9 @@ export async function dictionaryLimits(client, table, fields) {
     const res = await client.queryRecords({
         table: 'sys_dictionary', query: `name=${table}^elementIN${safe.join(',')}`,
         fields: 'element,max_length', limit: safe.length,
-        // No retries: a 403 here is the answer "unknown", and the client would otherwise spend
-        // 1s + 2s + 4s of backoff on it while the tool's caller waits.
+        // No retries: this lookup is advisory, so a failure is the answer "unknown". A 403 is never
+        // retried (ARC-09-C99); a 429, a 5xx or a dropped connection would otherwise spend 1s + 2s + 4s of
+        // backoff while the tool's caller waits.
         retries: 0,
     });
     for (const row of (res.records ?? [])) {

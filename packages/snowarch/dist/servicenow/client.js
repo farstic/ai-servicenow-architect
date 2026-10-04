@@ -10,6 +10,11 @@ catch {
     return url;
 } };
 import { currentInstanceOrNull } from './context.js';
+/**
+ * Errors the retry loop rethrows at once: the instance answered, and asking again gets the same
+ * answer. `INSUFFICIENT_PRIVILEGES` (a 403) is an access decision, not a fault (ARC-09-C99).
+ */
+const NOT_RETRIED = ['AUTHENTICATION_FAILED', 'INVALID_REQUEST', 'NOT_FOUND', 'INSUFFICIENT_PRIVILEGES'];
 // ─── Input validation helpers ────────────────────────────────────────────────
 /** Validate and sanitize ServiceNow table names (alphanumeric + underscores only) */
 function validateTableName(table) {
@@ -283,9 +288,13 @@ export class ServiceNowClient {
             }
             catch (error) {
                 lastError = error instanceof Error ? error : new Error('Unknown error');
-                // Don't retry on auth errors or invalid requests
+                // Don't retry an answer: the instance understood the request and refused it. A 401 is
+                // not made valid by asking again (and risks a lockout), a 400 or 404 does not change, and
+                // a 403 is an access decision (ARC-09-C99) - the same role is checked the same way each
+                // time, so a retry costs 1s + 2s + 4s of backoff to be told no four times. What is retried
+                // is what can clear: a rate limit, a server error, a request that never arrived.
                 if (error instanceof ServiceNowError) {
-                    if (['AUTHENTICATION_FAILED', 'INVALID_REQUEST', 'NOT_FOUND'].includes(error.code)) {
+                    if (NOT_RETRIED.includes(error.code)) {
                         throw error;
                     }
                 }

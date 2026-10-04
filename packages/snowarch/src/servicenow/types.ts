@@ -43,9 +43,10 @@ export interface QueryRecordsParams {
    * Attempts AFTER the first. Unset keeps the client's own policy (3 by default, with backoff). It can
    * only LOWER that policy: a larger value, or one that is not a non-negative integer, is held to it,
    * because this field is reachable from a tool argument.
-   * `0` is for a lookup whose failure is an acceptable answer: the client retries a 403, which is a
-   * decision and not a fault, and a caller that only wanted to know "can I read this?" should not
-   * wait out 1s + 2s + 4s to be told no (ARC-09-C93's dictionary lookup).
+   * `0` is for a lookup whose failure is an acceptable answer and should come at once: a rate limit,
+   * a server error or a dropped connection are retried with backoff (1s + 2s + 4s by default), and a
+   * caller that only wanted to know "can I read this?" should not wait that out (ARC-09-C93's
+   * dictionary lookup). A 403 is never retried, with or without this (ARC-09-C99).
    */
   retries?: number;
 }
