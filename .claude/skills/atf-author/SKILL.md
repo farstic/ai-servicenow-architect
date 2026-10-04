@@ -40,7 +40,7 @@ You design ServiceNow Automated Test Framework tests and suites that prove an ar
 | Admin properties (enablement) | `markdown/application-development/automated-test-framework-atf/atf-admin-properties.md` |
 
 ## Data model
-`sys_atf_test` (Test) · `sys_atf_test_suite` (Suite; nests child suites) · `sys_atf_step` (step) · `sys_atf_step_config` (step type, baseline + custom) · `sys_atf_test_template` (parameterised template) · result tables (`sys_atf_test_result` / `_test_suite_result` / `_step_result`). Tests are **metadata** — they travel in update sets, scoped to the app. *(citation: `markdown/application-development/automated-test-framework-atf/automated-test-framework.md`)*
+`sys_atf_test` (Test) · `sys_atf_test_suite` (Suite; nests child suites) · `sys_atf_step` (step) · `sys_atf_step_config` (step type, baseline + custom) · `sys_atf_test_template` (parameterised template) · result tables (`sys_atf_test_result`, `sys_atf_test_suite_result`, and step results in `sys_atf_test_result_step`) *(citation: `markdown/application-development/automated-test-framework-atf/atf-edit-table-cleanup.md`)*. Tests are **metadata** — they travel in update sets, scoped to the app. *(citation: `markdown/application-development/automated-test-framework-atf/automated-test-framework.md`)*
 
 ## Baseline step categories (use these — don't script what a step type does)
 - **Server** — *Create / Update / Delete / Query a Record* (with field-value assertions), *Record Validation*, *Run Server Side Script* (assertions via `outputs.assert`).

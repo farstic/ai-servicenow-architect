@@ -147,13 +147,14 @@ absolute path. Measured on this checkout: starting a session changes exactly one
 
 ## Docs corpus: how the pin, the areas file and the gate relate
 
-Three artefacts, and the design is which of them may disagree with which.
+Four artefacts, and the design is which of them may disagree with which.
 
 | Artefact | Written by | Read by |
 |---|---|---|
 | **the commit** — the gitlink and `docs.pin`, the same SHA | the seed commit, then only `docs sync --upstream` — never by hand | the recipe, the launchers, the doctor's E-checks, `docs-bump.yml`, ARC-09's release tag |
 | **`vendor/docs-areas.txt`** — which areas materialise | `gen-docs-areas.mjs`, from the areas cited; CI fails when stale | the cone, the completeness check, the recipe |
 | **the citation gate** — every `markdown/…` path cited | nobody: a property of the skills | `docs verify`, `docs status`, the bump workflow, CI |
+| **the identifier check** — every ServiceNow name the roster writes | nobody: a property of the skills, with `identifier-allowlist.json` for the examples' own names | `docs verify`, CI |
 
 **The invariants**, in the order they are checked:
 
