@@ -190,17 +190,27 @@ VALUE_TRUNCATED` with the field, both lengths and a limit. It cannot stop the cu
 response says so the record exists (and, if update-set capture was on, so does the entry), so the
 warning says to **modify** the record and not to add it again.
 
-*What it covers.* Writes made through `createRecord` and `updateRecord`, by any tool, string values only,
-when the response holds a strict prefix of what was sent (line endings normalised; a decimal's trailing
-zeros and trimmed whitespace are not a cut). The dictionary is read once per table after the tool has
-finished, within one budget, and the first failed lookup ends it; the warning is then `confirmed: false`.
+*What it covers.* Writes made through `createRecord` and `updateRecord`, by any tool; the Batch API
+(`snow_fluent_request_batch`: each POST, PATCH or PUT to `/api/now/table/<table>[/<sys_id>]` that the
+platform answered 2xx); the `file_name` of an attachment upload; `createChangeRequest`; and a client
+copy made with `withUser` (ARC-09-C100). String values only, when the response holds a strict prefix of
+what was sent (line endings normalised; a decimal's trailing zeros and trimmed whitespace are not a
+cut). The dictionary is read once per table after the tool has finished, within one budget, and the
+first failed lookup ends it; the warning is then `confirmed: false`.
 
-*What it does not cover* — so an absent `warnings` key is **not** proof that nothing was cut:
-`batchRequest` (`snow_fluent_request_batch`), attachment upload, `createChangeRequest`, the Now Assist
-and catalogue POSTs, and a client copy made with `withUser` (no caller today); fields the response does
-not echo (journal fields, passwords, write-only columns); and values that are not strings. In a playbook
-(`snow_orch_playbook_exec`) the warnings arrive on the playbook's result, not on the step that caused
-them, and `on_error: 'stop'` does not halt on one.
+*What it does not cover* — so an absent `warnings` key is **not** proof that nothing was cut: the Now
+Assist and catalogue POSTs (`callNowAssist`), which run something and answer with its result rather
+than the record that was written, so there is no stored value to compare; a batch operation on a path
+that is not the Table API; fields the response does not echo (journal fields, passwords, write-only
+columns); and values that are not strings.
+
+*Where the warnings land.* On the tool's result, as `warnings`, at most ten entries: the first nine whole
+and one roll-up (`rollup: true`, a `count`, the tables and fields) for the rest, so a bulk tool that
+writes 50 cut records does not put 36 KB ahead of its results. The audit trail counts a roll-up as the
+writes it stands for. In a playbook (`snow_orch_playbook_exec`) each step carries the warnings of its own
+writes (`step`, `tool`), the playbook result carries them all, and under `on_error: 'stop'` (the
+default) the playbook halts after a step whose writes stored a cut value or whose result carries a
+warning (`halted_at_step`, `halt_reason`); `continue` and `skip` go on.
 
 *Known false alarms.* Any reformat that drops a non-whitespace tail looks like a cut unless the dictionary
 rules it out: a datetime written to a date column, a trailing list delimiter or `^`, an HTML tail removed

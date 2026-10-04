@@ -9829,7 +9829,7 @@
   },
   {
     "name": "snow_orch_playbook_exec",
-    "description": "Execute a playbook step by step, passing results forward through context (requires NOW_ASSIST_ENABLED). Supports dry_run.",
+    "description": "Execute a playbook step by step, passing results forward through context (requires NOW_ASSIST_ENABLED). Supports dry_run. A step whose writes stored a cut value, or whose result carries a warning, shows it on the step (`warnings`, tagged with the step) and on the playbook result; under on_error \"stop\" (the default) the playbook halts there and says so in halted_at_step / halt_reason.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -9863,7 +9863,8 @@
                       "stop",
                       "skip",
                       "continue"
-                    ]
+                    ],
+                    "description": "\"stop\" (the default) ends the playbook after a step that fails or that returns a warning, such as a write that stored a cut value; \"skip\" and \"continue\" go on to the next step."
                   }
                 },
                 "required": [

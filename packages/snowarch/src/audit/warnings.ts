@@ -41,7 +41,9 @@ export function summariseWarnings(warnings: unknown): AuditWarning[] {
       group = { code: w.code, table, fields: [], count: 0 };
       groups.set(key, group);
     }
-    group.count += 1;
+    // A roll-up (`capWarnings`) stands for `count` writes; anything else, or a count that is not a
+    // count, is one.
+    group.count += typeof w.count === 'number' && Number.isInteger(w.count) && w.count > 0 ? w.count : 1;
     if (typeof w.field === 'string' && IDENT.test(w.field)
       && !group.fields.includes(w.field) && group.fields.length < MAX_FIELDS) {
       group.fields.push(w.field);
