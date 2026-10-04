@@ -11,8 +11,17 @@
 # `.claude/settings.local.json` comes from the product rather than by hand), then one fresh session
 # per test with the prompts read from `tests/VALIDATION-TESTS.md`.
 #
-# WHAT IT DOES NOT DO: judge. It produces sessions; a person or a separate reviewer judges them
-# against the spec's Pass criteria. A harness that scored its own runs would be marking its own work.
+# EVERY CASE, ISOLATED (ARC-09-C87). The prompts come from all of `tests/VALIDATION-TESTS.md` (T-01 to
+# the last), and each session runs on the policy in `scripts/validation/session-policy.mjs`: the
+# checkout's own settings and hooks only (`--setting-sources project`), no MCP server
+# (`--strict-mcp-config`), a tool set that is a set (`--tools`, with `--allowedTools` for the few that
+# would ask), and Sonnet 5.5 unless VALIDATION_MODEL says otherwise. The header prints the sha, the
+# model, the setting sources and the tools; each turn prints the skills invoked, the corpus pages read
+# and any cited page that does not exist (`scripts/validation/turn-report.mjs`).
+#
+# WHAT IT DOES NOT DO: judge. It produces sessions and counts what a reviewer used to count by hand; a
+# person or a separate reviewer judges them against the spec's Pass criteria. A harness that scored its
+# own runs would be marking its own work.
 #
 # Usage: validation-run.sh <tag> [--repeat N] [T-NN ...]
 set -u
@@ -34,6 +43,11 @@ git clone -q --depth 1 --branch "$TAG" --no-local "$ROOT" "$C" || { echo "clone 
 cd "$C" || exit 9
 echo "clone: $(git describe --tags --always) $(git rev-parse --short HEAD)"
 
+POLICY="node $ROOT/scripts/validation/session-policy.mjs"
+MODEL="${VALIDATION_MODEL:-$($POLICY model)}"
+SOURCES=$($POLICY sources)
+$POLICY header "$TAG" "$(git rev-parse --short HEAD)" "$MODEL" "$(claude --version 2>/dev/null | head -1)" | tee "$RUN/header.txt"
+
 # THE CORPUS AS A SUBMODULE, at the pin. The 2026-09-09 run COPIED it, and the copy made the doctor
 # inside every session report E-12/E-13/E-14 — a corpus that is present but not a gitlink is not the
 # state a user is in, and three checks said so in every transcript.
@@ -51,26 +65,22 @@ for T in $SEL; do
   [ "$N" = 0 ] && { echo "$T: no prompt in the spec"; continue; }
   R=1
   while [ "$R" -le "$REPEAT" ]; do
-    # `Skill` is granted by default: without it `Skill snowarch status` errors in an untrusted
-    # headless session and the engine recovers by running the doctor itself — which is the engine
-    # being resourceful about a harness limitation, not the behaviour under test.
-    TOOLS="Read,Grep,Glob,Skill"
-    case "$T" in
-      T-07) TOOLS="$TOOLS,Bash(./snowarch:*),Bash(./snowarch doctor:*)" ;;
-      T-13) TOOLS="$TOOLS,Write" ;;
-    esac
+    # The tool set and the permissions come from the policy, one place a test reads (see the header).
+    TOOLS=$($POLICY tools "$T")
+    ALLOWED=$($POLICY allowed "$T")
     SID=""; i=0
     while [ "$i" -lt "$N" ]; do
       node -e "const t=require('$PROMPTS').find(x=>x.id==='$T');process.stdout.write(t.prompts[$i])" > "$RUN/prompt.txt"
       OUT="$RUN/sessions/$T-run$R-turn$((i+1)).jsonl"
       if [ -z "$SID" ]; then
-        claude -p "$(cat "$RUN/prompt.txt")" --output-format stream-json --verbose --allowedTools "$TOOLS" > "$OUT" 2> "$OUT.err"
+        claude -p "$(cat "$RUN/prompt.txt")" --model "$MODEL" --setting-sources "$SOURCES" --strict-mcp-config --tools "$TOOLS" --allowedTools "$ALLOWED" --output-format stream-json --verbose > "$OUT" 2> "$OUT.err"
       else
-        claude -p "$(cat "$RUN/prompt.txt")" --resume "$SID" --output-format stream-json --verbose --allowedTools "$TOOLS" > "$OUT" 2> "$OUT.err"
+        claude -p "$(cat "$RUN/prompt.txt")" --resume "$SID" --model "$MODEL" --setting-sources "$SOURCES" --strict-mcp-config --tools "$TOOLS" --allowedTools "$ALLOWED" --output-format stream-json --verbose > "$OUT" 2> "$OUT.err"
       fi
       RC=$?
       SID=$(node -e "const L=require('fs').readFileSync('$OUT','utf8').trim().split('\n');for(const l of L.reverse()){try{const j=JSON.parse(l);if(j.session_id){console.log(j.session_id);break}}catch{}}")
       echo "$T run$R turn$((i+1)): exit=$RC tool_use=$(grep -c '\"type\":\"tool_use\"' "$OUT") mcp=$(grep -c '\"name\":\"mcp__servicenow' "$OUT") tools=[$TOOLS] session=$(echo "$SID" | cut -c1-8) stderr=$(head -c 70 "$OUT.err" | tr '\n' ' ')"
+      node "$ROOT/scripts/validation/turn-report.mjs" "$OUT" "$C" | sed 's/^/    /'
       i=$((i+1))
     done
     R=$((R+1))

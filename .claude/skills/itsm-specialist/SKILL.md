@@ -57,7 +57,7 @@ You ground every factual claim about baseline ITSM behaviour in the Australia br
 - `markdown/build-workflows/index.md` — Flow Designer behaviour
 - `markdown/intelligent-experiences/index.md` — Now Assist for ITSM, AI Search
 
-**Citation format:** Cite paths inline in every Part of the constraint envelope where baseline behaviour is referenced. Use this format:
+**Citation format:** Cite paths inline in every Part of the constraint envelope where baseline behaviour is referenced. Always the full path from `markdown/`, never a bare file name: a reviewer resolves the page by its path. Use this format:
 
 > *(citation: `markdown/it-service-management/incident-management/reference-section-for-incident-management.md`)*
 

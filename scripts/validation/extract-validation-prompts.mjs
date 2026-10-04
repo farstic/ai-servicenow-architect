@@ -5,6 +5,10 @@
 // the reviewer judges against. This reads the fenced blocks under each `### Prompt`, so a test with
 // two turns yields two prompts and a scripted run makes both.
 //
+// EVERY case. ARC-09-C87: this skipped any case above T-18, so T-19 to T-25 could not be run at all and
+// nothing said so; the class case in `tests/validation-harness.test.mjs` holds the extracted count to the
+// heading count.
+//
 // Usage: node scripts/validation/extract-validation-prompts.mjs tests/VALIDATION-TESTS.md <out.json>
 import { readFileSync, writeFileSync } from 'node:fs';
 const [,, src, out] = process.argv;
@@ -13,7 +17,6 @@ const sections = text.split(/\n(?=## T-\d\d )/).filter((s) => /^## T-\d\d /.test
 const tests = [];
 for (const sec of sections) {
   const id = sec.match(/^## (T-\d\d)/)[1];
-  if (Number(id.slice(2)) > 18) continue;
   const title = sec.match(/^## T-\d\d — (.+)$/m)?.[1]?.trim() ?? '';
   const modes = sec.match(/^\*\*Modes:\*\* (.+)$/m)?.[1]?.trim() ?? '';
   const sub = (name) => {
