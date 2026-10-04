@@ -312,9 +312,8 @@ flowchart LR
 
 - Inspect the object in the instance, or ask the engine to query it back for you.
 - When ready to promote, export the Update Set per your release process.
-- The three artefacts already deployed this way are listed in [`LIVE-ARTEFACTS-CATALOGUE.md`](./LIVE-ARTEFACTS-CATALOGUE.md).
 
-> **Why the friction is the point.** The engine will never write to your instance off the back of a general instruction. "Deploy it", "go ahead", or a tier upgrade are not write approvals. Each write is a discrete, named, logged decision — and every write lands in an Update Set, so nothing is ever stranded outside change control. Full detail: [`MCP-OPERATIONS-GUIDE.md`](./MCP-OPERATIONS-GUIDE.md).
+> **Why the friction is the point.** The engine will never write to your instance off the back of a general instruction. "Deploy it", "go ahead", or a tier upgrade are not write approvals. Each write is a discrete, named, logged decision — and every write lands in an Update Set, so nothing is ever stranded outside change control. Full detail: [`governance/mcp-protocols.md`](../governance/mcp-protocols.md) for the write gate and the update-set capture, and [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) when a call is refused.
 
 ---
 
@@ -348,9 +347,9 @@ Type `Status` any time to see the loaded engagement, the locked release family, 
 
 ## Where to next
 
-- For the team metaphor and value proposition: [`BUSINESS-OVERVIEW.md`](./BUSINESS-OVERVIEW.md).
-- For the protocol mechanics: [`TECHNICAL-ARCHITECTURE.md`](./TECHNICAL-ARCHITECTURE.md).
-- For live-instance operations: [`MCP-OPERATIONS-GUIDE.md`](./MCP-OPERATIONS-GUIDE.md).
+- For what the engine is and the team metaphor: [`README.md`](../README.md).
+- For the routing and post-build protocol: [`CLAUDE.md`](../CLAUDE.md), and the rules behind it in [`governance/governance-rules.md`](../governance/governance-rules.md).
+- For live-instance operations: [`governance/mcp-protocols.md`](../governance/mcp-protocols.md), and [`MODES-AND-PRESETS.md`](./MODES-AND-PRESETS.md) for what each preset grants.
 - For setup: [`INSTALL.md`](./INSTALL.md) — the one install page.
 
 ---

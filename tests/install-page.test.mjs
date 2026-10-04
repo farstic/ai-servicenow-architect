@@ -304,9 +304,8 @@ test('the server package\'s generated tables are current too', () => {
 
 test('no live page still points at an install guide that was deleted', () => {
   // The failure this catches is P-02's other half: a page telling a reader to read a page that is
-  // not there. `docs/USER-GUIDE.md` is checked for the INSTALL links only (below) — it is an
-  // ARC-02 import with four other dangling links of its own, reported rather than fixed here;
-  // widening this test to it now would fail for reasons no S13 change caused.
+  // not there. `docs/USER-GUIDE.md` is checked for the INSTALL links only (below); every other link
+  // in it is checked by `tests/docs-links.test.mjs` since ARC-09-C102.
   // `docs/RELICENSING.md` is exempt outright: recording what was retired is its job.
   for (const rel of ['docs/ARCHITECTURE.md', 'docs/CONTRIBUTING.md',
     'docs/PLATFORM-NOTES.md', INSTALL, README]) {
