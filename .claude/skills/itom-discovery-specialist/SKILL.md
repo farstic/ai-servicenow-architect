@@ -403,7 +403,7 @@ Cite where Verdict B/C is in play.]
 
 **Reflexive bad design:** Business Rule that updates CIs based on custom matching.
 **Baseline alternative:** Configure IRE identification rules with the desired matching attributes.
-**Verdict:** Always A (IRE configuration).
+**Verdict:** C — the request names custom dedup logic, which is on this skill's §1.1 list — and the halt's OPEN QUESTION proposes IRE identification and reconciliation rules.
 
 ### Hot spot 3 — "We need to track service-map metadata"
 
@@ -415,7 +415,7 @@ Cite where Verdict B/C is in play.]
 
 **Reflexive bad design:** Custom probe in MID Server scripts/.
 **Baseline alternative:** Baseline patterns cover most discovery needs. For genuine custom needs, extend baseline pattern.
-**Verdict:** A (baseline pattern) or B (pattern extension).
+**Verdict:** C — the request names a custom probe, which is on this skill's §1.1 list — and the halt's OPEN QUESTION proposes a baseline pattern, or an extension or override of one.
 
 ### Hot spot 5 — "We need a custom event correlation strategy"
 

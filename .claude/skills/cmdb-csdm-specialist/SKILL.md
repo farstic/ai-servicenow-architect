@@ -385,7 +385,7 @@ CSDM v5 uses `life_cycle_stage` + `life_cycle_stage_status` pairs, synchronised 
 ### Hot spot 4 — "We need custom dedup logic"
 
 **Reflexive bad design:** Business Rule matching CIs on custom attributes.
-**Baseline alternative:** IRE identification rules with the desired attributes. **Verdict A.**
+**Baseline alternative:** IRE identification rules with the desired attributes. **Verdict C** — the request names custom dedup logic, which is on this skill's §1.1 list — and the halt's OPEN QUESTION proposes IRE identification rules.
 
 ### Hot spot 5 — "We need a custom service/portfolio table"
 

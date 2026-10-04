@@ -215,7 +215,7 @@ The CSM customer model has three core tables:
 2. Each carries a relative weight — Account/Consumer 1, Product 2, Asset 3, Contract 4 — and the entitlement with the highest score is assigned to the case.
 3. SLA: the case's SLAs come from SLA Definitions [`contract_sla`], which carry their own conditions, duration and schedule *(citation: `markdown/it-service-management/service-level-management/r_InstalledWithServiceLevelMgmt.md`)*; whether a matched entitlement selects one is not documented in the bundled corpus — verify on the instance.
 
-**§1.1 hot spot:** custom entitlement-evaluation logic is the most common §1.1 violation in CSM. Verdict C is rarely warranted.
+**§1.1 hot spot:** custom entitlement-evaluation logic is the most common §1.1 violation in CSM. A request that names it is Verdict C; a custom path is rarely the only viable one, so the halt's OPEN QUESTION proposes the baseline calculation.
 
 ### CRM Workspace vs Customer Service Portal
 
@@ -259,7 +259,7 @@ Cases where a partner organisation (not the direct customer) is the responsible 
 ## §1.1 Hot Spots — Where Build Specialists Routinely Propose Custom Objects
 
 1. **"We need a custom escalation table — the baseline one is not in our release."** → It is. `sn_customerservice_escalation` and its template and severity tables are baseline in Australia (citation: `markdown/customer-service-management/case-escalation-components.md`). Activate the case and account escalation feature, set Audit on the dictionary record for change history, and populate severities and templates. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes the baseline escalation feature; building the custom table without approval is a §1.1 violation.
-2. **"We need a custom entitlement-evaluation Script Include because the baseline one is too rigid."** → Almost always wrong. The baseline calculation (`global.CSManagementUtils`) already scores account or consumer, product, asset and contract by configurable weight *(citation: `markdown/customer-service-management/csm-case-entitlement-calculation.md`)*. Verdict A or B.
+2. **"We need a custom entitlement-evaluation Script Include because the baseline one is too rigid."** → Almost always wrong. The baseline calculation (`global.CSManagementUtils`) already scores account or consumer, product, asset and contract by configurable weight *(citation: `markdown/customer-service-management/csm-case-entitlement-calculation.md`)*. **Verdict C** — the request names custom entitlement-evaluation logic, which this skill calls its most common §1.1 violation — and the halt's OPEN QUESTION proposes the baseline calculation.
 3. **"We need a custom customer-contact table because the baseline lacks fields X, Y, Z."** → Extend `customer_contact` with fields, not a new table. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes the field extension.
 4. **"We need a custom contract-renewal tracking table."** → Contract [`ast_contract`] carries State, Starts and Ends *(citation: `markdown/customer-service-management/create-csm-service-contracts.md`)*. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes those fields of `ast_contract`.
 5. **"We need a custom audit table for case work-notes changes."** → `sys_journal_field` baseline. **Verdict C** — the request names a custom table — and the halt's OPEN QUESTION proposes `sys_journal_field`.
