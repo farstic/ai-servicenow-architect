@@ -92,8 +92,12 @@ test('criterion 1 — the rule file is written, is short, and has no frontmatter
     // and the file landed EXACTLY on 64 — which is the cap doing nothing, since the next honest
     // line would fail it. Moved to 66 on the same principle as both moves above: the finished
     // section plus two, so there is room for one correction and none for prose.
+    //
+    // ARC-09-C101 costs five more (the warnings heading, the owner's one rule sentence and a line for
+    // each of the two warning codes, plus the blank line before it): 71. The owner ruled the cap at
+    // 72 — the finished section plus one — so a correction fits and a paragraph does not.
     const lines = text.trimEnd().split('\n').length;
-    assert.ok(lines <= 66, `${lines} lines, budget 66`);
+    assert.ok(lines <= 72, `${lines} lines, budget 72`);
     console.log(`    rule file: ${lines} lines`);
   } finally { cleanup(dir); }
 });

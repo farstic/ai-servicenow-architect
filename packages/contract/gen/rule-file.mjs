@@ -97,6 +97,18 @@ export const APPROVAL_PER_RECORD = 'N distinct records is N questions, each aske
 export const APPROVAL_WITH_CAPTURE = 'About to <action> on instance "<label>", after ensuring '
   + 'update set <name> and pointing capture at it — write approved?';
 
+/**
+ * The one rule sentence for a write that succeeded with warnings (ARC-09-C101) — the owner's wording.
+ *
+ * It is a literal because it is a judgement about how a session should behave, and it is exported so
+ * `tests/contract/runtime-errors.test.mjs` can pin it character for character: this sentence is in an
+ * always-loaded file, and a rewording of it is a change to every session's behaviour that should
+ * fail a test rather than slip through a regeneration. The codes it applies to are NOT here; they are
+ * the registry's `warning` entries.
+ */
+export const WARNINGS_RULE = 'A result with `warnings[]` is reported to the user, each warning in full, '
+  + 'before anything else is done; the correcting modify is its own write and needs its own "write approved".';
+
 /** Presets in the words someone chooses one by. `custom` is the absence of a preset, not an entry. */
 const USE_WHEN = {
   'read-only': 'none',
@@ -139,7 +151,11 @@ export function render(ctx) {
   // six near-identical lines in a file with a 45-line budget are six not spent on something else.
   // Everything else carrying `showInRule` gets its own line, in registry order.
   const flagCodes = new Set(contract.flags.map((f) => `${f.name.replace('_ENABLED', '')}_NOT_ENABLED`));
-  const ruleCodes = contract.errorCodes.filter((e) => e.showInRule && !flagCodes.has(e.code));
+  const ruleCodes = contract.errorCodes.filter((e) => e.showInRule && !e.warning && !flagCodes.has(e.code));
+  // Warnings are not runtime errors: the section below says stop, never retry, wait — and a write
+  // that already happened is none of those. They get their own heading, and only when the contract
+  // has any (the fixtures that render a synthetic contract have none, and must not grow an empty one).
+  const warningCodes = contract.errorCodes.filter((e) => e.showInRule && e.warning);
   // The wildcard line borrows one flag's remedy, and which flag is derived rather than named: the
   // base flag is the one the others `require`, which is what makes its remedy the right one for the
   // whole family. Naming WRITE here would be a literal the loader exists to remove.
@@ -209,7 +225,11 @@ ${ruleCodes.map(line).join('\n')}
 - \`*_NOT_ENABLED\` (${flagList}) → ${fillLauncher(wildcard.remedy, PAGE_SPELL)} — \`${fillLauncher(wildcard.command, PAGE_SPELL)}\`.
 
 A remedy printed with \`<label>\`, \`<host>\` or \`<proxy>\` still in it: substitute what the tool result carried (\`${CAPABILITIES_TOOL}\` has the label), and print the placeholder only when nothing did. If two different runtime errors occur in one session, also say: run \`./snowarch doctor\` in a terminal and paste the FAIL lines.
-
+${warningCodes.length === 0 ? '' : `
+## Warnings — a write that succeeded, with something to report first
+${WARNINGS_RULE}
+${warningCodes.map(line).join('\n')}
+`}
 Long form: \`governance/mcp-protocols.md\` · every code: \`docs/TROUBLESHOOTING.md\`
 `;
 }

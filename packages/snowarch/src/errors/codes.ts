@@ -21,6 +21,8 @@
  *                refused connection mid-task must stop and hand over exactly as it does for a
  *                wrong password
  *   httpStatus   the status the instance returned, where the code maps to one
+ *   warning      a warning on a write that succeeded, not an error; with `showInRule` it gets its own
+ *                section in the rule file, apart from the runtime errors (ARC-09-C101)
  */
 /**
  * THE LAUNCHER IS A PLACEHOLDER HERE — ARC-07-C32, and `<cli>` rather than `{cli}` on purpose.
@@ -50,6 +52,13 @@ export interface ErrorCode {
   command?: string;
   /** Shown in `.claude/rules/00-mode-and-mcp-gate.md`, which is always loaded and must stay short. */
   showInRule: boolean;
+  /**
+   * A WARNING on a write that succeeded, not an error: it arrives as `warnings[].code` on a tool's
+   * result and never as `(Code: X)` on a failure. The rule file lists it under its own heading — the
+   * 'Runtime errors' section says stop, never retry, wait, and a write that already happened is none
+   * of those (ARC-09-C101).
+   */
+  warning?: true;
   /** The HTTP status the instance returned, where this code maps to one. */
   httpStatus?: number;
 }
@@ -532,13 +541,15 @@ export const ERROR_CODES = [
     code: 'VALUE_TRUNCATED',
     meaning: "A WARNING on a write that succeeded, not an error: a string appears to have been cut at its column — the platform stored only the first part of it, without refusing. It arrives as `warnings[].code` on the tool's result (or as a note on the error of a tool that failed after it wrote) and names the field, both lengths and a limit. The limit is the dictionary's stated `max_length` when `confirmed` is true, and otherwise the stored length, which is a lower bound; a column defined on a parent table never confirms.",
     remedy: "the record exists with the stored value, so modify it with a value of at most `column_limit` characters (when `confirmed` is false that length is only known to fit); do not add it again, which would make a second record. If the record is active, set `active` to false until it is corrected",
-    showInRule: false,
+    showInRule: true,
+    warning: true,
   },
   {
     code: 'FIELD_NOT_STORED',
     meaning: "A WARNING on a write that succeeded, not an error: a field the tool sent is not shown as set in the platform's response (for `snow_scr_business_rule_add`: `filter_condition` or `advanced`). The record exists without it — a Business Rule without its filter runs on every matching operation. It arrives as `warnings[].code` on the tool's result.",
-    remedy: "read the record back with `snow_scr_business_rule_read`; if the field is not set, set it with a modify rather than adding the record again, and if the record is active set `active` to false first. If it is set, the response did not echo it: the column names are not documented in the bundled corpus, so check them on the instance",
-    showInRule: false,
+    remedy: "read the record back; if the field is not set, set it with a modify rather than adding the record again, and if the record is active set `active` to false first. If it is set, the response did not echo it: the column names are not documented in the bundled corpus, so check them on the instance",
+    showInRule: true,
+    warning: true,
   },
 ] as const satisfies readonly ErrorCode[];
 

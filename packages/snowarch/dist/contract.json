@@ -183,8 +183,9 @@
     {
       "code": "FIELD_NOT_STORED",
       "meaning": "A WARNING on a write that succeeded, not an error: a field the tool sent is not shown as set in the platform's response (for `snow_scr_business_rule_add`: `filter_condition` or `advanced`). The record exists without it — a Business Rule without its filter runs on every matching operation. It arrives as `warnings[].code` on the tool's result.",
-      "remedy": "read the record back with `snow_scr_business_rule_read`; if the field is not set, set it with a modify rather than adding the record again, and if the record is active set `active` to false first. If it is set, the response did not echo it: the column names are not documented in the bundled corpus, so check them on the instance",
-      "showInRule": false
+      "remedy": "read the record back; if the field is not set, set it with a modify rather than adding the record again, and if the record is active set `active` to false first. If it is set, the response did not echo it: the column names are not documented in the bundled corpus, so check them on the instance",
+      "showInRule": true,
+      "warning": true
     },
     {
       "code": "FLAG_DEPENDENCY_VIOLATION",
@@ -511,7 +512,8 @@
       "code": "VALUE_TRUNCATED",
       "meaning": "A WARNING on a write that succeeded, not an error: a string appears to have been cut at its column — the platform stored only the first part of it, without refusing. It arrives as `warnings[].code` on the tool's result (or as a note on the error of a tool that failed after it wrote) and names the field, both lengths and a limit. The limit is the dictionary's stated `max_length` when `confirmed` is true, and otherwise the stored length, which is a lower bound; a column defined on a parent table never confirms.",
       "remedy": "the record exists with the stored value, so modify it with a value of at most `column_limit` characters (when `confirmed` is false that length is only known to fit); do not add it again, which would make a second record. If the record is active, set `active` to false until it is corrected",
-      "showInRule": false
+      "showInRule": true,
+      "warning": true
     },
     {
       "code": "WRITE_NOT_ENABLED",
