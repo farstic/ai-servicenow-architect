@@ -135,9 +135,10 @@ rewrites or ignores `suffix`, say so — the unit test asserts what we send, not
 
 **Expected.** Step 2 returns `action_insert == "true"` (the REST layer returns booleans as strings —
 compare against the string, not the boolean, or the check fails for the wrong reason) and
-`action_update == "true"`, with `action_delete` and `action_query` false.
+`action_update == "true"`, with `action_delete` and `action_query` false, and `advanced == "true"` (the add
+now sends it, and it is the field that decides whether the probe script is in effect).
 
-**Record.** All four `action_*` values as read back. The old payload omitted them; a row with all four
+**Record.** All four `action_*` values and `advanced` as read back. The old payload omitted them; a row with all four
 false is a rule that fires on nothing while looking correct in the UI list.
 
 **Teardown.** `snow_core_record_remove { "table": "sys_script", "sys_id": "<BR>" }`, then complete the
@@ -398,13 +399,21 @@ Record in `docs/validation/` under the sitting's file, as **ARC-04-S10 c1: CONFI
 **Build under test:** `develop` @ the sha on the PR that adds this section.
 
 **What the unit tests already prove** (`tests/tools/script-business-rule-one-write.test.ts`,
-`tests/tools/silent-truncation.test.ts`, `tests/servicenow/silent-truncation-http.test.ts`): that
-`snow_scr_business_rule_add` puts `filter_condition`, `advanced` and `active` in the one create, and that
-a response whose `name` is a shorter prefix of what was sent comes back as a `VALUE_TRUNCATED` warning.
-**What only a live run can prove**, because a fake returns what it was told to: that the REAL response
-to a write on `sys_script` carries the STORED name, and that `sys_dictionary` states
-`sys_script.name`'s `max_length` to this account. The first is the premise of the whole design (PN-10).
-If it is false the check is silent exactly where it matters, and **that is the result to record**.
+`tests/tools/silent-truncation.test.ts`, `tests/servicenow/silent-truncation-http.test.ts`,
+`tests/servicenow/stored-values.test.ts`): that `snow_scr_business_rule_add` puts `filter_condition`,
+`advanced` and `active` in the one create, and that a response whose `name` is a shorter prefix of
+what was sent comes back as a `VALUE_TRUNCATED` warning. **What only a live run can prove**, because a
+fake returns what it was told to:
+
+1. that the REAL response to a write on `sys_script` carries the STORED name — on a POST and on a PATCH.
+   PN-07 observed it for a POST on `sys_script_fix.name` only. This is the premise of the whole design
+   (PN-10); if it is false the check is silent exactly where it matters, and **that is the result to
+   record**;
+2. that `sys_script` has columns called `filter_condition` and `advanced`. The names are not printed in
+   the bundled corpus; the add sends them and, if the response does not show them, reports
+   `FIELD_NOT_STORED` — which on a correct platform must NOT appear;
+3. that `sys_dictionary` states `sys_script.name`'s `max_length` to this account (reading the dictionary
+   needs an elevated role).
 
 ### Setup
 
@@ -415,37 +424,59 @@ An instance on the `pdi-developer` preset, and the §2.2 chain (`snow_us_active_
 
 ```
 1  snow_scr_business_rule_add
-   { name: "c93-live-probe-0123456789-0123456789-01", table: "incident", when: "before",
+   { name: "c93-live-probe-0123456789-0123456789-0123", table: "incident", when: "before",
      script: "// c93 probe", filter_condition: "number=INC0000000", advanced: true, active: false }
    (the name is 41 characters; the filter matches nothing; the rule is inactive — nothing can fire)
 2  snow_scr_business_rule_read { sys_id: <from step 1> }
 3  snow_scr_business_rule_add  the same call with name "c93-live-probe-short"
+4  snow_scr_business_rule_modify
+   { sys_id: <from step 3>, fields: { name: "c93-live-probe-0123456789-0123456789-0123" } }
+5  snow_scr_business_rule_modify { sys_id: <from step 3>, fields: { name: "c93-live-probe-short" } },
+   then snow_us_update_set_preview on the throwaway update set
+6  snow_scr_business_rule_add  the step 1 call with name "c93-live-probe-trailing" and
+   filter_condition "number=INC0000000^"
 ```
 
 ### Pass condition — the exact state to see
 
-Step 1 is ONE call, and its result carries `warnings[0]` with `code: "VALUE_TRUNCATED"`,
-`field: "name"`, `sent_length: 41`, `stored_length: 40`, `column_limit: 40` and `confirmed: true`. Step 2
-shows `name` of 40 characters, `filter_condition` as sent, `advanced` true and `active` false — the whole
-rule from the one write. **A failure looks like:** step 1 has no `warnings` while step 2 shows a 40-character
-name (the response echoed what was SENT — the design's premise is false); or `confirmed: false`
-(the account cannot read `sys_dictionary`, or the limit is not on this table's row); or step 2 missing
-`filter_condition` or `advanced`.
+- **Step 1** is ONE call, and its result carries `warnings[0]` with `code: "VALUE_TRUNCATED"`,
+  `operation: "create"`, `field: "name"`, `sent_length: 41`, `stored_length: 40`, `column_limit: 40` and
+  `confirmed: true`, and carries NO `FIELD_NOT_STORED` entry. The result's `summary` names the 40-character
+  stored name.
+- **Step 2** shows `name` of 40 characters, `filter_condition` STARTING with `number=INC0000000` (the
+  platform may append `^EQ` or item lines — record the exact stored form so a PN entry can be written),
+  `advanced` true and `active` false: the whole rule from the one write.
+- **Step 4** returns `warnings[0]` with `operation: "update"` and the same lengths. This is the PATCH half
+  of the premise.
+- **Step 5** shows, in the preview, one entry for the rule and whether its payload carries the corrected
+  name (the platform's behaviour for REST-captured entries is not documented in the bundled corpus —
+  record what it is).
+
+**A failure looks like:** step 1 or 4 has no `warnings` while the read shows a 40-character name (the
+response echoed what was SENT — the design's premise is false for that operation); `confirmed: false`
+(the account cannot read `sys_dictionary`, or the limit is not on this table's row); a
+`FIELD_NOT_STORED` entry (a column name is wrong, or the account cannot read the field back); or step 2
+missing `filter_condition` or `advanced`.
 
 ### The evidence to record
 
-- the `warnings` array from step 1, and step 2's `name` (its length), `filter_condition`, `advanced`
-  and `active` — none of these is a secret;
-- **the negative control:** step 3 returns no `warnings` key and made no `sys_dictionary` request. A check
-  that warned on every write would pass the positive half every time.
+- the `warnings` array from steps 1 and 4, and step 2's `name` (its length), `filter_condition`,
+  `advanced` and `active` — none of these is a secret;
+- **the negative control:** step 3 returns no `warnings` key, and the server's stderr log has no
+  `Querying ServiceNow table: sys_dictionary` line for it (the server logs each query at info level). A
+  check that warned on every write, or looked up the dictionary before every write, would pass the
+  positive half every time;
+- **the false-alarm check:** step 6 — whether a trailing `^` that the platform trims produces a
+  `VALUE_TRUNCATED` for `filter_condition`. If it does, that is a benign shape the detector flags
+  today (`looksCut` exempts only a decimal's trailing zeros) and it becomes a PN entry.
 
 ### Teardown
 
-Delete both probe rules in the UI (`record_remove` on a scripting table is the open question in the
+Delete the probe rules in the UI (`record_remove` on a scripting table is the open question in the
 ARC-02-S10 section above) and discard the update set.
 
 ### Verdict
 
 Record in `docs/validation/` under the sitting's file, as **ARC-09-C92 live: CONFIRMED / FAILED** and
-**ARC-09-C93 live: CONFIRMED / FAILED**, saying which of the three failure shapes above it was.
-
+**ARC-09-C93 live: CONFIRMED / FAILED**, saying which of the failure shapes above it was, for the POST
+and for the PATCH separately.

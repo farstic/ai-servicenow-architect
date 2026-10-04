@@ -11,7 +11,7 @@ withPreset('pdi-developer');
 /**
  * ARC-09-C93 at the HTTP seam: the REAL `ServiceNowClient`, the real router, and a platform (the
  * mocked `snFetch`) that answers 201 with a record whose `name` is the first 40 characters of what
- * was posted — the behaviour the owner's live test saw and PN-07 records.
+ * was posted — what PN-07 observed for `sys_script_fix.name`, and assumed here for `sys_script`.
  *
  * `silent-truncation.test.ts` proves the logic against a fake client. This file proves the one thing
  * a fake cannot: that the value the check reads is the one the real client hands back, and that the

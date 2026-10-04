@@ -8,14 +8,14 @@ import { expandPreset } from '../../src/utils/permissions.js';
 withPreset('pdi-developer');
 
 /**
- * ARC-09-C93 — a value longer than its column is never cut SILENTLY.
+ * ARC-09-C93 — a value the platform cuts at its column is REPORTED, within the limits PN-10 lists.
  *
- * The owner's live test (finding R4) created a Business Rule whose name was longer than 40
- * characters. The platform stored the first 40, answered 201, and the tool reported
- * "Created business rule <the long name>" — built from the argument, so the report agreed with the
- * request and not with the record. `docs/PLATFORM-NOTES.md` PN-07 records the same thing for
- * `sys_script_fix.name`: no error, the cut value echoed in the response, and a `sys_name` that is
- * wrong everywhere it is displayed.
+ * The owner's live test (finding R4) reported a Business Rule name cut at 40 characters, with the tool
+ * reporting success. `docs/PLATFORM-NOTES.md` PN-07 observed the same on `sys_script_fix.name`: no error,
+ * the cut value echoed in the response. That the response for `sys_script`, and for a PATCH, also carries
+ * the stored value is assumed, not seen (PN-10), and every test below builds its platform on that
+ * assumption. The tool's success line used to be built from the argument, so it agreed with the request
+ * and not with the record.
  *
  * WHAT THE WRITE PATH ALREADY HAS. `createRecord` and `updateRecord` return the platform's own
  * `result`, which is the stored record. Nothing compared it with what was sent. These tests drive
