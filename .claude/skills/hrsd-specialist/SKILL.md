@@ -286,7 +286,7 @@ One of:
 
 **Variants:** never add `state` values. A sub-state, `sn_hr_core_case.sub_state`, is not documented in the bundled corpus — verify on the instance. Where the instance has it, it can carry COE-specific or topic-specific sub-flows; where it does not, carry the variant in a field.
 
-**Baseline notifications (sample):** `hr_case.opened`, `hr_case.assigned`, `hr_case.commented`, `hr_case.resolved`, `hr_case.closed`.
+**Baseline notifications:** the baseline HR case notification names are not documented in the bundled corpus — verify on the instance. What the corpus does document: reminder notifications on HR tasks and task templates, built from email templates and sent to the Assigned to person — recurring for HR services, one-time for Lifecycle Events — and sent by the daily HR Daily Job scheduled job *(citation: `markdown/employee-service-management/hr-service-delivery/HRNotifications.md`, `markdown/employee-service-management/hr-service-delivery/components-installed-with-case-and-knowledge-management.md`)*; and one email notification to all approvers when a new HR case is submitted *(citation: `markdown/employee-service-management/hr-service-delivery/t_ApproveAnHRCase.md`)*.
 
 **Role gates:**
 - `sn_hr_core.basic` — read access to HR Case (filtered by subject_person or HR group membership)
