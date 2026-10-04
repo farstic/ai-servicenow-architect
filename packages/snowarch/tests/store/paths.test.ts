@@ -6,6 +6,7 @@ import {
   envPath, globalStorePath, isUnderCloudSyncFolder, maskPath, maskUsername, projectStorePath,
   resolveStorePath,
 } from '../../src/store/paths.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 const KEYS = ['SNOW_STORE', 'CLAUDE_PROJECT_DIR', 'APPDATA'] as const;
 let saved: Record<string, string | undefined>;
@@ -14,7 +15,7 @@ let tmp: string;
 beforeEach(() => {
   saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
   for (const k of KEYS) delete process.env[k];
-  tmp = mkdtempSync(join(tmpdir(), 'snowarch-paths-'));
+  tmp = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-paths-')));
 });
 afterEach(() => {
   for (const k of KEYS) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }

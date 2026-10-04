@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { CredentialPatchRefused, loadStore, updateInstance } from '../../src/store/index.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-08-S06 AC 8's server half — the door the doctor's F4 goes through, and what it refuses.
@@ -29,7 +30,7 @@ const entry = () => ({
 });
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'snowarch-store-'));
+  dir = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-store-')));
   mkdirSync(join(dir, '.local'), { recursive: true, mode: 0o700 });
   path = join(dir, '.local', 'instances.json');
   writeFileSync(path, `${JSON.stringify({ version: 1, defaultInstance: 'pdi',

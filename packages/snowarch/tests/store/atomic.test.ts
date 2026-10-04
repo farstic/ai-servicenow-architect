@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkFileModes, loadStore, saveStore } from '../../src/store/index.js';
 import type { Store } from '../../src/store/schema.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 const win32 = process.platform === 'win32';
 let tmp: string;
@@ -24,7 +25,7 @@ const store = (): Store => JSON.parse(JSON.stringify({
   },
 }));
 
-beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'snowarch-atomic-')); });
+beforeEach(() => { tmp = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-atomic-'))); });
 afterEach(() => { rmSync(tmp, { recursive: true, force: true }); });
 
 describe('saveStore — criterion 5', () => {

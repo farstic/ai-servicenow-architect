@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { ARGV_SECRET, CANCELLED, EXIT_INTERRUPTED, EXIT_USAGE, WINDOWS_KNOWN_BAD, argvCarriesSecret, cliSpelling, knownBadConsole, noTtyMessage, promptChoice, promptLine, promptSecret, readSecretFromStdin, type Io } from '../../src/cli/tty.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-S01 — the credential boundary, driven by a fake terminal.
@@ -346,7 +347,7 @@ describe('the shape B06 will spawn it in', () => {
    * should have refused.
    */
   it('a piped child refuses; an inherited child sees whatever the parent had', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'tty-spawn-'));
+    const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'tty-spawn-')));
     try {
       const probe = join(dir, 'probe.mjs');
       const out = join(dir, 'result.json');

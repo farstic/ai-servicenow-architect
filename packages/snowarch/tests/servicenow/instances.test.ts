@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { instanceManager } from '../../src/servicenow/instances.js';
 import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
 import { cliSpelling } from '../../src/cli/tty.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
@@ -60,7 +61,7 @@ function writeStore(path: string, body: unknown = STORE, mode = 0o600): string {
 beforeEach(() => {
   saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
   for (const k of KEYS) delete process.env[k];
-  tmp = mkdtempSync(join(tmpdir(), 'snowarch-inst-'));
+  tmp = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-inst-')));
   // Point the project store at an empty temp dir so the developer's real one is never read.
   process.env.CLAUDE_PROJECT_DIR = tmp;
 });

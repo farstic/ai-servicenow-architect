@@ -490,12 +490,17 @@ test('C35b — the real file: b00-checks has no phantom site at :93 (item 1)', (
 test('C35b — an inline pinned spelling call is a PINNED expectation (item 3)', () => {
   // `${spellings({ platform: 'linux', env: {} }).cli}` states its kind INLINE, and the kind used to be read
   // only from a NAMED constant — so ARC-07-C35's own named control site,
-  // `tools/snowarch/tests/store-forwarder.test.mjs:73`, was reported DERIVED against its own
+  // `tools/snowarch/tests/store-forwarder.test.mjs` (once at :73), was reported DERIVED against its own
   // "PINNED POSIX" comment.
   const file = 'tools/snowarch/tests/store-forwarder.test.mjs';
-  const sites = assertedLaunchers(file, readFileSync(resolve(root, file), 'utf8'));
-  const site = sites.find((s) => s.line === 73);
-  assert.ok(site, `the site at :73 is gone: ${JSON.stringify(sites.map((s) => s.line))}`);
+  const source = readFileSync(resolve(root, file), 'utf8');
+  const sites = assertedLaunchers(file, source);
+  // Found by its text, not by a line number: a line number is a fact about everything above it, and an
+  // import added to that file (ARC-09-C96) moved the site from :73 to :74 without changing it.
+  const at = source.split('\n').findIndex((l) => l.includes("`usage: ${spellings({ platform: 'linux', env: {} }).cli} store`")) + 1;
+  // The audit reports the line the assertion STARTS on; the spelling is on that line or the one below.
+  const site = sites.find((s) => s.line === at || s.line === at - 1);
+  assert.ok(at > 0 && site, `the pinned site is gone: ${JSON.stringify(sites.map((s) => s.line))}`);
   assert.equal(site.expectation, 'PINNED');
 
   // ...and inline DERIVED is still derived, so this is reading the argument rather than assuming.

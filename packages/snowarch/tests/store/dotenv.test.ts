@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { trackTempDir } from '../helpers/server-child.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
@@ -38,7 +39,7 @@ function runServer(cwd: string, env: Record<string, string | undefined>): { stdo
 
 describe('criterion 7 - a project .env has no effect without SNOW_ENV_FILE', () => {
   it('WRITE_ENABLED=true in the project .env does not reach the process', () => {
-    const project = mkdtempSync(join(tmpdir(), 'snowarch-dotenv-'));
+    const project = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-dotenv-')));
     try {
       writeFileSync(join(project, '.env'), 'WRITE_ENABLED=true\nSERVICENOW_INSTANCE_URL=https://leaked.service-now.com\n');
       mkdirSync(join(project, '.local'), { recursive: true, mode: 0o700 });
@@ -63,7 +64,7 @@ describe('criterion 7 - a project .env has no effect without SNOW_ENV_FILE', () 
   it('the same file IS read when SNOW_ENV_FILE names it', () => {
     // The other half of the rule: opting in explicitly still works, so this is isolation,
     // not removal.
-    const project = mkdtempSync(join(tmpdir(), 'snowarch-dotenv-'));
+    const project = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-dotenv-')));
     try {
       const envFile = join(project, 'my.env');
       writeFileSync(envFile, 'SERVICENOW_INSTANCE_URL=https://chosen.service-now.com\n');
@@ -80,7 +81,7 @@ describe('criterion 7 - a project .env has no effect without SNOW_ENV_FILE', () 
   }, 40_000);
 
   it('a SNOW_ENV_FILE that does not exist is ignored rather than fatal', () => {
-    const project = mkdtempSync(join(tmpdir(), 'snowarch-dotenv-'));
+    const project = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-dotenv-')));
     try {
       const { stderr } = runServer(project, {
         CLAUDE_PROJECT_DIR: project,

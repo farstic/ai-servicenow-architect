@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { CHECK_IDS } from '../../src/doctor/types.js';
 import { pollutingAncestors } from '../../src/doctor/checks.js';
 import { cliSpelling } from '../../src/cli/tty.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
@@ -94,7 +95,7 @@ const parse = (r: DoctorRun) => JSON.parse(r.stdout) as {
 };
 const check = (r: DoctorRun, id: string) => parse(r).checks.find((c) => c.id === id)!;
 
-beforeEach(() => { home = mkdtempSync(join(tmpdir(), 'snowarch-doctor-')); });
+beforeEach(() => { home = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-doctor-'))); });
 afterEach(() => { rmSync(home, { recursive: true, force: true }); });
 
 describe('criterion 1 - a valid store', () => {
@@ -376,7 +377,7 @@ describe('SV-07 and SV-08', () => {
   // so `afterEach` removed the outer directory and left these behind. That is exactly how the first
   // version of these two tests leaked into TMPDIR. The `finally` is what removes them.
   it('SV-08 does not report the home directory, even when ~/.claude/skills exists', () => {
-    const fakeHome = mkdtempSync(join(tmpdir(), 'sv08-home-'));
+    const fakeHome = trackTempDir(mkdtempSync(join(tmpdir(), 'sv08-home-')));
     try {
       mkdirSync(join(fakeHome, '.claude', 'skills'), { recursive: true });   // the user scope
       const checkout = join(fakeHome, 'work', 'checkout');
@@ -393,7 +394,7 @@ describe('SV-07 and SV-08', () => {
   it('SV-08 still reports a REAL ancestor project between the checkout and the home', () => {
     // Both directions: the case S-13 actually measured must keep warning, and must name the
     // ancestor it found — otherwise the exclusion above has silenced the check instead of correcting it.
-    const fakeHome = mkdtempSync(join(tmpdir(), 'sv08-home-'));
+    const fakeHome = trackTempDir(mkdtempSync(join(tmpdir(), 'sv08-home-')));
     try {
       mkdirSync(join(fakeHome, '.claude', 'skills'), { recursive: true });
       const ancestor = join(fakeHome, 'projects');

@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createServer as createHttpsServer } from 'node:https';
 import { createServer as createTcpServer } from 'node:net';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { bypassesProxy, classifyNetFailure, probeNetwork, proxyFor } from '../lib/probe-net.mjs';
 import { classifyGitFailure } from '../lib/docs/sync.mjs';
 import * as SENTENCE from '../lib/net-sentences.mjs';
 import { redact } from '../lib/redact.mjs';
 import { spellings } from '../lib/text.mjs';
+import { tempDir } from './helpers/temp.mjs';
 
 /**
  * ARC-07-C31 — the launcher these cases assert, DERIVED from the process.
@@ -115,11 +115,11 @@ test('AC 4 — an unreachable proxy is named as the proxy, not as being offline'
 
 test('AC 4 — a TLS-intercepting server gets the CA remedy, not a DNS one', { skip:
   spawnSync('openssl', ['version'], { stdio: 'ignore' }).status === 0
-    ? false : 'openssl is not on PATH to make a fixture certificate' }, async () => {
+    ? false : 'openssl is not on PATH to make a fixture certificate' }, async (t) => {
   // A real handshake against a real untrusted certificate, generated here and never committed:
   // a private key in the repository would be a credential-shaped file in a repository whose whole
   // discipline is not having one.
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-tls-'));
+  const dir = tempDir('snowarch-tls-', t);
   try {
     execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes',
       '-keyout', join(dir, 'k.pem'), '-out', join(dir, 'c.pem'), '-days', '1',

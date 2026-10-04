@@ -12,8 +12,7 @@
 // therefore a witness that the arguments reached the right program unchanged.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -22,6 +21,7 @@ import { CLI_PATH, preconditions, USAGE } from '../lib/instance.mjs';
 import { NO_INSTANCE_MESSAGE } from '../../../packages/snowarch/dist/no-instance.js';
 import { cliSpelling } from '../../../packages/snowarch/dist/cli/tty.js';
 import { useStateRoot } from './helpers/state-root.mjs';
+import { tempDir } from './helpers/temp.mjs';
 /*
  * ARC-07-C43 head 2 — THIS SUITE RUNS THE REAL CLI, so its `.local/` goes somewhere else.
  *
@@ -74,8 +74,8 @@ test('the server CLI can run from this checkout — the precondition for every r
 });
 
 for (const entry of ENTRIES) {
-  test(`${entry.name}: options reach the server — the production policy answers, exit 3`, () => {
-    const dir = mkdtempSync(join(tmpdir(), 'root-entry-'));
+  test(`${entry.name}: options reach the server — the production policy answers, exit 3`, (t) => {
+    const dir = tempDir('root-entry-', t);
     const store = join(dir, 'instances.json');
     try {
       const r = run(entry, ['instance', 'add', 'prod-acme', '--url', 'https://acme.service-now.com',
@@ -107,8 +107,8 @@ for (const entry of ENTRIES) {
     assert.match(r.text, /no such sub-command/);
   });
 
-  test(`${entry.name}: \`list --json\` reaches the server and prints only the object`, () => {
-    const dir = mkdtempSync(join(tmpdir(), 'root-entry-list-'));
+  test(`${entry.name}: \`list --json\` reaches the server and prints only the object`, (t) => {
+    const dir = tempDir('root-entry-list-', t);
     try {
       const r = run(entry, ['instance', 'list', '--json'],
         { SNOW_STORE: join(dir, 'instances.json') });
@@ -120,10 +120,10 @@ for (const entry of ENTRIES) {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  test(`${entry.name}: \`list --all\` reaches the server as two flags, not one`, () => {
+  test(`${entry.name}: \`list --all\` reaches the server as two flags, not one`, (t) => {
     // Two flags after a sub-command, which is the shape the frame used to eat. An empty store is
     // the empty-store sentence, and `--json` parses as a whole.
-    const dir = mkdtempSync(join(tmpdir(), 'root-entry-all-'));
+    const dir = tempDir('root-entry-all-', t);
     try {
       const store = join(dir, 'instances.json');
       const plain = run(entry, ['instance', 'list', '--all'], { SNOW_STORE: store });
@@ -140,10 +140,10 @@ for (const entry of ENTRIES) {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  test(`${entry.name}: \`list --all\` under SNOW_STORE lists the file the server READS`, () => {
+  test(`${entry.name}: \`list --all\` under SNOW_STORE lists the file the server READS`, (t) => {
     // The reviewer's reproduction, from the entry a user types. Two stores, one selected by the
     // override: `--all` used to show the global one alone, leaving out the very file in use.
-    const dir = mkdtempSync(join(tmpdir(), 'root-entry-two-'));
+    const dir = tempDir('root-entry-two-', t);
     try {
       const home = join(dir, 'home');
       // WHERE THIS PLATFORM PUTS IT: `%APPDATA%\snowarch` on Windows, `$XDG_CONFIG_HOME/snowarch`
@@ -179,11 +179,11 @@ for (const entry of ENTRIES) {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  test(`${entry.name}: \`test <label>\` reaches the server with its label`, () => {
+  test(`${entry.name}: \`test <label>\` reaches the server with its label`, (t) => {
     // The label is the proof: it is a POSITIONAL after a sub-command, which is exactly what the
     // frame used to swallow. A label that is not in the store answers before any network call, so
     // this asserts the routing without asserting the internet.
-    const dir = mkdtempSync(join(tmpdir(), 'root-entry-test-'));
+    const dir = tempDir('root-entry-test-', t);
     try {
       const r = run(entry, ['instance', 'test', 'no-such-label'],
         { SNOW_STORE: join(dir, 'instances.json') });
@@ -193,10 +193,10 @@ for (const entry of ENTRIES) {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  test(`${entry.name}: \`import --from-legacy --path … --dry-run\` plans and writes nothing`, () => {
+  test(`${entry.name}: \`import --from-legacy --path … --dry-run\` plans and writes nothing`, (t) => {
     // Three flags and a path after a sub-command, through the launcher: the shape the frame used
     // to eat. The fixture is the committed one, and the store must not exist afterwards.
-    const dir = mkdtempSync(join(tmpdir(), 'root-entry-import-'));
+    const dir = tempDir('root-entry-import-', t);
     try {
       const store = join(dir, 'instances.json');
       const fixture = join(root, 'packages/snowarch/tests/fixtures/legacy-instances.json');

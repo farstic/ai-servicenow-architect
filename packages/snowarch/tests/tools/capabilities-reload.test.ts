@@ -24,6 +24,7 @@ import { join } from 'node:path';
 import { currentCapabilities } from '../../src/tools/status.js';
 import { instanceManager } from '../../src/servicenow/instances.js';
 import { ERROR_CODES } from '../../src/errors/codes.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 let home: string;
 let saved: NodeJS.ProcessEnv;
@@ -55,7 +56,7 @@ const writeStore = (marker: { preset: string; maxRecords: number }) => {
 
 beforeEach(() => {
   saved = { ...process.env };
-  home = mkdtempSync(join(tmpdir(), 'caps-reload-'));
+  home = trackTempDir(mkdtempSync(join(tmpdir(), 'caps-reload-')));
   mkdirSync(join(home, '.local'), { recursive: true });
   // The same isolation `tests/doctor/sv03-sv04.test.ts` uses: the suite's setup provides
   // SERVICENOW_* env credentials, which load as an instance called `default` and would answer

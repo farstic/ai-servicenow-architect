@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { instanceManager } from '../../src/servicenow/instances.js';
 import type { ServiceNowError } from '../../src/utils/errors.js';
 import { cliSpelling } from '../../src/cli/tty.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
@@ -54,7 +55,7 @@ const instance = (over: Instance = {}): Instance => ({
 beforeEach(() => {
   saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
   for (const k of KEYS) delete process.env[k];
-  tmp = mkdtempSync(join(tmpdir(), 'snowarch-prod-'));
+  tmp = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-prod-')));
   process.env.CLAUDE_PROJECT_DIR = tmp;
 });
 

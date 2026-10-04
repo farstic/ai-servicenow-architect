@@ -4,6 +4,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { trackTempDir } from '../helpers/server-child.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SERVER = resolve(here, '../../dist/server.js');
@@ -64,7 +65,7 @@ function leakRegex(home: string, checkout: string): RegExp {
 
 describe('F2 - no absolute home or checkout path reaches a log line', () => {
   it.skipIf(win32)('a refused store: neither the description nor the Run: remedy carries an absolute path (skipped on Windows: the mode check that produces this message does not run there)', () => {
-    const base = mkdtempSync(join(tmpdir(), 'snowarch-mask-'));
+    const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-mask-')));
     const fakeHome = join(base, 'home');
     const checkout = join(base, 'volume', 'repo');   // NOT under fakeHome — see the note above
     mkdirSync(fakeHome, { recursive: true });
@@ -90,7 +91,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
   }, 40_000);
 
   it('a loaded store: the startup line names the checkout, never the absolute path', () => {
-    const base = mkdtempSync(join(tmpdir(), 'snowarch-mask-'));
+    const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-mask-')));
     const fakeHome = join(base, 'home');
     const checkout = join(base, 'volume', 'repo');   // NOT under fakeHome — see the note above
     mkdirSync(fakeHome, { recursive: true });
@@ -109,7 +110,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
   }, 40_000);
 
   it('a store that is not found: the message is masked too', () => {
-    const base = mkdtempSync(join(tmpdir(), 'snowarch-mask-'));
+    const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-mask-')));
     const fakeHome = join(base, 'home');
     const checkout = join(base, 'volume', 'repo');   // NOT under fakeHome — see the note above
     mkdirSync(fakeHome, { recursive: true });
@@ -126,7 +127,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
   }, 40_000);
 
   it('the env-instances note and the "no store" note are masked as well', () => {
-    const base = mkdtempSync(join(tmpdir(), 'snowarch-mask-'));
+    const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-mask-')));
     const fakeHome = join(base, 'home');
     const checkout = join(base, 'volume', 'repo');   // NOT under fakeHome — see the note above
     mkdirSync(fakeHome, { recursive: true });
@@ -153,7 +154,7 @@ describe('F2 - no absolute home or checkout path reaches a log line', () => {
   it.skipIf(win32)('a SNOW_STORE under HOME uses ~; one outside both HOME and the checkout is left as given (skipped on Windows: both halves assert a chmod remedy, and the mode check that produces it does not run there)', () => {
     // The user named that path explicitly. Rewriting it would point the remedy somewhere
     // they did not choose, which is worse than printing a path they already typed.
-    const base = mkdtempSync(join(tmpdir(), 'snowarch-mask-'));
+    const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-mask-')));
     const fakeHome = join(base, 'home');
     const checkout = join(base, 'volume', 'repo');
     try {

@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { ALL_CHECKS, resetHandshakeCache } from '../../dist/doctor/checks.js';
 import { stubProbesFor } from '../../dist/doctor/types.js';
 import { instanceManager } from '../../dist/servicenow/instances.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-08-S04 AC 7, second half — acceptance item B08-02.
@@ -91,7 +92,7 @@ const runCheck = async (id: string) => {
 
 describe('SV-06 — the running server against the store on disk (ARC-08-S04 AC 7)', () => {
   beforeEach(() => {
-    home = mkdtempSync(join(tmpdir(), 'snowarch-sv06-'));
+    home = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-sv06-')));
     resetHandshakeCache();
   });
   afterEach(() => {

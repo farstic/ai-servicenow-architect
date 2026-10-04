@@ -18,6 +18,7 @@ import type { Store } from '../../src/store/schema.js';
 import { fakeRest } from '../helpers/fake-rest.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
 import { cliSpelling } from '../../src/cli/tty.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
@@ -87,7 +88,7 @@ const entry = (over: Record<string, unknown> = {}): Record<string, unknown> => (
 interface Workspace { dir: string; store: string; config: string; audit: string; cleanup: () => void }
 
 function workspace(instances: Record<string, Record<string, unknown>>, defaultInstance = 'pdi'): Workspace {
-  const dir = mkdtempSync(join(tmpdir(), 'instance-manage-'));
+  const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'instance-manage-')));
   const store = join(dir, 'instances.json');
   writeFileSync(store, `${JSON.stringify({ version: 1, defaultInstance, instances }, null, 2)}\n`,
     { mode: 0o600 });

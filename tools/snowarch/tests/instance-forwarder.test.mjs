@@ -11,6 +11,7 @@ import {
 import { EXIT_PREREQ } from '../lib/exit.mjs';
 import { recorder } from './helpers/workspace.mjs';
 import { spellings } from '../lib/text.mjs';
+import { tempDir, trackTempDir } from './helpers/temp.mjs';
 
 /**
  * ARC-07-S05 — the forwarder forwards, and nothing else.
@@ -23,7 +24,7 @@ import { spellings } from '../lib/text.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const fakeRoot = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'forwarder-'));
+  const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'forwarder-')));
   writeFileSync(join(dir, 'engine.config.json'), JSON.stringify({
     docs: { pin: 'a'.repeat(40), family: 'australia', areasFile: 'vendor/docs-areas.txt', upstream: 'x' },
     mcp: { serverKey: 'servicenow', packageDir: 'packages/snowarch' },
@@ -130,13 +131,13 @@ test('the hand-over keeps the terminal, the checkout and the exit code', async (
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('the dependency check RESOLVES rather than guessing a path', () => {
+test('the dependency check RESOLVES rather than guessing a path', (t) => {
   // npm hoists `@modelcontextprotocol/sdk` to the repository root in this workspace, so the
   // nested tree under the server package is absent on a correctly installed checkout — the
   // forwarder refused to run on a machine where everything was fine. `createRequire` asks the
   // question Node will ask when the CLI starts.
   assert.equal(serverDepsInstalled(root), true);
-  const empty = mkdtempSync(join(tmpdir(), 'no-deps-'));
+  const empty = tempDir('no-deps-', t);
   try {
     mkdirSync(join(empty, 'packages', 'snowarch'), { recursive: true });
     writeFileSync(join(empty, 'packages', 'snowarch', 'package.json'), '{"name":"x"}');

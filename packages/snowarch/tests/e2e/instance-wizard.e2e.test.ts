@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { LIVE, ALLOW_WRITES, hasOauth, liveConfig, type LiveConfig } from './env.js';
 import { findSecret, redact } from './redact.js';
 import { ptyAvailable, runInPty, stdinPayload } from '../helpers/pty.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-S11 — the CLI against a REAL instance, behind `RUN_LIVE_E2E=1`.
@@ -83,7 +84,7 @@ const addInPty = (args: readonly string[], password: string, onStart?: (pid: num
 
 beforeAll(() => {
   if (!ready) return;
-  base = mkdtempSync(join(tmpdir(), 'snowarch-e2e-'));
+  base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-e2e-')));
   home = join(base, 'home');
   store = join(base, 'instances.json');
   mkdirSync(join(home, '.config'), { recursive: true });

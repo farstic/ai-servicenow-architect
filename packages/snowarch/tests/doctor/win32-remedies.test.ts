@@ -29,6 +29,7 @@ import { ALL_CHECKS } from '../../src/doctor/checks.js';
 import { cliSpelling } from '../../src/cli/tty.js';
 import { stubProbesFor } from '../../src/doctor/types.js';
 import type { CheckContext, CheckResult } from '../../src/doctor/types.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 const WIN = { platform: 'win32' as NodeJS.Platform, env: {} };
 const POSIX = { platform: 'linux' as NodeJS.Platform, env: {} };
@@ -104,7 +105,7 @@ const launchersAcrossScenarios = async (
 ): Promise<string[]> => {
   const out: string[] = [];
   for (const [name, body] of SCENARIOS) {
-    const dir = mkdtempSync(join(tmpdir(), 'c38-'));
+    const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'c38-')));
     const previous = process.env.SNOW_STORE;
     try {
       const store = join(dir, 'instances.json');
@@ -163,7 +164,7 @@ describe('ARC-07-C38 — the server doctor spells the launcher for the ctx it wa
     // THE BRANCH NEEDS A STORE TO EXIST, and measuring is how I know: without one the check returns
     // before reaching the mode question, so both directions came back with no note and the case passed
     // its negative half while proving nothing about its positive one.
-    const dir = mkdtempSync(join(tmpdir(), 'c38-acl-'));
+    const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'c38-acl-')));
     const previous = process.env.SNOW_STORE;
     try {
       const store = join(dir, 'instances.json');

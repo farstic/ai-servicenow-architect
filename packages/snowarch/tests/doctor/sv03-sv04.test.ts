@@ -13,6 +13,7 @@ import { logger } from '../../src/utils/logging.js';
 import { ROPC_ERROR_TABLE } from '../../src/servicenow/probes.js';
 import { FLAG_NAMES } from '../../src/utils/permissions.js';
 import { remedyFor } from '../../src/errors/codes.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-08-S04 — SV-03's new branches and SV-04's probe binding, in process.
@@ -113,7 +114,7 @@ const runCheck = async (id: string, opts: { fluent?: () => { installed: boolean;
   }
 };
 
-beforeEach(() => { home = mkdtempSync(join(tmpdir(), 'snowarch-sv-')); });
+beforeEach(() => { home = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-sv-'))); });
 afterEach(() => { rmSync(home, { recursive: true, force: true }); });
 
 describe('SV-03 — the flag matrix', () => {

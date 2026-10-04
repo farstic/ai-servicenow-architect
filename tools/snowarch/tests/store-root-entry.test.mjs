@@ -12,14 +12,14 @@ import assert from 'node:assert/strict';
 import { spellings } from '../lib/text.mjs';
 import { cliSpelling } from '../../../packages/snowarch/dist/cli/tty.js';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { preconditions } from '../lib/instance.mjs';
 import { useStateRoot } from './helpers/state-root.mjs';
+import { tempDir } from './helpers/temp.mjs';
 /*
  * ARC-07-C43 head 2 — THIS SUITE RUNS THE REAL CLI, so its `.local/` goes somewhere else.
  *
@@ -122,8 +122,8 @@ for (const entry of ENTRIES) {
     assert.match(r.text, /never pruned automatically/);
   });
 
-  test(`${entry.name}: \`migrate --yes\` reaches the server as a FLAG, not a value`, () => {
-    const dir = mkdtempSync(join(tmpdir(), 'store-root-entry-'));
+  test(`${entry.name}: \`migrate --yes\` reaches the server as a FLAG, not a value`, (t) => {
+    const dir = tempDir('store-root-entry-', t);
     try {
       const store = join(dir, 'instances.json');
       writeFileSync(store, `${JSON.stringify({ version: 1, instances: {} }, null, 2)}\n`);
@@ -136,8 +136,8 @@ for (const entry of ENTRIES) {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
-  test(`${entry.name}: an unreadable store exits 1 through the launcher, and writes nothing`, () => {
-    const dir = mkdtempSync(join(tmpdir(), 'store-root-entry-bad-'));
+  test(`${entry.name}: an unreadable store exits 1 through the launcher, and writes nothing`, (t) => {
+    const dir = tempDir('store-root-entry-bad-', t);
     try {
       const store = join(dir, 'instances.json');
       writeFileSync(store, '{ hand-edited\n');

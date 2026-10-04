@@ -24,6 +24,7 @@ const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import {
   AREAS, buildUpstream, git, makeWorkspace, writeCitingSkill, CITED_PAGE,
 } from '../../../tests/helpers/docs-fixture.mjs';
+import { trackTempDir } from './helpers/temp.mjs';
 
 /**
  * The fixture upstream, never the real one: no unit test here opens a socket to github.com. The
@@ -32,7 +33,7 @@ import {
 let scratch, upstream, upstreamUrl;
 
 before(() => {
-  scratch = mkdtempSync(join(tmpdir(), 'snowarch-b02-'));
+  scratch = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-b02-')));
   upstream = buildUpstream(scratch);
   upstreamUrl = pathToFileURL(upstream.bare).href;
 });
