@@ -187,6 +187,8 @@ export declare function attachWarnings(result: unknown, warnings: CutValueWarnin
  * serialised, not logged with the error, and not mistaken for the error's own fields.
  */
 export declare function carryWarningsOnError(error: unknown, warnings: CutValueWarning[]): void;
+/** The warnings an error carries out of a tool that wrote before it threw, or `[]`. */
+export declare function carriedWarnings(error: unknown): CutValueWarning[];
 /**
  * One sentence about cuts that happened before a tool threw, or `''`. Server-built from the warnings;
  * it never repeats the error's own text and never contains a `(Code: …)` marker, which the session

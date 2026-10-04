@@ -1,6 +1,14 @@
 /** Rotate at 10 MB, keeping three older files. */
 export declare const MAX_BYTES: number;
 export declare const KEEP = 3;
+/** One group of warnings from a single call: how many, of what, on which table and fields. */
+export interface AuditWarning {
+    code: string;
+    /** `null` when the table name was not identifier-shaped, so it is not recorded. */
+    table: string | null;
+    fields: string[];
+    count: number;
+}
 export interface AuditEntry {
     /** ISO-8601. Passed in rather than taken here, so a caller can time a call precisely. */
     ts: string;
@@ -18,6 +26,12 @@ export interface AuditEntry {
     source: 'mcp' | 'cli';
     /** Free-text context for a call with no table — `"switch → prod"`. Never a payload. */
     note?: string;
+    /**
+     * Present only when the call came back with warnings. `result` stays `ok` for a write that
+     * succeeded, or the error code for one that failed after it wrote; the warnings say what else
+     * happened. Absent means none, not "not checked" for the two write paths the check covers.
+     */
+    warnings?: AuditWarning[];
 }
 /**
  * A line written by the CLI rather than by a tool call (ARC-07-S06).

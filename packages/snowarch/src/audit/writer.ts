@@ -5,6 +5,10 @@
  * from a conversation transcript — which the reviewer asking the question does not have. The
  * audit file is what makes the claim checkable afterwards by someone who was not there.
  *
+ * A write that succeeded but came back with warnings (a value the platform stored cut, a field it did
+ * not keep) carries them as `warnings` — the codes, the table, the field names and a count, built by
+ * `audit/warnings.ts` and never a value (ARC-09-C101).
+ *
  * What a line may NOT contain is the whole design. Never a payload: `fields`, `data`, `script`
  * and the response body are all excluded, because an audit trail that records what was written
  * becomes a second copy of client data sitting in a git checkout. Never a credential. Never an
@@ -28,6 +32,15 @@ import { maskPath, projectStorePath, resolveStorePath } from '../store/paths.js'
 export const MAX_BYTES = 10 * 1024 * 1024;
 export const KEEP = 3;
 
+/** One group of warnings from a single call: how many, of what, on which table and fields. */
+export interface AuditWarning {
+  code: string;
+  /** `null` when the table name was not identifier-shaped, so it is not recorded. */
+  table: string | null;
+  fields: string[];
+  count: number;
+}
+
 export interface AuditEntry {
   /** ISO-8601. Passed in rather than taken here, so a caller can time a call precisely. */
   ts: string;
@@ -45,6 +58,12 @@ export interface AuditEntry {
   source: 'mcp' | 'cli';
   /** Free-text context for a call with no table — `"switch → prod"`. Never a payload. */
   note?: string;
+  /**
+   * Present only when the call came back with warnings. `result` stays `ok` for a write that
+   * succeeded, or the error code for one that failed after it wrote; the warnings say what else
+   * happened. Absent means none, not "not checked" for the two write paths the check covers.
+   */
+  warnings?: AuditWarning[];
 }
 
 /**

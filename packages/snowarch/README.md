@@ -314,6 +314,12 @@ once at start-up.
 instance URL — the label identifies the instance, and this file ends up in tickets. **Refusals are
 recorded** with their code; non-mutating tools append nothing.
 
+**A write that came back with warnings carries them.** `"warnings":[{"code":"VALUE_TRUNCATED","table":"sys_script","fields":["name"],"count":1}]`
+— the code, the table, the field names and a count, never a value. `result` stays `ok` for a write that
+succeeded, or is the error code for a tool that failed after it wrote; `warnings` says what else happened. A
+line without it is not proof that nothing was cut: `docs/PLATFORM-NOTES.md` PN-10 lists the writes the
+check does not see.
+
 **`query` is recorded and can contain personal data** — `caller_id=…`, a name in a `LIKE` filter. It
 is the filter that selected the records, so a line without it answers nothing. If that is not
 acceptable for an engagement, set `SNOW_AUDIT_FILE=off`, or point it outside the checkout.

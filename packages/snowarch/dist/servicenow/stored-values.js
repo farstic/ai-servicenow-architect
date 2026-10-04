@@ -343,16 +343,21 @@ export function carryWarningsOnError(error, warnings) {
     }
     catch { /* a frozen error: the server log still has the line */ }
 }
+/** The warnings an error carries out of a tool that wrote before it threw, or `[]`. */
+export function carriedWarnings(error) {
+    if (typeof error !== 'object' || error === null)
+        return [];
+    const carried = error[ON_ERROR];
+    return Array.isArray(carried) ? carried : [];
+}
 /**
  * One sentence about cuts that happened before a tool threw, or `''`. Server-built from the warnings;
  * it never repeats the error's own text and never contains a `(Code: …)` marker, which the session
  * rules read as the error's code.
  */
 export function describeCutsOnError(error) {
-    if (typeof error !== 'object' || error === null)
-        return '';
-    const carried = error[ON_ERROR];
-    if (!Array.isArray(carried) || carried.length === 0)
+    const carried = carriedWarnings(error);
+    if (carried.length === 0)
         return '';
     const listed = carried.slice(0, 5)
         .map((w) => `${w.table}.${w.field}${w.sys_id ? ` (${w.sys_id})` : ''}: ${w.sent_length} characters sent, ${w.stored_length} stored`);
