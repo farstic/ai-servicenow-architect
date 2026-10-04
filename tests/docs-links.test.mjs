@@ -16,6 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,12 +32,33 @@ const read = (rel) => readFileSync(join(root, rel), 'utf8');
 // knowing the tree.
 const DOCS = ['docs/CONTRIBUTING.md', 'docs/INSTALL.md', 'docs/ARCHITECTURE.md',
   'docs/MIGRATION.md',
+  // ARC-09-C102. The operator's guide, the page most people read after the install page. It was
+  // never on this list, and the list is hand-kept: it linked four documents that do not exist, one
+  // of them pinned as deleted by `tests/no-legacy-names.test.mjs`, and `tests/install-page.test.mjs`
+  // recorded the dangling links as "reported rather than fixed" because it could not widen to them.
+  'docs/USER-GUIDE.md',
+  // The four pages below measured clean on the day the sentinel further down was added, and were
+  // listed rather than exempted: an exemption says "this page may be wrong", and none of them may.
+  'docs/CLIENT-ONBOARDING.md', 'docs/MODES-AND-PRESETS.md', 'docs/PLATFORM-NOTES.md',
+  'docs/TROUBLESHOOTING.md',
   // ARC-09-C25. The COMPOSED copy, resolved from the repository root — the one place the link
   // defect could exist, and the one this file could not see. `README.md` is `docs/INSTALL.md`'s
   // body at a different depth, so a link that is correct in the source is wrong here unless the
   // generator retargets it. Checking only the sources was right for every other property and blind
   // to this one; five links on the project's front page were 404.
   'README.md'];
+
+/**
+ * The top-level pages that are NOT checked, each with the reason. A page is here because checking
+ * it would be wrong, never because nobody has looked: the sentinel below fails for a page that is in
+ * neither this table nor `DOCS`.
+ */
+const NOT_CHECKED = {
+  'docs/CHANGELOG.md': 'release history, written by scripts/release.mjs: it quotes retired commands, paths and page names in its fences and links on purpose',
+  'docs/RELICENSING.md': 'records what was retired, including the pages and paths a link check would call dead',
+  'docs/README-head.md': 'a fragment: README.md is composed from it and is checked in its composed form, from the repository root',
+  'docs/README-tail.md': 'a fragment: README.md is composed from it and is checked in its composed form, from the repository root',
+};
 
 /** GitHub's anchor rule, near enough for headings we write: lowercase, strip punctuation, hyphens. */
 const anchorFor = (heading) => heading.trim().toLowerCase()
@@ -88,6 +110,19 @@ test('every required section exists, by the anchor other pages link to (ARC-09-S
       assert.ok(have.has(a), `${doc} has no section anchored #${a}`);
     }
   }
+});
+
+test('every top-level docs page is checked here, or says why not (ARC-09-C102)', () => {
+  // The list above is kept by hand, and a hand-kept list is exactly what let the operator's guide
+  // link four documents that do not exist: it was never put on it. Enumerating the directory turns
+  // "someone must remember" into a failure naming the page that was left out.
+  const pages = execFileSync('git', ['ls-files', '--', 'docs/*.md'], { cwd: root, encoding: 'utf8' })
+    .split('\n').filter((f) => f && !f.slice('docs/'.length).includes('/'));
+  assert.ok(pages.length >= 10, `only ${pages.length} top-level pages listed — the enumeration is broken`);
+  assert.deepEqual(pages.filter((p) => !DOCS.includes(p) && !(p in NOT_CHECKED)), [],
+    'a docs page is neither in DOCS nor in NOT_CHECKED with a reason');
+  // ...and the table stays honest: no entry for a page that is gone, or that is checked as well.
+  assert.deepEqual(Object.keys(NOT_CHECKED).filter((p) => !pages.includes(p) || DOCS.includes(p)), []);
 });
 
 test('every internal link resolves to a heading that exists (ARC-09-S11)', () => {
