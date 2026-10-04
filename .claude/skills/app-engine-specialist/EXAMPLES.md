@@ -18,7 +18,7 @@ A custom scoped application is the object §1.1 governs, and no Chief Architect 
 1. Baseline options evaluated first:
    - **HRSD / asset**: equipment issued to employees is often baseline **Asset Management** (`alm_asset` + asset tasks / hardware model) — loans tracked as asset state + assignment, possibly an HR/service request to issue/return.
    - A **Service Catalog** request item (issue/return) with a flow, over baseline asset records.
-2. Custom app proposed only if baseline asset/request genuinely can't model "loan period + return + condition".
+2. Custom object proposed: the custom scoped app the request names — a new scoped app, the hierarchy's last rung, which needs the strongest justification — to hold "office-equipment loans to employees"; proposed only if baseline asset and request records genuinely cannot model a loan period, its return and the item's condition.
 3. Consequences of a custom app: new scope, tables, ACLs, lifecycle/upgrade ownership.
 4. Alternative if rejected: configure baseline Asset + a catalog request flow — no custom app.
 

@@ -23,7 +23,11 @@ const ITEM2 = /^\s*(?:#{1,4}\s*)?(?:\*\*)?2\.\s*(?:\*\*)?Custom object proposed/
 const ITEM3 = /^\s*(?:#{1,4}\s*)?(?:\*\*)?3\.\s|Consequences of approval/i;
 const DETAIL = [
   ['code fence', (l) => /^\s*```/.test(l)],
-  ['typed field', (l) => /`?[a-z_][a-z0-9_]*`?\s*\((?:Reference(?: list)?|String|Integer|DateTime|Date|Boolean|Choice|Currency|Decimal|JSON|Text)\b/i.test(l)],
+  // A field and its type, in each spelling a design has used: `name` (Reference to …), (ref to …),
+  // `name` — Integer, and a table row | name | Reference |.
+  ['typed field', (l) => /`?[a-z_][a-z0-9_]*`?\s*\((?:Reference(?: list)?|ref|String|Integer|DateTime|Date|Boolean|Choice|Currency|Decimal|JSON|Text)\b/i.test(l)
+    || /`?[a-z_][a-z0-9_]*`?\s*[—–]\s*(?:Reference|String|Integer|DateTime|Date|Boolean|Choice|Currency|Decimal|JSON|Text)\b/i.test(l)
+    || /^\s*\|\s*`?[a-z_][a-z0-9_.]*`?\s*\|\s*(?:Reference|ref|String|Integer|DateTime|Date|Boolean|Choice|Currency|Decimal|JSON|Text|True\/False)\b/i.test(l)],
   ['field-list line', (l) => /\b(?:Field list|New fields|Fields to define|Fields)\s*:/i.test(l)],
   ['index line', (l) => /\bInd(?:ex|ices|exes)\s*:/i.test(l)],
   ['ACL line', (l) => /\bACLs?(?: pattern)?\s*:/i.test(l)],
@@ -39,7 +43,8 @@ export function haltBlocks({ files, read }) {
     lines.forEach((l, i) => {
       if (!MARKER.test(l)) return;
       const s = lines.slice(i + 1, i + 61).findIndex((x) => ITEM2.test(x));
-      if (s < 0) return;
+      // A marker whose item 2 cannot be found is a block this test cannot read — said by name, not skipped.
+      if (s < 0) { blocks.push({ file: f, line: i + 1, item2: null, detail: [], unread: `${f}:${i + 1}: no item 2 ("2. Custom object proposed") within 60 lines of the marker` }); return; }
       const a = i + 1 + s;
       let b = a + 1;
       while (b < lines.length && b < a + 40 && !ITEM3.test(lines[b])) b += 1;
@@ -60,6 +65,8 @@ test('ARC-09-C85 — no proposal block carries design detail in item 2', () => {
   const blocks = haltBlocks({ files: tracked(), read: (f) => readFileSync(join(ROOT, f), 'utf8') });
   // A floor, because a scan that found no block would pass by having nothing to read.
   assert.ok(blocks.length >= 8, `only ${blocks.length} proposal block(s) found — the markers no longer match the roster`);
+  const unread = blocks.filter((b) => b.unread).map((b) => b.unread);
+  assert.deepEqual(unread, [], `${unread.length} marker(s) whose item 2 could not be read:\n  ${unread.join('\n  ')}`);
   const detail = blocks.flatMap((b) => b.detail);
   assert.deepEqual(detail, [], `${detail.length} line(s) of design detail inside a halt:\n  ${detail.join('\n  ')}`);
   console.log(`    ${blocks.length} proposal blocks, item 2 read in each`);
@@ -79,9 +86,15 @@ test('ARC-09-C85 — a planted field list, code fence or parent line in item 2 i
       '   - What it would hold, in the request\'s words: "the approval groups, in order".', '3. Consequences of approval'].join('\n'));
     // A Verdict B field design is an extension that proceeds, not a halt: its field names stay.
     plant('d.md', ['## Part 3 — Verdict B', '', '**Field design:**', '- `u_target_role_title` (String, 100)'].join('\n'));
-    const blocks = haltBlocks({ files: ['a.md', 'b.md', 'c.md', 'd.md'], read: (f) => readFileSync(join(dir, f), 'utf8') });
+    // The other spellings of a field and its type, and a marker whose item 2 is missing.
+    plant('e.md', ['### OPEN QUESTION — CUSTOM OBJECT PROPOSAL', '2. Custom object proposed:', '| from_tier | Reference | the tier |',
+      '   - u_business_unit (ref to business_unit)', '   - `u_shard_count` — Integer', '3. Consequences of approval'].join('\n'));
+    plant('f.md', ['**OPEN QUESTION — CUSTOM OBJECT PROPOSAL**', '', '2. Custom app proposed only if the baseline cannot hold it.', '3. Consequences'].join('\n'));
+    const blocks = haltBlocks({ files: ['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md'], read: (f) => readFileSync(join(dir, f), 'utf8') });
     const at = (f) => blocks.filter((b) => b.file === f).flatMap((b) => b.detail);
-    assert.equal(blocks.length, 3, 'the three halts were not all found, or the Verdict B design was taken for one');
+    assert.equal(blocks.length, 5, 'the five halts were not all found, or the Verdict B design was taken for one');
+    assert.equal(at('e.md').length, 3, 'a table-row field, a (ref to …) field or a "— Integer" field was not found');
+    assert.match(blocks.find((b) => b.file === 'f.md')?.unread ?? '', /f\.md:1: no item 2/, 'a marker with no item 2 was skipped instead of named');
     assert.equal(at('a.md').length, 2, 'a typed field list in item 2 was not found');
     assert.deepEqual(at('b.md').map((d) => d.split(': ')[1].split(' — ')[0]).sort(),
       ['code fence', 'code fence', 'parent line', 'table-name line'], 'a fenced table block in item 2 was not found');
