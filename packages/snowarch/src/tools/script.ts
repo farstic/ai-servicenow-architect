@@ -47,13 +47,13 @@ export function scriptToolManifest(): ToolDefinition[] {
         properties: {
           name: { type: 'string', description: 'Rule name' },
           table: { type: 'string', description: 'Table this rule applies to' },
-          when: { type: 'string', description: '"before" | "after" | "async" | "display"' },
+          when: { type: 'string', enum: ['before', 'after', 'async', 'display'], description: 'When the rule runs: "before" | "after" | "async" | "display". Anything else is refused before the write.' },
           script: { type: 'string', description: 'Server-side JavaScript. ServiceNow supports ES2021 (async/await, ?., ??).' },
           condition: { type: 'string', description: 'Optional condition SCRIPT (the Advanced section\'s Condition field). For a condition built from field tests, use filter_condition.' },
           filter_condition: { type: 'string', description: 'Optional filter as an encoded query (for example "priority=1^state=2"): the form\'s Filter Conditions builder, which decides whether the rule runs. Omit it only for a rule that should run on every matching operation. For changes, changesTo or changesFrom use the condition script (for example current.priority.changesTo(1)); their encoded-query form, and this column name, are not documented in the bundled corpus - verify on the instance.' },
           advanced: { type: 'boolean', description: 'Enable the form\'s Advanced section, where the script lives (default: true — this tool requires a script). The column name, and what the platform does with a script when this is false, are not documented in the bundled corpus - verify on the instance.' },
           active: { type: 'boolean', description: 'Whether to activate the rule (default: true)' },
-          order: { type: 'number', description: 'Execution order (default: 100)' },
+          order: { type: 'integer', description: 'Execution order, a whole number: rules run from lowest to highest (default: 100 when omitted; 0 is a valid order and is sent as 0). Anything that is not a whole number is refused before the write.' },
           action_insert: { type: 'boolean', description: 'Run on insert (default: true)' },
           action_update: { type: 'boolean', description: 'Run on update (default: true)' },
           action_delete: { type: 'boolean', description: 'Run on delete (default: false)' },
@@ -466,6 +466,31 @@ function strictBool(name: string, v: unknown, fallback: boolean): boolean {
 
 const isTrue = (v: unknown): boolean => v === true || v === 'true';
 
+/**
+ * The four values the form's When field takes: "display, before, async, or after the database operation
+ * is complete" (vendor/ServiceNowDocs/markdown/api-reference/business-rules-classic/c_BusinessRules.md).
+ */
+const RULE_WHEN = ['before', 'after', 'async', 'display'] as const;
+
+/** A value for an error message: short, and never the whole of something a caller typed. */
+const shown = (v: unknown): string => {
+  const text = typeof v === 'string' ? JSON.stringify(v) : (Array.isArray(v) ? 'an array' : typeof v === 'object' && v !== null ? 'an object' : String(v));
+  return text.length > 40 ? `${text.slice(0, 37)}...` : text;
+};
+
+/**
+ * The rule's execution order. Omitted or null is the form's default of 100; 0 is an order like any other
+ * (it used to become 100). The corpus says "a number indicating the sequence ... from lowest to highest";
+ * that the column is a whole number is not printed there, and a fraction sent to an integer column would be
+ * cut or rounded without a word, so only a whole number goes through.
+ */
+function ruleOrder(v: unknown): number {
+  if (v === undefined || v === null) return 100;
+  if (typeof v !== 'number' || !Number.isInteger(v))
+    throw new ServiceNowError(`order must be a whole number (got ${shown(v)}); omit it for the default of 100`, 'INVALID_REQUEST');
+  return v;
+}
+
 export async function dispatchScriptAction(
   client: ServiceNowClient,
   name: string,
@@ -495,6 +520,15 @@ export async function dispatchScriptAction(
       requireScripting();
       if (!args.name || !args.table || !args.when || !args.script)
         throw new ServiceNowError('name, table, when, and script are required', 'INVALID_REQUEST');
+      // ARC-09-C103: `when` and `order` are checked HERE, before any write. A rule created with the wrong
+      // `when` exists, is active, and fires in the wrong place - or not at all - and `order || 100` turned
+      // an order of 0 into 100 and passed "abc" through to the platform.
+      if (typeof args.when !== 'string' || !(RULE_WHEN as readonly string[]).includes(args.when))
+        throw new ServiceNowError(
+          `when must be one of ${RULE_WHEN.map((w) => `"${w}"`).slice(0, -1).join(', ')} or "${RULE_WHEN[RULE_WHEN.length - 1]}" `
+          + `(got ${shown(args.when)})`,
+          'INVALID_REQUEST');
+      const order = ruleOrder(args.order);
       // All four action_* flags are ALWAYS sent, as booleans. The payload used to omit them
       // entirely, and a sys_script row created with no action flags fires on nothing — the rule
       // existed, looked correct in the UI list, and never ran (field-notes §5). Defaults match
@@ -529,7 +563,7 @@ export async function dispatchScriptAction(
         // is not stated in the bundled corpus - verify on the instance; sending it is the path the
         // form documents.
         advanced,
-        active, order: args.order || 100,
+        active, order,
         action_insert: flag(args.action_insert, true),
         action_update: flag(args.action_update, true),
         action_delete: flag(args.action_delete, false),
