@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { COMMANDS } from '../tools/snowarch/lib/cli.mjs';
@@ -136,8 +136,11 @@ function deadLinks(docs, { readDoc = read, exists = (f) => existsSync(join(root,
     for (const [, target] of text.matchAll(/\]\(([^)\s]+)\)/g)) {
       if (/^(https?:|mailto:)/.test(target)) continue;
       const [path, anchor] = target.split('#');
-      // A bare `#anchor` points within the same document.
-      const file = path === '' ? doc : join(dirname(doc), path);
+      // A bare `#anchor` points within the same document. A link is a URL, so it resolves with POSIX
+      // rules whatever the platform: `join` is `path.win32.join` on a Windows runner and returns
+      // `docs\spikes\S-1\README.md`, which the real tree accepts and the in-memory control below does
+      // not - the Windows cells failed on exactly that.
+      const file = path === '' ? doc : posix.join(posix.dirname(doc), path);
       if (!exists(file)) { dead.push(`${doc} → ${target} (no such file)`); continue; }
       if (!anchor) continue;
       if (!file.endsWith('.md')) continue;
@@ -184,8 +187,12 @@ test('control - the check sees a wrong-depth link and a dead anchor, and skips a
     ].join('\n'),
     'docs/spikes/S-1/README.md': '# S-1\n\n## The spike\n\nback: [adr](../../decisions/ADR-1.md#heading-one), wrong: [adr](../../docs/decisions/ADR-1.md)\n',
   };
-  const opts = { readDoc: (f) => tree[f], exists: (f) => f in tree };
-  assert.deepEqual(deadLinks(Object.keys(tree), opts), [
+  const asked = [];
+  const opts = { readDoc: (f) => { asked.push(f); return tree[f]; }, exists: (f) => { asked.push(f); return f in tree; } };
+  const dead = deadLinks(Object.keys(tree), opts);
+  // A link is resolved the way a URL is, on every platform: a backslash here is `path.win32.join`.
+  assert.deepEqual(asked.filter((f) => f.includes('\\')), [], 'a link was resolved with the platform\'s separators');
+  assert.deepEqual(dead, [
     'docs/decisions/ADR-1.md → ../../spikes/S-1/README.md (no such file)',
     'docs/decisions/ADR-1.md → ../spikes/S-1/README.md#no-such-heading (no such heading)',
     'docs/spikes/S-1/README.md → ../../docs/decisions/ADR-1.md (no such file)',
