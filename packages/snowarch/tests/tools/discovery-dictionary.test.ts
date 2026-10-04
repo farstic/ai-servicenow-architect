@@ -64,7 +64,7 @@ function instance(tables: Record<string, Def>, opts: { hierarchyError?: Error } 
     }
     if (p.table === 'sys_dictionary') {
       const names = /nameIN([a-z0-9_,]+)/i.exec(q)?.[1]?.split(',') ?? [/name=([a-z0-9_]+)/i.exec(q)?.[1] ?? ''];
-      const rows = names.flatMap((n) => (tables[n]?.columns ?? []).map((c) => ({ name: n, ...dictRow(), ...c })));
+      const rows: Row[] = names.flatMap((n) => (tables[n]?.columns ?? []).map((c) => ({ name: n, ...dictRow(), ...c })));
       rows.sort((a, b) => String(a.element).localeCompare(String(b.element)) || String(a.name).localeCompare(String(b.name)));
       const off = p.offset ?? 0;
       const slice = rows.slice(off, off + (p.limit ?? 100));
