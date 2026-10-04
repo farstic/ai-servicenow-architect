@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { applyContractRemedy } from '../../tools/snowarch/lib/doctor/runner.mjs';
 import { spellings } from '../../tools/snowarch/lib/text.mjs';
 import { fillLauncher } from '../../packages/contract/lib/contract.mjs';
+import { WARNINGS_RULE } from '../../packages/contract/gen/rule-file.mjs';
 
 /**
  * ARC-07-C32 — the PAGE's rendering, which is what these cases must compare in.
@@ -45,7 +46,8 @@ const codeLines = (section = runtimeSection()) =>
 test('criterion 1 — one line per showInRule code, the six flag gates as one', () => {
   const c = contract();
   const flagCodes = new Set(c.flags.map((f) => `${f.name.replace('_ENABLED', '')}_NOT_ENABLED`));
-  const own = c.errorCodes.filter((e) => e.showInRule && !flagCodes.has(e.code)).map((e) => e.code);
+  // A warning is rule-visible too, but under its own heading (ARC-09-C101), not in this list.
+  const own = c.errorCodes.filter((e) => e.showInRule && !e.warning && !flagCodes.has(e.code)).map((e) => e.code);
   const rendered = codeLines().map((l) => /^- `([^`]+)`/.exec(l)[1]);
 
   assert.deepEqual(rendered, [...own, '*_NOT_ENABLED'],
@@ -149,4 +151,50 @@ test('criterion 2 — the wizard states the code and never a second remedy', () 
   assert.match(line, /AUTHENTICATION_FAILED/, 'the line does not name the code');
   assert.ok(!/\.\/snowarch instance (set-credentials|test)/.test(line),
     'the wizard grew a remedy of its own — it belongs in the registry');
+});
+
+// ARC-09-C101 (a) — the caller reads the warnings. A write that succeeded with `warnings[]` is not a
+// runtime error (stop, never retry, wait): the record exists. It has its own section in the rule file,
+// one sentence the owner worded, and a line per warning code, rendered from the registry.
+const OWNERS_SENTENCE = 'A result with `warnings[]` is reported to the user, each warning in full, '
+  + 'before anything else is done; the correcting modify is its own write and needs its own "write approved".';
+
+function warningsSection(text = read(RULE)) {
+  const from = text.indexOf('## Warnings');
+  assert.notEqual(from, -1, 'the warnings section is gone');
+  const rest = text.slice(from + 3);
+  const to = rest.indexOf('\n## ');
+  const section = to === -1 ? text.slice(from) : text.slice(from, from + 3 + to);
+  // The trailing "Long form" pointer is not part of the section.
+  return section.split('\n\nLong form:')[0];
+}
+
+test('ARC-09-C101 — the one rule sentence is the owner\'s, character for character', () => {
+  assert.equal(WARNINGS_RULE, OWNERS_SENTENCE, 'the generator\'s sentence is not the one the owner approved');
+  assert.ok(warningsSection().split('\n').includes(OWNERS_SENTENCE),
+    'the rule file does not carry the sentence on a line of its own');
+});
+
+test('ARC-09-C101 — the section has a line per warning code, and each remedy is the registry\'s', () => {
+  const c = contract();
+  const warnings = c.errorCodes.filter((e) => e.warning);
+  assert.deepEqual(warnings.map((e) => e.code).sort(), ['FIELD_NOT_STORED', 'VALUE_TRUNCATED']);
+  assert.ok(warnings.every((e) => e.showInRule), 'a warning that is not rule-visible is one nobody is told about');
+  const lines = warningsSection().split('\n').filter((l) => /^- `[A-Z_]+`/.test(l));
+  assert.deepEqual(lines.map((l) => /^- `([^`]+)`/.exec(l)[1]).sort(), warnings.map((e) => e.code).sort());
+  for (const e of warnings) {
+    const l = lines.find((x) => x.startsWith(`- \`${e.code}\``));
+    assert.ok(l.includes(onPage(e.remedy)), `${e.code}: the rule file paraphrases the registry`);
+  }
+});
+
+test('ARC-09-C101 — warnings are not runtime errors: not in that list, and not under its instructions', () => {
+  const s = runtimeSection();
+  for (const code of ['VALUE_TRUNCATED', 'FIELD_NOT_STORED']) {
+    assert.ok(!s.includes(code), `${code} is in the runtime-errors section, under "stop, never retry, wait"`);
+  }
+  const text = read(RULE);
+  assert.ok(text.indexOf('## Warnings') > text.indexOf('## Runtime errors'), 'the warnings section comes after the runtime errors');
+  // And the section does not borrow the error framing: a warning never arrives as `(Code: X)`.
+  assert.ok(!warningsSection().includes('(Code:'), 'the warnings section talks about an error code');
 });

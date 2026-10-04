@@ -505,17 +505,26 @@ describe('11 — every code the server can throw has a meaning and a remedy', ()
     //                           correct move is to tell the user which command to run. A session
     //                           that "helpfully" edited a credential file to make a version number
     //                           match is the failure these two exist to prevent.
+    //   the two warnings        ARC-09-C101: VALUE_TRUNCATED and FIELD_NOT_STORED arrive on a write
+    //                           that SUCCEEDED, so a session that does not read `warnings[]` never
+    //                           learns the record exists cut. They sit under their own heading in
+    //                           the rule file, not in the runtime-errors list (`warning: true`).
     const expected = [
       'ATF_NOT_ENABLED', 'AUTHENTICATION_FAILED', 'CMDB_WRITE_NOT_ENABLED', 'CONNECTION_REFUSED',
-      'CONNECTION_TIMEOUT', 'DNS_FAILURE', 'FLUENT_NOT_ENABLED', 'FLUENT_NOT_INSTALLED',
+      'CONNECTION_TIMEOUT', 'DNS_FAILURE', 'FIELD_NOT_STORED', 'FLUENT_NOT_ENABLED', 'FLUENT_NOT_INSTALLED',
       'INSTANCE_NOT_LOADED',
       'INSUFFICIENT_PRIVILEGES', 'NOW_ASSIST_NOT_ENABLED', 'NO_INSTANCE_CONFIGURED',
       'PROD_WRITE_NOT_ACKNOWLEDGED', 'PROXY_AUTH_REQUIRED', 'PROXY_UNREACHABLE',
       'SCRIPTING_NOT_ENABLED', 'STORE_SCHEMA_NEWER', 'STORE_SCHEMA_OUTDATED',
-      'TLS_CA_UNTRUSTED', 'UNKNOWN_TOOL', 'WRITE_NOT_ENABLED',
+      'TLS_CA_UNTRUSTED', 'UNKNOWN_TOOL', 'VALUE_TRUNCATED', 'WRITE_NOT_ENABLED',
     ];
     const actual = ERROR_CODES.filter((e) => e.showInRule).map((e) => e.code as string).sort();
     expect(actual).toEqual(expected);
+    // The warnings are exactly the entries flagged `warning`, and a warning is rule-visible: a flag
+    // that is set on a code the rule file does not show would be a warning nobody is told about.
+    expect(ERROR_CODES.filter((e) => 'warning' in e).map((e) => e.code as string).sort())
+      .toEqual(['FIELD_NOT_STORED', 'VALUE_TRUNCATED']);
+    expect(ERROR_CODES.filter((e) => 'warning' in e).every((e) => e.showInRule)).toBe(true);
     // And the contract carries the same set — the rule file renders from THAT, so a `dist/` that
     // is one compile behind would render yesterday's section from today's registry.
     expect(CONTRACT.errorCodes.filter((e: { showInRule: boolean }) => e.showInRule)

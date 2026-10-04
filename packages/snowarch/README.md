@@ -314,6 +314,12 @@ once at start-up.
 instance URL — the label identifies the instance, and this file ends up in tickets. **Refusals are
 recorded** with their code; non-mutating tools append nothing.
 
+**A write that came back with warnings carries them.** `"warnings":[{"code":"VALUE_TRUNCATED","table":"sys_script","fields":["name"],"count":1}]`
+— the code, the table, the field names and a count, never a value. `result` stays `ok` for a write that
+succeeded, or is the error code for a tool that failed after it wrote; `warnings` says what else happened. A
+line without it is not proof that nothing was cut: `docs/PLATFORM-NOTES.md` PN-10 lists the writes the
+check does not see.
+
 **`query` is recorded and can contain personal data** — `caller_id=…`, a name in a `LIKE` filter. It
 is the filter that selected the records, so a line without it answers nothing. If that is not
 acceptable for an engagement, set `SNOW_AUDIT_FILE=off`, or point it outside the checkout.
@@ -365,7 +371,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `ENOTFOUND` | as `DNS_FAILURE`: check the host in the store |
 | `ENV_REQUIRED` | pass `--env pdi|dev|test|prod`. Only `devNNNNN.service-now.com` hosts are recognised as PDIs, and the environment decides the preset a write is checked against — guessing it is the one thing this wizard will not do |
 | `ETIMEDOUT` | as `CONNECTION_TIMEOUT` |
-| `FIELD_NOT_STORED` | read the record back with `snow_scr_business_rule_read`; if the field is not set, set it with a modify rather than adding the record again, and if the record is active set `active` to false first. If it is set, the response did not echo it: the column names are not documented in the bundled corpus, so check them on the instance |
+| `FIELD_NOT_STORED` | read the record back; if the field is not set, set it with a modify rather than adding the record again, and if the record is active set `active` to false first. If it is set, the response did not echo it: the column names are not documented in the bundled corpus, so check them on the instance |
 | `FLAG_DEPENDENCY_VIOLATION` | decide which one was meant: turn WRITE on, or turn the dependent flag off. Neither is guessable from the store, so this is never repaired automatically |
 | `FLAGS_INCOMPLETE` | state every flag explicitly by re-applying a preset — the review screen shows what changes before anything is written |
 | `FLUENT_ERROR` | the message carries the SDK output |

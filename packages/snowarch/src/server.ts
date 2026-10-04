@@ -25,10 +25,12 @@ import { collectToolCatalog } from './tools/index.js';
 import { getResources, readResource } from './resources/index.js';
 import { logger } from './utils/logging.js';
 import { toolErrorText } from './utils/tool-error.js';
+import { summariseWarnings, warningsOfResult } from './audit/warnings.js';
+import { carriedWarnings } from './servicenow/stored-values.js';
 import { ServiceNowError } from './utils/errors.js';
 import { getPackageVersion } from './utils/version.js';
 import { capResult, resolveCap } from './utils/result-size.js';
-import { appendAudit, auditDisabled, resolveAuditPath } from './audit/writer.js';
+import { appendAudit, auditDisabled, resolveAuditPath, type AuditWarning } from './audit/writer.js';
 import type { ToolDefinition } from './tools/types.js';
 
 // dotenv ONLY when asked, and only for a file that exists. A bare `dotenv.config()` reads
@@ -95,6 +97,9 @@ export function createServer(): Server {
     let auditTool: ToolDefinition | undefined;
     let auditResult = 'ok';
     let auditSysId: string | null = null;
+    // What the call came back with besides its result (ARC-09-C101): a write that stored a cut value
+    // is not a plain `ok`. Codes, table, field names and a count, summarised by `audit/warnings.ts`.
+    let auditWarnings: AuditWarning[] = [];
     // The instance as it was when the call STARTED. It matters for exactly one tool: after
     // snow_core_instance_switch has run, `current()` is the destination, so reading it at the
     // end produced `instance: "other", note: "switch -> other"` — which says the same thing
@@ -130,6 +135,7 @@ export function createServer(): Server {
         // knowingly — see the writer's header and the README.
         query: session ? null : (str(a.query) ?? str(a.sysparm_query)),
         result: auditResult,
+        ...(auditWarnings.length > 0 ? { warnings: auditWarnings } : {}),
         ms: Math.round(performance.now() - started),
         source: 'mcp',
         // Free text built from SERVER-side state, never from the arguments.
@@ -202,6 +208,7 @@ export function createServer(): Server {
       // response body never reaches the line.
       const created = (result as { sys_id?: unknown })?.sys_id;
       if (typeof created === 'string') auditSysId = created;
+      auditWarnings = summariseWarnings(warningsOfResult(result));
       writeAudit();
 
       const capped = capResult(result, cap);
@@ -214,6 +221,8 @@ export function createServer(): Server {
       logger.error(`Tool execution error: ${name}`, error);
 
       auditResult = error instanceof ServiceNowError ? error.code : 'ERROR';
+      // A tool that wrote and then failed: the failure is the headline, the cut it left is the rest.
+      auditWarnings = summariseWarnings(carriedWarnings(error));
       writeAudit();
 
       // Includes a sentence about cut values when the tool had already written some before it threw

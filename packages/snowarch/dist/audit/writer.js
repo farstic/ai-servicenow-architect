@@ -5,6 +5,10 @@
  * from a conversation transcript — which the reviewer asking the question does not have. The
  * audit file is what makes the claim checkable afterwards by someone who was not there.
  *
+ * A write that succeeded but came back with warnings (a value the platform stored cut, a field it did
+ * not keep) carries them as `warnings` — the codes, the table, the field names and a count, built by
+ * `audit/warnings.ts` and never a value (ARC-09-C101).
+ *
  * What a line may NOT contain is the whole design. Never a payload: `fields`, `data`, `script`
  * and the response body are all excluded, because an audit trail that records what was written
  * becomes a second copy of client data sitting in a git checkout. Never a credential. Never an
