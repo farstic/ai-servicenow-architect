@@ -147,7 +147,9 @@ describe('dispatchDiscoveryAction', () => {
   });
 
   it('falls back to a record probe when sys_dictionary is empty, and says so', async () => {
+    // Three reads, in order: the table hierarchy (ARC-09-C98), the dictionary, the record probe.
     (mockClient.queryRecords as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ count: 0, records: [] })
       .mockResolvedValueOnce({ count: 0, records: [] })
       .mockResolvedValueOnce({ count: 1, records: [{ sys_id: 'abc', name: 'x', ip_address: '10.0.0.1' }] });
 
@@ -164,6 +166,7 @@ describe('dispatchDiscoveryAction', () => {
 
   it('a table that is in neither is NOT_FOUND', async () => {
     (mockClient.queryRecords as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ count: 0, records: [] })
       .mockResolvedValueOnce({ count: 0, records: [] })
       .mockResolvedValueOnce({ count: 0, records: [] });
     await expect(dispatchDiscoveryAction(mockClient, 'snow_disco_table_discover', { table: 'nope' }))

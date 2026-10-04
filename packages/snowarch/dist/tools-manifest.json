@@ -9911,7 +9911,7 @@
   },
   {
     "name": "snow_disco_table_discover",
-    "description": "Read a ServiceNow table schema and return its columns (element, type, label, max_length, mandatory, reference, read_only, default_value). Use the result to build calls to snow_core_records_query / snow_core_record_read / snow_core_record_add. Schemas are cached for 30 minutes.",
+    "description": "Read a ServiceNow table schema and return its columns (element, type, label, max_length, mandatory, reference, read_only, default_value), including the columns the table inherits from the tables it extends. max_length is null when the dictionary states none: unknown, not a default. A result that is not the whole schema (the hierarchy was unreadable, or the table is very wide) carries a note saying so and is not cached. Use the result to build calls to snow_core_records_query / snow_core_record_read / snow_core_record_add. Schemas are cached for 30 minutes, per instance.",
     "inputSchema": {
       "type": "object",
       "properties": {

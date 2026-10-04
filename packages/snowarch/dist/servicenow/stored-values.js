@@ -62,7 +62,8 @@ export function findCuts(sent, stored) {
 }
 /** Table and column names that are safe to put in an encoded query. Anything else is "unknown". */
 const IDENT = /^[a-z][a-z0-9_]*$/i;
-function parseLimit(raw) {
+/** The dictionary's `max_length` as a limit; null when it states none (blank, 0, not a whole number). */
+export function parseLimit(raw) {
     const n = typeof raw === 'number' ? raw : typeof raw === 'string' && /^\s*\d+\s*$/.test(raw) ? Number(raw) : NaN;
     return Number.isInteger(n) && n > 0 ? n : null;
 }
