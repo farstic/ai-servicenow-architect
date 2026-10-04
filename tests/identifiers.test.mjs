@@ -17,6 +17,16 @@ const HAS_CORPUS = existsSync(join(CORPUS, 'markdown'));
 
 // The allow-list's size by reason. A change here is a decision about the roster, made in review.
 const EXPECTED = { 'example-field': 28, 'payload-key': 21, 'example-role': 3, 'script-variable': 5, 'example-name': 51 };
+// The excuses the real roster rests on, by kind (sites), and the absent names written only in capitals
+// or in mixed case. A new member of either is a decision made in review, as a new allow-list entry is:
+// the marker covers its whole line, and a platform name retyped in capitals is never looked at.
+const EXCUSES = { tool: 6, marker: 7, proposed: 3, glob: 5, glued: 1, placeholder: 4 };
+const CAPITALS = {
+  constant: ['AT_RISK', 'BODY_SHA256', 'CMDB_WRITE', 'FLAG_DEPENDENCY_VIOLATION', 'GET_TICKET', 'NOW_ASSIST',
+    'POST_CLOSE_TICKET', 'POST_TICKET', 'PRESET_FLAGS_MISMATCH', 'PUT_TICKET', 'REST_OUT', 'WAR_ROOM'],
+  mixed: ['Discovery_Custom', 'System_Ext'],
+};
+const kinds = (r) => r.excused.reduce((a, e) => (e.by === 'allow-list' ? a : { ...a, [e.by]: (a[e.by] ?? 0) + 1 }), {});
 
 // A fixture corpus small enough to read: two `cmdb_ci_cloud_` names (a family), one `cmdb_ci_lone_`
 // name (a family of one), five `sn_demo.` names (a namespace), a glued label, and the tables a
@@ -62,6 +72,16 @@ test('tier 1: the marker on the line and a contract tool pass; the marker on ano
   assert.deepEqual(names(ok), []);
   const bad = run(fixture(t, `Use \`sn_cone_silent\`.\n(${MARKER})\n`));
   assert.deepEqual(names(bad), ['sn_cone_silent']);
+  // The marker covers its line, so a second name rides along; the trace shows it, and the real-tree
+  // test holds the count of marker sites.
+  const two = run(fixture(t, `Use \`sn_cone_silent\` and \`sn_ride_along\` (${MARKER}).\n`));
+  assert.deepEqual(two.excused.filter((e) => e.by === 'marker').map((e) => e.identifier), ['sn_cone_silent', 'sn_ride_along']);
+});
+
+test('capitalised and mixed-case absent names are listed by spelling, not looked at as platform claims', (t) => {
+  const r = run(fixture(t, 'Flags `SN_DEMO_SHOUTED` and `Sn_Demo_Mixed`, and the corpus name `SYS_USER`.\n'));
+  assert.deepEqual(names(r), []);
+  assert.deepEqual(r.capitals, { constant: ['SN_DEMO_SHOUTED'], mixed: ['Sn_Demo_Mixed'] });
 });
 
 test('tier 1: a name declared PROPOSED once covers its file; no phrase, no pass', (t) => {
@@ -70,6 +90,11 @@ test('tier 1: a name declared PROPOSED once covers its file; no phrase, no pass'
   assert.deepEqual(r.unexcused.map((u) => `${u.file}:${u.line} ${u.identifier}`), ['.claude/skills/fy/SKILL.md:1 sn_demo_new_table'],
     'the declaration covers its own file and no other');
   assert.deepEqual(names(run(fixture(t, 'Proposed table: `sn_demo_new_table` (proposed).\n'))), ['sn_demo_new_table'], 'the phrase is exact');
+  // It declares the name it is attached to, and no other name on its line.
+  const after = run(fixture(t, `Proposed: \`sn_demo_new_table\` (${PROPOSED}; supersedes \`sn_demo_wrong_table\`).\n`));
+  assert.deepEqual(names(after), ['sn_demo_wrong_table']);
+  const before = run(fixture(t, `\`sn_demo_wrong_table\` is replaced by \`sn_demo_new_table\` (${PROPOSED}).\n`));
+  assert.deepEqual(names(before), ['sn_demo_wrong_table']);
 });
 
 test('an example-field entry may name a table its file declares PROPOSED, and no other platform table', (t) => {
@@ -227,6 +252,27 @@ test('the real roster against the bundled corpus: nothing unexcused, nothing sta
   assert.equal(r.status, 'ok');
   assert.match(formatIdentifiers(r).text, /^identifiers: checked \d+ \| unexcused 0$/m);
   assert.equal(PLATFORM_PREFIXES.length, 36);
+  assert.deepEqual(kinds(r), EXCUSES);
+  assert.deepEqual(r.capitals, CAPITALS);
+});
+
+test('a ride-along on a marker line, and a platform name retyped in capitals, each move what the real-tree test holds', (t) => {
+  if (!HAS_CORPUS) { t.skip('the plant needs the bundled corpus; this cell has none'); return; }
+  const dir = tempDir('c81-ride-', t);
+  cpSync(join(ROOT, '.claude'), join(dir, '.claude'), { recursive: true });
+  const hr = join(dir, '.claude', 'skills', 'hrsd-specialist', 'SKILL.md');
+  const text = readFileSync(hr, 'utf8');
+  assert.ok(text.includes('- `employment_status` (Choice'), 'the marker line this plant edits');
+  writeFileSync(hr, text.replace('- `employment_status` (Choice', '- `employment_status` and `sn_hr_core_wrong_table_y` (Choice'));
+  const csm = join(dir, '.claude', 'skills', 'csm-specialist', 'SKILL.md');
+  writeFileSync(csm, `${readFileSync(csm, 'utf8')}\nAlso \`SN_CUSTOMERSERVICE_CONTRACT\` and \`Sn_Entitlement_Condition\`.\n`);
+  const r = verifyIdentifiers({ root: dir, corpusDir: CORPUS, index: realIndexOnce() });
+  assert.deepEqual(r.unexcused, [], 'the guard alone lets all three through');
+  assert.deepEqual(kinds(r), { ...EXCUSES, marker: EXCUSES.marker + 1 }, 'the ride-along is one more marker site');
+  assert.deepEqual(r.capitals, {
+    constant: [...CAPITALS.constant, 'SN_CUSTOMERSERVICE_CONTRACT'].sort(),
+    mixed: [...CAPITALS.mixed, 'Sn_Entitlement_Condition'].sort(),
+  });
 });
 
 test('the regression this guards: `sn_customerservice_contract` back in the CSM skill fails', (t) => {

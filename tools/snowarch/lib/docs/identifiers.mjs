@@ -30,10 +30,13 @@ export const MARKER = 'not documented in the bundled corpus — verify on the in
 
 /**
  * The phrase that declares an example's own proposal under a platform name — a table proposed in a
- * module's baseline scope, which the platform would name `sn_<module>_…`. One line carrying it with
- * the name declares that name for the whole file; no phrase, no pass.
+ * module's baseline scope, which the platform would name `sn_<module>_…`. It declares only the name
+ * it is attached to — the one written immediately before it, with at most a closing backtick, spaces
+ * and an opening parenthesis between (`` `sn_x_y` (proposed — not baseline) ``) — and that one
+ * declaration covers the name's other sites in the file. Another name on the line gets nothing.
  */
 export const PROPOSED = 'proposed — not baseline';
+const DECLARED = new RegExp(`([A-Za-z0-9]+(?:_[A-Za-z0-9]+)+)\`?\\s*\\(?\\s*${PROPOSED}`, 'gi');
 
 /** First segments that make an absent name a claim about the platform. Each must begin a corpus name. */
 export const PLATFORM_PREFIXES = Object.freeze([
@@ -111,8 +114,7 @@ export function scanRoster(root) {
     const file = relative(root, abs).split(sep).join('/');
     const body = readFileSync(abs, 'utf8');
     texts.set(file, body);
-    proposed.set(file, new Set(body.split(/\r?\n/).filter((l) => l.toLowerCase().includes(PROPOSED))
-      .flatMap((l) => [...l.matchAll(TOKEN)].map((m) => m[0].toLowerCase()))));
+    proposed.set(file, new Set([...body.matchAll(DECLARED)].map((m) => m[1].toLowerCase())));
     body.split(/\r?\n/).forEach((text, i) => {
       const line = i + 1;
       const spans = [];
@@ -244,7 +246,7 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
   const reasons = reasonCounts(list);
   const corpus = resolve(root, corpusDir);
   if (!index && !existsSync(join(corpus, 'markdown'))) {
-    return { status: 'missing', checked: 0, classes: null, unexcused: [], excused: [], stale: [], deadPrefixes: [], allowErrors, reasons };
+    return { status: 'missing', checked: 0, classes: null, capitals: null, unexcused: [], excused: [], stale: [], deadPrefixes: [], allowErrors, reasons };
   }
   const words = new Set();
   for (const t of roster.tokens.values()) for (const s of t.sites) if (s.on && !s.on.includes('_')) words.add(s.on);
@@ -279,6 +281,10 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
   const excused = roster.placeholders.map((p) => ({ ...p, by: 'placeholder' }));
   const pass = (s, identifier, by) => excused.push({ file: s.file, line: s.line, identifier, by });
   const classes = { found: 0, custom: 0, constant: 0, mixed: 0, absent: 0, qualified: 0, qualifiedAbsent: 0 };
+  // Absent names written only in capitals, or in mixed case, are not looked at as platform claims —
+  // `CMDB_WRITE` is snowarch's own flag — so they are listed by spelling, and the real-tree test holds
+  // the set: a platform name retyped in capitals arrives as a new member, decided in review.
+  const capitals = { constant: [], mixed: [] };
 
   for (const [whole, sites] of roster.qualified) {
     if (!qualifies(whole)) continue;
@@ -295,6 +301,7 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
     if (!sites.length) continue;
     const cls = classOf(low, t.spellings, idx.has);
     classes[cls] += 1;
+    if (cls === 'constant' || cls === 'mixed') capitals[cls].push(...t.spellings);
     if (cls !== 'absent') continue;
     // A snowarch tool is snowarch's name, not the platform's: the contract answers for it, in either tier.
     if (toolSet.has(low) || gluedOk.has(low)) {
@@ -329,7 +336,8 @@ export function verifyIdentifiers({ root = process.cwd(), corpusDir = 'vendor/Se
   return {
     status: bad ? 'fail' : 'ok',
     checked: classes.found + classes.custom + classes.constant + classes.mixed + classes.absent + classes.qualified,
-    classes, unexcused, excused, stale, deadPrefixes, allowErrors, reasons,
+    classes, capitals: { constant: [...new Set(capitals.constant)].sort(), mixed: [...new Set(capitals.mixed)].sort() },
+    unexcused, excused, stale, deadPrefixes, allowErrors, reasons,
   };
 }
 
