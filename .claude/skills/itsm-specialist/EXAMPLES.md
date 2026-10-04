@@ -304,7 +304,7 @@ This request touches change approval routing, change risk, frozen periods and ap
 
 ### Frozen periods / change windows
 
-- Baseline supports `cmn_schedule` records with blackout windows. The baseline `Change Schedule` script include can check whether a proposed `start_date`/`end_date` overlaps a blackout window.
+- Baseline supports `cmn_schedule` records with blackout windows. "Conflict detection uses blackout and maintenance schedules to find potential scheduling conflicts for the configuration items (CIs) associated with a change request" *(citation: `markdown/it-service-management/change-management/t_CreateBlkoutMaintSched.md`)*.
 - *(citation: `markdown/it-service-management/change-management/reference-change-management.md`)*
 - Conflict detection writes its result on the change: `conflict_status` holds the "Current conflict status as detected by the conflict detection script, such as Conflict and Not Run" *(citation: `markdown/api-reference/rest-apis/change-management-api.md`)*. A decision can read it.
 
@@ -394,7 +394,7 @@ Do not dispatch Technical Designer or Flow Designer Specialist until the Chief A
 - **Do not write one approval branch per scenario in the flow.** One Apply Change Approval Policy action per step generates the approvals *(citation: `markdown/it-service-management/change-management/use-apply-change-approval-policy-flow-activity.md`)*.
 - **Do not set the approval fields on the change by hand.** "You do not need to set the approval fields on the change request manually" *(same citation)*.
 - **Do not duplicate `change_request.risk`** — the decisions read it.
-- **Do not duplicate baseline blackout-window checks** — the decisions read `conflict_status`, or the flow calls the baseline `ChangeSchedule` Script Include.
+- **Do not duplicate baseline blackout-window checks** — the decisions read `conflict_status`, which conflict detection sets *(citation: `markdown/it-service-management/change-management/t_CreateBlkoutMaintSched.md`)*; a script that needs the check itself calls the baseline `ChangeCollisionHelper` script include of the Collision Detector plugin (`getBlackoutsByDate`, `isDateInCiMaintenanceWindows`) *(citation: `markdown/api-reference/server-api-reference/c_ChangeCollisionHelperAPI.md`)*.
 - **Do not store PCI scope anywhere but `cmdb_ci`** — the decisions read it through the change's CI.
 
 ## Open Questions
