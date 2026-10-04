@@ -334,25 +334,15 @@ Before any specialist may be dispatched, §1.1 requires honest evaluation. This 
 
 2. Custom object proposed (smallest viable scope):
 
-   Smallest-scope candidate: **One new child table extending `sn_hr_core_profile`, in the baseline `sn_hr_core` scope, with fields grouped to enable table-level ACLs per sensitivity tier — not 12 field-level ACLs.**
-
-   Actually, smallest scope considering the three sensitivity tiers may require **two new child tables**, one per restricted tier (emergency contacts are baseline — Part 2):
-   - `sn_hr_core_profile_mobility` (proposed — not baseline) — passport, work-permit (Mobility COE access)
-   - `sn_hr_core_profile_security` (proposed — not baseline) — security clearance level + expiry (Security COE access)
-   - emergency contacts stay in baseline `sn_hr_core_contact` — no third table
-
-   Hierarchy position (§1.1 preference order):
-   - Field on baseline table (12 fields): rejected — ACL complexity is the failure mode, not storage
-   - New child table (1) with 12 fields + complex per-field ACLs: rejected — same failure mode
-   - **Two new child tables (one per restricted tier) in baseline `sn_hr_core` scope**: PROPOSED — each table gets ONE table-level ACL per tier, simpler and harder to misconfigure
-   - New top-level table in scoped app: not justified — `sn_hr_core` scope is appropriate
-   - New scoped app: not justified
+   - Objects: two new tables, one per restricted tier — `sn_hr_core_profile_mobility` (proposed — not baseline) and `sn_hr_core_profile_security` (proposed — not baseline). Emergency contacts stay in the baseline `sn_hr_core_contact` (Part 2), so there is no third table.
+   - Kind and place in the §1.1 hierarchy: new tables extending a baseline table, in the baseline `sn_hr_core` scope — the "acceptable" rung. Fields on the baseline profile were weighed first and rejected: access by sensitivity tier is the failure mode, not storage. A top-level table or a new scoped app is not justified.
+   - What they would hold, in the request's words: "passport number, work-permit expiry" for the Mobility COE, and "security-clearance level and expiry" for the Security COE, "stored separately from the main `sn_hr_core_profile`".
 
 3. Consequences of approval:
-   - **Data model:** two new child tables in `sn_hr_core` scope, whose namespace a table in that scope begins with *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*. Each is a 1:1 extension of `sn_hr_core_profile`, joined by `profile` reference.
+   - **Data model:** two new child tables in `sn_hr_core` scope, whose namespace a table in that scope begins with *(citation: `markdown/application-development/r_ExampleNamespaceIdentifiers.md`)*. Each extends the baseline profile.
    - **Deployment:** ships in HRSD update set; no new scoped app cadence.
    - **Support cost:** medium — two new tables to administer; ACLs simpler than 12-field ACL design but still three patterns to maintain.
-   - **Platform-upgrade risk:** medium — child of baseline `sn_hr_core_profile`. Upgrade risk if ServiceNow ships its own sensitive-data-extension pattern in a future release (currently no announced roadmap).
+   - **Platform-upgrade risk:** medium — the tables extend a baseline table. Upgrade risk if ServiceNow ships its own sensitive-data-extension pattern in a future release (currently no announced roadmap).
    - **Compliance:** opens explicit conversation with engagement's HR-data-protection officer / DPO. Passport storage is in scope for GDPR / country-specific laws — encryption-at-rest may be required (separate Security & GRC consult).
 
 4. Alternatives if rejected:

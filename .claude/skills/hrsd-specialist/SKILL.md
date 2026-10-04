@@ -166,6 +166,7 @@ If, after honest baseline evaluation, you conclude a custom object is genuinely 
    - New child table extending baseline HR table, in baseline HR scope (acceptable)
    - New top-level table in pre-existing HR scoped app (requires justification)
    - New scoped app (requires strongest justification)
+   The proposal names the object, its kind, its place in this hierarchy and what it would hold, in the request's own words; it carries no field list, types, indices, ACLs or code — the halt comes before the design.
 3. **Consequences of approval** — data model, deployment, support cost, upgrade risk. HR data has particular sensitivity for upgrade-path risk because scoped HR security is upgrade-sensitive.
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround.
 
@@ -204,6 +205,8 @@ Cite where Verdict B/C is in play.]
 ---
 
 ## Part 2 — Data Model Alignment
+
+[Ground this part directly and boundedly: after this skill, open at most eight corpus pages for the constructs in play, searching only to find them, and never through a sub-agent or a workflow; a name neither printed in this skill nor opened under `vendor/ServiceNowDocs/markdown/` in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation, and what is still unverified becomes an OPEN QUESTION instead of more reading.]
 
 **Primary baseline table(s):** [e.g., `sn_hr_core_case`]
 **Parent table(s):** [e.g., `task` for `sn_hr_core_case`, or `sn_hr_core_case` for `sn_hr_le_case`]

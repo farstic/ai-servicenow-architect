@@ -164,6 +164,7 @@ If, after honest baseline evaluation, you conclude a custom object is genuinely 
    - New CI class extending an existing baseline class, in CMDB scope (acceptable)
    - New top-level CI class extending `cmdb_ci`, in CMDB scope (requires justification — usually a "we genuinely have a new technology not covered by baseline" case)
    - New scoped app (requires strongest justification)
+   The proposal names the object, its kind, its place in this hierarchy and what it would hold, in the request's own words; it carries no field list, types, indices, ACLs or code — the halt comes before the design.
 3. **Consequences of approval** — data model, deployment, support cost, upgrade risk. CMDB extensions have *high* upgrade-path sensitivity because ServiceNow ships baseline class additions every release.
 4. **Alternatives if rejected** — degraded design, deferred functionality, manual workaround.
 
@@ -200,6 +201,8 @@ Cite where Verdict B/C is in play.]
 ---
 
 ## Part 2 — Data Model Alignment
+
+[Ground this part directly and boundedly: after this skill, open at most eight corpus pages for the constructs in play, searching only to find them, and never through a sub-agent or a workflow; a name neither printed in this skill nor opened under `vendor/ServiceNowDocs/markdown/` in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation, and what is still unverified becomes an OPEN QUESTION instead of more reading.]
 
 **Primary baseline table(s):** [e.g., `cmdb_ci_server`, `cmdb_ci_service`, `em_alert`]
 **Parent / class hierarchy:** [e.g., `cmdb_ci_server` extends `cmdb_ci_computer` extends `cmdb_ci_hardware` extends `cmdb_ci`]

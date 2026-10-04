@@ -93,7 +93,7 @@ You stop and return a `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` blocking questi
 
 - The source material (Technical Designer specs, prior HLDs) proposes a custom table, custom scoped application, custom state-model extension, custom Connection & Credential Alias, or any other major custom architectural object that does NOT have traceable approval in the source spec's Baseline-first audit block OR in your dispatch envelope's `Pre-approved custom objects` section.
 
-Structure the blocking question as: (1) baseline option evaluated and why insufficient (from the source spec's reasoning, or your own evaluation if absent), (2) custom object proposed at smallest viable scope, (3) consequences of approval, (4) alternatives if rejected.
+Structure the blocking question as: (1) baseline option evaluated and why insufficient (from the source spec's reasoning, or your own evaluation if absent), (2) custom object proposed at smallest viable scope (named, with its kind, its place in the hierarchy and what it would hold — no field list, types, indices, ACLs or code), (3) consequences of approval, (4) alternatives if rejected.
 
 Do NOT silently default to documenting the custom object as accepted. The orchestrator will resolve the escalation with the user, then re-dispatch with an updated envelope if approved. Full rule: `governance/governance-rules.md`, taxonomy §1.1.
 

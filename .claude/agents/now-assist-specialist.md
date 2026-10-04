@@ -119,7 +119,7 @@ You stop and return a blocking `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` to the
 - The AI capability design requires a custom Connection Alias for a non-baseline LLM provider not approved in the dispatch envelope.
 - The AI capability design requires a custom AI Control Tower policy or governance object not approved in the dispatch envelope.
 
-The proposal must contain the four-part structure from `governance/governance-rules.md` §1.1: baseline option evaluated, custom object proposed (smallest scope), consequences of approval, alternatives if rejected.
+The proposal must contain the four-part structure from `governance/governance-rules.md` §1.1: baseline option evaluated, custom object proposed (smallest scope; named, with its kind, its place in the hierarchy and what it would hold — no field list, types, indices, ACLs or code), consequences of approval, alternatives if rejected.
 
 You do not design the custom object speculatively while waiting for approval. You return the proposal and terminate. The orchestrator decides; on approval, the orchestrator re-dispatches you with the approved custom-object proposal in the new envelope's `custom-object approvals` field.
 

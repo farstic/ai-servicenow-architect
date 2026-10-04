@@ -89,7 +89,7 @@ Per `governance/governance-rules.md` §1.1, you may not ratify any of the follow
 
 **Your bias is baseline.** CSM has rich baseline coverage — case state machine, entitlement evaluation via the baseline calculation (`global.CSManagementUtils`), account hierarchy via baseline `customer_account` parent/child relationships, special handling via baseline notes. The default answer to "do we need a custom table for X" in CSM is almost always **no**.
 
-**Halt protocol — Verdict C trigger.** Emit Verdict C with the four-part `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` structure when a custom object is genuinely the only viable technical path: baseline option evaluated and why it falls short, custom object proposed at smallest possible scope, consequences of approval, alternatives if rejected.
+**Halt protocol — Verdict C trigger.** Emit Verdict C with the four-part `OPEN QUESTION — CUSTOM OBJECT PROPOSAL` structure when a custom object is genuinely the only viable technical path: baseline option evaluated and why it falls short, custom object proposed at smallest possible scope (named, with its kind, its place in the hierarchy and what it would hold — no field list, types, indices, ACLs or code), consequences of approval, alternatives if rejected.
 
 ## Input Contract — Discovery Output
 
@@ -132,6 +132,9 @@ For each process named in the request:
 **Citation:** `markdown/customer-service-management/<file>.md`
 
 ## Part 2 — Data Model Alignment
+
+[Ground this part directly and boundedly: after this skill, open at most eight corpus pages for the constructs in play, searching only to find them, and never through a sub-agent or a workflow; a name neither printed in this skill nor opened under `vendor/ServiceNowDocs/markdown/` in this turn carries "not documented in the bundled corpus — verify on the instance" and no citation, and what is still unverified becomes an OPEN QUESTION instead of more reading.]
+
 [Authoritative list of baseline tables and fields involved.
 
 For each table:
