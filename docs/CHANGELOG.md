@@ -59,6 +59,15 @@ worked example were corrected with it.
 - The licensing specialist prices a custom table in the corpus's terms: the custom table entitlements of
   the subscription the table is mapped to, rather than "App Engine units", which the bundled documentation
   does not use. A question about App Engine units still reaches it.
+- The ITSM gateway's change-approval example weighs the baseline Change approval policies. Its request
+  names a custom table, so the verdict stays C, and the halt now recommends the policy: one decision per
+  scenario, and one flow action per approval step. The ITSM skill names the policy as the baseline for
+  change approvals.
+- The HLD template's process-flow figure is an SVG exported from a draw.io source, as every delivered
+  figure is, rather than a Mermaid block.
+- The Now Assist specialists search the documentation under both names it uses. The bundled
+  documentation titles the product family "ServiceNow Otto" on most pages and "Now Assist" on others; the
+  specialists use the client's naming in deliverables.
 
 ### Changed
 
