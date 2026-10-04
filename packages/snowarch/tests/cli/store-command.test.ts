@@ -28,6 +28,7 @@ import {
 import {
   CURRENT_SCHEMA_VERSION, listBackups, type Migration,
 } from '../../src/store/migrations/index.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * A pending migration for the CLI to be about.
@@ -86,7 +87,7 @@ function write(body: unknown): void {
 }
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'snowarch-store-cli-'));
+  dir = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-store-cli-')));
   checkout = join(dir, 'repo');
   mkdirSync(join(checkout, '.local'), { recursive: true, mode: 0o700 });
   store = join(checkout, '.local', 'instances.json');

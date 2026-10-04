@@ -60,7 +60,7 @@ beforeAll(async () => {
       }],
     },
   );
-  caDir = mkdtempSync(join(tmpdir(), 'snowarch-audit-ca-'));
+  caDir = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-audit-ca-')));
   caPath = join(caDir, 'fixture-ca.pem');
   writeFileSync(caPath, pems.cert);
 

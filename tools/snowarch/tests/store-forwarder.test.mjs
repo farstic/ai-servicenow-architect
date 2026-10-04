@@ -19,11 +19,12 @@ import { USAGE, storeCommand } from '../lib/store.mjs';
 import { COMMANDS } from '../lib/cli.mjs';
 import { EXIT_OK, EXIT_PREREQ } from '../lib/exit.mjs';
 import { recorder } from './helpers/workspace.mjs';
+import { trackTempDir } from './helpers/temp.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const fakeRoot = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'store-forwarder-'));
+  const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'store-forwarder-')));
   writeFileSync(join(dir, 'engine.config.json'), JSON.stringify({
     docs: { pin: 'a'.repeat(40), family: 'australia', areasFile: 'vendor/docs-areas.txt', upstream: 'x' },
     mcp: { serverKey: 'servicenow', packageDir: 'packages/snowarch' },

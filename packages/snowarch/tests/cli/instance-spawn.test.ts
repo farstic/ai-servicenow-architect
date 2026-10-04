@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { EXIT_CODES, labelExists } from '../../src/cli/instance.js';
 import { NO_INSTANCE_MESSAGE } from '../../src/no-instance.js';
 import { cliSpelling } from '../../src/cli/tty.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-C31 slice 3 — DERIVED, and named for the package that prints it.
@@ -73,7 +74,7 @@ describe('the built CLI', () => {
   });
 
   it('exits 3 on the production policy without touching the network or the store', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spawn-store-'));
+    const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'spawn-store-')));
     try {
       const store = join(dir, 'instances.json');
       const r = run(['instance', 'add', 'prod-acme', '--url', 'https://acme.service-now.com',
@@ -98,7 +99,7 @@ describe('the built CLI', () => {
   });
 
   it('runs `list` now, and prints the empty-store sentence rather than a story name', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'spawn-list-'));
+    const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'spawn-list-')));
     try {
       const r = run(['instance', 'list'], { SNOW_STORE: join(dir, 'instances.json') });
       expect(r.status).toBe(0);

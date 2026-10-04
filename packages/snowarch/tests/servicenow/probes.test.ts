@@ -11,6 +11,7 @@ import {
 } from '../../src/servicenow/probes.js';
 import { instanceSchema } from '../../src/store/schema.js';
 import { fakeRest, networkFailure } from '../helpers/fake-rest.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-S03 — the probes, and the requests they must not make.
@@ -207,7 +208,7 @@ describe('probeCapability — criterion 4', () => {
   });
 
   it('FLUENT is `not installed` in a tree without the package, and `ok` with one', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'fluent-'));
+    const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'fluent-')));
     try {
       // A temp directory with no `@servicenow/sdk` anywhere above it, and an `npm root -g` that
       // answers a directory which does not contain it either.

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
   KEEP, MAX_BYTES, appendAudit, auditDisabled, resetAuditWarning, resolveAuditPath, tailAudit,
 } from '../../src/audit/writer.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 const isWindows = process.platform === 'win32';
 
@@ -19,7 +20,7 @@ const entry = (over: Record<string, unknown> = {}) => ({
 const lines = (p: string): string[] => readFileSync(p, 'utf8').split('\n').filter((l) => l !== '');
 
 beforeEach(() => {
-  base = mkdtempSync(join(tmpdir(), 'snowarch-audit-'));
+  base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-audit-')));
   resetAuditWarning();
   vi.stubEnv('SNOW_AUDIT_FILE', join(base, 'audit.jsonl'));
 });

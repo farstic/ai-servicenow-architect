@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { removeTempDir, reapServerChildren, trackServerChild } from '../helpers/server-child.js';
+import { reapServerChildren, removeTempDir, trackServerChild, trackTempDir } from '../helpers/server-child.js';
 
 /**
  * The teardown guard itself, tested against the failure it exists to prevent.
@@ -35,7 +35,7 @@ afterEach(() => {
 
 describe('reapServerChildren', () => {
   it('a child that keeps writing after SIGTERM is still gone, and its directory can be removed', async () => {
-    const base = mkdtempSync(join(tmpdir(), 'snowarch-reap-'));
+    const base = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-reap-')));
     bases.push(base);
     const { pid } = stubborn(base);
     // A transport is not needed to test the reap — only the pid it would have handed over.

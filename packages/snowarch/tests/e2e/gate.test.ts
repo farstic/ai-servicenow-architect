@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { LIVE, liveConfig } from './env.js';
 import { findSecret, redact, secretForms } from './redact.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-S11, AC 1 — the live suite is SKIPPED in an ordinary run, and reaches that decision
@@ -31,7 +32,7 @@ describe('AC 1 — no live case runs, and no request is made, without the gate',
   });
 
   it('the reporter says SKIPPED, not passed — and the fetch stub was never called', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'e2e-gate-'));
+    const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'e2e-gate-')));
     try {
       // `fetch` replaced before anything imports, through `--import`: vitest's CLI has no
       // `--setupFiles` flag in this version, and a config file would need its own root resolution.

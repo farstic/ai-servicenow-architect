@@ -26,11 +26,11 @@
  *      (`tests/lib/temp-sites.mjs`). It fails on the NEXT bare site, before there is a run that
  *      leaks, and names the file and the line.
  *
- * WHAT THIS DOES NOT COVER, said here so nobody reads the scan as wider than it is:
- * `tools/snowarch/tests/` (apart from its `helpers/`) and `packages/snowarch/tests/` are separate
- * trees with their own bare sites and are not scanned — see the ARC-09-C80 row. `ROOTS` below is the
- * one line that widens it. And a directory made by PRODUCT code that a test imports or spawns is not
- * a spelling in a test file at all; case 1 and a whole-suite count against a private TMPDIR cover it.
+ * WHAT THIS DOES NOT COVER, said here so nobody reads the scan as wider than it is: a directory made
+ * by PRODUCT code that a test imports or spawns is not a spelling in a test file at all; case 1 and a
+ * whole-suite count against a private TMPDIR cover it. (ARC-09-C96 widened `ROOTS` to
+ * `tools/snowarch/tests/` and `packages/snowarch/tests/`, the two trees C80 left out; each had its own
+ * bare sites, and `fixture-cleanup.test.mjs` is exempt by file, with its reason, below.)
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -178,7 +178,19 @@ test('control — the listing sees a directory a test file leaves behind, under 
  * `tools/snowarch/tests/helpers` is here because 67 files in `tests/` import from it, so a bare site
  * added there would be everyone's — and it is the one place the sanctioned spelling is DEFINED.
  */
-const ROOTS = ['tests', 'tools/snowarch/tests/helpers'];
+const ROOTS = ['tests', 'tools/snowarch/tests', 'packages/snowarch/tests'];
+
+/**
+ * Files exempt as a whole, each with the reason. Narrower than it looks to be wide: a file listed here
+ * must still contain a bare site (the next case fails on a dead entry), so the exemption cannot outlive
+ * the reason for it.
+ */
+const EXEMPT_FILES = [
+  {
+    file: 'tools/snowarch/tests/fixture-cleanup.test.mjs',
+    reason: 'it tests the helper itself: it needs bare directories to prove what the helper removes and what it reports when a removal fails',
+  },
+];
 
 /**
  * Sites that are allowed, each with the reason. `needle` is a substring of the line, never a line
@@ -191,6 +203,11 @@ const EXEMPT = [
     needle: 'assert.equal(tmpdir(), privateTmp',
     reason: 'the case is ABOUT the temp location: it re-points TMPDIR and asserts os.tmpdir() followed',
   },
+  {
+    file: 'packages/snowarch/tests/cli/instance-global.test.ts',
+    needle: 'realGlobalStore.startsWith(tmpdir())',
+    reason: 'the case asks where the temp location is only to assert the real global store is NOT under it; it makes no directory there',
+  },
 ];
 
 /** Files the walk must have seen — a walk that quietly dropped a tree would report nothing and pass. */
@@ -200,6 +217,9 @@ const SENTINELS = [
   'tests/upgrade/plan-agrees.test.mjs',
   'tests/helpers/docs-fixture.mjs',
   'tools/snowarch/tests/helpers/temp.mjs',
+  'tools/snowarch/tests/cli.test.mjs',
+  'packages/snowarch/tests/doctor/doctor.test.ts',
+  'packages/snowarch/tests/helpers/server-child.ts',
 ];
 
 /** Every source file under `ROOTS`, minus data. */
@@ -229,16 +249,25 @@ test('ARC-09-C80 — no file under tests/ makes a temp directory outside the tra
   // the sanctioned form was found in most of them. The numbers sit within about 10% of what the tree
   // holds, so losing a tenth of the files or of the calls fails here instead of passing quietly.
   for (const sentinel of SENTINELS) assert.ok(names.includes(sentinel), `the walk never reached ${sentinel}`);
-  assert.ok(files.length > 125, `only ${files.length} source file(s) scanned — the walk is wrong`);
+  assert.ok(files.length > 245, `only ${files.length} source file(s) scanned — the walk is wrong`);
   const tracked = files.filter((f) => countCalls(readFileSync(f, 'utf8'), ['tempDir', 'trackTempDir'], f) > 0);
-  assert.ok(tracked.length > 64, `the tracked helper is called in only ${tracked.length} file(s) — `
+  assert.ok(tracked.length > 108, `the tracked helper is called in only ${tracked.length} file(s) — `
     + 'the parser stopped seeing the sanctioned form');
 
-  const bad = files.flatMap((f) => violations(rel(f), readFileSync(f, 'utf8'), EXEMPT));
+  const bad = files.filter((f) => !EXEMPT_FILES.some((e) => e.file === rel(f)))
+    .flatMap((f) => violations(rel(f), readFileSync(f, 'utf8'), EXEMPT));
   assert.deepEqual(bad.map((v) => `${v.file}:${v.line}  ${v.text}`), [],
     `${bad.length} site(s) make a temp directory outside tempDir()/trackTempDir(). Use `
     + 'tempDir(prefix, t) from tools/snowarch/tests/helpers/temp.mjs — it removes the directory when '
     + 'the test ends, passing or failing, and again at exit.');
+});
+
+test('every file exemption still holds a bare site, and says why (ARC-09-C96)', () => {
+  for (const e of EXEMPT_FILES) {
+    const sites = violations(e.file, readFileSync(join(root, e.file), 'utf8'), []);
+    assert.ok(sites.length > 0, `${e.file} has no bare site left: remove the exemption`);
+    assert.ok(e.reason.split(/\s+/).length >= 6, `${e.file}: an exemption without a reason a person could argue with`);
+  }
 });
 
 test('every exemption still exempts a site (a dead entry is a decision nobody is reading)', () => {

@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createLogger } from '../lib/log.mjs';
 import { register, reset } from '../lib/redact.mjs';
+import { tempDir } from './helpers/temp.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const isWindows = process.platform === 'win32';
@@ -14,8 +14,8 @@ const isWindows = process.platform === 'win32';
 /** A sink that records what a logger wrote, so the assertions are on bytes rather than on intent. */
 const sink = () => { const lines = []; return { write: (s) => lines.push(s), lines }; };
 
-test('every line goes through redaction — console and file alike', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-log-'));
+test('every line goes through redaction — console and file alike', (t) => {
+  const dir = tempDir('snowarch-log-', t);
   try {
     reset();
     const secret = `${'pw'}-${'q'.repeat(10)}`;
@@ -35,8 +35,8 @@ test('every line goes through redaction — console and file alike', () => {
   } finally { reset(); rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('the log file is opened lazily — a command that says nothing leaves nothing', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-log-'));
+test('the log file is opened lazily — a command that says nothing leaves nothing', (t) => {
+  const dir = tempDir('snowarch-log-', t);
   try {
     const log = createLogger({ command: 'quiet-one', logRoot: dir, out: sink(), err: sink() });
     assert.equal(log.logFile, null);
@@ -44,8 +44,8 @@ test('the log file is opened lazily — a command that says nothing leaves nothi
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('the log file is 0600', { skip: isWindows ? 'POSIX permissions' : false }, () => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-log-'));
+test('the log file is 0600', { skip: isWindows ? 'POSIX permissions' : false }, (t) => {
+  const dir = tempDir('snowarch-log-', t);
   try {
     const log = createLogger({ command: 'perm', logRoot: dir, out: sink(), err: sink() });
     log.step('something');
@@ -53,8 +53,8 @@ test('the log file is 0600', { skip: isWindows ? 'POSIX permissions' : false }, 
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('rotation keeps the last ten', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-log-'));
+test('rotation keeps the last ten', (t) => {
+  const dir = tempDir('snowarch-log-', t);
   try {
     const logs = join(dir, '.local', 'logs');
     mkdirSync(logs, { recursive: true });
@@ -69,8 +69,8 @@ test('rotation keeps the last ten', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('--quiet silences the console and still writes the file', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-log-'));
+test('--quiet silences the console and still writes the file', (t) => {
+  const dir = tempDir('snowarch-log-', t);
   try {
     const out = sink(); const err = sink();
     const log = createLogger({ command: 'q', logRoot: dir, quiet: true, out, err });
@@ -82,14 +82,14 @@ test('--quiet silences the console and still writes the file', () => {
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('a read-only checkout logs to the console and does not fail the command', () => {
+test('a read-only checkout logs to the console and does not fail the command', (t) => {
   // The log root is an existing FILE, so `mkdir <file>/.local/logs` throws on every platform
   // (ENOTDIR here, ENOENT on Windows) with no dependency on permissions. An unwritable *path*
   // was the obvious fixture and the wrong one: `/nonexistent- -path` is only unwritable for an
   // unprivileged user, and the Windows runner — Administrator, drive-relative — created
   // `C:\nonexistent- -path` and logged into it happily. The fixture has to make the failure,
   // not assume the environment supplies one.
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-ro-'));
+  const dir = tempDir('snowarch-ro-', t);
   try {
     const notADir = join(dir, 'read-only-checkout');
     writeFileSync(notADir, '');
@@ -106,8 +106,8 @@ test('a read-only checkout logs to the console and does not fail the command', (
 });
 
 test('AC 3 - the launcher refuses without Node, and with Node below the floor',
-  { skip: isWindows ? 'the POSIX launcher; snowarch.cmd is ARC-06-S11' : false }, () => {
-    const dir = mkdtempSync(join(tmpdir(), 'snowarch-launcher-'));
+  { skip: isWindows ? 'the POSIX launcher; snowarch.cmd is ARC-06-S11' : false }, (t) => {
+    const dir = tempDir('snowarch-launcher-', t);
     try {
       const binDir = join(dir, 'bin');
       mkdirSync(binDir, { recursive: true });

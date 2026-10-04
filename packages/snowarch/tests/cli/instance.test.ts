@@ -22,6 +22,7 @@ import { loadStore, saveStore } from '../../src/store/index.js';
 import type { Store } from '../../src/store/schema.js';
 import { fakeRest } from '../helpers/fake-rest.js';
 import { scriptedTty } from '../helpers/scripted-tty.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-S05 — `instance add`, and every way it ends without saving.
@@ -41,7 +42,7 @@ const PASSWORD = ['pw', '-', 'first'].join('');
 const OTHER_PASSWORD = ['pw', '-', 'second'].join('');
 
 const workspace = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'instance-add-'));
+  const dir = trackTempDir(mkdtempSync(join(tmpdir(), 'instance-add-')));
   return { dir, store: join(dir, 'instances.json'), cleanup: () => rmSync(dir, { recursive: true, force: true }) };
 };
 

@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { HANDSHAKE_TIMEOUT_MS, handshake } from '../../src/doctor/checks.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-06 acceptance, B06-02 and B06-04's child half — the handshake against a server that never
@@ -49,7 +50,7 @@ const DEADLINE_MS = 1_500;
 
 /** Every pid this file started, so a control that deliberately lingers cannot outlive the run. */
 const started: number[] = [];
-const scratch = mkdtempSync(join(tmpdir(), 'handshake-timeout-'));
+const scratch = trackTempDir(mkdtempSync(join(tmpdir(), 'handshake-timeout-')));
 
 /**
  * Point the stub at a fresh marker path, run the handshake, and REFUSE to draw any conclusion if

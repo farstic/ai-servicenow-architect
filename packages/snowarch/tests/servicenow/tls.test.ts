@@ -10,6 +10,7 @@ import type { AddressInfo } from 'node:net';
 import selfsigned from 'selfsigned';
 import { resetHttpDispatcher, snFetch } from '../../src/servicenow/http.js';
 import { classifyNetworkError } from '../../src/servicenow/net-errors.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * A TLS-intercepting corporate gateway, reproduced locally.
@@ -71,7 +72,7 @@ beforeAll(async () => {
     },
   );
 
-  dir = mkdtempSync(join(tmpdir(), 'snowarch-tls-'));
+  dir = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-tls-')));
   caPath = join(dir, 'fixture-ca.pem');
   writeFileSync(caPath, pems.cert);
 

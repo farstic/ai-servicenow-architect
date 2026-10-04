@@ -1,9 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync,
-  writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs, helpText, COMMANDS, main } from '../lib/cli.mjs';
@@ -23,6 +21,7 @@ const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 import { EXIT_OK, EXIT_USAGE } from '../lib/exit.mjs';
 import { contractSha, cwdNote, loadConfig, version } from '../lib/config.mjs';
 import { stateRootInUse, useStateRoot } from './helpers/state-root.mjs';
+import { tempDir } from './helpers/temp.mjs';
 /*
  * ARC-07-C43 head 2 — THIS SUITE RUNS THE REAL CLI, so its `.local/` goes somewhere else.
  *
@@ -204,8 +203,8 @@ test('version --json is the shape the doctor will read', () => {
   assert.equal(typeof o.docsFamily, 'string');
 });
 
-test('an unbuilt checkout says so rather than printing a stale sha', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-cli-'));
+test('an unbuilt checkout says so rather than printing a stale sha', (t) => {
+  const dir = tempDir('snowarch-cli-', t);
   try {
     writeFileSync(join(dir, 'engine.config.json'), readFileSync(join(repoRoot, 'engine.config.json')));
     // Precondition: the whole point is the ABSENT file.
@@ -434,7 +433,7 @@ test('ARC-07-C31 — the unknown-command line spells the reader\'s launcher too'
  * at all, found it in one run.
  */
 test('ARC-07-C33 — a read-only command writes no log file, and a writing one still does', (t) => {
-  const dir = mkdtempSync(join(tmpdir(), 'snowarch-nofile-'));
+  const dir = tempDir('snowarch-nofile-', t);
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const sink = { write: () => true };
 

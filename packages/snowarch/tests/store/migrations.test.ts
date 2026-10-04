@@ -18,6 +18,7 @@ import {
 } from '../../src/store/migrations/index.js';
 import { STORE_VERSION } from '../../src/store/schema.js';
 import { cliSpelling } from '../../src/cli/tty.js';
+import { trackTempDir } from '../helpers/server-child.js';
 
 /**
  * ARC-07-C31 slice 3 — the launcher these cases assert, DERIVED, and named for the package that
@@ -106,7 +107,7 @@ const read = () => JSON.parse(readFileSync(store, 'utf8'));
 const mode = (p: string) => statSync(p).mode & 0o777;
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'snowarch-migrate-'));
+  dir = trackTempDir(mkdtempSync(join(tmpdir(), 'snowarch-migrate-')));
   store = join(dir, 'instances.json');
   write(v1Store());
 });
