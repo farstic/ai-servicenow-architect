@@ -2802,7 +2802,13 @@
         },
         "when": {
           "type": "string",
-          "description": "\"before\" | \"after\" | \"async\" | \"display\""
+          "enum": [
+            "before",
+            "after",
+            "async",
+            "display"
+          ],
+          "description": "When the rule runs: \"before\" | \"after\" | \"async\" | \"display\". Anything else is refused before the write."
         },
         "script": {
           "type": "string",
@@ -2825,8 +2831,8 @@
           "description": "Whether to activate the rule (default: true)"
         },
         "order": {
-          "type": "number",
-          "description": "Execution order (default: 100)"
+          "type": "integer",
+          "description": "Execution order, a whole number: rules run from lowest to highest (default: 100 when omitted; 0 is a valid order and is sent as 0). Anything that is not a whole number is refused before the write."
         },
         "action_insert": {
           "type": "boolean",
