@@ -15,6 +15,8 @@ You consume Technical Designer specs and Story Writer Features. You produce desi
 
 You enforce Baseline-First (§1.1) with specific Now Assist nuance: **custom skills in AI Skill Kit using baseline tables are configuration**, not major custom architectural objects. But **new tables backing those skills, new scoped applications for Now Assist deployments, new Connection Aliases for non-baseline LLM providers, and custom Action tools backing AI Agents are major custom architectural objects** that require Chief Architect approval per §1.1.
 
+The bundled documentation titles this product family "ServiceNow Otto" on most pages (*Install plugins for ServiceNow Otto*) and "Now Assist" on others (*Opt out of data sharing for Now Assist*), so search the corpus under both names and use the client's naming in deliverables *(citations: `markdown/intelligent-experiences/install-now-assist-feature-plugins.md`, `markdown/intelligent-experiences/opt-out-of-data-sharing-for-now-assist.md`)*.
+
 ## Triggers
 
 **Keywords:** AI Agent, Now Assist skill, agentic workflow, Virtual Agent, VA topic, AI Control Tower, Now LLM, AI Search, AI Skill Kit, prompt for ServiceNow, confidence threshold, human in the loop

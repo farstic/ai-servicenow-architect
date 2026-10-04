@@ -695,8 +695,9 @@ export const AUDIT_PATTERNS = [
     why: 'the claude.ai project model; in Claude Code the firewall is folder discipline (CLAUDE.md §10)' },
   // The fetch with the corpus named on its line, in any of the ways it has been named. A `tools:` line
   // names no corpus, so the agents' tool lists pass: integration-specialist needs WebFetch for a
-  // counterparty's API documentation, which is not the corpus.
-  { id: 'corpus-webfetch', scope: ['.claude/', ...ALWAYS_READ],
+  // counterparty's API documentation, which is not the corpus. `window: 2` also reads a sentence the
+  // wrap split over two lines ("Use WebFetch to read" / "the ServiceNowDocs page") — see `oneSentence`.
+  { id: 'corpus-webfetch', scope: ['.claude/', ...ALWAYS_READ], window: 2,
     test: (l) => /github\.com\/ServiceNow\/ServiceNowDocs/i.test(l)
       || (/\bweb ?fetch\b/i.test(l)
         && /ServiceNowDocs|\bcorpus\b|servicenow\.com\/docs|\b(?:Australia|ServiceNow) (?:release |product )?documentation\b/i.test(l)),
@@ -744,22 +745,36 @@ export const AUDIT_ALLOW = [
 
 const inAuditScope = (file, scope) => scope.some((s) => (s.endsWith('/') ? file.startsWith(s) : file === s));
 
+// Two lines are read as one sentence only when the first does not end one and the second does not
+// start a new block — a list item, heading, table row, fence, quote or frontmatter key. Two sentences
+// that merely sit on adjacent lines ("WebFetch is for the counterparty API." / "Grep the corpus.")
+// stay two, and so does an agent's `tools:` line and the key under it.
+const oneSentence = (a, b) => b.trim() !== '' && !/[.!?]\s*$/.test(a.trim())
+  && !/^\s*(?:[-*+]\s|\d+\.\s|#|\||```|>|[A-Za-z][\w-]*:\s)/.test(b);
+
 /** The sweep, as a function over a file list and a reader, so the planted fixture runs THIS code. */
 export function findAuditRegressions({ files, read: readFile, patterns = AUDIT_PATTERNS, allow = AUDIT_ALLOW }) {
   const hits = [];
   for (const f of files) {
     const mine = patterns.filter((p) => inAuditScope(f, p.scope));
     if (mine.length === 0) continue;
-    readFile(f).split('\n').forEach((line, i) => {
+    const lines = readFile(f).split('\n');
+    lines.forEach((line, i) => {
       for (const p of mine) {
-        if (!p.test(line)) continue;
+        // A two-line pattern reads the line with the next one when the two are one sentence, and only
+        // when neither matches alone — so a hit is reported once, on the line where it starts.
+        const next = lines[i + 1] ?? '';
+        const pair = `${line} ${next}`;
+        const text = p.test(line) ? line
+          : p.window === 2 && oneSentence(line, next) && !p.test(next) && p.test(pair) ? pair : null;
+        if (text === null) continue;
         // An exemption excuses its own SENTENCE, not the line it sits on. The pattern is tested again
         // with the exempted text taken out, and the line passes only when what remains is clean — so
         // an old fetch written into the same step, beside the sentence, is still a hit.
-        const excused = allow.some((a) => a.file === f && a.id === p.id && line.includes(a.context)
-          && !p.test(line.split(a.context).join(' ')));
+        const excused = allow.some((a) => a.file === f && a.id === p.id && text.includes(a.context)
+          && !p.test(text.split(a.context).join(' ')));
         if (excused) continue;
-        hits.push(`${f}:${i + 1}: [${p.id}] ${line.trim().slice(0, 80)} — ${p.why}`);
+        hits.push(`${f}:${i + 1}: [${p.id}] ${text.trim().slice(0, 80)} — ${p.why}`);
       }
     });
   }
@@ -849,6 +864,18 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
         + `say so instead of recalling it. ${AUDIT_ALLOW[0].context}`,
     ].join('\n'));
     plant('.claude/agents/story-writer.md', AUDIT_ALLOW[0].context);
+    // The fetch the wrap split over two lines is one hit, on its first line; two sentences on adjacent
+    // lines, two list items, and a frontmatter key under `tools:` are not a sentence and stay quiet.
+    plant('.claude/skills/integration-specialist/SKILL.md', [
+      'Use WebFetch to read',
+      'the ServiceNowDocs page for the API.',
+      'WebFetch is for the counterparty API.',
+      'Grep the corpus for the table.',
+      '- Use WebFetch for the counterparty API',
+      '- Read the corpus with Grep',
+      'tools: Read, Write, Edit, Glob, Grep, WebFetch',
+      'description: reads the corpus locally',
+    ].join('\n'));
 
     const files = ['.claude/agents/atf-author.md', 'governance/governance-rules.md', '.claude/agents/developer.md',
       '.claude/skills/story-writer/SKILL.md', 'CLAUDE.md', '.claude/skills/diagramming-specialist/SKILL.md',
@@ -858,7 +885,7 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
       '.claude/skills/technical-designer/SKILL.md', '.claude/skills/technical-designer/EXAMPLES.md',
       '.claude/skills/now-assist-specialist/EXAMPLES.md', '.claude/skills/hld-lld-writer/EXAMPLES.md',
       '.claude/rules/00-mode-and-mcp-gate.md', 'templates/hld-template.md', 'tests/VALIDATION-TESTS.md',
-      '.claude/skills/developer/SKILL.md', 'docs/CONTRIBUTING.md'];
+      '.claude/skills/developer/SKILL.md', 'docs/CONTRIBUTING.md', '.claude/skills/integration-specialist/SKILL.md'];
     const readAt = (f) => readFileSync(join(dir, f), 'utf8');
     const hits = findAuditRegressions({ files, read: readAt });
     const at = (rel, id) => hits.filter((h) => h.startsWith(`${rel}:`) && h.includes(`[${id}]`)).length;
@@ -898,6 +925,8 @@ test('ARC-09-C78 — a planted token per pattern fails, and the exemption suppre
     assert.deepEqual(hits.filter((h) => h.startsWith('.claude/agents/integration-specialist.md:')).map((h) => h.split(':')[1]),
       ['2', '3'], 'the exemption must pass line 1 only — line 3 carries the old fetch beside the exempted sentence');
     assert.equal(at('.claude/agents/story-writer.md', 'corpus-webfetch'), 1, 'an exemption anchored to one file excused another');
+    assert.deepEqual(hits.filter((h) => h.startsWith('.claude/skills/integration-specialist/SKILL.md:')).map((h) => h.split(':')[1]),
+      ['1'], 'a fetch split over two lines was not seen once, or two sentences on adjacent lines were read as one');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
