@@ -979,6 +979,52 @@ warns rather than fails, because the fix is prose. One token is deliberately lef
 security skill names `servicenow-platform/security/` as the path ACLs are *not* under. A citation
 quoted to be contradicted must stay wrong.
 
+## ServiceNow names
+
+A cited page that exists does not make the names around it real. `docs verify` also reads every
+snake_case name in `.claude/skills/**` and `.claude/agents/*.md` and looks it up, whole, in the bundled
+corpus (`tools/snowarch/lib/docs/identifiers.mjs`, ARC-09-C81). It prints
+`identifiers: checked N | unexcused M` beside the citation line and fails on any unexcused name. A name
+whose first segment is one of the 36 declared platform namespaces (`sn`, `cmdb`, `sys`, `sc`, …) is a
+claim about the platform, and the corpus not having it passes only as:
+
+- **the corpus's own name** — replace it, and cite the page that names it;
+- **a snowarch tool** — read from the contract, never from a list;
+- **the marker** — `not documented in the bundled corpus — verify on the instance` on the same line,
+  for a platform object the cone does not document;
+- **a family** — written `<stem>_*`, over at least two corpus names beginning `<stem>_`;
+- **a glued name** — in the allow-list's `glued` list, where the corpus prints it fused to its label;
+  the check confirms the page still does;
+- **a declared proposal** — an example's own object under a platform name, such as a table proposed
+  in a module's baseline scope (which the platform names `sn_<module>_…`), declared once in its file by
+  `proposed — not baseline` attached to that name — `` `sn_x_y` (proposed — not baseline) `` — which
+  covers the name's other sites in the file and declares no other name on the line;
+- **custom** — an `x_`/`u_` name, a dotted name under one, or a name written straight after the
+  `x_<vendor>_<app>_` placeholder.
+
+Any other absent name also passes with an entry in `tools/snowarch/lib/docs/identifier-allowlist.json`,
+keyed by (file, name), with one of five reasons: `example-field` (naming the example's own table — an
+`x_`/`u_` table, or one its file declares proposed), `payload-key`, `example-role`, `script-variable` or
+`example-name`. A name written on a corpus name — `incident.assigned_at` — is a claim about that table,
+so no reason covers it: it is the corpus's field, the marker, or the example's own prefixed field. This
+rule is strict by design: any word the corpus contains counts as a corpus name on the left of the dot,
+so `payload.error_class` is refused when `error_class` is absent, even though `payload` is a variable.
+The refusal is the rule, not a bug — write the field without the dot, or give it the example's prefix.
+
+The marker covers its whole line, and a name written only in capitals or in mixed case (`CMDB_WRITE`,
+snowarch's own flag) is never looked at as a platform claim. So the real-tree case in
+`tests/identifiers.test.mjs` also holds the excuses the roster rests on, counted by kind, and the set
+of capitalised absent names: a new marker site, a new glob or a platform name retyped in capitals
+fails it, and is accepted or refused in review.
+
+What an example invents lives where its own envelope puts it, one convention per example: in the
+module's baseline scope, under the namespace the platform gives a table there, declared proposed (the
+governance hierarchy's preferred home for a new table, `governance/governance-rules.md` §1.1); in the
+example's scoped app, as `x_`; or in global, as `u_`. A field added to a global table takes `u_`, the
+platform's own prefix there. An entry whose name the corpus gains is stale and fails, so the list
+shrinks unless an example invents something; its size by reason is asserted in
+`tests/identifiers.test.mjs`.
+
 ---
 
 ## The engine's git floor

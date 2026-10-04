@@ -50,6 +50,11 @@ worked example were corrected with it.
   from GitHub; their confidentiality rule is folder discipline under `clients/<name>/`.
 - The Diagramming Specialist delivers every figure as an editable draw.io file with an SVG or PNG export;
   Mermaid is a draft only, and the HLD/LLD Writer takes its figures from it.
+- `./snowarch docs verify` also checks the ServiceNow names the specialists write against the bundled
+  documentation and prints `identifiers: checked N | unexcused M` beside the citation line. A name the
+  documentation does not contain fails it unless it is a snowarch tool, carries the "not documented in the
+  bundled corpus — verify on the instance" marker, is declared "proposed — not baseline" in its example,
+  or is an example's own name excused in the allow-list.
 
 ## 2.0.9 — 2026-10-01
 

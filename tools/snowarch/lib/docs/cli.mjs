@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { syncCorpus, planRecipe, readAreas, inspect, resolveMode, SyncError, EXIT as SYNC_EXIT }
   from './sync.mjs';
 import { verifyCitations, formatResult, EXIT } from './verify.mjs';
+import { verifyIdentifiers, formatIdentifiers } from './identifiers.mjs';
 import { docsStatus, formatStatus } from './status.mjs';
 import { syncUpstream, formatUpstream } from './upstream.mjs';
 import { planFamilySwitch, formatPlan, applyFamilySwitch, EXIT_NEEDS_YES } from './family.mjs';
@@ -121,13 +122,18 @@ export function runDocs(argv, { spell = spellings() } = {}) {
 
   if (cmd === 'verify') {
     const r = verifyCitations({ root, allowMissing: rest.includes('--allow-missing') });
+    // ARC-09-C81: the names the roster writes, beside the pages it cites. Only here, not in the
+    // doctor's E-16 — one walk of every corpus page is a maintainer's gate, not a health check.
+    const ids = verifyIdentifiers({ root });
+    const cites = formatResult(r, spell);
+    const names = formatIdentifiers(ids);
     if (rest.includes('--json')) {
-      console.log(JSON.stringify(r, null, 2));
-      return (formatResult(r, spell).code);
+      console.log(JSON.stringify({ ...r, identifiers: ids }, null, 2));
+      return (cites.code || names.code);
     }
-    const { text, code } = formatResult(r, spell);
-    (code === EXIT.ok ? console.log : console.error)(text);
-    return (code);
+    (cites.code === EXIT.ok ? console.log : console.error)(cites.text);
+    (names.code === EXIT.ok ? console.log : console.error)(names.text);
+    return (cites.code || names.code);
   }
 
   if (cmd === 'family') {
@@ -177,7 +183,7 @@ export function runDocs(argv, { spell = spellings() } = {}) {
     + '     | verify [--allow-missing] [--json]\n'
     + '     | status [--json]\n'
     + '     | family <name> [--dry-run | --yes] [--from <name>] [--json])\n'
-    + '\nexit: 0 ok · 1 incomplete, or the pin moved and citations broke · 2 plan printed, not applied\n'
+    + '\nexit: 0 ok · 1 incomplete, the pin moved and citations broke, or a roster name is unexcused · 2 plan printed, not applied\n'
     + '      3 corpus missing · 4 working tree not clean · 5 git failed · 6 upstream does not have it');
   return (2);
 }
