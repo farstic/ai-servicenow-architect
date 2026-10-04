@@ -105,6 +105,8 @@ export interface CutField {
 }
 /** Every field of `sent` that `stored` holds as a shorter prefix, in the order it was sent. RAW strings, not the normalised ones. */
 export declare function findCuts(sent: Record<string, unknown>, stored: Record<string, unknown>): CutField[];
+/** The dictionary's `max_length` as a limit; null when it states none (blank, 0, not a whole number). */
+export declare function parseLimit(raw: unknown): number | null;
 /**
  * `sys_dictionary.max_length` for columns of ONE table, one request: a map from each field asked
  * about to its limit, or `null` when none can be stated.

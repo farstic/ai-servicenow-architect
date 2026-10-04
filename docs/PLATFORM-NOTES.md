@@ -213,15 +213,25 @@ warning only when the limit fits under code points AND UTF-16 units); that the r
 the stored value; that a platform which ignores an unknown column name does so without an error (the add
 tool checks the response for the two columns it sends — `FIELD_NOT_STORED`).
 
-*Refusal before the write is not built, on purpose* (plan rows ARC-09-C97 and C98). It needs the limit
-before the write, and the only dictionary reader in the server (`snow_disco_table_discover`) defaults a
-blank limit to 255, caches by table without the instance, does not walk inherited columns and reads at
-most 200 columns, so a limit taken from it could refuse a write the platform would have accepted. A
-reader that can be trusted for this is instance-keyed, walks `sys_db_object.super_class`, treats a blank
-or 0 limit as unknown, restricts itself to string-like types, remembers that the dictionary is unreadable
-for this account (it needs the role above), refuses only on a fresh uncached read, and has its own error
-code. The gate to building it is the live run above showing that `max_length` is the point the platform
-cuts at, on the tables callers write most, inherited columns included.
+*Refusal before the write is not built, on purpose* (plan row ARC-09-C97). It needs the limit before the
+write. The only dictionary reader in the server, `snow_disco_table_discover`, used to default a blank
+limit to 255, cache by table without the instance, skip inherited columns and read at most 200 columns,
+so a limit taken from it could have refused a write the platform would have accepted; ARC-09-C98 fixed
+those four. It is now instance-keyed, walks `sys_db_object.super_class`, reports a blank or 0 limit as
+`null` (unknown) and reads every page, and says in a `note`, without caching, when it could not read the
+whole schema. A reader C97 can refuse on still needs what that tool does not do: restrict itself to
+string-like types, remember that the dictionary is unreadable for this account (it needs the role
+above), refuse only on a fresh uncached read, and have its own error code. The gate to building it is
+the live run above showing that `max_length` is the point the platform cuts at, on the tables callers
+write most, inherited columns included.
+
+*Assumed, not documented (the dictionary reader).* That a child table's parent is held in
+`sys_db_object.super_class` and comes back as `{ link, value }` with the parent's `sys_id` as the value
+(the corpus prints that a child extends and inherits from a parent, `platform-administration/table-administration-and-data-management/t_TableHierarchyAndTheExtModel.md`,
+and that a reference comes back as `{ link, value }` by default, `api-reference/rest-apis/c_TableAPI.md`;
+it prints neither the column's name nor which dictionary columns are references); and that a blank
+`max_length` means "not stated" rather than a default (the corpus says only that the value matters for
+String fields, `r_DictionaryEntryForm.md`). Both are checked on the instance, not here.
 
 ## Windows notes — this repository, not ServiceNow
 
