@@ -132,7 +132,7 @@ The Open Questions are real — the request as written has ambiguity in three pl
 > Module: ITSM
 > Volume: ~200K incidents/year
 > Sensitivity: standard ITSM
-> Engagement: BankCo — Service Owners are a defined role (`u_service_owner`, BankCo's own global role), Service Owners are already mapped to `cmdb_ci_service` records via a custom group structure. No current customisations to `incident.priority` or `incident.impact`.
+> Engagement: BankCo — Service Owners are a defined role (`u_service_owner`, BankCo's own global role), Service Owners are already mapped to `cmdb_ci_service` records via a custom group structure. No current customisations to the Priority or Impact fields of `incident`.
 > Release family: Australia
 
 ### Expected gateway output
