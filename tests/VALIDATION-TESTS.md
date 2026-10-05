@@ -1354,9 +1354,18 @@ case in this file, runs each in a session confined to the checkout's own setting
 (`--setting-sources project`), with no MCP server, a fixed tool set (`--tools`) and Sonnet 5.5 unless
 `VALIDATION_MODEL` says otherwise, and prints a header (sha, model, setting sources, tools) and, per turn,
 the skills invoked, the corpus pages read and any cited page that does not exist — a bare file name that
-resolves to one page is reported as BARE, not accepted. It judges nothing: the Pass criteria above do. It
-does not run a case's **Setup** block; T-25 and any other case that has one need it run by hand in the
-clone first.
+resolves to one page is reported as BARE, not accepted. It judges nothing: the Pass criteria above do.
+
+A case's **Setup** block is read by `scripts/validation/setup-plan.mjs` (ARC-09-C106), which says in the
+header which of four things each case's Setup is. **Prose** (T-06, T-13) is context for a person and
+nothing runs. **Files** (T-25): shell that writes under `clients/` is run in the clone before every run of
+the case, after `clients/` has been emptied, so a Setup's state reaches only its own case. **The product's
+own install** (T-07) is the runner's bootstrap, already done. **An instance** (T-19, T-22, T-23) is never
+run: the session has no MCP server, so the case runs as its design-only dormant variant and the header says
+`Setup NOT run`. Only `mkdir`, `touch`, `echo` and `printf` writing plain paths under `clients/` are run;
+any other command, shell syntax the planner does not interpret, or a path outside `clients/` is refused, and
+a refused or failed Setup stops its case (`Setup did not run clean - case not run`) rather than letting it
+fail for the harness's reason.
 
 Record the run under `docs/validation/<date>-<os>.md`, from `docs/validation/TEMPLATE.md`
 (ARC-10-S07). The records already under `docs/spikes/` stay where they are; that path is retired for
