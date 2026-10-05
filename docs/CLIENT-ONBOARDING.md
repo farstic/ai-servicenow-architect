@@ -86,15 +86,24 @@ step 3 costs nothing to maintain.
 
 ## No engagement named yet
 
-Design-only work does not wait for an engagement. A request with no client named is answered in the
-reply as usual — the Constraint Envelope included, with no question about a folder first — and what it
-produces is saved under `clients/_unfiled/`, never in a session scratchpad or a temp directory, which do
-not survive a restart. The reply says where each file went. `clients/` is gitignored as a whole, so
-`_unfiled` cannot be committed any more than an engagement can.
+Design work does not wait for an engagement, in `design-only` and in `live` mode alike. A request with no
+client named is answered in the reply as usual — the Constraint Envelope included, with no question about
+a folder first — and the design artefacts it produces are saved under `clients/_unfiled/`, never in a
+session scratchpad or a temp directory, which do not survive a restart. The reply says where each file
+went. `clients/` is gitignored as a whole, so `_unfiled` cannot be committed any more than an engagement
+can.
+
+`_unfiled` holds design artefacts and nothing else. A change to an instance is recorded in an engagement's
+state file, so in `live` mode, when a session with no engagement named reaches its first write to an
+instance, the Architect asks once — *Which engagement is this for?* — and waits. The answer is the
+engagement in the update-set name (`<engagement>-<topic>`, `governance/mcp-protocols.md` §2.2) and the state
+file the change is recorded in. The Architect never records an instance change under `_unfiled`: that folder
+can hold one client's work next to another's, and a change to a client's instance is the one record that
+has to say whose it is.
 
 When you name the engagement, say which of that work belongs to it: only what this session produced moves
 into `clients/<name>/`, to the folder the artefact belongs in (`designs/`, `stories/`…). Anything else in
-`_unfiled` stays there until you say which engagement it is for — one folder is never the place two
+`_unfiled` stays there until you say which engagement it is for — an engagement's folder is never the place two
 clients' work is mixed.
 
 ## Maintenance

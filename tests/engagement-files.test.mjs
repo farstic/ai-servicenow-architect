@@ -6,7 +6,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * ARC-09-C89, C90, C91 — the three places where an engagement's files are named, filed and numbered.
+ * ARC-09-C89, C90, C91, C105 — the places where an engagement's files are named, filed and numbered, and (C105)
+ * what a live session does about an engagement before its first write.
  *
  * The owner's S09/S10 sittings found that Phase 1 Step 2 read a file onboarding never wrote (R5), that
  * design-only work with no engagement named went to a session scratchpad (R6), and that two artefacts
@@ -172,4 +173,110 @@ test('the list detector sees a bare list, and a coded one passes (so a green run
   assert.deepEqual(bareListItems(coded), []);
   assert.deepEqual(bareListItems(gherkin), [2]);
   assert.deepEqual(bareListItems(outside), []);
+});
+
+// ── C105 — the unfiled home holds design artefacts in live mode too, and never an instance change ──
+//
+// C90 stated the home for design-only work. A live session with no engagement named has the same
+// durability problem, and one more: it can WRITE to an instance, and that write has to be recorded
+// somewhere that names a client. The owner's ruling (the architect's, 2026-10): `clients/_unfiled/`
+// is the home in live mode as well, for design artefacts only; before the first instance write of a
+// session with no engagement named the Architect asks once which engagement it is for and records the
+// change in that engagement's state file; it never records an instance change in `_unfiled`.
+//
+// That is one statement made in four places (CLAUDE.md, the generated rule file, the generated long
+// form, onboarding) that must not drift apart, so the sweep below asserts it of EVERY surface that
+// names the unfiled home, not of the four I happen to know about.
+
+const INSTANCE_CHANGE = /\b(?:instance change|change to an instance)\b/i;
+
+test('C105 — Step 2 files design artefacts in both modes, and files no instance change there', () => {
+  const lines = read('CLAUDE.md').split('\n');
+  const step2 = lines.find((l) => /^2\. \*\*Read engagement context\*\*/.test(l)) ?? '';
+  assert.match(step2, /design artefacts/, 'Step 2 still says "what you produce"');
+  assert.match(step2, /`design-only` and `live` mode alike/, 'Step 2 does not say the home applies in live mode');
+  assert.match(step2, /A change to an instance is never filed there/);
+  // C90's wording must survive: the scratchpad refusal and the reply that says where it went.
+  assert.match(step2, /never a scratchpad or temp directory/);
+  const map = lines.find((l) => l.startsWith('- `clients/<name>/`')) ?? '';
+  assert.match(map, /design artefacts produced before an engagement was named \(never instance changes\)/);
+});
+
+test('C105 — every surface that names the unfiled home also says no instance change is filed there', () => {
+  const naming = [...new Set(hits(/clients\/_unfiled\//).map((h) => h.split(':')[0]))];
+  // Not vacuous: the four places the statement is made. A surface that stopped naming the home would
+  // otherwise drop out of this sweep silently.
+  for (const want of ['CLAUDE.md', '.claude/rules/00-mode-and-mcp-gate.md', 'governance/mcp-protocols.md',
+    'docs/CLIENT-ONBOARDING.md']) {
+    assert.ok(naming.includes(want), `${want} no longer names clients/_unfiled/`);
+  }
+  // In ONE paragraph with the unfiled home, and with a "never": a sentence about instance changes anywhere
+  // else in a file does not say what is filed where.
+  const together = (text) => text.split(/\n\s*\n/)
+    .some((p) => /_unfiled/.test(p) && INSTANCE_CHANGE.test(p) && /\bnever\b/i.test(p));
+  const silent = naming.filter((f) => !together(read(f)));
+  assert.deepEqual(silent, [], 'names the unfiled home without saying, beside it, that an instance change is never filed there');
+});
+
+test('C105 — onboarding: the live-mode paragraph names the question, the update set and the state file', () => {
+  const doc = read('docs/CLIENT-ONBOARDING.md');
+  const section = doc.slice(doc.indexOf('## No engagement named yet'), doc.indexOf('## Maintenance'));
+  assert.match(section, /`design-only` and in `live` mode alike/);
+  assert.ok(section.includes('Which engagement is this for?'), 'the question is not quoted');
+  assert.match(section, /update-set name/);
+  assert.match(section, /state file/);
+  assert.match(section, /never records an instance change under `_unfiled`/);
+});
+
+/** One case of the spec, from its `## T-nn` heading to the next `## ` heading - never the tail of the file. */
+const caseOf = (doc, id) => {
+  const from = doc.indexOf(`## ${id} `);
+  assert.notEqual(from, -1, `${id} is gone`);
+  return doc.slice(from).split(/\n(?=## )/)[0];
+};
+
+test('C105 — T-25 states the live case: question before the update set, nothing recorded in _unfiled', () => {
+  const doc = read('tests/VALIDATION-TESTS.md');
+  const t25 = caseOf(doc, 'T-25');
+  assert.match(t25, /^\*\*Modes:\*\* design-only ✅ · live ✅/m, 'T-25 still says live was not run');
+  assert.ok(t25.includes('### Live variant'), 'T-25 has no live variant');
+  const live = t25.slice(t25.indexOf('### Live variant'));
+  assert.ok(live.includes('Which engagement is this for?'));
+  assert.match(live, /before any\s+`snow_us_active_update_set_ensure`\s+and before the write question/,
+    'the ordering — question, then update set, then the write question — is not stated');
+  assert.match(live, /`clients\/_unfiled\/` holds\s+no record of it/, 'the live case does not forbid filing the change in _unfiled');
+});
+
+test('C105 — T-25: the live variant is the second session, and the design-only half forbids the question', () => {
+  const t25 = caseOf(read('tests/VALIDATION-TESTS.md'), 'T-25');
+  const at = t25.indexOf('### Live variant');
+  assert.match(t25.slice(at), /a\s+second, separate session/);
+  assert.doesNotMatch(t25, /third, separate session/);
+  // The design-only turns run the scripted runner, so THEY are where "no question in design-only" can be checked.
+  const failSignals = t25.slice(t25.indexOf('### Fail signals'), at);
+  assert.ok(failSignals.includes('`Which engagement is this for?` asked in `design-only` mode'),
+    'the design-only Fail signals do not forbid the engagement question');
+});
+
+test('C105 — the live write cases (T-05, T-06, T-23) say the engagement question may come first and is not a write question', () => {
+  const doc = read('tests/VALIDATION-TESTS.md');
+  for (const id of ['T-05', 'T-06', 'T-23']) {
+    const t = caseOf(doc, id);
+    assert.ok(t.includes('`Which engagement is this for?`'), `${id} does not mention the engagement question`);
+    assert.match(t, /not a write question/, `${id} does not say the question is not a write question`);
+  }
+});
+
+test('C105 — the user guide\'s live-write walkthrough mentions the question', () => {
+  const guide = read('docs/USER-GUIDE.md');
+  const from = guide.indexOf('## Scenario 4');
+  const scenario = guide.slice(from, guide.indexOf('### What you receive', from));
+  assert.ok(scenario.length > 500, 'Scenario 4 was not found');
+  assert.ok(scenario.includes('Which engagement is this for?'), 'Scenario 4 never mentions the engagement question');
+});
+
+test('C105 — onboarding: the new sentence and the old one do not contradict each other', () => {
+  const doc = read('docs/CLIENT-ONBOARDING.md');
+  assert.doesNotMatch(doc, /one folder is never the place two\s+clients' work is mixed/);
+  assert.match(doc, /an engagement's folder is never the place two\s+clients' work is mixed/);
 });

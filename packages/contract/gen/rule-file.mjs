@@ -98,6 +98,25 @@ export const APPROVAL_WITH_CAPTURE = 'About to <action> on instance "<label>", a
   + 'update set <name> and pointing capture at it — write approved?';
 
 /**
+ * A session with no engagement named, about to make its first write to an instance (ARC-09-C105).
+ *
+ * `clients/_unfiled/` is where DESIGN artefacts go when no engagement is named (CLAUDE.md Phase 1
+ * Step 2), in `design-only` and `live` mode alike. A change to an instance is not a design artefact:
+ * it is recorded in an engagement's state file, and the §2.2 update-set name (`<engagement>-<topic>`)
+ * cannot be formed without one. So the first mutating call is preceded by one question, asked once.
+ *
+ * Both are literals because they are the owner's wording, and exported so `tests/contract/
+ * no-engagement.test.mjs` can pin them character for character: this sentence is in an always-loaded
+ * file, and the long form (`governance/mcp-protocols.md`) renders the same constants, so the two
+ * cannot disagree.
+ */
+export const NO_ENGAGEMENT_QUESTION = 'Which engagement is this for?';
+export const NO_ENGAGEMENT_RULE = 'With no engagement named, once §2.0 passes for the session\'s first mutating call, '
+  + `ask once — \`${NO_ENGAGEMENT_QUESTION}\` — and wait. The answer is the \`<engagement>\` of the §2.2 update-set `
+  + 'name and the engagement whose state file records the change; a change to an instance is never recorded '
+  + 'under `clients/_unfiled/`.';
+
+/**
  * The one rule sentence for a write that succeeded with warnings (ARC-09-C101) — the owner's wording.
  *
  * It is a literal because it is a judgement about how a session should behave, and it is exported so
@@ -204,6 +223,7 @@ On Windows PowerShell, type \`${spellings({ platform: 'win32', env: {} }).cli}\`
 - Self-approval is prohibited: approval is never inferred from context, urgency or logical flow.
 - Granularity: ${APPROVAL_PER_RECORD}
 - The §2.2 ensure + capture pair is covered by the configuration write's approval ONLY when the question names them: \`${APPROVAL_WITH_CAPTURE}\` Asked bare, each is its own write and gets its own question.
+- ${NO_ENGAGEMENT_RULE}
 
 ## §2.2 — Update-set capture (before every configuration write: Script Include, Business Rule, Client Script, UI Policy, UI Action, ACL, Flow, table or field)
 1. \`${ensure}\` \`{ "name": "<engagement>-<topic>" }\` — returns the in-progress update set created by the authenticated user, creating it if absent.

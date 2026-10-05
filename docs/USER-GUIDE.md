@@ -281,7 +281,7 @@ Australia release.
 
 ### What the engine does — and what it asks you
 
-The engine has already cleared §1.1 (the Script Include touches only baseline tables — `incident`, `task_sla`, `contract_sla`, `sys_user_group`). Before it writes anything, it runs the **two write gates** in order:
+The engine has already cleared §1.1 (the Script Include touches only baseline tables — `incident`, `task_sla`, `contract_sla`, `sys_user_group`). If no engagement is named in the session, it first asks `Which engagement is this for?` — once, and the answer approves nothing; it is the engagement in the Update Set's name (`<engagement>-<topic>`). Before it writes anything, it then runs the **two write gates** in order:
 
 ```mermaid
 flowchart LR

@@ -22,6 +22,7 @@ On Windows PowerShell, type `.\snowarch.cmd` wherever this page says `./snowarch
 - Self-approval is prohibited: approval is never inferred from context, urgency or logical flow.
 - Granularity: N distinct records is N questions, each asked and answered before its own call. A request that enumerates them is the request, not the approval — the same sentence as "the original task description is not approval".
 - The §2.2 ensure + capture pair is covered by the configuration write's approval ONLY when the question names them: `About to <action> on instance "<label>", after ensuring update set <name> and pointing capture at it — write approved?` Asked bare, each is its own write and gets its own question.
+- With no engagement named, once §2.0 passes for the session's first mutating call, ask once — `Which engagement is this for?` — and wait. The answer is the `<engagement>` of the §2.2 update-set name and the engagement whose state file records the change; a change to an instance is never recorded under `clients/_unfiled/`.
 
 ## §2.2 — Update-set capture (before every configuration write: Script Include, Business Rule, Client Script, UI Policy, UI Action, ACL, Flow, table or field)
 1. `snow_us_active_update_set_ensure` `{ "name": "<engagement>-<topic>" }` — returns the in-progress update set created by the authenticated user, creating it if absent.

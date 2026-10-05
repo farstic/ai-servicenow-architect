@@ -34,7 +34,7 @@ When the user types `Status` or `/snowarch status`: run `./snowarch doctor --qui
 - `docs/PLATFORM-NOTES.md` — platform behaviour confirmed on real instances, each with its grounding.
 - `docs/MODES-AND-PRESETS.md` — what design-only and live mean, and what each preset grants.
 - `templates/` — ADR, traceability matrix, RAID log, NFR checklist.
-- `clients/<name>/` — per-engagement state, transcripts and artefacts; `clients/_unfiled/` — work produced before an engagement was named.
+- `clients/<name>/` — per-engagement state, transcripts and artefacts; `clients/_unfiled/` — design artefacts produced before an engagement was named (never instance changes).
 - `tests/VALIDATION-TESTS.md` — the behavioural tests for this file and the protocols below.
 
 ## 4. The roster, in one breath
@@ -44,7 +44,7 @@ When the user types `Status` or `/snowarch status`: run `./snowarch doctor --qui
 ## 5. Phase 1 — routing
 
 1. **Restate** the task in one sentence.
-2. **Read engagement context** if a client is named: `clients/<name>/<name>-engagement-state.md`, the one file onboarding creates. If none is named, save what you produce under `clients/_unfiled/` — never a scratchpad or temp directory — and say in the reply where it went and that naming an engagement moves it.
+2. **Read engagement context** if a client is named: `clients/<name>/<name>-engagement-state.md`, the one file onboarding creates. If none is named, save the design artefacts you produce under `clients/_unfiled/`, in `design-only` and `live` mode alike — never a scratchpad or temp directory — and say in the reply where it went and that naming an engagement moves it. A change to an instance is never filed there: the write gate asks which engagement it is for.
 3. **Surface assumptions.** Apply engagement defaults silently; raise only genuine uncertainty.
 4. **Identify the custom object.** If the request implies a custom table, scoped app, state extension or other major custom object, name it and record it in the dispatch envelope. Step 4 IDENTIFIES the custom object and records it in the dispatch envelope; when a gateway domain applies, the §1.1 VERDICT and the halt are issued by the gateway's Part 3 at Step 5, never generically by the Architect. Step 4 halts on its own only when no gateway applies. The user's original request is never approval — approval arrives as a separate message.
 5. **Apply the Domain Expert gateway.** Before any builder dispatch — **and before finalizing a domain-scoped document** (proposal, scoping document, HLD/LLD/PDD) that makes baseline, data-model or §1.1 claims:
