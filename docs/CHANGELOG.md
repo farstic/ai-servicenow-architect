@@ -9,6 +9,149 @@ All notable changes to this project are documented in this file. Everything hand
 
 ### Notes
 
+**This release makes a write say what the platform stored, and makes the Architect ask which engagement a
+first write to an instance is for.** There is no migration step: an existing checkout keeps its instance
+store, its preset and its flags untouched, and the documentation corpus stays pinned at `68c0d11`. The server
+has the same 397 tools; the error registry gains two codes, `VALUE_TRUNCATED` and `FIELD_NOT_STORED`
+(68 to 70), and both are warnings on a write that succeeded, not errors. The roster is supported on Claude
+Sonnet or a more capable model; smaller models are not supported. One command can change what a script
+sees: `./snowarch upgrade` without `--yes` now stops when its input is closed (below).
+
+**What a user of the MCP tools sees.**
+
+- **A Business Rule is created in one write.** `snow_scr_business_rule_add` takes `filter_condition` (an
+  encoded query) and `advanced` (default true) beside `active`, and sends all three in one POST. The rule
+  never exists without its filter between two calls, and the write gate asks once. `active` and `advanced`
+  must be true or false: the string `"false"` used to create a live rule and is now refused with
+  `INVALID_REQUEST`. `when` must be one of before, after, async or display, and `order` a whole number;
+  an `order` of 0 is sent as 0, where it used to become 100, and 100 is the default only when `order` is
+  omitted.
+- **A write reports a value the platform cut, and the session reports it before anything else.** When the
+  platform answers a write with a string shorter than the one sent, for example a name cut at its column's
+  length, the result carries `warnings`, as its first key, with `VALUE_TRUNCATED`: the field, the lengths
+  sent and stored, the column's limit and whether the dictionary confirmed it. A Business Rule add whose
+  answer does not show the filter or the Advanced switch it sent carries `FIELD_NOT_STORED`. The success
+  line names the name the platform stored. The check covers the record tools, `snow_fluent_request_batch`,
+  the file name of an attachment upload and change requests, and a result carries at most ten warnings, the
+  first nine whole and one roll-up for the rest. The always-loaded rule file tells a session to report each
+  warning in full before it does anything else, and says the correcting modify is its own write with its own
+  "write approved". In `snow_orch_playbook_exec` each step shows its own warnings, and under `on_error:
+  "stop"`, the default, the playbook halts after a step that stored a cut value or returned a warning, with
+  `halted_at_step` and `halt_reason`; `"continue"` and `"skip"` go on. The audit line carries the warning
+  codes, the tables, the field names and a count, never a value.
+  **The premise of this check is not yet confirmed on a live instance.** It assumes that the answer to a
+  write on `sys_script`, and to a PATCH, carries the value the platform stored; that has been seen for one
+  POST on `sys_script_fix`. The names `filter_condition` and `advanced` for the `sys_script` columns are not
+  printed in the bundled corpus, which is what `FIELD_NOT_STORED` exists to catch, and the check can only see
+  a cut that the answer shows. The live run that settles it is in `packages/snowarch/tests/live/README.md`.
+- **A refused request is not retried.** A 403 now fails at once with `INSUFFICIENT_PRIVILEGES` from one
+  request. Before, the same request went out four times with 1 s, 2 s and 4 s between them, about 7 s, to be
+  refused each time. A 429, a 5xx and a request that never arrived are retried as before.
+- **`snow_fluent_request_batch` follows the Batch API as the documentation describes it.** Each operation's
+  body goes out Base64-encoded and each answer's body comes back decoded, as JSON when it is JSON and as text
+  otherwise; callers no longer receive Base64 in `results[].body`. The answer always carries `unserviced`,
+  the operations the platform did not run because the batch reached a size or processing limit, and a `note`
+  when it is not empty. This is checked against the documentation page, not against an instance: that the
+  platform accepts the encoded body is not yet confirmed live. The tool's input schema still declares `body`
+  as an object, so an XML body cannot be sent through the tool.
+- **`snow_disco_table_discover` returns the whole table.** `incident` now comes back with `short_description`,
+  `number` and `state`, which `task` defines, because the parent chain is walked; the dictionary is read in
+  pages and not cut at 200 rows; a `max_length` the dictionary does not state is `null`, not 255; the cache is
+  kept per instance, so a second instance is no longer answered with the first one's columns. An answer that is
+  not the whole schema carries a `note` and is not cached. That `sys_db_object.super_class` holds the parent,
+  and the shape of `internal_type` and `reference`, are assumed from the documentation and not yet confirmed
+  live.
+- **`./snowarch upgrade` does not proceed on a closed stdin.** At `Proceed? [Y/n]` a closed input (a pipe that
+  had ended, `< /dev/null`, a CI step) was taken as a yes and the checkout was moved. It now prints `upgrade:
+  no answer on stdin (it is closed, or not a terminal) — nothing was changed; pass --yes to accept the plan
+  without asking` and exits 2. A script that ran `upgrade` without `--yes` and relied on that now needs
+  `--yes`. An answer that is not Enter, `y` or `yes` also changes nothing and exits 0, as `n` does.
+
+**What a consultant sees.**
+
+- **The specialists name what the corpus names.** The HRSD specialist no longer presents five notification
+  names it had invented as baseline; it says they are not documented in the bundled corpus and to verify them
+  on the instance. The FSO specialist names the three Personal Lines Claims roles, and the CMDB & CSDM
+  specialist lists `cmdb_ci_cluster` and `cmdb_ci_cluster_node` as baseline cluster classes. The ITSM gateway
+  says that the name of the field linking a problem to a change request is not documented in the bundled
+  corpus, and the six domain gateways cite a page by its full path from `markdown/`, never by a bare file
+  name.
+- **One engagement file.** Phase 1 Step 2 reads `clients/<name>/<name>-engagement-state.md`, the file
+  onboarding creates; the Story Writer, Technical Designer, HLD/LLD Writer and Now Assist Specialist read the
+  Roles in it. There is no separate instructions file.
+- **`clients/_unfiled/`.** When no engagement is named, the design artefacts a session produces are saved
+  under `clients/_unfiled/`, in `design-only` and `live` mode alike, never in a scratchpad or temp directory,
+  and the reply says where they went. An instance change is never filed there.
+- **The engagement question.** In a live session with no engagement named, the Architect asks once, before
+  the session's first write to an instance and after the capabilities pre-flight has passed, `Which engagement
+  is this for?`. The answer is the engagement in the update-set name, `<engagement>-<topic>`, and the engagement
+  whose state file records the change. It is not a write approval; the "write approved" question still
+  follows. What a session does when the user declines to name one is not ruled: it waits, and makes no write.
+  Whether the question should also fire at `snow_core_instance_switch`, which writes nothing, is an open row.
+- **OPEN QUESTION ids carry their artefact.** Every id is `OQ-<kind>-<n>`, with the kinds ES, ST, DS, EV, DC
+  and CN defined once in `governance/governance-rules.md`, so an answer can no longer hold two questions both
+  numbered 1. The Architect also keeps the text of a prompt it wrote for a helper, and an error its own tooling
+  raised, out of the answer.
+- No real Claude session has yet been observed following the new lines in `CLAUDE.md`, or the new bullet in the
+  rule file; the tests pin the wording and the places that state it, not what a session does. The live case
+  of T-25 needs an instance and has not been run.
+
+### Fixed
+
+- A write that the platform answers with a cut value no longer goes unreported. The record tools, the batch
+  tool, an attachment's file name and change requests are compared with what the platform answered, and a
+  cut is a `VALUE_TRUNCATED` warning that is the first key of the result.
+- `snow_scr_business_rule_add` no longer creates a live rule from `active: "false"`, no longer turns an `order`
+  of 0 into 100, and refuses a `when` the form does not offer, a non-whole `order` and a non-string
+  `filter_condition` before it writes.
+- A 403 is no longer retried three times with a 7 s wait. It fails at once as `INSUFFICIENT_PRIVILEGES`.
+- `snow_disco_table_discover` no longer leaves out inherited columns, stops at 200 dictionary rows, turns an
+  unstated `max_length` into 255, or answers one instance from another's cache. A `table` that is not a plain
+  identifier is refused with `INVALID_REQUEST`.
+- `snow_fluent_request_batch` no longer sends a JSON body the Batch API documents as Base64, no longer returns
+  Base64 for a body it should decode, and no longer drops the operations the platform did not run.
+- `./snowarch upgrade --to <tag>` no longer moves the checkout when its input is closed.
+- The user guide no longer links four documents that do not exist, and three links in `docs/decisions/` and
+  `docs/spikes/` that were at the wrong depth point at their pages.
+- The specialists no longer give a model the wrong, or no, name: five invented HR notification names, the
+  Personal Lines Claims roles and the cluster classes (above), and eight table-and-field claims in six skill
+  files that are now in the corpus's own words with a page citation.
+- Phase 1 Step 2 no longer reads an instructions file that onboarding never wrote, and work with no
+  engagement no longer goes to a session scratchpad, where it was lost at the next restart.
+- Two artefacts in one answer no longer both carry an `OQ-1`.
+- A full `npm test` no longer leaves four `w17-win32-*` directories in the temporary directory, and no test in
+  the three test trees makes a temporary directory by hand.
+
+### Changed
+
+- Under `on_error: "stop"`, the default, `snow_orch_playbook_exec` halts after a step that stored a cut value or
+  returned a warning, and each step shows the warnings of its own writes.
+- The always-loaded rule file has a section on warnings (one sentence, then a line for each of the two codes)
+  and one more bullet in §2.1, the engagement question. The rule file is now 72 of its 72 lines.
+- `snow_fluent_request_batch`'s description says what it sends and returns, names 50 operations as this tool's
+  own cap and no longer says it "reduces round-trips by 50-70%", which nothing in the corpus states.
+- An answer to the upgrade prompt that is not Enter, `y` or `yes` changes nothing and exits 0.
+- `./snowarch docs verify` also checks dotted names such as `hr_case.opened`, and CamelCase names on a line
+  that calls them baseline, and prints `dotted names:` and `camelcase names:` beside the `identifiers:` line.
+- The validation runner covers all 25 cases of `tests/VALIDATION-TESTS.md`, runs each session with only the
+  checkout's own settings, no MCP server and a fixed tool set, prints for each turn the skills invoked, the
+  corpus pages read and the cited pages that do not resolve, and prepares a case's design-only Setup (T-25's
+  creates the `acme` engagement file) in the clone before the case; a Setup that needs an instance is not run.
+- The documentation link check covers the decision records, the spike write-ups and the user guide, and it
+  fails for a top-level page that is neither checked nor excused. The repository-hygiene sweeps read every file
+  whole; only the changelog keeps a history boundary.
+
+### Added
+
+- `filter_condition` and `advanced` on `snow_scr_business_rule_add`; `warnings` on write results; `unserviced`
+  and `note` on `snow_fluent_request_batch`; `note` on a `snow_disco_table_discover` answer that is not the whole
+  schema.
+- Two platform notes in `docs/PLATFORM-NOTES.md`: PN-10, what a write's answer is assumed to carry, and PN-11,
+  the Batch API's Base64 bodies and `unserviced` list, each with its grounding.
+- The live procedure for the cut-value premise, in `packages/snowarch/tests/live/README.md`.
+- A test that fails, naming the file and line, when a test makes a temporary directory by hand.
+- The engagement question, `clients/_unfiled/`, and the `OQ-<kind>-<n>` scheme (above).
+
 ## 2.0.10 — 2026-10-04
 
 ### Notes
