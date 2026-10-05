@@ -60,11 +60,28 @@ echo "bootstrap exit=$?  settings.local.json: $(tr -d '\n ' < .claude/settings.l
 ALL=$(node -e "console.log(require('$PROMPTS').map(t=>t.id).join(' '))")
 SEL="${*:-$ALL}"
 
+# WHICH SETUP RUNS, in the header (ARC-09-C106). A case's Setup used to be skipped without a word, so
+# T-25's second turn looked for a file only its Setup creates and the run failed for the harness's reason.
+# Design-only shell under clients/ is run in the clone before the case; the product's own install is
+# already done by the bootstrap above; a Setup that needs an instance is NOT run and the case goes on as
+# its dormant variant; anything the planner does not recognise stops its case.
+echo "setup:" | tee -a "$RUN/header.txt"
+node "$ROOT/scripts/validation/setup-plan.mjs" summary "$PROMPTS" $SEL | sed 's/^/  /' | tee -a "$RUN/header.txt"
+
 for T in $SEL; do
   N=$(node -e "const t=require('$PROMPTS').find(x=>x.id==='$T');console.log(t?t.prompts.length:0)")
   [ "$N" = 0 ] && { echo "$T: no prompt in the spec"; continue; }
   R=1
   while [ "$R" -le "$REPEAT" ]; do
+    # clients/ holds nothing tracked, so a case's state is whatever a Setup or a session put there. Clear
+    # it first: the state a Setup builds belongs to its own case, and a session's own artefacts
+    # (T-25 files its work under clients/_unfiled) must not be what the next case starts from.
+    git -C "$C" clean -fdxq -- clients
+    # The case's Setup, in the clone, before its first turn - on EVERY repeat, so each starts from the
+    # state the Setup describes. A refused or failed Setup means the state the case needs was not
+    # prepared: the case is not run, rather than failing for the harness's reason.
+    node "$ROOT/scripts/validation/setup-plan.mjs" run "$PROMPTS" "$T" "$C" \
+      || { echo "$T run$R: Setup did not run clean - case not run"; R=$((R+1)); continue; }
     # The tool set and the permissions come from the policy, one place a test reads (see the header).
     TOOLS=$($POLICY tools "$T")
     ALLOWED=$($POLICY allowed "$T")

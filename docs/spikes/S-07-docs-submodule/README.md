@@ -406,7 +406,7 @@ root, so the step is a no-op — it is a repair, not a version branch. **This is
 
 ### Consequences
 
-1. **`floors.git = "2.25.0"` is not supportable and moves — see [`ADR-0008`](../../docs/decisions/ADR-0008-git-floor.md)**
+1. **`floors.git = "2.25.0"` is not supportable and moves — see [`ADR-0008`](../../decisions/ADR-0008-git-floor.md)**
    (Proposed), which supersedes only ADR-0001's `floors.git` row. With the repair step above the floor is
    **2.34.1**, the lowest version *proven* to yield a correct corpus; **2.39.5** is the lowest proven
    correct *without* it. Nothing below 2.34.1 is measured and none is asserted.

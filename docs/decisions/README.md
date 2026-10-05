@@ -44,7 +44,7 @@ since is recorded here rather than by editing them:
 | [`ADR-0007-post-decision-rulings.md`](ADR-0007-post-decision-rulings.md) | Q-A, Q-B, R-1, R-2, R-3, R-4 | **Accepted** |
 | [`ADR-0008-git-floor.md`](ADR-0008-git-floor.md) | The git floor, and the sparse-checkout root-file repair that keeps it low — **supersedes ADR-0001's `floors.git` row only** | **Accepted (2026-09-07)** — option A: recipe repair step + `floors.git` = `2.34.1` |
 
-Values these ADRs fix are mirrored in [`../../spikes/engine.config.seed.json`](../../spikes/engine.config.seed.json),
+Values these ADRs fix are mirrored in [`../../spikes/engine.config.seed.json`](../spikes/engine.config.seed.json),
 which ARC-01-S04 starts `engine.config.json` from.
 
 **ADRs are immutable once Accepted.** A later change is a *new* ADR that supersedes the old one,
