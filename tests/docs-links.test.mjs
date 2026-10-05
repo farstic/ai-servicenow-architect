@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { COMMANDS } from '../tools/snowarch/lib/cli.mjs';
@@ -125,24 +125,78 @@ test('every top-level docs page is checked here, or says why not (ARC-09-C102)',
   assert.deepEqual(Object.keys(NOT_CHECKED).filter((p) => !pages.includes(p) || DOCS.includes(p)), []);
 });
 
-test('every internal link resolves to a heading that exists (ARC-09-S11)', () => {
+/**
+ * Every relative link in `docs`, as the dead ones: the file is not there, or the `#anchor` is not a
+ * heading of it. A link inside a fenced block is a sample, not a link a reader follows.
+ */
+function deadLinks(docs, { readDoc = read, exists = (f) => existsSync(join(root, f)) } = {}) {
   const dead = [];
-  for (const doc of DOCS) {
-    const text = read(doc);
+  for (const doc of docs) {
+    const text = readDoc(doc).replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[ \t]*$/gm, '');
     for (const [, target] of text.matchAll(/\]\(([^)\s]+)\)/g)) {
       if (/^(https?:|mailto:)/.test(target)) continue;
       const [path, anchor] = target.split('#');
-      // A bare `#anchor` points within the same document.
-      const file = path === '' ? doc : join(dirname(doc), path);
-      if (!existsSync(join(root, file))) { dead.push(`${doc} → ${target} (no such file)`); continue; }
+      // A bare `#anchor` points within the same document. A link is a URL, so it resolves with POSIX
+      // rules whatever the platform: `join` is `path.win32.join` on a Windows runner and returns
+      // `docs\spikes\S-1\README.md`, which the real tree accepts and the in-memory control below does
+      // not - the Windows cells failed on exactly that.
+      const file = path === '' ? doc : posix.join(posix.dirname(doc), path);
+      if (!exists(file)) { dead.push(`${doc} → ${target} (no such file)`); continue; }
       if (!anchor) continue;
       if (!file.endsWith('.md')) continue;
-      if (!anchorsIn(read(file)).has(anchor.toLowerCase())) {
+      if (!anchorsIn(readDoc(file)).has(anchor.toLowerCase())) {
         dead.push(`${doc} → ${target} (no such heading)`);
       }
     }
   }
-  assert.deepEqual(dead, []);
+  return dead;
+}
+
+test('every internal link resolves to a heading that exists (ARC-09-S11)', () => {
+  assert.deepEqual(deadLinks(DOCS), []);
+});
+
+// ARC-09-C107. The decision records and the spike write-ups are pages a reader follows - an ADR names
+// the spike that settled it, a spike names the ADR it led to - and they were outside the list above,
+// so three links written at the wrong depth (`../../spikes/…` from `docs/decisions/`, which is one
+// level down from `docs/`) pointed at nothing. They are enumerated rather than listed, so a new ADR
+// or spike is checked the day it exists. `docs/plans/` stays out: it quotes the text it will add to
+// other pages (ARC-10's story quotes a README line, whose path is right from the README and not from
+// the story) and holds samples, so a link check there needs those marked first.
+const records = () => execFileSync('git', ['ls-files', '--', 'docs/decisions', 'docs/spikes'],
+  { cwd: root, encoding: 'utf8' }).split('\n').filter((f) => f.endsWith('.md'));
+
+test('every link in the decision records and the spike write-ups resolves (ARC-09-C107)', () => {
+  const pages = records();
+  assert.ok(pages.length >= 40, `only ${pages.length} record pages listed - the enumeration is broken`);
+  assert.ok(pages.includes('docs/decisions/ADR-0008-git-floor.md') && pages.includes('docs/spikes/S-07-docs-submodule/README.md'),
+    'the sentinel: the two pages that held the defects must be in the set');
+  assert.deepEqual(deadLinks(pages), []);
+});
+
+test('control - the check sees a wrong-depth link and a dead anchor, and skips a fenced sample (ARC-09-C107)', () => {
+  // A tree in memory, shaped like the one that held the defect: an ADR under docs/decisions linking a
+  // spike under docs/spikes, and the spike linking back.
+  const tree = {
+    'docs/decisions/ADR-1.md': [
+      '# ADR 1', '', '## Heading one', '',
+      'right: [spike](../spikes/S-1/README.md) and [anchor](../spikes/S-1/README.md#the-spike)',
+      'wrong depth: [spike](../../spikes/S-1/README.md)',
+      'dead anchor: [anchor](../spikes/S-1/README.md#no-such-heading)',
+      '```', 'sample: [x](../../not/a/link.md)', '```',
+    ].join('\n'),
+    'docs/spikes/S-1/README.md': '# S-1\n\n## The spike\n\nback: [adr](../../decisions/ADR-1.md#heading-one), wrong: [adr](../../docs/decisions/ADR-1.md)\n',
+  };
+  const asked = [];
+  const opts = { readDoc: (f) => { asked.push(f); return tree[f]; }, exists: (f) => { asked.push(f); return f in tree; } };
+  const dead = deadLinks(Object.keys(tree), opts);
+  // A link is resolved the way a URL is, on every platform: a backslash here is `path.win32.join`.
+  assert.deepEqual(asked.filter((f) => f.includes('\\')), [], 'a link was resolved with the platform\'s separators');
+  assert.deepEqual(dead, [
+    'docs/decisions/ADR-1.md → ../../spikes/S-1/README.md (no such file)',
+    'docs/decisions/ADR-1.md → ../spikes/S-1/README.md#no-such-heading (no such heading)',
+    'docs/spikes/S-1/README.md → ../../docs/decisions/ADR-1.md (no such file)',
+  ]);
 });
 
 test('every fenced command in the three documents exists (ARC-09-S11)', () => {

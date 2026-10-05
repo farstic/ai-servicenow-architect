@@ -55,7 +55,7 @@ list` prints the flag back, which is the tell. Modern git parses the flag.
 After `sparse-checkout set --cone`, materialise any *root-level* path the index still marks skipped:
 
 > ⚠ **The snippet below is superseded by the corrected implementation in
-> [`spikes/S-07-docs-submodule/README.md`](../../spikes/S-07-docs-submodule/README.md), and ARC-03 must
+> [`spikes/S-07-docs-submodule/README.md`](../spikes/S-07-docs-submodule/README.md), and ARC-03 must
 > take the corrected one.** A portability test after this ADR was accepted found the version below
 > defective: `awk`'s `$2` truncates a path at the first space, `git ls-files -v` without `-z` C-quotes
 > non-ASCII paths, and one bad path aborts `update-index` while the script still prints success. The
