@@ -138,9 +138,8 @@ export async function addTest(client, args) {
 async function resolveConfig(client, ref) {
     let row;
     if (SYS_ID.test(ref)) {
+        // A sys_id no config has is a 404, which the client throws as NOT_FOUND: that is the refusal.
         row = (await client.getRecord(CONFIG, ref, 'sys_id,name,active,sys_scope')) ?? {};
-        if (!plain(row.sys_id))
-            throw new ServiceNowError(`Step config not found: ${ref}`, 'NOT_FOUND');
     }
     else {
         if (ref.includes('^'))
@@ -234,10 +233,10 @@ export async function addStep(client, args) {
     }
     const active = activeArg(args.active);
     const inputs = inputsArg(args.inputs);
-    // Refusals before any write: each one a read.
-    const testRow = (await client.getRecord(TEST, test, 'sys_id,name')) ?? {};
-    if (!plain(testRow.sys_id))
-        throw new ServiceNowError(`Test not found: ${test}`, 'NOT_FOUND');
+    // Refusals before any write: each one a read. A test that does not exist answers 404, "Not found. The
+    // requested item wasn't found." (vendor/ServiceNowDocs/markdown/api-reference/rest-apis/c_TableAPI.md),
+    // which the client throws as NOT_FOUND: that is the refusal.
+    await client.getRecord(TEST, test, 'sys_id');
     const config = await resolveConfig(client, args.step_config.trim());
     if (config.name === SERVER_SCRIPT_CONFIG)
         requireScripting();
