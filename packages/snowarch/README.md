@@ -349,7 +349,7 @@ Its output is written to be pasted: masked paths, no clear usernames, no secret 
 
 <!-- generated:error-codes -->
 
-Every code the server can throw (71), with what to do about it.
+Every code the server can throw (72), with what to do about it.
 Generated from `src/errors/codes.ts` via `dist/contract.json`.
 
 | Code | Remedy |
@@ -423,6 +423,7 @@ Generated from `src/errors/codes.ts` via `dist/contract.json`.
 | `URL_REQUIRED` | enter the full https URL of the instance; non-interactively pass `--url <origin>` (a URL cannot be proposed) |
 | `VALIDATION_ERROR` | the message names the argument and the shape |
 | `VALUE_NOT_AS_SENT` | the record exists with the stored value: read it back and, if that value is wrong, correct it with a modify — do not add it again, which would make a second record |
+| `VALUE_TOO_LONG` | shorten the value to at most the stated length and send the write again; records the call already wrote (named in the error) exist, so do not add them again |
 | `VALUE_TRUNCATED` | the record exists with the stored value, so modify it with a value of at most `column_limit` characters (when `confirmed` is false that length is only known to fit); do not add it again, which would make a second record. If the record is active, set `active` to false until it is corrected |
 | `WRITE_NOT_ENABLED` | raise the preset; a `prod` instance additionally needs `--ack-prod` |
 

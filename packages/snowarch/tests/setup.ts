@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach } from 'vitest';
 import { enterInstance } from '../src/servicenow/context.js';
+import { resetColumnLimits } from '../src/servicenow/stored-values.js';
 import { expandPreset } from '../src/utils/permissions.js';
 import { currentSuitePreset } from './helpers/preset.js';
 
@@ -39,4 +40,7 @@ beforeEach(() => {
     client: {} as never,
     warnings: [],
   });
+  // ARC-09-C97 remembers each instance's column limits, and every test runs on this one runtime: forget
+  // them, so no test reads a limit that another test's fake answered.
+  resetColumnLimits();
 });

@@ -20,7 +20,8 @@ import type { ServiceNowError } from '../../src/utils/errors.js';
  *
  * The rulings this pins: a budget of its own, so a slow read cannot blind C93 on the same call; lengths in
  * code points, as C93 counts; a refusal after an earlier write of the same call names that write; never a
- * refusal on a cached guess; a 403 remembered per instance and a 5xx not.
+ * refusal on a cached guess; a 403 remembered per instance, a 5xx not, and a 401 ending the call, so that a
+ * call with bad credentials makes one failed login and not two.
  */
 const cicd = vi.hoisted<CicdState>(() => ({ calls: [], progress: [], tables: {} }));
 vi.mock('../../src/servicenow/http.js', async () => (await import('../helpers/fake-cicd.js')).fakeCicdModule(cicd));
@@ -196,6 +197,16 @@ describe('ARC-09-C97 — the reader: instance-keyed, never refusing on a cached 
 
     expect(first.error).toBeUndefined();
     expect(second.error?.code).toBe('VALUE_TOO_LONG');
+  });
+
+  it('a 401 on the pre-check\'s read ends the call there: the write is not sent, one failed login and not two', async () => {
+    cicd.db!.refuse = (method, table) => (method === 'GET' && table === 'sys_dictionary' ? refused(401, 'User Not Authenticated') : undefined);
+
+    const { error } = await add('incident', { u_code: 'ABCD' });
+
+    expect(error?.code).toBe('AUTHENTICATION_FAILED');
+    expect(posts('incident')).toHaveLength(0);
+    expect(cicd.calls).toHaveLength(1);
   });
 
   it('two instances keep their own limits', async () => {
