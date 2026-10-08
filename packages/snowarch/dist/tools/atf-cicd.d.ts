@@ -19,8 +19,12 @@
  *
  * The page documents no call that runs a single test. The test exec therefore runs the one suite that
  * holds the test, says so, and creates nothing to make one (`suitesHolding` below).
+ *
+ * The suite-membership reads live here too: `suitesHolding` for the test exec, and `testsOfSuite` for
+ * `snow_atf_atf_tests_index` (ARC-09-C113).
  */
 import type { ServiceNowClient } from '../servicenow/client.js';
+import type { ServiceNowRecord } from '../servicenow/types.js';
 export declare const CICD_PAGE = "vendor/ServiceNowDocs/markdown/api-reference/rest-apis/cicd-api.md";
 /** How long a run is waited for when the caller does not say, in seconds. */
 export declare const DEFAULT_BUDGET_SECONDS = 300;
@@ -55,8 +59,8 @@ export interface SuiteRun {
     budget_seconds: number;
     summary: string;
 }
-/** `sys_id`, checked: a sys_id is 32 hexadecimal characters, and anything else is not sent anywhere. */
-export declare function sysIdArg(value: unknown): string;
+/** A sys_id argument, checked: 32 hexadecimal characters, and anything else is not sent anywhere. */
+export declare function sysIdArg(value: unknown, argument?: string): string;
 /** `budget_seconds`, checked: from 1 to MAX_BUDGET_SECONDS, DEFAULT_BUDGET_SECONDS when absent. */
 export declare function budgetArg(value: unknown): number;
 /**
@@ -78,6 +82,30 @@ export declare function runSuite(client: ServiceNowClient, suite: string, budget
  * and the tool refuses; it can never pick a suite the test is not in.
  */
 export declare function suitesHolding(client: ServiceNowClient, test: string): Promise<string[]>;
+/**
+ * The tests a suite holds, read from its `sys_atf_test_suite_test` rows (ARC-09-C113), in the order the
+ * rows came and each test once. A row counts only when the suite it carries IS this suite — the guard
+ * `suitesHolding` has, for the same reason. `capped` says the read stopped at SUITE_ROWS rows.
+ */
+export declare function testsOfSuite(client: ServiceNowClient, suite: string): Promise<{
+    tests: string[];
+    capped: boolean;
+}>;
+/**
+ * `snow_atf_atf_tests_index` for one suite (ARC-09-C113). It used to query `sys_atf_test` on
+ * `test_suite`, a column the corpus does not put there, and a condition on a column that does not
+ * exist is ignored rather than refused (c_TableAPI.md), so the suite filter could drop out and list
+ * every active test as the suite's. Now: the suite's tests from its membership rows, then those
+ * tests from `sys_atf_test` by `sys_idIN` — "fieldINvalue1,value2,value3"
+ * (vendor/ServiceNowDocs/markdown/platform-user-interface/c_EncodedQueryStrings.md) — IDS_PER_QUERY at
+ * a time, with the `active` filter the tool always had, up to `limit`. A suite with no rows lists
+ * nothing; it never falls back to every test.
+ */
+export declare function listSuiteTests(client: ServiceNowClient, suite: string, activeOnly: boolean, limit: number): Promise<{
+    count: number;
+    tests: ServiceNowRecord[];
+    summary: string;
+}>;
 /** Names for a list of suites, for a refusal that asks the caller to pick one. */
 export declare function suiteNames(client: ServiceNowClient, suites: string[]): Promise<Array<{
     sys_id: string;

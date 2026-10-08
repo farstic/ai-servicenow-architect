@@ -2416,13 +2416,13 @@
   },
   {
     "name": "snow_atf_atf_tests_index",
-    "description": "List ATF test cases, optionally filtered by suite",
+    "description": "List ATF test cases. With suite_sys_id, lists the tests that suite holds, read from its Test Suite Tests rows (sys_atf_test_suite_test); a suite with none lists nothing.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "suite_sys_id": {
           "type": "string",
-          "description": "Filter by test suite sys_id"
+          "description": "System ID of a test suite: list only the tests it holds"
         },
         "active": {
           "type": "boolean",
