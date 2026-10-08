@@ -2394,13 +2394,17 @@
   },
   {
     "name": "snow_atf_atf_suite_exec",
-    "description": "Execute an ATF test suite (requires ATF_ENABLED=true)",
+    "description": "Run an ATF test suite through the CI/CD API, wait for it within budget_seconds, and return its outcome, the test counts and its sys_atf_test_suite_result record. The account needs the sn_cicd.sys_ci_automation or admin role; a suite with UI tests needs a scheduled Client Test Runner or a headless runner. (requires ATF_ENABLED=true)",
     "inputSchema": {
       "type": "object",
       "properties": {
         "sys_id": {
           "type": "string",
           "description": "System ID of the test suite"
+        },
+        "budget_seconds": {
+          "type": "number",
+          "description": "How long to wait for the outcome, in seconds, from 1 to 1800 (default: 300). A run still going when it runs out is reported with its ids, not cancelled."
         }
       },
       "required": [
@@ -2454,13 +2458,17 @@
   },
   {
     "name": "snow_atf_atf_test_exec",
-    "description": "Execute a single ATF test (requires ATF_ENABLED=true)",
+    "description": "Run an ATF test through the one test suite that holds it: the platform documents no single-test run, so the whole suite runs through the CI/CD API, as snow_atf_atf_suite_exec, and the result says so. Refuses, creating nothing, when the test is in no suite or in several; the refusal lists them. (requires ATF_ENABLED=true)",
     "inputSchema": {
       "type": "object",
       "properties": {
         "sys_id": {
           "type": "string",
           "description": "System ID of the test"
+        },
+        "budget_seconds": {
+          "type": "number",
+          "description": "How long to wait for the outcome, in seconds, from 1 to 1800 (default: 300). A run still going when it runs out is reported with its ids, not cancelled."
         }
       },
       "required": [

@@ -85,6 +85,32 @@ export interface ServiceNowApiError {
   status: string;
 }
 
+/**
+ * The `result` of a CI/CD API call (ARC-09-C94): the fields the run, progress and results pages
+ * document, in vendor/ServiceNowDocs/markdown/api-reference/rest-apis/cicd-api.md. `status` is the
+ * page's "0: Pending, 1: Running, 2: Successful, 3: Failed, 4: Canceled", sent as a string.
+ */
+export interface CicdResult {
+  status?: string | number;
+  status_label?: string;
+  status_message?: string;
+  status_detail?: string;
+  error?: string;
+  percent_complete?: number;
+  links?: {
+    progress?: { id?: string; url?: string };
+    results?: { id?: string; url?: string };
+  };
+  test_suite_status?: string;
+  test_suite_name?: string;
+  test_suite_duration?: string;
+  rolledup_test_success_count?: number;
+  rolledup_test_failure_count?: number;
+  rolledup_test_error_count?: number;
+  rolledup_test_skip_count?: number;
+  [field: string]: unknown;
+}
+
 // ─── Core Platform Tool Params ────────────────────────────────────────────────
 
 export interface GetRecordParams {

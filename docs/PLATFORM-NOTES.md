@@ -312,6 +312,21 @@ the trailing `^` was kept, not trimmed.
 **Engine consequence:** the cut-value detector (`looksCut`) needs no exemption for a trailing `^` on this
 release. If a release trims it, the detector would flag a benign shape; that has not been observed.
 
+## PN-15 — A path the instance does not serve: one message, and the status follows the method
+
+**Applies to:** the REST API, any `/api/...` path the instance does not serve · release family not recorded by
+the sitting · observed in the 2.0.11-rc.1 live sitting (ARC-09-C94)
+**Behaviour:** `GET /api/now/atf/runner/run_test` in the REST API Explorer answered HTTP 404 with the message
+"Requested URI does not represent any resource". This server's `POST` to the same path got the same message
+with HTTP 400, which the client reports as `INVALID_REQUEST`. The status follows the method and the message
+does not. A path that does exist answered differently: `GET /api/sn_cicd/progress/{progress_id}` from the
+Explorer answered "User is not authenticated".
+**Grounding:** none in ServiceNowDocs (`markdown/api-reference/rest-apis/cicd-api.md` lists 404 for its own endpoints as "Not found. The requested item wasn't found." and gives no message for a path that is not served); observed behaviour.
+**Evidence:** `docs/validation/2.0.11-rc.1-live-sitting.md`, § ARC-09-C94, steps 6 to 8.
+**Engine consequence:** the ATF exec tools use this message, not the status, to tell "the CI/CD API is not
+served here" from "the suite was not found" (`src/tools/atf-cicd.ts`, ARC-09-C94). A 400 that carries it
+means a missing path, not a malformed body.
+
 ## Windows notes — this repository, not ServiceNow
 
 The notes above are ServiceNow behaviour. These are about the machine the engine runs on, and they

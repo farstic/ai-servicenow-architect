@@ -600,3 +600,56 @@ it again. Nothing else was written.
 
 Record in `docs/validation/` under the sitting's file, as **ARC-09-C94 live: WORKS / PATH ABSENT /
 API ABSENT / ROLE / RUNNER OFF / BODY**, with the step 6–8 answers and the fix the shape implies.
+
+**Measured on `v2.0.11-rc.1`: shape A** (`docs/validation/2.0.11-rc.1-live-sitting.md`, § ARC-09-C94).
+
+### After the fix — the confirmation run on `v2.0.11-rc.2`
+
+**What changed** (`src/tools/atf-cicd.ts`): `snow_atf_atf_suite_exec` sends
+`POST /api/sn_cicd/testsuite/run?test_suite_sys_id=<suite>` once, reads `GET /api/sn_cicd/progress/<id>` every
+five seconds within `budget_seconds` (default 300), then reads `GET /api/sn_cicd/testsuite/results/<id>`. It
+returns the outcome, the counts and the `sys_atf_test_suite_result` record. `snow_atf_atf_test_exec` reads
+`sys_atf_test_suite_test` and runs the one suite that holds the test, or refuses and creates nothing.
+
+**Setup:** the same instance and account. Choose a suite whose tests are all server-side: a suite with UI
+tests needs a scheduled Client Test Runner or a headless runner *(citation:
+`markdown/api-reference/rest-apis/cicd-api.md`)*. "Mixed Test Suite", read in the rc.1 sitting, may hold UI
+tests, so pick or make one that does not, for example a suite holding only "Jasmine Successful Test". Record
+its sys_id.
+
+```
+read-only — no approval needed
+1  snow_core_capabilities_read                         ATF_ENABLED on
+2  snow_core_records_query { table: "sys_atf_test_suite_test",
+     query: "test_suite=<suite>", fields: "test,test_suite" }
+                                                       the suite's tests. The column names test exec reads,
+                                                       `test` and `test_suite`, are not in the corpus
+the one write — its own "write approved"
+3  snow_atf_atf_suite_exec { sys_id: <suite>, budget_seconds: 120 }
+                                                       About to run ATF test suite <suite> on instance
+                                                       "<label>" — write approved?
+```
+
+**Pass condition:**
+- **Step 2:** every row carries `test` and `test_suite`, and `test_suite` is the suite's sys_id.
+- **Step 3:** it returns without an error and within the budget, with `outcome: "success"` (or `"failure"`
+  with the counts, if a test fails), counts that match the suite's tests, and
+  `result_record: { table: "sys_atf_test_suite_result", … }`. That record exists in the UI with the same
+  counts.
+
+**A failure looks like:**
+- `INSUFFICIENT_PRIVILEGES` naming `sn_cicd.sys_ci_automation`: the account lacks the role.
+- `NOT_FOUND` saying the CI/CD API is not served: `/api/sn_cicd` is absent.
+- `REQUEST_FAILED` carrying the platform's own error: the run was refused at the start.
+- `outcome: "pending"` or `"running"` at the budget: the run did not finish in 120 s. A server-side suite
+  stuck in Pending suggests it is waiting for a client runner.
+- Rows in step 2 without `test` or `test_suite`: the column names are wrong, and test exec would refuse
+  every test as in no suite.
+
+**Evidence:** step 2's row count and field names, and step 3's `outcome`, `status_label`, `counts` and
+`duration`, plus its audit line. None of these is a secret, and the ids stay out of the record.
+
+**Teardown:** none. The run's own result records are the evidence.
+
+**Verdict:** record **ARC-09-C94 after the fix: CONFIRMED / FAILED** in `docs/validation/`, under the rc.2
+sitting's file, naming the failure shape.
