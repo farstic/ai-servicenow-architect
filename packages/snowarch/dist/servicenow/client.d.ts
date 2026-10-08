@@ -1,4 +1,4 @@
-import type { ServiceNowConfig, QueryRecordsParams, QueryRecordsResponse, ServiceNowRecord } from './types.js';
+import type { CicdResult, ServiceNowConfig, QueryRecordsParams, QueryRecordsResponse, ServiceNowRecord } from './types.js';
 export declare class ServiceNowClient {
     private baseUrl;
     private authMethod;
@@ -153,6 +153,16 @@ export declare class ServiceNowClient {
      * Call Now Assist / Generative AI endpoints (latest release)
      */
     callNowAssist(endpoint: string, payload: Record<string, any>): Promise<any>;
+    /**
+     * The CI/CD API, `/api/sn_cicd/<path>` (ARC-09-C94). Its endpoints take their arguments in the query
+     * string and carry no request body ("Request body ... None" on every page this server calls), and
+     * they answer `{ result: {...} }`; this returns the `result`
+     * (vendor/ServiceNowDocs/markdown/api-reference/rest-apis/cicd-api.md).
+     *
+     * `retries` can only lower the client's own policy, as everywhere else: the call that STARTS
+     * something is sent once, because a retry after an answer lost on the way back starts it twice.
+     */
+    callCicd(method: 'GET' | 'POST', path: string, query?: Record<string, string>, retries?: number): Promise<CicdResult>;
     /**
      * Run aggregate/stats query on a table (ServiceNow Reporting API)
      */

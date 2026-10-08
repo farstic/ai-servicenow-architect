@@ -1,5 +1,11 @@
 import { ServiceNowError } from '../utils/errors.js';
 import { requireAtf } from '../utils/permissions.js';
+import { CICD_PAGE, DEFAULT_BUDGET_SECONDS, MAX_BUDGET_SECONDS, budgetArg, runSuite, suiteNames, suitesHolding, sysIdArg, } from './atf-cicd.js';
+const BUDGET_PROPERTY = {
+    type: 'number',
+    description: `How long to wait for the outcome, in seconds, from 1 to ${MAX_BUDGET_SECONDS} (default: ${DEFAULT_BUDGET_SECONDS}). `
+        + 'A run still going when it runs out is reported with its ids, not cancelled.',
+};
 export function atfToolManifest() {
     return [
         {
@@ -32,11 +38,15 @@ export function atfToolManifest() {
         },
         {
             name: 'snow_atf_atf_suite_exec',
-            description: 'Execute an ATF test suite (requires ATF_ENABLED=true)',
+            description: 'Run an ATF test suite through the CI/CD API, wait for it within budget_seconds, and return its '
+                + 'outcome, the test counts and its sys_atf_test_suite_result record. The account needs the '
+                + 'sn_cicd.sys_ci_automation or admin role; a suite with UI tests needs a scheduled Client Test Runner or a '
+                + 'headless runner. (requires ATF_ENABLED=true)',
             inputSchema: {
                 type: 'object',
                 properties: {
                     sys_id: { type: 'string', description: 'System ID of the test suite' },
+                    budget_seconds: BUDGET_PROPERTY,
                 },
                 required: ['sys_id'],
             },
@@ -73,11 +83,15 @@ export function atfToolManifest() {
         },
         {
             name: 'snow_atf_atf_test_exec',
-            description: 'Execute a single ATF test (requires ATF_ENABLED=true)',
+            description: 'Run an ATF test through the one test suite that holds it: the platform documents no '
+                + 'single-test run, so the whole suite runs through the CI/CD API, as snow_atf_atf_suite_exec, and the result '
+                + 'says so. Refuses, creating nothing, when the test is in no suite or in several; the refusal lists them. '
+                + '(requires ATF_ENABLED=true)',
             inputSchema: {
                 type: 'object',
                 properties: {
                     sys_id: { type: 'string', description: 'System ID of the test' },
+                    budget_seconds: BUDGET_PROPERTY,
                 },
                 required: ['sys_id'],
             },
@@ -150,9 +164,7 @@ export async function dispatchAtfAction(client, name, args) {
             requireAtf();
             if (!args.sys_id)
                 throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
-            // ServiceNow ATF runner API: POST /api/now/atf/runner/run_suite
-            const result = await client.callNowAssist('/api/now/atf/runner/run_suite', { sys_id: args.sys_id });
-            return { ...result, summary: `Started test suite ${args.sys_id}` };
+            return await runSuite(client, sysIdArg(args.sys_id), budgetArg(args.budget_seconds));
         }
         case 'snow_atf_atf_tests_index': {
             let query = args.active !== false ? 'active=true' : '';
@@ -170,8 +182,32 @@ export async function dispatchAtfAction(client, name, args) {
             requireAtf();
             if (!args.sys_id)
                 throw new ServiceNowError('sys_id is required', 'INVALID_REQUEST');
-            const result = await client.callNowAssist('/api/now/atf/runner/run_test', { sys_id: args.sys_id });
-            return { ...result, summary: `Started test ${args.sys_id}` };
+            const testId = sysIdArg(args.sys_id);
+            const budget = budgetArg(args.budget_seconds);
+            // The CI/CD API runs suites only (`atf-cicd.ts`), so a test runs through the one suite that holds it.
+            const test = await client.getRecord('sys_atf_test', testId, 'sys_id,name');
+            if (!test?.sys_id)
+                throw new ServiceNowError(`Test not found: ${testId}`, 'NOT_FOUND');
+            const named = typeof test.name === 'string' && test.name ? `"${test.name}" (${testId})` : testId;
+            const suites = await suitesHolding(client, testId);
+            if (suites.length === 0) {
+                throw new ServiceNowError(`Test ${named} is in no test suite, and the CI/CD API documents no call that runs one test (${CICD_PAGE}): `
+                    + 'put the test in a suite, or run snow_atf_atf_suite_exec. Nothing was run and nothing was created.', 'INVALID_REQUEST');
+            }
+            if (suites.length > 1) {
+                const listed = (await suiteNames(client, suites)).map((s) => `${s.name ? `"${s.name}"` : '(no name)'} (${s.sys_id})`);
+                throw new ServiceNowError(`Test ${named} is in ${suites.length} test suites: ${listed.join(', ')}. Each run is a whole suite, so pick `
+                    + 'one and run it with snow_atf_atf_suite_exec. Nothing was run.', 'INVALID_REQUEST');
+            }
+            const run = await runSuite(client, suites[0], budget);
+            return {
+                ...run,
+                test: { sys_id: testId, name: typeof test.name === 'string' ? test.name : undefined },
+                ran_through_suite: run.suite,
+                summary: `Test ${named} is in one test suite, ${run.suite.name ? `"${run.suite.name}"` : run.suite.sys_id}, and the `
+                    + 'platform documents no single-test run, so the whole suite was run through the CI/CD API: its other tests ran '
+                    + `too. ${run.summary}`,
+            };
         }
         case 'snow_atf_atf_suite_result_read': {
             if (!args.result_sys_id)
