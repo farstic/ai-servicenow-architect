@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ok, resetCicd, tableOf, type CicdState } from '../helpers/fake-cicd.js';
 import { ServiceNowClient } from '../../src/servicenow/client.js';
 import { dispatchAtfAction } from '../../src/tools/atf.js';
@@ -51,6 +51,14 @@ async function index(args: Record<string, unknown>) {
 
 const reads = (table: string) => cicd.calls.filter((c) => c.path === `/api/now/table/${table}`);
 const listed = (value: { tests: Array<{ sys_id: string }> }) => value.tests.map((t) => t.sys_id);
+
+// The client logs every request at INFO; these tests read the requests from the fake instead.
+const logLevel = process.env.LOG_LEVEL;
+beforeAll(() => { process.env.LOG_LEVEL = 'error'; });
+afterAll(() => {
+  if (logLevel === undefined) delete process.env.LOG_LEVEL;
+  else process.env.LOG_LEVEL = logLevel;
+});
 
 beforeEach(() => {
   resetCicd(cicd);
@@ -118,6 +126,46 @@ describe('ARC-09-C113 — snow_atf_atf_tests_index with suite_sys_id reads the s
     expect(error?.message).toMatch(/suite_sys_id/);
     expect(cicd.calls).toEqual([]);
   });
+
+  it('two membership rows for the same suite and test are one test', async () => {
+    cicd.tables.sys_atf_test_suite_test = ok([membership(T1, SUITE), membership(T1, SUITE)]);
+    cicd.tables.sys_atf_test = tableOf(ALL_TESTS);
+
+    const { value, error } = await index({ suite_sys_id: SUITE });
+
+    expect(error).toBeUndefined();
+    expect(reads('sys_atf_test')[0].query.sysparm_query).toBe(`active=true^sys_idIN${T1}`);
+    expect(value.summary).toMatch(/holds 1 test\(s\)/);
+    expect(listed(value)).toEqual([T1]);
+  });
+
+  it('the limit is what is left of it: 150 tests and limit 120 ask for 120, then 20', async () => {
+    const ids = Array.from({ length: 150 }, (_, i) => `e${String(i).padStart(31, '0')}`);
+    cicd.tables.sys_atf_test_suite_test = ok(ids.map((id) => membership(id, SUITE)));
+    cicd.tables.sys_atf_test = tableOf(ids.map((id, i) => testRow(id, `t${i}`)));
+
+    const { value, error } = await index({ suite_sys_id: SUITE, limit: 120 });
+
+    expect(error).toBeUndefined();
+    expect(reads('sys_atf_test').map((r) => r.query.sysparm_limit)).toEqual(['120', '20']);
+    expect(value.count).toBe(120);
+    expect(listed(value)).toEqual(ids.slice(0, 120));
+    expect(value.summary).toMatch(/up to the limit of 120/);
+  });
+
+  it.each([{ rows: 1000, capped: true }, { rows: 999, capped: false }])(
+    'a membership read of $rows rows says it stopped at the 1000-row read: $capped', async ({ rows, capped }) => {
+      const ids = Array.from({ length: rows }, (_, i) => `f${String(i).padStart(31, '0')}`);
+      cicd.tables.sys_atf_test_suite_test = ok(ids.map((id) => membership(id, SUITE)));
+      cicd.tables.sys_atf_test = tableOf(ids.map((id, i) => testRow(id, `t${i}`)));
+
+      const { value, error } = await index({ suite_sys_id: SUITE });
+
+      expect(error).toBeUndefined();
+      expect(reads('sys_atf_test_suite_test')[0].query.sysparm_limit).toBe('1000');
+      if (capped) expect(value.summary).toMatch(/in its first 1000 rows/);
+      else expect(value.summary).not.toMatch(/in its first/);
+    });
 
   it('a large suite is read in batches, each query under the client\'s 4096-character limit', async () => {
     const ids = Array.from({ length: 150 }, (_, i) => `e${String(i).padStart(31, '0')}`);
