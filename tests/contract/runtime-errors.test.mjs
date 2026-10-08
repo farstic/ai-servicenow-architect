@@ -175,22 +175,37 @@ test('ARC-09-C101 — the one rule sentence is the owner\'s, character for chara
     'the rule file does not carry the sentence on a line of its own');
 });
 
-test('ARC-09-C101 — the section has a line per warning code, and each remedy is the registry\'s', () => {
+test('ARC-09-C101 — every warning code is on a line of the section, and each remedy is the registry\'s', () => {
   const c = contract();
   const warnings = c.errorCodes.filter((e) => e.warning);
-  assert.deepEqual(warnings.map((e) => e.code).sort(), ['FIELD_NOT_STORED', 'VALUE_TRUNCATED']);
+  assert.deepEqual(warnings.map((e) => e.code).sort(), ['FIELD_NOT_STORED', 'VALUE_NOT_AS_SENT', 'VALUE_TRUNCATED']);
   assert.ok(warnings.every((e) => e.showInRule), 'a warning that is not rule-visible is one nobody is told about');
+  // ARC-09-C95: the file stands on its 72-line cap, so a warning may JOIN another's line (`ruleLineWith`)
+  // instead of adding one. A line leads with each code that has a line of its own; a joining code
+  // appears on its host's line, beside its own remedy.
   const lines = warningsSection().split('\n').filter((l) => /^- `[A-Z_]+`/.test(l));
-  assert.deepEqual(lines.map((l) => /^- `([^`]+)`/.exec(l)[1]).sort(), warnings.map((e) => e.code).sort());
+  const hosts = warnings.filter((e) => !e.ruleLineWith);
+  assert.deepEqual(lines.map((l) => /^- `([^`]+)`/.exec(l)[1]).sort(), hosts.map((e) => e.code).sort());
   for (const e of warnings) {
-    const l = lines.find((x) => x.startsWith(`- \`${e.code}\``));
-    assert.ok(l.includes(onPage(e.remedy)), `${e.code}: the rule file paraphrases the registry`);
+    const l = lines.find((x) => x.startsWith(`- \`${e.ruleLineWith ?? e.code}\``));
+    assert.ok(l, `${e.code}: no line carries it`);
+    assert.ok(l.includes(`\`${e.code}\` → ${onPage(e.remedy)}`), `${e.code}: the rule file paraphrases the registry`);
   }
+});
+
+test('ARC-09-C95 — VALUE_NOT_AS_SENT joins the VALUE_TRUNCATED line: no line of its own', () => {
+  const c = contract();
+  const joined = c.errorCodes.find((e) => e.code === 'VALUE_NOT_AS_SENT');
+  assert.equal(joined?.ruleLineWith, 'VALUE_TRUNCATED');
+  const lines = warningsSection().split('\n');
+  assert.equal(lines.filter((l) => l.includes('`VALUE_NOT_AS_SENT`')).length, 1, 'the code is on more than one line, or none');
+  assert.ok(lines.some((l) => l.startsWith('- `VALUE_TRUNCATED`') && l.includes('`VALUE_NOT_AS_SENT`')),
+    'VALUE_NOT_AS_SENT is not on the VALUE_TRUNCATED line');
 });
 
 test('ARC-09-C101 — warnings are not runtime errors: not in that list, and not under its instructions', () => {
   const s = runtimeSection();
-  for (const code of ['VALUE_TRUNCATED', 'FIELD_NOT_STORED']) {
+  for (const code of ['VALUE_TRUNCATED', 'FIELD_NOT_STORED', 'VALUE_NOT_AS_SENT']) {
     assert.ok(!s.includes(code), `${code} is in the runtime-errors section, under "stop, never retry, wait"`);
   }
   const text = read(RULE);

@@ -39,6 +39,13 @@ A test in no suite, or in several, is refused and nothing is created. The accoun
   readers ground an Envelope only in a session where the user has enabled Ultracode or max effort, and the
   answer says so.
 
+### Added
+
+- `snow_atf_atf_test_add` and `snow_atf_atf_step_add` create an ATF test and its steps and read every record
+  back. A step's script is proven attached to the step. A value the instance stored differently comes back
+  in `warnings[]`, under the new `VALUE_NOT_AS_SENT` or the existing `VALUE_TRUNCATED` and
+  `FIELD_NOT_STORED`. A Run Server Side Script step also needs `SCRIPTING_ENABLED`.
+
 ## 2.0.10 — 2026-10-04
 
 ### Notes

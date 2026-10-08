@@ -201,7 +201,25 @@ describe('criterion 3 - ATF is exec-gated only (unchanged, asserted)', () => {
     expect(PASSED_THE_GATE).toContain(await codeFor(name, expandPreset('pdi-developer'), 'pdi-developer'));
   });
 
-  it.each(atfTools.filter((n) => !EXEC.includes(n)))('%s is ungated', async (name) => {
+  // ARC-09-C95: authoring writes a test and its steps, so it needs ATF AND write (the snow_ai_*_add
+  // shape: `gate: atf`, `alsoRequires: write`). A Run Server Side Script step also needs SCRIPTING;
+  // that is decided after the step config is read, so it is asserted in atf-author.test.ts, not here.
+  const AUTHOR = ['snow_atf_atf_test_add', 'snow_atf_atf_step_add'];
+  const noWrite = { ...expandPreset('pdi-developer'), WRITE_ENABLED: 'false' } as Flags;
+
+  it.each(AUTHOR)('%s is refused without ATF', async (name) => {
+    expect(await codeFor(name, noAtf, 'custom')).toBe('ATF_NOT_ENABLED');
+  });
+
+  it.each(AUTHOR)('%s is refused without WRITE', async (name) => {
+    expect(await codeFor(name, noWrite, 'custom')).toBe('WRITE_NOT_ENABLED');
+  });
+
+  it.each(AUTHOR)('%s passes with ATF and WRITE', async (name) => {
+    expect(PASSED_THE_GATE).toContain(await codeFor(name, expandPreset('pdi-developer'), 'pdi-developer'));
+  });
+
+  it.each(atfTools.filter((n) => !EXEC.includes(n) && !AUTHOR.includes(n)))('%s is ungated', async (name) => {
     expect(PASSED_THE_GATE).toContain(await codeFor(name, noAtf, 'custom'));
   });
 });

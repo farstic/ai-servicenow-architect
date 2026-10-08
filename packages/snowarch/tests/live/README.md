@@ -653,3 +653,145 @@ the one write — its own "write approved"
 
 **Verdict:** record **ARC-09-C94 after the fix: CONFIRMED / FAILED** in `docs/validation/`, under the rc.2
 sitting's file, naming the failure shape.
+
+## ARC-09-C95 — authoring an ATF test and step, each record read back
+
+**Build under test:** the release candidate cut after the PR that adds this section.
+
+**The finding (the owner's R2):** a session wrote `sys_atf_test`, `sys_atf_step` and `sys_variable_value` by
+hand and could not confirm the script was attached to the step.
+
+**What the tools do** (`src/tools/atf-author.ts`):
+- `snow_atf_atf_test_add` writes the test and reads it back by sys_id.
+- `snow_atf_atf_step_add` reads before it writes, and refuses on any of these:
+  - a test that does not exist;
+  - a step config that does not exist, is inactive, or shares its name with another;
+  - an input the config does not have;
+  - an order the test already uses.
+
+  A Run Server Side Script step also needs `SCRIPTING_ENABLED`. The tool then writes the step and one
+  `sys_variable_value` row per input, updating a row the insert created rather than adding a second.
+  It reads each record back, then asks from the step's side that each input is attached exactly once.
+- A difference comes back in `warnings[]`:
+  - `FIELD_NOT_STORED`: a field is not shown, or an input is not attached.
+  - `VALUE_TRUNCATED`: a field holds a shorter prefix of what was sent.
+  - `VALUE_NOT_AS_SENT`: anything else, with the first differing offset and both lengths.
+
+  Line endings are normalised before the compare.
+
+**What the bundled corpus documents** (`68c0d11`):
+- **The tables.** Test Step [`sys_atf_step`] "specifies a test action, the step configuration, and an execution
+  order", and Test Step Config [`sys_atf_step_config`] "specifies the input variables" *(citation:
+  `markdown/application-development/automated-test-framework-atf/automated-test-framework.md`)*.
+- **A config's inputs are its Input Variables related list** *(citation:
+  `markdown/application-development/automated-test-framework-atf/atf-step-config-record.md`)*.
+- **The Run Server Side Script step's fields, by label only.** Execution order, Active, Test, Step config,
+  Jasmine version, and Test script ("The javascript for the server to execute") *(citation:
+  `markdown/application-development/automated-test-framework-atf/test-steps-server-category.md`)*.
+- **Tests move between instances "using update sets"** *(citation:
+  `markdown/application-development/automated-test-framework-atf/atf-move-test.md`)*, so the §2.2 capture
+  applies.
+- **Not documented, and assumed by the tools:**
+  - every column name;
+  - the input-variable table's columns (`atf_input_variable`: `model` for the config, `element` for the
+    name);
+  - where a step's input values are kept (`sys_variable_value`: `document`, `document_key`, `variable`,
+    `value`).
+
+  R3 and R4 below read them before anything is written.
+
+### Setup
+
+An instance on the `pdi-developer` preset (ATF, WRITE and SCRIPTING on), and an account with
+`atf_test_admin` or `atf_test_designer` *(citation:
+`markdown/application-development/automated-test-framework-atf/atf-create-test.md`)*. The shipped "Jasmine
+Successful Test" from the C94 sitting provides an existing Run Server Side Script step to read in R4.
+
+### The run
+
+```
+read-only — no approval needed
+R1 snow_core_capabilities_read                         ATF, WRITE and SCRIPTING on
+R2 snow_core_records_query { table: "sys_atf_step_config", query: "name=Run Server Side Script",
+     fields: "sys_id,name,active,sys_scope" }          exactly one row, active
+R3 snow_core_records_query { table: "atf_input_variable", query: "model=<R2 sys_id>", limit: 10 }
+                                                       all fields: the config column, the name column, and
+                                                       the script input's name
+R4 snow_core_records_query { table: "sys_atf_step", query: "test=<Jasmine Successful Test>",
+     fields: "sys_id,test,step_config,order,active" }
+   then snow_core_records_query { table: "sys_variable_value", query: "document_key=<its step>", limit: 10 }
+                                                       all fields: the columns the tool writes
+
+the two writes — each its own "write approved"
+W1 About to add ATF test "c95-live-probe" on instance "<label>", after ensuring update set
+   <engagement>-c95 and pointing capture at it — write approved?
+   snow_us_active_update_set_ensure { name: "<engagement>-c95" }, snow_us_capture_target_set,
+   then snow_atf_atf_test_add { name: "c95-live-probe", description: "ARC-09-C95 live probe" }
+W2 About to add a Run Server Side Script step, with its script, to ATF test c95-live-probe on instance
+   "<label>" — write approved?
+   snow_atf_atf_step_add { test: <W1 sys_id>, step_config: "Run Server Side Script",
+     inputs: { <R3's script input>: <the three lines below> } }
+then snow_us_update_set_preview on the update set (a read)
+```
+
+The script for W2:
+
+```
+describe("c95 live probe", function () {
+  it("runs", function () { expect(true).toBe(true); });
+});
+```
+
+**Stop before W1** if R2 shows more than one config of that name (W2 then needs the sys_id), or if R3 or R4
+shows other column names, or a step whose inputs are not `sys_variable_value` rows. The tool is built on
+that shape, and it is reworked before anything is written.
+
+### Pass condition — the exact state to see
+
+- W1 returns no `warnings` and its `summary` says the test reads back as sent.
+- W2 returns no `warnings`:
+  - its `inputs` shows the script `created`;
+  - its `order` is 1;
+  - its `summary` says each input is attached once.
+- The preview lists the test and the step as `sys_update_xml` entries. Record whether the input row is an
+  entry of its own; the corpus does not say.
+
+If the inputs show `updated`, the insert created the row and the tool updated it rather than adding a
+second one. That is not a failure, but record it.
+
+### The failure shapes, and what each means for the fix
+
+- **`FIELD_NOT_STORED` on `inputs.<script>`:** the script is not attached as the tool assumes. The storage
+  shape is different, and R3/R4 say how.
+- **`VALUE_NOT_AS_SENT` or `VALUE_TRUNCATED` on `value`:** the instance changed or cut the script. Record the
+  offset and lengths, or the limit. A cut is a PN entry.
+- **`VALUE_NOT_AS_SENT` on `inputs.<script>`:** more than one row holds the script for the step. Record the
+  rows; the message names them.
+- **A refusal before W2 writes** (`NOT_FOUND`, `INVALID_REQUEST`, `SCRIPTING_NOT_ENABLED`): record the message.
+  Nothing was written by W2.
+
+### The evidence to record
+
+- R2's row count and `active`.
+- R3's column names and the script input's name.
+- R4's column names, without the values.
+- W1's and W2's `warnings` (or their absence), W2's `inputs[].written` and `order`, and both audit lines.
+- The preview's entries, by table.
+
+None of these is a secret, and the ids stay out of the record.
+
+### Teardown
+
+In this order, each with its own "write approved":
+1. `snow_core_record_remove` on the input row(s);
+2. on the step;
+3. on the test;
+4. then discard the update set.
+
+Whether removing a record removes what hangs off it is not in the corpus. A later remove that answers
+`NOT_FOUND` is that finding, the cascade, so record which one did.
+
+### Verdict
+
+Record **ARC-09-C95 live: CONFIRMED / FAILED** in `docs/validation/`, under the sitting's file, naming the
+failure shape and what R3/R4 showed.
