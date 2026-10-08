@@ -43,6 +43,9 @@ A test in no suite, or in several, is refused and nothing is created. The accoun
   verdict, a table, a citation or an open question. The run itself is not capped. A gateway Envelope for a
   named engagement, in any mode, is saved under `clients/<engagement>/envelopes/` and listed in the
   engagement's state file, and every later session in that engagement starts from it.
+- The nine specialist sub-agents no longer have a web fetch tool: they ground in the bundled ServiceNow
+  documentation. The Integration Specialist reads a counterparty's API documentation only when it is
+  supplied, as a file or as pasted text; given only a URL, it asks for the document.
 
 ### Added
 
